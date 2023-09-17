@@ -1,0 +1,7 @@
+# IDE-specific files.
+.idea
+.vscode
+settings.json
+
+# Local builds.
+Build

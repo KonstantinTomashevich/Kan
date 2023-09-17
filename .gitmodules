@@ -1,0 +1,3 @@
+[submodule "CMake/CMakeUnitFramework"]
+	path = CMake/CMakeUnitFramework
+	url = https://github.com/KonstantinTomashevich/CMakeUnitFramework
