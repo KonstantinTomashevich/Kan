@@ -1,0 +1,5 @@
+register_concrete (threading_sdl)
+concrete_include (PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+concrete_sources ("*.c")
+concrete_require (SCOPE PRIVATE ABSTRACT error THIRD_PARTY SDL3::SDL3)
+concrete_implements_abstract (threading)

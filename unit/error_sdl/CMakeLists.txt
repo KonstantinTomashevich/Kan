@@ -1,0 +1,5 @@
+register_concrete (error_sdl)
+concrete_include (PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+concrete_sources ("*.c")
+concrete_require (SCOPE PRIVATE ABSTRACT threading THIRD_PARTY debug_break SDL3::SDL3)
+concrete_implements_abstract (error)

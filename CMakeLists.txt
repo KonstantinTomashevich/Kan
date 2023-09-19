@@ -12,10 +12,13 @@ set (CMAKE_C_STANDARD 17)
 set (CMAKE_CXX_STANDARD 17)
 
 # Include CMake Unit Framework.
-include ("${CMAKE_CURRENT_SOURCE_DIR}/CMake/CMakeUnitFramework/CodeGeneration.cmake")
-include ("${CMAKE_CURRENT_SOURCE_DIR}/CMake/CMakeUnitFramework/Core.cmake")
-include ("${CMAKE_CURRENT_SOURCE_DIR}/CMake/CMakeUnitFramework/Product.cmake")
-include ("${CMAKE_CURRENT_SOURCE_DIR}/CMake/CMakeUnitFramework/Unit.cmake")
+include ("${CMAKE_CURRENT_SOURCE_DIR}/cmake/CMakeUnitFramework/CodeGeneration.cmake")
+include ("${CMAKE_CURRENT_SOURCE_DIR}/cmake/CMakeUnitFramework/Core.cmake")
+include ("${CMAKE_CURRENT_SOURCE_DIR}/cmake/CMakeUnitFramework/Product.cmake")
+include ("${CMAKE_CURRENT_SOURCE_DIR}/cmake/CMakeUnitFramework/Unit.cmake")
+
+# Configure CMake Unit Framework.
+set (UNIT_FRAMEWORK_API_CASE "mixed_snake_case")
 
 # Include Kan CMake extensions.
 # Nothing here for now.
@@ -23,7 +26,7 @@ include ("${CMAKE_CURRENT_SOURCE_DIR}/CMake/CMakeUnitFramework/Unit.cmake")
 # Must be called from root CMakeLists.txt, otherwise CTest configuration won't be placed into binary root.
 enable_testing ()
 
-add_subdirectory (ThirdParty)
-add_subdirectory (Unit)
-add_subdirectory (Test)
-add_subdirectory (Executable)
+add_subdirectory (third_party)
+add_subdirectory (unit)
+add_subdirectory (test)
+add_subdirectory (executable)
