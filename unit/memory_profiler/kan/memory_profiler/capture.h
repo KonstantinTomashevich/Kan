@@ -1,0 +1,129 @@
+#pragma once
+
+#include <memory_profiler_api.h>
+
+#include <stdint.h>
+
+#include <kan/api_common/bool.h>
+#include <kan/api_common/c_header.h>
+#include <kan/memory_profiler/allocation_group.h>
+
+/// \file
+/// \brief Provides low level utilities for capturing memory usage.
+///
+/// \par Memory events
+/// \parblock
+/// If there are any observers, every allocation group operation creates an event that can be later parsed by any
+/// observer. Events are automatically destroyed when every existing observer has read this event or if there are
+/// no existing observers.
+/// \endparblock
+///
+/// \par Captured groups
+/// \parblock
+/// Group capture feature creates snapshot of full allocation group tree at required moment and provides functions
+/// to traverse it and extract all required data.
+/// \endparblock
+///
+/// \par Capture context
+/// \parblock
+/// To correctly capture all data you need you must capture groups and create observer at the same time without
+/// interruptions, which is done through `kan_allocation_group_begin_capture`, that guarantees that this requirement
+/// will be met. After that, observer and captured group hierarchy can be managed separately and can be destroyed at
+/// any time.
+/// \endparblock
+
+KAN_C_HEADER_BEGIN
+
+/// \brief Enumerates types of profiled memory events.
+enum kan_allocation_group_event_type_t : uint8_t
+{
+    /// \brief New allocation group is created. Its name is stored in `name` field of `kan_allocation_group_event_t`.
+    KAN_ALLOCATION_GROUP_EVENT_NEW_GROUP = 0u,
+
+    /// \brief Memory allocated in allocation group. Size is stored in `amount` field of `kan_allocation_group_event_t`.
+    KAN_ALLOCATION_GROUP_EVENT_ALLOCATE,
+
+    /// \brief Memory freed from allocation group. Size is stored in `amount` field of `kan_allocation_group_event_t`.
+    KAN_ALLOCATION_GROUP_EVENT_FREE,
+
+    /// \brief Custom marker is reported for allocation group.
+    ///        Its name is stored in `name` field of `kan_allocation_group_event_t`.
+    KAN_ALLOCATION_GROUP_EVENT_MARKER,
+};
+
+/// \brief Describes allocation group event.
+struct kan_allocation_group_event_t
+{
+    /// \brief Type of event that occurred.
+    enum kan_allocation_group_event_type_t type;
+
+    /// \brief Related allocation group.
+    kan_allocation_group_t group;
+    union
+    {
+        uint64_t amount;
+
+        char *name;
+    };
+};
+
+typedef uint64_t kan_captured_allocation_group_t;
+
+/// \brief Returns name of given captured allocation group.
+MEMORY_PROFILER_API const char *kan_captured_allocation_group_get_name (kan_captured_allocation_group_t group);
+
+/// \brief Returns allocation group from which given allocation group was captured.
+MEMORY_PROFILER_API kan_allocation_group_t
+kan_captured_allocation_group_get_source (kan_captured_allocation_group_t group);
+
+/// \brief Returns amount of memory inside captured allocation group including its children.
+MEMORY_PROFILER_API uint64_t kan_captured_allocation_group_get_total_allocated (kan_captured_allocation_group_t group);
+
+/// \brief Returns amount of memory inside captured allocation group excluding its children.
+MEMORY_PROFILER_API uint64_t
+kan_captured_allocation_group_get_directly_allocated (kan_captured_allocation_group_t group);
+
+typedef uint64_t kan_captured_allocation_group_iterator_t;
+
+/// \brief Returns iterator that points to first captured allocation group child if any.
+MEMORY_PROFILER_API kan_captured_allocation_group_iterator_t
+kan_captured_allocation_group_children_begin (kan_captured_allocation_group_t group);
+
+/// \brief Moves given captured allocation group iterator to the next child.
+MEMORY_PROFILER_API kan_captured_allocation_group_iterator_t
+kan_captured_allocation_group_children_next (kan_captured_allocation_group_iterator_t current);
+
+/// \brief Returns captured allocation group to which given iterator points.
+MEMORY_PROFILER_API kan_captured_allocation_group_t
+kan_captured_allocation_group_children_get (kan_captured_allocation_group_iterator_t current);
+
+/// \brief Returns iterator that points to the end of captured allocation group children.
+MEMORY_PROFILER_API kan_captured_allocation_group_iterator_t
+kan_captured_allocation_group_children_end (kan_captured_allocation_group_t group);
+
+/// \brief Destroys captured allocation group and all its children. Should only be called on captured root!
+MEMORY_PROFILER_API void kan_captured_allocation_group_destroy (kan_captured_allocation_group_t group);
+
+typedef uint64_t kan_allocation_group_observer_t;
+
+/// \brief Returns memory event to which observer is pointing right now.
+MEMORY_PROFILER_API const struct kan_allocation_group_event_t *kan_allocation_group_observer_get_current_event (
+    kan_allocation_group_observer_t observer);
+
+/// \brief Moves observer to the next event. Returns false if there are no new events.
+MEMORY_PROFILER_API kan_bool_t kan_allocation_group_observer_next (kan_allocation_group_observer_t observer);
+
+/// \brief Destroys given memory event observer.
+MEMORY_PROFILER_API void kan_allocation_group_observer_destroy (kan_allocation_group_observer_t observer);
+
+/// \brief Contains result of `kan_allocation_group_begin_capture`.
+struct kan_allocation_group_capture_t
+{
+    kan_captured_allocation_group_t captured_root;
+    kan_allocation_group_observer_t observer;
+};
+
+/// \brief Begins memory usage capture by snapshotting allocation groups and creating memory event observer.
+MEMORY_PROFILER_API struct kan_allocation_group_capture_t kan_allocation_group_begin_capture ();
+
+KAN_C_HEADER_END

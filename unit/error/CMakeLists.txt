@@ -7,3 +7,4 @@ if (KAN_ASSERT_ENABLED)
     abstract_compile_definitions (KAN_WITH_ASSERT)
 endif ()
 
+abstract_register_implementation (NAME sdl PARTS error_sdl)

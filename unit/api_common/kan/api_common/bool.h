@@ -1,5 +1,7 @@
 #pragma once
 
+#include <stdint.h>
+
 #include <kan/api_common/c_header.h>
 
 /// \file

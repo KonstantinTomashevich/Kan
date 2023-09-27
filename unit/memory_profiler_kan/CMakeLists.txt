@@ -1,0 +1,5 @@
+register_concrete (memory_profiler_kan)
+concrete_include (PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+concrete_sources ("*.c")
+concrete_require (SCOPE PRIVATE ABSTRACT error memory threading)
+concrete_implements_abstract (memory_profiler)
