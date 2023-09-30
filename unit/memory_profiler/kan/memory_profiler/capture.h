@@ -13,9 +13,9 @@
 ///
 /// \par Memory events
 /// \parblock
-/// If there are any observers, every allocation group operation creates an event that can be later parsed by any
-/// observer. Events are automatically destroyed when every existing observer has read this event or if there are
-/// no existing observers.
+/// If there are any memory event iterators, every allocation group operation creates an event that can be later parsed
+/// by any event iterator. Events are automatically destroyed when every existing event iterator has read this event or
+/// if there are no existing event iterators.
 /// \endparblock
 ///
 /// \par Captured groups
@@ -26,10 +26,10 @@
 ///
 /// \par Capture context
 /// \parblock
-/// To correctly capture all data you need you must capture groups and create observer at the same time without
+/// To correctly capture all data you need you must capture groups and create event iterator at the same time without
 /// interruptions, which is done through `kan_allocation_group_begin_capture`, that guarantees that this requirement
-/// will be met. After that, observer and captured group hierarchy can be managed separately and can be destroyed at
-/// any time.
+/// will be met. After that, event iterator and captured group hierarchy can be managed separately and can be destroyed
+/// at any time.
 /// \endparblock
 
 KAN_C_HEADER_BEGIN
@@ -104,26 +104,28 @@ kan_captured_allocation_group_children_end (kan_captured_allocation_group_t grou
 /// \brief Destroys captured allocation group and all its children. Should only be called on captured root!
 MEMORY_PROFILER_API void kan_captured_allocation_group_destroy (kan_captured_allocation_group_t group);
 
-typedef uint64_t kan_allocation_group_observer_t;
+typedef uint64_t kan_allocation_group_event_iterator_t;
 
-/// \brief Returns memory event to which observer is pointing right now.
-MEMORY_PROFILER_API const struct kan_allocation_group_event_t *kan_allocation_group_observer_get_current_event (
-    kan_allocation_group_observer_t observer);
+/// \brief Returns memory event to which iterator is pointing right now
+///        or `NULL` if iterator has reached end of events queue.
+MEMORY_PROFILER_API const struct kan_allocation_group_event_t *kan_allocation_group_event_iterator_get (
+    kan_allocation_group_event_iterator_t iterator);
 
-/// \brief Moves observer to the next event. Returns false if there are no new events.
-MEMORY_PROFILER_API kan_bool_t kan_allocation_group_observer_next (kan_allocation_group_observer_t observer);
+/// \brief Moves iterator to the next event and returns new iterator value.
+MEMORY_PROFILER_API kan_allocation_group_event_iterator_t
+kan_allocation_group_event_iterator_advance (kan_allocation_group_event_iterator_t iterator);
 
-/// \brief Destroys given memory event observer.
-MEMORY_PROFILER_API void kan_allocation_group_observer_destroy (kan_allocation_group_observer_t observer);
+/// \brief Destroys given memory event iterator.
+MEMORY_PROFILER_API void kan_allocation_group_event_iterator_destroy (kan_allocation_group_event_iterator_t iterator);
 
 /// \brief Contains result of `kan_allocation_group_begin_capture`.
 struct kan_allocation_group_capture_t
 {
     kan_captured_allocation_group_t captured_root;
-    kan_allocation_group_observer_t observer;
+    kan_allocation_group_event_iterator_t event_iterator;
 };
 
-/// \brief Begins memory usage capture by snapshotting allocation groups and creating memory event observer.
+/// \brief Begins memory usage capture by snapshotting allocation groups and creating memory event iterator.
 MEMORY_PROFILER_API struct kan_allocation_group_capture_t kan_allocation_group_begin_capture ();
 
 KAN_C_HEADER_END
