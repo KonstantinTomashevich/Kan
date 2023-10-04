@@ -2,7 +2,10 @@
 
 #include <debugbreak.h>
 
+#include <kan/api_common/mute_third_party_warnings.h>
+KAN_MUTE_THIRD_PARTY_WARNINGS_BEGIN
 #include <SDL_messagebox.h>
+KAN_MUTE_THIRD_PARTY_WARNINGS_END
 
 #include <kan/error/critical.h>
 #include <kan/log/logging.h>

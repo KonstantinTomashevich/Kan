@@ -1,3 +1,5 @@
+#include <stddef.h>
+
 #include <kan/container/event_queue.h>
 
 void kan_event_queue_init (struct kan_event_queue_t *queue, struct kan_event_queue_node_t *next_placeholder)

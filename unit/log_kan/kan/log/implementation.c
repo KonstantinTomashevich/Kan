@@ -1,7 +1,9 @@
 #define _CRT_SECURE_NO_WARNINGS
 
+#define __STDC_WANT_LIB_EXT1__
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
 
 #include <kan/api_common/bool.h>
 #include <kan/container/dynamic_array.h>
@@ -218,7 +220,11 @@ void kan_log_default_callback (kan_log_category_t category,
 {
     char date_time_string[18u];
     struct tm local_time;
+#if defined(WIN32)
     localtime_s (&local_time, &time.tv_sec);
+#else
+    localtime_r (&time.tv_sec, &local_time);
+#endif
     strftime (date_time_string, 18u, "%D %T", &local_time);
 
     switch (verbosity)

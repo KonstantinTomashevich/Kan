@@ -1,3 +1,5 @@
+#include <stddef.h>
+
 #include <kan/memory_profiler/capture.h>
 
 const char *kan_captured_allocation_group_get_name (kan_captured_allocation_group_t group)

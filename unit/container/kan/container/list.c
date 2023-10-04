@@ -1,3 +1,5 @@
+#include <stddef.h>
+
 #include <kan/container/list.h>
 
 void kan_bd_list_init (struct kan_bd_list_t *list)

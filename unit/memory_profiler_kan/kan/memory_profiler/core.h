@@ -22,7 +22,7 @@ struct allocation_group_t
 
 _Static_assert (sizeof (kan_allocation_group_t) >= sizeof (uintptr_t), "Allocation group handle can fit pointer.");
 
-inline struct allocation_group_t *retrieve_allocation_group (kan_allocation_group_t group)
+static inline struct allocation_group_t *retrieve_allocation_group (kan_allocation_group_t group)
 {
     return (struct allocation_group_t *) group;
 }

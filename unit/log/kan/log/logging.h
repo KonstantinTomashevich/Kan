@@ -37,7 +37,7 @@
 KAN_C_HEADER_BEGIN
 
 /// \brief Lists supported log verbosity values.
-enum kan_log_verbosity_t : uint8_t
+enum kan_log_verbosity_t
 {
     KAN_LOG_VERBOSE = 0u,
     KAN_LOG_DEBUG,

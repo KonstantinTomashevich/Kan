@@ -1,3 +1,5 @@
+#include <stddef.h>
+
 #include <kan/container/hash_storage.h>
 #include <kan/memory/allocation.h>
 

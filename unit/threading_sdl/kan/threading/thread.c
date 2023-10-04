@@ -35,7 +35,7 @@ kan_thread_handle_t kan_current_thread ()
     return (kan_thread_handle_t) SDL_ThreadID ();
 }
 
-const char *kan_current_thread_set_priority (enum kan_thread_priority priority)
+const char *kan_current_thread_set_priority (enum kan_thread_priority_t priority)
 {
     switch (priority)
     {

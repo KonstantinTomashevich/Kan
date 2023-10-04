@@ -1,3 +1,5 @@
+#include <stddef.h>
+
 #include <kan/error/critical.h>
 #include <kan/memory/allocation.h>
 #include <kan/memory_profiler/capture.h>

@@ -35,7 +35,7 @@
 KAN_C_HEADER_BEGIN
 
 /// \brief Enumerates types of profiled memory events.
-enum kan_allocation_group_event_type_t : uint8_t
+enum kan_allocation_group_event_type_t
 {
     /// \brief New allocation group is created. Its name is stored in `name` field of `kan_allocation_group_event_t`.
     KAN_ALLOCATION_GROUP_EVENT_NEW_GROUP = 0u,

@@ -22,7 +22,7 @@ typedef void *kan_thread_user_data_t;
 typedef kan_thread_result_t (*kan_thread_function_t) (kan_thread_user_data_t);
 
 /// \brief Enumerates supported thread execution priorities.
-enum kan_thread_priority : uint8_t
+enum kan_thread_priority_t
 {
     KAN_THREAD_PRIORITY_LOW = 0,
     KAN_THREAD_PRIORITY_NORMAL,
@@ -46,6 +46,6 @@ THREADING_API const char *kan_thread_get_name (kan_thread_handle_t handle);
 THREADING_API kan_thread_handle_t kan_current_thread ();
 
 /// \brief Sets priority of the invoking thread.
-THREADING_API const char *kan_current_thread_set_priority (enum kan_thread_priority priority);
+THREADING_API const char *kan_current_thread_set_priority (enum kan_thread_priority_t priority);
 
 KAN_C_HEADER_END
