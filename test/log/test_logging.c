@@ -25,7 +25,7 @@ static void test_callback (kan_log_category_t category,
     ++callback_calls;
     callback_category = category;
     callback_verbosity = verbosity;
-    strncpy (callback_message, message, BUFFER_SIZE);
+    strncpy (callback_message, message, BUFFER_SIZE - 1u);
     callback_user_data = user_data;
 }
 
