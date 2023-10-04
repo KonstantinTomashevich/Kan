@@ -1,6 +1,9 @@
 # Path to test runner template file.
 set (KAN_TEST_RUNNER_TEMPLATE "${CMAKE_SOURCE_DIR}/cmake/kan/test_runner.c")
 
+# Setup target to build all tests.
+add_custom_target (test_kan COMMENT "All tests must be dependencies of this target.")
+
 # Setups CTest test runners by scanning test unit sources and generating simple runner executables.
 # Arguments:
 # - TEST_UNIT: name of the unit that contains tests to be executed. Sources are scanned for KAN_TEST_CASE macro.
@@ -40,6 +43,7 @@ function (kan_setup_tests)
                         NAME "${SETUP_TEST_SHARED_LIBRARY}_case_${TEST_NAME}"
                         COMMAND "${TEST_RUNNER_TARGET}"
                         WORKING_DIRECTORY "${TEST_WORKSPACE}")
+                add_dependencies (test_kan "${TEST_RUNNER_TARGET}")
             endif ()
         endforeach ()
     endforeach ()

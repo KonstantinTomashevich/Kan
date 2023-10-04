@@ -78,10 +78,14 @@ jobs:
           echo "CXX=clang" >> $Env:GITHUB_ENV
           echo "CMAKE_GENERATOR=`"Ninja Multi-Config`"" >> $Env:GITHUB_ENV
 
-      - name: Build and test
+      - name: Configure
         working-directory: ${{env.BUILD_DIRECTORY}}
-        run: >
-          ctest 
-          --build-and-test ${{github.workspace}} . 
-          --build-generator ${{env.CMAKE_GENERATOR}} 
-          --build-options -DCMAKE_BUILD_TYPE=${{matrix.build_type}}
+        run: cmake ${{github.workspace}} -G ${{env.CMAKE_GENERATOR}} -DCMAKE_BUILD_TYPE=${{matrix.build_type}}
+
+      - name: Build
+        working-directory: ${{env.BUILD_DIRECTORY}}
+        run: cmake --build . --target test_kan --config ${{matrix.build_type}} -j 2
+
+      - name: Test
+        working-directory: ${{env.BUILD_DIRECTORY}}
+        run: ctest --build-config ${{matrix.build_type}}
