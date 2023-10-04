@@ -13,7 +13,7 @@ foreach (IMPLEMENTATION ${MEMORY_PROFILER_IMPLEMENTATIONS})
 
     shared_library_include (
             SCOPE PUBLIC
-            ABSTRACT error=sdl memory=kan memory_profiler=${IMPLEMENTATION} threading=sdl
+            ABSTRACT error=sdl hash=djb2 log=kan memory=kan memory_profiler=${IMPLEMENTATION} threading=sdl
             CONCRETE container testing test_memory_profiler)
 
     shared_library_verify ()

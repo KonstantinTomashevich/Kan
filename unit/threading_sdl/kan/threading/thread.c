@@ -1,6 +1,7 @@
 #include <SDL_thread.h>
 
 #include <kan/error/critical.h>
+#include <kan/log/logging.h>
 #include <kan/threading/thread.h>
 
 kan_thread_handle_t kan_thread_create (const char *name, kan_thread_function_t function, void *data)
@@ -8,7 +9,7 @@ kan_thread_handle_t kan_thread_create (const char *name, kan_thread_function_t f
     void *handle = SDL_CreateThread (function, name, data);
     if (!handle)
     {
-        // TODO: Log SDL error.
+        KAN_LOG (threading, KAN_LOG_ERROR, "Failed to create thread: %s.", SDL_GetError ())
         return KAN_INVALID_THREAD_HANDLE;
     }
 

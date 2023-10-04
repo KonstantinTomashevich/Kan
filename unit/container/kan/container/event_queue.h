@@ -90,7 +90,7 @@
 ///
 /// \par Thread safety
 /// \parblock
-/// This event queue implementation is not thread safe.ob
+/// This event queue implementation is not thread safe.
 /// \endparblock
 
 KAN_C_HEADER_BEGIN
