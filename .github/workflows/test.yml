@@ -16,6 +16,10 @@ jobs:
         os: [ windows-2022, ubuntu-22.04, macos-12 ]
         # Native toolchain is native compiler for the platform: MSVC for Windows, GCC for Ubuntu and macOS.
         toolchain: [ clang, native ]
+        exclude:
+          # Exclude GCC builds on macOS as SDL is incorrectly configured there.
+          - os: macos-12
+            toolchain: native
 
     defaults:
       run:
