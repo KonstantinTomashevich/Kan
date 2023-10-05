@@ -1,0 +1,50 @@
+name: format
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  check_format:
+    strategy:
+      matrix:
+        os: [ ubuntu-22.04]
+    defaults:
+      run:
+        shell: pwsh
+
+    env:
+      BUILD_DIRECTORY: ${{github.workspace}}/build
+
+    runs-on: ${{matrix.os}}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Ninja (Ubuntu)
+        if: matrix.os == 'ubuntu-22.04'
+        run: sudo apt-get update && sudo apt-get install ninja-build
+
+      - name: Create build directory
+        run: cmake -E make_directory ${{env.BUILD_DIRECTORY}}
+
+      - name: Ubuntu - Select clang toolset
+        if: matrix.os == 'ubuntu-22.04' && matrix.toolchain == 'clang'
+        run: |
+          echo "CC=clang" >> $Env:GITHUB_ENV
+          echo "CXX=clang" >> $Env:GITHUB_ENV
+          echo "CMAKE_GENERATOR=`"Ninja Multi-Config`"" >> $Env:GITHUB_ENV
+
+      - name: Configure
+        working-directory: ${{env.BUILD_DIRECTORY}}
+        run: cmake ${{github.workspace}} -G ${{env.CMAKE_GENERATOR}}
+
+      - name: Check
+        working-directory: ${{env.BUILD_DIRECTORY}}
+        run: cmake --build . --target kan_clang_format_check
