@@ -59,3 +59,34 @@ const char *kan_current_thread_set_priority (enum kan_thread_priority_t priority
     KAN_ASSERT (KAN_FALSE)
     return NULL;
 }
+
+_Static_assert (sizeof (kan_thread_local_storage_t) >= sizeof (SDL_TLSID),
+                "kan_thread_local_storage_t is able to hold SDL TLS id.");
+
+THREADING_API kan_thread_local_storage_t kan_thread_local_storage_create ()
+{
+    SDL_TLSID tls = SDL_CreateTLS ();
+    if (tls == 0u)
+    {
+        KAN_LOG (threading, KAN_LOG_ERROR, "Failed to create TLS: %s.", SDL_GetError ())
+        return KAN_INVALID_THREAD_HANDLE;
+    }
+
+    KAN_ASSERT (tls != KAN_THREAD_LOCAL_STORAGE_INVALID)
+    return (kan_thread_local_storage_t) tls;
+}
+
+THREADING_API void kan_thread_local_storage_set (kan_thread_local_storage_t storage,
+                                                 void *value,
+                                                 kan_thread_local_storage_destructor_t destructor)
+{
+    if (SDL_SetTLS ((SDL_TLSID) storage, value, destructor) != 0)
+    {
+        KAN_LOG (threading, KAN_LOG_ERROR, "Failed to set TLS: %s.", SDL_GetError ())
+    }
+}
+
+THREADING_API void *kan_thread_local_storage_get (kan_thread_local_storage_t storage)
+{
+    return SDL_GetTLS ((SDL_TLSID) storage);
+}

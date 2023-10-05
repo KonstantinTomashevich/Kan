@@ -3,8 +3,11 @@
 #include <string.h>
 
 #include <kan/error/critical.h>
+#include <kan/memory/allocation.h>
 #include <kan/memory_profiler/allocation_group.h>
 #include <kan/memory_profiler/core.h>
+#include <kan/threading/atomic.h>
+#include <kan/threading/thread.h>
 
 kan_allocation_group_t kan_allocation_group_root ()
 {
@@ -86,28 +89,70 @@ void kan_allocation_group_marker (kan_allocation_group_t group, const char *name
 
 #define KAN_ALLOCATION_GROUP_STACK_SIZE 32u
 
-static _Thread_local uint64_t stack_size = 0u;
-static _Thread_local kan_allocation_group_t stack[KAN_ALLOCATION_GROUP_STACK_SIZE];
+static struct kan_atomic_int_t thread_local_storage_initialization_lock;
+static kan_thread_local_storage_t thread_local_storage = KAN_THREAD_LOCAL_STORAGE_INVALID;
+
+struct thread_local_storage_stack_t
+{
+    uint64_t stack_size;
+    kan_allocation_group_t stack[KAN_ALLOCATION_GROUP_STACK_SIZE];
+};
+
+static struct thread_local_storage_stack_t *allocate_thread_local_storage_stack ()
+{
+    struct thread_local_storage_stack_t *storage =
+        (struct thread_local_storage_stack_t *) kan_allocate_general_no_profiling (
+            sizeof (struct thread_local_storage_stack_t), _Alignof (struct thread_local_storage_stack_t));
+
+    storage->stack_size = 0u;
+    return storage;
+}
+
+static void free_thread_local_storage_stack (void *memory)
+{
+    kan_free_general_no_profiling (memory);
+}
+
+static struct thread_local_storage_stack_t *ensure_thread_local_storage ()
+{
+    if (thread_local_storage == KAN_THREAD_LOCAL_STORAGE_INVALID)
+    {
+        kan_atomic_int_lock (&thread_local_storage_initialization_lock);
+        if (thread_local_storage == KAN_THREAD_LOCAL_STORAGE_INVALID)
+        {
+            thread_local_storage = kan_thread_local_storage_create ();
+            kan_thread_local_storage_set (thread_local_storage, allocate_thread_local_storage_stack (),
+                                          free_thread_local_storage_stack);
+        }
+
+        kan_atomic_int_unlock (&thread_local_storage_initialization_lock);
+    }
+
+    return kan_thread_local_storage_get (thread_local_storage);
+}
 
 kan_allocation_group_t kan_allocation_group_stack_get ()
 {
-    if (stack_size == 0u)
+    struct thread_local_storage_stack_t *storage = ensure_thread_local_storage ();
+    if (storage->stack_size == 0u)
     {
         return kan_allocation_group_root ();
     }
 
-    return stack[stack_size - 1u];
+    return storage->stack[storage->stack_size - 1u];
 }
 
 void kan_allocation_group_stack_push (kan_allocation_group_t group)
 {
-    KAN_ASSERT (stack_size < KAN_ALLOCATION_GROUP_STACK_SIZE)
-    stack[stack_size] = group;
-    ++stack_size;
+    struct thread_local_storage_stack_t *storage = ensure_thread_local_storage ();
+    KAN_ASSERT (storage->stack_size < KAN_ALLOCATION_GROUP_STACK_SIZE)
+    storage->stack[storage->stack_size] = group;
+    ++storage->stack_size;
 }
 
 void kan_allocation_group_stack_pop ()
 {
-    KAN_ASSERT (stack_size > 0)
-    --stack_size;
+    struct thread_local_storage_stack_t *storage = ensure_thread_local_storage ();
+    KAN_ASSERT (storage->stack_size > 0)
+    --storage->stack_size;
 }
