@@ -61,7 +61,9 @@ typedef void (*kan_thread_local_storage_destructor_t) (void *);
 THREADING_API kan_thread_local_storage_t kan_thread_local_storage_create ();
 
 /// \brief Sets value of thread local storage slot for current thread only. Destructor is executed on thread exit.
-THREADING_API void kan_thread_local_storage_set (kan_thread_local_storage_t storage, void *value, kan_thread_local_storage_destructor_t destructor);
+THREADING_API void kan_thread_local_storage_set (kan_thread_local_storage_t storage,
+                                                 void *value,
+                                                 kan_thread_local_storage_destructor_t destructor);
 
 /// \brief Returns value of thread local storage slot for current thread.
 THREADING_API void *kan_thread_local_storage_get (kan_thread_local_storage_t storage);

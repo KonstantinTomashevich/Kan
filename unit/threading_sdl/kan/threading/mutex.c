@@ -1,14 +1,14 @@
 #include <SDL_mutex.h>
 
-#include <kan/threading/mutex.h>
 #include <kan/log/logging.h>
+#include <kan/threading/mutex.h>
 
 kan_mutex_handle_t kan_mutex_create ()
 {
     void *sdl_handle = SDL_CreateMutex ();
     if (!sdl_handle)
     {
-        KAN_LOG (threading, KAN_LOG_ERROR, "Failed to create mutex: %s.", SDL_GetError())
+        KAN_LOG (threading, KAN_LOG_ERROR, "Failed to create mutex: %s.", SDL_GetError ())
         return KAN_INVALID_MUTEX_HANDLE;
     }
 

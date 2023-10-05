@@ -9,9 +9,7 @@ void kan_bd_list_init (struct kan_bd_list_t *list)
     list->last = NULL;
 }
 
-void kan_bd_list_add (struct kan_bd_list_t *list,
-                      struct kan_bd_list_node_t *before,
-                      struct kan_bd_list_node_t *node)
+void kan_bd_list_add (struct kan_bd_list_t *list, struct kan_bd_list_node_t *before, struct kan_bd_list_node_t *node)
 {
     ++list->size;
     node->next = before;
