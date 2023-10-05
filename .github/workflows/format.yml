@@ -24,15 +24,13 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Install Ninja (Ubuntu)
-        if: matrix.os == 'ubuntu-22.04'
+      - name: Install Ninja
         run: sudo apt-get update && sudo apt-get install ninja-build
 
       - name: Create build directory
         run: cmake -E make_directory ${{env.BUILD_DIRECTORY}}
 
-      - name: Ubuntu - Select clang toolset
-        if: matrix.os == 'ubuntu-22.04' && matrix.toolchain == 'clang'
+      - name: Select clang toolset
         run: |
           echo "CC=clang" >> $Env:GITHUB_ENV
           echo "CXX=clang" >> $Env:GITHUB_ENV
