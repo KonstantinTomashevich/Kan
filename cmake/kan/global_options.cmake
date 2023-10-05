@@ -18,7 +18,21 @@ function (add_common_compile_options)
     endif ()
 
     if (KAN_TREAT_WARNINGS_AS_ERRORS)
-        if (MSVC)
+        if ("${CMAKE_CXX_COMPILER_ID}" MATCHES "^.*Clang$")
+            if (MSVC)
+                add_compile_options (/W4 /WX)
+            else ()
+                add_compile_options (-pedantic)
+            endif ()
+
+            add_compile_options (
+                    # We silence unused parameter warnings, because it is troublesome
+                    # to silence them manually for every compiler.
+                    -Wno-unused-parameter
+                    # Zero length arrays greatly increase readability for classes and structs with dynamic sizes.
+                    -Wno-zero-length-array)
+
+        elseif (MSVC)
             add_compile_options (
                     /W4
                     /WX
@@ -30,26 +44,15 @@ function (add_common_compile_options)
                     # Currently we're okay with assignments on conditional expressions.
                     /wd4706)
         else ()
-            add_compile_options (-Wall -Wextra -Werror)
-
-            if ("${CMAKE_CXX_COMPILER_ID}" MATCHES "^.*Clang$")
-                # Exceptions in CLang format. Also, pedantic is enabled only on CLang,
-                # because there is no pedantic exceptions on GCC.
-                add_compile_options (
-                        -pedantic
-                        # We silence unused parameter warnings, because it is troublesome
-                        # to silence them manually for every compiler.
-                        -Wno-unused-parameter
-                        # Zero length arrays greatly increase readability for classes and structs with dynamic sizes.
-                        -Wno-zero-length-array)
-            else ()
-                add_compile_options (
-                        # We silence unused parameter warnings, because it is troublesome
-                        # to silence them manually for every compiler.
-                        -Wno-unused-parameter
-                        # Zero length arrays greatly increase readability for classes and structs with dynamic sizes.
-                        -Wno-zero-length-array)
-            endif ()
+            add_compile_options (
+                    -Wall
+                    -Wextra
+                    -Werror
+                    # We silence unused parameter warnings, because it is troublesome
+                    # to silence them manually for every compiler.
+                    -Wno-unused-parameter
+                    # Zero length arrays greatly increase readability for classes and structs with dynamic sizes.
+                    -Wno-zero-length-array)
         endif ()
     endif ()
 endfunction ()
