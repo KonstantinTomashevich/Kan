@@ -80,6 +80,7 @@ CONTAINER_API void kan_dynamic_array_remove_at (struct kan_dynamic_array_t *arra
 CONTAINER_API void kan_dynamic_array_remove_swap_at (struct kan_dynamic_array_t *array, uint64_t index);
 
 /// \brief Sets new array capacity and moves all items to new data storage.
+/// \invariant Capacity should not be zero.
 CONTAINER_API void kan_dynamic_array_set_capacity (struct kan_dynamic_array_t *array, uint64_t new_capacity);
 
 /// \brief Resets array size to zero.

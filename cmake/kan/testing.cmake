@@ -1,3 +1,5 @@
+# Declares function for automatic test extraction into separate executables and their registration inside CTest.
+
 # Path to test runner template file.
 set (KAN_TEST_RUNNER_TEMPLATE "${CMAKE_SOURCE_DIR}/cmake/kan/test_runner.c")
 

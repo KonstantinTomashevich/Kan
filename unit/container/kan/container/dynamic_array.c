@@ -84,6 +84,7 @@ void kan_dynamic_array_remove_swap_at (struct kan_dynamic_array_t *array, uint64
 void kan_dynamic_array_set_capacity (struct kan_dynamic_array_t *array, uint64_t new_capacity)
 {
     KAN_ASSERT (new_capacity <= array->size)
+    KAN_ASSERT (new_capacity > 0u)
     uint8_t *new_data = (uint8_t *) kan_allocate_general (array->allocation_group, new_capacity * array->item_size,
                                                           array->item_alignment);
 

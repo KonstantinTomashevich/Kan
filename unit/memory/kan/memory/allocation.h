@@ -36,7 +36,7 @@
 /// \parblock
 /// - General allocation is always thread safe.
 /// - Batched allocation is always thread safe.
-/// - Stack allocation is thread safe only when different threads use different instance.
+/// - Stack allocation is thread safe only when different threads use different instances.
 /// \endparblock
 
 KAN_C_HEADER_BEGIN

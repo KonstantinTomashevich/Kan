@@ -72,7 +72,7 @@
 /// After execution of `kan_event_queue_iterator_advance` and `kan_event_queue_iterator_destroy`, event queue should
 /// clean oldest event nodes that are no longer used and won't event be used again. It should be done like that:
 ///
-/// ```@c
+/// ```c
 /// struct memory_event_node_t *node;
 /// while ((node = (struct memory_event_node_t *) kan_event_queue_clean_oldest (&event_queue)))
 /// {

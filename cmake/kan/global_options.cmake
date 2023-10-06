@@ -1,4 +1,4 @@
-# Declares global build options for Emergence project and applies their values.
+# Declares global build options for Kan project and applies their values.
 
 include_guard (GLOBAL)
 
@@ -6,7 +6,7 @@ option (KAN_ENABLE_COVERAGE "Add compile and link time flags, that enable code c
 option (KAN_TREAT_WARNINGS_AS_ERRORS "Enables \"treat warnings as errors\" compiler policy for all targets." ON)
 
 # We can not add common compile options here, because they would affect third party libraries compilation.
-# Therefore every Emergence root source directory must call this function to setup compile options locally.
+# Therefore every Kan root source directory must call this function to setup compile options locally.
 function (add_common_compile_options)
     if (KAN_ENABLE_COVERAGE)
         if ("${CMAKE_CXX_COMPILER_ID}" MATCHES "^.*Clang$")
