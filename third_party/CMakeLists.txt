@@ -6,3 +6,6 @@ target_include_directories (debug_break INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/d
 set (SDL_SHARED ON CACHE BOOL "We use double-set with cache to override third party project options for good.")
 set (SDL_SHARED ON)
 add_subdirectory (SDL)
+
+# Tracy
+add_subdirectory (tracy)

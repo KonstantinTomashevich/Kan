@@ -1,0 +1,5 @@
+register_concrete (cpu_profiler_tracy)
+concrete_include (PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+concrete_sources ("*.c")
+concrete_require (SCOPE PRIVATE THIRD_PARTY Tracy::TracyClient)
+concrete_implements_abstract (cpu_profiler)

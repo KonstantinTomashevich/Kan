@@ -8,7 +8,7 @@ project (
     LANGUAGES C CXX)
 
 # 17th standard seems to be the best bet for both usability and compiler support.
-set (CMAKE_C_STANDARD 17)
+set (CMAKE_C_STANDARD 11)
 set (CMAKE_CXX_STANDARD 17)
 
 # Include CMake Unit Framework.
@@ -21,7 +21,9 @@ include ("${CMAKE_CURRENT_SOURCE_DIR}/cmake/CMakeUnitFramework/Unit.cmake")
 set (UNIT_FRAMEWORK_API_CASE "mixed_snake_case")
 
 # Include Kan CMake extensions.
-# Nothing here for now.
+include ("${CMAKE_CURRENT_SOURCE_DIR}/cmake/kan/clang_format.cmake")
+include ("${CMAKE_CURRENT_SOURCE_DIR}/cmake/kan/global_options.cmake")
+include ("${CMAKE_CURRENT_SOURCE_DIR}/cmake/kan/testing.cmake")
 
 # Must be called from root CMakeLists.txt, otherwise CTest configuration won't be placed into binary root.
 enable_testing ()

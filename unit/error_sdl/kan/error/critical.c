@@ -2,10 +2,16 @@
 
 #include <debugbreak.h>
 
+#include <kan/api_common/mute_third_party_warnings.h>
+KAN_MUTE_THIRD_PARTY_WARNINGS_BEGIN
 #include <SDL_messagebox.h>
+KAN_MUTE_THIRD_PARTY_WARNINGS_END
 
 #include <kan/error/critical.h>
+#include <kan/log/logging.h>
 #include <kan/threading/mutex.h>
+
+KAN_LOG_DEFINE_CATEGORY (error);
 
 struct critical_error_context_t
 {
@@ -35,8 +41,9 @@ void kan_set_critical_error_interactive (kan_bool_t is_interactive)
 void kan_critical_error (const char *message, const char *file, int line)
 {
     kan_critical_error_context_ensure ();
+    KAN_LOG (error, KAN_LOG_CRITICAL_ERROR, "Critical error: \"%s\". File: \"%s\". Line: \"%d\".", message, file, line)
+    // TODO: Perhaps add stacktrace in future.
 
-    // TODO: Log critical error.
     if (critical_error_context.is_interactive)
     {
         kan_mutex_lock (critical_error_context.interactive_mutex);
@@ -55,10 +62,9 @@ void kan_critical_error (const char *message, const char *file, int line)
             {SDL_MESSAGEBOX_BUTTON_RETURNKEY_DEFAULT | SDL_MESSAGEBOX_BUTTON_ESCAPEKEY_DEFAULT, BUTTON_SKIP, "Skip"},
         };
 
-        // TODO: Form assert text using container library.
-        const char *box_message = message;
-
-        // TODO: Stacktrace if possible?
+        char box_message[KAN_ERROR_INTERACTIVE_CRITICAL_MESSAGE_MAX_LENGTH];
+        snprintf (box_message, KAN_ERROR_INTERACTIVE_CRITICAL_MESSAGE_MAX_LENGTH,
+                  "Critical error: \"%s\". File: \"%s\". Line: \"%d\".", message, file, line);
 
         const SDL_MessageBoxData message_box_data = {
             SDL_MESSAGEBOX_ERROR, NULL, "Assert failed!", box_message, SDL_arraysize (buttons), buttons, NULL};
@@ -69,7 +75,8 @@ void kan_critical_error (const char *message, const char *file, int line)
 
         if (message_box_return_code < 0)
         {
-            // TODO: Log SDL error.
+            KAN_LOG (testing, KAN_LOG_CRITICAL_ERROR, "Failed to create interactive assert message box: %s.",
+                     SDL_GetError ())
             abort ();
         }
 
@@ -101,7 +108,7 @@ void kan_critical_error (const char *message, const char *file, int line)
             abort ();
         }
 
-        // TODO: Log unknown button error.
+        KAN_LOG (testing, KAN_LOG_CRITICAL_ERROR, "Received unknown button from interactive assert message box.")
         abort ();
     }
     else
