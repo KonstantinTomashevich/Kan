@@ -2,6 +2,9 @@
 add_library (debug_break INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/debugbreak/debugbreak.h")
 target_include_directories (debug_break INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/debugbreak")
 
+# re2c
+add_subdirectory (re2c)
+
 # SDL3
 set (SDL_SHARED ON CACHE BOOL "We use double-set with cache to override third party project options for good.")
 set (SDL_SHARED ON)

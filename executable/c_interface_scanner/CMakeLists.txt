@@ -1,0 +1,8 @@
+add_subdirectory (unit)
+register_executable (c_interface_scanner)
+executable_include (
+        SCOPE PUBLIC
+        ABSTRACT error=sdl hash=djb2 log=kan memory=kan memory_profiler=none threading=sdl
+        CONCRETE c_interface_scanner_main container testing)
+executable_verify ()
+executable_copy_linked_artefacts ()
