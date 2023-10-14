@@ -10,4 +10,4 @@ add_custom_command (
 register_concrete (c_interface_scanner_main)
 concrete_include (PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 concrete_sources_direct ("${GENERATION_OUTPUT}")
-concrete_require (SCOPE PUBLIC ABSTRACT error memory CONCRETE_INTERFACE container)
+concrete_require (SCOPE PUBLIC ABSTRACT error file_system memory CONCRETE_INTERFACE c_interface container)

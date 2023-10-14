@@ -2,15 +2,22 @@
 
 #include <ctype.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include <kan/api_common/bool.h>
+#include <kan/c_interface/builder.h>
+#include <kan/error/critical.h>
+#include <kan/file_system/stream.h>
+#include <kan/memory/allocation.h>
 
 #define RETURN_CODE_SUCCESS 0
 #define RETURN_CODE_INVALID_ARGUMENTS (-1)
 #define RETURN_CODE_UNABLE_TO_OPEN_INPUT (-2)
 #define RETURN_CODE_PARSE_FAILED (-3)
-#define RETURN_CODE_UNABLE_TO_OPEN_OUTPUT (-4)
+#define RETURN_CODE_BUILD_FAILED (-4)
+#define RETURN_CODE_UNABLE_TO_OPEN_OUTPUT (-5)
+#define RETURN_CODE_SERIALIZATION_FAILED (-6)
 
 #define INPUT_ERROR_REFIL_AFTER_END_OF_FILE 1
 #define INPUT_ERROR_LEXEME_OVERFLOW 2
@@ -27,10 +34,8 @@ static struct
 
 static struct
 {
-    FILE *input_file;
-    FILE *output_file;
-
-    char input_file_buffer[INPUT_BUFFER_SIZE];
+    struct kan_stream_t *input_stream;
+    char input_buffer[INPUT_BUFFER_SIZE];
     char *limit;
     char *cursor;
     char *marker;
@@ -42,18 +47,26 @@ static struct
     size_t marker_line;
     size_t marker_symbol;
 } io = {
-    .input_file = NULL,
-    .output_file = NULL,
-    .input_file_buffer = {0},
-    .limit = io.input_file_buffer + INPUT_BUFFER_SIZE - 1u,
-    .cursor = io.input_file_buffer + INPUT_BUFFER_SIZE - 1u,
-    .marker = io.input_file_buffer + INPUT_BUFFER_SIZE - 1u,
-    .token = io.input_file_buffer + INPUT_BUFFER_SIZE - 1u,
+    .input_stream = NULL,
+    .input_buffer = {0},
+    .limit = io.input_buffer + INPUT_BUFFER_SIZE - 1u,
+    .cursor = io.input_buffer + INPUT_BUFFER_SIZE - 1u,
+    .marker = io.input_buffer + INPUT_BUFFER_SIZE - 1u,
+    .token = io.input_buffer + INPUT_BUFFER_SIZE - 1u,
     .end_of_input_reached = KAN_FALSE,
     .cursor_line = 1u,
     .cursor_symbol = 1u,
     .marker_line = 1u,
     .marker_symbol = 1u,
+};
+
+static struct
+{
+    struct kan_c_token_t *first;
+    struct kan_c_token_t *last;
+} reporting = {
+    .first = NULL,
+    .last = NULL,
 };
 
 // IO
@@ -65,7 +78,7 @@ static int io_refill_buffer ()
         return INPUT_ERROR_REFIL_AFTER_END_OF_FILE;
     }
 
-    const size_t shift = io.token - io.input_file_buffer;
+    const size_t shift = io.token - io.input_buffer;
     const size_t used = io.limit - io.token;
 
     if (shift < 1)
@@ -74,32 +87,46 @@ static int io_refill_buffer ()
     }
 
     // Shift buffer contents (discard everything up to the current token).
-    memmove (io.input_file_buffer, io.token, used);
+    memmove (io.input_buffer, io.token, used);
     io.limit -= shift;
     io.cursor -= shift;
     io.marker -= shift;
     io.token -= shift;
 
     // Fill free space at the end of buffer with new data from file.
-    io.limit += fread (io.limit, 1, INPUT_BUFFER_SIZE - used - 1u, io.input_file);
+    io.limit += io.input_stream->operations->read (io.input_stream, INPUT_BUFFER_SIZE - used - 1u, io.limit);
     io.limit[0u] = 0;
-    io.end_of_input_reached = io.limit < io.input_file_buffer + INPUT_BUFFER_SIZE - 1u;
+    io.end_of_input_reached = io.limit < io.input_buffer + INPUT_BUFFER_SIZE - 1u;
 
     return 0;
 }
 
 // Parse result reporting functions
 
-static void report_meta_marker (const char *name_begin, const char *name_end)
+static struct kan_c_token_t *create_next_token ()
 {
-    printf ("Found meta marker: ");
-    while (name_begin != name_end)
+    struct kan_c_token_t *token = kan_allocate_batched (KAN_ALLOCATION_GROUP_IGNORE, sizeof (struct kan_c_token_t));
+    token->next = NULL;
+
+    if (reporting.last)
     {
-        printf ("%c", *name_begin);
-        ++name_begin;
+        reporting.last->next = token;
+        reporting.last = token;
+    }
+    else
+    {
+        reporting.first = token;
+        reporting.last = token;
     }
 
-    printf ("\n");
+    return token;
+}
+
+static void report_meta_marker (const char *name_begin, const char *name_end)
+{
+    struct kan_c_token_t *token = create_next_token ();
+    token->type = KAN_C_TOKEN_MARKER_META;
+    token->marker_meta.name = kan_char_sequence_intern (name_begin, name_end);
 }
 
 static void report_meta_integer (const char *name_begin,
@@ -107,21 +134,34 @@ static void report_meta_integer (const char *name_begin,
                                  const char *value_begin,
                                  const char *value_end)
 {
-    printf ("Found meta integer. Name: ");
-    while (name_begin != name_end)
+    struct kan_c_token_t *token = create_next_token ();
+    token->type = KAN_C_TOKEN_INTEGER_META;
+    token->integer_meta.name = kan_char_sequence_intern (name_begin, name_end);
+
+    int64_t sign = 1;
+    if (*value_begin == '-')
     {
-        printf ("%c", *name_begin);
-        ++name_begin;
+        sign = -1;
+        ++value_begin;
+    }
+    else if (*value_begin == '+')
+    {
+        ++value_begin;
+    }
+    else
+    {
+        KAN_ASSERT (isdigit (*value_begin))
     }
 
-    printf (". Value: ");
+    int64_t number = 0;
     while (value_begin != value_end)
     {
-        printf ("%c", *name_begin);
+        KAN_ASSERT (isdigit (*value_begin))
+        number = number * 10 + (*value_begin - '0');
         ++value_begin;
     }
 
-    printf ("\n");
+    token->integer_meta.value = sign * number;
 }
 
 static void report_meta_string (const char *name_begin,
@@ -129,73 +169,41 @@ static void report_meta_string (const char *name_begin,
                                 const char *value_begin,
                                 const char *value_end)
 {
-    printf ("Found meta string. Name: ");
-    while (name_begin != name_end)
-    {
-        printf ("%c", *name_begin);
-        ++name_begin;
-    }
-
-    printf (". Value: ");
-    while (value_begin != value_end)
-    {
-        printf ("%c", *value_begin);
-        ++value_begin;
-    }
-
-    printf ("\n");
+    struct kan_c_token_t *token = create_next_token ();
+    token->type = KAN_C_TOKEN_STRING_META;
+    token->string_meta.name = kan_char_sequence_intern (name_begin, name_end);
+    token->string_meta.value = kan_char_sequence_intern (value_begin, value_end);
 }
-
-enum archetype_t
-{
-    ARCHETYPE_BASIC,
-    ARCHETYPE_STRUCT,
-    ARCHETYPE_ENUM,
-};
 
 static void report_enum_begin (const char *name_begin, const char *name_end)
 {
-    printf ("Found enum: ");
-    while (name_begin != name_end)
-    {
-        printf ("%c", *name_begin);
-        ++name_begin;
-    }
-
-    printf ("\n");
+    struct kan_c_token_t *token = create_next_token ();
+    token->type = KAN_C_TOKEN_ENUM_BEGIN;
+    token->enum_begin.name = kan_char_sequence_intern (name_begin, name_end);
 }
 
 static void report_enum_value (const char *name_begin, const char *name_end)
 {
-    printf ("    Found value. Name: ");
-    while (name_begin != name_end)
-    {
-        printf ("%c", *name_begin);
-        ++name_begin;
-    }
-
-    printf (".\n");
+    struct kan_c_token_t *token = create_next_token ();
+    token->type = KAN_C_TOKEN_ENUM_VALUE;
+    token->enum_value.name = kan_char_sequence_intern (name_begin, name_end);
 }
 
 static void report_enum_end ()
 {
-    printf ("Enum end.\n");
+    struct kan_c_token_t *token = create_next_token ();
+    token->type = KAN_C_TOKEN_ENUM_END;
 }
 
 static void report_struct_begin (const char *name_begin, const char *name_end)
 {
-    printf ("Found struct: ");
-    while (name_begin != name_end)
-    {
-        printf ("%c", *name_begin);
-        ++name_begin;
-    }
-
-    printf ("\n");
+    struct kan_c_token_t *token = create_next_token ();
+    token->type = KAN_C_TOKEN_STRUCT_BEGIN;
+    token->struct_begin.name = kan_char_sequence_intern (name_begin, name_end);
 }
 
 static void report_struct_field (kan_bool_t is_const,
-                                 enum archetype_t archetype,
+                                 enum kan_c_archetype_t archetype,
                                  const char *type_name_begin,
                                  const char *type_name_end,
                                  size_t pointer_level,
@@ -203,99 +211,72 @@ static void report_struct_field (kan_bool_t is_const,
                                  const char *name_end,
                                  kan_bool_t is_array)
 {
-    printf ("    Found field. Const: %s. Archetype: %s. Array: %s. Pointer level: %lld. Type: ", is_const ? "1" : "0",
-            archetype == ARCHETYPE_BASIC  ? "basic" :
-            archetype == ARCHETYPE_STRUCT ? "struct" :
-                                            "enum",
-            is_array ? "1" : "0", pointer_level);
+    struct kan_c_token_t *token = create_next_token ();
+    token->type = KAN_C_TOKEN_STRUCT_FIELD;
+    token->struct_field.name = kan_char_sequence_intern (name_begin, name_end);
+    token->struct_field.type.name = kan_char_sequence_intern (type_name_begin, type_name_end);
+    token->struct_field.type.archetype = archetype;
+    token->struct_field.type.is_array = is_array;
+    token->struct_field.type.is_const = is_const;
 
-    while (type_name_begin != type_name_end)
-    {
-        printf ("%c", *type_name_begin);
-        ++type_name_begin;
-    }
-
-    printf (". Name: ");
-    while (name_begin != name_end)
-    {
-        printf ("%c", *name_begin);
-        ++name_begin;
-    }
-
-    printf (".\n");
+    KAN_ASSERT (pointer_level <= UINT8_MAX)
+    token->struct_field.type.pointer_level = (uint8_t) pointer_level;
 }
 
 static void report_struct_end ()
 {
-    printf ("Struct end.\n");
+    struct kan_c_token_t *token = create_next_token ();
+    token->type = KAN_C_TOKEN_STRUCT_END;
 }
 
 static void report_exported_function_begin (kan_bool_t is_return_const,
-                                            enum archetype_t return_archetype,
+                                            enum kan_c_archetype_t return_archetype,
                                             const char *type_name_begin,
                                             const char *type_name_end,
                                             size_t pointer_level,
                                             const char *name_begin,
                                             const char *name_end)
 {
-    printf ("Function start. Return const: %s. Return archetype: %s. Return type name: ", is_return_const ? "1" : "0",
-            return_archetype == ARCHETYPE_BASIC  ? "basic" :
-            return_archetype == ARCHETYPE_STRUCT ? "struct" :
-                                                   "enum");
+    struct kan_c_token_t *token = create_next_token ();
+    token->type = KAN_C_TOKEN_FUNCTION_BEGIN;
+    token->function_begin.name = kan_char_sequence_intern (name_begin, name_end);
+    token->function_begin.return_type.name = kan_char_sequence_intern (type_name_begin, type_name_end);
+    token->function_begin.return_type.archetype = return_archetype;
+    token->function_begin.return_type.is_array = KAN_FALSE;
+    token->function_begin.return_type.is_const = is_return_const;
 
-    while (type_name_begin != type_name_end)
-    {
-        printf ("%c", *type_name_begin);
-        ++type_name_begin;
-    }
-
-    printf (". Pointer level: %lld. Name: ", pointer_level);
-    while (name_begin != name_end)
-    {
-        printf ("%c", *name_begin);
-        ++name_begin;
-    }
-
-    printf (".\n");
+    KAN_ASSERT (pointer_level <= UINT8_MAX)
+    token->function_begin.return_type.pointer_level = (uint8_t) pointer_level;
 }
 
 static void report_exported_function_argument (kan_bool_t is_const,
-                                               enum archetype_t archetype,
+                                               enum kan_c_archetype_t archetype,
                                                const char *type_name_begin,
                                                const char *type_name_end,
                                                size_t pointer_level,
                                                const char *name_begin,
                                                const char *name_end)
 {
-    printf ("    Found field. Const: %s. Archetype: %s. Pointer level: %lld. Type: ", is_const ? "1" : "0",
-            archetype == ARCHETYPE_BASIC  ? "basic" :
-            archetype == ARCHETYPE_STRUCT ? "struct" :
-                                            "enum",
-            pointer_level);
+    struct kan_c_token_t *token = create_next_token ();
+    token->type = KAN_C_TOKEN_FUNCTION_ARGUMENT;
+    token->function_argument.name = kan_char_sequence_intern (name_begin, name_end);
+    token->function_argument.type.name = kan_char_sequence_intern (type_name_begin, type_name_end);
+    token->function_argument.type.archetype = archetype;
+    token->function_argument.type.is_array = KAN_FALSE;
+    token->function_argument.type.is_const = is_const;
 
-    while (type_name_begin != type_name_end)
-    {
-        printf ("%c", *type_name_begin);
-        ++type_name_begin;
-    }
-
-    printf (". Name: ");
-    while (name_begin != name_end)
-    {
-        printf ("%c", *name_begin);
-        ++name_begin;
-    }
-
-    printf (".\n");
+    KAN_ASSERT (pointer_level <= UINT8_MAX)
+    token->struct_field.type.pointer_level = (uint8_t) pointer_level;
 }
 
 static void report_exported_function_end ()
 {
-    printf ("Function end.\n");
+    struct kan_c_token_t *token = create_next_token ();
+    token->type = KAN_C_TOKEN_FUNCTION_END;
 }
 
 static void report_exported_symbol (kan_bool_t is_const,
-                                    enum archetype_t archetype,
+                                    enum kan_c_archetype_t archetype,
                                     const char *type_name_begin,
                                     const char *type_name_end,
                                     size_t pointer_level,
@@ -303,27 +284,16 @@ static void report_exported_symbol (kan_bool_t is_const,
                                     const char *name_end,
                                     kan_bool_t is_array)
 {
-    printf (
-        "Found exported symbol. Const: %s. Archetype: %s. Array: %s. Pointer level: %lld. Type: ", is_const ? "1" : "0",
-        archetype == ARCHETYPE_BASIC  ? "basic" :
-        archetype == ARCHETYPE_STRUCT ? "struct" :
-                                        "enum",
-        is_array ? "1" : "0", pointer_level);
+    struct kan_c_token_t *token = create_next_token ();
+    token->type = KAN_C_TOKEN_SYMBOL;
+    token->symbol.name = kan_char_sequence_intern (name_begin, name_end);
+    token->symbol.type.name = kan_char_sequence_intern (type_name_begin, type_name_end);
+    token->symbol.type.archetype = archetype;
+    token->symbol.type.is_array = is_array;
+    token->symbol.type.is_const = is_const;
 
-    while (type_name_begin != type_name_end)
-    {
-        printf ("%c", *type_name_begin);
-        ++type_name_begin;
-    }
-
-    printf (". Name: ");
-    while (name_begin != name_end)
-    {
-        printf ("%c", *name_begin);
-        ++name_begin;
-    }
-
-    printf (".\n");
+    KAN_ASSERT (pointer_level <= UINT8_MAX)
+    token->struct_field.type.pointer_level = (uint8_t) pointer_level;
 }
 
 // Parse input using re2c
@@ -426,8 +396,8 @@ static const char *capture_meta_value_end;
  separator | any_preprocessor { continue; }
  *
  {
-     fprintf (stderr, "Error. [%lld:%lld]: Unable to parse next token. Parser: %s. Symbol code: 0x%x.\n",
-         io.cursor_line, io.cursor_symbol, __func__, (int) *io.cursor);
+     fprintf (stderr, "Error. [%ld:%ld]: Unable to parse next token. Parser: %s. Symbol code: 0x%x.\n",
+         (long) io.cursor_line, (long) io.cursor_symbol, __func__, (int) *io.cursor);
      return KAN_FALSE;
  }
  */
@@ -524,8 +494,8 @@ static kan_bool_t parse_main ()
          // Forbidden typedef.
          "typedef" separator+ ("enum" | "struct") [^;]+ ";"
          {
-             fprintf (stderr, "Error. [%lld:%lld]: Encountered struct/enum hiding typedef, it confuses parser.\n",
-                io.cursor_line, io.cursor_symbol);
+             fprintf (stderr, "Error. [%ld:%ld]: Encountered struct/enum hiding typedef, it confuses parser.\n",
+                (long) io.cursor_line, (long) io.cursor_symbol);
              return KAN_FALSE;
          }
 
@@ -584,9 +554,9 @@ static kan_bool_t parse_struct ()
          {
              report_struct_field (
                  capture_const_begin == capture_const_end ? KAN_FALSE : KAN_TRUE,
-                 capture_enum_begin != capture_enum_end     ? ARCHETYPE_ENUM :
-                 capture_struct_begin != capture_struct_end ? ARCHETYPE_STRUCT :
-                                                              ARCHETYPE_BASIC,
+                 capture_enum_begin != capture_enum_end     ? KAN_C_ARCHETYPE_ENUM :
+                 capture_struct_begin != capture_struct_end ? KAN_C_ARCHETYPE_STRUCT :
+                                                              KAN_C_ARCHETYPE_BASIC,
                  capture_type_name_begin,
                  capture_type_name_end,
                  capture_pointer_end - capture_pointer_begin,
@@ -600,8 +570,8 @@ static kan_bool_t parse_struct ()
          {
              if (inside_union)
              {
-                 fprintf (stderr, "Error. [%lld:%lld]: Nested unions aren't supported.\n",
-                     io.cursor_line, io.cursor_symbol);
+                 fprintf (stderr, "Error. [%ld:%ld]: Nested unions aren't supported.\n",
+                     (long) io.cursor_line, (long) io.cursor_symbol);
                  return KAN_FALSE;
              }
 
@@ -641,9 +611,9 @@ static kan_bool_t parse_exported_symbol_begin ()
          {
              report_exported_function_begin (
                  capture_const_begin == capture_const_end ? KAN_FALSE : KAN_TRUE,
-                 capture_enum_begin != capture_enum_end     ? ARCHETYPE_ENUM :
-                 capture_struct_begin != capture_struct_end ? ARCHETYPE_STRUCT :
-                                                              ARCHETYPE_BASIC,
+                 capture_enum_begin != capture_enum_end     ? KAN_C_ARCHETYPE_ENUM :
+                 capture_struct_begin != capture_struct_end ? KAN_C_ARCHETYPE_STRUCT :
+                                                              KAN_C_ARCHETYPE_BASIC,
                  capture_type_name_begin,
                  capture_type_name_end,
                  capture_pointer_end - capture_pointer_begin,
@@ -657,9 +627,9 @@ static kan_bool_t parse_exported_symbol_begin ()
          {
              report_exported_symbol (
                  capture_const_begin == capture_const_end ? KAN_FALSE : KAN_TRUE,
-                 capture_enum_begin != capture_enum_end     ? ARCHETYPE_ENUM :
-                 capture_struct_begin != capture_struct_end ? ARCHETYPE_STRUCT :
-                                                              ARCHETYPE_BASIC,
+                 capture_enum_begin != capture_enum_end     ? KAN_C_ARCHETYPE_ENUM :
+                 capture_struct_begin != capture_struct_end ? KAN_C_ARCHETYPE_STRUCT :
+                                                              KAN_C_ARCHETYPE_BASIC,
                  capture_type_name_begin,
                  capture_type_name_end,
                  capture_pointer_end - capture_pointer_begin,
@@ -690,9 +660,9 @@ static kan_bool_t parse_exported_function_arguments ()
          {
             report_exported_function_argument (
                 capture_const_begin == capture_const_end ? KAN_FALSE : KAN_TRUE,
-                capture_enum_begin != capture_enum_end     ? ARCHETYPE_ENUM :
-                capture_struct_begin != capture_struct_end ? ARCHETYPE_STRUCT :
-                                                             ARCHETYPE_BASIC,
+                capture_enum_begin != capture_enum_end     ? KAN_C_ARCHETYPE_ENUM :
+                capture_struct_begin != capture_struct_end ? KAN_C_ARCHETYPE_STRUCT :
+                                                             KAN_C_ARCHETYPE_BASIC,
                 capture_type_name_begin,
                 capture_type_name_end,
                 capture_pointer_end - capture_pointer_begin,
@@ -844,8 +814,8 @@ int main (int argument_count, char **arguments_array)
              "- output_file_path: \"%s\"\n",
              arguments.export_macro, arguments.input_file_path, arguments.output_file_path);
 
-    io.input_file = fopen (arguments.input_file_path, "r");
-    if (!io.input_file)
+    io.input_stream = kan_direct_file_stream_open_for_read (arguments.input_file_path, KAN_FALSE);
+    if (!io.input_stream)
     {
         fprintf (stderr, "Unable to open input file \"%s\".\n", arguments.input_file_path);
         return RETURN_CODE_UNABLE_TO_OPEN_INPUT;
@@ -854,18 +824,43 @@ int main (int argument_count, char **arguments_array)
     if (!parse_input ())
     {
         fprintf (stderr, "Parse failed, exiting...\n");
-        fclose (io.input_file);
+        kan_direct_file_stream_close (io.input_stream);
         return RETURN_CODE_PARSE_FAILED;
     }
 
-    io.output_file = fopen (arguments.output_file_path, "w");
-    if (!io.output_file)
+    kan_direct_file_stream_close (io.input_stream);
+    struct kan_c_interface_t *interface = kan_c_interface_build (reporting.first);
+
+    if (!interface)
+    {
+        fprintf (stderr, "Build failed, exiting...\n");
+        return RETURN_CODE_BUILD_FAILED;
+    }
+
+    struct kan_stream_t *output_stream = kan_direct_file_stream_open_for_write (arguments.output_file_path, KAN_FALSE);
+    if (!output_stream)
     {
         fprintf (stderr, "Unable to open output file \"%s\".\n", arguments.output_file_path);
         return RETURN_CODE_UNABLE_TO_OPEN_OUTPUT;
     }
 
-    fclose (io.input_file);
-    fclose (io.output_file);
+    if (!kan_c_interface_serialize (interface, output_stream))
+    {
+        fprintf (stderr, "Serialization failed, exiting...\n");
+        kan_direct_file_stream_close (output_stream);
+        return RETURN_CODE_SERIALIZATION_FAILED;
+    }
+
+    fprintf (stdout, "Finished, cleaning up...\n");
+    kan_c_interface_destroy (interface);
+
+    while (reporting.first)
+    {
+        struct kan_c_token_t *next = reporting.first->next;
+        kan_free_batched (KAN_ALLOCATION_GROUP_IGNORE, reporting.first);
+        reporting.first = next;
+    }
+
+    kan_direct_file_stream_close (output_stream);
     return RETURN_CODE_SUCCESS;
 }

@@ -14,4 +14,7 @@ KAN_C_HEADER_BEGIN
 /// \brief Hashes given null-terminated string.
 HASH_API uint64_t kan_string_hash (const char *string);
 
+/// \brief Hashes given character sequence.
+HASH_API uint64_t kan_char_sequence_hash (const char *begin, const char *end);
+
 KAN_C_HEADER_END

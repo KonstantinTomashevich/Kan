@@ -20,6 +20,7 @@ struct context_t
 struct node_t
 {
     struct kan_hash_storage_node_t node;
+    uint64_t length;
     char string[0u];
 };
 
@@ -31,20 +32,31 @@ static struct context_t context;
 //       dense arrays to make iteration over them more cache coherent. In separate experiment it gave up to 20% speedup
 //       for interning.
 
-kan_interned_string_t kan_string_intern (const char *string)
+kan_interned_string_t kan_string_intern (const char *null_terminated_string)
 {
-    if (!string)
+    if (!null_terminated_string)
     {
         return NULL;
     }
 
-    uint64_t string_length = strlen (string);
-    if (string_length == 0u)
+    const char *end = null_terminated_string;
+    while (*end != '\0')
+    {
+        ++end;
+    }
+
+    return kan_char_sequence_intern (null_terminated_string, end);
+}
+
+kan_interned_string_t kan_char_sequence_intern (const char *begin, const char *end)
+{
+    if (!begin || begin == end)
     {
         return NULL;
     }
 
-    const uint64_t hash = kan_string_hash (string);
+    uint64_t string_length = end - begin;
+    const uint64_t hash = kan_char_sequence_hash (begin, end);
     kan_atomic_int_lock (&lock);
 
     if (!initialized)
@@ -59,11 +71,12 @@ kan_interned_string_t kan_string_intern (const char *string)
 
     const struct kan_hash_storage_bucket_t *bucket = kan_hash_storage_query (&context.hash_storage, hash);
     struct node_t *node = (struct node_t *) bucket->first;
-    const struct node_t *end = (struct node_t *) (bucket->last ? bucket->last->next : NULL);
+    const struct node_t *node_end = (struct node_t *) (bucket->last ? bucket->last->next : NULL);
 
-    while (node != end)
+    while (node != node_end)
     {
-        if (node->node.hash == hash && strcmp (node->string, string) == 0)
+        if (node->node.hash == hash && node->length == string_length &&
+            strncmp (node->string, begin, string_length) == 0)
         {
             // Already interned.
             kan_atomic_int_unlock (&lock);
@@ -88,7 +101,9 @@ kan_interned_string_t kan_string_intern (const char *string)
     }
 
     node->node.hash = hash;
-    strcpy (node->string, string);
+    node->length = string_length;
+    strncpy (node->string, begin, string_length);
+    node->string[string_length] = '\0';
 
     if (context.hash_storage.items.size >=
         context.hash_storage.bucket_count * KAN_CONTAINER_STRING_INTERNING_LOAD_FACTOR)
