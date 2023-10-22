@@ -21,7 +21,7 @@ struct node_t
 {
     struct kan_hash_storage_node_t node;
     uint64_t length;
-    char string[0u];
+    char string[];
 };
 
 static kan_bool_t initialized = KAN_FALSE;

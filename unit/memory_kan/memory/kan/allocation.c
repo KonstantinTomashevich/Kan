@@ -46,7 +46,7 @@ struct batched_allocator_page_t
     struct batched_allocator_item_t *first_free;
     uint64_t acquired_count;
     uint64_t item_size;
-    uint8_t data[0u];
+    uint8_t data[];
 };
 
 struct batched_allocator_t
@@ -251,7 +251,7 @@ struct stack_allocator_t
     uint8_t *top;
     uint8_t *end;
     kan_allocation_group_t group;
-    uint8_t data[0u];
+    uint8_t data[];
 };
 
 kan_stack_allocator_t kan_stack_allocator_create (kan_allocation_group_t group, uint64_t amount)

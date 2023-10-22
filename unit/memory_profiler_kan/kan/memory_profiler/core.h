@@ -17,7 +17,7 @@ struct allocation_group_t
     uint64_t allocated_here;
     struct allocation_group_t *next_on_level;
     struct allocation_group_t *first_child;
-    char name[0u];
+    char name[];
 };
 
 _Static_assert (sizeof (kan_allocation_group_t) >= sizeof (uintptr_t), "Allocation group handle can fit pointer.");
