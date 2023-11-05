@@ -71,7 +71,7 @@ static struct
 
 // IO
 
-static int io_refill_buffer ()
+static int io_refill_buffer (void)
 {
     if (io.end_of_input_reached)
     {
@@ -103,7 +103,7 @@ static int io_refill_buffer ()
 
 // Parse result reporting functions
 
-static struct kan_c_token_t *create_next_token ()
+static struct kan_c_token_t *create_next_token (void)
 {
     struct kan_c_token_t *token = kan_allocate_batched (KAN_ALLOCATION_GROUP_IGNORE, sizeof (struct kan_c_token_t));
     token->next = NULL;
@@ -189,7 +189,7 @@ static void report_enum_value (const char *name_begin, const char *name_end)
     token->enum_value.name = kan_char_sequence_intern (name_begin, name_end);
 }
 
-static void report_enum_end ()
+static void report_enum_end (void)
 {
     struct kan_c_token_t *token = create_next_token ();
     token->type = KAN_C_TOKEN_ENUM_END;
@@ -223,7 +223,7 @@ static void report_struct_field (kan_bool_t is_const,
     token->struct_field.type.pointer_level = (uint8_t) pointer_level;
 }
 
-static void report_struct_end ()
+static void report_struct_end (void)
 {
     struct kan_c_token_t *token = create_next_token ();
     token->type = KAN_C_TOKEN_STRUCT_END;
@@ -269,7 +269,7 @@ static void report_exported_function_argument (kan_bool_t is_const,
     token->struct_field.type.pointer_level = (uint8_t) pointer_level;
 }
 
-static void report_exported_function_end ()
+static void report_exported_function_end (void)
 {
     struct kan_c_token_t *token = create_next_token ();
     token->type = KAN_C_TOKEN_FUNCTION_END;
@@ -302,7 +302,7 @@ static void report_exported_symbol (kan_bool_t is_const,
 /*!stags:re2c format = 'const char *@@ = NULL;';*/
 
 // Helpers for re2c api.
-static void re2c_yyskip ()
+static void re2c_yyskip (void)
 {
     if (*io.cursor == '\n')
     {
@@ -314,14 +314,14 @@ static void re2c_yyskip ()
     ++io.cursor_symbol;
 }
 
-static void re2c_yybackup ()
+static void re2c_yybackup (void)
 {
     io.marker = io.cursor;
     io.marker_line = io.cursor_line;
     io.marker_symbol = io.cursor_symbol;
 }
 
-static void re2c_yyrestore ()
+static void re2c_yyrestore (void)
 {
     io.cursor = io.marker;
     io.cursor_line = io.marker_line;
@@ -444,18 +444,18 @@ static const char *capture_meta_value_end;
  }
  */
 
-static kan_bool_t parse_main ();
-static kan_bool_t parse_enum ();
-static kan_bool_t parse_struct ();
-static kan_bool_t parse_exported_symbol_begin ();
-static kan_bool_t parse_exported_function_arguments ();
-static kan_bool_t parse_skip_until_round_braces_close ();
-static kan_bool_t parse_skip_until_curly_braces_close ();
+static kan_bool_t parse_main (void);
+static kan_bool_t parse_enum (void);
+static kan_bool_t parse_struct (void);
+static kan_bool_t parse_exported_symbol_begin (void);
+static kan_bool_t parse_exported_function_arguments (void);
+static kan_bool_t parse_skip_until_round_braces_close (void);
+static kan_bool_t parse_skip_until_curly_braces_close (void);
 
-static kan_bool_t parse_subroutine_multi_line_comment ();
-static kan_bool_t parse_subroutine_single_line_comment ();
+static kan_bool_t parse_subroutine_multi_line_comment (void);
+static kan_bool_t parse_subroutine_single_line_comment (void);
 
-static kan_bool_t parse_main ()
+static kan_bool_t parse_main (void)
 {
     while (KAN_TRUE)
     {
@@ -516,7 +516,7 @@ static kan_bool_t parse_main ()
     }
 }
 
-static kan_bool_t parse_enum ()
+static kan_bool_t parse_enum (void)
 {
     while (KAN_TRUE)
     {
@@ -541,7 +541,7 @@ static kan_bool_t parse_enum ()
     }
 }
 
-static kan_bool_t parse_struct ()
+static kan_bool_t parse_struct (void)
 {
     kan_bool_t inside_union = KAN_FALSE;
     while (KAN_TRUE)
@@ -598,7 +598,7 @@ static kan_bool_t parse_struct ()
     }
 }
 
-static kan_bool_t parse_exported_symbol_begin ()
+static kan_bool_t parse_exported_symbol_begin (void)
 {
     while (KAN_TRUE)
     {
@@ -648,7 +648,7 @@ static kan_bool_t parse_exported_symbol_begin ()
     }
 }
 
-static kan_bool_t parse_exported_function_arguments ()
+static kan_bool_t parse_exported_function_arguments (void)
 {
     while (KAN_TRUE)
     {
@@ -673,6 +673,8 @@ static kan_bool_t parse_exported_function_arguments ()
 
          "," { continue; }
 
+         "void" { continue; }
+
          ")"
          {
              report_exported_function_end ();
@@ -684,7 +686,7 @@ static kan_bool_t parse_exported_function_arguments ()
     }
 }
 
-static kan_bool_t parse_skip_until_round_braces_close ()
+static kan_bool_t parse_skip_until_round_braces_close (void)
 {
     size_t left_to_close = 1u;
     while (KAN_TRUE)
@@ -717,7 +719,7 @@ static kan_bool_t parse_skip_until_round_braces_close ()
     }
 }
 
-static kan_bool_t parse_skip_until_curly_braces_close ()
+static kan_bool_t parse_skip_until_curly_braces_close (void)
 {
     size_t left_to_close = 1u;
     while (KAN_TRUE)
@@ -750,7 +752,7 @@ static kan_bool_t parse_skip_until_curly_braces_close ()
     }
 }
 
-static kan_bool_t parse_subroutine_multi_line_comment ()
+static kan_bool_t parse_subroutine_multi_line_comment (void)
 {
     while (KAN_TRUE)
     {
@@ -768,7 +770,7 @@ static kan_bool_t parse_subroutine_multi_line_comment ()
     }
 }
 
-static kan_bool_t parse_subroutine_single_line_comment ()
+static kan_bool_t parse_subroutine_single_line_comment (void)
 {
     while (KAN_TRUE)
     {
@@ -786,7 +788,7 @@ static kan_bool_t parse_subroutine_single_line_comment ()
     }
 }
 
-static kan_bool_t parse_input ()
+static kan_bool_t parse_input (void)
 {
     return parse_main ();
 }
