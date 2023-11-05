@@ -113,5 +113,8 @@ void kan_dynamic_array_reset (struct kan_dynamic_array_t *array)
 
 void kan_dynamic_array_shutdown (struct kan_dynamic_array_t *array)
 {
-    kan_free_general (array->allocation_group, array->data, array->capacity * array->item_size);
+    if (array->data)
+    {
+        kan_free_general (array->allocation_group, array->data, array->capacity * array->item_size);
+    }
 }

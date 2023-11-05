@@ -82,7 +82,7 @@ static inline uint8_t *get_page_data_begin (struct batched_allocator_page_t *pag
     return data_begin;
 }
 
-uint64_t kan_get_batched_allocation_max_size ()
+uint64_t kan_get_batched_allocation_max_size (void)
 {
     return MAX_RATIONAL_ITEM_SIZE;
 }
@@ -288,6 +288,18 @@ void kan_stack_allocator_reset (kan_stack_allocator_t allocator)
 {
     struct stack_allocator_t *stack = (struct stack_allocator_t *) allocator;
     stack->top = stack->data;
+}
+
+MEMORY_API void *kan_stack_allocator_save_top (kan_stack_allocator_t allocator)
+{
+    return ((struct stack_allocator_t *) allocator)->top;
+}
+
+MEMORY_API void kan_stack_allocator_load_top (kan_stack_allocator_t allocator, void *top)
+{
+    struct stack_allocator_t *stack = (struct stack_allocator_t *) allocator;
+    KAN_ASSERT ((uint8_t *) top >= stack->data && (uint8_t *) top <= stack->end)
+    stack->top = top;
 }
 
 void kan_stack_allocator_destroy (kan_stack_allocator_t allocator)

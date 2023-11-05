@@ -32,7 +32,7 @@ typedef uint64_t kan_allocation_group_t;
 #define KAN_ALLOCATION_GROUP_IGNORE 0u
 
 /// \brief Identifier of allocation group tree root.
-MEMORY_PROFILER_API kan_allocation_group_t kan_allocation_group_root ();
+MEMORY_PROFILER_API kan_allocation_group_t kan_allocation_group_root (void);
 
 /// \brief Gets or creates child of given allocation group with given name.
 /// \details Can be relatively slow, therefore it is advised to get identifier once and cache it somewhere.
@@ -50,12 +50,12 @@ MEMORY_PROFILER_API void kan_allocation_group_free (kan_allocation_group_t group
 MEMORY_PROFILER_API void kan_allocation_group_marker (kan_allocation_group_t group, const char *name);
 
 /// \brief Allocation group on top of the stack or root group if stack is empty.
-MEMORY_PROFILER_API kan_allocation_group_t kan_allocation_group_stack_get ();
+MEMORY_PROFILER_API kan_allocation_group_t kan_allocation_group_stack_get (void);
 
 /// \brief Pushes given group to the top.
 MEMORY_PROFILER_API void kan_allocation_group_stack_push (kan_allocation_group_t group);
 
 /// \brief Pops the top group from the stack.
-MEMORY_PROFILER_API void kan_allocation_group_stack_pop ();
+MEMORY_PROFILER_API void kan_allocation_group_stack_pop (void);
 
 KAN_C_HEADER_END

@@ -126,6 +126,6 @@ struct kan_allocation_group_capture_t
 };
 
 /// \brief Begins memory usage capture by snapshotting allocation groups and creating memory event iterator.
-MEMORY_PROFILER_API struct kan_allocation_group_capture_t kan_allocation_group_begin_capture ();
+MEMORY_PROFILER_API struct kan_allocation_group_capture_t kan_allocation_group_begin_capture (void);
 
 KAN_C_HEADER_END

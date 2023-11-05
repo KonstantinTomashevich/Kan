@@ -136,7 +136,7 @@ struct kan_c_interface_t
 
 /// \brief Returns allocation group used to allocate everything connected to interface usage.
 /// \details Aimed to be used inside `c_interface`, but is allowed to be used outside.
-C_INTERFACE_API kan_allocation_group_t kan_c_interface_allocation_group ();
+C_INTERFACE_API kan_allocation_group_t kan_c_interface_allocation_group (void);
 
 /// \brief Serializes given interface into given stream.
 C_INTERFACE_API kan_bool_t kan_c_interface_serialize (const struct kan_c_interface_t *interface,

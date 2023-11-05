@@ -22,7 +22,7 @@ struct critical_error_context_t
 static kan_bool_t critical_error_context_ready = KAN_FALSE;
 static struct critical_error_context_t critical_error_context;
 
-static inline void kan_critical_error_context_ensure ()
+static inline void kan_critical_error_context_ensure (void)
 {
     if (!critical_error_context_ready)
     {

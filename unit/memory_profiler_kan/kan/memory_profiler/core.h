@@ -8,9 +8,9 @@
 
 KAN_C_HEADER_BEGIN
 
-void lock_memory_profiling_context ();
+void lock_memory_profiling_context (void);
 
-void unlock_memory_profiling_context ();
+void unlock_memory_profiling_context (void);
 
 struct allocation_group_t
 {
@@ -27,7 +27,7 @@ static inline struct allocation_group_t *retrieve_allocation_group (kan_allocati
     return (struct allocation_group_t *) group;
 }
 
-struct allocation_group_t *retrieve_root_allocation_group_unguarded ();
+struct allocation_group_t *retrieve_root_allocation_group_unguarded (void);
 
 struct allocation_group_t *create_allocation_group_unguarded (struct allocation_group_t *next_on_level,
                                                               const char *name);
@@ -35,7 +35,7 @@ struct allocation_group_t *create_allocation_group_unguarded (struct allocation_
 _Static_assert (sizeof (kan_allocation_group_event_iterator_t) >= sizeof (uintptr_t),
                 "Event iterator can fit pointer.");
 
-kan_allocation_group_event_iterator_t event_iterator_create_unguarded ();
+kan_allocation_group_event_iterator_t event_iterator_create_unguarded (void);
 
 const struct kan_allocation_group_event_t *event_iterator_get_unguarded (
     kan_allocation_group_event_iterator_t event_iterator);

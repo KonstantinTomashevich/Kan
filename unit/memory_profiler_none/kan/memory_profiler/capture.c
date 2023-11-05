@@ -66,7 +66,7 @@ void kan_allocation_group_event_iterator_destroy (kan_allocation_group_event_ite
 {
 }
 
-struct kan_allocation_group_capture_t kan_allocation_group_begin_capture ()
+struct kan_allocation_group_capture_t kan_allocation_group_begin_capture (void)
 {
     struct kan_allocation_group_capture_t capture;
     capture.captured_root = 0u;

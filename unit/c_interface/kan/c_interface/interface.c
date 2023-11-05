@@ -10,7 +10,7 @@
 static kan_bool_t allocation_group_ready = KAN_FALSE;
 static kan_allocation_group_t allocation_group;
 
-C_INTERFACE_API kan_allocation_group_t kan_c_interface_allocation_group ()
+kan_allocation_group_t kan_c_interface_allocation_group (void)
 {
     if (!allocation_group_ready)
     {
@@ -35,7 +35,7 @@ struct string_encoding_context_t
     kan_bool_t serialized;
 };
 
-static struct string_encoding_node_t *string_encoding_node_create ()
+static struct string_encoding_node_t *string_encoding_node_create (void)
 {
     return kan_allocate_batched (kan_c_interface_allocation_group (), sizeof (struct string_encoding_node_t));
 }
@@ -392,8 +392,7 @@ static kan_bool_t c_interface_serialize (const struct kan_c_interface_t *interfa
     return KAN_TRUE;
 }
 
-C_INTERFACE_API kan_bool_t kan_c_interface_serialize (const struct kan_c_interface_t *interface,
-                                                      struct kan_stream_t *stream)
+kan_bool_t kan_c_interface_serialize (const struct kan_c_interface_t *interface, struct kan_stream_t *stream)
 {
     if (!kan_stream_is_writeable (stream))
     {
@@ -706,7 +705,7 @@ static kan_bool_t c_interface_deserialize (struct kan_c_interface_t *interface,
     return KAN_TRUE;
 }
 
-C_INTERFACE_API struct kan_c_interface_t *kan_c_interface_deserialize (struct kan_stream_t *stream)
+struct kan_c_interface_t *kan_c_interface_deserialize (struct kan_stream_t *stream)
 {
     struct kan_c_interface_t *interface = (struct kan_c_interface_t *) kan_allocate_batched (
         kan_c_interface_allocation_group (), sizeof (struct kan_c_interface_t));
@@ -755,7 +754,7 @@ static void meta_attachment_shutdown (struct kan_c_meta_attachment_t *attachment
     }
 }
 
-C_INTERFACE_API void kan_c_interface_destroy (struct kan_c_interface_t *interface)
+void kan_c_interface_destroy (struct kan_c_interface_t *interface)
 {
     for (uint64_t enum_index = 0u; enum_index < interface->enums_count; ++enum_index)
     {

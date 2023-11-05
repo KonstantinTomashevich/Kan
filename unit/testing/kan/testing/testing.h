@@ -35,7 +35,7 @@ KAN_C_HEADER_BEGIN
 #if defined(_WIN32)
 #    define KAN_TEST_CASE(NAME) __declspec (dllexport) void execute_test_case_##NAME ()
 #else
-#    define KAN_TEST_CASE(NAME) void execute_test_case_##NAME ()
+#    define KAN_TEST_CASE(NAME) void execute_test_case_##NAME (void)
 #endif
 
 #define KAN_TEST_ASSERT(...)                                                                                           \
@@ -46,7 +46,7 @@ KAN_C_HEADER_BEGIN
 
 TESTING_API void kan_test_check_failed (const char *message, const char *file, int line);
 
-TESTING_API kan_bool_t kan_test_are_checks_passed ();
+TESTING_API kan_bool_t kan_test_are_checks_passed (void);
 
 #define KAN_TEST_CHECK(...)                                                                                            \
     if (!(__VA_ARGS__))                                                                                                \

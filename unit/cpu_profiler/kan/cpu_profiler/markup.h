@@ -27,7 +27,7 @@
 KAN_C_HEADER_BEGIN
 
 /// \brief Separates program execution into stages. In game development it is usually frames.
-CPU_PROFILER_API void kan_cpu_stage_separator ();
+CPU_PROFILER_API void kan_cpu_stage_separator (void);
 
 struct kan_cpu_section_t
 {

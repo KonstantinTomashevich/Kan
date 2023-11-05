@@ -9,7 +9,7 @@
 static kan_bool_t allocation_group_ready = KAN_FALSE;
 static kan_allocation_group_t allocation_group;
 
-static kan_allocation_group_t get_allocation_group ()
+static kan_allocation_group_t get_allocation_group (void)
 {
     if (!allocation_group_ready)
     {

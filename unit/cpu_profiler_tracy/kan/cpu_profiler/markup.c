@@ -4,7 +4,7 @@
 
 #include <tracy/TracyC.h>
 
-void kan_cpu_stage_separator ()
+void kan_cpu_stage_separator (void)
 {
     ___tracy_emit_frame_mark (NULL);
 }

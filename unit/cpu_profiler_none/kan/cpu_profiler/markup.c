@@ -1,6 +1,6 @@
 #include <kan/cpu_profiler/markup.h>
 
-void kan_cpu_stage_separator ()
+void kan_cpu_stage_separator (void)
 {
 }
 

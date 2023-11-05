@@ -17,7 +17,7 @@ typedef uint64_t kan_mutex_handle_t;
 #define KAN_INVALID_MUTEX_HANDLE 0u
 
 /// \brief Creates new mutex instance.
-THREADING_API kan_mutex_handle_t kan_mutex_create ();
+THREADING_API kan_mutex_handle_t kan_mutex_create (void);
 
 /// \brief Locks given mutex. Pauses current thread if it is already locked.
 /// \return Whether locking was successful.

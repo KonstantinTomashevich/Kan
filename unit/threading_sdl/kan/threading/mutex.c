@@ -3,7 +3,7 @@
 #include <kan/log/logging.h>
 #include <kan/threading/mutex.h>
 
-kan_mutex_handle_t kan_mutex_create ()
+kan_mutex_handle_t kan_mutex_create (void)
 {
     void *sdl_handle = SDL_CreateMutex ();
     if (!sdl_handle)
