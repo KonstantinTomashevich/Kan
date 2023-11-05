@@ -2,6 +2,8 @@
 
 include_guard (GLOBAL)
 
+option (KAN_ENABLE_ADDRESS_SANITIZER "Add compile and link time flags, that enable address sanitizing." OFF)
+option (KAN_ENABLE_THREAD_SANITIZER "Add compile and link time flags, that enable thread sanitizing." OFF)
 option (KAN_ENABLE_COVERAGE "Add compile and link time flags, that enable code coverage reporting." OFF)
 option (KAN_TREAT_WARNINGS_AS_ERRORS "Enables \"treat warnings as errors\" compiler policy for all targets." ON)
 
@@ -17,15 +19,38 @@ function (add_common_compile_options)
         endif ()
     endif ()
 
+    if (KAN_ENABLE_ADDRESS_SANITIZER)
+        if ("${CMAKE_CXX_COMPILER_ID}" MATCHES "^.*Clang$")
+            add_compile_options (-fsanitize=address -fno-omit-frame-pointer)
+            # We need to also link asan as adding just flags is not enough for some reason.
+            link_libraries (asan)
+        else ()
+            message (FATAL_ERROR "Currently, address sanitizing is supported only under clang.")
+        endif ()
+    endif ()
+
+    if (KAN_ENABLE_THREAD_SANITIZER)
+        if ("${CMAKE_CXX_COMPILER_ID}" MATCHES "^.*Clang$")
+            add_compile_options (-fsanitize=thread)
+            # We need to also link tsan as adding just flags is not enough for some reason.
+            link_libraries (tsan)
+        else ()
+            message (FATAL_ERROR "Currently, thread sanitizing is supported only under clang.")
+        endif ()
+    endif ()
+
     if (KAN_TREAT_WARNINGS_AS_ERRORS)
         if ("${CMAKE_CXX_COMPILER_ID}" MATCHES "^.*Clang$")
             if (MSVC)
                 add_compile_options (/W4 /WX)
             else ()
-                add_compile_options (-pedantic)
+                add_compile_options (-Wall -Wextra -Werror -pedantic)
             endif ()
 
             add_compile_options (
+                    # Actually, field with flexible array extension can be last field in a struct,
+                    # but clang ignores this fact and treats it as errors.
+                    -Wno-flexible-array-extensions
                     # We silence unused parameter warnings, because it is troublesome
                     # to silence them manually for every compiler.
                     -Wno-unused-parameter
