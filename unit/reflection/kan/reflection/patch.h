@@ -50,7 +50,7 @@ struct kan_reflection_patch_chunk_info_t
 typedef uint64_t kan_reflection_patch_iterator_t;
 
 /// \brief Creates new instance of patch builder.
-REFLECTION_API kan_reflection_patch_builder_t kan_reflection_patch_builder_create ();
+REFLECTION_API kan_reflection_patch_builder_t kan_reflection_patch_builder_create (void);
 
 /// \brief Adds new chunk to currently constructed patch. Data is copied inside.
 REFLECTION_API void kan_reflection_patch_builder_add_chunk (kan_reflection_patch_builder_t builder,
@@ -91,7 +91,5 @@ REFLECTION_API struct kan_reflection_patch_chunk_info_t kan_reflection_patch_ite
 
 /// \brief Destroys given patch.
 REFLECTION_API void kan_reflection_patch_destroy (kan_reflection_patch_t patch);
-
-// TODO: Patch migration.
 
 KAN_C_HEADER_END

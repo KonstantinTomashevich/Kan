@@ -35,6 +35,103 @@ struct kan_reflection_visibility_iterator_t
     const void *context;
 };
 
+/// \brief Utility method for checking visibility conditions.
+/// \param visibility_condition_field Information about field that holds visibility-deciding value.
+/// \param visibility_condition_values_count Number of elements in `visibility_condition_values` array.
+/// \param visibility_condition_values Array of values that trigger visibility condition.
+/// \param visibility_value_pointer_with_offset Pointer to visibility value to be used. We don't request full context
+///                                             and manually offset it, because it is easier for other reflection code.
+static inline kan_bool_t kan_reflection_check_visibility (
+    const struct kan_reflection_field_t *visibility_condition_field,
+    uint64_t visibility_condition_values_count,
+    const int64_t *visibility_condition_values,
+    const void *visibility_value_pointer_with_offset)
+{
+    if (visibility_condition_values_count > 0u)
+    {
+        KAN_ASSERT (visibility_condition_field)
+
+#define CHECK_CONDITIONS(TYPE)                                                                                         \
+    for (uint64_t index = 0u; index < visibility_condition_values_count; ++index)                                      \
+    {                                                                                                                  \
+        if (*(const TYPE *) (visibility_value_pointer_with_offset) == (TYPE) visibility_condition_values[index])       \
+        {                                                                                                              \
+            return KAN_TRUE;                                                                                           \
+        }                                                                                                              \
+    }                                                                                                                  \
+                                                                                                                       \
+    return KAN_FALSE;
+
+        switch (visibility_condition_field->archetype)
+        {
+        case KAN_REFLECTION_ARCHETYPE_SIGNED_INT:
+            switch (visibility_condition_field->size)
+            {
+            case 1u:
+                CHECK_CONDITIONS (int8_t)
+            case 2u:
+                CHECK_CONDITIONS (int16_t)
+            case 4u:
+                CHECK_CONDITIONS (int32_t)
+            case 8u:
+                CHECK_CONDITIONS (int64_t)
+            default:
+                KAN_ASSERT (KAN_FALSE)
+                break;
+            }
+
+            break;
+
+        case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
+            switch (visibility_condition_field->size)
+            {
+            case 1u:
+                CHECK_CONDITIONS (uint8_t)
+            case 2u:
+                CHECK_CONDITIONS (uint16_t)
+            case 4u:
+                CHECK_CONDITIONS (uint32_t)
+            case 8u:
+                CHECK_CONDITIONS (uint64_t)
+            default:
+                KAN_ASSERT (KAN_FALSE)
+                break;
+            }
+
+            break;
+
+        case KAN_REFLECTION_ARCHETYPE_ENUM:
+            switch (visibility_condition_field->size)
+            {
+            case sizeof (int):
+                CHECK_CONDITIONS (int)
+            default:
+                KAN_ASSERT (KAN_FALSE)
+                break;
+            }
+
+            break;
+
+        case KAN_REFLECTION_ARCHETYPE_FLOATING:
+        case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
+        case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:
+        case KAN_REFLECTION_ARCHETYPE_EXTERNAL_POINTER:
+        case KAN_REFLECTION_ARCHETYPE_STRUCT:
+        case KAN_REFLECTION_ARCHETYPE_STRUCT_POINTER:
+        case KAN_REFLECTION_ARCHETYPE_INLINE_ARRAY:
+        case KAN_REFLECTION_ARCHETYPE_DYNAMIC_ARRAY:
+        case KAN_REFLECTION_ARCHETYPE_PATCH:
+            KAN_ASSERT (KAN_FALSE)
+            break;
+        }
+
+#undef CHECK_CONDITIONS
+        return KAN_FALSE;
+    }
+
+    return KAN_TRUE;
+}
+
 /// \brief Initializes visibility-based field iterator.
 static inline void kan_reflection_visibility_iterator_init (struct kan_reflection_visibility_iterator_t *iterator,
                                                             const struct kan_reflection_struct_t *struct_reflection,
@@ -59,96 +156,12 @@ static inline void kan_reflection_visibility_iterator_advance (struct kan_reflec
     ++iterator->field;
     while (iterator->field != iterator->field_end)
     {
-        if (iterator->field->visibility_condition_values_count > 0u)
-        {
-            KAN_ASSERT (iterator->field->visibility_condition_field)
-
-#define CHECK_CONDITIONS(TYPE)                                                                                         \
-    for (uint64_t index = 0u; index < iterator->field->visibility_condition_values_count; ++index)                     \
-    {                                                                                                                  \
-        if (*(const TYPE *) (((const uint8_t *) iterator->context) +                                                   \
-                             iterator->field->visibility_condition_field->offset) ==                                   \
-            (TYPE) iterator->field->visibility_condition_values[index])                                                \
-        {                                                                                                              \
-            return;                                                                                                    \
-        }                                                                                                              \
-    }
-
-            switch (iterator->field->visibility_condition_field->archetype)
-            {
-            case KAN_REFLECTION_ARCHETYPE_SIGNED_INT:
-                switch (iterator->field->visibility_condition_field->size)
-                {
-                case 1u:
-                    CHECK_CONDITIONS (int8_t)
-                    break;
-                case 2u:
-                    CHECK_CONDITIONS (int16_t)
-                    break;
-                case 4u:
-                    CHECK_CONDITIONS (int32_t)
-                    break;
-                case 8u:
-                    CHECK_CONDITIONS (int64_t)
-                    break;
-                default:
-                    KAN_ASSERT (KAN_FALSE)
-                    break;
-                }
-
-                break;
-
-            case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
-                switch (iterator->field->visibility_condition_field->size)
-                {
-                case 1u:
-                    CHECK_CONDITIONS (uint8_t)
-                    break;
-                case 2u:
-                    CHECK_CONDITIONS (uint16_t)
-                    break;
-                case 4u:
-                    CHECK_CONDITIONS (uint32_t)
-                    break;
-                case 8u:
-                    CHECK_CONDITIONS (uint64_t)
-                    break;
-                default:
-                    KAN_ASSERT (KAN_FALSE)
-                    break;
-                }
-
-                break;
-
-            case KAN_REFLECTION_ARCHETYPE_ENUM:
-                switch (iterator->field->visibility_condition_field->size)
-                {
-                case sizeof (int):
-                    CHECK_CONDITIONS (int)
-                    break;
-                default:
-                    KAN_ASSERT (KAN_FALSE)
-                    break;
-                }
-
-                break;
-
-            case KAN_REFLECTION_ARCHETYPE_FLOATING:
-            case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
-            case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:
-            case KAN_REFLECTION_ARCHETYPE_STRUCT:
-            case KAN_REFLECTION_ARCHETYPE_STRUCT_POINTER:
-            case KAN_REFLECTION_ARCHETYPE_INLINE_ARRAY:
-            case KAN_REFLECTION_ARCHETYPE_DYNAMIC_ARRAY:
-            case KAN_REFLECTION_ARCHETYPE_PATCH:
-                KAN_ASSERT (KAN_FALSE)
-                break;
-            }
-
-#undef CHECK_CONDITIONS
-        }
-
-        else
+        if (kan_reflection_check_visibility (
+                iterator->field->visibility_condition_field, iterator->field->visibility_condition_values_count,
+                iterator->field->visibility_condition_values,
+                ((const uint8_t *) iterator->context) + (iterator->field->visibility_condition_field ?
+                                                             iterator->field->visibility_condition_field->offset :
+                                                             0u)))
         {
             return;
         }

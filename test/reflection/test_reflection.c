@@ -1,7 +1,9 @@
 #include <memory.h>
 #include <stddef.h>
 
+#include <kan/container/dynamic_array.h>
 #include <kan/reflection/field_visibility_iterator.h>
+#include <kan/reflection/migration.h>
 #include <kan/reflection/patch.h>
 #include <kan/reflection/registry.h>
 #include <kan/testing/testing.h>
@@ -328,8 +330,8 @@ KAN_TEST_CASE (query_local_field)
     };
 
     kan_reflection_registry_t registry = kan_reflection_registry_create ();
-    KAN_TEST_CHECK (kan_reflection_registry_add_struct (registry, &first_struct));
-    KAN_TEST_CHECK (kan_reflection_registry_add_struct (registry, &second_struct));
+    KAN_TEST_CHECK (kan_reflection_registry_add_struct (registry, &first_struct))
+    KAN_TEST_CHECK (kan_reflection_registry_add_struct (registry, &second_struct))
 
     uint64_t absolute_offset;
     kan_interned_string_t first_first_path[] = {first_struct.name, first_struct_fields[0u].name};
@@ -673,4 +675,982 @@ KAN_TEST_CASE (patch)
 
     // Patches will be automatically destroyed with owning registry.
     kan_reflection_registry_destroy (registry);
+}
+
+enum first_enum_source_t
+{
+    FIRST_ENUM_SOURCE_HELLO = 0,
+    FIRST_ENUM_SOURCE_WORLD
+};
+
+enum first_enum_target_t
+{
+    FIRST_ENUM_TARGET_HELLO = 0,
+    FIRST_ENUM_TARGET_REFLECTION,
+    FIRST_ENUM_TARGET_WORLD
+};
+
+enum second_enum_source_t
+{
+    SECOND_ENUM_SOURCE_FIRST = 1u << 0u,
+    SECOND_ENUM_SOURCE_SECOND = 1u << 1u,
+    SECOND_ENUM_SOURCE_THIRD = 1u << 2u,
+};
+
+enum second_enum_target_t
+{
+    SECOND_ENUM_TARGET_FIRST = 1u << 0u,
+    SECOND_ENUM_TARGET_SECOND = 1u << 1u,
+    SECOND_ENUM_TARGET_THIRD = 1u << 2u,
+};
+
+struct same_source_t
+{
+    uint64_t first;
+    enum second_enum_source_t second;
+    uint64_t third;
+};
+
+struct same_target_t
+{
+    uint64_t first;
+    enum second_enum_target_t second;
+    uint64_t third;
+};
+
+struct cross_copy_source_t
+{
+    uint64_t a;
+    uint64_t b;
+    uint64_t c;
+    uint64_t d;
+    uint64_t e;
+    uint64_t f;
+};
+
+struct cross_copy_target_t
+{
+    uint64_t d;
+    uint64_t e;
+    uint64_t f;
+    uint64_t a;
+    uint64_t b;
+    uint64_t c;
+};
+
+struct nesting_source_t
+{
+    struct same_source_t same;
+    struct cross_copy_source_t cross_copy;
+};
+
+struct nesting_target_t
+{
+    struct same_target_t same;
+    struct cross_copy_target_t cross_copy;
+};
+
+struct migration_source_t
+{
+    struct nesting_source_t nesting_first;
+    struct nesting_source_t nesting_to_drop;
+    struct nesting_source_t nesting_second;
+
+    enum first_enum_source_t enums_array_one[4u];
+    enum second_enum_source_t enums_array_two[4u];
+    uint32_t numeric_to_adapt;
+
+    uint64_t selector;
+    union
+    {
+        enum first_enum_source_t selection_first;
+        enum second_enum_source_t selection_second;
+    };
+
+    kan_interned_string_t interned_string;
+    char *owned_string;
+    struct kan_dynamic_array_t dynamic_array;
+};
+
+struct migration_target_t
+{
+    struct nesting_target_t nesting_first;
+    struct nesting_target_t nesting_second;
+    struct nesting_target_t nesting_to_add;
+
+    enum first_enum_target_t enums_array_one[4u];
+    enum second_enum_target_t enums_array_two[4u];
+    uint64_t numeric_to_adapt;
+
+    uint64_t selector;
+    union
+    {
+        enum first_enum_target_t selection_first;
+        enum second_enum_target_t selection_second;
+    };
+
+    kan_interned_string_t interned_string;
+    char *owned_string;
+    struct kan_dynamic_array_t dynamic_array;
+};
+
+static struct migration_target_t construct_empty_migration_target (void)
+{
+    struct migration_target_t migration_target = {
+        .nesting_first =
+            {
+                .same = {.first = 0u, .second = 0u, .third = 0u},
+                .cross_copy = {.a = 0u, .b = 0u, .c = 0u, .d = 0u, .e = 0u, .f = 0u},
+            },
+        .nesting_second =
+            {
+                .same = {.first = 0u, .second = 0u, .third = 0u},
+                .cross_copy = {.a = 0u, .b = 0u, .c = 0u, .d = 0u, .e = 0u, .f = 0u},
+            },
+        .nesting_to_add =
+            {
+                .same = {.first = 0u, .second = 0u, .third = 0u},
+                .cross_copy = {.a = 0u, .b = 0u, .c = 0u, .d = 0u, .e = 0u, .f = 0u},
+            },
+        .enums_array_one = {FIRST_ENUM_TARGET_HELLO, FIRST_ENUM_TARGET_HELLO, FIRST_ENUM_TARGET_HELLO,
+                            FIRST_ENUM_TARGET_HELLO},
+        .enums_array_two = {0u, 0u, 0u, 0u},
+        .numeric_to_adapt = 0u,
+        .selector = 0u,
+        .selection_first = FIRST_ENUM_TARGET_HELLO,
+        .interned_string = NULL,
+        .owned_string = NULL,
+    };
+
+    kan_dynamic_array_init (&migration_target.dynamic_array, 0u, sizeof (int), _Alignof (int),
+                            KAN_ALLOCATION_GROUP_IGNORE);
+    return migration_target;
+}
+
+static void check_nesting_migration_result (const struct nesting_source_t *source,
+                                            const struct nesting_target_t *target)
+{
+    KAN_TEST_CHECK (source->same.first == target->same.first)
+    KAN_TEST_CHECK ((int) source->same.second == (int) target->same.second)
+    KAN_TEST_CHECK (source->same.third == target->same.third)
+
+    KAN_TEST_CHECK (source->cross_copy.a == target->cross_copy.a)
+    KAN_TEST_CHECK (source->cross_copy.b == target->cross_copy.b)
+    KAN_TEST_CHECK (source->cross_copy.c == target->cross_copy.c)
+    KAN_TEST_CHECK (source->cross_copy.d == target->cross_copy.d)
+    KAN_TEST_CHECK (source->cross_copy.e == target->cross_copy.e)
+    KAN_TEST_CHECK (source->cross_copy.f == target->cross_copy.f)
+}
+
+static void check_nesting_unchanged (const struct nesting_target_t *target)
+{
+    KAN_TEST_CHECK (target->same.first == 0u)
+    KAN_TEST_CHECK (target->same.second == 0)
+    KAN_TEST_CHECK (target->same.third == 0u)
+    KAN_TEST_CHECK (target->cross_copy.a == 0u)
+    KAN_TEST_CHECK (target->cross_copy.b == 0u)
+    KAN_TEST_CHECK (target->cross_copy.c == 0u)
+    KAN_TEST_CHECK (target->cross_copy.d == 0u)
+    KAN_TEST_CHECK (target->cross_copy.e == 0u)
+    KAN_TEST_CHECK (target->cross_copy.f == 0u)
+}
+
+static void check_first_enum_migration_result (enum first_enum_source_t source, enum first_enum_target_t target)
+{
+    switch (source)
+    {
+    case FIRST_ENUM_SOURCE_HELLO:
+        KAN_TEST_CHECK (target == FIRST_ENUM_TARGET_HELLO)
+        break;
+
+    case FIRST_ENUM_SOURCE_WORLD:
+        KAN_TEST_CHECK (target == FIRST_ENUM_TARGET_WORLD)
+        break;
+
+    default:
+        KAN_TEST_CHECK (KAN_FALSE)
+    }
+}
+
+static void check_generic_migration_result (const struct migration_source_t *source,
+                                            const struct migration_target_t *target)
+{
+    check_nesting_migration_result (&source->nesting_first, &target->nesting_first);
+    check_nesting_migration_result (&source->nesting_second, &target->nesting_second);
+    check_nesting_unchanged (&target->nesting_to_add);
+
+    check_first_enum_migration_result (source->enums_array_one[0u], target->enums_array_one[0u]);
+    check_first_enum_migration_result (source->enums_array_one[1u], target->enums_array_one[1u]);
+    check_first_enum_migration_result (source->enums_array_one[2u], target->enums_array_one[2u]);
+    check_first_enum_migration_result (source->enums_array_one[3u], target->enums_array_one[3u]);
+
+    KAN_TEST_CHECK ((int) source->enums_array_two[0u] == (int) target->enums_array_two[0u])
+    KAN_TEST_CHECK ((int) source->enums_array_two[1u] == (int) target->enums_array_two[1u])
+    KAN_TEST_CHECK ((int) source->enums_array_two[2u] == (int) target->enums_array_two[2u])
+    KAN_TEST_CHECK ((int) source->enums_array_two[3u] == (int) target->enums_array_two[3u])
+
+    KAN_TEST_CHECK ((uint64_t) source->numeric_to_adapt == target->numeric_to_adapt)
+    KAN_TEST_CHECK (source->selector == target->selector)
+
+    if (source->selector == 0u)
+    {
+        check_first_enum_migration_result (source->selection_first, target->selection_first);
+    }
+    else
+    {
+        KAN_TEST_CHECK ((int) source->selection_second == (int) target->selection_second)
+    }
+
+    KAN_TEST_CHECK (source->interned_string == target->interned_string)
+
+    // String and array should be moved, so we can't check them.
+    KAN_TEST_CHECK (!source->owned_string)
+    KAN_TEST_CHECK (source->dynamic_array.capacity == 0u)
+    KAN_TEST_CHECK (source->dynamic_array.size == 0u)
+    KAN_TEST_CHECK (!source->dynamic_array.data)
+}
+
+KAN_TEST_CASE (migration)
+{
+    struct kan_reflection_enum_value_t first_enum_source_values[] = {
+        {kan_string_intern ("FIRST_ENUM_HELLO"), FIRST_ENUM_SOURCE_HELLO},
+        {kan_string_intern ("FIRST_ENUM_WORLD"), FIRST_ENUM_SOURCE_WORLD},
+    };
+
+    struct kan_reflection_enum_value_t first_enum_target_values[] = {
+        {kan_string_intern ("FIRST_ENUM_HELLO"), FIRST_ENUM_TARGET_HELLO},
+        {kan_string_intern ("FIRST_ENUM_REFLECTION"), FIRST_ENUM_TARGET_REFLECTION},
+        {kan_string_intern ("FIRST_ENUM_WORLD"), FIRST_ENUM_TARGET_WORLD},
+    };
+
+    struct kan_reflection_enum_t first_enum_source = {
+        .name = kan_string_intern ("first_enum_t"),
+        .flags = KAN_FALSE,
+        .values_count = sizeof (first_enum_source_values) / sizeof (struct kan_reflection_enum_value_t),
+        .values = first_enum_source_values,
+    };
+
+    struct kan_reflection_enum_t first_enum_target = {
+        .name = kan_string_intern ("first_enum_t"),
+        .flags = KAN_FALSE,
+        .values_count = sizeof (first_enum_target_values) / sizeof (struct kan_reflection_enum_value_t),
+        .values = first_enum_target_values,
+    };
+
+    struct kan_reflection_enum_value_t second_enum_source_values[] = {
+        {kan_string_intern ("SECOND_ENUM_FIRST"), SECOND_ENUM_SOURCE_FIRST},
+        {kan_string_intern ("SECOND_ENUM_SECOND"), SECOND_ENUM_SOURCE_SECOND},
+        {kan_string_intern ("SECOND_ENUM_THIRD"), SECOND_ENUM_SOURCE_THIRD},
+    };
+
+    struct kan_reflection_enum_value_t second_enum_target_values[] = {
+        {kan_string_intern ("SECOND_ENUM_FIRST"), SECOND_ENUM_TARGET_FIRST},
+        {kan_string_intern ("SECOND_ENUM_SECOND"), SECOND_ENUM_TARGET_SECOND},
+        {kan_string_intern ("SECOND_ENUM_THIRD"), SECOND_ENUM_TARGET_THIRD},
+    };
+
+    struct kan_reflection_enum_t second_enum_source = {
+        .name = kan_string_intern ("second_enum_t"),
+        .flags = KAN_TRUE,
+        .values_count = sizeof (second_enum_source_values) / sizeof (struct kan_reflection_enum_value_t),
+        .values = second_enum_source_values,
+    };
+
+    struct kan_reflection_enum_t second_enum_target = {
+        .name = kan_string_intern ("second_enum_t"),
+        .flags = KAN_TRUE,
+        .values_count = sizeof (second_enum_target_values) / sizeof (struct kan_reflection_enum_value_t),
+        .values = second_enum_target_values,
+    };
+
+    struct kan_reflection_field_t same_source_fields[] = {
+        {.name = kan_string_intern ("first"),
+         .offset = offsetof (struct same_source_t, first),
+         .size = sizeof (((struct same_source_t *) NULL)->first),
+         .archetype = KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT,
+         .visibility_condition_field = NULL,
+         .visibility_condition_values_count = 0u,
+         .visibility_condition_values = NULL},
+        {.name = kan_string_intern ("second"),
+         .offset = offsetof (struct same_source_t, second),
+         .size = sizeof (((struct same_source_t *) NULL)->second),
+         .archetype = KAN_REFLECTION_ARCHETYPE_ENUM,
+         .archetype_enum = {.type_name = kan_string_intern ("second_enum_t")},
+         .visibility_condition_field = NULL,
+         .visibility_condition_values_count = 0u,
+         .visibility_condition_values = NULL},
+        {.name = kan_string_intern ("third"),
+         .offset = offsetof (struct same_source_t, third),
+         .size = sizeof (((struct same_source_t *) NULL)->third),
+         .archetype = KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT,
+         .visibility_condition_field = NULL,
+         .visibility_condition_values_count = 0u,
+         .visibility_condition_values = NULL},
+    };
+
+    struct kan_reflection_field_t same_target_fields[] = {
+        {.name = kan_string_intern ("first"),
+         .offset = offsetof (struct same_target_t, first),
+         .size = sizeof (((struct same_target_t *) NULL)->first),
+         .archetype = KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT,
+         .visibility_condition_field = NULL,
+         .visibility_condition_values_count = 0u,
+         .visibility_condition_values = NULL},
+        {.name = kan_string_intern ("second"),
+         .offset = offsetof (struct same_target_t, second),
+         .size = sizeof (((struct same_target_t *) NULL)->second),
+         .archetype = KAN_REFLECTION_ARCHETYPE_ENUM,
+         .archetype_enum = {.type_name = kan_string_intern ("second_enum_t")},
+         .visibility_condition_field = NULL,
+         .visibility_condition_values_count = 0u,
+         .visibility_condition_values = NULL},
+        {.name = kan_string_intern ("third"),
+         .offset = offsetof (struct same_target_t, third),
+         .size = sizeof (((struct same_target_t *) NULL)->third),
+         .archetype = KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT,
+         .visibility_condition_field = NULL,
+         .visibility_condition_values_count = 0u,
+         .visibility_condition_values = NULL},
+    };
+
+    struct kan_reflection_struct_t same_source = {
+        .name = kan_string_intern ("same_t"),
+        .size = sizeof (struct same_source_t),
+        .alignment = _Alignof (struct same_source_t),
+        .initialize = NULL,
+        .shutdown = NULL,
+        .fields_count = sizeof (same_source_fields) / sizeof (struct kan_reflection_field_t),
+        .fields = same_source_fields,
+    };
+
+    struct kan_reflection_struct_t same_target = {
+        .name = kan_string_intern ("same_t"),
+        .size = sizeof (struct same_target_t),
+        .alignment = _Alignof (struct same_target_t),
+        .initialize = NULL,
+        .shutdown = NULL,
+        .fields_count = sizeof (same_target_fields) / sizeof (struct kan_reflection_field_t),
+        .fields = same_target_fields,
+    };
+
+    struct kan_reflection_field_t cross_copy_source_fields[] = {
+        {.name = kan_string_intern ("a"),
+         .offset = offsetof (struct cross_copy_source_t, a),
+         .size = sizeof (((struct cross_copy_source_t *) NULL)->a),
+         .archetype = KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT,
+         .visibility_condition_field = NULL,
+         .visibility_condition_values_count = 0u,
+         .visibility_condition_values = NULL},
+        {.name = kan_string_intern ("b"),
+         .offset = offsetof (struct cross_copy_source_t, b),
+         .size = sizeof (((struct cross_copy_source_t *) NULL)->b),
+         .archetype = KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT,
+         .visibility_condition_field = NULL,
+         .visibility_condition_values_count = 0u,
+         .visibility_condition_values = NULL},
+        {.name = kan_string_intern ("c"),
+         .offset = offsetof (struct cross_copy_source_t, c),
+         .size = sizeof (((struct cross_copy_source_t *) NULL)->c),
+         .archetype = KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT,
+         .visibility_condition_field = NULL,
+         .visibility_condition_values_count = 0u,
+         .visibility_condition_values = NULL},
+        {.name = kan_string_intern ("d"),
+         .offset = offsetof (struct cross_copy_source_t, d),
+         .size = sizeof (((struct cross_copy_source_t *) NULL)->d),
+         .archetype = KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT,
+         .visibility_condition_field = NULL,
+         .visibility_condition_values_count = 0u,
+         .visibility_condition_values = NULL},
+        {.name = kan_string_intern ("e"),
+         .offset = offsetof (struct cross_copy_source_t, e),
+         .size = sizeof (((struct cross_copy_source_t *) NULL)->e),
+         .archetype = KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT,
+         .visibility_condition_field = NULL,
+         .visibility_condition_values_count = 0u,
+         .visibility_condition_values = NULL},
+        {.name = kan_string_intern ("f"),
+         .offset = offsetof (struct cross_copy_source_t, f),
+         .size = sizeof (((struct cross_copy_source_t *) NULL)->f),
+         .archetype = KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT,
+         .visibility_condition_field = NULL,
+         .visibility_condition_values_count = 0u,
+         .visibility_condition_values = NULL},
+    };
+
+    struct kan_reflection_field_t cross_copy_target_fields[] = {
+        {.name = kan_string_intern ("d"),
+         .offset = offsetof (struct cross_copy_target_t, d),
+         .size = sizeof (((struct cross_copy_target_t *) NULL)->d),
+         .archetype = KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT,
+         .visibility_condition_field = NULL,
+         .visibility_condition_values_count = 0u,
+         .visibility_condition_values = NULL},
+        {.name = kan_string_intern ("e"),
+         .offset = offsetof (struct cross_copy_target_t, e),
+         .size = sizeof (((struct cross_copy_target_t *) NULL)->e),
+         .archetype = KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT,
+         .visibility_condition_field = NULL,
+         .visibility_condition_values_count = 0u,
+         .visibility_condition_values = NULL},
+        {.name = kan_string_intern ("f"),
+         .offset = offsetof (struct cross_copy_target_t, f),
+         .size = sizeof (((struct cross_copy_target_t *) NULL)->f),
+         .archetype = KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT,
+         .visibility_condition_field = NULL,
+         .visibility_condition_values_count = 0u,
+         .visibility_condition_values = NULL},
+        {.name = kan_string_intern ("a"),
+         .offset = offsetof (struct cross_copy_target_t, a),
+         .size = sizeof (((struct cross_copy_target_t *) NULL)->a),
+         .archetype = KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT,
+         .visibility_condition_field = NULL,
+         .visibility_condition_values_count = 0u,
+         .visibility_condition_values = NULL},
+        {.name = kan_string_intern ("b"),
+         .offset = offsetof (struct cross_copy_target_t, b),
+         .size = sizeof (((struct cross_copy_target_t *) NULL)->b),
+         .archetype = KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT,
+         .visibility_condition_field = NULL,
+         .visibility_condition_values_count = 0u,
+         .visibility_condition_values = NULL},
+        {.name = kan_string_intern ("c"),
+         .offset = offsetof (struct cross_copy_target_t, c),
+         .size = sizeof (((struct cross_copy_target_t *) NULL)->c),
+         .archetype = KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT,
+         .visibility_condition_field = NULL,
+         .visibility_condition_values_count = 0u,
+         .visibility_condition_values = NULL},
+    };
+
+    struct kan_reflection_struct_t cross_copy_source = {
+        .name = kan_string_intern ("cross_copy_t"),
+        .size = sizeof (struct cross_copy_source_t),
+        .alignment = _Alignof (struct cross_copy_source_t),
+        .initialize = NULL,
+        .shutdown = NULL,
+        .fields_count = sizeof (cross_copy_source_fields) / sizeof (struct kan_reflection_field_t),
+        .fields = cross_copy_source_fields,
+    };
+
+    struct kan_reflection_struct_t cross_copy_target = {
+        .name = kan_string_intern ("cross_copy_t"),
+        .size = sizeof (struct cross_copy_target_t),
+        .alignment = _Alignof (struct cross_copy_target_t),
+        .initialize = NULL,
+        .shutdown = NULL,
+        .fields_count = sizeof (cross_copy_target_fields) / sizeof (struct kan_reflection_field_t),
+        .fields = cross_copy_target_fields,
+    };
+
+    struct kan_reflection_field_t nesting_source_fields[] = {
+        {.name = kan_string_intern ("same"),
+         .offset = offsetof (struct nesting_source_t, same),
+         .size = sizeof (((struct nesting_source_t *) NULL)->same),
+         .archetype = KAN_REFLECTION_ARCHETYPE_STRUCT,
+         .archetype_struct = {.type_name = kan_string_intern ("same_t")},
+         .visibility_condition_field = NULL,
+         .visibility_condition_values_count = 0u,
+         .visibility_condition_values = NULL},
+        {.name = kan_string_intern ("cross_copy"),
+         .offset = offsetof (struct nesting_source_t, cross_copy),
+         .size = sizeof (((struct nesting_source_t *) NULL)->cross_copy),
+         .archetype = KAN_REFLECTION_ARCHETYPE_STRUCT,
+         .archetype_struct = {.type_name = kan_string_intern ("cross_copy_t")},
+         .visibility_condition_field = NULL,
+         .visibility_condition_values_count = 0u,
+         .visibility_condition_values = NULL},
+    };
+
+    struct kan_reflection_field_t nesting_target_fields[] = {
+        {.name = kan_string_intern ("same"),
+         .offset = offsetof (struct nesting_target_t, same),
+         .size = sizeof (((struct nesting_target_t *) NULL)->same),
+         .archetype = KAN_REFLECTION_ARCHETYPE_STRUCT,
+         .archetype_struct = {.type_name = kan_string_intern ("same_t")},
+         .visibility_condition_field = NULL,
+         .visibility_condition_values_count = 0u,
+         .visibility_condition_values = NULL},
+        {.name = kan_string_intern ("cross_copy"),
+         .offset = offsetof (struct nesting_target_t, cross_copy),
+         .size = sizeof (((struct nesting_target_t *) NULL)->cross_copy),
+         .archetype = KAN_REFLECTION_ARCHETYPE_STRUCT,
+         .archetype_struct = {.type_name = kan_string_intern ("cross_copy_t")},
+         .visibility_condition_field = NULL,
+         .visibility_condition_values_count = 0u,
+         .visibility_condition_values = NULL},
+    };
+
+    struct kan_reflection_struct_t nesting_source = {
+        .name = kan_string_intern ("nesting_t"),
+        .size = sizeof (struct nesting_source_t),
+        .alignment = _Alignof (struct nesting_source_t),
+        .initialize = NULL,
+        .shutdown = NULL,
+        .fields_count = sizeof (nesting_source_fields) / sizeof (struct kan_reflection_field_t),
+        .fields = nesting_source_fields,
+    };
+
+    struct kan_reflection_struct_t nesting_target = {
+        .name = kan_string_intern ("nesting_t"),
+        .size = sizeof (struct nesting_target_t),
+        .alignment = _Alignof (struct nesting_target_t),
+        .initialize = NULL,
+        .shutdown = NULL,
+        .fields_count = sizeof (nesting_target_fields) / sizeof (struct kan_reflection_field_t),
+        .fields = nesting_target_fields,
+    };
+
+    int64_t first_selection_conditions[] = {(int64_t) 0u};
+    int64_t second_selection_conditions[] = {(int64_t) 1u};
+
+    struct kan_reflection_field_t migration_source_fields[] = {
+        {.name = kan_string_intern ("nesting_first"),
+         .offset = offsetof (struct migration_source_t, nesting_first),
+         .size = sizeof (((struct migration_source_t *) NULL)->nesting_first),
+         .archetype = KAN_REFLECTION_ARCHETYPE_STRUCT,
+         .archetype_struct = {.type_name = kan_string_intern ("nesting_t")},
+         .visibility_condition_field = NULL,
+         .visibility_condition_values_count = 0u,
+         .visibility_condition_values = NULL},
+        {.name = kan_string_intern ("nesting_to_drop"),
+         .offset = offsetof (struct migration_source_t, nesting_to_drop),
+         .size = sizeof (((struct migration_source_t *) NULL)->nesting_to_drop),
+         .archetype = KAN_REFLECTION_ARCHETYPE_STRUCT,
+         .archetype_struct = {.type_name = kan_string_intern ("nesting_t")},
+         .visibility_condition_field = NULL,
+         .visibility_condition_values_count = 0u,
+         .visibility_condition_values = NULL},
+        {.name = kan_string_intern ("nesting_second"),
+         .offset = offsetof (struct migration_source_t, nesting_second),
+         .size = sizeof (((struct migration_source_t *) NULL)->nesting_second),
+         .archetype = KAN_REFLECTION_ARCHETYPE_STRUCT,
+         .archetype_struct = {.type_name = kan_string_intern ("nesting_t")},
+         .visibility_condition_field = NULL,
+         .visibility_condition_values_count = 0u,
+         .visibility_condition_values = NULL},
+        {.name = kan_string_intern ("enums_array_one"),
+         .offset = offsetof (struct migration_source_t, enums_array_one),
+         .size = sizeof (((struct migration_source_t *) NULL)->enums_array_one),
+         .archetype = KAN_REFLECTION_ARCHETYPE_INLINE_ARRAY,
+         .archetype_inline_array =
+             {
+                 .item_archetype = KAN_REFLECTION_ARCHETYPE_ENUM,
+                 .item_size = sizeof (int),
+                 .item_archetype_enum = {.type_name = kan_string_intern ("first_enum_t")},
+                 .items_count = 4u,
+                 .size_field = NULL,
+             },
+         .visibility_condition_field = NULL,
+         .visibility_condition_values_count = 0u,
+         .visibility_condition_values = NULL},
+        {.name = kan_string_intern ("enums_array_two"),
+         .offset = offsetof (struct migration_source_t, enums_array_two),
+         .size = sizeof (((struct migration_source_t *) NULL)->enums_array_two),
+         .archetype = KAN_REFLECTION_ARCHETYPE_INLINE_ARRAY,
+         .archetype_inline_array =
+             {
+                 .item_archetype = KAN_REFLECTION_ARCHETYPE_ENUM,
+                 .item_size = sizeof (int),
+                 .item_archetype_enum = {.type_name = kan_string_intern ("second_enum_t")},
+                 .items_count = 4u,
+                 .size_field = NULL,
+             },
+         .visibility_condition_field = NULL,
+         .visibility_condition_values_count = 0u,
+         .visibility_condition_values = NULL},
+        {.name = kan_string_intern ("numeric_to_adapt"),
+         .offset = offsetof (struct migration_source_t, numeric_to_adapt),
+         .size = sizeof (((struct migration_source_t *) NULL)->numeric_to_adapt),
+         .archetype = KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT,
+         .visibility_condition_field = NULL,
+         .visibility_condition_values_count = 0u,
+         .visibility_condition_values = NULL},
+        {.name = kan_string_intern ("selector"),
+         .offset = offsetof (struct migration_source_t, selector),
+         .size = sizeof (((struct migration_source_t *) NULL)->selector),
+         .archetype = KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT,
+         .visibility_condition_field = NULL,
+         .visibility_condition_values_count = 0u,
+         .visibility_condition_values = NULL},
+        {.name = kan_string_intern ("selection_first"),
+         .offset = offsetof (struct migration_source_t, selection_first),
+         .size = sizeof (((struct migration_source_t *) NULL)->selection_first),
+         .archetype = KAN_REFLECTION_ARCHETYPE_ENUM,
+         .archetype_enum = {.type_name = kan_string_intern ("first_enum_t")},
+         .visibility_condition_field = &migration_source_fields[6],
+         .visibility_condition_values_count = 1u,
+         .visibility_condition_values = first_selection_conditions},
+        {.name = kan_string_intern ("selection_second"),
+         .offset = offsetof (struct migration_source_t, selection_second),
+         .size = sizeof (((struct migration_source_t *) NULL)->selection_second),
+         .archetype = KAN_REFLECTION_ARCHETYPE_ENUM,
+         .archetype_enum = {.type_name = kan_string_intern ("second_enum_t")},
+         .visibility_condition_field = &migration_source_fields[6],
+         .visibility_condition_values_count = 1u,
+         .visibility_condition_values = second_selection_conditions},
+        {.name = kan_string_intern ("interned_string"),
+         .offset = offsetof (struct migration_source_t, interned_string),
+         .size = sizeof (((struct migration_source_t *) NULL)->interned_string),
+         .archetype = KAN_REFLECTION_ARCHETYPE_INTERNED_STRING,
+         .visibility_condition_field = NULL,
+         .visibility_condition_values_count = 0u,
+         .visibility_condition_values = NULL},
+        {.name = kan_string_intern ("owned_string"),
+         .offset = offsetof (struct migration_source_t, owned_string),
+         .size = sizeof (((struct migration_source_t *) NULL)->owned_string),
+         .archetype = KAN_REFLECTION_ARCHETYPE_STRING_POINTER,
+         .visibility_condition_field = NULL,
+         .visibility_condition_values_count = 0u,
+         .visibility_condition_values = NULL},
+        {.name = kan_string_intern ("dynamic_array"),
+         .offset = offsetof (struct migration_source_t, dynamic_array),
+         .size = sizeof (((struct migration_source_t *) NULL)->dynamic_array),
+         .archetype = KAN_REFLECTION_ARCHETYPE_DYNAMIC_ARRAY,
+         .archetype_dynamic_array =
+             {
+                 .item_archetype = KAN_REFLECTION_ARCHETYPE_ENUM,
+                 .item_size = sizeof (int),
+                 .item_archetype_enum = {.type_name = kan_string_intern ("first_enum_t")},
+             },
+         .visibility_condition_field = NULL,
+         .visibility_condition_values_count = 0u,
+         .visibility_condition_values = NULL},
+    };
+
+    struct kan_reflection_field_t migration_target_fields[] = {
+        {.name = kan_string_intern ("nesting_first"),
+         .offset = offsetof (struct migration_target_t, nesting_first),
+         .size = sizeof (((struct migration_target_t *) NULL)->nesting_first),
+         .archetype = KAN_REFLECTION_ARCHETYPE_STRUCT,
+         .archetype_struct = {.type_name = kan_string_intern ("nesting_t")},
+         .visibility_condition_field = NULL,
+         .visibility_condition_values_count = 0u,
+         .visibility_condition_values = NULL},
+        {.name = kan_string_intern ("nesting_second"),
+         .offset = offsetof (struct migration_target_t, nesting_second),
+         .size = sizeof (((struct migration_target_t *) NULL)->nesting_second),
+         .archetype = KAN_REFLECTION_ARCHETYPE_STRUCT,
+         .archetype_struct = {.type_name = kan_string_intern ("nesting_t")},
+         .visibility_condition_field = NULL,
+         .visibility_condition_values_count = 0u,
+         .visibility_condition_values = NULL},
+        {.name = kan_string_intern ("nesting_to_add"),
+         .offset = offsetof (struct migration_target_t, nesting_to_add),
+         .size = sizeof (((struct migration_target_t *) NULL)->nesting_to_add),
+         .archetype = KAN_REFLECTION_ARCHETYPE_STRUCT,
+         .archetype_struct = {.type_name = kan_string_intern ("nesting_t")},
+         .visibility_condition_field = NULL,
+         .visibility_condition_values_count = 0u,
+         .visibility_condition_values = NULL},
+        {.name = kan_string_intern ("enums_array_one"),
+         .offset = offsetof (struct migration_target_t, enums_array_one),
+         .size = sizeof (((struct migration_target_t *) NULL)->enums_array_one),
+         .archetype = KAN_REFLECTION_ARCHETYPE_INLINE_ARRAY,
+         .archetype_inline_array =
+             {
+                 .item_archetype = KAN_REFLECTION_ARCHETYPE_ENUM,
+                 .item_size = sizeof (int),
+                 .item_archetype_enum = {.type_name = kan_string_intern ("first_enum_t")},
+                 .items_count = 4u,
+                 .size_field = NULL,
+             },
+         .visibility_condition_field = NULL,
+         .visibility_condition_values_count = 0u,
+         .visibility_condition_values = NULL},
+        {.name = kan_string_intern ("enums_array_two"),
+         .offset = offsetof (struct migration_target_t, enums_array_two),
+         .size = sizeof (((struct migration_target_t *) NULL)->enums_array_two),
+         .archetype = KAN_REFLECTION_ARCHETYPE_INLINE_ARRAY,
+         .archetype_inline_array =
+             {
+                 .item_archetype = KAN_REFLECTION_ARCHETYPE_ENUM,
+                 .item_size = sizeof (int),
+                 .item_archetype_enum = {.type_name = kan_string_intern ("second_enum_t")},
+                 .items_count = 4u,
+                 .size_field = NULL,
+             },
+         .visibility_condition_field = NULL,
+         .visibility_condition_values_count = 0u,
+         .visibility_condition_values = NULL},
+        {.name = kan_string_intern ("numeric_to_adapt"),
+         .offset = offsetof (struct migration_target_t, numeric_to_adapt),
+         .size = sizeof (((struct migration_target_t *) NULL)->numeric_to_adapt),
+         .archetype = KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT,
+         .visibility_condition_field = NULL,
+         .visibility_condition_values_count = 0u,
+         .visibility_condition_values = NULL},
+        {.name = kan_string_intern ("selector"),
+         .offset = offsetof (struct migration_target_t, selector),
+         .size = sizeof (((struct migration_target_t *) NULL)->selector),
+         .archetype = KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT,
+         .visibility_condition_field = NULL,
+         .visibility_condition_values_count = 0u,
+         .visibility_condition_values = NULL},
+        {.name = kan_string_intern ("selection_first"),
+         .offset = offsetof (struct migration_target_t, selection_first),
+         .size = sizeof (((struct migration_target_t *) NULL)->selection_first),
+         .archetype = KAN_REFLECTION_ARCHETYPE_ENUM,
+         .archetype_enum = {.type_name = kan_string_intern ("first_enum_t")},
+         .visibility_condition_field = &migration_target_fields[6],
+         .visibility_condition_values_count = 1u,
+         .visibility_condition_values = first_selection_conditions},
+        {.name = kan_string_intern ("selection_second"),
+         .offset = offsetof (struct migration_target_t, selection_second),
+         .size = sizeof (((struct migration_target_t *) NULL)->selection_second),
+         .archetype = KAN_REFLECTION_ARCHETYPE_ENUM,
+         .archetype_enum = {.type_name = kan_string_intern ("second_enum_t")},
+         .visibility_condition_field = &migration_target_fields[6],
+         .visibility_condition_values_count = 1u,
+         .visibility_condition_values = second_selection_conditions},
+        {.name = kan_string_intern ("interned_string"),
+         .offset = offsetof (struct migration_target_t, interned_string),
+         .size = sizeof (((struct migration_target_t *) NULL)->interned_string),
+         .archetype = KAN_REFLECTION_ARCHETYPE_INTERNED_STRING,
+         .visibility_condition_field = NULL,
+         .visibility_condition_values_count = 0u,
+         .visibility_condition_values = NULL},
+        {.name = kan_string_intern ("owned_string"),
+         .offset = offsetof (struct migration_target_t, owned_string),
+         .size = sizeof (((struct migration_target_t *) NULL)->owned_string),
+         .archetype = KAN_REFLECTION_ARCHETYPE_STRING_POINTER,
+         .visibility_condition_field = NULL,
+         .visibility_condition_values_count = 0u,
+         .visibility_condition_values = NULL},
+        {.name = kan_string_intern ("dynamic_array"),
+         .offset = offsetof (struct migration_target_t, dynamic_array),
+         .size = sizeof (((struct migration_target_t *) NULL)->dynamic_array),
+         .archetype = KAN_REFLECTION_ARCHETYPE_DYNAMIC_ARRAY,
+         .archetype_dynamic_array =
+             {
+                 .item_archetype = KAN_REFLECTION_ARCHETYPE_ENUM,
+                 .item_size = sizeof (int),
+                 .item_archetype_enum = {.type_name = kan_string_intern ("first_enum_t")},
+             },
+         .visibility_condition_field = NULL,
+         .visibility_condition_values_count = 0u,
+         .visibility_condition_values = NULL},
+    };
+
+    struct kan_reflection_struct_t migration_source = {
+        .name = kan_string_intern ("migration_t"),
+        .size = sizeof (struct migration_source_t),
+        .alignment = _Alignof (struct migration_source_t),
+        .initialize = NULL,
+        .shutdown = NULL,
+        .fields_count = sizeof (migration_source_fields) / sizeof (struct kan_reflection_field_t),
+        .fields = migration_source_fields,
+    };
+
+    struct kan_reflection_struct_t migration_target = {
+        .name = kan_string_intern ("migration_t"),
+        .size = sizeof (struct migration_target_t),
+        .alignment = _Alignof (struct migration_target_t),
+        .initialize = NULL,
+        .shutdown = NULL,
+        .fields_count = sizeof (migration_target_fields) / sizeof (struct kan_reflection_field_t),
+        .fields = migration_target_fields,
+    };
+
+    kan_reflection_registry_t source_registry = kan_reflection_registry_create ();
+    kan_reflection_registry_t target_registry = kan_reflection_registry_create ();
+
+    KAN_TEST_CHECK (kan_reflection_registry_add_enum (source_registry, &first_enum_source))
+    KAN_TEST_CHECK (kan_reflection_registry_add_enum (target_registry, &first_enum_target))
+
+    KAN_TEST_CHECK (kan_reflection_registry_add_enum (source_registry, &second_enum_source))
+    KAN_TEST_CHECK (kan_reflection_registry_add_enum (target_registry, &second_enum_target))
+
+    KAN_TEST_CHECK (kan_reflection_registry_add_struct (source_registry, &same_source))
+    KAN_TEST_CHECK (kan_reflection_registry_add_struct (target_registry, &same_target))
+
+    KAN_TEST_CHECK (kan_reflection_registry_add_struct (source_registry, &cross_copy_source))
+    KAN_TEST_CHECK (kan_reflection_registry_add_struct (target_registry, &cross_copy_target))
+
+    KAN_TEST_CHECK (kan_reflection_registry_add_struct (source_registry, &nesting_source))
+    KAN_TEST_CHECK (kan_reflection_registry_add_struct (target_registry, &nesting_target))
+
+    KAN_TEST_CHECK (kan_reflection_registry_add_struct (source_registry, &migration_source))
+    KAN_TEST_CHECK (kan_reflection_registry_add_struct (target_registry, &migration_target))
+
+    kan_reflection_migration_seed_t source_to_target_migration_seed =
+        kan_reflection_migration_seed_build (source_registry, target_registry);
+
+    const struct kan_reflection_enum_migration_seed_t *first_enum_seed =
+        kan_reflection_migration_seed_get_for_enum (source_to_target_migration_seed, first_enum_source.name);
+    KAN_TEST_ASSERT (first_enum_seed)
+    KAN_TEST_CHECK (first_enum_seed->status == KAN_REFLECTION_MIGRATION_NEEDED)
+    KAN_TEST_CHECK (first_enum_seed->value_remap[0u] == &first_enum_target_values[0u])
+    KAN_TEST_CHECK (first_enum_seed->value_remap[1u] == &first_enum_target_values[2u])
+
+    const struct kan_reflection_enum_migration_seed_t *second_enum_seed =
+        kan_reflection_migration_seed_get_for_enum (source_to_target_migration_seed, second_enum_source.name);
+    KAN_TEST_ASSERT (second_enum_seed)
+    KAN_TEST_CHECK (second_enum_seed->status == KAN_REFLECTION_MIGRATION_NOT_NEEDED)
+
+    const struct kan_reflection_struct_migration_seed_t *same_seed =
+        kan_reflection_migration_seed_get_for_struct (source_to_target_migration_seed, same_source.name);
+    KAN_TEST_ASSERT (same_seed)
+    KAN_TEST_CHECK (same_seed->status == KAN_REFLECTION_MIGRATION_NOT_NEEDED)
+
+    const struct kan_reflection_struct_migration_seed_t *cross_copy_seed =
+        kan_reflection_migration_seed_get_for_struct (source_to_target_migration_seed, cross_copy_source.name);
+    KAN_TEST_ASSERT (cross_copy_seed)
+    KAN_TEST_CHECK (cross_copy_seed->status == KAN_REFLECTION_MIGRATION_NEEDED)
+    KAN_TEST_CHECK (cross_copy_seed->field_remap[0u] == &cross_copy_target_fields[3u])
+    KAN_TEST_CHECK (cross_copy_seed->field_remap[1u] == &cross_copy_target_fields[4u])
+    KAN_TEST_CHECK (cross_copy_seed->field_remap[2u] == &cross_copy_target_fields[5u])
+    KAN_TEST_CHECK (cross_copy_seed->field_remap[3u] == &cross_copy_target_fields[0u])
+    KAN_TEST_CHECK (cross_copy_seed->field_remap[4u] == &cross_copy_target_fields[1u])
+    KAN_TEST_CHECK (cross_copy_seed->field_remap[5u] == &cross_copy_target_fields[2u])
+
+    const struct kan_reflection_struct_migration_seed_t *nesting_seed =
+        kan_reflection_migration_seed_get_for_struct (source_to_target_migration_seed, nesting_source.name);
+    KAN_TEST_ASSERT (nesting_seed)
+    KAN_TEST_CHECK (nesting_seed->status == KAN_REFLECTION_MIGRATION_NEEDED)
+    KAN_TEST_CHECK (nesting_seed->field_remap[0u] == &nesting_target_fields[0u])
+    KAN_TEST_CHECK (nesting_seed->field_remap[1u] == &nesting_target_fields[1u])
+
+    const struct kan_reflection_struct_migration_seed_t *migration_seed =
+        kan_reflection_migration_seed_get_for_struct (source_to_target_migration_seed, migration_source.name);
+    KAN_TEST_ASSERT (migration_seed)
+    KAN_TEST_CHECK (migration_seed->status == KAN_REFLECTION_MIGRATION_NEEDED)
+    KAN_TEST_CHECK (migration_seed->field_remap[0u] == &migration_target_fields[0u])
+    KAN_TEST_CHECK (migration_seed->field_remap[1u] == NULL)
+    KAN_TEST_CHECK (migration_seed->field_remap[2u] == &migration_target_fields[1u])
+    KAN_TEST_CHECK (migration_seed->field_remap[3u] == &migration_target_fields[3u])
+    KAN_TEST_CHECK (migration_seed->field_remap[4u] == &migration_target_fields[4u])
+    KAN_TEST_CHECK (migration_seed->field_remap[5u] == &migration_target_fields[5u])
+    KAN_TEST_CHECK (migration_seed->field_remap[6u] == &migration_target_fields[6u])
+    KAN_TEST_CHECK (migration_seed->field_remap[7u] == &migration_target_fields[7u])
+    KAN_TEST_CHECK (migration_seed->field_remap[8u] == &migration_target_fields[8u])
+    KAN_TEST_CHECK (migration_seed->field_remap[9u] == &migration_target_fields[9u])
+    KAN_TEST_CHECK (migration_seed->field_remap[10u] == &migration_target_fields[10u])
+    KAN_TEST_CHECK (migration_seed->field_remap[11u] == &migration_target_fields[11u])
+
+    kan_reflection_struct_migrator_t source_to_target_migrator =
+        kan_reflection_struct_migrator_build (source_to_target_migration_seed);
+
+    struct migration_source_t first_migration_source = {
+        .nesting_first =
+            {
+                .same = {.first = 42u, .second = SECOND_ENUM_SOURCE_SECOND, .third = 13u},
+                .cross_copy = {.a = 1u, .b = 2u, .c = 3u, .d = 4u, .e = 5u, .f = 6u},
+            },
+        .nesting_to_drop =
+            {
+                .same = {.first = 11u, .second = SECOND_ENUM_SOURCE_FIRST, .third = 99u},
+                .cross_copy = {.a = 0u, .b = 1u, .c = 2u, .d = 3u, .e = 4u, .f = 5u},
+            },
+        .nesting_second =
+            {
+                .same = {.first = 167u, .second = SECOND_ENUM_SOURCE_FIRST, .third = 255u},
+                .cross_copy = {.a = 11u, .b = 15u, .c = 22u, .d = 34u, .e = 37u, .f = 99u},
+            },
+        .enums_array_one = {FIRST_ENUM_SOURCE_HELLO, FIRST_ENUM_SOURCE_WORLD, FIRST_ENUM_SOURCE_WORLD,
+                            FIRST_ENUM_SOURCE_HELLO},
+        .enums_array_two = {SECOND_ENUM_SOURCE_FIRST, SECOND_ENUM_SOURCE_THIRD, SECOND_ENUM_SOURCE_SECOND,
+                            SECOND_ENUM_SOURCE_FIRST | SECOND_ENUM_SOURCE_SECOND | SECOND_ENUM_SOURCE_THIRD},
+        .numeric_to_adapt = 177756u,
+        .selector = 0u,
+        .selection_first = FIRST_ENUM_SOURCE_WORLD,
+        .interned_string = kan_string_intern ("Hello, world!"),
+        .owned_string = "Let's think it is owned string.",
+    };
+
+    // Just the same, but with own dynamic array and other selector.
+    struct migration_source_t second_migration_source = first_migration_source;
+    second_migration_source.selector = 1u;
+    second_migration_source.selection_second = SECOND_ENUM_SOURCE_SECOND | SECOND_ENUM_SOURCE_THIRD;
+
+    kan_dynamic_array_init (&first_migration_source.dynamic_array, 4u, sizeof (int), _Alignof (int),
+                            KAN_ALLOCATION_GROUP_IGNORE);
+    *(enum first_enum_source_t *) kan_dynamic_array_add_last (&first_migration_source.dynamic_array) =
+        FIRST_ENUM_SOURCE_HELLO;
+    *(enum first_enum_source_t *) kan_dynamic_array_add_last (&first_migration_source.dynamic_array) =
+        FIRST_ENUM_SOURCE_WORLD;
+
+    kan_dynamic_array_init (&second_migration_source.dynamic_array, 4u, sizeof (int), _Alignof (int),
+                            KAN_ALLOCATION_GROUP_IGNORE);
+    *(enum first_enum_source_t *) kan_dynamic_array_add_last (&second_migration_source.dynamic_array) =
+        FIRST_ENUM_SOURCE_WORLD;
+    *(enum first_enum_source_t *) kan_dynamic_array_add_last (&second_migration_source.dynamic_array) =
+        FIRST_ENUM_SOURCE_HELLO;
+
+    struct migration_target_t first_migration_target = construct_empty_migration_target ();
+    kan_reflection_struct_migrator_migrate_instance (source_to_target_migrator, migration_source.name,
+                                                     &first_migration_source, &first_migration_target);
+
+    check_generic_migration_result (&first_migration_source, &first_migration_target);
+    KAN_TEST_CHECK (strcmp (first_migration_target.interned_string, "Hello, world!") == 0)
+    KAN_TEST_CHECK (strcmp (first_migration_target.owned_string, "Let's think it is owned string.") == 0)
+
+    KAN_TEST_CHECK (first_migration_target.dynamic_array.size == 2u)
+    KAN_TEST_CHECK (((enum first_enum_source_t *) first_migration_target.dynamic_array.data)[0u] ==
+                    FIRST_ENUM_TARGET_HELLO)
+    KAN_TEST_CHECK (((enum first_enum_source_t *) first_migration_target.dynamic_array.data)[1u] ==
+                    FIRST_ENUM_TARGET_WORLD)
+
+    struct migration_target_t second_migration_target = construct_empty_migration_target ();
+    kan_reflection_struct_migrator_migrate_instance (source_to_target_migrator, migration_source.name,
+                                                     &second_migration_source, &second_migration_target);
+
+    check_generic_migration_result (&second_migration_source, &second_migration_target);
+    KAN_TEST_CHECK (strcmp (second_migration_target.interned_string, "Hello, world!") == 0)
+    KAN_TEST_CHECK (strcmp (second_migration_target.owned_string, "Let's think it is owned string.") == 0)
+
+    KAN_TEST_CHECK (second_migration_target.dynamic_array.size == 2u)
+    KAN_TEST_CHECK (((enum first_enum_source_t *) second_migration_target.dynamic_array.data)[0u] ==
+                    FIRST_ENUM_TARGET_WORLD)
+    KAN_TEST_CHECK (((enum first_enum_source_t *) second_migration_target.dynamic_array.data)[1u] ==
+                    FIRST_ENUM_TARGET_HELLO)
+
+    kan_reflection_patch_builder_t patch_builder = kan_reflection_patch_builder_create ();
+
+    kan_reflection_patch_builder_add_chunk (patch_builder, offsetof (struct migration_source_t, nesting_first),
+                                            sizeof (struct nesting_source_t), &first_migration_source.nesting_first);
+    kan_reflection_patch_builder_add_chunk (patch_builder, offsetof (struct migration_source_t, nesting_to_drop),
+                                            sizeof (struct nesting_source_t), &first_migration_source.nesting_to_drop);
+    kan_reflection_patch_builder_add_chunk (patch_builder, offsetof (struct migration_source_t, nesting_second),
+                                            sizeof (struct nesting_source_t), &first_migration_source.nesting_second);
+    kan_reflection_patch_builder_add_chunk (patch_builder, offsetof (struct migration_source_t, enums_array_one),
+                                            sizeof (enum first_enum_target_t) * 4u,
+                                            first_migration_source.enums_array_one);
+    kan_reflection_patch_builder_add_chunk (patch_builder, offsetof (struct migration_source_t, numeric_to_adapt),
+                                            sizeof (uint32_t), &first_migration_source.numeric_to_adapt);
+    kan_reflection_patch_builder_add_chunk (patch_builder, offsetof (struct migration_source_t, selector),
+                                            sizeof (uint64_t), &first_migration_source.selector);
+    kan_reflection_patch_builder_add_chunk (patch_builder, offsetof (struct migration_source_t, selection_first),
+                                            sizeof (enum first_enum_source_t), &first_migration_source.selection_first);
+    kan_reflection_patch_t patch =
+        kan_reflection_patch_builder_build (patch_builder, source_registry, &migration_source);
+
+    kan_reflection_patch_builder_destroy (patch_builder);
+
+    kan_reflection_struct_migrator_migrate_patches (source_to_target_migrator, source_registry, target_registry);
+    struct migration_target_t patch_target = construct_empty_migration_target ();
+    kan_reflection_patch_apply (patch, &patch_target);
+
+    check_nesting_migration_result (&first_migration_source.nesting_first, &patch_target.nesting_first);
+    check_nesting_migration_result (&first_migration_source.nesting_second, &patch_target.nesting_second);
+    check_nesting_unchanged (&patch_target.nesting_to_add);
+
+    check_first_enum_migration_result (first_migration_source.enums_array_one[0u], patch_target.enums_array_one[0u]);
+    check_first_enum_migration_result (first_migration_source.enums_array_one[1u], patch_target.enums_array_one[1u]);
+    check_first_enum_migration_result (first_migration_source.enums_array_one[2u], patch_target.enums_array_one[2u]);
+    check_first_enum_migration_result (first_migration_source.enums_array_one[3u], patch_target.enums_array_one[3u]);
+
+    KAN_TEST_CHECK ((uint64_t) first_migration_source.numeric_to_adapt == patch_target.numeric_to_adapt)
+    KAN_TEST_CHECK (first_migration_source.selector == patch_target.selector)
+    check_first_enum_migration_result (first_migration_source.selection_first, patch_target.selection_first);
+
+    kan_dynamic_array_shutdown (&first_migration_source.dynamic_array);
+    kan_dynamic_array_shutdown (&first_migration_target.dynamic_array);
+    kan_dynamic_array_shutdown (&second_migration_source.dynamic_array);
+    kan_dynamic_array_shutdown (&second_migration_target.dynamic_array);
+
+    kan_reflection_struct_migrator_destroy (source_to_target_migrator);
+    kan_reflection_migration_seed_destroy (source_to_target_migration_seed);
+    kan_reflection_registry_destroy (source_registry);
+    kan_reflection_registry_destroy (target_registry);
 }

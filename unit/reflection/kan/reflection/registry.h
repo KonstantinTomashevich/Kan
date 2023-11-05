@@ -86,6 +86,9 @@ enum kan_reflection_archetype_t
     /// \brief Refers to a value that belongs to some enumeration.
     KAN_REFLECTION_ARCHETYPE_ENUM,
 
+    /// \brief Refers to a pointer to arbitrary data type that is not registered as struct in reflection.
+    KAN_REFLECTION_ARCHETYPE_EXTERNAL_POINTER,
+
     /// \brief Refers to a structure that is a part of main structure memory block.
     KAN_REFLECTION_ARCHETYPE_STRUCT,
 
@@ -139,7 +142,7 @@ struct kan_reflection_archetype_inline_array_suffix_t
 ///          supported.
 struct kan_reflection_archetype_dynamic_array_suffix_t
 {
-    enum kan_reflection_archetype_t archetype;
+    enum kan_reflection_archetype_t item_archetype;
     uint64_t item_size;
 
     union
@@ -190,7 +193,7 @@ struct kan_reflection_struct_t
 typedef uint64_t kan_reflection_registry_t;
 
 /// \brief Allocates new reflection registry.
-REFLECTION_API kan_reflection_registry_t kan_reflection_registry_create ();
+REFLECTION_API kan_reflection_registry_t kan_reflection_registry_create (void);
 
 /// \brief Adds new enum unless its type name is already taken.
 REFLECTION_API kan_bool_t kan_reflection_registry_add_enum (kan_reflection_registry_t registry,
@@ -297,6 +300,6 @@ kan_reflection_registry_struct_iterator_next (kan_reflection_registry_struct_ite
 /// \brief Destroys reflection registry. Does not destroy registered reflection data.
 REFLECTION_API void kan_reflection_registry_destroy (kan_reflection_registry_t registry);
 
-// TODO: Migration support.
+// TODO: Support for reflection remaps like Unreal Engine core redirects? Might be needed later.
 
 KAN_C_HEADER_END
