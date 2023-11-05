@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <string.h>
 
 #include <debugbreak.h>
 
@@ -7,8 +8,11 @@ KAN_MUTE_THIRD_PARTY_WARNINGS_BEGIN
 #include <SDL_messagebox.h>
 KAN_MUTE_THIRD_PARTY_WARNINGS_END
 
+#include <kan/container/hash_storage.h>
 #include <kan/error/critical.h>
+#include <kan/hash/hash.h>
 #include <kan/log/logging.h>
+#include <kan/memory/allocation.h>
 #include <kan/threading/mutex.h>
 
 KAN_LOG_DEFINE_CATEGORY (error);
@@ -17,10 +21,21 @@ struct critical_error_context_t
 {
     kan_bool_t is_interactive;
     kan_mutex_handle_t interactive_mutex;
+    struct kan_hash_storage_t skipped_error_storage;
+};
+
+struct skipped_error_node_t
+{
+    struct kan_hash_storage_node_t node;
+    const char *file;
+    int line;
 };
 
 static kan_bool_t critical_error_context_ready = KAN_FALSE;
 static struct critical_error_context_t critical_error_context;
+
+#define SKIPPED_CRITICAL_ERROR_INFO_STORAGE_INITIAL_BUCKETS 8u
+#define SKIPPED_CRITICAL_ERROR_INFO_STORAGE_LOAD_FACTOR 4u
 
 static inline void kan_critical_error_context_ensure (void)
 {
@@ -28,8 +43,16 @@ static inline void kan_critical_error_context_ensure (void)
     {
         critical_error_context.is_interactive = KAN_FALSE;
         critical_error_context.interactive_mutex = kan_mutex_create ();
+        kan_hash_storage_init (&critical_error_context.skipped_error_storage, KAN_ALLOCATION_GROUP_IGNORE,
+                               SKIPPED_CRITICAL_ERROR_INFO_STORAGE_INITIAL_BUCKETS);
+
         critical_error_context_ready = KAN_TRUE;
     }
+}
+
+static inline uint64_t hash_error (const char *file, int line)
+{
+    return kan_hash_combine (kan_string_hash (file), (uint64_t) line);
 }
 
 void kan_set_critical_error_interactive (kan_bool_t is_interactive)
@@ -48,7 +71,24 @@ void kan_critical_error (const char *message, const char *file, int line)
     {
         kan_mutex_lock (critical_error_context.interactive_mutex);
 
-        // TODO: Support for skip all feature.
+        const uint64_t error_hash = hash_error (file, line);
+        const struct kan_hash_storage_bucket_t *bucket =
+            kan_hash_storage_query (&critical_error_context.skipped_error_storage, error_hash);
+
+        struct skipped_error_node_t *node = (struct skipped_error_node_t *) bucket->first;
+        const struct skipped_error_node_t *end =
+            (struct skipped_error_node_t *) (bucket->last ? bucket->last->next : NULL);
+
+        while (node != end)
+        {
+            if (node->node.hash == error_hash && node->line == line && strcmp (node->file, file) == 0)
+            {
+                return;
+            }
+
+            kan_mutex_unlock (critical_error_context.interactive_mutex);
+            node = (struct skipped_error_node_t *) node->node.list_node.next;
+        }
 
 #define BUTTON_SKIP 0
 #define BUTTON_SKIP_ALL_OCCURRENCES 1
@@ -71,14 +111,37 @@ void kan_critical_error (const char *message, const char *file, int line)
 
         int result_button_id;
         int message_box_return_code = SDL_ShowMessageBox (&message_box_data, &result_button_id);
-        kan_mutex_unlock (critical_error_context.interactive_mutex);
 
         if (message_box_return_code < 0)
         {
             KAN_LOG (testing, KAN_LOG_CRITICAL_ERROR, "Failed to create interactive assert message box: %s.",
                      SDL_GetError ())
+            kan_mutex_unlock (critical_error_context.interactive_mutex);
             abort ();
         }
+
+        if (result_button_id == BUTTON_SKIP_ALL_OCCURRENCES)
+        {
+            node = kan_allocate_batched (KAN_ALLOCATION_GROUP_IGNORE, sizeof (struct skipped_error_node_t));
+            node->node.hash = error_hash;
+            node->file = file;
+            node->line = line;
+
+            if (critical_error_context.skipped_error_storage.items.size >=
+                critical_error_context.skipped_error_storage.bucket_count *
+                    SKIPPED_CRITICAL_ERROR_INFO_STORAGE_LOAD_FACTOR)
+            {
+                kan_hash_storage_set_bucket_count (&critical_error_context.skipped_error_storage,
+                                                   critical_error_context.skipped_error_storage.bucket_count * 2u);
+            }
+
+            kan_hash_storage_add (&critical_error_context.skipped_error_storage, &node->node);
+
+            kan_mutex_unlock (critical_error_context.interactive_mutex);
+            return;
+        }
+
+        kan_mutex_unlock (critical_error_context.interactive_mutex);
 
         // If window was closed.
         if (result_button_id < 0)
@@ -88,12 +151,6 @@ void kan_critical_error (const char *message, const char *file, int line)
 
         if (result_button_id == BUTTON_SKIP)
         {
-            return;
-        }
-
-        if (result_button_id == BUTTON_SKIP_ALL_OCCURRENCES)
-        {
-            // TODO: Support for skip all feature.
             return;
         }
 
