@@ -1,6 +1,7 @@
 #include <memory.h>
 #include <stddef.h>
 
+#include <kan/api_common/min_max.h>
 #include <kan/container/dynamic_array.h>
 #include <kan/reflection/field_visibility_iterator.h>
 #include <kan/reflection/migration.h>
@@ -903,11 +904,18 @@ static void check_generic_migration_result (const struct migration_source_t *sou
 
     KAN_TEST_CHECK (source->interned_string == target->interned_string)
 
-    // String and array should be moved, so we can't check them.
+    // String should be moved, so we can't check it.
     KAN_TEST_CHECK (!source->owned_string)
-    KAN_TEST_CHECK (source->dynamic_array.capacity == 0u)
-    KAN_TEST_CHECK (source->dynamic_array.size == 0u)
-    KAN_TEST_CHECK (!source->dynamic_array.data)
+
+    KAN_TEST_CHECK (source->dynamic_array.capacity == target->dynamic_array.capacity)
+    KAN_TEST_CHECK (source->dynamic_array.size == target->dynamic_array.size)
+
+    const uint64_t min_size = KAN_MIN (source->dynamic_array.size, target->dynamic_array.size);
+    for (uint64_t index = 0u; index < min_size; ++index)
+    {
+        check_first_enum_migration_result (((const enum first_enum_source_t *) source->dynamic_array.data)[index],
+                                           ((const enum first_enum_target_t *) target->dynamic_array.data)[index]);
+    }
 }
 
 KAN_TEST_CASE (migration)
@@ -1585,12 +1593,6 @@ KAN_TEST_CASE (migration)
     KAN_TEST_CHECK (strcmp (first_migration_target.interned_string, "Hello, world!") == 0)
     KAN_TEST_CHECK (strcmp (first_migration_target.owned_string, "Let's think it is owned string.") == 0)
 
-    KAN_TEST_CHECK (first_migration_target.dynamic_array.size == 2u)
-    KAN_TEST_CHECK (((enum first_enum_source_t *) first_migration_target.dynamic_array.data)[0u] ==
-                    FIRST_ENUM_TARGET_HELLO)
-    KAN_TEST_CHECK (((enum first_enum_source_t *) first_migration_target.dynamic_array.data)[1u] ==
-                    FIRST_ENUM_TARGET_WORLD)
-
     struct migration_target_t second_migration_target = construct_empty_migration_target ();
     kan_reflection_struct_migrator_migrate_instance (source_to_target_migrator, migration_source.name,
                                                      &second_migration_source, &second_migration_target);
@@ -1598,12 +1600,6 @@ KAN_TEST_CASE (migration)
     check_generic_migration_result (&second_migration_source, &second_migration_target);
     KAN_TEST_CHECK (strcmp (second_migration_target.interned_string, "Hello, world!") == 0)
     KAN_TEST_CHECK (strcmp (second_migration_target.owned_string, "Let's think it is owned string.") == 0)
-
-    KAN_TEST_CHECK (second_migration_target.dynamic_array.size == 2u)
-    KAN_TEST_CHECK (((enum first_enum_source_t *) second_migration_target.dynamic_array.data)[0u] ==
-                    FIRST_ENUM_TARGET_WORLD)
-    KAN_TEST_CHECK (((enum first_enum_source_t *) second_migration_target.dynamic_array.data)[1u] ==
-                    FIRST_ENUM_TARGET_HELLO)
 
     kan_reflection_patch_builder_t patch_builder = kan_reflection_patch_builder_create ();
 

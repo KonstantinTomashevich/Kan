@@ -2529,6 +2529,12 @@ static struct struct_migrator_node_t *migrator_add_struct (struct migrator_t *mi
                     copy_command.size = source_field->size;
                     copy_command.condition_index = condition_index;
                     migrator_add_copy_command (copy_command, algorithm_allocator, &queues);
+
+                    struct migrator_command_set_zero_t set_zero_command;
+                    set_zero_command.absolute_source_offset = source_field->offset;
+                    set_zero_command.size = sizeof (uint64_t) + sizeof (uint64_t) + sizeof (uint8_t *);
+                    set_zero_command.condition_index = condition_index;
+                    migrator_add_set_zero_command (set_zero_command, algorithm_allocator, &queues);
                 }
                 else
                 {
@@ -2541,11 +2547,6 @@ static struct struct_migrator_node_t *migrator_add_struct (struct migrator_t *mi
                     migrator_add_adapt_dynamic_array_command (adapt_command, algorithm_allocator, &queues);
                 }
 
-                struct migrator_command_set_zero_t set_zero_command;
-                set_zero_command.absolute_source_offset = source_field->offset;
-                set_zero_command.size = sizeof (uint64_t) + sizeof (uint64_t) + sizeof (uint8_t *);
-                set_zero_command.condition_index = condition_index;
-                migrator_add_set_zero_command (set_zero_command, algorithm_allocator, &queues);
                 break;
             }
             }
@@ -3471,5 +3472,6 @@ REFLECTION_API void kan_reflection_struct_migrator_destroy (kan_reflection_struc
         node = next;
     }
 
+    kan_hash_storage_shutdown (&migrator_data->struct_migrators);
     kan_free_batched (allocation_group, migrator_data);
 }
