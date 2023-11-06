@@ -64,3 +64,5 @@ option (KAN_REFLECTION_VALIDATION_ENABLED "Whether reflection data validation is
 if (KAN_REFLECTION_VALIDATION_ENABLED)
     concrete_compile_definitions (PRIVATE KAN_REFLECTION_WITH_VALIDATION)
 endif ()
+
+c_interface_scanner_add_to_unit ()

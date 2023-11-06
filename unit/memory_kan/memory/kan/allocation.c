@@ -290,12 +290,12 @@ void kan_stack_allocator_reset (kan_stack_allocator_t allocator)
     stack->top = stack->data;
 }
 
-MEMORY_API void *kan_stack_allocator_save_top (kan_stack_allocator_t allocator)
+void *kan_stack_allocator_save_top (kan_stack_allocator_t allocator)
 {
     return ((struct stack_allocator_t *) allocator)->top;
 }
 
-MEMORY_API void kan_stack_allocator_load_top (kan_stack_allocator_t allocator, void *top)
+void kan_stack_allocator_load_top (kan_stack_allocator_t allocator, void *top)
 {
     struct stack_allocator_t *stack = (struct stack_allocator_t *) allocator;
     KAN_ASSERT ((uint8_t *) top >= stack->data && (uint8_t *) top <= stack->end)

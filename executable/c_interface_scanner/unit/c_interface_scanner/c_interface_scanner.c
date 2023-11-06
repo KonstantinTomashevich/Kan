@@ -6,7 +6,9 @@
 #include <string.h>
 
 #include <kan/api_common/bool.h>
+#include <kan/api_common/min_max.h>
 #include <kan/c_interface/builder.h>
+#include <kan/c_interface/file.h>
 #include <kan/error/critical.h>
 #include <kan/file_system/stream.h>
 #include <kan/memory/allocation.h>
@@ -68,6 +70,12 @@ static struct
     .first = NULL,
     .last = NULL,
 };
+
+static struct kan_c_interface_file_t interface_file;
+static kan_bool_t interface_file_should_have_includable_object;
+static char *optional_includable_object_building_buffer = NULL;
+static uint64_t optional_includable_object_building_buffer_size = 0u;
+static uint64_t optional_includable_object_building_buffer_capacity = 0u;
 
 // IO
 
@@ -296,6 +304,70 @@ static void report_exported_symbol (kan_bool_t is_const,
     token->struct_field.type.pointer_level = (uint8_t) pointer_level;
 }
 
+// Optional includable object building
+
+static void optional_includable_object_append_general (const char *source, uint64_t length)
+{
+    if (!interface_file_should_have_includable_object || length == 0u)
+    {
+        return;
+    }
+
+    if (optional_includable_object_building_buffer_size + length >= optional_includable_object_building_buffer_capacity)
+    {
+        const uint64_t new_capacity =
+            KAN_MAX (optional_includable_object_building_buffer_capacity * 2u, INPUT_BUFFER_SIZE);
+        char *new_buffer = kan_allocate_general (KAN_ALLOCATION_GROUP_IGNORE, new_capacity, _Alignof (char));
+
+        memcpy (new_buffer, optional_includable_object_building_buffer,
+                optional_includable_object_building_buffer_size);
+        kan_free_general (KAN_ALLOCATION_GROUP_IGNORE, optional_includable_object_building_buffer,
+                          optional_includable_object_building_buffer_capacity);
+
+        optional_includable_object_building_buffer = new_buffer;
+        optional_includable_object_building_buffer_capacity = new_capacity;
+    }
+
+    strncpy (optional_includable_object_building_buffer + optional_includable_object_building_buffer_size, source,
+             length);
+    optional_includable_object_building_buffer_size += length;
+}
+
+static void optional_includable_object_append_token (void)
+{
+    if (!interface_file_should_have_includable_object)
+    {
+        return;
+    }
+
+    optional_includable_object_append_general (io.token, io.cursor - io.token);
+}
+
+static void optional_includable_object_append_string (char *string)
+{
+    if (!interface_file_should_have_includable_object)
+    {
+        return;
+    }
+
+    optional_includable_object_append_general (string, strlen (string));
+}
+
+static void optional_includable_object_finish (void)
+{
+    if (!interface_file_should_have_includable_object || !optional_includable_object_building_buffer)
+    {
+        return;
+    }
+
+    const uint64_t length = strlen (optional_includable_object_building_buffer);
+    interface_file.optional_includable_object =
+        kan_allocate_general (KAN_ALLOCATION_GROUP_IGNORE, length + 1u, _Alignof (char));
+    strcpy (interface_file.optional_includable_object, optional_includable_object_building_buffer);
+    kan_free_general (KAN_ALLOCATION_GROUP_IGNORE, optional_includable_object_building_buffer,
+                      optional_includable_object_building_buffer_capacity);
+}
+
 // Parse input using re2c
 
 // Define tag format.
@@ -393,7 +465,8 @@ static const char *capture_meta_value_end;
  "/""*" { if (!parse_subroutine_multi_line_comment ()) { return KAN_FALSE; } continue; }
  "//" { if (!parse_subroutine_single_line_comment ()) { return KAN_FALSE; } continue; }
 
- separator | any_preprocessor { continue; }
+ separator | any_preprocessor { optional_includable_object_append_token (); continue; }
+
  *
  {
      fprintf (stderr, "Error. [%ld:%ld]: Unable to parse next token. Parser: %s. Symbol code: 0x%x.\n",
@@ -465,6 +538,7 @@ static kan_bool_t parse_main (void)
 
          identifier (separator | [;])
          {
+             optional_includable_object_append_token ();
              if (strncmp (
                  capture_identifier_begin, arguments.export_macro,
                  capture_identifier_end - capture_identifier_begin) == 0)
@@ -480,6 +554,7 @@ static kan_bool_t parse_main (void)
          // Named enum.
         "enum" separator+ identifier separator* "{"
         {
+            optional_includable_object_append_token ();
             report_enum_begin (capture_identifier_begin, capture_identifier_end);
             return parse_enum ();
         }
@@ -487,6 +562,7 @@ static kan_bool_t parse_main (void)
          // Named structure.
          "struct" separator+ identifier separator* "{"
          {
+             optional_includable_object_append_token ();
              report_struct_begin (capture_identifier_begin, capture_identifier_end);
              return parse_struct ();
          }
@@ -500,16 +576,19 @@ static kan_bool_t parse_main (void)
          }
 
          // We ignore usual typedefs.
-         "typedef" separator+ [^;]+ ";" { continue; }
+         "typedef" separator+ [^;]+ ";" { optional_includable_object_append_token (); continue; }
 
          // Looks like we've encountered '(' from function that is not exported. Skip everything inside.
-         "(" { return parse_skip_until_round_braces_close (); }
+         "(" { optional_includable_object_append_token (); return parse_skip_until_round_braces_close (); }
 
          // Looks like we've encountered '{' from function body or initializer. Skip everything inside.
-         "{" { return parse_skip_until_curly_braces_close (); }
+         "{" { optional_includable_object_append_string (";"); return parse_skip_until_curly_braces_close (); }
 
          // Symbols about which we're not concerned while they're in global scope.
-         [*=;] { continue; }
+         [*;] { optional_includable_object_append_token (); continue; }
+         "=" { continue; }
+         "=" (separator | [a-zA-Z0-9+*_] | "-" | "/" | ")" | "(" )* ";"
+         { optional_includable_object_append_string (";"); continue; }
 
          $ { return KAN_TRUE; }
          */
@@ -526,15 +605,16 @@ static kan_bool_t parse_enum (void)
 
          identifier (separator? "=" separator* [0-9a-zA-Z_]+ separator*)?
          {
+             optional_includable_object_append_token ();
              report_enum_value (
                  capture_identifier_begin,
                  capture_identifier_end);
              continue;
          }
 
-         "," { continue; }
+         "," { optional_includable_object_append_token (); continue; }
 
-         "}" { report_enum_end (); return parse_main (); }
+         "}" { optional_includable_object_append_token (); report_enum_end (); return parse_main (); }
 
          $ { fprintf (stderr, "Error. Reached end of file while parsing enum."); return KAN_FALSE; }
          */
@@ -552,6 +632,7 @@ static kan_bool_t parse_struct (void)
 
          type separator* identifier separator* array_suffix? separator* ";"
          {
+             optional_includable_object_append_token ();
              report_struct_field (
                  capture_const_begin == capture_const_end ? KAN_FALSE : KAN_TRUE,
                  capture_enum_begin != capture_enum_end     ? KAN_C_ARCHETYPE_ENUM :
@@ -568,6 +649,7 @@ static kan_bool_t parse_struct (void)
 
          "union" separator* "{"
          {
+             optional_includable_object_append_token ();
              if (inside_union)
              {
                  fprintf (stderr, "Error. [%ld:%ld]: Nested unions aren't supported.\n",
@@ -579,10 +661,11 @@ static kan_bool_t parse_struct (void)
              continue;
          }
 
-         ";" { continue; }
+         ";" { optional_includable_object_append_token (); continue; }
 
          "}"
          {
+             optional_includable_object_append_token ();
              if (inside_union)
              {
                  inside_union = KAN_FALSE;
@@ -609,6 +692,7 @@ static kan_bool_t parse_exported_symbol_begin (void)
          // Exported function
          type separator* identifier separator* "("
          {
+             optional_includable_object_append_token ();
              report_exported_function_begin (
                  capture_const_begin == capture_const_end ? KAN_FALSE : KAN_TRUE,
                  capture_enum_begin != capture_enum_end     ? KAN_C_ARCHETYPE_ENUM :
@@ -623,8 +707,11 @@ static kan_bool_t parse_exported_symbol_begin (void)
          }
 
          // Exported symbol
-         type separator* identifier separator* array_suffix? separator* (";" | "=")
+         type separator* identifier separator* array_suffix? separator* ";"*
          {
+             optional_includable_object_append_string ("extern ");
+             optional_includable_object_append_token ();
+             optional_includable_object_append_string (";");
              report_exported_symbol (
                  capture_const_begin == capture_const_end ? KAN_FALSE : KAN_TRUE,
                  capture_enum_begin != capture_enum_end     ? KAN_C_ARCHETYPE_ENUM :
@@ -658,6 +745,7 @@ static kan_bool_t parse_exported_function_arguments (void)
 
          type separator* identifier separator*
          {
+            optional_includable_object_append_token ();
             report_exported_function_argument (
                 capture_const_begin == capture_const_end ? KAN_FALSE : KAN_TRUE,
                 capture_enum_begin != capture_enum_end     ? KAN_C_ARCHETYPE_ENUM :
@@ -671,12 +759,14 @@ static kan_bool_t parse_exported_function_arguments (void)
             continue;
          }
 
-         "," { continue; }
+         "," { optional_includable_object_append_token (); continue; }
 
-         "void" { continue; }
+         "void" { optional_includable_object_append_token (); continue; }
 
          ")"
          {
+             optional_includable_object_append_token ();
+             optional_includable_object_append_string (";");
              report_exported_function_end ();
              return parse_main ();
          }
@@ -697,12 +787,14 @@ static kan_bool_t parse_skip_until_round_braces_close (void)
 
          "("
          {
+             optional_includable_object_append_token ();
              ++left_to_close;
              continue;
          }
 
          ")"
          {
+             optional_includable_object_append_token ();
              --left_to_close;
              if (left_to_close == 0u)
              {
@@ -712,7 +804,7 @@ static kan_bool_t parse_skip_until_round_braces_close (void)
              continue;
          }
 
-         * { continue; }
+         * { optional_includable_object_append_token (); continue; }
          $ { fprintf (stderr, "Error. Reached end of file while waiting for round braces to close."); return KAN_FALSE;
          }
         */
@@ -809,6 +901,12 @@ int main (int argument_count, char **arguments_array)
     arguments.input_file_path = arguments_array[2u];
     arguments.output_file_path = arguments_array[3u];
 
+    kan_c_interface_file_init (&interface_file);
+    interface_file.source_file_path = kan_allocate_general (kan_c_interface_allocation_group (),
+                                                            strlen (arguments.input_file_path) + 1u, _Alignof (char));
+    strcpy (interface_file.source_file_path, arguments.input_file_path);
+    interface_file_should_have_includable_object = kan_c_interface_file_should_have_includable_object (&interface_file);
+
     fprintf (stdout,
              "Running with arguments:\n"
              "- export_macro: \"%s\"\n"
@@ -830,10 +928,11 @@ int main (int argument_count, char **arguments_array)
         return RETURN_CODE_PARSE_FAILED;
     }
 
+    optional_includable_object_finish ();
     kan_direct_file_stream_close (io.input_stream);
-    struct kan_c_interface_t *interface = kan_c_interface_build (reporting.first);
+    interface_file.interface = kan_c_interface_build (reporting.first);
 
-    if (!interface)
+    if (!interface_file.interface)
     {
         fprintf (stderr, "Build failed, exiting...\n");
         return RETURN_CODE_BUILD_FAILED;
@@ -846,7 +945,7 @@ int main (int argument_count, char **arguments_array)
         return RETURN_CODE_UNABLE_TO_OPEN_OUTPUT;
     }
 
-    if (!kan_c_interface_serialize (interface, output_stream))
+    if (!kan_c_interface_file_serialize (&interface_file, output_stream))
     {
         fprintf (stderr, "Serialization failed, exiting...\n");
         kan_direct_file_stream_close (output_stream);
@@ -854,8 +953,6 @@ int main (int argument_count, char **arguments_array)
     }
 
     fprintf (stdout, "Finished, cleaning up...\n");
-    kan_c_interface_destroy (interface);
-
     while (reporting.first)
     {
         struct kan_c_token_t *next = reporting.first->next;
@@ -864,5 +961,6 @@ int main (int argument_count, char **arguments_array)
     }
 
     kan_direct_file_stream_close (output_stream);
+    kan_c_interface_file_shutdown (&interface_file);
     return RETURN_CODE_SUCCESS;
 }

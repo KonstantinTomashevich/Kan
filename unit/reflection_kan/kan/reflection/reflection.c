@@ -3092,10 +3092,10 @@ static void migrator_adapt_dynamic_array (struct migrator_t *migrator,
     }
 }
 
-REFLECTION_API void kan_reflection_struct_migrator_migrate_instance (kan_reflection_struct_migrator_t migrator,
-                                                                     kan_interned_string_t type_name,
-                                                                     void *source,
-                                                                     void *target)
+void kan_reflection_struct_migrator_migrate_instance (kan_reflection_struct_migrator_t migrator,
+                                                      kan_interned_string_t type_name,
+                                                      void *source,
+                                                      void *target)
 {
     struct migrator_t *migrator_data = (struct migrator_t *) migrator;
     struct struct_migrator_node_t *struct_node = migrator_query_struct (migrator_data, type_name);
@@ -3279,9 +3279,9 @@ static inline kan_bool_t patch_migration_evaluate_condition (uint64_t condition_
     return condition_status_vla[condition_index] == PATCH_CONDITION_STATUS_TRUE ? KAN_TRUE : KAN_FALSE;
 }
 
-REFLECTION_API void kan_reflection_struct_migrator_migrate_patches (kan_reflection_struct_migrator_t migrator,
-                                                                    kan_reflection_registry_t source_registry,
-                                                                    kan_reflection_registry_t target_registry)
+void kan_reflection_struct_migrator_migrate_patches (kan_reflection_struct_migrator_t migrator,
+                                                     kan_reflection_registry_t source_registry,
+                                                     kan_reflection_registry_t target_registry)
 {
     const kan_allocation_group_t group = get_compiled_patch_allocation_group ();
     struct migrator_t *migrator_data = (struct migrator_t *) migrator;
@@ -3450,7 +3450,7 @@ REFLECTION_API void kan_reflection_struct_migrator_migrate_patches (kan_reflecti
     kan_reflection_patch_builder_destroy (patch_builder);
 }
 
-REFLECTION_API void kan_reflection_struct_migrator_destroy (kan_reflection_struct_migrator_t migrator)
+void kan_reflection_struct_migrator_destroy (kan_reflection_struct_migrator_t migrator)
 {
     const kan_allocation_group_t allocation_group = get_migrator_allocation_group ();
     struct migrator_t *migrator_data = (struct migrator_t *) migrator;
