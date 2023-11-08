@@ -23,6 +23,10 @@ function (kan_setup_tests)
     file (MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/Generated")
 
     foreach (TEST_SOURCE ${TEST_SOURCES})
+        if (NOT EXISTS "${TEST_SOURCE}")
+            continue ()
+        endif ()
+
         file (STRINGS "${TEST_SOURCE}" TEST_SOURCE_LINES)
         foreach (TEST_LINE ${TEST_SOURCE_LINES})
             if (TEST_LINE MATCHES "^KAN_TEST_CASE.*\\((.+)\\)$")
