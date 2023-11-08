@@ -369,7 +369,7 @@ static kan_bool_t c_interface_serialize (const struct kan_c_interface_t *interfa
     }
 
     KAN_ASSERT (interface->symbols_count < UINT8_MAX)
-    count = (uint8_t) interface->structs_count;
+    count = (uint8_t) interface->symbols_count;
 
     if (stream->operations->write (stream, sizeof (uint8_t), &count) != sizeof (uint8_t))
     {

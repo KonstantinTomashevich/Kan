@@ -103,9 +103,16 @@ C_INTERFACE_API kan_bool_t kan_c_interface_file_deserialize (struct kan_c_interf
 
 void kan_c_interface_file_shutdown (struct kan_c_interface_file_t *file)
 {
-    kan_c_interface_destroy (file->interface);
-    kan_free_general (kan_c_interface_allocation_group (), file->source_file_path,
-                      strlen (file->source_file_path) + 1u);
+    if (file->interface)
+    {
+        kan_c_interface_destroy (file->interface);
+    }
+
+    if (file->source_file_path)
+    {
+        kan_free_general (kan_c_interface_allocation_group (), file->source_file_path,
+                          strlen (file->source_file_path) + 1u);
+    }
 
     if (file->optional_includable_object)
     {
