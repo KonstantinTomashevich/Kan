@@ -9,6 +9,7 @@
 #include <kan/api_common/min_max.h>
 #include <kan/c_interface/builder.h>
 #include <kan/c_interface/file.h>
+#include <kan/container/trivial_string_buffer.h>
 #include <kan/error/critical.h>
 #include <kan/file_system/stream.h>
 #include <kan/memory/allocation.h>
@@ -73,9 +74,7 @@ static struct
 
 static struct kan_c_interface_file_t interface_file;
 static kan_bool_t interface_file_should_have_includable_object;
-static char *optional_includable_object_building_buffer = NULL;
-static uint64_t optional_includable_object_building_buffer_size = 0u;
-static uint64_t optional_includable_object_building_buffer_capacity = 0u;
+static struct kan_trivial_string_buffer_t optional_includable_object_buffer;
 
 // IO
 
@@ -306,31 +305,14 @@ static void report_exported_symbol (kan_bool_t is_const,
 
 // Optional includable object building
 
-static void optional_includable_object_append_general (const char *source, uint64_t length)
+static void optional_includable_object_begin (void)
 {
-    if (!interface_file_should_have_includable_object || length == 0u)
+    if (!interface_file_should_have_includable_object)
     {
         return;
     }
 
-    if (optional_includable_object_building_buffer_size + length >= optional_includable_object_building_buffer_capacity)
-    {
-        const uint64_t new_capacity =
-            KAN_MAX (optional_includable_object_building_buffer_capacity * 2u, INPUT_BUFFER_SIZE);
-        char *new_buffer = kan_allocate_general (KAN_ALLOCATION_GROUP_IGNORE, new_capacity, _Alignof (char));
-
-        memcpy (new_buffer, optional_includable_object_building_buffer,
-                optional_includable_object_building_buffer_size);
-        kan_free_general (KAN_ALLOCATION_GROUP_IGNORE, optional_includable_object_building_buffer,
-                          optional_includable_object_building_buffer_capacity);
-
-        optional_includable_object_building_buffer = new_buffer;
-        optional_includable_object_building_buffer_capacity = new_capacity;
-    }
-
-    strncpy (optional_includable_object_building_buffer + optional_includable_object_building_buffer_size, source,
-             length);
-    optional_includable_object_building_buffer_size += length;
+    kan_trivial_string_buffer_init (&optional_includable_object_buffer, KAN_ALLOCATION_GROUP_IGNORE, INPUT_BUFFER_SIZE);
 }
 
 static void optional_includable_object_append_token (void)
@@ -340,7 +322,7 @@ static void optional_includable_object_append_token (void)
         return;
     }
 
-    optional_includable_object_append_general (io.token, io.cursor - io.token);
+    kan_trivial_string_buffer_append_char_sequence (&optional_includable_object_buffer, io.token, io.cursor - io.token);
 }
 
 static void optional_includable_object_append_string (char *string)
@@ -350,22 +332,23 @@ static void optional_includable_object_append_string (char *string)
         return;
     }
 
-    optional_includable_object_append_general (string, strlen (string));
+    kan_trivial_string_buffer_append_char_sequence (&optional_includable_object_buffer, string, strlen (string));
 }
 
 static void optional_includable_object_finish (void)
 {
-    if (!interface_file_should_have_includable_object || !optional_includable_object_building_buffer)
+    if (!interface_file_should_have_includable_object || optional_includable_object_buffer.size == 0u)
     {
         return;
     }
 
-    const uint64_t length = strlen (optional_includable_object_building_buffer);
-    interface_file.optional_includable_object =
-        kan_allocate_general (KAN_ALLOCATION_GROUP_IGNORE, length + 1u, _Alignof (char));
-    strcpy (interface_file.optional_includable_object, optional_includable_object_building_buffer);
-    kan_free_general (KAN_ALLOCATION_GROUP_IGNORE, optional_includable_object_building_buffer,
-                      optional_includable_object_building_buffer_capacity);
+    interface_file.optional_includable_object = kan_allocate_general (
+        KAN_ALLOCATION_GROUP_IGNORE, optional_includable_object_buffer.size + 1u, _Alignof (char));
+    strncpy (interface_file.optional_includable_object, optional_includable_object_buffer.buffer,
+             optional_includable_object_buffer.size);
+
+    interface_file.optional_includable_object[optional_includable_object_buffer.size] = '\0';
+    kan_trivial_string_buffer_shutdown (&optional_includable_object_buffer);
 }
 
 // Parse input using re2c
@@ -585,7 +568,7 @@ static kan_bool_t parse_main (void)
          "{" { optional_includable_object_append_string (";"); return parse_skip_until_curly_braces_close (); }
 
          // Symbols about which we're not concerned while they're in global scope.
-         [*;] { optional_includable_object_append_token (); continue; }
+         [*;+] { optional_includable_object_append_token (); continue; }
          "=" { continue; }
          "=" (separator | [a-zA-Z0-9+*_] | "-" | "/" | ")" | "(" )* ";"
          { optional_includable_object_append_string (";"); continue; }
@@ -603,7 +586,7 @@ static kan_bool_t parse_enum (void)
         /*!re2c
          !use:default;
 
-         identifier (separator? "=" separator* [0-9a-zA-Z_]+ separator*)?
+         identifier (separator? "=" separator* ([0-9a-zA-Z_+<>] | separator | "-")+ separator*)?
          {
              optional_includable_object_append_token ();
              report_enum_value (
@@ -882,7 +865,10 @@ static kan_bool_t parse_subroutine_single_line_comment (void)
 
 static kan_bool_t parse_input (void)
 {
-    return parse_main ();
+    optional_includable_object_begin ();
+    kan_bool_t result = parse_main ();
+    optional_includable_object_finish ();
+    return result;
 }
 
 int main (int argument_count, char **arguments_array)
@@ -928,7 +914,6 @@ int main (int argument_count, char **arguments_array)
         return RETURN_CODE_PARSE_FAILED;
     }
 
-    optional_includable_object_finish ();
     kan_direct_file_stream_close (io.input_stream);
     interface_file.interface = kan_c_interface_build (reporting.first);
 
