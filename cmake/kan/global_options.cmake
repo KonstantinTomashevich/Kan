@@ -73,6 +73,8 @@ function (add_common_compile_options)
                     -Wall
                     -Wextra
                     -Werror
+                    # It only triggered once and it was false-positive alarm, therefore we disable it.
+                    -Wno-stringop-truncation
                     # We silence unused parameter warnings, because it is troublesome
                     # to silence them manually for every compiler.
                     -Wno-unused-parameter
