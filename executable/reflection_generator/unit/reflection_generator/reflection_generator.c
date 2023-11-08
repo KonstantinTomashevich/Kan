@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 
 #include <kan/c_interface/file.h>
 #include <kan/container/trivial_string_buffer.h>
@@ -90,6 +91,9 @@ static void shutdown (void)
         {
             kan_c_interface_file_shutdown (&io.input_files[index]);
         }
+
+        kan_free_general (KAN_ALLOCATION_GROUP_IGNORE, io.input_files,
+                          arguments.input_files_count * sizeof (struct kan_c_interface_file_t));
     }
 
     if (io.output_buffer.buffer != NULL)
@@ -423,7 +427,7 @@ static void add_bootstrap (void)
                 kan_trivial_string_buffer_append_string (&io.output_buffer, "    reflection_");
                 kan_trivial_string_buffer_append_string (&io.output_buffer, enum_data->name);
                 kan_trivial_string_buffer_append_string (&io.output_buffer, "_values[");
-                kan_trivial_string_buffer_append_unsigned_long (&io.output_buffer, value_index);
+                kan_trivial_string_buffer_append_unsigned_long (&io.output_buffer, (unsigned long) value_index);
                 kan_trivial_string_buffer_append_string (&io.output_buffer,
                                                          "u] = (struct kan_reflection_enum_value_t) {\n");
                 kan_trivial_string_buffer_append_string (&io.output_buffer, "        .name = kan_string_intern (\"");
@@ -468,7 +472,7 @@ static void add_bootstrap (void)
                 kan_trivial_string_buffer_append_string (&io.output_buffer, "    reflection_");
                 kan_trivial_string_buffer_append_string (&io.output_buffer, struct_data->name);
                 kan_trivial_string_buffer_append_string (&io.output_buffer, "_fields[");
-                kan_trivial_string_buffer_append_unsigned_long (&io.output_buffer, field_index);
+                kan_trivial_string_buffer_append_unsigned_long (&io.output_buffer, (unsigned long) field_index);
                 kan_trivial_string_buffer_append_string (&io.output_buffer, "u] = (struct kan_reflection_field_t) {\n");
                 kan_trivial_string_buffer_append_string (&io.output_buffer, "        .name = kan_string_intern (\"");
                 kan_trivial_string_buffer_append_string (&io.output_buffer, field_data->name);
@@ -558,7 +562,8 @@ static void add_bootstrap (void)
                                                                  "            .size_field = reflection_");
                         kan_trivial_string_buffer_append_string (&io.output_buffer, struct_data->name);
                         kan_trivial_string_buffer_append_string (&io.output_buffer, "_fields + ");
-                        kan_trivial_string_buffer_append_unsigned_long (&io.output_buffer, size_field_index);
+                        kan_trivial_string_buffer_append_unsigned_long (&io.output_buffer,
+                                                                        (unsigned long) size_field_index);
                         kan_trivial_string_buffer_append_string (&io.output_buffer, "u,\n");
                     }
 
@@ -785,7 +790,7 @@ static void add_bootstrap (void)
                     kan_trivial_string_buffer_append_string (&io.output_buffer, struct_data->name);
                     kan_trivial_string_buffer_append_string (&io.output_buffer, "_fields + ");
                     kan_trivial_string_buffer_append_unsigned_long (&io.output_buffer,
-                                                                    visibility_condition_field_index);
+                                                                    (unsigned long) visibility_condition_field_index);
                     kan_trivial_string_buffer_append_string (&io.output_buffer, "u,\n");
 
                     kan_trivial_string_buffer_append_string (
@@ -878,7 +883,8 @@ static void add_bootstrap (void)
             }
 
             kan_trivial_string_buffer_append_string (&io.output_buffer, "        .fields_count = ");
-            kan_trivial_string_buffer_append_unsigned_long (&io.output_buffer, struct_data->fields_count);
+            kan_trivial_string_buffer_append_unsigned_long (&io.output_buffer,
+                                                            (unsigned long) struct_data->fields_count);
             kan_trivial_string_buffer_append_string (&io.output_buffer, "u,\n");
 
             kan_trivial_string_buffer_append_string (&io.output_buffer, "        .fields = reflection_");
@@ -1091,8 +1097,9 @@ int main (int argument_count, char **arguments_array)
     interned.type_dynamic_array = kan_string_intern ("kan_dynamic_array_t");
     interned.type_patch = kan_string_intern ("kan_reflection_patch_t");
 
-    struct kan_c_interface_file_t input_files_vla[arguments.input_files_count];
-    io.input_files = input_files_vla;
+    io.input_files = kan_allocate_general (KAN_ALLOCATION_GROUP_IGNORE,
+                                           sizeof (struct kan_c_interface_file_t) * arguments.input_files_count,
+                                           _Alignof (struct kan_c_interface_file_t));
 
     for (uint64_t index = 0u; index < arguments.input_files_count; ++index)
     {

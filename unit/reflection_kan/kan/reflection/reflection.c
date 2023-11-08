@@ -1862,7 +1862,7 @@ void kan_reflection_migration_seed_destroy (kan_reflection_migration_seed_t seed
 
         kan_free_general (allocation_group, node,
                           sizeof (struct struct_migration_node_t) +
-                              sizeof (struct kan_reflection_field_t_t *) * struct_data->fields_count);
+                              sizeof (struct kan_reflection_field_t *) * struct_data->fields_count);
         node = next;
     }
 
@@ -3106,20 +3106,28 @@ void kan_reflection_struct_migrator_migrate_instance (kan_reflection_struct_migr
         return;
     }
 
-    kan_bool_t conditions_vla[struct_node->conditions_count > 0u ? struct_node->conditions_count : 1u];
+    kan_bool_t conditions_fixed[KAN_REFLECTION_MIGRATOR_MAX_CONDITIONS];
+    kan_bool_t *conditions = conditions_fixed;
+
+    if (struct_node->conditions_count > KAN_REFLECTION_MIGRATOR_MAX_CONDITIONS)
+    {
+        conditions = kan_allocate_general (get_migrator_allocation_group (),
+                                           sizeof (kan_bool_t) * struct_node->conditions_count, _Alignof (kan_bool_t));
+    }
+
     for (uint64_t condition_index = 0u; condition_index < struct_node->conditions_count; ++condition_index)
     {
         const struct migrator_condition_t *condition = &struct_node->conditions[condition_index];
         if (condition->parent_condition_index != MIGRATOR_CONDITION_INDEX_NONE)
         {
             KAN_ASSERT (condition->parent_condition_index < condition_index)
-            if (!(conditions_vla[condition_index] = conditions_vla[condition->parent_condition_index]))
+            if (!(conditions[condition_index] = conditions[condition->parent_condition_index]))
             {
                 continue;
             }
         }
 
-        conditions_vla[condition_index] = kan_reflection_check_visibility (
+        conditions[condition_index] = kan_reflection_check_visibility (
             condition->condition_field, condition->condition_values_count, condition->condition_values,
             ((uint8_t *) source) + condition->absolute_source_offset);
     }
@@ -3128,7 +3136,7 @@ void kan_reflection_struct_migrator_migrate_instance (kan_reflection_struct_migr
     {
         const struct migrator_command_copy_t *copy_command = &struct_node->copy_commands[command_index];
         if (copy_command->condition_index != MIGRATOR_CONDITION_INDEX_NONE &&
-            !conditions_vla[copy_command->condition_index])
+            !conditions[copy_command->condition_index])
         {
             continue;
         }
@@ -3143,7 +3151,7 @@ void kan_reflection_struct_migrator_migrate_instance (kan_reflection_struct_migr
             &struct_node->adapt_numeric_commands[command_index];
 
         if (adapt_numeric_command->condition_index != MIGRATOR_CONDITION_INDEX_NONE &&
-            !conditions_vla[adapt_numeric_command->condition_index])
+            !conditions[adapt_numeric_command->condition_index])
         {
             continue;
         }
@@ -3160,7 +3168,7 @@ void kan_reflection_struct_migrator_migrate_instance (kan_reflection_struct_migr
             &struct_node->adapt_enum_commands[command_index];
 
         if (adapt_enum_command->condition_index != MIGRATOR_CONDITION_INDEX_NONE &&
-            !conditions_vla[adapt_enum_command->condition_index])
+            !conditions[adapt_enum_command->condition_index])
         {
             continue;
         }
@@ -3176,7 +3184,7 @@ void kan_reflection_struct_migrator_migrate_instance (kan_reflection_struct_migr
             &struct_node->adapt_dynamic_array_commands[command_index];
 
         if (adapt_dynamic_array_command->condition_index != MIGRATOR_CONDITION_INDEX_NONE &&
-            !conditions_vla[adapt_dynamic_array_command->condition_index])
+            !conditions[adapt_dynamic_array_command->condition_index])
         {
             continue;
         }
@@ -3190,12 +3198,18 @@ void kan_reflection_struct_migrator_migrate_instance (kan_reflection_struct_migr
     {
         const struct migrator_command_set_zero_t *set_zero_command = &struct_node->set_zero_commands[command_index];
         if (set_zero_command->condition_index != MIGRATOR_CONDITION_INDEX_NONE &&
-            !conditions_vla[set_zero_command->condition_index])
+            !conditions[set_zero_command->condition_index])
         {
             continue;
         }
 
         memset (((uint8_t *) source) + set_zero_command->absolute_source_offset, 0u, set_zero_command->size);
+    }
+
+    if (conditions != conditions_fixed)
+    {
+        kan_free_general (get_migrator_allocation_group (), conditions,
+                          sizeof (kan_bool_t) * struct_node->conditions_count);
     }
 }
 
@@ -3208,24 +3222,24 @@ enum patch_condition_status_t
 
 static inline kan_bool_t patch_migration_evaluate_condition (uint64_t condition_index,
                                                              struct migrator_condition_t *conditions,
-                                                             enum patch_condition_status_t *condition_status_vla,
+                                                             enum patch_condition_status_t *condition_statuses,
                                                              uint64_t node_index,
-                                                             struct compiled_patch_node_t **nodes_vla)
+                                                             struct compiled_patch_node_t **nodes)
 {
     if (condition_index == MIGRATOR_CONDITION_INDEX_NONE)
     {
         return KAN_TRUE;
     }
 
-    if (condition_status_vla[condition_index] == PATCH_CONDITION_STATUS_NOT_CALCULATED)
+    if (condition_statuses[condition_index] == PATCH_CONDITION_STATUS_NOT_CALCULATED)
     {
         const struct migrator_condition_t *condition = &conditions[condition_index];
         if (condition->parent_condition_index != MIGRATOR_CONDITION_INDEX_NONE)
         {
-            if (!patch_migration_evaluate_condition (condition->parent_condition_index, conditions,
-                                                     condition_status_vla, node_index, nodes_vla))
+            if (!patch_migration_evaluate_condition (condition->parent_condition_index, conditions, condition_statuses,
+                                                     node_index, nodes))
             {
-                condition_status_vla[condition_index] = PATCH_CONDITION_STATUS_FALSE;
+                condition_statuses[condition_index] = PATCH_CONDITION_STATUS_FALSE;
                 return KAN_FALSE;
             }
         }
@@ -3235,7 +3249,7 @@ static inline kan_bool_t patch_migration_evaluate_condition (uint64_t condition_
         // Search for node with condition value.
         while (KAN_TRUE)
         {
-            struct compiled_patch_node_t *node = nodes_vla[node_index];
+            struct compiled_patch_node_t *node = nodes[node_index];
             if (condition->absolute_source_offset >= node->offset &&
                 condition->absolute_source_offset < node->offset + node->size)
             {
@@ -3260,7 +3274,7 @@ static inline kan_bool_t patch_migration_evaluate_condition (uint64_t condition_
                 condition->condition_field, condition->condition_values_count, condition->condition_values,
                 node_with_condition_value->data + offset_in_node);
 
-            condition_status_vla[condition_index] =
+            condition_statuses[condition_index] =
                 check_result ? PATCH_CONDITION_STATUS_TRUE : PATCH_CONDITION_STATUS_FALSE;
         }
         else
@@ -3271,12 +3285,12 @@ static inline kan_bool_t patch_migration_evaluate_condition (uint64_t condition_
                 condition_index == 0u ||
                 conditions[condition_index - 1].absolute_source_offset != condition->absolute_source_offset;
 
-            condition_status_vla[condition_index] =
+            condition_statuses[condition_index] =
                 first_on_this_address ? PATCH_CONDITION_STATUS_TRUE : PATCH_CONDITION_STATUS_FALSE;
         }
     }
 
-    return condition_status_vla[condition_index] == PATCH_CONDITION_STATUS_TRUE ? KAN_TRUE : KAN_FALSE;
+    return condition_statuses[condition_index] == PATCH_CONDITION_STATUS_TRUE ? KAN_TRUE : KAN_FALSE;
 }
 
 void kan_reflection_struct_migrator_migrate_patches (kan_reflection_struct_migrator_t migrator,
@@ -3295,17 +3309,32 @@ void kan_reflection_struct_migrator_migrate_patches (kan_reflection_struct_migra
     while (patch)
     {
         struct compiled_patch_t *next = patch->next;
-        struct compiled_patch_node_t *nodes_vla[patch->node_count > 0u ? patch->node_count : 1u];
-
         struct struct_migrator_node_t *migrator_node = migrator_query_struct (migrator_data, patch->type->name);
+
         if (migrator_node)
         {
-            enum patch_condition_status_t
-                conditions_vla[migrator_node->conditions_count > 0u ? migrator_node->conditions_count : 1u];
+            struct compiled_patch_node_t *nodes_fixed[KAN_REFLECTION_MIGRATOR_PATCH_MAX_NODES];
+            struct compiled_patch_node_t **nodes = nodes_fixed;
+
+            if (patch->node_count > KAN_REFLECTION_MIGRATOR_PATCH_MAX_NODES)
+            {
+                nodes = kan_allocate_general (group, sizeof (struct compiled_patch_node_t *) * patch->node_count,
+                                              _Alignof (struct compiled_patch_node_t *));
+            }
+
+            enum patch_condition_status_t conditions_fixed[KAN_REFLECTION_MIGRATOR_MAX_CONDITIONS];
+            enum patch_condition_status_t *conditions = conditions_fixed;
+
+            if (migrator_node->conditions_count > KAN_REFLECTION_MIGRATOR_MAX_CONDITIONS)
+            {
+                conditions = kan_allocate_general (
+                    group, sizeof (enum patch_condition_status_t) * migrator_node->conditions_count,
+                    _Alignof (enum patch_condition_status_t));
+            }
 
             for (uint64_t condition_index = 0u; condition_index < migrator_node->conditions_count; ++condition_index)
             {
-                conditions_vla[condition_index] = PATCH_CONDITION_STATUS_NOT_CALCULATED;
+                conditions[condition_index] = PATCH_CONDITION_STATUS_NOT_CALCULATED;
             }
 
             struct compiled_patch_node_t *node = patch->begin;
@@ -3326,7 +3355,7 @@ void kan_reflection_struct_migrator_migrate_patches (kan_reflection_struct_migra
 
             while (node != end)
             {
-                nodes_vla[node_index] = node;
+                nodes[node_index] = node;
                 uint64_t offset = node->offset;
 
                 while (offset < node->size + node->offset)
@@ -3336,7 +3365,7 @@ void kan_reflection_struct_migrator_migrate_patches (kan_reflection_struct_migra
                         copy_command != copy_command_end &&
                         (copy_command->absolute_source_offset + copy_command->size < offset ||
                          !patch_migration_evaluate_condition (copy_command->condition_index, migrator_node->conditions,
-                                                              conditions_vla, node_index, nodes_vla)))
+                                                              conditions, node_index, nodes)))
                     {
                         ++copy_command;
                     }
@@ -3345,8 +3374,8 @@ void kan_reflection_struct_migrator_migrate_patches (kan_reflection_struct_migra
                         adapt_numeric_command != adapt_numeric_command_end &&
                         (adapt_numeric_command->absolute_source_offset + adapt_numeric_command->source_size < offset ||
                          !patch_migration_evaluate_condition (adapt_numeric_command->condition_index,
-                                                              migrator_node->conditions, conditions_vla, node_index,
-                                                              nodes_vla)))
+                                                              migrator_node->conditions, conditions, node_index,
+                                                              nodes)))
                     {
                         ++adapt_numeric_command;
                     }
@@ -3354,8 +3383,8 @@ void kan_reflection_struct_migrator_migrate_patches (kan_reflection_struct_migra
                     while (adapt_enum_command != adapt_enum_command_end &&
                            (adapt_enum_command->absolute_source_offset + sizeof (int) < offset ||
                             !patch_migration_evaluate_condition (adapt_enum_command->condition_index,
-                                                                 migrator_node->conditions, conditions_vla, node_index,
-                                                                 nodes_vla)))
+                                                                 migrator_node->conditions, conditions, node_index,
+                                                                 nodes)))
                     {
                         ++adapt_enum_command;
                     }
@@ -3422,6 +3451,17 @@ void kan_reflection_struct_migrator_migrate_patches (kan_reflection_struct_migra
                 data_end += compiled_patch_node_add_alignment ((uint64_t) data_end);
                 node = (struct compiled_patch_node_t *) data_end;
                 ++node_index;
+            }
+
+            if (conditions != conditions_fixed)
+            {
+                kan_free_general (group, conditions,
+                                  sizeof (enum patch_condition_status_t) * migrator_node->conditions_count);
+            }
+
+            if (nodes != nodes_fixed)
+            {
+                kan_free_general (group, nodes, sizeof (struct compiled_patch_node_t *) * patch->node_count);
             }
 
             // Destroy old nodes.

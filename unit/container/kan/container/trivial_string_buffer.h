@@ -3,6 +3,7 @@
 #include <container_api.h>
 
 #include <memory.h>
+#include <string.h>
 
 #include <kan/api_common/c_header.h>
 #include <kan/error/critical.h>
