@@ -16,4 +16,4 @@ concrete_compile_definitions (
         KAN_CONTAINER_STRING_INTERNING_INITIAL_BUCKETS=${KAN_CONTAINER_STRING_INTERNING_INITIAL_BUCKETS}
         KAN_CONTAINER_STRING_INTERNING_LOAD_FACTOR=${KAN_CONTAINER_STRING_INTERNING_LOAD_FACTOR})
 
-c_interface_scanner_add_to_unit ()
+c_interface_scanner_setup (GLOB "*.c" "*.h")

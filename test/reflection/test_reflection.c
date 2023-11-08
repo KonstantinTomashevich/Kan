@@ -4,10 +4,14 @@
 #include <kan/api_common/min_max.h>
 #include <kan/container/dynamic_array.h>
 #include <kan/reflection/field_visibility_iterator.h>
+#include <kan/reflection/generated_reflection.h>
 #include <kan/reflection/migration.h>
 #include <kan/reflection/patch.h>
 #include <kan/reflection/registry.h>
 #include <kan/testing/testing.h>
+
+#include <generator_test_first.h>
+#include <generator_test_second.h>
 
 struct example_struct_meta_assembly_t
 {
@@ -559,7 +563,7 @@ KAN_TEST_CASE (patch)
                  .item_archetype = KAN_REFLECTION_ARCHETYPE_STRUCT,
                  .item_size = sizeof (struct patch_inner_t),
                  .item_archetype_struct = {kan_string_intern ("patch_inner_t")},
-                 .items_count = sizeof (((struct patch_outer_t *) NULL)->inner) / sizeof (struct patch_inner_t),
+                 .item_count = sizeof (((struct patch_outer_t *) NULL)->inner) / sizeof (struct patch_inner_t),
                  .size_field = NULL,
              },
          .visibility_condition_field = NULL,
@@ -1025,7 +1029,7 @@ KAN_TEST_CASE (migration)
         .name = kan_string_intern ("same_t"),
         .size = sizeof (struct same_source_t),
         .alignment = _Alignof (struct same_source_t),
-        .initialize = NULL,
+        .init = NULL,
         .shutdown = NULL,
         .fields_count = sizeof (same_source_fields) / sizeof (struct kan_reflection_field_t),
         .fields = same_source_fields,
@@ -1035,7 +1039,7 @@ KAN_TEST_CASE (migration)
         .name = kan_string_intern ("same_t"),
         .size = sizeof (struct same_target_t),
         .alignment = _Alignof (struct same_target_t),
-        .initialize = NULL,
+        .init = NULL,
         .shutdown = NULL,
         .fields_count = sizeof (same_target_fields) / sizeof (struct kan_reflection_field_t),
         .fields = same_target_fields,
@@ -1135,7 +1139,7 @@ KAN_TEST_CASE (migration)
         .name = kan_string_intern ("cross_copy_t"),
         .size = sizeof (struct cross_copy_source_t),
         .alignment = _Alignof (struct cross_copy_source_t),
-        .initialize = NULL,
+        .init = NULL,
         .shutdown = NULL,
         .fields_count = sizeof (cross_copy_source_fields) / sizeof (struct kan_reflection_field_t),
         .fields = cross_copy_source_fields,
@@ -1145,7 +1149,7 @@ KAN_TEST_CASE (migration)
         .name = kan_string_intern ("cross_copy_t"),
         .size = sizeof (struct cross_copy_target_t),
         .alignment = _Alignof (struct cross_copy_target_t),
-        .initialize = NULL,
+        .init = NULL,
         .shutdown = NULL,
         .fields_count = sizeof (cross_copy_target_fields) / sizeof (struct kan_reflection_field_t),
         .fields = cross_copy_target_fields,
@@ -1193,7 +1197,7 @@ KAN_TEST_CASE (migration)
         .name = kan_string_intern ("nesting_t"),
         .size = sizeof (struct nesting_source_t),
         .alignment = _Alignof (struct nesting_source_t),
-        .initialize = NULL,
+        .init = NULL,
         .shutdown = NULL,
         .fields_count = sizeof (nesting_source_fields) / sizeof (struct kan_reflection_field_t),
         .fields = nesting_source_fields,
@@ -1203,7 +1207,7 @@ KAN_TEST_CASE (migration)
         .name = kan_string_intern ("nesting_t"),
         .size = sizeof (struct nesting_target_t),
         .alignment = _Alignof (struct nesting_target_t),
-        .initialize = NULL,
+        .init = NULL,
         .shutdown = NULL,
         .fields_count = sizeof (nesting_target_fields) / sizeof (struct kan_reflection_field_t),
         .fields = nesting_target_fields,
@@ -1246,7 +1250,7 @@ KAN_TEST_CASE (migration)
                  .item_archetype = KAN_REFLECTION_ARCHETYPE_ENUM,
                  .item_size = sizeof (int),
                  .item_archetype_enum = {.type_name = kan_string_intern ("first_enum_t")},
-                 .items_count = 4u,
+                 .item_count = 4u,
                  .size_field = NULL,
              },
          .visibility_condition_field = NULL,
@@ -1261,7 +1265,7 @@ KAN_TEST_CASE (migration)
                  .item_archetype = KAN_REFLECTION_ARCHETYPE_ENUM,
                  .item_size = sizeof (int),
                  .item_archetype_enum = {.type_name = kan_string_intern ("second_enum_t")},
-                 .items_count = 4u,
+                 .item_count = 4u,
                  .size_field = NULL,
              },
          .visibility_condition_field = NULL,
@@ -1360,7 +1364,7 @@ KAN_TEST_CASE (migration)
                  .item_archetype = KAN_REFLECTION_ARCHETYPE_ENUM,
                  .item_size = sizeof (int),
                  .item_archetype_enum = {.type_name = kan_string_intern ("first_enum_t")},
-                 .items_count = 4u,
+                 .item_count = 4u,
                  .size_field = NULL,
              },
          .visibility_condition_field = NULL,
@@ -1375,7 +1379,7 @@ KAN_TEST_CASE (migration)
                  .item_archetype = KAN_REFLECTION_ARCHETYPE_ENUM,
                  .item_size = sizeof (int),
                  .item_archetype_enum = {.type_name = kan_string_intern ("second_enum_t")},
-                 .items_count = 4u,
+                 .item_count = 4u,
                  .size_field = NULL,
              },
          .visibility_condition_field = NULL,
@@ -1444,7 +1448,7 @@ KAN_TEST_CASE (migration)
         .name = kan_string_intern ("migration_t"),
         .size = sizeof (struct migration_source_t),
         .alignment = _Alignof (struct migration_source_t),
-        .initialize = NULL,
+        .init = NULL,
         .shutdown = NULL,
         .fields_count = sizeof (migration_source_fields) / sizeof (struct kan_reflection_field_t),
         .fields = migration_source_fields,
@@ -1454,7 +1458,7 @@ KAN_TEST_CASE (migration)
         .name = kan_string_intern ("migration_t"),
         .size = sizeof (struct migration_target_t),
         .alignment = _Alignof (struct migration_target_t),
-        .initialize = NULL,
+        .init = NULL,
         .shutdown = NULL,
         .fields_count = sizeof (migration_target_fields) / sizeof (struct kan_reflection_field_t),
         .fields = migration_target_fields,
@@ -1649,4 +1653,162 @@ KAN_TEST_CASE (migration)
     kan_reflection_migration_seed_destroy (source_to_target_migration_seed);
     kan_reflection_registry_destroy (source_registry);
     kan_reflection_registry_destroy (target_registry);
+}
+
+KAN_REFLECTION_EXPECT_UNIT_REGISTRAR (test_reflection);
+
+KAN_TEST_CASE (generated_reflection)
+{
+    kan_reflection_registry_t registry = kan_reflection_registry_create ();
+    KAN_REFLECTION_UNIT_REGISTRAR_NAME (test_reflection) (registry);
+
+    // We do not check everything here, because it would be just copying and pasting generated code.
+    // We check only the main aspects.
+
+    const struct kan_reflection_struct_t *vector3_data =
+        kan_reflection_registry_query_struct (registry, kan_string_intern ("vector3_t"));
+    KAN_TEST_ASSERT (vector3_data)
+    KAN_TEST_CHECK (vector3_data->size == sizeof (struct vector3_t))
+    KAN_TEST_CHECK (vector3_data->alignment == _Alignof (struct vector3_t))
+    KAN_TEST_CHECK (!vector3_data->init)
+    KAN_TEST_CHECK (!vector3_data->shutdown)
+    KAN_TEST_CHECK (vector3_data->fields_count == 3u)
+
+    const struct kan_reflection_struct_t *vector4_data =
+        kan_reflection_registry_query_struct (registry, kan_string_intern ("vector4_t"));
+    KAN_TEST_ASSERT (vector4_data)
+    KAN_TEST_CHECK (vector4_data->size == sizeof (struct vector4_t))
+    KAN_TEST_CHECK (vector4_data->alignment == _Alignof (struct vector4_t))
+    KAN_TEST_CHECK (!vector4_data->init)
+    KAN_TEST_CHECK (!vector4_data->shutdown)
+    KAN_TEST_CHECK (vector4_data->fields_count == 4u)
+
+    KAN_TEST_CHECK (!kan_reflection_registry_query_struct (registry, kan_string_intern ("ignored_t")))
+    KAN_TEST_CHECK (!kan_reflection_registry_query_enum (registry, kan_string_intern ("ignored_enum_t")))
+
+    const struct kan_reflection_enum_t *some_flags_data =
+        kan_reflection_registry_query_enum (registry, kan_string_intern ("some_flags_t"));
+    KAN_TEST_ASSERT (some_flags_data)
+    KAN_TEST_CHECK (some_flags_data->flags)
+    KAN_TEST_CHECK (some_flags_data->values_count == 2u)
+
+    const struct kan_reflection_enum_t *some_enum_data =
+        kan_reflection_registry_query_enum (registry, kan_string_intern ("some_enum_t"));
+    KAN_TEST_ASSERT (some_enum_data)
+    KAN_TEST_CHECK (!some_enum_data->flags)
+    KAN_TEST_CHECK (some_enum_data->values_count == 2u)
+
+    const struct kan_reflection_struct_t *first_component_data =
+        kan_reflection_registry_query_struct (registry, kan_string_intern ("first_component_t"));
+    KAN_TEST_ASSERT (first_component_data)
+    KAN_TEST_CHECK (first_component_data->init)
+    KAN_TEST_CHECK (first_component_data->shutdown)
+
+    const struct kan_reflection_struct_t *second_component_data =
+        kan_reflection_registry_query_struct (registry, kan_string_intern ("second_component_t"));
+    KAN_TEST_ASSERT (second_component_data)
+    KAN_TEST_CHECK (second_component_data->init)
+    KAN_TEST_CHECK (second_component_data->shutdown)
+
+    const struct kan_reflection_struct_t *a_bit_of_everything_data =
+        kan_reflection_registry_query_struct (registry, kan_string_intern ("a_bit_of_everything_t"));
+    KAN_TEST_ASSERT (a_bit_of_everything_data)
+    KAN_TEST_ASSERT (a_bit_of_everything_data->fields_count == 16u)
+
+    KAN_TEST_CHECK (a_bit_of_everything_data->fields[0u].name == kan_string_intern ("some_enum"))
+    KAN_TEST_CHECK (a_bit_of_everything_data->fields[0u].size == sizeof (int))
+    KAN_TEST_CHECK (a_bit_of_everything_data->fields[0u].offset == offsetof (struct a_bit_of_everything_t, some_enum))
+    KAN_TEST_CHECK (a_bit_of_everything_data->fields[0u].archetype == KAN_REFLECTION_ARCHETYPE_ENUM)
+    KAN_TEST_CHECK (a_bit_of_everything_data->fields[0u].archetype_enum.type_name == kan_string_intern ("some_enum_t"))
+    KAN_TEST_CHECK (a_bit_of_everything_data->fields[0u].visibility_condition_field == NULL)
+    KAN_TEST_CHECK (a_bit_of_everything_data->fields[0u].visibility_condition_values_count == 0u)
+    KAN_TEST_CHECK (a_bit_of_everything_data->fields[0u].visibility_condition_values == NULL)
+
+    KAN_TEST_CHECK (a_bit_of_everything_data->fields[1u].name == kan_string_intern ("some_flags"))
+    KAN_TEST_CHECK (a_bit_of_everything_data->fields[1u].size == sizeof (int))
+    KAN_TEST_CHECK (a_bit_of_everything_data->fields[1u].offset == offsetof (struct a_bit_of_everything_t, some_flags))
+    KAN_TEST_CHECK (a_bit_of_everything_data->fields[1u].archetype == KAN_REFLECTION_ARCHETYPE_ENUM)
+    KAN_TEST_CHECK (a_bit_of_everything_data->fields[1u].archetype_enum.type_name == kan_string_intern ("some_flags_t"))
+    KAN_TEST_CHECK (a_bit_of_everything_data->fields[1u].visibility_condition_field == NULL)
+    KAN_TEST_CHECK (a_bit_of_everything_data->fields[1u].visibility_condition_values_count == 0u)
+    KAN_TEST_CHECK (a_bit_of_everything_data->fields[1u].visibility_condition_values == NULL)
+
+    KAN_TEST_CHECK (a_bit_of_everything_data->fields[2u].name == kan_string_intern ("uint32"))
+    KAN_TEST_CHECK (a_bit_of_everything_data->fields[2u].size == sizeof (uint32_t))
+    KAN_TEST_CHECK (a_bit_of_everything_data->fields[2u].offset == offsetof (struct a_bit_of_everything_t, uint32))
+    KAN_TEST_CHECK (a_bit_of_everything_data->fields[2u].archetype == KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT)
+    KAN_TEST_CHECK (a_bit_of_everything_data->fields[2u].visibility_condition_field == NULL)
+    KAN_TEST_CHECK (a_bit_of_everything_data->fields[2u].visibility_condition_values_count == 0u)
+    KAN_TEST_CHECK (a_bit_of_everything_data->fields[2u].visibility_condition_values == NULL)
+
+    KAN_TEST_CHECK (a_bit_of_everything_data->fields[3u].name == kan_string_intern ("int32"))
+    KAN_TEST_CHECK (a_bit_of_everything_data->fields[3u].size == sizeof (int32_t))
+    KAN_TEST_CHECK (a_bit_of_everything_data->fields[3u].offset == offsetof (struct a_bit_of_everything_t, int32))
+    KAN_TEST_CHECK (a_bit_of_everything_data->fields[3u].archetype == KAN_REFLECTION_ARCHETYPE_SIGNED_INT)
+    KAN_TEST_CHECK (a_bit_of_everything_data->fields[3u].visibility_condition_field == NULL)
+    KAN_TEST_CHECK (a_bit_of_everything_data->fields[3u].visibility_condition_values_count == 0u)
+    KAN_TEST_CHECK (a_bit_of_everything_data->fields[3u].visibility_condition_values == NULL)
+
+    KAN_TEST_CHECK (a_bit_of_everything_data->fields[4u].name == kan_string_intern ("count"))
+    KAN_TEST_CHECK (a_bit_of_everything_data->fields[5u].name == kan_string_intern ("bytes"))
+    KAN_TEST_CHECK (a_bit_of_everything_data->fields[5u].archetype == KAN_REFLECTION_ARCHETYPE_INLINE_ARRAY)
+    KAN_TEST_CHECK (a_bit_of_everything_data->fields[5u].archetype_inline_array.item_archetype ==
+                    KAN_REFLECTION_ARCHETYPE_SIGNED_INT)
+    KAN_TEST_CHECK (a_bit_of_everything_data->fields[5u].archetype_inline_array.item_size == sizeof (int8_t))
+    KAN_TEST_CHECK (a_bit_of_everything_data->fields[5u].archetype_inline_array.item_count == 128u)
+    KAN_TEST_CHECK (a_bit_of_everything_data->fields[5u].archetype_inline_array.size_field ==
+                    &a_bit_of_everything_data->fields[4u])
+
+    KAN_TEST_CHECK (a_bit_of_everything_data->fields[6u].name == kan_string_intern ("selector"))
+    KAN_TEST_CHECK (a_bit_of_everything_data->fields[7u].name == kan_string_intern ("first_selection"))
+    KAN_TEST_CHECK (a_bit_of_everything_data->fields[7u].visibility_condition_field ==
+                    &a_bit_of_everything_data->fields[6u])
+    KAN_TEST_CHECK (a_bit_of_everything_data->fields[7u].visibility_condition_values_count == 2u)
+    KAN_TEST_CHECK (a_bit_of_everything_data->fields[7u].visibility_condition_values[0u] == 0)
+    KAN_TEST_CHECK (a_bit_of_everything_data->fields[7u].visibility_condition_values[1u] == 2)
+    KAN_TEST_CHECK (a_bit_of_everything_data->fields[8u].name == kan_string_intern ("second_selection"))
+    KAN_TEST_CHECK (a_bit_of_everything_data->fields[8u].visibility_condition_field ==
+                    &a_bit_of_everything_data->fields[6u])
+    KAN_TEST_CHECK (a_bit_of_everything_data->fields[8u].visibility_condition_values_count == 1u)
+    KAN_TEST_CHECK (a_bit_of_everything_data->fields[8u].visibility_condition_values[0u] == 1)
+
+    KAN_TEST_CHECK (a_bit_of_everything_data->fields[9u].name == kan_string_intern ("owned_string"))
+    KAN_TEST_CHECK (a_bit_of_everything_data->fields[9u].archetype == KAN_REFLECTION_ARCHETYPE_STRING_POINTER)
+
+    KAN_TEST_CHECK (a_bit_of_everything_data->fields[10u].name == kan_string_intern ("interned_string"))
+    KAN_TEST_CHECK (a_bit_of_everything_data->fields[10u].archetype == KAN_REFLECTION_ARCHETYPE_INTERNED_STRING)
+
+    KAN_TEST_CHECK (a_bit_of_everything_data->fields[11u].name == kan_string_intern ("patch"))
+    KAN_TEST_CHECK (a_bit_of_everything_data->fields[11u].archetype == KAN_REFLECTION_ARCHETYPE_PATCH)
+
+    KAN_TEST_CHECK (a_bit_of_everything_data->fields[12u].name == kan_string_intern ("first_external_pointer"))
+    KAN_TEST_CHECK (a_bit_of_everything_data->fields[12u].archetype == KAN_REFLECTION_ARCHETYPE_EXTERNAL_POINTER)
+
+    KAN_TEST_CHECK (a_bit_of_everything_data->fields[13u].name == kan_string_intern ("struct_pointer"))
+    KAN_TEST_CHECK (a_bit_of_everything_data->fields[13u].archetype == KAN_REFLECTION_ARCHETYPE_STRUCT_POINTER)
+    KAN_TEST_CHECK (a_bit_of_everything_data->fields[13u].archetype_struct_pointer.type_name ==
+                    kan_string_intern ("first_component_t"))
+
+    KAN_TEST_CHECK (a_bit_of_everything_data->fields[14u].name == kan_string_intern ("second_external_pointer"))
+    KAN_TEST_CHECK (a_bit_of_everything_data->fields[14u].archetype == KAN_REFLECTION_ARCHETYPE_EXTERNAL_POINTER)
+
+    KAN_TEST_CHECK (a_bit_of_everything_data->fields[15u].name == kan_string_intern ("dynamic_array"))
+    KAN_TEST_CHECK (a_bit_of_everything_data->fields[15u].archetype = KAN_REFLECTION_ARCHETYPE_DYNAMIC_ARRAY)
+    KAN_TEST_CHECK (a_bit_of_everything_data->fields[15u].archetype_dynamic_array.item_archetype ==
+                    KAN_REFLECTION_ARCHETYPE_STRUCT_POINTER)
+    KAN_TEST_CHECK (a_bit_of_everything_data->fields[15u].archetype_dynamic_array.item_size ==
+                    sizeof (struct second_component_t *))
+    KAN_TEST_CHECK (
+        a_bit_of_everything_data->fields[15u].archetype_dynamic_array.item_archetype_struct_pointer.type_name ==
+        kan_string_intern ("second_component_t"))
+
+    KAN_TEST_CHECK (kan_reflection_registry_query_struct_field_meta (registry, kan_string_intern ("first_component_t"),
+                                                                     kan_string_intern ("position"),
+                                                                     kan_string_intern ("network_meta_t")))
+
+    KAN_TEST_CHECK (kan_reflection_registry_query_struct_field_meta (registry, kan_string_intern ("second_component_t"),
+                                                                     kan_string_intern ("velocity"),
+                                                                     kan_string_intern ("network_meta_t")))
+
+    kan_reflection_registry_destroy (registry);
 }

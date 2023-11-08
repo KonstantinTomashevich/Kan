@@ -902,7 +902,7 @@ void add_registrar (void)
 {
     kan_trivial_string_buffer_append_string (&io.output_buffer,
                                              "// Section: registration function.\n\n"
-                                             "EXPORT_THIS void KAN_REFLECTION_MODULE_REGISTRAR_NAME (");
+                                             "EXPORT_THIS void KAN_REFLECTION_UNIT_REGISTRAR_NAME (");
     kan_trivial_string_buffer_append_string (&io.output_buffer, arguments.module_name);
     kan_trivial_string_buffer_append_string (&io.output_buffer,
                                              ") (kan_reflection_registry_t registry)\n"

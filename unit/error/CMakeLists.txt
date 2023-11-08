@@ -8,4 +8,4 @@ if (KAN_ASSERT_ENABLED)
 endif ()
 
 abstract_register_implementation (NAME sdl PARTS error_sdl)
-c_interface_scanner_add_to_unit ()
+c_interface_scanner_setup (GLOB "*.h")

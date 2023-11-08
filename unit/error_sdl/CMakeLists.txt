@@ -13,4 +13,4 @@ set (KAN_ERROR_INTERACTIVE_CRITICAL_MESSAGE_MAX_LENGTH "1024" CACHE STRING
 
 concrete_compile_definitions (
         PRIVATE KAN_ERROR_INTERACTIVE_CRITICAL_MESSAGE_MAX_LENGTH=${KAN_ERROR_INTERACTIVE_CRITICAL_MESSAGE_MAX_LENGTH})
-c_interface_scanner_add_to_unit ()
+c_interface_scanner_setup (GLOB "*.c" "*.h")

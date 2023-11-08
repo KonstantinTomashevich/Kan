@@ -437,7 +437,7 @@ kan_bool_t kan_reflection_registry_add_struct (kan_reflection_registry_t registr
             break;
 
         case KAN_REFLECTION_ARCHETYPE_INLINE_ARRAY:
-            KAN_ASSERT (field_reflection->archetype_inline_array.items_count > 0u)
+            KAN_ASSERT (field_reflection->archetype_inline_array.item_count > 0u)
             KAN_ASSERT (
                 field_reflection->archetype_inline_array.item_archetype != KAN_REFLECTION_ARCHETYPE_INLINE_ARRAY &&
                 field_reflection->archetype_inline_array.item_archetype != KAN_REFLECTION_ARCHETYPE_DYNAMIC_ARRAY)
@@ -1046,7 +1046,7 @@ static void validate_compiled_node_internal (const struct compiled_patch_node_t 
                 const struct kan_reflection_struct_t *element_type = kan_reflection_registry_query_struct (
                     registry, field->archetype_inline_array.item_archetype_struct.type_name);
 
-                for (uint64_t element_index = 0u; element_index < field->archetype_inline_array.items_count;
+                for (uint64_t element_index = 0u; element_index < field->archetype_inline_array.item_count;
                      ++element_index)
                 {
                     validate_compiled_node_internal (node, registry, element_type,
@@ -1660,8 +1660,8 @@ static struct struct_migration_node_t *migration_seed_add_struct (
 
                             if (source_field->archetype_inline_array.item_size !=
                                     target_field->archetype_inline_array.item_size ||
-                                source_field->archetype_inline_array.items_count !=
-                                    target_field->archetype_inline_array.items_count)
+                                source_field->archetype_inline_array.item_count !=
+                                    target_field->archetype_inline_array.item_count)
                             {
                                 node->seed.status = KAN_REFLECTION_MIGRATION_NEEDED;
                             }
@@ -2418,10 +2418,10 @@ static struct struct_migrator_node_t *migrator_add_struct (struct migrator_t *mi
                 //       We can rewrite inline array migration as separate command in order to take size field into
                 //       account, but it will make migration slower as it will block current command-level
                 //       optimizations from happening.
-                const uint64_t items_count = source_field->archetype_inline_array.items_count <
-                                                     target_field->archetype_inline_array.items_count ?
-                                                 source_field->archetype_inline_array.items_count :
-                                                 target_field->archetype_inline_array.items_count;
+                const uint64_t items_count =
+                    source_field->archetype_inline_array.item_count < target_field->archetype_inline_array.item_count ?
+                        source_field->archetype_inline_array.item_count :
+                        target_field->archetype_inline_array.item_count;
 
                 for (uint64_t item_index = 0u; item_index < items_count; ++item_index)
                 {

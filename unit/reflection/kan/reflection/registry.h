@@ -133,7 +133,7 @@ struct kan_reflection_archetype_inline_array_suffix_t
         struct kan_reflection_archetype_struct_suffix_t item_archetype_struct_pointer;
     };
 
-    uint64_t items_count;
+    uint64_t item_count;
     const struct kan_reflection_field_t *size_field;
 };
 
@@ -184,7 +184,7 @@ struct kan_reflection_struct_t
     kan_interned_string_t name;
     uint64_t size;
     uint64_t alignment;
-    kan_reflection_initialize_functor initialize;
+    kan_reflection_initialize_functor init;
     kan_reflection_shutdown_functor shutdown;
     uint64_t fields_count;
     struct kan_reflection_field_t *fields;
