@@ -1,3 +1,5 @@
+#define _CRT_SECURE_NO_WARNINGS
+
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
@@ -836,15 +838,18 @@ static void add_bootstrap (void)
                 struct_data_name_length -= 2u;
             }
 
-            char init_function_name_value[struct_data_name_length + 6u];
+#define MAX_STRUCT_NAME_LENGTH 128u
+            KAN_ASSERT (struct_data_name_length < MAX_STRUCT_NAME_LENGTH)
+            char init_function_name_value[MAX_STRUCT_NAME_LENGTH + 6u];
             strncpy (init_function_name_value, struct_data->name, struct_data_name_length);
             strcpy (init_function_name_value + struct_data_name_length, "_init");
             kan_interned_string_t init_function_name = kan_string_intern (init_function_name_value);
 
-            char shutdown_function_name_value[struct_data_name_length + 10u];
+            char shutdown_function_name_value[MAX_STRUCT_NAME_LENGTH + 10u];
             strncpy (shutdown_function_name_value, struct_data->name, struct_data_name_length);
             strcpy (shutdown_function_name_value + struct_data_name_length, "_shutdown");
             kan_interned_string_t shutdown_function_name = kan_string_intern (shutdown_function_name_value);
+#undef MAX_STRUCT_NAME_LENGTH
 
             kan_bool_t init_found = KAN_FALSE;
             kan_bool_t shutdown_found = KAN_FALSE;
