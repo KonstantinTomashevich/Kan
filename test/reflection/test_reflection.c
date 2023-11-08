@@ -1,5 +1,6 @@
 #include <memory.h>
 #include <stddef.h>
+#include <string.h>
 
 #include <kan/api_common/min_max.h>
 #include <kan/container/dynamic_array.h>

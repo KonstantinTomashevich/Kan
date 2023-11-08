@@ -923,7 +923,7 @@ int main (int argument_count, char **arguments_array)
         return RETURN_CODE_BUILD_FAILED;
     }
 
-    struct kan_stream_t *output_stream = kan_direct_file_stream_open_for_write (arguments.output_file_path, KAN_FALSE);
+    struct kan_stream_t *output_stream = kan_direct_file_stream_open_for_write (arguments.output_file_path, KAN_TRUE);
     if (!output_stream)
     {
         fprintf (stderr, "Unable to open output file \"%s\".\n", arguments.output_file_path);
