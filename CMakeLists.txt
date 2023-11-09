@@ -21,8 +21,10 @@ include ("${CMAKE_CURRENT_SOURCE_DIR}/cmake/CMakeUnitFramework/Unit.cmake")
 set (UNIT_FRAMEWORK_API_CASE "mixed_snake_case")
 
 # Include Kan CMake extensions.
+include ("${CMAKE_CURRENT_SOURCE_DIR}/cmake/kan/c_interface_scanner.cmake")
 include ("${CMAKE_CURRENT_SOURCE_DIR}/cmake/kan/clang_format.cmake")
 include ("${CMAKE_CURRENT_SOURCE_DIR}/cmake/kan/global_options.cmake")
+include ("${CMAKE_CURRENT_SOURCE_DIR}/cmake/kan/reflection_generator.cmake")
 include ("${CMAKE_CURRENT_SOURCE_DIR}/cmake/kan/testing.cmake")
 
 # Must be called from root CMakeLists.txt, otherwise CTest configuration won't be placed into binary root.

@@ -13,7 +13,7 @@ void kan_dynamic_array_init (struct kan_dynamic_array_t *array,
     array->size = 0;
     array->capacity = initial_capacity;
 
-    if (initial_capacity)
+    if (initial_capacity > 0u)
     {
         array->data = (uint8_t *) kan_allocate_general (allocation_group, initial_capacity * item_size, item_alignment);
     }
@@ -83,13 +83,24 @@ void kan_dynamic_array_remove_swap_at (struct kan_dynamic_array_t *array, uint64
 
 void kan_dynamic_array_set_capacity (struct kan_dynamic_array_t *array, uint64_t new_capacity)
 {
-    KAN_ASSERT (new_capacity <= array->size)
-    KAN_ASSERT (new_capacity > 0u)
-    uint8_t *new_data = (uint8_t *) kan_allocate_general (array->allocation_group, new_capacity * array->item_size,
-                                                          array->item_alignment);
+    KAN_ASSERT (new_capacity >= array->size)
+    uint8_t *new_data = NULL;
 
-    memcpy (new_data, array->data, array->size * array->item_size);
-    kan_free_general (array->allocation_group, array->data, array->capacity * array->item_size);
+    if (new_capacity > 0u)
+    {
+        new_data = (uint8_t *) kan_allocate_general (array->allocation_group, new_capacity * array->item_size,
+                                                     array->item_alignment);
+
+        if (array->data && array->size > 0u)
+        {
+            memcpy (new_data, array->data, array->size * array->item_size);
+        }
+    }
+
+    if (array->data)
+    {
+        kan_free_general (array->allocation_group, array->data, array->capacity * array->item_size);
+    }
 
     array->data = new_data;
     array->capacity = new_capacity;
@@ -102,5 +113,8 @@ void kan_dynamic_array_reset (struct kan_dynamic_array_t *array)
 
 void kan_dynamic_array_shutdown (struct kan_dynamic_array_t *array)
 {
-    kan_free_general (array->allocation_group, array->data, array->capacity * array->item_size);
+    if (array->data)
+    {
+        kan_free_general (array->allocation_group, array->data, array->capacity * array->item_size);
+    }
 }

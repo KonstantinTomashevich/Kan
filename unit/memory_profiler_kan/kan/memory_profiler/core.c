@@ -12,17 +12,17 @@ static struct kan_atomic_int_t memory_profiling_lock = {.value = 0u};
 
 static struct allocation_group_t *root_allocation_group = NULL;
 
-void lock_memory_profiling_context ()
+void lock_memory_profiling_context (void)
 {
     kan_atomic_int_lock (&memory_profiling_lock);
 }
 
-void unlock_memory_profiling_context ()
+void unlock_memory_profiling_context (void)
 {
     kan_atomic_int_unlock (&memory_profiling_lock);
 }
 
-struct allocation_group_t *retrieve_root_allocation_group_unguarded ()
+struct allocation_group_t *retrieve_root_allocation_group_unguarded (void)
 {
     if (!root_allocation_group)
     {
@@ -32,11 +32,24 @@ struct allocation_group_t *retrieve_root_allocation_group_unguarded ()
     return root_allocation_group;
 }
 
+static uint64_t calculate_allocation_group_size (const char *name)
+{
+    const uint64_t used_size = sizeof (struct allocation_group_t) + strlen (name) + 1u;
+    const uint64_t modulo = used_size % _Alignof (struct allocation_group_t);
+
+    if (modulo != 0u)
+    {
+        return used_size + _Alignof (struct allocation_group_t) - modulo;
+    }
+
+    return used_size;
+}
+
 struct allocation_group_t *create_allocation_group_unguarded (struct allocation_group_t *next_on_level,
                                                               const char *name)
 {
     struct allocation_group_t *group = (struct allocation_group_t *) kan_allocate_general_no_profiling (
-        sizeof (struct allocation_group_t) + strlen (name) + 1u, _Alignof (struct allocation_group_t));
+        calculate_allocation_group_size (name), _Alignof (struct allocation_group_t));
     group->allocated_here = 0u;
     group->next_on_level = next_on_level;
     group->first_child = NULL;
@@ -55,7 +68,7 @@ struct memory_event_node_t
 static kan_bool_t event_queue_initialized = KAN_FALSE;
 static struct kan_event_queue_t event_queue;
 
-static struct memory_event_node_t *create_event_node_unguarded ()
+static struct memory_event_node_t *create_event_node_unguarded (void)
 {
     // We cannot use batched allocators inside memory profiling as they're reporting reserved memory
     // and it results in deadlock when new page is being allocated to hold new profiling objects.
@@ -63,7 +76,7 @@ static struct memory_event_node_t *create_event_node_unguarded ()
                                                                              _Alignof (struct memory_event_node_t));
 }
 
-kan_allocation_group_event_iterator_t event_iterator_create_unguarded ()
+kan_allocation_group_event_iterator_t event_iterator_create_unguarded (void)
 {
     if (!event_queue_initialized)
     {
@@ -83,7 +96,7 @@ const struct kan_allocation_group_event_t *event_iterator_get_unguarded (
     return node ? &node->event : NULL;
 }
 
-static void cleanup_event_queue ()
+static void cleanup_event_queue (void)
 {
     struct memory_event_node_t *node;
     while ((node = (struct memory_event_node_t *) kan_event_queue_clean_oldest (&event_queue)))

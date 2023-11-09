@@ -2,7 +2,7 @@
 
 #include <kan/testing/testing.h>
 
-extern void execute_test_case_${TEST_NAME} ();
+extern void execute_test_case_${TEST_NAME} (void);
 
 int main (int argc, char *argv[])
 {

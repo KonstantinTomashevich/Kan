@@ -138,7 +138,7 @@ static struct captured_allocation_group_t *capture_allocation_group_snapshot (st
     return captured;
 }
 
-struct kan_allocation_group_capture_t kan_allocation_group_begin_capture ()
+struct kan_allocation_group_capture_t kan_allocation_group_begin_capture (void)
 {
     lock_memory_profiling_context ();
     struct kan_allocation_group_capture_t capture;

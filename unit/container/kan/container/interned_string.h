@@ -21,8 +21,11 @@ KAN_C_HEADER_BEGIN
 
 typedef const char *kan_interned_string_t;
 
-/// \brief Interns given string and returns pointer to interned version of it.
+/// \brief Interns given null terminated string and returns pointer to interned version of it.
 /// \details No allocations happen if string or its value is already interned.
-CONTAINER_API kan_interned_string_t kan_string_intern (const char *string);
+CONTAINER_API kan_interned_string_t kan_string_intern (const char *null_terminated_string);
+
+/// \brief Interns character sequence in the same way as kan_string_intern.
+CONTAINER_API kan_interned_string_t kan_char_sequence_intern (const char *begin, const char *end);
 
 KAN_C_HEADER_END

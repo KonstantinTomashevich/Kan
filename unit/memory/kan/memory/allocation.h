@@ -54,7 +54,7 @@ MEMORY_API void *kan_allocate_general (kan_allocation_group_t group, uint64_t am
 MEMORY_API void kan_free_general (kan_allocation_group_t group, void *memory, uint64_t amount);
 
 /// \brief Maximum size of an object in bytes supported by batched allocator implementation.
-MEMORY_API uint64_t kan_get_batched_allocation_max_size ();
+MEMORY_API uint64_t kan_get_batched_allocation_max_size (void);
 
 /// \brief Allocates given amount of memory with alignment equal to its size using batched allocator.
 MEMORY_API void *kan_allocate_batched (kan_allocation_group_t group, uint64_t item_size);
@@ -73,6 +73,12 @@ MEMORY_API void *kan_stack_allocator_allocate (kan_stack_allocator_t allocator, 
 
 /// \brief Returns given stack pointer back to zero.
 MEMORY_API void kan_stack_allocator_reset (kan_stack_allocator_t allocator);
+
+/// \brief Saves pointer to stack top that can be later used to partially reset stack.
+MEMORY_API void *kan_stack_allocator_save_top (kan_stack_allocator_t allocator);
+
+/// \brief Sets stack top to given value which usually causes partial stack reset.
+MEMORY_API void kan_stack_allocator_load_top (kan_stack_allocator_t allocator, void *top);
 
 /// \brief Destroys given stack instance and frees its memory.
 MEMORY_API void kan_stack_allocator_destroy (kan_stack_allocator_t allocator);

@@ -30,7 +30,7 @@ const char *kan_thread_get_name (kan_thread_handle_t handle)
     return SDL_GetThreadName (sdl_handle);
 }
 
-kan_thread_handle_t kan_current_thread ()
+kan_thread_handle_t kan_current_thread (void)
 {
     return (kan_thread_handle_t) SDL_ThreadID ();
 }
@@ -63,7 +63,7 @@ const char *kan_current_thread_set_priority (enum kan_thread_priority_t priority
 _Static_assert (sizeof (kan_thread_local_storage_t) >= sizeof (SDL_TLSID),
                 "kan_thread_local_storage_t is able to hold SDL TLS id.");
 
-THREADING_API kan_thread_local_storage_t kan_thread_local_storage_create ()
+THREADING_API kan_thread_local_storage_t kan_thread_local_storage_create (void)
 {
     SDL_TLSID tls = SDL_CreateTLS ();
     if (tls == 0u)

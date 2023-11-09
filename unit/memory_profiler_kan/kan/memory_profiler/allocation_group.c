@@ -9,7 +9,7 @@
 #include <kan/threading/atomic.h>
 #include <kan/threading/thread.h>
 
-kan_allocation_group_t kan_allocation_group_root ()
+kan_allocation_group_t kan_allocation_group_root (void)
 {
     lock_memory_profiling_context ();
     kan_allocation_group_t result = (kan_allocation_group_t) retrieve_root_allocation_group_unguarded ();
@@ -98,7 +98,7 @@ struct thread_local_storage_stack_t
     kan_allocation_group_t stack[KAN_ALLOCATION_GROUP_STACK_SIZE];
 };
 
-static struct thread_local_storage_stack_t *allocate_thread_local_storage_stack ()
+static struct thread_local_storage_stack_t *allocate_thread_local_storage_stack (void)
 {
     struct thread_local_storage_stack_t *storage =
         (struct thread_local_storage_stack_t *) kan_allocate_general_no_profiling (
@@ -113,7 +113,7 @@ static void free_thread_local_storage_stack (void *memory)
     kan_free_general_no_profiling (memory);
 }
 
-static struct thread_local_storage_stack_t *ensure_thread_local_storage ()
+static struct thread_local_storage_stack_t *ensure_thread_local_storage (void)
 {
     if (thread_local_storage == KAN_THREAD_LOCAL_STORAGE_INVALID)
     {
@@ -131,7 +131,7 @@ static struct thread_local_storage_stack_t *ensure_thread_local_storage ()
     return kan_thread_local_storage_get (thread_local_storage);
 }
 
-kan_allocation_group_t kan_allocation_group_stack_get ()
+kan_allocation_group_t kan_allocation_group_stack_get (void)
 {
     struct thread_local_storage_stack_t *storage = ensure_thread_local_storage ();
     if (storage->stack_size == 0u)
@@ -150,7 +150,7 @@ void kan_allocation_group_stack_push (kan_allocation_group_t group)
     ++storage->stack_size;
 }
 
-void kan_allocation_group_stack_pop ()
+void kan_allocation_group_stack_pop (void)
 {
     struct thread_local_storage_stack_t *storage = ensure_thread_local_storage ();
     KAN_ASSERT (storage->stack_size > 0)

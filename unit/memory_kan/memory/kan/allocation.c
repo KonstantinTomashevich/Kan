@@ -46,7 +46,7 @@ struct batched_allocator_page_t
     struct batched_allocator_item_t *first_free;
     uint64_t acquired_count;
     uint64_t item_size;
-    uint8_t data[0u];
+    uint8_t data[];
 };
 
 struct batched_allocator_t
@@ -82,7 +82,7 @@ static inline uint8_t *get_page_data_begin (struct batched_allocator_page_t *pag
     return data_begin;
 }
 
-uint64_t kan_get_batched_allocation_max_size ()
+uint64_t kan_get_batched_allocation_max_size (void)
 {
     return MAX_RATIONAL_ITEM_SIZE;
 }
@@ -251,7 +251,7 @@ struct stack_allocator_t
     uint8_t *top;
     uint8_t *end;
     kan_allocation_group_t group;
-    uint8_t data[0u];
+    uint8_t data[];
 };
 
 kan_stack_allocator_t kan_stack_allocator_create (kan_allocation_group_t group, uint64_t amount)
@@ -288,6 +288,18 @@ void kan_stack_allocator_reset (kan_stack_allocator_t allocator)
 {
     struct stack_allocator_t *stack = (struct stack_allocator_t *) allocator;
     stack->top = stack->data;
+}
+
+void *kan_stack_allocator_save_top (kan_stack_allocator_t allocator)
+{
+    return ((struct stack_allocator_t *) allocator)->top;
+}
+
+void kan_stack_allocator_load_top (kan_stack_allocator_t allocator, void *top)
+{
+    struct stack_allocator_t *stack = (struct stack_allocator_t *) allocator;
+    KAN_ASSERT ((uint8_t *) top >= stack->data && (uint8_t *) top <= stack->end)
+    stack->top = top;
 }
 
 void kan_stack_allocator_destroy (kan_stack_allocator_t allocator)

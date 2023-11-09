@@ -7,7 +7,7 @@ KAN_TEST_CASE (general_no_profiling)
 {
     for (uint64_t size = 16u; size <= 1024u; size *= 2u)
     {
-        for (uint64_t alignment = 8u; alignment <= 32u; alignment *= 2u)
+        for (uint64_t alignment = 8u; size <= alignment && alignment <= 32u; alignment *= 2u)
         {
             void *data = kan_allocate_general_no_profiling (size, alignment);
             KAN_TEST_CHECK (data)
@@ -22,7 +22,7 @@ KAN_TEST_CASE (general)
 {
     for (uint64_t size = 16u; size <= 1024u; size *= 2u)
     {
-        for (uint64_t alignment = 8u; alignment <= 32u; alignment *= 2u)
+        for (uint64_t alignment = 8u; size <= alignment && alignment <= 32u; alignment *= 2u)
         {
             void *data = kan_allocate_general (KAN_ALLOCATION_GROUP_IGNORE, size, alignment);
             KAN_TEST_CHECK (data)

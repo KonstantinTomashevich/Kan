@@ -115,13 +115,13 @@ static kan_bool_t logging_context_initialized = KAN_FALSE;
 static struct kan_atomic_int_t logging_context_lock = {0u};
 static struct logging_context_t logging_context;
 
-static struct event_node_t *allocate_event_node ()
+static struct event_node_t *allocate_event_node (void)
 {
     return (struct event_node_t *) kan_allocate_batched (logging_context.events_allocation_group,
                                                          sizeof (struct event_node_t));
 }
 
-static void ensure_logging_context_initialized ()
+static void ensure_logging_context_initialized (void)
 {
     if (!logging_context_initialized)
     {
@@ -247,7 +247,7 @@ void kan_log_default_callback (kan_log_category_t category,
     KAN_ASSERT (KAN_FALSE);
 }
 
-kan_log_event_iterator_t kan_log_event_iterator_create ()
+kan_log_event_iterator_t kan_log_event_iterator_create (void)
 {
     kan_atomic_int_lock (&logging_context_lock);
     ensure_logging_context_initialized ();
@@ -271,7 +271,7 @@ const struct kan_log_event_t *kan_log_event_iterator_get (kan_log_event_iterator
     return node ? &node->event : NULL;
 }
 
-static void cleanup_event_queue ()
+static void cleanup_event_queue (void)
 {
     struct event_node_t *node;
     while ((node = (struct event_node_t *) kan_event_queue_clean_oldest (&logging_context.event_queue)))
