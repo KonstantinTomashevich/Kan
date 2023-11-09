@@ -16,7 +16,7 @@
 /// \parblock
 /// In addition to storing information about all enums, structs, functions and symbols, interface structure stores
 /// user-defined meta that can be used by other tools to analyze C interface. Meta is expected to be added inside
-/// comments with `\\meta` prefix before meta target appears, for example:
+/// comments with `\meta` prefix before meta target appears, for example:
 ///
 /// ```c
 /// // \meta first_function_meta_as_marker

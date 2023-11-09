@@ -42,7 +42,7 @@ set (KAN_REFLECTION_MIGRATOR_BUILD_STACK "16777216" CACHE STRING
 set (KAN_REFLECTION_MIGRATOR_MAX_CONDITIONS "32" CACHE STRING
         "Maximum count of conditions in migrator code in order to allocate their evaluation array on stack.")
 
-set (KAN_REFLECTION_MIGRATOR_PATCH_MAX_NODES "256" CACHE STRING
+set (KAN_REFLECTION_MIGRATOR_PATCH_MAX_NODES "32" CACHE STRING
         "Maximum count of nodes in migrated patch in order to allocate their array on stack.")
 
 concrete_compile_definitions (

@@ -43,7 +43,7 @@ function (reflection_generator_setup)
             "${OUTPUT_FILE_PATH}"
             ${INPUTS}
 
-            COMMENT "Generate reflection for module \"${UNIT_NAME}\"."
+            COMMENT "Generate reflection for unit \"${UNIT_NAME}\"."
             COMMAND_EXPAND_LISTS
             VERBATIM)
 endfunction ()

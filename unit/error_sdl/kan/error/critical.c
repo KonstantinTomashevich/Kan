@@ -83,10 +83,10 @@ void kan_critical_error (const char *message, const char *file, int line)
         {
             if (node->node.hash == error_hash && node->line == line && strcmp (node->file, file) == 0)
             {
+                kan_mutex_unlock (critical_error_context.interactive_mutex);
                 return;
             }
 
-            kan_mutex_unlock (critical_error_context.interactive_mutex);
             node = (struct skipped_error_node_t *) node->node.list_node.next;
         }
 

@@ -28,7 +28,7 @@
 /// \parblock
 /// Patches should not override fields of `KAN_REFLECTION_ARCHETYPE_STRING_POINTER`,
 /// `KAN_REFLECTION_ARCHETYPE_STRUCT_POINTER`, `KAN_REFLECTION_ARCHETYPE_DYNAMIC_ARRAY`,
-/// `KAN_REFLECTION_ARCHETYPE_PATCH` as these archetypes technically pointer to the outer block of memory.
+/// `KAN_REFLECTION_ARCHETYPE_PATCH` as these archetypes technically point to the outer block of memory.
 /// \endparblock
 
 KAN_C_HEADER_BEGIN

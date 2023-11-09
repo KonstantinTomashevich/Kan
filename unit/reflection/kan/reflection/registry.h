@@ -22,7 +22,7 @@
 /// is that `meta_type_name` functions as key, therefore there can't be several metas with the same `meta_type_name` on
 /// single entry. Keep in mind, that reflection meta is not the same as `c_interface` meta: `c_interface` meta is
 /// designed to add info about interface during declaration, while reflection meta aims to be registrable from outside.
-/// For example, transform structure should not specify network details in its declaration as it is common module that
+/// For example, transform structure should not specify network details in its declaration as it is a common module that
 /// can be used in different projects with different network settings, instead it should be added from outside in every
 /// project that uses transform and network modules.
 /// \endparblock

@@ -13,7 +13,7 @@ void kan_dynamic_array_init (struct kan_dynamic_array_t *array,
     array->size = 0;
     array->capacity = initial_capacity;
 
-    if (initial_capacity > 0)
+    if (initial_capacity > 0u)
     {
         array->data = (uint8_t *) kan_allocate_general (allocation_group, initial_capacity * item_size, item_alignment);
     }
@@ -86,7 +86,7 @@ void kan_dynamic_array_set_capacity (struct kan_dynamic_array_t *array, uint64_t
     KAN_ASSERT (new_capacity >= array->size)
     uint8_t *new_data = NULL;
 
-    if (new_capacity > 0)
+    if (new_capacity > 0u)
     {
         new_data = (uint8_t *) kan_allocate_general (array->allocation_group, new_capacity * array->item_size,
                                                      array->item_alignment);
