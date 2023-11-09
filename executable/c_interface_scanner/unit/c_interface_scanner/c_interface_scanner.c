@@ -893,13 +893,6 @@ int main (int argument_count, char **arguments_array)
     strcpy (interface_file.source_file_path, arguments.input_file_path);
     interface_file_should_have_includable_object = kan_c_interface_file_should_have_includable_object (&interface_file);
 
-    fprintf (stdout,
-             "Running with arguments:\n"
-             "- export_macro: \"%s\"\n"
-             "- input_file_path: \"%s\"\n"
-             "- output_file_path: \"%s\"\n",
-             arguments.export_macro, arguments.input_file_path, arguments.output_file_path);
-
     io.input_stream = kan_direct_file_stream_open_for_read (arguments.input_file_path, KAN_FALSE);
     if (!io.input_stream)
     {
@@ -937,7 +930,6 @@ int main (int argument_count, char **arguments_array)
         return RETURN_CODE_SERIALIZATION_FAILED;
     }
 
-    fprintf (stdout, "Finished, cleaning up...\n");
     while (reporting.first)
     {
         struct kan_c_token_t *next = reporting.first->next;

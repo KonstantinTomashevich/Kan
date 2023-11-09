@@ -1077,13 +1077,6 @@ int main (int argument_count, char **arguments_array)
     arguments.input_files_count = argument_count - 3u;
     arguments.input_files = arguments_array + 3u;
 
-    fprintf (stdout,
-             "Running with arguments:\n"
-             "- module_name: \"%s\"\n"
-             "- output_file_path: \"%s\"\n"
-             "- input_files:\n",
-             arguments.module_name, arguments.output_file_path);
-
     interned.reflection_flags = kan_string_intern ("reflection_flags");
     interned.reflection_ignore_enum = kan_string_intern ("reflection_ignore_enum");
     interned.reflection_ignore_struct = kan_string_intern ("reflection_ignore_struct");
@@ -1108,7 +1101,6 @@ int main (int argument_count, char **arguments_array)
 
     for (uint64_t index = 0u; index < arguments.input_files_count; ++index)
     {
-        fprintf (stdout, "  - \"%s\"\n", arguments.input_files[index]);
         kan_c_interface_file_init (&io.input_files[index]);
     }
 
@@ -1170,7 +1162,6 @@ int main (int argument_count, char **arguments_array)
     }
 
     kan_direct_file_stream_close (output_stream);
-    fprintf (stdout, "Finished, cleaning up...\n");
     shutdown ();
     return RETURN_CODE_SUCCESS;
 }
