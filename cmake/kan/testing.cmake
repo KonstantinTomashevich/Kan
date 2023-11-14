@@ -10,8 +10,9 @@ add_custom_target (test_kan COMMENT "All tests must be dependencies of this targ
 # Arguments:
 # - TEST_UNIT: name of the unit that contains tests to be executed. Sources are scanned for KAN_TEST_CASE macro.
 # - TEST_SHARED_LIBRARY: name of the shared library to which test runner must link.
+# - PROPERTIES: value of this argument is redirect to set_tests_properties for every generated test.
 function (kan_setup_tests)
-    cmake_parse_arguments (SETUP "" "TEST_UNIT;TEST_SHARED_LIBRARY" "" ${ARGV})
+    cmake_parse_arguments (SETUP "" "TEST_UNIT;TEST_SHARED_LIBRARY" "PROPERTIES" ${ARGV})
     if (DEFINED SETUP_UNPARSED_ARGUMENTS OR
             NOT DEFINED SETUP_TEST_UNIT OR
             NOT DEFINED SETUP_TEST_SHARED_LIBRARY)
@@ -50,6 +51,11 @@ function (kan_setup_tests)
                         COMMAND "${TEST_RUNNER_TARGET}"
                         WORKING_DIRECTORY "${TEST_WORKSPACE}")
                 add_dependencies (test_kan "${TEST_RUNNER_TARGET}")
+
+                if (DEFINED SETUP_PROPERTIES)
+                    set_tests_properties (
+                            "${SETUP_TEST_SHARED_LIBRARY}_case_${TEST_NAME}" PROPERTIES ${SETUP_PROPERTIES})
+                endif ()
             endif ()
         endforeach ()
     endforeach ()
