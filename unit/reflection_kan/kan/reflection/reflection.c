@@ -7,6 +7,7 @@
 #include <kan/api_common/min_max.h>
 #include <kan/container/dynamic_array.h>
 #include <kan/container/hash_storage.h>
+#include <kan/cpu_dispatch/job.h>
 #include <kan/error/critical.h>
 #include <kan/hash/hash.h>
 #include <kan/log/logging.h>
@@ -15,6 +16,7 @@
 #include <kan/reflection/migration.h>
 #include <kan/reflection/patch.h>
 #include <kan/reflection/registry.h>
+#include <kan/threading/atomic.h>
 
 KAN_LOG_DEFINE_CATEGORY (reflection_registry);
 KAN_LOG_DEFINE_CATEGORY (reflection_patch_builder);
@@ -76,6 +78,7 @@ struct registry_t
     struct kan_hash_storage_t enum_value_meta_storage;
     struct kan_hash_storage_t struct_meta_storage;
     struct kan_hash_storage_t struct_field_meta_storage;
+    struct kan_atomic_int_t patch_addition_lock;
     struct compiled_patch_t *first_patch;
 };
 
@@ -270,6 +273,7 @@ kan_reflection_registry_t kan_reflection_registry_create (void)
         kan_allocation_group_get_child (kan_allocation_group_stack_get (), "reflection_registry");
     struct registry_t *registry = (struct registry_t *) kan_allocate_batched (group, sizeof (struct registry_t));
     registry->allocation_group = group;
+    registry->patch_addition_lock = kan_atomic_int_init (0);
     registry->first_patch = NULL;
 
     kan_hash_storage_init (&registry->enum_storage, group, KAN_REFLECTION_ENUM_INITIAL_BUCKETS);
@@ -1195,12 +1199,15 @@ static kan_bool_t compiled_patch_build_into (struct patch_builder_t *patch_build
     output_patch->previous = NULL;
     output_patch->next = registry_struct->first_patch;
 
+    kan_atomic_int_lock (&registry_struct->patch_addition_lock);
     if (registry_struct->first_patch)
     {
         registry_struct->first_patch->previous = output_patch;
     }
 
     registry_struct->first_patch = output_patch;
+    kan_atomic_int_unlock (&registry_struct->patch_addition_lock);
+
     uint8_t *output = (uint8_t *) output_patch->begin;
     struct compiled_patch_node_t *output_node = NULL;
 
@@ -1250,7 +1257,7 @@ kan_reflection_patch_t kan_reflection_patch_builder_build (kan_reflection_patch_
     if (!compiled_patch_build_into (patch_builder, registry_struct, type, patch))
     {
         kan_free_batched (get_compiled_patch_allocation_group (), patch);
-        return KAN_REFLECTION_INVALID_PATCH;
+        return KAN_INVALID_REFLECTION_PATCH;
     }
 
     return (kan_reflection_patch_t) patch;
@@ -2934,7 +2941,7 @@ static void migrator_adapt_numeric (uint64_t source_size,
     KAN_ASSERT (KAN_FALSE)
 }
 
-static void migrator_adapt_enum (struct migrator_t *migrator,
+static void migrator_adapt_enum (const struct migrator_t *migrator,
                                  kan_interned_string_t type_name,
                                  const void *located_input,
                                  void *located_output)
@@ -3293,20 +3300,26 @@ static inline kan_bool_t patch_migration_evaluate_condition (uint64_t condition_
     return condition_statuses[condition_index] == PATCH_CONDITION_STATUS_TRUE ? KAN_TRUE : KAN_FALSE;
 }
 
-void kan_reflection_struct_migrator_migrate_patches (kan_reflection_struct_migrator_t migrator,
-                                                     kan_reflection_registry_t source_registry,
-                                                     kan_reflection_registry_t target_registry)
+struct patch_migration_task_data_t
+{
+    kan_reflection_registry_t target_registry;
+    kan_reflection_struct_migrator_t migrator;
+    struct compiled_patch_t *patch_begin;
+    struct compiled_patch_t *patch_end;
+};
+
+static void migrate_patch_task (kan_cpu_task_user_data_t user_data)
 {
     const kan_allocation_group_t group = get_compiled_patch_allocation_group ();
-    struct migrator_t *migrator_data = (struct migrator_t *) migrator;
-    struct registry_t *source_registry_data = (struct registry_t *) source_registry;
-    struct registry_t *target_registry_data = (struct registry_t *) target_registry;
-
     kan_reflection_patch_builder_t patch_builder = kan_reflection_patch_builder_create ();
     struct patch_builder_t *patch_builder_data = (struct patch_builder_t *) patch_builder;
-    struct compiled_patch_t *patch = source_registry_data->first_patch;
+    struct patch_migration_task_data_t *data = (struct patch_migration_task_data_t *) user_data;
 
-    while (patch)
+    struct registry_t *target_registry_data = (struct registry_t *) data->target_registry;
+    struct migrator_t *migrator_data = (struct migrator_t *) data->migrator;
+    struct compiled_patch_t *patch = data->patch_begin;
+
+    while (patch != data->patch_end)
     {
         struct compiled_patch_t *next = patch->next;
         struct struct_migrator_node_t *migrator_node = migrator_query_struct (migrator_data, patch->type->name);
@@ -3468,7 +3481,7 @@ void kan_reflection_struct_migrator_migrate_patches (kan_reflection_struct_migra
             kan_free_general (group, patch->begin, ((uint8_t *) patch->end) - (uint8_t *) patch->begin);
 
             const struct kan_reflection_struct_t *target_type =
-                kan_reflection_registry_query_struct (target_registry, patch->type->name);
+                kan_reflection_registry_query_struct (data->target_registry, patch->type->name);
 
             if (!compiled_patch_build_into (patch_builder_data, target_registry_data, target_type, patch))
             {
@@ -3486,8 +3499,78 @@ void kan_reflection_struct_migrator_migrate_patches (kan_reflection_struct_migra
         patch = next;
     }
 
-    source_registry_data->first_patch = NULL;
     kan_reflection_patch_builder_destroy (patch_builder);
+    kan_free_batched (group, data);
+}
+
+void kan_reflection_struct_migrator_migrate_patches (kan_reflection_struct_migrator_t migrator,
+                                                     kan_reflection_registry_t source_registry,
+                                                     kan_reflection_registry_t target_registry)
+{
+    const kan_allocation_group_t group = get_compiled_patch_allocation_group ();
+    struct registry_t *source_registry_data = (struct registry_t *) source_registry;
+    struct compiled_patch_t *patch = source_registry_data->first_patch;
+
+    if (patch == NULL)
+    {
+        return;
+    }
+
+    struct patch_migration_task_data_t *next_task_data = NULL;
+    uint64_t patches_in_task = 0u;
+    struct kan_cpu_task_list_node_t *task_list = NULL;
+    const kan_interned_string_t task_name = kan_string_intern ("reflection_patch_migration");
+
+    while (patch)
+    {
+        struct compiled_patch_t *next = patch->next;
+        if (!next_task_data)
+        {
+            next_task_data = kan_allocate_batched (group, sizeof (struct patch_migration_task_data_t));
+            next_task_data->target_registry = target_registry;
+            next_task_data->migrator = migrator;
+            next_task_data->patch_begin = patch;
+        }
+
+        ++patches_in_task;
+        if (patches_in_task > KAN_REFLECTION_MIGRATOR_PATCH_BUNDLE_SIZE || !next)
+        {
+            next_task_data->patch_end = next;
+            struct kan_cpu_task_list_node_t *task_list_node =
+                kan_allocate_batched (group, sizeof (struct kan_cpu_task_list_node_t));
+            task_list_node->next = task_list;
+
+            task_list_node->task = (struct kan_cpu_task_t) {
+                .name = task_name,
+                .function = migrate_patch_task,
+                .user_data = (uint64_t) next_task_data,
+            };
+
+            task_list_node->queue = KAN_CPU_DISPATCH_QUEUE_FOREGROUND;
+            task_list = task_list_node;
+
+            next_task_data = NULL;
+            patches_in_task = 0u;
+        }
+
+        patch = next;
+    }
+
+    kan_cpu_job_t job = kan_cpu_job_create ();
+    kan_cpu_job_dispatch_task_list (job, task_list);
+    kan_cpu_job_release (job);
+
+    while (task_list)
+    {
+        KAN_ASSERT (task_list->dispatch_handle != KAN_INVALID_CPU_TASK_HANDLE)
+        kan_cpu_task_detach (task_list->dispatch_handle);
+        struct kan_cpu_task_list_node_t *next = task_list->next;
+        kan_free_batched (group, task_list);
+        task_list = next;
+    }
+
+    kan_cpu_job_wait (job);
+    source_registry_data->first_patch = NULL;
 }
 
 void kan_reflection_struct_migrator_destroy (kan_reflection_struct_migrator_t migrator)

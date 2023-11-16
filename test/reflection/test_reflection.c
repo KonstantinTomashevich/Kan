@@ -625,7 +625,7 @@ KAN_TEST_CASE (patch)
         sizeof (second.inner[0u].second), &second.inner[0u].second);
 
     kan_reflection_patch_t first_to_second = kan_reflection_patch_builder_build (patch_builder, registry, &patch_outer);
-    KAN_TEST_ASSERT (first_to_second != KAN_REFLECTION_INVALID_PATCH)
+    KAN_TEST_ASSERT (first_to_second != KAN_INVALID_REFLECTION_PATCH)
 
     struct patch_outer_t third = second;
     third.after = 3.0;
@@ -644,7 +644,7 @@ KAN_TEST_CASE (patch)
                                             sizeof (third.inner[1u].second), &third.inner[1u].second);
 
     kan_reflection_patch_t second_to_third = kan_reflection_patch_builder_build (patch_builder, registry, &patch_outer);
-    KAN_TEST_ASSERT (second_to_third != KAN_REFLECTION_INVALID_PATCH)
+    KAN_TEST_ASSERT (second_to_third != KAN_INVALID_REFLECTION_PATCH)
     kan_reflection_patch_builder_destroy (patch_builder);
 
     KAN_TEST_CHECK (!is_patch_outer_equal (&first, &second))

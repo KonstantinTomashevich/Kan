@@ -1,7 +1,7 @@
 register_concrete (reflection_kan)
 concrete_include (PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
 concrete_sources ("*.c")
-concrete_require (SCOPE PRIVATE ABSTRACT error hash log memory THIRD_PARTY qsort)
+concrete_require (SCOPE PRIVATE ABSTRACT cpu_dispatch error hash log memory THIRD_PARTY qsort)
 concrete_implements_abstract (reflection)
 
 set (KAN_REFLECTION_ENUM_INITIAL_BUCKETS "64" CACHE STRING "Initial count of buckets for enum hash storage.")
@@ -45,6 +45,9 @@ set (KAN_REFLECTION_MIGRATOR_MAX_CONDITIONS "32" CACHE STRING
 set (KAN_REFLECTION_MIGRATOR_PATCH_MAX_NODES "32" CACHE STRING
         "Maximum count of nodes in migrated patch in order to allocate their array on stack.")
 
+set (KAN_REFLECTION_MIGRATOR_PATCH_BUNDLE_SIZE "32" CACHE STRING
+        "Size of a bundle of patches that is sent as one cpu task.")
+
 concrete_compile_definitions (
         PRIVATE
         KAN_REFLECTION_ENUM_INITIAL_BUCKETS=${KAN_REFLECTION_ENUM_INITIAL_BUCKETS}
@@ -66,7 +69,8 @@ concrete_compile_definitions (
         KAN_REFLECTION_MIGRATION_STRUCT_SEED_LOAD_FACTOR=${KAN_REFLECTION_MIGRATION_STRUCT_SEED_LOAD_FACTOR}
         KAN_REFLECTION_MIGRATOR_BUILD_STACK=${KAN_REFLECTION_MIGRATOR_BUILD_STACK}
         KAN_REFLECTION_MIGRATOR_MAX_CONDITIONS=${KAN_REFLECTION_MIGRATOR_MAX_CONDITIONS}
-        KAN_REFLECTION_MIGRATOR_PATCH_MAX_NODES=${KAN_REFLECTION_MIGRATOR_PATCH_MAX_NODES})
+        KAN_REFLECTION_MIGRATOR_PATCH_MAX_NODES=${KAN_REFLECTION_MIGRATOR_PATCH_MAX_NODES}
+        KAN_REFLECTION_MIGRATOR_PATCH_BUNDLE_SIZE=${KAN_REFLECTION_MIGRATOR_PATCH_BUNDLE_SIZE})
 
 option (KAN_REFLECTION_VALIDATION_ENABLED "Whether reflection data validation is enabled." ON)
 if (KAN_REFLECTION_VALIDATION_ENABLED)

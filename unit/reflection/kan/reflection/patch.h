@@ -30,6 +30,14 @@
 /// `KAN_REFLECTION_ARCHETYPE_STRUCT_POINTER`, `KAN_REFLECTION_ARCHETYPE_DYNAMIC_ARRAY`,
 /// `KAN_REFLECTION_ARCHETYPE_PATCH` as these archetypes technically point to the outer block of memory.
 /// \endparblock
+///
+/// \par Threading
+/// \parblock
+/// Patch builder is not thread safe: only one thread can work with one patch builder at a time. However, it is safe
+/// to build multiple patches from multiple threads using multiple patch builders for the same registry: registry
+/// should check for registration race and process it accordingly. Also, applying patches is fully thread safe,
+/// as it does not change patch data.
+/// \endparblock
 
 KAN_C_HEADER_BEGIN
 
@@ -37,7 +45,7 @@ typedef uint64_t kan_reflection_patch_builder_t;
 
 typedef uint64_t kan_reflection_patch_t;
 
-#define KAN_REFLECTION_INVALID_PATCH 0u
+#define KAN_INVALID_REFLECTION_PATCH 0u
 
 /// \brief Contains information about single patch chunk.
 struct kan_reflection_patch_chunk_info_t

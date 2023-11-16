@@ -17,7 +17,8 @@ foreach (IMPLEMENTATION ${MEMORY_IMPLEMENTATIONS})
     shared_library_include (
             SCOPE PUBLIC
             ABSTRACT
-            error=sdl hash=djb2 log=kan memory=kan memory_profiler=none reflection=${IMPLEMENTATION} threading=sdl
+            cpu_dispatch=kan cpu_profiler=none error=sdl hash=djb2 log=kan memory=kan memory_profiler=none
+            platform=sdl reflection=${IMPLEMENTATION} threading=sdl
 
             CONCRETE container testing test_reflection)
 
