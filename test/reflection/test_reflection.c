@@ -166,96 +166,141 @@ KAN_TEST_CASE (registry)
     KAN_TEST_CHECK (!kan_reflection_registry_query_struct (registry, first_struct.name))
     KAN_TEST_CHECK (!kan_reflection_registry_query_struct (registry, second_struct.name))
 
-    KAN_TEST_CHECK (kan_reflection_registry_add_enum_meta (registry, kan_string_intern ("first_t"),
-                                                           kan_string_intern ("example_enum_meta_serialization_t"),
-                                                           &first_enum_serialization))
+    kan_reflection_registry_add_enum_meta (registry, kan_string_intern ("first_t"),
+                                           kan_string_intern ("example_enum_meta_serialization_t"),
+                                           &first_enum_serialization);
     KAN_TEST_CHECK (kan_reflection_registry_add_enum (registry, &first_enum))
-    KAN_TEST_CHECK (kan_reflection_registry_add_enum_meta (
-        registry, first_enum.name, kan_string_intern ("example_universal_meta_editor_t"), &first_enum_editor))
+    kan_reflection_registry_add_enum_meta (registry, first_enum.name,
+                                           kan_string_intern ("example_universal_meta_editor_t"), &first_enum_editor);
 
-    KAN_TEST_CHECK (kan_reflection_registry_add_enum_meta (
-        registry, second_enum.name, kan_string_intern ("example_universal_meta_editor_t"), &second_enum_editor))
+    kan_reflection_registry_add_enum_meta (registry, second_enum.name,
+                                           kan_string_intern ("example_universal_meta_editor_t"), &second_enum_editor);
     KAN_TEST_CHECK (kan_reflection_registry_add_enum (registry, &second_enum))
-    KAN_TEST_CHECK (kan_reflection_registry_add_enum_meta (registry, kan_string_intern ("second_t"),
-                                                           kan_string_intern ("example_enum_meta_serialization_t"),
-                                                           &second_enum_serialization))
+    kan_reflection_registry_add_enum_meta (registry, kan_string_intern ("second_t"),
+                                           kan_string_intern ("example_enum_meta_serialization_t"),
+                                           &second_enum_serialization);
 
-    KAN_TEST_CHECK (kan_reflection_registry_add_struct_meta (registry, kan_string_intern ("struct_first_t"),
-                                                             kan_string_intern ("example_struct_meta_assembly_t"),
-                                                             &first_struct_assembly))
-    KAN_TEST_CHECK (kan_reflection_registry_add_struct_field_meta (
-        registry, first_struct.name, first_struct_fields[0u].name, kan_string_intern ("example_field_meta_min_max_t"),
-        &first_struct_first_min_max))
+    kan_reflection_registry_add_struct_meta (registry, kan_string_intern ("struct_first_t"),
+                                             kan_string_intern ("example_struct_meta_assembly_t"),
+                                             &first_struct_assembly);
+    kan_reflection_registry_add_struct_field_meta (registry, first_struct.name, first_struct_fields[0u].name,
+                                                   kan_string_intern ("example_field_meta_min_max_t"),
+                                                   &first_struct_first_min_max);
     KAN_TEST_CHECK (kan_reflection_registry_add_struct (registry, &first_struct))
-    KAN_TEST_CHECK (kan_reflection_registry_add_struct_meta (
-        registry, first_struct.name, kan_string_intern ("example_universal_meta_editor_t"), &first_struct_editor))
+    kan_reflection_registry_add_struct_meta (
+        registry, first_struct.name, kan_string_intern ("example_universal_meta_editor_t"), &first_struct_editor);
 
-    KAN_TEST_CHECK (kan_reflection_registry_add_struct_meta (
-        registry, second_struct.name, kan_string_intern ("example_universal_meta_editor_t"), &second_struct_editor))
+    kan_reflection_registry_add_struct_meta (
+        registry, second_struct.name, kan_string_intern ("example_universal_meta_editor_t"), &second_struct_editor);
     KAN_TEST_CHECK (kan_reflection_registry_add_struct (registry, &second_struct))
-    KAN_TEST_CHECK (kan_reflection_registry_add_struct_meta (registry, kan_string_intern ("struct_second_t"),
-                                                             kan_string_intern ("example_struct_meta_assembly_t"),
-                                                             &second_struct_assembly))
-    KAN_TEST_CHECK (kan_reflection_registry_add_struct_field_meta (
-        registry, second_struct.name, second_struct_fields[1u].name, kan_string_intern ("example_field_meta_min_max_t"),
-        &second_struct_second_min_max))
+    kan_reflection_registry_add_struct_meta (registry, kan_string_intern ("struct_second_t"),
+                                             kan_string_intern ("example_struct_meta_assembly_t"),
+                                             &second_struct_assembly);
+    kan_reflection_registry_add_struct_field_meta (registry, second_struct.name, second_struct_fields[1u].name,
+                                                   kan_string_intern ("example_field_meta_min_max_t"),
+                                                   &second_struct_second_min_max);
 
     KAN_TEST_CHECK (kan_reflection_registry_query_enum (registry, first_enum.name) == &first_enum)
-    KAN_TEST_CHECK (kan_reflection_registry_query_enum_meta (registry, first_enum.name,
-                                                             kan_string_intern ("example_enum_meta_serialization_t")) ==
-                    &first_enum_serialization)
-    KAN_TEST_CHECK (kan_reflection_registry_query_enum_meta (registry, first_enum.name,
-                                                             kan_string_intern ("example_universal_meta_editor_t")) ==
-                    &first_enum_editor)
-    KAN_TEST_CHECK (kan_reflection_registry_query_enum_meta (registry, first_enum.name,
-                                                             kan_string_intern ("there_is_no_such_meta")) == NULL)
+
+    struct kan_reflection_enum_meta_iterator_t enum_meta_iterator = kan_reflection_registry_query_enum_meta (
+        registry, first_enum.name, kan_string_intern ("example_enum_meta_serialization_t"));
+    KAN_TEST_CHECK (kan_reflection_enum_meta_iterator_get (&enum_meta_iterator) == &first_enum_serialization)
+    kan_reflection_enum_meta_iterator_next (&enum_meta_iterator);
+    KAN_TEST_CHECK (!kan_reflection_enum_meta_iterator_get (&enum_meta_iterator))
+
+    enum_meta_iterator = kan_reflection_registry_query_enum_meta (
+        registry, first_enum.name, kan_string_intern ("example_universal_meta_editor_t"));
+    KAN_TEST_CHECK (kan_reflection_enum_meta_iterator_get (&enum_meta_iterator) == &first_enum_editor)
+    kan_reflection_enum_meta_iterator_next (&enum_meta_iterator);
+    KAN_TEST_CHECK (!kan_reflection_enum_meta_iterator_get (&enum_meta_iterator))
+
+    enum_meta_iterator = kan_reflection_registry_query_enum_meta (registry, first_enum.name,
+                                                                  kan_string_intern ("there_is_no_such_meta"));
+    KAN_TEST_CHECK (!kan_reflection_enum_meta_iterator_get (&enum_meta_iterator))
 
     KAN_TEST_CHECK (kan_reflection_registry_query_enum (registry, second_enum.name) == &second_enum)
-    KAN_TEST_CHECK (kan_reflection_registry_query_enum_meta (registry, second_enum.name,
-                                                             kan_string_intern ("example_enum_meta_serialization_t")) ==
-                    &second_enum_serialization)
-    KAN_TEST_CHECK (kan_reflection_registry_query_enum_meta (registry, second_enum.name,
-                                                             kan_string_intern ("example_universal_meta_editor_t")) ==
-                    &second_enum_editor)
-    KAN_TEST_CHECK (kan_reflection_registry_query_enum_meta (registry, second_enum.name,
-                                                             kan_string_intern ("there_is_no_such_meta")) == NULL)
-    KAN_TEST_CHECK (kan_reflection_registry_query_enum_value_meta (registry, second_enum.name,
-                                                                   second_enum_values[1u].name,
-                                                                   kan_string_intern ("there_is_no_such_meta")) == NULL)
+
+    enum_meta_iterator = kan_reflection_registry_query_enum_meta (
+        registry, second_enum.name, kan_string_intern ("example_enum_meta_serialization_t"));
+    KAN_TEST_CHECK (kan_reflection_enum_meta_iterator_get (&enum_meta_iterator) == &second_enum_serialization)
+    kan_reflection_enum_meta_iterator_next (&enum_meta_iterator);
+    KAN_TEST_CHECK (!kan_reflection_enum_meta_iterator_get (&enum_meta_iterator))
+
+    enum_meta_iterator = kan_reflection_registry_query_enum_meta (
+        registry, second_enum.name, kan_string_intern ("example_universal_meta_editor_t"));
+    KAN_TEST_CHECK (kan_reflection_enum_meta_iterator_get (&enum_meta_iterator) == &second_enum_editor)
+    kan_reflection_enum_meta_iterator_next (&enum_meta_iterator);
+    KAN_TEST_CHECK (!kan_reflection_enum_meta_iterator_get (&enum_meta_iterator))
+
+    enum_meta_iterator = kan_reflection_registry_query_enum_meta (registry, second_enum.name,
+                                                                  kan_string_intern ("there_is_no_such_meta"));
+    KAN_TEST_CHECK (!kan_reflection_enum_meta_iterator_get (&enum_meta_iterator))
+
+    struct kan_reflection_enum_value_meta_iterator_t enum_value_meta_iterator =
+        kan_reflection_registry_query_enum_value_meta (registry, second_enum.name, second_enum_values[1u].name,
+                                                       kan_string_intern ("there_is_no_such_meta"));
+    KAN_TEST_CHECK (!kan_reflection_enum_value_meta_iterator_get (&enum_value_meta_iterator))
 
     KAN_TEST_CHECK (kan_reflection_registry_query_struct (registry, first_struct.name) == &first_struct)
-    KAN_TEST_CHECK (kan_reflection_registry_query_struct_meta (registry, first_struct.name,
-                                                               kan_string_intern ("example_struct_meta_assembly_t")) ==
-                    &first_struct_assembly)
-    KAN_TEST_CHECK (kan_reflection_registry_query_struct_meta (registry, first_struct.name,
-                                                               kan_string_intern ("example_universal_meta_editor_t")) ==
-                    &first_struct_editor)
-    KAN_TEST_CHECK (kan_reflection_registry_query_struct_meta (registry, first_struct.name,
-                                                               kan_string_intern ("there_is_no_such_meta")) == NULL)
+
+    struct kan_reflection_struct_meta_iterator_t struct_meta_iterator = kan_reflection_registry_query_struct_meta (
+        registry, first_struct.name, kan_string_intern ("example_struct_meta_assembly_t"));
+    KAN_TEST_CHECK (kan_reflection_struct_meta_iterator_get (&struct_meta_iterator) == &first_struct_assembly)
+    kan_reflection_struct_meta_iterator_next (&struct_meta_iterator);
+    KAN_TEST_CHECK (!kan_reflection_struct_meta_iterator_get (&struct_meta_iterator))
+
+    struct_meta_iterator = kan_reflection_registry_query_struct_meta (
+        registry, first_struct.name, kan_string_intern ("example_universal_meta_editor_t"));
+    KAN_TEST_CHECK (kan_reflection_struct_meta_iterator_get (&struct_meta_iterator) == &first_struct_editor)
+    kan_reflection_struct_meta_iterator_next (&struct_meta_iterator);
+    KAN_TEST_CHECK (!kan_reflection_struct_meta_iterator_get (&struct_meta_iterator))
+
+    struct_meta_iterator = kan_reflection_registry_query_struct_meta (registry, first_struct.name,
+                                                                      kan_string_intern ("there_is_no_such_meta"));
+    KAN_TEST_CHECK (!kan_reflection_struct_meta_iterator_get (&struct_meta_iterator))
 
     KAN_TEST_CHECK (kan_reflection_registry_query_struct (registry, second_struct.name) == &second_struct)
-    KAN_TEST_CHECK (kan_reflection_registry_query_struct_meta (registry, second_struct.name,
-                                                               kan_string_intern ("example_struct_meta_assembly_t")) ==
-                    &second_struct_assembly)
-    KAN_TEST_CHECK (kan_reflection_registry_query_struct_meta (registry, second_struct.name,
-                                                               kan_string_intern ("example_universal_meta_editor_t")) ==
-                    &second_struct_editor)
-    KAN_TEST_CHECK (kan_reflection_registry_query_struct_meta (registry, second_struct.name,
-                                                               kan_string_intern ("there_is_no_such_meta")) == NULL)
 
-    KAN_TEST_CHECK (kan_reflection_registry_query_struct_field_meta (
-                        registry, first_struct.name, first_struct_fields[0u].name,
-                        kan_string_intern ("example_field_meta_min_max_t")) == &first_struct_first_min_max)
-    KAN_TEST_CHECK (
-        kan_reflection_registry_query_struct_field_meta (registry, first_struct.name, first_struct_fields[1u].name,
-                                                         kan_string_intern ("example_field_meta_min_max_t")) == NULL)
+    struct_meta_iterator = kan_reflection_registry_query_struct_meta (
+        registry, second_struct.name, kan_string_intern ("example_struct_meta_assembly_t"));
+    KAN_TEST_CHECK (kan_reflection_struct_meta_iterator_get (&struct_meta_iterator) == &second_struct_assembly)
+    kan_reflection_struct_meta_iterator_next (&struct_meta_iterator);
+    KAN_TEST_CHECK (!kan_reflection_struct_meta_iterator_get (&struct_meta_iterator))
 
-    KAN_TEST_CHECK (
+    struct_meta_iterator = kan_reflection_registry_query_struct_meta (
+        registry, second_struct.name, kan_string_intern ("example_universal_meta_editor_t"));
+    KAN_TEST_CHECK (kan_reflection_struct_meta_iterator_get (&struct_meta_iterator) == &second_struct_editor)
+    kan_reflection_struct_meta_iterator_next (&struct_meta_iterator);
+    KAN_TEST_CHECK (!kan_reflection_struct_meta_iterator_get (&struct_meta_iterator))
+
+    struct_meta_iterator = kan_reflection_registry_query_struct_meta (registry, second_struct.name,
+                                                                      kan_string_intern ("there_is_no_such_meta"));
+    KAN_TEST_CHECK (!kan_reflection_struct_meta_iterator_get (&struct_meta_iterator))
+
+    struct kan_reflection_struct_field_meta_iterator_t struct_field_meta_iterator =
+        kan_reflection_registry_query_struct_field_meta (registry, first_struct.name, first_struct_fields[0u].name,
+                                                         kan_string_intern ("example_field_meta_min_max_t"));
+    KAN_TEST_CHECK (kan_reflection_struct_field_meta_iterator_get (&struct_field_meta_iterator) ==
+                    &first_struct_first_min_max)
+    kan_reflection_struct_field_meta_iterator_next (&struct_field_meta_iterator);
+    KAN_TEST_CHECK (!kan_reflection_struct_field_meta_iterator_get (&struct_field_meta_iterator))
+
+    struct_field_meta_iterator = kan_reflection_registry_query_struct_field_meta (
+        registry, first_struct.name, first_struct_fields[1u].name, kan_string_intern ("example_field_meta_min_max_t"));
+    KAN_TEST_CHECK (!kan_reflection_struct_field_meta_iterator_get (&struct_field_meta_iterator))
+
+    struct_field_meta_iterator =
         kan_reflection_registry_query_struct_field_meta (registry, second_struct.name, second_struct_fields[0u].name,
-                                                         kan_string_intern ("example_field_meta_min_max_t")) == NULL)
-    KAN_TEST_CHECK (kan_reflection_registry_query_struct_field_meta (
-                        registry, second_struct.name, second_struct_fields[1u].name,
-                        kan_string_intern ("example_field_meta_min_max_t")) == &second_struct_second_min_max)
+                                                         kan_string_intern ("example_field_meta_min_max_t"));
+    KAN_TEST_CHECK (!kan_reflection_struct_field_meta_iterator_get (&struct_field_meta_iterator))
+
+    struct_field_meta_iterator =
+        kan_reflection_registry_query_struct_field_meta (registry, second_struct.name, second_struct_fields[1u].name,
+                                                         kan_string_intern ("example_field_meta_min_max_t"));
+    KAN_TEST_CHECK (kan_reflection_struct_field_meta_iterator_get (&struct_field_meta_iterator) ==
+                    &second_struct_second_min_max)
+    kan_reflection_struct_field_meta_iterator_next (&struct_field_meta_iterator);
+    KAN_TEST_CHECK (!kan_reflection_struct_field_meta_iterator_get (&struct_field_meta_iterator))
 
     kan_reflection_registry_destroy (registry);
 }
@@ -1803,13 +1848,21 @@ KAN_TEST_CASE (generated_reflection)
         a_bit_of_everything_data->fields[15u].archetype_dynamic_array.item_archetype_struct_pointer.type_name ==
         kan_string_intern ("second_component_t"))
 
-    KAN_TEST_CHECK (kan_reflection_registry_query_struct_field_meta (registry, kan_string_intern ("first_component_t"),
-                                                                     kan_string_intern ("position"),
-                                                                     kan_string_intern ("network_meta_t")))
+    struct kan_reflection_struct_field_meta_iterator_t iterator = kan_reflection_registry_query_struct_field_meta (
+        registry, kan_string_intern ("first_component_t"), kan_string_intern ("position"),
+        kan_string_intern ("network_meta_t"));
 
-    KAN_TEST_CHECK (kan_reflection_registry_query_struct_field_meta (registry, kan_string_intern ("second_component_t"),
-                                                                     kan_string_intern ("velocity"),
-                                                                     kan_string_intern ("network_meta_t")))
+    KAN_TEST_CHECK (kan_reflection_struct_field_meta_iterator_get (&iterator))
+    kan_reflection_struct_field_meta_iterator_next (&iterator);
+    KAN_TEST_CHECK (!kan_reflection_struct_field_meta_iterator_get (&iterator))
+
+    iterator = kan_reflection_registry_query_struct_field_meta (registry, kan_string_intern ("second_component_t"),
+                                                                kan_string_intern ("velocity"),
+                                                                kan_string_intern ("network_meta_t"));
+
+    KAN_TEST_CHECK (kan_reflection_struct_field_meta_iterator_get (&iterator))
+    kan_reflection_struct_field_meta_iterator_next (&iterator);
+    KAN_TEST_CHECK (!kan_reflection_struct_field_meta_iterator_get (&iterator))
 
     kan_reflection_registry_destroy (registry);
 }
