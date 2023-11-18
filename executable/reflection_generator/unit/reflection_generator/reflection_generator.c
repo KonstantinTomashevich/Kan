@@ -887,6 +887,7 @@ static void add_bootstrap (void)
                 kan_trivial_string_buffer_append_string (&io.output_buffer, "        .shutdown = NULL,\n");
             }
 
+            kan_trivial_string_buffer_append_string (&io.output_buffer, "        .functor_user_data = 0u,\n");
             kan_trivial_string_buffer_append_string (&io.output_buffer, "        .fields_count = ");
             kan_trivial_string_buffer_append_unsigned_long (&io.output_buffer,
                                                             (unsigned long) struct_data->fields_count);

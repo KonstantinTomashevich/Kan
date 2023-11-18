@@ -107,6 +107,7 @@ KAN_TEST_CASE (registry)
         8u,
         NULL,
         NULL,
+        0u,
         sizeof (first_struct_fields) / sizeof (struct kan_reflection_field_t),
         first_struct_fields,
     };
@@ -150,6 +151,7 @@ KAN_TEST_CASE (registry)
         8u,
         NULL,
         NULL,
+        0u,
         sizeof (second_struct_fields) / sizeof (struct kan_reflection_field_t),
         second_struct_fields,
     };
@@ -343,6 +345,7 @@ KAN_TEST_CASE (query_local_field)
         8u,
         NULL,
         NULL,
+        0u,
         sizeof (first_struct_fields) / sizeof (struct kan_reflection_field_t),
         first_struct_fields,
     };
@@ -376,6 +379,7 @@ KAN_TEST_CASE (query_local_field)
         8u,
         NULL,
         NULL,
+        0u,
         sizeof (second_struct_fields) / sizeof (struct kan_reflection_field_t),
         second_struct_fields,
     };
@@ -478,6 +482,7 @@ KAN_TEST_CASE (field_visibility_iterator)
         _Alignof (struct struct_with_union_t),
         NULL,
         NULL,
+        0u,
         sizeof (struct_with_union_fields) / sizeof (struct kan_reflection_field_t),
         struct_with_union_fields,
     };
@@ -588,6 +593,7 @@ KAN_TEST_CASE (patch)
         _Alignof (struct patch_inner_t),
         NULL,
         NULL,
+        0u,
         sizeof (patch_inner_fields) / sizeof (struct kan_reflection_field_t),
         patch_inner_fields,
     };
@@ -630,6 +636,7 @@ KAN_TEST_CASE (patch)
         _Alignof (struct patch_outer_t),
         NULL,
         NULL,
+        0u,
         sizeof (patch_outer_fields) / sizeof (struct kan_reflection_field_t),
         patch_outer_fields,
     };
@@ -1077,6 +1084,7 @@ KAN_TEST_CASE (migration)
         .alignment = _Alignof (struct same_source_t),
         .init = NULL,
         .shutdown = NULL,
+        .functor_user_data = 0u,
         .fields_count = sizeof (same_source_fields) / sizeof (struct kan_reflection_field_t),
         .fields = same_source_fields,
     };
@@ -1087,6 +1095,7 @@ KAN_TEST_CASE (migration)
         .alignment = _Alignof (struct same_target_t),
         .init = NULL,
         .shutdown = NULL,
+        .functor_user_data = 0u,
         .fields_count = sizeof (same_target_fields) / sizeof (struct kan_reflection_field_t),
         .fields = same_target_fields,
     };
@@ -1187,6 +1196,7 @@ KAN_TEST_CASE (migration)
         .alignment = _Alignof (struct cross_copy_source_t),
         .init = NULL,
         .shutdown = NULL,
+        .functor_user_data = 0u,
         .fields_count = sizeof (cross_copy_source_fields) / sizeof (struct kan_reflection_field_t),
         .fields = cross_copy_source_fields,
     };
@@ -1197,6 +1207,7 @@ KAN_TEST_CASE (migration)
         .alignment = _Alignof (struct cross_copy_target_t),
         .init = NULL,
         .shutdown = NULL,
+        .functor_user_data = 0u,
         .fields_count = sizeof (cross_copy_target_fields) / sizeof (struct kan_reflection_field_t),
         .fields = cross_copy_target_fields,
     };
@@ -1245,6 +1256,7 @@ KAN_TEST_CASE (migration)
         .alignment = _Alignof (struct nesting_source_t),
         .init = NULL,
         .shutdown = NULL,
+        .functor_user_data = 0u,
         .fields_count = sizeof (nesting_source_fields) / sizeof (struct kan_reflection_field_t),
         .fields = nesting_source_fields,
     };
@@ -1255,6 +1267,7 @@ KAN_TEST_CASE (migration)
         .alignment = _Alignof (struct nesting_target_t),
         .init = NULL,
         .shutdown = NULL,
+        .functor_user_data = 0u,
         .fields_count = sizeof (nesting_target_fields) / sizeof (struct kan_reflection_field_t),
         .fields = nesting_target_fields,
     };
@@ -1496,6 +1509,7 @@ KAN_TEST_CASE (migration)
         .alignment = _Alignof (struct migration_source_t),
         .init = NULL,
         .shutdown = NULL,
+        .functor_user_data = 0u,
         .fields_count = sizeof (migration_source_fields) / sizeof (struct kan_reflection_field_t),
         .fields = migration_source_fields,
     };
@@ -1506,6 +1520,7 @@ KAN_TEST_CASE (migration)
         .alignment = _Alignof (struct migration_target_t),
         .init = NULL,
         .shutdown = NULL,
+        .functor_user_data = 0u,
         .fields_count = sizeof (migration_target_fields) / sizeof (struct kan_reflection_field_t),
         .fields = migration_target_fields,
     };

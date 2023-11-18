@@ -174,8 +174,9 @@ struct kan_reflection_field_t
     int64_t *visibility_condition_values;
 };
 
-typedef void (*kan_reflection_initialize_functor) (void *pointer);
-typedef void (*kan_reflection_shutdown_functor) (void *pointer);
+typedef uint64_t kan_reflection_functor_user_data;
+typedef void (*kan_reflection_initialize_functor) (kan_reflection_functor_user_data user_data, void *pointer);
+typedef void (*kan_reflection_shutdown_functor) (kan_reflection_functor_user_data user_data, void *pointer);
 
 /// \brief Describes fixed-size structure with optional initialize and shutdown functions.
 struct kan_reflection_struct_t
@@ -185,6 +186,7 @@ struct kan_reflection_struct_t
     uint64_t alignment;
     kan_reflection_initialize_functor init;
     kan_reflection_shutdown_functor shutdown;
+    kan_reflection_functor_user_data functor_user_data;
     uint64_t fields_count;
     struct kan_reflection_field_t *fields;
 };
