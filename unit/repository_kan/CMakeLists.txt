@@ -1,0 +1,6 @@
+register_concrete (repository_kan)
+concrete_include (PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+concrete_sources ("*.c")
+concrete_require (SCOPE PRIVATE CONCRETE_INTERFACE repository_reflection)
+concrete_implements_abstract (repository)
+c_interface_scanner_setup (GLOB "*.c" "*.h")
