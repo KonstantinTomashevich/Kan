@@ -16,7 +16,7 @@ static void shutdown_sdl (void)
     SDL_QuitSubSystem (SDL_INIT_TIMER);
 }
 
-uint64_t kan_platform_get_elapsed_nanoseconds (void)
+static void ensure_sdl_ready (void)
 {
     if (!subsystem_initialized)
     {
@@ -40,6 +40,16 @@ uint64_t kan_platform_get_elapsed_nanoseconds (void)
 
         kan_atomic_int_unlock (&subsystem_initialized_lock);
     }
+}
 
+uint64_t kan_platform_get_elapsed_nanoseconds (void)
+{
+    ensure_sdl_ready ();
     return (uint64_t) SDL_GetTicksNS ();
+}
+
+void kan_platform_sleep (uint64_t nanoseconds)
+{
+    ensure_sdl_ready ();
+    SDL_DelayNS (nanoseconds);
 }
