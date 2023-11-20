@@ -5,6 +5,7 @@
 #include <stdint.h>
 
 #include <kan/api_common/c_header.h>
+#include <kan/threading/atomic.h>
 
 /// \file
 /// \brief Provides lightweight implementation for event queue container.
@@ -90,7 +91,8 @@
 ///
 /// \par Thread safety
 /// \parblock
-/// This event queue implementation is not thread safe.
+/// This event queue implementation is not thread safe in general scenario. But queue iterator methods are safe if it is
+/// guaranteed that no other queue method (submit or clean) is called.
 /// \endparblock
 
 KAN_C_HEADER_BEGIN
@@ -99,13 +101,13 @@ KAN_C_HEADER_BEGIN
 struct kan_event_queue_node_t
 {
     struct kan_event_queue_node_t *next;
-    uint64_t iterators_here;
+    struct kan_atomic_int_t iterators_here;
 };
 
 /// \brief Contains event queue internal data.
 struct kan_event_queue_t
 {
-    uint64_t total_iterators;
+    struct kan_atomic_int_t total_iterators;
     struct kan_event_queue_node_t *next_placeholder;
     struct kan_event_queue_node_t *oldest;
 };
