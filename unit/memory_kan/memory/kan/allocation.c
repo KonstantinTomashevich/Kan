@@ -302,6 +302,18 @@ void kan_stack_allocator_load_top (kan_stack_allocator_t allocator, void *top)
     stack->top = top;
 }
 
+uint64_t kan_stack_allocator_get_size (kan_stack_allocator_t allocator)
+{
+    struct stack_allocator_t *stack = (struct stack_allocator_t *) allocator;
+    return stack->end - stack->data;
+}
+
+uint64_t kan_stack_allocator_get_available (kan_stack_allocator_t allocator)
+{
+    struct stack_allocator_t *stack = (struct stack_allocator_t *) allocator;
+    return stack->top - stack->data;
+}
+
 void kan_stack_allocator_destroy (kan_stack_allocator_t allocator)
 {
     struct stack_allocator_t *stack = (struct stack_allocator_t *) allocator;

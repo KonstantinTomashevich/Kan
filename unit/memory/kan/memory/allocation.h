@@ -80,6 +80,12 @@ MEMORY_API void *kan_stack_allocator_save_top (kan_stack_allocator_t allocator);
 /// \brief Sets stack top to given value which usually causes partial stack reset.
 MEMORY_API void kan_stack_allocator_load_top (kan_stack_allocator_t allocator, void *top);
 
+/// \brief Returns total size of a stack allocator, specified during creation.
+MEMORY_API uint64_t kan_stack_allocator_get_size (kan_stack_allocator_t allocator);
+
+/// \brief Returns amount of bytes that can be allocated from stack allocator.
+MEMORY_API uint64_t kan_stack_allocator_get_available (kan_stack_allocator_t allocator);
+
 /// \brief Destroys given stack instance and frees its memory.
 MEMORY_API void kan_stack_allocator_destroy (kan_stack_allocator_t allocator);
 

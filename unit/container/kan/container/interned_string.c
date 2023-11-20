@@ -5,7 +5,7 @@
 #include <kan/api_common/bool.h>
 #include <kan/container/hash_storage.h>
 #include <kan/container/interned_string.h>
-#include <kan/error/critical.h>
+#include <kan/container/stack_group_allocator.h>
 #include <kan/hash/hash.h>
 #include <kan/memory/allocation.h>
 #include <kan/threading/atomic.h>
@@ -14,7 +14,7 @@ struct context_t
 {
     kan_allocation_group_t allocation_group;
     struct kan_hash_storage_t hash_storage;
-    kan_stack_allocator_t last_stack;
+    struct kan_stack_group_allocator_t stack;
 };
 
 struct node_t
@@ -64,8 +64,8 @@ kan_interned_string_t kan_char_sequence_intern (const char *begin, const char *e
         context.allocation_group = kan_allocation_group_get_child (kan_allocation_group_root (), "string_interning");
         kan_hash_storage_init (&context.hash_storage, context.allocation_group,
                                KAN_CONTAINER_STRING_INTERNING_INITIAL_BUCKETS);
-        context.last_stack =
-            kan_stack_allocator_create (context.allocation_group, KAN_CONTAINER_STRING_INTERNING_STACK_SIZE);
+        kan_stack_group_allocator_init (&context.stack, context.allocation_group,
+                                        KAN_CONTAINER_STRING_INTERNING_STACK_SIZE);
         initialized = KAN_TRUE;
     }
 
@@ -87,18 +87,8 @@ kan_interned_string_t kan_char_sequence_intern (const char *begin, const char *e
     }
 
     // Not interned.
-    node = kan_stack_allocator_allocate (context.last_stack, sizeof (struct node_t) + string_length + 1u,
-                                         _Alignof (struct node_t));
-
-    if (!node)
-    {
-        context.last_stack =
-            kan_stack_allocator_create (context.allocation_group, KAN_CONTAINER_STRING_INTERNING_STACK_SIZE);
-
-        node = kan_stack_allocator_allocate (context.last_stack, sizeof (struct node_t) + string_length + 1u,
-                                             _Alignof (struct node_t));
-        KAN_ASSERT (node)
-    }
+    node = kan_stack_group_allocator_allocate (&context.stack, sizeof (struct node_t) + string_length + 1u,
+                                               _Alignof (struct node_t));
 
     node->node.hash = hash;
     node->length = string_length;
