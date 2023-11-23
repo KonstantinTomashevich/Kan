@@ -3586,7 +3586,8 @@ static void migrate_patch_task (kan_cpu_task_user_data_t user_data)
                 }
 
                 uint8_t *data_end = node->data + node->size;
-                data_end = (uint8_t *) kan_apply_alignment ((uint64_t) data_end, _Alignof (struct compiled_patch_node_t));
+                data_end =
+                    (uint8_t *) kan_apply_alignment ((uint64_t) data_end, _Alignof (struct compiled_patch_node_t));
                 node = (struct compiled_patch_node_t *) data_end;
                 ++node_index;
             }

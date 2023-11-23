@@ -4,6 +4,7 @@
 
 #include <kan/api_common/c_header.h>
 #include <kan/memory_profiler/allocation_group.h>
+#include <kan/reflection/migration.h>
 #include <kan/reflection/registry.h>
 #include <kan/repository/meta.h>
 
@@ -155,7 +156,10 @@ REPOSITORY_API kan_repository_t kan_repository_create_child (kan_repository_t pa
 
 REPOSITORY_API void kan_repository_enter_planning_mode (kan_repository_t root_repository);
 
-REPOSITORY_API void kan_repository_migrate (kan_repository_t root_repository, kan_reflection_registry_t new_registry);
+REPOSITORY_API void kan_repository_migrate (kan_repository_t root_repository,
+                                            kan_reflection_registry_t new_registry,
+                                            kan_reflection_migration_seed_t migration_seed,
+                                            kan_reflection_struct_migrator_t migrator);
 
 REPOSITORY_API kan_repository_singleton_storage_t
 kan_repository_singleton_storage_open (kan_repository_t repository, kan_interned_string_t type_name);

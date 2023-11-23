@@ -6,6 +6,8 @@
 #include <kan/api_common/alignment.h>
 #include <kan/container/event_queue.h>
 #include <kan/container/hash_storage.h>
+#include <kan/container/stack_group_allocator.h>
+#include <kan/cpu_dispatch/job.h>
 #include <kan/error/critical.h>
 #include <kan/log/logging.h>
 #include <kan/memory/allocation.h>
@@ -175,6 +177,23 @@ struct repository_t
 
     struct kan_hash_storage_t singleton_storages;
     struct kan_hash_storage_t event_storages;
+};
+
+struct migration_context_t
+{
+    struct kan_stack_group_allocator_t allocator;
+    struct kan_cpu_task_list_node_t *task_list;
+    kan_interned_string_t task_name;
+};
+
+struct record_migration_user_data_t
+{
+    void **record_pointer;
+    kan_allocation_group_t allocation_group;
+    kan_bool_t batched_allocation;
+    kan_reflection_struct_migrator_t migrator;
+    const struct kan_reflection_struct_t *old_type;
+    const struct kan_reflection_struct_t *new_type;
 };
 
 #if defined(KAN_REPOSITORY_SAFEGUARDS_ENABLED)
@@ -464,6 +483,56 @@ static void observation_event_triggers_definition_shutdown (struct observation_e
     definition->event_triggers_count = 0u;
 }
 
+static void singleton_storage_node_shutdown_and_free (struct singleton_storage_node_t *node,
+                                                      struct repository_t *repository)
+{
+    KAN_ASSERT (kan_atomic_int_get (&node->queries_count) == 0)
+    KAN_ASSERT (node->singleton)
+
+    if (node->type->shutdown)
+    {
+        node->type->shutdown (node->type->functor_user_data, node->singleton);
+    }
+
+    kan_free_general (node->allocation_group, node->singleton, node->type->size);
+    observation_buffer_definition_shutdown (&node->observation_buffer, node->allocation_group);
+    observation_event_triggers_definition_shutdown (&node->observation_events_triggers, node->allocation_group);
+
+    kan_hash_storage_remove (&repository->singleton_storages, &node->node);
+    kan_free_batched (node->allocation_group, node);
+}
+
+static void event_queue_node_shutdown_and_free (struct event_queue_node_t *node, struct event_storage_node_t *storage)
+{
+    KAN_ASSERT (node->event || &node->node == storage->event_queue.next_placeholder)
+    if (node->event)
+    {
+        if (storage->type->shutdown)
+        {
+            storage->type->shutdown (storage->type->functor_user_data, node->event);
+        }
+
+        kan_free_batched (storage->allocation_group, node->event);
+    }
+
+    kan_free_batched (storage->allocation_group, node);
+}
+
+static void event_storage_node_shutdown_and_free (struct event_storage_node_t *node, struct repository_t *repository)
+{
+    KAN_ASSERT (kan_atomic_int_get (&node->queries_count) == 0)
+    struct event_queue_node_t *queue_node = (struct event_queue_node_t *) node->event_queue.oldest;
+
+    while (queue_node)
+    {
+        event_queue_node_shutdown_and_free (queue_node, node);
+        queue_node = (struct event_queue_node_t *) queue_node->node.next;
+    }
+
+    kan_hash_storage_remove (&repository->singleton_storages, &node->node);
+    kan_free_batched (node->allocation_group, node);
+}
+
 static struct repository_t *repository_create (kan_allocation_group_t allocation_group,
                                                struct repository_t *parent,
                                                kan_interned_string_t name,
@@ -516,7 +585,6 @@ kan_repository_t kan_repository_create_child (kan_repository_t parent, kan_inter
 static void repository_enter_planning_mode_internal (struct repository_t *repository)
 {
     KAN_ASSERT (repository->mode == REPOSITORY_MODE_SERVING)
-    // TODO: Check safeguards? That there is no leaked accesses.
     repository->mode = REPOSITORY_MODE_PLANNING;
 
     struct singleton_storage_node_t *singleton_storage_node =
@@ -524,6 +592,15 @@ static void repository_enter_planning_mode_internal (struct repository_t *reposi
 
     while (singleton_storage_node)
     {
+#if defined(KAN_REPOSITORY_SAFEGUARDS_ENABLED)
+        if (kan_atomic_int_get (&singleton_storage_node->safeguard_access_status) != 0)
+        {
+            KAN_LOG (repository_safeguard, KAN_LOG_ERROR,
+                     "Unsafe switch to planning mode. Singleton \"%s\" is still accessed.",
+                     singleton_storage_node->type->name);
+        }
+#endif
+
         const kan_allocation_group_t automatic_events_group =
             storage_event_automation_allocation_group (singleton_storage_node->allocation_group);
 
@@ -533,6 +610,23 @@ static void repository_enter_planning_mode_internal (struct repository_t *reposi
 
         singleton_storage_node = (struct singleton_storage_node_t *) singleton_storage_node->node.list_node.next;
     }
+
+#if defined(KAN_REPOSITORY_SAFEGUARDS_ENABLED)
+    struct event_storage_node_t *event_storage_node =
+        (struct event_storage_node_t *) repository->event_storages.items.first;
+
+    while (event_storage_node)
+    {
+        if (kan_atomic_int_get (&event_storage_node->safeguard_access_status) != 0)
+        {
+            KAN_LOG (repository_safeguard, KAN_LOG_ERROR,
+                     "Unsafe switch to planning mode. Events \"%s\" are still accessed.",
+                     singleton_storage_node->type->name);
+        }
+
+        event_storage_node = (struct event_storage_node_t *) event_storage_node->node.list_node.next;
+    }
+#endif
 
     repository = repository->first;
     while (repository)
@@ -549,9 +643,207 @@ void kan_repository_enter_planning_mode (kan_repository_t root_repository)
     repository_enter_planning_mode_internal (repository);
 }
 
-void kan_repository_migrate (kan_repository_t root_repository, kan_reflection_registry_t new_registry)
+static void execute_migration (uint64_t user_data)
 {
-    // TODO: Implement.
+    struct record_migration_user_data_t *data = (struct record_migration_user_data_t *) user_data;
+    void *old_object = *data->record_pointer;
+
+    void *new_object = data->batched_allocation ? kan_allocate_batched (data->allocation_group, data->new_type->size) :
+                                                  kan_allocate_general (data->allocation_group, data->new_type->size,
+                                                                        data->new_type->alignment);
+
+    if (data->new_type->init)
+    {
+        data->new_type->init (data->new_type->functor_user_data, new_object);
+    }
+
+    kan_reflection_struct_migrator_migrate_instance (data->migrator, data->new_type->name, old_object, new_object);
+    if (data->old_type->shutdown)
+    {
+        data->old_type->shutdown (data->old_type->functor_user_data, old_object);
+    }
+
+    if (data->batched_allocation)
+    {
+        kan_free_batched (data->allocation_group, old_object);
+    }
+    else
+    {
+        kan_free_general (data->allocation_group, old_object, data->old_type->size);
+    }
+
+    *data->record_pointer = new_object;
+}
+
+static struct record_migration_user_data_t *allocate_migration_user_data (struct migration_context_t *context)
+{
+    return (struct record_migration_user_data_t *) kan_stack_group_allocator_allocate (
+        &context->allocator, sizeof (struct record_migration_user_data_t),
+        _Alignof (struct record_migration_user_data_t));
+}
+
+static void spawn_migration_task (struct migration_context_t *context, struct record_migration_user_data_t *user_data)
+{
+    struct kan_cpu_task_list_node_t *node = (struct kan_cpu_task_list_node_t *) kan_stack_group_allocator_allocate (
+        &context->allocator, sizeof (struct kan_cpu_task_list_node_t), _Alignof (struct kan_cpu_task_list_node_t));
+
+    node->queue = KAN_CPU_DISPATCH_QUEUE_FOREGROUND;
+    node->task = (struct kan_cpu_task_t) {
+        .name = context->task_name,
+        .function = execute_migration,
+        .user_data = (uint64_t) user_data,
+    };
+
+    node->next = context->task_list;
+    context->task_list = node;
+}
+
+static void repository_migrate_internal (struct repository_t *repository,
+                                         struct migration_context_t *context,
+                                         kan_reflection_registry_t new_registry,
+                                         kan_reflection_migration_seed_t migration_seed,
+                                         kan_reflection_struct_migrator_t migrator)
+{
+    KAN_ASSERT (repository->mode == REPOSITORY_MODE_PLANNING)
+    struct singleton_storage_node_t *singleton_storage_node =
+        (struct singleton_storage_node_t *) repository->singleton_storages.items.first;
+
+    while (singleton_storage_node)
+    {
+        struct singleton_storage_node_t *next =
+            (struct singleton_storage_node_t *) singleton_storage_node->node.list_node.next;
+
+        const struct kan_reflection_struct_t *old_type = singleton_storage_node->type;
+        const struct kan_reflection_struct_t *new_type =
+            kan_reflection_registry_query_struct (new_registry, old_type->name);
+        singleton_storage_node->type = new_type;
+
+        const struct kan_reflection_struct_migration_seed_t *seed =
+            kan_reflection_migration_seed_get_for_struct (migration_seed, old_type->name);
+
+        switch (seed->status)
+        {
+        case KAN_REFLECTION_MIGRATION_NEEDED:
+        {
+            struct record_migration_user_data_t *user_data = allocate_migration_user_data (context);
+            *user_data = (struct record_migration_user_data_t) {
+                .record_pointer = &singleton_storage_node->singleton,
+                .allocation_group = singleton_storage_node->allocation_group,
+                .batched_allocation = KAN_FALSE,
+                .migrator = migrator,
+                .old_type = old_type,
+                .new_type = new_type,
+            };
+
+            spawn_migration_task (context, user_data);
+            break;
+        }
+
+        case KAN_REFLECTION_MIGRATION_NOT_NEEDED:
+            // No migration, therefore don't need to do anything.
+            break;
+
+        case KAN_REFLECTION_MIGRATION_REMOVED:
+            singleton_storage_node_shutdown_and_free (singleton_storage_node, repository);
+            break;
+        }
+
+        singleton_storage_node = next;
+    }
+
+    struct event_storage_node_t *event_storage_node =
+        (struct event_storage_node_t *) repository->event_storages.items.first;
+
+    while (event_storage_node)
+    {
+        struct event_storage_node_t *next = (struct event_storage_node_t *) event_storage_node->node.list_node.next;
+
+        const struct kan_reflection_struct_t *old_type = event_storage_node->type;
+        const struct kan_reflection_struct_t *new_type =
+            kan_reflection_registry_query_struct (new_registry, old_type->name);
+        event_storage_node->type = new_type;
+
+        const struct kan_reflection_struct_migration_seed_t *seed =
+            kan_reflection_migration_seed_get_for_struct (migration_seed, old_type->name);
+
+        switch (seed->status)
+        {
+        case KAN_REFLECTION_MIGRATION_NEEDED:
+        {
+            struct event_queue_node_t *node = (struct event_queue_node_t *) event_storage_node->event_queue.oldest;
+            while (&node->node != event_storage_node->event_queue.next_placeholder)
+            {
+                struct record_migration_user_data_t *user_data = allocate_migration_user_data (context);
+                *user_data = (struct record_migration_user_data_t) {
+                    .record_pointer = &node->event,
+                    .allocation_group = event_storage_node->allocation_group,
+                    .batched_allocation = KAN_TRUE,
+                    .migrator = migrator,
+                    .old_type = old_type,
+                    .new_type = new_type,
+                };
+
+                spawn_migration_task (context, user_data);
+                node = (struct event_queue_node_t *) node->node.next;
+            }
+
+            break;
+        }
+
+        case KAN_REFLECTION_MIGRATION_NOT_NEEDED:
+            // No migration, therefore don't need to do anything.
+            break;
+
+        case KAN_REFLECTION_MIGRATION_REMOVED:
+            event_storage_node_shutdown_and_free (event_storage_node, repository);
+            break;
+        }
+
+        event_storage_node = next;
+    }
+
+    repository->registry = new_registry;
+    repository = repository->first;
+
+    while (repository)
+    {
+        repository_migrate_internal (repository, context, new_registry, migration_seed, migrator);
+        repository = repository->next;
+    }
+}
+
+void kan_repository_migrate (kan_repository_t root_repository,
+                             kan_reflection_registry_t new_registry,
+                             kan_reflection_migration_seed_t migration_seed,
+                             kan_reflection_struct_migrator_t migrator)
+{
+    struct repository_t *repository = (struct repository_t *) root_repository;
+    KAN_ASSERT (!repository->parent)
+    kan_cpu_job_t job = kan_cpu_job_create ();
+    KAN_ASSERT (job != KAN_INVALID_CPU_JOB)
+
+    struct migration_context_t context;
+    kan_stack_group_allocator_init (&context.allocator,
+                                    kan_allocation_group_get_child (repository->allocation_group, "migration"),
+                                    KAN_REPOSITORY_MIGRATION_STACK_INITIAL_SIZE);
+
+    context.task_list = NULL;
+    context.task_name = kan_string_intern ("repository_migration_instance");
+    repository_migrate_internal (repository, &context, new_registry, migration_seed, migrator);
+
+    if (context.task_list)
+    {
+        kan_cpu_job_dispatch_task_list (job, context.task_list);
+        while (context.task_list)
+        {
+            KAN_ASSERT (context.task_list->dispatch_handle != KAN_INVALID_CPU_TASK_HANDLE)
+            kan_cpu_task_detach (context.task_list->dispatch_handle);
+            context.task_list = context.task_list->next;
+        }
+    }
+
+    kan_cpu_job_wait (job);
+    kan_stack_group_shutdown (&context.allocator);
 }
 
 static struct singleton_storage_node_t *query_singleton_storage_across_hierarchy (struct repository_t *repository,
@@ -619,6 +911,15 @@ kan_repository_singleton_storage_t kan_repository_singleton_storage_open (kan_re
 #if defined(KAN_REPOSITORY_SAFEGUARDS_ENABLED)
         storage->safeguard_access_status = kan_atomic_int_init (0);
 #endif
+
+        if (repository_data->singleton_storages.bucket_count * KAN_REPOSITORY_SINGLETON_STORAGE_LOAD_FACTOR >=
+            repository_data->singleton_storages.items.size)
+        {
+            kan_hash_storage_set_bucket_count (&repository_data->singleton_storages,
+                                               repository_data->singleton_storages.bucket_count * 2u);
+        }
+
+        kan_hash_storage_add (&repository_data->singleton_storages, &storage->node);
     }
 
     return (kan_repository_singleton_storage_t) storage;
@@ -764,11 +1065,6 @@ static struct event_queue_node_t *event_queue_node_allocate (kan_allocation_grou
     return node;
 }
 
-static void event_queue_node_free (kan_allocation_group_t storage_allocation_group, struct event_queue_node_t *node)
-{
-    kan_free_batched (storage_allocation_group, node);
-}
-
 kan_repository_event_storage_t kan_repository_event_storage_open (kan_repository_t repository,
                                                                   kan_interned_string_t type_name)
 {
@@ -803,6 +1099,15 @@ kan_repository_event_storage_t kan_repository_event_storage_open (kan_repository
 #if defined(KAN_REPOSITORY_SAFEGUARDS_ENABLED)
         storage->safeguard_access_status = kan_atomic_int_init (0);
 #endif
+
+        if (repository_data->event_storages.bucket_count * KAN_REPOSITORY_EVENT_STORAGE_LOAD_FACTOR >=
+            repository_data->event_storages.items.size)
+        {
+            kan_hash_storage_set_bucket_count (&repository_data->event_storages,
+                                               repository_data->event_storages.bucket_count * 2u);
+        }
+
+        kan_hash_storage_add (&repository_data->event_storages, &storage->node);
     }
 
     return (kan_repository_event_storage_t) storage;
@@ -987,7 +1292,7 @@ void kan_repository_event_read_access_close (struct kan_repository_event_read_ac
 
             while (oldest)
             {
-                event_queue_node_free (access_data->storage->allocation_group, oldest);
+                event_queue_node_shutdown_and_free (oldest, access_data->storage);
                 oldest =
                     (struct event_queue_node_t *) kan_event_queue_clean_oldest (&access_data->storage->event_queue);
             }
@@ -1015,7 +1320,51 @@ void kan_repository_enter_serving_mode (kan_repository_t root_repository)
     // TODO: Connect automatic event storages with singleton and indexed storages. Build copy-outs and such things.
 }
 
+static void repository_destroy_internal (struct repository_t *repository)
+{
+    KAN_ASSERT (repository->mode == REPOSITORY_MODE_PLANNING)
+    while (repository->first)
+    {
+        repository_destroy_internal (repository->first);
+    }
+
+    while (repository->singleton_storages.items.first)
+    {
+        singleton_storage_node_shutdown_and_free (
+            (struct singleton_storage_node_t *) repository->singleton_storages.items.first, repository);
+    }
+
+    while (repository->event_storages.items.first)
+    {
+        event_storage_node_shutdown_and_free ((struct event_storage_node_t *) repository->event_storages.items.first,
+                                              repository);
+    }
+
+    kan_hash_storage_shutdown (&repository->singleton_storages);
+    kan_hash_storage_shutdown (&repository->event_storages);
+
+    if (repository->parent)
+    {
+        if (repository->parent->first == repository)
+        {
+            repository->parent->first = repository->next;
+        }
+        else
+        {
+            struct repository_t *sibling = repository->parent->first;
+            while (sibling->next != repository)
+            {
+                sibling = sibling->next;
+                KAN_ASSERT (sibling)
+            }
+
+            sibling->next = repository->next;
+        }
+    }
+}
+
 void kan_repository_destroy (kan_repository_t repository)
 {
-    // TODO: Implement.
+    struct repository_t *repository_data = (struct repository_t *) repository;
+    repository_destroy_internal (repository_data);
 }
