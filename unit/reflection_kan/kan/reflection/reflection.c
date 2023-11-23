@@ -4,6 +4,7 @@
 #include <qsort.h>
 #include <stddef.h>
 
+#include <kan/api_common/alignment.h>
 #include <kan/api_common/min_max.h>
 #include <kan/container/dynamic_array.h>
 #include <kan/container/hash_storage.h>
@@ -1233,17 +1234,6 @@ static void validate_compiled_node (const struct compiled_patch_node_t *node,
 }
 #endif
 
-static uint64_t compiled_patch_node_add_alignment (uint64_t offset)
-{
-    const uint64_t modulo = offset % _Alignof (struct compiled_patch_node_t);
-    if (modulo != 0u)
-    {
-        return _Alignof (struct compiled_patch_node_t) - modulo;
-    }
-
-    return 0u;
-}
-
 static kan_bool_t compiled_patch_build_into (struct patch_builder_t *patch_builder,
                                              struct registry_t *registry_struct,
                                              const struct kan_reflection_struct_t *type,
@@ -1315,7 +1305,7 @@ static kan_bool_t compiled_patch_build_into (struct patch_builder_t *patch_build
 
         if (new_node)
         {
-            patch_data_size += compiled_patch_node_add_alignment (patch_data_size);
+            patch_data_size = kan_apply_alignment (patch_data_size, _Alignof (struct compiled_patch_node_t));
             patch_data_size += sizeof (struct compiled_patch_node_t);
             ++node_count;
         }
@@ -1323,7 +1313,7 @@ static kan_bool_t compiled_patch_build_into (struct patch_builder_t *patch_build
         patch_data_size += nodes_array[index]->size;
     }
 
-    patch_data_size += compiled_patch_node_add_alignment (patch_data_size);
+    patch_data_size = kan_apply_alignment (patch_data_size, _Alignof (struct compiled_patch_node_t));
     output_patch->type = type;
     output_patch->node_count = node_count;
     output_patch->begin = kan_allocate_general (get_compiled_patch_allocation_group (), patch_data_size,
@@ -1351,7 +1341,7 @@ static kan_bool_t compiled_patch_build_into (struct patch_builder_t *patch_build
         if (index == 0u ||
             nodes_array[index - 1u]->offset + nodes_array[index - 1u]->size != nodes_array[index]->offset)
         {
-            output += compiled_patch_node_add_alignment ((uint64_t) output);
+            output = (uint8_t *) kan_apply_alignment ((uint64_t) output, _Alignof (struct compiled_patch_node_t));
 #if defined(KAN_REFLECTION_WITH_VALIDATION) && defined(KAN_WITH_ASSERT)
             validate_compiled_node (output_node, (kan_reflection_registry_t) registry_struct, type);
 #endif
@@ -1372,7 +1362,7 @@ static kan_bool_t compiled_patch_build_into (struct patch_builder_t *patch_build
 #endif
 
 #if defined(KAN_WITH_ASSERT)
-    output += compiled_patch_node_add_alignment ((uint64_t) output);
+    output = (uint8_t *) kan_apply_alignment ((uint64_t) output, _Alignof (struct compiled_patch_node_t));
     KAN_ASSERT ((struct compiled_patch_node_t *) output == output_patch->end)
 #endif
 
@@ -1420,7 +1410,7 @@ void kan_reflection_patch_apply (kan_reflection_patch_t patch, void *target)
     {
         memcpy (((uint8_t *) target) + node->offset, node->data, node->size);
         uint8_t *data_end = node->data + node->size;
-        data_end += compiled_patch_node_add_alignment ((uint64_t) data_end);
+        data_end = (uint8_t *) kan_apply_alignment ((uint64_t) data_end, _Alignof (struct compiled_patch_node_t));
         node = (struct compiled_patch_node_t *) data_end;
     }
 }
@@ -1441,7 +1431,7 @@ kan_reflection_patch_iterator_t kan_reflection_patch_iterator_next (kan_reflecti
 {
     struct compiled_patch_node_t *node = (struct compiled_patch_node_t *) iterator;
     uint8_t *data_end = node->data + node->size;
-    data_end += compiled_patch_node_add_alignment ((uint64_t) data_end);
+    data_end = (uint8_t *) kan_apply_alignment ((uint64_t) data_end, _Alignof (struct compiled_patch_node_t));
     return (kan_reflection_patch_iterator_t) data_end;
 }
 
@@ -3596,7 +3586,7 @@ static void migrate_patch_task (kan_cpu_task_user_data_t user_data)
                 }
 
                 uint8_t *data_end = node->data + node->size;
-                data_end += compiled_patch_node_add_alignment ((uint64_t) data_end);
+                data_end = (uint8_t *) kan_apply_alignment ((uint64_t) data_end, _Alignof (struct compiled_patch_node_t));
                 node = (struct compiled_patch_node_t *) data_end;
                 ++node_index;
             }
