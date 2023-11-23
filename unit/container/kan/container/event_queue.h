@@ -91,8 +91,9 @@
 ///
 /// \par Thread safety
 /// \parblock
-/// This event queue implementation is not thread safe in general scenario. But queue iterator methods are safe if it is
-/// guaranteed that no other queue method (submit or clean) is called.
+/// - Creating, moving, destroying iterators is thread safe until no submission is done.
+/// - Cleaning oldest from single thread while operating on iterators from other threads is thread safe.
+/// - Submission is not thread safe in any scenario.
 /// \endparblock
 
 KAN_C_HEADER_BEGIN
@@ -126,10 +127,16 @@ CONTAINER_API void kan_event_queue_submit_end (struct kan_event_queue_t *queue,
 /// \brief Returns oldest node to be cleaned out or `NULL` if there is no nodes to be cleaned out.
 CONTAINER_API struct kan_event_queue_node_t *kan_event_queue_clean_oldest (struct kan_event_queue_t *queue);
 
-typedef uint64_t kan_event_queue_iterator_t;
+typedef uintptr_t kan_event_queue_iterator_t;
+
+#define KAN_INVALID_EVENT_QUEUE_ITERATOR 0u
 
 /// \brief Creates iterator for listening to events that happen after its creation.
 CONTAINER_API kan_event_queue_iterator_t kan_event_queue_iterator_create (struct kan_event_queue_t *queue);
+
+/// \brief Creates new iterator that points to the event after given iterator. Given iterator must point to an event.
+CONTAINER_API kan_event_queue_iterator_t kan_event_queue_iterator_create_next (struct kan_event_queue_t *queue,
+                                                                               kan_event_queue_iterator_t iterator);
 
 /// \brief Returns event node under the iterator or `NULL` if there are no new events.
 CONTAINER_API const struct kan_event_queue_node_t *kan_event_queue_iterator_get (struct kan_event_queue_t *queue,
@@ -139,7 +146,8 @@ CONTAINER_API const struct kan_event_queue_node_t *kan_event_queue_iterator_get 
 CONTAINER_API kan_event_queue_iterator_t kan_event_queue_iterator_advance (kan_event_queue_iterator_t iterator);
 
 /// \brief Destroys given iterator and informs queue that it won't listen to events anymore.
-CONTAINER_API void kan_event_queue_iterator_destroy (struct kan_event_queue_t *queue,
-                                                     kan_event_queue_iterator_t iterator);
+/// \return KAN_TRUE if it was last iterator on this node.
+CONTAINER_API kan_bool_t kan_event_queue_iterator_destroy (struct kan_event_queue_t *queue,
+                                                           kan_event_queue_iterator_t iterator);
 
 KAN_C_HEADER_END

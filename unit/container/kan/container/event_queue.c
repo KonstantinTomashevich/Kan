@@ -1,6 +1,7 @@
 #include <stddef.h>
 
 #include <kan/container/event_queue.h>
+#include <kan/error/critical.h>
 
 void kan_event_queue_init (struct kan_event_queue_t *queue, struct kan_event_queue_node_t *next_placeholder)
 {
@@ -45,6 +46,17 @@ kan_event_queue_iterator_t kan_event_queue_iterator_create (struct kan_event_que
     return (kan_event_queue_iterator_t) queue->next_placeholder;
 }
 
+kan_event_queue_iterator_t kan_event_queue_iterator_create_next (struct kan_event_queue_t *queue,
+                                                                 kan_event_queue_iterator_t iterator)
+{
+    kan_atomic_int_add (&queue->total_iterators, 1);
+    const struct kan_event_queue_node_t *node = (const struct kan_event_queue_node_t *) iterator;
+    KAN_ASSERT (node != queue->next_placeholder)
+    struct kan_event_queue_node_t *next = node->next;
+    kan_atomic_int_add (&next->iterators_here, 1);
+    return (kan_event_queue_iterator_t) next;
+}
+
 const struct kan_event_queue_node_t *kan_event_queue_iterator_get (struct kan_event_queue_t *queue,
                                                                    kan_event_queue_iterator_t iterator)
 {
@@ -64,9 +76,9 @@ kan_event_queue_iterator_t kan_event_queue_iterator_advance (kan_event_queue_ite
     return node->next ? (kan_event_queue_iterator_t) node->next : iterator;
 }
 
-void kan_event_queue_iterator_destroy (struct kan_event_queue_t *queue, kan_event_queue_iterator_t iterator)
+kan_bool_t kan_event_queue_iterator_destroy (struct kan_event_queue_t *queue, kan_event_queue_iterator_t iterator)
 {
     kan_atomic_int_add (&queue->total_iterators, -1);
     struct kan_event_queue_node_t *node = (struct kan_event_queue_node_t *) iterator;
-    kan_atomic_int_add (&node->iterators_here, -1);
+    return kan_atomic_int_add (&node->iterators_here, -1) == 1 ? KAN_TRUE : KAN_FALSE;
 }
