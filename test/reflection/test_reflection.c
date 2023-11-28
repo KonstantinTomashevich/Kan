@@ -390,33 +390,35 @@ KAN_TEST_CASE (query_local_field)
 
     uint64_t absolute_offset;
     uint64_t size_with_padding;
-    kan_interned_string_t first_first_path[] = {first_struct.name, first_struct_fields[0u].name};
-    KAN_TEST_CHECK (kan_reflection_registry_query_local_field (registry, 2u, first_first_path, &absolute_offset,
+    kan_interned_string_t first_first_path[] = {first_struct_fields[0u].name};
+    KAN_TEST_CHECK (kan_reflection_registry_query_local_field (registry, first_struct.name, 1u, first_first_path,
+                                                               &absolute_offset,
                                                                &size_with_padding) == &first_struct_fields[0u])
     KAN_TEST_CHECK (absolute_offset == first_struct_fields[0u].offset)
     KAN_TEST_CHECK (size_with_padding == first_struct_fields[0u].size)
 
-    kan_interned_string_t first_second_path[] = {first_struct.name, first_struct_fields[1u].name};
-    KAN_TEST_CHECK (kan_reflection_registry_query_local_field (registry, 2u, first_second_path, &absolute_offset,
+    kan_interned_string_t first_second_path[] = {first_struct_fields[1u].name};
+    KAN_TEST_CHECK (kan_reflection_registry_query_local_field (registry, first_struct.name, 1u, first_second_path,
+                                                               &absolute_offset,
                                                                &size_with_padding) == &first_struct_fields[1u])
     KAN_TEST_CHECK (absolute_offset == first_struct_fields[1u].offset)
     KAN_TEST_CHECK (size_with_padding == first_struct_fields[1u].size)
 
-    kan_interned_string_t first_unknown_path[] = {first_struct.name, kan_string_intern ("unknown")};
-    KAN_TEST_CHECK (kan_reflection_registry_query_local_field (registry, 2u, first_unknown_path, &absolute_offset,
-                                                               &size_with_padding) == NULL)
+    kan_interned_string_t first_unknown_path[] = {kan_string_intern ("unknown")};
+    KAN_TEST_CHECK (kan_reflection_registry_query_local_field (registry, first_struct.name, 1u, first_unknown_path,
+                                                               &absolute_offset, &size_with_padding) == NULL)
     KAN_TEST_CHECK (absolute_offset == 0u)
 
-    kan_interned_string_t second_second_third_path[] = {second_struct.name, second_struct_fields[1u].name,
-                                                        first_struct_fields[2u].name};
-    KAN_TEST_CHECK (kan_reflection_registry_query_local_field (registry, 3u, second_second_third_path, &absolute_offset,
+    kan_interned_string_t second_second_third_path[] = {second_struct_fields[1u].name, first_struct_fields[2u].name};
+    KAN_TEST_CHECK (kan_reflection_registry_query_local_field (registry, second_struct.name, 2u,
+                                                               second_second_third_path, &absolute_offset,
                                                                &size_with_padding) == &first_struct_fields[2u])
     KAN_TEST_CHECK (absolute_offset == second_struct_fields[1u].offset + first_struct_fields[2u].offset)
     KAN_TEST_CHECK (size_with_padding == sizeof (uintptr_t))
 
-    kan_interned_string_t second_first_third_path[] = {second_struct.name, second_struct_fields[0u].name,
-                                                       first_struct_fields[2u].name};
-    KAN_TEST_CHECK (kan_reflection_registry_query_local_field (registry, 3u, second_first_third_path, &absolute_offset,
+    kan_interned_string_t second_first_third_path[] = {second_struct_fields[0u].name, first_struct_fields[2u].name};
+    KAN_TEST_CHECK (kan_reflection_registry_query_local_field (registry, second_struct.name, 2u,
+                                                               second_first_third_path, &absolute_offset,
                                                                &size_with_padding) == NULL)
     KAN_TEST_CHECK (absolute_offset == 0u)
 

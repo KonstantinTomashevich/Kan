@@ -9,6 +9,7 @@ KAN_C_HEADER_BEGIN
 
 struct kan_repository_field_path_t
 {
+    uint64_t reflection_path_length;
     kan_interned_string_t *reflection_path;
 };
 

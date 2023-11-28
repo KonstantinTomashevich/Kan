@@ -825,17 +825,19 @@ void kan_reflection_struct_field_meta_iterator_next (struct kan_reflection_struc
 }
 
 const struct kan_reflection_field_t *kan_reflection_registry_query_local_field (kan_reflection_registry_t registry,
+                                                                                kan_interned_string_t struct_name,
                                                                                 uint64_t path_length,
                                                                                 kan_interned_string_t *path,
                                                                                 uint64_t *absolute_offset_output,
                                                                                 uint64_t *size_with_padding_output)
 
 {
-    KAN_ASSERT (path_length > 1u)
+    KAN_ASSERT (path_length > 0u)
     KAN_ASSERT (absolute_offset_output)
     KAN_ASSERT (size_with_padding_output)
     *absolute_offset_output = 0u;
-    const struct kan_reflection_struct_t *struct_reflection = kan_reflection_registry_query_struct (registry, path[0u]);
+    const struct kan_reflection_struct_t *struct_reflection =
+        kan_reflection_registry_query_struct (registry, struct_name);
 
     if (!struct_reflection)
     {
@@ -846,7 +848,7 @@ const struct kan_reflection_field_t *kan_reflection_registry_query_local_field (
     *size_with_padding_output = struct_reflection->size;
     const struct kan_reflection_field_t *field_reflection = NULL;
 
-    for (uint64_t path_element_index = 1u; path_element_index < path_length; ++path_element_index)
+    for (uint64_t path_element_index = 0u; path_element_index < path_length; ++path_element_index)
     {
         kan_interned_string_t path_element = path[path_element_index];
         field_reflection = NULL;

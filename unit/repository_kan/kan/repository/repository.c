@@ -513,14 +513,15 @@ static void apply_copy_outs (uint64_t copy_outs_count, struct copy_out_t *copy_o
 }
 
 static const struct kan_reflection_field_t *query_field_for_automatic_event_from_path (
+    kan_interned_string_t struct_name,
     struct kan_repository_field_path_t *path,
     kan_reflection_registry_t registry,
     uint64_t *output_absolute_offset,
     uint64_t *output_size_with_padding)
 {
-    const struct kan_reflection_field_t *field =
-        kan_reflection_registry_query_local_field (registry, path->reflection_path_length, path->reflection_path,
-                                                   output_absolute_offset, output_size_with_padding);
+    const struct kan_reflection_field_t *field = kan_reflection_registry_query_local_field (
+        registry, struct_name, path->reflection_path_length, path->reflection_path, output_absolute_offset,
+        output_size_with_padding);
 
     if (!field)
     {
@@ -537,7 +538,8 @@ static const struct kan_reflection_field_t *query_field_for_automatic_event_from
     return field;
 }
 
-static struct copy_out_list_node_t *extract_raw_copy_outs (uint64_t copy_outs_count,
+static struct copy_out_list_node_t *extract_raw_copy_outs (kan_interned_string_t struct_name,
+                                                           uint64_t copy_outs_count,
                                                            struct kan_repository_copy_out_t *copy_outs,
                                                            kan_reflection_registry_t registry,
                                                            struct kan_stack_group_allocator_t *temporary_allocator)
@@ -552,12 +554,12 @@ static struct copy_out_list_node_t *extract_raw_copy_outs (uint64_t copy_outs_co
         uint64_t source_absolute_offset;
         uint64_t source_size_with_padding;
         const struct kan_reflection_field_t *source_field = query_field_for_automatic_event_from_path (
-            &copy_out->source_path, registry, &source_absolute_offset, &source_size_with_padding);
+            struct_name, &copy_out->source_path, registry, &source_absolute_offset, &source_size_with_padding);
 
         uint64_t target_absolute_offset;
         uint64_t target_size_with_padding;
         const struct kan_reflection_field_t *target_field = query_field_for_automatic_event_from_path (
-            &copy_out->target_path, registry, &target_absolute_offset, &target_size_with_padding);
+            struct_name, &copy_out->target_path, registry, &target_absolute_offset, &target_size_with_padding);
 
         if (!source_field || !target_field)
         {
@@ -1042,7 +1044,7 @@ static void observation_event_triggers_definition_build (struct observation_even
         if (event_storage)
         {
             struct copy_out_list_node_t *raw_buffer_copy_outs =
-                extract_raw_copy_outs (event->unchanged_copy_outs_count, event->unchanged_copy_outs,
+                extract_raw_copy_outs (event->event_type, event->unchanged_copy_outs_count, event->unchanged_copy_outs,
                                        repository->registry, temporary_allocator);
 
             struct copy_out_list_node_t *retargeted_buffer_copy_outs =
@@ -1052,8 +1054,9 @@ static void observation_event_triggers_definition_build (struct observation_even
             struct copy_out_list_node_t *merged_buffer_copy_outs =
                 merge_copy_outs (retargeted_buffer_copy_outs, temporary_allocator, &merged_buffer_copy_outs_count);
 
-            struct copy_out_list_node_t *raw_record_copy_outs = extract_raw_copy_outs (
-                event->changed_copy_outs_count, event->changed_copy_outs, repository->registry, temporary_allocator);
+            struct copy_out_list_node_t *raw_record_copy_outs =
+                extract_raw_copy_outs (event->event_type, event->changed_copy_outs_count, event->changed_copy_outs,
+                                       repository->registry, temporary_allocator);
 
             uint64_t merged_record_copy_outs_count;
             struct copy_out_list_node_t *merged_record_copy_outs =
@@ -2133,7 +2136,7 @@ static void extract_observation_chunks_from_on_change_events (
                 uint64_t size_with_padding;
 
                 const struct kan_reflection_field_t *field = query_field_for_automatic_event_from_path (
-                    path, repository->registry, &absolute_offset, &size_with_padding);
+                    observed_struct->name, path, repository->registry, &absolute_offset, &size_with_padding);
 
                 if (!field)
                 {

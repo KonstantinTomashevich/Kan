@@ -316,11 +316,13 @@ REFLECTION_API void kan_reflection_struct_field_meta_iterator_next (
     struct kan_reflection_struct_field_meta_iterator_t *iterator);
 
 /// \brief Queries for field in fixed memory block by path array.
-/// \details Path array is an array of 2 or more interned strings where first string is a struct name and subsequent
-///          strings are field names. Query only succeeds if field is local for given struct: it means that it is stored
-///          in the same memory block.
+/// \details Struct name parameter decides search root for the path and path is an array of field names in succession.
+///          You can imagine structure reflection as a tree and path is a path from root to target field node.
+///          Query only succeeds if target field is local for given struct: it means that it is stored in the
+///          same memory block.
 REFLECTION_API const struct kan_reflection_field_t *kan_reflection_registry_query_local_field (
     kan_reflection_registry_t registry,
+    kan_interned_string_t struct_name,
     uint64_t path_length,
     kan_interned_string_t *path,
     uint64_t *absolute_offset_output,
