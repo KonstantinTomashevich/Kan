@@ -5,6 +5,7 @@
 #include <kan/api_common/bool.h>
 #include <kan/api_common/c_header.h>
 #include <kan/cpu_dispatch/task.h>
+#include <kan/error/critical.h>
 
 /// \file
 /// \brief Describes job -- a high-level activity, that can be executed by multiple threads in parallel.
@@ -62,5 +63,21 @@ CPU_DISPATCH_API void kan_cpu_job_detach (kan_cpu_job_t job);
 /// \brief Puts current threads to sleep until job is completed.
 /// \invariant This function should not be called inside tasks as it essentially bricks task dispatch logic.
 CPU_DISPATCH_API void kan_cpu_job_wait (kan_cpu_job_t job);
+
+/// \brief Inline utility function that calls ::kan_cpu_job_dispatch_task_list and then detaches all tasks.
+/// \details Dispatch and immediate detach of job tasks is a common pattern, therefore we're adding syntax sugar for it.
+static inline void kan_cpu_job_dispatch_and_detach_task_list (kan_cpu_job_t job, struct kan_cpu_task_list_node_t *list)
+{
+    if (list)
+    {
+        kan_cpu_job_dispatch_task_list (job, list);
+        while (list)
+        {
+            KAN_ASSERT (list->dispatch_handle != KAN_INVALID_CPU_TASK_HANDLE)
+            kan_cpu_task_detach (list->dispatch_handle);
+            list = list->next;
+        }
+    }
+}
 
 KAN_C_HEADER_END
