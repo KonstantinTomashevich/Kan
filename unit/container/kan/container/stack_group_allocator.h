@@ -54,6 +54,6 @@ CONTAINER_API void kan_stack_group_allocator_reset (struct kan_stack_group_alloc
 CONTAINER_API void kan_stack_group_allocator_shrink (struct kan_stack_group_allocator_t *allocator);
 
 /// \brief Destroys all stacks and shuts down stack group allocator.
-CONTAINER_API void kan_stack_group_shutdown (struct kan_stack_group_allocator_t *allocator);
+CONTAINER_API void kan_stack_group_allocator_shutdown (struct kan_stack_group_allocator_t *allocator);
 
 KAN_C_HEADER_END

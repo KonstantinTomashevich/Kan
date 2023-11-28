@@ -22,7 +22,9 @@ void *kan_stack_group_allocator_allocate (struct kan_stack_group_allocator_t *al
                                           uint64_t amount,
                                           uint64_t alignment)
 {
+    KAN_ASSERT (amount <= kan_stack_allocator_get_size (allocator->current_stack->stack))
     void *allocated = kan_stack_allocator_allocate (allocator->current_stack->stack, amount, alignment);
+
     if (!allocated)
     {
         struct kan_stack_group_allocator_node_t *next = allocator->current_stack->next;
@@ -70,7 +72,7 @@ void kan_stack_group_allocator_shrink (struct kan_stack_group_allocator_t *alloc
     }
 }
 
-void kan_stack_group_shutdown (struct kan_stack_group_allocator_t *allocator)
+void kan_stack_group_allocator_shutdown (struct kan_stack_group_allocator_t *allocator)
 {
     struct kan_stack_group_allocator_node_t *node = allocator->first_stack;
     while (node)
