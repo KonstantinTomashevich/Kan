@@ -91,12 +91,14 @@ LOG_API kan_interned_string_t kan_log_category_get_name (kan_log_category_t cate
             kan_log_category_##CATEGORY##_reference = kan_log_category_get (#CATEGORY);                                \
         }                                                                                                              \
                                                                                                                        \
-        enum kan_log_verbosity_t verbosity = kan_log_category_get_verbosity (kan_log_category_##CATEGORY##_reference); \
-        if (VERBOSITY >= verbosity)                                                                                    \
+        enum kan_log_verbosity_t kan_logging_verbosity =                                                               \
+            kan_log_category_get_verbosity (kan_log_category_##CATEGORY##_reference);                                  \
+                                                                                                                       \
+        if (VERBOSITY >= kan_logging_verbosity)                                                                        \
         {                                                                                                              \
-            char buffer[BUFFER_SIZE];                                                                                  \
-            snprintf (buffer, BUFFER_SIZE, __VA_ARGS__);                                                               \
-            kan_submit_log (kan_log_category_##CATEGORY##_reference, VERBOSITY, buffer);                               \
+            char kan_logging_buffer[BUFFER_SIZE];                                                                      \
+            snprintf (kan_logging_buffer, BUFFER_SIZE, __VA_ARGS__);                                                   \
+            kan_submit_log (kan_log_category_##CATEGORY##_reference, VERBOSITY, kan_logging_buffer);                   \
         }                                                                                                              \
     }
 
