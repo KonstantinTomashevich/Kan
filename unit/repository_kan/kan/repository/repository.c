@@ -1,9 +1,11 @@
 #define _CRT_SECURE_NO_WARNINGS
 
 #include <memory.h>
+#include <qsort.h>
 #include <stddef.h>
 
 #include <kan/api_common/alignment.h>
+#include <kan/api_common/min_max.h>
 #include <kan/container/event_queue.h>
 #include <kan/container/hash_storage.h>
 #include <kan/container/stack_group_allocator.h>
@@ -14,6 +16,8 @@
 #include <kan/repository/meta.h>
 #include <kan/repository/repository.h>
 #include <kan/threading/atomic.h>
+
+// TODO: After everything is implemented, think about integration cpu profiler here if it is appropriate.
 
 KAN_LOG_DEFINE_CATEGORY (repository);
 
@@ -27,8 +31,24 @@ struct observation_buffer_scenario_chunk_t
     uint64_t flags;
 };
 
+struct observation_buffer_scenario_chunk_list_node_t
+{
+    struct observation_buffer_scenario_chunk_list_node_t *next;
+    uint64_t source_offset;
+    uint64_t size;
+    uint64_t flags;
+};
+
 struct copy_out_t
 {
+    uint64_t source_offset;
+    uint64_t target_offset;
+    uint64_t size;
+};
+
+struct copy_out_list_node_t
+{
+    struct copy_out_list_node_t *next;
     uint64_t source_offset;
     uint64_t target_offset;
     uint64_t size;
@@ -37,8 +57,6 @@ struct copy_out_t
 struct observation_buffer_definition_t
 {
     uint64_t buffer_size;
-    void *buffer;
-
     uint64_t scenario_chunks_count;
     struct observation_buffer_scenario_chunk_t *scenario_chunks;
 };
@@ -50,6 +68,17 @@ struct observation_event_trigger_t
     uint64_t buffer_copy_outs_count;
     uint64_t record_copy_outs_count;
     struct copy_out_t copy_outs[];
+};
+
+struct observation_event_trigger_list_node_t
+{
+    struct observation_event_trigger_list_node_t *next;
+    uint64_t flags;
+    struct kan_repository_event_insert_query_t event_insert_query;
+    uint64_t buffer_copy_outs_count;
+    struct copy_out_list_node_t *buffer_copy_outs;
+    uint64_t record_copy_outs_count;
+    struct copy_out_list_node_t *record_copy_outs;
 };
 
 struct observation_event_triggers_definition_t
@@ -67,6 +96,7 @@ struct singleton_storage_node_t
     void *singleton;
 
     struct observation_buffer_definition_t observation_buffer;
+    void *observation_buffer_memory;
     struct observation_event_triggers_definition_t observation_events_triggers;
 
 #if defined(KAN_REPOSITORY_SAFEGUARDS_ENABLED)
@@ -170,6 +200,12 @@ struct repository_t
     struct repository_t *next;
     struct repository_t *first;
 
+    union
+    {
+        struct kan_atomic_int_t shared_storage_access_lock;
+        struct kan_atomic_int_t *shared_storage_access_lock_pointer;
+    };
+
     kan_interned_string_t name;
     kan_reflection_registry_t registry;
     kan_allocation_group_t allocation_group;
@@ -183,7 +219,6 @@ struct migration_context_t
 {
     struct kan_stack_group_allocator_t allocator;
     struct kan_cpu_task_list_node_t *task_list;
-    kan_interned_string_t task_name;
 };
 
 struct record_migration_user_data_t
@@ -195,6 +230,40 @@ struct record_migration_user_data_t
     const struct kan_reflection_struct_t *old_type;
     const struct kan_reflection_struct_t *new_type;
 };
+
+struct switch_to_serving_context_t
+{
+    struct kan_stack_group_allocator_t allocator;
+    struct kan_cpu_task_list_node_t *task_list;
+};
+
+struct singleton_switch_to_serving_user_data_t
+{
+    struct singleton_storage_node_t *storage;
+    struct repository_t *repository;
+};
+
+static kan_bool_t interned_strings_ready = KAN_FALSE;
+static struct kan_atomic_int_t interned_strings_initialization_lock = {.value = 0};
+static kan_interned_string_t migration_task_name;
+static kan_interned_string_t switch_to_serving_task_name;
+static kan_interned_string_t meta_automatic_on_change_event_name;
+
+static void ensure_interned_strings_ready (void)
+{
+    if (!interned_strings_ready)
+    {
+        kan_atomic_int_lock (&interned_strings_initialization_lock);
+        if (!interned_strings_ready)
+        {
+            migration_task_name = kan_string_intern ("repository_migration_task");
+            switch_to_serving_task_name = kan_string_intern ("repository_switch_to_serving_task");
+            meta_automatic_on_change_event_name = kan_string_intern ("kan_repository_meta_automatic_on_change_event_t");
+        }
+
+        kan_atomic_int_unlock (&interned_strings_initialization_lock);
+    }
+}
 
 #if defined(KAN_REPOSITORY_SAFEGUARDS_ENABLED)
 KAN_LOG_DEFINE_CATEGORY (repository_safeguards);
@@ -306,6 +375,127 @@ static void safeguard_event_read_access_destroyed (struct event_storage_node_t *
 }
 #endif
 
+#if defined(KAN_REPOSITORY_VALIDATION_ENABLED)
+KAN_LOG_DEFINE_CATEGORY (repository_validation);
+
+static kan_bool_t validation_field_is_observable (kan_reflection_registry_t registry,
+                                                  enum kan_reflection_archetype_t field_archetype,
+                                                  kan_interned_string_t field_name,
+                                                  const void *archetype_suffix)
+{
+    switch (field_archetype)
+    {
+    case KAN_REFLECTION_ARCHETYPE_SIGNED_INT:
+    case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
+    case KAN_REFLECTION_ARCHETYPE_FLOATING:
+    case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:
+    case KAN_REFLECTION_ARCHETYPE_ENUM:
+        return KAN_TRUE;
+
+    case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
+        KAN_LOG (repository_validation, KAN_LOG_ERROR,
+                 "Found attempt to observe string pointer field \"%s\". String pointers are not observable.",
+                 field_name)
+        return KAN_FALSE;
+
+    case KAN_REFLECTION_ARCHETYPE_EXTERNAL_POINTER:
+        KAN_LOG (repository_validation, KAN_LOG_ERROR,
+                 "Found attempt to observe external pointer field \"%s\". External pointers are not observable.",
+                 field_name)
+        return KAN_FALSE;
+
+    case KAN_REFLECTION_ARCHETYPE_STRUCT:
+    {
+        KAN_ASSERT (archetype_suffix)
+        const struct kan_reflection_archetype_struct_suffix_t *suffix =
+            (const struct kan_reflection_archetype_struct_suffix_t *) archetype_suffix;
+
+        const struct kan_reflection_struct_t *reflection_struct =
+            kan_reflection_registry_query_struct (registry, suffix->type_name);
+
+        if (!reflection_struct)
+        {
+            KAN_LOG (repository_validation, KAN_LOG_ERROR,
+                     "Found attempt to observe struct field \"%s\". It's struct type is not found.", field_name)
+            return KAN_FALSE;
+        }
+
+        for (uint64_t field_index = 0u; field_index < reflection_struct->fields_count; ++field_index)
+        {
+            if (!validation_field_is_observable (registry, reflection_struct->fields[field_index].archetype,
+                                                 reflection_struct->fields[field_index].name,
+                                                 &reflection_struct->fields[field_index].archetype_struct))
+            {
+                return KAN_FALSE;
+            }
+        }
+
+        return KAN_TRUE;
+    }
+
+    case KAN_REFLECTION_ARCHETYPE_STRUCT_POINTER:
+        KAN_LOG (repository_validation, KAN_LOG_ERROR,
+                 "Found attempt to observe struct pointer field \"%s\". Struct pointers are not observable.",
+                 field_name)
+        return KAN_FALSE;
+
+    case KAN_REFLECTION_ARCHETYPE_INLINE_ARRAY:
+    {
+        KAN_ASSERT (archetype_suffix)
+        const struct kan_reflection_archetype_inline_array_suffix_t *suffix =
+            (const struct kan_reflection_archetype_inline_array_suffix_t *) archetype_suffix;
+
+        return validation_field_is_observable (registry, suffix->item_archetype, field_name,
+                                               &suffix->item_archetype_struct);
+    }
+
+    case KAN_REFLECTION_ARCHETYPE_DYNAMIC_ARRAY:
+        KAN_LOG (repository_validation, KAN_LOG_ERROR,
+                 "Found attempt to observe dynamic array field \"%s\". Dynamic arrays are not observable.", field_name)
+        return KAN_FALSE;
+
+    case KAN_REFLECTION_ARCHETYPE_PATCH:
+        KAN_LOG (repository_validation, KAN_LOG_ERROR,
+                 "Found attempt to observe reflection patch field \"%s\". Reflection patches are not observable.",
+                 field_name)
+        return KAN_FALSE;
+    }
+
+    KAN_ASSERT (KAN_FALSE)
+    return KAN_FALSE;
+}
+
+static kan_bool_t validation_copy_out_is_possible (kan_reflection_registry_t registry,
+                                                   const struct kan_reflection_field_t *source,
+                                                   const struct kan_reflection_field_t *target)
+{
+    if (source->archetype != target->archetype)
+    {
+        KAN_LOG (repository_validation, KAN_LOG_ERROR,
+                 "Found copy out attempt for fields of different archetypes with names \"%s\" and \"%s\".",
+                 source->name, target->name)
+        return KAN_FALSE;
+    }
+
+    if (source->size != target->size)
+    {
+        KAN_LOG (
+            repository_validation, KAN_LOG_ERROR,
+            "Found copy out attempt for fields of different sizes with names \"%s\" and \"%s\" and sizes %lu and %lu.",
+            source->name, target->name, (unsigned long) source->size, (unsigned long) target->size)
+        return KAN_FALSE;
+    }
+
+    if (!validation_field_is_observable (registry, source->archetype, source->name, &source->archetype_struct))
+    {
+        KAN_LOG (repository_validation, KAN_LOG_ERROR, "Only observable fields are supported for copy out.")
+        return KAN_FALSE;
+    }
+
+    return KAN_TRUE;
+}
+#endif
+
 static kan_allocation_group_t storage_event_automation_allocation_group (
     kan_allocation_group_t storage_allocation_group)
 {
@@ -322,17 +512,426 @@ static void apply_copy_outs (uint64_t copy_outs_count, struct copy_out_t *copy_o
     }
 }
 
+static const struct kan_reflection_field_t *query_field_for_automatic_event_from_path (
+    struct kan_repository_field_path_t *path,
+    kan_reflection_registry_t registry,
+    uint64_t *output_absolute_offset,
+    uint64_t *output_size_with_padding)
+{
+    const struct kan_reflection_field_t *field =
+        kan_reflection_registry_query_local_field (registry, path->reflection_path_length, path->reflection_path,
+                                                   output_absolute_offset, output_size_with_padding);
+
+    if (!field)
+    {
+        KAN_LOG (repository, KAN_LOG_ERROR,
+                 "Unable to query field for automatic event from path: it is either non-local or it does "
+                 "not exist. Path:")
+
+        for (uint64_t path_element_index = 0u; path_element_index < path->reflection_path_length; ++path_element_index)
+        {
+            KAN_LOG (repository, KAN_LOG_ERROR, "    - \"%s\"", path->reflection_path[path_element_index])
+        }
+    }
+
+    return field;
+}
+
+static struct copy_out_list_node_t *extract_raw_copy_outs (uint64_t copy_outs_count,
+                                                           struct kan_repository_copy_out_t *copy_outs,
+                                                           kan_reflection_registry_t registry,
+                                                           struct kan_stack_group_allocator_t *temporary_allocator)
+{
+    struct copy_out_list_node_t *first = NULL;
+    struct copy_out_list_node_t *last = NULL;
+
+    for (uint64_t index = 0u; index < copy_outs_count; ++index)
+    {
+        struct kan_repository_copy_out_t *copy_out = &copy_outs[index];
+
+        uint64_t source_absolute_offset;
+        uint64_t source_size_with_padding;
+        const struct kan_reflection_field_t *source_field = query_field_for_automatic_event_from_path (
+            &copy_out->source_path, registry, &source_absolute_offset, &source_size_with_padding);
+
+        uint64_t target_absolute_offset;
+        uint64_t target_size_with_padding;
+        const struct kan_reflection_field_t *target_field = query_field_for_automatic_event_from_path (
+            &copy_out->target_path, registry, &target_absolute_offset, &target_size_with_padding);
+
+        if (!source_field || !target_field)
+        {
+            continue;
+        }
+
+#if defined(KAN_REPOSITORY_VALIDATION_ENABLED)
+        if (!validation_copy_out_is_possible (registry, source_field, target_field))
+        {
+            continue;
+        }
+#endif
+
+        struct copy_out_list_node_t *node = (struct copy_out_list_node_t *) kan_stack_group_allocator_allocate (
+            temporary_allocator, sizeof (struct copy_out_list_node_t), _Alignof (struct copy_out_list_node_t));
+
+        node->next = NULL;
+        node->source_offset = source_absolute_offset;
+        node->target_offset = target_absolute_offset;
+        node->size = KAN_MIN (source_size_with_padding, target_size_with_padding);
+
+        if (last)
+        {
+            last->next = node;
+            last = node;
+        }
+        else
+        {
+            first = node;
+            last = node;
+        }
+    }
+
+    return first;
+}
+
+static struct copy_out_list_node_t *convert_to_buffer_copy_outs (
+    struct copy_out_list_node_t *input,
+    struct observation_buffer_definition_t *buffer,
+    struct kan_stack_group_allocator_t *temporary_allocator)
+{
+    struct copy_out_list_node_t *first = NULL;
+    struct copy_out_list_node_t *last = NULL;
+
+    while (input)
+    {
+        uint64_t buffer_offset = 0u;
+        for (uint64_t index = 0u; index < buffer->scenario_chunks_count; ++index)
+        {
+            struct observation_buffer_scenario_chunk_t *chunk = &buffer->scenario_chunks[index];
+            if (input->source_offset < chunk->source_offset)
+            {
+                KAN_LOG (repository, KAN_LOG_ERROR,
+                         "Internal error: failed to map copy out to observation buffer. Double-check whether your "
+                         "unchanged copy outs are tracked as observed fields.")
+                break;
+            }
+
+            if (input->source_offset < chunk->source_offset + chunk->size)
+            {
+                const uint64_t offset = input->source_offset - chunk->source_offset;
+                const uint64_t size_in_chunk = KAN_MIN (input->size, chunk->size - offset);
+
+                struct copy_out_list_node_t *node = (struct copy_out_list_node_t *) kan_stack_group_allocator_allocate (
+                    temporary_allocator, sizeof (struct copy_out_list_node_t), _Alignof (struct copy_out_list_node_t));
+
+                node->next = NULL;
+                node->source_offset = buffer_offset + offset;
+                node->target_offset = input->target_offset;
+                node->size = size_in_chunk;
+
+                if (last)
+                {
+                    last->next = node;
+                    last = node;
+                }
+                else
+                {
+                    first = node;
+                    last = node;
+                }
+
+                input->source_offset += size_in_chunk;
+                input->target_offset += size_in_chunk;
+                input->size -= size_in_chunk;
+
+                if (input->size == 0u)
+                {
+                    break;
+                }
+            }
+
+            buffer_offset = kan_apply_alignment (buffer_offset + chunk->size, OBSERVATION_BUFFER_ALIGNMENT);
+        }
+
+        input = input->next;
+    }
+
+    return first;
+}
+
+static struct copy_out_list_node_t *merge_copy_outs (struct copy_out_list_node_t *input,
+                                                     struct kan_stack_group_allocator_t *temporary_allocator,
+                                                     uint64_t *output_count)
+{
+    if (!input)
+    {
+        return NULL;
+    }
+
+    uint64_t count = 0u;
+    struct copy_out_list_node_t *copy_out = input;
+
+    while (copy_out)
+    {
+        ++count;
+        copy_out = copy_out->next;
+    }
+
+    struct copy_out_list_node_t **input_array =
+        kan_stack_group_allocator_allocate (temporary_allocator, count * sizeof (void *), _Alignof (void *));
+
+    copy_out = input;
+    uint64_t copy_out_index = 0u;
+
+    while (copy_out)
+    {
+        input_array[copy_out_index] = copy_out;
+        ++copy_out_index;
+        copy_out = copy_out->next;
+    }
+
+    {
+#define LESS(first_index, second_index)                                                                                \
+    (input_array[first_index]->source_offset < input_array[second_index]->source_offset)
+
+#define SWAP(first_index, second_index)                                                                                \
+    copy_out = input_array[first_index], input_array[first_index] = input_array[second_index],                         \
+    input_array[second_index] = copy_out
+
+        QSORT (count, LESS, SWAP);
+#undef LESS
+#undef SWAP
+    }
+
+    struct copy_out_list_node_t *first = NULL;
+    struct copy_out_list_node_t *last = NULL;
+    *output_count = 0u;
+
+    while (input)
+    {
+        // We don't handle intersections here (they will be just left as it is, no optimization).
+        if (last && last->source_offset + last->size == input->source_offset &&
+            last->target_offset + last->size == input->target_offset)
+        {
+            last->size += input->size;
+        }
+        else
+        {
+            struct copy_out_list_node_t *node = (struct copy_out_list_node_t *) kan_stack_group_allocator_allocate (
+                temporary_allocator, sizeof (struct copy_out_list_node_t), _Alignof (struct copy_out_list_node_t));
+
+            node->next = NULL;
+            node->source_offset = input->source_offset;
+            node->target_offset = input->target_offset;
+            node->size = input->size;
+
+            if (last)
+            {
+                last->next = node;
+                last = node;
+            }
+            else
+            {
+                first = node;
+                last = node;
+            }
+
+            ++*output_count;
+        }
+
+        input = input->next;
+    }
+
+    return first;
+}
+
 static void observation_buffer_definition_init (struct observation_buffer_definition_t *definition)
 {
     definition->buffer_size = 0u;
-    definition->buffer = NULL;
     definition->scenario_chunks_count = 0u;
     definition->scenario_chunks = NULL;
 }
 
-static void observation_buffer_definition_import (struct observation_buffer_definition_t *definition, void *record)
+static void observation_buffer_definition_build (struct observation_buffer_definition_t *definition,
+                                                 struct observation_buffer_scenario_chunk_list_node_t *first_chunk,
+                                                 struct kan_stack_group_allocator_t *temporary_allocator,
+                                                 kan_allocation_group_t result_allocation_group)
 {
-    if (!definition->buffer)
+    uint64_t initial_chunks_count = 0u;
+    struct observation_buffer_scenario_chunk_list_node_t *chunk = first_chunk;
+
+    while (chunk)
+    {
+        ++initial_chunks_count;
+        chunk = chunk->next;
+    }
+
+    struct observation_buffer_scenario_chunk_list_node_t **initial_chunks = kan_stack_group_allocator_allocate (
+        temporary_allocator, initial_chunks_count * sizeof (void *), _Alignof (void *));
+
+    chunk = first_chunk;
+    uint64_t chunk_index = 0u;
+
+    while (chunk)
+    {
+        initial_chunks[chunk_index] = chunk;
+        ++chunk_index;
+        chunk = chunk->next;
+    }
+
+    {
+#define LESS(first_index, second_index)                                                                                \
+    (initial_chunks[first_index]->source_offset == initial_chunks[second_index]->source_offset ?                       \
+         (initial_chunks[first_index]->size < initial_chunks[second_index]->size) :                                    \
+         (initial_chunks[first_index]->source_offset < initial_chunks[second_index]->source_offset))
+
+#define SWAP(first_index, second_index)                                                                                \
+    chunk = initial_chunks[first_index], initial_chunks[first_index] = initial_chunks[second_index],                   \
+    initial_chunks[second_index] = chunk
+
+        QSORT (initial_chunks_count, LESS, SWAP);
+#undef LESS
+#undef SWAP
+    }
+
+    // Start by splitting all chunks into a list of chunks with zero intersections.
+    struct observation_buffer_scenario_chunk_list_node_t *first_no_intersection_node = NULL;
+    struct observation_buffer_scenario_chunk_list_node_t *last_no_intersection_node = NULL;
+    chunk_index = 0u;
+
+    while (chunk_index < initial_chunks_count)
+    {
+        struct observation_buffer_scenario_chunk_list_node_t *initial_node = initial_chunks[chunk_index];
+        if (initial_node->size == 0u)
+        {
+            ++chunk_index;
+            continue;
+        }
+
+        uint64_t no_intersection_size = initial_node->size;
+        uint64_t no_intersection_flags = initial_node->flags;
+        uint64_t affected_stop_index = initial_chunks_count;
+
+        for (uint64_t next_index = chunk_index + 1u; next_index < initial_chunks_count; ++next_index)
+        {
+            struct observation_buffer_scenario_chunk_list_node_t *next_node = initial_chunks[next_index];
+            if (next_node->source_offset == initial_node->source_offset)
+            {
+                KAN_ASSERT (next_node->size >= initial_node->size)
+                no_intersection_flags |= next_node->flags;
+            }
+            else
+            {
+                KAN_ASSERT (next_node->source_offset > initial_node->source_offset)
+                no_intersection_size =
+                    KAN_MIN (no_intersection_size, next_node->source_offset - initial_node->source_offset);
+                affected_stop_index = next_index;
+                break;
+            }
+        }
+
+        KAN_ASSERT (no_intersection_size > 0u)
+        for (uint64_t affected_index = chunk_index; affected_index < affected_stop_index; ++affected_index)
+        {
+            struct observation_buffer_scenario_chunk_list_node_t *affected_node = initial_chunks[affected_index];
+            affected_node->size -= no_intersection_size;
+            affected_node->source_offset += no_intersection_size;
+        }
+
+        struct observation_buffer_scenario_chunk_list_node_t *no_intersection_node =
+            kan_stack_group_allocator_allocate (temporary_allocator,
+                                                sizeof (struct observation_buffer_scenario_chunk_list_node_t),
+                                                _Alignof (struct observation_buffer_scenario_chunk_list_node_t));
+
+        *no_intersection_node = (struct observation_buffer_scenario_chunk_list_node_t) {
+            .source_offset = initial_node->source_offset - no_intersection_size,
+            .size = no_intersection_size,
+            .flags = no_intersection_flags,
+            .next = NULL,
+        };
+
+        if (first_no_intersection_node == NULL)
+        {
+            first_no_intersection_node = no_intersection_node;
+            last_no_intersection_node = no_intersection_node;
+        }
+        else
+        {
+            last_no_intersection_node->next = no_intersection_node;
+            last_no_intersection_node = no_intersection_node;
+        }
+    }
+
+    // We don't have intersections now, therefore we can try to safely merge nodes.
+    struct observation_buffer_scenario_chunk_list_node_t *first_merged_node = NULL;
+    struct observation_buffer_scenario_chunk_list_node_t *last_merged_node = NULL;
+    uint64_t merged_nodes_count = 0u;
+    chunk = first_no_intersection_node;
+
+    while (chunk)
+    {
+        if (last_merged_node && last_merged_node->flags == chunk->flags &&
+            last_merged_node->source_offset + last_merged_node->size == chunk->source_offset)
+        {
+            last_merged_node->size += chunk->size;
+        }
+        else
+        {
+            struct observation_buffer_scenario_chunk_list_node_t *merged_node = kan_stack_group_allocator_allocate (
+                temporary_allocator, sizeof (struct observation_buffer_scenario_chunk_list_node_t),
+                _Alignof (struct observation_buffer_scenario_chunk_list_node_t));
+
+            *merged_node = *chunk;
+            merged_node->next = NULL;
+            ++merged_nodes_count;
+
+            if (first_merged_node == NULL)
+            {
+                first_merged_node = merged_node;
+                last_merged_node = merged_node;
+            }
+            else
+            {
+                last_merged_node->next = merged_node;
+                last_merged_node = merged_node;
+            }
+        }
+
+        chunk = chunk->next;
+    }
+
+    definition->buffer_size = 0u;
+    definition->scenario_chunks_count = merged_nodes_count;
+
+    definition->scenario_chunks =
+        kan_allocate_general (result_allocation_group,
+                              definition->scenario_chunks_count * sizeof (struct observation_buffer_scenario_chunk_t),
+                              _Alignof (struct observation_buffer_scenario_chunk_t));
+
+    chunk = first_merged_node;
+    chunk_index = 0u;
+
+    while (chunk)
+    {
+        definition->buffer_size =
+            kan_apply_alignment (definition->buffer_size + chunk->size, OBSERVATION_BUFFER_ALIGNMENT);
+
+        definition->scenario_chunks[chunk_index] = (struct observation_buffer_scenario_chunk_t) {
+            .source_offset = chunk->source_offset,
+            .size = chunk->size,
+            .flags = chunk->flags,
+        };
+
+        chunk = chunk->next;
+        ++chunk_index;
+    }
+}
+
+static void observation_buffer_definition_import (struct observation_buffer_definition_t *definition,
+                                                  void *observation_buffer_memory,
+                                                  void *record)
+{
+    if (!observation_buffer_memory)
     {
         return;
     }
@@ -341,7 +940,7 @@ static void observation_buffer_definition_import (struct observation_buffer_defi
     KAN_ASSERT (definition->scenario_chunks_count > 0u)
     KAN_ASSERT (definition->scenario_chunks)
 
-    uint8_t *output = (uint8_t *) definition->buffer;
+    uint8_t *output = (uint8_t *) observation_buffer_memory;
     const struct observation_buffer_scenario_chunk_t *chunk = definition->scenario_chunks;
     const struct observation_buffer_scenario_chunk_t *end =
         definition->scenario_chunks + definition->scenario_chunks_count;
@@ -353,18 +952,20 @@ static void observation_buffer_definition_import (struct observation_buffer_defi
         ++chunk;
     }
 
-    KAN_ASSERT ((uint64_t) (output - (uint8_t *) definition->buffer) == definition->buffer_size)
+    KAN_ASSERT ((uint64_t) (output - (uint8_t *) observation_buffer_memory) == definition->buffer_size)
 }
 
-static uint64_t observation_buffer_definition_compare (struct observation_buffer_definition_t *definition, void *record)
+static uint64_t observation_buffer_definition_compare (struct observation_buffer_definition_t *definition,
+                                                       void *observation_buffer_memory,
+                                                       void *record)
 {
-    if (!definition->buffer)
+    if (!observation_buffer_memory)
     {
         return 0u;
     }
 
     uint64_t result = 0u;
-    const uint8_t *input = (uint8_t *) definition->buffer;
+    const uint8_t *input = (uint8_t *) observation_buffer_memory;
     const struct observation_buffer_scenario_chunk_t *chunk = definition->scenario_chunks;
     const struct observation_buffer_scenario_chunk_t *end =
         definition->scenario_chunks + definition->scenario_chunks_count;
@@ -386,21 +987,11 @@ static uint64_t observation_buffer_definition_compare (struct observation_buffer
 static void observation_buffer_definition_shutdown (struct observation_buffer_definition_t *definition,
                                                     kan_allocation_group_t allocation_group)
 {
-    if (definition->buffer)
-    {
-        kan_free_general (allocation_group, definition->buffer, definition->buffer_size);
-        definition->buffer = NULL;
-    }
-
-    definition->buffer_size = 0u;
     if (definition->scenario_chunks)
     {
         kan_free_general (allocation_group, definition->scenario_chunks,
                           definition->scenario_chunks_count * sizeof (struct observation_buffer_scenario_chunk_t));
-        definition->scenario_chunks = NULL;
     }
-
-    definition->scenario_chunks_count = 0u;
 }
 
 static struct observation_event_trigger_t *observation_event_trigger_next (struct observation_event_trigger_t *trigger)
@@ -421,9 +1012,137 @@ static void observation_event_triggers_definition_init (struct observation_event
     definition->event_triggers = NULL;
 }
 
+static struct event_storage_node_t *query_event_storage_across_hierarchy (struct repository_t *repository,
+                                                                          kan_interned_string_t type_name);
+
+static void observation_event_triggers_definition_build (struct observation_event_triggers_definition_t *definition,
+                                                         uint64_t first_event_flag,
+                                                         struct repository_t *repository,
+                                                         const struct kan_reflection_struct_t *observed_struct,
+                                                         struct observation_buffer_definition_t *buffer,
+                                                         struct kan_stack_group_allocator_t *temporary_allocator,
+                                                         kan_allocation_group_t result_allocation_group)
+{
+    ensure_interned_strings_ready ();
+    struct kan_reflection_struct_meta_iterator_t iterator = kan_reflection_registry_query_struct_meta (
+        repository->registry, observed_struct->name, meta_automatic_on_change_event_name);
+
+    struct kan_repository_meta_automatic_on_change_event_t *event =
+        (struct kan_repository_meta_automatic_on_change_event_t *) kan_reflection_struct_meta_iterator_get (&iterator);
+    uint64_t event_flag = first_event_flag;
+
+    uint64_t triggers_count = 0u;
+    uint64_t triggers_array_size = 0u;
+    struct observation_event_trigger_list_node_t *first_event_node = NULL;
+
+    while (event)
+    {
+        struct event_storage_node_t *event_storage =
+            query_event_storage_across_hierarchy (repository, event->event_type);
+        if (event_storage)
+        {
+            struct copy_out_list_node_t *raw_buffer_copy_outs =
+                extract_raw_copy_outs (event->unchanged_copy_outs_count, event->unchanged_copy_outs,
+                                       repository->registry, temporary_allocator);
+
+            struct copy_out_list_node_t *retargeted_buffer_copy_outs =
+                convert_to_buffer_copy_outs (raw_buffer_copy_outs, buffer, temporary_allocator);
+
+            uint64_t merged_buffer_copy_outs_count;
+            struct copy_out_list_node_t *merged_buffer_copy_outs =
+                merge_copy_outs (retargeted_buffer_copy_outs, temporary_allocator, &merged_buffer_copy_outs_count);
+
+            struct copy_out_list_node_t *raw_record_copy_outs = extract_raw_copy_outs (
+                event->changed_copy_outs_count, event->changed_copy_outs, repository->registry, temporary_allocator);
+
+            uint64_t merged_record_copy_outs_count;
+            struct copy_out_list_node_t *merged_record_copy_outs =
+                merge_copy_outs (raw_record_copy_outs, temporary_allocator, &merged_record_copy_outs_count);
+
+            struct observation_event_trigger_list_node_t *event_node = kan_stack_group_allocator_allocate (
+                temporary_allocator, sizeof (struct observation_event_trigger_list_node_t),
+                _Alignof (struct observation_event_trigger_list_node_t));
+
+            event_node->flags = event_flag;
+            kan_repository_event_insert_query_init (&event_node->event_insert_query,
+                                                    (kan_repository_event_storage_t) event_storage);
+            event_node->buffer_copy_outs_count = merged_buffer_copy_outs_count;
+            event_node->buffer_copy_outs = merged_buffer_copy_outs;
+            event_node->record_copy_outs_count = merged_record_copy_outs_count;
+            event_node->record_copy_outs = merged_record_copy_outs;
+
+            event_node->next = first_event_node;
+            first_event_node = event_node;
+
+            ++triggers_count;
+            triggers_array_size = kan_apply_alignment (
+                triggers_array_size + sizeof (struct observation_event_trigger_t) +
+                    (merged_buffer_copy_outs_count + merged_record_copy_outs_count) * sizeof (struct copy_out_t),
+                _Alignof (struct observation_event_trigger_t));
+            event_flag <<= 1u;
+        }
+
+        kan_reflection_struct_meta_iterator_next (&iterator);
+        event = (struct kan_repository_meta_automatic_on_change_event_t *) kan_reflection_struct_meta_iterator_get (
+            &iterator);
+    }
+
+    definition->event_triggers_count = triggers_count;
+    if (triggers_count > 0u)
+    {
+        definition->event_triggers = kan_allocate_general (result_allocation_group, triggers_array_size,
+                                                           _Alignof (struct observation_event_trigger_t));
+    }
+    else
+    {
+        definition->event_triggers = NULL;
+    }
+
+    struct observation_event_trigger_t *trigger = (struct observation_event_trigger_t *) definition->event_triggers;
+    while (first_event_node)
+    {
+        trigger->flags = first_event_node->flags;
+        trigger->event_insert_query = first_event_node->event_insert_query;
+        trigger->buffer_copy_outs_count = first_event_node->buffer_copy_outs_count;
+        trigger->record_copy_outs_count = first_event_node->record_copy_outs_count;
+
+        uint64_t copy_out_index = 0u;
+        struct copy_out_list_node_t *copy_out = first_event_node->buffer_copy_outs;
+
+        while (copy_out)
+        {
+            trigger->copy_outs[copy_out_index] = (struct copy_out_t) {
+                .source_offset = copy_out->source_offset,
+                .target_offset = copy_out->target_offset,
+                .size = copy_out->size,
+            };
+
+            ++copy_out_index;
+            copy_out = copy_out->next;
+        }
+
+        copy_out = first_event_node->record_copy_outs;
+        while (copy_out)
+        {
+            trigger->copy_outs[copy_out_index] = (struct copy_out_t) {
+                .source_offset = copy_out->source_offset,
+                .target_offset = copy_out->target_offset,
+                .size = copy_out->size,
+            };
+
+            ++copy_out_index;
+            copy_out = copy_out->next;
+        }
+
+        trigger = observation_event_trigger_next (trigger);
+        first_event_node = first_event_node->next;
+    }
+}
+
 static void observation_event_triggers_definition_fire (struct observation_event_triggers_definition_t *definition,
                                                         uint64_t flags,
                                                         struct observation_buffer_definition_t *buffer,
+                                                        void *observation_buffer_memory,
                                                         void *record)
 {
     if (!definition->event_triggers)
@@ -433,7 +1152,7 @@ static void observation_event_triggers_definition_fire (struct observation_event
 
     KAN_ASSERT (definition->event_triggers_count > 0u)
     KAN_ASSERT (buffer->buffer_size > 0u)
-    KAN_ASSERT (buffer->buffer)
+    KAN_ASSERT (observation_buffer_memory)
 
     struct observation_event_trigger_t *current_trigger = definition->event_triggers;
     for (uint64_t trigger_index = 0u; trigger_index < definition->event_triggers_count; ++trigger_index)
@@ -446,8 +1165,8 @@ static void observation_event_triggers_definition_fire (struct observation_event
 
             if (event)
             {
-                apply_copy_outs (current_trigger->buffer_copy_outs_count, current_trigger->copy_outs, buffer->buffer,
-                                 event);
+                apply_copy_outs (current_trigger->buffer_copy_outs_count, current_trigger->copy_outs,
+                                 observation_buffer_memory, event);
                 apply_copy_outs (current_trigger->record_copy_outs_count,
                                  current_trigger->copy_outs + current_trigger->buffer_copy_outs_count, record, event);
                 kan_repository_event_insertion_package_submit (&package);
@@ -477,10 +1196,7 @@ static void observation_event_triggers_definition_shutdown (struct observation_e
 
         uint64_t triggers_size = (uint8_t *) current_trigger - (uint8_t *) first_trigger;
         kan_free_general (allocation_group, definition->event_triggers, triggers_size);
-        definition->event_triggers = NULL;
     }
-
-    definition->event_triggers_count = 0u;
 }
 
 static void singleton_storage_node_shutdown_and_free (struct singleton_storage_node_t *node,
@@ -495,8 +1211,18 @@ static void singleton_storage_node_shutdown_and_free (struct singleton_storage_n
     }
 
     kan_free_general (node->allocation_group, node->singleton, node->type->size);
+    if (node->observation_buffer_memory)
+    {
+        kan_free_general (node->allocation_group, node->observation_buffer_memory,
+                          node->observation_buffer.buffer_size);
+        node->observation_buffer_memory = NULL;
+    }
+
     observation_buffer_definition_shutdown (&node->observation_buffer, node->allocation_group);
+    observation_buffer_definition_init (&node->observation_buffer);
+
     observation_event_triggers_definition_shutdown (&node->observation_events_triggers, node->allocation_group);
+    observation_event_triggers_definition_init (&node->observation_events_triggers);
 
     kan_hash_storage_remove (&repository->singleton_storages, &node->node);
     kan_free_batched (node->allocation_group, node);
@@ -523,6 +1249,7 @@ static void event_storage_node_shutdown_and_free (struct event_storage_node_t *n
     KAN_ASSERT (kan_atomic_int_get (&node->queries_count) == 0)
     struct event_queue_node_t *queue_node = (struct event_queue_node_t *) node->event_queue.oldest;
 
+    // We can make event shutdown multithreaded if it proves to be too slow.
     while (queue_node)
     {
         event_queue_node_shutdown_and_free (queue_node, node);
@@ -531,6 +1258,18 @@ static void event_storage_node_shutdown_and_free (struct event_storage_node_t *n
 
     kan_hash_storage_remove (&repository->singleton_storages, &node->node);
     kan_free_batched (node->allocation_group, node);
+}
+
+static void repository_storage_map_access_lock (struct repository_t *caller)
+{
+    kan_atomic_int_lock (caller->parent ? caller->shared_storage_access_lock_pointer :
+                                          &caller->shared_storage_access_lock);
+}
+
+static void repository_storage_map_access_unlock (struct repository_t *caller)
+{
+    kan_atomic_int_unlock (caller->parent ? caller->shared_storage_access_lock_pointer :
+                                            &caller->shared_storage_access_lock);
 }
 
 static struct repository_t *repository_create (kan_allocation_group_t allocation_group,
@@ -547,10 +1286,20 @@ static struct repository_t *repository_create (kan_allocation_group_t allocation
     {
         repository->next = parent->first;
         parent->first = repository;
+
+        if (parent->parent)
+        {
+            repository->shared_storage_access_lock_pointer = parent->shared_storage_access_lock_pointer;
+        }
+        else
+        {
+            repository->shared_storage_access_lock_pointer = &parent->shared_storage_access_lock;
+        }
     }
     else
     {
         repository->next = NULL;
+        repository->shared_storage_access_lock = kan_atomic_int_init (0);
     }
 
     repository->name = name;
@@ -645,6 +1394,7 @@ void kan_repository_enter_planning_mode (kan_repository_t root_repository)
 
 static void execute_migration (uint64_t user_data)
 {
+    // We can migrate several records in one task if instance-per-task model is too slow.
     struct record_migration_user_data_t *data = (struct record_migration_user_data_t *) user_data;
     void *old_object = *data->record_pointer;
 
@@ -688,8 +1438,10 @@ static void spawn_migration_task (struct migration_context_t *context, struct re
         &context->allocator, sizeof (struct kan_cpu_task_list_node_t), _Alignof (struct kan_cpu_task_list_node_t));
 
     node->queue = KAN_CPU_DISPATCH_QUEUE_FOREGROUND;
+    ensure_interned_strings_ready ();
+
     node->task = (struct kan_cpu_task_t) {
-        .name = context->task_name,
+        .name = migration_task_name,
         .function = execute_migration,
         .user_data = (uint64_t) user_data,
     };
@@ -828,22 +1580,12 @@ void kan_repository_migrate (kan_repository_t root_repository,
                                     KAN_REPOSITORY_MIGRATION_STACK_INITIAL_SIZE);
 
     context.task_list = NULL;
-    context.task_name = kan_string_intern ("repository_migration_instance");
     repository_migrate_internal (repository, &context, new_registry, migration_seed, migrator);
 
-    if (context.task_list)
-    {
-        kan_cpu_job_dispatch_task_list (job, context.task_list);
-        while (context.task_list)
-        {
-            KAN_ASSERT (context.task_list->dispatch_handle != KAN_INVALID_CPU_TASK_HANDLE)
-            kan_cpu_task_detach (context.task_list->dispatch_handle);
-            context.task_list = context.task_list->next;
-        }
-    }
-
+    kan_cpu_job_dispatch_and_detach_task_list (job, context.task_list);
+    kan_cpu_job_release (job);
     kan_cpu_job_wait (job);
-    kan_stack_group_shutdown (&context.allocator);
+    kan_stack_group_allocator_shutdown (&context.allocator);
 }
 
 static struct singleton_storage_node_t *query_singleton_storage_across_hierarchy (struct repository_t *repository,
@@ -873,6 +1615,7 @@ kan_repository_singleton_storage_t kan_repository_singleton_storage_open (kan_re
 {
     struct repository_t *repository_data = (struct repository_t *) repository;
     KAN_ASSERT (repository_data->mode == REPOSITORY_MODE_PLANNING)
+    repository_storage_map_access_lock (repository_data);
     struct singleton_storage_node_t *storage = query_singleton_storage_across_hierarchy (repository_data, type_name);
 
     if (!storage)
@@ -882,7 +1625,8 @@ kan_repository_singleton_storage_t kan_repository_singleton_storage_open (kan_re
 
         if (!singleton_type)
         {
-            KAN_LOG (repository, KAN_LOG_ERROR, "Singleton type \"%s\" not found.", type_name);
+            KAN_LOG (repository, KAN_LOG_ERROR, "Singleton type \"%s\" not found.", type_name)
+            repository_storage_map_access_unlock (repository_data);
             return KAN_INVALID_REPOSITORY_SINGLETON_STORAGE;
         }
 
@@ -906,6 +1650,7 @@ kan_repository_singleton_storage_t kan_repository_singleton_storage_open (kan_re
         }
 
         observation_buffer_definition_init (&storage->observation_buffer);
+        storage->observation_buffer_memory = NULL;
         observation_event_triggers_definition_init (&storage->observation_events_triggers);
 
 #if defined(KAN_REPOSITORY_SAFEGUARDS_ENABLED)
@@ -922,6 +1667,7 @@ kan_repository_singleton_storage_t kan_repository_singleton_storage_open (kan_re
         kan_hash_storage_add (&repository_data->singleton_storages, &storage->node);
     }
 
+    repository_storage_map_access_unlock (repository_data);
     return (kan_repository_singleton_storage_t) storage;
 }
 
@@ -997,7 +1743,9 @@ kan_repository_singleton_write_access_t kan_repository_singleton_write_query_exe
     }
 #endif
 
-    observation_buffer_definition_import (&query_data->storage->observation_buffer, query_data->storage->singleton);
+    observation_buffer_definition_import (&query_data->storage->observation_buffer,
+                                          query_data->storage->observation_buffer_memory,
+                                          query_data->storage->singleton);
     return (kan_repository_singleton_write_access_t) query_data->storage;
 }
 
@@ -1012,12 +1760,14 @@ void kan_repository_singleton_write_access_close (kan_repository_singleton_write
     struct singleton_storage_node_t *storage = (struct singleton_storage_node_t *) access;
     if (storage)
     {
-        const uint64_t change_flags =
-            observation_buffer_definition_compare (&storage->observation_buffer, storage->singleton);
+        const uint64_t change_flags = observation_buffer_definition_compare (
+            &storage->observation_buffer, storage->observation_buffer_memory, storage->singleton);
+
         if (change_flags != 0u)
         {
             observation_event_triggers_definition_fire (&storage->observation_events_triggers, change_flags,
-                                                        &storage->observation_buffer, storage->singleton);
+                                                        &storage->observation_buffer,
+                                                        storage->observation_buffer_memory, storage->singleton);
         }
 
 #if defined(KAN_REPOSITORY_SAFEGUARDS_ENABLED)
@@ -1070,6 +1820,7 @@ kan_repository_event_storage_t kan_repository_event_storage_open (kan_repository
 {
     struct repository_t *repository_data = (struct repository_t *) repository;
     KAN_ASSERT (repository_data->mode == REPOSITORY_MODE_PLANNING)
+    repository_storage_map_access_lock (repository_data);
     struct event_storage_node_t *storage = query_event_storage_across_hierarchy (repository_data, type_name);
 
     if (!storage)
@@ -1079,7 +1830,8 @@ kan_repository_event_storage_t kan_repository_event_storage_open (kan_repository
 
         if (!event_type)
         {
-            KAN_LOG (repository, KAN_LOG_ERROR, "Event type \"%s\" not found.", type_name);
+            KAN_LOG (repository, KAN_LOG_ERROR, "Event type \"%s\" not found.", type_name)
+            repository_storage_map_access_unlock (repository_data);
             return KAN_INVALID_REPOSITORY_EVENT_STORAGE;
         }
 
@@ -1110,6 +1862,7 @@ kan_repository_event_storage_t kan_repository_event_storage_open (kan_repository
         kan_hash_storage_add (&repository_data->event_storages, &storage->node);
     }
 
+    repository_storage_map_access_unlock (repository_data);
     return (kan_repository_event_storage_t) storage;
 }
 
@@ -1312,12 +2065,232 @@ void kan_repository_event_fetch_query_shutdown (struct kan_repository_event_fetc
     }
 }
 
+static void repository_clean_storages (struct repository_t *repository)
+{
+    struct singleton_storage_node_t *singleton_storage_node =
+        (struct singleton_storage_node_t *) repository->singleton_storages.items.first;
+
+    while (singleton_storage_node)
+    {
+        struct singleton_storage_node_t *next =
+            (struct singleton_storage_node_t *) singleton_storage_node->node.list_node.next;
+
+        if (kan_atomic_int_get (&singleton_storage_node->queries_count) == 0)
+        {
+            singleton_storage_node_shutdown_and_free (singleton_storage_node, repository);
+        }
+
+        singleton_storage_node = next;
+    }
+
+    struct event_storage_node_t *event_storage_node =
+        (struct event_storage_node_t *) repository->event_storages.items.first;
+
+    while (event_storage_node)
+    {
+        struct event_storage_node_t *next = (struct event_storage_node_t *) event_storage_node->node.list_node.next;
+        if (kan_atomic_int_get (&event_storage_node->queries_count) == 0)
+        {
+            event_storage_node_shutdown_and_free (event_storage_node, repository);
+        }
+
+        event_storage_node = next;
+    }
+
+    repository = repository->first;
+    while (repository)
+    {
+        repository_clean_storages (repository);
+        repository = repository->next;
+    }
+}
+
+static void extract_observation_chunks_from_on_change_events (
+    struct repository_t *repository,
+    const struct kan_reflection_struct_t *observed_struct,
+    uint64_t first_event_flag,
+    struct kan_stack_group_allocator_t *temporary_allocator,
+    struct observation_buffer_scenario_chunk_list_node_t **first,
+    struct observation_buffer_scenario_chunk_list_node_t **last)
+{
+    ensure_interned_strings_ready ();
+    struct kan_reflection_struct_meta_iterator_t iterator = kan_reflection_registry_query_struct_meta (
+        repository->registry, observed_struct->name, meta_automatic_on_change_event_name);
+
+    struct kan_repository_meta_automatic_on_change_event_t *event =
+        (struct kan_repository_meta_automatic_on_change_event_t *) kan_reflection_struct_meta_iterator_get (&iterator);
+    uint64_t event_flag = first_event_flag;
+
+    while (event)
+    {
+        // Query for event storage to check if event is used anywhere. No need to observe for unused events.
+        if (query_event_storage_across_hierarchy (repository, event->event_type))
+        {
+            for (uint64_t index = 0u; index < event->observed_fields_count; ++index)
+            {
+                struct kan_repository_field_path_t *path = &event->observed_fields[index];
+                uint64_t absolute_offset;
+                uint64_t size_with_padding;
+
+                const struct kan_reflection_field_t *field = query_field_for_automatic_event_from_path (
+                    path, repository->registry, &absolute_offset, &size_with_padding);
+
+                if (!field)
+                {
+                    continue;
+                }
+
+#if defined(KAN_REPOSITORY_VALIDATION_ENABLED)
+                if (!validation_field_is_observable (repository->registry, field->archetype, field->name,
+                                                     &field->archetype_struct))
+                {
+                    continue;
+                }
+#endif
+
+                struct observation_buffer_scenario_chunk_list_node_t *node =
+                    (struct observation_buffer_scenario_chunk_list_node_t *) kan_stack_group_allocator_allocate (
+                        temporary_allocator, sizeof (struct observation_buffer_scenario_chunk_list_node_t),
+                        _Alignof (struct observation_buffer_scenario_chunk_list_node_t));
+
+                node->next = 0u;
+                node->source_offset = absolute_offset;
+                node->size = size_with_padding;
+                node->flags = event_flag;
+
+                if (*last)
+                {
+                    (*last)->next = node;
+                    *last = node;
+                }
+                else
+                {
+                    *first = node;
+                    *last = node;
+                }
+            }
+
+            event_flag <<= 1u;
+        }
+
+        kan_reflection_struct_meta_iterator_next (&iterator);
+        event = (struct kan_repository_meta_automatic_on_change_event_t *) kan_reflection_struct_meta_iterator_get (
+            &iterator);
+    }
+}
+
+static void prepare_singleton_storage (uint64_t user_data)
+{
+    struct singleton_switch_to_serving_user_data_t *data = (struct singleton_switch_to_serving_user_data_t *) user_data;
+    struct kan_stack_group_allocator_t temporary_allocator;
+    const kan_allocation_group_t result_allocation_group =
+        kan_allocation_group_get_child (data->storage->allocation_group, "observation");
+
+    kan_stack_group_allocator_init (
+        &temporary_allocator, kan_allocation_group_get_child (data->storage->allocation_group, "switch_to_serving"),
+        KAN_REPOSITORY_SWITCH_TO_SERVING_STACK_INITIAL_SIZE);
+
+    struct observation_buffer_scenario_chunk_list_node_t *first_chunk = NULL;
+    struct observation_buffer_scenario_chunk_list_node_t *last_chunk = NULL;
+    extract_observation_chunks_from_on_change_events (data->repository, data->storage->type, 1u, &temporary_allocator,
+                                                      &first_chunk, &last_chunk);
+
+    if (first_chunk)
+    {
+        observation_buffer_definition_build (&data->storage->observation_buffer, first_chunk, &temporary_allocator,
+                                             result_allocation_group);
+
+        if (data->storage->observation_buffer.buffer_size > 0u)
+        {
+            data->storage->observation_buffer_memory = kan_allocate_general (
+                result_allocation_group, data->storage->observation_buffer.buffer_size, OBSERVATION_BUFFER_ALIGNMENT);
+        }
+    }
+
+    observation_event_triggers_definition_build (&data->storage->observation_events_triggers, 1u, data->repository,
+                                                 data->storage->type, &data->storage->observation_buffer,
+                                                 &temporary_allocator, result_allocation_group);
+    kan_stack_group_allocator_shutdown (&temporary_allocator);
+}
+
+static void repository_prepare_storages (struct repository_t *repository, struct switch_to_serving_context_t *context)
+{
+    struct singleton_storage_node_t *singleton_storage_node =
+        (struct singleton_storage_node_t *) repository->singleton_storages.items.first;
+
+    while (singleton_storage_node)
+    {
+        struct singleton_switch_to_serving_user_data_t *user_data =
+            (struct singleton_switch_to_serving_user_data_t *) kan_stack_group_allocator_allocate (
+                &context->allocator, sizeof (struct singleton_switch_to_serving_user_data_t),
+                _Alignof (struct singleton_switch_to_serving_user_data_t));
+
+        *user_data = (struct singleton_switch_to_serving_user_data_t) {
+            .storage = singleton_storage_node,
+            .repository = repository,
+        };
+
+        struct kan_cpu_task_list_node_t *node = (struct kan_cpu_task_list_node_t *) kan_stack_group_allocator_allocate (
+            &context->allocator, sizeof (struct kan_cpu_task_list_node_t), _Alignof (struct kan_cpu_task_list_node_t));
+
+        node->queue = KAN_CPU_DISPATCH_QUEUE_FOREGROUND;
+        ensure_interned_strings_ready ();
+
+        node->task = (struct kan_cpu_task_t) {
+            .name = switch_to_serving_task_name,
+            .function = prepare_singleton_storage,
+            .user_data = (uint64_t) user_data,
+        };
+
+        node->next = context->task_list;
+        context->task_list = node;
+        singleton_storage_node = (struct singleton_storage_node_t *) singleton_storage_node->node.list_node.next;
+    }
+
+    repository = repository->first;
+    while (repository)
+    {
+        repository_prepare_storages (repository, context);
+        repository = repository->next;
+    }
+}
+
+static void repository_complete_switch_to_serving (struct repository_t *repository)
+{
+    repository->mode = REPOSITORY_MODE_SERVING;
+    repository = repository->first;
+
+    while (repository)
+    {
+        repository_complete_switch_to_serving (repository);
+        repository = repository->next;
+    }
+}
+
 void kan_repository_enter_serving_mode (kan_repository_t root_repository)
 {
-    // TODO: Implement. Do not forget about tree hierarchy and storages in parent repositories (especially events).
-    // TODO: Clean storages with no queries.
-    // TODO: Tasks below might take some time and can be executed in parallel. Attach serving mode enter to cpu jobs?
-    // TODO: Connect automatic event storages with singleton and indexed storages. Build copy-outs and such things.
+    struct repository_t *repository = (struct repository_t *) root_repository;
+    KAN_ASSERT (!repository->parent)
+    KAN_ASSERT (repository->mode == REPOSITORY_MODE_PLANNING)
+    repository_clean_storages (repository);
+
+    kan_cpu_job_t job = kan_cpu_job_create ();
+    KAN_ASSERT (job != KAN_INVALID_CPU_JOB)
+
+    struct switch_to_serving_context_t context;
+    kan_stack_group_allocator_init (&context.allocator,
+                                    kan_allocation_group_get_child (repository->allocation_group, "switch_to_serving"),
+                                    KAN_REPOSITORY_SWITCH_TO_SERVING_STACK_INITIAL_SIZE);
+
+    context.task_list = NULL;
+    repository_prepare_storages (repository, &context);
+
+    kan_cpu_job_dispatch_and_detach_task_list (job, context.task_list);
+    kan_cpu_job_release (job);
+    kan_cpu_job_wait (job);
+
+    kan_stack_group_allocator_shutdown (&context.allocator);
+    repository_complete_switch_to_serving (repository);
 }
 
 static void repository_destroy_internal (struct repository_t *repository)
