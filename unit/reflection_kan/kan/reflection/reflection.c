@@ -8,6 +8,7 @@
 #include <kan/api_common/min_max.h>
 #include <kan/container/dynamic_array.h>
 #include <kan/container/hash_storage.h>
+#include <kan/container/stack_group_allocator.h>
 #include <kan/cpu_dispatch/job.h>
 #include <kan/error/critical.h>
 #include <kan/hash/hash.h>
@@ -826,11 +827,13 @@ void kan_reflection_struct_field_meta_iterator_next (struct kan_reflection_struc
 const struct kan_reflection_field_t *kan_reflection_registry_query_local_field (kan_reflection_registry_t registry,
                                                                                 uint64_t path_length,
                                                                                 kan_interned_string_t *path,
-                                                                                uint64_t *absolute_offset_output)
+                                                                                uint64_t *absolute_offset_output,
+                                                                                uint64_t *size_with_padding_output)
 
 {
     KAN_ASSERT (path_length > 1u)
     KAN_ASSERT (absolute_offset_output)
+    KAN_ASSERT (size_with_padding_output)
     *absolute_offset_output = 0u;
     const struct kan_reflection_struct_t *struct_reflection = kan_reflection_registry_query_struct (registry, path[0u]);
 
@@ -840,13 +843,16 @@ const struct kan_reflection_field_t *kan_reflection_registry_query_local_field (
         return NULL;
     }
 
+    *size_with_padding_output = struct_reflection->size;
     const struct kan_reflection_field_t *field_reflection = NULL;
+
     for (uint64_t path_element_index = 1u; path_element_index < path_length; ++path_element_index)
     {
         kan_interned_string_t path_element = path[path_element_index];
         field_reflection = NULL;
+        uint64_t field_index;
 
-        for (uint64_t field_index = 0u; field_index < struct_reflection->fields_count; ++field_index)
+        for (field_index = 0u; field_index < struct_reflection->fields_count; ++field_index)
         {
             const struct kan_reflection_field_t *field_reflection_to_check = &struct_reflection->fields[field_index];
             if (field_reflection_to_check->name == path_element)
@@ -863,7 +869,33 @@ const struct kan_reflection_field_t *kan_reflection_registry_query_local_field (
             return NULL;
         }
 
+        // Calculate size with padding.
+        uint64_t element_size_with_padding = 0u;
+
+        // Find next field in layout.
+        for (field_index = field_index + 1u; field_index < struct_reflection->fields_count; ++field_index)
+        {
+            const struct kan_reflection_field_t *field_reflection_to_check = &struct_reflection->fields[field_index];
+
+            // We skip fields with the same offset, because they are most likely part of the union and therefore
+            // cannot be used for full size calculation in layout.
+            if (field_reflection_to_check->offset > field_reflection->offset)
+            {
+                element_size_with_padding = field_reflection_to_check->offset - field_reflection->offset;
+                break;
+            }
+        }
+
+        // No next field, padding is described by structure size and its field padding.
+        if (element_size_with_padding == 0u)
+        {
+            element_size_with_padding = *size_with_padding_output - field_reflection->offset;
+        }
+
+        *size_with_padding_output = element_size_with_padding;
+        KAN_ASSERT (*size_with_padding_output >= field_reflection->size)
         *absolute_offset_output += field_reflection->offset;
+
         if (path_element_index != path_length - 1u)
         {
             switch (field_reflection->archetype)
@@ -3626,7 +3658,6 @@ static void migrate_patch_task (kan_cpu_task_user_data_t user_data)
     }
 
     kan_reflection_patch_builder_destroy (patch_builder);
-    kan_free_batched (group, data);
 }
 
 void kan_reflection_struct_migrator_migrate_patches (kan_reflection_struct_migrator_t migrator,
@@ -3647,12 +3678,16 @@ void kan_reflection_struct_migrator_migrate_patches (kan_reflection_struct_migra
     struct kan_cpu_task_list_node_t *task_list = NULL;
     const kan_interned_string_t task_name = kan_string_intern ("reflection_patch_migration");
 
+    struct kan_stack_group_allocator_t allocator;
+    kan_stack_group_allocator_init (&allocator, group, KAN_REFLECTION_MIGRATOR_PATCH_TASK_STACK_INITIAL_SIZE);
+
     while (patch)
     {
         struct compiled_patch_t *next = patch->next;
         if (!next_task_data)
         {
-            next_task_data = kan_allocate_batched (group, sizeof (struct patch_migration_task_data_t));
+            next_task_data = (struct patch_migration_task_data_t *) kan_stack_group_allocator_allocate (
+                &allocator, sizeof (struct patch_migration_task_data_t), _Alignof (struct patch_migration_task_data_t));
             next_task_data->target_registry = target_registry;
             next_task_data->migrator = migrator;
             next_task_data->patch_begin = patch;
@@ -3663,9 +3698,10 @@ void kan_reflection_struct_migrator_migrate_patches (kan_reflection_struct_migra
         {
             next_task_data->patch_end = next;
             struct kan_cpu_task_list_node_t *task_list_node =
-                kan_allocate_batched (group, sizeof (struct kan_cpu_task_list_node_t));
-            task_list_node->next = task_list;
+                (struct kan_cpu_task_list_node_t *) kan_stack_group_allocator_allocate (
+                    &allocator, sizeof (struct kan_cpu_task_list_node_t), _Alignof (struct kan_cpu_task_list_node_t));
 
+            task_list_node->next = task_list;
             task_list_node->task = (struct kan_cpu_task_t) {
                 .name = task_name,
                 .function = migrate_patch_task,
@@ -3683,19 +3719,11 @@ void kan_reflection_struct_migrator_migrate_patches (kan_reflection_struct_migra
     }
 
     kan_cpu_job_t job = kan_cpu_job_create ();
-    kan_cpu_job_dispatch_task_list (job, task_list);
+    kan_cpu_job_dispatch_and_detach_task_list (job, task_list);
     kan_cpu_job_release (job);
-
-    while (task_list)
-    {
-        KAN_ASSERT (task_list->dispatch_handle != KAN_INVALID_CPU_TASK_HANDLE)
-        kan_cpu_task_detach (task_list->dispatch_handle);
-        struct kan_cpu_task_list_node_t *next = task_list->next;
-        kan_free_batched (group, task_list);
-        task_list = next;
-    }
-
     kan_cpu_job_wait (job);
+
+    kan_stack_group_allocator_shutdown (&allocator);
     source_registry_data->first_patch = NULL;
 }
 

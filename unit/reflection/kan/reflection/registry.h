@@ -188,6 +188,8 @@ struct kan_reflection_struct_t
     kan_reflection_shutdown_functor shutdown;
     kan_reflection_functor_user_data functor_user_data;
     uint64_t fields_count;
+
+    /// \details Fields must be ordered by ascending offset.
     struct kan_reflection_field_t *fields;
 };
 
@@ -321,7 +323,8 @@ REFLECTION_API const struct kan_reflection_field_t *kan_reflection_registry_quer
     kan_reflection_registry_t registry,
     uint64_t path_length,
     kan_interned_string_t *path,
-    uint64_t *absolute_offset_output);
+    uint64_t *absolute_offset_output,
+    uint64_t *size_with_padding_output);
 
 typedef uint64_t kan_reflection_registry_enum_iterator_t;
 
