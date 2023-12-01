@@ -34,7 +34,7 @@ struct kan_repository_copy_out_t
     struct kan_repository_field_path_t target_path;
 };
 
-struct kan_repository_meta_automatic_on_add_event_t
+struct kan_repository_meta_automatic_on_insert_event_t
 {
     kan_interned_string_t event_type;
     uint64_t copy_outs_count;
@@ -52,7 +52,7 @@ struct kan_repository_meta_automatic_on_change_event_t
     struct kan_repository_copy_out_t *changed_copy_outs;
 };
 
-struct kan_repository_meta_automatic_on_remove_event_t
+struct kan_repository_meta_automatic_on_delete_event_t
 {
     kan_interned_string_t event_type;
     uint64_t copy_outs_count;

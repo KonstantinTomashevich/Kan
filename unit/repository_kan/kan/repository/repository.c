@@ -8,6 +8,7 @@
 #include <kan/api_common/min_max.h>
 #include <kan/container/event_queue.h>
 #include <kan/container/hash_storage.h>
+#include <kan/container/list.h>
 #include <kan/container/stack_group_allocator.h>
 #include <kan/cpu_dispatch/job.h>
 #include <kan/error/critical.h>
@@ -87,10 +88,36 @@ struct observation_event_triggers_definition_t
     struct observation_event_trigger_t *event_triggers;
 };
 
+struct lifetime_event_trigger_t
+{
+    struct kan_repository_event_insert_query_t event_insert_query;
+    uint64_t copy_outs_count;
+    struct copy_out_t copy_outs[];
+};
+
+struct lifetime_event_trigger_list_node_t
+{
+    struct lifetime_event_trigger_list_node_t *next;
+    struct kan_repository_event_insert_query_t event_insert_query;
+    uint64_t copy_outs_count;
+    struct copy_out_list_node_t *copy_outs;
+};
+
+struct lifetime_event_triggers_definition_t
+{
+    uint64_t event_triggers_count;
+    struct lifetime_event_trigger_t *event_triggers;
+};
+
+enum lifetime_event_trigger_type_t
+{
+    LIFETIME_EVENT_TRIGGER_ON_INSERT = 0u,
+    LIFETIME_EVENT_TRIGGER_ON_DELETE,
+};
+
 struct singleton_storage_node_t
 {
     struct kan_hash_storage_node_t node;
-    kan_allocation_group_t allocation_group;
     const struct kan_reflection_struct_t *type;
     struct kan_atomic_int_t queries_count;
     void *singleton;
@@ -99,29 +126,210 @@ struct singleton_storage_node_t
     void *observation_buffer_memory;
     struct observation_event_triggers_definition_t observation_events_triggers;
 
+    kan_allocation_group_t allocation_group;
+    kan_allocation_group_t automation_allocation_group;
+
 #if defined(KAN_REPOSITORY_SAFEGUARDS_ENABLED)
     struct kan_atomic_int_t safeguard_access_status;
 #endif
 };
 
-struct singleton_read_query_t
+struct singleton_query_t
 {
     struct singleton_storage_node_t *storage;
 };
 
-_Static_assert (sizeof (struct singleton_read_query_t) <= sizeof (struct kan_repository_singleton_read_query_t),
+_Static_assert (sizeof (struct singleton_query_t) <= sizeof (struct kan_repository_singleton_read_query_t),
                 "Query sizes match.");
-_Static_assert (_Alignof (struct singleton_read_query_t) <= _Alignof (struct kan_repository_singleton_read_query_t),
+_Static_assert (_Alignof (struct singleton_query_t) <= _Alignof (struct kan_repository_singleton_read_query_t),
+                "Query alignments match.");
+_Static_assert (sizeof (struct singleton_query_t) <= sizeof (struct kan_repository_singleton_write_query_t),
+                "Query sizes match.");
+_Static_assert (_Alignof (struct singleton_query_t) <= _Alignof (struct kan_repository_singleton_write_query_t),
                 "Query alignments match.");
 
-struct singleton_write_query_t
+struct indexed_storage_record_node_t
 {
-    struct singleton_storage_node_t *storage;
+    struct kan_bd_list_node_t list_node;
+    void *record;
+
+#if defined(KAN_REPOSITORY_SAFEGUARDS_ENABLED)
+    struct kan_atomic_int_t safeguard_access_status;
+#endif
 };
 
-_Static_assert (sizeof (struct singleton_write_query_t) <= sizeof (struct kan_repository_singleton_write_query_t),
+enum indexed_storage_dirty_record_type_t
+{
+    INDEXED_STORAGE_DIRTY_RECORD_CHANGED = 0u,
+    INDEXED_STORAGE_DIRTY_RECORD_INSERTED,
+    INDEXED_STORAGE_DIRTY_RECORD_DELETED,
+};
+
+struct indexed_storage_dirty_record_node_t
+{
+    struct indexed_storage_dirty_record_node_t *next;
+    struct indexed_storage_record_node_t *source_node;
+
+    enum indexed_storage_dirty_record_type_t type;
+    void *observation_buffer_memory;
+    uint64_t observation_comparison_flags;
+
+    void *dirt_source_index;
+    void *dirt_source_index_node;
+    void *dirt_source_index_sub_node;
+};
+
+struct indexed_storage_node_t
+{
+    struct kan_hash_storage_node_t node;
+    const struct kan_reflection_struct_t *type;
+    struct kan_atomic_int_t queries_count;
+
+    struct kan_bd_list_t records;
+    struct kan_atomic_int_t access_status;
+    struct kan_atomic_int_t maintenance_lock;
+    struct indexed_storage_dirty_record_node_t *dirty_records;
+    struct kan_stack_group_allocator_t temporary_allocator;
+
+    struct observation_buffer_definition_t observation_buffer;
+    struct observation_event_triggers_definition_t observation_events_triggers;
+    struct lifetime_event_triggers_definition_t on_insert_events_triggers;
+    struct lifetime_event_triggers_definition_t on_delete_events_triggers;
+
+    kan_allocation_group_t allocation_group;
+    kan_allocation_group_t records_allocation_group;
+    kan_allocation_group_t nodes_allocation_group;
+    kan_allocation_group_t automation_allocation_group;
+};
+
+struct indexed_insert_query_t
+{
+    struct indexed_storage_node_t *storage;
+};
+
+_Static_assert (sizeof (struct indexed_insert_query_t) <= sizeof (struct kan_repository_indexed_insert_query_t),
                 "Query sizes match.");
-_Static_assert (_Alignof (struct singleton_write_query_t) <= _Alignof (struct kan_repository_singleton_write_query_t),
+_Static_assert (_Alignof (struct indexed_insert_query_t) <= _Alignof (struct kan_repository_indexed_insert_query_t),
+                "Query alignments match.");
+
+struct indexed_insertion_package_t
+{
+    struct indexed_storage_node_t *storage;
+    void *record;
+};
+
+_Static_assert (sizeof (struct indexed_insertion_package_t) <=
+                    sizeof (struct kan_repository_indexed_insertion_package_t),
+                "Insertion package sizes match.");
+_Static_assert (_Alignof (struct indexed_insertion_package_t) <=
+                    _Alignof (struct kan_repository_indexed_insertion_package_t),
+                "Insertion package alignments match.");
+
+struct indexed_sequence_query_t
+{
+    struct indexed_storage_node_t *storage;
+};
+
+_Static_assert (sizeof (struct indexed_sequence_query_t) <=
+                    sizeof (struct kan_repository_indexed_sequence_read_query_t),
+                "Query sizes match.");
+_Static_assert (_Alignof (struct indexed_sequence_query_t) <=
+                    _Alignof (struct kan_repository_indexed_sequence_read_query_t),
+                "Query alignments match.");
+
+_Static_assert (sizeof (struct indexed_sequence_query_t) <=
+                    sizeof (struct kan_repository_indexed_sequence_update_query_t),
+                "Query sizes match.");
+_Static_assert (_Alignof (struct indexed_sequence_query_t) <=
+                    _Alignof (struct kan_repository_indexed_sequence_update_query_t),
+                "Query alignments match.");
+
+_Static_assert (sizeof (struct indexed_sequence_query_t) <=
+                    sizeof (struct kan_repository_indexed_sequence_delete_query_t),
+                "Query sizes match.");
+_Static_assert (_Alignof (struct indexed_sequence_query_t) <=
+                    _Alignof (struct kan_repository_indexed_sequence_delete_query_t),
+                "Query alignments match.");
+
+_Static_assert (sizeof (struct indexed_sequence_query_t) <=
+                    sizeof (struct kan_repository_indexed_sequence_write_query_t),
+                "Query sizes match.");
+_Static_assert (_Alignof (struct indexed_sequence_query_t) <=
+                    _Alignof (struct kan_repository_indexed_sequence_write_query_t),
+                "Query alignments match.");
+
+struct indexed_sequence_cursor_t
+{
+    struct indexed_storage_node_t *storage;
+    struct indexed_storage_record_node_t *node;
+};
+
+_Static_assert (sizeof (struct indexed_sequence_cursor_t) <=
+                    sizeof (struct kan_repository_indexed_sequence_read_cursor_t),
+                "Query sizes match.");
+_Static_assert (_Alignof (struct indexed_sequence_cursor_t) <=
+                    _Alignof (struct kan_repository_indexed_sequence_read_cursor_t),
+                "Query alignments match.");
+
+_Static_assert (sizeof (struct indexed_sequence_cursor_t) <=
+                    sizeof (struct kan_repository_indexed_sequence_update_cursor_t),
+                "Query sizes match.");
+_Static_assert (_Alignof (struct indexed_sequence_cursor_t) <=
+                    _Alignof (struct kan_repository_indexed_sequence_update_cursor_t),
+                "Query alignments match.");
+
+_Static_assert (sizeof (struct indexed_sequence_cursor_t) <=
+                    sizeof (struct kan_repository_indexed_sequence_delete_cursor_t),
+                "Query sizes match.");
+_Static_assert (_Alignof (struct indexed_sequence_cursor_t) <=
+                    _Alignof (struct kan_repository_indexed_sequence_delete_cursor_t),
+                "Query alignments match.");
+
+_Static_assert (sizeof (struct indexed_sequence_cursor_t) <=
+                    sizeof (struct kan_repository_indexed_sequence_write_cursor_t),
+                "Query sizes match.");
+_Static_assert (_Alignof (struct indexed_sequence_cursor_t) <=
+                    _Alignof (struct kan_repository_indexed_sequence_write_cursor_t),
+                "Query alignments match.");
+
+struct indexed_sequence_constant_access_t
+{
+    struct indexed_storage_node_t *storage;
+    struct indexed_storage_record_node_t *node;
+};
+
+_Static_assert (sizeof (struct indexed_sequence_constant_access_t) <=
+                    sizeof (struct kan_repository_indexed_sequence_read_access_t),
+                "Query sizes match.");
+_Static_assert (_Alignof (struct indexed_sequence_constant_access_t) <=
+                    _Alignof (struct kan_repository_indexed_sequence_read_access_t),
+                "Query alignments match.");
+
+_Static_assert (sizeof (struct indexed_sequence_constant_access_t) <=
+                    sizeof (struct kan_repository_indexed_sequence_delete_access_t),
+                "Query sizes match.");
+_Static_assert (_Alignof (struct indexed_sequence_constant_access_t) <=
+                    _Alignof (struct kan_repository_indexed_sequence_delete_access_t),
+                "Query alignments match.");
+
+struct indexed_sequence_mutable_access_t
+{
+    struct indexed_storage_node_t *storage;
+    struct indexed_storage_dirty_record_node_t *dirty_node;
+};
+
+_Static_assert (sizeof (struct indexed_sequence_mutable_access_t) <=
+                    sizeof (struct kan_repository_indexed_sequence_update_access_t),
+                "Query sizes match.");
+_Static_assert (_Alignof (struct indexed_sequence_mutable_access_t) <=
+                    _Alignof (struct kan_repository_indexed_sequence_update_access_t),
+                "Query alignments match.");
+
+_Static_assert (sizeof (struct indexed_sequence_mutable_access_t) <=
+                    sizeof (struct kan_repository_indexed_sequence_write_access_t),
+                "Query sizes match.");
+_Static_assert (_Alignof (struct indexed_sequence_mutable_access_t) <=
+                    _Alignof (struct kan_repository_indexed_sequence_write_access_t),
                 "Query alignments match.");
 
 struct event_queue_node_t
@@ -212,6 +420,7 @@ struct repository_t
     enum repository_mode_t mode;
 
     struct kan_hash_storage_t singleton_storages;
+    struct kan_hash_storage_t indexed_storages;
     struct kan_hash_storage_t event_storages;
 };
 
@@ -243,11 +452,19 @@ struct singleton_switch_to_serving_user_data_t
     struct repository_t *repository;
 };
 
+struct indexed_switch_to_serving_user_data_t
+{
+    struct indexed_storage_node_t *storage;
+    struct repository_t *repository;
+};
+
 static kan_bool_t interned_strings_ready = KAN_FALSE;
 static struct kan_atomic_int_t interned_strings_initialization_lock = {.value = 0};
 static kan_interned_string_t migration_task_name;
 static kan_interned_string_t switch_to_serving_task_name;
 static kan_interned_string_t meta_automatic_on_change_event_name;
+static kan_interned_string_t meta_automatic_on_insert_event_name;
+static kan_interned_string_t meta_automatic_on_delete_event_name;
 
 static void ensure_interned_strings_ready (void)
 {
@@ -259,6 +476,8 @@ static void ensure_interned_strings_ready (void)
             migration_task_name = kan_string_intern ("repository_migration_task");
             switch_to_serving_task_name = kan_string_intern ("repository_switch_to_serving_task");
             meta_automatic_on_change_event_name = kan_string_intern ("kan_repository_meta_automatic_on_change_event_t");
+            meta_automatic_on_insert_event_name = kan_string_intern ("kan_repository_meta_automatic_on_insert_event_t");
+            meta_automatic_on_delete_event_name = kan_string_intern ("kan_repository_meta_automatic_on_delete_event_t");
         }
 
         kan_atomic_int_unlock (&interned_strings_initialization_lock);
@@ -277,6 +496,14 @@ static kan_bool_t safeguard_singleton_write_access_try_create (struct singleton_
         {
             KAN_LOG (repository_safeguards, KAN_LOG_ERROR,
                      "Singleton type \"%s\". Unable to create write access because read accesses detected.",
+                     singleton_storage->type->name);
+            return KAN_FALSE;
+        }
+
+        if (old_value > 0)
+        {
+            KAN_LOG (repository_safeguards, KAN_LOG_ERROR,
+                     "Singleton type \"%s\". Unable to create write access because other write access detected.",
                      singleton_storage->type->name);
             return KAN_FALSE;
         }
@@ -318,6 +545,71 @@ static kan_bool_t safeguard_singleton_read_access_try_create (struct singleton_s
 static void safeguard_singleton_read_access_destroyed (struct singleton_storage_node_t *singleton_storage)
 {
     kan_atomic_int_add (&singleton_storage->safeguard_access_status, 1);
+}
+
+static kan_bool_t safeguard_indexed_write_access_try_create (struct indexed_storage_node_t *storage,
+                                                             struct indexed_storage_record_node_t *node)
+{
+    while (KAN_TRUE)
+    {
+        int old_value = kan_atomic_int_get (&node->safeguard_access_status);
+        if (old_value < 0)
+        {
+            KAN_LOG (repository_safeguards, KAN_LOG_ERROR,
+                     "Indexed type \"%s\". Unable to create update/delete/write access because read accesses to the "
+                     "same record detected.",
+                     storage->type->name);
+            return KAN_FALSE;
+        }
+
+        if (old_value > 0)
+        {
+            KAN_LOG (repository_safeguards, KAN_LOG_ERROR,
+                     "Indexed type \"%s\". Unable to create update/delete/write access because update/delete/write "
+                     "access to the same record detected.",
+                     storage->type->name);
+            return KAN_FALSE;
+        }
+
+        int new_value = old_value + 1;
+        if (kan_atomic_int_compare_and_set (&node->safeguard_access_status, old_value, new_value))
+        {
+            return KAN_TRUE;
+        }
+    }
+}
+
+static void safeguard_indexed_write_access_destroyed (struct indexed_storage_record_node_t *node)
+{
+    kan_atomic_int_add (&node->safeguard_access_status, -1);
+}
+
+static kan_bool_t safeguard_indexed_read_access_try_create (struct indexed_storage_node_t *storage,
+                                                            struct indexed_storage_record_node_t *node)
+{
+    while (KAN_TRUE)
+    {
+        int old_value = kan_atomic_int_get (&node->safeguard_access_status);
+        if (old_value > 0)
+        {
+            KAN_LOG (repository_safeguards, KAN_LOG_ERROR,
+                     "Indexed type \"%s\". Unable to create read access because update/delete/write access to the same "
+                     "record detected.",
+                     storage->type->name);
+            return KAN_FALSE;
+        }
+
+        int new_value = old_value - 1;
+        if (kan_atomic_int_compare_and_set (&node->safeguard_access_status, old_value, new_value))
+        {
+            return KAN_TRUE;
+        }
+    }
+}
+
+static void safeguard_indexed_read_access_destroyed (struct indexed_storage_record_node_t *node)
+{
+    kan_atomic_int_add (&node->safeguard_access_status, 1);
 }
 
 static kan_bool_t safeguard_event_insertion_package_try_create (struct event_storage_node_t *event_storage)
@@ -495,12 +787,6 @@ static kan_bool_t validation_copy_out_is_possible (kan_reflection_registry_t reg
     return KAN_TRUE;
 }
 #endif
-
-static kan_allocation_group_t storage_event_automation_allocation_group (
-    kan_allocation_group_t storage_allocation_group)
-{
-    return kan_allocation_group_get_child (storage_allocation_group, "event_automation");
-}
 
 static void apply_copy_outs (uint64_t copy_outs_count, struct copy_out_t *copy_outs, const void *source, void *target)
 {
@@ -1018,7 +1304,7 @@ static struct event_storage_node_t *query_event_storage_across_hierarchy (struct
                                                                           kan_interned_string_t type_name);
 
 static void observation_event_triggers_definition_build (struct observation_event_triggers_definition_t *definition,
-                                                         uint64_t first_event_flag,
+                                                         uint64_t *event_flag,
                                                          struct repository_t *repository,
                                                          const struct kan_reflection_struct_t *observed_struct,
                                                          struct observation_buffer_definition_t *buffer,
@@ -1031,7 +1317,6 @@ static void observation_event_triggers_definition_build (struct observation_even
 
     struct kan_repository_meta_automatic_on_change_event_t *event =
         (struct kan_repository_meta_automatic_on_change_event_t *) kan_reflection_struct_meta_iterator_get (&iterator);
-    uint64_t event_flag = first_event_flag;
 
     uint64_t triggers_count = 0u;
     uint64_t triggers_array_size = 0u;
@@ -1066,7 +1351,7 @@ static void observation_event_triggers_definition_build (struct observation_even
                 temporary_allocator, sizeof (struct observation_event_trigger_list_node_t),
                 _Alignof (struct observation_event_trigger_list_node_t));
 
-            event_node->flags = event_flag;
+            event_node->flags = *event_flag;
             kan_repository_event_insert_query_init (&event_node->event_insert_query,
                                                     (kan_repository_event_storage_t) event_storage);
             event_node->buffer_copy_outs_count = merged_buffer_copy_outs_count;
@@ -1082,7 +1367,7 @@ static void observation_event_triggers_definition_build (struct observation_even
                 triggers_array_size + sizeof (struct observation_event_trigger_t) +
                     (merged_buffer_copy_outs_count + merged_record_copy_outs_count) * sizeof (struct copy_out_t),
                 _Alignof (struct observation_event_trigger_t));
-            event_flag <<= 1u;
+            *event_flag <<= 1u;
         }
 
         kan_reflection_struct_meta_iterator_next (&iterator);
@@ -1202,6 +1487,250 @@ static void observation_event_triggers_definition_shutdown (struct observation_e
     }
 }
 
+static struct lifetime_event_trigger_t *lifetime_event_trigger_next (struct lifetime_event_trigger_t *trigger)
+{
+    uint8_t *raw_pointer = (uint8_t *) trigger;
+    const uint64_t trigger_size =
+        sizeof (struct lifetime_event_trigger_t) + trigger->copy_outs_count * sizeof (struct copy_out_t);
+
+    return (struct lifetime_event_trigger_t *) (raw_pointer +
+                                                kan_apply_alignment (trigger_size,
+                                                                     _Alignof (struct lifetime_event_trigger_t)));
+}
+
+static void lifetime_event_triggers_definition_init (struct lifetime_event_triggers_definition_t *definition)
+{
+    definition->event_triggers_count = 0u;
+    definition->event_triggers = NULL;
+}
+
+static struct lifetime_event_trigger_list_node_t *lifetime_event_triggers_extract_on_insert (
+    struct repository_t *repository,
+    const struct kan_reflection_struct_t *observed_struct,
+    struct kan_stack_group_allocator_t *temporary_allocator,
+    uint64_t *count_output,
+    uint64_t *array_size_output)
+{
+    ensure_interned_strings_ready ();
+    struct kan_reflection_struct_meta_iterator_t iterator = kan_reflection_registry_query_struct_meta (
+        repository->registry, observed_struct->name, meta_automatic_on_insert_event_name);
+
+    struct kan_repository_meta_automatic_on_insert_event_t *event =
+        (struct kan_repository_meta_automatic_on_insert_event_t *) kan_reflection_struct_meta_iterator_get (&iterator);
+
+    struct lifetime_event_trigger_list_node_t *first_event_node = NULL;
+    *count_output = 0u;
+    *array_size_output = 0u;
+
+    while (event)
+    {
+        struct event_storage_node_t *event_storage =
+            query_event_storage_across_hierarchy (repository, event->event_type);
+
+        if (event_storage)
+        {
+            struct copy_out_list_node_t *raw_copy_outs = extract_raw_copy_outs (
+                event->event_type, event->copy_outs_count, event->copy_outs, repository->registry, temporary_allocator);
+
+            uint64_t merged_copy_outs_count;
+            struct copy_out_list_node_t *merged_copy_outs =
+                merge_copy_outs (raw_copy_outs, temporary_allocator, &merged_copy_outs_count);
+
+            struct lifetime_event_trigger_list_node_t *event_node = kan_stack_group_allocator_allocate (
+                temporary_allocator, sizeof (struct lifetime_event_trigger_list_node_t),
+                _Alignof (struct lifetime_event_trigger_list_node_t));
+
+            kan_repository_event_insert_query_init (&event_node->event_insert_query,
+                                                    (kan_repository_event_storage_t) event_storage);
+            event_node->copy_outs_count = merged_copy_outs_count;
+            event_node->copy_outs = merged_copy_outs;
+
+            event_node->next = first_event_node;
+            first_event_node = event_node;
+
+            ++*count_output;
+            *array_size_output = kan_apply_alignment (*array_size_output + sizeof (struct lifetime_event_trigger_t) +
+                                                          merged_copy_outs_count * sizeof (struct copy_out_t),
+                                                      _Alignof (struct lifetime_event_trigger_t));
+        }
+
+        kan_reflection_struct_meta_iterator_next (&iterator);
+        event = (struct kan_repository_meta_automatic_on_insert_event_t *) kan_reflection_struct_meta_iterator_get (
+            &iterator);
+    }
+
+    return first_event_node;
+}
+
+static struct lifetime_event_trigger_list_node_t *lifetime_event_triggers_extract_on_delete (
+    struct repository_t *repository,
+    const struct kan_reflection_struct_t *observed_struct,
+    struct kan_stack_group_allocator_t *temporary_allocator,
+    uint64_t *count_output,
+    uint64_t *array_size_output)
+{
+    ensure_interned_strings_ready ();
+    struct kan_reflection_struct_meta_iterator_t iterator = kan_reflection_registry_query_struct_meta (
+        repository->registry, observed_struct->name, meta_automatic_on_delete_event_name);
+
+    struct kan_repository_meta_automatic_on_delete_event_t *event =
+        (struct kan_repository_meta_automatic_on_delete_event_t *) kan_reflection_struct_meta_iterator_get (&iterator);
+
+    struct lifetime_event_trigger_list_node_t *first_event_node = NULL;
+    *count_output = 0u;
+    *array_size_output = 0u;
+
+    while (event)
+    {
+        struct event_storage_node_t *event_storage =
+            query_event_storage_across_hierarchy (repository, event->event_type);
+
+        if (event_storage)
+        {
+            struct copy_out_list_node_t *raw_copy_outs = extract_raw_copy_outs (
+                event->event_type, event->copy_outs_count, event->copy_outs, repository->registry, temporary_allocator);
+
+            uint64_t merged_copy_outs_count;
+            struct copy_out_list_node_t *merged_copy_outs =
+                merge_copy_outs (raw_copy_outs, temporary_allocator, &merged_copy_outs_count);
+
+            struct lifetime_event_trigger_list_node_t *event_node = kan_stack_group_allocator_allocate (
+                temporary_allocator, sizeof (struct lifetime_event_trigger_list_node_t),
+                _Alignof (struct lifetime_event_trigger_list_node_t));
+
+            kan_repository_event_insert_query_init (&event_node->event_insert_query,
+                                                    (kan_repository_event_storage_t) event_storage);
+            event_node->copy_outs_count = merged_copy_outs_count;
+            event_node->copy_outs = merged_copy_outs;
+
+            event_node->next = first_event_node;
+            first_event_node = event_node;
+
+            ++*count_output;
+            *array_size_output = kan_apply_alignment (*array_size_output + sizeof (struct lifetime_event_trigger_t) +
+                                                          merged_copy_outs_count * sizeof (struct copy_out_t),
+                                                      _Alignof (struct lifetime_event_trigger_t));
+        }
+
+        kan_reflection_struct_meta_iterator_next (&iterator);
+        event = (struct kan_repository_meta_automatic_on_delete_event_t *) kan_reflection_struct_meta_iterator_get (
+            &iterator);
+    }
+
+    return first_event_node;
+}
+
+static void lifetime_event_triggers_definition_build (struct lifetime_event_triggers_definition_t *definition,
+                                                      struct repository_t *repository,
+                                                      const struct kan_reflection_struct_t *observed_struct,
+                                                      enum lifetime_event_trigger_type_t type,
+                                                      struct kan_stack_group_allocator_t *temporary_allocator,
+                                                      kan_allocation_group_t result_allocation_group)
+{
+    uint64_t triggers_count = 0u;
+    uint64_t triggers_array_size = 0u;
+    struct lifetime_event_trigger_list_node_t *first_event_node = NULL;
+
+    switch (type)
+    {
+    case LIFETIME_EVENT_TRIGGER_ON_INSERT:
+        first_event_node = lifetime_event_triggers_extract_on_insert (repository, observed_struct, temporary_allocator,
+                                                                      &triggers_count, &triggers_array_size);
+        break;
+
+    case LIFETIME_EVENT_TRIGGER_ON_DELETE:
+        first_event_node = lifetime_event_triggers_extract_on_delete (repository, observed_struct, temporary_allocator,
+                                                                      &triggers_count, &triggers_array_size);
+        break;
+    }
+
+    definition->event_triggers_count = triggers_count;
+    if (triggers_count > 0u)
+    {
+        definition->event_triggers = kan_allocate_general (result_allocation_group, triggers_array_size,
+                                                           _Alignof (struct lifetime_event_trigger_t));
+    }
+    else
+    {
+        definition->event_triggers = NULL;
+    }
+
+    struct lifetime_event_trigger_t *trigger = (struct lifetime_event_trigger_t *) definition->event_triggers;
+    while (first_event_node)
+    {
+        trigger->event_insert_query = first_event_node->event_insert_query;
+        trigger->copy_outs_count = first_event_node->copy_outs_count;
+
+        uint64_t copy_out_index = 0u;
+        struct copy_out_list_node_t *copy_out = first_event_node->copy_outs;
+
+        while (copy_out)
+        {
+            trigger->copy_outs[copy_out_index] = (struct copy_out_t) {
+                .source_offset = copy_out->source_offset,
+                .target_offset = copy_out->target_offset,
+                .size = copy_out->size,
+            };
+
+            ++copy_out_index;
+            copy_out = copy_out->next;
+        }
+
+        trigger = lifetime_event_trigger_next (trigger);
+        first_event_node = first_event_node->next;
+    }
+}
+
+static void lifetime_event_triggers_definition_fire (struct lifetime_event_triggers_definition_t *definition,
+                                                     void *record)
+{
+    if (!definition->event_triggers)
+    {
+        return;
+    }
+
+    KAN_ASSERT (definition->event_triggers_count > 0u)
+    KAN_ASSERT (record)
+
+    struct lifetime_event_trigger_t *current_trigger = definition->event_triggers;
+    for (uint64_t trigger_index = 0u; trigger_index < definition->event_triggers_count; ++trigger_index)
+    {
+        struct kan_repository_event_insertion_package_t package =
+            kan_repository_event_insert_query_execute (&current_trigger->event_insert_query);
+        void *event = kan_repository_event_insertion_package_get (&package);
+
+        if (event)
+        {
+            apply_copy_outs (current_trigger->copy_outs_count, current_trigger->copy_outs, record, event);
+            kan_repository_event_insertion_package_submit (&package);
+        }
+
+        if (trigger_index != definition->event_triggers_count - 1u)
+        {
+            current_trigger = lifetime_event_trigger_next (current_trigger);
+        }
+    }
+}
+
+static void lifetime_event_triggers_definition_shutdown (struct lifetime_event_triggers_definition_t *definition,
+                                                         kan_allocation_group_t allocation_group)
+{
+    if (definition->event_triggers)
+    {
+        struct lifetime_event_trigger_t *first_trigger = definition->event_triggers;
+        struct lifetime_event_trigger_t *current_trigger = first_trigger;
+
+        for (uint64_t trigger_index = 0u; trigger_index < definition->event_triggers_count; ++trigger_index)
+        {
+            kan_repository_event_insert_query_shutdown (&current_trigger->event_insert_query);
+            current_trigger = lifetime_event_trigger_next (current_trigger);
+        }
+
+        uint64_t triggers_size = (uint8_t *) current_trigger - (uint8_t *) first_trigger;
+        kan_free_general (allocation_group, definition->event_triggers, triggers_size);
+    }
+}
+
 static void singleton_storage_node_shutdown_and_free (struct singleton_storage_node_t *node,
                                                       struct repository_t *repository)
 {
@@ -1221,13 +1750,55 @@ static void singleton_storage_node_shutdown_and_free (struct singleton_storage_n
         node->observation_buffer_memory = NULL;
     }
 
-    observation_buffer_definition_shutdown (&node->observation_buffer, node->allocation_group);
-    observation_buffer_definition_init (&node->observation_buffer);
-
-    observation_event_triggers_definition_shutdown (&node->observation_events_triggers, node->allocation_group);
-    observation_event_triggers_definition_init (&node->observation_events_triggers);
+    observation_buffer_definition_shutdown (&node->observation_buffer, node->automation_allocation_group);
+    observation_event_triggers_definition_shutdown (&node->observation_events_triggers,
+                                                    node->automation_allocation_group);
 
     kan_hash_storage_remove (&repository->singleton_storages, &node->node);
+    kan_free_batched (node->allocation_group, node);
+}
+
+static void indexed_storage_shutdown_and_free_record_node (struct indexed_storage_node_t *storage,
+                                                           struct indexed_storage_record_node_t *record)
+{
+    if (storage->type->shutdown)
+    {
+        storage->type->shutdown (storage->type->functor_user_data, record->record);
+    }
+
+    kan_free_batched (storage->records_allocation_group, record->record);
+    kan_free_batched (storage->nodes_allocation_group, record);
+}
+
+static void indexed_storage_node_shutdown_and_free (struct indexed_storage_node_t *node,
+                                                    struct repository_t *repository)
+{
+    KAN_ASSERT (kan_atomic_int_get (&node->access_status) == 0)
+    KAN_ASSERT (!node->dirty_records)
+
+    // TODO: Do not forget about indices here.
+
+    struct indexed_storage_record_node_t *record = (struct indexed_storage_record_node_t *) node->records.first;
+    while (record)
+    {
+        struct indexed_storage_record_node_t *next = (struct indexed_storage_record_node_t *) record->list_node.next;
+#if defined(KAN_REPOSITORY_SAFEGUARDS_ENABLED)
+        KAN_ASSERT (kan_atomic_int_get (&record->safeguard_access_status) == 0)
+#endif
+
+        indexed_storage_shutdown_and_free_record_node (node, record);
+        record = next;
+    }
+
+    kan_stack_group_allocator_shutdown (&node->temporary_allocator);
+    observation_buffer_definition_shutdown (&node->observation_buffer, node->automation_allocation_group);
+    observation_event_triggers_definition_shutdown (&node->observation_events_triggers,
+                                                    node->automation_allocation_group);
+
+    lifetime_event_triggers_definition_shutdown (&node->on_insert_events_triggers, node->automation_allocation_group);
+    lifetime_event_triggers_definition_shutdown (&node->on_delete_events_triggers, node->automation_allocation_group);
+
+    kan_hash_storage_remove (&repository->indexed_storages, &node->node);
     kan_free_batched (node->allocation_group, node);
 }
 
@@ -1252,7 +1823,6 @@ static void event_storage_node_shutdown_and_free (struct event_storage_node_t *n
     KAN_ASSERT (kan_atomic_int_get (&node->queries_count) == 0)
     struct event_queue_node_t *queue_node = (struct event_queue_node_t *) node->event_queue.oldest;
 
-    // We can make event shutdown multithreaded if it proves to be too slow.
     while (queue_node)
     {
         event_queue_node_shutdown_and_free (queue_node, node);
@@ -1353,14 +1923,47 @@ static void repository_enter_planning_mode_internal (struct repository_t *reposi
         }
 #endif
 
-        const kan_allocation_group_t automatic_events_group =
-            storage_event_automation_allocation_group (singleton_storage_node->allocation_group);
+        if (singleton_storage_node->observation_buffer_memory)
+        {
+            kan_free_general (singleton_storage_node->automation_allocation_group,
+                              singleton_storage_node->observation_buffer_memory,
+                              singleton_storage_node->observation_buffer.buffer_size);
+            singleton_storage_node->observation_buffer_memory = NULL;
+        }
 
-        observation_buffer_definition_shutdown (&singleton_storage_node->observation_buffer, automatic_events_group);
+        observation_buffer_definition_shutdown (&singleton_storage_node->observation_buffer,
+                                                singleton_storage_node->automation_allocation_group);
+        observation_buffer_definition_init (&singleton_storage_node->observation_buffer);
+
         observation_event_triggers_definition_shutdown (&singleton_storage_node->observation_events_triggers,
-                                                        automatic_events_group);
+                                                        singleton_storage_node->automation_allocation_group);
+        observation_event_triggers_definition_init (&singleton_storage_node->observation_events_triggers);
 
         singleton_storage_node = (struct singleton_storage_node_t *) singleton_storage_node->node.list_node.next;
+    }
+
+    struct indexed_storage_node_t *indexed_storage_node =
+        (struct indexed_storage_node_t *) repository->indexed_storages.items.first;
+
+    while (indexed_storage_node)
+    {
+        observation_buffer_definition_shutdown (&indexed_storage_node->observation_buffer,
+                                                indexed_storage_node->automation_allocation_group);
+        observation_buffer_definition_init (&indexed_storage_node->observation_buffer);
+
+        observation_event_triggers_definition_shutdown (&indexed_storage_node->observation_events_triggers,
+                                                        indexed_storage_node->automation_allocation_group);
+        observation_event_triggers_definition_init (&indexed_storage_node->observation_events_triggers);
+
+        lifetime_event_triggers_definition_shutdown (&indexed_storage_node->on_insert_events_triggers,
+                                                     indexed_storage_node->automation_allocation_group);
+        lifetime_event_triggers_definition_init (&indexed_storage_node->on_insert_events_triggers);
+
+        lifetime_event_triggers_definition_shutdown (&indexed_storage_node->on_delete_events_triggers,
+                                                     indexed_storage_node->automation_allocation_group);
+        lifetime_event_triggers_definition_init (&indexed_storage_node->on_delete_events_triggers);
+
+        indexed_storage_node = (struct indexed_storage_node_t *) indexed_storage_node->node.list_node.next;
     }
 
 #if defined(KAN_REPOSITORY_SAFEGUARDS_ENABLED)
@@ -1506,6 +2109,63 @@ static void repository_migrate_internal (struct repository_t *repository,
         singleton_storage_node = next;
     }
 
+    struct indexed_storage_node_t *indexed_storage_node =
+        (struct indexed_storage_node_t *) repository->indexed_storages.items.first;
+
+    while (indexed_storage_node)
+    {
+        struct indexed_storage_node_t *next =
+            (struct indexed_storage_node_t *) indexed_storage_node->node.list_node.next;
+
+        const struct kan_reflection_struct_t *old_type = indexed_storage_node->type;
+        const struct kan_reflection_struct_t *new_type =
+            kan_reflection_registry_query_struct (new_registry, old_type->name);
+        indexed_storage_node->type = new_type;
+
+        const struct kan_reflection_struct_migration_seed_t *seed =
+            kan_reflection_migration_seed_get_for_struct (migration_seed, old_type->name);
+
+        switch (seed->status)
+        {
+        case KAN_REFLECTION_MIGRATION_NEEDED:
+        {
+            // TODO: Drop indices if their fields are deleted.
+            // TODO: Schedule index reflection data re-bake if their fields are affected.
+
+            struct indexed_storage_record_node_t *node =
+                (struct indexed_storage_record_node_t *) indexed_storage_node->records.first;
+
+            while (node)
+            {
+                struct record_migration_user_data_t *user_data = allocate_migration_user_data (context);
+                *user_data = (struct record_migration_user_data_t) {
+                    .record_pointer = &node->record,
+                    .allocation_group = indexed_storage_node->allocation_group,
+                    .batched_allocation = KAN_TRUE,
+                    .migrator = migrator,
+                    .old_type = old_type,
+                    .new_type = new_type,
+                };
+
+                spawn_migration_task (context, user_data);
+                node = (struct indexed_storage_record_node_t *) node->list_node.next;
+            }
+
+            break;
+        }
+
+        case KAN_REFLECTION_MIGRATION_NOT_NEEDED:
+            // No migration, therefore don't need to do anything.
+            break;
+
+        case KAN_REFLECTION_MIGRATION_REMOVED:
+            indexed_storage_node_shutdown_and_free (indexed_storage_node, repository);
+            break;
+        }
+
+        indexed_storage_node = next;
+    }
+
     struct event_storage_node_t *event_storage_node =
         (struct event_storage_node_t *) repository->event_storages.items.first;
 
@@ -1640,7 +2300,6 @@ kan_repository_singleton_storage_t kan_repository_singleton_storage_open (kan_re
                                                                             sizeof (struct singleton_storage_node_t));
 
         storage->node.hash = (uint64_t) type_name;
-        storage->allocation_group = storage_allocation_group;
         storage->type = singleton_type;
         storage->queries_count = kan_atomic_int_init (0);
 
@@ -1655,6 +2314,9 @@ kan_repository_singleton_storage_t kan_repository_singleton_storage_open (kan_re
         observation_buffer_definition_init (&storage->observation_buffer);
         storage->observation_buffer_memory = NULL;
         observation_event_triggers_definition_init (&storage->observation_events_triggers);
+
+        storage->allocation_group = storage_allocation_group;
+        storage->automation_allocation_group = kan_allocation_group_get_child (storage_allocation_group, "automation");
 
 #if defined(KAN_REPOSITORY_SAFEGUARDS_ENABLED)
         storage->safeguard_access_status = kan_atomic_int_init (0);
@@ -1679,13 +2341,13 @@ void kan_repository_singleton_read_query_init (struct kan_repository_singleton_r
 {
     struct singleton_storage_node_t *storage_data = (struct singleton_storage_node_t *) storage;
     kan_atomic_int_add (&storage_data->queries_count, 1);
-    *(struct singleton_read_query_t *) query = (struct singleton_read_query_t) {.storage = storage_data};
+    *(struct singleton_query_t *) query = (struct singleton_query_t) {.storage = storage_data};
 }
 
 kan_repository_singleton_read_access_t kan_repository_singleton_read_query_execute (
     struct kan_repository_singleton_read_query_t *query)
 {
-    struct singleton_read_query_t *query_data = (struct singleton_read_query_t *) query;
+    struct singleton_query_t *query_data = (struct singleton_query_t *) query;
     KAN_ASSERT (query_data->storage)
 
 #if defined(KAN_REPOSITORY_SAFEGUARDS_ENABLED)
@@ -1717,7 +2379,7 @@ void kan_repository_singleton_read_access_close (kan_repository_singleton_read_a
 
 void kan_repository_singleton_read_query_shutdown (struct kan_repository_singleton_read_query_t *query)
 {
-    struct singleton_read_query_t *query_data = (struct singleton_read_query_t *) query;
+    struct singleton_query_t *query_data = (struct singleton_query_t *) query;
     if (query_data->storage)
     {
         kan_atomic_int_add (&query_data->storage->queries_count, -1);
@@ -1730,13 +2392,13 @@ void kan_repository_singleton_write_query_init (struct kan_repository_singleton_
 {
     struct singleton_storage_node_t *storage_data = (struct singleton_storage_node_t *) storage;
     kan_atomic_int_add (&storage_data->queries_count, 1);
-    *(struct singleton_write_query_t *) query = (struct singleton_write_query_t) {.storage = storage_data};
+    *(struct singleton_query_t *) query = (struct singleton_query_t) {.storage = storage_data};
 }
 
 kan_repository_singleton_write_access_t kan_repository_singleton_write_query_execute (
     struct kan_repository_singleton_write_query_t *query)
 {
-    struct singleton_write_query_t *query_data = (struct singleton_write_query_t *) query;
+    struct singleton_query_t *query_data = (struct singleton_query_t *) query;
     KAN_ASSERT (query_data->storage)
 
 #if defined(KAN_REPOSITORY_SAFEGUARDS_ENABLED)
@@ -1781,12 +2443,726 @@ void kan_repository_singleton_write_access_close (kan_repository_singleton_write
 
 void kan_repository_singleton_write_query_shutdown (struct kan_repository_singleton_write_query_t *query)
 {
-    struct singleton_write_query_t *query_data = (struct singleton_write_query_t *) query;
+    struct singleton_query_t *query_data = (struct singleton_query_t *) query;
     if (query_data->storage)
     {
         kan_atomic_int_add (&query_data->storage->queries_count, -1);
         query_data->storage = NULL;
     }
+}
+
+static struct indexed_storage_node_t *query_indexed_storage_across_hierarchy (struct repository_t *repository,
+                                                                              kan_interned_string_t type_name)
+{
+    const struct kan_hash_storage_bucket_t *bucket =
+        kan_hash_storage_query (&repository->indexed_storages, (uint64_t) type_name);
+    struct indexed_storage_node_t *node = (struct indexed_storage_node_t *) bucket->first;
+    const struct indexed_storage_node_t *end =
+        (struct indexed_storage_node_t *) (bucket->last ? bucket->last->next : NULL);
+
+    while (node != end)
+    {
+        if (node->type->name == type_name)
+        {
+            return node;
+        }
+
+        node = (struct indexed_storage_node_t *) node->node.list_node.next;
+    }
+
+    return repository->parent ? query_indexed_storage_across_hierarchy (repository->parent, type_name) : NULL;
+}
+
+kan_repository_indexed_storage_t kan_repository_indexed_storage_open (kan_repository_t repository,
+                                                                      kan_interned_string_t type_name)
+{
+    struct repository_t *repository_data = (struct repository_t *) repository;
+    KAN_ASSERT (repository_data->mode == REPOSITORY_MODE_PLANNING)
+    repository_storage_map_access_lock (repository_data);
+    struct indexed_storage_node_t *storage = query_indexed_storage_across_hierarchy (repository_data, type_name);
+
+    if (!storage)
+    {
+        const struct kan_reflection_struct_t *indexed_type =
+            kan_reflection_registry_query_struct (repository_data->registry, type_name);
+
+        if (!indexed_type)
+        {
+            KAN_LOG (repository, KAN_LOG_ERROR, "Indexed record type \"%s\" not found.", type_name)
+            repository_storage_map_access_unlock (repository_data);
+            return KAN_INVALID_REPOSITORY_INDEXED_STORAGE;
+        }
+
+        const kan_allocation_group_t storage_allocation_group = kan_allocation_group_get_child (
+            kan_allocation_group_get_child (repository_data->allocation_group, "indexed"), type_name);
+
+        storage = (struct indexed_storage_node_t *) kan_allocate_batched (storage_allocation_group,
+                                                                          sizeof (struct indexed_storage_node_t));
+
+        storage->node.hash = (uint64_t) type_name;
+        storage->type = indexed_type;
+
+        kan_bd_list_init (&storage->records);
+        storage->access_status = kan_atomic_int_init (0);
+        storage->maintenance_lock = kan_atomic_int_init (0);
+        storage->dirty_records = NULL;
+        kan_stack_group_allocator_init (&storage->temporary_allocator,
+                                        kan_allocation_group_get_child (storage_allocation_group, "temporary"),
+                                        KAN_REPOSITORY_INDEX_STORAGE_STACK_INITIAL_SIZE);
+
+        observation_buffer_definition_init (&storage->observation_buffer);
+        observation_event_triggers_definition_init (&storage->observation_events_triggers);
+        lifetime_event_triggers_definition_init (&storage->on_insert_events_triggers);
+        lifetime_event_triggers_definition_init (&storage->on_delete_events_triggers);
+
+        storage->allocation_group = storage_allocation_group;
+        storage->records_allocation_group = kan_allocation_group_get_child (storage_allocation_group, "records");
+        storage->nodes_allocation_group = kan_allocation_group_get_child (storage_allocation_group, "nodes");
+        storage->automation_allocation_group = kan_allocation_group_get_child (storage_allocation_group, "automation");
+
+        if (repository_data->indexed_storages.bucket_count * KAN_REPOSITORY_EVENT_STORAGE_LOAD_FACTOR >=
+            repository_data->indexed_storages.items.size)
+        {
+            kan_hash_storage_set_bucket_count (&repository_data->indexed_storages,
+                                               repository_data->indexed_storages.bucket_count * 2u);
+        }
+
+        kan_hash_storage_add (&repository_data->indexed_storages, &storage->node);
+    }
+
+    repository_storage_map_access_unlock (repository_data);
+    return (kan_repository_indexed_storage_t) storage;
+}
+
+static void indexed_storage_acquire_access (struct indexed_storage_node_t *storage)
+{
+    while (KAN_TRUE)
+    {
+        int old_status = kan_atomic_int_get (&storage->access_status);
+        if (old_status < 0)
+        {
+            // We're on maintenance, wait until it ends.
+            kan_atomic_int_lock (&storage->maintenance_lock);
+            kan_atomic_int_unlock (&storage->maintenance_lock);
+            continue;
+        }
+
+        int new_status = old_status + 1;
+        if (kan_atomic_int_compare_and_set (&storage->access_status, old_status, new_status))
+        {
+            break;
+        }
+    }
+}
+
+static void indexed_storage_perform_maintenance (struct indexed_storage_node_t *storage)
+{
+    while (storage->dirty_records)
+    {
+        struct indexed_storage_record_node_t *node = storage->dirty_records->source_node;
+        switch (storage->dirty_records->type)
+        {
+        case INDEXED_STORAGE_DIRTY_RECORD_CHANGED:
+        {
+#if defined(KAN_REPOSITORY_SAFEGUARDS_ENABLED)
+            // Safeguards for write access are destroyed only after maintenance
+            // as technically access persists till maintenance is finished.
+            safeguard_indexed_write_access_destroyed (storage->dirty_records->source_node);
+#endif
+
+            if (storage->dirty_records->observation_comparison_flags)
+            {
+                // TODO: Update indices.
+
+                observation_event_triggers_definition_fire (
+                    &storage->observation_events_triggers, storage->dirty_records->observation_comparison_flags,
+                    &storage->observation_buffer, storage->dirty_records->observation_buffer_memory, node->record);
+            }
+
+            break;
+        }
+
+        case INDEXED_STORAGE_DIRTY_RECORD_INSERTED:
+        {
+            kan_bd_list_add (&storage->records, NULL, &node->list_node);
+
+            // TODO: Add to indices.
+
+            lifetime_event_triggers_definition_fire (&storage->on_insert_events_triggers, node->record);
+            break;
+        }
+
+        case INDEXED_STORAGE_DIRTY_RECORD_DELETED:
+        {
+#if defined(KAN_REPOSITORY_SAFEGUARDS_ENABLED)
+            // Safeguards for write access are destroyed only after maintenance
+            // as technically access persists till maintenance is finished.
+            safeguard_indexed_write_access_destroyed (storage->dirty_records->source_node);
+#endif
+
+            if (storage->dirty_records->observation_comparison_flags)
+            {
+                // If something was changed, we need to still fire events.
+                // Imagine situation: asset references were changed and then record was deleted. If we only report
+                // deletion, it would be reported with incorrect asset references (that were never added for this record
+                // previously). But if we send change event too, then asset manager would be able to properly process
+                // both asset references change and deletion.
+                observation_event_triggers_definition_fire (
+                    &storage->observation_events_triggers, storage->dirty_records->observation_comparison_flags,
+                    &storage->observation_buffer, storage->dirty_records->observation_buffer_memory, node->record);
+            }
+
+            lifetime_event_triggers_definition_fire (&storage->on_delete_events_triggers, node->record);
+
+            // TODO: Remove from indices.
+
+            kan_bd_list_remove (&storage->records, &node->list_node);
+            indexed_storage_shutdown_and_free_record_node (storage, node);
+            break;
+        }
+        }
+
+        storage->dirty_records = storage->dirty_records->next;
+    }
+
+    kan_stack_group_allocator_shrink (&storage->temporary_allocator);
+    kan_stack_group_allocator_reset (&storage->temporary_allocator);
+}
+
+static void indexed_storage_release_access (struct indexed_storage_node_t *storage)
+{
+    while (KAN_TRUE)
+    {
+        int old_status = kan_atomic_int_get (&storage->access_status);
+        kan_bool_t start_maintenance = KAN_FALSE;
+        int new_status;
+
+        if (old_status == 1)
+        {
+            new_status = -1;
+            start_maintenance = KAN_TRUE;
+            kan_atomic_int_lock (&storage->maintenance_lock);
+        }
+        else
+        {
+            new_status = old_status - 1;
+        }
+
+        if (kan_atomic_int_compare_and_set (&storage->access_status, old_status, new_status))
+        {
+            if (start_maintenance)
+            {
+                indexed_storage_perform_maintenance (storage);
+                kan_atomic_int_set (&storage->access_status, 0);
+                kan_atomic_int_unlock (&storage->maintenance_lock);
+            }
+
+            break;
+        }
+        else if (start_maintenance)
+        {
+            kan_atomic_int_unlock (&storage->maintenance_lock);
+        }
+    }
+}
+
+static struct indexed_storage_dirty_record_node_t *indexed_storage_allocate_dirty_record (
+    struct indexed_storage_node_t *storage, kan_bool_t with_observation_buffer_memory)
+{
+    KAN_ASSERT (kan_atomic_int_get (&storage->access_status) > 0)
+    // When maintenance is not possible, maintenance lock is used to restrict dirty record creation.
+    kan_atomic_int_lock (&storage->maintenance_lock);
+
+    struct indexed_storage_dirty_record_node_t *node = kan_stack_group_allocator_allocate (
+        &storage->temporary_allocator, sizeof (struct indexed_storage_dirty_record_node_t),
+        _Alignof (struct indexed_storage_dirty_record_node_t));
+
+    node->next = storage->dirty_records;
+    storage->dirty_records = node;
+
+    if (with_observation_buffer_memory && storage->observation_buffer.buffer_size > 0u)
+    {
+        node->observation_buffer_memory = kan_stack_group_allocator_allocate (
+            &storage->temporary_allocator, storage->observation_buffer.buffer_size, OBSERVATION_BUFFER_CHUNK_ALIGNMENT);
+    }
+
+    kan_atomic_int_unlock (&storage->maintenance_lock);
+    return node;
+}
+
+static void indexed_storage_report_insertion (struct indexed_storage_node_t *storage, void *inserted_record)
+{
+    struct indexed_storage_dirty_record_node_t *record = indexed_storage_allocate_dirty_record (storage, KAN_FALSE);
+    record->source_node =
+        kan_allocate_batched (storage->nodes_allocation_group, sizeof (struct indexed_storage_record_node_t));
+    record->source_node->record = inserted_record;
+
+#if defined(KAN_REPOSITORY_SAFEGUARDS_ENABLED)
+    record->source_node->safeguard_access_status = kan_atomic_int_init (0);
+#endif
+
+    record->type = INDEXED_STORAGE_DIRTY_RECORD_INSERTED;
+}
+
+static struct indexed_storage_dirty_record_node_t *indexed_storage_report_mutable_access_begin (
+    struct indexed_storage_node_t *storage,
+    struct indexed_storage_record_node_t *node,
+    void *from_index,
+    void *from_index_node,
+    void *from_index_sub_node)
+{
+    struct indexed_storage_dirty_record_node_t *record = indexed_storage_allocate_dirty_record (storage, KAN_TRUE);
+    record->source_node = node;
+
+    observation_buffer_definition_import (&storage->observation_buffer, record->observation_buffer_memory,
+                                          node->record);
+
+    record->dirt_source_index = from_index;
+    record->dirt_source_index_node = from_index_node;
+    record->dirt_source_index_sub_node = from_index_sub_node;
+    return record;
+}
+
+static void indexed_storage_report_mutable_access_end (struct indexed_storage_node_t *storage,
+                                                       struct indexed_storage_dirty_record_node_t *dirty_node)
+{
+    dirty_node->type = INDEXED_STORAGE_DIRTY_RECORD_CHANGED;
+    dirty_node->observation_comparison_flags = observation_buffer_definition_compare (
+        &storage->observation_buffer, dirty_node->observation_buffer_memory, dirty_node->source_node->record);
+}
+
+static void indexed_storage_report_delete_from_mutable_access (struct indexed_storage_node_t *storage,
+                                                               struct indexed_storage_dirty_record_node_t *dirty_node)
+{
+    dirty_node->type = INDEXED_STORAGE_DIRTY_RECORD_DELETED;
+    dirty_node->observation_comparison_flags = observation_buffer_definition_compare (
+        &storage->observation_buffer, dirty_node->observation_buffer_memory, dirty_node->source_node->record);
+}
+
+static void indexed_storage_report_delete_from_constant_access (struct indexed_storage_node_t *storage,
+                                                                struct indexed_storage_record_node_t *node,
+                                                                void *from_index,
+                                                                void *from_index_node,
+                                                                void *from_index_sub_node)
+{
+    struct indexed_storage_dirty_record_node_t *record = indexed_storage_allocate_dirty_record (storage, KAN_FALSE);
+    record->source_node = node;
+    record->type = INDEXED_STORAGE_DIRTY_RECORD_DELETED;
+    record->observation_buffer_memory = NULL;
+    record->observation_comparison_flags = 0u;
+    record->dirt_source_index = from_index;
+    record->dirt_source_index_node = from_index_node;
+    record->dirt_source_index_sub_node = from_index_sub_node;
+}
+
+void kan_repository_indexed_insert_query_init (struct kan_repository_indexed_insert_query_t *query,
+                                               kan_repository_indexed_storage_t storage)
+{
+    struct indexed_storage_node_t *storage_data = (struct indexed_storage_node_t *) storage;
+    *(struct indexed_insert_query_t *) query = (struct indexed_insert_query_t) {.storage = storage_data};
+    kan_atomic_int_add (&storage_data->queries_count, 1);
+}
+
+struct kan_repository_indexed_insertion_package_t kan_repository_indexed_insert_query_execute (
+    struct kan_repository_indexed_insert_query_t *query)
+{
+    struct indexed_insert_query_t *query_data = (struct indexed_insert_query_t *) query;
+    KAN_ASSERT (query_data->storage)
+    indexed_storage_acquire_access (query_data->storage);
+
+    struct indexed_insertion_package_t package;
+    package.storage = query_data->storage;
+    package.record =
+        kan_allocate_batched (query_data->storage->records_allocation_group, query_data->storage->type->size);
+
+    if (query_data->storage->type->init)
+    {
+        query_data->storage->type->init (query_data->storage->type->functor_user_data, package.record);
+    }
+
+    return *(struct kan_repository_indexed_insertion_package_t *) &package;
+}
+
+void *kan_repository_indexed_insertion_package_get (struct kan_repository_indexed_insertion_package_t *package)
+{
+    return ((struct indexed_insertion_package_t *) package)->record;
+}
+
+void kan_repository_indexed_insertion_package_undo (struct kan_repository_indexed_insertion_package_t *package)
+{
+    struct indexed_insertion_package_t *package_data = (struct indexed_insertion_package_t *) package;
+    if (package_data->record)
+    {
+        if (package_data->storage->type->shutdown)
+        {
+            package_data->storage->type->shutdown (package_data->storage->type->functor_user_data,
+                                                   package_data->record);
+        }
+
+        kan_free_batched (package_data->storage->records_allocation_group, package_data->record);
+    }
+
+    indexed_storage_release_access (package_data->storage);
+}
+
+void kan_repository_indexed_insertion_package_submit (struct kan_repository_indexed_insertion_package_t *package)
+{
+    struct indexed_insertion_package_t *package_data = (struct indexed_insertion_package_t *) package;
+    indexed_storage_report_insertion (package_data->storage, package_data->record);
+    indexed_storage_release_access (package_data->storage);
+}
+
+void kan_repository_indexed_insert_query_shutdown (struct kan_repository_indexed_insert_query_t *query)
+{
+    struct indexed_insert_query_t *query_data = (struct indexed_insert_query_t *) query;
+    if (query_data->storage)
+    {
+        kan_atomic_int_add (&query_data->storage->queries_count, -1);
+        query_data->storage = NULL;
+    }
+}
+
+static inline void indexed_storage_sequence_query_init (struct indexed_storage_node_t *storage,
+                                                        struct indexed_sequence_query_t *query)
+{
+    *query = (struct indexed_sequence_query_t) {.storage = storage};
+    kan_atomic_int_add (&storage->queries_count, 1);
+}
+
+static inline struct indexed_sequence_cursor_t indexed_storage_sequence_query_execute (
+    struct indexed_sequence_query_t *query)
+{
+    KAN_ASSERT (query->storage)
+    indexed_storage_acquire_access (query->storage);
+
+    return (struct indexed_sequence_cursor_t) {
+        .storage = query->storage,
+        .node = (struct indexed_storage_record_node_t *) query->storage->records.first,
+    };
+}
+
+static inline void indexed_storage_sequence_cursor_close (struct indexed_sequence_cursor_t *cursor)
+{
+    indexed_storage_release_access (cursor->storage);
+}
+
+static inline void indexed_storage_sequence_query_shutdown (struct indexed_sequence_query_t *query)
+{
+    if (query->storage)
+    {
+        kan_atomic_int_add (&query->storage->queries_count, -1);
+        query->storage = NULL;
+    }
+}
+
+void kan_repository_indexed_sequence_read_query_init (struct kan_repository_indexed_sequence_read_query_t *query,
+                                                      kan_repository_indexed_storage_t storage)
+{
+    indexed_storage_sequence_query_init ((struct indexed_storage_node_t *) storage,
+                                         (struct indexed_sequence_query_t *) query);
+}
+
+struct kan_repository_indexed_sequence_read_cursor_t kan_repository_indexed_sequence_read_query_execute (
+    struct kan_repository_indexed_sequence_read_query_t *query)
+{
+    struct indexed_sequence_cursor_t cursor =
+        indexed_storage_sequence_query_execute ((struct indexed_sequence_query_t *) query);
+    return *(struct kan_repository_indexed_sequence_read_cursor_t *) &cursor;
+}
+
+struct kan_repository_indexed_sequence_read_access_t kan_repository_indexed_sequence_read_cursor_next (
+    struct kan_repository_indexed_sequence_read_cursor_t *cursor)
+{
+    struct indexed_sequence_cursor_t *cursor_data = (struct indexed_sequence_cursor_t *) cursor;
+    struct indexed_sequence_constant_access_t access = {
+        .storage = cursor_data->storage,
+        .node = cursor_data->node,
+    };
+
+    if (cursor_data->node)
+    {
+        cursor_data->node = (struct indexed_storage_record_node_t *) cursor_data->node->list_node.next;
+
+#if defined(KAN_REPOSITORY_SAFEGUARDS_ENABLED)
+        if (!safeguard_indexed_read_access_try_create (access.storage, access.node))
+        {
+            access.node = NULL;
+        }
+        else
+#endif
+        {
+            indexed_storage_acquire_access (cursor_data->storage);
+        }
+    }
+
+    return *(struct kan_repository_indexed_sequence_read_access_t *) &access;
+}
+
+const void *kan_repository_indexed_sequence_read_access_resolve (
+    struct kan_repository_indexed_sequence_read_access_t *access)
+{
+    struct indexed_sequence_constant_access_t *access_data = (struct indexed_sequence_constant_access_t *) access;
+    return access_data->node ? access_data->node->record : NULL;
+}
+
+void kan_repository_indexed_sequence_read_access_close (struct kan_repository_indexed_sequence_read_access_t *access)
+{
+    struct indexed_sequence_constant_access_t *access_data = (struct indexed_sequence_constant_access_t *) access;
+    if (access_data->node)
+    {
+#if defined(KAN_REPOSITORY_SAFEGUARDS_ENABLED)
+        safeguard_indexed_read_access_destroyed (access_data->node);
+#endif
+        indexed_storage_release_access (access_data->storage);
+    }
+}
+
+void kan_repository_indexed_sequence_read_cursor_close (struct kan_repository_indexed_sequence_read_cursor_t *cursor)
+{
+    indexed_storage_sequence_cursor_close ((struct indexed_sequence_cursor_t *) cursor);
+}
+
+void kan_repository_indexed_sequence_read_query_shutdown (struct kan_repository_indexed_sequence_read_query_t *query)
+{
+    indexed_storage_sequence_query_shutdown ((struct indexed_sequence_query_t *) query);
+}
+
+void kan_repository_indexed_sequence_update_query_init (struct kan_repository_indexed_sequence_update_query_t *query,
+                                                        kan_repository_indexed_storage_t storage)
+{
+    indexed_storage_sequence_query_init ((struct indexed_storage_node_t *) storage,
+                                         (struct indexed_sequence_query_t *) query);
+}
+
+struct kan_repository_indexed_sequence_update_cursor_t kan_repository_indexed_sequence_update_query_execute (
+    struct kan_repository_indexed_sequence_update_query_t *query)
+{
+    struct indexed_sequence_cursor_t cursor =
+        indexed_storage_sequence_query_execute ((struct indexed_sequence_query_t *) query);
+    return *(struct kan_repository_indexed_sequence_update_cursor_t *) &cursor;
+}
+
+struct kan_repository_indexed_sequence_update_access_t kan_repository_indexed_sequence_update_cursor_next (
+    struct kan_repository_indexed_sequence_update_cursor_t *cursor)
+{
+    struct indexed_sequence_cursor_t *cursor_data = (struct indexed_sequence_cursor_t *) cursor;
+    struct indexed_sequence_mutable_access_t access = {
+        .storage = cursor_data->storage,
+        .dirty_node = NULL,
+    };
+
+    if (cursor_data->node)
+    {
+        cursor_data->node = (struct indexed_storage_record_node_t *) cursor_data->node->list_node.next;
+
+#if defined(KAN_REPOSITORY_SAFEGUARDS_ENABLED)
+        if (!safeguard_indexed_write_access_try_create (access.storage, cursor_data->node))
+        {
+            access.dirty_node = NULL;
+        }
+        else
+#endif
+        {
+            access.dirty_node =
+                indexed_storage_report_mutable_access_begin (cursor_data->storage, cursor_data->node, NULL, NULL, NULL);
+            indexed_storage_acquire_access (cursor_data->storage);
+        }
+    }
+
+    return *(struct kan_repository_indexed_sequence_update_access_t *) &access;
+}
+
+void *kan_repository_indexed_sequence_update_access_resolve (
+    struct kan_repository_indexed_sequence_update_access_t *access)
+{
+    struct indexed_sequence_mutable_access_t *access_data = (struct indexed_sequence_mutable_access_t *) access;
+    return access_data->dirty_node ? access_data->dirty_node->next : NULL;
+}
+
+void kan_repository_indexed_sequence_update_access_close (
+    struct kan_repository_indexed_sequence_update_access_t *access)
+{
+    struct indexed_sequence_mutable_access_t *access_data = (struct indexed_sequence_mutable_access_t *) access;
+    if (access_data->dirty_node)
+    {
+        indexed_storage_report_mutable_access_end (access_data->storage, access_data->dirty_node);
+        indexed_storage_release_access (access_data->storage);
+    }
+}
+
+void kan_repository_indexed_sequence_update_cursor_close (
+    struct kan_repository_indexed_sequence_update_cursor_t *cursor)
+{
+    indexed_storage_sequence_cursor_close ((struct indexed_sequence_cursor_t *) cursor);
+}
+
+void kan_repository_indexed_sequence_update_query_shutdown (
+    struct kan_repository_indexed_sequence_update_query_t *query)
+{
+    indexed_storage_sequence_query_shutdown ((struct indexed_sequence_query_t *) query);
+}
+
+void kan_repository_indexed_sequence_delete_query_init (struct kan_repository_indexed_sequence_delete_query_t *query,
+                                                        kan_repository_indexed_storage_t storage)
+{
+    indexed_storage_sequence_query_init ((struct indexed_storage_node_t *) storage,
+                                         (struct indexed_sequence_query_t *) query);
+}
+
+struct kan_repository_indexed_sequence_delete_cursor_t kan_repository_indexed_sequence_delete_query_execute (
+    struct kan_repository_indexed_sequence_delete_query_t *query)
+{
+    struct indexed_sequence_cursor_t cursor =
+        indexed_storage_sequence_query_execute ((struct indexed_sequence_query_t *) query);
+    return *(struct kan_repository_indexed_sequence_delete_cursor_t *) &cursor;
+}
+
+struct kan_repository_indexed_sequence_delete_access_t kan_repository_indexed_sequence_delete_cursor_next (
+    struct kan_repository_indexed_sequence_delete_cursor_t *cursor)
+{
+    struct indexed_sequence_cursor_t *cursor_data = (struct indexed_sequence_cursor_t *) cursor;
+    struct indexed_sequence_constant_access_t access = {
+        .storage = cursor_data->storage,
+        .node = cursor_data->node,
+    };
+
+    if (cursor_data->node)
+    {
+        cursor_data->node = (struct indexed_storage_record_node_t *) cursor_data->node->list_node.next;
+
+#if defined(KAN_REPOSITORY_SAFEGUARDS_ENABLED)
+        if (!safeguard_indexed_write_access_try_create (access.storage, access.node))
+        {
+            access.node = NULL;
+        }
+        else
+#endif
+        {
+            indexed_storage_acquire_access (cursor_data->storage);
+        }
+    }
+
+    return *(struct kan_repository_indexed_sequence_delete_access_t *) &access;
+}
+
+const void *kan_repository_indexed_sequence_delete_access_resolve (
+    struct kan_repository_indexed_sequence_delete_access_t *access)
+{
+    struct indexed_sequence_constant_access_t *access_data = (struct indexed_sequence_constant_access_t *) access;
+    return access_data->node ? access_data->node->record : NULL;
+}
+
+void kan_repository_indexed_sequence_delete_access_delete (
+    struct kan_repository_indexed_sequence_delete_access_t *access)
+{
+    struct indexed_sequence_constant_access_t *access_data = (struct indexed_sequence_constant_access_t *) access;
+    indexed_storage_report_delete_from_constant_access (access_data->storage, access_data->node, NULL, NULL, NULL);
+    indexed_storage_release_access (access_data->storage);
+}
+
+void kan_repository_indexed_sequence_delete_access_close (
+    struct kan_repository_indexed_sequence_delete_access_t *access)
+{
+    struct indexed_sequence_constant_access_t *access_data = (struct indexed_sequence_constant_access_t *) access;
+    if (access_data->node)
+    {
+#if defined(KAN_REPOSITORY_SAFEGUARDS_ENABLED)
+        safeguard_indexed_write_access_destroyed (access_data->node);
+#endif
+        indexed_storage_release_access (access_data->storage);
+    }
+}
+
+void kan_repository_indexed_sequence_delete_cursor_close (
+    struct kan_repository_indexed_sequence_delete_cursor_t *cursor)
+{
+    indexed_storage_sequence_cursor_close ((struct indexed_sequence_cursor_t *) cursor);
+}
+
+void kan_repository_indexed_sequence_delete_query_shutdown (
+    struct kan_repository_indexed_sequence_delete_query_t *query)
+{
+    indexed_storage_sequence_query_shutdown ((struct indexed_sequence_query_t *) query);
+}
+
+void kan_repository_indexed_sequence_write_query_init (struct kan_repository_indexed_sequence_write_query_t *query,
+                                                       kan_repository_indexed_storage_t storage)
+{
+    indexed_storage_sequence_query_init ((struct indexed_storage_node_t *) storage,
+                                         (struct indexed_sequence_query_t *) query);
+}
+
+struct kan_repository_indexed_sequence_write_cursor_t kan_repository_indexed_sequence_write_query_execute (
+    struct kan_repository_indexed_sequence_write_query_t *query)
+{
+    struct indexed_sequence_cursor_t cursor =
+        indexed_storage_sequence_query_execute ((struct indexed_sequence_query_t *) query);
+    return *(struct kan_repository_indexed_sequence_write_cursor_t *) &cursor;
+}
+
+struct kan_repository_indexed_sequence_write_access_t kan_repository_indexed_sequence_write_cursor_next (
+    struct kan_repository_indexed_sequence_write_cursor_t *cursor)
+{
+    struct indexed_sequence_cursor_t *cursor_data = (struct indexed_sequence_cursor_t *) cursor;
+    struct indexed_sequence_mutable_access_t access = {
+        .storage = cursor_data->storage,
+        .dirty_node = NULL,
+    };
+
+    if (cursor_data->node)
+    {
+        cursor_data->node = (struct indexed_storage_record_node_t *) cursor_data->node->list_node.next;
+
+#if defined(KAN_REPOSITORY_SAFEGUARDS_ENABLED)
+        if (!safeguard_indexed_write_access_try_create (access.storage, cursor_data->node))
+        {
+            access.dirty_node = NULL;
+        }
+        else
+#endif
+        {
+            access.dirty_node =
+                indexed_storage_report_mutable_access_begin (cursor_data->storage, cursor_data->node, NULL, NULL, NULL);
+            indexed_storage_acquire_access (cursor_data->storage);
+        }
+    }
+
+    return *(struct kan_repository_indexed_sequence_write_access_t *) &access;
+}
+
+void *kan_repository_indexed_sequence_write_access_resolve (
+    struct kan_repository_indexed_sequence_write_access_t *access)
+{
+    struct indexed_sequence_mutable_access_t *access_data = (struct indexed_sequence_mutable_access_t *) access;
+    return access_data->dirty_node ? access_data->dirty_node->next : NULL;
+}
+
+void kan_repository_indexed_sequence_write_access_delete (struct kan_repository_indexed_sequence_write_access_t *access)
+{
+    struct indexed_sequence_mutable_access_t *access_data = (struct indexed_sequence_mutable_access_t *) access;
+    KAN_ASSERT (access_data->dirty_node)
+    indexed_storage_report_delete_from_mutable_access (access_data->storage, access_data->dirty_node);
+    indexed_storage_release_access (access_data->storage);
+}
+
+void kan_repository_indexed_sequence_write_access_close (struct kan_repository_indexed_sequence_write_access_t *access)
+{
+    struct indexed_sequence_mutable_access_t *access_data = (struct indexed_sequence_mutable_access_t *) access;
+    if (access_data->dirty_node)
+    {
+        indexed_storage_report_mutable_access_end (access_data->storage, access_data->dirty_node);
+        indexed_storage_release_access (access_data->storage);
+    }
+}
+
+void kan_repository_indexed_sequence_write_cursor_close (struct kan_repository_indexed_sequence_write_cursor_t *cursor)
+{
+    indexed_storage_sequence_cursor_close ((struct indexed_sequence_cursor_t *) cursor);
+}
+
+void kan_repository_indexed_sequence_write_query_shutdown (struct kan_repository_indexed_sequence_write_query_t *query)
+{
+    indexed_storage_sequence_query_shutdown ((struct indexed_sequence_query_t *) query);
 }
 
 static struct event_storage_node_t *query_event_storage_across_hierarchy (struct repository_t *repository,
@@ -2086,6 +3462,24 @@ static void repository_clean_storages (struct repository_t *repository)
         singleton_storage_node = next;
     }
 
+    struct indexed_storage_node_t *indexed_storage_node =
+        (struct indexed_storage_node_t *) repository->indexed_storages.items.first;
+
+    while (indexed_storage_node)
+    {
+        struct indexed_storage_node_t *next =
+            (struct indexed_storage_node_t *) indexed_storage_node->node.list_node.next;
+
+        // TODO: Clean up unused indices.
+
+        if (kan_atomic_int_get (&indexed_storage_node->queries_count) == 0)
+        {
+            indexed_storage_node_shutdown_and_free (indexed_storage_node, repository);
+        }
+
+        indexed_storage_node = next;
+    }
+
     struct event_storage_node_t *event_storage_node =
         (struct event_storage_node_t *) repository->event_storages.items.first;
 
@@ -2111,7 +3505,7 @@ static void repository_clean_storages (struct repository_t *repository)
 static void extract_observation_chunks_from_on_change_events (
     struct repository_t *repository,
     const struct kan_reflection_struct_t *observed_struct,
-    uint64_t first_event_flag,
+    uint64_t *event_flag,
     struct kan_stack_group_allocator_t *temporary_allocator,
     struct observation_buffer_scenario_chunk_list_node_t **first,
     struct observation_buffer_scenario_chunk_list_node_t **last)
@@ -2122,7 +3516,6 @@ static void extract_observation_chunks_from_on_change_events (
 
     struct kan_repository_meta_automatic_on_change_event_t *event =
         (struct kan_repository_meta_automatic_on_change_event_t *) kan_reflection_struct_meta_iterator_get (&iterator);
-    uint64_t event_flag = first_event_flag;
 
     while (event)
     {
@@ -2159,7 +3552,7 @@ static void extract_observation_chunks_from_on_change_events (
                 node->next = 0u;
                 node->source_offset = absolute_offset;
                 node->size = size_with_padding;
-                node->flags = event_flag;
+                node->flags = *event_flag;
 
                 if (*last)
                 {
@@ -2173,7 +3566,7 @@ static void extract_observation_chunks_from_on_change_events (
                 }
             }
 
-            event_flag <<= 1u;
+            *event_flag <<= 1u;
         }
 
         kan_reflection_struct_meta_iterator_next (&iterator);
@@ -2186,8 +3579,6 @@ static void prepare_singleton_storage (uint64_t user_data)
 {
     struct singleton_switch_to_serving_user_data_t *data = (struct singleton_switch_to_serving_user_data_t *) user_data;
     struct kan_stack_group_allocator_t temporary_allocator;
-    const kan_allocation_group_t result_allocation_group =
-        kan_allocation_group_get_child (data->storage->allocation_group, "observation");
 
     kan_stack_group_allocator_init (
         &temporary_allocator, kan_allocation_group_get_child (data->storage->allocation_group, "switch_to_serving"),
@@ -2195,24 +3586,69 @@ static void prepare_singleton_storage (uint64_t user_data)
 
     struct observation_buffer_scenario_chunk_list_node_t *first_chunk = NULL;
     struct observation_buffer_scenario_chunk_list_node_t *last_chunk = NULL;
-    extract_observation_chunks_from_on_change_events (data->repository, data->storage->type, 1u, &temporary_allocator,
-                                                      &first_chunk, &last_chunk);
+
+    uint64_t extraction_event_flag = 1u;
+    extract_observation_chunks_from_on_change_events (data->repository, data->storage->type, &extraction_event_flag,
+                                                      &temporary_allocator, &first_chunk, &last_chunk);
 
     if (first_chunk)
     {
         observation_buffer_definition_build (&data->storage->observation_buffer, first_chunk, &temporary_allocator,
-                                             result_allocation_group);
+                                             data->storage->automation_allocation_group);
 
         if (data->storage->observation_buffer.buffer_size > 0u)
         {
-            data->storage->observation_buffer_memory = kan_allocate_general (
-                result_allocation_group, data->storage->observation_buffer.buffer_size, OBSERVATION_BUFFER_ALIGNMENT);
+            data->storage->observation_buffer_memory =
+                kan_allocate_general (data->storage->automation_allocation_group,
+                                      data->storage->observation_buffer.buffer_size, OBSERVATION_BUFFER_ALIGNMENT);
         }
     }
 
-    observation_event_triggers_definition_build (&data->storage->observation_events_triggers, 1u, data->repository,
-                                                 data->storage->type, &data->storage->observation_buffer,
-                                                 &temporary_allocator, result_allocation_group);
+    uint64_t building_event_flag = 1u;
+    observation_event_triggers_definition_build (
+        &data->storage->observation_events_triggers, &building_event_flag, data->repository, data->storage->type,
+        &data->storage->observation_buffer, &temporary_allocator, data->storage->automation_allocation_group);
+    kan_stack_group_allocator_shutdown (&temporary_allocator);
+}
+
+static void prepare_indexed_storage (uint64_t user_data)
+{
+    struct indexed_switch_to_serving_user_data_t *data = (struct indexed_switch_to_serving_user_data_t *) user_data;
+    struct kan_stack_group_allocator_t temporary_allocator;
+
+    kan_stack_group_allocator_init (
+        &temporary_allocator, kan_allocation_group_get_child (data->storage->allocation_group, "switch_to_serving"),
+        KAN_REPOSITORY_SWITCH_TO_SERVING_STACK_INITIAL_SIZE);
+
+    struct observation_buffer_scenario_chunk_list_node_t *first_chunk = NULL;
+    struct observation_buffer_scenario_chunk_list_node_t *last_chunk = NULL;
+
+    uint64_t extraction_event_flag = 1u;
+    extract_observation_chunks_from_on_change_events (data->repository, data->storage->type, &extraction_event_flag,
+                                                      &temporary_allocator, &first_chunk, &last_chunk);
+    // TODO: Extract observation chunks from indices.
+
+    if (first_chunk)
+    {
+        observation_buffer_definition_build (&data->storage->observation_buffer, first_chunk, &temporary_allocator,
+                                             data->storage->automation_allocation_group);
+    }
+
+    uint64_t building_event_flag = 1u;
+    observation_event_triggers_definition_build (
+        &data->storage->observation_events_triggers, &building_event_flag, data->repository, data->storage->type,
+        &data->storage->observation_buffer, &temporary_allocator, data->storage->automation_allocation_group);
+
+    lifetime_event_triggers_definition_build (&data->storage->on_insert_events_triggers, data->repository,
+                                              data->storage->type, LIFETIME_EVENT_TRIGGER_ON_INSERT,
+                                              &temporary_allocator, data->storage->automation_allocation_group);
+
+    lifetime_event_triggers_definition_build (&data->storage->on_delete_events_triggers, data->repository,
+                                              data->storage->type, LIFETIME_EVENT_TRIGGER_ON_DELETE,
+                                              &temporary_allocator, data->storage->automation_allocation_group);
+
+    // TODO: Fill or update indices if needed.
+
     kan_stack_group_allocator_shutdown (&temporary_allocator);
 }
 
@@ -2248,6 +3684,38 @@ static void repository_prepare_storages (struct repository_t *repository, struct
         node->next = context->task_list;
         context->task_list = node;
         singleton_storage_node = (struct singleton_storage_node_t *) singleton_storage_node->node.list_node.next;
+    }
+
+    struct indexed_storage_node_t *indexed_storage_node =
+        (struct indexed_storage_node_t *) repository->indexed_storages.items.first;
+
+    while (indexed_storage_node)
+    {
+        struct indexed_switch_to_serving_user_data_t *user_data =
+            (struct indexed_switch_to_serving_user_data_t *) kan_stack_group_allocator_allocate (
+                &context->allocator, sizeof (struct indexed_switch_to_serving_user_data_t),
+                _Alignof (struct indexed_switch_to_serving_user_data_t));
+
+        *user_data = (struct indexed_switch_to_serving_user_data_t) {
+            .storage = indexed_storage_node,
+            .repository = repository,
+        };
+
+        struct kan_cpu_task_list_node_t *node = (struct kan_cpu_task_list_node_t *) kan_stack_group_allocator_allocate (
+            &context->allocator, sizeof (struct kan_cpu_task_list_node_t), _Alignof (struct kan_cpu_task_list_node_t));
+
+        node->queue = KAN_CPU_DISPATCH_QUEUE_FOREGROUND;
+        ensure_interned_strings_ready ();
+
+        node->task = (struct kan_cpu_task_t) {
+            .name = switch_to_serving_task_name,
+            .function = prepare_indexed_storage,
+            .user_data = (uint64_t) user_data,
+        };
+
+        node->next = context->task_list;
+        context->task_list = node;
+        indexed_storage_node = (struct indexed_storage_node_t *) indexed_storage_node->node.list_node.next;
     }
 
     repository = repository->first;
