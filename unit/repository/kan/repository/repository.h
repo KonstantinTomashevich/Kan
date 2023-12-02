@@ -120,6 +120,82 @@ struct kan_repository_indexed_sequence_write_access_t
     void *implementation_data[2u];
 };
 
+/// \meta reflection_ignore_init_shutdown
+struct kan_repository_indexed_value_read_query_t
+{
+    void *implementation_data;
+};
+
+/// \meta reflection_ignore_init_shutdown
+struct kan_repository_indexed_value_read_cursor_t
+{
+    void *implementation_data[3u];
+};
+
+/// \meta reflection_ignore_init_shutdown
+struct kan_repository_indexed_value_read_access_t
+{
+    void *implementation_data[3u];
+};
+
+/// \meta reflection_ignore_init_shutdown
+struct kan_repository_indexed_value_update_query_t
+{
+    void *implementation_data;
+};
+
+/// \meta reflection_ignore_init_shutdown
+struct kan_repository_indexed_value_update_cursor_t
+{
+    void *implementation_data[3u];
+};
+
+/// \meta reflection_ignore_init_shutdown
+struct kan_repository_indexed_value_update_access_t
+{
+    void *implementation_data[4u];
+};
+
+/// \meta reflection_ignore_init_shutdown
+struct kan_repository_indexed_value_delete_query_t
+{
+    void *implementation_data;
+};
+
+/// \meta reflection_ignore_init_shutdown
+struct kan_repository_indexed_value_delete_cursor_t
+{
+    void *implementation_data[3u];
+};
+
+/// \meta reflection_ignore_init_shutdown
+struct kan_repository_indexed_value_delete_access_t
+{
+    void *implementation_data[3u];
+};
+
+/// \meta reflection_ignore_init_shutdown
+struct kan_repository_indexed_value_write_query_t
+{
+    void *implementation_data;
+};
+
+/// \meta reflection_ignore_init_shutdown
+struct kan_repository_indexed_value_write_cursor_t
+{
+    void *implementation_data[3u];
+};
+
+/// \meta reflection_ignore_init_shutdown
+struct kan_repository_indexed_value_write_access_t
+{
+    void *implementation_data[4u];
+};
+
+// TODO: Signal index.
+// TODO: Interval index.
+// TODO: Space index.
+
 #define KAN_INVALID_REPOSITORY_EVENT_STORAGE 0u
 
 typedef uint64_t kan_repository_event_storage_t;
@@ -127,7 +203,6 @@ typedef uint64_t kan_repository_event_storage_t;
 /// \meta reflection_ignore_init_shutdown
 struct kan_repository_event_insert_query_t
 {
-    // TODO: Why void*? Because it will make migrators auto-zero queries and it'll be easy to migrate systems.
     void *implementation_data;
 };
 
@@ -298,6 +373,104 @@ REPOSITORY_API void kan_repository_indexed_sequence_write_cursor_close (
 
 REPOSITORY_API void kan_repository_indexed_sequence_write_query_shutdown (
     struct kan_repository_indexed_sequence_write_query_t *query);
+
+REPOSITORY_API void kan_repository_indexed_value_read_query_init (
+    struct kan_repository_indexed_value_read_query_t *query,
+    kan_repository_indexed_storage_t storage,
+    struct kan_repository_field_path_t path);
+
+REPOSITORY_API struct kan_repository_indexed_value_read_cursor_t kan_repository_indexed_value_read_query_execute (
+    struct kan_repository_indexed_value_read_query_t *query, const void *value);
+
+REPOSITORY_API struct kan_repository_indexed_value_read_access_t kan_repository_indexed_value_read_cursor_next (
+    struct kan_repository_indexed_value_read_cursor_t *cursor);
+
+REPOSITORY_API const void *kan_repository_indexed_value_read_access_resolve (
+    struct kan_repository_indexed_value_read_access_t *access);
+
+REPOSITORY_API void kan_repository_indexed_value_read_access_close (
+    struct kan_repository_indexed_value_read_access_t *access);
+
+REPOSITORY_API void kan_repository_indexed_value_read_cursor_close (
+    struct kan_repository_indexed_value_read_cursor_t *cursor);
+
+REPOSITORY_API void kan_repository_indexed_value_read_query_shutdown (
+    struct kan_repository_indexed_value_read_query_t *query);
+
+REPOSITORY_API void kan_repository_indexed_value_update_query_init (
+    struct kan_repository_indexed_value_update_query_t *query,
+    kan_repository_indexed_storage_t storage,
+    struct kan_repository_field_path_t path);
+
+REPOSITORY_API struct kan_repository_indexed_value_update_cursor_t kan_repository_indexed_value_update_query_execute (
+    struct kan_repository_indexed_value_update_query_t *query, const void *value);
+
+REPOSITORY_API struct kan_repository_indexed_value_update_access_t kan_repository_indexed_value_update_cursor_next (
+    struct kan_repository_indexed_value_update_cursor_t *cursor);
+
+REPOSITORY_API void *kan_repository_indexed_value_update_access_resolve (
+    struct kan_repository_indexed_value_update_access_t *access);
+
+REPOSITORY_API void kan_repository_indexed_value_update_access_close (
+    struct kan_repository_indexed_value_update_access_t *access);
+
+REPOSITORY_API void kan_repository_indexed_value_update_cursor_close (
+    struct kan_repository_indexed_value_update_cursor_t *cursor);
+
+REPOSITORY_API void kan_repository_indexed_value_update_query_shutdown (
+    struct kan_repository_indexed_value_update_query_t *query);
+
+REPOSITORY_API void kan_repository_indexed_value_delete_query_init (
+    struct kan_repository_indexed_value_delete_query_t *query,
+    kan_repository_indexed_storage_t storage,
+    struct kan_repository_field_path_t path);
+
+REPOSITORY_API struct kan_repository_indexed_value_delete_cursor_t kan_repository_indexed_value_delete_query_execute (
+    struct kan_repository_indexed_value_delete_query_t *query, const void *value);
+
+REPOSITORY_API struct kan_repository_indexed_value_delete_access_t kan_repository_indexed_value_delete_cursor_next (
+    struct kan_repository_indexed_value_delete_cursor_t *cursor);
+
+REPOSITORY_API const void *kan_repository_indexed_value_delete_access_resolve (
+    struct kan_repository_indexed_value_delete_access_t *access);
+
+REPOSITORY_API void kan_repository_indexed_value_delete_access_delete (
+    struct kan_repository_indexed_value_delete_access_t *access);
+
+REPOSITORY_API void kan_repository_indexed_value_delete_access_close (
+    struct kan_repository_indexed_value_delete_access_t *access);
+
+REPOSITORY_API void kan_repository_indexed_value_delete_cursor_close (
+    struct kan_repository_indexed_value_delete_cursor_t *cursor);
+
+REPOSITORY_API void kan_repository_indexed_value_delete_query_shutdown (
+    struct kan_repository_indexed_value_delete_query_t *query);
+
+REPOSITORY_API void kan_repository_indexed_value_write_query_init (
+    struct kan_repository_indexed_value_write_query_t *query,
+    kan_repository_indexed_storage_t storage,
+    struct kan_repository_field_path_t path);
+
+REPOSITORY_API struct kan_repository_indexed_value_write_cursor_t kan_repository_indexed_value_write_query_execute (
+    struct kan_repository_indexed_value_write_query_t *query, const void *value);
+
+REPOSITORY_API struct kan_repository_indexed_value_write_access_t kan_repository_indexed_value_write_cursor_next (
+    struct kan_repository_indexed_value_write_cursor_t *cursor);
+
+REPOSITORY_API void *kan_repository_indexed_value_write_access_resolve (
+    struct kan_repository_indexed_value_write_access_t *access);
+
+REPOSITORY_API void kan_repository_indexed_value_write_access_delete (
+    struct kan_repository_indexed_value_write_access_t *access);
+
+REPOSITORY_API void kan_repository_indexed_value_write_access_close (
+    struct kan_repository_indexed_value_write_access_t *access);
+
+REPOSITORY_API void kan_repository_indexed_value_write_cursor_close (
+    struct kan_repository_indexed_value_write_cursor_t *cursor);
+
+REPOSITORY_API void kan_repository_indexed_value_write_query_shutdown (
+    struct kan_repository_indexed_value_write_query_t *query);
 
 REPOSITORY_API kan_repository_event_storage_t kan_repository_event_storage_open (kan_repository_t repository,
                                                                                  kan_interned_string_t type_name);
