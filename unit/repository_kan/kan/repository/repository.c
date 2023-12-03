@@ -675,7 +675,7 @@ static kan_bool_t safeguard_singleton_write_access_try_create (struct singleton_
         {
             KAN_LOG (repository_safeguards, KAN_LOG_ERROR,
                      "Singleton type \"%s\". Unable to create write access because read accesses detected.",
-                     singleton_storage->type->name);
+                     singleton_storage->type->name)
             return KAN_FALSE;
         }
 
@@ -683,7 +683,7 @@ static kan_bool_t safeguard_singleton_write_access_try_create (struct singleton_
         {
             KAN_LOG (repository_safeguards, KAN_LOG_ERROR,
                      "Singleton type \"%s\". Unable to create write access because other write access detected.",
-                     singleton_storage->type->name);
+                     singleton_storage->type->name)
             return KAN_FALSE;
         }
 
@@ -709,7 +709,7 @@ static kan_bool_t safeguard_singleton_read_access_try_create (struct singleton_s
         {
             KAN_LOG (repository_safeguards, KAN_LOG_ERROR,
                      "Singleton type \"%s\". Unable to create read access because write detected.",
-                     singleton_storage->type->name);
+                     singleton_storage->type->name)
             return KAN_FALSE;
         }
 
@@ -737,7 +737,7 @@ static kan_bool_t safeguard_indexed_write_access_try_create (struct indexed_stor
             KAN_LOG (repository_safeguards, KAN_LOG_ERROR,
                      "Indexed type \"%s\". Unable to create update/delete/write access because read accesses to the "
                      "same record detected.",
-                     storage->type->name);
+                     storage->type->name)
             return KAN_FALSE;
         }
 
@@ -746,7 +746,7 @@ static kan_bool_t safeguard_indexed_write_access_try_create (struct indexed_stor
             KAN_LOG (repository_safeguards, KAN_LOG_ERROR,
                      "Indexed type \"%s\". Unable to create update/delete/write access because update/delete/write "
                      "access to the same record detected.",
-                     storage->type->name);
+                     storage->type->name)
             return KAN_FALSE;
         }
 
@@ -774,7 +774,7 @@ static kan_bool_t safeguard_indexed_read_access_try_create (struct indexed_stora
             KAN_LOG (repository_safeguards, KAN_LOG_ERROR,
                      "Indexed type \"%s\". Unable to create read access because update/delete/write access to the same "
                      "record detected.",
-                     storage->type->name);
+                     storage->type->name)
             return KAN_FALSE;
         }
 
@@ -801,7 +801,7 @@ static kan_bool_t safeguard_event_insertion_package_try_create (struct event_sto
             KAN_LOG (repository_safeguards, KAN_LOG_ERROR,
                      "Event type \"%s\". Unable to create event insertion package because existing event read accesses "
                      "detected.",
-                     event_storage->type->name);
+                     event_storage->type->name)
             return KAN_FALSE;
         }
 
@@ -828,7 +828,7 @@ static kan_bool_t safeguard_event_read_access_try_create (struct event_storage_n
             KAN_LOG (repository_safeguards, KAN_LOG_ERROR,
                      "Event type \"%s\". Unable to create event read access because existing event insertion packages "
                      "detected.",
-                     event_storage->type->name);
+                     event_storage->type->name)
             return KAN_FALSE;
         }
 
@@ -2276,7 +2276,7 @@ static uint64_t value_index_extract_hash_from_record (struct value_index_t *inde
         return *(const uint64_t *) with_offset;
     }
 
-    KAN_ASSERT (KAN_FALSE);
+    KAN_ASSERT (KAN_FALSE)
     return 0u;
 }
 
@@ -2295,7 +2295,7 @@ static uint64_t value_index_extract_hash_from_buffer (struct value_index_t *inde
         return *(const uint64_t *) with_offset;
     }
 
-    KAN_ASSERT (KAN_FALSE);
+    KAN_ASSERT (KAN_FALSE)
     return 0u;
 }
 
@@ -2537,7 +2537,7 @@ static void repository_enter_planning_mode_internal (struct repository_t *reposi
         {
             KAN_LOG (repository_safeguards, KAN_LOG_ERROR,
                      "Unsafe switch to planning mode. Singleton \"%s\" is still accessed.",
-                     singleton_storage_node->type->name);
+                     singleton_storage_node->type->name)
         }
 #endif
 
@@ -2598,7 +2598,7 @@ static void repository_enter_planning_mode_internal (struct repository_t *reposi
         {
             KAN_LOG (repository_safeguards, KAN_LOG_ERROR,
                      "Unsafe switch to planning mode. Events \"%s\" are still accessed.",
-                     singleton_storage_node->type->name);
+                     singleton_storage_node->type->name)
         }
 
         event_storage_node = (struct event_storage_node_t *) event_storage_node->node.list_node.next;
@@ -3926,11 +3926,11 @@ static struct value_index_t *indexed_storage_find_or_create_value_index (struct 
                                           &backed_absolute_offset, &backed_size, &backed_size_with_padding))
     {
         KAN_LOG (repository, KAN_LOG_ERROR,
-                 "Unable to create value index for path (inside struct \"%s\":", storage->type->name);
+                 "Unable to create value index for path (inside struct \"%s\":", storage->type->name)
 
         for (uint32_t path_index = 0; path_index < path.reflection_path_length; ++path_index)
         {
-            KAN_LOG (repository, KAN_LOG_ERROR, "    - %s", path.reflection_path[path_index]);
+            KAN_LOG (repository, KAN_LOG_ERROR, "    - %s", path.reflection_path[path_index])
         }
 
         shutdown_field_path (interned_path, storage->value_index_allocation_group);
@@ -4497,7 +4497,7 @@ void kan_repository_event_insertion_package_submit (struct kan_repository_event_
     struct event_queue_node_t *node =
         (struct event_queue_node_t *) kan_event_queue_submit_begin (&package_data->storage->event_queue);
 
-    KAN_ASSERT (node);
+    KAN_ASSERT (node)
     node->event = package_data->event;
 
     kan_event_queue_submit_end (&package_data->storage->event_queue,
@@ -4571,7 +4571,7 @@ const void *kan_repository_event_read_access_resolve (struct kan_repository_even
 
         if (node)
         {
-            KAN_ASSERT (node->event);
+            KAN_ASSERT (node->event)
             return node->event;
         }
     }
