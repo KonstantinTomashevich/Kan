@@ -1,7 +1,7 @@
 register_abstract (repository)
 abstract_include ("${CMAKE_CURRENT_SOURCE_DIR}")
 abstract_require (CONCRETE_INTERFACE container INTERFACE api_common reflection threading)
-abstract_register_implementation (NAME kan PARTS reflection_kan)
+abstract_register_implementation (NAME kan PARTS repository_kan)
 
 c_interface_scanner_setup (GLOB "*.h")
 reflection_generator_setup (GLOB "*.h")

@@ -2279,11 +2279,12 @@ static void event_storage_node_shutdown_and_free (struct event_storage_node_t *n
 
     while (queue_node)
     {
+        struct event_queue_node_t *next = (struct event_queue_node_t *) queue_node->node.next;
         event_queue_node_shutdown_and_free (queue_node, node);
-        queue_node = (struct event_queue_node_t *) queue_node->node.next;
+        queue_node = next;
     }
 
-    kan_hash_storage_remove (&repository->singleton_storages, &node->node);
+    kan_hash_storage_remove (&repository->event_storages, &node->node);
     kan_free_batched (node->allocation_group, node);
 }
 
@@ -2371,7 +2372,7 @@ static void repository_enter_planning_mode_internal (struct repository_t *reposi
 #if defined(KAN_REPOSITORY_SAFEGUARDS_ENABLED)
         if (kan_atomic_int_get (&singleton_storage_node->safeguard_access_status) != 0)
         {
-            KAN_LOG (repository_safeguard, KAN_LOG_ERROR,
+            KAN_LOG (repository_safeguards, KAN_LOG_ERROR,
                      "Unsafe switch to planning mode. Singleton \"%s\" is still accessed.",
                      singleton_storage_node->type->name);
         }
@@ -2428,7 +2429,7 @@ static void repository_enter_planning_mode_internal (struct repository_t *reposi
     {
         if (kan_atomic_int_get (&event_storage_node->safeguard_access_status) != 0)
         {
-            KAN_LOG (repository_safeguard, KAN_LOG_ERROR,
+            KAN_LOG (repository_safeguards, KAN_LOG_ERROR,
                      "Unsafe switch to planning mode. Events \"%s\" are still accessed.",
                      singleton_storage_node->type->name);
         }
