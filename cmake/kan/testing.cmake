@@ -32,7 +32,7 @@ function (kan_setup_tests)
         foreach (TEST_LINE ${TEST_SOURCE_LINES})
             if (TEST_LINE MATCHES "^KAN_TEST_CASE.*\\((.+)\\)$")
                 set (TEST_NAME "${CMAKE_MATCH_1}")
-                message (STATUS "    Setting up test case \"${TEST_NAME}\".")
+                message (STATUS "    Setting up test case \"${TEST_NAME}\" from source \"${TEST_SOURCE}\".")
 
                 set (TEST_RUNNER_FILE "${CMAKE_CURRENT_BINARY_DIR}/Generated/test_runner_${TEST_NAME}.c")
                 configure_file ("${KAN_TEST_RUNNER_TEMPLATE}" "${TEST_RUNNER_FILE}")
