@@ -6,8 +6,6 @@
 
 KAN_C_HEADER_BEGIN
 
-// TODO: Implement cascade deletion through the repository using meta for markup.
-
 struct kan_repository_field_path_t
 {
     uint64_t reflection_path_length;
@@ -58,6 +56,13 @@ struct kan_repository_meta_automatic_on_delete_event_t
     const char *event_type;
     uint64_t copy_outs_count;
     struct kan_repository_copy_out_t *copy_outs;
+};
+
+struct kan_repository_meta_automatic_cascade_deletion_t
+{
+    struct kan_repository_field_path_t parent_key_path;
+    const char *child_type_name;
+    struct kan_repository_field_path_t child_key_path;
 };
 
 KAN_C_HEADER_END

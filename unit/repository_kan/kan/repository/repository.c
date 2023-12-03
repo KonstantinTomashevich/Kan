@@ -121,6 +121,25 @@ enum lifetime_event_trigger_type_t
     LIFETIME_EVENT_TRIGGER_ON_DELETE,
 };
 
+struct cascade_deleter_t
+{
+    struct kan_repository_indexed_value_delete_query_t query;
+    uint64_t absolute_input_value_offset;
+};
+
+struct cascade_deleter_node_t
+{
+    struct cascade_deleter_node_t *next;
+    struct kan_repository_indexed_value_delete_query_t query;
+    uint64_t absolute_input_value_offset;
+};
+
+struct cascade_deleters_definition_t
+{
+    uint64_t cascade_deleters_count;
+    struct cascade_deleter_t *cascade_deleters;
+};
+
 struct singleton_storage_node_t
 {
     struct kan_hash_storage_node_t node;
@@ -211,6 +230,7 @@ struct indexed_storage_node_t
     struct observation_event_triggers_definition_t observation_events_triggers;
     struct lifetime_event_triggers_definition_t on_insert_events_triggers;
     struct lifetime_event_triggers_definition_t on_delete_events_triggers;
+    struct cascade_deleters_definition_t cascade_deleters;
 
     struct value_index_t *first_value_index;
     struct signal_index_t *first_signal_index;
@@ -621,6 +641,7 @@ static kan_interned_string_t switch_to_serving_task_name;
 static kan_interned_string_t meta_automatic_on_change_event_name;
 static kan_interned_string_t meta_automatic_on_insert_event_name;
 static kan_interned_string_t meta_automatic_on_delete_event_name;
+static kan_interned_string_t meta_automatic_cascade_deletion_name;
 
 static void ensure_interned_strings_ready (void)
 {
@@ -634,6 +655,8 @@ static void ensure_interned_strings_ready (void)
             meta_automatic_on_change_event_name = kan_string_intern ("kan_repository_meta_automatic_on_change_event_t");
             meta_automatic_on_insert_event_name = kan_string_intern ("kan_repository_meta_automatic_on_insert_event_t");
             meta_automatic_on_delete_event_name = kan_string_intern ("kan_repository_meta_automatic_on_delete_event_t");
+            meta_automatic_cascade_deletion_name =
+                kan_string_intern ("kan_repository_meta_automatic_cascade_deletion_t");
         }
 
         kan_atomic_int_unlock (&interned_strings_initialization_lock);
@@ -1984,6 +2007,122 @@ static void lifetime_event_triggers_definition_shutdown (struct lifetime_event_t
     }
 }
 
+static void cascade_deleters_definition_init (struct cascade_deleters_definition_t *definition)
+{
+    definition->cascade_deleters_count = 0u;
+    definition->cascade_deleters = NULL;
+}
+
+static struct indexed_storage_node_t *query_indexed_storage_across_hierarchy (struct repository_t *repository,
+                                                                              kan_interned_string_t type_name);
+
+static void cascade_deleters_definition_build (struct cascade_deleters_definition_t *definition,
+                                               kan_interned_string_t parent_type_name,
+                                               struct repository_t *repository,
+                                               struct kan_stack_group_allocator_t *temporary_allocator,
+                                               kan_allocation_group_t result_allocation_group)
+{
+    ensure_interned_strings_ready ();
+    KAN_ASSERT (!definition->cascade_deleters)
+
+    struct kan_reflection_struct_meta_iterator_t iterator = kan_reflection_registry_query_struct_meta (
+        repository->registry, parent_type_name, meta_automatic_cascade_deletion_name);
+
+    struct kan_repository_meta_automatic_cascade_deletion_t *meta =
+        (struct kan_repository_meta_automatic_cascade_deletion_t *) kan_reflection_struct_meta_iterator_get (&iterator);
+
+    struct cascade_deleter_node_t *first_node = NULL;
+    uint64_t nodes_count = 0u;
+
+    while (meta)
+    {
+        kan_interned_string_t child_type_name = kan_string_intern (meta->child_type_name);
+        struct indexed_storage_node_t *child_storage =
+            query_indexed_storage_across_hierarchy (repository, child_type_name);
+
+        uint64_t parent_absolute_offset;
+        uint64_t parent_size_with_padding;
+        const struct kan_reflection_field_t *parent_field = query_field_for_automatic_event_from_path (
+            parent_type_name, &meta->parent_key_path, repository->registry, temporary_allocator,
+            &parent_absolute_offset, &parent_size_with_padding);
+
+        if (!child_storage || !parent_field)
+        {
+            kan_reflection_struct_meta_iterator_next (&iterator);
+            meta = (struct kan_repository_meta_automatic_cascade_deletion_t *) kan_reflection_struct_meta_iterator_get (
+                &iterator);
+            continue;
+        }
+
+        struct cascade_deleter_node_t *node = kan_stack_group_allocator_allocate (
+            temporary_allocator, sizeof (struct cascade_deleter_node_t), _Alignof (struct cascade_deleter_node_t));
+
+        node->next = first_node;
+        first_node = node;
+        ++nodes_count;
+
+        kan_repository_indexed_value_delete_query_init (&node->query, (kan_repository_indexed_storage_t) child_storage,
+                                                        meta->child_key_path);
+        node->absolute_input_value_offset = parent_absolute_offset;
+
+        kan_reflection_struct_meta_iterator_next (&iterator);
+        meta = (struct kan_repository_meta_automatic_cascade_deletion_t *) kan_reflection_struct_meta_iterator_get (
+            &iterator);
+    }
+
+    if (nodes_count == 0u)
+    {
+        return;
+    }
+
+    definition->cascade_deleters_count = nodes_count;
+    definition->cascade_deleters = kan_allocate_general (
+        result_allocation_group, sizeof (struct cascade_deleter_t) * nodes_count, _Alignof (struct cascade_deleter_t));
+    uint64_t index = 0u;
+
+    while (first_node)
+    {
+        definition->cascade_deleters[index].query = first_node->query;
+        definition->cascade_deleters[index].absolute_input_value_offset = first_node->absolute_input_value_offset;
+        ++index;
+        first_node = first_node->next;
+    }
+}
+
+static void cascade_deleters_definition_fire (struct cascade_deleters_definition_t *definition,
+                                              const void *deleted_record)
+{
+    for (uint64_t index = 0u; index < definition->cascade_deleters_count; ++index)
+    {
+        struct cascade_deleter_t *deleter = &definition->cascade_deleters[index];
+        const uint8_t *deleted_key = (const uint8_t *) deleted_record + deleter->absolute_input_value_offset;
+
+        struct kan_repository_indexed_value_delete_cursor_t cursor =
+            kan_repository_indexed_value_delete_query_execute (&deleter->query, deleted_key);
+
+        struct kan_repository_indexed_value_delete_access_t access =
+            kan_repository_indexed_value_delete_cursor_next (&cursor);
+
+        while (kan_repository_indexed_value_delete_access_resolve (&access))
+        {
+            kan_repository_indexed_value_delete_access_delete (&access);
+            access = kan_repository_indexed_value_delete_cursor_next (&cursor);
+        }
+
+        kan_repository_indexed_value_delete_cursor_close (&cursor);
+    }
+}
+
+static void cascade_deleters_definition_shutdown (struct cascade_deleters_definition_t *definition,
+                                                  kan_allocation_group_t allocation_group)
+{
+    if (definition->cascade_deleters)
+    {
+        kan_free_general (allocation_group, definition->cascade_deleters,
+                          sizeof (struct cascade_deleter_t) * definition->cascade_deleters_count);
+    }
+}
+
 static void singleton_storage_node_shutdown_and_free (struct singleton_storage_node_t *node,
                                                       struct repository_t *repository)
 {
@@ -2061,6 +2200,7 @@ static void indexed_storage_node_shutdown_and_free (struct indexed_storage_node_
 
     lifetime_event_triggers_definition_shutdown (&node->on_insert_events_triggers, node->automation_allocation_group);
     lifetime_event_triggers_definition_shutdown (&node->on_delete_events_triggers, node->automation_allocation_group);
+    cascade_deleters_definition_shutdown (&node->cascade_deleters, node->automation_allocation_group);
 
     kan_hash_storage_remove (&repository->indexed_storages, &node->node);
     kan_free_batched (node->allocation_group, node);
@@ -2440,6 +2580,10 @@ static void repository_enter_planning_mode_internal (struct repository_t *reposi
         lifetime_event_triggers_definition_shutdown (&indexed_storage_node->on_delete_events_triggers,
                                                      indexed_storage_node->automation_allocation_group);
         lifetime_event_triggers_definition_init (&indexed_storage_node->on_delete_events_triggers);
+
+        cascade_deleters_definition_shutdown (&indexed_storage_node->cascade_deleters,
+                                              indexed_storage_node->automation_allocation_group);
+        cascade_deleters_definition_init (&indexed_storage_node->cascade_deleters);
 
         indexed_storage_node = (struct indexed_storage_node_t *) indexed_storage_node->node.list_node.next;
     }
@@ -3028,6 +3172,7 @@ kan_repository_indexed_storage_t kan_repository_indexed_storage_open (kan_reposi
         observation_event_triggers_definition_init (&storage->observation_events_triggers);
         lifetime_event_triggers_definition_init (&storage->on_insert_events_triggers);
         lifetime_event_triggers_definition_init (&storage->on_delete_events_triggers);
+        cascade_deleters_definition_init (&storage->cascade_deleters);
 
         storage->first_value_index = NULL;
         storage->first_signal_index = NULL;
@@ -3642,6 +3787,7 @@ void kan_repository_indexed_sequence_delete_access_delete (
 {
     struct indexed_sequence_constant_access_t *access_data = (struct indexed_sequence_constant_access_t *) access;
     indexed_storage_report_delete_from_constant_access (access_data->storage, access_data->node, NULL, NULL, NULL);
+    cascade_deleters_definition_fire (&access_data->storage->cascade_deleters, access_data->node->record);
     indexed_storage_release_access (access_data->storage);
 }
 
@@ -3727,6 +3873,8 @@ void kan_repository_indexed_sequence_write_access_delete (struct kan_repository_
     struct indexed_sequence_mutable_access_t *access_data = (struct indexed_sequence_mutable_access_t *) access;
     KAN_ASSERT (access_data->dirty_node)
     indexed_storage_report_delete_from_mutable_access (access_data->storage, access_data->dirty_node);
+    cascade_deleters_definition_fire (&access_data->storage->cascade_deleters,
+                                      access_data->dirty_node->source_node->record);
     indexed_storage_release_access (access_data->storage);
 }
 
@@ -4082,6 +4230,8 @@ void kan_repository_indexed_value_delete_access_delete (struct kan_repository_in
     struct indexed_value_constant_access_t *access_data = (struct indexed_value_constant_access_t *) access;
     indexed_storage_report_delete_from_constant_access (access_data->index->storage, access_data->sub_node->record,
                                                         access_data->index, access_data->node, access_data->sub_node);
+    cascade_deleters_definition_fire (&access_data->index->storage->cascade_deleters,
+                                      access_data->sub_node->record->record);
     indexed_storage_release_access (access_data->index->storage);
 }
 
@@ -4166,6 +4316,8 @@ void kan_repository_indexed_value_write_access_delete (struct kan_repository_ind
     struct indexed_value_mutable_access_t *access_data = (struct indexed_value_mutable_access_t *) access;
     KAN_ASSERT (access_data->dirty_node)
     indexed_storage_report_delete_from_mutable_access (access_data->index->storage, access_data->dirty_node);
+    cascade_deleters_definition_fire (&access_data->index->storage->cascade_deleters,
+                                      access_data->sub_node->record->record);
     indexed_storage_release_access (access_data->index->storage);
 }
 
@@ -4802,6 +4954,8 @@ static void prepare_indexed_storage (uint64_t user_data)
                                               &temporary_allocator, data->storage->automation_allocation_group);
 
     prepare_indices (data->storage, &building_event_flag);
+    cascade_deleters_definition_build (&data->storage->cascade_deleters, data->storage->type->name, data->repository,
+                                       &temporary_allocator, data->storage->automation_allocation_group);
     kan_stack_group_allocator_shutdown (&temporary_allocator);
 }
 
