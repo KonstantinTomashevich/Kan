@@ -227,7 +227,7 @@ struct kan_repository_event_read_access_t
 REPOSITORY_API kan_repository_t kan_repository_create_root (kan_allocation_group_t allocation_group,
                                                             kan_reflection_registry_t registry);
 
-REPOSITORY_API kan_repository_t kan_repository_create_child (kan_repository_t parent, kan_interned_string_t name);
+REPOSITORY_API kan_repository_t kan_repository_create_child (kan_repository_t parent, const char *name);
 
 REPOSITORY_API void kan_repository_enter_planning_mode (kan_repository_t root_repository);
 
@@ -236,8 +236,8 @@ REPOSITORY_API void kan_repository_migrate (kan_repository_t root_repository,
                                             kan_reflection_migration_seed_t migration_seed,
                                             kan_reflection_struct_migrator_t migrator);
 
-REPOSITORY_API kan_repository_singleton_storage_t
-kan_repository_singleton_storage_open (kan_repository_t repository, kan_interned_string_t type_name);
+REPOSITORY_API kan_repository_singleton_storage_t kan_repository_singleton_storage_open (kan_repository_t repository,
+                                                                                         const char *type_name);
 
 REPOSITORY_API void kan_repository_singleton_read_query_init (struct kan_repository_singleton_read_query_t *query,
                                                               kan_repository_singleton_storage_t storage);
@@ -265,7 +265,7 @@ REPOSITORY_API void kan_repository_singleton_write_query_shutdown (
     struct kan_repository_singleton_write_query_t *query);
 
 REPOSITORY_API kan_repository_indexed_storage_t kan_repository_indexed_storage_open (kan_repository_t repository,
-                                                                                     kan_interned_string_t type_name);
+                                                                                     const char *type_name);
 
 REPOSITORY_API void kan_repository_indexed_insert_query_init (struct kan_repository_indexed_insert_query_t *query,
                                                               kan_repository_indexed_storage_t storage);
@@ -473,7 +473,7 @@ REPOSITORY_API void kan_repository_indexed_value_write_query_shutdown (
     struct kan_repository_indexed_value_write_query_t *query);
 
 REPOSITORY_API kan_repository_event_storage_t kan_repository_event_storage_open (kan_repository_t repository,
-                                                                                 kan_interned_string_t type_name);
+                                                                                 const char *type_name);
 
 REPOSITORY_API void kan_repository_event_insert_query_init (struct kan_repository_event_insert_query_t *query,
                                                             kan_repository_event_storage_t storage);

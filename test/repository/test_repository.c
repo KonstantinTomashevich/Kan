@@ -128,8 +128,7 @@ KAN_TEST_CASE (manual_event)
     KAN_REFLECTION_UNIT_REGISTRAR_NAME (test_repository) (registry);
 
     kan_repository_t repository = kan_repository_create_root (KAN_ALLOCATION_GROUP_IGNORE, registry);
-    kan_repository_event_storage_t storage =
-        kan_repository_event_storage_open (repository, kan_string_intern ("manual_event_t"));
+    kan_repository_event_storage_t storage = kan_repository_event_storage_open (repository, "manual_event_t");
 
     struct kan_repository_event_insert_query_t event_insert;
     kan_repository_event_insert_query_init (&event_insert, storage);
@@ -175,8 +174,7 @@ KAN_TEST_CASE (manual_event_no_insert_if_no_fetch)
     KAN_REFLECTION_UNIT_REGISTRAR_NAME (test_repository) (registry);
 
     kan_repository_t repository = kan_repository_create_root (KAN_ALLOCATION_GROUP_IGNORE, registry);
-    kan_repository_event_storage_t storage =
-        kan_repository_event_storage_open (repository, kan_string_intern ("manual_event_t"));
+    kan_repository_event_storage_t storage = kan_repository_event_storage_open (repository, "manual_event_t");
 
     struct kan_repository_event_insert_query_t event_insert;
     kan_repository_event_insert_query_init (&event_insert, storage);
@@ -204,14 +202,12 @@ KAN_TEST_CASE (manual_event_insert_from_child_to_root)
     KAN_REFLECTION_UNIT_REGISTRAR_NAME (test_repository) (registry);
 
     kan_repository_t root_repository = kan_repository_create_root (KAN_ALLOCATION_GROUP_IGNORE, registry);
-    kan_repository_t child_repository =
-        kan_repository_create_child (root_repository, kan_string_intern ("child_repository"));
+    kan_repository_t child_repository = kan_repository_create_child (root_repository, "child_repository");
 
-    kan_repository_event_storage_t root_storage =
-        kan_repository_event_storage_open (root_repository, kan_string_intern ("manual_event_t"));
+    kan_repository_event_storage_t root_storage = kan_repository_event_storage_open (root_repository, "manual_event_t");
 
     kan_repository_event_storage_t child_storage =
-        kan_repository_event_storage_open (child_repository, kan_string_intern ("manual_event_t"));
+        kan_repository_event_storage_open (child_repository, "manual_event_t");
 
     struct kan_repository_event_fetch_query_t event_fetch;
     kan_repository_event_fetch_query_init (&event_fetch, root_storage);
@@ -240,10 +236,9 @@ KAN_TEST_CASE (manual_event_two_types)
     KAN_REFLECTION_UNIT_REGISTRAR_NAME (test_repository) (registry);
 
     kan_repository_t repository = kan_repository_create_root (KAN_ALLOCATION_GROUP_IGNORE, registry);
-    kan_repository_event_storage_t first_storage =
-        kan_repository_event_storage_open (repository, kan_string_intern ("manual_event_t"));
+    kan_repository_event_storage_t first_storage = kan_repository_event_storage_open (repository, "manual_event_t");
     kan_repository_event_storage_t second_storage =
-        kan_repository_event_storage_open (repository, kan_string_intern ("manual_event_second_t"));
+        kan_repository_event_storage_open (repository, "manual_event_second_t");
 
     struct kan_repository_event_insert_query_t event_insert_first;
     kan_repository_event_insert_query_init (&event_insert_first, first_storage);
@@ -287,8 +282,7 @@ KAN_TEST_CASE (manual_event_access_from_tasks)
     KAN_REFLECTION_UNIT_REGISTRAR_NAME (test_repository) (registry);
 
     kan_repository_t repository = kan_repository_create_root (KAN_ALLOCATION_GROUP_IGNORE, registry);
-    kan_repository_event_storage_t storage =
-        kan_repository_event_storage_open (repository, kan_string_intern ("manual_event_t"));
+    kan_repository_event_storage_t storage = kan_repository_event_storage_open (repository, "manual_event_t");
 
     struct kan_repository_event_insert_query_t event_insert;
     kan_repository_event_insert_query_init (&event_insert, storage);

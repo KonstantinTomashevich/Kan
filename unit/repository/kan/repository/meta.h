@@ -3,14 +3,15 @@
 #include <stdint.h>
 
 #include <kan/api_common/c_header.h>
-#include <kan/container/interned_string.h>
 
 KAN_C_HEADER_BEGIN
+
+// TODO: Implement cascade deletion through the repository using meta for markup.
 
 struct kan_repository_field_path_t
 {
     uint64_t reflection_path_length;
-    kan_interned_string_t *reflection_path;
+    const char **reflection_path;
 };
 
 struct kan_repository_dimension_t
@@ -23,7 +24,7 @@ struct kan_repository_dimension_t
 
 struct kan_repository_meta_space_t
 {
-    kan_interned_string_t name;
+    const char *name;
     uint64_t dimension_count;
     struct kan_repository_dimension_t *dimensions;
 };
@@ -36,14 +37,14 @@ struct kan_repository_copy_out_t
 
 struct kan_repository_meta_automatic_on_insert_event_t
 {
-    kan_interned_string_t event_type;
+    const char *event_type;
     uint64_t copy_outs_count;
     struct kan_repository_copy_out_t *copy_outs;
 };
 
 struct kan_repository_meta_automatic_on_change_event_t
 {
-    kan_interned_string_t event_type;
+    const char *event_type;
     uint64_t observed_fields_count;
     struct kan_repository_field_path_t *observed_fields;
     uint64_t unchanged_copy_outs_count;
@@ -54,7 +55,7 @@ struct kan_repository_meta_automatic_on_change_event_t
 
 struct kan_repository_meta_automatic_on_delete_event_t
 {
-    kan_interned_string_t event_type;
+    const char *event_type;
     uint64_t copy_outs_count;
     struct kan_repository_copy_out_t *copy_outs;
 };

@@ -22,6 +22,12 @@
 
 KAN_LOG_DEFINE_CATEGORY (repository);
 
+struct interned_field_path_t
+{
+    uint64_t length;
+    kan_interned_string_t *path;
+};
+
 #define OBSERVATION_BUFFER_ALIGNMENT _Alignof (uint64_t)
 #define OBSERVATION_BUFFER_CHUNK_ALIGNMENT _Alignof (uint64_t)
 
@@ -248,7 +254,7 @@ struct value_index_t
 
     uint64_t observation_flags;
     struct kan_hash_storage_t hash_storage;
-    struct kan_repository_field_path_t source_path;
+    struct interned_field_path_t source_path;
 };
 
 struct indexed_insert_query_t
@@ -981,30 +987,31 @@ static kan_bool_t validation_value_index_is_possible (const struct kan_reflectio
 }
 #endif
 
-static struct kan_repository_field_path_t copy_field_path (struct kan_repository_field_path_t input,
-                                                           kan_allocation_group_t allocation_group)
+static struct interned_field_path_t copy_field_path (struct kan_repository_field_path_t input,
+                                                     kan_allocation_group_t allocation_group)
 {
-    struct kan_repository_field_path_t result;
-    result.reflection_path_length = input.reflection_path_length;
-    result.reflection_path =
-        kan_allocate_batched (allocation_group, sizeof (kan_interned_string_t) * input.reflection_path_length);
+    struct interned_field_path_t result;
+    result.length = input.reflection_path_length;
+    result.path = kan_allocate_batched (allocation_group, sizeof (kan_interned_string_t) * result.length);
 
-    memcpy (result.reflection_path, input.reflection_path,
-            sizeof (kan_interned_string_t) * input.reflection_path_length);
+    for (uint64_t index = 0u; index < input.reflection_path_length; ++index)
+    {
+        result.path[index] = kan_string_intern (input.reflection_path[index]);
+    }
+
     return result;
 }
 
-static kan_bool_t is_field_path_equal (struct kan_repository_field_path_t first,
-                                       struct kan_repository_field_path_t second)
+static kan_bool_t is_field_path_equal (struct kan_repository_field_path_t input, struct interned_field_path_t interned)
 {
-    if (first.reflection_path_length != second.reflection_path_length)
+    if (input.reflection_path_length != interned.length)
     {
         return KAN_FALSE;
     }
 
-    for (uint64_t index = 0u; index < first.reflection_path_length; ++index)
+    for (uint64_t index = 0u; index < input.reflection_path_length; ++index)
     {
-        if (first.reflection_path[index] != second.reflection_path[index])
+        if (strcmp (input.reflection_path[index], interned.path[index]) != 0)
         {
             return KAN_FALSE;
         }
@@ -1013,9 +1020,9 @@ static kan_bool_t is_field_path_equal (struct kan_repository_field_path_t first,
     return KAN_TRUE;
 }
 
-static void shutdown_field_path (struct kan_repository_field_path_t input, kan_allocation_group_t group)
+static void shutdown_field_path (struct interned_field_path_t interned, kan_allocation_group_t group)
 {
-    kan_free_batched (group, input.reflection_path);
+    kan_free_batched (group, interned.path);
 }
 
 static void apply_copy_outs (uint64_t copy_outs_count, struct copy_out_t *copy_outs, const void *source, void *target)
@@ -1032,12 +1039,22 @@ static const struct kan_reflection_field_t *query_field_for_automatic_event_from
     kan_interned_string_t struct_name,
     struct kan_repository_field_path_t *path,
     kan_reflection_registry_t registry,
+    struct kan_stack_group_allocator_t *temporary_allocator,
     uint64_t *output_absolute_offset,
     uint64_t *output_size_with_padding)
 {
-    const struct kan_reflection_field_t *field = kan_reflection_registry_query_local_field (
-        registry, struct_name, path->reflection_path_length, path->reflection_path, output_absolute_offset,
-        output_size_with_padding);
+    kan_interned_string_t *interned_path = kan_stack_group_allocator_allocate (
+        temporary_allocator, sizeof (kan_interned_string_t) * path->reflection_path_length,
+        _Alignof (kan_interned_string_t));
+
+    for (uint64_t index = 0u; index < path->reflection_path_length; ++index)
+    {
+        interned_path[index] = kan_string_intern (path->reflection_path[index]);
+    }
+
+    const struct kan_reflection_field_t *field =
+        kan_reflection_registry_query_local_field (registry, struct_name, path->reflection_path_length, interned_path,
+                                                   output_absolute_offset, output_size_with_padding);
 
     if (!field)
     {
@@ -1070,12 +1087,14 @@ static struct copy_out_list_node_t *extract_raw_copy_outs (kan_interned_string_t
         uint64_t source_absolute_offset;
         uint64_t source_size_with_padding;
         const struct kan_reflection_field_t *source_field = query_field_for_automatic_event_from_path (
-            struct_name, &copy_out->source_path, registry, &source_absolute_offset, &source_size_with_padding);
+            struct_name, &copy_out->source_path, registry, temporary_allocator, &source_absolute_offset,
+            &source_size_with_padding);
 
         uint64_t target_absolute_offset;
         uint64_t target_size_with_padding;
         const struct kan_reflection_field_t *target_field = query_field_for_automatic_event_from_path (
-            struct_name, &copy_out->target_path, registry, &target_absolute_offset, &target_size_with_padding);
+            struct_name, &copy_out->target_path, registry, temporary_allocator, &target_absolute_offset,
+            &target_size_with_padding);
 
         if (!source_field || !target_field)
         {
@@ -1554,12 +1573,14 @@ static void observation_event_triggers_definition_build (struct observation_even
 
     while (event)
     {
+        const kan_interned_string_t event_type = kan_string_intern (event->event_type);
         struct event_storage_node_t *event_storage =
-            query_event_storage_across_hierarchy (repository, event->event_type);
+            query_event_storage_across_hierarchy (repository, kan_string_intern (event_type));
+
         if (event_storage)
         {
             struct copy_out_list_node_t *raw_buffer_copy_outs =
-                extract_raw_copy_outs (event->event_type, event->unchanged_copy_outs_count, event->unchanged_copy_outs,
+                extract_raw_copy_outs (event_type, event->unchanged_copy_outs_count, event->unchanged_copy_outs,
                                        repository->registry, temporary_allocator);
 
             struct copy_out_list_node_t *retargeted_buffer_copy_outs =
@@ -1570,7 +1591,7 @@ static void observation_event_triggers_definition_build (struct observation_even
                 merge_copy_outs (retargeted_buffer_copy_outs, temporary_allocator, &merged_buffer_copy_outs_count);
 
             struct copy_out_list_node_t *raw_record_copy_outs =
-                extract_raw_copy_outs (event->event_type, event->changed_copy_outs_count, event->changed_copy_outs,
+                extract_raw_copy_outs (event_type, event->changed_copy_outs_count, event->changed_copy_outs,
                                        repository->registry, temporary_allocator);
 
             uint64_t merged_record_copy_outs_count;
@@ -1756,13 +1777,13 @@ static struct lifetime_event_trigger_list_node_t *lifetime_event_triggers_extrac
 
     while (event)
     {
-        struct event_storage_node_t *event_storage =
-            query_event_storage_across_hierarchy (repository, event->event_type);
+        const kan_interned_string_t event_type = kan_string_intern (event->event_type);
+        struct event_storage_node_t *event_storage = query_event_storage_across_hierarchy (repository, event_type);
 
         if (event_storage)
         {
             struct copy_out_list_node_t *raw_copy_outs = extract_raw_copy_outs (
-                event->event_type, event->copy_outs_count, event->copy_outs, repository->registry, temporary_allocator);
+                event_type, event->copy_outs_count, event->copy_outs, repository->registry, temporary_allocator);
 
             uint64_t merged_copy_outs_count;
             struct copy_out_list_node_t *merged_copy_outs =
@@ -1814,13 +1835,13 @@ static struct lifetime_event_trigger_list_node_t *lifetime_event_triggers_extrac
 
     while (event)
     {
-        struct event_storage_node_t *event_storage =
-            query_event_storage_across_hierarchy (repository, event->event_type);
+        const kan_interned_string_t event_type = kan_string_intern (event->event_type);
+        struct event_storage_node_t *event_storage = query_event_storage_across_hierarchy (repository, event_type);
 
         if (event_storage)
         {
             struct copy_out_list_node_t *raw_copy_outs = extract_raw_copy_outs (
-                event->event_type, event->copy_outs_count, event->copy_outs, repository->registry, temporary_allocator);
+                event_type, event->copy_outs_count, event->copy_outs, repository->registry, temporary_allocator);
 
             uint64_t merged_copy_outs_count;
             struct copy_out_list_node_t *merged_copy_outs =
@@ -2047,7 +2068,7 @@ static void indexed_storage_node_shutdown_and_free (struct indexed_storage_node_
 
 static kan_bool_t value_index_prepare_backed_data (kan_reflection_registry_t registry,
                                                    kan_interned_string_t type_name,
-                                                   struct kan_repository_field_path_t path,
+                                                   struct interned_field_path_t path,
                                                    uint32_t *backed_offset_output,
                                                    uint8_t *backed_size_output,
                                                    uint8_t *backed_size_with_padding_output)
@@ -2056,7 +2077,7 @@ static kan_bool_t value_index_prepare_backed_data (kan_reflection_registry_t reg
     uint64_t size_with_padding;
 
     const struct kan_reflection_field_t *field = kan_reflection_registry_query_local_field (
-        registry, type_name, path.reflection_path_length, path.reflection_path, &absolute_offset, &size_with_padding);
+        registry, type_name, path.length, path.path, &absolute_offset, &size_with_padding);
 
     if (field)
     {
@@ -2349,13 +2370,15 @@ kan_repository_t kan_repository_create_root (kan_allocation_group_t allocation_g
     return (kan_repository_t) repository_create (allocation_group, NULL, kan_string_intern ("root"), registry);
 }
 
-kan_repository_t kan_repository_create_child (kan_repository_t parent, kan_interned_string_t name)
+kan_repository_t kan_repository_create_child (kan_repository_t parent, const char *name)
 {
     struct repository_t *parent_repository = (struct repository_t *) parent;
+
     const kan_allocation_group_t allocation_group = kan_allocation_group_get_child (
         kan_allocation_group_get_child (parent_repository->allocation_group, "child_repositories"), name);
 
-    return (kan_repository_t) repository_create (allocation_group, parent_repository, name,
+    const kan_interned_string_t interned_name = kan_string_intern (name);
+    return (kan_repository_t) repository_create (allocation_group, parent_repository, interned_name,
                                                  parent_repository->registry);
 }
 
@@ -2760,32 +2783,34 @@ static struct singleton_storage_node_t *query_singleton_storage_across_hierarchy
 }
 
 kan_repository_singleton_storage_t kan_repository_singleton_storage_open (kan_repository_t repository,
-                                                                          kan_interned_string_t type_name)
+                                                                          const char *type_name)
 {
     struct repository_t *repository_data = (struct repository_t *) repository;
     KAN_ASSERT (repository_data->mode == REPOSITORY_MODE_PLANNING)
     repository_storage_map_access_lock (repository_data);
-    struct singleton_storage_node_t *storage = query_singleton_storage_across_hierarchy (repository_data, type_name);
+    const kan_interned_string_t interned_type_name = kan_string_intern (type_name);
+    struct singleton_storage_node_t *storage =
+        query_singleton_storage_across_hierarchy (repository_data, interned_type_name);
 
     if (!storage)
     {
         const struct kan_reflection_struct_t *singleton_type =
-            kan_reflection_registry_query_struct (repository_data->registry, type_name);
+            kan_reflection_registry_query_struct (repository_data->registry, interned_type_name);
 
         if (!singleton_type)
         {
-            KAN_LOG (repository, KAN_LOG_ERROR, "Singleton type \"%s\" not found.", type_name)
+            KAN_LOG (repository, KAN_LOG_ERROR, "Singleton type \"%s\" not found.", interned_type_name)
             repository_storage_map_access_unlock (repository_data);
             return KAN_INVALID_REPOSITORY_SINGLETON_STORAGE;
         }
 
         const kan_allocation_group_t storage_allocation_group = kan_allocation_group_get_child (
-            kan_allocation_group_get_child (repository_data->allocation_group, "singletons"), type_name);
+            kan_allocation_group_get_child (repository_data->allocation_group, "singletons"), interned_type_name);
 
         storage = (struct singleton_storage_node_t *) kan_allocate_batched (storage_allocation_group,
                                                                             sizeof (struct singleton_storage_node_t));
 
-        storage->node.hash = (uint64_t) type_name;
+        storage->node.hash = (uint64_t) interned_type_name;
         storage->type = singleton_type;
         storage->queries_count = kan_atomic_int_init (0);
 
@@ -2965,27 +2990,29 @@ kan_repository_indexed_storage_t kan_repository_indexed_storage_open (kan_reposi
     struct repository_t *repository_data = (struct repository_t *) repository;
     KAN_ASSERT (repository_data->mode == REPOSITORY_MODE_PLANNING)
     repository_storage_map_access_lock (repository_data);
-    struct indexed_storage_node_t *storage = query_indexed_storage_across_hierarchy (repository_data, type_name);
+    const kan_interned_string_t interned_type_name = kan_string_intern (type_name);
+    struct indexed_storage_node_t *storage =
+        query_indexed_storage_across_hierarchy (repository_data, interned_type_name);
 
     if (!storage)
     {
         const struct kan_reflection_struct_t *indexed_type =
-            kan_reflection_registry_query_struct (repository_data->registry, type_name);
+            kan_reflection_registry_query_struct (repository_data->registry, interned_type_name);
 
         if (!indexed_type)
         {
-            KAN_LOG (repository, KAN_LOG_ERROR, "Indexed record type \"%s\" not found.", type_name)
+            KAN_LOG (repository, KAN_LOG_ERROR, "Indexed record type \"%s\" not found.", interned_type_name)
             repository_storage_map_access_unlock (repository_data);
             return KAN_INVALID_REPOSITORY_INDEXED_STORAGE;
         }
 
         const kan_allocation_group_t storage_allocation_group = kan_allocation_group_get_child (
-            kan_allocation_group_get_child (repository_data->allocation_group, "indexed"), type_name);
+            kan_allocation_group_get_child (repository_data->allocation_group, "indexed"), interned_type_name);
 
         storage = (struct indexed_storage_node_t *) kan_allocate_batched (storage_allocation_group,
                                                                           sizeof (struct indexed_storage_node_t));
 
-        storage->node.hash = (uint64_t) type_name;
+        storage->node.hash = (uint64_t) interned_type_name;
         storage->repository = repository_data;
         storage->type = indexed_type;
 
@@ -3731,7 +3758,7 @@ static struct value_index_t *indexed_storage_find_or_create_value_index (struct 
 
     while (index)
     {
-        if (is_field_path_equal (index->source_path, path))
+        if (is_field_path_equal (path, index->source_path))
         {
             kan_atomic_int_unlock (&storage->maintenance_lock);
             kan_atomic_int_add (&index->storage->queries_count, 1);
@@ -3745,8 +3772,9 @@ static struct value_index_t *indexed_storage_find_or_create_value_index (struct 
     uint32_t backed_absolute_offset;
     uint8_t backed_size;
     uint8_t backed_size_with_padding;
+    struct interned_field_path_t interned_path = copy_field_path (path, storage->value_index_allocation_group);
 
-    if (!value_index_prepare_backed_data (storage->repository->registry, storage->type->name, path,
+    if (!value_index_prepare_backed_data (storage->repository->registry, storage->type->name, interned_path,
                                           &backed_absolute_offset, &backed_size, &backed_size_with_padding))
     {
         KAN_LOG (repository, KAN_LOG_ERROR,
@@ -3757,6 +3785,7 @@ static struct value_index_t *indexed_storage_find_or_create_value_index (struct 
             KAN_LOG (repository, KAN_LOG_ERROR, "    - %s", path.reflection_path[path_index]);
         }
 
+        shutdown_field_path (interned_path, storage->value_index_allocation_group);
         kan_atomic_int_unlock (&storage->maintenance_lock);
         return NULL;
     }
@@ -3773,7 +3802,7 @@ static struct value_index_t *indexed_storage_find_or_create_value_index (struct 
 
     kan_hash_storage_init (&index->hash_storage, storage->value_index_allocation_group,
                            KAN_REPOSITORY_VALUE_INDEX_INITIAL_BUCKETS);
-    index->source_path = copy_field_path (path, storage->value_index_allocation_group);
+    index->source_path = interned_path;
 
     kan_atomic_int_lock (&storage->maintenance_lock);
     kan_atomic_int_add (&index->storage->queries_count, 1);
@@ -4195,27 +4224,28 @@ kan_repository_event_storage_t kan_repository_event_storage_open (kan_repository
     struct repository_t *repository_data = (struct repository_t *) repository;
     KAN_ASSERT (repository_data->mode == REPOSITORY_MODE_PLANNING)
     repository_storage_map_access_lock (repository_data);
-    struct event_storage_node_t *storage = query_event_storage_across_hierarchy (repository_data, type_name);
+    const kan_interned_string_t interned_type_name = kan_string_intern (type_name);
+    struct event_storage_node_t *storage = query_event_storage_across_hierarchy (repository_data, interned_type_name);
 
     if (!storage)
     {
         const struct kan_reflection_struct_t *event_type =
-            kan_reflection_registry_query_struct (repository_data->registry, type_name);
+            kan_reflection_registry_query_struct (repository_data->registry, interned_type_name);
 
         if (!event_type)
         {
-            KAN_LOG (repository, KAN_LOG_ERROR, "Event type \"%s\" not found.", type_name)
+            KAN_LOG (repository, KAN_LOG_ERROR, "Event type \"%s\" not found.", interned_type_name)
             repository_storage_map_access_unlock (repository_data);
             return KAN_INVALID_REPOSITORY_EVENT_STORAGE;
         }
 
         const kan_allocation_group_t storage_allocation_group = kan_allocation_group_get_child (
-            kan_allocation_group_get_child (repository_data->allocation_group, "events"), type_name);
+            kan_allocation_group_get_child (repository_data->allocation_group, "events"), interned_type_name);
 
         storage = (struct event_storage_node_t *) kan_allocate_batched (storage_allocation_group,
                                                                         sizeof (struct event_storage_node_t));
 
-        storage->node.hash = (uint64_t) type_name;
+        storage->node.hash = (uint64_t) interned_type_name;
         storage->allocation_group = storage_allocation_group;
         storage->type = event_type;
         storage->single_threaded_operations_lock = kan_atomic_int_init (0);
@@ -4543,7 +4573,9 @@ static void extract_observation_chunks_from_on_change_events (
     while (event)
     {
         // Query for event storage to check if event is used anywhere. No need to observe for unused events.
-        if (query_event_storage_across_hierarchy (repository, event->event_type))
+        const kan_interned_string_t event_type = kan_string_intern (event->event_type);
+
+        if (query_event_storage_across_hierarchy (repository, event_type))
         {
             for (uint64_t index = 0u; index < event->observed_fields_count; ++index)
             {
@@ -4552,7 +4584,8 @@ static void extract_observation_chunks_from_on_change_events (
                 uint64_t size_with_padding;
 
                 const struct kan_reflection_field_t *field = query_field_for_automatic_event_from_path (
-                    observed_struct->name, path, repository->registry, &absolute_offset, &size_with_padding);
+                    observed_struct->name, path, repository->registry, temporary_allocator, &absolute_offset,
+                    &size_with_padding);
 
                 if (!field)
                 {
