@@ -2,8 +2,8 @@ register_concrete (test_repository)
 concrete_include (PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 concrete_sources ("*.c")
 
-c_interface_scanner_setup (GLOB "*.h")
-reflection_generator_setup (GLOB "*.h")
+c_interface_scanner_setup (DIRECT "test_repository.c")
+reflection_generator_setup (DIRECT "test_repository.c")
 
 reflection_generator_get_output_file_path (REFLECTION_GENERATOR_OUTPUT_FILE_PATH)
 concrete_sources_direct ("${REFLECTION_GENERATOR_OUTPUT_FILE_PATH}")
