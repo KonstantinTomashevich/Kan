@@ -1094,7 +1094,8 @@ static const struct kan_reflection_field_t *query_field_for_automatic_event_from
     return field;
 }
 
-static struct copy_out_list_node_t *extract_raw_copy_outs (kan_interned_string_t struct_name,
+static struct copy_out_list_node_t *extract_raw_copy_outs (kan_interned_string_t source_struct_name,
+                                                           kan_interned_string_t target_struct_name,
                                                            uint64_t copy_outs_count,
                                                            struct kan_repository_copy_out_t *copy_outs,
                                                            kan_reflection_registry_t registry,
@@ -1110,13 +1111,13 @@ static struct copy_out_list_node_t *extract_raw_copy_outs (kan_interned_string_t
         uint64_t source_absolute_offset;
         uint64_t source_size_with_padding;
         const struct kan_reflection_field_t *source_field = query_field_for_automatic_event_from_path (
-            struct_name, &copy_out->source_path, registry, temporary_allocator, &source_absolute_offset,
+            source_struct_name, &copy_out->source_path, registry, temporary_allocator, &source_absolute_offset,
             &source_size_with_padding);
 
         uint64_t target_absolute_offset;
         uint64_t target_size_with_padding;
         const struct kan_reflection_field_t *target_field = query_field_for_automatic_event_from_path (
-            struct_name, &copy_out->target_path, registry, temporary_allocator, &target_absolute_offset,
+            target_struct_name, &copy_out->target_path, registry, temporary_allocator, &target_absolute_offset,
             &target_size_with_padding);
 
         if (!source_field || !target_field)
@@ -1603,8 +1604,8 @@ static void observation_event_triggers_definition_build (struct observation_even
         if (event_storage)
         {
             struct copy_out_list_node_t *raw_buffer_copy_outs =
-                extract_raw_copy_outs (event_type, event->unchanged_copy_outs_count, event->unchanged_copy_outs,
-                                       repository->registry, temporary_allocator);
+                extract_raw_copy_outs (observed_struct->name, event_type, event->unchanged_copy_outs_count,
+                                       event->unchanged_copy_outs, repository->registry, temporary_allocator);
 
             struct copy_out_list_node_t *retargeted_buffer_copy_outs =
                 convert_to_buffer_copy_outs (raw_buffer_copy_outs, buffer, temporary_allocator);
@@ -1614,8 +1615,8 @@ static void observation_event_triggers_definition_build (struct observation_even
                 merge_copy_outs (retargeted_buffer_copy_outs, temporary_allocator, &merged_buffer_copy_outs_count);
 
             struct copy_out_list_node_t *raw_record_copy_outs =
-                extract_raw_copy_outs (event_type, event->changed_copy_outs_count, event->changed_copy_outs,
-                                       repository->registry, temporary_allocator);
+                extract_raw_copy_outs (observed_struct->name, event_type, event->changed_copy_outs_count,
+                                       event->changed_copy_outs, repository->registry, temporary_allocator);
 
             uint64_t merged_record_copy_outs_count;
             struct copy_out_list_node_t *merged_record_copy_outs =
@@ -1805,8 +1806,9 @@ static struct lifetime_event_trigger_list_node_t *lifetime_event_triggers_extrac
 
         if (event_storage)
         {
-            struct copy_out_list_node_t *raw_copy_outs = extract_raw_copy_outs (
-                event_type, event->copy_outs_count, event->copy_outs, repository->registry, temporary_allocator);
+            struct copy_out_list_node_t *raw_copy_outs =
+                extract_raw_copy_outs (observed_struct->name, event_type, event->copy_outs_count, event->copy_outs,
+                                       repository->registry, temporary_allocator);
 
             uint64_t merged_copy_outs_count;
             struct copy_out_list_node_t *merged_copy_outs =
@@ -1863,8 +1865,9 @@ static struct lifetime_event_trigger_list_node_t *lifetime_event_triggers_extrac
 
         if (event_storage)
         {
-            struct copy_out_list_node_t *raw_copy_outs = extract_raw_copy_outs (
-                event_type, event->copy_outs_count, event->copy_outs, repository->registry, temporary_allocator);
+            struct copy_out_list_node_t *raw_copy_outs =
+                extract_raw_copy_outs (observed_struct->name, event_type, event->copy_outs_count, event->copy_outs,
+                                       repository->registry, temporary_allocator);
 
             uint64_t merged_copy_outs_count;
             struct copy_out_list_node_t *merged_copy_outs =
