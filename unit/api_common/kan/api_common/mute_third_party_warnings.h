@@ -10,7 +10,8 @@
 // clang-format off
 #    define KAN_MUTE_THIRD_PARTY_WARNINGS_BEGIN                                                                        \
         _Pragma ("GCC diagnostic push")                                                                                \
-        _Pragma ("GCC diagnostic ignored \"-Wpedantic\"")
+        _Pragma ("GCC diagnostic ignored \"-Wpedantic\"")                                                              \
+        _Pragma ("GCC diagnostic ignored \"-Wunused-function\"")
 // clang-format on
 
 #    define KAN_MUTE_THIRD_PARTY_WARNINGS_END _Pragma ("GCC diagnostic pop")
