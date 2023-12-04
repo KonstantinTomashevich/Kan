@@ -24,7 +24,7 @@ function (kan_setup_tests)
     file (MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/Generated")
 
     foreach (TEST_SOURCE ${TEST_SOURCES})
-        if (NOT EXISTS "${TEST_SOURCE}")
+        if (NOT EXISTS "${TEST_SOURCE}" OR "${TEST_SOURCE}" MATCHES ".*/Generated/.*")
             continue ()
         endif ()
 
