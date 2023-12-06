@@ -137,6 +137,204 @@ TEST_REPOSITORY_API void second_singleton_init (uint64_t reflection_user_data, v
     };
 }
 
+struct object_record_t
+{
+    uint64_t object_id;
+    uint64_t parent_object_id;
+    uint64_t data_x;
+    uint64_t data_y;
+};
+
+#define INVALID_PARENT_OBJECT_ID ((uint64_t) ~0ull)
+
+TEST_REPOSITORY_API void object_record_init (uint64_t reflection_user_data, void *data)
+{
+    *(struct object_record_t *) data = (struct object_record_t) {
+        .object_id = 0u,
+        .parent_object_id = INVALID_PARENT_OBJECT_ID,
+        .data_x = 0u,
+        .data_y = 0u,
+    };
+}
+
+// \meta reflection_struct_meta = "object_record_t"
+TEST_REPOSITORY_API struct kan_repository_meta_automatic_cascade_deletion_t object_record_hierarchy_cascade_deletion = {
+    .parent_key_path = {.reflection_path_length = 1u, .reflection_path = (const char *[]) {"object_id"}},
+    .child_type_name = "object_record_t",
+    .child_key_path = {.reflection_path_length = 1u, .reflection_path = (const char *[]) {"parent_object_id"}},
+};
+
+struct status_record_t
+{
+    uint64_t object_id;
+    kan_bool_t observable_alive;
+    kan_bool_t observable_poisoned;
+    kan_bool_t observable_stunned;
+    kan_bool_t observable_boosted;
+};
+
+TEST_REPOSITORY_API void status_record_init (uint64_t reflection_user_data, void *data)
+{
+    *(struct status_record_t *) data = (struct status_record_t) {
+        .object_id = 0u,
+        .observable_alive = KAN_FALSE,
+        .observable_poisoned = KAN_FALSE,
+        .observable_stunned = KAN_FALSE,
+        .observable_boosted = KAN_FALSE,
+    };
+}
+
+// \meta reflection_struct_meta = "object_record_t"
+TEST_REPOSITORY_API struct kan_repository_meta_automatic_cascade_deletion_t status_record_object_cascade_deletion = {
+    .parent_key_path = {.reflection_path_length = 1u, .reflection_path = (const char *[]) {"object_id"}},
+    .child_type_name = "status_record_t",
+    .child_key_path = {.reflection_path_length = 1u, .reflection_path = (const char *[]) {"object_id"}},
+};
+
+struct status_record_on_insert_event_t
+{
+    uint64_t object_id;
+    kan_bool_t initially_alive;
+};
+
+// \meta reflection_struct_meta = "status_record_t"
+TEST_REPOSITORY_API struct kan_repository_meta_automatic_on_insert_event_t status_record_on_insert = {
+    .event_type = "status_record_on_insert_event_t",
+    .copy_outs_count = 2u,
+    .copy_outs =
+        (struct kan_repository_copy_out_t[]) {
+            {
+                .source_path = {.reflection_path_length = 1u, .reflection_path = (const char *[]) {"object_id"}},
+                .target_path = {.reflection_path_length = 1u, .reflection_path = (const char *[]) {"object_id"}},
+            },
+            {
+                .source_path = {.reflection_path_length = 1u, .reflection_path = (const char *[]) {"observable_alive"}},
+                .target_path = {.reflection_path_length = 1u, .reflection_path = (const char *[]) {"initially_alive"}},
+            },
+        },
+};
+
+struct status_record_on_change_event_t
+{
+    uint64_t object_id;
+    kan_bool_t was_alive;
+    kan_bool_t was_poisoned;
+    kan_bool_t was_stunned;
+    kan_bool_t was_boosted;
+    kan_bool_t now_alive;
+    kan_bool_t now_poisoned;
+    kan_bool_t now_stunned;
+    kan_bool_t now_boosted;
+};
+
+// \meta reflection_struct_meta = "status_record_t"
+TEST_REPOSITORY_API struct kan_repository_meta_automatic_on_change_event_t status_record_on_change = {
+    .event_type = "status_record_on_change_event_t",
+    .observed_fields_count = 4u,
+    .observed_fields =
+        (struct kan_repository_field_path_t[]) {
+            {.reflection_path_length = 1u, .reflection_path = (const char *[]) {"observable_alive"}},
+            {.reflection_path_length = 1u, .reflection_path = (const char *[]) {"observable_poisoned"}},
+            {.reflection_path_length = 1u, .reflection_path = (const char *[]) {"observable_stunned"}},
+            {.reflection_path_length = 1u, .reflection_path = (const char *[]) {"observable_boosted"}},
+        },
+    .unchanged_copy_outs_count = 4u,
+    .unchanged_copy_outs =
+        (struct kan_repository_copy_out_t[]) {
+            {
+                .source_path = {.reflection_path_length = 1u, .reflection_path = (const char *[]) {"observable_alive"}},
+                .target_path = {.reflection_path_length = 1u, .reflection_path = (const char *[]) {"was_alive"}},
+            },
+            {
+                .source_path = {.reflection_path_length = 1u,
+                                .reflection_path = (const char *[]) {"observable_poisoned"}},
+                .target_path = {.reflection_path_length = 1u, .reflection_path = (const char *[]) {"was_poisoned"}},
+            },
+            {
+                .source_path = {.reflection_path_length = 1u,
+                                .reflection_path = (const char *[]) {"observable_stunned"}},
+                .target_path = {.reflection_path_length = 1u, .reflection_path = (const char *[]) {"was_stunned"}},
+            },
+            {
+                .source_path = {.reflection_path_length = 1u,
+                                .reflection_path = (const char *[]) {"observable_boosted"}},
+                .target_path = {.reflection_path_length = 1u, .reflection_path = (const char *[]) {"was_boosted"}},
+            },
+        },
+    .changed_copy_outs_count = 5u,
+    .changed_copy_outs =
+        (struct kan_repository_copy_out_t[]) {
+            {
+                .source_path = {.reflection_path_length = 1u, .reflection_path = (const char *[]) {"object_id"}},
+                .target_path = {.reflection_path_length = 1u, .reflection_path = (const char *[]) {"object_id"}},
+            },
+            {
+                .source_path = {.reflection_path_length = 1u, .reflection_path = (const char *[]) {"observable_alive"}},
+                .target_path = {.reflection_path_length = 1u, .reflection_path = (const char *[]) {"now_alive"}},
+            },
+            {
+                .source_path = {.reflection_path_length = 1u,
+                                .reflection_path = (const char *[]) {"observable_poisoned"}},
+                .target_path = {.reflection_path_length = 1u, .reflection_path = (const char *[]) {"now_poisoned"}},
+            },
+            {
+                .source_path = {.reflection_path_length = 1u,
+                                .reflection_path = (const char *[]) {"observable_stunned"}},
+                .target_path = {.reflection_path_length = 1u, .reflection_path = (const char *[]) {"now_stunned"}},
+            },
+            {
+                .source_path = {.reflection_path_length = 1u,
+                                .reflection_path = (const char *[]) {"observable_boosted"}},
+                .target_path = {.reflection_path_length = 1u, .reflection_path = (const char *[]) {"now_boosted"}},
+            },
+        },
+};
+
+struct status_record_on_delete_event_t
+{
+    uint64_t object_id;
+    kan_bool_t was_alive;
+};
+
+// \meta reflection_struct_meta = "status_record_t"
+TEST_REPOSITORY_API struct kan_repository_meta_automatic_on_delete_event_t status_record_on_delete = {
+    .event_type = "status_record_on_delete_event_t",
+    .copy_outs_count = 2u,
+    .copy_outs =
+        (struct kan_repository_copy_out_t[]) {
+            {
+                .source_path = {.reflection_path_length = 1u, .reflection_path = (const char *[]) {"object_id"}},
+                .target_path = {.reflection_path_length = 1u, .reflection_path = (const char *[]) {"object_id"}},
+            },
+            {
+                .source_path = {.reflection_path_length = 1u, .reflection_path = (const char *[]) {"observable_alive"}},
+                .target_path = {.reflection_path_length = 1u, .reflection_path = (const char *[]) {"was_alive"}},
+            },
+        },
+};
+
+struct multi_component_record_t
+{
+    uint64_t object_id;
+    uint64_t some_data;
+};
+
+TEST_REPOSITORY_API void multi_component_record_init (uint64_t reflection_user_data, void *data)
+{
+    *(struct multi_component_record_t *) data = (struct multi_component_record_t) {
+        .object_id = 0u,
+        .some_data = 0u,
+    };
+}
+
+// \meta reflection_struct_meta = "object_record_t"
+TEST_REPOSITORY_API struct kan_repository_meta_automatic_cascade_deletion_t
+    multi_component_record_object_cascade_deletion = {
+        .parent_key_path = {.reflection_path_length = 1u, .reflection_path = (const char *[]) {"object_id"}},
+        .child_type_name = "multi_component_record_t",
+        .child_key_path = {.reflection_path_length = 1u, .reflection_path = (const char *[]) {"object_id"}},
+};
+
 static void check_no_event (struct kan_repository_event_fetch_query_t *query)
 {
     struct kan_repository_event_read_access_t access = kan_repository_event_fetch_query_next (query);
@@ -275,6 +473,113 @@ static void check_a_b_changed_event (struct kan_repository_event_fetch_query_t *
     KAN_TEST_CHECK (event->new_a == data.new_a)
     KAN_TEST_CHECK (event->new_b == data.new_b)
     kan_repository_event_read_access_close (&access);
+}
+
+static void check_status_insert_event (struct kan_repository_event_fetch_query_t *query,
+                                       struct status_record_on_insert_event_t data)
+{
+    struct kan_repository_event_read_access_t access = kan_repository_event_fetch_query_next (query);
+    struct status_record_on_insert_event_t *event =
+        (struct status_record_on_insert_event_t *) kan_repository_event_read_access_resolve (&access);
+
+    KAN_TEST_ASSERT (event)
+    KAN_TEST_CHECK (event->object_id == data.object_id)
+    KAN_TEST_CHECK (event->initially_alive == data.initially_alive)
+    kan_repository_event_read_access_close (&access);
+}
+
+static void check_status_change_event (struct kan_repository_event_fetch_query_t *query,
+                                       struct status_record_on_change_event_t data)
+{
+    struct kan_repository_event_read_access_t access = kan_repository_event_fetch_query_next (query);
+    struct status_record_on_change_event_t *event =
+        (struct status_record_on_change_event_t *) kan_repository_event_read_access_resolve (&access);
+
+    KAN_TEST_ASSERT (event)
+    KAN_TEST_CHECK (event->object_id == data.object_id)
+    KAN_TEST_CHECK (event->was_alive == data.was_alive)
+    KAN_TEST_CHECK (event->was_poisoned == data.was_poisoned)
+    KAN_TEST_CHECK (event->was_stunned == data.was_stunned)
+    KAN_TEST_CHECK (event->was_boosted == data.was_boosted)
+    KAN_TEST_CHECK (event->now_alive == data.now_alive)
+    KAN_TEST_CHECK (event->now_poisoned == data.now_poisoned)
+    KAN_TEST_CHECK (event->now_stunned == data.now_stunned)
+    KAN_TEST_CHECK (event->now_boosted == data.now_boosted)
+    kan_repository_event_read_access_close (&access);
+}
+
+static void check_status_delete_event (struct kan_repository_event_fetch_query_t *query,
+                                       struct status_record_on_delete_event_t data)
+{
+    struct kan_repository_event_read_access_t access = kan_repository_event_fetch_query_next (query);
+    struct status_record_on_delete_event_t *event =
+        (struct status_record_on_delete_event_t *) kan_repository_event_read_access_resolve (&access);
+
+    KAN_TEST_ASSERT (event)
+    KAN_TEST_CHECK (event->object_id == data.object_id)
+    KAN_TEST_CHECK (event->was_alive == data.was_alive)
+    kan_repository_event_read_access_close (&access);
+}
+
+static void insert_object_record_and_undo (struct kan_repository_indexed_insert_query_t *query)
+{
+    struct kan_repository_indexed_insertion_package_t package = kan_repository_indexed_insert_query_execute (query);
+    KAN_TEST_CHECK (kan_repository_indexed_insertion_package_get (&package));
+    kan_repository_indexed_insertion_package_undo (&package);
+}
+
+static void insert_object_record (struct kan_repository_indexed_insert_query_t *query, struct object_record_t data)
+{
+    struct kan_repository_indexed_insertion_package_t package = kan_repository_indexed_insert_query_execute (query);
+    struct object_record_t *record = (struct object_record_t *) kan_repository_indexed_insertion_package_get (&package);
+    KAN_TEST_ASSERT (record);
+    *record = data;
+    kan_repository_indexed_insertion_package_submit (&package);
+}
+
+static void insert_status_record (struct kan_repository_indexed_insert_query_t *query, struct status_record_t data)
+{
+    struct kan_repository_indexed_insertion_package_t package = kan_repository_indexed_insert_query_execute (query);
+    struct status_record_t *record = (struct status_record_t *) kan_repository_indexed_insertion_package_get (&package);
+    KAN_TEST_ASSERT (record);
+    *record = data;
+    kan_repository_indexed_insertion_package_submit (&package);
+}
+
+static void insert_multi_component_record (struct kan_repository_indexed_insert_query_t *query,
+                                           struct multi_component_record_t data)
+{
+    struct kan_repository_indexed_insertion_package_t package = kan_repository_indexed_insert_query_execute (query);
+    struct multi_component_record_t *record =
+        (struct multi_component_record_t *) kan_repository_indexed_insertion_package_get (&package);
+
+    KAN_TEST_ASSERT (record);
+    *record = data;
+    kan_repository_indexed_insertion_package_submit (&package);
+}
+
+static void check_value_exists_unique (struct kan_repository_indexed_value_read_query_t *query, uint64_t value)
+{
+    struct kan_repository_indexed_value_read_cursor_t cursor =
+        kan_repository_indexed_value_read_query_execute (query, &value);
+
+    struct kan_repository_indexed_value_read_access_t access = kan_repository_indexed_value_read_cursor_next (&cursor);
+    KAN_TEST_CHECK (kan_repository_indexed_value_read_access_resolve (&access))
+    kan_repository_indexed_value_read_access_close (&access);
+
+    access = kan_repository_indexed_value_read_cursor_next (&cursor);
+    KAN_TEST_CHECK (!kan_repository_indexed_value_read_access_resolve (&access))
+    kan_repository_indexed_value_read_cursor_close (&cursor);
+}
+
+static void check_value_not_exists (struct kan_repository_indexed_value_read_query_t *query, uint64_t value)
+{
+    struct kan_repository_indexed_value_read_cursor_t cursor =
+        kan_repository_indexed_value_read_query_execute (query, &value);
+
+    struct kan_repository_indexed_value_read_access_t access = kan_repository_indexed_value_read_cursor_next (&cursor);
+    KAN_TEST_CHECK (!kan_repository_indexed_value_read_access_resolve (&access))
+    kan_repository_indexed_value_read_cursor_close (&cursor);
 }
 
 KAN_TEST_CASE (manual_event)
@@ -717,6 +1022,747 @@ KAN_TEST_CASE (singleton_write_events)
     kan_repository_singleton_write_query_shutdown (&write_singleton);
     kan_repository_event_fetch_query_shutdown (&fetch_z_changed);
     kan_repository_event_fetch_query_shutdown (&fetch_a_b_changed);
+
+    kan_repository_destroy (repository);
+    kan_reflection_registry_destroy (registry);
+}
+
+KAN_TEST_CASE (indexed_sequence_operations)
+{
+    kan_reflection_registry_t registry = kan_reflection_registry_create ();
+    KAN_REFLECTION_UNIT_REGISTRAR_NAME (repository) (registry);
+    KAN_REFLECTION_UNIT_REGISTRAR_NAME (test_repository) (registry);
+
+    kan_repository_t root_repository = kan_repository_create_root (KAN_ALLOCATION_GROUP_IGNORE, registry);
+    kan_repository_t child_repository = kan_repository_create_child (root_repository, "child");
+
+    kan_repository_indexed_storage_t storage_root =
+        kan_repository_indexed_storage_open (root_repository, "object_record_t");
+    kan_repository_indexed_storage_t storage_child =
+        kan_repository_indexed_storage_open (child_repository, "object_record_t");
+
+    struct kan_repository_indexed_insert_query_t insert_child;
+    kan_repository_indexed_insert_query_init (&insert_child, storage_child);
+
+    struct kan_repository_indexed_sequence_read_query_t read_root;
+    kan_repository_indexed_sequence_read_query_init (&read_root, storage_root);
+
+    struct kan_repository_indexed_sequence_update_query_t update_child;
+    kan_repository_indexed_sequence_update_query_init (&update_child, storage_child);
+
+    struct kan_repository_indexed_sequence_delete_query_t delete_child;
+    kan_repository_indexed_sequence_delete_query_init (&delete_child, storage_child);
+
+    struct kan_repository_indexed_sequence_write_query_t write_root;
+    kan_repository_indexed_sequence_write_query_init (&write_root, storage_root);
+
+    kan_repository_enter_serving_mode (root_repository);
+
+    {
+        struct kan_repository_indexed_sequence_read_cursor_t cursor =
+            kan_repository_indexed_sequence_read_query_execute (&read_root);
+
+        struct kan_repository_indexed_sequence_read_access_t access =
+            kan_repository_indexed_sequence_read_cursor_next (&cursor);
+        KAN_TEST_CHECK (!kan_repository_indexed_sequence_read_access_resolve (&access));
+
+        kan_repository_indexed_sequence_read_cursor_close (&cursor);
+    }
+
+    insert_object_record (
+        &insert_child,
+        (struct object_record_t) {
+            .object_id = 1u, .parent_object_id = INVALID_PARENT_OBJECT_ID, .data_x = 42u, .data_y = 13u});
+
+    insert_object_record (
+        &insert_child,
+        (struct object_record_t) {
+            .object_id = 2u, .parent_object_id = INVALID_PARENT_OBJECT_ID, .data_x = 11u, .data_y = 19u});
+
+    insert_object_record_and_undo (&insert_child);
+
+    {
+        struct kan_repository_indexed_sequence_update_cursor_t cursor =
+            kan_repository_indexed_sequence_update_query_execute (&update_child);
+        uint64_t objects_found = 0u;
+
+        while (KAN_TRUE)
+        {
+            struct kan_repository_indexed_sequence_update_access_t access =
+                kan_repository_indexed_sequence_update_cursor_next (&cursor);
+
+            struct object_record_t *object =
+                (struct object_record_t *) kan_repository_indexed_sequence_update_access_resolve (&access);
+
+            if (!object)
+            {
+                break;
+            }
+
+            ++objects_found;
+            if (object->object_id == 1u)
+            {
+                KAN_TEST_CHECK (object->parent_object_id == INVALID_PARENT_OBJECT_ID)
+                KAN_TEST_CHECK (object->data_x == 42u)
+                KAN_TEST_CHECK (object->data_y == 13u)
+                object->object_id = 10u;
+            }
+            else
+            {
+                KAN_TEST_CHECK (object->object_id == 2u)
+                KAN_TEST_CHECK (object->parent_object_id == INVALID_PARENT_OBJECT_ID)
+                KAN_TEST_CHECK (object->data_x == 11u)
+                KAN_TEST_CHECK (object->data_y == 19u)
+            }
+
+            kan_repository_indexed_sequence_update_access_close (&access);
+        }
+
+        KAN_TEST_CHECK (objects_found == 2u)
+        kan_repository_indexed_sequence_update_cursor_close (&cursor);
+    }
+
+    {
+        struct kan_repository_indexed_sequence_delete_cursor_t cursor =
+            kan_repository_indexed_sequence_delete_query_execute (&delete_child);
+        uint64_t objects_found = 0u;
+
+        while (KAN_TRUE)
+        {
+            struct kan_repository_indexed_sequence_delete_access_t access =
+                kan_repository_indexed_sequence_delete_cursor_next (&cursor);
+
+            struct object_record_t *object =
+                (struct object_record_t *) kan_repository_indexed_sequence_delete_access_resolve (&access);
+
+            if (!object)
+            {
+                break;
+            }
+
+            ++objects_found;
+            if (object->object_id == 10u)
+            {
+                KAN_TEST_CHECK (object->parent_object_id == INVALID_PARENT_OBJECT_ID)
+                KAN_TEST_CHECK (object->data_x == 42u)
+                KAN_TEST_CHECK (object->data_y == 13u)
+                kan_repository_indexed_sequence_delete_access_close (&access);
+            }
+            else
+            {
+                KAN_TEST_CHECK (object->object_id == 2u)
+                KAN_TEST_CHECK (object->parent_object_id == INVALID_PARENT_OBJECT_ID)
+                KAN_TEST_CHECK (object->data_x == 11u)
+                KAN_TEST_CHECK (object->data_y == 19u)
+                kan_repository_indexed_sequence_delete_access_delete (&access);
+            }
+        }
+
+        KAN_TEST_CHECK (objects_found == 2u)
+        kan_repository_indexed_sequence_delete_cursor_close (&cursor);
+    }
+
+    {
+        struct kan_repository_indexed_sequence_write_cursor_t cursor =
+            kan_repository_indexed_sequence_write_query_execute (&write_root);
+        uint64_t objects_found = 0u;
+
+        while (KAN_TRUE)
+        {
+            struct kan_repository_indexed_sequence_write_access_t access =
+                kan_repository_indexed_sequence_write_cursor_next (&cursor);
+
+            struct object_record_t *object =
+                (struct object_record_t *) kan_repository_indexed_sequence_write_access_resolve (&access);
+
+            if (!object)
+            {
+                break;
+            }
+
+            ++objects_found;
+            if (object->object_id == 10u)
+            {
+                KAN_TEST_CHECK (object->parent_object_id == INVALID_PARENT_OBJECT_ID)
+                KAN_TEST_CHECK (object->data_x == 42u)
+                KAN_TEST_CHECK (object->data_y == 13u)
+                kan_repository_indexed_sequence_write_access_delete (&access);
+            }
+            else
+            {
+                KAN_TEST_CHECK (KAN_FALSE)
+                kan_repository_indexed_sequence_write_access_close (&access);
+            }
+        }
+
+        KAN_TEST_CHECK (objects_found == 1u)
+        kan_repository_indexed_sequence_write_cursor_close (&cursor);
+    }
+
+    {
+        struct kan_repository_indexed_sequence_read_cursor_t cursor =
+            kan_repository_indexed_sequence_read_query_execute (&read_root);
+
+        struct kan_repository_indexed_sequence_read_access_t access =
+            kan_repository_indexed_sequence_read_cursor_next (&cursor);
+        KAN_TEST_CHECK (!kan_repository_indexed_sequence_read_access_resolve (&access));
+
+        kan_repository_indexed_sequence_read_cursor_close (&cursor);
+    }
+
+    kan_repository_enter_planning_mode (root_repository);
+    kan_repository_indexed_insert_query_shutdown (&insert_child);
+    kan_repository_indexed_sequence_read_query_shutdown (&read_root);
+    kan_repository_indexed_sequence_update_query_shutdown (&update_child);
+    kan_repository_indexed_sequence_delete_query_shutdown (&delete_child);
+    kan_repository_indexed_sequence_write_query_shutdown (&write_root);
+
+    kan_repository_destroy (root_repository);
+    kan_reflection_registry_destroy (registry);
+}
+
+KAN_TEST_CASE (indexed_value_operations)
+{
+    kan_reflection_registry_t registry = kan_reflection_registry_create ();
+    KAN_REFLECTION_UNIT_REGISTRAR_NAME (repository) (registry);
+    KAN_REFLECTION_UNIT_REGISTRAR_NAME (test_repository) (registry);
+
+    kan_repository_t root_repository = kan_repository_create_root (KAN_ALLOCATION_GROUP_IGNORE, registry);
+    kan_repository_t child_repository = kan_repository_create_child (root_repository, "child");
+
+    kan_repository_indexed_storage_t storage_root =
+        kan_repository_indexed_storage_open (root_repository, "object_record_t");
+    kan_repository_indexed_storage_t storage_child =
+        kan_repository_indexed_storage_open (child_repository, "object_record_t");
+    kan_repository_indexed_storage_t storage_multi_component =
+        kan_repository_indexed_storage_open (root_repository, "multi_component_record_t");
+
+    struct kan_repository_indexed_insert_query_t insert_child;
+    kan_repository_indexed_insert_query_init (&insert_child, storage_child);
+
+    struct kan_repository_indexed_value_read_query_t read_root;
+    kan_repository_indexed_value_read_query_init (
+        &read_root, storage_root,
+        (struct kan_repository_field_path_t) {.reflection_path_length = 1u, (const char *[]) {"object_id"}});
+
+    struct kan_repository_indexed_value_update_query_t update_child;
+    kan_repository_indexed_value_update_query_init (
+        &update_child, storage_child,
+        (struct kan_repository_field_path_t) {.reflection_path_length = 1u, (const char *[]) {"object_id"}});
+
+    struct kan_repository_indexed_value_delete_query_t delete_child;
+    kan_repository_indexed_value_delete_query_init (
+        &delete_child, storage_child,
+        (struct kan_repository_field_path_t) {.reflection_path_length = 1u, (const char *[]) {"object_id"}});
+
+    struct kan_repository_indexed_insert_query_t insert_multi_component;
+    kan_repository_indexed_insert_query_init (&insert_multi_component, storage_multi_component);
+
+    struct kan_repository_indexed_value_write_query_t write_multi_component;
+    kan_repository_indexed_value_write_query_init (
+        &write_multi_component, storage_multi_component,
+        (struct kan_repository_field_path_t) {.reflection_path_length = 1u, (const char *[]) {"object_id"}});
+
+    kan_repository_enter_serving_mode (root_repository);
+
+    struct object_record_t first_record_value = {
+        .object_id = 1u, .parent_object_id = INVALID_PARENT_OBJECT_ID, .data_x = 42u, .data_y = 13u};
+
+    struct object_record_t second_record_value = {
+        .object_id = 2u, .parent_object_id = INVALID_PARENT_OBJECT_ID, .data_x = 11u, .data_y = 19u};
+
+    struct object_record_t third_record_value = {
+        .object_id = 3u, .parent_object_id = INVALID_PARENT_OBJECT_ID, .data_x = 14u, .data_y = 21u};
+
+    insert_object_record (&insert_child, first_record_value);
+    insert_object_record (&insert_child, second_record_value);
+    insert_object_record (&insert_child, third_record_value);
+
+    {
+        struct kan_repository_indexed_value_read_cursor_t cursor =
+            kan_repository_indexed_value_read_query_execute (&read_root, &first_record_value.object_id);
+
+        struct kan_repository_indexed_value_read_access_t access =
+            kan_repository_indexed_value_read_cursor_next (&cursor);
+
+        struct object_record_t *record =
+            (struct object_record_t *) kan_repository_indexed_value_read_access_resolve (&access);
+
+        KAN_TEST_ASSERT (record)
+        KAN_TEST_CHECK (record->object_id == first_record_value.object_id)
+        KAN_TEST_CHECK (record->parent_object_id == first_record_value.parent_object_id)
+        KAN_TEST_CHECK (record->data_x == first_record_value.data_x)
+        KAN_TEST_CHECK (record->data_y == first_record_value.data_y)
+
+        kan_repository_indexed_value_read_access_close (&access);
+        access = kan_repository_indexed_value_read_cursor_next (&cursor);
+        KAN_TEST_CHECK (!kan_repository_indexed_value_read_access_resolve (&access))
+        kan_repository_indexed_value_read_cursor_close (&cursor);
+    }
+
+    const uint64_t id_4u = 4u;
+
+    {
+        struct kan_repository_indexed_value_read_cursor_t cursor =
+            kan_repository_indexed_value_read_query_execute (&read_root, &id_4u);
+
+        struct kan_repository_indexed_value_read_access_t access =
+            kan_repository_indexed_value_read_cursor_next (&cursor);
+
+        struct object_record_t *record =
+            (struct object_record_t *) kan_repository_indexed_value_read_access_resolve (&access);
+
+        KAN_TEST_CHECK (!record)
+        kan_repository_indexed_value_read_cursor_close (&cursor);
+    }
+
+    {
+        struct kan_repository_indexed_value_update_cursor_t cursor =
+            kan_repository_indexed_value_update_query_execute (&update_child, &second_record_value.object_id);
+
+        struct kan_repository_indexed_value_update_access_t access =
+            kan_repository_indexed_value_update_cursor_next (&cursor);
+
+        struct object_record_t *record =
+            (struct object_record_t *) kan_repository_indexed_value_update_access_resolve (&access);
+
+        KAN_TEST_ASSERT (record)
+        KAN_TEST_CHECK (record->object_id == second_record_value.object_id)
+        KAN_TEST_CHECK (record->parent_object_id == second_record_value.parent_object_id)
+        KAN_TEST_CHECK (record->data_x == second_record_value.data_x)
+        KAN_TEST_CHECK (record->data_y == second_record_value.data_y)
+
+        record->object_id = id_4u;
+        kan_repository_indexed_value_update_access_close (&access);
+        access = kan_repository_indexed_value_update_cursor_next (&cursor);
+        KAN_TEST_CHECK (!kan_repository_indexed_value_update_access_resolve (&access))
+        kan_repository_indexed_value_update_cursor_close (&cursor);
+    }
+
+    {
+        struct kan_repository_indexed_value_read_cursor_t cursor =
+            kan_repository_indexed_value_read_query_execute (&read_root, &id_4u);
+
+        struct kan_repository_indexed_value_read_access_t access =
+            kan_repository_indexed_value_read_cursor_next (&cursor);
+
+        KAN_TEST_CHECK (kan_repository_indexed_value_read_access_resolve (&access))
+        kan_repository_indexed_value_read_access_close (&access);
+        kan_repository_indexed_value_read_cursor_close (&cursor);
+    }
+
+    {
+        struct kan_repository_indexed_value_delete_cursor_t cursor =
+            kan_repository_indexed_value_delete_query_execute (&delete_child, &id_4u);
+
+        struct kan_repository_indexed_value_delete_access_t access =
+            kan_repository_indexed_value_delete_cursor_next (&cursor);
+
+        KAN_TEST_CHECK (kan_repository_indexed_value_delete_access_resolve (&access))
+        kan_repository_indexed_value_delete_access_delete (&access);
+        kan_repository_indexed_value_delete_cursor_close (&cursor);
+    }
+
+    {
+        struct kan_repository_indexed_value_read_cursor_t cursor =
+            kan_repository_indexed_value_read_query_execute (&read_root, &id_4u);
+
+        struct kan_repository_indexed_value_read_access_t access =
+            kan_repository_indexed_value_read_cursor_next (&cursor);
+
+        struct object_record_t *record =
+            (struct object_record_t *) kan_repository_indexed_value_read_access_resolve (&access);
+
+        KAN_TEST_CHECK (!record)
+        kan_repository_indexed_value_read_cursor_close (&cursor);
+    }
+
+    insert_multi_component_record (&insert_multi_component,
+                                   (struct multi_component_record_t) {.object_id = 1u, .some_data = 11u});
+    insert_multi_component_record (&insert_multi_component,
+                                   (struct multi_component_record_t) {.object_id = 1u, .some_data = 12u});
+    insert_multi_component_record (&insert_multi_component,
+                                   (struct multi_component_record_t) {.object_id = 1u, .some_data = 13u});
+
+    {
+        struct kan_repository_indexed_value_write_cursor_t cursor =
+            kan_repository_indexed_value_write_query_execute (&write_multi_component, &first_record_value.object_id);
+
+        struct kan_repository_indexed_value_write_access_t accesses[3u];
+        for (uint64_t index = 0u; index < 3u; ++index)
+        {
+            accesses[index] = kan_repository_indexed_value_write_cursor_next (&cursor);
+        }
+
+        struct kan_repository_indexed_value_write_access_t last_access =
+            kan_repository_indexed_value_write_cursor_next (&cursor);
+        KAN_TEST_ASSERT (!kan_repository_indexed_value_write_access_resolve (&last_access))
+
+        kan_repository_indexed_value_write_cursor_close (&cursor);
+        uint8_t found_11u = 0u;
+        uint8_t found_12u = 0u;
+        uint8_t found_13u = 0u;
+
+        for (uint64_t index = 0u; index < 3u; ++index)
+        {
+            struct multi_component_record_t *record =
+                (struct multi_component_record_t *) kan_repository_indexed_value_write_access_resolve (
+                    &accesses[index]);
+
+            switch (record->some_data)
+            {
+            case 11u:
+                ++found_11u;
+                kan_repository_indexed_value_write_access_delete (&accesses[index]);
+                break;
+
+            case 12u:
+                ++found_12u;
+                record->some_data = 42u;
+                kan_repository_indexed_value_write_access_close (&accesses[index]);
+                break;
+
+            case 13u:
+                ++found_13u;
+                kan_repository_indexed_value_write_access_close (&accesses[index]);
+                break;
+
+            default:
+                KAN_TEST_CHECK (KAN_FALSE);
+                kan_repository_indexed_value_write_access_close (&accesses[index]);
+                break;
+            }
+        }
+
+        KAN_TEST_CHECK (found_11u == 1u)
+        KAN_TEST_CHECK (found_12u == 1u)
+        KAN_TEST_CHECK (found_13u == 1u)
+    }
+
+    {
+        struct kan_repository_indexed_value_write_cursor_t cursor =
+            kan_repository_indexed_value_write_query_execute (&write_multi_component, &first_record_value.object_id);
+
+        struct kan_repository_indexed_value_write_access_t accesses[2u];
+        for (uint64_t index = 0u; index < 2u; ++index)
+        {
+            accesses[index] = kan_repository_indexed_value_write_cursor_next (&cursor);
+        }
+
+        struct kan_repository_indexed_value_write_access_t last_access =
+            kan_repository_indexed_value_write_cursor_next (&cursor);
+        KAN_TEST_ASSERT (!kan_repository_indexed_value_write_access_resolve (&last_access))
+
+        kan_repository_indexed_value_write_cursor_close (&cursor);
+        uint8_t found_42u = 0u;
+        uint8_t found_13u = 0u;
+
+        for (uint64_t index = 0u; index < 2u; ++index)
+        {
+            struct multi_component_record_t *record =
+                (struct multi_component_record_t *) kan_repository_indexed_value_write_access_resolve (
+                    &accesses[index]);
+
+            switch (record->some_data)
+            {
+            case 42u:
+                ++found_42u;
+                break;
+
+            case 13u:
+                ++found_13u;
+                break;
+
+            default:
+                KAN_TEST_CHECK (KAN_FALSE);
+                break;
+            }
+
+            kan_repository_indexed_value_write_access_close (&accesses[index]);
+        }
+
+        KAN_TEST_CHECK (found_42u == 1u)
+        KAN_TEST_CHECK (found_13u == 1u)
+    }
+
+    kan_repository_enter_planning_mode (root_repository);
+    kan_repository_indexed_insert_query_shutdown (&insert_child);
+    kan_repository_indexed_value_read_query_shutdown (&read_root);
+    kan_repository_indexed_value_update_query_shutdown (&update_child);
+    kan_repository_indexed_value_delete_query_shutdown (&delete_child);
+    kan_repository_indexed_insert_query_shutdown (&insert_multi_component);
+    kan_repository_indexed_value_write_query_shutdown (&write_multi_component);
+
+    kan_repository_destroy (root_repository);
+    kan_reflection_registry_destroy (registry);
+}
+
+KAN_TEST_CASE (indexed_cascade_deletion)
+{
+    kan_reflection_registry_t registry = kan_reflection_registry_create ();
+    KAN_REFLECTION_UNIT_REGISTRAR_NAME (repository) (registry);
+    KAN_REFLECTION_UNIT_REGISTRAR_NAME (test_repository) (registry);
+
+    kan_repository_t repository = kan_repository_create_root (KAN_ALLOCATION_GROUP_IGNORE, registry);
+    kan_repository_indexed_storage_t storage_object =
+        kan_repository_indexed_storage_open (repository, "object_record_t");
+    kan_repository_indexed_storage_t storage_status =
+        kan_repository_indexed_storage_open (repository, "status_record_t");
+    kan_repository_indexed_storage_t storage_multi_component =
+        kan_repository_indexed_storage_open (repository, "multi_component_record_t");
+
+    struct kan_repository_indexed_insert_query_t insert_object;
+    kan_repository_indexed_insert_query_init (&insert_object, storage_object);
+
+    struct kan_repository_indexed_value_read_query_t read_object;
+    kan_repository_indexed_value_read_query_init (
+        &read_object, storage_object,
+        (struct kan_repository_field_path_t) {.reflection_path_length = 1u, (const char *[]) {"object_id"}});
+
+    struct kan_repository_indexed_value_delete_query_t delete_object;
+    kan_repository_indexed_value_delete_query_init (
+        &delete_object, storage_object,
+        (struct kan_repository_field_path_t) {.reflection_path_length = 1u, (const char *[]) {"object_id"}});
+
+    struct kan_repository_indexed_insert_query_t insert_status;
+    kan_repository_indexed_insert_query_init (&insert_status, storage_status);
+
+    struct kan_repository_indexed_value_read_query_t read_status;
+    kan_repository_indexed_value_read_query_init (
+        &read_status, storage_status,
+        (struct kan_repository_field_path_t) {.reflection_path_length = 1u, (const char *[]) {"object_id"}});
+
+    struct kan_repository_indexed_insert_query_t insert_multi_component;
+    kan_repository_indexed_insert_query_init (&insert_multi_component, storage_multi_component);
+
+    struct kan_repository_indexed_value_read_query_t read_multi_component;
+    kan_repository_indexed_value_read_query_init (
+        &read_multi_component, storage_multi_component,
+        (struct kan_repository_field_path_t) {.reflection_path_length = 1u, (const char *[]) {"object_id"}});
+
+    kan_repository_enter_serving_mode (repository);
+
+    insert_object_record (
+        &insert_object,
+        (struct object_record_t) {
+            .object_id = 1u, .parent_object_id = INVALID_PARENT_OBJECT_ID, .data_x = 42u, .data_y = 13u});
+    insert_status_record (&insert_status, (struct status_record_t) {.object_id = 1u,
+                                                                    .observable_alive = KAN_TRUE,
+                                                                    .observable_poisoned = KAN_FALSE,
+                                                                    .observable_stunned = KAN_FALSE,
+                                                                    .observable_boosted = KAN_FALSE});
+
+    insert_object_record (&insert_object, (struct object_record_t) {
+                                              .object_id = 2u, .parent_object_id = 1u, .data_x = 11u, .data_y = 19u});
+    insert_multi_component_record (&insert_multi_component,
+                                   (struct multi_component_record_t) {.object_id = 2u, .some_data = 1u});
+    insert_multi_component_record (&insert_multi_component,
+                                   (struct multi_component_record_t) {.object_id = 2u, .some_data = 1u});
+
+    insert_object_record (&insert_object, (struct object_record_t) {
+                                              .object_id = 3u, .parent_object_id = 2u, .data_x = 14u, .data_y = 21u});
+    insert_status_record (&insert_status, (struct status_record_t) {.object_id = 3u,
+                                                                    .observable_alive = KAN_TRUE,
+                                                                    .observable_poisoned = KAN_FALSE,
+                                                                    .observable_stunned = KAN_FALSE,
+                                                                    .observable_boosted = KAN_FALSE});
+    insert_multi_component_record (&insert_multi_component,
+                                   (struct multi_component_record_t) {.object_id = 3u, .some_data = 1u});
+
+    insert_object_record (&insert_object, (struct object_record_t) {
+                                              .object_id = 4u, .parent_object_id = 1u, .data_x = 14u, .data_y = 21u});
+    insert_multi_component_record (&insert_multi_component,
+                                   (struct multi_component_record_t) {.object_id = 4u, .some_data = 1u});
+    insert_multi_component_record (&insert_multi_component,
+                                   (struct multi_component_record_t) {.object_id = 4u, .some_data = 1u});
+
+    insert_object_record (
+        &insert_object,
+        (struct object_record_t) {
+            .object_id = 5u, .parent_object_id = INVALID_PARENT_OBJECT_ID, .data_x = 14u, .data_y = 21u});
+    insert_status_record (&insert_status, (struct status_record_t) {.object_id = 5u,
+                                                                    .observable_alive = KAN_TRUE,
+                                                                    .observable_poisoned = KAN_FALSE,
+                                                                    .observable_stunned = KAN_FALSE,
+                                                                    .observable_boosted = KAN_FALSE});
+    insert_multi_component_record (&insert_multi_component,
+                                   (struct multi_component_record_t) {.object_id = 5u, .some_data = 1u});
+
+    {
+        const uint64_t id_1u = 1u;
+        struct kan_repository_indexed_value_delete_cursor_t cursor =
+            kan_repository_indexed_value_delete_query_execute (&delete_object, &id_1u);
+
+        struct kan_repository_indexed_value_delete_access_t access =
+            kan_repository_indexed_value_delete_cursor_next (&cursor);
+        kan_repository_indexed_value_delete_cursor_close (&cursor);
+
+        KAN_TEST_CHECK (kan_repository_indexed_value_delete_access_resolve (&access))
+        kan_repository_indexed_value_delete_access_delete (&access);
+    }
+
+    check_value_not_exists (&read_object, 1u);
+    check_value_not_exists (&read_status, 1u);
+    check_value_not_exists (&read_multi_component, 1u);
+
+    check_value_not_exists (&read_object, 2u);
+    check_value_not_exists (&read_status, 2u);
+    check_value_not_exists (&read_multi_component, 2u);
+
+    check_value_not_exists (&read_object, 3u);
+    check_value_not_exists (&read_status, 3u);
+    check_value_not_exists (&read_multi_component, 3u);
+
+    check_value_not_exists (&read_object, 4u);
+    check_value_not_exists (&read_status, 4u);
+    check_value_not_exists (&read_multi_component, 4u);
+
+    check_value_exists_unique (&read_object, 5u);
+    check_value_exists_unique (&read_status, 5u);
+    check_value_exists_unique (&read_multi_component, 5u);
+
+    kan_repository_enter_planning_mode (repository);
+    kan_repository_indexed_insert_query_shutdown (&insert_object);
+    kan_repository_indexed_value_read_query_shutdown (&read_object);
+    kan_repository_indexed_value_delete_query_shutdown (&delete_object);
+    kan_repository_indexed_insert_query_shutdown (&insert_status);
+    kan_repository_indexed_value_read_query_shutdown (&read_status);
+    kan_repository_indexed_insert_query_shutdown (&insert_multi_component);
+    kan_repository_indexed_value_read_query_shutdown (&read_multi_component);
+
+    kan_repository_destroy (repository);
+    kan_reflection_registry_destroy (registry);
+}
+
+KAN_TEST_CASE (indexed_automatic_events)
+{
+    kan_reflection_registry_t registry = kan_reflection_registry_create ();
+    KAN_REFLECTION_UNIT_REGISTRAR_NAME (repository) (registry);
+    KAN_REFLECTION_UNIT_REGISTRAR_NAME (test_repository) (registry);
+
+    kan_repository_t repository = kan_repository_create_root (KAN_ALLOCATION_GROUP_IGNORE, registry);
+    kan_repository_indexed_storage_t status_storage =
+        kan_repository_indexed_storage_open (repository, "status_record_t");
+
+    kan_repository_event_storage_t on_insert_storage =
+        kan_repository_event_storage_open (repository, "status_record_on_insert_event_t");
+
+    kan_repository_event_storage_t on_change_storage =
+        kan_repository_event_storage_open (repository, "status_record_on_change_event_t");
+
+    kan_repository_event_storage_t on_delete_storage =
+        kan_repository_event_storage_open (repository, "status_record_on_delete_event_t");
+
+    struct kan_repository_indexed_insert_query_t insert_status;
+    kan_repository_indexed_insert_query_init (&insert_status, status_storage);
+
+    struct kan_repository_indexed_value_write_query_t write_status;
+    kan_repository_indexed_value_write_query_init (
+        &write_status, status_storage,
+        (struct kan_repository_field_path_t) {.reflection_path_length = 1u, (const char *[]) {"object_id"}});
+
+    struct kan_repository_event_fetch_query_t fetch_on_insert;
+    kan_repository_event_fetch_query_init (&fetch_on_insert, on_insert_storage);
+
+    struct kan_repository_event_fetch_query_t fetch_on_change;
+    kan_repository_event_fetch_query_init (&fetch_on_change, on_change_storage);
+
+    struct kan_repository_event_fetch_query_t fetch_on_delete;
+    kan_repository_event_fetch_query_init (&fetch_on_delete, on_delete_storage);
+
+    kan_repository_enter_serving_mode (repository);
+    check_no_event (&fetch_on_insert);
+    check_no_event (&fetch_on_change);
+    check_no_event (&fetch_on_delete);
+
+    insert_status_record (&insert_status, (struct status_record_t) {.object_id = 1u,
+                                                                    .observable_alive = KAN_TRUE,
+                                                                    .observable_poisoned = KAN_FALSE,
+                                                                    .observable_stunned = KAN_FALSE,
+                                                                    .observable_boosted = KAN_FALSE});
+
+    insert_status_record (&insert_status, (struct status_record_t) {.object_id = 2u,
+                                                                    .observable_alive = KAN_FALSE,
+                                                                    .observable_poisoned = KAN_FALSE,
+                                                                    .observable_stunned = KAN_FALSE,
+                                                                    .observable_boosted = KAN_FALSE});
+
+    insert_status_record (&insert_status, (struct status_record_t) {.object_id = 3u,
+                                                                    .observable_alive = KAN_TRUE,
+                                                                    .observable_poisoned = KAN_FALSE,
+                                                                    .observable_stunned = KAN_FALSE,
+                                                                    .observable_boosted = KAN_FALSE});
+
+    check_status_insert_event (&fetch_on_insert,
+                               (struct status_record_on_insert_event_t) {.object_id = 1u, .initially_alive = KAN_TRUE});
+
+    check_status_insert_event (
+        &fetch_on_insert, (struct status_record_on_insert_event_t) {.object_id = 2u, .initially_alive = KAN_FALSE});
+
+    check_status_insert_event (&fetch_on_insert,
+                               (struct status_record_on_insert_event_t) {.object_id = 3u, .initially_alive = KAN_TRUE});
+
+    check_no_event (&fetch_on_change);
+    check_no_event (&fetch_on_delete);
+
+    const uint64_t id_1u = 1u;
+
+    {
+        struct kan_repository_indexed_value_write_cursor_t cursor =
+            kan_repository_indexed_value_write_query_execute (&write_status, &id_1u);
+
+        struct kan_repository_indexed_value_write_access_t access =
+            kan_repository_indexed_value_write_cursor_next (&cursor);
+        kan_repository_indexed_value_write_cursor_close (&cursor);
+
+        struct status_record_t *record =
+            (struct status_record_t *) kan_repository_indexed_value_write_access_resolve (&access);
+        record->observable_stunned = KAN_TRUE;
+        record->observable_poisoned = KAN_TRUE;
+        record->observable_boosted = KAN_TRUE;
+        record->observable_boosted = KAN_FALSE;
+        kan_repository_indexed_value_write_access_close (&access);
+    }
+
+    check_status_change_event (&fetch_on_change, (struct status_record_on_change_event_t) {.object_id = 1u,
+                                                                                           .was_alive = KAN_TRUE,
+                                                                                           .was_poisoned = KAN_FALSE,
+                                                                                           .was_stunned = KAN_FALSE,
+                                                                                           .was_boosted = KAN_FALSE,
+                                                                                           .now_alive = KAN_TRUE,
+                                                                                           .now_poisoned = KAN_TRUE,
+                                                                                           .now_stunned = KAN_TRUE,
+                                                                                           .now_boosted = KAN_FALSE});
+
+    check_no_event (&fetch_on_insert);
+    check_no_event (&fetch_on_delete);
+
+    const uint64_t id_2u = 2u;
+
+    {
+        struct kan_repository_indexed_value_write_cursor_t cursor =
+            kan_repository_indexed_value_write_query_execute (&write_status, &id_2u);
+
+        struct kan_repository_indexed_value_write_access_t access =
+            kan_repository_indexed_value_write_cursor_next (&cursor);
+        kan_repository_indexed_value_write_cursor_close (&cursor);
+
+        KAN_TEST_ASSERT (kan_repository_indexed_value_write_access_resolve (&access));
+        kan_repository_indexed_value_write_access_delete (&access);
+    }
+
+    check_no_event (&fetch_on_insert);
+    check_no_event (&fetch_on_change);
+
+    check_status_delete_event (&fetch_on_delete,
+                               (struct status_record_on_delete_event_t) {.object_id = 2u, .was_alive = KAN_FALSE});
+
+    kan_repository_enter_planning_mode (repository);
+    kan_repository_indexed_insert_query_shutdown (&insert_status);
+    kan_repository_indexed_value_write_query_shutdown (&write_status);
+    kan_repository_event_fetch_query_shutdown (&fetch_on_insert);
+    kan_repository_event_fetch_query_shutdown (&fetch_on_change);
+    kan_repository_event_fetch_query_shutdown (&fetch_on_delete);
 
     kan_repository_destroy (repository);
     kan_reflection_registry_destroy (registry);

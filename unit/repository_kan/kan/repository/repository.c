@@ -2502,6 +2502,9 @@ static struct repository_t *repository_create (kan_allocation_group_t allocation
     kan_hash_storage_init (&repository->singleton_storages, repository->allocation_group,
                            KAN_REPOSITORY_SINGLETON_STORAGE_INITIAL_BUCKETS);
 
+    kan_hash_storage_init (&repository->indexed_storages, repository->allocation_group,
+                           KAN_REPOSITORY_INDEXED_STORAGE_INITIAL_BUCKETS);
+
     kan_hash_storage_init (&repository->event_storages, repository->allocation_group,
                            KAN_REPOSITORY_EVENT_STORAGE_INITIAL_BUCKETS);
     return repository;
@@ -3169,7 +3172,7 @@ kan_repository_indexed_storage_t kan_repository_indexed_storage_open (kan_reposi
         storage->dirty_records = NULL;
         kan_stack_group_allocator_init (&storage->temporary_allocator,
                                         kan_allocation_group_get_child (storage_allocation_group, "temporary"),
-                                        KAN_REPOSITORY_INDEX_STORAGE_STACK_INITIAL_SIZE);
+                                        KAN_REPOSITORY_INDEXED_STORAGE_STACK_INITIAL_SIZE);
 
         observation_buffer_definition_init (&storage->observation_buffer);
         observation_event_triggers_definition_init (&storage->observation_events_triggers);
@@ -3686,10 +3689,11 @@ struct kan_repository_indexed_sequence_update_access_t kan_repository_indexed_se
 
     if (cursor_data->node)
     {
+        struct indexed_storage_record_node_t *old_node = cursor_data->node;
         cursor_data->node = (struct indexed_storage_record_node_t *) cursor_data->node->list_node.next;
 
 #if defined(KAN_REPOSITORY_SAFEGUARDS_ENABLED)
-        if (!safeguard_indexed_write_access_try_create (access.storage, cursor_data->node))
+        if (!safeguard_indexed_write_access_try_create (access.storage, old_node))
         {
             access.dirty_node = NULL;
         }
@@ -3697,7 +3701,7 @@ struct kan_repository_indexed_sequence_update_access_t kan_repository_indexed_se
 #endif
         {
             access.dirty_node =
-                indexed_storage_report_mutable_access_begin (cursor_data->storage, cursor_data->node, NULL, NULL, NULL);
+                indexed_storage_report_mutable_access_begin (cursor_data->storage, old_node, NULL, NULL, NULL);
             indexed_storage_acquire_access (cursor_data->storage);
         }
     }
@@ -3709,7 +3713,7 @@ void *kan_repository_indexed_sequence_update_access_resolve (
     struct kan_repository_indexed_sequence_update_access_t *access)
 {
     struct indexed_sequence_mutable_access_t *access_data = (struct indexed_sequence_mutable_access_t *) access;
-    return access_data->dirty_node ? access_data->dirty_node->next : NULL;
+    return access_data->dirty_node ? access_data->dirty_node->source_node->record : NULL;
 }
 
 void kan_repository_indexed_sequence_update_access_close (
@@ -3845,10 +3849,11 @@ struct kan_repository_indexed_sequence_write_access_t kan_repository_indexed_seq
 
     if (cursor_data->node)
     {
+        struct indexed_storage_record_node_t *old_node = cursor_data->node;
         cursor_data->node = (struct indexed_storage_record_node_t *) cursor_data->node->list_node.next;
 
 #if defined(KAN_REPOSITORY_SAFEGUARDS_ENABLED)
-        if (!safeguard_indexed_write_access_try_create (access.storage, cursor_data->node))
+        if (!safeguard_indexed_write_access_try_create (access.storage, old_node))
         {
             access.dirty_node = NULL;
         }
@@ -3856,7 +3861,7 @@ struct kan_repository_indexed_sequence_write_access_t kan_repository_indexed_seq
 #endif
         {
             access.dirty_node =
-                indexed_storage_report_mutable_access_begin (cursor_data->storage, cursor_data->node, NULL, NULL, NULL);
+                indexed_storage_report_mutable_access_begin (cursor_data->storage, old_node, NULL, NULL, NULL);
             indexed_storage_acquire_access (cursor_data->storage);
         }
     }
@@ -3868,7 +3873,7 @@ void *kan_repository_indexed_sequence_write_access_resolve (
     struct kan_repository_indexed_sequence_write_access_t *access)
 {
     struct indexed_sequence_mutable_access_t *access_data = (struct indexed_sequence_mutable_access_t *) access;
-    return access_data->dirty_node ? access_data->dirty_node->next : NULL;
+    return access_data->dirty_node ? access_data->dirty_node->source_node->record : NULL;
 }
 
 void kan_repository_indexed_sequence_write_access_delete (struct kan_repository_indexed_sequence_write_access_t *access)
@@ -3955,7 +3960,7 @@ static struct value_index_t *indexed_storage_find_or_create_value_index (struct 
                            KAN_REPOSITORY_VALUE_INDEX_INITIAL_BUCKETS);
     index->source_path = interned_path;
 
-    kan_atomic_int_lock (&storage->maintenance_lock);
+    kan_atomic_int_unlock (&storage->maintenance_lock);
     kan_atomic_int_add (&index->storage->queries_count, 1);
     kan_atomic_int_add (&index->queries_count, 1);
     return index;
@@ -4710,6 +4715,32 @@ static void repository_clean_storages (struct repository_t *repository)
     }
 }
 
+static void repository_init_cascade_deleters (struct repository_t *repository,
+                                              struct kan_stack_group_allocator_t *temporary_allocator)
+{
+    // Cascade deleters are a special case: they are only needed for a small count of storages and are usually quick to
+    // build, therefore it should be okay to build them all at once inside single thread without parallelization. But
+    // this decision can be changed later.
+
+    struct indexed_storage_node_t *indexed_storage_node =
+        (struct indexed_storage_node_t *) repository->indexed_storages.items.first;
+
+    while (indexed_storage_node)
+    {
+        cascade_deleters_definition_build (&indexed_storage_node->cascade_deleters, indexed_storage_node->type->name,
+                                           repository, temporary_allocator,
+                                           indexed_storage_node->automation_allocation_group);
+        indexed_storage_node = (struct indexed_storage_node_t *) indexed_storage_node->node.list_node.next;
+    }
+
+    repository = repository->first;
+    while (repository)
+    {
+        repository_clean_storages (repository);
+        repository = repository->next;
+    }
+}
+
 static void extract_observation_chunks_from_on_change_events (
     struct repository_t *repository,
     const struct kan_reflection_struct_t *observed_struct,
@@ -4874,7 +4905,7 @@ static void prepare_indices (struct indexed_storage_node_t *storage, uint64_t *e
         for (uint64_t index = 0u; index < storage->observation_buffer.scenario_chunks_count; ++index)
         {
             struct observation_buffer_scenario_chunk_t *chunk = &storage->observation_buffer.scenario_chunks[index];
-            if (field_end >= chunk->source_offset)
+            if (field_end > chunk->source_offset && field_begin < chunk->source_offset + chunk->size)
             {
                 // Can only be broken if index field chunk is broken due to invalid internal logic or attempt to
                 // make index for field inside union. Either way, it is impossible to fix situation in this case.
@@ -4957,8 +4988,6 @@ static void prepare_indexed_storage (uint64_t user_data)
                                               &temporary_allocator, data->storage->automation_allocation_group);
 
     prepare_indices (data->storage, &building_event_flag);
-    cascade_deleters_definition_build (&data->storage->cascade_deleters, data->storage->type->name, data->repository,
-                                       &temporary_allocator, data->storage->automation_allocation_group);
     kan_stack_group_allocator_shutdown (&temporary_allocator);
 }
 
@@ -5055,13 +5084,14 @@ void kan_repository_enter_serving_mode (kan_repository_t root_repository)
     KAN_ASSERT (repository->mode == REPOSITORY_MODE_PLANNING)
     repository_clean_storages (repository);
 
-    kan_cpu_job_t job = kan_cpu_job_create ();
-    KAN_ASSERT (job != KAN_INVALID_CPU_JOB)
-
     struct switch_to_serving_context_t context;
     kan_stack_group_allocator_init (&context.allocator,
                                     kan_allocation_group_get_child (repository->allocation_group, "switch_to_serving"),
                                     KAN_REPOSITORY_SWITCH_TO_SERVING_STACK_INITIAL_SIZE);
+
+    repository_init_cascade_deleters (repository, &context.allocator);
+    kan_cpu_job_t job = kan_cpu_job_create ();
+    KAN_ASSERT (job != KAN_INVALID_CPU_JOB)
 
     context.task_list = NULL;
     repository_prepare_storages (repository, &context);
