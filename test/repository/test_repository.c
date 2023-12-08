@@ -1767,3 +1767,249 @@ KAN_TEST_CASE (indexed_automatic_events)
     kan_repository_destroy (repository);
     kan_reflection_registry_destroy (registry);
 }
+
+KAN_TEST_CASE (indexed_signal_operations)
+{
+    kan_reflection_registry_t registry = kan_reflection_registry_create ();
+    KAN_REFLECTION_UNIT_REGISTRAR_NAME (repository) (registry);
+    KAN_REFLECTION_UNIT_REGISTRAR_NAME (test_repository) (registry);
+
+    kan_repository_t root_repository = kan_repository_create_root (KAN_ALLOCATION_GROUP_IGNORE, registry);
+    kan_repository_t child_repository = kan_repository_create_child (root_repository, "child");
+
+    kan_repository_indexed_storage_t storage_root =
+        kan_repository_indexed_storage_open (root_repository, "status_record_t");
+    kan_repository_indexed_storage_t storage_child =
+        kan_repository_indexed_storage_open (child_repository, "status_record_t");
+
+    struct kan_repository_indexed_insert_query_t insert_child;
+    kan_repository_indexed_insert_query_init (&insert_child, storage_child);
+
+    struct kan_repository_indexed_signal_read_query_t read_alive_root;
+    kan_repository_indexed_signal_read_query_init (
+        &read_alive_root, storage_root,
+        (struct kan_repository_field_path_t) {.reflection_path_length = 1u, (const char *[]) {"observable_alive"}},
+        KAN_TRUE);
+
+    struct kan_repository_indexed_signal_update_query_t update_poisoned_child;
+    kan_repository_indexed_signal_update_query_init (
+        &update_poisoned_child, storage_child,
+        (struct kan_repository_field_path_t) {.reflection_path_length = 1u, (const char *[]) {"observable_poisoned"}},
+        KAN_TRUE);
+
+    struct kan_repository_indexed_signal_delete_query_t delete_dead_child;
+    kan_repository_indexed_signal_delete_query_init (
+        &delete_dead_child, storage_child,
+        (struct kan_repository_field_path_t) {.reflection_path_length = 1u, (const char *[]) {"observable_alive"}},
+        KAN_FALSE);
+
+    struct kan_repository_indexed_signal_write_query_t write_boosted_root;
+    kan_repository_indexed_signal_write_query_init (
+        &write_boosted_root, storage_child,
+        (struct kan_repository_field_path_t) {.reflection_path_length = 1u, (const char *[]) {"observable_boosted"}},
+        KAN_TRUE);
+
+    kan_repository_enter_serving_mode (root_repository);
+
+    insert_status_record (&insert_child, (struct status_record_t) {.object_id = 1u,
+                                                                   .observable_alive = KAN_TRUE,
+                                                                   .observable_poisoned = KAN_FALSE,
+                                                                   .observable_stunned = KAN_FALSE,
+                                                                   .observable_boosted = KAN_TRUE});
+
+    insert_status_record (&insert_child, (struct status_record_t) {.object_id = 2u,
+                                                                   .observable_alive = KAN_TRUE,
+                                                                   .observable_poisoned = KAN_TRUE,
+                                                                   .observable_stunned = KAN_FALSE,
+                                                                   .observable_boosted = KAN_FALSE});
+
+    insert_status_record (&insert_child, (struct status_record_t) {.object_id = 3u,
+                                                                   .observable_alive = KAN_FALSE,
+                                                                   .observable_poisoned = KAN_FALSE,
+                                                                   .observable_stunned = KAN_FALSE,
+                                                                   .observable_boosted = KAN_TRUE});
+
+    {
+        struct kan_repository_indexed_signal_read_cursor_t cursor =
+            kan_repository_indexed_signal_read_query_execute (&read_alive_root);
+
+        struct kan_repository_indexed_signal_read_access_t access =
+            kan_repository_indexed_signal_read_cursor_next (&cursor);
+
+        struct status_record_t *record =
+            (struct status_record_t *) kan_repository_indexed_signal_read_access_resolve (&access);
+
+        uint64_t records_found = 0u;
+        kan_bool_t one_found = KAN_FALSE;
+        kan_bool_t two_found = KAN_FALSE;
+
+        while (record)
+        {
+            ++records_found;
+            if (record->object_id == 1u)
+            {
+                one_found = KAN_TRUE;
+                KAN_TEST_CHECK (record->observable_alive)
+                KAN_TEST_CHECK (!record->observable_poisoned)
+                KAN_TEST_CHECK (!record->observable_stunned)
+                KAN_TEST_CHECK (record->observable_boosted)
+            }
+            else if (record->object_id == 2u)
+            {
+                two_found = KAN_TRUE;
+                KAN_TEST_CHECK (record->observable_alive)
+                KAN_TEST_CHECK (record->observable_poisoned)
+                KAN_TEST_CHECK (!record->observable_stunned)
+                KAN_TEST_CHECK (!record->observable_boosted)
+            }
+
+            kan_repository_indexed_signal_read_access_close (&access);
+            access = kan_repository_indexed_signal_read_cursor_next (&cursor);
+            record = (struct status_record_t *) kan_repository_indexed_signal_read_access_resolve (&access);
+        }
+
+        kan_repository_indexed_signal_read_cursor_close (&cursor);
+        KAN_TEST_CHECK (records_found == 2u)
+        KAN_TEST_CHECK (one_found)
+        KAN_TEST_CHECK (two_found)
+    }
+
+    {
+        struct kan_repository_indexed_signal_update_cursor_t cursor =
+            kan_repository_indexed_signal_update_query_execute (&update_poisoned_child);
+
+        struct kan_repository_indexed_signal_update_access_t access =
+            kan_repository_indexed_signal_update_cursor_next (&cursor);
+
+        struct status_record_t *record =
+            (struct status_record_t *) kan_repository_indexed_signal_update_access_resolve (&access);
+
+        KAN_TEST_ASSERT (record)
+        KAN_TEST_CHECK (record->object_id == 2u)
+        record->observable_alive = KAN_FALSE;
+        record->observable_poisoned = KAN_FALSE;
+
+        kan_repository_indexed_signal_update_access_close (&access);
+        access = kan_repository_indexed_signal_update_cursor_next (&cursor);
+        KAN_TEST_ASSERT (!kan_repository_indexed_signal_update_access_resolve (&access))
+        kan_repository_indexed_signal_update_cursor_close (&cursor);
+    }
+
+    {
+        struct kan_repository_indexed_signal_delete_cursor_t cursor =
+            kan_repository_indexed_signal_delete_query_execute (&delete_dead_child);
+
+        struct kan_repository_indexed_signal_delete_access_t access =
+            kan_repository_indexed_signal_delete_cursor_next (&cursor);
+
+        struct status_record_t *record =
+            (struct status_record_t *) kan_repository_indexed_signal_delete_access_resolve (&access);
+
+        uint64_t records_found = 0u;
+        kan_bool_t two_found = KAN_FALSE;
+        kan_bool_t three_found = KAN_FALSE;
+
+        while (record)
+        {
+            ++records_found;
+            if (record->object_id == 2u)
+            {
+                two_found = KAN_TRUE;
+            }
+            else if (record->object_id == 3u)
+            {
+                three_found = KAN_TRUE;
+            }
+
+            kan_repository_indexed_signal_delete_access_delete (&access);
+            access = kan_repository_indexed_signal_delete_cursor_next (&cursor);
+            record = (struct status_record_t *) kan_repository_indexed_signal_delete_access_resolve (&access);
+        }
+
+        kan_repository_indexed_signal_delete_cursor_close (&cursor);
+        KAN_TEST_CHECK (records_found == 2u)
+        KAN_TEST_CHECK (two_found)
+        KAN_TEST_CHECK (three_found)
+    }
+
+    insert_status_record (&insert_child, (struct status_record_t) {.object_id = 4u,
+                                                                   .observable_alive = KAN_FALSE,
+                                                                   .observable_poisoned = KAN_FALSE,
+                                                                   .observable_stunned = KAN_FALSE,
+                                                                   .observable_boosted = KAN_TRUE});
+
+    {
+        struct kan_repository_indexed_signal_write_cursor_t cursor =
+            kan_repository_indexed_signal_write_query_execute (&write_boosted_root);
+
+        struct kan_repository_indexed_signal_write_access_t access =
+            kan_repository_indexed_signal_write_cursor_next (&cursor);
+
+        struct status_record_t *record =
+            (struct status_record_t *) kan_repository_indexed_signal_write_access_resolve (&access);
+
+        uint64_t records_found = 0u;
+        kan_bool_t one_found = KAN_FALSE;
+        kan_bool_t four_found = KAN_FALSE;
+
+        while (record)
+        {
+            ++records_found;
+            if (record->object_id == 1u)
+            {
+                one_found = KAN_TRUE;
+            }
+            else if (record->object_id == 4u)
+            {
+                four_found = KAN_TRUE;
+            }
+
+            if (record->observable_alive)
+            {
+                kan_repository_indexed_signal_write_access_delete (&access);
+            }
+            else
+            {
+                record->observable_alive = KAN_TRUE;
+                kan_repository_indexed_signal_write_access_close (&access);
+            }
+
+            access = kan_repository_indexed_signal_write_cursor_next (&cursor);
+            record = (struct status_record_t *) kan_repository_indexed_signal_write_access_resolve (&access);
+        }
+
+        kan_repository_indexed_signal_write_cursor_close (&cursor);
+        KAN_TEST_CHECK (records_found == 2u)
+        KAN_TEST_CHECK (one_found)
+        KAN_TEST_CHECK (four_found)
+    }
+
+    {
+        struct kan_repository_indexed_signal_read_cursor_t cursor =
+            kan_repository_indexed_signal_read_query_execute (&read_alive_root);
+
+        struct kan_repository_indexed_signal_read_access_t access =
+            kan_repository_indexed_signal_read_cursor_next (&cursor);
+
+        struct status_record_t *record =
+            (struct status_record_t *) kan_repository_indexed_signal_read_access_resolve (&access);
+
+        KAN_TEST_ASSERT (record)
+        KAN_TEST_CHECK (record->object_id == 4u)
+
+        kan_repository_indexed_signal_read_access_close (&access);
+        access = kan_repository_indexed_signal_read_cursor_next (&cursor);
+        KAN_TEST_ASSERT (!kan_repository_indexed_signal_read_access_resolve (&access))
+        kan_repository_indexed_signal_read_cursor_close (&cursor);
+    }
+
+    kan_repository_enter_planning_mode (root_repository);
+    kan_repository_indexed_insert_query_shutdown (&insert_child);
+    kan_repository_indexed_signal_read_query_shutdown (&read_alive_root);
+    kan_repository_indexed_signal_update_query_shutdown (&update_poisoned_child);
+    kan_repository_indexed_signal_delete_query_shutdown (&delete_dead_child);
+    kan_repository_indexed_signal_write_query_shutdown (&write_boosted_root);
+
+    kan_repository_destroy (root_repository);
+    kan_reflection_registry_destroy (registry);
+}
