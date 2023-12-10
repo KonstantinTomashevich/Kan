@@ -2013,3 +2013,304 @@ KAN_TEST_CASE (indexed_signal_operations)
     kan_repository_destroy (root_repository);
     kan_reflection_registry_destroy (registry);
 }
+
+KAN_TEST_CASE (interval_operations)
+{
+    kan_reflection_registry_t registry = kan_reflection_registry_create ();
+    KAN_REFLECTION_UNIT_REGISTRAR_NAME (repository) (registry);
+    KAN_REFLECTION_UNIT_REGISTRAR_NAME (test_repository) (registry);
+
+    kan_repository_t root_repository = kan_repository_create_root (KAN_ALLOCATION_GROUP_IGNORE, registry);
+    kan_repository_t child_repository = kan_repository_create_child (root_repository, "child");
+
+    kan_repository_indexed_storage_t root_storage =
+        kan_repository_indexed_storage_open (root_repository, "object_record_t");
+    kan_repository_indexed_storage_t child_storage =
+        kan_repository_indexed_storage_open (child_repository, "object_record_t");
+
+    struct kan_repository_indexed_insert_query_t insert_child;
+    kan_repository_indexed_insert_query_init (&insert_child, child_storage);
+
+    struct kan_repository_indexed_interval_read_query_t read_x_root;
+    kan_repository_indexed_interval_read_query_init (
+        &read_x_root, root_storage,
+        (struct kan_repository_field_path_t) {.reflection_path_length = 1u, (const char *[]) {"data_x"}});
+
+    struct kan_repository_indexed_interval_update_query_t update_x_child;
+    kan_repository_indexed_interval_update_query_init (
+        &update_x_child, child_storage,
+        (struct kan_repository_field_path_t) {.reflection_path_length = 1u, (const char *[]) {"data_x"}});
+
+    struct kan_repository_indexed_interval_delete_query_t delete_y_child;
+    kan_repository_indexed_interval_delete_query_init (
+        &delete_y_child, child_storage,
+        (struct kan_repository_field_path_t) {.reflection_path_length = 1u, (const char *[]) {"data_y"}});
+
+    struct kan_repository_indexed_interval_write_query_t write_y_root;
+    kan_repository_indexed_interval_write_query_init (
+        &write_y_root, root_storage,
+        (struct kan_repository_field_path_t) {.reflection_path_length = 1u, (const char *[]) {"data_y"}});
+
+    kan_repository_enter_serving_mode (root_repository);
+
+    for (uint64_t index = 0u; index < 100u; ++index)
+    {
+        insert_object_record (
+            &insert_child,
+            (struct object_record_t) {
+                .object_id = index, .parent_object_id = INVALID_PARENT_OBJECT_ID, .data_x = index, .data_y = index});
+    }
+
+    // Read all ascending.
+    {
+        struct kan_repository_indexed_interval_ascending_read_cursor_t read_all_cursor =
+            kan_repository_indexed_interval_read_query_execute_ascending (&read_x_root, NULL, NULL);
+
+        for (uint64_t index = 0u; index < 100u; ++index)
+        {
+            struct kan_repository_indexed_interval_read_access_t access =
+                kan_repository_indexed_interval_ascending_read_cursor_next (&read_all_cursor);
+
+            const struct object_record_t *record =
+                (const struct object_record_t *) kan_repository_indexed_interval_read_access_resolve (&access);
+            KAN_TEST_ASSERT (record)
+            KAN_TEST_CHECK (record->data_x == index)
+            kan_repository_indexed_interval_read_access_close (&access);
+        }
+
+        struct kan_repository_indexed_interval_read_access_t access =
+            kan_repository_indexed_interval_ascending_read_cursor_next (&read_all_cursor);
+        KAN_TEST_ASSERT (!kan_repository_indexed_interval_read_access_resolve (&access))
+        kan_repository_indexed_interval_ascending_read_cursor_close (&read_all_cursor);
+    }
+
+    // Read all descending.
+    {
+        struct kan_repository_indexed_interval_descending_read_cursor_t read_all_cursor =
+            kan_repository_indexed_interval_read_query_execute_descending (&read_x_root, NULL, NULL);
+
+        for (uint64_t index = 0u; index < 100u; ++index)
+        {
+            struct kan_repository_indexed_interval_read_access_t access =
+                kan_repository_indexed_interval_descending_read_cursor_next (&read_all_cursor);
+
+            const struct object_record_t *record =
+                (const struct object_record_t *) kan_repository_indexed_interval_read_access_resolve (&access);
+            KAN_TEST_ASSERT (record)
+            KAN_TEST_CHECK (record->data_x == 100u - index - 1u)
+            kan_repository_indexed_interval_read_access_close (&access);
+        }
+
+        struct kan_repository_indexed_interval_read_access_t access =
+            kan_repository_indexed_interval_descending_read_cursor_next (&read_all_cursor);
+        KAN_TEST_ASSERT (!kan_repository_indexed_interval_read_access_resolve (&access))
+        kan_repository_indexed_interval_descending_read_cursor_close (&read_all_cursor);
+    }
+
+    // Read interval.
+    {
+        const uint64_t including_start = 42u;
+        const uint64_t including_end = 69u;
+
+        struct kan_repository_indexed_interval_ascending_read_cursor_t read_cursor =
+            kan_repository_indexed_interval_read_query_execute_ascending (&read_x_root, &including_start,
+                                                                          &including_end);
+
+        for (uint64_t index = including_start; index <= including_end; ++index)
+        {
+            struct kan_repository_indexed_interval_read_access_t access =
+                kan_repository_indexed_interval_ascending_read_cursor_next (&read_cursor);
+
+            const struct object_record_t *record =
+                (const struct object_record_t *) kan_repository_indexed_interval_read_access_resolve (&access);
+            KAN_TEST_ASSERT (record)
+            KAN_TEST_CHECK (record->data_x == index)
+            kan_repository_indexed_interval_read_access_close (&access);
+        }
+
+        struct kan_repository_indexed_interval_read_access_t access =
+            kan_repository_indexed_interval_ascending_read_cursor_next (&read_cursor);
+        KAN_TEST_ASSERT (!kan_repository_indexed_interval_read_access_resolve (&access))
+        kan_repository_indexed_interval_ascending_read_cursor_close (&read_cursor);
+    }
+
+    // Update everything above 49 to 0..49 to make duplicates.
+    {
+        const uint64_t including_start = 50u;
+        struct kan_repository_indexed_interval_descending_update_cursor_t update_cursor =
+            kan_repository_indexed_interval_update_query_execute_descending (&update_x_child, &including_start, NULL);
+
+        for (uint64_t index = including_start; index < 100u; ++index)
+        {
+            struct kan_repository_indexed_interval_update_access_t access =
+                kan_repository_indexed_interval_descending_update_cursor_next (&update_cursor);
+
+            struct object_record_t *record =
+                (struct object_record_t *) kan_repository_indexed_interval_update_access_resolve (&access);
+            KAN_TEST_ASSERT (record)
+            record->data_x -= 50u;
+            kan_repository_indexed_interval_update_access_close (&access);
+        }
+
+        struct kan_repository_indexed_interval_update_access_t access =
+            kan_repository_indexed_interval_descending_update_cursor_next (&update_cursor);
+        KAN_TEST_ASSERT (!kan_repository_indexed_interval_update_access_resolve (&access))
+        kan_repository_indexed_interval_descending_update_cursor_close (&update_cursor);
+    }
+
+    // Read interval again.
+    {
+        const uint64_t including_start = 17u;
+        const uint64_t including_end = 42u;
+
+        struct kan_repository_indexed_interval_ascending_read_cursor_t read_cursor =
+            kan_repository_indexed_interval_read_query_execute_ascending (&read_x_root, &including_start,
+                                                                          &including_end);
+
+        for (uint64_t index = including_start; index <= including_end; ++index)
+        {
+            struct kan_repository_indexed_interval_read_access_t access =
+                kan_repository_indexed_interval_ascending_read_cursor_next (&read_cursor);
+
+            const struct object_record_t *record =
+                (const struct object_record_t *) kan_repository_indexed_interval_read_access_resolve (&access);
+            KAN_TEST_ASSERT (record)
+            KAN_TEST_CHECK (record->data_x == index)
+            kan_repository_indexed_interval_read_access_close (&access);
+
+            // We expect two records with the same data.
+            access = kan_repository_indexed_interval_ascending_read_cursor_next (&read_cursor);
+            record = (const struct object_record_t *) kan_repository_indexed_interval_read_access_resolve (&access);
+            KAN_TEST_ASSERT (record)
+            KAN_TEST_CHECK (record->data_x == index)
+            kan_repository_indexed_interval_read_access_close (&access);
+        }
+
+        struct kan_repository_indexed_interval_read_access_t access =
+            kan_repository_indexed_interval_ascending_read_cursor_next (&read_cursor);
+        KAN_TEST_ASSERT (!kan_repository_indexed_interval_read_access_resolve (&access))
+        kan_repository_indexed_interval_ascending_read_cursor_close (&read_cursor);
+    }
+
+    // Delete all records with odd value of data_y.
+    {
+        struct kan_repository_indexed_interval_ascending_delete_cursor_t delete_cursor =
+            kan_repository_indexed_interval_delete_query_execute_ascending (&delete_y_child, NULL, NULL);
+
+        while (KAN_TRUE)
+        {
+            struct kan_repository_indexed_interval_delete_access_t access =
+                kan_repository_indexed_interval_ascending_delete_cursor_next (&delete_cursor);
+
+            const struct object_record_t *record =
+                (const struct object_record_t *) kan_repository_indexed_interval_delete_access_resolve (&access);
+
+            if (!record)
+            {
+                break;
+            }
+
+            if (record->data_y % 2u == 0u)
+            {
+                kan_repository_indexed_interval_delete_access_close (&access);
+            }
+            else
+            {
+                kan_repository_indexed_interval_delete_access_delete (&access);
+            }
+        }
+
+        kan_repository_indexed_interval_ascending_delete_cursor_close (&delete_cursor);
+    }
+
+    // Make all even data_y records odd.
+    {
+        struct kan_repository_indexed_interval_ascending_write_cursor_t write_cursor =
+            kan_repository_indexed_interval_write_query_execute_ascending (&write_y_root, NULL, NULL);
+
+        while (KAN_TRUE)
+        {
+            struct kan_repository_indexed_interval_write_access_t access =
+                kan_repository_indexed_interval_ascending_write_cursor_next (&write_cursor);
+
+            struct object_record_t *record =
+                (struct object_record_t *) kan_repository_indexed_interval_write_access_resolve (&access);
+
+            if (!record)
+            {
+                break;
+            }
+
+            ++record->data_y;
+            KAN_TEST_CHECK (record->data_y % 2u == 1u)
+            kan_repository_indexed_interval_write_access_close (&access);
+        }
+
+        kan_repository_indexed_interval_ascending_write_cursor_close (&write_cursor);
+    }
+
+    // Delete everything with data_y inside [20, 60].
+    {
+        const uint64_t value_20u = 20u;
+        const uint64_t value_60u = 60u;
+
+        struct kan_repository_indexed_interval_descending_write_cursor_t write_cursor =
+            kan_repository_indexed_interval_write_query_execute_descending (&write_y_root, &value_20u, &value_60u);
+
+        while (KAN_TRUE)
+        {
+            struct kan_repository_indexed_interval_write_access_t access =
+                kan_repository_indexed_interval_descending_write_cursor_next (&write_cursor);
+
+            struct object_record_t *record =
+                (struct object_record_t *) kan_repository_indexed_interval_write_access_resolve (&access);
+
+            if (!record)
+            {
+                break;
+            }
+
+            KAN_TEST_CHECK (record->data_y % 2u == 1u)
+            KAN_TEST_CHECK (record->data_y > 20u)
+            KAN_TEST_CHECK (record->data_y < 60u)
+            kan_repository_indexed_interval_write_access_delete (&access);
+        }
+
+        kan_repository_indexed_interval_descending_write_cursor_close (&write_cursor);
+    }
+
+    // Read all and check that deletion above is done.
+    {
+        struct kan_repository_indexed_interval_ascending_read_cursor_t read_all_cursor =
+            kan_repository_indexed_interval_read_query_execute_ascending (&read_x_root, NULL, NULL);
+
+        while (KAN_TRUE)
+        {
+            struct kan_repository_indexed_interval_read_access_t access =
+                kan_repository_indexed_interval_ascending_read_cursor_next (&read_all_cursor);
+
+            struct object_record_t *record =
+                (struct object_record_t *) kan_repository_indexed_interval_read_access_resolve (&access);
+
+            if (!record)
+            {
+                break;
+            }
+
+            KAN_TEST_CHECK (record->data_y < 20u || record->data_y > 60u)
+            kan_repository_indexed_interval_read_access_close (&access);
+        }
+
+        kan_repository_indexed_interval_ascending_read_cursor_close (&read_all_cursor);
+    }
+
+    kan_repository_enter_planning_mode (root_repository);
+    kan_repository_indexed_insert_query_shutdown (&insert_child);
+    kan_repository_indexed_interval_read_query_shutdown (&read_x_root);
+    kan_repository_indexed_interval_update_query_shutdown (&update_x_child);
+    kan_repository_indexed_interval_delete_query_shutdown (&delete_y_child);
+    kan_repository_indexed_interval_write_query_shutdown (&write_y_root);
+
+    kan_repository_destroy (root_repository);
+    kan_reflection_registry_destroy (registry);
+}

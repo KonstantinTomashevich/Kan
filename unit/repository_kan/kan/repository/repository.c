@@ -1,11 +1,13 @@
 #define _CRT_SECURE_NO_WARNINGS
 
+#include <math.h>
 #include <memory.h>
 #include <qsort.h>
 #include <stddef.h>
 
 #include <kan/api_common/alignment.h>
 #include <kan/api_common/min_max.h>
+#include <kan/container/avl_tree.h>
 #include <kan/container/event_queue.h>
 #include <kan/container/hash_storage.h>
 #include <kan/container/list.h>
@@ -248,12 +250,24 @@ struct indexed_storage_node_t
     kan_allocation_group_t space_index_allocation_group;
 };
 
+enum index_type_t
+{
+    INDEX_TYPE_EQUALITY = 0u,
+    INDEX_TYPE_COMPARISON,
+};
+
 struct indexed_field_baked_data_t
 {
     uint32_t absolute_offset;
     uint16_t offset_in_buffer;
     uint8_t size;
     uint8_t size_with_padding;
+};
+
+struct indexed_field_baked_data_with_archetype_t
+{
+    struct indexed_field_baked_data_t data;
+    enum kan_reflection_archetype_t archetype;
 };
 
 struct value_index_sub_node_t
@@ -301,6 +315,32 @@ struct signal_index_t
 
     struct signal_index_node_t *first_node;
     kan_bool_t initial_fill_executed;
+    struct interned_field_path_t source_path;
+};
+
+struct interval_index_sub_node_t
+{
+    struct interval_index_sub_node_t *next;
+    struct interval_index_sub_node_t *previous;
+    struct indexed_storage_record_node_t *record;
+};
+
+struct interval_index_node_t
+{
+    struct kan_avl_tree_node_t node;
+    struct interval_index_sub_node_t *first_sub_node;
+};
+
+struct interval_index_t
+{
+    struct interval_index_t *next;
+    struct indexed_storage_node_t *storage;
+    struct kan_atomic_int_t queries_count;
+
+    struct indexed_field_baked_data_with_archetype_t baked;
+    uint64_t observation_flags;
+
+    struct kan_avl_tree_t tree;
     struct interned_field_path_t source_path;
 };
 
@@ -512,6 +552,91 @@ struct indexed_signal_mutable_access_t
 };
 
 ASSERT_MUTABLE_ACCESS_FOR_INDEXED_STORAGE (signal);
+
+struct indexed_interval_query_t
+{
+    struct interval_index_t *index;
+};
+
+ASSERT_SIZE_FOR_INDEXED_STORAGE (interval);
+
+struct indexed_interval_cursor_t
+{
+    struct interval_index_t *index;
+    struct interval_index_node_t *current_node;
+    struct interval_index_node_t *end_node;
+    struct interval_index_sub_node_t *sub_node;
+    double min_floating;
+    double max_floating;
+};
+
+_Static_assert (sizeof (struct indexed_interval_cursor_t) <=
+                    sizeof (struct kan_repository_indexed_interval_ascending_read_cursor_t),
+                "Query sizes match.");
+_Static_assert (_Alignof (struct indexed_interval_cursor_t) <=
+                    _Alignof (struct kan_repository_indexed_interval_ascending_read_cursor_t),
+                "Query alignments match.");
+_Static_assert (sizeof (struct indexed_interval_cursor_t) <=
+                    sizeof (struct kan_repository_indexed_interval_ascending_update_cursor_t),
+                "Query sizes match.");
+_Static_assert (_Alignof (struct indexed_interval_cursor_t) <=
+                    _Alignof (struct kan_repository_indexed_interval_ascending_update_cursor_t),
+                "Query alignments match.");
+_Static_assert (sizeof (struct indexed_interval_cursor_t) <=
+                    sizeof (struct kan_repository_indexed_interval_ascending_delete_cursor_t),
+                "Query sizes match.");
+_Static_assert (_Alignof (struct indexed_interval_cursor_t) <=
+                    _Alignof (struct kan_repository_indexed_interval_ascending_delete_cursor_t),
+                "Query alignments match.");
+_Static_assert (sizeof (struct indexed_interval_cursor_t) <=
+                    sizeof (struct kan_repository_indexed_interval_ascending_write_cursor_t),
+                "Query sizes match.");
+_Static_assert (_Alignof (struct indexed_interval_cursor_t) <=
+                    _Alignof (struct kan_repository_indexed_interval_ascending_write_cursor_t),
+                "Query alignments match.");
+_Static_assert (sizeof (struct indexed_interval_cursor_t) <=
+                    sizeof (struct kan_repository_indexed_interval_descending_read_cursor_t),
+                "Query sizes match.");
+_Static_assert (_Alignof (struct indexed_interval_cursor_t) <=
+                    _Alignof (struct kan_repository_indexed_interval_descending_read_cursor_t),
+                "Query alignments match.");
+_Static_assert (sizeof (struct indexed_interval_cursor_t) <=
+                    sizeof (struct kan_repository_indexed_interval_descending_update_cursor_t),
+                "Query sizes match.");
+_Static_assert (_Alignof (struct indexed_interval_cursor_t) <=
+                    _Alignof (struct kan_repository_indexed_interval_descending_update_cursor_t),
+                "Query alignments match.");
+_Static_assert (sizeof (struct indexed_interval_cursor_t) <=
+                    sizeof (struct kan_repository_indexed_interval_descending_delete_cursor_t),
+                "Query sizes match.");
+_Static_assert (_Alignof (struct indexed_interval_cursor_t) <=
+                    _Alignof (struct kan_repository_indexed_interval_descending_delete_cursor_t),
+                "Query alignments match.");
+_Static_assert (sizeof (struct indexed_interval_cursor_t) <=
+                    sizeof (struct kan_repository_indexed_interval_descending_write_cursor_t),
+                "Query sizes match.");
+_Static_assert (_Alignof (struct indexed_interval_cursor_t) <=
+                    _Alignof (struct kan_repository_indexed_interval_descending_write_cursor_t),
+                "Query alignments match.");
+
+struct indexed_interval_constant_access_t
+{
+    struct interval_index_t *index;
+    struct interval_index_node_t *node;
+    struct interval_index_sub_node_t *sub_node;
+};
+
+ASSERT_CONSTANT_ACCESS_FOR_INDEXED_STORAGE (interval);
+
+struct indexed_interval_mutable_access_t
+{
+    struct interval_index_t *index;
+    struct interval_index_node_t *node;
+    struct interval_index_sub_node_t *sub_node;
+    struct indexed_storage_dirty_record_node_t *dirty_node;
+};
+
+ASSERT_MUTABLE_ACCESS_FOR_INDEXED_STORAGE (interval);
 
 struct event_queue_node_t
 {
@@ -971,7 +1096,8 @@ static kan_bool_t validation_copy_out_is_possible (kan_reflection_registry_t reg
     return KAN_TRUE;
 }
 
-static kan_bool_t validation_any_index_is_possible (const struct kan_reflection_field_t *field)
+static kan_bool_t validation_index_is_possible (const struct kan_reflection_field_t *field,
+                                                enum index_type_t index_type)
 {
     if (field->visibility_condition_values_count > 0u)
     {
@@ -997,7 +1123,18 @@ static kan_bool_t validation_any_index_is_possible (const struct kan_reflection_
             return KAN_FALSE;
         }
 
-        return KAN_TRUE;
+        switch (index_type)
+        {
+        case INDEX_TYPE_EQUALITY:
+            return KAN_TRUE;
+
+        case INDEX_TYPE_COMPARISON:
+            return field->archetype == KAN_REFLECTION_ARCHETYPE_SIGNED_INT ||
+                   field->archetype == KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT ||
+                   field->archetype == KAN_REFLECTION_ARCHETYPE_FLOATING;
+        }
+
+        break;
 
     case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
     case KAN_REFLECTION_ARCHETYPE_EXTERNAL_POINTER:
@@ -2126,6 +2263,11 @@ static void cascade_deleters_definition_shutdown (struct cascade_deleters_defini
 {
     if (definition->cascade_deleters)
     {
+        for (uint64_t index = 0u; index < definition->cascade_deleters_count; ++index)
+        {
+            kan_repository_indexed_value_delete_query_shutdown (&definition->cascade_deleters[index].query);
+        }
+
         kan_free_general (allocation_group, definition->cascade_deleters,
                           sizeof (struct cascade_deleter_t) * definition->cascade_deleters_count);
     }
@@ -2174,6 +2316,8 @@ static void value_index_shutdown_and_free (struct value_index_t *value_index);
 
 static void signal_index_shutdown_and_free (struct signal_index_t *signal_index);
 
+static void interval_index_shutdown_and_free (struct interval_index_t *interval_index);
+
 static void indexed_storage_node_shutdown_and_free (struct indexed_storage_node_t *node,
                                                     struct repository_t *repository)
 {
@@ -2195,6 +2339,14 @@ static void indexed_storage_node_shutdown_and_free (struct indexed_storage_node_
         struct signal_index_t *next = signal_index->next;
         signal_index_shutdown_and_free (signal_index);
         signal_index = next;
+    }
+
+    struct interval_index_t *interval_index = node->first_interval_index;
+    while (interval_index)
+    {
+        struct interval_index_t *next = interval_index->next;
+        interval_index_shutdown_and_free (interval_index);
+        interval_index = next;
     }
 
     // TODO: Do not forget about indices here.
@@ -2265,10 +2417,123 @@ static inline uint64_t indexed_field_baked_data_extract_unsigned_from_buffer (st
         data, (const uint8_t *) buffer_memory + data->offset_in_buffer);
 }
 
+static inline double indexed_field_baked_data_extract_floating_from_pointer (struct indexed_field_baked_data_t *data,
+                                                                             const void *pointer)
+{
+    switch (data->size)
+    {
+    case 4u:
+        return *(const float *) pointer;
+    case 8u:
+        return *(const double *) pointer;
+    }
+
+    KAN_ASSERT (KAN_FALSE)
+    return 0.0;
+}
+
+static inline double indexed_field_baked_data_extract_floating_from_record (struct indexed_field_baked_data_t *data,
+                                                                            void *record)
+{
+    return indexed_field_baked_data_extract_floating_from_pointer (data,
+                                                                   (const uint8_t *) record + data->absolute_offset);
+}
+
+static inline uint64_t convert_signed_to_unsigned (int64_t signed_value, uint64_t size)
+{
+    switch (size)
+    {
+    case 1u:
+        return signed_value < 0 ? (uint8_t) (signed_value - INT8_MIN) :
+                                  ((uint8_t) signed_value) + ((uint8_t) -INT8_MIN);
+
+    case 2u:
+        return signed_value < 0 ? (uint16_t) (signed_value - INT16_MIN) :
+                                  ((uint16_t) signed_value) + ((uint16_t) -INT16_MIN);
+
+    case 4u:
+        return signed_value < 0 ? (uint32_t) (signed_value - INT32_MIN) :
+                                  ((uint32_t) signed_value) + ((uint32_t) -INT32_MIN);
+
+    case 8u:
+        return signed_value < 0 ? (uint64_t) (signed_value - INT64_MIN) :
+                                  ((uint64_t) signed_value) + ((uint64_t) -INT64_MIN);
+    }
+
+    KAN_ASSERT (KAN_FALSE)
+    return 0u;
+}
+
+static inline uint64_t indexed_field_baked_data_extract_and_convert_unsigned_from_pointer (
+    struct indexed_field_baked_data_with_archetype_t *data, const void *pointer)
+{
+    switch (data->archetype)
+    {
+    case KAN_REFLECTION_ARCHETYPE_SIGNED_INT:
+        switch (data->data.size)
+        {
+        case 1u:
+            return convert_signed_to_unsigned (*(const int8_t *) pointer, 1u);
+
+        case 2u:
+            return convert_signed_to_unsigned (*(const int16_t *) pointer, 2u);
+
+        case 4u:
+            return convert_signed_to_unsigned (*(const int32_t *) pointer, 4u);
+
+        case 8u:
+            return convert_signed_to_unsigned (*(const int64_t *) pointer, 8u);
+        }
+
+        break;
+
+    case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
+        return indexed_field_baked_data_extract_unsigned_from_pointer (&data->data, pointer);
+
+    case KAN_REFLECTION_ARCHETYPE_FLOATING:
+    {
+        const double value = indexed_field_baked_data_extract_floating_from_pointer (&data->data, pointer);
+        KAN_ASSERT (value <= (double) INT64_MAX)
+        KAN_ASSERT (value >= (double) INT64_MIN)
+        return convert_signed_to_unsigned ((int64_t) llroundf (value), 8u);
+    }
+
+    case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
+    case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:
+    case KAN_REFLECTION_ARCHETYPE_ENUM:
+    case KAN_REFLECTION_ARCHETYPE_EXTERNAL_POINTER:
+    case KAN_REFLECTION_ARCHETYPE_STRUCT:
+    case KAN_REFLECTION_ARCHETYPE_STRUCT_POINTER:
+    case KAN_REFLECTION_ARCHETYPE_INLINE_ARRAY:
+    case KAN_REFLECTION_ARCHETYPE_DYNAMIC_ARRAY:
+    case KAN_REFLECTION_ARCHETYPE_PATCH:
+        KAN_ASSERT (KAN_FALSE)
+        break;
+    }
+
+    KAN_ASSERT (KAN_FALSE)
+    return 0u;
+}
+
+static inline uint64_t indexed_field_baked_data_extract_and_convert_unsigned_from_record (
+    struct indexed_field_baked_data_with_archetype_t *data, void *record)
+{
+    return indexed_field_baked_data_extract_and_convert_unsigned_from_pointer (
+        data, (const uint8_t *) record + data->data.absolute_offset);
+}
+
+static inline uint64_t indexed_field_baked_data_extract_and_convert_unsigned_from_buffer (
+    struct indexed_field_baked_data_with_archetype_t *data, void *buffer_memory)
+{
+    return indexed_field_baked_data_extract_and_convert_unsigned_from_pointer (
+        data, (const uint8_t *) buffer_memory + data->data.offset_in_buffer);
+}
+
 static kan_bool_t indexed_field_baked_data_bake_from_reflection (struct indexed_field_baked_data_t *data,
                                                                  kan_reflection_registry_t registry,
                                                                  kan_interned_string_t type_name,
-                                                                 struct interned_field_path_t path)
+                                                                 struct interned_field_path_t path,
+                                                                 enum index_type_t index_type)
 {
     uint64_t absolute_offset;
     uint64_t size_with_padding;
@@ -2280,7 +2545,7 @@ static kan_bool_t indexed_field_baked_data_bake_from_reflection (struct indexed_
     {
         // Field exists, just re-bake then.
 #if defined(KAN_REPOSITORY_VALIDATION_ENABLED)
-        if (!validation_any_index_is_possible (field))
+        if (!validation_index_is_possible (field, index_type))
         {
             return KAN_FALSE;
         }
@@ -2293,6 +2558,12 @@ static kan_bool_t indexed_field_baked_data_bake_from_reflection (struct indexed_
         data->absolute_offset = (uint32_t) absolute_offset;
         data->size = (uint8_t) field->size;
         data->size_with_padding = (uint8_t) size_with_padding;
+
+        if (index_type == INDEX_TYPE_COMPARISON)
+        {
+            ((struct indexed_field_baked_data_with_archetype_t *) data)->archetype = field->archetype;
+        }
+
         return KAN_TRUE;
     }
 
@@ -2447,7 +2718,7 @@ static void value_index_shutdown_and_free (struct value_index_t *value_index)
     while (index_node)
     {
         struct value_index_node_t *next_node = (struct value_index_node_t *) index_node->node.list_node.next;
-        struct value_index_sub_node_t *sub_node = next_node->first_sub_node;
+        struct value_index_sub_node_t *sub_node = index_node->first_sub_node;
 
         while (sub_node)
         {
@@ -2542,6 +2813,124 @@ static void signal_index_shutdown_and_free (struct signal_index_t *signal_index)
 
     shutdown_field_path (signal_index->source_path, signal_index_allocation_group);
     kan_free_batched (signal_index_allocation_group, signal_index);
+}
+
+static void interval_index_insert_record (struct interval_index_t *index,
+                                          struct indexed_storage_record_node_t *record_node)
+{
+    const uint64_t converted_value =
+        indexed_field_baked_data_extract_and_convert_unsigned_from_record (&index->baked, record_node->record);
+
+    struct interval_index_node_t *parent_index_node =
+        (struct interval_index_node_t *) kan_avl_tree_find_parent_for_insertion (&index->tree, converted_value);
+    struct interval_index_node_t *insert_index_node;
+
+    if (kan_avl_tree_can_insert (&parent_index_node->node, converted_value))
+    {
+        insert_index_node = (struct interval_index_node_t *) kan_allocate_batched (
+            index->storage->interval_index_allocation_group, sizeof (struct interval_index_node_t));
+        insert_index_node->node.tree_value = converted_value;
+        insert_index_node->first_sub_node = NULL;
+        kan_avl_tree_insert (&index->tree, &parent_index_node->node, &insert_index_node->node);
+    }
+    else
+    {
+        KAN_ASSERT (parent_index_node && parent_index_node->node.tree_value == converted_value)
+        insert_index_node = parent_index_node;
+    }
+
+    struct interval_index_sub_node_t *sub_node = kan_allocate_batched (index->storage->interval_index_allocation_group,
+                                                                       sizeof (struct interval_index_sub_node_t));
+    sub_node->previous = NULL;
+    sub_node->next = insert_index_node->first_sub_node;
+    sub_node->record = record_node;
+
+    if (insert_index_node->first_sub_node)
+    {
+        insert_index_node->first_sub_node->previous = sub_node;
+    }
+
+    insert_index_node->first_sub_node = sub_node;
+}
+
+static void interval_index_delete_by_sub_node (struct interval_index_t *index,
+                                               struct interval_index_node_t *node,
+                                               struct interval_index_sub_node_t *sub_node)
+{
+    kan_allocation_group_t interval_allocation_group = index->storage->interval_index_allocation_group;
+    if (sub_node->next)
+    {
+        sub_node->next->previous = sub_node->previous;
+    }
+
+    if (sub_node->previous)
+    {
+        sub_node->previous->next = sub_node->next;
+    }
+    else
+    {
+        KAN_ASSERT (node->first_sub_node == sub_node)
+        node->first_sub_node = sub_node->next;
+    }
+
+    kan_free_batched (interval_allocation_group, sub_node);
+    if (!node->first_sub_node)
+    {
+        kan_avl_tree_delete (&index->tree, &node->node);
+        kan_free_batched (interval_allocation_group, node);
+    }
+}
+
+static void interval_index_delete_by_converted_value (struct interval_index_t *index,
+                                                      struct indexed_storage_record_node_t *record_node,
+                                                      uint64_t converted_value)
+{
+    struct interval_index_node_t *index_node =
+        (struct interval_index_node_t *) kan_avl_tree_find_equal (&index->tree, converted_value);
+    KAN_ASSERT (index_node)
+
+    struct interval_index_sub_node_t *sub_node = index_node->first_sub_node;
+    while (sub_node)
+    {
+        if (sub_node->record == record_node)
+        {
+            interval_index_delete_by_sub_node (index, index_node, sub_node);
+            return;
+        }
+
+        sub_node = sub_node->next;
+    }
+
+    KAN_ASSERT (KAN_FALSE)
+}
+
+static void interval_index_shutdown_and_free_node (kan_allocation_group_t allocation_group,
+                                                   struct interval_index_node_t *node)
+{
+    if (node)
+    {
+        struct interval_index_sub_node_t *sub_node = node->first_sub_node;
+        while (sub_node)
+        {
+            struct interval_index_sub_node_t *next = sub_node->next;
+            kan_free_batched (allocation_group, sub_node);
+            sub_node = next;
+        }
+
+        interval_index_shutdown_and_free_node (allocation_group, (struct interval_index_node_t *) node->node.left);
+        interval_index_shutdown_and_free_node (allocation_group, (struct interval_index_node_t *) node->node.right);
+        kan_free_batched (allocation_group, node);
+    }
+}
+
+static void interval_index_shutdown_and_free (struct interval_index_t *interval_index)
+{
+    KAN_ASSERT (kan_atomic_int_get (&interval_index->queries_count) == 0)
+    kan_allocation_group_t interval_index_allocation_group = interval_index->storage->interval_index_allocation_group;
+    interval_index_shutdown_and_free_node (interval_index_allocation_group,
+                                           (struct interval_index_node_t *) interval_index->tree.root);
+    shutdown_field_path (interval_index->source_path, interval_index_allocation_group);
+    kan_free_batched (interval_index_allocation_group, interval_index);
 }
 
 static void event_queue_node_shutdown_and_free (struct event_queue_node_t *node, struct event_storage_node_t *storage)
@@ -2881,37 +3270,38 @@ static void repository_migrate_internal (struct repository_t *repository,
         {
         case KAN_REFLECTION_MIGRATION_NEEDED:
         {
-#define HELPER_UPDATE_SINGLE_FIELD_INDEX(INDEX_TYPE)                                                                   \
-    struct INDEX_TYPE##_index_t *INDEX_TYPE##_index = indexed_storage_node->first_##INDEX_TYPE##_index;                \
-    struct INDEX_TYPE##_index_t *previous_##INDEX_TYPE##_index = NULL;                                                 \
+#define HELPER_UPDATE_SINGLE_FIELD_INDEX(INDEX_TYPE_NAME, INDEX_TYPE, BAKED_GETTER)                                    \
+    struct INDEX_TYPE_NAME##_index_t *INDEX_TYPE_NAME##_index = indexed_storage_node->first_##INDEX_TYPE_NAME##_index; \
+    struct INDEX_TYPE_NAME##_index_t *previous_##INDEX_TYPE_NAME##_index = NULL;                                       \
                                                                                                                        \
-    while (INDEX_TYPE##_index)                                                                                         \
+    while (INDEX_TYPE_NAME##_index)                                                                                    \
     {                                                                                                                  \
-        struct INDEX_TYPE##_index_t *next_##INDEX_TYPE##_index = INDEX_TYPE##_index->next;                             \
-        if (!indexed_field_baked_data_bake_from_reflection (&INDEX_TYPE##_index->baked, new_registry, old_type->name,  \
-                                                            INDEX_TYPE##_index->source_path))                          \
+        struct INDEX_TYPE_NAME##_index_t *next_##INDEX_TYPE_NAME##_index = INDEX_TYPE_NAME##_index->next;              \
+        if (!indexed_field_baked_data_bake_from_reflection (BAKED_GETTER, new_registry, old_type->name,                \
+                                                            INDEX_TYPE_NAME##_index->source_path, INDEX_TYPE))         \
         {                                                                                                              \
-            INDEX_TYPE##_index_shutdown_and_free (INDEX_TYPE##_index);                                                 \
+            INDEX_TYPE_NAME##_index_shutdown_and_free (INDEX_TYPE_NAME##_index);                                       \
                                                                                                                        \
-            if (previous_##INDEX_TYPE##_index)                                                                         \
+            if (previous_##INDEX_TYPE_NAME##_index)                                                                    \
             {                                                                                                          \
-                previous_##INDEX_TYPE##_index->next = next_##INDEX_TYPE##_index;                                       \
+                previous_##INDEX_TYPE_NAME##_index->next = next_##INDEX_TYPE_NAME##_index;                             \
             }                                                                                                          \
             else                                                                                                       \
             {                                                                                                          \
-                indexed_storage_node->first_##INDEX_TYPE##_index = next_##INDEX_TYPE##_index;                          \
+                indexed_storage_node->first_##INDEX_TYPE_NAME##_index = next_##INDEX_TYPE_NAME##_index;                \
             }                                                                                                          \
         }                                                                                                              \
         else                                                                                                           \
         {                                                                                                              \
-            previous_##INDEX_TYPE##_index = INDEX_TYPE##_index;                                                        \
+            previous_##INDEX_TYPE_NAME##_index = INDEX_TYPE_NAME##_index;                                              \
         }                                                                                                              \
                                                                                                                        \
-        INDEX_TYPE##_index = next_##INDEX_TYPE##_index;                                                                \
+        INDEX_TYPE_NAME##_index = next_##INDEX_TYPE_NAME##_index;                                                      \
     }
 
-            HELPER_UPDATE_SINGLE_FIELD_INDEX (value)
-            HELPER_UPDATE_SINGLE_FIELD_INDEX (signal)
+            HELPER_UPDATE_SINGLE_FIELD_INDEX (value, INDEX_TYPE_EQUALITY, &value_index->baked)
+            HELPER_UPDATE_SINGLE_FIELD_INDEX (signal, INDEX_TYPE_EQUALITY, &signal_index->baked)
+            HELPER_UPDATE_SINGLE_FIELD_INDEX (interval, INDEX_TYPE_COMPARISON, &interval_index->baked.data)
 
 #undef HELPER_UPDATE_SINGLE_FIELD_INDEX
 
@@ -3295,6 +3685,7 @@ kan_repository_indexed_storage_t kan_repository_indexed_storage_open (kan_reposi
 
         kan_bd_list_init (&storage->records);
         storage->access_status = kan_atomic_int_init (0);
+        storage->queries_count = kan_atomic_int_init (0);
         storage->maintenance_lock = kan_atomic_int_init (0);
         storage->dirty_records = NULL;
         kan_stack_group_allocator_init (&storage->temporary_allocator,
@@ -3428,6 +3819,33 @@ static void indexed_storage_perform_maintenance (struct indexed_storage_node_t *
                     signal_index = signal_index->next;
                 }
 
+                struct interval_index_t *interval_index = storage->first_interval_index;
+                while (interval_index)
+                {
+                    if (interval_index->observation_flags & storage->dirty_records->observation_comparison_flags)
+                    {
+                        if (interval_index == storage->dirty_records->dirt_source_index)
+                        {
+                            interval_index_delete_by_sub_node (
+                                interval_index,
+                                (struct interval_index_node_t *) storage->dirty_records->dirt_source_index_node,
+                                (struct interval_index_sub_node_t *)
+                                    storage->dirty_records->dirt_source_index_sub_node);
+                        }
+                        else
+                        {
+                            const uint64_t converted_value =
+                                indexed_field_baked_data_extract_and_convert_unsigned_from_buffer (
+                                    &interval_index->baked, storage->dirty_records->observation_buffer_memory);
+                            interval_index_delete_by_converted_value (interval_index, node, converted_value);
+                        }
+
+                        interval_index_insert_record (interval_index, node);
+                    }
+
+                    interval_index = interval_index->next;
+                }
+
                 // TODO: Update indices.
 
                 observation_event_triggers_definition_fire (
@@ -3454,6 +3872,13 @@ static void indexed_storage_perform_maintenance (struct indexed_storage_node_t *
             {
                 signal_index_insert_record (signal_index, node);
                 signal_index = signal_index->next;
+            }
+
+            struct interval_index_t *interval_index = storage->first_interval_index;
+            while (interval_index)
+            {
+                interval_index_insert_record (interval_index, node);
+                interval_index = interval_index->next;
             }
 
             // TODO: Add to indices.
@@ -3500,6 +3925,7 @@ static void indexed_storage_perform_maintenance (struct indexed_storage_node_t *
                             indexed_field_baked_data_extract_unsigned_from_buffer (
                                 &value_index->baked, storage->dirty_records->observation_buffer_memory) :
                             indexed_field_baked_data_extract_unsigned_from_record (&value_index->baked, node->record);
+
                     value_index_delete_by_hash (value_index, node, old_hash);
                 }
 
@@ -3529,6 +3955,30 @@ static void indexed_storage_perform_maintenance (struct indexed_storage_node_t *
                 }
 
                 signal_index = signal_index->next;
+            }
+
+            struct interval_index_t *interval_index = storage->first_interval_index;
+            while (interval_index)
+            {
+                if (interval_index == storage->dirty_records->dirt_source_index)
+                {
+                    interval_index_delete_by_sub_node (
+                        interval_index, (struct interval_index_node_t *) storage->dirty_records->dirt_source_index_node,
+                        (struct interval_index_sub_node_t *) storage->dirty_records->dirt_source_index_sub_node);
+                }
+                else
+                {
+                    const uint64_t converted_value =
+                        storage->dirty_records->observation_buffer_memory ?
+                            indexed_field_baked_data_extract_and_convert_unsigned_from_buffer (
+                                &interval_index->baked, storage->dirty_records->observation_buffer_memory) :
+                            indexed_field_baked_data_extract_and_convert_unsigned_from_record (&interval_index->baked,
+                                                                                               node->record);
+
+                    interval_index_delete_by_converted_value (interval_index, node, converted_value);
+                }
+
+                interval_index = interval_index->next;
             }
 
             // TODO: Remove from indices.
@@ -4099,12 +4549,14 @@ static inline kan_bool_t try_bake_for_single_field_index (kan_reflection_registr
                                                           struct kan_repository_field_path_t path,
                                                           kan_allocation_group_t allocation_group,
                                                           struct indexed_field_baked_data_t *baked_output,
-                                                          struct interned_field_path_t *interned_path_output)
+                                                          struct interned_field_path_t *interned_path_output,
+                                                          enum index_type_t index_type)
 {
     indexed_field_baked_data_init (baked_output);
     *interned_path_output = copy_field_path (path, allocation_group);
 
-    if (!indexed_field_baked_data_bake_from_reflection (baked_output, registry, type_name, *interned_path_output))
+    if (!indexed_field_baked_data_bake_from_reflection (baked_output, registry, type_name, *interned_path_output,
+                                                        index_type))
     {
         KAN_LOG (repository, KAN_LOG_ERROR, "Unable to create index for path (inside struct \"%s\":", type_name)
         for (uint32_t path_index = 0; path_index < path.reflection_path_length; ++path_index)
@@ -4142,7 +4594,8 @@ static struct value_index_t *indexed_storage_find_or_create_value_index (struct 
     struct interned_field_path_t interned_path;
 
     if (!try_bake_for_single_field_index (storage->repository->registry, storage->type->name, path,
-                                          storage->value_index_allocation_group, &baked, &interned_path))
+                                          storage->value_index_allocation_group, &baked, &interned_path,
+                                          INDEX_TYPE_EQUALITY))
     {
         kan_atomic_int_unlock (&storage->maintenance_lock);
         return NULL;
@@ -4243,7 +4696,7 @@ struct kan_repository_indexed_value_read_access_t kan_repository_indexed_value_r
         .sub_node = cursor_data->sub_node,
     };
 
-    if (cursor_data->index && cursor_data->sub_node)
+    if (cursor_data->sub_node)
     {
         cursor_data->sub_node = cursor_data->sub_node->next;
 
@@ -4317,7 +4770,7 @@ struct kan_repository_indexed_value_update_access_t kan_repository_indexed_value
         .dirty_node = NULL,
     };
 
-    if (cursor_data->index && cursor_data->sub_node)
+    if (cursor_data->sub_node)
     {
         cursor_data->sub_node = cursor_data->sub_node->next;
 
@@ -4390,7 +4843,7 @@ struct kan_repository_indexed_value_delete_access_t kan_repository_indexed_value
         .sub_node = cursor_data->sub_node,
     };
 
-    if (cursor_data->index && cursor_data->sub_node)
+    if (cursor_data->sub_node)
     {
         cursor_data->sub_node = cursor_data->sub_node->next;
 
@@ -4475,7 +4928,7 @@ struct kan_repository_indexed_value_write_access_t kan_repository_indexed_value_
         .dirty_node = NULL,
     };
 
-    if (cursor_data->index && cursor_data->sub_node)
+    if (cursor_data->sub_node)
     {
         cursor_data->sub_node = cursor_data->sub_node->next;
 
@@ -4556,7 +5009,8 @@ static struct signal_index_t *indexed_storage_find_or_create_signal_index (struc
     struct interned_field_path_t interned_path;
 
     if (!try_bake_for_single_field_index (storage->repository->registry, storage->type->name, path,
-                                          storage->value_index_allocation_group, &baked, &interned_path))
+                                          storage->value_index_allocation_group, &baked, &interned_path,
+                                          INDEX_TYPE_EQUALITY))
     {
         kan_atomic_int_unlock (&storage->maintenance_lock);
         return NULL;
@@ -4654,7 +5108,7 @@ struct kan_repository_indexed_signal_read_access_t kan_repository_indexed_signal
         .node = cursor_data->node,
     };
 
-    if (cursor_data->index && cursor_data->node)
+    if (cursor_data->node)
     {
         cursor_data->node = cursor_data->node->next;
 
@@ -4729,7 +5183,7 @@ struct kan_repository_indexed_signal_update_access_t kan_repository_indexed_sign
         .dirty_node = NULL,
     };
 
-    if (cursor_data->index && cursor_data->node)
+    if (cursor_data->node)
     {
         cursor_data->node = cursor_data->node->next;
 
@@ -4802,7 +5256,7 @@ struct kan_repository_indexed_signal_delete_access_t kan_repository_indexed_sign
         .node = cursor_data->node,
     };
 
-    if (cursor_data->index && cursor_data->node)
+    if (cursor_data->node)
     {
         cursor_data->node = cursor_data->node->next;
 
@@ -4887,7 +5341,7 @@ struct kan_repository_indexed_signal_write_access_t kan_repository_indexed_signa
         .dirty_node = NULL,
     };
 
-    if (cursor_data->index && cursor_data->node)
+    if (cursor_data->node)
     {
         cursor_data->node = cursor_data->node->next;
 
@@ -4942,6 +5396,793 @@ void kan_repository_indexed_signal_write_cursor_close (struct kan_repository_ind
 void kan_repository_indexed_signal_write_query_shutdown (struct kan_repository_indexed_signal_write_query_t *query)
 {
     indexed_storage_signal_query_shutdown ((struct indexed_signal_query_t *) query);
+}
+
+static struct interval_index_t *indexed_storage_find_or_create_interval_index (struct indexed_storage_node_t *storage,
+                                                                               struct kan_repository_field_path_t path)
+{
+    kan_atomic_int_lock (&storage->maintenance_lock);
+    struct interval_index_t *index = storage->first_interval_index;
+
+    while (index)
+    {
+        if (is_field_path_equal (path, index->source_path))
+        {
+            kan_atomic_int_unlock (&storage->maintenance_lock);
+            kan_atomic_int_add (&index->storage->queries_count, 1);
+            kan_atomic_int_add (&index->queries_count, 1);
+            return index;
+        }
+
+        index = index->next;
+    }
+
+    struct indexed_field_baked_data_with_archetype_t baked;
+    struct interned_field_path_t interned_path;
+
+    if (!try_bake_for_single_field_index (storage->repository->registry, storage->type->name, path,
+                                          storage->interval_index_allocation_group, &baked.data, &interned_path,
+                                          INDEX_TYPE_COMPARISON))
+    {
+        kan_atomic_int_unlock (&storage->maintenance_lock);
+        return NULL;
+    }
+
+    index = kan_allocate_batched (storage->interval_index_allocation_group, sizeof (struct interval_index_t));
+    index->next = storage->first_interval_index;
+    storage->first_interval_index = index;
+
+    index->storage = storage;
+    index->queries_count = kan_atomic_int_init (0);
+    index->baked = baked;
+
+    kan_avl_tree_init (&index->tree);
+    index->source_path = interned_path;
+
+    kan_atomic_int_unlock (&storage->maintenance_lock);
+    kan_atomic_int_add (&index->storage->queries_count, 1);
+    kan_atomic_int_add (&index->queries_count, 1);
+    return index;
+}
+
+static inline void indexed_storage_interval_query_init (struct indexed_interval_query_t *query,
+                                                        struct indexed_storage_node_t *storage,
+                                                        struct kan_repository_field_path_t path)
+{
+    *query = (struct indexed_interval_query_t) {.index = indexed_storage_find_or_create_interval_index (storage, path)};
+}
+
+static inline void indexed_storage_interval_ascending_cursor_fix_floating (struct indexed_interval_cursor_t *cursor);
+
+static inline void indexed_storage_interval_descending_cursor_fix_floating (struct indexed_interval_cursor_t *cursor);
+
+static inline struct indexed_interval_cursor_t indexed_storage_interval_query_execute (
+    struct indexed_interval_query_t *query, const void *min, const void *max, kan_bool_t ascending)
+{
+    struct indexed_interval_query_t *query_data = (struct indexed_interval_query_t *) query;
+
+    // Handle queries for invalid indices.
+    if (!query_data->index)
+    {
+        return (struct indexed_interval_cursor_t) {
+            .index = NULL,
+            .current_node = NULL,
+            .end_node = NULL,
+            .sub_node = NULL,
+        };
+    }
+
+    indexed_storage_acquire_access (query_data->index->storage);
+    struct interval_index_node_t *min_node = NULL;
+    struct interval_index_node_t *max_node = NULL;
+
+    if (min)
+    {
+        min_node = (struct interval_index_node_t *) kan_avl_tree_find_lower_bound (
+            &query_data->index->tree,
+            indexed_field_baked_data_extract_and_convert_unsigned_from_pointer (&query_data->index->baked, min));
+    }
+
+    if (max)
+    {
+        max_node = (struct interval_index_node_t *) kan_avl_tree_find_upper_bound (
+            &query_data->index->tree,
+            indexed_field_baked_data_extract_and_convert_unsigned_from_pointer (&query_data->index->baked, max));
+    }
+
+    struct indexed_interval_cursor_t cursor;
+    cursor.index = query_data->index;
+
+    if (ascending)
+    {
+        cursor.current_node =
+            (struct interval_index_node_t *) (min_node ?
+                                                  kan_avl_tree_ascending_iteration_next (&min_node->node) :
+                                                  kan_avl_tree_ascending_iteration_begin (&query_data->index->tree));
+        cursor.end_node = max_node;
+    }
+    else
+    {
+        cursor.current_node =
+            (struct interval_index_node_t *) (max_node ?
+                                                  kan_avl_tree_descending_iteration_next (&max_node->node) :
+                                                  kan_avl_tree_descending_iteration_begin (&query_data->index->tree));
+        cursor.end_node = min_node;
+    }
+
+    if (cursor.current_node)
+    {
+        cursor.sub_node = cursor.current_node->first_sub_node;
+    }
+    else
+    {
+        cursor.sub_node = NULL;
+    }
+
+    if (query_data->index->baked.archetype == KAN_REFLECTION_ARCHETYPE_FLOATING)
+    {
+        switch (query_data->index->baked.data.size)
+        {
+        case 4u:
+            cursor.min_floating = min ? *((float *) min) : -INFINITY;
+            cursor.max_floating = max ? *((float *) max) : INFINITY;
+            break;
+
+        case 8u:
+            cursor.min_floating = min ? *((double *) min) : -INFINITY;
+            cursor.max_floating = max ? *((double *) max) : INFINITY;
+            break;
+        }
+
+        if (ascending)
+        {
+            indexed_storage_interval_ascending_cursor_fix_floating (&cursor);
+        }
+        else
+        {
+            indexed_storage_interval_descending_cursor_fix_floating (&cursor);
+        }
+    }
+
+    return cursor;
+}
+
+#define HELPER_INTERVAL_CURSOR_NEXT(TYPE)                                                                              \
+    static inline void indexed_storage_interval_##TYPE##_cursor_next (struct indexed_interval_cursor_t *cursor)        \
+    {                                                                                                                  \
+        if (cursor->current_node == cursor->end_node)                                                                  \
+        {                                                                                                              \
+            return;                                                                                                    \
+        }                                                                                                              \
+                                                                                                                       \
+        if (cursor->sub_node)                                                                                          \
+        {                                                                                                              \
+            cursor->sub_node = cursor->sub_node->next;                                                                 \
+        }                                                                                                              \
+                                                                                                                       \
+        if (!cursor->sub_node)                                                                                         \
+        {                                                                                                              \
+            cursor->current_node =                                                                                     \
+                (struct interval_index_node_t *) kan_avl_tree_##TYPE##_iteration_next (&cursor->current_node->node);   \
+                                                                                                                       \
+            if (cursor->current_node != cursor->end_node)                                                              \
+            {                                                                                                          \
+                cursor->sub_node = cursor->current_node->first_sub_node;                                               \
+            }                                                                                                          \
+            else                                                                                                       \
+            {                                                                                                          \
+                cursor->sub_node = NULL;                                                                               \
+            }                                                                                                          \
+        }                                                                                                              \
+    }
+
+HELPER_INTERVAL_CURSOR_NEXT (ascending)
+HELPER_INTERVAL_CURSOR_NEXT (descending)
+#undef HELPER_INTERVAL_CURSOR_NEXT
+
+static inline void indexed_storage_interval_ascending_cursor_fix_floating (struct indexed_interval_cursor_t *cursor)
+{
+    if (cursor->index->baked.archetype != KAN_REFLECTION_ARCHETYPE_FLOATING)
+    {
+        return;
+    }
+
+    while (cursor->sub_node)
+    {
+#if defined(KAN_REPOSITORY_SAFEGUARDS_ENABLED)
+        if (!safeguard_indexed_read_access_try_create (cursor->index->storage, cursor->sub_node->record))
+        {
+            cursor->sub_node = NULL;
+            break;
+        }
+#endif
+
+        const double value = indexed_field_baked_data_extract_floating_from_record (&cursor->index->baked.data,
+                                                                                    cursor->sub_node->record->record);
+
+#if defined(KAN_REPOSITORY_SAFEGUARDS_ENABLED)
+        safeguard_indexed_read_access_destroyed (cursor->sub_node->record);
+#endif
+
+        if (value >= cursor->min_floating && value <= cursor->max_floating)
+        {
+            break;
+        }
+
+        indexed_storage_interval_ascending_cursor_next (cursor);
+    }
+}
+
+static inline void indexed_storage_interval_descending_cursor_fix_floating (struct indexed_interval_cursor_t *cursor)
+{
+    if (cursor->index->baked.archetype != KAN_REFLECTION_ARCHETYPE_FLOATING)
+    {
+        return;
+    }
+
+    while (cursor->sub_node)
+    {
+#if defined(KAN_REPOSITORY_SAFEGUARDS_ENABLED)
+        if (!safeguard_indexed_read_access_try_create (cursor->index->storage, cursor->sub_node->record))
+        {
+            cursor->sub_node = NULL;
+            break;
+        }
+#endif
+
+        const double value = indexed_field_baked_data_extract_floating_from_record (&cursor->index->baked.data,
+                                                                                    cursor->sub_node->record->record);
+
+#if defined(KAN_REPOSITORY_SAFEGUARDS_ENABLED)
+        safeguard_indexed_read_access_destroyed (cursor->sub_node->record);
+#endif
+
+        if (value >= cursor->min_floating && value <= cursor->max_floating)
+        {
+            break;
+        }
+
+        indexed_storage_interval_descending_cursor_next (cursor);
+    }
+}
+
+static inline void indexed_storage_interval_cursor_close (struct indexed_interval_cursor_t *cursor)
+{
+    if (cursor->index)
+    {
+        indexed_storage_release_access (cursor->index->storage);
+    }
+}
+
+static inline void indexed_storage_interval_query_shutdown (struct indexed_interval_query_t *query)
+{
+    if (query->index)
+    {
+        kan_atomic_int_add (&query->index->queries_count, -1);
+        kan_atomic_int_add (&query->index->storage->queries_count, -1);
+        query->index = NULL;
+    }
+}
+
+void kan_repository_indexed_interval_read_query_init (struct kan_repository_indexed_interval_read_query_t *query,
+                                                      kan_repository_indexed_storage_t storage,
+                                                      struct kan_repository_field_path_t path)
+{
+    indexed_storage_interval_query_init ((struct indexed_interval_query_t *) query,
+                                         (struct indexed_storage_node_t *) storage, path);
+}
+
+struct kan_repository_indexed_interval_ascending_read_cursor_t
+kan_repository_indexed_interval_read_query_execute_ascending (
+    struct kan_repository_indexed_interval_read_query_t *query, const void *min, const void *max)
+{
+    struct indexed_interval_cursor_t cursor =
+        indexed_storage_interval_query_execute ((struct indexed_interval_query_t *) query, min, max, KAN_TRUE);
+    return *(struct kan_repository_indexed_interval_ascending_read_cursor_t *) &cursor;
+}
+
+struct kan_repository_indexed_interval_descending_read_cursor_t
+kan_repository_indexed_interval_read_query_execute_descending (
+    struct kan_repository_indexed_interval_read_query_t *query, const void *min, const void *max)
+{
+    struct indexed_interval_cursor_t cursor =
+        indexed_storage_interval_query_execute ((struct indexed_interval_query_t *) query, min, max, KAN_FALSE);
+    return *(struct kan_repository_indexed_interval_descending_read_cursor_t *) &cursor;
+}
+
+struct kan_repository_indexed_interval_read_access_t kan_repository_indexed_interval_ascending_read_cursor_next (
+    struct kan_repository_indexed_interval_ascending_read_cursor_t *cursor)
+{
+    struct indexed_interval_cursor_t *cursor_data = (struct indexed_interval_cursor_t *) cursor;
+    struct indexed_interval_constant_access_t access = {
+        .index = cursor_data->index,
+        .node = cursor_data->current_node,
+        .sub_node = cursor_data->sub_node,
+    };
+
+    if (cursor_data->sub_node)
+    {
+        indexed_storage_interval_ascending_cursor_next (cursor_data);
+        indexed_storage_interval_ascending_cursor_fix_floating (cursor_data);
+
+#if defined(KAN_REPOSITORY_SAFEGUARDS_ENABLED)
+        if (!safeguard_indexed_read_access_try_create (access.index->storage, access.sub_node->record))
+        {
+            access.sub_node = NULL;
+        }
+        else
+#endif
+        {
+            indexed_storage_acquire_access (cursor_data->index->storage);
+        }
+    }
+
+    return *(struct kan_repository_indexed_interval_read_access_t *) &access;
+}
+
+struct kan_repository_indexed_interval_read_access_t kan_repository_indexed_interval_descending_read_cursor_next (
+    struct kan_repository_indexed_interval_descending_read_cursor_t *cursor)
+{
+    struct indexed_interval_cursor_t *cursor_data = (struct indexed_interval_cursor_t *) cursor;
+    struct indexed_interval_constant_access_t access = {
+        .index = cursor_data->index,
+        .node = cursor_data->current_node,
+        .sub_node = cursor_data->sub_node,
+    };
+
+    if (cursor_data->sub_node)
+    {
+        indexed_storage_interval_descending_cursor_next (cursor_data);
+        indexed_storage_interval_descending_cursor_fix_floating (cursor_data);
+
+#if defined(KAN_REPOSITORY_SAFEGUARDS_ENABLED)
+        if (!safeguard_indexed_read_access_try_create (access.index->storage, access.sub_node->record))
+        {
+            access.sub_node = NULL;
+        }
+        else
+#endif
+        {
+            indexed_storage_acquire_access (cursor_data->index->storage);
+        }
+    }
+
+    return *(struct kan_repository_indexed_interval_read_access_t *) &access;
+}
+
+const void *kan_repository_indexed_interval_read_access_resolve (
+    struct kan_repository_indexed_interval_read_access_t *access)
+{
+    struct indexed_interval_constant_access_t *access_data = (struct indexed_interval_constant_access_t *) access;
+    return access_data->sub_node ? access_data->sub_node->record->record : NULL;
+}
+
+void kan_repository_indexed_interval_read_access_close (struct kan_repository_indexed_interval_read_access_t *access)
+{
+    struct indexed_interval_constant_access_t *access_data = (struct indexed_interval_constant_access_t *) access;
+    if (access_data->sub_node)
+    {
+#if defined(KAN_REPOSITORY_SAFEGUARDS_ENABLED)
+        safeguard_indexed_read_access_destroyed (access_data->sub_node->record);
+#endif
+        indexed_storage_release_access (access_data->index->storage);
+    }
+}
+
+void kan_repository_indexed_interval_ascending_read_cursor_close (
+    struct kan_repository_indexed_interval_ascending_read_cursor_t *cursor)
+{
+    indexed_storage_interval_cursor_close ((struct indexed_interval_cursor_t *) cursor);
+}
+
+void kan_repository_indexed_interval_descending_read_cursor_close (
+    struct kan_repository_indexed_interval_descending_read_cursor_t *cursor)
+{
+    indexed_storage_interval_cursor_close ((struct indexed_interval_cursor_t *) cursor);
+}
+
+void kan_repository_indexed_interval_read_query_shutdown (struct kan_repository_indexed_interval_read_query_t *query)
+{
+    indexed_storage_interval_query_shutdown ((struct indexed_interval_query_t *) query);
+}
+
+void kan_repository_indexed_interval_update_query_init (struct kan_repository_indexed_interval_update_query_t *query,
+                                                        kan_repository_indexed_storage_t storage,
+                                                        struct kan_repository_field_path_t path)
+{
+    indexed_storage_interval_query_init ((struct indexed_interval_query_t *) query,
+                                         (struct indexed_storage_node_t *) storage, path);
+}
+
+struct kan_repository_indexed_interval_ascending_update_cursor_t
+kan_repository_indexed_interval_update_query_execute_ascending (
+    struct kan_repository_indexed_interval_update_query_t *query, const void *min, const void *max)
+{
+    struct indexed_interval_cursor_t cursor =
+        indexed_storage_interval_query_execute ((struct indexed_interval_query_t *) query, min, max, KAN_TRUE);
+    return *(struct kan_repository_indexed_interval_ascending_update_cursor_t *) &cursor;
+}
+
+struct kan_repository_indexed_interval_descending_update_cursor_t
+kan_repository_indexed_interval_update_query_execute_descending (
+    struct kan_repository_indexed_interval_update_query_t *query, const void *min, const void *max)
+{
+    struct indexed_interval_cursor_t cursor =
+        indexed_storage_interval_query_execute ((struct indexed_interval_query_t *) query, min, max, KAN_FALSE);
+    return *(struct kan_repository_indexed_interval_descending_update_cursor_t *) &cursor;
+}
+
+struct kan_repository_indexed_interval_update_access_t kan_repository_indexed_interval_ascending_update_cursor_next (
+    struct kan_repository_indexed_interval_ascending_update_cursor_t *cursor)
+{
+    struct indexed_interval_cursor_t *cursor_data = (struct indexed_interval_cursor_t *) cursor;
+    struct indexed_interval_mutable_access_t access = {
+        .index = cursor_data->index,
+        .node = cursor_data->current_node,
+        .sub_node = cursor_data->sub_node,
+        .dirty_node = NULL,
+    };
+
+    if (cursor_data->sub_node)
+    {
+        indexed_storage_interval_ascending_cursor_next (cursor_data);
+        indexed_storage_interval_ascending_cursor_fix_floating (cursor_data);
+
+#if defined(KAN_REPOSITORY_SAFEGUARDS_ENABLED)
+        if (!safeguard_indexed_write_access_try_create (access.index->storage, access.sub_node->record))
+        {
+            access.sub_node = NULL;
+        }
+        else
+#endif
+        {
+            access.dirty_node = indexed_storage_report_mutable_access_begin (
+                access.index->storage, access.sub_node->record, access.index, access.node, access.sub_node);
+            indexed_storage_acquire_access (cursor_data->index->storage);
+        }
+    }
+
+    return *(struct kan_repository_indexed_interval_update_access_t *) &access;
+}
+
+struct kan_repository_indexed_interval_update_access_t kan_repository_indexed_interval_descending_update_cursor_next (
+    struct kan_repository_indexed_interval_descending_update_cursor_t *cursor)
+{
+    struct indexed_interval_cursor_t *cursor_data = (struct indexed_interval_cursor_t *) cursor;
+    struct indexed_interval_mutable_access_t access = {
+        .index = cursor_data->index,
+        .node = cursor_data->current_node,
+        .sub_node = cursor_data->sub_node,
+        .dirty_node = NULL,
+    };
+
+    if (cursor_data->sub_node)
+    {
+        indexed_storage_interval_descending_cursor_next (cursor_data);
+        indexed_storage_interval_descending_cursor_fix_floating (cursor_data);
+
+#if defined(KAN_REPOSITORY_SAFEGUARDS_ENABLED)
+        if (!safeguard_indexed_write_access_try_create (access.index->storage, access.sub_node->record))
+        {
+            access.sub_node = NULL;
+        }
+        else
+#endif
+        {
+            access.dirty_node = indexed_storage_report_mutable_access_begin (
+                access.index->storage, access.sub_node->record, access.index, access.node, access.sub_node);
+            indexed_storage_acquire_access (cursor_data->index->storage);
+        }
+    }
+
+    return *(struct kan_repository_indexed_interval_update_access_t *) &access;
+}
+
+void *kan_repository_indexed_interval_update_access_resolve (
+    struct kan_repository_indexed_interval_update_access_t *access)
+{
+    struct indexed_interval_mutable_access_t *access_data = (struct indexed_interval_mutable_access_t *) access;
+    return access_data->sub_node ? access_data->sub_node->record->record : NULL;
+}
+
+void kan_repository_indexed_interval_update_access_close (
+    struct kan_repository_indexed_interval_update_access_t *access)
+{
+    struct indexed_interval_mutable_access_t *access_data = (struct indexed_interval_mutable_access_t *) access;
+    if (access_data->dirty_node)
+    {
+        indexed_storage_report_mutable_access_end (access_data->index->storage, access_data->dirty_node);
+        indexed_storage_release_access (access_data->index->storage);
+    }
+}
+
+void kan_repository_indexed_interval_ascending_update_cursor_close (
+    struct kan_repository_indexed_interval_ascending_update_cursor_t *cursor)
+{
+    indexed_storage_interval_cursor_close ((struct indexed_interval_cursor_t *) cursor);
+}
+
+void kan_repository_indexed_interval_descending_update_cursor_close (
+    struct kan_repository_indexed_interval_descending_update_cursor_t *cursor)
+{
+    indexed_storage_interval_cursor_close ((struct indexed_interval_cursor_t *) cursor);
+}
+
+void kan_repository_indexed_interval_update_query_shutdown (
+    struct kan_repository_indexed_interval_update_query_t *query)
+{
+    indexed_storage_interval_query_shutdown ((struct indexed_interval_query_t *) query);
+}
+
+void kan_repository_indexed_interval_delete_query_init (struct kan_repository_indexed_interval_delete_query_t *query,
+                                                        kan_repository_indexed_storage_t storage,
+                                                        struct kan_repository_field_path_t path)
+{
+    indexed_storage_interval_query_init ((struct indexed_interval_query_t *) query,
+                                         (struct indexed_storage_node_t *) storage, path);
+}
+
+struct kan_repository_indexed_interval_ascending_delete_cursor_t
+kan_repository_indexed_interval_delete_query_execute_ascending (
+    struct kan_repository_indexed_interval_delete_query_t *query, const void *min, const void *max)
+{
+    struct indexed_interval_cursor_t cursor =
+        indexed_storage_interval_query_execute ((struct indexed_interval_query_t *) query, min, max, KAN_TRUE);
+    return *(struct kan_repository_indexed_interval_ascending_delete_cursor_t *) &cursor;
+}
+
+struct kan_repository_indexed_interval_descending_delete_cursor_t
+kan_repository_indexed_interval_delete_query_execute_descending (
+    struct kan_repository_indexed_interval_delete_query_t *query, const void *min, const void *max)
+{
+    struct indexed_interval_cursor_t cursor =
+        indexed_storage_interval_query_execute ((struct indexed_interval_query_t *) query, min, max, KAN_FALSE);
+    return *(struct kan_repository_indexed_interval_descending_delete_cursor_t *) &cursor;
+}
+
+struct kan_repository_indexed_interval_delete_access_t kan_repository_indexed_interval_ascending_delete_cursor_next (
+    struct kan_repository_indexed_interval_ascending_delete_cursor_t *cursor)
+{
+    struct indexed_interval_cursor_t *cursor_data = (struct indexed_interval_cursor_t *) cursor;
+    struct indexed_interval_constant_access_t access = {
+        .index = cursor_data->index,
+        .node = cursor_data->current_node,
+        .sub_node = cursor_data->sub_node,
+    };
+
+    if (cursor_data->sub_node)
+    {
+        indexed_storage_interval_ascending_cursor_next (cursor_data);
+        indexed_storage_interval_ascending_cursor_fix_floating (cursor_data);
+
+#if defined(KAN_REPOSITORY_SAFEGUARDS_ENABLED)
+        if (!safeguard_indexed_write_access_try_create (access.index->storage, access.sub_node->record))
+        {
+            access.sub_node = NULL;
+        }
+        else
+#endif
+        {
+            indexed_storage_acquire_access (cursor_data->index->storage);
+        }
+    }
+
+    return *(struct kan_repository_indexed_interval_delete_access_t *) &access;
+}
+
+struct kan_repository_indexed_interval_delete_access_t kan_repository_indexed_interval_descending_delete_cursor_next (
+    struct kan_repository_indexed_interval_descending_delete_cursor_t *cursor)
+{
+    struct indexed_interval_cursor_t *cursor_data = (struct indexed_interval_cursor_t *) cursor;
+    struct indexed_interval_constant_access_t access = {
+        .index = cursor_data->index,
+        .node = cursor_data->current_node,
+        .sub_node = cursor_data->sub_node,
+    };
+
+    if (cursor_data->sub_node)
+    {
+        indexed_storage_interval_descending_cursor_next (cursor_data);
+        indexed_storage_interval_descending_cursor_fix_floating (cursor_data);
+
+#if defined(KAN_REPOSITORY_SAFEGUARDS_ENABLED)
+        if (!safeguard_indexed_write_access_try_create (access.index->storage, access.sub_node->record))
+        {
+            access.sub_node = NULL;
+        }
+        else
+#endif
+        {
+            indexed_storage_acquire_access (cursor_data->index->storage);
+        }
+    }
+
+    return *(struct kan_repository_indexed_interval_delete_access_t *) &access;
+}
+
+const void *kan_repository_indexed_interval_delete_access_resolve (
+    struct kan_repository_indexed_interval_delete_access_t *access)
+{
+    struct indexed_interval_constant_access_t *access_data = (struct indexed_interval_constant_access_t *) access;
+    return access_data->sub_node ? access_data->sub_node->record->record : NULL;
+}
+
+void kan_repository_indexed_interval_delete_access_delete (
+    struct kan_repository_indexed_interval_delete_access_t *access)
+{
+    struct indexed_interval_constant_access_t *access_data = (struct indexed_interval_constant_access_t *) access;
+    indexed_storage_report_delete_from_constant_access (access_data->index->storage, access_data->sub_node->record,
+                                                        access_data->index, access_data->node, access_data->sub_node);
+    cascade_deleters_definition_fire (&access_data->index->storage->cascade_deleters,
+                                      access_data->sub_node->record->record);
+    indexed_storage_release_access (access_data->index->storage);
+}
+
+void kan_repository_indexed_interval_delete_access_close (
+    struct kan_repository_indexed_interval_delete_access_t *access)
+{
+    struct indexed_interval_constant_access_t *access_data = (struct indexed_interval_constant_access_t *) access;
+    if (access_data->sub_node)
+    {
+#if defined(KAN_REPOSITORY_SAFEGUARDS_ENABLED)
+        safeguard_indexed_write_access_destroyed (access_data->sub_node->record);
+#endif
+        indexed_storage_release_access (access_data->index->storage);
+    }
+}
+
+void kan_repository_indexed_interval_ascending_delete_cursor_close (
+    struct kan_repository_indexed_interval_ascending_delete_cursor_t *cursor)
+{
+    indexed_storage_interval_cursor_close ((struct indexed_interval_cursor_t *) cursor);
+}
+
+void kan_repository_indexed_interval_descending_delete_cursor_close (
+    struct kan_repository_indexed_interval_descending_delete_cursor_t *cursor)
+{
+    indexed_storage_interval_cursor_close ((struct indexed_interval_cursor_t *) cursor);
+}
+
+void kan_repository_indexed_interval_delete_query_shutdown (
+    struct kan_repository_indexed_interval_delete_query_t *query)
+{
+    indexed_storage_interval_query_shutdown ((struct indexed_interval_query_t *) query);
+}
+
+void kan_repository_indexed_interval_write_query_init (struct kan_repository_indexed_interval_write_query_t *query,
+                                                       kan_repository_indexed_storage_t storage,
+                                                       struct kan_repository_field_path_t path)
+{
+    indexed_storage_interval_query_init ((struct indexed_interval_query_t *) query,
+                                         (struct indexed_storage_node_t *) storage, path);
+}
+
+struct kan_repository_indexed_interval_ascending_write_cursor_t
+kan_repository_indexed_interval_write_query_execute_ascending (
+    struct kan_repository_indexed_interval_write_query_t *query, const void *min, const void *max)
+{
+    struct indexed_interval_cursor_t cursor =
+        indexed_storage_interval_query_execute ((struct indexed_interval_query_t *) query, min, max, KAN_TRUE);
+    return *(struct kan_repository_indexed_interval_ascending_write_cursor_t *) &cursor;
+}
+
+struct kan_repository_indexed_interval_descending_write_cursor_t
+kan_repository_indexed_interval_write_query_execute_descending (
+    struct kan_repository_indexed_interval_write_query_t *query, const void *min, const void *max)
+{
+    struct indexed_interval_cursor_t cursor =
+        indexed_storage_interval_query_execute ((struct indexed_interval_query_t *) query, min, max, KAN_FALSE);
+    return *(struct kan_repository_indexed_interval_descending_write_cursor_t *) &cursor;
+}
+
+struct kan_repository_indexed_interval_write_access_t kan_repository_indexed_interval_ascending_write_cursor_next (
+    struct kan_repository_indexed_interval_ascending_write_cursor_t *cursor)
+{
+    struct indexed_interval_cursor_t *cursor_data = (struct indexed_interval_cursor_t *) cursor;
+    struct indexed_interval_mutable_access_t access = {
+        .index = cursor_data->index,
+        .node = cursor_data->current_node,
+        .sub_node = cursor_data->sub_node,
+        .dirty_node = NULL,
+    };
+
+    if (cursor_data->sub_node)
+    {
+        indexed_storage_interval_ascending_cursor_next (cursor_data);
+        indexed_storage_interval_ascending_cursor_fix_floating (cursor_data);
+
+#if defined(KAN_REPOSITORY_SAFEGUARDS_ENABLED)
+        if (!safeguard_indexed_write_access_try_create (access.index->storage, access.sub_node->record))
+        {
+            access.sub_node = NULL;
+        }
+        else
+#endif
+        {
+            access.dirty_node = indexed_storage_report_mutable_access_begin (
+                access.index->storage, access.sub_node->record, access.index, access.node, access.sub_node);
+            indexed_storage_acquire_access (cursor_data->index->storage);
+        }
+    }
+
+    return *(struct kan_repository_indexed_interval_write_access_t *) &access;
+}
+
+struct kan_repository_indexed_interval_write_access_t kan_repository_indexed_interval_descending_write_cursor_next (
+    struct kan_repository_indexed_interval_descending_write_cursor_t *cursor)
+{
+    struct indexed_interval_cursor_t *cursor_data = (struct indexed_interval_cursor_t *) cursor;
+    struct indexed_interval_mutable_access_t access = {
+        .index = cursor_data->index,
+        .node = cursor_data->current_node,
+        .sub_node = cursor_data->sub_node,
+        .dirty_node = NULL,
+    };
+
+    if (cursor_data->sub_node)
+    {
+        indexed_storage_interval_descending_cursor_next (cursor_data);
+        indexed_storage_interval_descending_cursor_fix_floating (cursor_data);
+
+#if defined(KAN_REPOSITORY_SAFEGUARDS_ENABLED)
+        if (!safeguard_indexed_write_access_try_create (access.index->storage, access.sub_node->record))
+        {
+            access.sub_node = NULL;
+        }
+        else
+#endif
+        {
+            access.dirty_node = indexed_storage_report_mutable_access_begin (
+                access.index->storage, access.sub_node->record, access.index, access.node, access.sub_node);
+            indexed_storage_acquire_access (cursor_data->index->storage);
+        }
+    }
+
+    return *(struct kan_repository_indexed_interval_write_access_t *) &access;
+}
+
+void *kan_repository_indexed_interval_write_access_resolve (
+    struct kan_repository_indexed_interval_write_access_t *access)
+{
+    struct indexed_interval_mutable_access_t *access_data = (struct indexed_interval_mutable_access_t *) access;
+    return access_data->sub_node ? access_data->sub_node->record->record : NULL;
+}
+
+void kan_repository_indexed_interval_write_access_delete (struct kan_repository_indexed_interval_write_access_t *access)
+{
+    struct indexed_interval_mutable_access_t *access_data = (struct indexed_interval_mutable_access_t *) access;
+    KAN_ASSERT (access_data->dirty_node)
+    indexed_storage_report_delete_from_mutable_access (access_data->index->storage, access_data->dirty_node);
+    cascade_deleters_definition_fire (&access_data->index->storage->cascade_deleters,
+                                      access_data->sub_node->record->record);
+    indexed_storage_release_access (access_data->index->storage);
+}
+
+void kan_repository_indexed_interval_write_access_close (struct kan_repository_indexed_interval_write_access_t *access)
+{
+    struct indexed_interval_mutable_access_t *access_data = (struct indexed_interval_mutable_access_t *) access;
+    if (access_data->dirty_node)
+    {
+        indexed_storage_report_mutable_access_end (access_data->index->storage, access_data->dirty_node);
+        indexed_storage_release_access (access_data->index->storage);
+    }
+}
+
+void kan_repository_indexed_interval_ascending_write_cursor_close (
+    struct kan_repository_indexed_interval_ascending_write_cursor_t *cursor)
+{
+    indexed_storage_interval_cursor_close ((struct indexed_interval_cursor_t *) cursor);
+}
+
+void kan_repository_indexed_interval_descending_write_cursor_close (
+    struct kan_repository_indexed_interval_descending_write_cursor_t *cursor)
+{
+    indexed_storage_interval_cursor_close ((struct indexed_interval_cursor_t *) cursor);
+}
+
+void kan_repository_indexed_interval_write_query_shutdown (struct kan_repository_indexed_interval_write_query_t *query)
+{
+    indexed_storage_interval_query_shutdown ((struct indexed_interval_query_t *) query);
 }
 
 static struct event_storage_node_t *query_event_storage_across_hierarchy (struct repository_t *repository,
@@ -5279,6 +6520,7 @@ static void repository_clean_storages (struct repository_t *repository)
 
         HELPER_SHUTDOWN_UNUSED_INDICES (value)
         HELPER_SHUTDOWN_UNUSED_INDICES (signal)
+        HELPER_SHUTDOWN_UNUSED_INDICES (interval)
 
         // TODO: Clean up unused indices.
 
@@ -5459,7 +6701,7 @@ static void extract_observation_chunks_from_indices (struct indexed_storage_node
                                                      struct observation_buffer_scenario_chunk_list_node_t **first,
                                                      struct observation_buffer_scenario_chunk_list_node_t **last)
 {
-#define HELPER_EXTRACT_OBSERVATION_FROM_SINGLE_FIELD_INDEX(INDEX_TYPE)                                                 \
+#define HELPER_EXTRACT_OBSERVATION_FROM_SINGLE_FIELD_INDEX(INDEX_TYPE, BAKED_GETTER)                                   \
     struct INDEX_TYPE##_index_t *INDEX_TYPE##_index = storage->first_##INDEX_TYPE##_index;                             \
     while (INDEX_TYPE##_index)                                                                                         \
     {                                                                                                                  \
@@ -5469,8 +6711,8 @@ static void extract_observation_chunks_from_indices (struct indexed_storage_node
                 _Alignof (struct observation_buffer_scenario_chunk_list_node_t));                                      \
                                                                                                                        \
         node->next = 0u;                                                                                               \
-        node->source_offset = INDEX_TYPE##_index->baked.absolute_offset;                                               \
-        node->size = INDEX_TYPE##_index->baked.size_with_padding;                                                      \
+        node->source_offset = BAKED_GETTER.absolute_offset;                                                            \
+        node->size = BAKED_GETTER.size_with_padding;                                                                   \
         node->flags = *event_flag;                                                                                     \
                                                                                                                        \
         if (*last)                                                                                                     \
@@ -5489,8 +6731,9 @@ static void extract_observation_chunks_from_indices (struct indexed_storage_node
         INDEX_TYPE##_index = INDEX_TYPE##_index->next;                                                                 \
     }
 
-    HELPER_EXTRACT_OBSERVATION_FROM_SINGLE_FIELD_INDEX (value)
-    HELPER_EXTRACT_OBSERVATION_FROM_SINGLE_FIELD_INDEX (signal)
+    HELPER_EXTRACT_OBSERVATION_FROM_SINGLE_FIELD_INDEX (value, value_index->baked)
+    HELPER_EXTRACT_OBSERVATION_FROM_SINGLE_FIELD_INDEX (signal, signal_index->baked)
+    HELPER_EXTRACT_OBSERVATION_FROM_SINGLE_FIELD_INDEX (interval, interval_index->baked.data)
 
     // TODO: Extract observation chunks from indices.
 
@@ -5513,10 +6756,7 @@ static void prepare_indices (struct indexed_storage_node_t *storage, uint64_t *e
     {
         const kan_bool_t baked_from_buffer =
             indexed_field_baked_data_bake_from_buffer (&value_index->baked, &value_index->storage->observation_buffer);
-
         KAN_ASSERT (baked_from_buffer)
-        KAN_ASSERT (value_index->hash_storage.items.size == 0u ||
-                    value_index->hash_storage.items.size == storage->records.size)
 
         if (value_index->hash_storage.items.size == 0u)
         {
@@ -5546,6 +6786,24 @@ static void prepare_indices (struct indexed_storage_node_t *storage, uint64_t *e
         *event_flag <<= 1u;
         KAN_ASSERT (*event_flag > 0u)
         signal_index = signal_index->next;
+    }
+
+    struct interval_index_t *interval_index = storage->first_interval_index;
+    while (interval_index)
+    {
+        const kan_bool_t baked_from_buffer = indexed_field_baked_data_bake_from_buffer (
+            &interval_index->baked.data, &interval_index->storage->observation_buffer);
+        KAN_ASSERT (baked_from_buffer)
+
+        if (interval_index->tree.size == 0u)
+        {
+            HELPER_FILL_INDEX (interval)
+        }
+
+        interval_index->observation_flags = *event_flag;
+        *event_flag <<= 1u;
+        KAN_ASSERT (*event_flag > 0u)
+        interval_index = interval_index->next;
     }
 
     // TODO: Fill or update indices if needed. Remember about filling buffer offsets for indexed fields.
@@ -5722,6 +6980,12 @@ static void repository_destroy_internal (struct repository_t *repository)
             (struct singleton_storage_node_t *) repository->singleton_storages.items.first, repository);
     }
 
+    while (repository->indexed_storages.items.first)
+    {
+        indexed_storage_node_shutdown_and_free (
+            (struct indexed_storage_node_t *) repository->indexed_storages.items.first, repository);
+    }
+
     while (repository->event_storages.items.first)
     {
         event_storage_node_shutdown_and_free ((struct event_storage_node_t *) repository->event_storages.items.first,
@@ -5729,6 +6993,7 @@ static void repository_destroy_internal (struct repository_t *repository)
     }
 
     kan_hash_storage_shutdown (&repository->singleton_storages);
+    kan_hash_storage_shutdown (&repository->indexed_storages);
     kan_hash_storage_shutdown (&repository->event_storages);
 
     if (repository->parent)
@@ -5749,6 +7014,8 @@ static void repository_destroy_internal (struct repository_t *repository)
             sibling->next = repository->next;
         }
     }
+
+    kan_free_general (repository->allocation_group, repository, sizeof (struct repository_t));
 }
 
 void kan_repository_destroy (kan_repository_t repository)

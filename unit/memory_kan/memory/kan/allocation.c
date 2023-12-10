@@ -1,5 +1,6 @@
 #include <stdlib.h>
 
+#include <kan/api_common/alignment.h>
 #include <kan/error/critical.h>
 #include <kan/memory/allocation.h>
 #include <kan/threading/atomic.h>
@@ -257,7 +258,9 @@ struct stack_allocator_t
 kan_stack_allocator_t kan_stack_allocator_create (kan_allocation_group_t group, uint64_t amount)
 {
     struct stack_allocator_t *stack = (struct stack_allocator_t *) kan_allocate_general (
-        group, sizeof (struct stack_allocator_t) + amount, _Alignof (struct stack_allocator_t));
+        group, kan_apply_alignment (sizeof (struct stack_allocator_t) + amount, _Alignof (struct stack_allocator_t)),
+        _Alignof (struct stack_allocator_t));
+
     stack->top = stack->data;
     stack->end = stack->data + amount;
     stack->group = group;
