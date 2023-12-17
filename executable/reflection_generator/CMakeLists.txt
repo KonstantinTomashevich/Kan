@@ -3,6 +3,6 @@ register_executable (reflection_generator)
 executable_include (
         SCOPE PUBLIC
         ABSTRACT error=sdl file_system=stdcxx hash=djb2 log=kan memory=kan memory_profiler=none threading=sdl
-        CONCRETE c_interface container reflection_generator_main testing)
+        CONCRETE c_interface container reflection_generator_main)
 executable_verify ()
 executable_copy_linked_artefacts ()
