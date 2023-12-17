@@ -145,6 +145,8 @@
 /// - Deletion modifies the tree structure and therefore is not thread safe.
 /// \endparblock
 
+KAN_C_HEADER_BEGIN
+
 _Static_assert (KAN_CONTAINER_SPACE_TREE_MAX_DIMENSIONS <= 4u,
                 "Current implementation is optimized for 4 or less dimensions.");
 
@@ -461,3 +463,5 @@ static inline struct kan_ray_intersection_output_t kan_check_if_ray_and_bounds_i
     result.time = max_time;
     return result;
 }
+
+KAN_C_HEADER_END
