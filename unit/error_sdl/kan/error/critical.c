@@ -114,7 +114,7 @@ void kan_critical_error (const char *message, const char *file, int line)
 
         if (message_box_return_code < 0)
         {
-            KAN_LOG (testing, KAN_LOG_CRITICAL_ERROR, "Failed to create interactive assert message box: %s.",
+            KAN_LOG (error, KAN_LOG_CRITICAL_ERROR, "Failed to create interactive assert message box: %s.",
                      SDL_GetError ())
             kan_mutex_unlock (critical_error_context.interactive_mutex);
             abort ();
@@ -165,7 +165,7 @@ void kan_critical_error (const char *message, const char *file, int line)
             abort ();
         }
 
-        KAN_LOG (testing, KAN_LOG_CRITICAL_ERROR, "Received unknown button from interactive assert message box.")
+        KAN_LOG (error, KAN_LOG_CRITICAL_ERROR, "Received unknown button from interactive assert message box.")
         abort ();
     }
     else
