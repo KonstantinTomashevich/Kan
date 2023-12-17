@@ -6,6 +6,10 @@
 #include <kan/error/critical.h>
 #include <kan/memory/allocation.h>
 
+// TODO: Current implementation is very good at keeping memory usage low, but it's not efficient due to cache misses.
+//       We use 3.5 less memory than UE5 Octree, but we're also 3-10 times slower than UE5 octree.
+//       This needs to be investigated and improved. The best tool for doing it is `perf` on Linux.
+
 static inline uint16_t quantize (double value, double min, double max)
 {
     const double normalized_value = (value - min) / (max - min);
