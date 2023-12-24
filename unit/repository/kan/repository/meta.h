@@ -12,21 +12,6 @@ struct kan_repository_field_path_t
     const char **reflection_path;
 };
 
-struct kan_repository_dimension_t
-{
-    struct kan_repository_field_path_t min_path;
-    struct kan_repository_field_path_t max_path;
-    double min;
-    double max;
-};
-
-struct kan_repository_meta_space_t
-{
-    const char *name;
-    uint64_t dimension_count;
-    struct kan_repository_dimension_t *dimensions;
-};
-
 struct kan_repository_copy_out_t
 {
     struct kan_repository_field_path_t source_path;

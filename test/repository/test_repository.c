@@ -335,6 +335,21 @@ TEST_REPOSITORY_API struct kan_repository_meta_automatic_cascade_deletion_t
         .child_key_path = {.reflection_path_length = 1u, .reflection_path = (const char *[]) {"object_id"}},
 };
 
+struct bounding_box_component_record_t
+{
+    uint64_t object_id;
+    float min[3u];
+    float max[3u];
+};
+
+// \meta reflection_struct_meta = "object_record_t"
+TEST_REPOSITORY_API struct kan_repository_meta_automatic_cascade_deletion_t
+    bounding_box_component_record_object_cascade_deletion = {
+        .parent_key_path = {.reflection_path_length = 1u, .reflection_path = (const char *[]) {"object_id"}},
+        .child_type_name = "bounding_box_component_record_t",
+        .child_key_path = {.reflection_path_length = 1u, .reflection_path = (const char *[]) {"object_id"}},
+};
+
 static void check_no_event (struct kan_repository_event_fetch_query_t *query)
 {
     struct kan_repository_event_read_access_t access = kan_repository_event_fetch_query_next (query);
@@ -570,6 +585,97 @@ static void check_value_exists_unique (struct kan_repository_indexed_value_read_
     access = kan_repository_indexed_value_read_cursor_next (&cursor);
     KAN_TEST_CHECK (!kan_repository_indexed_value_read_access_resolve (&access))
     kan_repository_indexed_value_read_cursor_close (&cursor);
+}
+
+static void insert_bounding_box_component_record (struct kan_repository_indexed_insert_query_t *query,
+                                                  struct bounding_box_component_record_t data)
+{
+    struct kan_repository_indexed_insertion_package_t package = kan_repository_indexed_insert_query_execute (query);
+    struct bounding_box_component_record_t *record =
+        (struct bounding_box_component_record_t *) kan_repository_indexed_insertion_package_get (&package);
+
+    KAN_TEST_ASSERT (record);
+    *record = data;
+    kan_repository_indexed_insertion_package_submit (&package);
+}
+
+static uint64_t query_bounding_box (struct kan_repository_indexed_space_read_query_t *query,
+                                    double min_x,
+                                    double min_y,
+                                    double min_z,
+                                    double max_x,
+                                    double max_y,
+                                    double max_z)
+{
+    uint64_t flags = 0u;
+    const double min[] = {min_x, min_y, min_z};
+    const double max[] = {max_x, max_y, max_z};
+
+    struct kan_repository_indexed_space_shape_read_cursor_t cursor =
+        kan_repository_indexed_space_read_query_execute_shape (query, min, max);
+
+    while (KAN_TRUE)
+    {
+        struct kan_repository_indexed_space_read_access_t access =
+            kan_repository_indexed_space_shape_read_cursor_next (&cursor);
+
+        const struct bounding_box_component_record_t *record =
+            (struct bounding_box_component_record_t *) kan_repository_indexed_space_read_access_resolve (&access);
+
+        if (!record)
+        {
+            break;
+        }
+
+        const uint64_t record_flag = 1u << record->object_id;
+        // Check that there are no duplicate visits.
+        KAN_TEST_CHECK ((flags & record_flag) == 0u)
+        flags |= record_flag;
+        kan_repository_indexed_space_read_access_close (&access);
+    }
+
+    kan_repository_indexed_space_shape_read_cursor_close (&cursor);
+    return flags;
+}
+
+static uint64_t query_ray (struct kan_repository_indexed_space_read_query_t *query,
+                           double origin_x,
+                           double origin_y,
+                           double origin_z,
+                           double direction_x,
+                           double direction_y,
+                           double direction_z,
+                           double max_time)
+{
+    uint64_t flags = 0u;
+    const double origin[] = {origin_x, origin_y, origin_z};
+    const double direction[] = {direction_x, direction_y, direction_z};
+
+    struct kan_repository_indexed_space_ray_read_cursor_t cursor =
+        kan_repository_indexed_space_read_query_execute_ray (query, origin, direction, max_time);
+
+    while (KAN_TRUE)
+    {
+        struct kan_repository_indexed_space_read_access_t access =
+            kan_repository_indexed_space_ray_read_cursor_next (&cursor);
+
+        const struct bounding_box_component_record_t *record =
+            (struct bounding_box_component_record_t *) kan_repository_indexed_space_read_access_resolve (&access);
+
+        if (!record)
+        {
+            break;
+        }
+
+        const uint64_t record_flag = 1u << record->object_id;
+        // Check that there are no duplicate visits.
+        KAN_TEST_CHECK ((flags & record_flag) == 0u)
+        flags |= record_flag;
+        kan_repository_indexed_space_read_access_close (&access);
+    }
+
+    kan_repository_indexed_space_ray_read_cursor_close (&cursor);
+    return flags;
 }
 
 static void check_value_not_exists (struct kan_repository_indexed_value_read_query_t *query, uint64_t value)
@@ -2310,6 +2416,179 @@ KAN_TEST_CASE (interval_operations)
     kan_repository_indexed_interval_update_query_shutdown (&update_x_child);
     kan_repository_indexed_interval_delete_query_shutdown (&delete_y_child);
     kan_repository_indexed_interval_write_query_shutdown (&write_y_root);
+
+    kan_repository_destroy (root_repository);
+    kan_reflection_registry_destroy (registry);
+}
+
+KAN_TEST_CASE (space_operations)
+{
+    kan_reflection_registry_t registry = kan_reflection_registry_create ();
+    KAN_REFLECTION_UNIT_REGISTRAR_NAME (repository) (registry);
+    KAN_REFLECTION_UNIT_REGISTRAR_NAME (test_repository) (registry);
+
+    kan_repository_t root_repository = kan_repository_create_root (KAN_ALLOCATION_GROUP_IGNORE, registry);
+    kan_repository_t child_repository = kan_repository_create_child (root_repository, "child");
+
+    kan_repository_indexed_storage_t root_storage =
+        kan_repository_indexed_storage_open (root_repository, "bounding_box_component_record_t");
+    kan_repository_indexed_storage_t child_storage =
+        kan_repository_indexed_storage_open (child_repository, "bounding_box_component_record_t");
+
+    struct kan_repository_indexed_insert_query_t insert_child;
+    kan_repository_indexed_insert_query_init (&insert_child, child_storage);
+
+    struct kan_repository_indexed_space_read_query_t read_root;
+    kan_repository_indexed_space_read_query_init (
+        &read_root, root_storage,
+        (struct kan_repository_field_path_t) {.reflection_path_length = 1u, (const char *[]) {"min"}},
+        (struct kan_repository_field_path_t) {.reflection_path_length = 1u, (const char *[]) {"max"}}, -100.0, 100.0,
+        2.0);
+
+    struct kan_repository_indexed_space_update_query_t update_child;
+    kan_repository_indexed_space_update_query_init (
+        &update_child, child_storage,
+        (struct kan_repository_field_path_t) {.reflection_path_length = 1u, (const char *[]) {"min"}},
+        (struct kan_repository_field_path_t) {.reflection_path_length = 1u, (const char *[]) {"max"}}, -100.0, 100.0,
+        2.0);
+
+    struct kan_repository_indexed_space_delete_query_t delete_child;
+    kan_repository_indexed_space_delete_query_init (
+        &delete_child, child_storage,
+        (struct kan_repository_field_path_t) {.reflection_path_length = 1u, (const char *[]) {"min"}},
+        (struct kan_repository_field_path_t) {.reflection_path_length = 1u, (const char *[]) {"max"}}, -100.0, 100.0,
+        2.0);
+
+    struct kan_repository_indexed_space_write_query_t write_root;
+    kan_repository_indexed_space_write_query_init (
+        &write_root, root_storage,
+        (struct kan_repository_field_path_t) {.reflection_path_length = 1u, (const char *[]) {"min"}},
+        (struct kan_repository_field_path_t) {.reflection_path_length = 1u, (const char *[]) {"max"}}, -100.0, 100.0,
+        2.0);
+
+    kan_repository_enter_serving_mode (root_repository);
+
+    insert_bounding_box_component_record (&insert_child,
+                                          (struct bounding_box_component_record_t) {
+                                              .object_id = 0u, .min = {10.0f, 8.0f, 4.0f}, .max = {11.0f, 9.0f, 5.0f}});
+
+    insert_bounding_box_component_record (&insert_child,
+                                          (struct bounding_box_component_record_t) {
+                                              .object_id = 1u, .min = {-2.0f, 1.0f, 0.0f}, .max = {0.0f, 4.0f, 2.0f}});
+
+    insert_bounding_box_component_record (
+        &insert_child, (struct bounding_box_component_record_t) {
+                           .object_id = 2u, .min = {15.0f, 8.0f, 50.0f}, .max = {19.0f, 11.0f, 60.0f}});
+
+    insert_bounding_box_component_record (
+        &insert_child, (struct bounding_box_component_record_t) {
+                           .object_id = 3u, .min = {10.0f, 8.0f, -90.0f}, .max = {11.0f, 9.0f, -89.0f}});
+
+    const uint64_t flag_0 = 1u << 0u;
+    const uint64_t flag_1 = 1u << 1u;
+    const uint64_t flag_2 = 1u << 2u;
+    const uint64_t flag_3 = 1u << 3u;
+
+    KAN_TEST_CHECK (query_bounding_box (&read_root, -3.0, -3.0, -3.0, 50.0, 50.0, 50.0) == (flag_0 | flag_1 | flag_2))
+    KAN_TEST_CHECK (query_bounding_box (&read_root, 9.0, 7.0, 0.0, 20.0, 10.5, 50.0) == (flag_0 | flag_2))
+    KAN_TEST_CHECK (query_bounding_box (&read_root, 9.0, 7.0, 0.0, 20.0, 10.5, 20.0) == flag_0)
+    KAN_TEST_CHECK (query_bounding_box (&read_root, 9.0, 7.0, 20.0, 20.0, 10.5, 50.0) == flag_2)
+    KAN_TEST_CHECK (query_bounding_box (&read_root, 2.0, 0.0, 0.0, 7.0, 8.5, 7.0) == 0u)
+
+    KAN_TEST_CHECK (query_bounding_box (&read_root, 8.0, 6.0, -90.0, 10.5, 9.0, -89.0) == flag_3)
+    KAN_TEST_CHECK (query_bounding_box (&read_root, 8.0, 7.0, -90.0, 9.0, 9.0, -89.0) == 0u)
+    KAN_TEST_CHECK (query_bounding_box (&read_root, 10.5, 9.0, -90.0, 10.5, 9.0, -89.0) == flag_3)
+    KAN_TEST_CHECK (query_bounding_box (&read_root, 8.0, 7.0, -90.0, 10.5, 8.0, -89.0) == flag_3)
+    KAN_TEST_CHECK (query_bounding_box (&read_root, 0.0, 0.0, -90.0, 50.0, 50.0, -89.0) == flag_3)
+    KAN_TEST_CHECK (query_bounding_box (&read_root, -3.0, 0.0, -90.0, 00.0, 50.0, -89.0) == 0u)
+
+    KAN_TEST_CHECK (query_ray (&read_root, 7.0, -100.0, -89.5, 2.0, 0.0, 0.0, 100.0) == 0u)
+    KAN_TEST_CHECK (query_ray (&read_root, 7.0, 9.0, -89.5, 2.0, 0.0, 0.0, 1.0) == 0u)
+    KAN_TEST_CHECK (query_ray (&read_root, 7.0, 9.0, -89.5, 2.0, 0.0, 0.0, 3.0) == flag_3)
+    KAN_TEST_CHECK (query_ray (&read_root, 7.0, 8.5, -89.5, 2.0, 0.0, 0.0, 1000.0) == flag_3)
+    KAN_TEST_CHECK (query_ray (&read_root, 7.0, 8.0, -89.5, 2.0, 0.0, 0.0, 1000.0) == flag_3)
+    KAN_TEST_CHECK (query_ray (&read_root, 10.5, 8.0, -89.5, 2.0, 0.0, 0.0, 1000.0) == flag_3)
+    KAN_TEST_CHECK (query_ray (&read_root, 7.0, 7.0, -89.5, 2.0, 0.0, 0.0, 1000.0) == 0u)
+    KAN_TEST_CHECK (query_ray (&read_root, 10.5, 0.0, -89.5, 0.0, 2.0, 0.0, 1000.0) == flag_3)
+    KAN_TEST_CHECK (query_ray (&read_root, 10.5, 50.0, -89.5, 0.0, 2.0, 0.0, 1000.0) == 0u)
+    KAN_TEST_CHECK (query_ray (&read_root, 10.5, 0.0, -89.5, 0.0, -1.0, 0.0, 1000.0) == 0u)
+    KAN_TEST_CHECK (query_ray (&read_root, 10.5, 50.0, -89.5, 0.0, -1.0, 0.0, 1000.0) == flag_3)
+    KAN_TEST_CHECK (query_ray (&read_root, 7.0, 9.0, -89.5, 2.0, -1.0, 0.0, 1000.0) == 0u)
+    KAN_TEST_CHECK (query_ray (&read_root, 9.0, 9.0, -89.5, 2.0, -1.0, 0.0, 1000.0) == flag_3)
+    KAN_TEST_CHECK (query_ray (&read_root, 9.0, 9.0, -89.5, 2.0, -1.0, 0.0, 0.45) == 0u)
+    KAN_TEST_CHECK (query_ray (&read_root, 9.0, 9.0, -89.5, 2.0, -1.0, 0.0, 0.55) == flag_3)
+
+    KAN_TEST_CHECK (query_ray (&read_root, 7.0, 8.5, 4.5, 2.0, 0.0, 0.0, 1000.0) == flag_0)
+    KAN_TEST_CHECK (query_ray (&read_root, 7.0, 8.5, 4.5, 2.0, 0.0, 9.0, 1000.0) == flag_2)
+    KAN_TEST_CHECK (query_ray (&read_root, 10.5, 8.5, 4.5, 2.0, 0.0, 20.0, 1000.0) == (flag_0 | flag_2))
+    KAN_TEST_CHECK (query_ray (&read_root, 10.5, 8.5, 4.5, 2.0, 0.0, 20.0, 2.0) == flag_0)
+
+    // Delete box with id 2 and check that it no longer appears in queries.
+    {
+        double min[] = {9.0, 7.0, 20.0};
+        double max[] = {20.0, 10.5, 50.0};
+
+        struct kan_repository_indexed_space_shape_delete_cursor_t cursor =
+            kan_repository_indexed_space_delete_query_execute_shape (&delete_child, min, max);
+
+        struct kan_repository_indexed_space_delete_access_t access =
+            kan_repository_indexed_space_shape_delete_cursor_next (&cursor);
+
+        const struct bounding_box_component_record_t *record =
+            (const struct bounding_box_component_record_t *) kan_repository_indexed_space_delete_access_resolve (
+                &access);
+
+        KAN_TEST_ASSERT (record)
+        kan_repository_indexed_space_delete_access_delete (&access);
+        kan_repository_indexed_space_shape_delete_cursor_close (&cursor);
+    }
+
+    KAN_TEST_CHECK (query_bounding_box (&read_root, -3.0, -3.0, -3.0, 50.0, 50.0, 50.0) == (flag_0 | flag_1))
+    KAN_TEST_CHECK (query_bounding_box (&read_root, 9.0, 7.0, 0.0, 20.0, 10.5, 50.0) == flag_0)
+    KAN_TEST_CHECK (query_bounding_box (&read_root, 9.0, 7.0, 20.0, 20.0, 10.5, 50.0) == 0u)
+    KAN_TEST_CHECK (query_ray (&read_root, 7.0, 8.5, 4.5, 2.0, 0.0, 9.0, 1000.0) == 0u)
+    KAN_TEST_CHECK (query_ray (&read_root, 10.5, 8.5, 4.5, 2.0, 0.0, 20.0, 1000.0) == flag_0)
+
+    // Edit box with id 0 in order to make it equal to previously deleted box with id 2.
+    {
+        double origin[] = {10.5, 8.5, 4.5};
+        double direction[] = {2.0, 0.0, 20.0};
+
+        struct kan_repository_indexed_space_ray_write_cursor_t cursor =
+            kan_repository_indexed_space_write_query_execute_ray (&write_root, origin, direction, 1000.0);
+
+        struct kan_repository_indexed_space_write_access_t access =
+            kan_repository_indexed_space_ray_write_cursor_next (&cursor);
+
+        struct bounding_box_component_record_t *record =
+            (struct bounding_box_component_record_t *) kan_repository_indexed_space_write_access_resolve (&access);
+
+        KAN_TEST_ASSERT (record)
+        record->object_id = 2u;
+        record->min[0u] = 15.0f;
+        record->min[1u] = 8.0f;
+        record->min[2u] = 50.0f;
+        record->max[0u] = 19.0f;
+        record->max[1u] = 11.0f;
+        record->max[2u] = 60.0f;
+
+        kan_repository_indexed_space_write_access_close (&access);
+        kan_repository_indexed_space_ray_write_cursor_close (&cursor);
+    }
+
+    KAN_TEST_CHECK (query_bounding_box (&read_root, -3.0, -3.0, -3.0, 50.0, 50.0, 50.0) == (flag_1 | flag_2))
+    KAN_TEST_CHECK (query_bounding_box (&read_root, 9.0, 7.0, 0.0, 20.0, 10.5, 50.0) == flag_2)
+    KAN_TEST_CHECK (query_bounding_box (&read_root, 9.0, 7.0, 20.0, 20.0, 10.5, 50.0) == flag_2)
+    KAN_TEST_CHECK (query_ray (&read_root, 7.0, 8.5, 4.5, 2.0, 0.0, 9.0, 1000.0) == flag_2)
+    KAN_TEST_CHECK (query_ray (&read_root, 10.5, 8.5, 4.5, 2.0, 0.0, 20.0, 1000.0) == flag_2)
+    KAN_TEST_CHECK (query_ray (&read_root, 10.5, 8.5, 4.5, 2.0, 0.0, 20.0, 2.0) == 0u)
+
+    kan_repository_enter_planning_mode (root_repository);
+    kan_repository_indexed_insert_query_shutdown (&insert_child);
+    kan_repository_indexed_space_read_query_shutdown (&read_root);
+    kan_repository_indexed_space_update_query_shutdown (&update_child);
+    kan_repository_indexed_space_delete_query_shutdown (&delete_child);
+    kan_repository_indexed_space_write_query_shutdown (&write_root);
 
     kan_repository_destroy (root_repository);
     kan_reflection_registry_destroy (registry);

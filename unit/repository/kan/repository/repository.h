@@ -368,7 +368,101 @@ struct kan_repository_indexed_interval_write_access_t
     void *implementation_data[4u];
 };
 
-// TODO: Space index.
+/// \meta reflection_ignore_init_shutdown
+struct kan_repository_indexed_space_read_query_t
+{
+    void *implementation_data;
+};
+
+/// \meta reflection_ignore_init_shutdown
+struct kan_repository_indexed_space_shape_read_cursor_t
+{
+    uint64_t implementation_data_64[22u];
+};
+
+/// \meta reflection_ignore_init_shutdown
+struct kan_repository_indexed_space_ray_read_cursor_t
+{
+    uint64_t implementation_data_64[32u];
+};
+
+/// \meta reflection_ignore_init_shutdown
+struct kan_repository_indexed_space_read_access_t
+{
+    void *implementation_data[3u];
+};
+
+/// \meta reflection_ignore_init_shutdown
+struct kan_repository_indexed_space_update_query_t
+{
+    void *implementation_data;
+};
+
+/// \meta reflection_ignore_init_shutdown
+struct kan_repository_indexed_space_shape_update_cursor_t
+{
+    uint64_t implementation_data_64[22u];
+};
+
+/// \meta reflection_ignore_init_shutdown
+struct kan_repository_indexed_space_ray_update_cursor_t
+{
+    uint64_t implementation_data_64[32u];
+};
+
+/// \meta reflection_ignore_init_shutdown
+struct kan_repository_indexed_space_update_access_t
+{
+    void *implementation_data[4u];
+};
+
+/// \meta reflection_ignore_init_shutdown
+struct kan_repository_indexed_space_delete_query_t
+{
+    void *implementation_data;
+};
+
+/// \meta reflection_ignore_init_shutdown
+struct kan_repository_indexed_space_shape_delete_cursor_t
+{
+    uint64_t implementation_data_64[22u];
+};
+
+/// \meta reflection_ignore_init_shutdown
+struct kan_repository_indexed_space_ray_delete_cursor_t
+{
+    uint64_t implementation_data_64[32u];
+};
+
+/// \meta reflection_ignore_init_shutdown
+struct kan_repository_indexed_space_delete_access_t
+{
+    void *implementation_data[3u];
+};
+
+/// \meta reflection_ignore_init_shutdown
+struct kan_repository_indexed_space_write_query_t
+{
+    void *implementation_data;
+};
+
+/// \meta reflection_ignore_init_shutdown
+struct kan_repository_indexed_space_shape_write_cursor_t
+{
+    uint64_t implementation_data_64[122u];
+};
+
+/// \meta reflection_ignore_init_shutdown
+struct kan_repository_indexed_space_ray_write_cursor_t
+{
+    uint64_t implementation_data_64[32u];
+};
+
+/// \meta reflection_ignore_init_shutdown
+struct kan_repository_indexed_space_write_access_t
+{
+    void *implementation_data[4u];
+};
 
 #define KAN_INVALID_REPOSITORY_EVENT_STORAGE 0u
 
@@ -897,6 +991,178 @@ REPOSITORY_API void kan_repository_indexed_interval_descending_write_cursor_clos
 
 REPOSITORY_API void kan_repository_indexed_interval_write_query_shutdown (
     struct kan_repository_indexed_interval_write_query_t *query);
+
+REPOSITORY_API void kan_repository_indexed_space_read_query_init (
+    struct kan_repository_indexed_space_read_query_t *query,
+    kan_repository_indexed_storage_t storage,
+    struct kan_repository_field_path_t min_path,
+    struct kan_repository_field_path_t max_path,
+    double global_min,
+    double global_max,
+    double leaf_size);
+
+REPOSITORY_API struct kan_repository_indexed_space_shape_read_cursor_t
+kan_repository_indexed_space_read_query_execute_shape (struct kan_repository_indexed_space_read_query_t *query,
+                                                       const double *min,
+                                                       const double *max);
+
+REPOSITORY_API struct kan_repository_indexed_space_ray_read_cursor_t
+kan_repository_indexed_space_read_query_execute_ray (struct kan_repository_indexed_space_read_query_t *query,
+                                                     const double *origin,
+                                                     const double *direction,
+                                                     double max_time);
+
+REPOSITORY_API struct kan_repository_indexed_space_read_access_t kan_repository_indexed_space_shape_read_cursor_next (
+    struct kan_repository_indexed_space_shape_read_cursor_t *cursor);
+
+REPOSITORY_API struct kan_repository_indexed_space_read_access_t kan_repository_indexed_space_ray_read_cursor_next (
+    struct kan_repository_indexed_space_ray_read_cursor_t *cursor);
+
+REPOSITORY_API const void *kan_repository_indexed_space_read_access_resolve (
+    struct kan_repository_indexed_space_read_access_t *access);
+
+REPOSITORY_API void kan_repository_indexed_space_read_access_close (
+    struct kan_repository_indexed_space_read_access_t *access);
+
+REPOSITORY_API void kan_repository_indexed_space_shape_read_cursor_close (
+    struct kan_repository_indexed_space_shape_read_cursor_t *cursor);
+
+REPOSITORY_API void kan_repository_indexed_space_ray_read_cursor_close (
+    struct kan_repository_indexed_space_ray_read_cursor_t *cursor);
+
+REPOSITORY_API void kan_repository_indexed_space_read_query_shutdown (
+    struct kan_repository_indexed_space_read_query_t *query);
+
+REPOSITORY_API void kan_repository_indexed_space_update_query_init (
+    struct kan_repository_indexed_space_update_query_t *query,
+    kan_repository_indexed_storage_t storage,
+    struct kan_repository_field_path_t min_path,
+    struct kan_repository_field_path_t max_path,
+    double global_min,
+    double global_max,
+    double leaf_size);
+
+REPOSITORY_API struct kan_repository_indexed_space_shape_update_cursor_t
+kan_repository_indexed_space_update_query_execute_shape (struct kan_repository_indexed_space_update_query_t *query,
+                                                         const double *min,
+                                                         const double *max);
+
+REPOSITORY_API struct kan_repository_indexed_space_ray_update_cursor_t
+kan_repository_indexed_space_update_query_execute_ray (struct kan_repository_indexed_space_update_query_t *query,
+                                                       const double *origin,
+                                                       const double *direction,
+                                                       double max_time);
+
+REPOSITORY_API struct kan_repository_indexed_space_update_access_t
+kan_repository_indexed_space_shape_update_cursor_next (
+    struct kan_repository_indexed_space_shape_update_cursor_t *cursor);
+
+REPOSITORY_API struct kan_repository_indexed_space_update_access_t kan_repository_indexed_space_ray_update_cursor_next (
+    struct kan_repository_indexed_space_ray_update_cursor_t *cursor);
+
+REPOSITORY_API void *kan_repository_indexed_space_update_access_resolve (
+    struct kan_repository_indexed_space_update_access_t *access);
+
+REPOSITORY_API void kan_repository_indexed_space_update_access_close (
+    struct kan_repository_indexed_space_update_access_t *access);
+
+REPOSITORY_API void kan_repository_indexed_space_shape_update_cursor_close (
+    struct kan_repository_indexed_space_shape_update_cursor_t *cursor);
+
+REPOSITORY_API void kan_repository_indexed_space_ray_update_cursor_close (
+    struct kan_repository_indexed_space_ray_update_cursor_t *cursor);
+
+REPOSITORY_API void kan_repository_indexed_space_update_query_shutdown (
+    struct kan_repository_indexed_space_update_query_t *query);
+
+REPOSITORY_API void kan_repository_indexed_space_delete_query_init (
+    struct kan_repository_indexed_space_delete_query_t *query,
+    kan_repository_indexed_storage_t storage,
+    struct kan_repository_field_path_t min_path,
+    struct kan_repository_field_path_t max_path,
+    double global_min,
+    double global_max,
+    double leaf_size);
+
+REPOSITORY_API struct kan_repository_indexed_space_shape_delete_cursor_t
+kan_repository_indexed_space_delete_query_execute_shape (struct kan_repository_indexed_space_delete_query_t *query,
+                                                         const double *min,
+                                                         const double *max);
+
+REPOSITORY_API struct kan_repository_indexed_space_ray_delete_cursor_t
+kan_repository_indexed_space_delete_query_execute_ray (struct kan_repository_indexed_space_delete_query_t *query,
+                                                       const double *origin,
+                                                       const double *direction,
+                                                       double max_time);
+
+REPOSITORY_API struct kan_repository_indexed_space_delete_access_t
+kan_repository_indexed_space_shape_delete_cursor_next (
+    struct kan_repository_indexed_space_shape_delete_cursor_t *cursor);
+
+REPOSITORY_API struct kan_repository_indexed_space_delete_access_t kan_repository_indexed_space_ray_delete_cursor_next (
+    struct kan_repository_indexed_space_ray_delete_cursor_t *cursor);
+
+REPOSITORY_API const void *kan_repository_indexed_space_delete_access_resolve (
+    struct kan_repository_indexed_space_delete_access_t *access);
+
+REPOSITORY_API void kan_repository_indexed_space_delete_access_delete (
+    struct kan_repository_indexed_space_delete_access_t *access);
+
+REPOSITORY_API void kan_repository_indexed_space_delete_access_close (
+    struct kan_repository_indexed_space_delete_access_t *access);
+
+REPOSITORY_API void kan_repository_indexed_space_shape_delete_cursor_close (
+    struct kan_repository_indexed_space_shape_delete_cursor_t *cursor);
+
+REPOSITORY_API void kan_repository_indexed_space_ray_delete_cursor_close (
+    struct kan_repository_indexed_space_ray_delete_cursor_t *cursor);
+
+REPOSITORY_API void kan_repository_indexed_space_delete_query_shutdown (
+    struct kan_repository_indexed_space_delete_query_t *query);
+
+REPOSITORY_API void kan_repository_indexed_space_write_query_init (
+    struct kan_repository_indexed_space_write_query_t *query,
+    kan_repository_indexed_storage_t storage,
+    struct kan_repository_field_path_t min_path,
+    struct kan_repository_field_path_t max_path,
+    double global_min,
+    double global_max,
+    double leaf_size);
+
+REPOSITORY_API struct kan_repository_indexed_space_shape_write_cursor_t
+kan_repository_indexed_space_write_query_execute_shape (struct kan_repository_indexed_space_write_query_t *query,
+                                                        const double *min,
+                                                        const double *max);
+
+REPOSITORY_API struct kan_repository_indexed_space_ray_write_cursor_t
+kan_repository_indexed_space_write_query_execute_ray (struct kan_repository_indexed_space_write_query_t *query,
+                                                      const double *origin,
+                                                      const double *direction,
+                                                      double max_time);
+
+REPOSITORY_API struct kan_repository_indexed_space_write_access_t kan_repository_indexed_space_shape_write_cursor_next (
+    struct kan_repository_indexed_space_shape_write_cursor_t *cursor);
+
+REPOSITORY_API struct kan_repository_indexed_space_write_access_t kan_repository_indexed_space_ray_write_cursor_next (
+    struct kan_repository_indexed_space_ray_write_cursor_t *cursor);
+
+REPOSITORY_API void *kan_repository_indexed_space_write_access_resolve (
+    struct kan_repository_indexed_space_write_access_t *access);
+
+REPOSITORY_API void kan_repository_indexed_space_write_access_delete (
+    struct kan_repository_indexed_space_write_access_t *access);
+
+REPOSITORY_API void kan_repository_indexed_space_write_access_close (
+    struct kan_repository_indexed_space_write_access_t *access);
+
+REPOSITORY_API void kan_repository_indexed_space_shape_write_cursor_close (
+    struct kan_repository_indexed_space_shape_write_cursor_t *cursor);
+
+REPOSITORY_API void kan_repository_indexed_space_ray_write_cursor_close (
+    struct kan_repository_indexed_space_ray_write_cursor_t *cursor);
+
+REPOSITORY_API void kan_repository_indexed_space_write_query_shutdown (
+    struct kan_repository_indexed_space_write_query_t *query);
 
 REPOSITORY_API kan_repository_event_storage_t kan_repository_event_storage_open (kan_repository_t repository,
                                                                                  const char *type_name);

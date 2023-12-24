@@ -11,6 +11,7 @@
 #include <kan/container/event_queue.h>
 #include <kan/container/hash_storage.h>
 #include <kan/container/list.h>
+#include <kan/container/space_tree.h>
 #include <kan/container/stack_group_allocator.h>
 #include <kan/cpu_dispatch/job.h>
 #include <kan/error/critical.h>
@@ -142,6 +143,25 @@ struct cascade_deleters_definition_t
     struct cascade_deleter_t *cascade_deleters;
 };
 
+struct return_uniqueness_watcher_list_node_t
+{
+    struct return_uniqueness_watcher_list_node_t *next;
+    struct indexed_storage_record_node_t *record;
+};
+
+struct return_uniqueness_watcher_hash_node_t
+{
+    struct kan_hash_storage_node_t node;
+    struct indexed_storage_record_node_t *record;
+};
+
+struct return_uniqueness_watcher_t
+{
+    uint64_t unique_count;
+    struct return_uniqueness_watcher_list_node_t *first_node;
+    struct kan_hash_storage_t hash_storage;
+};
+
 struct singleton_storage_node_t
 {
     struct kan_hash_storage_node_t node;
@@ -250,24 +270,12 @@ struct indexed_storage_node_t
     kan_allocation_group_t space_index_allocation_group;
 };
 
-enum index_type_t
-{
-    INDEX_TYPE_EQUALITY = 0u,
-    INDEX_TYPE_COMPARISON,
-};
-
 struct indexed_field_baked_data_t
 {
     uint32_t absolute_offset;
     uint16_t offset_in_buffer;
     uint8_t size;
     uint8_t size_with_padding;
-};
-
-struct indexed_field_baked_data_with_archetype_t
-{
-    struct indexed_field_baked_data_t data;
-    enum kan_reflection_archetype_t archetype;
 };
 
 struct value_index_sub_node_t
@@ -337,11 +345,39 @@ struct interval_index_t
     struct indexed_storage_node_t *storage;
     struct kan_atomic_int_t queries_count;
 
-    struct indexed_field_baked_data_with_archetype_t baked;
+    struct indexed_field_baked_data_t baked;
+    enum kan_reflection_archetype_t baked_archetype;
     uint64_t observation_flags;
 
     struct kan_avl_tree_t tree;
     struct interned_field_path_t source_path;
+};
+
+struct space_index_sub_node_t
+{
+    struct kan_space_tree_sub_node_t sub_node;
+    struct indexed_storage_record_node_t *record;
+};
+
+struct space_index_t
+{
+    struct space_index_t *next;
+    struct indexed_storage_node_t *storage;
+    struct kan_atomic_int_t queries_count;
+
+    struct indexed_field_baked_data_t baked_min;
+    struct indexed_field_baked_data_t baked_max;
+    enum kan_reflection_archetype_t baked_archetype;
+    uint64_t baked_dimension_count;
+    uint64_t observation_flags;
+
+    struct kan_space_tree_t tree;
+    kan_bool_t initial_fill_executed;
+    struct interned_field_path_t source_path_min;
+    struct interned_field_path_t source_path_max;
+    double source_global_min;
+    double source_global_max;
+    double source_leaf_size;
 };
 
 struct indexed_insert_query_t
@@ -637,6 +673,103 @@ struct indexed_interval_mutable_access_t
 };
 
 ASSERT_MUTABLE_ACCESS_FOR_INDEXED_STORAGE (interval);
+
+struct indexed_space_query_t
+{
+    struct space_index_t *index;
+};
+
+ASSERT_SIZE_FOR_INDEXED_STORAGE (space);
+
+struct indexed_space_shape_cursor_t
+{
+    struct space_index_t *index;
+    struct kan_space_tree_shape_iterator_t iterator;
+    struct space_index_sub_node_t *current_sub_node;
+    double min[KAN_CONTAINER_SPACE_TREE_MAX_DIMENSIONS];
+    double max[KAN_CONTAINER_SPACE_TREE_MAX_DIMENSIONS];
+    struct return_uniqueness_watcher_t uniqueness_watcher;
+};
+
+_Static_assert (sizeof (struct indexed_space_shape_cursor_t) <=
+                    sizeof (struct kan_repository_indexed_space_shape_read_cursor_t),
+                "Query sizes match.");
+_Static_assert (_Alignof (struct indexed_space_shape_cursor_t) <=
+                    _Alignof (struct kan_repository_indexed_space_shape_read_cursor_t),
+                "Query alignments match.");
+_Static_assert (sizeof (struct indexed_space_shape_cursor_t) <=
+                    sizeof (struct kan_repository_indexed_space_shape_update_cursor_t),
+                "Query sizes match.");
+_Static_assert (_Alignof (struct indexed_space_shape_cursor_t) <=
+                    _Alignof (struct kan_repository_indexed_space_shape_update_cursor_t),
+                "Query alignments match.");
+_Static_assert (sizeof (struct indexed_space_shape_cursor_t) <=
+                    sizeof (struct kan_repository_indexed_space_shape_delete_cursor_t),
+                "Query sizes match.");
+_Static_assert (_Alignof (struct indexed_space_shape_cursor_t) <=
+                    _Alignof (struct kan_repository_indexed_space_shape_delete_cursor_t),
+                "Query alignments match.");
+_Static_assert (sizeof (struct indexed_space_shape_cursor_t) <=
+                    sizeof (struct kan_repository_indexed_space_shape_write_cursor_t),
+                "Query sizes match.");
+_Static_assert (_Alignof (struct indexed_space_shape_cursor_t) <=
+                    _Alignof (struct kan_repository_indexed_space_shape_write_cursor_t),
+                "Query alignments match.");
+
+struct indexed_space_ray_cursor_t
+{
+    struct space_index_t *index;
+    struct kan_space_tree_ray_iterator_t iterator;
+    struct space_index_sub_node_t *current_sub_node;
+    double origin[KAN_CONTAINER_SPACE_TREE_MAX_DIMENSIONS];
+    double direction[KAN_CONTAINER_SPACE_TREE_MAX_DIMENSIONS];
+    double max_time;
+    struct return_uniqueness_watcher_t uniqueness_watcher;
+};
+
+_Static_assert (sizeof (struct indexed_space_ray_cursor_t) <=
+                    sizeof (struct kan_repository_indexed_space_ray_read_cursor_t),
+                "Query sizes match.");
+_Static_assert (_Alignof (struct indexed_space_ray_cursor_t) <=
+                    _Alignof (struct kan_repository_indexed_space_ray_read_cursor_t),
+                "Query alignments match.");
+_Static_assert (sizeof (struct indexed_space_ray_cursor_t) <=
+                    sizeof (struct kan_repository_indexed_space_ray_update_cursor_t),
+                "Query sizes match.");
+_Static_assert (_Alignof (struct indexed_space_ray_cursor_t) <=
+                    _Alignof (struct kan_repository_indexed_space_ray_update_cursor_t),
+                "Query alignments match.");
+_Static_assert (sizeof (struct indexed_space_ray_cursor_t) <=
+                    sizeof (struct kan_repository_indexed_space_ray_delete_cursor_t),
+                "Query sizes match.");
+_Static_assert (_Alignof (struct indexed_space_ray_cursor_t) <=
+                    _Alignof (struct kan_repository_indexed_space_ray_delete_cursor_t),
+                "Query alignments match.");
+_Static_assert (sizeof (struct indexed_space_ray_cursor_t) <=
+                    sizeof (struct kan_repository_indexed_space_ray_write_cursor_t),
+                "Query sizes match.");
+_Static_assert (_Alignof (struct indexed_space_ray_cursor_t) <=
+                    _Alignof (struct kan_repository_indexed_space_ray_write_cursor_t),
+                "Query alignments match.");
+
+struct indexed_space_constant_access_t
+{
+    struct space_index_t *index;
+    struct kan_space_tree_node_t *node;
+    struct space_index_sub_node_t *sub_node;
+};
+
+ASSERT_CONSTANT_ACCESS_FOR_INDEXED_STORAGE (space);
+
+struct indexed_space_mutable_access_t
+{
+    struct space_index_t *index;
+    struct kan_space_tree_node_t *node;
+    struct space_index_sub_node_t *sub_node;
+    struct indexed_storage_dirty_record_node_t *dirty_node;
+};
+
+ASSERT_MUTABLE_ACCESS_FOR_INDEXED_STORAGE (space);
 
 struct event_queue_node_t
 {
@@ -1096,8 +1229,8 @@ static kan_bool_t validation_copy_out_is_possible (kan_reflection_registry_t reg
     return KAN_TRUE;
 }
 
-static kan_bool_t validation_index_is_possible (const struct kan_reflection_field_t *field,
-                                                enum index_type_t index_type)
+static kan_bool_t validation_single_value_index_is_possible (const struct kan_reflection_field_t *field,
+                                                             kan_bool_t allow_not_comparable)
 {
     if (field->visibility_condition_values_count > 0u)
     {
@@ -1116,25 +1249,24 @@ static kan_bool_t validation_index_is_possible (const struct kan_reflection_fiel
     case KAN_REFLECTION_ARCHETYPE_ENUM:
         if (field->size > sizeof (uint64_t))
         {
-            KAN_LOG (repository_validation, KAN_LOG_ERROR,
-                     "Passed field \"%s\" to value index with supported archetype, but suspicious size %lu. Broken "
-                     "reflection?",
-                     field->name, (unsigned long) field->size)
+            KAN_LOG (
+                repository_validation, KAN_LOG_ERROR,
+                "Passed field \"%s\" to single value index with supported archetype, but suspicious size %lu. Broken "
+                "reflection?",
+                field->name, (unsigned long) field->size)
             return KAN_FALSE;
         }
 
-        switch (index_type)
+        if (!allow_not_comparable && field->archetype != KAN_REFLECTION_ARCHETYPE_SIGNED_INT &&
+            field->archetype != KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT &&
+            field->archetype != KAN_REFLECTION_ARCHETYPE_FLOATING)
         {
-        case INDEX_TYPE_EQUALITY:
-            return KAN_TRUE;
-
-        case INDEX_TYPE_COMPARISON:
-            return field->archetype == KAN_REFLECTION_ARCHETYPE_SIGNED_INT ||
-                   field->archetype == KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT ||
-                   field->archetype == KAN_REFLECTION_ARCHETYPE_FLOATING;
+            KAN_LOG (repository_validation, KAN_LOG_ERROR,
+                     "Passed field \"%s\" to single value index with unsupported archetype.", field->name)
+            return KAN_FALSE;
         }
 
-        break;
+        return KAN_TRUE;
 
     case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
     case KAN_REFLECTION_ARCHETYPE_EXTERNAL_POINTER:
@@ -1143,12 +1275,140 @@ static kan_bool_t validation_index_is_possible (const struct kan_reflection_fiel
     case KAN_REFLECTION_ARCHETYPE_INLINE_ARRAY:
     case KAN_REFLECTION_ARCHETYPE_DYNAMIC_ARRAY:
     case KAN_REFLECTION_ARCHETYPE_PATCH:
-        KAN_LOG (repository_validation, KAN_LOG_ERROR, "Passed field \"%s\" to value index with unsupported archetype.",
-                 field->name)
+        KAN_LOG (repository_validation, KAN_LOG_ERROR,
+                 "Passed field \"%s\" to single value index with unsupported archetype.", field->name)
         return KAN_FALSE;
     }
 
     return KAN_FALSE;
+}
+
+static kan_bool_t validation_multi_value_index_is_possible (const struct kan_reflection_field_t *field)
+{
+    if (field->visibility_condition_values_count > 0u)
+    {
+        KAN_LOG (repository_validation, KAN_LOG_ERROR,
+                 "Passed field \"%s\" has visibility conditions. Fields with visibility conditions cannot be indexed.",
+                 field->name)
+        return KAN_FALSE;
+    }
+
+    if (field->archetype != KAN_REFLECTION_ARCHETYPE_INLINE_ARRAY)
+    {
+        KAN_LOG (repository_validation, KAN_LOG_ERROR,
+                 "Passed field \"%s\" to multi value index that is not an inline array.", field->name)
+    }
+
+    switch (field->archetype_inline_array.item_archetype)
+    {
+    case KAN_REFLECTION_ARCHETYPE_SIGNED_INT:
+    case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
+    case KAN_REFLECTION_ARCHETYPE_FLOATING:
+        if (field->archetype_inline_array.item_size > sizeof (uint64_t))
+        {
+            KAN_LOG (repository_validation, KAN_LOG_ERROR,
+                     "Passed field \"%s\" to multi value index with supported archetype, but suspicious item size %lu. "
+                     "Broken "
+                     "reflection?",
+                     field->name, (unsigned long) field->archetype_inline_array.item_size)
+            return KAN_FALSE;
+        }
+
+        return KAN_TRUE;
+
+    case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:
+    case KAN_REFLECTION_ARCHETYPE_ENUM:
+    case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
+    case KAN_REFLECTION_ARCHETYPE_EXTERNAL_POINTER:
+    case KAN_REFLECTION_ARCHETYPE_STRUCT:
+    case KAN_REFLECTION_ARCHETYPE_STRUCT_POINTER:
+    case KAN_REFLECTION_ARCHETYPE_INLINE_ARRAY:
+    case KAN_REFLECTION_ARCHETYPE_DYNAMIC_ARRAY:
+    case KAN_REFLECTION_ARCHETYPE_PATCH:
+        KAN_LOG (repository_validation, KAN_LOG_ERROR,
+                 "Passed field \"%s\" to multi value index with unsupported item archetype.", field->name)
+        return KAN_FALSE;
+    }
+
+    return KAN_FALSE;
+}
+
+static inline kan_bool_t check_baked_data_intersects (struct indexed_field_baked_data_t *first,
+                                                      struct indexed_field_baked_data_t *second)
+{
+    return second->absolute_offset + second->size_with_padding >= first->absolute_offset &&
+           first->absolute_offset + first->size_with_padding >= second->absolute_offset;
+}
+
+static kan_bool_t validation_single_value_index_does_not_intersect_with_multi_value (
+    struct indexed_storage_node_t *storage, struct indexed_field_baked_data_t *new_index_data)
+{
+    struct space_index_t *space_index = storage->first_space_index;
+    while (space_index)
+    {
+        if (check_baked_data_intersects (&space_index->baked_min, new_index_data))
+        {
+            KAN_LOG (repository_validation, KAN_LOG_ERROR,
+                     "Passed field to single value index intersects with multi value index fields.")
+            return KAN_FALSE;
+        }
+
+        if (check_baked_data_intersects (&space_index->baked_max, new_index_data))
+        {
+            KAN_LOG (repository_validation, KAN_LOG_ERROR,
+                     "Passed field to single value index intersects with multi value index fields.")
+            return KAN_FALSE;
+        }
+
+        space_index = space_index->next;
+    }
+
+    return KAN_TRUE;
+}
+
+static kan_bool_t validation_multi_value_index_does_not_intersect_with_single_value (
+    struct indexed_storage_node_t *storage, struct indexed_field_baked_data_t *new_index_data)
+{
+    struct value_index_t *value_index = storage->first_value_index;
+    while (value_index)
+    {
+        if (check_baked_data_intersects (&value_index->baked, new_index_data))
+        {
+            KAN_LOG (repository_validation, KAN_LOG_ERROR,
+                     "Passed field to multi value index intersects with single value index fields.")
+            return KAN_FALSE;
+        }
+
+        value_index = value_index->next;
+    }
+
+    struct signal_index_t *signal_index = storage->first_signal_index;
+    while (signal_index)
+    {
+        if (check_baked_data_intersects (&signal_index->baked, new_index_data))
+        {
+            KAN_LOG (repository_validation, KAN_LOG_ERROR,
+                     "Passed field to multi signal index intersects with single signal index fields.")
+            return KAN_FALSE;
+        }
+
+        signal_index = signal_index->next;
+    }
+
+    struct interval_index_t *interval_index = storage->first_interval_index;
+    while (interval_index)
+    {
+        if (check_baked_data_intersects (&interval_index->baked, new_index_data))
+        {
+            KAN_LOG (repository_validation, KAN_LOG_ERROR,
+                     "Passed field to multi interval index intersects with single interval index fields.")
+            return KAN_FALSE;
+        }
+
+        interval_index = interval_index->next;
+    }
+
+    return KAN_TRUE;
 }
 #endif
 
@@ -2300,6 +2560,121 @@ static void singleton_storage_node_shutdown_and_free (struct singleton_storage_n
     kan_free_batched (node->allocation_group, node);
 }
 
+static void return_uniqueness_watcher_init (struct return_uniqueness_watcher_t *watcher)
+{
+    watcher->unique_count = 0u;
+    watcher->first_node = NULL;
+}
+
+static kan_bool_t return_uniqueness_watcher_register (struct return_uniqueness_watcher_t *watcher,
+                                                      struct indexed_storage_record_node_t *record,
+                                                      struct kan_atomic_int_t *temporary_allocator_lock,
+                                                      struct kan_stack_group_allocator_t *temporary_allocator)
+{
+    if (watcher->unique_count > KAN_REPOSITORY_UNIQUENESS_WATCHER_SIMPLICITY_LIMIT)
+    {
+        const struct kan_hash_storage_bucket_t *bucket =
+            kan_hash_storage_query (&watcher->hash_storage, (uint64_t) record);
+
+        struct return_uniqueness_watcher_hash_node_t *node =
+            (struct return_uniqueness_watcher_hash_node_t *) bucket->first;
+        struct return_uniqueness_watcher_hash_node_t *end =
+            (struct return_uniqueness_watcher_hash_node_t *) (bucket->last ? bucket->last->next : NULL);
+
+        while (node != end)
+        {
+            if (node->record == record)
+            {
+                return KAN_FALSE;
+            }
+
+            node = (struct return_uniqueness_watcher_hash_node_t *) node->node.list_node.next;
+        }
+    }
+    else
+    {
+        struct return_uniqueness_watcher_list_node_t *node = watcher->first_node;
+        while (node)
+        {
+            if (node->record == record)
+            {
+                return KAN_FALSE;
+            }
+
+            node = node->next;
+        }
+    }
+
+    ++watcher->unique_count;
+    if (watcher->unique_count == KAN_REPOSITORY_UNIQUENESS_WATCHER_SIMPLICITY_LIMIT + 1u)
+    {
+        kan_hash_storage_init (&watcher->hash_storage, temporary_allocator->group,
+                               KAN_REPOSITORY_UNIQUENESS_WATCHER_INITIAL_BUCKETS);
+
+        struct return_uniqueness_watcher_list_node_t *list_node = watcher->first_node;
+        kan_atomic_int_lock (temporary_allocator_lock);
+
+        while (list_node)
+        {
+            struct return_uniqueness_watcher_hash_node_t *hash_node = kan_stack_group_allocator_allocate (
+                temporary_allocator, sizeof (struct return_uniqueness_watcher_hash_node_t),
+                _Alignof (struct return_uniqueness_watcher_hash_node_t));
+
+            hash_node->node.hash = (uint64_t) record;
+            hash_node->record = record;
+
+            kan_hash_storage_add (&watcher->hash_storage, &hash_node->node);
+            list_node = list_node->next;
+        }
+
+        kan_atomic_int_unlock (temporary_allocator_lock);
+    }
+
+    if (watcher->unique_count > KAN_REPOSITORY_UNIQUENESS_WATCHER_SIMPLICITY_LIMIT)
+    {
+        if (watcher->hash_storage.bucket_count * KAN_REPOSITORY_UNIQUENESS_WATCHER_LOAD_FACTOR <=
+            watcher->hash_storage.items.size)
+        {
+            kan_hash_storage_set_bucket_count (&watcher->hash_storage, watcher->hash_storage.bucket_count * 2u);
+        }
+
+        kan_atomic_int_lock (temporary_allocator_lock);
+        struct return_uniqueness_watcher_hash_node_t *hash_node = kan_stack_group_allocator_allocate (
+            temporary_allocator, sizeof (struct return_uniqueness_watcher_hash_node_t),
+            _Alignof (struct return_uniqueness_watcher_hash_node_t));
+        kan_atomic_int_unlock (temporary_allocator_lock);
+
+        hash_node->node.hash = (uint64_t) record;
+        hash_node->record = record;
+        kan_hash_storage_add (&watcher->hash_storage, &hash_node->node);
+    }
+    else
+    {
+        kan_atomic_int_lock (temporary_allocator_lock);
+        struct return_uniqueness_watcher_list_node_t *list_node = kan_stack_group_allocator_allocate (
+            temporary_allocator, sizeof (struct return_uniqueness_watcher_list_node_t),
+            _Alignof (struct return_uniqueness_watcher_list_node_t));
+        kan_atomic_int_unlock (temporary_allocator_lock);
+
+        list_node->next = watcher->first_node;
+        list_node->record = record;
+        watcher->first_node = list_node;
+    }
+
+    return KAN_TRUE;
+}
+
+static void return_uniqueness_watcher_shutdown (struct return_uniqueness_watcher_t *watcher)
+{
+    // List nodes are allocated through temporary allocator.
+
+    if (watcher->unique_count > KAN_REPOSITORY_UNIQUENESS_WATCHER_SIMPLICITY_LIMIT)
+    {
+        // Storage nodes are allocated through temporary allocator.
+        kan_hash_storage_shutdown (&watcher->hash_storage);
+    }
+}
+
 static void indexed_storage_shutdown_and_free_record_node (struct indexed_storage_node_t *storage,
                                                            struct indexed_storage_record_node_t *record)
 {
@@ -2317,6 +2692,8 @@ static void value_index_shutdown_and_free (struct value_index_t *value_index);
 static void signal_index_shutdown_and_free (struct signal_index_t *signal_index);
 
 static void interval_index_shutdown_and_free (struct interval_index_t *interval_index);
+
+static void space_index_shutdown_and_free (struct space_index_t *space_index);
 
 static void indexed_storage_node_shutdown_and_free (struct indexed_storage_node_t *node,
                                                     struct repository_t *repository)
@@ -2349,7 +2726,13 @@ static void indexed_storage_node_shutdown_and_free (struct indexed_storage_node_
         interval_index = next;
     }
 
-    // TODO: Do not forget about indices here.
+    struct space_index_t *space_index = node->first_space_index;
+    while (space_index)
+    {
+        struct space_index_t *next = space_index->next;
+        space_index_shutdown_and_free (space_index);
+        space_index = next;
+    }
 
     struct indexed_storage_record_node_t *record = (struct indexed_storage_record_node_t *) node->records.first;
     while (record)
@@ -2465,12 +2848,12 @@ static inline uint64_t convert_signed_to_unsigned (int64_t signed_value, uint64_
 }
 
 static inline uint64_t indexed_field_baked_data_extract_and_convert_unsigned_from_pointer (
-    struct indexed_field_baked_data_with_archetype_t *data, const void *pointer)
+    struct indexed_field_baked_data_t *data, enum kan_reflection_archetype_t archetype, const void *pointer)
 {
-    switch (data->archetype)
+    switch (archetype)
     {
     case KAN_REFLECTION_ARCHETYPE_SIGNED_INT:
-        switch (data->data.size)
+        switch (data->size)
         {
         case 1u:
             return convert_signed_to_unsigned (*(const int8_t *) pointer, 1u);
@@ -2488,11 +2871,11 @@ static inline uint64_t indexed_field_baked_data_extract_and_convert_unsigned_fro
         break;
 
     case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
-        return indexed_field_baked_data_extract_unsigned_from_pointer (&data->data, pointer);
+        return indexed_field_baked_data_extract_unsigned_from_pointer (data, pointer);
 
     case KAN_REFLECTION_ARCHETYPE_FLOATING:
     {
-        const double value = indexed_field_baked_data_extract_floating_from_pointer (&data->data, pointer);
+        const double value = indexed_field_baked_data_extract_floating_from_pointer (data, pointer);
         KAN_ASSERT (value <= (double) INT64_MAX)
         KAN_ASSERT (value >= (double) INT64_MIN)
         return convert_signed_to_unsigned ((int64_t) llroundf (value), 8u);
@@ -2516,24 +2899,120 @@ static inline uint64_t indexed_field_baked_data_extract_and_convert_unsigned_fro
 }
 
 static inline uint64_t indexed_field_baked_data_extract_and_convert_unsigned_from_record (
-    struct indexed_field_baked_data_with_archetype_t *data, void *record)
+    struct indexed_field_baked_data_t *data, enum kan_reflection_archetype_t archetype, void *record)
 {
     return indexed_field_baked_data_extract_and_convert_unsigned_from_pointer (
-        data, (const uint8_t *) record + data->data.absolute_offset);
+        data, archetype, (const uint8_t *) record + data->absolute_offset);
 }
 
 static inline uint64_t indexed_field_baked_data_extract_and_convert_unsigned_from_buffer (
-    struct indexed_field_baked_data_with_archetype_t *data, void *buffer_memory)
+    struct indexed_field_baked_data_t *data, enum kan_reflection_archetype_t archetype, void *buffer_memory)
 {
     return indexed_field_baked_data_extract_and_convert_unsigned_from_pointer (
-        data, (const uint8_t *) buffer_memory + data->data.offset_in_buffer);
+        data, archetype, (const uint8_t *) buffer_memory + data->offset_in_buffer);
+}
+
+static inline void indexed_field_baked_data_extract_and_convert_double_array_from_pointer (
+    struct indexed_field_baked_data_t *data,
+    enum kan_reflection_archetype_t archetype,
+    uint64_t array_size,
+    const void *pointer,
+    double *output)
+{
+    const uint64_t item_size = data->size / array_size;
+
+#define CONVERT_CASE(SIZE, TYPE)                                                                                       \
+    case SIZE:                                                                                                         \
+    {                                                                                                                  \
+        const TYPE *input = (const TYPE *) pointer;                                                                    \
+        for (uint64_t index = 0u; index < array_size; ++index)                                                         \
+        {                                                                                                              \
+            output[index] = (double) input[index];                                                                     \
+        }                                                                                                              \
+                                                                                                                       \
+        return;                                                                                                        \
+    }
+
+    switch (archetype)
+    {
+    case KAN_REFLECTION_ARCHETYPE_SIGNED_INT:
+        switch (item_size)
+        {
+            CONVERT_CASE (1u, int8_t)
+            CONVERT_CASE (2u, int16_t)
+            CONVERT_CASE (4u, int32_t)
+            CONVERT_CASE (8u, int64_t)
+        }
+
+        break;
+
+    case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
+        switch (item_size)
+        {
+            CONVERT_CASE (1u, uint8_t)
+            CONVERT_CASE (2u, uint16_t)
+            CONVERT_CASE (4u, uint32_t)
+            CONVERT_CASE (8u, uint64_t)
+        }
+
+        break;
+
+    case KAN_REFLECTION_ARCHETYPE_FLOATING:
+        switch (item_size)
+        {
+            CONVERT_CASE (4u, float)
+            CONVERT_CASE (8u, double)
+        }
+
+        break;
+
+    case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
+    case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:
+    case KAN_REFLECTION_ARCHETYPE_ENUM:
+    case KAN_REFLECTION_ARCHETYPE_EXTERNAL_POINTER:
+    case KAN_REFLECTION_ARCHETYPE_STRUCT:
+    case KAN_REFLECTION_ARCHETYPE_STRUCT_POINTER:
+    case KAN_REFLECTION_ARCHETYPE_INLINE_ARRAY:
+    case KAN_REFLECTION_ARCHETYPE_DYNAMIC_ARRAY:
+    case KAN_REFLECTION_ARCHETYPE_PATCH:
+        KAN_ASSERT (KAN_FALSE)
+        break;
+    }
+
+    KAN_ASSERT (KAN_FALSE)
+
+#undef CONVERT_CASE
+}
+
+static inline void indexed_field_baked_data_extract_and_convert_double_array_from_record (
+    struct indexed_field_baked_data_t *data,
+    enum kan_reflection_archetype_t archetype,
+    uint64_t array_size,
+    void *record,
+    double *output)
+{
+    indexed_field_baked_data_extract_and_convert_double_array_from_pointer (
+        data, archetype, array_size, (const uint8_t *) record + data->absolute_offset, output);
+}
+
+static inline void indexed_field_baked_data_extract_and_convert_double_array_from_buffer (
+    struct indexed_field_baked_data_t *data,
+    enum kan_reflection_archetype_t archetype,
+    uint64_t array_size,
+    void *buffer_memory,
+    double *output)
+{
+    indexed_field_baked_data_extract_and_convert_double_array_from_pointer (
+        data, archetype, array_size, (const uint8_t *) buffer_memory + data->offset_in_buffer, output);
 }
 
 static kan_bool_t indexed_field_baked_data_bake_from_reflection (struct indexed_field_baked_data_t *data,
                                                                  kan_reflection_registry_t registry,
                                                                  kan_interned_string_t type_name,
                                                                  struct interned_field_path_t path,
-                                                                 enum index_type_t index_type)
+                                                                 enum kan_reflection_archetype_t *archetype_output,
+                                                                 uint64_t *array_size_output_for_multi_value,
+                                                                 kan_bool_t validation_allow_not_comparable)
 {
     uint64_t absolute_offset;
     uint64_t size_with_padding;
@@ -2545,7 +3024,9 @@ static kan_bool_t indexed_field_baked_data_bake_from_reflection (struct indexed_
     {
         // Field exists, just re-bake then.
 #if defined(KAN_REPOSITORY_VALIDATION_ENABLED)
-        if (!validation_index_is_possible (field, index_type))
+        if ((!array_size_output_for_multi_value &&
+             !validation_single_value_index_is_possible (field, validation_allow_not_comparable)) ||
+            (array_size_output_for_multi_value && !validation_multi_value_index_is_possible (field)))
         {
             return KAN_FALSE;
         }
@@ -2559,9 +3040,19 @@ static kan_bool_t indexed_field_baked_data_bake_from_reflection (struct indexed_
         data->size = (uint8_t) field->size;
         data->size_with_padding = (uint8_t) size_with_padding;
 
-        if (index_type == INDEX_TYPE_COMPARISON)
+        if (array_size_output_for_multi_value)
         {
-            ((struct indexed_field_baked_data_with_archetype_t *) data)->archetype = field->archetype;
+            KAN_ASSERT (field->archetype == KAN_REFLECTION_ARCHETYPE_INLINE_ARRAY)
+            if (archetype_output)
+            {
+                *archetype_output = field->archetype_inline_array.item_archetype;
+            }
+
+            *array_size_output_for_multi_value = (uint8_t) field->archetype_inline_array.item_count;
+        }
+        else if (archetype_output)
+        {
+            *archetype_output = field->archetype;
         }
 
         return KAN_TRUE;
@@ -2818,8 +3309,8 @@ static void signal_index_shutdown_and_free (struct signal_index_t *signal_index)
 static void interval_index_insert_record (struct interval_index_t *index,
                                           struct indexed_storage_record_node_t *record_node)
 {
-    const uint64_t converted_value =
-        indexed_field_baked_data_extract_and_convert_unsigned_from_record (&index->baked, record_node->record);
+    const uint64_t converted_value = indexed_field_baked_data_extract_and_convert_unsigned_from_record (
+        &index->baked, index->baked_archetype, record_node->record);
 
     struct interval_index_node_t *parent_index_node =
         (struct interval_index_node_t *) kan_avl_tree_find_parent_for_insertion (&index->tree, converted_value);
@@ -2931,6 +3422,259 @@ static void interval_index_shutdown_and_free (struct interval_index_t *interval_
                                            (struct interval_index_node_t *) interval_index->tree.root);
     shutdown_field_path (interval_index->source_path, interval_index_allocation_group);
     kan_free_batched (interval_index_allocation_group, interval_index);
+}
+
+static void space_index_insert_record_with_bounds (struct space_index_t *space_index,
+                                                   struct indexed_storage_record_node_t *record_node,
+                                                   const double *min,
+                                                   const double *max)
+{
+    struct kan_space_tree_insertion_iterator_t iterator = kan_space_tree_insertion_start (&space_index->tree, min, max);
+    while (!kan_space_tree_insertion_is_finished (&iterator))
+    {
+        struct space_index_sub_node_t *sub_node = (struct space_index_sub_node_t *) kan_allocate_batched (
+            space_index->storage->space_index_allocation_group, sizeof (struct space_index_sub_node_t));
+        sub_node->record = record_node;
+        kan_space_tree_insertion_insert_and_move (&space_index->tree, &iterator, &sub_node->sub_node);
+    }
+}
+
+static inline void space_index_get_min_max_from_record (struct space_index_t *space_index,
+                                                        struct indexed_storage_record_node_t *record_node,
+                                                        double *min,
+                                                        double *max)
+{
+    indexed_field_baked_data_extract_and_convert_double_array_from_record (
+        &space_index->baked_min, space_index->baked_archetype, space_index->baked_dimension_count, record_node->record,
+        min);
+
+    indexed_field_baked_data_extract_and_convert_double_array_from_record (
+        &space_index->baked_max, space_index->baked_archetype, space_index->baked_dimension_count, record_node->record,
+        max);
+}
+
+static void space_index_insert_record (struct space_index_t *space_index,
+                                       struct indexed_storage_record_node_t *record_node)
+{
+    double min[KAN_CONTAINER_SPACE_TREE_MAX_DIMENSIONS];
+    double max[KAN_CONTAINER_SPACE_TREE_MAX_DIMENSIONS];
+    KAN_ASSERT (space_index->baked_dimension_count <= KAN_CONTAINER_SPACE_TREE_MAX_DIMENSIONS)
+    space_index_get_min_max_from_record (space_index, record_node, min, max);
+    space_index_insert_record_with_bounds (space_index, record_node, min, max);
+}
+
+struct space_index_sub_node_deletion_order_t
+{
+    struct space_index_sub_node_deletion_order_t *next;
+    struct kan_space_tree_node_t *node;
+    struct space_index_sub_node_t *sub_node;
+};
+
+static inline void space_index_delete_all_sub_nodes (struct space_index_t *space_index,
+                                                     const double *min,
+                                                     const double *max,
+                                                     struct indexed_storage_record_node_t *record_node,
+                                                     struct kan_stack_group_allocator_t *temporary_allocator)
+{
+    struct space_index_sub_node_deletion_order_t *first_to_delete = NULL;
+    struct kan_space_tree_shape_iterator_t iterator = kan_space_tree_shape_start (&space_index->tree, min, max);
+
+    while (!kan_space_tree_shape_is_finished (&iterator))
+    {
+        struct kan_space_tree_node_t *node = iterator.current_node;
+        struct kan_space_tree_sub_node_t *sub_node = node->first_sub_node;
+
+        while (sub_node)
+        {
+            struct space_index_sub_node_t *typed_sub_node = (struct space_index_sub_node_t *) sub_node;
+            if (typed_sub_node->record == record_node)
+            {
+                struct space_index_sub_node_deletion_order_t *to_delete =
+                    (struct space_index_sub_node_deletion_order_t *) kan_stack_group_allocator_allocate (
+                        temporary_allocator, sizeof (struct space_index_sub_node_deletion_order_t),
+                        _Alignof (struct space_index_sub_node_deletion_order_t));
+
+                to_delete->next = first_to_delete;
+                to_delete->node = node;
+                to_delete->sub_node = typed_sub_node;
+                first_to_delete = to_delete;
+            }
+
+            sub_node = sub_node->next;
+        }
+
+        kan_space_tree_shape_move_to_next_node (&space_index->tree, &iterator);
+    }
+
+    while (first_to_delete)
+    {
+        kan_space_tree_delete (&space_index->tree, first_to_delete->node, &first_to_delete->sub_node->sub_node);
+        kan_free_batched (space_index->storage->space_index_allocation_group, first_to_delete->sub_node);
+        first_to_delete = first_to_delete->next;
+    }
+}
+
+static inline void space_index_get_min_max_from_buffer (struct space_index_t *space_index,
+                                                        void *observation_buffer_memory,
+                                                        double *min,
+                                                        double *max)
+{
+    indexed_field_baked_data_extract_and_convert_double_array_from_buffer (
+        &space_index->baked_min, space_index->baked_archetype, space_index->baked_dimension_count,
+        observation_buffer_memory, min);
+
+    indexed_field_baked_data_extract_and_convert_double_array_from_buffer (
+        &space_index->baked_max, space_index->baked_archetype, space_index->baked_dimension_count,
+        observation_buffer_memory, max);
+}
+
+static void space_index_delete_by_buffer (struct space_index_t *space_index,
+                                          void *observation_buffer_memory,
+                                          struct indexed_storage_record_node_t *record_node,
+                                          struct kan_stack_group_allocator_t *temporary_allocator)
+{
+    double min[KAN_CONTAINER_SPACE_TREE_MAX_DIMENSIONS];
+    double max[KAN_CONTAINER_SPACE_TREE_MAX_DIMENSIONS];
+    KAN_ASSERT (space_index->baked_dimension_count <= KAN_CONTAINER_SPACE_TREE_MAX_DIMENSIONS)
+    space_index_get_min_max_from_buffer (space_index, observation_buffer_memory, min, max);
+    space_index_delete_all_sub_nodes (space_index, min, max, record_node, temporary_allocator);
+}
+
+static void space_index_delete_by_record (struct space_index_t *space_index,
+                                          struct indexed_storage_record_node_t *record_node,
+                                          struct kan_stack_group_allocator_t *temporary_allocator)
+{
+    double min[KAN_CONTAINER_SPACE_TREE_MAX_DIMENSIONS];
+    double max[KAN_CONTAINER_SPACE_TREE_MAX_DIMENSIONS];
+    KAN_ASSERT (space_index->baked_dimension_count <= KAN_CONTAINER_SPACE_TREE_MAX_DIMENSIONS)
+    space_index_get_min_max_from_record (space_index, record_node, min, max);
+    space_index_delete_all_sub_nodes (space_index, min, max, record_node, temporary_allocator);
+}
+
+static void space_index_delete_by_sub_node (struct space_index_t *space_index,
+                                            struct kan_space_tree_node_t *tree_node,
+                                            struct space_index_sub_node_t *sub_node,
+                                            void *observation_buffer_memory,
+                                            struct kan_stack_group_allocator_t *temporary_allocator)
+{
+    struct indexed_storage_record_node_t *record_node = sub_node->record;
+    kan_space_tree_delete (&space_index->tree, tree_node, &sub_node->sub_node);
+    kan_free_batched (space_index->storage->space_index_allocation_group, sub_node);
+
+    double min[KAN_CONTAINER_SPACE_TREE_MAX_DIMENSIONS];
+    double max[KAN_CONTAINER_SPACE_TREE_MAX_DIMENSIONS];
+    KAN_ASSERT (space_index->baked_dimension_count <= KAN_CONTAINER_SPACE_TREE_MAX_DIMENSIONS)
+
+    if (observation_buffer_memory)
+    {
+        space_index_get_min_max_from_buffer (space_index, observation_buffer_memory, min, max);
+    }
+    else
+    {
+        space_index_get_min_max_from_record (space_index, record_node, min, max);
+    }
+
+    if (!kan_space_tree_is_contained_in_one_sub_node (&space_index->tree, min, max))
+    {
+        space_index_delete_all_sub_nodes (space_index, min, max, record_node, temporary_allocator);
+    }
+}
+
+static void space_index_update (struct space_index_t *space_index,
+                                void *observation_buffer_memory,
+                                struct indexed_storage_record_node_t *record_node,
+                                struct kan_stack_group_allocator_t *temporary_allocator)
+{
+    double old_min[KAN_CONTAINER_SPACE_TREE_MAX_DIMENSIONS];
+    double old_max[KAN_CONTAINER_SPACE_TREE_MAX_DIMENSIONS];
+    double new_min[KAN_CONTAINER_SPACE_TREE_MAX_DIMENSIONS];
+    double new_max[KAN_CONTAINER_SPACE_TREE_MAX_DIMENSIONS];
+    KAN_ASSERT (space_index->baked_dimension_count <= KAN_CONTAINER_SPACE_TREE_MAX_DIMENSIONS)
+
+    space_index_get_min_max_from_buffer (space_index, observation_buffer_memory, old_min, old_max);
+    space_index_get_min_max_from_record (space_index, record_node, new_min, new_max);
+
+    if (kan_space_tree_is_re_insert_needed (&space_index->tree, old_min, old_max, new_min, new_max))
+    {
+        space_index_delete_all_sub_nodes (space_index, old_min, old_max, record_node, temporary_allocator);
+        space_index_insert_record_with_bounds (space_index, record_node, new_min, new_max);
+    }
+}
+
+static void space_index_update_with_sub_node (struct space_index_t *space_index,
+                                              struct kan_space_tree_node_t *tree_node,
+                                              struct space_index_sub_node_t *sub_node,
+                                              void *observation_buffer_memory,
+                                              struct kan_stack_group_allocator_t *temporary_allocator)
+{
+    double old_min[KAN_CONTAINER_SPACE_TREE_MAX_DIMENSIONS];
+    double old_max[KAN_CONTAINER_SPACE_TREE_MAX_DIMENSIONS];
+    double new_min[KAN_CONTAINER_SPACE_TREE_MAX_DIMENSIONS];
+    double new_max[KAN_CONTAINER_SPACE_TREE_MAX_DIMENSIONS];
+    KAN_ASSERT (space_index->baked_dimension_count <= KAN_CONTAINER_SPACE_TREE_MAX_DIMENSIONS)
+
+    struct indexed_storage_record_node_t *record_node = sub_node->record;
+    space_index_get_min_max_from_buffer (space_index, observation_buffer_memory, old_min, old_max);
+    space_index_get_min_max_from_record (space_index, record_node, new_min, new_max);
+
+    if (kan_space_tree_is_re_insert_needed (&space_index->tree, old_min, old_max, new_min, new_max))
+    {
+        space_index_delete_by_sub_node (space_index, tree_node, sub_node, observation_buffer_memory,
+                                        temporary_allocator);
+        space_index_insert_record_with_bounds (space_index, record_node, new_min, new_max);
+    }
+}
+
+static void space_index_shutdown_sub_nodes (struct space_index_t *space_index, struct kan_space_tree_node_t *node)
+{
+    if (!node)
+    {
+        return;
+    }
+
+    if (node->height != space_index->tree.last_level_height)
+    {
+        while (node->first_sub_node)
+        {
+            struct kan_space_tree_sub_node_t *next = node->first_sub_node->next;
+            kan_free_batched (space_index->storage->space_index_allocation_group, node->first_sub_node);
+            node->first_sub_node = next;
+        }
+
+        switch (space_index->tree.dimension_count)
+        {
+        case 4u:
+            space_index_shutdown_sub_nodes (space_index, node->children[15u]);
+            space_index_shutdown_sub_nodes (space_index, node->children[14u]);
+            space_index_shutdown_sub_nodes (space_index, node->children[13u]);
+            space_index_shutdown_sub_nodes (space_index, node->children[12u]);
+            space_index_shutdown_sub_nodes (space_index, node->children[11u]);
+            space_index_shutdown_sub_nodes (space_index, node->children[10u]);
+            space_index_shutdown_sub_nodes (space_index, node->children[9u]);
+            space_index_shutdown_sub_nodes (space_index, node->children[8u]);
+        case 3u:
+            space_index_shutdown_sub_nodes (space_index, node->children[7u]);
+            space_index_shutdown_sub_nodes (space_index, node->children[6u]);
+            space_index_shutdown_sub_nodes (space_index, node->children[5u]);
+            space_index_shutdown_sub_nodes (space_index, node->children[4u]);
+        case 2u:
+            space_index_shutdown_sub_nodes (space_index, node->children[3u]);
+            space_index_shutdown_sub_nodes (space_index, node->children[2u]);
+        case 1u:
+            space_index_shutdown_sub_nodes (space_index, node->children[1u]);
+            space_index_shutdown_sub_nodes (space_index, node->children[0u]);
+        }
+    }
+}
+
+static void space_index_shutdown_and_free (struct space_index_t *space_index)
+{
+    space_index_shutdown_sub_nodes (space_index, space_index->tree.root);
+    kan_allocation_group_t space_index_allocation_group = space_index->storage->space_index_allocation_group;
+    kan_space_tree_shutdown (&space_index->tree);
+    shutdown_field_path (space_index->source_path_min, space_index_allocation_group);
+    shutdown_field_path (space_index->source_path_max, space_index_allocation_group);
+    kan_free_batched (space_index_allocation_group, space_index);
 }
 
 static void event_queue_node_shutdown_and_free (struct event_queue_node_t *node, struct event_storage_node_t *storage)
@@ -3270,43 +4014,108 @@ static void repository_migrate_internal (struct repository_t *repository,
         {
         case KAN_REFLECTION_MIGRATION_NEEDED:
         {
-#define HELPER_UPDATE_SINGLE_FIELD_INDEX(INDEX_TYPE_NAME, INDEX_TYPE, BAKED_GETTER)                                    \
-    struct INDEX_TYPE_NAME##_index_t *INDEX_TYPE_NAME##_index = indexed_storage_node->first_##INDEX_TYPE_NAME##_index; \
-    struct INDEX_TYPE_NAME##_index_t *previous_##INDEX_TYPE_NAME##_index = NULL;                                       \
+#define HELPER_UPDATE_SINGLE_FIELD_INDEX(INDEX_TYPE, ARCHETYPE_OUTPUT, ALLOW_NOT_COMPARABLE)                           \
+    struct INDEX_TYPE##_index_t *INDEX_TYPE##_index = indexed_storage_node->first_##INDEX_TYPE##_index;                \
+    struct INDEX_TYPE##_index_t *previous_##INDEX_TYPE##_index = NULL;                                                 \
                                                                                                                        \
-    while (INDEX_TYPE_NAME##_index)                                                                                    \
+    while (INDEX_TYPE##_index)                                                                                         \
     {                                                                                                                  \
-        struct INDEX_TYPE_NAME##_index_t *next_##INDEX_TYPE_NAME##_index = INDEX_TYPE_NAME##_index->next;              \
-        if (!indexed_field_baked_data_bake_from_reflection (BAKED_GETTER, new_registry, old_type->name,                \
-                                                            INDEX_TYPE_NAME##_index->source_path, INDEX_TYPE))         \
+        struct INDEX_TYPE##_index_t *next_##INDEX_TYPE##_index = INDEX_TYPE##_index->next;                             \
+        if (!indexed_field_baked_data_bake_from_reflection (&INDEX_TYPE##_index->baked, new_registry, old_type->name,  \
+                                                            INDEX_TYPE##_index->source_path, ARCHETYPE_OUTPUT, NULL,   \
+                                                            ALLOW_NOT_COMPARABLE))                                     \
         {                                                                                                              \
-            INDEX_TYPE_NAME##_index_shutdown_and_free (INDEX_TYPE_NAME##_index);                                       \
+            INDEX_TYPE##_index_shutdown_and_free (INDEX_TYPE##_index);                                                 \
                                                                                                                        \
-            if (previous_##INDEX_TYPE_NAME##_index)                                                                    \
+            if (previous_##INDEX_TYPE##_index)                                                                         \
             {                                                                                                          \
-                previous_##INDEX_TYPE_NAME##_index->next = next_##INDEX_TYPE_NAME##_index;                             \
+                previous_##INDEX_TYPE##_index->next = next_##INDEX_TYPE##_index;                                       \
             }                                                                                                          \
             else                                                                                                       \
             {                                                                                                          \
-                indexed_storage_node->first_##INDEX_TYPE_NAME##_index = next_##INDEX_TYPE_NAME##_index;                \
+                indexed_storage_node->first_##INDEX_TYPE##_index = next_##INDEX_TYPE##_index;                          \
             }                                                                                                          \
         }                                                                                                              \
         else                                                                                                           \
         {                                                                                                              \
-            previous_##INDEX_TYPE_NAME##_index = INDEX_TYPE_NAME##_index;                                              \
+            previous_##INDEX_TYPE##_index = INDEX_TYPE##_index;                                                        \
         }                                                                                                              \
                                                                                                                        \
-        INDEX_TYPE_NAME##_index = next_##INDEX_TYPE_NAME##_index;                                                      \
+        INDEX_TYPE##_index = next_##INDEX_TYPE##_index;                                                                \
     }
 
-            HELPER_UPDATE_SINGLE_FIELD_INDEX (value, INDEX_TYPE_EQUALITY, &value_index->baked)
-            HELPER_UPDATE_SINGLE_FIELD_INDEX (signal, INDEX_TYPE_EQUALITY, &signal_index->baked)
-            HELPER_UPDATE_SINGLE_FIELD_INDEX (interval, INDEX_TYPE_COMPARISON, &interval_index->baked.data)
+            HELPER_UPDATE_SINGLE_FIELD_INDEX (value, NULL, KAN_TRUE)
+            HELPER_UPDATE_SINGLE_FIELD_INDEX (signal, NULL, KAN_TRUE)
+            HELPER_UPDATE_SINGLE_FIELD_INDEX (interval, &interval_index->baked_archetype, KAN_FALSE)
 
 #undef HELPER_UPDATE_SINGLE_FIELD_INDEX
 
-            // TODO: Drop indices if their fields are deleted.
-            // TODO: Schedule index reflection data re-bake if their fields are affected. Or re-bake it here.
+            struct space_index_t *space_index = indexed_storage_node->first_space_index;
+            struct space_index_t *previous_space_index = NULL;
+
+            while (space_index)
+            {
+                struct space_index_t *next_space_index = space_index->next;
+                uint64_t min_size;
+                uint64_t max_size;
+
+                enum kan_reflection_archetype_t min_archetype;
+                enum kan_reflection_archetype_t max_archetype;
+
+                const kan_bool_t min_baked = indexed_field_baked_data_bake_from_reflection (
+                    &space_index->baked_min, new_registry, old_type->name, space_index->source_path_min, &min_archetype,
+                    &min_size, KAN_FALSE);
+
+                const kan_bool_t max_baked = indexed_field_baked_data_bake_from_reflection (
+                    &space_index->baked_max, new_registry, old_type->name, space_index->source_path_max, &max_archetype,
+                    &max_size, KAN_FALSE);
+
+                space_index->baked_archetype = min_archetype;
+                space_index->baked_dimension_count = min_size;
+
+                if (min_archetype != max_archetype)
+                {
+                    KAN_LOG (repository, KAN_LOG_ERROR,
+                             "Failed to migrate space index on type %s, min and max archetypes mismatch detected.",
+                             old_type->name)
+                }
+
+                if (min_size != max_size)
+                {
+                    KAN_LOG (
+                        repository, KAN_LOG_ERROR,
+                        "Failed to migrate space index on type %s, min and max array sizes do not match: %lu and %lu.",
+                        old_type->name, (unsigned long) min_size, (unsigned long) max_size)
+                }
+
+                if (min_size > KAN_CONTAINER_SPACE_TREE_MAX_DIMENSIONS)
+                {
+                    KAN_LOG (repository, KAN_LOG_ERROR,
+                             "Failed to migrate space index on type %s, min array size is bigger that allowed for "
+                             "space tree: %lu > %lu.",
+                             old_type->name, (unsigned long) min_size,
+                             (unsigned long) KAN_CONTAINER_SPACE_TREE_MAX_DIMENSIONS)
+                }
+
+                if (!min_baked || !max_baked || min_archetype != max_archetype || min_size != max_size ||
+                    min_size > KAN_CONTAINER_SPACE_TREE_MAX_DIMENSIONS)
+                {
+                    space_index_shutdown_and_free (space_index);
+                    if (previous_space_index)
+                    {
+                        previous_space_index->next = next_space_index;
+                    }
+                    else
+                    {
+                        indexed_storage_node->first_space_index = next_space_index;
+                    }
+                }
+                else
+                {
+                    previous_space_index = space_index;
+                }
+                space_index = next_space_index;
+            }
 
             struct indexed_storage_record_node_t *node =
                 (struct indexed_storage_record_node_t *) indexed_storage_node->records.first;
@@ -3836,7 +4645,8 @@ static void indexed_storage_perform_maintenance (struct indexed_storage_node_t *
                         {
                             const uint64_t converted_value =
                                 indexed_field_baked_data_extract_and_convert_unsigned_from_buffer (
-                                    &interval_index->baked, storage->dirty_records->observation_buffer_memory);
+                                    &interval_index->baked, interval_index->baked_archetype,
+                                    storage->dirty_records->observation_buffer_memory);
                             interval_index_delete_by_converted_value (interval_index, node, converted_value);
                         }
 
@@ -3846,7 +4656,28 @@ static void indexed_storage_perform_maintenance (struct indexed_storage_node_t *
                     interval_index = interval_index->next;
                 }
 
-                // TODO: Update indices.
+                struct space_index_t *space_index = storage->first_space_index;
+                while (space_index)
+                {
+                    if (space_index->observation_flags & storage->dirty_records->observation_comparison_flags)
+                    {
+                        if (space_index == storage->dirty_records->dirt_source_index)
+                        {
+                            space_index_update_with_sub_node (
+                                space_index,
+                                (struct kan_space_tree_node_t *) storage->dirty_records->dirt_source_index_node,
+                                (struct space_index_sub_node_t *) storage->dirty_records->dirt_source_index_sub_node,
+                                storage->dirty_records->observation_buffer_memory, &storage->temporary_allocator);
+                        }
+                        else
+                        {
+                            space_index_update (space_index, storage->dirty_records->observation_buffer_memory,
+                                                storage->dirty_records->source_node, &storage->temporary_allocator);
+                        }
+                    }
+
+                    space_index = space_index->next;
+                }
 
                 observation_event_triggers_definition_fire (
                     &storage->observation_events_triggers, storage->dirty_records->observation_comparison_flags,
@@ -3881,7 +4712,12 @@ static void indexed_storage_perform_maintenance (struct indexed_storage_node_t *
                 interval_index = interval_index->next;
             }
 
-            // TODO: Add to indices.
+            struct space_index_t *space_index = storage->first_space_index;
+            while (space_index)
+            {
+                space_index_insert_record (space_index, node);
+                space_index = space_index->next;
+            }
 
             lifetime_event_triggers_definition_fire (&storage->on_insert_events_triggers, node->record);
             break;
@@ -3971,9 +4807,10 @@ static void indexed_storage_perform_maintenance (struct indexed_storage_node_t *
                     const uint64_t converted_value =
                         storage->dirty_records->observation_buffer_memory ?
                             indexed_field_baked_data_extract_and_convert_unsigned_from_buffer (
-                                &interval_index->baked, storage->dirty_records->observation_buffer_memory) :
-                            indexed_field_baked_data_extract_and_convert_unsigned_from_record (&interval_index->baked,
-                                                                                               node->record);
+                                &interval_index->baked, interval_index->baked_archetype,
+                                storage->dirty_records->observation_buffer_memory) :
+                            indexed_field_baked_data_extract_and_convert_unsigned_from_record (
+                                &interval_index->baked, interval_index->baked_archetype, node->record);
 
                     interval_index_delete_by_converted_value (interval_index, node, converted_value);
                 }
@@ -3981,7 +4818,29 @@ static void indexed_storage_perform_maintenance (struct indexed_storage_node_t *
                 interval_index = interval_index->next;
             }
 
-            // TODO: Remove from indices.
+            struct space_index_t *space_index = storage->first_space_index;
+            while (space_index)
+            {
+                if (space_index == storage->dirty_records->dirt_source_index)
+                {
+                    space_index_delete_by_sub_node (
+                        space_index, (struct kan_space_tree_node_t *) storage->dirty_records->dirt_source_index_node,
+                        (struct space_index_sub_node_t *) storage->dirty_records->dirt_source_index_sub_node,
+                        storage->dirty_records->observation_buffer_memory, &storage->temporary_allocator);
+                }
+                else if (storage->dirty_records->observation_buffer_memory)
+                {
+                    space_index_delete_by_buffer (space_index, storage->dirty_records->observation_buffer_memory,
+                                                  storage->dirty_records->source_node, &storage->temporary_allocator);
+                }
+                else
+                {
+                    space_index_delete_by_record (space_index, storage->dirty_records->source_node,
+                                                  &storage->temporary_allocator);
+                }
+
+                space_index = space_index->next;
+            }
 
             kan_bd_list_remove (&storage->records, &node->list_node);
             indexed_storage_shutdown_and_free_record_node (storage, node);
@@ -4550,13 +5409,14 @@ static inline kan_bool_t try_bake_for_single_field_index (kan_reflection_registr
                                                           kan_allocation_group_t allocation_group,
                                                           struct indexed_field_baked_data_t *baked_output,
                                                           struct interned_field_path_t *interned_path_output,
-                                                          enum index_type_t index_type)
+                                                          enum kan_reflection_archetype_t *archetype_output,
+                                                          kan_bool_t allow_not_comparable)
 {
     indexed_field_baked_data_init (baked_output);
     *interned_path_output = copy_field_path (path, allocation_group);
 
     if (!indexed_field_baked_data_bake_from_reflection (baked_output, registry, type_name, *interned_path_output,
-                                                        index_type))
+                                                        archetype_output, NULL, allow_not_comparable))
     {
         KAN_LOG (repository, KAN_LOG_ERROR, "Unable to create index for path (inside struct \"%s\":", type_name)
         for (uint32_t path_index = 0; path_index < path.reflection_path_length; ++path_index)
@@ -4594,12 +5454,21 @@ static struct value_index_t *indexed_storage_find_or_create_value_index (struct 
     struct interned_field_path_t interned_path;
 
     if (!try_bake_for_single_field_index (storage->repository->registry, storage->type->name, path,
-                                          storage->value_index_allocation_group, &baked, &interned_path,
-                                          INDEX_TYPE_EQUALITY))
+                                          storage->value_index_allocation_group, &baked, &interned_path, NULL,
+                                          KAN_TRUE))
     {
         kan_atomic_int_unlock (&storage->maintenance_lock);
         return NULL;
     }
+
+#if defined(KAN_REPOSITORY_VALIDATION_ENABLED)
+    if (!validation_single_value_index_does_not_intersect_with_multi_value (storage, &baked))
+    {
+        kan_atomic_int_unlock (&storage->maintenance_lock);
+        shutdown_field_path (interned_path, storage->value_index_allocation_group);
+        return NULL;
+    }
+#endif
 
     index = kan_allocate_batched (storage->value_index_allocation_group, sizeof (struct value_index_t));
     index->next = storage->first_value_index;
@@ -5009,12 +5878,21 @@ static struct signal_index_t *indexed_storage_find_or_create_signal_index (struc
     struct interned_field_path_t interned_path;
 
     if (!try_bake_for_single_field_index (storage->repository->registry, storage->type->name, path,
-                                          storage->value_index_allocation_group, &baked, &interned_path,
-                                          INDEX_TYPE_EQUALITY))
+                                          storage->signal_index_allocation_group, &baked, &interned_path, NULL,
+                                          KAN_TRUE))
     {
         kan_atomic_int_unlock (&storage->maintenance_lock);
         return NULL;
     }
+
+#if defined(KAN_REPOSITORY_VALIDATION_ENABLED)
+    if (!validation_single_value_index_does_not_intersect_with_multi_value (storage, &baked))
+    {
+        kan_atomic_int_unlock (&storage->maintenance_lock);
+        shutdown_field_path (interned_path, storage->signal_index_allocation_group);
+        return NULL;
+    }
+#endif
 
     index = kan_allocate_batched (storage->signal_index_allocation_group, sizeof (struct signal_index_t));
     index->next = storage->first_signal_index;
@@ -5417,16 +6295,26 @@ static struct interval_index_t *indexed_storage_find_or_create_interval_index (s
         index = index->next;
     }
 
-    struct indexed_field_baked_data_with_archetype_t baked;
+    struct indexed_field_baked_data_t baked;
+    enum kan_reflection_archetype_t baked_archetype;
     struct interned_field_path_t interned_path;
 
     if (!try_bake_for_single_field_index (storage->repository->registry, storage->type->name, path,
-                                          storage->interval_index_allocation_group, &baked.data, &interned_path,
-                                          INDEX_TYPE_COMPARISON))
+                                          storage->interval_index_allocation_group, &baked, &interned_path,
+                                          &baked_archetype, KAN_FALSE))
     {
         kan_atomic_int_unlock (&storage->maintenance_lock);
         return NULL;
     }
+
+#if defined(KAN_REPOSITORY_VALIDATION_ENABLED)
+    if (!validation_single_value_index_does_not_intersect_with_multi_value (storage, &baked))
+    {
+        kan_atomic_int_unlock (&storage->maintenance_lock);
+        shutdown_field_path (interned_path, storage->interval_index_allocation_group);
+        return NULL;
+    }
+#endif
 
     index = kan_allocate_batched (storage->interval_index_allocation_group, sizeof (struct interval_index_t));
     index->next = storage->first_interval_index;
@@ -5479,15 +6367,15 @@ static inline struct indexed_interval_cursor_t indexed_storage_interval_query_ex
     if (min)
     {
         min_node = (struct interval_index_node_t *) kan_avl_tree_find_lower_bound (
-            &query_data->index->tree,
-            indexed_field_baked_data_extract_and_convert_unsigned_from_pointer (&query_data->index->baked, min));
+            &query_data->index->tree, indexed_field_baked_data_extract_and_convert_unsigned_from_pointer (
+                                          &query_data->index->baked, query_data->index->baked_archetype, min));
     }
 
     if (max)
     {
         max_node = (struct interval_index_node_t *) kan_avl_tree_find_upper_bound (
-            &query_data->index->tree,
-            indexed_field_baked_data_extract_and_convert_unsigned_from_pointer (&query_data->index->baked, max));
+            &query_data->index->tree, indexed_field_baked_data_extract_and_convert_unsigned_from_pointer (
+                                          &query_data->index->baked, query_data->index->baked_archetype, max));
     }
 
     struct indexed_interval_cursor_t cursor;
@@ -5519,9 +6407,9 @@ static inline struct indexed_interval_cursor_t indexed_storage_interval_query_ex
         cursor.sub_node = NULL;
     }
 
-    if (query_data->index->baked.archetype == KAN_REFLECTION_ARCHETYPE_FLOATING)
+    if (query_data->index->baked_archetype == KAN_REFLECTION_ARCHETYPE_FLOATING)
     {
-        switch (query_data->index->baked.data.size)
+        switch (query_data->index->baked.size)
         {
         case 4u:
             cursor.min_floating = min ? *((float *) min) : -INFINITY;
@@ -5582,7 +6470,7 @@ HELPER_INTERVAL_CURSOR_NEXT (descending)
 
 static inline void indexed_storage_interval_ascending_cursor_fix_floating (struct indexed_interval_cursor_t *cursor)
 {
-    if (cursor->index->baked.archetype != KAN_REFLECTION_ARCHETYPE_FLOATING)
+    if (cursor->index->baked_archetype != KAN_REFLECTION_ARCHETYPE_FLOATING)
     {
         return;
     }
@@ -5597,7 +6485,7 @@ static inline void indexed_storage_interval_ascending_cursor_fix_floating (struc
         }
 #endif
 
-        const double value = indexed_field_baked_data_extract_floating_from_record (&cursor->index->baked.data,
+        const double value = indexed_field_baked_data_extract_floating_from_record (&cursor->index->baked,
                                                                                     cursor->sub_node->record->record);
 
 #if defined(KAN_REPOSITORY_SAFEGUARDS_ENABLED)
@@ -5615,7 +6503,7 @@ static inline void indexed_storage_interval_ascending_cursor_fix_floating (struc
 
 static inline void indexed_storage_interval_descending_cursor_fix_floating (struct indexed_interval_cursor_t *cursor)
 {
-    if (cursor->index->baked.archetype != KAN_REFLECTION_ARCHETYPE_FLOATING)
+    if (cursor->index->baked_archetype != KAN_REFLECTION_ARCHETYPE_FLOATING)
     {
         return;
     }
@@ -5630,7 +6518,7 @@ static inline void indexed_storage_interval_descending_cursor_fix_floating (stru
         }
 #endif
 
-        const double value = indexed_field_baked_data_extract_floating_from_record (&cursor->index->baked.data,
+        const double value = indexed_field_baked_data_extract_floating_from_record (&cursor->index->baked,
                                                                                     cursor->sub_node->record->record);
 
 #if defined(KAN_REPOSITORY_SAFEGUARDS_ENABLED)
@@ -6185,6 +7073,974 @@ void kan_repository_indexed_interval_write_query_shutdown (struct kan_repository
     indexed_storage_interval_query_shutdown ((struct indexed_interval_query_t *) query);
 }
 
+static struct space_index_t *indexed_storage_find_or_create_space_index (struct indexed_storage_node_t *storage,
+                                                                         struct kan_repository_field_path_t min_path,
+                                                                         struct kan_repository_field_path_t max_path,
+                                                                         double global_min,
+                                                                         double global_max,
+                                                                         double leaf_size)
+{
+    kan_atomic_int_lock (&storage->maintenance_lock);
+    struct space_index_t *index = storage->first_space_index;
+
+    while (index)
+    {
+        if (is_field_path_equal (min_path, index->source_path_min) &&
+            is_field_path_equal (max_path, index->source_path_max))
+        {
+            if (index->source_global_min == global_min && index->source_global_max == global_max &&
+                index->source_leaf_size == leaf_size)
+            {
+                kan_atomic_int_unlock (&storage->maintenance_lock);
+                kan_atomic_int_add (&index->storage->queries_count, 1);
+                kan_atomic_int_add (&index->queries_count, 1);
+                return index;
+            }
+            else
+            {
+                KAN_LOG (repository, KAN_LOG_ERROR,
+                         "Detected request for the space index with the same fields but different global bounds. Path "
+                         "to min field:")
+
+                for (uint64_t path_element_index = 0u; path_element_index < min_path.reflection_path_length;
+                     ++path_element_index)
+                {
+                    KAN_LOG (repository, KAN_LOG_ERROR, "    - \"%s\"", min_path.reflection_path[path_element_index])
+                }
+
+                KAN_LOG (repository, KAN_LOG_ERROR, "Path to max field:")
+                for (uint64_t path_element_index = 0u; path_element_index < max_path.reflection_path_length;
+                     ++path_element_index)
+                {
+                    KAN_LOG (repository, KAN_LOG_ERROR, "    - \"%s\"", max_path.reflection_path[path_element_index])
+                }
+            }
+        }
+
+        index = index->next;
+    }
+
+    struct indexed_field_baked_data_t baked_min;
+    enum kan_reflection_archetype_t baked_min_archetype;
+    uint64_t baked_min_count;
+    struct interned_field_path_t interned_min_path;
+
+    indexed_field_baked_data_init (&baked_min);
+    interned_min_path = copy_field_path (min_path, storage->space_index_allocation_group);
+
+    const kan_bool_t bake_min_result = indexed_field_baked_data_bake_from_reflection (
+        &baked_min, storage->repository->registry, storage->type->name, interned_min_path, &baked_min_archetype,
+        &baked_min_count, KAN_FALSE);
+
+    struct indexed_field_baked_data_t baked_max;
+    enum kan_reflection_archetype_t baked_max_archetype;
+    uint64_t baked_max_count;
+    struct interned_field_path_t interned_max_path;
+
+    indexed_field_baked_data_init (&baked_max);
+    interned_max_path = copy_field_path (max_path, storage->space_index_allocation_group);
+
+    const kan_bool_t bake_max_result = indexed_field_baked_data_bake_from_reflection (
+        &baked_max, storage->repository->registry, storage->type->name, interned_max_path, &baked_max_archetype,
+        &baked_max_count, KAN_FALSE);
+
+    const kan_bool_t archetypes_match = baked_min_archetype == baked_max_archetype;
+    const kan_bool_t counts_match = baked_min_count == baked_max_count;
+    const kan_bool_t adequate_count =
+        baked_min_count > 0u && baked_min_count <= KAN_CONTAINER_SPACE_TREE_MAX_DIMENSIONS;
+
+    kan_bool_t min_no_intersection = KAN_TRUE;
+    kan_bool_t max_no_intersection = KAN_TRUE;
+
+#if defined(KAN_REPOSITORY_VALIDATION_ENABLED)
+    min_no_intersection = validation_multi_value_index_does_not_intersect_with_single_value (storage, &baked_min);
+    max_no_intersection = validation_multi_value_index_does_not_intersect_with_single_value (storage, &baked_max);
+#endif
+
+    if (!bake_min_result || !bake_max_result || !archetypes_match || !counts_match || !adequate_count ||
+        !min_no_intersection || !max_no_intersection)
+    {
+        KAN_LOG (repository, KAN_LOG_ERROR,
+                 "Failed to create space index. Min baked: %s. Max baked: %s. Archetypes match: %s. Counts match: %s. "
+                 "Count is not zero and supported by space tree: %s. Min does not intersect with single value indices: "
+                 "%s. Max does not intersect with single value indices: %s. Path to min field:",
+                 bake_min_result ? "yes" : "no", bake_max_result ? "yes" : "no", archetypes_match ? "yes" : "no",
+                 counts_match ? "yes" : "no", adequate_count ? "yes" : "no", min_no_intersection ? "yes" : "no",
+                 max_no_intersection ? "yes" : "no")
+
+        for (uint64_t path_element_index = 0u; path_element_index < min_path.reflection_path_length;
+             ++path_element_index)
+        {
+            KAN_LOG (repository, KAN_LOG_ERROR, "    - \"%s\"", min_path.reflection_path[path_element_index])
+        }
+
+        KAN_LOG (repository, KAN_LOG_ERROR, "Path to max field:")
+        for (uint64_t path_element_index = 0u; path_element_index < max_path.reflection_path_length;
+             ++path_element_index)
+        {
+            KAN_LOG (repository, KAN_LOG_ERROR, "    - \"%s\"", max_path.reflection_path[path_element_index])
+        }
+
+        shutdown_field_path (interned_min_path, storage->space_index_allocation_group);
+        shutdown_field_path (interned_max_path, storage->space_index_allocation_group);
+        kan_atomic_int_unlock (&storage->maintenance_lock);
+        return NULL;
+    }
+
+    index = kan_allocate_batched (storage->space_index_allocation_group, sizeof (struct space_index_t));
+    index->next = storage->first_space_index;
+    storage->first_space_index = index;
+
+    index->storage = storage;
+    index->queries_count = kan_atomic_int_init (0);
+
+    index->baked_min = baked_min;
+    index->baked_max = baked_max;
+    index->baked_archetype = baked_min_archetype;
+    index->baked_dimension_count = baked_min_count;
+
+    kan_space_tree_init (&index->tree, storage->space_index_allocation_group, baked_min_count, global_min, global_max,
+                         leaf_size);
+
+    index->source_path_min = interned_min_path;
+    index->source_path_max = interned_max_path;
+    index->source_global_min = global_min;
+    index->source_global_max = global_max;
+    index->source_leaf_size = leaf_size;
+
+    kan_atomic_int_unlock (&storage->maintenance_lock);
+    kan_atomic_int_add (&index->storage->queries_count, 1);
+    kan_atomic_int_add (&index->queries_count, 1);
+    return index;
+}
+
+static inline void indexed_storage_space_query_init (struct indexed_space_query_t *query,
+                                                     struct indexed_storage_node_t *storage,
+                                                     struct kan_repository_field_path_t min_path,
+                                                     struct kan_repository_field_path_t max_path,
+                                                     double global_min,
+                                                     double global_max,
+                                                     double leaf_size)
+{
+    *query = (struct indexed_space_query_t) {.index = indexed_storage_find_or_create_space_index (
+                                                 storage, min_path, max_path, global_min, global_max, leaf_size)};
+}
+
+static inline void indexed_storage_space_shape_cursor_next (struct indexed_space_shape_cursor_t *cursor);
+
+static inline void indexed_storage_space_shape_cursor_fix (struct indexed_space_shape_cursor_t *cursor);
+
+static inline struct indexed_space_shape_cursor_t indexed_storage_space_query_execute_shape (
+    struct indexed_space_query_t *query, const double *min, const double *max)
+{
+    struct indexed_space_query_t *query_data = (struct indexed_space_query_t *) query;
+
+    // Handle queries for invalid indices.
+    if (!query_data->index)
+    {
+        struct indexed_space_shape_cursor_t blank;
+        blank.index = NULL;
+        blank.iterator.current_node = NULL;
+        blank.current_sub_node = NULL;
+        return blank;
+    }
+
+    struct indexed_space_shape_cursor_t cursor;
+    cursor.index = query_data->index;
+    return_uniqueness_watcher_init (&cursor.uniqueness_watcher);
+
+    switch (cursor.index->baked_dimension_count)
+    {
+    case 4u:
+        cursor.min[3u] = min[3u];
+        cursor.max[3u] = max[3u];
+    case 3u:
+        cursor.min[2u] = min[2u];
+        cursor.max[2u] = max[2u];
+    case 2u:
+        cursor.min[1u] = min[1u];
+        cursor.max[1u] = max[1u];
+    case 1u:
+        cursor.min[0u] = min[0u];
+        cursor.max[0u] = max[0u];
+    }
+
+    indexed_storage_acquire_access (query_data->index->storage);
+    cursor.iterator = kan_space_tree_shape_start (&cursor.index->tree, cursor.min, cursor.max);
+
+    if (cursor.iterator.current_node)
+    {
+        cursor.current_sub_node = (struct space_index_sub_node_t *) cursor.iterator.current_node->first_sub_node;
+    }
+    else
+    {
+        cursor.current_sub_node = NULL;
+    }
+
+    // Special case: first node has no sub nodes. Go to the next one until we find sub nodes or exhaust iterator.
+    if (!cursor.current_sub_node && !kan_space_tree_shape_is_finished (&cursor.iterator))
+    {
+        indexed_storage_space_shape_cursor_next (&cursor);
+    }
+
+    indexed_storage_space_shape_cursor_fix (&cursor);
+    return cursor;
+}
+
+static inline void indexed_storage_space_ray_cursor_next (struct indexed_space_ray_cursor_t *cursor);
+
+static inline void indexed_storage_space_ray_cursor_fix (struct indexed_space_ray_cursor_t *cursor);
+
+static inline struct indexed_space_ray_cursor_t indexed_storage_space_query_execute_ray (
+    struct indexed_space_query_t *query, const double *origin, const double *direction, double max_time)
+{
+    struct indexed_space_query_t *query_data = (struct indexed_space_query_t *) query;
+
+    // Handle queries for invalid indices.
+    if (!query_data->index)
+    {
+        struct indexed_space_ray_cursor_t blank;
+        blank.index = NULL;
+        blank.iterator.current_node = NULL;
+        blank.current_sub_node = NULL;
+        return blank;
+    }
+
+    struct indexed_space_ray_cursor_t cursor;
+    cursor.index = query_data->index;
+    return_uniqueness_watcher_init (&cursor.uniqueness_watcher);
+
+    switch (cursor.index->baked_dimension_count)
+    {
+    case 4u:
+        cursor.origin[3u] = origin[3u];
+        cursor.direction[3u] = direction[3u];
+    case 3u:
+        cursor.origin[2u] = origin[2u];
+        cursor.direction[2u] = direction[2u];
+    case 2u:
+        cursor.origin[1u] = origin[1u];
+        cursor.direction[1u] = direction[1u];
+    case 1u:
+        cursor.origin[0u] = origin[0u];
+        cursor.direction[0u] = direction[0u];
+    }
+
+    cursor.max_time = max_time;
+    indexed_storage_acquire_access (query_data->index->storage);
+    cursor.iterator = kan_space_tree_ray_start (&cursor.index->tree, cursor.origin, cursor.direction, cursor.max_time);
+
+    if (cursor.iterator.current_node)
+    {
+        cursor.current_sub_node = (struct space_index_sub_node_t *) cursor.iterator.current_node->first_sub_node;
+    }
+    else
+    {
+        cursor.current_sub_node = NULL;
+    }
+
+    // Special case: first node has no sub nodes. Go to the next one until we find sub nodes or exhaust iterator.
+    if (!cursor.current_sub_node && !kan_space_tree_ray_is_finished (&cursor.iterator))
+    {
+        indexed_storage_space_ray_cursor_next (&cursor);
+    }
+
+    indexed_storage_space_ray_cursor_fix (&cursor);
+    return cursor;
+}
+
+static inline void indexed_storage_space_shape_cursor_next (struct indexed_space_shape_cursor_t *cursor)
+{
+    if (kan_space_tree_shape_is_finished (&cursor->iterator))
+    {
+        return;
+    }
+
+    if (cursor->current_sub_node)
+    {
+        cursor->current_sub_node = (struct space_index_sub_node_t *) cursor->current_sub_node->sub_node.next;
+    }
+
+    while (!cursor->current_sub_node)
+    {
+        kan_space_tree_shape_move_to_next_node (&cursor->index->tree, &cursor->iterator);
+        if (kan_space_tree_shape_is_finished (&cursor->iterator))
+        {
+            return;
+        }
+
+        cursor->current_sub_node = (struct space_index_sub_node_t *) cursor->iterator.current_node->first_sub_node;
+    }
+}
+
+static inline void indexed_storage_space_ray_cursor_next (struct indexed_space_ray_cursor_t *cursor)
+{
+    if (kan_space_tree_ray_is_finished (&cursor->iterator))
+    {
+        return;
+    }
+
+    if (cursor->current_sub_node)
+    {
+        cursor->current_sub_node = (struct space_index_sub_node_t *) cursor->current_sub_node->sub_node.next;
+    }
+
+    while (!cursor->current_sub_node)
+    {
+        kan_space_tree_ray_move_to_next_node (&cursor->index->tree, &cursor->iterator);
+        if (kan_space_tree_ray_is_finished (&cursor->iterator))
+        {
+            return;
+        }
+
+        cursor->current_sub_node = (struct space_index_sub_node_t *) cursor->iterator.current_node->first_sub_node;
+    }
+}
+
+static inline void indexed_storage_space_shape_cursor_fix (struct indexed_space_shape_cursor_t *cursor)
+{
+    while (cursor->current_sub_node)
+    {
+#if defined(KAN_REPOSITORY_SAFEGUARDS_ENABLED)
+        if (!safeguard_indexed_read_access_try_create (cursor->index->storage, cursor->current_sub_node->record))
+        {
+            cursor->current_sub_node = NULL;
+            break;
+        }
+#endif
+
+        double record_min[KAN_CONTAINER_SPACE_TREE_MAX_DIMENSIONS];
+        indexed_field_baked_data_extract_and_convert_double_array_from_record (
+            &cursor->index->baked_min, cursor->index->baked_archetype, cursor->index->baked_dimension_count,
+            cursor->current_sub_node->record->record, record_min);
+
+        double record_max[KAN_CONTAINER_SPACE_TREE_MAX_DIMENSIONS];
+        indexed_field_baked_data_extract_and_convert_double_array_from_record (
+            &cursor->index->baked_max, cursor->index->baked_archetype, cursor->index->baked_dimension_count,
+            cursor->current_sub_node->record->record, record_max);
+
+#if defined(KAN_REPOSITORY_SAFEGUARDS_ENABLED)
+        safeguard_indexed_read_access_destroyed (cursor->current_sub_node->record);
+#endif
+
+        if (kan_check_if_bounds_intersect (cursor->index->baked_dimension_count, cursor->min, cursor->max, record_min,
+                                           record_max))
+        {
+            if (return_uniqueness_watcher_register (&cursor->uniqueness_watcher, cursor->current_sub_node->record,
+                                                    &cursor->index->storage->maintenance_lock,
+                                                    &cursor->index->storage->temporary_allocator))
+            {
+                break;
+            }
+        }
+
+        indexed_storage_space_shape_cursor_next (cursor);
+    }
+}
+
+static inline void indexed_storage_space_ray_cursor_fix (struct indexed_space_ray_cursor_t *cursor)
+{
+    while (cursor->current_sub_node)
+    {
+#if defined(KAN_REPOSITORY_SAFEGUARDS_ENABLED)
+        if (!safeguard_indexed_read_access_try_create (cursor->index->storage, cursor->current_sub_node->record))
+        {
+            cursor->current_sub_node = NULL;
+            break;
+        }
+#endif
+
+        double record_min[KAN_CONTAINER_SPACE_TREE_MAX_DIMENSIONS];
+        indexed_field_baked_data_extract_and_convert_double_array_from_record (
+            &cursor->index->baked_min, cursor->index->baked_archetype, cursor->index->baked_dimension_count,
+            cursor->current_sub_node->record->record, record_min);
+
+        double record_max[KAN_CONTAINER_SPACE_TREE_MAX_DIMENSIONS];
+        indexed_field_baked_data_extract_and_convert_double_array_from_record (
+            &cursor->index->baked_max, cursor->index->baked_archetype, cursor->index->baked_dimension_count,
+            cursor->current_sub_node->record->record, record_max);
+
+#if defined(KAN_REPOSITORY_SAFEGUARDS_ENABLED)
+        safeguard_indexed_read_access_destroyed (cursor->current_sub_node->record);
+#endif
+
+        struct kan_ray_intersection_output_t output = kan_check_if_ray_and_bounds_intersect (
+            cursor->index->baked_dimension_count, record_min, record_max, cursor->origin, cursor->direction);
+
+        if (output.hit && output.time <= cursor->max_time)
+        {
+            if (return_uniqueness_watcher_register (&cursor->uniqueness_watcher, cursor->current_sub_node->record,
+                                                    &cursor->index->storage->maintenance_lock,
+                                                    &cursor->index->storage->temporary_allocator))
+            {
+                break;
+            }
+        }
+
+        indexed_storage_space_ray_cursor_next (cursor);
+    }
+}
+
+static inline void indexed_storage_space_shape_cursor_close (struct indexed_space_shape_cursor_t *cursor)
+{
+    if (cursor->index)
+    {
+        return_uniqueness_watcher_shutdown (&cursor->uniqueness_watcher);
+        indexed_storage_release_access (cursor->index->storage);
+    }
+}
+
+static inline void indexed_storage_space_ray_cursor_close (struct indexed_space_ray_cursor_t *cursor)
+{
+    if (cursor->index)
+    {
+        return_uniqueness_watcher_shutdown (&cursor->uniqueness_watcher);
+        indexed_storage_release_access (cursor->index->storage);
+    }
+}
+
+static inline void indexed_storage_space_query_shutdown (struct indexed_space_query_t *query)
+{
+    if (query->index)
+    {
+        kan_atomic_int_add (&query->index->queries_count, -1);
+        kan_atomic_int_add (&query->index->storage->queries_count, -1);
+        query->index = NULL;
+    }
+}
+
+void kan_repository_indexed_space_read_query_init (struct kan_repository_indexed_space_read_query_t *query,
+                                                   kan_repository_indexed_storage_t storage,
+                                                   struct kan_repository_field_path_t min_path,
+                                                   struct kan_repository_field_path_t max_path,
+                                                   double global_min,
+                                                   double global_max,
+                                                   double leaf_size)
+{
+    indexed_storage_space_query_init ((struct indexed_space_query_t *) query, (struct indexed_storage_node_t *) storage,
+                                      min_path, max_path, global_min, global_max, leaf_size);
+}
+
+struct kan_repository_indexed_space_shape_read_cursor_t kan_repository_indexed_space_read_query_execute_shape (
+    struct kan_repository_indexed_space_read_query_t *query, const double *min, const double *max)
+{
+    struct indexed_space_shape_cursor_t cursor =
+        indexed_storage_space_query_execute_shape ((struct indexed_space_query_t *) query, min, max);
+    return *(struct kan_repository_indexed_space_shape_read_cursor_t *) &cursor;
+}
+
+struct kan_repository_indexed_space_ray_read_cursor_t kan_repository_indexed_space_read_query_execute_ray (
+    struct kan_repository_indexed_space_read_query_t *query,
+    const double *origin,
+    const double *direction,
+    double max_time)
+{
+    struct indexed_space_ray_cursor_t cursor =
+        indexed_storage_space_query_execute_ray ((struct indexed_space_query_t *) query, origin, direction, max_time);
+    return *(struct kan_repository_indexed_space_ray_read_cursor_t *) &cursor;
+}
+
+struct kan_repository_indexed_space_read_access_t kan_repository_indexed_space_shape_read_cursor_next (
+    struct kan_repository_indexed_space_shape_read_cursor_t *cursor)
+{
+    struct indexed_space_shape_cursor_t *cursor_data = (struct indexed_space_shape_cursor_t *) cursor;
+    struct indexed_space_constant_access_t access = {
+        .index = cursor_data->index,
+        .node = cursor_data->iterator.current_node,
+        .sub_node = cursor_data->current_sub_node,
+    };
+
+    if (cursor_data->current_sub_node)
+    {
+        indexed_storage_space_shape_cursor_next (cursor_data);
+        indexed_storage_space_shape_cursor_fix (cursor_data);
+
+#if defined(KAN_REPOSITORY_SAFEGUARDS_ENABLED)
+        if (!safeguard_indexed_read_access_try_create (access.index->storage, access.sub_node->record))
+        {
+            access.sub_node = NULL;
+        }
+        else
+#endif
+        {
+            indexed_storage_acquire_access (cursor_data->index->storage);
+        }
+    }
+
+    return *(struct kan_repository_indexed_space_read_access_t *) &access;
+}
+
+struct kan_repository_indexed_space_read_access_t kan_repository_indexed_space_ray_read_cursor_next (
+    struct kan_repository_indexed_space_ray_read_cursor_t *cursor)
+{
+    struct indexed_space_ray_cursor_t *cursor_data = (struct indexed_space_ray_cursor_t *) cursor;
+    struct indexed_space_constant_access_t access = {
+        .index = cursor_data->index,
+        .node = cursor_data->iterator.current_node,
+        .sub_node = cursor_data->current_sub_node,
+    };
+
+    if (cursor_data->current_sub_node)
+    {
+        indexed_storage_space_ray_cursor_next (cursor_data);
+        indexed_storage_space_ray_cursor_fix (cursor_data);
+
+#if defined(KAN_REPOSITORY_SAFEGUARDS_ENABLED)
+        if (!safeguard_indexed_read_access_try_create (access.index->storage, access.sub_node->record))
+        {
+            access.sub_node = NULL;
+        }
+        else
+#endif
+        {
+            indexed_storage_acquire_access (cursor_data->index->storage);
+        }
+    }
+
+    return *(struct kan_repository_indexed_space_read_access_t *) &access;
+}
+
+const void *kan_repository_indexed_space_read_access_resolve (struct kan_repository_indexed_space_read_access_t *access)
+{
+    struct indexed_space_constant_access_t *access_data = (struct indexed_space_constant_access_t *) access;
+    return access_data->sub_node ? access_data->sub_node->record->record : NULL;
+}
+
+void kan_repository_indexed_space_read_access_close (struct kan_repository_indexed_space_read_access_t *access)
+{
+    struct indexed_space_constant_access_t *access_data = (struct indexed_space_constant_access_t *) access;
+    if (access_data->sub_node)
+    {
+#if defined(KAN_REPOSITORY_SAFEGUARDS_ENABLED)
+        safeguard_indexed_read_access_destroyed (access_data->sub_node->record);
+#endif
+        indexed_storage_release_access (access_data->index->storage);
+    }
+}
+
+void kan_repository_indexed_space_shape_read_cursor_close (
+    struct kan_repository_indexed_space_shape_read_cursor_t *cursor)
+{
+    indexed_storage_space_shape_cursor_close ((struct indexed_space_shape_cursor_t *) cursor);
+}
+
+void kan_repository_indexed_space_ray_read_cursor_close (struct kan_repository_indexed_space_ray_read_cursor_t *cursor)
+{
+    indexed_storage_space_ray_cursor_close ((struct indexed_space_ray_cursor_t *) cursor);
+}
+
+void kan_repository_indexed_space_read_query_shutdown (struct kan_repository_indexed_space_read_query_t *query)
+{
+    indexed_storage_space_query_shutdown ((struct indexed_space_query_t *) query);
+}
+
+void kan_repository_indexed_space_update_query_init (struct kan_repository_indexed_space_update_query_t *query,
+                                                     kan_repository_indexed_storage_t storage,
+                                                     struct kan_repository_field_path_t min_path,
+                                                     struct kan_repository_field_path_t max_path,
+                                                     double global_min,
+                                                     double global_max,
+                                                     double leaf_size)
+{
+    indexed_storage_space_query_init ((struct indexed_space_query_t *) query, (struct indexed_storage_node_t *) storage,
+                                      min_path, max_path, global_min, global_max, leaf_size);
+}
+
+struct kan_repository_indexed_space_shape_update_cursor_t kan_repository_indexed_space_update_query_execute_shape (
+    struct kan_repository_indexed_space_update_query_t *query, const double *min, const double *max)
+{
+    struct indexed_space_shape_cursor_t cursor =
+        indexed_storage_space_query_execute_shape ((struct indexed_space_query_t *) query, min, max);
+    return *(struct kan_repository_indexed_space_shape_update_cursor_t *) &cursor;
+}
+
+struct kan_repository_indexed_space_ray_update_cursor_t kan_repository_indexed_space_update_query_execute_ray (
+    struct kan_repository_indexed_space_update_query_t *query,
+    const double *origin,
+    const double *direction,
+    double max_time)
+{
+    struct indexed_space_ray_cursor_t cursor =
+        indexed_storage_space_query_execute_ray ((struct indexed_space_query_t *) query, origin, direction, max_time);
+    return *(struct kan_repository_indexed_space_ray_update_cursor_t *) &cursor;
+}
+
+struct kan_repository_indexed_space_update_access_t kan_repository_indexed_space_shape_update_cursor_next (
+    struct kan_repository_indexed_space_shape_update_cursor_t *cursor)
+{
+    struct indexed_space_shape_cursor_t *cursor_data = (struct indexed_space_shape_cursor_t *) cursor;
+    struct indexed_space_mutable_access_t access = {
+        .index = cursor_data->index,
+        .node = cursor_data->iterator.current_node,
+        .sub_node = cursor_data->current_sub_node,
+        .dirty_node = NULL,
+    };
+
+    if (cursor_data->current_sub_node)
+    {
+        indexed_storage_space_shape_cursor_next (cursor_data);
+        indexed_storage_space_shape_cursor_fix (cursor_data);
+
+#if defined(KAN_REPOSITORY_SAFEGUARDS_ENABLED)
+        if (!safeguard_indexed_write_access_try_create (access.index->storage, access.sub_node->record))
+        {
+            access.sub_node = NULL;
+        }
+        else
+#endif
+        {
+            access.dirty_node = indexed_storage_report_mutable_access_begin (
+                access.index->storage, access.sub_node->record, access.index, access.node, access.sub_node);
+            indexed_storage_acquire_access (cursor_data->index->storage);
+        }
+    }
+
+    return *(struct kan_repository_indexed_space_update_access_t *) &access;
+}
+
+struct kan_repository_indexed_space_update_access_t kan_repository_indexed_space_ray_update_cursor_next (
+    struct kan_repository_indexed_space_ray_update_cursor_t *cursor)
+{
+    struct indexed_space_ray_cursor_t *cursor_data = (struct indexed_space_ray_cursor_t *) cursor;
+    struct indexed_space_mutable_access_t access = {
+        .index = cursor_data->index,
+        .node = cursor_data->iterator.current_node,
+        .sub_node = cursor_data->current_sub_node,
+        .dirty_node = NULL,
+    };
+
+    if (cursor_data->current_sub_node)
+    {
+        indexed_storage_space_ray_cursor_next (cursor_data);
+        indexed_storage_space_ray_cursor_fix (cursor_data);
+
+#if defined(KAN_REPOSITORY_SAFEGUARDS_ENABLED)
+        if (!safeguard_indexed_write_access_try_create (access.index->storage, access.sub_node->record))
+        {
+            access.sub_node = NULL;
+        }
+        else
+#endif
+        {
+            access.dirty_node = indexed_storage_report_mutable_access_begin (
+                access.index->storage, access.sub_node->record, access.index, access.node, access.sub_node);
+            indexed_storage_acquire_access (cursor_data->index->storage);
+        }
+    }
+
+    return *(struct kan_repository_indexed_space_update_access_t *) &access;
+}
+
+void *kan_repository_indexed_space_update_access_resolve (struct kan_repository_indexed_space_update_access_t *access)
+{
+    struct indexed_space_mutable_access_t *access_data = (struct indexed_space_mutable_access_t *) access;
+    return access_data->sub_node ? access_data->sub_node->record->record : NULL;
+}
+
+void kan_repository_indexed_space_update_access_close (struct kan_repository_indexed_space_update_access_t *access)
+{
+    struct indexed_space_mutable_access_t *access_data = (struct indexed_space_mutable_access_t *) access;
+    if (access_data->dirty_node)
+    {
+        indexed_storage_report_mutable_access_end (access_data->index->storage, access_data->dirty_node);
+        indexed_storage_release_access (access_data->index->storage);
+    }
+}
+
+void kan_repository_indexed_space_shape_update_cursor_close (
+    struct kan_repository_indexed_space_shape_update_cursor_t *cursor)
+{
+    indexed_storage_space_shape_cursor_close ((struct indexed_space_shape_cursor_t *) cursor);
+}
+
+void kan_repository_indexed_space_ray_update_cursor_close (
+    struct kan_repository_indexed_space_ray_update_cursor_t *cursor)
+{
+    indexed_storage_space_ray_cursor_close ((struct indexed_space_ray_cursor_t *) cursor);
+}
+
+void kan_repository_indexed_space_update_query_shutdown (struct kan_repository_indexed_space_update_query_t *query)
+{
+    indexed_storage_space_query_shutdown ((struct indexed_space_query_t *) query);
+}
+
+void kan_repository_indexed_space_delete_query_init (struct kan_repository_indexed_space_delete_query_t *query,
+                                                     kan_repository_indexed_storage_t storage,
+                                                     struct kan_repository_field_path_t min_path,
+                                                     struct kan_repository_field_path_t max_path,
+                                                     double global_min,
+                                                     double global_max,
+                                                     double leaf_size)
+{
+    indexed_storage_space_query_init ((struct indexed_space_query_t *) query, (struct indexed_storage_node_t *) storage,
+                                      min_path, max_path, global_min, global_max, leaf_size);
+}
+
+struct kan_repository_indexed_space_shape_delete_cursor_t kan_repository_indexed_space_delete_query_execute_shape (
+    struct kan_repository_indexed_space_delete_query_t *query, const double *min, const double *max)
+{
+    struct indexed_space_shape_cursor_t cursor =
+        indexed_storage_space_query_execute_shape ((struct indexed_space_query_t *) query, min, max);
+    return *(struct kan_repository_indexed_space_shape_delete_cursor_t *) &cursor;
+}
+
+struct kan_repository_indexed_space_ray_delete_cursor_t kan_repository_indexed_space_delete_query_execute_ray (
+    struct kan_repository_indexed_space_delete_query_t *query,
+    const double *origin,
+    const double *direction,
+    double max_time)
+{
+    struct indexed_space_ray_cursor_t cursor =
+        indexed_storage_space_query_execute_ray ((struct indexed_space_query_t *) query, origin, direction, max_time);
+    return *(struct kan_repository_indexed_space_ray_delete_cursor_t *) &cursor;
+}
+
+struct kan_repository_indexed_space_delete_access_t kan_repository_indexed_space_shape_delete_cursor_next (
+    struct kan_repository_indexed_space_shape_delete_cursor_t *cursor)
+{
+    struct indexed_space_shape_cursor_t *cursor_data = (struct indexed_space_shape_cursor_t *) cursor;
+    struct indexed_space_constant_access_t access = {
+        .index = cursor_data->index,
+        .node = cursor_data->iterator.current_node,
+        .sub_node = cursor_data->current_sub_node,
+    };
+
+    if (cursor_data->current_sub_node)
+    {
+        indexed_storage_space_shape_cursor_next (cursor_data);
+        indexed_storage_space_shape_cursor_fix (cursor_data);
+
+#if defined(KAN_REPOSITORY_SAFEGUARDS_ENABLED)
+        if (!safeguard_indexed_write_access_try_create (access.index->storage, access.sub_node->record))
+        {
+            access.sub_node = NULL;
+        }
+        else
+#endif
+        {
+            indexed_storage_acquire_access (cursor_data->index->storage);
+        }
+    }
+
+    return *(struct kan_repository_indexed_space_delete_access_t *) &access;
+}
+
+struct kan_repository_indexed_space_delete_access_t kan_repository_indexed_space_ray_delete_cursor_next (
+    struct kan_repository_indexed_space_ray_delete_cursor_t *cursor)
+{
+    struct indexed_space_ray_cursor_t *cursor_data = (struct indexed_space_ray_cursor_t *) cursor;
+    struct indexed_space_constant_access_t access = {
+        .index = cursor_data->index,
+        .node = cursor_data->iterator.current_node,
+        .sub_node = cursor_data->current_sub_node,
+    };
+
+    if (cursor_data->current_sub_node)
+    {
+        indexed_storage_space_ray_cursor_next (cursor_data);
+        indexed_storage_space_ray_cursor_fix (cursor_data);
+
+#if defined(KAN_REPOSITORY_SAFEGUARDS_ENABLED)
+        if (!safeguard_indexed_write_access_try_create (access.index->storage, access.sub_node->record))
+        {
+            access.sub_node = NULL;
+        }
+        else
+#endif
+        {
+            indexed_storage_acquire_access (cursor_data->index->storage);
+        }
+    }
+
+    return *(struct kan_repository_indexed_space_delete_access_t *) &access;
+}
+
+const void *kan_repository_indexed_space_delete_access_resolve (
+    struct kan_repository_indexed_space_delete_access_t *access)
+{
+    struct indexed_space_constant_access_t *access_data = (struct indexed_space_constant_access_t *) access;
+    return access_data->sub_node ? access_data->sub_node->record->record : NULL;
+}
+
+void kan_repository_indexed_space_delete_access_delete (struct kan_repository_indexed_space_delete_access_t *access)
+{
+    struct indexed_space_constant_access_t *access_data = (struct indexed_space_constant_access_t *) access;
+    indexed_storage_report_delete_from_constant_access (access_data->index->storage, access_data->sub_node->record,
+                                                        access_data->index, access_data->node, access_data->sub_node);
+    cascade_deleters_definition_fire (&access_data->index->storage->cascade_deleters,
+                                      access_data->sub_node->record->record);
+    indexed_storage_release_access (access_data->index->storage);
+}
+
+void kan_repository_indexed_space_delete_access_close (struct kan_repository_indexed_space_delete_access_t *access)
+{
+    struct indexed_space_constant_access_t *access_data = (struct indexed_space_constant_access_t *) access;
+    if (access_data->sub_node)
+    {
+#if defined(KAN_REPOSITORY_SAFEGUARDS_ENABLED)
+        safeguard_indexed_write_access_destroyed (access_data->sub_node->record);
+#endif
+        indexed_storage_release_access (access_data->index->storage);
+    }
+}
+
+void kan_repository_indexed_space_shape_delete_cursor_close (
+    struct kan_repository_indexed_space_shape_delete_cursor_t *cursor)
+{
+    indexed_storage_space_shape_cursor_close ((struct indexed_space_shape_cursor_t *) cursor);
+}
+
+void kan_repository_indexed_space_ray_delete_cursor_close (
+    struct kan_repository_indexed_space_ray_delete_cursor_t *cursor)
+{
+    indexed_storage_space_ray_cursor_close ((struct indexed_space_ray_cursor_t *) cursor);
+}
+
+void kan_repository_indexed_space_delete_query_shutdown (struct kan_repository_indexed_space_delete_query_t *query)
+{
+    indexed_storage_space_query_shutdown ((struct indexed_space_query_t *) query);
+}
+
+void kan_repository_indexed_space_write_query_init (struct kan_repository_indexed_space_write_query_t *query,
+                                                    kan_repository_indexed_storage_t storage,
+                                                    struct kan_repository_field_path_t min_path,
+                                                    struct kan_repository_field_path_t max_path,
+                                                    double global_min,
+                                                    double global_max,
+                                                    double leaf_size)
+{
+    indexed_storage_space_query_init ((struct indexed_space_query_t *) query, (struct indexed_storage_node_t *) storage,
+                                      min_path, max_path, global_min, global_max, leaf_size);
+}
+
+struct kan_repository_indexed_space_shape_write_cursor_t kan_repository_indexed_space_write_query_execute_shape (
+    struct kan_repository_indexed_space_write_query_t *query, const double *min, const double *max)
+{
+    struct indexed_space_shape_cursor_t cursor =
+        indexed_storage_space_query_execute_shape ((struct indexed_space_query_t *) query, min, max);
+    return *(struct kan_repository_indexed_space_shape_write_cursor_t *) &cursor;
+}
+
+struct kan_repository_indexed_space_ray_write_cursor_t kan_repository_indexed_space_write_query_execute_ray (
+    struct kan_repository_indexed_space_write_query_t *query,
+    const double *origin,
+    const double *direction,
+    double max_time)
+{
+    struct indexed_space_ray_cursor_t cursor =
+        indexed_storage_space_query_execute_ray ((struct indexed_space_query_t *) query, origin, direction, max_time);
+    return *(struct kan_repository_indexed_space_ray_write_cursor_t *) &cursor;
+}
+
+struct kan_repository_indexed_space_write_access_t kan_repository_indexed_space_shape_write_cursor_next (
+    struct kan_repository_indexed_space_shape_write_cursor_t *cursor)
+{
+    struct indexed_space_shape_cursor_t *cursor_data = (struct indexed_space_shape_cursor_t *) cursor;
+    struct indexed_space_mutable_access_t access = {
+        .index = cursor_data->index,
+        .node = cursor_data->iterator.current_node,
+        .sub_node = cursor_data->current_sub_node,
+        .dirty_node = NULL,
+    };
+
+    if (cursor_data->current_sub_node)
+    {
+        indexed_storage_space_shape_cursor_next (cursor_data);
+        indexed_storage_space_shape_cursor_fix (cursor_data);
+
+#if defined(KAN_REPOSITORY_SAFEGUARDS_ENABLED)
+        if (!safeguard_indexed_write_access_try_create (access.index->storage, access.sub_node->record))
+        {
+            access.sub_node = NULL;
+        }
+        else
+#endif
+        {
+            access.dirty_node = indexed_storage_report_mutable_access_begin (
+                access.index->storage, access.sub_node->record, access.index, access.node, access.sub_node);
+            indexed_storage_acquire_access (cursor_data->index->storage);
+        }
+    }
+
+    return *(struct kan_repository_indexed_space_write_access_t *) &access;
+}
+
+struct kan_repository_indexed_space_write_access_t kan_repository_indexed_space_ray_write_cursor_next (
+    struct kan_repository_indexed_space_ray_write_cursor_t *cursor)
+{
+    struct indexed_space_ray_cursor_t *cursor_data = (struct indexed_space_ray_cursor_t *) cursor;
+    struct indexed_space_mutable_access_t access = {
+        .index = cursor_data->index,
+        .node = cursor_data->iterator.current_node,
+        .sub_node = cursor_data->current_sub_node,
+        .dirty_node = NULL,
+    };
+
+    if (cursor_data->current_sub_node)
+    {
+        indexed_storage_space_ray_cursor_next (cursor_data);
+        indexed_storage_space_ray_cursor_fix (cursor_data);
+
+#if defined(KAN_REPOSITORY_SAFEGUARDS_ENABLED)
+        if (!safeguard_indexed_write_access_try_create (access.index->storage, access.sub_node->record))
+        {
+            access.sub_node = NULL;
+        }
+        else
+#endif
+        {
+            access.dirty_node = indexed_storage_report_mutable_access_begin (
+                access.index->storage, access.sub_node->record, access.index, access.node, access.sub_node);
+            indexed_storage_acquire_access (cursor_data->index->storage);
+        }
+    }
+
+    return *(struct kan_repository_indexed_space_write_access_t *) &access;
+}
+
+void *kan_repository_indexed_space_write_access_resolve (struct kan_repository_indexed_space_write_access_t *access)
+{
+    struct indexed_space_mutable_access_t *access_data = (struct indexed_space_mutable_access_t *) access;
+    return access_data->sub_node ? access_data->sub_node->record->record : NULL;
+}
+
+void kan_repository_indexed_space_write_access_delete (struct kan_repository_indexed_space_write_access_t *access)
+{
+    struct indexed_space_mutable_access_t *access_data = (struct indexed_space_mutable_access_t *) access;
+    KAN_ASSERT (access_data->dirty_node)
+    indexed_storage_report_delete_from_mutable_access (access_data->index->storage, access_data->dirty_node);
+    cascade_deleters_definition_fire (&access_data->index->storage->cascade_deleters,
+                                      access_data->sub_node->record->record);
+    indexed_storage_release_access (access_data->index->storage);
+}
+
+void kan_repository_indexed_space_write_access_close (struct kan_repository_indexed_space_write_access_t *access)
+{
+    struct indexed_space_mutable_access_t *access_data = (struct indexed_space_mutable_access_t *) access;
+    if (access_data->dirty_node)
+    {
+        indexed_storage_report_mutable_access_end (access_data->index->storage, access_data->dirty_node);
+        indexed_storage_release_access (access_data->index->storage);
+    }
+}
+
+void kan_repository_indexed_space_shape_write_cursor_close (
+    struct kan_repository_indexed_space_shape_write_cursor_t *cursor)
+{
+    indexed_storage_space_shape_cursor_close ((struct indexed_space_shape_cursor_t *) cursor);
+}
+
+void kan_repository_indexed_space_ray_write_cursor_close (
+    struct kan_repository_indexed_space_ray_write_cursor_t *cursor)
+{
+    indexed_storage_space_ray_cursor_close ((struct indexed_space_ray_cursor_t *) cursor);
+}
+
+void kan_repository_indexed_space_write_query_shutdown (struct kan_repository_indexed_space_write_query_t *query)
+{
+    indexed_storage_space_query_shutdown ((struct indexed_space_query_t *) query);
+}
+
 static struct event_storage_node_t *query_event_storage_across_hierarchy (struct repository_t *repository,
                                                                           kan_interned_string_t type_name)
 {
@@ -6521,8 +8377,7 @@ static void repository_clean_storages (struct repository_t *repository)
         HELPER_SHUTDOWN_UNUSED_INDICES (value)
         HELPER_SHUTDOWN_UNUSED_INDICES (signal)
         HELPER_SHUTDOWN_UNUSED_INDICES (interval)
-
-        // TODO: Clean up unused indices.
+        HELPER_SHUTDOWN_UNUSED_INDICES (space)
 
 #undef HELPER_SHUTDOWN_UNUSED_INDICES
 
@@ -6701,9 +8556,7 @@ static void extract_observation_chunks_from_indices (struct indexed_storage_node
                                                      struct observation_buffer_scenario_chunk_list_node_t **first,
                                                      struct observation_buffer_scenario_chunk_list_node_t **last)
 {
-#define HELPER_EXTRACT_OBSERVATION_FROM_SINGLE_FIELD_INDEX(INDEX_TYPE, BAKED_GETTER)                                   \
-    struct INDEX_TYPE##_index_t *INDEX_TYPE##_index = storage->first_##INDEX_TYPE##_index;                             \
-    while (INDEX_TYPE##_index)                                                                                         \
+#define HELPER_ADD_NODE_FOR(BAKED_GETTER)                                                                              \
     {                                                                                                                  \
         struct observation_buffer_scenario_chunk_list_node_t *node =                                                   \
             (struct observation_buffer_scenario_chunk_list_node_t *) kan_stack_group_allocator_allocate (              \
@@ -6711,8 +8564,8 @@ static void extract_observation_chunks_from_indices (struct indexed_storage_node
                 _Alignof (struct observation_buffer_scenario_chunk_list_node_t));                                      \
                                                                                                                        \
         node->next = 0u;                                                                                               \
-        node->source_offset = BAKED_GETTER.absolute_offset;                                                            \
-        node->size = BAKED_GETTER.size_with_padding;                                                                   \
+        node->source_offset = (BAKED_GETTER).absolute_offset;                                                          \
+        node->size = (BAKED_GETTER).size_with_padding;                                                                 \
         node->flags = *event_flag;                                                                                     \
                                                                                                                        \
         if (*last)                                                                                                     \
@@ -6728,16 +8581,38 @@ static void extract_observation_chunks_from_indices (struct indexed_storage_node
                                                                                                                        \
         *event_flag <<= 1u;                                                                                            \
         KAN_ASSERT (*event_flag > 0u)                                                                                  \
-        INDEX_TYPE##_index = INDEX_TYPE##_index->next;                                                                 \
     }
 
-    HELPER_EXTRACT_OBSERVATION_FROM_SINGLE_FIELD_INDEX (value, value_index->baked)
-    HELPER_EXTRACT_OBSERVATION_FROM_SINGLE_FIELD_INDEX (signal, signal_index->baked)
-    HELPER_EXTRACT_OBSERVATION_FROM_SINGLE_FIELD_INDEX (interval, interval_index->baked.data)
+    struct value_index_t *value_index = storage->first_value_index;
+    while (value_index)
+    {
+        HELPER_ADD_NODE_FOR (value_index->baked)
+        value_index = value_index->next;
+    }
 
-    // TODO: Extract observation chunks from indices.
+    struct signal_index_t *signal_index = storage->first_signal_index;
+    while (signal_index)
+    {
+        HELPER_ADD_NODE_FOR (signal_index->baked)
+        signal_index = signal_index->next;
+    }
 
-#undef HELPER_EXTRACT_OBSERVATION_FROM_SINGLE_FIELD_INDEX
+    struct interval_index_t *interval_index = storage->first_interval_index;
+    while (interval_index)
+    {
+        HELPER_ADD_NODE_FOR (interval_index->baked)
+        interval_index = interval_index->next;
+    }
+
+    struct space_index_t *space_index = storage->first_space_index;
+    while (space_index)
+    {
+        HELPER_ADD_NODE_FOR (space_index->baked_min)
+        HELPER_ADD_NODE_FOR (space_index->baked_max)
+        space_index = space_index->next;
+    }
+
+#undef HELPER_ADD_NODE_FOR
 }
 
 static void prepare_indices (struct indexed_storage_node_t *storage, uint64_t *event_flag)
@@ -6792,7 +8667,7 @@ static void prepare_indices (struct indexed_storage_node_t *storage, uint64_t *e
     while (interval_index)
     {
         const kan_bool_t baked_from_buffer = indexed_field_baked_data_bake_from_buffer (
-            &interval_index->baked.data, &interval_index->storage->observation_buffer);
+            &interval_index->baked, &interval_index->storage->observation_buffer);
         KAN_ASSERT (baked_from_buffer)
 
         if (interval_index->tree.size == 0u)
@@ -6806,7 +8681,28 @@ static void prepare_indices (struct indexed_storage_node_t *storage, uint64_t *e
         interval_index = interval_index->next;
     }
 
-    // TODO: Fill or update indices if needed. Remember about filling buffer offsets for indexed fields.
+    struct space_index_t *space_index = storage->first_space_index;
+    while (space_index)
+    {
+        kan_bool_t baked_from_buffer = indexed_field_baked_data_bake_from_buffer (
+            &space_index->baked_min, &space_index->storage->observation_buffer);
+        KAN_ASSERT (baked_from_buffer)
+
+        baked_from_buffer = indexed_field_baked_data_bake_from_buffer (&space_index->baked_max,
+                                                                       &space_index->storage->observation_buffer);
+        KAN_ASSERT (baked_from_buffer)
+
+        if (!space_index->initial_fill_executed)
+        {
+            HELPER_FILL_INDEX (space)
+            space_index->initial_fill_executed = KAN_TRUE;
+        }
+
+        space_index->observation_flags = *event_flag;
+        *event_flag <<= 1u;
+        KAN_ASSERT (*event_flag > 0u)
+        space_index = space_index->next;
+    }
 
 #undef HELPER_FILL_INDEX
 }
