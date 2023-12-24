@@ -50,8 +50,7 @@
 /// const double min[] = {min_x, min_y, min_z};
 /// const double max[] = {max_x, max_y, max_z};
 ///
-/// struct kan_space_tree_insertion_iterator_t iterator =
-///     kan_space_tree_insertion_iterator_start (space_tree, min, max);
+/// struct kan_space_tree_insertion_iterator_t iterator = kan_space_tree_insertion_start (space_tree, min, max);
 ///
 /// // Due to the nature of octree, we might need to insert multiple sub nodes into multiple nodes in order to represent
 /// // required axis aligned bounding shape in a correct and optimized way. Therefore, we need this cycle.
@@ -59,7 +58,7 @@
 /// {
 ///     // Allocate and create sub node here.
 ///     // Then insert it and move iterator.
-///     kan_space_tree_insertion_iterator_insert_and_move (space_tree, &iterator, &sub_node->node);
+///     kan_space_tree_insertion_insert_and_move (space_tree, &iterator, &sub_node->node);
 /// }
 /// ```
 ///
@@ -69,7 +68,7 @@
 /// const double min[] = {min_x, min_y, min_z};
 /// const double max[] = {max_x, max_y, max_z};
 ///
-/// struct kan_space_tree_shape_iterator_t iterator = kan_space_tree_shape_iterator_start (space_tree, min, max);
+/// struct kan_space_tree_shape_iterator_t iterator = kan_space_tree_shape_start (space_tree, min, max);
 ///
 /// // Due to the nature of octree, intersecting sub nodes might be inside different tree nodes and we need to iterate
 /// // all of them.
@@ -91,7 +90,7 @@
 ///         sub_node = sub_node->next;
 ///     }
 ///
-///     kan_space_tree_shape_iterator_move_to_next_node (space_tree, &iterator);
+///     kan_space_tree_shape_move_to_next_node (space_tree, &iterator);
 /// }
 /// ```
 ///
@@ -102,7 +101,7 @@
 /// const double direction[] = {direction_x, direction_y, direction_z};
 ///
 /// struct kan_space_tree_ray_iterator_t iterator =
-///     kan_space_tree_ray_iterator_start (space_tree, origin, direction, max_time);
+///     kan_space_tree_ray_start (space_tree, origin, direction, max_time);
 ///
 /// // Due to the nature of octree, intersecting sub nodes might be inside different tree nodes and we need to iterate
 /// // all of them.
@@ -127,7 +126,7 @@
 ///         sub_node = sub_node->next;
 ///     }
 ///
-///     kan_space_tree_ray_iterator_move_to_next_node (space_tree, &iterator);
+///     kan_space_tree_ray_move_to_next_node (space_tree, &iterator);
 /// }
 /// ```
 ///
@@ -241,15 +240,15 @@ CONTAINER_API void kan_space_tree_init (struct kan_space_tree_t *tree,
 
 /// \brief Starts iteration that aims to insert sub node to every node that should contain axis aligned bounding shape
 ///        with given min and max coordinates.
-CONTAINER_API struct kan_space_tree_insertion_iterator_t kan_space_tree_insertion_iterator_start (
-    struct kan_space_tree_t *tree, const double *min_sequence, const double *max_sequence);
+CONTAINER_API struct kan_space_tree_insertion_iterator_t kan_space_tree_insertion_start (struct kan_space_tree_t *tree,
+                                                                                         const double *min_sequence,
+                                                                                         const double *max_sequence);
 
 /// \brief Inserts given sub node into tree and moves to the next node for the insertion.
 /// \invariant kan_space_tree_insertion_is_finished is KAN_FALSE.
-CONTAINER_API void kan_space_tree_insertion_iterator_insert_and_move (
-    struct kan_space_tree_t *tree,
-    struct kan_space_tree_insertion_iterator_t *iterator,
-    struct kan_space_tree_sub_node_t *sub_node);
+CONTAINER_API void kan_space_tree_insertion_insert_and_move (struct kan_space_tree_t *tree,
+                                                             struct kan_space_tree_insertion_iterator_t *iterator,
+                                                             struct kan_space_tree_sub_node_t *sub_node);
 
 /// \brief Whether given insertion iteration is finished.
 static inline kan_bool_t kan_space_tree_insertion_is_finished (struct kan_space_tree_insertion_iterator_t *iterator)
@@ -258,13 +257,13 @@ static inline kan_bool_t kan_space_tree_insertion_is_finished (struct kan_space_
 }
 
 /// \brief Starts iteration that aims to query intersections between given and inserted axis aligned bounding shapes.
-CONTAINER_API struct kan_space_tree_shape_iterator_t kan_space_tree_shape_iterator_start (struct kan_space_tree_t *tree,
-                                                                                          const double *min_sequence,
-                                                                                          const double *max_sequence);
+CONTAINER_API struct kan_space_tree_shape_iterator_t kan_space_tree_shape_start (struct kan_space_tree_t *tree,
+                                                                                 const double *min_sequence,
+                                                                                 const double *max_sequence);
 
 /// \brief Moves shape iterator to the next node that may contain intersections.
-CONTAINER_API void kan_space_tree_shape_iterator_move_to_next_node (struct kan_space_tree_t *tree,
-                                                                    struct kan_space_tree_shape_iterator_t *iterator);
+CONTAINER_API void kan_space_tree_shape_move_to_next_node (struct kan_space_tree_t *tree,
+                                                           struct kan_space_tree_shape_iterator_t *iterator);
 
 /// \brief Whether given shape iteration is finished.
 static inline kan_bool_t kan_space_tree_shape_is_finished (struct kan_space_tree_shape_iterator_t *iterator)
@@ -274,20 +273,33 @@ static inline kan_bool_t kan_space_tree_shape_is_finished (struct kan_space_tree
 
 /// \brief Starts iteration that aims to query intersections between given ray and
 ///        inserted axis aligned bounding shapes.
-CONTAINER_API struct kan_space_tree_ray_iterator_t kan_space_tree_ray_iterator_start (struct kan_space_tree_t *tree,
-                                                                                      const double *origin_sequence,
-                                                                                      const double *direction_sequence,
-                                                                                      double max_time);
+CONTAINER_API struct kan_space_tree_ray_iterator_t kan_space_tree_ray_start (struct kan_space_tree_t *tree,
+                                                                             const double *origin_sequence,
+                                                                             const double *direction_sequence,
+                                                                             double max_time);
 
 /// \brief Moves ray iterator to the next node that may contain intersections.
-CONTAINER_API void kan_space_tree_ray_iterator_move_to_next_node (struct kan_space_tree_t *tree,
-                                                                  struct kan_space_tree_ray_iterator_t *iterator);
+CONTAINER_API void kan_space_tree_ray_move_to_next_node (struct kan_space_tree_t *tree,
+                                                         struct kan_space_tree_ray_iterator_t *iterator);
 
 /// \brief Whether given ray iteration is finished.
 static inline kan_bool_t kan_space_tree_ray_is_finished (struct kan_space_tree_ray_iterator_t *iterator)
 {
     return !iterator->current_node;
 }
+
+/// \brief Checks whether given axis aligned bounding shape needs to be deleted and
+///        re-inserted after its values changed from old to new sequences.
+CONTAINER_API kan_bool_t kan_space_tree_is_re_insert_needed (struct kan_space_tree_t *tree,
+                                                             const double *old_min,
+                                                             const double *old_max,
+                                                             const double *new_min,
+                                                             const double *new_max);
+
+/// \brief Checks whether given axis aligned bounding shape can be stored as only one sub node.
+CONTAINER_API kan_bool_t kan_space_tree_is_contained_in_one_sub_node (struct kan_space_tree_t *tree,
+                                                                      const double *min,
+                                                                      const double *max);
 
 /// \brief Deletes given sub node from given space tree.
 /// \warning Breaks iterators!
