@@ -14,14 +14,13 @@
 #include <kan/container/space_tree.h>
 #include <kan/container/stack_group_allocator.h>
 #include <kan/cpu_dispatch/job.h>
+#include <kan/cpu_profiler/markup.h>
 #include <kan/error/critical.h>
 #include <kan/log/logging.h>
 #include <kan/memory/allocation.h>
 #include <kan/repository/meta.h>
 #include <kan/repository/repository.h>
 #include <kan/threading/atomic.h>
-
-// TODO: After everything is implemented, think about integration cpu profiler here if it is appropriate.
 
 KAN_LOG_DEFINE_CATEGORY (repository);
 
@@ -3880,7 +3879,12 @@ void kan_repository_enter_planning_mode (kan_repository_t root_repository)
 {
     struct repository_t *repository = (struct repository_t *) root_repository;
     KAN_ASSERT (!repository->parent)
+
+    kan_cpu_section_t section = kan_cpu_section_get ("repository_enter_planning_mode");
+    struct kan_cpu_section_execution_t execution;
+    kan_cpu_section_execution_init (&execution, section);
     repository_enter_planning_mode_internal (repository);
+    kan_cpu_section_execution_shutdown (&execution);
 }
 
 static void execute_migration (uint64_t user_data)
@@ -4219,6 +4223,11 @@ void kan_repository_migrate (kan_repository_t root_repository,
 {
     struct repository_t *repository = (struct repository_t *) root_repository;
     KAN_ASSERT (!repository->parent)
+
+    kan_cpu_section_t section = kan_cpu_section_get ("repository_migrate");
+    struct kan_cpu_section_execution_t execution;
+    kan_cpu_section_execution_init (&execution, section);
+
     kan_cpu_job_t job = kan_cpu_job_create ();
     KAN_ASSERT (job != KAN_INVALID_CPU_JOB)
 
@@ -4234,6 +4243,7 @@ void kan_repository_migrate (kan_repository_t root_repository,
     kan_cpu_job_release (job);
     kan_cpu_job_wait (job);
     kan_stack_group_allocator_shutdown (&context.allocator);
+    kan_cpu_section_execution_shutdown (&execution);
 }
 
 static struct singleton_storage_node_t *query_singleton_storage_across_hierarchy (struct repository_t *repository,
@@ -8840,6 +8850,10 @@ void kan_repository_enter_serving_mode (kan_repository_t root_repository)
     struct repository_t *repository = (struct repository_t *) root_repository;
     KAN_ASSERT (!repository->parent)
     KAN_ASSERT (repository->mode == REPOSITORY_MODE_PLANNING)
+
+    kan_cpu_section_t section = kan_cpu_section_get ("repository_enter_serving_mode");
+    struct kan_cpu_section_execution_t execution;
+    kan_cpu_section_execution_init (&execution, section);
     repository_clean_storages (repository);
 
     struct switch_to_serving_context_t context;
@@ -8860,6 +8874,7 @@ void kan_repository_enter_serving_mode (kan_repository_t root_repository)
 
     kan_stack_group_allocator_shutdown (&context.allocator);
     repository_complete_switch_to_serving (repository);
+    kan_cpu_section_execution_shutdown (&execution);
 }
 
 static void repository_destroy_internal (struct repository_t *repository)

@@ -4,7 +4,7 @@ concrete_sources ("*.c")
 
 concrete_require (
         SCOPE PRIVATE
-        ABSTRACT cpu_dispatch error log
+        ABSTRACT cpu_dispatch cpu_profiler error log
         CONCRETE_INTERFACE repository_reflection
         THIRD_PARTY qsort)
 
