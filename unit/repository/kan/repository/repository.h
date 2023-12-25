@@ -560,7 +560,7 @@ struct kan_repository_indexed_space_write_query_t
 /// \meta reflection_ignore_init_shutdown
 struct kan_repository_indexed_space_shape_write_cursor_t
 {
-    uint64_t implementation_data_64[122u];
+    uint64_t implementation_data_64[22u];
 };
 
 /// \meta reflection_ignore_init_shutdown

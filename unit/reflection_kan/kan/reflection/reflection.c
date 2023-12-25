@@ -6,6 +6,7 @@
 
 #include <kan/api_common/alignment.h>
 #include <kan/api_common/min_max.h>
+#include <kan/api_common/type_punning.h>
 #include <kan/container/dynamic_array.h>
 #include <kan/container/hash_storage.h>
 #include <kan/container/stack_group_allocator.h>
@@ -611,13 +612,13 @@ struct kan_reflection_enum_meta_iterator_t kan_reflection_registry_query_enum_me
     {
         if (iterator.current->enum_name == enum_name && iterator.current->meta_type_name == meta_type_name)
         {
-            return *(struct kan_reflection_enum_meta_iterator_t *) &iterator;
+            return KAN_PUN_TYPE (struct enum_meta_iterator_t, struct kan_reflection_enum_meta_iterator_t, iterator);
         }
 
         iterator.current = (struct enum_meta_node_t *) iterator.current->node.list_node.next;
     }
 
-    return *(struct kan_reflection_enum_meta_iterator_t *) &iterator;
+    return KAN_PUN_TYPE (struct enum_meta_iterator_t, struct kan_reflection_enum_meta_iterator_t, iterator);
 }
 
 const void *kan_reflection_enum_meta_iterator_get (struct kan_reflection_enum_meta_iterator_t *iterator)
@@ -666,13 +667,14 @@ struct kan_reflection_enum_value_meta_iterator_t kan_reflection_registry_query_e
         if (iterator.current->enum_name == enum_name && iterator.current->enum_value_name == enum_value_name &&
             iterator.current->meta_type_name == meta_type_name)
         {
-            return *(struct kan_reflection_enum_value_meta_iterator_t *) &iterator;
+            return KAN_PUN_TYPE (struct enum_value_meta_iterator_t, struct kan_reflection_enum_value_meta_iterator_t,
+                                 iterator);
         }
 
         iterator.current = (struct enum_value_meta_node_t *) iterator.current->node.list_node.next;
     }
 
-    return *(struct kan_reflection_enum_value_meta_iterator_t *) &iterator;
+    return KAN_PUN_TYPE (struct enum_value_meta_iterator_t, struct kan_reflection_enum_value_meta_iterator_t, iterator);
 }
 
 const void *kan_reflection_enum_value_meta_iterator_get (struct kan_reflection_enum_value_meta_iterator_t *iterator)
@@ -738,13 +740,13 @@ struct kan_reflection_struct_meta_iterator_t kan_reflection_registry_query_struc
     {
         if (iterator.current->struct_name == struct_name && iterator.current->meta_type_name == meta_type_name)
         {
-            return *(struct kan_reflection_struct_meta_iterator_t *) &iterator;
+            return KAN_PUN_TYPE (struct struct_meta_iterator_t, struct kan_reflection_struct_meta_iterator_t, iterator);
         }
 
         iterator.current = (struct struct_meta_node_t *) iterator.current->node.list_node.next;
     }
 
-    return *(struct kan_reflection_struct_meta_iterator_t *) &iterator;
+    return KAN_PUN_TYPE (struct struct_meta_iterator_t, struct kan_reflection_struct_meta_iterator_t, iterator);
 }
 
 const void *kan_reflection_struct_meta_iterator_get (struct kan_reflection_struct_meta_iterator_t *iterator)
@@ -793,13 +795,15 @@ struct kan_reflection_struct_field_meta_iterator_t kan_reflection_registry_query
         if (iterator.current->struct_name == struct_name && iterator.current->struct_field_name == struct_field_name &&
             iterator.current->meta_type_name == meta_type_name)
         {
-            return *(struct kan_reflection_struct_field_meta_iterator_t *) &iterator;
+            return KAN_PUN_TYPE (struct struct_field_meta_iterator_t,
+                                 struct kan_reflection_struct_field_meta_iterator_t, iterator);
         }
 
         iterator.current = (struct struct_field_meta_node_t *) iterator.current->node.list_node.next;
     }
 
-    return *(struct kan_reflection_struct_field_meta_iterator_t *) &iterator;
+    return KAN_PUN_TYPE (struct struct_field_meta_iterator_t, struct kan_reflection_struct_field_meta_iterator_t,
+                         iterator);
 }
 
 const void *kan_reflection_struct_field_meta_iterator_get (struct kan_reflection_struct_field_meta_iterator_t *iterator)

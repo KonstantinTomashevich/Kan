@@ -7,6 +7,7 @@
 
 #include <kan/api_common/alignment.h>
 #include <kan/api_common/min_max.h>
+#include <kan/api_common/type_punning.h>
 #include <kan/container/avl_tree.h>
 #include <kan/container/event_queue.h>
 #include <kan/container/hash_storage.h>
@@ -2839,7 +2840,7 @@ static inline uint64_t convert_signed_to_unsigned (int64_t signed_value, uint64_
 
     case 8u:
         return signed_value < 0 ? (uint64_t) (signed_value - INT64_MIN) :
-                                  ((uint64_t) signed_value) + (1u + UINT64_MAX / 2u);;
+                                  ((uint64_t) signed_value) + (1u + UINT64_MAX / 2u);
     }
 
     KAN_ASSERT (KAN_FALSE)
@@ -5023,7 +5024,8 @@ struct kan_repository_indexed_insertion_package_t kan_repository_indexed_insert_
         query_data->storage->type->init (query_data->storage->type->functor_user_data, package.record);
     }
 
-    return *(struct kan_repository_indexed_insertion_package_t *) &package;
+    return KAN_PUN_TYPE (struct indexed_insertion_package_t, struct kan_repository_indexed_insertion_package_t,
+                         package);
 }
 
 void *kan_repository_indexed_insertion_package_get (struct kan_repository_indexed_insertion_package_t *package)
@@ -5110,7 +5112,8 @@ struct kan_repository_indexed_sequence_read_cursor_t kan_repository_indexed_sequ
 {
     struct indexed_sequence_cursor_t cursor =
         indexed_storage_sequence_query_execute ((struct indexed_sequence_query_t *) query);
-    return *(struct kan_repository_indexed_sequence_read_cursor_t *) &cursor;
+    return KAN_PUN_TYPE (struct indexed_sequence_cursor_t, struct kan_repository_indexed_sequence_read_cursor_t,
+                         cursor);
 }
 
 struct kan_repository_indexed_sequence_read_access_t kan_repository_indexed_sequence_read_cursor_next (
@@ -5138,7 +5141,8 @@ struct kan_repository_indexed_sequence_read_access_t kan_repository_indexed_sequ
         }
     }
 
-    return *(struct kan_repository_indexed_sequence_read_access_t *) &access;
+    return KAN_PUN_TYPE (struct indexed_sequence_constant_access_t,
+                         struct kan_repository_indexed_sequence_read_access_t, access);
 }
 
 const void *kan_repository_indexed_sequence_read_access_resolve (
@@ -5182,7 +5186,8 @@ struct kan_repository_indexed_sequence_update_cursor_t kan_repository_indexed_se
 {
     struct indexed_sequence_cursor_t cursor =
         indexed_storage_sequence_query_execute ((struct indexed_sequence_query_t *) query);
-    return *(struct kan_repository_indexed_sequence_update_cursor_t *) &cursor;
+    return KAN_PUN_TYPE (struct indexed_sequence_cursor_t, struct kan_repository_indexed_sequence_update_cursor_t,
+                         cursor);
 }
 
 struct kan_repository_indexed_sequence_update_access_t kan_repository_indexed_sequence_update_cursor_next (
@@ -5213,7 +5218,8 @@ struct kan_repository_indexed_sequence_update_access_t kan_repository_indexed_se
         }
     }
 
-    return *(struct kan_repository_indexed_sequence_update_access_t *) &access;
+    return KAN_PUN_TYPE (struct indexed_sequence_mutable_access_t,
+                         struct kan_repository_indexed_sequence_update_access_t, access);
 }
 
 void *kan_repository_indexed_sequence_update_access_resolve (
@@ -5258,7 +5264,8 @@ struct kan_repository_indexed_sequence_delete_cursor_t kan_repository_indexed_se
 {
     struct indexed_sequence_cursor_t cursor =
         indexed_storage_sequence_query_execute ((struct indexed_sequence_query_t *) query);
-    return *(struct kan_repository_indexed_sequence_delete_cursor_t *) &cursor;
+    return KAN_PUN_TYPE (struct indexed_sequence_cursor_t, struct kan_repository_indexed_sequence_delete_cursor_t,
+                         cursor);
 }
 
 struct kan_repository_indexed_sequence_delete_access_t kan_repository_indexed_sequence_delete_cursor_next (
@@ -5286,7 +5293,8 @@ struct kan_repository_indexed_sequence_delete_access_t kan_repository_indexed_se
         }
     }
 
-    return *(struct kan_repository_indexed_sequence_delete_access_t *) &access;
+    return KAN_PUN_TYPE (struct indexed_sequence_constant_access_t,
+                         struct kan_repository_indexed_sequence_delete_access_t, access);
 }
 
 const void *kan_repository_indexed_sequence_delete_access_resolve (
@@ -5342,7 +5350,8 @@ struct kan_repository_indexed_sequence_write_cursor_t kan_repository_indexed_seq
 {
     struct indexed_sequence_cursor_t cursor =
         indexed_storage_sequence_query_execute ((struct indexed_sequence_query_t *) query);
-    return *(struct kan_repository_indexed_sequence_write_cursor_t *) &cursor;
+    return KAN_PUN_TYPE (struct indexed_sequence_cursor_t, struct kan_repository_indexed_sequence_write_cursor_t,
+                         cursor);
 }
 
 struct kan_repository_indexed_sequence_write_access_t kan_repository_indexed_sequence_write_cursor_next (
@@ -5373,7 +5382,8 @@ struct kan_repository_indexed_sequence_write_access_t kan_repository_indexed_seq
         }
     }
 
-    return *(struct kan_repository_indexed_sequence_write_access_t *) &access;
+    return KAN_PUN_TYPE (struct indexed_sequence_mutable_access_t,
+                         struct kan_repository_indexed_sequence_write_access_t, access);
 }
 
 void *kan_repository_indexed_sequence_write_access_resolve (
@@ -5562,7 +5572,7 @@ struct kan_repository_indexed_value_read_cursor_t kan_repository_indexed_value_r
 {
     struct indexed_value_cursor_t cursor =
         indexed_storage_value_query_execute ((struct indexed_value_query_t *) query, value);
-    return *(struct kan_repository_indexed_value_read_cursor_t *) &cursor;
+    return KAN_PUN_TYPE (struct indexed_value_cursor_t, struct kan_repository_indexed_value_read_cursor_t, cursor);
 }
 
 struct kan_repository_indexed_value_read_access_t kan_repository_indexed_value_read_cursor_next (
@@ -5591,7 +5601,8 @@ struct kan_repository_indexed_value_read_access_t kan_repository_indexed_value_r
         }
     }
 
-    return *(struct kan_repository_indexed_value_read_access_t *) &access;
+    return KAN_PUN_TYPE (struct indexed_value_constant_access_t, struct kan_repository_indexed_value_read_access_t,
+                         access);
 }
 
 const void *kan_repository_indexed_value_read_access_resolve (struct kan_repository_indexed_value_read_access_t *access)
@@ -5635,7 +5646,7 @@ struct kan_repository_indexed_value_update_cursor_t kan_repository_indexed_value
 {
     struct indexed_value_cursor_t cursor =
         indexed_storage_value_query_execute ((struct indexed_value_query_t *) query, value);
-    return *(struct kan_repository_indexed_value_update_cursor_t *) &cursor;
+    return KAN_PUN_TYPE (struct indexed_value_cursor_t, struct kan_repository_indexed_value_update_cursor_t, cursor);
 }
 
 struct kan_repository_indexed_value_update_access_t kan_repository_indexed_value_update_cursor_next (
@@ -5667,7 +5678,8 @@ struct kan_repository_indexed_value_update_access_t kan_repository_indexed_value
         }
     }
 
-    return *(struct kan_repository_indexed_value_update_access_t *) &access;
+    return KAN_PUN_TYPE (struct indexed_value_mutable_access_t, struct kan_repository_indexed_value_update_access_t,
+                         access);
 }
 
 void *kan_repository_indexed_value_update_access_resolve (struct kan_repository_indexed_value_update_access_t *access)
@@ -5709,7 +5721,7 @@ struct kan_repository_indexed_value_delete_cursor_t kan_repository_indexed_value
 {
     struct indexed_value_cursor_t cursor =
         indexed_storage_value_query_execute ((struct indexed_value_query_t *) query, value);
-    return *(struct kan_repository_indexed_value_delete_cursor_t *) &cursor;
+    return KAN_PUN_TYPE (struct indexed_value_cursor_t, struct kan_repository_indexed_value_delete_cursor_t, cursor);
 }
 
 struct kan_repository_indexed_value_delete_access_t kan_repository_indexed_value_delete_cursor_next (
@@ -5738,7 +5750,8 @@ struct kan_repository_indexed_value_delete_access_t kan_repository_indexed_value
         }
     }
 
-    return *(struct kan_repository_indexed_value_delete_access_t *) &access;
+    return KAN_PUN_TYPE (struct indexed_value_constant_access_t, struct kan_repository_indexed_value_delete_access_t,
+                         access);
 }
 
 const void *kan_repository_indexed_value_delete_access_resolve (
@@ -5793,7 +5806,7 @@ struct kan_repository_indexed_value_write_cursor_t kan_repository_indexed_value_
 {
     struct indexed_value_cursor_t cursor =
         indexed_storage_value_query_execute ((struct indexed_value_query_t *) query, value);
-    return *(struct kan_repository_indexed_value_write_cursor_t *) &cursor;
+    return KAN_PUN_TYPE (struct indexed_value_cursor_t, struct kan_repository_indexed_value_write_cursor_t, cursor);
 }
 
 struct kan_repository_indexed_value_write_access_t kan_repository_indexed_value_write_cursor_next (
@@ -5825,7 +5838,8 @@ struct kan_repository_indexed_value_write_access_t kan_repository_indexed_value_
         }
     }
 
-    return *(struct kan_repository_indexed_value_write_access_t *) &access;
+    return KAN_PUN_TYPE (struct indexed_value_mutable_access_t, struct kan_repository_indexed_value_write_access_t,
+                         access);
 }
 
 void *kan_repository_indexed_value_write_access_resolve (struct kan_repository_indexed_value_write_access_t *access)
@@ -5984,7 +5998,7 @@ struct kan_repository_indexed_signal_read_cursor_t kan_repository_indexed_signal
 {
     struct indexed_signal_cursor_t cursor =
         indexed_storage_signal_query_execute ((struct indexed_signal_query_t *) query);
-    return *(struct kan_repository_indexed_signal_read_cursor_t *) &cursor;
+    return KAN_PUN_TYPE (struct indexed_signal_cursor_t, struct kan_repository_indexed_signal_read_cursor_t, cursor);
 }
 
 struct kan_repository_indexed_signal_read_access_t kan_repository_indexed_signal_read_cursor_next (
@@ -6012,7 +6026,8 @@ struct kan_repository_indexed_signal_read_access_t kan_repository_indexed_signal
         }
     }
 
-    return *(struct kan_repository_indexed_signal_read_access_t *) &access;
+    return KAN_PUN_TYPE (struct indexed_signal_constant_access_t, struct kan_repository_indexed_signal_read_access_t,
+                         access);
 }
 
 const void *kan_repository_indexed_signal_read_access_resolve (
@@ -6058,7 +6073,7 @@ struct kan_repository_indexed_signal_update_cursor_t kan_repository_indexed_sign
 {
     struct indexed_signal_cursor_t cursor =
         indexed_storage_signal_query_execute ((struct indexed_signal_query_t *) query);
-    return *(struct kan_repository_indexed_signal_update_cursor_t *) &cursor;
+    return KAN_PUN_TYPE (struct indexed_signal_cursor_t, struct kan_repository_indexed_signal_update_cursor_t, cursor);
 }
 
 struct kan_repository_indexed_signal_update_access_t kan_repository_indexed_signal_update_cursor_next (
@@ -6089,7 +6104,8 @@ struct kan_repository_indexed_signal_update_access_t kan_repository_indexed_sign
         }
     }
 
-    return *(struct kan_repository_indexed_signal_update_access_t *) &access;
+    return KAN_PUN_TYPE (struct indexed_signal_mutable_access_t, struct kan_repository_indexed_signal_update_access_t,
+                         access);
 }
 
 void *kan_repository_indexed_signal_update_access_resolve (struct kan_repository_indexed_signal_update_access_t *access)
@@ -6132,7 +6148,7 @@ struct kan_repository_indexed_signal_delete_cursor_t kan_repository_indexed_sign
 {
     struct indexed_signal_cursor_t cursor =
         indexed_storage_signal_query_execute ((struct indexed_signal_query_t *) query);
-    return *(struct kan_repository_indexed_signal_delete_cursor_t *) &cursor;
+    return KAN_PUN_TYPE (struct indexed_signal_cursor_t, struct kan_repository_indexed_signal_delete_cursor_t, cursor);
 }
 
 struct kan_repository_indexed_signal_delete_access_t kan_repository_indexed_signal_delete_cursor_next (
@@ -6160,7 +6176,8 @@ struct kan_repository_indexed_signal_delete_access_t kan_repository_indexed_sign
         }
     }
 
-    return *(struct kan_repository_indexed_signal_delete_access_t *) &access;
+    return KAN_PUN_TYPE (struct indexed_signal_constant_access_t, struct kan_repository_indexed_signal_delete_access_t,
+                         access);
 }
 
 const void *kan_repository_indexed_signal_delete_access_resolve (
@@ -6216,7 +6233,7 @@ struct kan_repository_indexed_signal_write_cursor_t kan_repository_indexed_signa
 {
     struct indexed_signal_cursor_t cursor =
         indexed_storage_signal_query_execute ((struct indexed_signal_query_t *) query);
-    return *(struct kan_repository_indexed_signal_write_cursor_t *) &cursor;
+    return KAN_PUN_TYPE (struct indexed_signal_cursor_t, struct kan_repository_indexed_signal_write_cursor_t, cursor);
 }
 
 struct kan_repository_indexed_signal_write_access_t kan_repository_indexed_signal_write_cursor_next (
@@ -6247,7 +6264,8 @@ struct kan_repository_indexed_signal_write_access_t kan_repository_indexed_signa
         }
     }
 
-    return *(struct kan_repository_indexed_signal_write_access_t *) &access;
+    return KAN_PUN_TYPE (struct indexed_signal_mutable_access_t, struct kan_repository_indexed_signal_write_access_t,
+                         access);
 }
 
 void *kan_repository_indexed_signal_write_access_resolve (struct kan_repository_indexed_signal_write_access_t *access)
@@ -6576,7 +6594,8 @@ kan_repository_indexed_interval_read_query_execute_ascending (
 {
     struct indexed_interval_cursor_t cursor =
         indexed_storage_interval_query_execute ((struct indexed_interval_query_t *) query, min, max, KAN_TRUE);
-    return *(struct kan_repository_indexed_interval_ascending_read_cursor_t *) &cursor;
+    return KAN_PUN_TYPE (struct indexed_interval_cursor_t,
+                         struct kan_repository_indexed_interval_ascending_read_cursor_t, cursor);
 }
 
 struct kan_repository_indexed_interval_descending_read_cursor_t
@@ -6585,7 +6604,8 @@ kan_repository_indexed_interval_read_query_execute_descending (
 {
     struct indexed_interval_cursor_t cursor =
         indexed_storage_interval_query_execute ((struct indexed_interval_query_t *) query, min, max, KAN_FALSE);
-    return *(struct kan_repository_indexed_interval_descending_read_cursor_t *) &cursor;
+    return KAN_PUN_TYPE (struct indexed_interval_cursor_t,
+                         struct kan_repository_indexed_interval_descending_read_cursor_t, cursor);
 }
 
 struct kan_repository_indexed_interval_read_access_t kan_repository_indexed_interval_ascending_read_cursor_next (
@@ -6615,7 +6635,8 @@ struct kan_repository_indexed_interval_read_access_t kan_repository_indexed_inte
         }
     }
 
-    return *(struct kan_repository_indexed_interval_read_access_t *) &access;
+    return KAN_PUN_TYPE (struct indexed_interval_constant_access_t,
+                         struct kan_repository_indexed_interval_read_access_t, access);
 }
 
 struct kan_repository_indexed_interval_read_access_t kan_repository_indexed_interval_descending_read_cursor_next (
@@ -6645,7 +6666,8 @@ struct kan_repository_indexed_interval_read_access_t kan_repository_indexed_inte
         }
     }
 
-    return *(struct kan_repository_indexed_interval_read_access_t *) &access;
+    return KAN_PUN_TYPE (struct indexed_interval_constant_access_t,
+                         struct kan_repository_indexed_interval_read_access_t, access);
 }
 
 const void *kan_repository_indexed_interval_read_access_resolve (
@@ -6698,7 +6720,8 @@ kan_repository_indexed_interval_update_query_execute_ascending (
 {
     struct indexed_interval_cursor_t cursor =
         indexed_storage_interval_query_execute ((struct indexed_interval_query_t *) query, min, max, KAN_TRUE);
-    return *(struct kan_repository_indexed_interval_ascending_update_cursor_t *) &cursor;
+    return KAN_PUN_TYPE (struct indexed_interval_cursor_t,
+                         struct kan_repository_indexed_interval_ascending_update_cursor_t, cursor);
 }
 
 struct kan_repository_indexed_interval_descending_update_cursor_t
@@ -6707,7 +6730,8 @@ kan_repository_indexed_interval_update_query_execute_descending (
 {
     struct indexed_interval_cursor_t cursor =
         indexed_storage_interval_query_execute ((struct indexed_interval_query_t *) query, min, max, KAN_FALSE);
-    return *(struct kan_repository_indexed_interval_descending_update_cursor_t *) &cursor;
+    return KAN_PUN_TYPE (struct indexed_interval_cursor_t,
+                         struct kan_repository_indexed_interval_descending_update_cursor_t, cursor);
 }
 
 struct kan_repository_indexed_interval_update_access_t kan_repository_indexed_interval_ascending_update_cursor_next (
@@ -6740,7 +6764,8 @@ struct kan_repository_indexed_interval_update_access_t kan_repository_indexed_in
         }
     }
 
-    return *(struct kan_repository_indexed_interval_update_access_t *) &access;
+    return KAN_PUN_TYPE (struct indexed_interval_mutable_access_t,
+                         struct kan_repository_indexed_interval_update_access_t, access);
 }
 
 struct kan_repository_indexed_interval_update_access_t kan_repository_indexed_interval_descending_update_cursor_next (
@@ -6773,7 +6798,8 @@ struct kan_repository_indexed_interval_update_access_t kan_repository_indexed_in
         }
     }
 
-    return *(struct kan_repository_indexed_interval_update_access_t *) &access;
+    return KAN_PUN_TYPE (struct indexed_interval_mutable_access_t,
+                         struct kan_repository_indexed_interval_update_access_t, access);
 }
 
 void *kan_repository_indexed_interval_update_access_resolve (
@@ -6826,7 +6852,8 @@ kan_repository_indexed_interval_delete_query_execute_ascending (
 {
     struct indexed_interval_cursor_t cursor =
         indexed_storage_interval_query_execute ((struct indexed_interval_query_t *) query, min, max, KAN_TRUE);
-    return *(struct kan_repository_indexed_interval_ascending_delete_cursor_t *) &cursor;
+    return KAN_PUN_TYPE (struct indexed_interval_cursor_t,
+                         struct kan_repository_indexed_interval_ascending_delete_cursor_t, cursor);
 }
 
 struct kan_repository_indexed_interval_descending_delete_cursor_t
@@ -6835,7 +6862,8 @@ kan_repository_indexed_interval_delete_query_execute_descending (
 {
     struct indexed_interval_cursor_t cursor =
         indexed_storage_interval_query_execute ((struct indexed_interval_query_t *) query, min, max, KAN_FALSE);
-    return *(struct kan_repository_indexed_interval_descending_delete_cursor_t *) &cursor;
+    return KAN_PUN_TYPE (struct indexed_interval_cursor_t,
+                         struct kan_repository_indexed_interval_descending_delete_cursor_t, cursor);
 }
 
 struct kan_repository_indexed_interval_delete_access_t kan_repository_indexed_interval_ascending_delete_cursor_next (
@@ -6865,7 +6893,8 @@ struct kan_repository_indexed_interval_delete_access_t kan_repository_indexed_in
         }
     }
 
-    return *(struct kan_repository_indexed_interval_delete_access_t *) &access;
+    return KAN_PUN_TYPE (struct indexed_interval_constant_access_t,
+                         struct kan_repository_indexed_interval_delete_access_t, access);
 }
 
 struct kan_repository_indexed_interval_delete_access_t kan_repository_indexed_interval_descending_delete_cursor_next (
@@ -6895,7 +6924,8 @@ struct kan_repository_indexed_interval_delete_access_t kan_repository_indexed_in
         }
     }
 
-    return *(struct kan_repository_indexed_interval_delete_access_t *) &access;
+    return KAN_PUN_TYPE (struct indexed_interval_constant_access_t,
+                         struct kan_repository_indexed_interval_delete_access_t, access);
 }
 
 const void *kan_repository_indexed_interval_delete_access_resolve (
@@ -6961,7 +6991,8 @@ kan_repository_indexed_interval_write_query_execute_ascending (
 {
     struct indexed_interval_cursor_t cursor =
         indexed_storage_interval_query_execute ((struct indexed_interval_query_t *) query, min, max, KAN_TRUE);
-    return *(struct kan_repository_indexed_interval_ascending_write_cursor_t *) &cursor;
+    return KAN_PUN_TYPE (struct indexed_interval_cursor_t,
+                         struct kan_repository_indexed_interval_ascending_write_cursor_t, cursor);
 }
 
 struct kan_repository_indexed_interval_descending_write_cursor_t
@@ -6970,7 +7001,8 @@ kan_repository_indexed_interval_write_query_execute_descending (
 {
     struct indexed_interval_cursor_t cursor =
         indexed_storage_interval_query_execute ((struct indexed_interval_query_t *) query, min, max, KAN_FALSE);
-    return *(struct kan_repository_indexed_interval_descending_write_cursor_t *) &cursor;
+    return KAN_PUN_TYPE (struct indexed_interval_cursor_t,
+                         struct kan_repository_indexed_interval_descending_write_cursor_t, cursor);
 }
 
 struct kan_repository_indexed_interval_write_access_t kan_repository_indexed_interval_ascending_write_cursor_next (
@@ -7003,7 +7035,8 @@ struct kan_repository_indexed_interval_write_access_t kan_repository_indexed_int
         }
     }
 
-    return *(struct kan_repository_indexed_interval_write_access_t *) &access;
+    return KAN_PUN_TYPE (struct indexed_interval_mutable_access_t,
+                         struct kan_repository_indexed_interval_write_access_t, access);
 }
 
 struct kan_repository_indexed_interval_write_access_t kan_repository_indexed_interval_descending_write_cursor_next (
@@ -7036,7 +7069,8 @@ struct kan_repository_indexed_interval_write_access_t kan_repository_indexed_int
         }
     }
 
-    return *(struct kan_repository_indexed_interval_write_access_t *) &access;
+    return KAN_PUN_TYPE (struct indexed_interval_mutable_access_t,
+                         struct kan_repository_indexed_interval_write_access_t, access);
 }
 
 void *kan_repository_indexed_interval_write_access_resolve (
@@ -7536,7 +7570,8 @@ struct kan_repository_indexed_space_shape_read_cursor_t kan_repository_indexed_s
 {
     struct indexed_space_shape_cursor_t cursor =
         indexed_storage_space_query_execute_shape ((struct indexed_space_query_t *) query, min, max);
-    return *(struct kan_repository_indexed_space_shape_read_cursor_t *) &cursor;
+    return KAN_PUN_TYPE (struct indexed_space_shape_cursor_t, struct kan_repository_indexed_space_shape_read_cursor_t,
+                         cursor);
 }
 
 struct kan_repository_indexed_space_ray_read_cursor_t kan_repository_indexed_space_read_query_execute_ray (
@@ -7547,7 +7582,8 @@ struct kan_repository_indexed_space_ray_read_cursor_t kan_repository_indexed_spa
 {
     struct indexed_space_ray_cursor_t cursor =
         indexed_storage_space_query_execute_ray ((struct indexed_space_query_t *) query, origin, direction, max_time);
-    return *(struct kan_repository_indexed_space_ray_read_cursor_t *) &cursor;
+    return KAN_PUN_TYPE (struct indexed_space_ray_cursor_t, struct kan_repository_indexed_space_ray_read_cursor_t,
+                         cursor);
 }
 
 struct kan_repository_indexed_space_read_access_t kan_repository_indexed_space_shape_read_cursor_next (
@@ -7577,7 +7613,8 @@ struct kan_repository_indexed_space_read_access_t kan_repository_indexed_space_s
         }
     }
 
-    return *(struct kan_repository_indexed_space_read_access_t *) &access;
+    return KAN_PUN_TYPE (struct indexed_space_constant_access_t, struct kan_repository_indexed_space_read_access_t,
+                         access);
 }
 
 struct kan_repository_indexed_space_read_access_t kan_repository_indexed_space_ray_read_cursor_next (
@@ -7607,7 +7644,8 @@ struct kan_repository_indexed_space_read_access_t kan_repository_indexed_space_r
         }
     }
 
-    return *(struct kan_repository_indexed_space_read_access_t *) &access;
+    return KAN_PUN_TYPE (struct indexed_space_constant_access_t, struct kan_repository_indexed_space_read_access_t,
+                         access);
 }
 
 const void *kan_repository_indexed_space_read_access_resolve (struct kan_repository_indexed_space_read_access_t *access)
@@ -7661,7 +7699,8 @@ struct kan_repository_indexed_space_shape_update_cursor_t kan_repository_indexed
 {
     struct indexed_space_shape_cursor_t cursor =
         indexed_storage_space_query_execute_shape ((struct indexed_space_query_t *) query, min, max);
-    return *(struct kan_repository_indexed_space_shape_update_cursor_t *) &cursor;
+    return KAN_PUN_TYPE (struct indexed_space_shape_cursor_t, struct kan_repository_indexed_space_shape_update_cursor_t,
+                         cursor);
 }
 
 struct kan_repository_indexed_space_ray_update_cursor_t kan_repository_indexed_space_update_query_execute_ray (
@@ -7672,7 +7711,8 @@ struct kan_repository_indexed_space_ray_update_cursor_t kan_repository_indexed_s
 {
     struct indexed_space_ray_cursor_t cursor =
         indexed_storage_space_query_execute_ray ((struct indexed_space_query_t *) query, origin, direction, max_time);
-    return *(struct kan_repository_indexed_space_ray_update_cursor_t *) &cursor;
+    return KAN_PUN_TYPE (struct indexed_space_ray_cursor_t, struct kan_repository_indexed_space_ray_update_cursor_t,
+                         cursor);
 }
 
 struct kan_repository_indexed_space_update_access_t kan_repository_indexed_space_shape_update_cursor_next (
@@ -7705,7 +7745,8 @@ struct kan_repository_indexed_space_update_access_t kan_repository_indexed_space
         }
     }
 
-    return *(struct kan_repository_indexed_space_update_access_t *) &access;
+    return KAN_PUN_TYPE (struct indexed_space_mutable_access_t, struct kan_repository_indexed_space_update_access_t,
+                         access);
 }
 
 struct kan_repository_indexed_space_update_access_t kan_repository_indexed_space_ray_update_cursor_next (
@@ -7738,7 +7779,8 @@ struct kan_repository_indexed_space_update_access_t kan_repository_indexed_space
         }
     }
 
-    return *(struct kan_repository_indexed_space_update_access_t *) &access;
+    return KAN_PUN_TYPE (struct indexed_space_mutable_access_t, struct kan_repository_indexed_space_update_access_t,
+                         access);
 }
 
 void *kan_repository_indexed_space_update_access_resolve (struct kan_repository_indexed_space_update_access_t *access)
@@ -7791,7 +7833,8 @@ struct kan_repository_indexed_space_shape_delete_cursor_t kan_repository_indexed
 {
     struct indexed_space_shape_cursor_t cursor =
         indexed_storage_space_query_execute_shape ((struct indexed_space_query_t *) query, min, max);
-    return *(struct kan_repository_indexed_space_shape_delete_cursor_t *) &cursor;
+    return KAN_PUN_TYPE (struct indexed_space_shape_cursor_t, struct kan_repository_indexed_space_shape_delete_cursor_t,
+                         cursor);
 }
 
 struct kan_repository_indexed_space_ray_delete_cursor_t kan_repository_indexed_space_delete_query_execute_ray (
@@ -7802,7 +7845,8 @@ struct kan_repository_indexed_space_ray_delete_cursor_t kan_repository_indexed_s
 {
     struct indexed_space_ray_cursor_t cursor =
         indexed_storage_space_query_execute_ray ((struct indexed_space_query_t *) query, origin, direction, max_time);
-    return *(struct kan_repository_indexed_space_ray_delete_cursor_t *) &cursor;
+    return KAN_PUN_TYPE (struct indexed_space_ray_cursor_t, struct kan_repository_indexed_space_ray_delete_cursor_t,
+                         cursor);
 }
 
 struct kan_repository_indexed_space_delete_access_t kan_repository_indexed_space_shape_delete_cursor_next (
@@ -7832,7 +7876,8 @@ struct kan_repository_indexed_space_delete_access_t kan_repository_indexed_space
         }
     }
 
-    return *(struct kan_repository_indexed_space_delete_access_t *) &access;
+    return KAN_PUN_TYPE (struct indexed_space_constant_access_t, struct kan_repository_indexed_space_delete_access_t,
+                         access);
 }
 
 struct kan_repository_indexed_space_delete_access_t kan_repository_indexed_space_ray_delete_cursor_next (
@@ -7862,7 +7907,8 @@ struct kan_repository_indexed_space_delete_access_t kan_repository_indexed_space
         }
     }
 
-    return *(struct kan_repository_indexed_space_delete_access_t *) &access;
+    return KAN_PUN_TYPE (struct indexed_space_constant_access_t, struct kan_repository_indexed_space_delete_access_t,
+                         access);
 }
 
 const void *kan_repository_indexed_space_delete_access_resolve (
@@ -7928,7 +7974,8 @@ struct kan_repository_indexed_space_shape_write_cursor_t kan_repository_indexed_
 {
     struct indexed_space_shape_cursor_t cursor =
         indexed_storage_space_query_execute_shape ((struct indexed_space_query_t *) query, min, max);
-    return *(struct kan_repository_indexed_space_shape_write_cursor_t *) &cursor;
+    return KAN_PUN_TYPE (struct indexed_space_shape_cursor_t, struct kan_repository_indexed_space_shape_write_cursor_t,
+                         cursor);
 }
 
 struct kan_repository_indexed_space_ray_write_cursor_t kan_repository_indexed_space_write_query_execute_ray (
@@ -7939,7 +7986,8 @@ struct kan_repository_indexed_space_ray_write_cursor_t kan_repository_indexed_sp
 {
     struct indexed_space_ray_cursor_t cursor =
         indexed_storage_space_query_execute_ray ((struct indexed_space_query_t *) query, origin, direction, max_time);
-    return *(struct kan_repository_indexed_space_ray_write_cursor_t *) &cursor;
+    return KAN_PUN_TYPE (struct indexed_space_ray_cursor_t, struct kan_repository_indexed_space_ray_write_cursor_t,
+                         cursor);
 }
 
 struct kan_repository_indexed_space_write_access_t kan_repository_indexed_space_shape_write_cursor_next (
@@ -7972,7 +8020,8 @@ struct kan_repository_indexed_space_write_access_t kan_repository_indexed_space_
         }
     }
 
-    return *(struct kan_repository_indexed_space_write_access_t *) &access;
+    return KAN_PUN_TYPE (struct indexed_space_mutable_access_t, struct kan_repository_indexed_space_write_access_t,
+                         access);
 }
 
 struct kan_repository_indexed_space_write_access_t kan_repository_indexed_space_ray_write_cursor_next (
@@ -8005,7 +8054,8 @@ struct kan_repository_indexed_space_write_access_t kan_repository_indexed_space_
         }
     }
 
-    return *(struct kan_repository_indexed_space_write_access_t *) &access;
+    return KAN_PUN_TYPE (struct indexed_space_mutable_access_t, struct kan_repository_indexed_space_write_access_t,
+                         access);
 }
 
 void *kan_repository_indexed_space_write_access_resolve (struct kan_repository_indexed_space_write_access_t *access)
@@ -8154,14 +8204,16 @@ struct kan_repository_event_insertion_package_t kan_repository_event_insert_quer
     if (kan_atomic_int_get (&query_data->storage->event_queue.total_iterators) == 0)
     {
         package.event = NULL;
-        return *(struct kan_repository_event_insertion_package_t *) &package;
+        return KAN_PUN_TYPE (struct event_insertion_package_t, struct kan_repository_event_insertion_package_t,
+                             package);
     }
 
 #if defined(KAN_REPOSITORY_SAFEGUARDS_ENABLED)
     if (!safeguard_event_insertion_package_try_create (query_data->storage))
     {
         package.event = NULL;
-        return *(struct kan_repository_event_insertion_package_t *) &package;
+        return KAN_PUN_TYPE (struct event_insertion_package_t, struct kan_repository_event_insertion_package_t,
+                             package);
     }
 #endif
 
@@ -8171,7 +8223,7 @@ struct kan_repository_event_insertion_package_t kan_repository_event_insert_quer
         query_data->storage->type->init (query_data->storage->type->functor_user_data, package.event);
     }
 
-    return *(struct kan_repository_event_insertion_package_t *) &package;
+    return KAN_PUN_TYPE (struct event_insertion_package_t, struct kan_repository_event_insertion_package_t, package);
 }
 
 void *kan_repository_event_insertion_package_get (struct kan_repository_event_insertion_package_t *package)
@@ -8252,21 +8304,21 @@ struct kan_repository_event_read_access_t kan_repository_event_fetch_query_next 
     if (!kan_event_queue_iterator_get (&query_data->storage->event_queue, query_data->iterator))
     {
         access.iterator = KAN_INVALID_EVENT_QUEUE_ITERATOR;
-        return *(struct kan_repository_event_read_access_t *) &access;
+        return KAN_PUN_TYPE (struct event_read_access_t, struct kan_repository_event_read_access_t, access);
     }
 
 #if defined(KAN_REPOSITORY_SAFEGUARDS_ENABLED)
     if (!safeguard_event_read_access_try_create (query_data->storage))
     {
         access.iterator = KAN_INVALID_EVENT_QUEUE_ITERATOR;
-        return *(struct kan_repository_event_read_access_t *) &access;
+        return KAN_PUN_TYPE (struct event_read_access_t, struct kan_repository_event_read_access_t, access);
     }
 #endif
 
     access.iterator = query_data->iterator;
     query_data->iterator =
         kan_event_queue_iterator_create_next (&query_data->storage->event_queue, query_data->iterator);
-    return *(struct kan_repository_event_read_access_t *) &access;
+    return KAN_PUN_TYPE (struct event_read_access_t, struct kan_repository_event_read_access_t, access);
 }
 
 const void *kan_repository_event_read_access_resolve (struct kan_repository_event_read_access_t *access)
