@@ -766,7 +766,6 @@ kan_repository_indexed_sequence_update_cursor_next (struct kan_repository_indexe
 REPOSITORY_API void *kan_repository_indexed_sequence_update_access_resolve (
     struct kan_repository_indexed_sequence_update_access_t *access);
 
-
 /// \brief Closes underlying read access. Should not be called for null accesses.
 /// \invariant Should be called in serving mode.
 REPOSITORY_API void kan_repository_indexed_sequence_update_access_close (
