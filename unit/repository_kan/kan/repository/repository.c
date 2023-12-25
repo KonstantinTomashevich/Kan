@@ -6351,6 +6351,7 @@ static struct interval_index_t *indexed_storage_find_or_create_interval_index (s
     index->storage = storage;
     index->queries_count = kan_atomic_int_init (0);
     index->baked = baked;
+    index->baked_archetype = baked_archetype;
 
     kan_avl_tree_init (&index->tree);
     index->source_path = interned_path;
