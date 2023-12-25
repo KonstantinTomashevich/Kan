@@ -18,8 +18,8 @@
 #endif
 
 #if defined(_MSC_VER) && !defined(__clang__)
-#    define KAN_MUTE_UNINITIALIZED_WARNINGS_BEGIN
-#    define KAN_MUTE_UNINITIALIZED_WARNINGS_END
+#    define KAN_MUTE_UNINITIALIZED_WARNINGS_BEGIN _Pragma ("warning (push, disable : 4701)")
+#    define KAN_MUTE_UNINITIALIZED_WARNINGS_END _Pragma ("warning (pop)")
 #else
 // clang-format off
 #    define KAN_MUTE_UNINITIALIZED_WARNINGS_BEGIN                                                                      \

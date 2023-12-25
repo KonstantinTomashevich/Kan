@@ -11,10 +11,9 @@
 #if defined(_WIN32)
 /// \brief Converts unit name into external declaration of its reflection registrar function.
 #    define KAN_REFLECTION_EXPECT_UNIT_REGISTRAR(UNIT_NAME)                                                            \
-        extern __declspec (dllimport) void KAN_REFLECTION_UNIT_REGISTRAR_NAME (UNIT_NAME) (                            \
-            kan_reflection_registry_t registry)
+        __declspec (dllimport) void KAN_REFLECTION_UNIT_REGISTRAR_NAME (UNIT_NAME) (kan_reflection_registry_t registry)
 #else
 /// \brief Converts unit name into external declaration of its reflection registrar function.
 #    define KAN_REFLECTION_EXPECT_UNIT_REGISTRAR(UNIT_NAME)                                                            \
-        extern void KAN_REFLECTION_UNIT_REGISTRAR_NAME (UNIT_NAME) (kan_reflection_registry_t registry)
+        void KAN_REFLECTION_UNIT_REGISTRAR_NAME (UNIT_NAME) (kan_reflection_registry_t registry)
 #endif

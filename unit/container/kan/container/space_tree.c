@@ -20,6 +20,7 @@ static inline uint16_t quantize (double value, double min, double max)
 static inline struct kan_space_tree_quantized_path_t quantize_sequence (struct kan_space_tree_t *tree,
                                                                         const double *sequence)
 {
+    KAN_MUTE_UNINITIALIZED_WARNINGS_BEGIN
     struct kan_space_tree_quantized_path_t path;
     switch (tree->dimension_count)
     {
@@ -34,6 +35,7 @@ static inline struct kan_space_tree_quantized_path_t quantize_sequence (struct k
     }
 
     return path;
+    KAN_MUTE_UNINITIALIZED_WARNINGS_END
 }
 
 static inline double to_quantized_space (double value, double min, double max)
