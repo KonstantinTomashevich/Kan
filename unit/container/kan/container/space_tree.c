@@ -312,7 +312,7 @@ static inline uint64_t calculate_node_size (uint16_t dimension_count, kan_bool_t
     uint64_t size = sizeof (struct kan_space_tree_node_t);
     if (with_children)
     {
-        size += sizeof (void *) * (1u << dimension_count);
+        size += sizeof (void *) * (uint64_t) (1u << dimension_count);
     }
 
     return kan_apply_alignment (size, _Alignof (struct kan_space_tree_node_t));
@@ -360,7 +360,7 @@ static inline struct kan_space_tree_node_t *get_or_create_child_node (struct kan
         tree->allocation_group, calculate_node_size (tree->dimension_count, child_height != tree->last_level_height));
 
     child_node->parent = parent_node;
-    child_node->height = child_height;
+    child_node->height = (uint8_t) child_height;
     child_node->first_sub_node = NULL;
 
     if (child_height != tree->last_level_height)
