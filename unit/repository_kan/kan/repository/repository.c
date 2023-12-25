@@ -2835,11 +2835,11 @@ static inline uint64_t convert_signed_to_unsigned (int64_t signed_value, uint64_
 
     case 4u:
         return signed_value < 0 ? (uint32_t) (signed_value - INT32_MIN) :
-                                  ((uint32_t) signed_value) + ((uint32_t) -INT32_MIN);
+                                  ((uint32_t) signed_value) + (1u + UINT32_MAX / 2u);
 
     case 8u:
         return signed_value < 0 ? (uint64_t) (signed_value - INT64_MIN) :
-                                  ((uint64_t) signed_value) + ((uint64_t) -INT64_MIN);
+                                  ((uint64_t) signed_value) + (1u + UINT64_MAX / 2u);;
     }
 
     KAN_ASSERT (KAN_FALSE)
