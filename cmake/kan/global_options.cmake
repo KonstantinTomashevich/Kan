@@ -73,6 +73,8 @@ function (add_common_compile_options)
                     -Wall
                     -Wextra
                     -Werror
+                    # We're aware that fallthrough is default implicit behavior and we use it in some cases.
+                    -Wno-implicit-fallthrough
                     # It only triggered once and it was false-positive alarm, therefore we disable it.
                     -Wno-stringop-truncation
                     # We silence unused parameter warnings, because it is troublesome
