@@ -24,6 +24,7 @@
 // clang-format off
 #    define KAN_MUTE_UNINITIALIZED_WARNINGS_BEGIN                                                                      \
         _Pragma ("GCC diagnostic push")                                                                                \
+        _Pragma ("GCC diagnostic ignored \"-Wpragmas\"")                                                               \
         _Pragma ("GCC diagnostic ignored \"-Wunknown-warning-option\"")                                                \
         _Pragma ("GCC diagnostic ignored \"-Wmaybe-uninitialized\"")
 // clang-format on
