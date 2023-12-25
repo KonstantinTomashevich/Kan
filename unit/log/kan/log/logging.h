@@ -54,7 +54,7 @@ typedef uint64_t kan_log_category_t;
 #define KAN_LOG_CATEGORY_INVALID 0u
 
 #if defined(_WIN32)
-#    define KAN_LOG_EXPORT __declspec (dllexport)
+#    define KAN_LOG_EXPORT __declspec(dllexport)
 #else
 #    define KAN_LOG_EXPORT
 #endif
