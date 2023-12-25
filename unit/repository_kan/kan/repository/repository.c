@@ -4,6 +4,7 @@
 #include <memory.h>
 #include <qsort.h>
 #include <stddef.h>
+#include <string.h>
 
 #include <kan/api_common/alignment.h>
 #include <kan/api_common/min_max.h>
