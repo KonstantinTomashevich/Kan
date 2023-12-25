@@ -64,6 +64,8 @@ function (add_common_compile_options)
                     # We silence unused parameter warnings, because it is troublesome
                     # to silence them manually for every compiler.
                     /wd4100
+                    # We're using unnamed typed for type punning to be more explicit.
+                    /wd4116
                     # Zero length arrays greatly increase readability for classes and structs with dynamic sizes.
                     /wd4200
                     # Currently we're okay with assignments on conditional expressions.

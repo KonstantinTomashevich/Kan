@@ -1662,7 +1662,7 @@ static struct copy_out_list_node_t *merge_copy_outs (struct copy_out_list_node_t
     copy_out = input_array[first_index], input_array[first_index] = input_array[second_index],                         \
     input_array[second_index] = copy_out
 
-        QSORT (count, LESS, SWAP);
+        QSORT ((unsigned long) count, LESS, SWAP);
 #undef LESS
 #undef SWAP
     }
@@ -1753,7 +1753,7 @@ static void observation_buffer_definition_build (struct observation_buffer_defin
     chunk = initial_chunks[first_index], initial_chunks[first_index] = initial_chunks[second_index],                   \
     initial_chunks[second_index] = chunk
 
-        QSORT (initial_chunks_count, LESS, SWAP);
+        QSORT ((unsigned long) initial_chunks_count, LESS, SWAP);
 #undef LESS
 #undef SWAP
     }
@@ -2879,7 +2879,7 @@ static inline uint64_t indexed_field_baked_data_extract_and_convert_unsigned_fro
         const double value = indexed_field_baked_data_extract_floating_from_pointer (data, pointer);
         KAN_ASSERT (value <= (double) INT64_MAX)
         KAN_ASSERT (value >= (double) INT64_MIN)
-        return convert_signed_to_unsigned ((int64_t) llroundf (value), 8u);
+        return convert_signed_to_unsigned ((int64_t) llround (value), 8u);
     }
 
     case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
