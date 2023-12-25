@@ -7,6 +7,7 @@
 #include <kan/api_common/alignment.h>
 #include <kan/api_common/bool.h>
 #include <kan/api_common/c_header.h>
+#include <kan/api_common/mute_third_party_warnings.h>
 #include <kan/memory_profiler/allocation_group.h>
 
 /// \file
@@ -349,6 +350,7 @@ static inline struct kan_ray_intersection_output_t kan_check_if_ray_and_bounds_i
                                                                                           const double *ray_origin,
                                                                                           const double *ray_direction)
 {
+    KAN_MUTE_UNINITIALIZED_WARNINGS_BEGIN
     // Integration of:
     //     Fast Ray-Box Intersection
     //     by Andrew Woo
@@ -474,6 +476,7 @@ static inline struct kan_ray_intersection_output_t kan_check_if_ray_and_bounds_i
     result.hit = KAN_TRUE;
     result.time = max_time;
     return result;
+    KAN_MUTE_UNINITIALIZED_WARNINGS_END
 }
 
 KAN_C_HEADER_END

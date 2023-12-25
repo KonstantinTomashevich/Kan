@@ -1,7 +1,7 @@
 #pragma once
 
 /// \file
-/// \brief Contains macros for muting warnings in third party headers.
+/// \brief Contains macros for muting warnings in third party headers or for some rare cases in Kan.
 
 #if defined(_MSC_VER) && !defined(__clang__)
 #    define KAN_MUTE_THIRD_PARTY_WARNINGS_BEGIN _Pragma ("warning (push, 0)")
@@ -15,4 +15,17 @@
 // clang-format on
 
 #    define KAN_MUTE_THIRD_PARTY_WARNINGS_END _Pragma ("GCC diagnostic pop")
+#endif
+
+#if defined(_MSC_VER) && !defined(__clang__)
+#    define KAN_MUTE_UNINITIALIZED_WARNINGS_BEGIN
+#    define KAN_MUTE_UNINITIALIZED_WARNINGS_END
+#else
+// clang-format off
+#    define KAN_MUTE_UNINITIALIZED_WARNINGS_BEGIN                                                                      \
+        _Pragma ("GCC diagnostic push")                                                                                \
+        _Pragma ("GCC diagnostic ignored \"-Wmaybe-uninitialized\"")
+// clang-format on
+
+#    define KAN_MUTE_UNINITIALIZED_WARNINGS_END _Pragma ("GCC diagnostic pop")
 #endif
