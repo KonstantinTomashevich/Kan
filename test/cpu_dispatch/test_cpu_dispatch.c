@@ -136,7 +136,9 @@ KAN_TEST_CASE (execute_1000_tasks_separate_dispatch)
     }
 }
 
-KAN_TEST_CASE (execute_1000_tasks_separate_dispatch_cancell_middle_100)
+// Full name is too much to bear for the Windows without long file paths.
+// execute_1000_tasks_separate_dispatch_cancell_middle_100
+KAN_TEST_CASE (execute_1000_tasks_sd_cm100)
 {
     kan_cpu_task_handle_t handles[1000u];
     struct test_task_user_data_t user_data[1000u];
@@ -174,7 +176,9 @@ KAN_TEST_CASE (execute_1000_tasks_list_dispatch)
     }
 }
 
-KAN_TEST_CASE (execute_1000_tasks_separate_dispatch_and_detach_right_away)
+// Full name is too much to bear for the Windows without long file paths.
+// execute_1000_tasks_separate_dispatch_and_detach_right_away
+KAN_TEST_CASE (execute_1000_tasks_sd_dra)
 {
     kan_cpu_task_handle_t handles[1000u];
     struct test_task_user_data_t user_data[1000u];
@@ -273,6 +277,7 @@ KAN_TEST_CASE (job_1000_completion_task)
     kan_cpu_task_handle_t handles[1000u];
     struct test_task_user_data_t user_data[1000u];
     struct test_task_user_data_t completion_task_user_data;
+    completion_task_user_data.work_done = kan_atomic_int_init (0);
     const kan_cpu_job_t job = kan_cpu_job_create ();
 
     kan_cpu_job_set_completion_task (job,

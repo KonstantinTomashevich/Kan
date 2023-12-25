@@ -8,8 +8,10 @@
 #include <kan/repository/repository.h>
 #include <kan/testing/testing.h>
 
+// \c_interface_scanner_disable
 KAN_REFLECTION_EXPECT_UNIT_REGISTRAR (repository);
 KAN_REFLECTION_EXPECT_UNIT_REGISTRAR (test_repository);
+// \c_interface_scanner_enable
 
 struct manual_event_t
 {
@@ -627,7 +629,7 @@ static uint64_t query_bounding_box (struct kan_repository_indexed_space_read_que
             break;
         }
 
-        const uint64_t record_flag = 1u << record->object_id;
+        const uint64_t record_flag = ((uint64_t) 1u) << record->object_id;
         // Check that there are no duplicate visits.
         KAN_TEST_CHECK ((flags & record_flag) == 0u)
         flags |= record_flag;
@@ -667,7 +669,7 @@ static uint64_t query_ray (struct kan_repository_indexed_space_read_query_t *que
             break;
         }
 
-        const uint64_t record_flag = 1u << record->object_id;
+        const uint64_t record_flag = ((uint64_t) 1u) << record->object_id;
         // Check that there are no duplicate visits.
         KAN_TEST_CHECK ((flags & record_flag) == 0u)
         flags |= record_flag;
