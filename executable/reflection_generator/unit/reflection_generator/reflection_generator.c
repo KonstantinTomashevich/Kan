@@ -41,6 +41,7 @@ static struct
 {
     kan_interned_string_t reflection_flags;
     kan_interned_string_t reflection_ignore_enum;
+    kan_interned_string_t reflection_ignore_init_shutdown;
     kan_interned_string_t reflection_ignore_struct;
     kan_interned_string_t reflection_external_pointer;
     kan_interned_string_t reflection_dynamic_array_type;
@@ -505,21 +506,29 @@ static void add_bootstrap (void)
                     kan_trivial_string_buffer_append_string (&io.output_buffer, field_data->name);
                     kan_trivial_string_buffer_append_string (&io.output_buffer, ") / sizeof (");
 
-                    switch (field_data->type.archetype)
+                    if (field_data->type.pointer_level > 0u)
                     {
-                    case KAN_C_ARCHETYPE_BASIC:
-                        break;
+                        kan_trivial_string_buffer_append_string (&io.output_buffer, "void *");
+                    }
+                    else
+                    {
+                        switch (field_data->type.archetype)
+                        {
+                        case KAN_C_ARCHETYPE_BASIC:
+                            break;
 
-                    case KAN_C_ARCHETYPE_ENUM:
-                        kan_trivial_string_buffer_append_string (&io.output_buffer, "enum ");
-                        break;
+                        case KAN_C_ARCHETYPE_ENUM:
+                            kan_trivial_string_buffer_append_string (&io.output_buffer, "enum ");
+                            break;
 
-                    case KAN_C_ARCHETYPE_STRUCT:
-                        kan_trivial_string_buffer_append_string (&io.output_buffer, "struct ");
-                        break;
+                        case KAN_C_ARCHETYPE_STRUCT:
+                            kan_trivial_string_buffer_append_string (&io.output_buffer, "struct ");
+                            break;
+                        }
+
+                        kan_trivial_string_buffer_append_string (&io.output_buffer, field_data->type.name);
                     }
 
-                    kan_trivial_string_buffer_append_string (&io.output_buffer, field_data->type.name);
                     kan_trivial_string_buffer_append_string (&io.output_buffer, "),\n");
 
 #define NO_SIZE_FIELD ~0u
@@ -838,42 +847,56 @@ static void add_bootstrap (void)
                 struct_data_name_length -= 2u;
             }
 
-#define MAX_STRUCT_NAME_LENGTH 128u
-            KAN_ASSERT (struct_data_name_length < MAX_STRUCT_NAME_LENGTH)
-            char init_function_name_value[MAX_STRUCT_NAME_LENGTH + 6u];
-            strncpy (init_function_name_value, struct_data->name, struct_data_name_length);
-            strcpy (init_function_name_value + struct_data_name_length, "_init");
-            kan_interned_string_t init_function_name = kan_string_intern (init_function_name_value);
-
-            char shutdown_function_name_value[MAX_STRUCT_NAME_LENGTH + 10u];
-            strncpy (shutdown_function_name_value, struct_data->name, struct_data_name_length);
-            strcpy (shutdown_function_name_value + struct_data_name_length, "_shutdown");
-            kan_interned_string_t shutdown_function_name = kan_string_intern (shutdown_function_name_value);
-#undef MAX_STRUCT_NAME_LENGTH
-
             kan_bool_t init_found = KAN_FALSE;
             kan_bool_t shutdown_found = KAN_FALSE;
+            kan_bool_t should_scan_for_init_shutdown = KAN_TRUE;
 
-            for (uint64_t function_index = 0u; function_index < interface->functions_count; ++function_index)
+            for (uint64_t meta_index = 0u; meta_index < struct_data->meta.meta_count; ++meta_index)
             {
-                if (!init_found && interface->functions[function_index].name == init_function_name)
+                if (struct_data->meta.meta_array[meta_index].name == interned.reflection_ignore_init_shutdown &&
+                    struct_data->meta.meta_array[meta_index].type == KAN_C_META_MARKER)
                 {
-                    kan_trivial_string_buffer_append_string (&io.output_buffer, "        .init = ");
-                    kan_trivial_string_buffer_append_string (&io.output_buffer, init_function_name);
-                    kan_trivial_string_buffer_append_string (&io.output_buffer, ",\n");
-                    init_found = KAN_TRUE;
-                }
-                else if (!shutdown_found && interface->functions[function_index].name == shutdown_function_name)
-                {
-                    kan_trivial_string_buffer_append_string (&io.output_buffer, "        .shutdown = ");
-                    kan_trivial_string_buffer_append_string (&io.output_buffer, shutdown_function_name);
-                    kan_trivial_string_buffer_append_string (&io.output_buffer, ",\n");
-                    shutdown_found = KAN_TRUE;
-                }
-
-                if (init_found && shutdown_found)
-                {
+                    should_scan_for_init_shutdown = KAN_FALSE;
                     break;
+                }
+            }
+
+            if (should_scan_for_init_shutdown)
+            {
+#define MAX_STRUCT_NAME_LENGTH 128u
+                KAN_ASSERT (struct_data_name_length < MAX_STRUCT_NAME_LENGTH)
+                char init_function_name_value[MAX_STRUCT_NAME_LENGTH + 6u];
+                strncpy (init_function_name_value, struct_data->name, struct_data_name_length);
+                strcpy (init_function_name_value + struct_data_name_length, "_init");
+                kan_interned_string_t init_function_name = kan_string_intern (init_function_name_value);
+
+                char shutdown_function_name_value[MAX_STRUCT_NAME_LENGTH + 10u];
+                strncpy (shutdown_function_name_value, struct_data->name, struct_data_name_length);
+                strcpy (shutdown_function_name_value + struct_data_name_length, "_shutdown");
+                kan_interned_string_t shutdown_function_name = kan_string_intern (shutdown_function_name_value);
+#undef MAX_STRUCT_NAME_LENGTH
+
+                for (uint64_t function_index = 0u; function_index < interface->functions_count; ++function_index)
+                {
+                    if (!init_found && interface->functions[function_index].name == init_function_name)
+                    {
+                        kan_trivial_string_buffer_append_string (&io.output_buffer, "        .init = ");
+                        kan_trivial_string_buffer_append_string (&io.output_buffer, init_function_name);
+                        kan_trivial_string_buffer_append_string (&io.output_buffer, ",\n");
+                        init_found = KAN_TRUE;
+                    }
+                    else if (!shutdown_found && interface->functions[function_index].name == shutdown_function_name)
+                    {
+                        kan_trivial_string_buffer_append_string (&io.output_buffer, "        .shutdown = ");
+                        kan_trivial_string_buffer_append_string (&io.output_buffer, shutdown_function_name);
+                        kan_trivial_string_buffer_append_string (&io.output_buffer, ",\n");
+                        shutdown_found = KAN_TRUE;
+                    }
+
+                    if (init_found && shutdown_found)
+                    {
+                        break;
+                    }
                 }
             }
 
@@ -887,6 +910,7 @@ static void add_bootstrap (void)
                 kan_trivial_string_buffer_append_string (&io.output_buffer, "        .shutdown = NULL,\n");
             }
 
+            kan_trivial_string_buffer_append_string (&io.output_buffer, "        .functor_user_data = 0u,\n");
             kan_trivial_string_buffer_append_string (&io.output_buffer, "        .fields_count = ");
             kan_trivial_string_buffer_append_unsigned_long (&io.output_buffer,
                                                             (unsigned long) struct_data->fields_count);
@@ -1079,6 +1103,7 @@ int main (int argument_count, char **arguments_array)
 
     interned.reflection_flags = kan_string_intern ("reflection_flags");
     interned.reflection_ignore_enum = kan_string_intern ("reflection_ignore_enum");
+    interned.reflection_ignore_init_shutdown = kan_string_intern ("reflection_ignore_init_shutdown");
     interned.reflection_ignore_struct = kan_string_intern ("reflection_ignore_struct");
     interned.reflection_external_pointer = kan_string_intern ("reflection_external_pointer");
     interned.reflection_dynamic_array_type = kan_string_intern ("reflection_dynamic_array_type");

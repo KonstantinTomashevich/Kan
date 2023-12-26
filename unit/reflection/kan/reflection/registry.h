@@ -18,13 +18,12 @@
 /// - `kan_reflection_field_t`
 ///
 /// In addition to this, any runtime meta can be added to any reflection entry: enums, enum values, structs and struct
-/// fields. Meta is basically a pair of `meta_type_name` interned string and an arbitrary pointer. The only restriction
-/// is that `meta_type_name` functions as key, therefore there can't be several metas with the same `meta_type_name` on
-/// single entry. Keep in mind, that reflection meta is not the same as `c_interface` meta: `c_interface` meta is
-/// designed to add info about interface during declaration, while reflection meta aims to be registrable from outside.
-/// For example, transform structure should not specify network details in its declaration as it is a common module that
-/// can be used in different projects with different network settings, instead it should be added from outside in every
-/// project that uses transform and network modules.
+/// fields. Meta is basically a pair of `meta_type_name` interned string and an arbitrary pointer, and you can attach
+/// several metas of one type to one entry. Keep in mind, that reflection meta is not the same as `c_interface` meta:
+/// `c_interface` meta is designed to add info about interface during declaration, while reflection meta aims to be
+/// registrable from outside. For example, transform structure should not specify network details in its declaration as
+/// it is a common module that can be used in different projects with different network settings, instead it should be
+/// added from outside in every project that uses transform and network modules.
 /// \endparblock
 ///
 /// \par Registry
@@ -175,8 +174,9 @@ struct kan_reflection_field_t
     int64_t *visibility_condition_values;
 };
 
-typedef void (*kan_reflection_initialize_functor) (void *pointer);
-typedef void (*kan_reflection_shutdown_functor) (void *pointer);
+typedef uint64_t kan_reflection_functor_user_data;
+typedef void (*kan_reflection_initialize_functor) (kan_reflection_functor_user_data user_data, void *pointer);
+typedef void (*kan_reflection_shutdown_functor) (kan_reflection_functor_user_data user_data, void *pointer);
 
 /// \brief Describes fixed-size structure with optional initialize and shutdown functions.
 struct kan_reflection_struct_t
@@ -186,8 +186,35 @@ struct kan_reflection_struct_t
     uint64_t alignment;
     kan_reflection_initialize_functor init;
     kan_reflection_shutdown_functor shutdown;
+    kan_reflection_functor_user_data functor_user_data;
     uint64_t fields_count;
+
+    /// \details Fields must be ordered by ascending offset.
     struct kan_reflection_field_t *fields;
+};
+
+/// \brief Claims memory for enum meta iterator implementation.
+struct kan_reflection_enum_meta_iterator_t
+{
+    uint64_t implementation_data[4u];
+};
+
+/// \brief Claims memory for enum value meta iterator implementation.
+struct kan_reflection_enum_value_meta_iterator_t
+{
+    uint64_t implementation_data[5u];
+};
+
+/// \brief Claims memory for struct meta iterator implementation.
+struct kan_reflection_struct_meta_iterator_t
+{
+    uint64_t implementation_data[4u];
+};
+
+/// \brief Claims memory for struct field meta iterator implementation.
+struct kan_reflection_struct_field_meta_iterator_t
+{
+    uint64_t implementation_data[5u];
 };
 
 typedef uint64_t kan_reflection_registry_t;
@@ -199,75 +226,107 @@ REFLECTION_API kan_reflection_registry_t kan_reflection_registry_create (void);
 REFLECTION_API kan_bool_t kan_reflection_registry_add_enum (kan_reflection_registry_t registry,
                                                             const struct kan_reflection_enum_t *enum_reflection);
 
-/// \brief Adds new enum meta unless its meta type name is already taken.
-REFLECTION_API kan_bool_t kan_reflection_registry_add_enum_meta (kan_reflection_registry_t registry,
+/// \brief Adds meta of given type to given enum.
+REFLECTION_API void kan_reflection_registry_add_enum_meta (kan_reflection_registry_t registry,
+                                                           kan_interned_string_t enum_name,
+                                                           kan_interned_string_t meta_type_name,
+                                                           const void *meta);
+
+/// \brief Adds meta of given type to given value of given enum.
+REFLECTION_API void kan_reflection_registry_add_enum_value_meta (kan_reflection_registry_t registry,
                                                                  kan_interned_string_t enum_name,
+                                                                 kan_interned_string_t enum_value_name,
                                                                  kan_interned_string_t meta_type_name,
                                                                  const void *meta);
-
-/// \brief Adds new enum value meta unless its meta type name is already taken.
-REFLECTION_API kan_bool_t kan_reflection_registry_add_enum_value_meta (kan_reflection_registry_t registry,
-                                                                       kan_interned_string_t enum_name,
-                                                                       kan_interned_string_t enum_value_name,
-                                                                       kan_interned_string_t meta_type_name,
-                                                                       const void *meta);
 
 /// \brief Adds new struct unless its type name is already taken.
 REFLECTION_API kan_bool_t kan_reflection_registry_add_struct (kan_reflection_registry_t registry,
                                                               const struct kan_reflection_struct_t *struct_reflection);
 
-/// \brief Adds new struct meta unless its meta type name is already taken.
-REFLECTION_API kan_bool_t kan_reflection_registry_add_struct_meta (kan_reflection_registry_t registry,
+/// \brief Adds meta of given type to given struct.
+REFLECTION_API void kan_reflection_registry_add_struct_meta (kan_reflection_registry_t registry,
+                                                             kan_interned_string_t struct_name,
+                                                             kan_interned_string_t meta_type_name,
+                                                             const void *meta);
+
+/// \brief Adds meta of given type to given field of given struct.
+REFLECTION_API void kan_reflection_registry_add_struct_field_meta (kan_reflection_registry_t registry,
                                                                    kan_interned_string_t struct_name,
+                                                                   kan_interned_string_t struct_field_name,
                                                                    kan_interned_string_t meta_type_name,
                                                                    const void *meta);
-
-/// \brief Adds new struct field meta unless its meta type name is already taken.
-REFLECTION_API kan_bool_t kan_reflection_registry_add_struct_field_meta (kan_reflection_registry_t registry,
-                                                                         kan_interned_string_t struct_name,
-                                                                         kan_interned_string_t struct_field_name,
-                                                                         kan_interned_string_t meta_type_name,
-                                                                         const void *meta);
 
 /// \brief Queries for enum by its name.
 REFLECTION_API const struct kan_reflection_enum_t *kan_reflection_registry_query_enum (
     kan_reflection_registry_t registry, kan_interned_string_t enum_name);
 
-/// \brief Queries for enum meta.
-REFLECTION_API const void *kan_reflection_registry_query_enum_meta (kan_reflection_registry_t registry,
-                                                                    kan_interned_string_t enum_name,
-                                                                    kan_interned_string_t meta_type_name);
+/// \brief Queries for enum meta and returns result iterator.
+REFLECTION_API struct kan_reflection_enum_meta_iterator_t kan_reflection_registry_query_enum_meta (
+    kan_reflection_registry_t registry, kan_interned_string_t enum_name, kan_interned_string_t meta_type_name);
 
-/// \brief Queries for enum value meta.
-REFLECTION_API const void *kan_reflection_registry_query_enum_value_meta (kan_reflection_registry_t registry,
-                                                                          kan_interned_string_t enum_name,
-                                                                          kan_interned_string_t enum_value_name,
-                                                                          kan_interned_string_t meta_type_name);
+/// \brief Returns pointer to meta object or `NULL` if there is no more meta.
+REFLECTION_API const void *kan_reflection_enum_meta_iterator_get (struct kan_reflection_enum_meta_iterator_t *iterator);
+
+/// \brief Moves iterator to the next meta unless it already points to the end.
+REFLECTION_API void kan_reflection_enum_meta_iterator_next (struct kan_reflection_enum_meta_iterator_t *iterator);
+
+/// \brief Queries for enum value meta and returns result iterator.
+REFLECTION_API struct kan_reflection_enum_value_meta_iterator_t kan_reflection_registry_query_enum_value_meta (
+    kan_reflection_registry_t registry,
+    kan_interned_string_t enum_name,
+    kan_interned_string_t enum_value_name,
+    kan_interned_string_t meta_type_name);
+
+/// \brief Returns pointer to meta object or `NULL` if there is no more meta.
+REFLECTION_API const void *kan_reflection_enum_value_meta_iterator_get (
+    struct kan_reflection_enum_value_meta_iterator_t *iterator);
+
+/// \brief Moves iterator to the next meta unless it already points to the end.
+REFLECTION_API void kan_reflection_enum_value_meta_iterator_next (
+    struct kan_reflection_enum_value_meta_iterator_t *iterator);
 
 /// \brief Queries for struct by its name.
 REFLECTION_API const struct kan_reflection_struct_t *kan_reflection_registry_query_struct (
     kan_reflection_registry_t registry, kan_interned_string_t struct_name);
 
-/// \brief Queries for struct meta.
-REFLECTION_API const void *kan_reflection_registry_query_struct_meta (kan_reflection_registry_t registry,
-                                                                      kan_interned_string_t struct_name,
-                                                                      kan_interned_string_t meta_type_name);
+/// \brief Queries for struct meta and returns result iterator.
+REFLECTION_API struct kan_reflection_struct_meta_iterator_t kan_reflection_registry_query_struct_meta (
+    kan_reflection_registry_t registry, kan_interned_string_t struct_name, kan_interned_string_t meta_type_name);
 
-/// \brief Queries for struct field meta.
-REFLECTION_API const void *kan_reflection_registry_query_struct_field_meta (kan_reflection_registry_t registry,
-                                                                            kan_interned_string_t struct_name,
-                                                                            kan_interned_string_t struct_field_name,
-                                                                            kan_interned_string_t meta_type_name);
+/// \brief Returns pointer to meta object or `NULL` if there is no more meta.
+REFLECTION_API const void *kan_reflection_struct_meta_iterator_get (
+    struct kan_reflection_struct_meta_iterator_t *iterator);
+
+/// \brief Moves iterator to the next meta unless it already points to the end.
+REFLECTION_API void kan_reflection_struct_meta_iterator_next (struct kan_reflection_struct_meta_iterator_t *iterator);
+
+/// \brief Queries for struct field meta and returns result iterator.
+REFLECTION_API struct kan_reflection_struct_field_meta_iterator_t kan_reflection_registry_query_struct_field_meta (
+    kan_reflection_registry_t registry,
+    kan_interned_string_t struct_name,
+    kan_interned_string_t struct_field_name,
+    kan_interned_string_t meta_type_name);
+
+/// \brief Returns pointer to meta object or `NULL` if there is no more meta.
+REFLECTION_API const void *kan_reflection_struct_field_meta_iterator_get (
+    struct kan_reflection_struct_field_meta_iterator_t *iterator);
+
+/// \brief Moves iterator to the next meta unless it already points to the end.
+REFLECTION_API void kan_reflection_struct_field_meta_iterator_next (
+    struct kan_reflection_struct_field_meta_iterator_t *iterator);
 
 /// \brief Queries for field in fixed memory block by path array.
-/// \details Path array is an array of 2 or more interned strings where first string is a struct name and subsequent
-///          strings are field names. Query only succeeds if field is local for given struct: it means that it is stored
-///          in the same memory block.
+/// \details Struct name parameter decides search root for the path and path is an array of field names in succession.
+///          You can imagine structure reflection as a tree and path is a path from root to target field node.
+///          Query only succeeds if target field is local for given struct: it means that it is stored in the
+///          same memory block.
 REFLECTION_API const struct kan_reflection_field_t *kan_reflection_registry_query_local_field (
     kan_reflection_registry_t registry,
+    kan_interned_string_t struct_name,
     uint64_t path_length,
     kan_interned_string_t *path,
-    uint64_t *absolute_offset_output);
+    uint64_t *absolute_offset_output,
+    uint64_t *size_with_padding_output);
 
 typedef uint64_t kan_reflection_registry_enum_iterator_t;
 

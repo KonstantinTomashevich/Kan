@@ -445,6 +445,8 @@ static const char *capture_meta_value_end;
 // Define common rules.
 
 /*!rules:re2c:default
+ "//" separator* "\\c_interface_scanner_disable" separator*
+ { if (!parse_skip_until_enabled ()) { return KAN_FALSE; } continue; }
  "/""*" { if (!parse_subroutine_multi_line_comment ()) { return KAN_FALSE; } continue; }
  "//" { if (!parse_subroutine_single_line_comment ()) { return KAN_FALSE; } continue; }
 
@@ -505,9 +507,10 @@ static kan_bool_t parse_enum (void);
 static kan_bool_t parse_struct (void);
 static kan_bool_t parse_exported_symbol_begin (void);
 static kan_bool_t parse_exported_function_arguments (void);
-static kan_bool_t parse_skip_until_round_braces_close (void);
+static kan_bool_t parse_skip_until_round_braces_close (kan_bool_t append_token);
 static kan_bool_t parse_skip_until_curly_braces_close (void);
 
+static kan_bool_t parse_skip_until_enabled (void);
 static kan_bool_t parse_subroutine_multi_line_comment (void);
 static kan_bool_t parse_subroutine_single_line_comment (void);
 
@@ -518,6 +521,18 @@ static kan_bool_t parse_main (void)
         io.token = io.cursor;
         /*!re2c
          !use:default;
+
+         // Some static global variable, skip it.
+         "static" separator+ type separator* identifier separator* ("=" | ";")
+         {
+             continue;
+         }
+
+         // Some static function, skip it.
+         "static" separator+ type separator* identifier separator* "("
+         {
+             return parse_skip_until_round_braces_close (KAN_FALSE);
+         }
 
          identifier (separator | [;])
          {
@@ -562,7 +577,7 @@ static kan_bool_t parse_main (void)
          "typedef" separator+ [^;]+ ";" { optional_includable_object_append_token (); continue; }
 
          // Looks like we've encountered '(' from function that is not exported. Skip everything inside.
-         "(" { optional_includable_object_append_token (); return parse_skip_until_round_braces_close (); }
+         "(" { optional_includable_object_append_token (); return parse_skip_until_round_braces_close (KAN_TRUE); }
 
          // Looks like we've encountered '{' from function body or initializer. Skip everything inside.
          "{" { optional_includable_object_append_string (";"); return parse_skip_until_curly_braces_close (); }
@@ -759,7 +774,7 @@ static kan_bool_t parse_exported_function_arguments (void)
     }
 }
 
-static kan_bool_t parse_skip_until_round_braces_close (void)
+static kan_bool_t parse_skip_until_round_braces_close (kan_bool_t append_token)
 {
     size_t left_to_close = 1u;
     while (KAN_TRUE)
@@ -770,14 +785,22 @@ static kan_bool_t parse_skip_until_round_braces_close (void)
 
          "("
          {
-             optional_includable_object_append_token ();
+             if (append_token)
+             {
+                 optional_includable_object_append_token ();
+             }
+
              ++left_to_close;
              continue;
          }
 
          ")"
          {
-             optional_includable_object_append_token ();
+             if (append_token)
+             {
+                 optional_includable_object_append_token ();
+             }
+
              --left_to_close;
              if (left_to_close == 0u)
              {
@@ -787,7 +810,7 @@ static kan_bool_t parse_skip_until_round_braces_close (void)
              continue;
          }
 
-         * { optional_includable_object_append_token (); continue; }
+         * { if (append_token) { optional_includable_object_append_token (); } continue; }
          $ { fprintf (stderr, "Error. Reached end of file while waiting for round braces to close."); return KAN_FALSE;
          }
         */
@@ -827,6 +850,23 @@ static kan_bool_t parse_skip_until_curly_braces_close (void)
     }
 }
 
+kan_bool_t parse_skip_until_enabled (void)
+{
+    while (KAN_TRUE)
+    {
+        io.token = io.cursor;
+        /*!re2c
+         "//" separator* "\\c_interface_scanner_enable" separator* { return KAN_TRUE; }
+         * { continue; }
+         $
+         {
+             fprintf (stderr, "Error. Reached end of file while being disabled.");
+             return KAN_FALSE;
+         }
+         */
+    }
+}
+
 static kan_bool_t parse_subroutine_multi_line_comment (void)
 {
     while (KAN_TRUE)
@@ -838,7 +878,7 @@ static kan_bool_t parse_subroutine_multi_line_comment (void)
          * { continue; }
          $
          {
-             fprintf (stderr, "Error. Reached end of file while waiting for multi line comment to close ");
+             fprintf (stderr, "Error. Reached end of file while waiting for multi line comment to close.");
              return KAN_FALSE;
          }
          */
@@ -856,7 +896,7 @@ static kan_bool_t parse_subroutine_single_line_comment (void)
          * { continue; }
          $
          {
-             fprintf (stderr, "Error. Reached end of file while waiting for multi line comment to close ");
+             fprintf (stderr, "Error. Reached end of file while waiting for multi line comment to close.");
              return KAN_FALSE;
          }
          */

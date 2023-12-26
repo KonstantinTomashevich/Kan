@@ -2,6 +2,7 @@
 
 #include <string.h>
 
+#include <kan/api_common/alignment.h>
 #include <kan/container/event_queue.h>
 #include <kan/error/critical.h>
 #include <kan/memory/allocation.h>
@@ -32,24 +33,14 @@ struct allocation_group_t *retrieve_root_allocation_group_unguarded (void)
     return root_allocation_group;
 }
 
-static uint64_t calculate_allocation_group_size (const char *name)
-{
-    const uint64_t used_size = sizeof (struct allocation_group_t) + strlen (name) + 1u;
-    const uint64_t modulo = used_size % _Alignof (struct allocation_group_t);
-
-    if (modulo != 0u)
-    {
-        return used_size + _Alignof (struct allocation_group_t) - modulo;
-    }
-
-    return used_size;
-}
-
 struct allocation_group_t *create_allocation_group_unguarded (struct allocation_group_t *next_on_level,
                                                               const char *name)
 {
     struct allocation_group_t *group = (struct allocation_group_t *) kan_allocate_general_no_profiling (
-        calculate_allocation_group_size (name), _Alignof (struct allocation_group_t));
+        kan_apply_alignment (sizeof (struct allocation_group_t) + strlen (name) + 1u,
+                             _Alignof (struct allocation_group_t)),
+        _Alignof (struct allocation_group_t));
+
     group->allocated_here = 0u;
     group->next_on_level = next_on_level;
     group->first_child = NULL;

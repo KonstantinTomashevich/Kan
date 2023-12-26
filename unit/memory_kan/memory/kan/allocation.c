@@ -1,5 +1,6 @@
 #include <stdlib.h>
 
+#include <kan/api_common/alignment.h>
 #include <kan/error/critical.h>
 #include <kan/memory/allocation.h>
 #include <kan/threading/atomic.h>
@@ -257,7 +258,9 @@ struct stack_allocator_t
 kan_stack_allocator_t kan_stack_allocator_create (kan_allocation_group_t group, uint64_t amount)
 {
     struct stack_allocator_t *stack = (struct stack_allocator_t *) kan_allocate_general (
-        group, sizeof (struct stack_allocator_t) + amount, _Alignof (struct stack_allocator_t));
+        group, kan_apply_alignment (sizeof (struct stack_allocator_t) + amount, _Alignof (struct stack_allocator_t)),
+        _Alignof (struct stack_allocator_t));
+
     stack->top = stack->data;
     stack->end = stack->data + amount;
     stack->group = group;
@@ -300,6 +303,18 @@ void kan_stack_allocator_load_top (kan_stack_allocator_t allocator, void *top)
     struct stack_allocator_t *stack = (struct stack_allocator_t *) allocator;
     KAN_ASSERT ((uint8_t *) top >= stack->data && (uint8_t *) top <= stack->end)
     stack->top = top;
+}
+
+uint64_t kan_stack_allocator_get_size (kan_stack_allocator_t allocator)
+{
+    struct stack_allocator_t *stack = (struct stack_allocator_t *) allocator;
+    return stack->end - stack->data;
+}
+
+uint64_t kan_stack_allocator_get_available (kan_stack_allocator_t allocator)
+{
+    struct stack_allocator_t *stack = (struct stack_allocator_t *) allocator;
+    return stack->top - stack->data;
 }
 
 void kan_stack_allocator_destroy (kan_stack_allocator_t allocator)
