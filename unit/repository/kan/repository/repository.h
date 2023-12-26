@@ -17,7 +17,7 @@
 /// repository provides tools to:
 ///
 /// - Store, access and delete any data defined by reflection.
-/// - Efficiently search for data through prepared queries that uses indices as backend.
+/// - Efficiently search for data through prepared queries that use indices as backend.
 /// - Observe record addition, deleting and modification through automatic events ecosystem.
 /// - Delete logically connected data automatically using cascade deleters.
 /// \endparblock
@@ -115,7 +115,7 @@
 /// gather all required accesses from cursor on one thread and then send them to other threads (for example as tasks).
 ///
 /// While executing queries, remember about access patterns: opening write or delete accesses on different records of
-/// the same type is allowed, but opening write or delete accesses on the same records results in race condition. Also,
+/// the same type is allowed, but opening write or delete accesses on the same records results is race condition. Also,
 /// opening read access on record that is already accessed through write or delete access results in race condition too.
 /// \endparblock
 
@@ -1081,7 +1081,7 @@ REPOSITORY_API void kan_repository_indexed_signal_update_query_init (
     struct kan_repository_field_path_t path,
     uint64_t signal_value);
 
-/// \brief Returns read-owrite cursor that iterates over records with predefined value.
+/// \brief Returns read-write cursor that iterates over records with predefined value.
 /// \invariant Should be called in serving mode.
 REPOSITORY_API struct kan_repository_indexed_signal_update_cursor_t kan_repository_indexed_signal_update_query_execute (
     struct kan_repository_indexed_signal_update_query_t *query);

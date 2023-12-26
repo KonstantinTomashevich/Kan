@@ -589,6 +589,16 @@ static void check_value_exists_unique (struct kan_repository_indexed_value_read_
     kan_repository_indexed_value_read_cursor_close (&cursor);
 }
 
+static void check_value_not_exists (struct kan_repository_indexed_value_read_query_t *query, uint64_t value)
+{
+    struct kan_repository_indexed_value_read_cursor_t cursor =
+        kan_repository_indexed_value_read_query_execute (query, &value);
+
+    struct kan_repository_indexed_value_read_access_t access = kan_repository_indexed_value_read_cursor_next (&cursor);
+    KAN_TEST_CHECK (!kan_repository_indexed_value_read_access_resolve (&access))
+    kan_repository_indexed_value_read_cursor_close (&cursor);
+}
+
 static void insert_bounding_box_component_record (struct kan_repository_indexed_insert_query_t *query,
                                                   struct bounding_box_component_record_t data)
 {
@@ -678,16 +688,6 @@ static uint64_t query_ray (struct kan_repository_indexed_space_read_query_t *que
 
     kan_repository_indexed_space_ray_read_cursor_close (&cursor);
     return flags;
-}
-
-static void check_value_not_exists (struct kan_repository_indexed_value_read_query_t *query, uint64_t value)
-{
-    struct kan_repository_indexed_value_read_cursor_t cursor =
-        kan_repository_indexed_value_read_query_execute (query, &value);
-
-    struct kan_repository_indexed_value_read_access_t access = kan_repository_indexed_value_read_cursor_next (&cursor);
-    KAN_TEST_CHECK (!kan_repository_indexed_value_read_access_resolve (&access))
-    kan_repository_indexed_value_read_cursor_close (&cursor);
 }
 
 KAN_TEST_CASE (manual_event)

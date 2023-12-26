@@ -529,10 +529,10 @@ static kan_bool_t parse_main (void)
          }
 
          // Some static function, skip it.
-        "static" separator+ type separator* identifier separator* "("
-        {
-            return parse_skip_until_round_braces_close (KAN_FALSE);
-        }
+         "static" separator+ type separator* identifier separator* "("
+         {
+             return parse_skip_until_round_braces_close (KAN_FALSE);
+         }
 
          identifier (separator | [;])
          {

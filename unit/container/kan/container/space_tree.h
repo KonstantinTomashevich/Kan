@@ -223,7 +223,7 @@ struct kan_space_tree_ray_iterator_t
     double max_time;
 };
 
-/// \brief Initializes given space tree with given parameters/
+/// \brief Initializes given space tree with given parameters.
 ///
 /// \param tree Pointer for tree to initialize.
 /// \param allocation_group Allocation group for tree internal allocations.
