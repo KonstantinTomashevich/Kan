@@ -26,7 +26,6 @@ jobs:
           submodules: recursive
 
       - name: Install Ninja (Ubuntu)
-        if: matrix.os == 'ubuntu-22.04'
         run: sudo apt-get update && sudo apt-get install ninja-build
 
       - name: Create build directory
