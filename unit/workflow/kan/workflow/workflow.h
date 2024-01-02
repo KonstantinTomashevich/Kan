@@ -6,8 +6,8 @@
 
 #include <kan/api_common/bool.h>
 #include <kan/api_common/c_header.h>
-#include <kan/memory_profiler/allocation_group.h>
 #include <kan/cpu_dispatch/job.h>
+#include <kan/memory_profiler/allocation_group.h>
 
 KAN_C_HEADER_BEGIN
 
@@ -46,11 +46,9 @@ WORKFLOW_API void kan_workflow_graph_node_write_resource (kan_workflow_graph_nod
 
 WORKFLOW_API void kan_workflow_graph_node_read_resource (kan_workflow_graph_node_t node, const char *resource_name);
 
-WORKFLOW_API void kan_workflow_graph_node_depend_on (kan_workflow_graph_node_t node,
-                                                     const char *task_or_checkpoint_name);
+WORKFLOW_API void kan_workflow_graph_node_depend_on (kan_workflow_graph_node_t node, const char *name);
 
-WORKFLOW_API void kan_workflow_graph_node_make_dependency_of (kan_workflow_graph_node_t node,
-                                                              const char *task_or_checkpoint_name);
+WORKFLOW_API void kan_workflow_graph_node_make_dependency_of (kan_workflow_graph_node_t node, const char *name);
 
 WORKFLOW_API kan_bool_t kan_workflow_graph_node_submit (kan_workflow_graph_node_t node);
 

@@ -182,7 +182,7 @@ static kan_bool_t traverse_and_verify (struct building_graph_node_t *node, struc
         }
 
         node->intermediate_traverse_status = TRAVERSE_STATUS_DONE;
-        break;
+        return KAN_TRUE;
 
     case TRAVERSE_STATUS_IN_PROGRESS:
         KAN_LOG (workflow_graph_builder, KAN_LOG_ERROR, "Caught cycle in workflow graph. Dumping node stack: ")
@@ -272,7 +272,7 @@ static kan_bool_t graph_builder_verify_intermediate (struct graph_builder_t *bui
     while (node)
     {
         node->intermediate_insert_access = (struct kan_fixed_length_bitset_t *) kan_stack_group_allocator_allocate (
-            &temporary_allocator, kan_fixed_length_bitset_calculate_allocation_size (resource_id_counter - 1u),
+            &temporary_allocator, kan_fixed_length_bitset_calculate_allocation_size (resource_id_counter),
             _Alignof (struct kan_fixed_length_bitset_t));
         kan_fixed_length_bitset_init (node->intermediate_insert_access, resource_id_counter);
 
@@ -375,13 +375,13 @@ static kan_bool_t graph_builder_verify_intermediate (struct graph_builder_t *bui
                     {
                         is_valid = KAN_FALSE;
                         KAN_LOG (workflow_graph_builder, KAN_LOG_ERROR,
-                                 "Found race collision between tasks \"%s\" and \"%s\", enumerating collisions:",
+                                 "Found race collision between nodes \"%s\" and \"%s\", enumerating collisions:",
                                  first_node->name, second_node->name)
 
                         if (read_write_collision)
                         {
                             KAN_LOG (workflow_graph_builder, KAN_LOG_ERROR,
-                                     "- First task reads and second task writes:")
+                                     "- First node reads and second node writes:")
 
                             print_colliding_resources (first_node->intermediate_read_access,
                                                        second_node->intermediate_write_access, id_to_resource_node);
@@ -390,7 +390,7 @@ static kan_bool_t graph_builder_verify_intermediate (struct graph_builder_t *bui
                         if (write_read_collision)
                         {
                             KAN_LOG (workflow_graph_builder, KAN_LOG_ERROR,
-                                     "- First task writes and second task reads:")
+                                     "- First node writes and second node reads:")
 
                             print_colliding_resources (first_node->intermediate_write_access,
                                                        second_node->intermediate_read_access, id_to_resource_node);
@@ -399,7 +399,7 @@ static kan_bool_t graph_builder_verify_intermediate (struct graph_builder_t *bui
                         if (read_insert_collision)
                         {
                             KAN_LOG (workflow_graph_builder, KAN_LOG_ERROR,
-                                     "- First task reads and second task inserts:")
+                                     "- First node reads and second node inserts:")
 
                             print_colliding_resources (first_node->intermediate_read_access,
                                                        second_node->intermediate_insert_access, id_to_resource_node);
@@ -408,7 +408,7 @@ static kan_bool_t graph_builder_verify_intermediate (struct graph_builder_t *bui
                         if (insert_read_collision)
                         {
                             KAN_LOG (workflow_graph_builder, KAN_LOG_ERROR,
-                                     "- First task inserts and second task reads:")
+                                     "- First node inserts and second node reads:")
 
                             print_colliding_resources (first_node->intermediate_insert_access,
                                                        second_node->intermediate_read_access, id_to_resource_node);
@@ -417,7 +417,7 @@ static kan_bool_t graph_builder_verify_intermediate (struct graph_builder_t *bui
                         if (insert_write_collision)
                         {
                             KAN_LOG (workflow_graph_builder, KAN_LOG_ERROR,
-                                     "- First task inserts and second task writes:")
+                                     "- First node inserts and second node writes:")
 
                             print_colliding_resources (first_node->intermediate_insert_access,
                                                        second_node->intermediate_write_access, id_to_resource_node);
@@ -426,7 +426,7 @@ static kan_bool_t graph_builder_verify_intermediate (struct graph_builder_t *bui
                         if (write_insert_collision)
                         {
                             KAN_LOG (workflow_graph_builder, KAN_LOG_ERROR,
-                                     "- First task writes and second task inserts:")
+                                     "- First node writes and second node inserts:")
 
                             print_colliding_resources (first_node->intermediate_write_access,
                                                        second_node->intermediate_insert_access, id_to_resource_node);
@@ -435,7 +435,7 @@ static kan_bool_t graph_builder_verify_intermediate (struct graph_builder_t *bui
                         if (write_write_collision)
                         {
                             KAN_LOG (workflow_graph_builder, KAN_LOG_ERROR,
-                                     "- First task writes and second task writes:")
+                                     "- First node writes and second node writes:")
 
                             print_colliding_resources (first_node->intermediate_write_access,
                                                        second_node->intermediate_write_access, id_to_resource_node);
@@ -709,8 +709,8 @@ kan_workflow_graph_t kan_workflow_graph_builder_finalize (kan_workflow_graph_bui
             KAN_ASSERT (found_node)
             ++found_node->intermediate_references_count;
 
-            add_to_id_array (&node->intermediate_outcomes, found_node->intermediate_node_id);
-            add_to_id_array (&found_node->intermediate_incomes, node->intermediate_node_id);
+            add_to_id_array (&found_node->intermediate_outcomes, node->intermediate_node_id);
+            add_to_id_array (&node->intermediate_incomes, found_node->intermediate_node_id);
         }
 
         for (uint64_t index = 0u; index < node->dependency_of.size; ++index)
@@ -721,8 +721,8 @@ kan_workflow_graph_t kan_workflow_graph_builder_finalize (kan_workflow_graph_bui
             KAN_ASSERT (found_node)
             ++found_node->intermediate_references_count;
 
-            add_to_id_array (&found_node->intermediate_outcomes, found_node->intermediate_node_id);
-            add_to_id_array (&node->intermediate_incomes, node->intermediate_node_id);
+            add_to_id_array (&node->intermediate_outcomes, found_node->intermediate_node_id);
+            add_to_id_array (&found_node->intermediate_incomes, node->intermediate_node_id);
         }
 
         node = (struct building_graph_node_t *) node->node.list_node.next;
@@ -774,7 +774,7 @@ kan_workflow_graph_t kan_workflow_graph_builder_finalize (kan_workflow_graph_bui
     if (builder_data->nodes.items.size == 0u)
     {
         KAN_LOG (workflow_graph_builder, KAN_LOG_ERROR,
-                 "Caught attempt to finalize graph with only checkpoints and no tasks.")
+                 "Caught attempt to finalize graph with only checkpoints and no functional nodes.")
         kan_free_general (builder_data->builder_group, id_to_node, sizeof (void *) * next_id_to_assign);
         return KAN_INVALID_WORKFLOW_GRAPH;
     }
@@ -820,7 +820,7 @@ kan_workflow_graph_t kan_workflow_graph_builder_finalize (kan_workflow_graph_bui
             result_graph = (struct workflow_graph_header_t *) kan_allocate_general (
                 builder_data->main_group, graph_size, _Alignof (struct workflow_graph_header_t));
 
-            result_graph->total_nodes_count = next_id_to_assign;
+            result_graph->total_nodes_count = builder_data->nodes.items.size;
             result_graph->start_nodes_count = start_nodes_count;
 
             kan_stack_group_allocator_init (&result_graph->temporary_allocator, builder_data->main_group,
@@ -834,7 +834,7 @@ kan_workflow_graph_t kan_workflow_graph_builder_finalize (kan_workflow_graph_bui
             result_graph->allocation_size = graph_size;
 
             struct workflow_graph_node_t **id_to_built_node = (struct workflow_graph_node_t **) kan_allocate_general (
-                builder_data->builder_group, sizeof (void *) * next_id_to_assign, _Alignof (void *));
+                builder_data->builder_group, sizeof (void *) * builder_data->nodes.items.size, _Alignof (void *));
 
             // Fill basic data about built nodes and fill id to built nodes array. Assign start nodes.
             node = (struct building_graph_node_t *) builder_data->nodes.items.first;
@@ -886,7 +886,7 @@ kan_workflow_graph_t kan_workflow_graph_builder_finalize (kan_workflow_graph_bui
                 node = (struct building_graph_node_t *) node->node.list_node.next;
             }
 
-            kan_free_general (builder_data->builder_group, id_to_built_node, sizeof (void *) * next_id_to_assign);
+            kan_free_general (builder_data->builder_group, id_to_built_node, sizeof (void *) * builder_data->nodes.items.size);
         }
         else
         {
@@ -941,22 +941,22 @@ void kan_workflow_graph_node_read_resource (kan_workflow_graph_node_t node, cons
     add_to_interned_string_array (&node_data->resource_read_access, kan_string_intern (resource_name));
 }
 
-void kan_workflow_graph_node_depend_on (kan_workflow_graph_node_t node, const char *task_or_checkpoint_name)
+void kan_workflow_graph_node_depend_on (kan_workflow_graph_node_t node, const char *name)
 {
     struct building_graph_node_t *node_data = (struct building_graph_node_t *) node;
-    add_to_interned_string_array (&node_data->depends_on, kan_string_intern (task_or_checkpoint_name));
+    add_to_interned_string_array (&node_data->depends_on, kan_string_intern (name));
 }
 
-void kan_workflow_graph_node_make_dependency_of (kan_workflow_graph_node_t node, const char *task_or_checkpoint_name)
+void kan_workflow_graph_node_make_dependency_of (kan_workflow_graph_node_t node, const char *name)
 {
     struct building_graph_node_t *node_data = (struct building_graph_node_t *) node;
-    add_to_interned_string_array (&node_data->dependency_of, kan_string_intern (task_or_checkpoint_name));
+    add_to_interned_string_array (&node_data->dependency_of, kan_string_intern (name));
 }
 
 kan_bool_t kan_workflow_graph_node_submit (kan_workflow_graph_node_t node)
 {
     struct building_graph_node_t *node_data = (struct building_graph_node_t *) node;
-    if (!building_graph_node_is_checkpoint (node_data))
+    if (building_graph_node_is_checkpoint (node_data))
     {
         KAN_LOG (workflow_graph_builder, KAN_LOG_ERROR,
                  "Failed to submit workflow node \"%s\" as it has no function and therefore simulates checkpoint.",
@@ -982,6 +982,8 @@ void kan_workflow_graph_node_destroy (kan_workflow_graph_node_t node)
 
 static void workflow_task_finish_function (uint64_t user_data);
 
+static void workflow_task_execute_function (uint64_t user_data);
+
 static void workflow_task_start_function (uint64_t user_data)
 {
     struct workflow_graph_node_t *node = (struct workflow_graph_node_t *) user_data;
@@ -993,6 +995,19 @@ static void workflow_task_start_function (uint64_t user_data)
                                          .user_data = user_data,
                                      },
                                      KAN_CPU_DISPATCH_QUEUE_FOREGROUND);
+
+    kan_cpu_job_dispatch_task (node->job,
+                               (struct kan_cpu_task_t) {
+                                   .name = node->name,
+                                   .function = workflow_task_execute_function,
+                                   .user_data = user_data,
+                               },
+                               KAN_CPU_DISPATCH_QUEUE_FOREGROUND);
+}
+
+static void workflow_task_execute_function (uint64_t user_data)
+{
+    struct workflow_graph_node_t *node = (struct workflow_graph_node_t *) user_data;
     node->function (node->job, node->user_data);
 }
 
