@@ -834,7 +834,7 @@ kan_workflow_graph_t kan_workflow_graph_builder_finalize (kan_workflow_graph_bui
             result_graph->allocation_size = graph_size;
 
             struct workflow_graph_node_t **id_to_built_node = (struct workflow_graph_node_t **) kan_allocate_general (
-                builder_data->builder_group, sizeof (void *) * builder_data->nodes.items.size, _Alignof (void *));
+                builder_data->builder_group, sizeof (void *) * next_id_to_assign, _Alignof (void *));
 
             // Fill basic data about built nodes and fill id to built nodes array. Assign start nodes.
             node = (struct building_graph_node_t *) builder_data->nodes.items.first;
@@ -886,8 +886,7 @@ kan_workflow_graph_t kan_workflow_graph_builder_finalize (kan_workflow_graph_bui
                 node = (struct building_graph_node_t *) node->node.list_node.next;
             }
 
-            kan_free_general (builder_data->builder_group, id_to_built_node,
-                              sizeof (void *) * builder_data->nodes.items.size);
+            kan_free_general (builder_data->builder_group, id_to_built_node, sizeof (void *) * next_id_to_assign);
         }
         else
         {
@@ -904,7 +903,9 @@ kan_workflow_graph_t kan_workflow_graph_builder_finalize (kan_workflow_graph_bui
 
 void kan_workflow_graph_builder_destroy (kan_workflow_graph_builder_t builder)
 {
-    shutdown_nodes ((struct graph_builder_t *) builder, KAN_FALSE, KAN_FALSE);
+    struct graph_builder_t *builder_data = (struct graph_builder_t *) builder;
+    shutdown_nodes (builder_data, KAN_FALSE, KAN_FALSE);
+    kan_free_general (builder_data->builder_group, builder_data, sizeof (struct graph_builder_t));
 }
 
 kan_workflow_graph_node_t kan_workflow_graph_node_create (kan_workflow_graph_builder_t builder, const char *name)
@@ -1036,6 +1037,7 @@ static void workflow_task_finish_function (uint64_t user_data)
                 .user_data = (uint64_t) outcome,
             };
 
+            list_node->queue = KAN_CPU_DISPATCH_QUEUE_FOREGROUND;
             list_node->next = first_list_node;
             first_list_node = list_node;
         }
@@ -1082,6 +1084,7 @@ void kan_workflow_graph_execute (kan_workflow_graph_t graph)
             .user_data = (uint64_t) start,
         };
 
+        list_node->queue = KAN_CPU_DISPATCH_QUEUE_FOREGROUND;
         list_node->next = first_list_node;
         first_list_node = list_node;
     }
