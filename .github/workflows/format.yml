@@ -17,27 +17,19 @@ jobs:
     env:
       BUILD_DIRECTORY: ${{github.workspace}}/build
 
-    runs-on: ubuntu-22.04
+    runs-on: windows-2022
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           submodules: recursive
 
-      - name: Install Ninja (Ubuntu)
-        run: sudo apt-get update && sudo apt-get install ninja-build
-
       - name: Create build directory
         run: cmake -E make_directory ${{env.BUILD_DIRECTORY}}
 
-      - name: Select clang toolset
-        run: |
-          echo "CC=clang" >> $Env:GITHUB_ENV
-          echo "CXX=clang" >> $Env:GITHUB_ENV
-
       - name: Configure
         working-directory: ${{env.BUILD_DIRECTORY}}
-        run: cmake ${{github.workspace}} -G "Ninja Multi-Config" -DCMAKE_BUILD_TYPE=Debug
+        run: cmake ${{github.workspace}} -G "Visual Studio 17 2022" -A x64 -T clangcl
 
       - name: Check
         working-directory: ${{env.BUILD_DIRECTORY}}
