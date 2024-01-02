@@ -1,0 +1,56 @@
+name: sanitize_address
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  run_tests_with_sanitize_address:
+    defaults:
+      run:
+        shell: pwsh
+
+    env:
+      BUILD_DIRECTORY: ${{github.workspace}}/build
+
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Ninja (Ubuntu)
+        run: sudo apt-get update && sudo apt-get install ninja-build
+
+      - name: Create build directory
+        run: cmake -E make_directory ${{env.BUILD_DIRECTORY}}
+
+      - name: Select clang toolset
+        run: |
+          echo "CC=clang" >> $Env:GITHUB_ENV
+          echo "CXX=clang" >> $Env:GITHUB_ENV
+
+      - name: Configure
+        working-directory: ${{env.BUILD_DIRECTORY}}
+        run: >
+          cmake ${{github.workspace}} -G "Ninja Multi-Config" -DCMAKE_BUILD_TYPE=Debug -DKAN_ENABLE_ADDRESS_SANITIZER=ON
+
+      - name: Build
+        working-directory: ${{env.BUILD_DIRECTORY}}
+        run: cmake --build . --target test_kan --config Debug -j 2
+
+      - name: Test
+        working-directory: ${{env.BUILD_DIRECTORY}}
+        run: ctest --build-config Debug
+
+      - name: Upload test results
+        if: ${{ success() }} || ${{ failure() }}
+        uses: actions/upload-artifact@v3
+        with:
+          name: test_results_sanitize_address
+          path: ${{env.BUILD_DIRECTORY}}/Testing/Temporary
