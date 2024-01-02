@@ -209,7 +209,7 @@ static inline void print_colliding_resources (struct kan_fixed_length_bitset_t *
         {
             for (uint64_t bit_index = 0u; bit_index < 64u; ++bit_index)
             {
-                if ((intersection & (1u << bit_index)) > 0u)
+                if ((intersection & (((uint64_t) 1u) << bit_index)) > 0u)
                 {
                     KAN_LOG (workflow_graph_builder, KAN_LOG_ERROR, "  - \"%s\"",
                              id_to_resource_node[item_index * 64u + bit_index]->name)

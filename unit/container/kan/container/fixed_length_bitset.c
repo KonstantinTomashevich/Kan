@@ -22,7 +22,7 @@ void kan_fixed_length_bitset_set (struct kan_fixed_length_bitset_t *bitset, uint
     const uint64_t item_index = index / 64u;
     KAN_ASSERT (item_index < bitset->items)
     const uint64_t bit_index = index % 64u;
-    const uint64_t mask = 1u << bit_index;
+    const uint64_t mask = ((uint64_t) 1u) << bit_index;
 
     if (value)
     {
@@ -39,7 +39,7 @@ kan_bool_t kan_fixed_length_bitset_get (const struct kan_fixed_length_bitset_t *
     const uint64_t item_index = index / 64u;
     KAN_ASSERT (item_index < bitset->items)
     const uint64_t bit_index = index % 64u;
-    const uint64_t mask = 1u << bit_index;
+    const uint64_t mask = ((uint64_t) 1u) << bit_index;
     return (bitset->data[item_index] & mask) > 0u ? KAN_TRUE : KAN_FALSE;
 }
 
