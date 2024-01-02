@@ -886,7 +886,8 @@ kan_workflow_graph_t kan_workflow_graph_builder_finalize (kan_workflow_graph_bui
                 node = (struct building_graph_node_t *) node->node.list_node.next;
             }
 
-            kan_free_general (builder_data->builder_group, id_to_built_node, sizeof (void *) * builder_data->nodes.items.size);
+            kan_free_general (builder_data->builder_group, id_to_built_node,
+                              sizeof (void *) * builder_data->nodes.items.size);
         }
         else
         {
