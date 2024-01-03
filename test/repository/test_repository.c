@@ -37,17 +37,15 @@ struct first_singleton_t
     float observable_b;
 };
 
-TEST_REPOSITORY_API void first_singleton_init (uint64_t reflection_user_data, void *data)
+TEST_REPOSITORY_API void first_singleton_init (struct first_singleton_t *data)
 {
-    *(struct first_singleton_t *) data = (struct first_singleton_t) {
-        .x = 0u,
-        .y = 0u,
-        .observable_z = 0u,
+    data->x = 0u;
+    data->y = 0u;
+    data->observable_z = 0u;
 
-        .some_string = kan_string_intern ("some_value"),
-        .observable_a = 0.0f,
-        .observable_b = 0.0f,
-    };
+    data->some_string = kan_string_intern ("some_value");
+    data->observable_a = 0.0f;
+    data->observable_b = 0.0f;
 }
 
 struct first_singleton_z_changed_event_t
@@ -131,12 +129,10 @@ struct second_singleton_t
     uint32_t b;
 };
 
-TEST_REPOSITORY_API void second_singleton_init (uint64_t reflection_user_data, void *data)
+TEST_REPOSITORY_API void second_singleton_init (struct second_singleton_t *data)
 {
-    *(struct second_singleton_t *) data = (struct second_singleton_t) {
-        .a = 0u,
-        .b = 0u,
-    };
+    data->a = 0u;
+    data->b = 0u;
 }
 
 struct object_record_t
@@ -149,14 +145,12 @@ struct object_record_t
 
 #define INVALID_PARENT_OBJECT_ID ((uint64_t) ~0ull)
 
-TEST_REPOSITORY_API void object_record_init (uint64_t reflection_user_data, void *data)
+TEST_REPOSITORY_API void object_record_init (struct object_record_t *data)
 {
-    *(struct object_record_t *) data = (struct object_record_t) {
-        .object_id = 0u,
-        .parent_object_id = INVALID_PARENT_OBJECT_ID,
-        .data_x = 0u,
-        .data_y = 0u,
-    };
+    data->object_id = 0u;
+    data->parent_object_id = INVALID_PARENT_OBJECT_ID;
+    data->data_x = 0u;
+    data->data_y = 0u;
 }
 
 // \meta reflection_struct_meta = "object_record_t"
@@ -175,15 +169,13 @@ struct status_record_t
     kan_bool_t observable_boosted;
 };
 
-TEST_REPOSITORY_API void status_record_init (uint64_t reflection_user_data, void *data)
+TEST_REPOSITORY_API void status_record_init (struct status_record_t *data)
 {
-    *(struct status_record_t *) data = (struct status_record_t) {
-        .object_id = 0u,
-        .observable_alive = KAN_FALSE,
-        .observable_poisoned = KAN_FALSE,
-        .observable_stunned = KAN_FALSE,
-        .observable_boosted = KAN_FALSE,
-    };
+    data->object_id = 0u;
+    data->observable_alive = KAN_FALSE;
+    data->observable_poisoned = KAN_FALSE;
+    data->observable_stunned = KAN_FALSE;
+    data->observable_boosted = KAN_FALSE;
 }
 
 // \meta reflection_struct_meta = "object_record_t"
@@ -321,12 +313,10 @@ struct multi_component_record_t
     uint64_t some_data;
 };
 
-TEST_REPOSITORY_API void multi_component_record_init (uint64_t reflection_user_data, void *data)
+TEST_REPOSITORY_API void multi_component_record_init (struct multi_component_record_t *data)
 {
-    *(struct multi_component_record_t *) data = (struct multi_component_record_t) {
-        .object_id = 0u,
-        .some_data = 0u,
-    };
+    data->object_id = 0u;
+    data->some_data = 0u;
 }
 
 // \meta reflection_struct_meta = "object_record_t"

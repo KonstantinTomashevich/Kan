@@ -127,7 +127,6 @@ typedef uint64_t kan_repository_t;
 
 typedef uint64_t kan_repository_singleton_storage_t;
 
-/// \meta reflection_ignore_init_shutdown
 struct kan_repository_singleton_read_query_t
 {
     void *implementation_data;
@@ -135,7 +134,6 @@ struct kan_repository_singleton_read_query_t
 
 typedef uint64_t kan_repository_singleton_read_access_t;
 
-/// \meta reflection_ignore_init_shutdown
 struct kan_repository_singleton_write_query_t
 {
     void *implementation_data;
@@ -147,429 +145,359 @@ typedef uint64_t kan_repository_singleton_write_access_t;
 
 typedef uint64_t kan_repository_indexed_storage_t;
 
-/// \meta reflection_ignore_init_shutdown
 struct kan_repository_indexed_insert_query_t
 {
     void *implementation_data;
 };
 
-/// \meta reflection_ignore_init_shutdown
 struct kan_repository_indexed_insertion_package_t
 {
     void *implementation_data[2u];
 };
 
-/// \meta reflection_ignore_init_shutdown
 struct kan_repository_indexed_sequence_read_query_t
 {
     void *implementation_data;
 };
 
-/// \meta reflection_ignore_init_shutdown
 struct kan_repository_indexed_sequence_read_cursor_t
 {
     void *implementation_data[2u];
 };
 
-/// \meta reflection_ignore_init_shutdown
 struct kan_repository_indexed_sequence_read_access_t
 {
     void *implementation_data[2u];
 };
 
-/// \meta reflection_ignore_init_shutdown
 struct kan_repository_indexed_sequence_update_query_t
 {
     void *implementation_data;
 };
 
-/// \meta reflection_ignore_init_shutdown
 struct kan_repository_indexed_sequence_update_cursor_t
 {
     void *implementation_data[2u];
 };
 
-/// \meta reflection_ignore_init_shutdown
 struct kan_repository_indexed_sequence_update_access_t
 {
     void *implementation_data[2u];
 };
 
-/// \meta reflection_ignore_init_shutdown
 struct kan_repository_indexed_sequence_delete_query_t
 {
     void *implementation_data;
 };
 
-/// \meta reflection_ignore_init_shutdown
 struct kan_repository_indexed_sequence_delete_cursor_t
 {
     void *implementation_data[2u];
 };
 
-/// \meta reflection_ignore_init_shutdown
 struct kan_repository_indexed_sequence_delete_access_t
 {
     void *implementation_data[2u];
 };
 
-/// \meta reflection_ignore_init_shutdown
 struct kan_repository_indexed_sequence_write_query_t
 {
     void *implementation_data;
 };
 
-/// \meta reflection_ignore_init_shutdown
 struct kan_repository_indexed_sequence_write_cursor_t
 {
     void *implementation_data[2u];
 };
 
-/// \meta reflection_ignore_init_shutdown
 struct kan_repository_indexed_sequence_write_access_t
 {
     void *implementation_data[2u];
 };
 
-/// \meta reflection_ignore_init_shutdown
 struct kan_repository_indexed_value_read_query_t
 {
     void *implementation_data;
 };
 
-/// \meta reflection_ignore_init_shutdown
 struct kan_repository_indexed_value_read_cursor_t
 {
     void *implementation_data[3u];
 };
 
-/// \meta reflection_ignore_init_shutdown
 struct kan_repository_indexed_value_read_access_t
 {
     void *implementation_data[3u];
 };
 
-/// \meta reflection_ignore_init_shutdown
 struct kan_repository_indexed_value_update_query_t
 {
     void *implementation_data;
 };
 
-/// \meta reflection_ignore_init_shutdown
 struct kan_repository_indexed_value_update_cursor_t
 {
     void *implementation_data[3u];
 };
 
-/// \meta reflection_ignore_init_shutdown
 struct kan_repository_indexed_value_update_access_t
 {
     void *implementation_data[4u];
 };
 
-/// \meta reflection_ignore_init_shutdown
 struct kan_repository_indexed_value_delete_query_t
 {
     void *implementation_data;
 };
 
-/// \meta reflection_ignore_init_shutdown
 struct kan_repository_indexed_value_delete_cursor_t
 {
     void *implementation_data[3u];
 };
 
-/// \meta reflection_ignore_init_shutdown
 struct kan_repository_indexed_value_delete_access_t
 {
     void *implementation_data[3u];
 };
 
-/// \meta reflection_ignore_init_shutdown
 struct kan_repository_indexed_value_write_query_t
 {
     void *implementation_data;
 };
 
-/// \meta reflection_ignore_init_shutdown
 struct kan_repository_indexed_value_write_cursor_t
 {
     void *implementation_data[3u];
 };
 
-/// \meta reflection_ignore_init_shutdown
 struct kan_repository_indexed_value_write_access_t
 {
     void *implementation_data[4u];
 };
 
-/// \meta reflection_ignore_init_shutdown
 struct kan_repository_indexed_signal_read_query_t
 {
     void *implementation_data;
 };
 
-/// \meta reflection_ignore_init_shutdown
 struct kan_repository_indexed_signal_read_cursor_t
 {
     void *implementation_data[2u];
 };
 
-/// \meta reflection_ignore_init_shutdown
 struct kan_repository_indexed_signal_read_access_t
 {
     void *implementation_data[2u];
 };
 
-/// \meta reflection_ignore_init_shutdown
 struct kan_repository_indexed_signal_update_query_t
 {
     void *implementation_data;
 };
 
-/// \meta reflection_ignore_init_shutdown
 struct kan_repository_indexed_signal_update_cursor_t
 {
     void *implementation_data[2u];
 };
 
-/// \meta reflection_ignore_init_shutdown
 struct kan_repository_indexed_signal_update_access_t
 {
     void *implementation_data[3u];
 };
 
-/// \meta reflection_ignore_init_shutdown
 struct kan_repository_indexed_signal_delete_query_t
 {
     void *implementation_data;
 };
 
-/// \meta reflection_ignore_init_shutdown
 struct kan_repository_indexed_signal_delete_cursor_t
 {
     void *implementation_data[2u];
 };
 
-/// \meta reflection_ignore_init_shutdown
 struct kan_repository_indexed_signal_delete_access_t
 {
     void *implementation_data[2u];
 };
 
-/// \meta reflection_ignore_init_shutdown
 struct kan_repository_indexed_signal_write_query_t
 {
     void *implementation_data;
 };
 
-/// \meta reflection_ignore_init_shutdown
 struct kan_repository_indexed_signal_write_cursor_t
 {
     void *implementation_data[2u];
 };
 
-/// \meta reflection_ignore_init_shutdown
 struct kan_repository_indexed_signal_write_access_t
 {
     void *implementation_data[3u];
 };
 
-/// \meta reflection_ignore_init_shutdown
 struct kan_repository_indexed_interval_read_query_t
 {
     void *implementation_data;
 };
 
-/// \meta reflection_ignore_init_shutdown
 struct kan_repository_indexed_interval_ascending_read_cursor_t
 {
     void *implementation_data[4u];
     uint64_t implementation_data_64[2u];
 };
 
-/// \meta reflection_ignore_init_shutdown
 struct kan_repository_indexed_interval_descending_read_cursor_t
 {
     void *implementation_data[4u];
     uint64_t implementation_data_64[2u];
 };
 
-/// \meta reflection_ignore_init_shutdown
 struct kan_repository_indexed_interval_read_access_t
 {
     void *implementation_data[3u];
 };
 
-/// \meta reflection_ignore_init_shutdown
 struct kan_repository_indexed_interval_update_query_t
 {
     void *implementation_data;
 };
 
-/// \meta reflection_ignore_init_shutdown
 struct kan_repository_indexed_interval_ascending_update_cursor_t
 {
     void *implementation_data[4u];
     uint64_t implementation_data_64[2u];
 };
 
-/// \meta reflection_ignore_init_shutdown
 struct kan_repository_indexed_interval_descending_update_cursor_t
 {
     void *implementation_data[4u];
     uint64_t implementation_data_64[2u];
 };
 
-/// \meta reflection_ignore_init_shutdown
 struct kan_repository_indexed_interval_update_access_t
 {
     void *implementation_data[4u];
 };
 
-/// \meta reflection_ignore_init_shutdown
 struct kan_repository_indexed_interval_delete_query_t
 {
     void *implementation_data;
 };
 
-/// \meta reflection_ignore_init_shutdown
 struct kan_repository_indexed_interval_ascending_delete_cursor_t
 {
     void *implementation_data[4u];
     uint64_t implementation_data_64[2u];
 };
 
-/// \meta reflection_ignore_init_shutdown
 struct kan_repository_indexed_interval_descending_delete_cursor_t
 {
     void *implementation_data[4u];
     uint64_t implementation_data_64[2u];
 };
 
-/// \meta reflection_ignore_init_shutdown
 struct kan_repository_indexed_interval_delete_access_t
 {
     void *implementation_data[3u];
 };
 
-/// \meta reflection_ignore_init_shutdown
 struct kan_repository_indexed_interval_write_query_t
 {
     void *implementation_data;
 };
 
-/// \meta reflection_ignore_init_shutdown
 struct kan_repository_indexed_interval_ascending_write_cursor_t
 {
     void *implementation_data[4u];
     uint64_t implementation_data_64[2u];
 };
 
-/// \meta reflection_ignore_init_shutdown
 struct kan_repository_indexed_interval_descending_write_cursor_t
 {
     void *implementation_data[4u];
     uint64_t implementation_data_64[2u];
 };
 
-/// \meta reflection_ignore_init_shutdown
 struct kan_repository_indexed_interval_write_access_t
 {
     void *implementation_data[4u];
 };
 
-/// \meta reflection_ignore_init_shutdown
 struct kan_repository_indexed_space_read_query_t
 {
     void *implementation_data;
 };
 
-/// \meta reflection_ignore_init_shutdown
 struct kan_repository_indexed_space_shape_read_cursor_t
 {
     uint64_t implementation_data_64[22u];
 };
 
-/// \meta reflection_ignore_init_shutdown
 struct kan_repository_indexed_space_ray_read_cursor_t
 {
     uint64_t implementation_data_64[32u];
 };
 
-/// \meta reflection_ignore_init_shutdown
 struct kan_repository_indexed_space_read_access_t
 {
     void *implementation_data[3u];
 };
 
-/// \meta reflection_ignore_init_shutdown
 struct kan_repository_indexed_space_update_query_t
 {
     void *implementation_data;
 };
 
-/// \meta reflection_ignore_init_shutdown
 struct kan_repository_indexed_space_shape_update_cursor_t
 {
     uint64_t implementation_data_64[22u];
 };
 
-/// \meta reflection_ignore_init_shutdown
 struct kan_repository_indexed_space_ray_update_cursor_t
 {
     uint64_t implementation_data_64[32u];
 };
 
-/// \meta reflection_ignore_init_shutdown
 struct kan_repository_indexed_space_update_access_t
 {
     void *implementation_data[4u];
 };
 
-/// \meta reflection_ignore_init_shutdown
 struct kan_repository_indexed_space_delete_query_t
 {
     void *implementation_data;
 };
 
-/// \meta reflection_ignore_init_shutdown
 struct kan_repository_indexed_space_shape_delete_cursor_t
 {
     uint64_t implementation_data_64[22u];
 };
 
-/// \meta reflection_ignore_init_shutdown
 struct kan_repository_indexed_space_ray_delete_cursor_t
 {
     uint64_t implementation_data_64[32u];
 };
 
-/// \meta reflection_ignore_init_shutdown
 struct kan_repository_indexed_space_delete_access_t
 {
     void *implementation_data[3u];
 };
 
-/// \meta reflection_ignore_init_shutdown
 struct kan_repository_indexed_space_write_query_t
 {
     void *implementation_data;
 };
 
-/// \meta reflection_ignore_init_shutdown
 struct kan_repository_indexed_space_shape_write_cursor_t
 {
     uint64_t implementation_data_64[22u];
 };
 
-/// \meta reflection_ignore_init_shutdown
 struct kan_repository_indexed_space_ray_write_cursor_t
 {
     uint64_t implementation_data_64[32u];
 };
 
-/// \meta reflection_ignore_init_shutdown
 struct kan_repository_indexed_space_write_access_t
 {
     void *implementation_data[4u];
@@ -579,25 +507,21 @@ struct kan_repository_indexed_space_write_access_t
 
 typedef uint64_t kan_repository_event_storage_t;
 
-/// \meta reflection_ignore_init_shutdown
 struct kan_repository_event_insert_query_t
 {
     void *implementation_data;
 };
 
-/// \meta reflection_ignore_init_shutdown
 struct kan_repository_event_insertion_package_t
 {
     uint64_t implementation_data[2u];
 };
 
-/// \meta reflection_ignore_init_shutdown
 struct kan_repository_event_fetch_query_t
 {
     void *implementation_data[2u];
 };
 
-/// \meta reflection_ignore_init_shutdown
 struct kan_repository_event_read_access_t
 {
     uint64_t implementation_data[2u];

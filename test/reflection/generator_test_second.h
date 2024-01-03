@@ -19,9 +19,9 @@ struct first_component_t
     struct vector4_t rotation;
 };
 
-TEST_REFLECTION_API void first_component_init (kan_reflection_functor_user_data_t user_data, void *generic_instance);
+TEST_REFLECTION_API void first_component_init (struct first_component_t *instance);
 
-TEST_REFLECTION_API void first_component_shutdown (kan_reflection_functor_user_data_t user_data, void *generic_instance);
+TEST_REFLECTION_API void first_component_shutdown (struct first_component_t *instance);
 
 struct second_component_t
 {
@@ -29,9 +29,9 @@ struct second_component_t
     struct vector3_t acceleration;
 };
 
-TEST_REFLECTION_API void second_component_init (kan_reflection_functor_user_data_t user_data, void *generic_instance);
+TEST_REFLECTION_API void second_component_init (struct second_component_t *instance);
 
-TEST_REFLECTION_API void second_component_shutdown (kan_reflection_functor_user_data_t user_data, void *generic_instance);
+TEST_REFLECTION_API void second_component_shutdown (struct second_component_t *instance);
 
 // \meta reflection_ignore_struct
 struct ignored_t
