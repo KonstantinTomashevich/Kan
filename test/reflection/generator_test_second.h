@@ -50,7 +50,14 @@ enum ignored_enum_t
 enum some_enum_t
 {
     SOME_ENUM_VALUE_1 = 0,
+
+    // \meta reflection_ignore_enum_value
+    SOME_ENUM_HIDDEN,
+
     SOME_ENUM_VALUE_2,
+
+    // \meta reflection_ignore_enum_value
+    SOME_ENUM_COUNT,
 };
 
 // \meta reflection_flags
@@ -95,6 +102,9 @@ struct a_bit_of_everything_t
 
     /// \meta reflection_external_pointer
     struct first_component_t *second_external_pointer;
+
+    // \meta reflection_ignore_struct_field
+    struct kan_dynamic_array_t ignored_dynamic_array;
 
     /// \meta reflection_dynamic_array_type = "struct second_component_t *"
     struct kan_dynamic_array_t dynamic_array;
