@@ -37,6 +37,25 @@ struct example_universal_meta_editor_t
     kan_bool_t hidden;
 };
 
+struct example_function_meta_editor_action_t
+{
+    const char *category;
+    const char *display_name_key;
+    const char *description_key;
+};
+
+struct example_argument_meta_min_max_t
+{
+    int64_t min_value;
+    int64_t max_value;
+};
+
+static void function_call_functor_stub (kan_reflection_functor_user_data_t user_data,
+                                        void *return_pointer,
+                                        void *arguments_pointer)
+{
+}
+
 KAN_TEST_CASE (registry)
 {
     struct kan_reflection_enum_value_t first_enum_values[] = {
@@ -162,11 +181,61 @@ KAN_TEST_CASE (registry)
     struct example_field_meta_min_max_t first_struct_first_min_max = {-10, 10};
     struct example_field_meta_min_max_t second_struct_second_min_max = {0u, 16u};
 
+    struct kan_reflection_argument_t first_function_arguments[] = {
+        {
+            .name = kan_string_intern ("x"),
+            .size = sizeof (int32_t),
+            .archetype = KAN_REFLECTION_ARCHETYPE_SIGNED_INT,
+        },
+        {
+            .name = kan_string_intern ("y"),
+            .size = sizeof (uint32_t),
+            .archetype = KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT,
+        },
+    };
+
+    struct kan_reflection_function_t first_function = {
+        .name = kan_string_intern ("first_function"),
+        .call = function_call_functor_stub,
+        .call_user_data = 0u,
+        .return_type = {.size = sizeof (int32_t), .archetype = KAN_REFLECTION_ARCHETYPE_SIGNED_INT},
+        .arguments_count = sizeof (first_function_arguments) / sizeof (struct kan_reflection_argument_t),
+        .arguments = first_function_arguments,
+    };
+
+    struct example_argument_meta_min_max_t first_function_x_min_max = {-10, 10};
+    struct example_argument_meta_min_max_t first_function_y_min_max = {0, 16};
+
+    struct kan_reflection_argument_t second_function_arguments[] = {
+        {
+            .name = kan_string_intern ("parameter"),
+            .size = sizeof (int32_t),
+            .archetype = KAN_REFLECTION_ARCHETYPE_SIGNED_INT,
+        },
+    };
+
+    struct kan_reflection_function_t second_function = {
+        .name = kan_string_intern ("second_function"),
+        .call = function_call_functor_stub,
+        .call_user_data = 0u,
+        .return_type = {.size = sizeof (int32_t), .archetype = KAN_REFLECTION_ARCHETYPE_SIGNED_INT},
+        .arguments_count = sizeof (second_function_arguments) / sizeof (struct kan_reflection_argument_t),
+        .arguments = second_function_arguments,
+    };
+
+    struct example_function_meta_editor_action_t second_function_editor_action = {
+        .category = "Tools",
+        .display_name_key = "Bake",
+        .description_key = "Bake",
+    };
+
     kan_reflection_registry_t registry = kan_reflection_registry_create ();
     KAN_TEST_CHECK (!kan_reflection_registry_query_enum (registry, first_enum.name))
     KAN_TEST_CHECK (!kan_reflection_registry_query_enum (registry, second_enum.name))
     KAN_TEST_CHECK (!kan_reflection_registry_query_struct (registry, first_struct.name))
     KAN_TEST_CHECK (!kan_reflection_registry_query_struct (registry, second_struct.name))
+    KAN_TEST_CHECK (!kan_reflection_registry_query_function (registry, first_function.name))
+    KAN_TEST_CHECK (!kan_reflection_registry_query_function (registry, second_function.name))
 
     kan_reflection_registry_add_enum_meta (registry, kan_string_intern ("first_t"),
                                            kan_string_intern ("example_enum_meta_serialization_t"),
@@ -201,6 +270,19 @@ KAN_TEST_CASE (registry)
     kan_reflection_registry_add_struct_field_meta (registry, second_struct.name, second_struct_fields[1u].name,
                                                    kan_string_intern ("example_field_meta_min_max_t"),
                                                    &second_struct_second_min_max);
+
+    kan_reflection_registry_add_function_argument_meta (
+        registry, first_function.name, first_function_arguments[0u].name,
+        kan_string_intern ("example_argument_meta_min_max_t"), &first_function_x_min_max);
+    KAN_TEST_CHECK (kan_reflection_registry_add_function (registry, &first_function))
+    kan_reflection_registry_add_function_argument_meta (
+        registry, first_function.name, first_function_arguments[1u].name,
+        kan_string_intern ("example_argument_meta_min_max_t"), &first_function_y_min_max);
+
+    KAN_TEST_CHECK (kan_reflection_registry_add_function (registry, &second_function))
+    kan_reflection_registry_add_function_meta (registry, second_function.name,
+                                               kan_string_intern ("example_function_meta_editor_action_t"),
+                                               &second_function_editor_action);
 
     KAN_TEST_CHECK (kan_reflection_registry_query_enum (registry, first_enum.name) == &first_enum)
 
@@ -303,6 +385,40 @@ KAN_TEST_CASE (registry)
                     &second_struct_second_min_max)
     kan_reflection_struct_field_meta_iterator_next (&struct_field_meta_iterator);
     KAN_TEST_CHECK (!kan_reflection_struct_field_meta_iterator_get (&struct_field_meta_iterator))
+
+    KAN_TEST_CHECK (kan_reflection_registry_query_function (registry, first_function.name) == &first_function)
+    KAN_TEST_CHECK (kan_reflection_registry_query_function (registry, second_function.name) == &second_function)
+    KAN_TEST_CHECK (!kan_reflection_registry_query_function (registry, kan_string_intern ("unknown")))
+
+    struct kan_reflection_function_meta_iterator_t function_meta_iterator =
+        kan_reflection_registry_query_function_meta (registry, first_function.name,
+                                                     kan_string_intern ("example_function_meta_editor_action_t"));
+    KAN_TEST_CHECK (!kan_reflection_function_meta_iterator_get (&function_meta_iterator))
+
+    function_meta_iterator = kan_reflection_registry_query_function_meta (
+        registry, second_function.name, kan_string_intern ("example_function_meta_editor_action_t"));
+    KAN_TEST_CHECK (kan_reflection_function_meta_iterator_get (&function_meta_iterator) ==
+                    &second_function_editor_action)
+    kan_reflection_function_meta_iterator_next (&function_meta_iterator);
+    KAN_TEST_CHECK (!kan_reflection_function_meta_iterator_get (&function_meta_iterator))
+
+    struct kan_reflection_function_argument_meta_iterator_t argument_meta_iterator =
+        kan_reflection_registry_query_function_argument_meta (registry, first_function.name,
+                                                              first_function_arguments[0u].name,
+                                                              kan_string_intern ("example_argument_meta_min_max_t"));
+    KAN_TEST_CHECK (kan_reflection_function_argument_meta_iterator_get (&argument_meta_iterator) ==
+                    &first_function_x_min_max)
+    kan_reflection_function_argument_meta_iterator_next (&argument_meta_iterator);
+    KAN_TEST_CHECK (!kan_reflection_function_argument_meta_iterator_get (&argument_meta_iterator))
+
+    argument_meta_iterator =
+        kan_reflection_registry_query_function_argument_meta (registry, first_function.name,
+                                                              first_function_arguments[1u].name,
+                                                              kan_string_intern ("example_argument_meta_min_max_t"));
+    KAN_TEST_CHECK (kan_reflection_function_argument_meta_iterator_get (&argument_meta_iterator) ==
+                    &first_function_y_min_max)
+    kan_reflection_function_argument_meta_iterator_next (&argument_meta_iterator);
+    KAN_TEST_CHECK (!kan_reflection_function_argument_meta_iterator_get (&argument_meta_iterator))
 
     kan_reflection_registry_destroy (registry);
 }

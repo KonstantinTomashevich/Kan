@@ -7,7 +7,7 @@
 #include <kan/container/interned_string.h>
 
 /// \file
-/// \brief Provides ability to register and query struct and enum reflection data.
+/// \brief Provides ability to register and query enum, struct and function reflection data.
 ///
 /// \par Reflection data structure
 /// \parblock
@@ -16,14 +16,17 @@
 /// - `kan_reflection_enum_value_t`
 /// - `kan_reflection_struct_t`
 /// - `kan_reflection_field_t`
+/// - `kan_reflection_function_t`
+/// - `kan_reflection_return_type_t`
+/// - `kan_reflection_function_argument_t`
 ///
-/// In addition to this, any runtime meta can be added to any reflection entry: enums, enum values, structs and struct
-/// fields. Meta is basically a pair of `meta_type_name` interned string and an arbitrary pointer, and you can attach
-/// several metas of one type to one entry. Keep in mind, that reflection meta is not the same as `c_interface` meta:
-/// `c_interface` meta is designed to add info about interface during declaration, while reflection meta aims to be
-/// registrable from outside. For example, transform structure should not specify network details in its declaration as
-/// it is a common module that can be used in different projects with different network settings, instead it should be
-/// added from outside in every project that uses transform and network modules.
+/// In addition to this, any runtime meta can be added to any reflection entry: enums, enum values, structs, struct
+/// fields, functions and function arguments. Meta is basically a pair of `meta_type_name` interned string and an
+/// arbitrary pointer, and you can attach several metas of one type to one entry. Keep in mind, that reflection meta is
+/// not the same as `c_interface` meta: `c_interface` meta is designed to add info about interface during declaration,
+/// while reflection meta aims to be registrable from outside. For example, transform structure should not specify
+/// network details in its declaration as it is a common module that can be used in different projects with different
+/// network settings, instead it should be added from outside in every project that uses transform and network modules.
 /// \endparblock
 ///
 /// \par Registry
@@ -174,9 +177,9 @@ struct kan_reflection_field_t
     int64_t *visibility_condition_values;
 };
 
-typedef uint64_t kan_reflection_functor_user_data;
-typedef void (*kan_reflection_initialize_functor) (kan_reflection_functor_user_data user_data, void *pointer);
-typedef void (*kan_reflection_shutdown_functor) (kan_reflection_functor_user_data user_data, void *pointer);
+typedef uint64_t kan_reflection_functor_user_data_t;
+typedef void (*kan_reflection_initialize_functor) (kan_reflection_functor_user_data_t user_data, void *pointer);
+typedef void (*kan_reflection_shutdown_functor) (kan_reflection_functor_user_data_t user_data, void *pointer);
 
 /// \brief Describes fixed-size structure with optional initialize and shutdown functions.
 struct kan_reflection_struct_t
@@ -186,11 +189,60 @@ struct kan_reflection_struct_t
     uint64_t alignment;
     kan_reflection_initialize_functor init;
     kan_reflection_shutdown_functor shutdown;
-    kan_reflection_functor_user_data functor_user_data;
+    kan_reflection_functor_user_data_t functor_user_data;
     uint64_t fields_count;
 
     /// \details Fields must be ordered by ascending offset.
     struct kan_reflection_field_t *fields;
+};
+
+/// \brief Describes function return type.
+/// \details Archetypes KAN_REFLECTION_ARCHETYPE_INLINE_ARRAY and
+///          KAN_REFLECTION_ARCHETYPE_DYNAMIC_ARRAY are not supported.
+struct kan_reflection_return_type_t
+{
+    uint64_t size;
+    enum kan_reflection_archetype_t archetype;
+
+    union
+    {
+        struct kan_reflection_archetype_enum_suffix_t archetype_enum;
+        struct kan_reflection_archetype_struct_suffix_t archetype_struct;
+        struct kan_reflection_archetype_struct_suffix_t archetype_struct_pointer;
+    };
+};
+
+/// \brief Describes function argument.
+/// \details Archetypes KAN_REFLECTION_ARCHETYPE_INLINE_ARRAY and
+///          KAN_REFLECTION_ARCHETYPE_DYNAMIC_ARRAY are not supported.
+struct kan_reflection_argument_t
+{
+    kan_interned_string_t name;
+    uint64_t size;
+    enum kan_reflection_archetype_t archetype;
+
+    union
+    {
+        struct kan_reflection_archetype_enum_suffix_t archetype_enum;
+        struct kan_reflection_archetype_struct_suffix_t archetype_struct;
+        struct kan_reflection_archetype_struct_suffix_t archetype_struct_pointer;
+    };
+};
+
+typedef void (*kan_reflection_call_functor) (kan_reflection_functor_user_data_t user_data,
+                                             void *return_address,
+                                             void *arguments_address);
+
+/// \brief Describes callable reflected function.
+struct kan_reflection_function_t
+{
+    kan_interned_string_t name;
+    kan_reflection_call_functor call;
+    kan_reflection_functor_user_data_t call_user_data;
+
+    struct kan_reflection_return_type_t return_type;
+    uint64_t arguments_count;
+    struct kan_reflection_argument_t *arguments;
 };
 
 /// \brief Claims memory for enum meta iterator implementation.
@@ -213,6 +265,18 @@ struct kan_reflection_struct_meta_iterator_t
 
 /// \brief Claims memory for struct field meta iterator implementation.
 struct kan_reflection_struct_field_meta_iterator_t
+{
+    uint64_t implementation_data[5u];
+};
+
+/// \brief Claims memory for function meta iterator implementation.
+struct kan_reflection_function_meta_iterator_t
+{
+    uint64_t implementation_data[4u];
+};
+
+/// \brief Claims memory for function argument meta iterator implementation.
+struct kan_reflection_function_argument_meta_iterator_t
 {
     uint64_t implementation_data[5u];
 };
@@ -255,6 +319,23 @@ REFLECTION_API void kan_reflection_registry_add_struct_field_meta (kan_reflectio
                                                                    kan_interned_string_t struct_field_name,
                                                                    kan_interned_string_t meta_type_name,
                                                                    const void *meta);
+
+/// \brief Adds new function unless its name is already taken.
+REFLECTION_API kan_bool_t kan_reflection_registry_add_function (
+    kan_reflection_registry_t registry, const struct kan_reflection_function_t *function_reflection);
+
+/// \brief Adds meta of given type to given function.
+REFLECTION_API void kan_reflection_registry_add_function_meta (kan_reflection_registry_t registry,
+                                                               kan_interned_string_t function_name,
+                                                               kan_interned_string_t meta_type_name,
+                                                               const void *meta);
+
+/// \brief Adds meta of given type to given argument of given function.
+REFLECTION_API void kan_reflection_registry_add_function_argument_meta (kan_reflection_registry_t registry,
+                                                                        kan_interned_string_t function_name,
+                                                                        kan_interned_string_t function_argument_name,
+                                                                        kan_interned_string_t meta_type_name,
+                                                                        const void *meta);
 
 /// \brief Queries for enum by its name.
 REFLECTION_API const struct kan_reflection_enum_t *kan_reflection_registry_query_enum (
@@ -315,6 +396,37 @@ REFLECTION_API const void *kan_reflection_struct_field_meta_iterator_get (
 REFLECTION_API void kan_reflection_struct_field_meta_iterator_next (
     struct kan_reflection_struct_field_meta_iterator_t *iterator);
 
+/// \brief Queries for function by its name.
+REFLECTION_API const struct kan_reflection_function_t *kan_reflection_registry_query_function (
+    kan_reflection_registry_t registry, kan_interned_string_t function_name);
+
+/// \brief Queries for function meta and returns result iterator.
+REFLECTION_API struct kan_reflection_function_meta_iterator_t kan_reflection_registry_query_function_meta (
+    kan_reflection_registry_t registry, kan_interned_string_t function_name, kan_interned_string_t meta_type_name);
+
+/// \brief Returns pointer to meta object or `NULL` if there is no more meta.
+REFLECTION_API const void *kan_reflection_function_meta_iterator_get (
+    struct kan_reflection_function_meta_iterator_t *iterator);
+
+/// \brief Moves iterator to the next meta unless it already points to the end.
+REFLECTION_API void kan_reflection_function_meta_iterator_next (
+    struct kan_reflection_function_meta_iterator_t *iterator);
+
+/// \brief Queries for function argument meta and returns result iterator.
+REFLECTION_API struct kan_reflection_function_argument_meta_iterator_t
+kan_reflection_registry_query_function_argument_meta (kan_reflection_registry_t registry,
+                                                      kan_interned_string_t function_name,
+                                                      kan_interned_string_t function_argument_name,
+                                                      kan_interned_string_t meta_type_name);
+
+/// \brief Returns pointer to meta object or `NULL` if there is no more meta.
+REFLECTION_API const void *kan_reflection_function_argument_meta_iterator_get (
+    struct kan_reflection_function_argument_meta_iterator_t *iterator);
+
+/// \brief Moves iterator to the next meta unless it already points to the end.
+REFLECTION_API void kan_reflection_function_argument_meta_iterator_next (
+    struct kan_reflection_function_argument_meta_iterator_t *iterator);
+
 /// \brief Queries for field in fixed memory block by path array.
 /// \details Struct name parameter decides search root for the path and path is an array of field names in succession.
 ///          You can imagine structure reflection as a tree and path is a path from root to target field node.
@@ -355,6 +467,20 @@ REFLECTION_API const struct kan_reflection_struct_t *kan_reflection_registry_str
 /// \brief Moves iterator to the next struct unless it already points to the end.
 REFLECTION_API kan_reflection_registry_struct_iterator_t
 kan_reflection_registry_struct_iterator_next (kan_reflection_registry_struct_iterator_t iterator);
+
+typedef uint64_t kan_reflection_registry_function_iterator_t;
+
+/// \brief Returns iterator that points to the beginning of functions storage.
+REFLECTION_API kan_reflection_registry_function_iterator_t
+kan_reflection_registry_function_iterator_create (kan_reflection_registry_t registry);
+
+/// \brief Returns function to which iterator points or `NULL` if there is no more structs.
+REFLECTION_API const struct kan_reflection_function_t *kan_reflection_registry_function_iterator_get (
+    kan_reflection_registry_function_iterator_t iterator);
+
+/// \brief Moves iterator to the next function unless it already points to the end.
+REFLECTION_API kan_reflection_registry_function_iterator_t
+kan_reflection_registry_function_iterator_next (kan_reflection_registry_function_iterator_t iterator);
 
 /// \brief Destroys reflection registry. Does not destroy registered reflection data.
 REFLECTION_API void kan_reflection_registry_destroy (kan_reflection_registry_t registry);
