@@ -41,8 +41,10 @@ static struct
 {
     kan_interned_string_t reflection_flags;
     kan_interned_string_t reflection_ignore_enum;
+    kan_interned_string_t reflection_ignore_enum_value;
     kan_interned_string_t reflection_ignore_init_shutdown;
     kan_interned_string_t reflection_ignore_struct;
+    kan_interned_string_t reflection_ignore_struct_field;
     kan_interned_string_t reflection_external_pointer;
     kan_interned_string_t reflection_dynamic_array_type;
     kan_interned_string_t reflection_size_field;
@@ -133,12 +135,40 @@ static kan_bool_t is_enum_ignored (const struct kan_c_enum_t *enum_data)
     return KAN_FALSE;
 }
 
+static kan_bool_t is_enum_value_ignored (const struct kan_c_enum_value_t *enum_value_data)
+{
+    for (uint64_t index = 0u; index < enum_value_data->meta.meta_count; ++index)
+    {
+        if (enum_value_data->meta.meta_array[index].type == KAN_C_META_MARKER &&
+            enum_value_data->meta.meta_array[index].name == interned.reflection_ignore_enum_value)
+        {
+            return KAN_TRUE;
+        }
+    }
+
+    return KAN_FALSE;
+}
+
 static kan_bool_t is_struct_ignored (const struct kan_c_struct_t *struct_data)
 {
     for (uint64_t index = 0u; index < struct_data->meta.meta_count; ++index)
     {
         if (struct_data->meta.meta_array[index].type == KAN_C_META_MARKER &&
             struct_data->meta.meta_array[index].name == interned.reflection_ignore_struct)
+        {
+            return KAN_TRUE;
+        }
+    }
+
+    return KAN_FALSE;
+}
+
+static kan_bool_t is_struct_field_ignored (const struct kan_c_variable_t *struct_field_data)
+{
+    for (uint64_t index = 0u; index < struct_field_data->meta.meta_count; ++index)
+    {
+        if (struct_field_data->meta.meta_array[index].type == KAN_C_META_MARKER &&
+            struct_field_data->meta.meta_array[index].name == interned.reflection_ignore_struct_field)
         {
             return KAN_TRUE;
         }
@@ -325,11 +355,25 @@ static void add_variables (void)
                 continue;
             }
 
+            unsigned long values_count = 0u;
+            for (uint64_t value_index = 0u; value_index < enum_data->values_count; ++value_index)
+            {
+                if (!is_enum_value_ignored (&enum_data->values[value_index]))
+                {
+                    ++values_count;
+                }
+            }
+
+            if (values_count == 0u)
+            {
+                continue;
+            }
+
             kan_trivial_string_buffer_append_string (&io.output_buffer,
                                                      "static struct kan_reflection_enum_value_t reflection_");
             kan_trivial_string_buffer_append_string (&io.output_buffer, enum_data->name);
             kan_trivial_string_buffer_append_string (&io.output_buffer, "_values[");
-            kan_trivial_string_buffer_append_unsigned_long (&io.output_buffer, (unsigned long) enum_data->values_count);
+            kan_trivial_string_buffer_append_unsigned_long (&io.output_buffer, values_count);
             kan_trivial_string_buffer_append_string (&io.output_buffer, "];\n");
 
             kan_trivial_string_buffer_append_string (&io.output_buffer,
@@ -346,9 +390,16 @@ static void add_variables (void)
                 continue;
             }
 
+            unsigned long fields_count = 0u;
             for (uint64_t field_index = 0u; field_index < struct_data->fields_count; ++field_index)
             {
                 const struct kan_c_variable_t *field_data = &struct_data->fields[field_index];
+                if (is_struct_field_ignored (field_data))
+                {
+                    continue;
+                }
+
+                ++fields_count;
                 for (uint64_t meta_index = 0u; meta_index < field_data->meta.meta_count; ++meta_index)
                 {
                     if (field_data->meta.meta_array[meta_index].name == interned.reflection_visibility_condition_values)
@@ -380,8 +431,7 @@ static void add_variables (void)
                                                      "static struct kan_reflection_field_t reflection_");
             kan_trivial_string_buffer_append_string (&io.output_buffer, struct_data->name);
             kan_trivial_string_buffer_append_string (&io.output_buffer, "_fields[");
-            kan_trivial_string_buffer_append_unsigned_long (&io.output_buffer,
-                                                            (unsigned long) struct_data->fields_count);
+            kan_trivial_string_buffer_append_unsigned_long (&io.output_buffer, fields_count);
             kan_trivial_string_buffer_append_string (&io.output_buffer, "u];\n");
 
             kan_trivial_string_buffer_append_string (&io.output_buffer,
@@ -424,13 +474,19 @@ static void add_bootstrap (void)
                 continue;
             }
 
+            unsigned long output_value_index = 0u;
             for (uint64_t value_index = 0u; value_index < enum_data->values_count; ++value_index)
             {
                 const struct kan_c_enum_value_t *value_data = &enum_data->values[value_index];
+                if (is_enum_value_ignored (value_data))
+                {
+                    continue;
+                }
+
                 kan_trivial_string_buffer_append_string (&io.output_buffer, "    reflection_");
                 kan_trivial_string_buffer_append_string (&io.output_buffer, enum_data->name);
                 kan_trivial_string_buffer_append_string (&io.output_buffer, "_values[");
-                kan_trivial_string_buffer_append_unsigned_long (&io.output_buffer, (unsigned long) value_index);
+                kan_trivial_string_buffer_append_unsigned_long (&io.output_buffer, output_value_index);
                 kan_trivial_string_buffer_append_string (&io.output_buffer,
                                                          "u] = (struct kan_reflection_enum_value_t) {\n");
                 kan_trivial_string_buffer_append_string (&io.output_buffer, "        .name = kan_string_intern (\"");
@@ -440,6 +496,8 @@ static void add_bootstrap (void)
                 kan_trivial_string_buffer_append_string (&io.output_buffer, value_data->name);
                 kan_trivial_string_buffer_append_string (&io.output_buffer, ",\n");
                 kan_trivial_string_buffer_append_string (&io.output_buffer, "    };\n\n");
+
+                ++output_value_index;
             }
 
             kan_trivial_string_buffer_append_string (&io.output_buffer, "    reflection_");
@@ -453,7 +511,7 @@ static void add_bootstrap (void)
                                                      is_flags (&enum_data->meta) ? "KAN_TRUE" : "KAN_FALSE");
             kan_trivial_string_buffer_append_string (&io.output_buffer, ",\n");
             kan_trivial_string_buffer_append_string (&io.output_buffer, "        .values_count = ");
-            kan_trivial_string_buffer_append_unsigned_long (&io.output_buffer, (unsigned long) enum_data->values_count);
+            kan_trivial_string_buffer_append_unsigned_long (&io.output_buffer, output_value_index);
             kan_trivial_string_buffer_append_string (&io.output_buffer, "u,\n");
             kan_trivial_string_buffer_append_string (&io.output_buffer, "        .values = reflection_");
             kan_trivial_string_buffer_append_string (&io.output_buffer, enum_data->name);
@@ -469,13 +527,19 @@ static void add_bootstrap (void)
                 continue;
             }
 
+            unsigned long output_field_index = 0u;
             for (uint64_t field_index = 0u; field_index < struct_data->fields_count; ++field_index)
             {
                 const struct kan_c_variable_t *field_data = &struct_data->fields[field_index];
+                if (is_struct_field_ignored (field_data))
+                {
+                    continue;
+                }
+
                 kan_trivial_string_buffer_append_string (&io.output_buffer, "    reflection_");
                 kan_trivial_string_buffer_append_string (&io.output_buffer, struct_data->name);
                 kan_trivial_string_buffer_append_string (&io.output_buffer, "_fields[");
-                kan_trivial_string_buffer_append_unsigned_long (&io.output_buffer, (unsigned long) field_index);
+                kan_trivial_string_buffer_append_unsigned_long (&io.output_buffer, output_field_index);
                 kan_trivial_string_buffer_append_string (&io.output_buffer, "u] = (struct kan_reflection_field_t) {\n");
                 kan_trivial_string_buffer_append_string (&io.output_buffer, "        .name = kan_string_intern (\"");
                 kan_trivial_string_buffer_append_string (&io.output_buffer, field_data->name);
@@ -539,14 +603,20 @@ static void add_bootstrap (void)
                         if (field_data->meta.meta_array[meta_index].name == interned.reflection_size_field &&
                             field_data->meta.meta_array[meta_index].type == KAN_C_META_STRING)
                         {
+                            uint64_t index_with_ignored_skipped = 0u;
                             for (uint64_t search_field_index = 0u; search_field_index < struct_data->fields_count;
                                  ++search_field_index)
                             {
-                                if (struct_data->fields[search_field_index].name ==
-                                    field_data->meta.meta_array[meta_index].string_value)
+                                if (!is_struct_field_ignored (&struct_data->fields[search_field_index]))
                                 {
-                                    size_field_index = search_field_index;
-                                    break;
+                                    if (struct_data->fields[search_field_index].name ==
+                                        field_data->meta.meta_array[meta_index].string_value)
+                                    {
+                                        size_field_index = index_with_ignored_skipped;
+                                        break;
+                                    }
+
+                                    ++index_with_ignored_skipped;
                                 }
                             }
 
@@ -764,14 +834,20 @@ static void add_bootstrap (void)
                             interned.reflection_visibility_condition_field &&
                         field_data->meta.meta_array[meta_index].type == KAN_C_META_STRING)
                     {
+                        uint64_t index_with_ignored_skipped = 0u;
                         for (uint64_t search_field_index = 0u; search_field_index < struct_data->fields_count;
                              ++search_field_index)
                         {
-                            if (struct_data->fields[search_field_index].name ==
-                                field_data->meta.meta_array[meta_index].string_value)
+                            if (!is_struct_field_ignored (&struct_data->fields[search_field_index]))
                             {
-                                visibility_condition_field_index = search_field_index;
-                                break;
+                                if (struct_data->fields[search_field_index].name ==
+                                    field_data->meta.meta_array[meta_index].string_value)
+                                {
+                                    visibility_condition_field_index = index_with_ignored_skipped;
+                                    break;
+                                }
+
+                                ++index_with_ignored_skipped;
                             }
                         }
 
@@ -822,6 +898,7 @@ static void add_bootstrap (void)
 #undef NO_VISIBILITY_FIELD
 
                 kan_trivial_string_buffer_append_string (&io.output_buffer, "    };\n\n");
+                ++output_field_index;
             }
 
             kan_trivial_string_buffer_append_string (&io.output_buffer, "    reflection_");
@@ -912,8 +989,7 @@ static void add_bootstrap (void)
 
             kan_trivial_string_buffer_append_string (&io.output_buffer, "        .functor_user_data = 0u,\n");
             kan_trivial_string_buffer_append_string (&io.output_buffer, "        .fields_count = ");
-            kan_trivial_string_buffer_append_unsigned_long (&io.output_buffer,
-                                                            (unsigned long) struct_data->fields_count);
+            kan_trivial_string_buffer_append_unsigned_long (&io.output_buffer, output_field_index);
             kan_trivial_string_buffer_append_string (&io.output_buffer, "u,\n");
 
             kan_trivial_string_buffer_append_string (&io.output_buffer, "        .fields = reflection_");
@@ -1103,8 +1179,10 @@ int main (int argument_count, char **arguments_array)
 
     interned.reflection_flags = kan_string_intern ("reflection_flags");
     interned.reflection_ignore_enum = kan_string_intern ("reflection_ignore_enum");
+    interned.reflection_ignore_enum_value = kan_string_intern ("reflection_ignore_enum_value");
     interned.reflection_ignore_init_shutdown = kan_string_intern ("reflection_ignore_init_shutdown");
     interned.reflection_ignore_struct = kan_string_intern ("reflection_ignore_struct");
+    interned.reflection_ignore_struct_field = kan_string_intern ("reflection_ignore_struct_field");
     interned.reflection_external_pointer = kan_string_intern ("reflection_external_pointer");
     interned.reflection_dynamic_array_type = kan_string_intern ("reflection_dynamic_array_type");
     interned.reflection_size_field = kan_string_intern ("reflection_size_field");
