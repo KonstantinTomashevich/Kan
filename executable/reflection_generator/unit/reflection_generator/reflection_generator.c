@@ -18,6 +18,7 @@
 #define RETURN_CODE_INVALID_PARSABLE_META_TARGET (-6)
 #define RETURN_CODE_UNABLE_TO_OPEN_OUTPUT (-7)
 #define RETURN_CODE_IO_OUTPUT_FAILED (-8)
+#define RETURN_CODE_UNSUPPORTED_ARRAY (-9)
 
 #define OUTPUT_BUFFER_INITIAL_CAPACITY 524288u // 512 kilobytes
 
@@ -468,7 +469,9 @@ static inline void append_argument_type (const struct kan_c_type_t *type_data)
 
     if (type_data->is_array)
     {
-        kan_trivial_string_buffer_append_string (&io.output_buffer, "<arrays_not_supported> ");
+        fprintf (stderr, "Encountered array of type %s as function argument or return which is not supported.\n",
+                 type_data->name);
+        current_error_code = RETURN_CODE_UNSUPPORTED_ARRAY;
     }
 
     for (uint64_t pointer_index = 0u; pointer_index < type_data->pointer_level; ++pointer_index)
@@ -498,8 +501,9 @@ static void append_function_argument_type_info (struct kan_c_type_t *type_data, 
 
     if (type_data->is_array)
     {
-        kan_trivial_string_buffer_append_string (&io.output_buffer, indentation);
-        kan_trivial_string_buffer_append_string (&io.output_buffer, "<arrays_not_supported_here>\n");
+        fprintf (stderr, "Encountered array of type %s as function argument or return which is not supported.\n",
+                 type_data->name);
+        current_error_code = RETURN_CODE_UNSUPPORTED_ARRAY;
         return;
     }
 
@@ -1771,7 +1775,13 @@ int main (int argument_count, char **arguments_array)
     add_header ();
     add_includes ();
     add_variables ();
+
     add_functors ();
+    if (current_error_code != RETURN_CODE_SUCCESS)
+    {
+        shutdown ();
+        return current_error_code;
+    }
 
     add_bootstrap ();
     if (current_error_code != RETURN_CODE_SUCCESS)
