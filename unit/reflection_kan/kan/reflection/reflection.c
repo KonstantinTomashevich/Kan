@@ -632,13 +632,15 @@ void kan_reflection_registry_add_struct_field_meta (kan_reflection_registry_t re
 }
 
 #if defined(KAN_REFLECTION_WITH_VALIDATION) && defined(KAN_WITH_ASSERT)
-static inline void reflection_function_validate_archetype (enum kan_reflection_archetype_t archetype, uint64_t size)
+static inline void reflection_function_validate_archetype (enum kan_reflection_archetype_t archetype,
+                                                           uint64_t size,
+                                                           kan_bool_t return_type)
 {
     switch (archetype)
     {
     case KAN_REFLECTION_ARCHETYPE_SIGNED_INT:
         KAN_ASSERT (size == sizeof (int8_t) || size == sizeof (int16_t) || size == sizeof (int32_t) ||
-                    size == sizeof (int64_t))
+                    size == sizeof (int64_t) || (return_type && size == 0u))
         break;
 
     case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
@@ -687,16 +689,15 @@ kan_bool_t kan_reflection_registry_add_function (kan_reflection_registry_t regis
 
 #if defined(KAN_REFLECTION_WITH_VALIDATION) && defined(KAN_WITH_ASSERT)
     KAN_ASSERT (function_reflection->call)
-    KAN_ASSERT (function_reflection->return_type.size > 0u)
     reflection_function_validate_archetype (function_reflection->return_type.archetype,
-                                            function_reflection->return_type.size);
+                                            function_reflection->return_type.size, KAN_TRUE);
 
     for (uint64_t index = 0u; index < function_reflection->arguments_count; ++index)
     {
         const struct kan_reflection_argument_t *argument_reflection = &function_reflection->arguments[index];
         KAN_ASSERT (argument_reflection->name)
         KAN_ASSERT (argument_reflection->size > 0u)
-        reflection_function_validate_archetype (argument_reflection->archetype, argument_reflection->size);
+        reflection_function_validate_archetype (argument_reflection->archetype, argument_reflection->size, KAN_FALSE);
     }
 #endif
 

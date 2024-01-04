@@ -47,6 +47,7 @@ static struct
     kan_interned_string_t reflection_ignore_enum_value;
     kan_interned_string_t reflection_ignore_struct;
     kan_interned_string_t reflection_ignore_struct_field;
+    kan_interned_string_t reflection_ignore_function;
     kan_interned_string_t reflection_external_pointer;
     kan_interned_string_t reflection_dynamic_array_type;
     kan_interned_string_t reflection_size_field;
@@ -56,7 +57,10 @@ static struct
     kan_interned_string_t reflection_enum_value_meta;
     kan_interned_string_t reflection_struct_meta;
     kan_interned_string_t reflection_struct_field_meta;
+    kan_interned_string_t reflection_function_meta;
+    kan_interned_string_t reflection_function_argument_meta;
 
+    kan_interned_string_t type_void;
     kan_interned_string_t type_char;
     kan_interned_string_t type_interned_string;
     kan_interned_string_t type_dynamic_array;
@@ -189,6 +193,20 @@ static kan_bool_t is_struct_field_ignored (const struct kan_c_variable_t *struct
     {
         if (struct_field_data->meta.meta_array[index].type == KAN_C_META_MARKER &&
             struct_field_data->meta.meta_array[index].name == interned.reflection_ignore_struct_field)
+        {
+            return KAN_TRUE;
+        }
+    }
+
+    return KAN_FALSE;
+}
+
+static kan_bool_t is_function_ignored (const struct kan_c_function_t *function_data)
+{
+    for (uint64_t index = 0u; index < function_data->meta.meta_count; ++index)
+    {
+        if (function_data->meta.meta_array[index].type == KAN_C_META_MARKER &&
+            function_data->meta.meta_array[index].name == interned.reflection_ignore_function)
         {
             return KAN_TRUE;
         }
@@ -417,6 +435,180 @@ static const char *get_registered_shutdown_functor_name_or_null_name (const stru
     return "NULL";
 }
 
+static inline kan_interned_string_t build_call_functor_name (const struct kan_c_function_t *function_data)
+{
+    char value[MAX_STRUCT_NAME_LENGTH + 14u] = "call_functor_";
+    strcpy (value + 13u, function_data->name);
+    return kan_string_intern (value);
+}
+
+static inline void append_argument_type (const struct kan_c_type_t *type_data)
+{
+    if (type_data->is_const)
+    {
+        kan_trivial_string_buffer_append_string (&io.output_buffer, "const ");
+    }
+
+    switch (type_data->archetype)
+    {
+    case KAN_C_ARCHETYPE_BASIC:
+        break;
+
+    case KAN_C_ARCHETYPE_ENUM:
+        kan_trivial_string_buffer_append_string (&io.output_buffer, "enum ");
+        break;
+
+    case KAN_C_ARCHETYPE_STRUCT:
+        kan_trivial_string_buffer_append_string (&io.output_buffer, "struct ");
+        break;
+    }
+
+    kan_trivial_string_buffer_append_string (&io.output_buffer, type_data->name);
+    kan_trivial_string_buffer_append_string (&io.output_buffer, " ");
+
+    if (type_data->is_array)
+    {
+        kan_trivial_string_buffer_append_string (&io.output_buffer, "<arrays_not_supported> ");
+    }
+
+    for (uint64_t pointer_index = 0u; pointer_index < type_data->pointer_level; ++pointer_index)
+    {
+        kan_trivial_string_buffer_append_string (&io.output_buffer, "*");
+    }
+}
+
+static void append_function_argument_type_info (struct kan_c_type_t *type_data, const char *indentation)
+{
+    kan_trivial_string_buffer_append_string (&io.output_buffer, indentation);
+    if (type_data->name != interned.type_void || type_data->pointer_level > 0u)
+    {
+        kan_trivial_string_buffer_append_string (&io.output_buffer, ".size = sizeof (");
+        append_argument_type (type_data);
+        kan_trivial_string_buffer_append_string (&io.output_buffer, "),\n");
+    }
+    else
+    {
+        // Fallback logic for functions with void return type.
+        kan_trivial_string_buffer_append_string (&io.output_buffer, ".size = 0u,\n");
+        kan_trivial_string_buffer_append_string (&io.output_buffer, indentation);
+        kan_trivial_string_buffer_append_string (&io.output_buffer,
+                                                 ".archetype = KAN_REFLECTION_ARCHETYPE_SIGNED_INT,\n");
+        return;
+    }
+
+    if (type_data->is_array)
+    {
+        kan_trivial_string_buffer_append_string (&io.output_buffer, indentation);
+        kan_trivial_string_buffer_append_string (&io.output_buffer, "<arrays_not_supported_here>\n");
+        return;
+    }
+
+    if (type_data->pointer_level == 0u)
+    {
+        switch (type_data->archetype)
+        {
+        case KAN_C_ARCHETYPE_BASIC:
+            if (type_data->name == interned.type_interned_string)
+            {
+                kan_trivial_string_buffer_append_string (&io.output_buffer, indentation);
+                kan_trivial_string_buffer_append_string (&io.output_buffer,
+                                                         ".archetype = KAN_REFLECTION_ARCHETYPE_INTERNED_STRING,\n");
+            }
+            else if (type_data->name == interned.type_patch)
+            {
+                kan_trivial_string_buffer_append_string (&io.output_buffer, indentation);
+                kan_trivial_string_buffer_append_string (&io.output_buffer,
+                                                         ".archetype = KAN_REFLECTION_ARCHETYPE_PATCH,\n");
+            }
+            else
+            {
+                kan_trivial_string_buffer_append_string (&io.output_buffer, indentation);
+                kan_trivial_string_buffer_append_string (&io.output_buffer,
+                                                         ".archetype = ARCHETYPE_SELECTION_HELPER_GENERIC ((");
+                kan_trivial_string_buffer_append_string (&io.output_buffer, type_data->name);
+                kan_trivial_string_buffer_append_string (&io.output_buffer, ") 0),\n");
+            }
+
+            break;
+
+        case KAN_C_ARCHETYPE_ENUM:
+            kan_trivial_string_buffer_append_string (&io.output_buffer, indentation);
+            kan_trivial_string_buffer_append_string (&io.output_buffer,
+                                                     ".archetype = KAN_REFLECTION_ARCHETYPE_ENUM,\n");
+
+            kan_trivial_string_buffer_append_string (&io.output_buffer, indentation);
+            kan_trivial_string_buffer_append_string (&io.output_buffer,
+                                                     ".archetype_enum = {.type_name = kan_string_intern (\"");
+            kan_trivial_string_buffer_append_string (&io.output_buffer, type_data->name);
+            kan_trivial_string_buffer_append_string (&io.output_buffer, "\")},\n");
+            break;
+
+        case KAN_C_ARCHETYPE_STRUCT:
+            kan_trivial_string_buffer_append_string (&io.output_buffer, indentation);
+            kan_trivial_string_buffer_append_string (&io.output_buffer,
+                                                     ".archetype = KAN_REFLECTION_ARCHETYPE_STRUCT,\n");
+
+            kan_trivial_string_buffer_append_string (&io.output_buffer, indentation);
+            kan_trivial_string_buffer_append_string (&io.output_buffer,
+                                                     ".archetype_struct = {.type_name = kan_string_intern (\"");
+            kan_trivial_string_buffer_append_string (&io.output_buffer, type_data->name);
+            kan_trivial_string_buffer_append_string (&io.output_buffer, "\")},\n");
+            break;
+        }
+    }
+    else
+    {
+        switch (type_data->archetype)
+        {
+        case KAN_C_ARCHETYPE_BASIC:
+            if (type_data->name == interned.type_char && type_data->pointer_level == 1u)
+            {
+                kan_trivial_string_buffer_append_string (&io.output_buffer, indentation);
+                kan_trivial_string_buffer_append_string (&io.output_buffer,
+                                                         ".archetype = KAN_REFLECTION_ARCHETYPE_STRING_POINTER,\n");
+            }
+            else
+            {
+                kan_trivial_string_buffer_append_string (&io.output_buffer, indentation);
+                kan_trivial_string_buffer_append_string (&io.output_buffer,
+                                                         ".archetype = KAN_REFLECTION_ARCHETYPE_EXTERNAL_POINTER,\n");
+            }
+
+            break;
+
+        case KAN_C_ARCHETYPE_ENUM:
+            kan_trivial_string_buffer_append_string (&io.output_buffer, indentation);
+            kan_trivial_string_buffer_append_string (&io.output_buffer,
+                                                     ".archetype = KAN_REFLECTION_ARCHETYPE_EXTERNAL_POINTER,\n");
+            break;
+
+        case KAN_C_ARCHETYPE_STRUCT:
+            if (type_data->pointer_level == 1u)
+            {
+                kan_trivial_string_buffer_append_string (&io.output_buffer, indentation);
+                kan_trivial_string_buffer_append_string (&io.output_buffer,
+                                                         ".archetype = KAN_REFLECTION_ARCHETYPE_STRUCT_POINTER,\n");
+
+                kan_trivial_string_buffer_append_string (&io.output_buffer, indentation);
+                kan_trivial_string_buffer_append_string (
+                    &io.output_buffer, ".archetype_struct_pointer = {.type_name = kan_string_intern (\"");
+                kan_trivial_string_buffer_append_string (&io.output_buffer, type_data->name);
+                kan_trivial_string_buffer_append_string (&io.output_buffer, "\")},\n");
+            }
+            else
+            {
+                kan_trivial_string_buffer_append_string (&io.output_buffer, indentation);
+                kan_trivial_string_buffer_append_string (&io.output_buffer,
+                                                         ".archetype = KAN_REFLECTION_ARCHETYPE_EXTERNAL_POINTER,\n");
+            }
+
+            break;
+        }
+    }
+
+    // TODO: Archetype and suffixes.
+}
+
 // Execution mainline functions.
 
 static void add_header (void)
@@ -572,6 +764,28 @@ static void add_variables (void)
             kan_trivial_string_buffer_append_string (&io.output_buffer, "_data;\n");
         }
 
+        for (uint64_t function_index = 0u; function_index < interface->functions_count; ++function_index)
+        {
+            struct kan_c_function_t *function_data = &interface->functions[function_index];
+            if (is_function_ignored (function_data))
+            {
+                continue;
+            }
+
+            kan_trivial_string_buffer_append_string (&io.output_buffer,
+                                                     "static struct kan_reflection_argument_t reflection_");
+            kan_trivial_string_buffer_append_string (&io.output_buffer, function_data->name);
+            kan_trivial_string_buffer_append_string (&io.output_buffer, "_arguments[");
+            kan_trivial_string_buffer_append_unsigned_long (&io.output_buffer,
+                                                            (unsigned long) function_data->arguments_count);
+            kan_trivial_string_buffer_append_string (&io.output_buffer, "u];\n");
+
+            kan_trivial_string_buffer_append_string (&io.output_buffer,
+                                                     "static struct kan_reflection_function_t reflection_");
+            kan_trivial_string_buffer_append_string (&io.output_buffer, function_data->name);
+            kan_trivial_string_buffer_append_string (&io.output_buffer, "_data;\n");
+        }
+
         kan_trivial_string_buffer_append_string (&io.output_buffer, "// End of variables from \"");
         kan_trivial_string_buffer_append_string (&io.output_buffer, io.input_files[file_index].source_file_path);
         kan_trivial_string_buffer_append_string (&io.output_buffer, "\"\n\n");
@@ -644,6 +858,63 @@ static void add_functors (void)
                     break;
                 }
             }
+        }
+
+        for (uint64_t function_index = 0u; function_index < interface->functions_count; ++function_index)
+        {
+            struct kan_c_function_t *function = &interface->functions[function_index];
+            if (is_function_ignored (function))
+            {
+                continue;
+            }
+
+            kan_trivial_string_buffer_append_string (&io.output_buffer, "struct ");
+            kan_trivial_string_buffer_append_string (&io.output_buffer, function->name);
+            kan_trivial_string_buffer_append_string (&io.output_buffer, "_call_arguments_t\n{\n");
+
+            for (uint64_t argument_index = 0u; argument_index < function->arguments_count; ++argument_index)
+            {
+                struct kan_c_variable_t *argument = &function->arguments[argument_index];
+                kan_trivial_string_buffer_append_string (&io.output_buffer, "    ");
+                append_argument_type (&argument->type);
+                kan_trivial_string_buffer_append_string (&io.output_buffer, argument->name);
+                kan_trivial_string_buffer_append_string (&io.output_buffer, ";\n");
+            }
+
+            kan_trivial_string_buffer_append_string (&io.output_buffer, "};\n\n");
+            const kan_interned_string_t functor_name = build_call_functor_name (function);
+            kan_trivial_string_buffer_append_string (&io.output_buffer, "static void ");
+            kan_trivial_string_buffer_append_string (&io.output_buffer, functor_name);
+            kan_trivial_string_buffer_append_string (&io.output_buffer,
+                                                     " (kan_reflection_functor_user_data_t user_data, void "
+                                                     "*return_address, void *arguments_address)\n{\n    ");
+
+            if (function->return_type.name != interned.type_void || function->return_type.pointer_level > 0u)
+            {
+                kan_trivial_string_buffer_append_string (&io.output_buffer, "*(");
+                append_argument_type (&function->return_type);
+                kan_trivial_string_buffer_append_string (&io.output_buffer, " *) return_address = ");
+            }
+
+            kan_trivial_string_buffer_append_string (&io.output_buffer, function->name);
+            kan_trivial_string_buffer_append_string (&io.output_buffer, " (\n");
+
+            for (uint64_t argument_index = 0u; argument_index < function->arguments_count; ++argument_index)
+            {
+                kan_trivial_string_buffer_append_string (&io.output_buffer, "        ((struct ");
+                kan_trivial_string_buffer_append_string (&io.output_buffer, function->name);
+                kan_trivial_string_buffer_append_string (&io.output_buffer,
+                                                         "_call_arguments_t *) arguments_address)->");
+                kan_trivial_string_buffer_append_string (&io.output_buffer, function->arguments[argument_index].name);
+
+                if (argument_index + 1u != function->arguments_count)
+                {
+                    kan_trivial_string_buffer_append_string (&io.output_buffer, ",\n");
+                }
+            }
+
+            kan_trivial_string_buffer_append_string (&io.output_buffer, ");\n}\n\n");
+            register_functor (functor_name);
         }
 
         kan_trivial_string_buffer_append_string (&io.output_buffer, "// End of functors from \"");
@@ -1152,6 +1423,61 @@ static void add_bootstrap (void)
             kan_trivial_string_buffer_append_string (&io.output_buffer, "    };\n\n");
         }
 
+        for (uint64_t function_index = 0u; function_index < interface->functions_count; ++function_index)
+        {
+            struct kan_c_function_t *function_data = &interface->functions[function_index];
+            if (is_function_ignored (function_data))
+            {
+                continue;
+            }
+
+            for (uint64_t argument_index = 0u; argument_index < function_data->arguments_count; ++argument_index)
+            {
+                struct kan_c_variable_t *argument_data = &function_data->arguments[argument_index];
+                kan_trivial_string_buffer_append_string (&io.output_buffer, "    reflection_");
+                kan_trivial_string_buffer_append_string (&io.output_buffer, function_data->name);
+                kan_trivial_string_buffer_append_string (&io.output_buffer, "_arguments[");
+                kan_trivial_string_buffer_append_unsigned_long (&io.output_buffer, (unsigned long) argument_index);
+                kan_trivial_string_buffer_append_string (&io.output_buffer,
+                                                         "u] = (struct kan_reflection_argument_t) {\n");
+
+                kan_trivial_string_buffer_append_string (&io.output_buffer, "        .name = kan_string_intern (\"");
+                kan_trivial_string_buffer_append_string (&io.output_buffer, argument_data->name);
+                kan_trivial_string_buffer_append_string (&io.output_buffer, "\"),\n");
+
+                append_function_argument_type_info (&argument_data->type, "        ");
+                kan_trivial_string_buffer_append_string (&io.output_buffer, "    };\n\n");
+            }
+
+            kan_trivial_string_buffer_append_string (&io.output_buffer, "    reflection_");
+            kan_trivial_string_buffer_append_string (&io.output_buffer, function_data->name);
+            kan_trivial_string_buffer_append_string (&io.output_buffer,
+                                                     "_data = (struct kan_reflection_function_t) {\n");
+            kan_trivial_string_buffer_append_string (&io.output_buffer, "        .name = kan_string_intern (\"");
+            kan_trivial_string_buffer_append_string (&io.output_buffer, function_data->name);
+            kan_trivial_string_buffer_append_string (&io.output_buffer, "\"),\n");
+
+            const kan_interned_string_t functor_name = build_call_functor_name (function_data);
+            kan_trivial_string_buffer_append_string (&io.output_buffer, "        .call = ");
+            kan_trivial_string_buffer_append_string (&io.output_buffer, functor_name);
+            kan_trivial_string_buffer_append_string (&io.output_buffer, ",\n");
+            kan_trivial_string_buffer_append_string (&io.output_buffer, "        .call_user_data = 0u,\n");
+
+            kan_trivial_string_buffer_append_string (&io.output_buffer, "        .return_type = {\n");
+            append_function_argument_type_info (&function_data->return_type, "            ");
+            kan_trivial_string_buffer_append_string (&io.output_buffer, "        },\n");
+
+            kan_trivial_string_buffer_append_string (&io.output_buffer, "        .arguments_count = ");
+            kan_trivial_string_buffer_append_unsigned_long (&io.output_buffer,
+                                                            (unsigned long) function_data->arguments_count);
+            kan_trivial_string_buffer_append_string (&io.output_buffer, "u,\n");
+            kan_trivial_string_buffer_append_string (&io.output_buffer, "        .arguments = reflection_");
+            kan_trivial_string_buffer_append_string (&io.output_buffer, function_data->name);
+            kan_trivial_string_buffer_append_string (&io.output_buffer, "_arguments,\n");
+
+            kan_trivial_string_buffer_append_string (&io.output_buffer, "    };\n\n");
+        }
+
         kan_trivial_string_buffer_append_string (&io.output_buffer, "    // End of data from \"");
         kan_trivial_string_buffer_append_string (&io.output_buffer, io.input_files[file_index].source_file_path);
         kan_trivial_string_buffer_append_string (&io.output_buffer, "\"\n\n");
@@ -1204,6 +1530,19 @@ void add_registrar (void)
             kan_trivial_string_buffer_append_string (&io.output_buffer,
                                                      "    kan_reflection_registry_add_struct (registry, &reflection_");
             kan_trivial_string_buffer_append_string (&io.output_buffer, interface->structs[struct_index].name);
+            kan_trivial_string_buffer_append_string (&io.output_buffer, "_data);\n");
+        }
+
+        for (uint64_t function_index = 0u; function_index < interface->functions_count; ++function_index)
+        {
+            if (is_function_ignored (&interface->functions[function_index]))
+            {
+                continue;
+            }
+
+            kan_trivial_string_buffer_append_string (
+                &io.output_buffer, "    kan_reflection_registry_add_function (registry, &reflection_");
+            kan_trivial_string_buffer_append_string (&io.output_buffer, interface->functions[function_index].name);
             kan_trivial_string_buffer_append_string (&io.output_buffer, "_data);\n");
         }
 
@@ -1278,8 +1617,7 @@ void add_registrar (void)
                         {
                             fprintf (stderr,
                                      "Unable to find type-value separator '.' in struct field meta specifier \"%s\" on "
-                                     "symbol "
-                                     "\"%s\".\n",
+                                     "symbol \"%s\".\n",
                                      meta->string_value, symbol_data->name);
                             current_error_code = RETURN_CODE_INVALID_PARSABLE_META_TARGET;
                         }
@@ -1288,6 +1626,49 @@ void add_registrar (void)
                             kan_trivial_string_buffer_append_string (
                                 &io.output_buffer,
                                 "    kan_reflection_registry_add_struct_field_meta (registry, kan_string_intern (\"");
+                            kan_trivial_string_buffer_append_char_sequence (&io.output_buffer, meta->string_value,
+                                                                            separator - meta->string_value);
+                            kan_trivial_string_buffer_append_string (&io.output_buffer, "\"), kan_string_intern (\"");
+                            kan_trivial_string_buffer_append_string (&io.output_buffer, separator + 1u);
+                            kan_trivial_string_buffer_append_string (&io.output_buffer, "\"), kan_string_intern (\"");
+                            kan_trivial_string_buffer_append_string (&io.output_buffer, symbol_data->type.name);
+                            kan_trivial_string_buffer_append_string (&io.output_buffer, "\"), &");
+                            kan_trivial_string_buffer_append_string (&io.output_buffer, symbol_data->name);
+                            kan_trivial_string_buffer_append_string (&io.output_buffer, ");\n");
+                        }
+
+                        break;
+                    }
+                    else if (meta->name == interned.reflection_function_meta)
+                    {
+                        kan_trivial_string_buffer_append_string (
+                            &io.output_buffer,
+                            "    kan_reflection_registry_add_function_meta (registry, kan_string_intern (\"");
+                        kan_trivial_string_buffer_append_string (&io.output_buffer, meta->string_value);
+                        kan_trivial_string_buffer_append_string (&io.output_buffer, "\"), kan_string_intern (\"");
+                        kan_trivial_string_buffer_append_string (&io.output_buffer, symbol_data->type.name);
+                        kan_trivial_string_buffer_append_string (&io.output_buffer, "\"), &");
+                        kan_trivial_string_buffer_append_string (&io.output_buffer, symbol_data->name);
+                        kan_trivial_string_buffer_append_string (&io.output_buffer, ");\n");
+                        break;
+                    }
+                    else if (meta->name == interned.reflection_function_argument_meta)
+                    {
+                        char *separator = strchr (meta->string_value, '.');
+                        if (separator == NULL || separator[1u] == '\0')
+                        {
+                            fprintf (stderr,
+                                     "Unable to find function-argument separator '.' in function argument meta "
+                                     "specifier \"%s\" on symbol \"%s\".\n",
+                                     meta->string_value, symbol_data->name);
+                            current_error_code = RETURN_CODE_INVALID_PARSABLE_META_TARGET;
+                        }
+                        else
+                        {
+                            kan_trivial_string_buffer_append_string (
+                                &io.output_buffer,
+                                "    kan_reflection_registry_add_function_argument_meta (registry, kan_string_intern "
+                                "(\"");
                             kan_trivial_string_buffer_append_char_sequence (&io.output_buffer, meta->string_value,
                                                                             separator - meta->string_value);
                             kan_trivial_string_buffer_append_string (&io.output_buffer, "\"), kan_string_intern (\"");
@@ -1335,6 +1716,7 @@ int main (int argument_count, char **arguments_array)
     interned.reflection_ignore_enum_value = kan_string_intern ("reflection_ignore_enum_value");
     interned.reflection_ignore_struct = kan_string_intern ("reflection_ignore_struct");
     interned.reflection_ignore_struct_field = kan_string_intern ("reflection_ignore_struct_field");
+    interned.reflection_ignore_function = kan_string_intern ("reflection_ignore_function");
     interned.reflection_external_pointer = kan_string_intern ("reflection_external_pointer");
     interned.reflection_dynamic_array_type = kan_string_intern ("reflection_dynamic_array_type");
     interned.reflection_size_field = kan_string_intern ("reflection_size_field");
@@ -1344,7 +1726,10 @@ int main (int argument_count, char **arguments_array)
     interned.reflection_enum_value_meta = kan_string_intern ("reflection_enum_value_meta");
     interned.reflection_struct_meta = kan_string_intern ("reflection_struct_meta");
     interned.reflection_struct_field_meta = kan_string_intern ("reflection_struct_field_meta");
+    interned.reflection_function_meta = kan_string_intern ("reflection_function_meta");
+    interned.reflection_function_argument_meta = kan_string_intern ("reflection_function_argument_meta");
 
+    interned.type_void = kan_string_intern ("void");
     interned.type_char = kan_string_intern ("char");
     interned.type_interned_string = kan_string_intern ("kan_interned_string_t");
     interned.type_dynamic_array = kan_string_intern ("kan_dynamic_array_t");

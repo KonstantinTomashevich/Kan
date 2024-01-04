@@ -201,7 +201,9 @@ struct kan_reflection_struct_t
 ///          KAN_REFLECTION_ARCHETYPE_DYNAMIC_ARRAY are not supported.
 struct kan_reflection_return_type_t
 {
+    /// \warning Special case: if size is zero, then return type is void.
     uint64_t size;
+
     enum kan_reflection_archetype_t archetype;
 
     union
