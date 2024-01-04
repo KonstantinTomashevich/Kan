@@ -38,6 +38,12 @@ struct struct_node_t
     const struct kan_reflection_struct_t *struct_reflection;
 };
 
+struct function_node_t
+{
+    struct kan_hash_storage_node_t node;
+    const struct kan_reflection_function_t *function_reflection;
+};
+
 struct enum_meta_node_t
 {
     struct kan_hash_storage_node_t node;
@@ -129,15 +135,64 @@ _Static_assert (_Alignof (struct struct_field_meta_iterator_t) ==
                     _Alignof (struct kan_reflection_struct_field_meta_iterator_t),
                 "Iterator alignments match.");
 
+struct function_meta_node_t
+{
+    struct kan_hash_storage_node_t node;
+    kan_interned_string_t function_name;
+    kan_interned_string_t meta_type_name;
+    const void *meta;
+};
+
+struct function_meta_iterator_t
+{
+    struct function_meta_node_t *current;
+    struct function_meta_node_t *end;
+    kan_interned_string_t function_name;
+    kan_interned_string_t meta_type_name;
+};
+
+_Static_assert (sizeof (struct function_meta_iterator_t) == sizeof (struct kan_reflection_function_meta_iterator_t),
+                "Iterator sizes match.");
+_Static_assert (_Alignof (struct function_meta_iterator_t) == _Alignof (struct kan_reflection_function_meta_iterator_t),
+                "Iterator alignments match.");
+
+struct function_argument_meta_node_t
+{
+    struct kan_hash_storage_node_t node;
+    kan_interned_string_t function_name;
+    kan_interned_string_t function_argument_name;
+    kan_interned_string_t meta_type_name;
+    const void *meta;
+};
+
+struct function_argument_meta_iterator_t
+{
+    struct function_argument_meta_node_t *current;
+    struct function_argument_meta_node_t *end;
+    kan_interned_string_t function_name;
+    kan_interned_string_t function_argument_name;
+    kan_interned_string_t meta_type_name;
+};
+
+_Static_assert (sizeof (struct function_argument_meta_iterator_t) ==
+                    sizeof (struct kan_reflection_function_argument_meta_iterator_t),
+                "Iterator sizes match.");
+_Static_assert (_Alignof (struct function_argument_meta_iterator_t) ==
+                    _Alignof (struct kan_reflection_function_argument_meta_iterator_t),
+                "Iterator alignments match.");
+
 struct registry_t
 {
     kan_allocation_group_t allocation_group;
     struct kan_hash_storage_t enum_storage;
     struct kan_hash_storage_t struct_storage;
+    struct kan_hash_storage_t function_storage;
     struct kan_hash_storage_t enum_meta_storage;
     struct kan_hash_storage_t enum_value_meta_storage;
     struct kan_hash_storage_t struct_meta_storage;
     struct kan_hash_storage_t struct_field_meta_storage;
+    struct kan_hash_storage_t function_meta_storage;
+    struct kan_hash_storage_t function_argument_meta_storage;
     struct kan_atomic_int_t patch_addition_lock;
     struct compiled_patch_t *first_patch;
 };
@@ -338,11 +393,15 @@ kan_reflection_registry_t kan_reflection_registry_create (void)
 
     kan_hash_storage_init (&registry->enum_storage, group, KAN_REFLECTION_ENUM_INITIAL_BUCKETS);
     kan_hash_storage_init (&registry->struct_storage, group, KAN_REFLECTION_STRUCT_INITIAL_BUCKETS);
+    kan_hash_storage_init (&registry->function_storage, group, KAN_REFLECTION_FUNCTION_INITIAL_BUCKETS);
     kan_hash_storage_init (&registry->enum_meta_storage, group, KAN_REFLECTION_ENUM_META_INITIAL_BUCKETS);
     kan_hash_storage_init (&registry->enum_value_meta_storage, group, KAN_REFLECTION_ENUM_VALUE_META_INITIAL_BUCKETS);
     kan_hash_storage_init (&registry->struct_meta_storage, group, KAN_REFLECTION_STRUCT_META_INITIAL_BUCKETS);
     kan_hash_storage_init (&registry->struct_field_meta_storage, group,
                            KAN_REFLECTION_STRUCT_FIELD_META_INITIAL_BUCKETS);
+    kan_hash_storage_init (&registry->function_meta_storage, group, KAN_REFLECTION_FUNCTION_META_INITIAL_BUCKETS);
+    kan_hash_storage_init (&registry->function_argument_meta_storage, group,
+                           KAN_REFLECTION_FUNCTION_ARGUMENT_META_INITIAL_BUCKETS);
 
     return (uint64_t) registry;
 }
@@ -570,6 +629,145 @@ void kan_reflection_registry_add_struct_field_meta (kan_reflection_registry_t re
     }
 
     kan_hash_storage_add (&registry_struct->struct_field_meta_storage, &node->node);
+}
+
+#if defined(KAN_REFLECTION_WITH_VALIDATION) && defined(KAN_WITH_ASSERT)
+static inline void reflection_function_validate_archetype (enum kan_reflection_archetype_t archetype,
+                                                           uint64_t size,
+                                                           kan_bool_t return_type)
+{
+    switch (archetype)
+    {
+    case KAN_REFLECTION_ARCHETYPE_SIGNED_INT:
+        KAN_ASSERT (size == sizeof (int8_t) || size == sizeof (int16_t) || size == sizeof (int32_t) ||
+                    size == sizeof (int64_t) || (return_type && size == 0u))
+        break;
+
+    case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
+        KAN_ASSERT (size == sizeof (uint8_t) || size == sizeof (uint16_t) || size == sizeof (uint32_t) ||
+                    size == sizeof (uint64_t))
+        break;
+
+    case KAN_REFLECTION_ARCHETYPE_FLOATING:
+        KAN_ASSERT (size == sizeof (float) || size == sizeof (double))
+        break;
+
+    case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
+        KAN_ASSERT (size == sizeof (char *))
+        break;
+
+    case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:
+        KAN_ASSERT (size == sizeof (kan_interned_string_t))
+        break;
+
+    case KAN_REFLECTION_ARCHETYPE_ENUM:
+        KAN_ASSERT (size == sizeof (int))
+        break;
+
+    case KAN_REFLECTION_ARCHETYPE_EXTERNAL_POINTER:
+    case KAN_REFLECTION_ARCHETYPE_STRUCT:
+    case KAN_REFLECTION_ARCHETYPE_STRUCT_POINTER:
+    case KAN_REFLECTION_ARCHETYPE_PATCH:
+        break;
+
+    case KAN_REFLECTION_ARCHETYPE_INLINE_ARRAY:
+    case KAN_REFLECTION_ARCHETYPE_DYNAMIC_ARRAY:
+        // Not supported as function argument or return type.
+        KAN_ASSERT (KAN_FALSE)
+        break;
+    }
+}
+#endif
+
+kan_bool_t kan_reflection_registry_add_function (kan_reflection_registry_t registry,
+                                                 const struct kan_reflection_function_t *function_reflection)
+{
+    if (kan_reflection_registry_query_function (registry, function_reflection->name))
+    {
+        return KAN_FALSE;
+    }
+
+#if defined(KAN_REFLECTION_WITH_VALIDATION) && defined(KAN_WITH_ASSERT)
+    KAN_ASSERT (function_reflection->call)
+    reflection_function_validate_archetype (function_reflection->return_type.archetype,
+                                            function_reflection->return_type.size, KAN_TRUE);
+
+    for (uint64_t index = 0u; index < function_reflection->arguments_count; ++index)
+    {
+        const struct kan_reflection_argument_t *argument_reflection = &function_reflection->arguments[index];
+        KAN_ASSERT (argument_reflection->name)
+        KAN_ASSERT (argument_reflection->size > 0u)
+        reflection_function_validate_archetype (argument_reflection->archetype, argument_reflection->size, KAN_FALSE);
+    }
+#endif
+
+    struct registry_t *registry_struct = (struct registry_t *) registry;
+    struct function_node_t *node = (struct function_node_t *) kan_allocate_batched (registry_struct->allocation_group,
+                                                                                    sizeof (struct function_node_t));
+    node->node.hash = (uint64_t) function_reflection->name;
+    node->function_reflection = function_reflection;
+
+    if (registry_struct->function_storage.items.size >=
+        registry_struct->function_storage.bucket_count * KAN_REFLECTION_FUNCTION_LOAD_FACTOR)
+    {
+        kan_hash_storage_set_bucket_count (&registry_struct->function_storage,
+                                           registry_struct->function_storage.bucket_count * 2u);
+    }
+
+    kan_hash_storage_add (&registry_struct->function_storage, &node->node);
+    return KAN_TRUE;
+}
+
+void kan_reflection_registry_add_function_meta (kan_reflection_registry_t registry,
+                                                kan_interned_string_t function_name,
+                                                kan_interned_string_t meta_type_name,
+                                                const void *meta)
+{
+    struct registry_t *registry_struct = (struct registry_t *) registry;
+    struct function_meta_node_t *node = (struct function_meta_node_t *) kan_allocate_batched (
+        registry_struct->allocation_group, sizeof (struct function_meta_node_t));
+
+    node->node.hash = kan_hash_combine ((uint64_t) function_name, (uint64_t) meta_type_name);
+    node->function_name = function_name;
+    node->meta_type_name = meta_type_name;
+    node->meta = meta;
+
+    if (registry_struct->function_meta_storage.items.size >=
+        registry_struct->function_meta_storage.bucket_count * KAN_REFLECTION_FUNCTION_META_LOAD_FACTOR)
+    {
+        kan_hash_storage_set_bucket_count (&registry_struct->function_meta_storage,
+                                           registry_struct->function_meta_storage.bucket_count * 2u);
+    }
+
+    kan_hash_storage_add (&registry_struct->function_meta_storage, &node->node);
+}
+
+void kan_reflection_registry_add_function_argument_meta (kan_reflection_registry_t registry,
+                                                         kan_interned_string_t function_name,
+                                                         kan_interned_string_t function_argument_name,
+                                                         kan_interned_string_t meta_type_name,
+                                                         const void *meta)
+{
+    struct registry_t *registry_struct = (struct registry_t *) registry;
+    struct function_argument_meta_node_t *node = (struct function_argument_meta_node_t *) kan_allocate_batched (
+        registry_struct->allocation_group, sizeof (struct function_argument_meta_node_t));
+
+    node->node.hash = kan_hash_combine (kan_hash_combine ((uint64_t) function_name, (uint64_t) function_argument_name),
+                                        (uint64_t) meta_type_name);
+    node->function_name = function_name;
+    node->function_argument_name = function_argument_name;
+    node->meta_type_name = meta_type_name;
+    node->meta = meta;
+
+    if (registry_struct->function_argument_meta_storage.items.size >=
+        registry_struct->function_argument_meta_storage.bucket_count *
+            KAN_REFLECTION_FUNCTION_ARGUMENT_META_LOAD_FACTOR)
+    {
+        kan_hash_storage_set_bucket_count (&registry_struct->function_argument_meta_storage,
+                                           registry_struct->function_argument_meta_storage.bucket_count * 2u);
+    }
+
+    kan_hash_storage_add (&registry_struct->function_argument_meta_storage, &node->node);
 }
 
 const struct kan_reflection_enum_t *kan_reflection_registry_query_enum (kan_reflection_registry_t registry,
@@ -828,6 +1026,139 @@ void kan_reflection_struct_field_meta_iterator_next (struct kan_reflection_struc
                                             data->current->meta_type_name != data->meta_type_name));
 }
 
+const struct kan_reflection_function_t *kan_reflection_registry_query_function (kan_reflection_registry_t registry,
+                                                                                kan_interned_string_t function_name)
+{
+    struct registry_t *registry_struct = (struct registry_t *) registry;
+    const struct kan_hash_storage_bucket_t *bucket =
+        kan_hash_storage_query (&registry_struct->function_storage, (uint64_t) function_name);
+    struct function_node_t *node = (struct function_node_t *) bucket->first;
+    const struct function_node_t *end = (struct function_node_t *) (bucket->last ? bucket->last->next : NULL);
+
+    while (node != end)
+    {
+        if (node->function_reflection->name == function_name)
+        {
+            return node->function_reflection;
+        }
+
+        node = (struct function_node_t *) node->node.list_node.next;
+    }
+
+    return NULL;
+}
+
+struct kan_reflection_function_meta_iterator_t kan_reflection_registry_query_function_meta (
+    kan_reflection_registry_t registry, kan_interned_string_t function_name, kan_interned_string_t meta_type_name)
+{
+    struct registry_t *registry_struct = (struct registry_t *) registry;
+    const uint64_t hash = kan_hash_combine ((uint64_t) function_name, (uint64_t) meta_type_name);
+    const struct kan_hash_storage_bucket_t *bucket =
+        kan_hash_storage_query (&registry_struct->function_meta_storage, hash);
+
+    struct function_meta_iterator_t iterator = {
+        .current = (struct function_meta_node_t *) bucket->first,
+        .end = (struct function_meta_node_t *) (bucket->last ? bucket->last->next : NULL),
+        .function_name = function_name,
+        .meta_type_name = meta_type_name,
+    };
+
+    while (iterator.current != iterator.end)
+    {
+        if (iterator.current->function_name == function_name && iterator.current->meta_type_name == meta_type_name)
+        {
+            return KAN_PUN_TYPE (struct function_meta_iterator_t, struct kan_reflection_function_meta_iterator_t,
+                                 iterator);
+        }
+
+        iterator.current = (struct function_meta_node_t *) iterator.current->node.list_node.next;
+    }
+
+    return KAN_PUN_TYPE (struct function_meta_iterator_t, struct kan_reflection_function_meta_iterator_t, iterator);
+}
+
+const void *kan_reflection_function_meta_iterator_get (struct kan_reflection_function_meta_iterator_t *iterator)
+{
+    struct function_meta_node_t *node = ((struct function_meta_iterator_t *) iterator)->current;
+    return node && node != ((struct function_meta_iterator_t *) iterator)->end ? node->meta : NULL;
+}
+
+void kan_reflection_function_meta_iterator_next (struct kan_reflection_function_meta_iterator_t *iterator)
+{
+    struct function_meta_iterator_t *data = (struct function_meta_iterator_t *) iterator;
+    if (data->current == data->end)
+    {
+        return;
+    }
+
+    do
+    {
+        data->current = (struct function_meta_node_t *) data->current->node.list_node.next;
+    } while (data->current != data->end && (data->current->function_name != data->function_name ||
+                                            data->current->meta_type_name != data->meta_type_name));
+}
+
+struct kan_reflection_function_argument_meta_iterator_t kan_reflection_registry_query_function_argument_meta (
+    kan_reflection_registry_t registry,
+    kan_interned_string_t function_name,
+    kan_interned_string_t function_argument_name,
+    kan_interned_string_t meta_type_name)
+{
+    struct registry_t *registry_struct = (struct registry_t *) registry;
+    const uint64_t hash = kan_hash_combine (
+        kan_hash_combine ((uint64_t) function_name, (uint64_t) function_argument_name), (uint64_t) meta_type_name);
+    const struct kan_hash_storage_bucket_t *bucket =
+        kan_hash_storage_query (&registry_struct->function_argument_meta_storage, hash);
+
+    struct function_argument_meta_iterator_t iterator = {
+        .current = (struct function_argument_meta_node_t *) bucket->first,
+        .end = (struct function_argument_meta_node_t *) (bucket->last ? bucket->last->next : NULL),
+        .function_name = function_name,
+        .function_argument_name = function_argument_name,
+        .meta_type_name = meta_type_name,
+    };
+
+    while (iterator.current != iterator.end)
+    {
+        if (iterator.current->function_name == function_name &&
+            iterator.current->function_argument_name == function_argument_name &&
+            iterator.current->meta_type_name == meta_type_name)
+        {
+            return KAN_PUN_TYPE (struct function_argument_meta_iterator_t,
+                                 struct kan_reflection_function_argument_meta_iterator_t, iterator);
+        }
+
+        iterator.current = (struct function_argument_meta_node_t *) iterator.current->node.list_node.next;
+    }
+
+    return KAN_PUN_TYPE (struct function_argument_meta_iterator_t,
+                         struct kan_reflection_function_argument_meta_iterator_t, iterator);
+}
+
+const void *kan_reflection_function_argument_meta_iterator_get (
+    struct kan_reflection_function_argument_meta_iterator_t *iterator)
+{
+    struct function_argument_meta_node_t *node = ((struct function_argument_meta_iterator_t *) iterator)->current;
+    return node && node != ((struct function_argument_meta_iterator_t *) iterator)->end ? node->meta : NULL;
+}
+
+void kan_reflection_function_argument_meta_iterator_next (
+    struct kan_reflection_function_argument_meta_iterator_t *iterator)
+{
+    struct function_argument_meta_iterator_t *data = (struct function_argument_meta_iterator_t *) iterator;
+    if (data->current == data->end)
+    {
+        return;
+    }
+
+    do
+    {
+        data->current = (struct function_argument_meta_node_t *) data->current->node.list_node.next;
+    } while (data->current != data->end && (data->current->function_name != data->function_name ||
+                                            data->current->function_argument_name != data->function_argument_name ||
+                                            data->current->meta_type_name != data->meta_type_name));
+}
+
 const struct kan_reflection_field_t *kan_reflection_registry_query_local_field (kan_reflection_registry_t registry,
                                                                                 kan_interned_string_t struct_name,
                                                                                 uint64_t path_length,
@@ -1015,6 +1346,37 @@ kan_reflection_registry_struct_iterator_t kan_reflection_registry_struct_iterato
     return (kan_reflection_registry_struct_iterator_t) NULL;
 }
 
+kan_reflection_registry_function_iterator_t kan_reflection_registry_function_iterator_create (
+    kan_reflection_registry_t registry)
+{
+    struct registry_t *registry_struct = (struct registry_t *) registry;
+    return (kan_reflection_registry_function_iterator_t) registry_struct->function_storage.items.first;
+}
+
+const struct kan_reflection_function_t *kan_reflection_registry_function_iterator_get (
+    kan_reflection_registry_function_iterator_t iterator)
+{
+    const struct function_node_t *node = (struct function_node_t *) iterator;
+    if (node)
+    {
+        return node->function_reflection;
+    }
+
+    return NULL;
+}
+
+kan_reflection_registry_function_iterator_t kan_reflection_registry_function_iterator_next (
+    kan_reflection_registry_function_iterator_t iterator)
+{
+    const struct function_node_t *node = (struct function_node_t *) iterator;
+    if (node)
+    {
+        return (kan_reflection_registry_function_iterator_t) node->node.list_node.next;
+    }
+
+    return (kan_reflection_registry_function_iterator_t) NULL;
+}
+
 static void compiled_patch_destroy (struct compiled_patch_t *patch)
 {
     const kan_allocation_group_t group = get_compiled_patch_allocation_group ();
@@ -1044,6 +1406,14 @@ void kan_reflection_registry_destroy (kan_reflection_registry_t registry)
     }
 
     node = registry_struct->struct_storage.items.first;
+    while (node)
+    {
+        struct kan_bd_list_node_t *next = node->next;
+        kan_free_batched (registry_struct->allocation_group, node);
+        node = next;
+    }
+
+    node = registry_struct->function_storage.items.first;
     while (node)
     {
         struct kan_bd_list_node_t *next = node->next;
@@ -1083,12 +1453,31 @@ void kan_reflection_registry_destroy (kan_reflection_registry_t registry)
         node = next;
     }
 
+    node = registry_struct->function_meta_storage.items.first;
+    while (node)
+    {
+        struct kan_bd_list_node_t *next = node->next;
+        kan_free_batched (registry_struct->allocation_group, node);
+        node = next;
+    }
+
+    node = registry_struct->function_argument_meta_storage.items.first;
+    while (node)
+    {
+        struct kan_bd_list_node_t *next = node->next;
+        kan_free_batched (registry_struct->allocation_group, node);
+        node = next;
+    }
+
     kan_hash_storage_shutdown (&registry_struct->enum_storage);
     kan_hash_storage_shutdown (&registry_struct->struct_storage);
+    kan_hash_storage_shutdown (&registry_struct->function_storage);
     kan_hash_storage_shutdown (&registry_struct->enum_meta_storage);
     kan_hash_storage_shutdown (&registry_struct->enum_value_meta_storage);
     kan_hash_storage_shutdown (&registry_struct->struct_meta_storage);
     kan_hash_storage_shutdown (&registry_struct->struct_field_meta_storage);
+    kan_hash_storage_shutdown (&registry_struct->function_meta_storage);
+    kan_hash_storage_shutdown (&registry_struct->function_argument_meta_storage);
 
     kan_free_batched (registry_struct->allocation_group, registry_struct);
 }

@@ -21,4 +21,8 @@ struct vector4_t
     float w;
 };
 
+TEST_REFLECTION_API struct vector3_t vector3_add (const struct vector3_t *first, const struct vector3_t *second);
+
+TEST_REFLECTION_API struct vector4_t vector4_add (const struct vector4_t *first, const struct vector4_t *second);
+
 KAN_C_HEADER_END

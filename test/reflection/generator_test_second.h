@@ -19,9 +19,9 @@ struct first_component_t
     struct vector4_t rotation;
 };
 
-TEST_REFLECTION_API void first_component_init (kan_reflection_functor_user_data user_data, void *generic_instance);
+TEST_REFLECTION_API void first_component_init (struct first_component_t *instance);
 
-TEST_REFLECTION_API void first_component_shutdown (kan_reflection_functor_user_data user_data, void *generic_instance);
+TEST_REFLECTION_API void first_component_shutdown (struct first_component_t *instance);
 
 struct second_component_t
 {
@@ -29,9 +29,9 @@ struct second_component_t
     struct vector3_t acceleration;
 };
 
-TEST_REFLECTION_API void second_component_init (kan_reflection_functor_user_data user_data, void *generic_instance);
+TEST_REFLECTION_API void second_component_init (struct second_component_t *instance);
 
-TEST_REFLECTION_API void second_component_shutdown (kan_reflection_functor_user_data user_data, void *generic_instance);
+TEST_REFLECTION_API void second_component_shutdown (struct second_component_t *instance);
 
 // \meta reflection_ignore_struct
 struct ignored_t
@@ -50,7 +50,14 @@ enum ignored_enum_t
 enum some_enum_t
 {
     SOME_ENUM_VALUE_1 = 0,
+
+    // \meta reflection_ignore_enum_value
+    SOME_ENUM_HIDDEN,
+
     SOME_ENUM_VALUE_2,
+
+    // \meta reflection_ignore_enum_value
+    SOME_ENUM_COUNT,
 };
 
 // \meta reflection_flags
@@ -95,6 +102,9 @@ struct a_bit_of_everything_t
 
     /// \meta reflection_external_pointer
     struct first_component_t *second_external_pointer;
+
+    // \meta reflection_ignore_struct_field
+    struct kan_dynamic_array_t ignored_dynamic_array;
 
     /// \meta reflection_dynamic_array_type = "struct second_component_t *"
     struct kan_dynamic_array_t dynamic_array;

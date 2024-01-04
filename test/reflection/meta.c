@@ -24,3 +24,21 @@ TEST_REFLECTION_API struct network_meta_t second_component_velocity_network_meta
     .max = {.x = 10.0f, .y = 10.0f, .z = 10.0f},
     .bits = 8,
 };
+
+struct function_script_graph_meta_t
+{
+    const char *name;
+    const char *hint;
+};
+
+// \meta reflection_function_meta = "vector3_add"
+TEST_REFLECTION_API struct function_script_graph_meta_t vector3_add_meta = {
+    .name = "sum (vector3)",
+    .hint = "Produces sum of two 3d vectors",
+};
+
+// \meta reflection_function_meta = "vector4_add"
+TEST_REFLECTION_API struct function_script_graph_meta_t vector4_add_meta = {
+    .name = "sum (vector4)",
+    .hint = "Produces sum of two 4d vectors",
+};
