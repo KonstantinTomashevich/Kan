@@ -605,8 +605,6 @@ static void append_function_argument_type_info (struct kan_c_type_t *type_data, 
             break;
         }
     }
-
-    // TODO: Archetype and suffixes.
 }
 
 // Execution mainline functions.
