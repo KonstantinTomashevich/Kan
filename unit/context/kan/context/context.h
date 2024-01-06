@@ -52,7 +52,9 @@
 /// - Creation stage. All requested systems are created through their create functor.
 /// - Connection stage. Systems are allowed to connect to each other, mostly to setup delegates and other logical
 ///   connections. In this stage systems are still considered uninitialized and should not call any heavy logic.
-///   It is allowed to get other systems through `kan_context_query`.
+///   It is allowed to get other systems through `kan_context_query`. Accessing other systems from functor through
+///   `kan_context_query` will create connection dependency: this system will be initialized (next stage) earlier than
+///   every system to which it is connected. Also, this system won't be shut down until these systems will be shut down.
 /// - Initialization stage. Systems run their initialization functors and do all heavy initialization logic. Accessing
 ///   other systems from functor through `kan_context_query` will create logical dependency: accessed system will be
 ///   initialized unless it is already initialized and it won't be uninitialized until this system is uninitialized.

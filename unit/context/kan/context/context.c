@@ -30,15 +30,19 @@ struct system_instance_node_t
     kan_context_system_handle_t instance;
     struct kan_context_system_api_t *api;
     kan_bool_t initialized;
-    uint64_t connected_references_to_me;
+    uint64_t connection_references_to_others;
+    uint64_t initialization_references_to_me;
 
-    // Array of interned strings.
-    struct kan_dynamic_array_t connected_references_to_others;
+    // Array of node pointers.
+    struct kan_dynamic_array_t initialization_references_to_others;
+
+    // Array of node pointers.
+    struct kan_dynamic_array_t connection_references_to_me;
 };
 
-struct connected_operation_stack_item_t
+struct operation_stack_item_t
 {
-    struct connected_operation_stack_item_t *next;
+    struct operation_stack_item_t *next;
     struct system_instance_node_t *system;
 };
 
@@ -46,9 +50,34 @@ struct context_t
 {
     enum context_state_t state;
     struct kan_hash_storage_t systems;
-    struct connected_operation_stack_item_t *connected_operation_stack_top;
+    struct operation_stack_item_t *operation_stack_top;
     kan_allocation_group_t group;
 };
+
+static inline kan_bool_t node_array_contains (struct kan_dynamic_array_t *array, struct system_instance_node_t *node)
+{
+    for (uint64_t index = 0u; index < array->size; ++index)
+    {
+        if (((struct system_instance_node_t **) array->data)[index] == node)
+        {
+            return KAN_TRUE;
+        }
+    }
+
+    return KAN_FALSE;
+}
+
+static inline void node_array_add (struct kan_dynamic_array_t *array, struct system_instance_node_t *node)
+{
+    void *spot = kan_dynamic_array_add_last (array);
+    if (!spot)
+    {
+        kan_dynamic_array_set_capacity (array, array->capacity * 2u);
+        spot = kan_dynamic_array_add_last (array);
+    }
+
+    *((struct system_instance_node_t **) spot) = node;
+}
 
 static struct system_instance_node_t *context_query_system (struct context_t *context,
                                                             kan_interned_string_t system_name)
@@ -71,31 +100,74 @@ static struct system_instance_node_t *context_query_system (struct context_t *co
     return NULL;
 }
 
-static void context_push_connected_operation (struct context_t *context, struct system_instance_node_t *system)
+static inline void context_push_operation (struct context_t *context, struct system_instance_node_t *system)
 {
-    struct connected_operation_stack_item_t *item =
-        kan_allocate_batched (context->group, sizeof (struct connected_operation_stack_item_t));
+    struct operation_stack_item_t *item = kan_allocate_batched (context->group, sizeof (struct operation_stack_item_t));
     item->system = system;
-    item->next = context->connected_operation_stack_top;
-    context->connected_operation_stack_top = item;
+    item->next = context->operation_stack_top;
+    context->operation_stack_top = item;
 }
 
-static void context_pop_connected_operation (struct context_t *context)
+static inline void context_pop_operation (struct context_t *context)
 {
-    KAN_ASSERT (context->connected_operation_stack_top)
-    struct connected_operation_stack_item_t *next = context->connected_operation_stack_top->next;
-    kan_free_batched (context->group, context->connected_operation_stack_top);
-    context->connected_operation_stack_top = next;
+    KAN_ASSERT (context->operation_stack_top)
+    struct operation_stack_item_t *next = context->operation_stack_top->next;
+    kan_free_batched (context->group, context->operation_stack_top);
+    context->operation_stack_top = next;
 }
 
-static inline void context_initialize_system (struct context_t *context, struct system_instance_node_t *node)
+static void context_initialize_system (struct context_t *context, struct system_instance_node_t *node)
 {
+    if (node->instance == KAN_INVALID_CONTEXT_SYSTEM_HANDLE || node->initialized)
+    {
+        return;
+    }
+
+    for (uint64_t connected_index = 0u; connected_index < node->connection_references_to_me.size; ++connected_index)
+    {
+        context_initialize_system (
+            context, ((struct system_instance_node_t **) node->connection_references_to_me.data)[connected_index]);
+    }
+
     KAN_LOG (context, KAN_LOG_ERROR, "Begin system \"%s\" initialization.", node->name)
-    context_push_connected_operation (context, node);
+    context_push_operation (context, node);
     node->api->connected_init (node->instance);
-    context_pop_connected_operation (context);
+    context_pop_operation (context);
     node->initialized = KAN_TRUE;
     KAN_LOG (context, KAN_LOG_ERROR, "End system \"%s\" initialization.", node->name)
+}
+
+static void context_shutdown_system (struct context_t *context, struct system_instance_node_t *node)
+{
+    if (node->instance == KAN_INVALID_CONTEXT_SYSTEM_HANDLE || !node->initialized ||
+        node->initialization_references_to_me > 0u || node->connection_references_to_others > 0u)
+    {
+        return;
+    }
+
+    KAN_LOG (context, KAN_LOG_ERROR, "Begin system \"%s\" shutdown.", node->name)
+    context_push_operation (context, node);
+    node->api->connected_shutdown (node->instance);
+    context_pop_operation (context);
+    node->initialized = KAN_FALSE;
+    KAN_LOG (context, KAN_LOG_ERROR, "End system \"%s\" shutdown.", node->name)
+
+    for (uint64_t initialized_index = 0u; initialized_index < node->initialization_references_to_others.size;
+         ++initialized_index)
+    {
+        struct system_instance_node_t *other_node =
+            ((struct system_instance_node_t **) node->initialization_references_to_others.data)[initialized_index];
+        --other_node->initialization_references_to_me;
+        context_shutdown_system (context, other_node);
+    }
+
+    for (uint64_t connected_index = 0u; connected_index < node->connection_references_to_me.size; ++connected_index)
+    {
+        struct system_instance_node_t *other_node =
+            ((struct system_instance_node_t **) node->connection_references_to_me.data)[connected_index];
+        --other_node->connection_references_to_others;
+        context_shutdown_system (context, other_node);
+    }
 }
 
 #if defined(_WIN32)
@@ -111,7 +183,7 @@ kan_context_handle_t kan_context_create (kan_allocation_group_t group)
     struct context_t *context = kan_allocate_general (group, sizeof (struct context_t), _Alignof (struct context_t));
     context->state = CONTEXT_STATE_COLLECTING_REQUESTS;
     kan_hash_storage_init (&context->systems, group, KAN_CONTEXT_SYSTEM_INITIAL_BUCKETS);
-    context->connected_operation_stack_top = NULL;
+    context->operation_stack_top = NULL;
     context->group = group;
     return (kan_context_handle_t) context;
 }
@@ -150,9 +222,14 @@ kan_bool_t kan_context_request_system (kan_context_handle_t handle, const char *
     node->instance = KAN_INVALID_CONTEXT_SYSTEM_HANDLE;
     node->api = api;
     node->initialized = KAN_FALSE;
-    node->connected_references_to_me = 0u;
-    kan_dynamic_array_init (&node->connected_references_to_others, KAN_CONTEXT_SYSTEM_CONNECTIONS_INITIAL_COUNT,
-                            sizeof (kan_interned_string_t), _Alignof (kan_interned_string_t), context->group);
+    node->connection_references_to_others = 0u;
+    node->initialization_references_to_me = 0u;
+
+    kan_dynamic_array_init (&node->initialization_references_to_others, KAN_CONTEXT_SYSTEM_CONNECTIONS_INITIAL_COUNT,
+                            sizeof (void *), _Alignof (void *), context->group);
+
+    kan_dynamic_array_init (&node->connection_references_to_me, KAN_CONTEXT_SYSTEM_CONNECTIONS_INITIAL_COUNT,
+                            sizeof (void *), _Alignof (void *), context->group);
 
     if (context->systems.bucket_count * KAN_CONTEXT_SYSTEM_LOAD_FACTOR <= context->systems.items.size)
     {
@@ -187,26 +264,25 @@ void kan_context_assembly (kan_context_handle_t handle)
     {
         if (node->instance != KAN_INVALID_CONTEXT_SYSTEM_HANDLE)
         {
+            context_push_operation (context, node);
             node->api->connect (node->instance, handle);
+            context_pop_operation (context);
         }
 
         node = (struct system_instance_node_t *) node->node.list_node.next;
     }
 
+    KAN_ASSERT (!context->operation_stack_top)
     context->state = CONTEXT_STATE_CONNECTED_INITIALIZATION;
     node = (struct system_instance_node_t *) context->systems.items.first;
 
     while (node)
     {
-        if (node->instance != KAN_INVALID_CONTEXT_SYSTEM_HANDLE && !node->initialized)
-        {
-            context_initialize_system (context, node);
-        }
-
+        context_initialize_system (context, node);
         node = (struct system_instance_node_t *) node->node.list_node.next;
     }
 
-    KAN_ASSERT (!context->connected_operation_stack_top)
+    KAN_ASSERT (!context->operation_stack_top)
     context->state = CONTEXT_STATE_READY;
 }
 
@@ -224,44 +300,31 @@ kan_context_system_handle_t kan_context_query (kan_context_handle_t handle, cons
     switch (context->state)
     {
     case CONTEXT_STATE_CONNECTION:
+        if (context->operation_stack_top)
+        {
+            struct system_instance_node_t *top = context->operation_stack_top->system;
+            if (!node_array_contains (&node->connection_references_to_me, top))
+            {
+                node_array_add (&node->connection_references_to_me, top);
+                ++top->connection_references_to_others;
+            }
+        }
+
         KAN_ASSERT (!node->initialized)
         return node->instance;
 
     case CONTEXT_STATE_CONNECTED_INITIALIZATION:
-        if (context->connected_operation_stack_top)
+        if (context->operation_stack_top)
         {
-            kan_bool_t found_in_references = KAN_FALSE;
-            struct system_instance_node_t *top = context->connected_operation_stack_top->system;
-
-            for (uint64_t index = 0u; index < top->connected_references_to_others.size; ++index)
+            struct system_instance_node_t *top = context->operation_stack_top->system;
+            if (!node_array_contains (&top->initialization_references_to_others, node))
             {
-                if (((kan_interned_string_t *) top->connected_references_to_others.data)[index] == interned_system_name)
-                {
-                    found_in_references = KAN_TRUE;
-                    break;
-                }
-            }
-
-            if (!found_in_references)
-            {
-                void *spot = kan_dynamic_array_add_last (&top->connected_references_to_others);
-                if (!spot)
-                {
-                    kan_dynamic_array_set_capacity (&top->connected_references_to_others,
-                                                    top->connected_references_to_others.capacity * 2u);
-                    spot = kan_dynamic_array_add_last (&top->connected_references_to_others);
-                }
-
-                *((kan_interned_string_t *) spot) = interned_system_name;
-                ++node->connected_references_to_me;
+                node_array_add (&top->initialization_references_to_others, node);
+                ++node->initialization_references_to_me;
             }
         }
 
-        if (node->instance != KAN_INVALID_CONTEXT_SYSTEM_HANDLE && !node->initialized)
-        {
-            context_initialize_system (context, node);
-        }
-
+        context_initialize_system (context, node);
         return node->instance;
 
     case CONTEXT_STATE_READY:
@@ -270,21 +333,10 @@ kan_context_system_handle_t kan_context_query (kan_context_handle_t handle, cons
 
     case CONTEXT_STATE_CONNECTED_SHUTDOWN:
 #if defined(KAN_WITH_ASSERT)
-        if (context->connected_operation_stack_top)
+        if (context->operation_stack_top)
         {
-            kan_bool_t found_in_references = KAN_FALSE;
-            struct system_instance_node_t *top = context->connected_operation_stack_top->system;
-
-            for (uint64_t index = 0u; index < top->connected_references_to_others.size; ++index)
-            {
-                if (((kan_interned_string_t *) top->connected_references_to_others.data)[index] == interned_system_name)
-                {
-                    found_in_references = KAN_TRUE;
-                    break;
-                }
-            }
-
-            KAN_ASSERT (found_in_references)
+            struct system_instance_node_t *top = context->operation_stack_top->system;
+            KAN_ASSERT (node_array_contains (&top->initialization_references_to_others, node))
         }
 #endif
 
@@ -311,63 +363,24 @@ void kan_context_destroy (kan_context_handle_t handle)
 {
     struct context_t *context = (struct context_t *) handle;
     KAN_ASSERT (context->state == CONTEXT_STATE_READY)
+
     context->state = CONTEXT_STATE_CONNECTED_SHUTDOWN;
-    uint64_t initialized_count = 0u;
+    struct system_instance_node_t *node = (struct system_instance_node_t *) context->systems.items.first;
 
-    do
+    while (node)
     {
-        initialized_count = 0u;
-#if defined(KAN_WITH_ASSERT)
-        uint64_t freed_count = 0u;
-#endif
-
-        struct system_instance_node_t *node = (struct system_instance_node_t *) context->systems.items.first;
-        while (node)
-        {
-            if (node->instance != KAN_INVALID_CONTEXT_SYSTEM_HANDLE && node->initialized)
-            {
-                if (node->connected_references_to_me == 0u)
-                {
-                    KAN_LOG (context, KAN_LOG_ERROR, "Begin system \"%s\" shutdown.", node->name)
-                    context_push_connected_operation (context, node);
-                    node->api->connected_shutdown (node->instance);
-                    context_pop_connected_operation (context);
-                    node->initialized = KAN_FALSE;
-                    KAN_LOG (context, KAN_LOG_ERROR, "End system \"%s\" shutdown.", node->name)
-
-                    for (uint64_t index = 0u; index < node->connected_references_to_others.size; ++index)
-                    {
-                        struct system_instance_node_t *other_node = context_query_system (
-                            context, ((kan_interned_string_t *) node->connected_references_to_others.data)[index]);
-                        --other_node->connected_references_to_me;
-
-#if defined(KAN_WITH_ASSERT)
-                        if (other_node->connected_references_to_me == 0u)
-                        {
-                            ++freed_count;
-                        }
-#endif
-                    }
-                }
-                else
-                {
-                    ++initialized_count;
-                }
-            }
-
-            node = (struct system_instance_node_t *) node->node.list_node.next;
-        }
-
-        KAN_ASSERT (freed_count > 0u || initialized_count == 0u)
-    } while (initialized_count > 0u);
+        context_shutdown_system (context, node);
+        node = (struct system_instance_node_t *) node->node.list_node.next;
+    }
 
     context->state = CONTEXT_STATE_DISCONNECTION;
-    struct system_instance_node_t *node = (struct system_instance_node_t *) context->systems.items.first;
+    node = (struct system_instance_node_t *) context->systems.items.first;
 
     while (node)
     {
         if (node->instance != KAN_INVALID_CONTEXT_SYSTEM_HANDLE)
         {
+            KAN_ASSERT (!node->initialized)
             node->api->disconnect (node->instance);
         }
 
@@ -385,12 +398,12 @@ void kan_context_destroy (kan_context_handle_t handle)
             node->api->destroy (node->instance);
         }
 
-        kan_dynamic_array_shutdown (&node->connected_references_to_others);
+        kan_dynamic_array_shutdown (&node->initialization_references_to_others);
         kan_free_batched (context->group, node);
         node = next;
     }
 
-    KAN_ASSERT (!context->connected_operation_stack_top)
+    KAN_ASSERT (!context->operation_stack_top)
     kan_hash_storage_shutdown (&context->systems);
     kan_free_general (context->group, context, sizeof (struct context_t));
 }
