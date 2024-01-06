@@ -398,6 +398,7 @@ void kan_context_destroy (kan_context_handle_t handle)
             node->api->destroy (node->instance);
         }
 
+        kan_dynamic_array_shutdown (&node->connection_references_to_me);
         kan_dynamic_array_shutdown (&node->initialization_references_to_others);
         kan_free_batched (context->group, node);
         node = next;
