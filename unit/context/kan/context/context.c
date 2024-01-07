@@ -29,6 +29,7 @@ struct system_instance_node_t
     kan_interned_string_t name;
     kan_context_system_handle_t instance;
     struct kan_context_system_api_t *api;
+    void *user_config;
     kan_bool_t initialized;
     uint64_t connection_references_to_others;
     uint64_t initialization_references_to_me;
@@ -188,7 +189,7 @@ kan_context_handle_t kan_context_create (kan_allocation_group_t group)
     return (kan_context_handle_t) context;
 }
 
-kan_bool_t kan_context_request_system (kan_context_handle_t handle, const char *system_name)
+kan_bool_t kan_context_request_system (kan_context_handle_t handle, const char *system_name, void *user_config)
 {
     struct context_t *context = (struct context_t *) handle;
     KAN_ASSERT (context->state == CONTEXT_STATE_COLLECTING_REQUESTS)
@@ -221,6 +222,7 @@ kan_bool_t kan_context_request_system (kan_context_handle_t handle, const char *
     node->name = interned_system_name;
     node->instance = KAN_INVALID_CONTEXT_SYSTEM_HANDLE;
     node->api = api;
+    node->user_config = user_config;
     node->initialized = KAN_FALSE;
     node->connection_references_to_others = 0u;
     node->initialization_references_to_me = 0u;
@@ -248,7 +250,9 @@ void kan_context_assembly (kan_context_handle_t handle)
     struct system_instance_node_t *node = (struct system_instance_node_t *) context->systems.items.first;
     while (node)
     {
-        node->instance = node->api->create (kan_allocation_group_get_child (context->group, node->name));
+        node->instance =
+            node->api->create (kan_allocation_group_get_child (context->group, node->name), node->user_config);
+
         if (node->instance == KAN_INVALID_CONTEXT_SYSTEM_HANDLE)
         {
             KAN_LOG (context, KAN_LOG_ERROR, "Failed to create instance of system \"%s\"", node->name)

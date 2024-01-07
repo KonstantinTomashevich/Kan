@@ -88,7 +88,8 @@ typedef uint64_t kan_context_system_handle_t;
 
 #define KAN_INVALID_CONTEXT_SYSTEM_HANDLE 0u
 
-typedef kan_context_system_handle_t (*kan_context_system_create_functor_t) (kan_allocation_group_t group);
+typedef kan_context_system_handle_t (*kan_context_system_create_functor_t) (kan_allocation_group_t group,
+                                                                            void *user_config);
 
 typedef void (*kan_context_system_connect_functor_t) (kan_context_system_handle_t handle, kan_context_handle_t context);
 
@@ -116,7 +117,9 @@ struct kan_context_system_api_t
 CONTEXT_API kan_context_handle_t kan_context_create (kan_allocation_group_t group);
 
 /// \brief Requests system with given name to be added to context. Should be called before `kan_context_assembly`.
-CONTEXT_API kan_bool_t kan_context_request_system (kan_context_handle_t handle, const char *system_name);
+CONTEXT_API kan_bool_t kan_context_request_system (kan_context_handle_t handle,
+                                                   const char *system_name,
+                                                   void *user_config);
 
 /// \brief Assembles and initializes all the requested systems.
 CONTEXT_API void kan_context_assembly (kan_context_handle_t handle);
