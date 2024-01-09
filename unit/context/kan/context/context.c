@@ -130,12 +130,12 @@ static void context_initialize_system (struct context_t *context, struct system_
             context, ((struct system_instance_node_t **) node->connection_references_to_me.data)[connected_index]);
     }
 
-    KAN_LOG (context, KAN_LOG_ERROR, "Begin system \"%s\" initialization.", node->name)
+    KAN_LOG (context, KAN_LOG_INFO, "Begin system \"%s\" initialization.", node->name)
     context_push_operation (context, node);
     node->api->connected_init (node->instance);
     context_pop_operation (context);
     node->initialized = KAN_TRUE;
-    KAN_LOG (context, KAN_LOG_ERROR, "End system \"%s\" initialization.", node->name)
+    KAN_LOG (context, KAN_LOG_INFO, "End system \"%s\" initialization.", node->name)
 }
 
 static void context_shutdown_system (struct context_t *context, struct system_instance_node_t *node)
@@ -146,12 +146,12 @@ static void context_shutdown_system (struct context_t *context, struct system_in
         return;
     }
 
-    KAN_LOG (context, KAN_LOG_ERROR, "Begin system \"%s\" shutdown.", node->name)
+    KAN_LOG (context, KAN_LOG_INFO, "Begin system \"%s\" shutdown.", node->name)
     context_push_operation (context, node);
     node->api->connected_shutdown (node->instance);
     context_pop_operation (context);
     node->initialized = KAN_FALSE;
-    KAN_LOG (context, KAN_LOG_ERROR, "End system \"%s\" shutdown.", node->name)
+    KAN_LOG (context, KAN_LOG_INFO, "End system \"%s\" shutdown.", node->name)
 
     for (uint64_t initialized_index = 0u; initialized_index < node->initialization_references_to_others.size;
          ++initialized_index)

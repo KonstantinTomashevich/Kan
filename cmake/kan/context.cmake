@@ -1,4 +1,4 @@
-# Contains function for integration with context unit.
+# Contains functions for integration with context unit.
 
 # Path to context statics template file.
 set (KAN_CONTEXT_STATICS_TEMPLATE "${CMAKE_SOURCE_DIR}/cmake/kan/context_statics.c")
