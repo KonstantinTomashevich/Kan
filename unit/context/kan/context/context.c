@@ -174,13 +174,16 @@ static void context_shutdown_system (struct context_t *context, struct system_in
 #if defined(_WIN32)
 __declspec (dllimport) extern uint64_t KAN_CONTEXT_SYSTEM_COUNT_NAME;
 __declspec (dllimport) extern struct kan_context_system_api_t *KAN_CONTEXT_SYSTEM_ARRAY_NAME[];
+__declspec (dllimport) void KAN_CONTEXT_SYSTEM_ARRAY_INITIALIZER_NAME (void);
 #else
 extern uint64_t KAN_CONTEXT_SYSTEM_COUNT_NAME;
 extern struct kan_context_system_api_t *KAN_CONTEXT_SYSTEM_ARRAY_NAME[];
+void KAN_CONTEXT_SYSTEM_ARRAY_INITIALIZER_NAME (void);
 #endif
 
 kan_context_handle_t kan_context_create (kan_allocation_group_t group)
 {
+    KAN_CONTEXT_SYSTEM_ARRAY_INITIALIZER_NAME ();
     struct context_t *context = kan_allocate_general (group, sizeof (struct context_t), _Alignof (struct context_t));
     context->state = CONTEXT_STATE_COLLECTING_REQUESTS;
     kan_hash_storage_init (&context->systems, group, KAN_CONTEXT_SYSTEM_INITIAL_BUCKETS);

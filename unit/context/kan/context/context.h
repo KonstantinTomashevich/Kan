@@ -81,6 +81,7 @@ KAN_C_HEADER_BEGIN
 
 #define KAN_CONTEXT_SYSTEM_COUNT_NAME kan_context_available_systems_count
 #define KAN_CONTEXT_SYSTEM_ARRAY_NAME kan_context_available_systems
+#define KAN_CONTEXT_SYSTEM_ARRAY_INITIALIZER_NAME kan_context_fill_available_systems
 #define KAN_CONTEXT_SYSTEM_API_NAME(SYSTEM_NAME) kan_context_system_api_##SYSTEM_NAME
 
 typedef uint64_t kan_context_handle_t;

@@ -43,12 +43,22 @@ function (generate_artefact_context_data)
             message (STATUS "        - \"${SYSTEM}\"")
         endforeach ()
 
-        set (SYSTEM_APIS_LIST ${SYSTEMS})
+        set (SYSTEM_APIS_SETTERS_WITHOUT_INDEX ${SYSTEMS})
         set (SYSTEM_APIS_DECLARATIONS ${SYSTEMS})
 
-        list (TRANSFORM SYSTEM_APIS_LIST PREPEND "&KAN_CONTEXT_SYSTEM_API_NAME (")
-        list (TRANSFORM SYSTEM_APIS_LIST APPEND ")")
-        list (JOIN SYSTEM_APIS_LIST ",\n    " SYSTEM_APIS_LIST)
+        list (TRANSFORM SYSTEM_APIS_SETTERS_WITHOUT_INDEX PREPEND
+                "KAN_CONTEXT_SYSTEM_ARRAY_NAME[SYSTEM_INDEX] = &KAN_CONTEXT_SYSTEM_API_NAME (")
+        list (TRANSFORM SYSTEM_APIS_SETTERS_WITHOUT_INDEX APPEND ")")
+        set (SYSTEM_APIS_SETTERS)
+        set (SYSTEM_INDEX "0")
+
+        foreach (SETTER ${SYSTEM_APIS_SETTERS_WITHOUT_INDEX})
+            string (REPLACE "SYSTEM_INDEX" "${SYSTEM_INDEX}u" SETTER "${SETTER}")
+            list (APPEND SYSTEM_APIS_SETTERS "${SETTER}")
+            math (EXPR SYSTEM_INDEX "${SYSTEM_INDEX} + 1")
+        endforeach ()
+
+        list (JOIN SYSTEM_APIS_SETTERS ";\n    " SYSTEM_APIS_SETTERS)
 
         list (TRANSFORM SYSTEM_APIS_DECLARATIONS PREPEND
                 "IMPORT_THIS extern struct kan_context_system_api_t KAN_CONTEXT_SYSTEM_API_NAME (")
