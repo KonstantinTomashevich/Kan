@@ -180,7 +180,8 @@ struct kan_reflection_system_added_function_meta_t
 
 /// \brief Return info about next added function or structure with NULLs if all events are processed.
 CONTEXT_REFLECTION_SYSTEM_API struct kan_reflection_system_added_function_meta_t
-kan_reflection_system_generation_iterator_next_added_function_meta (kan_reflection_system_generation_iterator_t iterator);
+kan_reflection_system_generation_iterator_next_added_function_meta (
+    kan_reflection_system_generation_iterator_t iterator);
 
 struct kan_reflection_system_added_function_argument_meta_t
 {

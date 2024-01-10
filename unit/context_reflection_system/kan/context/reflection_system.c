@@ -193,7 +193,7 @@ static void reflection_system_generate (struct reflection_system_t *system)
     generation_context.first_changed_enum_this_iteration = NULL;
     generation_context.first_changed_struct_this_iteration = NULL;
     generation_context.first_changed_function_this_iteration = NULL;
-    
+
     generation_context.first_added_enum_meta_this_iteration = NULL;
     generation_context.first_added_enum_value_meta_this_iteration = NULL;
     generation_context.first_added_struct_meta_this_iteration = NULL;
@@ -207,7 +207,7 @@ static void reflection_system_generate (struct reflection_system_t *system)
     generation_context.first_changed_enum_previous_iteration = NULL;
     generation_context.first_changed_struct_previous_iteration = NULL;
     generation_context.first_changed_function_previous_iteration = NULL;
-    
+
     generation_context.first_added_enum_meta_previous_iteration = NULL;
     generation_context.first_added_enum_value_meta_previous_iteration = NULL;
     generation_context.first_added_struct_meta_previous_iteration = NULL;
