@@ -102,6 +102,7 @@ CONTEXT_UPDATE_SYSTEM_API void update_system_init (kan_context_system_handle_t h
 
     kan_dynamic_array_set_capacity (&system->update_sequence, system->connection_request_count);
     struct update_connection_request_t *request = system->first_connection_request;
+
     while (request)
     {
         visit_to_generate_update_sequence (system, request);

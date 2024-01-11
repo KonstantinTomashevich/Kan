@@ -595,58 +595,6 @@ kan_interned_string_t kan_reflection_system_generation_iterator_next_changed_fun
 
 #undef ITERATOR_NEXT
 
-#define APPEND_EVENT(EVENT, ENTITY)                                                                                    \
-    struct generation_iterator_t *iterator_data = (struct generation_iterator_t *) iterator;                           \
-    kan_atomic_int_lock (&iterator_data->generation_context->this_iteration_submission_lock);                          \
-                                                                                                                       \
-    struct ENTITY##_event_entry_node_t *node =                                                                         \
-        (struct ENTITY##_event_entry_node_t *) kan_stack_group_allocator_allocate (                                    \
-            &iterator_data->generation_context->temporary_allocator, sizeof (struct ENTITY##_event_entry_node_t),      \
-            _Alignof (struct ENTITY##_event_entry_node_t));                                                            \
-                                                                                                                       \
-    node->data = data;                                                                                                 \
-    node->next = iterator_data->generation_context->first_##EVENT##_##ENTITY##_this_iteration;                         \
-    iterator_data->generation_context->first_##EVENT##_##ENTITY##_this_iteration = node;                               \
-    kan_atomic_int_unlock (&iterator_data->generation_context->this_iteration_submission_lock)
-
-void kan_reflection_system_generation_iterator_add_enum (kan_reflection_system_generation_iterator_t iterator,
-                                                         const struct kan_reflection_enum_t *data)
-{
-    APPEND_EVENT (added, enum);
-}
-
-void kan_reflection_system_generation_iterator_add_struct (kan_reflection_system_generation_iterator_t iterator,
-                                                           const struct kan_reflection_struct_t *data)
-{
-    APPEND_EVENT (added, struct);
-}
-
-void kan_reflection_system_generation_iterator_add_function (kan_reflection_system_generation_iterator_t iterator,
-                                                             const struct kan_reflection_function_t *data)
-{
-    APPEND_EVENT (added, function);
-}
-
-void kan_reflection_system_generation_iterator_change_enum (kan_reflection_system_generation_iterator_t iterator,
-                                                            const struct kan_reflection_enum_t *data)
-{
-    APPEND_EVENT (changed, enum);
-}
-
-void kan_reflection_system_generation_iterator_change_struct (kan_reflection_system_generation_iterator_t iterator,
-                                                              const struct kan_reflection_struct_t *data)
-{
-    APPEND_EVENT (changed, struct);
-}
-
-void kan_reflection_system_generation_iterator_change_function (kan_reflection_system_generation_iterator_t iterator,
-                                                                const struct kan_reflection_function_t *data)
-{
-    APPEND_EVENT (changed, function);
-}
-
-#undef APPEND_EVENT
-
 #define META_ITERATOR_NEXT_TOP_LEVEL(TYPE)                                                                             \
     struct generation_iterator_t *iterator_data = (struct generation_iterator_t *) iterator;                           \
     if (iterator_data->current_##TYPE##_meta)                                                                          \
@@ -725,6 +673,58 @@ kan_reflection_system_generation_iterator_next_added_function_argument_meta (
 
 #undef META_ITERATOR_NEXT_TOP_LEVEL
 #undef META_ITERATOR_NEXT_LOW_LEVEL
+
+#define APPEND_EVENT(EVENT, ENTITY)                                                                                    \
+    struct generation_iterator_t *iterator_data = (struct generation_iterator_t *) iterator;                           \
+    kan_atomic_int_lock (&iterator_data->generation_context->this_iteration_submission_lock);                          \
+                                                                                                                       \
+    struct ENTITY##_event_entry_node_t *node =                                                                         \
+        (struct ENTITY##_event_entry_node_t *) kan_stack_group_allocator_allocate (                                    \
+            &iterator_data->generation_context->temporary_allocator, sizeof (struct ENTITY##_event_entry_node_t),      \
+            _Alignof (struct ENTITY##_event_entry_node_t));                                                            \
+                                                                                                                       \
+    node->data = data;                                                                                                 \
+    node->next = iterator_data->generation_context->first_##EVENT##_##ENTITY##_this_iteration;                         \
+    iterator_data->generation_context->first_##EVENT##_##ENTITY##_this_iteration = node;                               \
+    kan_atomic_int_unlock (&iterator_data->generation_context->this_iteration_submission_lock)
+
+void kan_reflection_system_generation_iterator_add_enum (kan_reflection_system_generation_iterator_t iterator,
+                                                         const struct kan_reflection_enum_t *data)
+{
+    APPEND_EVENT (added, enum);
+}
+
+void kan_reflection_system_generation_iterator_add_struct (kan_reflection_system_generation_iterator_t iterator,
+                                                           const struct kan_reflection_struct_t *data)
+{
+    APPEND_EVENT (added, struct);
+}
+
+void kan_reflection_system_generation_iterator_add_function (kan_reflection_system_generation_iterator_t iterator,
+                                                             const struct kan_reflection_function_t *data)
+{
+    APPEND_EVENT (added, function);
+}
+
+void kan_reflection_system_generation_iterator_change_enum (kan_reflection_system_generation_iterator_t iterator,
+                                                            const struct kan_reflection_enum_t *data)
+{
+    APPEND_EVENT (changed, enum);
+}
+
+void kan_reflection_system_generation_iterator_change_struct (kan_reflection_system_generation_iterator_t iterator,
+                                                              const struct kan_reflection_struct_t *data)
+{
+    APPEND_EVENT (changed, struct);
+}
+
+void kan_reflection_system_generation_iterator_change_function (kan_reflection_system_generation_iterator_t iterator,
+                                                                const struct kan_reflection_function_t *data)
+{
+    APPEND_EVENT (changed, function);
+}
+
+#undef APPEND_EVENT
 
 #define ADD_META_EVENT_TOP_LEVEL(EVENT, ENTITY)                                                                        \
     struct generation_iterator_t *iterator_data = (struct generation_iterator_t *) iterator;                           \
