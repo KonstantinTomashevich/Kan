@@ -34,19 +34,19 @@ struct building_graph_node_t
     kan_workflow_function_t function;
     kan_workflow_user_data_t user_data;
 
-    // Array of interned strings.
+    /// \meta reflection_dynamic_array_type = "kan_interned_string_t"
     struct kan_dynamic_array_t depends_on;
 
-    // Array of interned strings.
+    /// \meta reflection_dynamic_array_type = "kan_interned_string_t"
     struct kan_dynamic_array_t dependency_of;
 
-    // Array of interned strings.
+    /// \meta reflection_dynamic_array_type = "kan_interned_string_t"
     struct kan_dynamic_array_t resource_insert_access;
 
-    // Array of interned strings.
+    /// \meta reflection_dynamic_array_type = "kan_interned_string_t"
     struct kan_dynamic_array_t resource_write_access;
 
-    // Array of interned strings.
+    /// \meta reflection_dynamic_array_type = "kan_interned_string_t"
     struct kan_dynamic_array_t resource_read_access;
 
     struct graph_builder_t *builder;
@@ -54,10 +54,10 @@ struct building_graph_node_t
     uint64_t intermediate_node_id;
     uint64_t intermediate_references_count;
 
-    // Array of 64-but unsigned integers.
+    /// \meta reflection_dynamic_array_type = "uint64_t"
     struct kan_dynamic_array_t intermediate_incomes;
 
-    // Array of 64-but unsigned integers.
+    /// \meta reflection_dynamic_array_type = "uint64_t"
     struct kan_dynamic_array_t intermediate_outcomes;
 
 #if defined(KAN_WORKFLOW_VERIFY)

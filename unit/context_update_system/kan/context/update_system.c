@@ -33,7 +33,7 @@ struct update_system_t
     kan_context_handle_t context;
     kan_allocation_group_t group;
 
-    // Array of update_callable_t. Ordered in execution order.
+    /// \meta reflection_dynamic_array_type = "struct update_callable_t"
     struct kan_dynamic_array_t update_sequence;
 
     uint64_t connection_request_count;
