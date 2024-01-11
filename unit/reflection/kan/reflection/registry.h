@@ -285,6 +285,8 @@ struct kan_reflection_function_argument_meta_iterator_t
 
 typedef uint64_t kan_reflection_registry_t;
 
+#define KAN_INVALID_REFLECTION_REGISTRY 0u
+
 /// \brief Allocates new reflection registry.
 REFLECTION_API kan_reflection_registry_t kan_reflection_registry_create (void);
 
