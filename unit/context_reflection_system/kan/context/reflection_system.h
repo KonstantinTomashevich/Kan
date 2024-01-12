@@ -4,6 +4,7 @@
 
 #include <kan/api_common/c_header.h>
 #include <kan/context/context.h>
+#include <kan/reflection/migration.h>
 #include <kan/reflection/registry.h>
 
 /// \file
@@ -62,7 +63,9 @@ typedef void (*kan_context_reflection_populate_t) (kan_context_system_handle_t o
                                                    kan_reflection_registry_t registry);
 
 typedef void (*kan_context_reflection_generated_t) (kan_context_system_handle_t other_system,
-                                                    kan_reflection_registry_t registry);
+                                                    kan_reflection_registry_t registry,
+                                                    kan_reflection_migration_seed_t migration_seed,
+                                                    kan_reflection_struct_migrator_t migrator);
 
 typedef uint64_t kan_reflection_system_generation_iterator_t;
 

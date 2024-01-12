@@ -404,15 +404,32 @@ static void reflection_system_generate (struct reflection_system_t *system)
     KAN_LOG (reflection_system, KAN_LOG_INFO, "Running generation callbacks.")
     struct generated_connection_node_t *generated_node = system->first_generated_connection;
 
+    kan_reflection_migration_seed_t migration_seed = KAN_INVALID_REFLECTION_MIGRATION_SEED;
+    kan_reflection_struct_migrator_t migrator = KAN_INVALID_REFLECTION_STRUCT_MIGRATOR;
+
+    if (system->current_registry != KAN_INVALID_REFLECTION_REGISTRY)
+    {
+        KAN_LOG (reflection_system, KAN_LOG_INFO, "Creating migration data.")
+        migration_seed = kan_reflection_migration_seed_build (system->current_registry, new_registry);
+        migrator = kan_reflection_struct_migrator_build (migration_seed);
+    }
+
     while (generated_node)
     {
-        generated_node->functor (generated_node->other_system, new_registry);
+        generated_node->functor (generated_node->other_system, new_registry, migration_seed, migrator);
         generated_node = generated_node->next;
     }
 
-    KAN_LOG (reflection_system, KAN_LOG_INFO, "Destroying old reflection registry.")
     if (system->current_registry != KAN_INVALID_REFLECTION_REGISTRY)
     {
+        KAN_LOG (reflection_system, KAN_LOG_INFO, "Migrating patches.")
+        kan_reflection_struct_migrator_migrate_patches (migrator, system->current_registry, new_registry);
+
+        KAN_LOG (reflection_system, KAN_LOG_INFO, "Destroying migration data.")
+        kan_reflection_struct_migrator_destroy (migrator);
+        kan_reflection_migration_seed_destroy (migration_seed);
+
+        KAN_LOG (reflection_system, KAN_LOG_INFO, "Destroying old reflection registry.")
         kan_reflection_registry_destroy (system->current_registry);
     }
 
