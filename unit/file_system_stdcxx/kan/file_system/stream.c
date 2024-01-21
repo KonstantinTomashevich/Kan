@@ -38,7 +38,7 @@ static uint64_t write (struct kan_stream_t *stream, uint64_t amount, const void 
 
 static kan_bool_t flush (struct kan_stream_t *stream)
 {
-    return fflush (((struct file_stream_t *) stream)->file) == 0 ? KAN_TRUE : KAN_FALSE;
+    return fflush (((struct file_stream_t *) stream)->file) == 0;
 }
 
 static uint64_t tell (struct kan_stream_t *stream)
@@ -51,13 +51,13 @@ static kan_bool_t seek (struct kan_stream_t *stream, enum kan_stream_seek_pivot 
     switch (pivot)
     {
     case KAN_STREAM_SEEK_START:
-        return fseek (((struct file_stream_t *) stream)->file, (long) offset, SEEK_SET) == 0 ? KAN_TRUE : KAN_FALSE;
+        return fseek (((struct file_stream_t *) stream)->file, (long) offset, SEEK_SET) == 0;
 
     case KAN_STREAM_SEEK_CURRENT:
-        return fseek (((struct file_stream_t *) stream)->file, (long) offset, SEEK_CUR) == 0 ? KAN_TRUE : KAN_FALSE;
+        return fseek (((struct file_stream_t *) stream)->file, (long) offset, SEEK_CUR) == 0;
 
     case KAN_STREAM_SEEK_END:
-        return fseek (((struct file_stream_t *) stream)->file, (long) offset, SEEK_END) == 0 ? KAN_TRUE : KAN_FALSE;
+        return fseek (((struct file_stream_t *) stream)->file, (long) offset, SEEK_END) == 0;
     }
 
     KAN_ASSERT (KAN_FALSE)

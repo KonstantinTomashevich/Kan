@@ -23,7 +23,7 @@ kan_bool_t kan_mutex_lock (kan_mutex_handle_t handle)
 
 kan_bool_t kan_mutex_try_lock (kan_mutex_handle_t handle)
 {
-    return SDL_TryLockMutex ((void *) handle) == 0 ? KAN_TRUE : KAN_FALSE;
+    return SDL_TryLockMutex ((void *) handle) == 0;
 }
 
 kan_bool_t kan_mutex_unlock (kan_mutex_handle_t handle)

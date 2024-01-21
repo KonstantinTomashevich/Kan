@@ -169,7 +169,7 @@ static kan_thread_result_t worker_thread_function (kan_thread_user_data_t user_d
         {
             int old_state = kan_atomic_int_get (&task->state);
             KAN_ASSERT (old_state == TASK_STATE_RUNNING || TASK_STATE_RUNNING_DETACHED)
-            free_task = old_state == TASK_STATE_RUNNING_DETACHED ? KAN_TRUE : KAN_FALSE;
+            free_task = old_state == TASK_STATE_RUNNING_DETACHED;
             const int new_state = TASK_STATE_FINISHED;
 
             if (kan_atomic_int_compare_and_set (&task->state, old_state, new_state))
