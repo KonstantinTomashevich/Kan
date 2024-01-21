@@ -433,25 +433,13 @@ static void check_manual_event_from_task (struct kan_repository_event_fetch_quer
                                           struct manual_event_t data)
 {
     struct kan_repository_event_read_access_t access = kan_repository_event_fetch_query_next (query);
-    struct check_manual_event_from_task_user_data_t *user_data = kan_stack_group_allocator_allocate (
-        temporary_allocator, sizeof (struct check_manual_event_from_task_user_data_t),
-        _Alignof (struct check_manual_event_from_task_user_data_t));
-
-    user_data->access = access;
-    user_data->data = data;
-
-    struct kan_cpu_task_list_node_t *task_node = kan_stack_group_allocator_allocate (
-        temporary_allocator, sizeof (struct kan_cpu_task_list_node_t), _Alignof (struct kan_cpu_task_list_node_t));
-    task_node->next = *node;
-    *node = task_node;
-
-    task_node->task = (struct kan_cpu_task_t) {
-        .name = kan_string_intern ("check_manual_event_from_task"),
-        .user_data = (uint64_t) user_data,
-        .function = check_manual_event_from_task_executor,
-    };
-
-    task_node->queue = KAN_CPU_DISPATCH_QUEUE_FOREGROUND;
+    KAN_CPU_TASK_LIST_USER_STRUCT (node, temporary_allocator, kan_string_intern ("check_manual_event_from_task"),
+                                   check_manual_event_from_task_executor, FOREGROUND,
+                                   struct check_manual_event_from_task_user_data_t,
+                                   {
+                                       .access = access,
+                                       .data = data,
+                                   })
 }
 
 static void check_z_changed_event (struct kan_repository_event_fetch_query_t *query,
