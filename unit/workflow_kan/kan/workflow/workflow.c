@@ -152,8 +152,8 @@ static inline void register_resource (struct kan_hash_storage_t *hash_storage,
         kan_hash_storage_set_bucket_count (hash_storage, hash_storage->bucket_count * 2u);
     }
 
-    struct resource_info_node_t *node = kan_stack_group_allocator_allocate (
-        temporary_allocator, sizeof (struct resource_info_node_t), _Alignof (struct resource_info_node_t));
+    struct resource_info_node_t *node =
+        KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (temporary_allocator, struct resource_info_node_t);
     node->node.hash = (uint64_t) resource_name;
     node->name = resource_name;
     node->id = *id_counter;
@@ -1026,9 +1026,8 @@ static void workflow_task_finish_function (uint64_t user_data)
         if (kan_atomic_int_add (&outcome->incomes_left, -1) == 1)
         {
             kan_atomic_int_lock (&node->header->temporary_allocator_lock);
-            struct kan_cpu_task_list_node_t *list_node = kan_stack_group_allocator_allocate (
-                &node->header->temporary_allocator, sizeof (struct kan_cpu_task_list_node_t),
-                _Alignof (struct kan_cpu_task_list_node_t));
+            struct kan_cpu_task_list_node_t *list_node = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (
+                &node->header->temporary_allocator, struct kan_cpu_task_list_node_t);
             kan_atomic_int_unlock (&node->header->temporary_allocator_lock);
 
             list_node->task = (struct kan_cpu_task_t) {
@@ -1074,9 +1073,8 @@ void kan_workflow_graph_execute (kan_workflow_graph_t graph)
     for (uint64_t start_index = 0u; start_index < graph_header->start_nodes_count; ++start_index)
     {
         struct workflow_graph_node_t *start = graph_header->start_nodes[start_index];
-        struct kan_cpu_task_list_node_t *list_node = kan_stack_group_allocator_allocate (
-            &graph_header->temporary_allocator, sizeof (struct kan_cpu_task_list_node_t),
-            _Alignof (struct kan_cpu_task_list_node_t));
+        struct kan_cpu_task_list_node_t *list_node = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (
+            &graph_header->temporary_allocator, struct kan_cpu_task_list_node_t);
 
         list_node->task = (struct kan_cpu_task_t) {
             .name = start->name,

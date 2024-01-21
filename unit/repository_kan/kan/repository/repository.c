@@ -1535,8 +1535,8 @@ static struct copy_out_list_node_t *extract_raw_copy_outs (kan_interned_string_t
         }
 #endif
 
-        struct copy_out_list_node_t *node = (struct copy_out_list_node_t *) kan_stack_group_allocator_allocate (
-            temporary_allocator, sizeof (struct copy_out_list_node_t), _Alignof (struct copy_out_list_node_t));
+        struct copy_out_list_node_t *node =
+            KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (temporary_allocator, struct copy_out_list_node_t);
 
         node->next = NULL;
         node->source_offset = source_absolute_offset;
@@ -1585,8 +1585,8 @@ static struct copy_out_list_node_t *convert_to_buffer_copy_outs (
                 const uint64_t offset = input->source_offset - chunk->source_offset;
                 const uint64_t size_in_chunk = KAN_MIN (input->size, chunk->size - offset);
 
-                struct copy_out_list_node_t *node = (struct copy_out_list_node_t *) kan_stack_group_allocator_allocate (
-                    temporary_allocator, sizeof (struct copy_out_list_node_t), _Alignof (struct copy_out_list_node_t));
+                struct copy_out_list_node_t *node =
+                    KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (temporary_allocator, struct copy_out_list_node_t);
 
                 node->next = NULL;
                 node->source_offset = buffer_offset + offset;
@@ -1681,8 +1681,8 @@ static struct copy_out_list_node_t *merge_copy_outs (struct copy_out_list_node_t
         }
         else
         {
-            struct copy_out_list_node_t *node = (struct copy_out_list_node_t *) kan_stack_group_allocator_allocate (
-                temporary_allocator, sizeof (struct copy_out_list_node_t), _Alignof (struct copy_out_list_node_t));
+            struct copy_out_list_node_t *node =
+                KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (temporary_allocator, struct copy_out_list_node_t);
 
             node->next = NULL;
             node->source_offset = input->source_offset;
@@ -1803,9 +1803,8 @@ static void observation_buffer_definition_build (struct observation_buffer_defin
         }
 
         struct observation_buffer_scenario_chunk_list_node_t *no_intersection_node =
-            kan_stack_group_allocator_allocate (temporary_allocator,
-                                                sizeof (struct observation_buffer_scenario_chunk_list_node_t),
-                                                _Alignof (struct observation_buffer_scenario_chunk_list_node_t));
+            KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (temporary_allocator,
+                                                      struct observation_buffer_scenario_chunk_list_node_t);
 
         *no_intersection_node = (struct observation_buffer_scenario_chunk_list_node_t) {
             .source_offset = initial_node->source_offset - no_intersection_size,
@@ -1841,9 +1840,9 @@ static void observation_buffer_definition_build (struct observation_buffer_defin
         }
         else
         {
-            struct observation_buffer_scenario_chunk_list_node_t *merged_node = kan_stack_group_allocator_allocate (
-                temporary_allocator, sizeof (struct observation_buffer_scenario_chunk_list_node_t),
-                _Alignof (struct observation_buffer_scenario_chunk_list_node_t));
+            struct observation_buffer_scenario_chunk_list_node_t *merged_node =
+                KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (temporary_allocator,
+                                                          struct observation_buffer_scenario_chunk_list_node_t);
 
             *merged_node = *chunk;
             merged_node->next = NULL;
@@ -2025,9 +2024,8 @@ static void observation_event_triggers_definition_build (struct observation_even
             struct copy_out_list_node_t *merged_record_copy_outs =
                 merge_copy_outs (raw_record_copy_outs, temporary_allocator, &merged_record_copy_outs_count);
 
-            struct observation_event_trigger_list_node_t *event_node = kan_stack_group_allocator_allocate (
-                temporary_allocator, sizeof (struct observation_event_trigger_list_node_t),
-                _Alignof (struct observation_event_trigger_list_node_t));
+            struct observation_event_trigger_list_node_t *event_node = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (
+                temporary_allocator, struct observation_event_trigger_list_node_t);
 
             event_node->flags = *event_flag;
             kan_repository_event_insert_query_init (&event_node->event_insert_query,
@@ -2217,9 +2215,8 @@ static struct lifetime_event_trigger_list_node_t *lifetime_event_triggers_extrac
             struct copy_out_list_node_t *merged_copy_outs =
                 merge_copy_outs (raw_copy_outs, temporary_allocator, &merged_copy_outs_count);
 
-            struct lifetime_event_trigger_list_node_t *event_node = kan_stack_group_allocator_allocate (
-                temporary_allocator, sizeof (struct lifetime_event_trigger_list_node_t),
-                _Alignof (struct lifetime_event_trigger_list_node_t));
+            struct lifetime_event_trigger_list_node_t *event_node = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (
+                temporary_allocator, struct lifetime_event_trigger_list_node_t);
 
             kan_repository_event_insert_query_init (&event_node->event_insert_query,
                                                     (kan_repository_event_storage_t) event_storage);
@@ -2276,9 +2273,8 @@ static struct lifetime_event_trigger_list_node_t *lifetime_event_triggers_extrac
             struct copy_out_list_node_t *merged_copy_outs =
                 merge_copy_outs (raw_copy_outs, temporary_allocator, &merged_copy_outs_count);
 
-            struct lifetime_event_trigger_list_node_t *event_node = kan_stack_group_allocator_allocate (
-                temporary_allocator, sizeof (struct lifetime_event_trigger_list_node_t),
-                _Alignof (struct lifetime_event_trigger_list_node_t));
+            struct lifetime_event_trigger_list_node_t *event_node = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (
+                temporary_allocator, struct lifetime_event_trigger_list_node_t);
 
             kan_repository_event_insert_query_init (&event_node->event_insert_query,
                                                     (kan_repository_event_storage_t) event_storage);
@@ -2460,8 +2456,8 @@ static void cascade_deleters_definition_build (struct cascade_deleters_definitio
             continue;
         }
 
-        struct cascade_deleter_node_t *node = kan_stack_group_allocator_allocate (
-            temporary_allocator, sizeof (struct cascade_deleter_node_t), _Alignof (struct cascade_deleter_node_t));
+        struct cascade_deleter_node_t *node =
+            KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (temporary_allocator, struct cascade_deleter_node_t);
 
         node->next = first_node;
         first_node = node;
@@ -2617,9 +2613,8 @@ static kan_bool_t return_uniqueness_watcher_register (struct return_uniqueness_w
 
         while (list_node)
         {
-            struct return_uniqueness_watcher_hash_node_t *hash_node = kan_stack_group_allocator_allocate (
-                temporary_allocator, sizeof (struct return_uniqueness_watcher_hash_node_t),
-                _Alignof (struct return_uniqueness_watcher_hash_node_t));
+            struct return_uniqueness_watcher_hash_node_t *hash_node = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (
+                temporary_allocator, struct return_uniqueness_watcher_hash_node_t);
 
             hash_node->node.hash = (uint64_t) record;
             hash_node->record = record;
@@ -2640,9 +2635,8 @@ static kan_bool_t return_uniqueness_watcher_register (struct return_uniqueness_w
         }
 
         kan_atomic_int_lock (temporary_allocator_lock);
-        struct return_uniqueness_watcher_hash_node_t *hash_node = kan_stack_group_allocator_allocate (
-            temporary_allocator, sizeof (struct return_uniqueness_watcher_hash_node_t),
-            _Alignof (struct return_uniqueness_watcher_hash_node_t));
+        struct return_uniqueness_watcher_hash_node_t *hash_node = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (
+            temporary_allocator, struct return_uniqueness_watcher_hash_node_t);
         kan_atomic_int_unlock (temporary_allocator_lock);
 
         hash_node->node.hash = (uint64_t) record;
@@ -2652,9 +2646,8 @@ static kan_bool_t return_uniqueness_watcher_register (struct return_uniqueness_w
     else
     {
         kan_atomic_int_lock (temporary_allocator_lock);
-        struct return_uniqueness_watcher_list_node_t *list_node = kan_stack_group_allocator_allocate (
-            temporary_allocator, sizeof (struct return_uniqueness_watcher_list_node_t),
-            _Alignof (struct return_uniqueness_watcher_list_node_t));
+        struct return_uniqueness_watcher_list_node_t *list_node = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (
+            temporary_allocator, struct return_uniqueness_watcher_list_node_t);
         kan_atomic_int_unlock (temporary_allocator_lock);
 
         list_node->next = watcher->first_node;
@@ -3490,10 +3483,8 @@ static inline void space_index_delete_all_sub_nodes (struct space_index_t *space
             struct space_index_sub_node_t *typed_sub_node = (struct space_index_sub_node_t *) sub_node;
             if (typed_sub_node->record == record_node)
             {
-                struct space_index_sub_node_deletion_order_t *to_delete =
-                    (struct space_index_sub_node_deletion_order_t *) kan_stack_group_allocator_allocate (
-                        temporary_allocator, sizeof (struct space_index_sub_node_deletion_order_t),
-                        _Alignof (struct space_index_sub_node_deletion_order_t));
+                struct space_index_sub_node_deletion_order_t *to_delete = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (
+                    temporary_allocator, struct space_index_sub_node_deletion_order_t);
 
                 to_delete->next = first_to_delete;
                 to_delete->node = node;
@@ -3924,15 +3915,13 @@ static void execute_migration (uint64_t user_data)
 
 static struct record_migration_user_data_t *allocate_migration_user_data (struct migration_context_t *context)
 {
-    return (struct record_migration_user_data_t *) kan_stack_group_allocator_allocate (
-        &context->allocator, sizeof (struct record_migration_user_data_t),
-        _Alignof (struct record_migration_user_data_t));
+    return KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&context->allocator, struct record_migration_user_data_t);
 }
 
 static void spawn_migration_task (struct migration_context_t *context, struct record_migration_user_data_t *user_data)
 {
-    struct kan_cpu_task_list_node_t *node = (struct kan_cpu_task_list_node_t *) kan_stack_group_allocator_allocate (
-        &context->allocator, sizeof (struct kan_cpu_task_list_node_t), _Alignof (struct kan_cpu_task_list_node_t));
+    struct kan_cpu_task_list_node_t *node =
+        KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&context->allocator, struct kan_cpu_task_list_node_t);
 
     node->queue = KAN_CPU_DISPATCH_QUEUE_FOREGROUND;
     ensure_interned_strings_ready ();
@@ -4918,9 +4907,8 @@ static struct indexed_storage_dirty_record_node_t *indexed_storage_allocate_dirt
     // When maintenance is not possible, maintenance lock is used to restrict dirty record creation.
     kan_atomic_int_lock (&storage->maintenance_lock);
 
-    struct indexed_storage_dirty_record_node_t *node = kan_stack_group_allocator_allocate (
-        &storage->temporary_allocator, sizeof (struct indexed_storage_dirty_record_node_t),
-        _Alignof (struct indexed_storage_dirty_record_node_t));
+    struct indexed_storage_dirty_record_node_t *node = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (
+        &storage->temporary_allocator, struct indexed_storage_dirty_record_node_t);
 
     node->next = storage->dirty_records;
     storage->dirty_records = node;
@@ -8546,10 +8534,8 @@ static void extract_observation_chunks_from_on_change_events (
                 }
 #endif
 
-                struct observation_buffer_scenario_chunk_list_node_t *node =
-                    (struct observation_buffer_scenario_chunk_list_node_t *) kan_stack_group_allocator_allocate (
-                        temporary_allocator, sizeof (struct observation_buffer_scenario_chunk_list_node_t),
-                        _Alignof (struct observation_buffer_scenario_chunk_list_node_t));
+                struct observation_buffer_scenario_chunk_list_node_t *node = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (
+                    temporary_allocator, struct observation_buffer_scenario_chunk_list_node_t);
 
                 node->next = 0u;
                 node->source_offset = absolute_offset;
@@ -8622,10 +8608,8 @@ static void extract_observation_chunks_from_indices (struct indexed_storage_node
 {
 #define HELPER_ADD_NODE_FOR(BAKED_GETTER)                                                                              \
     {                                                                                                                  \
-        struct observation_buffer_scenario_chunk_list_node_t *node =                                                   \
-            (struct observation_buffer_scenario_chunk_list_node_t *) kan_stack_group_allocator_allocate (              \
-                temporary_allocator, sizeof (struct observation_buffer_scenario_chunk_list_node_t),                    \
-                _Alignof (struct observation_buffer_scenario_chunk_list_node_t));                                      \
+        struct observation_buffer_scenario_chunk_list_node_t *node = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (        \
+            temporary_allocator, struct observation_buffer_scenario_chunk_list_node_t);                                \
                                                                                                                        \
         node->next = 0u;                                                                                               \
         node->source_offset = (BAKED_GETTER).absolute_offset;                                                          \
@@ -8820,18 +8804,16 @@ static void repository_prepare_storages (struct repository_t *repository, struct
 
     while (singleton_storage_node)
     {
-        struct singleton_switch_to_serving_user_data_t *user_data =
-            (struct singleton_switch_to_serving_user_data_t *) kan_stack_group_allocator_allocate (
-                &context->allocator, sizeof (struct singleton_switch_to_serving_user_data_t),
-                _Alignof (struct singleton_switch_to_serving_user_data_t));
+        struct singleton_switch_to_serving_user_data_t *user_data = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (
+            &context->allocator, struct singleton_switch_to_serving_user_data_t);
 
         *user_data = (struct singleton_switch_to_serving_user_data_t) {
             .storage = singleton_storage_node,
             .repository = repository,
         };
 
-        struct kan_cpu_task_list_node_t *node = (struct kan_cpu_task_list_node_t *) kan_stack_group_allocator_allocate (
-            &context->allocator, sizeof (struct kan_cpu_task_list_node_t), _Alignof (struct kan_cpu_task_list_node_t));
+        struct kan_cpu_task_list_node_t *node =
+            KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&context->allocator, struct kan_cpu_task_list_node_t);
 
         node->queue = KAN_CPU_DISPATCH_QUEUE_FOREGROUND;
         ensure_interned_strings_ready ();
@@ -8852,18 +8834,16 @@ static void repository_prepare_storages (struct repository_t *repository, struct
 
     while (indexed_storage_node)
     {
-        struct indexed_switch_to_serving_user_data_t *user_data =
-            (struct indexed_switch_to_serving_user_data_t *) kan_stack_group_allocator_allocate (
-                &context->allocator, sizeof (struct indexed_switch_to_serving_user_data_t),
-                _Alignof (struct indexed_switch_to_serving_user_data_t));
+        struct indexed_switch_to_serving_user_data_t *user_data = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (
+            &context->allocator, struct indexed_switch_to_serving_user_data_t);
 
         *user_data = (struct indexed_switch_to_serving_user_data_t) {
             .storage = indexed_storage_node,
             .repository = repository,
         };
 
-        struct kan_cpu_task_list_node_t *node = (struct kan_cpu_task_list_node_t *) kan_stack_group_allocator_allocate (
-            &context->allocator, sizeof (struct kan_cpu_task_list_node_t), _Alignof (struct kan_cpu_task_list_node_t));
+        struct kan_cpu_task_list_node_t *node =
+            KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&context->allocator, struct kan_cpu_task_list_node_t);
 
         node->queue = KAN_CPU_DISPATCH_QUEUE_FOREGROUND;
         ensure_interned_strings_ready ();

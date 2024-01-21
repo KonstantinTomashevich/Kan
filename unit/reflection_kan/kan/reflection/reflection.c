@@ -3849,7 +3849,7 @@ static inline kan_bool_t patch_migration_evaluate_condition (uint64_t condition_
         }
     }
 
-    return condition_statuses[condition_index] == PATCH_CONDITION_STATUS_TRUE ? KAN_TRUE : KAN_FALSE;
+    return condition_statuses[condition_index] == PATCH_CONDITION_STATUS_TRUE;
 }
 
 struct patch_migration_task_data_t
@@ -4081,8 +4081,7 @@ void kan_reflection_struct_migrator_migrate_patches (kan_reflection_struct_migra
         struct compiled_patch_t *next = patch->next;
         if (!next_task_data)
         {
-            next_task_data = (struct patch_migration_task_data_t *) kan_stack_group_allocator_allocate (
-                &allocator, sizeof (struct patch_migration_task_data_t), _Alignof (struct patch_migration_task_data_t));
+            next_task_data = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&allocator, struct patch_migration_task_data_t);
             next_task_data->target_registry = target_registry;
             next_task_data->migrator = migrator;
             next_task_data->patch_begin = patch;
@@ -4093,8 +4092,7 @@ void kan_reflection_struct_migrator_migrate_patches (kan_reflection_struct_migra
         {
             next_task_data->patch_end = next;
             struct kan_cpu_task_list_node_t *task_list_node =
-                (struct kan_cpu_task_list_node_t *) kan_stack_group_allocator_allocate (
-                    &allocator, sizeof (struct kan_cpu_task_list_node_t), _Alignof (struct kan_cpu_task_list_node_t));
+                KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&allocator, struct kan_cpu_task_list_node_t);
 
             task_list_node->next = task_list;
             task_list_node->task = (struct kan_cpu_task_t) {
