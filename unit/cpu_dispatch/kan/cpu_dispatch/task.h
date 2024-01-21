@@ -5,6 +5,7 @@
 #include <kan/api_common/bool.h>
 #include <kan/api_common/c_header.h>
 #include <kan/container/interned_string.h>
+#include <kan/container/stack_group_allocator.h>
 
 /// \file
 /// \brief Describes tasks -- minimal multithreading units that can be run on different CPU threads.
@@ -90,5 +91,63 @@ struct kan_cpu_task_list_node_t
 
 /// \brief Dispatches list of tasks. Advised when you have multiple tasks to be dispatched.
 CPU_DISPATCH_API void kan_cpu_task_dispatch_list (struct kan_cpu_task_list_node_t *list);
+
+/// \brief Syntax sugar for allocating cpu task with big user data (more than 64 bits) from temporary allocator and
+///        adding it to the list of cpu tasks.
+/// \param LIST_HEAD Pointer to pointer to list head (struct kan_cpu_task_list_node_t **).
+/// \param TEMPORARY_ALLOCATOR Pointer to stack group allocator used for temporary allocation of user data and cpu task.
+/// \param NAME Name of the task. Interned string.
+/// \param FUNCTION Task function to be executed.
+/// \param QUEUE Name of the queue to be used: FOREGROUND or BACKGROUND.
+/// \param USER_TYPE User structure name with `struct` prefix.
+/// \param ... User data designated initializer
+#define KAN_CPU_TASK_LIST_USER_STRUCT(LIST_HEAD, TEMPORARY_ALLOCATOR, NAME, FUNCTION, QUEUE, USER_TYPE, ...)           \
+    {                                                                                                                  \
+        _Static_assert (sizeof (USER_TYPE) > sizeof (uint64_t),                                                        \
+                        "Do not use this for user data that can fit in 64 bits.");                                     \
+                                                                                                                       \
+        USER_TYPE *user_data = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (TEMPORARY_ALLOCATOR, USER_TYPE);              \
+        *user_data = (USER_TYPE) __VA_ARGS__;                                                                          \
+                                                                                                                       \
+        struct kan_cpu_task_list_node_t *new_node =                                                                    \
+            KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (TEMPORARY_ALLOCATOR, struct kan_cpu_task_list_node_t);           \
+                                                                                                                       \
+        new_node->task = (struct kan_cpu_task_t) {                                                                     \
+            .name = NAME,                                                                                              \
+            .function = FUNCTION,                                                                                      \
+            .user_data = (uint64_t) user_data,                                                                         \
+        };                                                                                                             \
+                                                                                                                       \
+        new_node->queue = KAN_CPU_DISPATCH_QUEUE_##QUEUE;                                                              \
+        new_node->next = *LIST_HEAD;                                                                                   \
+        *LIST_HEAD = new_node;                                                                                         \
+    }
+
+/// \brief Syntax sugar for allocating cpu task with small user data (can be packed into 64 bits) from temporary
+///        allocator and adding it to the list of cpu tasks.
+/// \param LIST_HEAD Pointer to pointer to list head (struct kan_cpu_task_list_node_t **).
+/// \param TEMPORARY_ALLOCATOR Pointer to stack group allocator used for temporary allocation of cpu task.
+/// \param NAME Name of the task. Interned string.
+/// \param FUNCTION Task function to be executed.
+/// \param QUEUE Name of the queue to be used: FOREGROUND or BACKGROUND.
+/// \param USER_VALUE User value that can be converted to `uint64_t`.
+#define KAN_CPU_TASK_LIST_USER_VALUE(LIST_HEAD, TEMPORARY_ALLOCATOR, NAME, FUNCTION, QUEUE, USER_VALUE)                \
+    {                                                                                                                  \
+        _Static_assert (sizeof (USER_VALUE) <= sizeof (uint64_t),                                                      \
+                        "Do not use this for user data that cannot fit in 64 bits.");                                  \
+                                                                                                                       \
+        struct kan_cpu_task_list_node_t *new_node =                                                                    \
+            KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (TEMPORARY_ALLOCATOR, struct kan_cpu_task_list_node_t);           \
+                                                                                                                       \
+        new_node->task = (struct kan_cpu_task_t) {                                                                     \
+            .name = NAME,                                                                                              \
+            .function = FUNCTION,                                                                                      \
+            .user_data = (uint64_t) USER_VALUE,                                                                        \
+        };                                                                                                             \
+                                                                                                                       \
+        new_node->queue = KAN_CPU_DISPATCH_QUEUE_##QUEUE;                                                              \
+        new_node->next = *LIST_HEAD;                                                                                   \
+        *LIST_HEAD = new_node;                                                                                         \
+    }
 
 KAN_C_HEADER_END

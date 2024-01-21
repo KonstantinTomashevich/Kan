@@ -336,44 +336,35 @@ static void reflection_system_generate (struct reflection_system_t *system)
 
         while (iterate_node)
         {
-            struct kan_cpu_task_list_node_t *next_node = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (
-                &generation_context.temporary_allocator, struct kan_cpu_task_list_node_t);
+            KAN_CPU_TASK_LIST_USER_STRUCT (
+                &list_node, &generation_context.temporary_allocator, task_name, call_generation_iterate_task,
+                FOREGROUND, struct generation_iteration_task_user_data_t,
+                {
+                    .iterator =
+                        (struct generation_iterator_t) {
+                            .generation_context = &generation_context,
+                            .current_added_enum = generation_context.first_added_enum_previous_iteration,
+                            .current_added_struct = generation_context.first_added_struct_previous_iteration,
+                            .current_added_function = generation_context.first_added_function_previous_iteration,
+                            .current_changed_enum = generation_context.first_changed_enum_previous_iteration,
+                            .current_changed_struct = generation_context.first_changed_struct_previous_iteration,
+                            .current_changed_function = generation_context.first_changed_function_previous_iteration,
 
-            struct generation_iteration_task_user_data_t *user_data = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (
-                &generation_context.temporary_allocator, struct generation_iteration_task_user_data_t);
-
-            user_data->iterator = (struct generation_iterator_t) {
-                .generation_context = &generation_context,
-                .current_added_enum = generation_context.first_added_enum_previous_iteration,
-                .current_added_struct = generation_context.first_added_struct_previous_iteration,
-                .current_added_function = generation_context.first_added_function_previous_iteration,
-                .current_changed_enum = generation_context.first_changed_enum_previous_iteration,
-                .current_changed_struct = generation_context.first_changed_struct_previous_iteration,
-                .current_changed_function = generation_context.first_changed_function_previous_iteration,
-
-                .current_added_enum_meta = generation_context.first_added_enum_meta_previous_iteration,
-                .current_added_enum_value_meta = generation_context.first_added_enum_value_meta_previous_iteration,
-                .current_added_struct_meta = generation_context.first_added_struct_meta_previous_iteration,
-                .current_added_struct_field_meta = generation_context.first_added_struct_field_meta_previous_iteration,
-                .current_added_function_meta = generation_context.first_added_function_meta_previous_iteration,
-                .current_added_function_argument_meta =
-                    generation_context.first_added_function_argument_meta_previous_iteration,
-            };
-
-            user_data->new_registry = new_registry;
-            user_data->iteration_index = iteration_index;
-            user_data->node = iterate_node;
-
-            next_node->task = (struct kan_cpu_task_t) {
-                .name = task_name,
-                .function = call_generation_iterate_task,
-                .user_data = (uint64_t) user_data,
-            };
-
-            next_node->queue = KAN_CPU_DISPATCH_QUEUE_FOREGROUND;
-            next_node->next = list_node;
-            list_node = next_node;
-
+                            .current_added_enum_meta = generation_context.first_added_enum_meta_previous_iteration,
+                            .current_added_enum_value_meta =
+                                generation_context.first_added_enum_value_meta_previous_iteration,
+                            .current_added_struct_meta = generation_context.first_added_struct_meta_previous_iteration,
+                            .current_added_struct_field_meta =
+                                generation_context.first_added_struct_field_meta_previous_iteration,
+                            .current_added_function_meta =
+                                generation_context.first_added_function_meta_previous_iteration,
+                            .current_added_function_argument_meta =
+                                generation_context.first_added_function_argument_meta_previous_iteration,
+                        },
+                    .new_registry = new_registry,
+                    .iteration_index = iteration_index,
+                    .node = iterate_node,
+                })
             iterate_node = iterate_node->next;
         }
 

@@ -1073,18 +1073,8 @@ void kan_workflow_graph_execute (kan_workflow_graph_t graph)
     for (uint64_t start_index = 0u; start_index < graph_header->start_nodes_count; ++start_index)
     {
         struct workflow_graph_node_t *start = graph_header->start_nodes[start_index];
-        struct kan_cpu_task_list_node_t *list_node = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (
-            &graph_header->temporary_allocator, struct kan_cpu_task_list_node_t);
-
-        list_node->task = (struct kan_cpu_task_t) {
-            .name = start->name,
-            .function = workflow_task_start_function,
-            .user_data = (uint64_t) start,
-        };
-
-        list_node->queue = KAN_CPU_DISPATCH_QUEUE_FOREGROUND;
-        list_node->next = first_list_node;
-        first_list_node = list_node;
+        KAN_CPU_TASK_LIST_USER_VALUE (&first_list_node, &graph_header->temporary_allocator, start->name,
+                                      workflow_task_start_function, FOREGROUND, start)
     }
 
     kan_cpu_task_dispatch_list (first_list_node);

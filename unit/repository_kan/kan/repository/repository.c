@@ -3913,29 +3913,6 @@ static void execute_migration (uint64_t user_data)
     *data->record_pointer = new_object;
 }
 
-static struct record_migration_user_data_t *allocate_migration_user_data (struct migration_context_t *context)
-{
-    return KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&context->allocator, struct record_migration_user_data_t);
-}
-
-static void spawn_migration_task (struct migration_context_t *context, struct record_migration_user_data_t *user_data)
-{
-    struct kan_cpu_task_list_node_t *node =
-        KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&context->allocator, struct kan_cpu_task_list_node_t);
-
-    node->queue = KAN_CPU_DISPATCH_QUEUE_FOREGROUND;
-    ensure_interned_strings_ready ();
-
-    node->task = (struct kan_cpu_task_t) {
-        .name = migration_task_name,
-        .function = execute_migration,
-        .user_data = (uint64_t) user_data,
-    };
-
-    node->next = context->task_list;
-    context->task_list = node;
-}
-
 static void repository_migrate_internal (struct repository_t *repository,
                                          struct migration_context_t *context,
                                          kan_reflection_registry_t new_registry,
@@ -3963,17 +3940,16 @@ static void repository_migrate_internal (struct repository_t *repository,
         {
         case KAN_REFLECTION_MIGRATION_NEEDED:
         {
-            struct record_migration_user_data_t *user_data = allocate_migration_user_data (context);
-            *user_data = (struct record_migration_user_data_t) {
-                .record_pointer = &singleton_storage_node->singleton,
-                .allocation_group = singleton_storage_node->allocation_group,
-                .batched_allocation = KAN_FALSE,
-                .migrator = migrator,
-                .old_type = old_type,
-                .new_type = new_type,
-            };
-
-            spawn_migration_task (context, user_data);
+            KAN_CPU_TASK_LIST_USER_STRUCT (&context->task_list, &context->allocator, migration_task_name,
+                                           execute_migration, FOREGROUND, struct record_migration_user_data_t,
+                                           {
+                                               .record_pointer = &singleton_storage_node->singleton,
+                                               .allocation_group = singleton_storage_node->allocation_group,
+                                               .batched_allocation = KAN_FALSE,
+                                               .migrator = migrator,
+                                               .old_type = old_type,
+                                               .new_type = new_type,
+                                           })
             break;
         }
 
@@ -4117,17 +4093,16 @@ static void repository_migrate_internal (struct repository_t *repository,
 
             while (node)
             {
-                struct record_migration_user_data_t *user_data = allocate_migration_user_data (context);
-                *user_data = (struct record_migration_user_data_t) {
-                    .record_pointer = &node->record,
-                    .allocation_group = indexed_storage_node->allocation_group,
-                    .batched_allocation = KAN_TRUE,
-                    .migrator = migrator,
-                    .old_type = old_type,
-                    .new_type = new_type,
-                };
-
-                spawn_migration_task (context, user_data);
+                KAN_CPU_TASK_LIST_USER_STRUCT (&context->task_list, &context->allocator, migration_task_name,
+                                               execute_migration, FOREGROUND, struct record_migration_user_data_t,
+                                               {
+                                                   .record_pointer = &node->record,
+                                                   .allocation_group = indexed_storage_node->allocation_group,
+                                                   .batched_allocation = KAN_TRUE,
+                                                   .migrator = migrator,
+                                                   .old_type = old_type,
+                                                   .new_type = new_type,
+                                               })
                 node = (struct indexed_storage_record_node_t *) node->list_node.next;
             }
 
@@ -4168,17 +4143,16 @@ static void repository_migrate_internal (struct repository_t *repository,
             struct event_queue_node_t *node = (struct event_queue_node_t *) event_storage_node->event_queue.oldest;
             while (&node->node != event_storage_node->event_queue.next_placeholder)
             {
-                struct record_migration_user_data_t *user_data = allocate_migration_user_data (context);
-                *user_data = (struct record_migration_user_data_t) {
-                    .record_pointer = &node->event,
-                    .allocation_group = event_storage_node->allocation_group,
-                    .batched_allocation = KAN_TRUE,
-                    .migrator = migrator,
-                    .old_type = old_type,
-                    .new_type = new_type,
-                };
-
-                spawn_migration_task (context, user_data);
+                KAN_CPU_TASK_LIST_USER_STRUCT (&context->task_list, &context->allocator, migration_task_name,
+                                               execute_migration, FOREGROUND, struct record_migration_user_data_t,
+                                               {
+                                                   .record_pointer = &node->event,
+                                                   .allocation_group = event_storage_node->allocation_group,
+                                                   .batched_allocation = KAN_TRUE,
+                                                   .migrator = migrator,
+                                                   .old_type = old_type,
+                                                   .new_type = new_type,
+                                               })
                 node = (struct event_queue_node_t *) node->node.next;
             }
 
@@ -8804,28 +8778,13 @@ static void repository_prepare_storages (struct repository_t *repository, struct
 
     while (singleton_storage_node)
     {
-        struct singleton_switch_to_serving_user_data_t *user_data = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (
-            &context->allocator, struct singleton_switch_to_serving_user_data_t);
-
-        *user_data = (struct singleton_switch_to_serving_user_data_t) {
-            .storage = singleton_storage_node,
-            .repository = repository,
-        };
-
-        struct kan_cpu_task_list_node_t *node =
-            KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&context->allocator, struct kan_cpu_task_list_node_t);
-
-        node->queue = KAN_CPU_DISPATCH_QUEUE_FOREGROUND;
-        ensure_interned_strings_ready ();
-
-        node->task = (struct kan_cpu_task_t) {
-            .name = switch_to_serving_task_name,
-            .function = prepare_singleton_storage,
-            .user_data = (uint64_t) user_data,
-        };
-
-        node->next = context->task_list;
-        context->task_list = node;
+        KAN_CPU_TASK_LIST_USER_STRUCT (&context->task_list, &context->allocator, switch_to_serving_task_name,
+                                       prepare_singleton_storage, FOREGROUND,
+                                       struct singleton_switch_to_serving_user_data_t,
+                                       {
+                                           .storage = singleton_storage_node,
+                                           .repository = repository,
+                                       })
         singleton_storage_node = (struct singleton_storage_node_t *) singleton_storage_node->node.list_node.next;
     }
 
@@ -8834,28 +8793,13 @@ static void repository_prepare_storages (struct repository_t *repository, struct
 
     while (indexed_storage_node)
     {
-        struct indexed_switch_to_serving_user_data_t *user_data = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (
-            &context->allocator, struct indexed_switch_to_serving_user_data_t);
-
-        *user_data = (struct indexed_switch_to_serving_user_data_t) {
-            .storage = indexed_storage_node,
-            .repository = repository,
-        };
-
-        struct kan_cpu_task_list_node_t *node =
-            KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&context->allocator, struct kan_cpu_task_list_node_t);
-
-        node->queue = KAN_CPU_DISPATCH_QUEUE_FOREGROUND;
-        ensure_interned_strings_ready ();
-
-        node->task = (struct kan_cpu_task_t) {
-            .name = switch_to_serving_task_name,
-            .function = prepare_indexed_storage,
-            .user_data = (uint64_t) user_data,
-        };
-
-        node->next = context->task_list;
-        context->task_list = node;
+        KAN_CPU_TASK_LIST_USER_STRUCT (&context->task_list, &context->allocator, switch_to_serving_task_name,
+                                       prepare_indexed_storage, FOREGROUND,
+                                       struct indexed_switch_to_serving_user_data_t,
+                                       {
+                                           .storage = indexed_storage_node,
+                                           .repository = repository,
+                                       })
         indexed_storage_node = (struct indexed_storage_node_t *) indexed_storage_node->node.list_node.next;
     }
 
