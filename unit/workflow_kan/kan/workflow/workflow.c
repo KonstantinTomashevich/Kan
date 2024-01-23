@@ -157,6 +157,13 @@ static inline void register_resource (struct kan_hash_storage_t *hash_storage,
     node->node.hash = (uint64_t) resource_name;
     node->name = resource_name;
     node->id = *id_counter;
+
+    if (hash_storage->bucket_count * KAN_WORKFLOW_RESOURCE_LOAD_FACTOR <= hash_storage->items.size)
+    {
+        kan_hash_storage_set_bucket_count (hash_storage, hash_storage->bucket_count * 2u);
+    }
+
+    kan_hash_storage_add (hash_storage, &node->node);
     ++*id_counter;
 }
 

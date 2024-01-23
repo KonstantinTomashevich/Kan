@@ -1512,7 +1512,7 @@ kan_reflection_patch_builder_t kan_reflection_patch_builder_create (void)
 void kan_reflection_patch_builder_add_chunk (kan_reflection_patch_builder_t builder,
                                              uint64_t offset,
                                              uint64_t size,
-                                             void *data)
+                                             const void *data)
 {
     struct patch_builder_t *patch_builder = (struct patch_builder_t *) builder;
     const uint64_t node_size = sizeof (struct patch_builder_node_t) + size;

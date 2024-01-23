@@ -537,13 +537,15 @@ void kan_reflection_system_connect_on_generated (kan_context_system_handle_t ref
 }
 
 void kan_reflection_system_disconnect_on_generated (kan_context_system_handle_t reflection_system,
-                                                    kan_context_system_handle_t other_system)
-{
-    DISCONNECT (generated)
-}
+                                                    kan_context_system_handle_t other_system) {DISCONNECT (generated)}
 
 #undef CONNECT
 #undef DISCONNECT
+
+kan_reflection_registry_t kan_reflection_system_get_registry (kan_context_system_handle_t reflection_system)
+{
+    return ((struct reflection_system_t *) reflection_system)->current_registry;
+}
 
 void kan_reflection_system_invalidate (kan_context_system_handle_t reflection_system)
 {

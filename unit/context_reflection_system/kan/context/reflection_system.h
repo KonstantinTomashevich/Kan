@@ -104,6 +104,10 @@ CONTEXT_REFLECTION_SYSTEM_API void kan_reflection_system_connect_on_generated (
 CONTEXT_REFLECTION_SYSTEM_API void kan_reflection_system_disconnect_on_generated (
     kan_context_system_handle_t reflection_system, kan_context_system_handle_t other_system);
 
+/// \brief Returns latest reflection registry if it exists.
+CONTEXT_REFLECTION_SYSTEM_API kan_reflection_registry_t
+kan_reflection_system_get_registry (kan_context_system_handle_t reflection_system);
+
 /// \brief Invalidate current reflection and triggers generation of new reflection.
 CONTEXT_REFLECTION_SYSTEM_API void kan_reflection_system_invalidate (kan_context_system_handle_t reflection_system);
 

@@ -78,7 +78,7 @@ void universe_system_destroy (kan_context_system_handle_t handle)
 }
 
 struct kan_context_system_api_t KAN_CONTEXT_SYSTEM_API_NAME (universe_system_t) = {
-    .name = "universe_system_t",
+    .name = KAN_CONTEXT_UNIVERSE_SYSTEM_NAME,
     .create = universe_system_create,
     .connect = universe_system_connect,
     .connected_init = universe_system_init,
