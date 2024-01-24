@@ -2,7 +2,10 @@ register_concrete (universe)
 concrete_include (PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 concrete_sources ("*.c")
 concrete_require (SCOPE PUBLIC ABSTRACT repository workflow CONCRETE_INTERFACE container context)
-concrete_require (SCOPE PRIVATE ABSTRACT error log memory CONCRETE_INTERFACE context_reflection_system)
+concrete_require (
+        SCOPE PRIVATE
+        ABSTRACT error log memory
+        CONCRETE_INTERFACE context_reflection_system context_update_system)
 register_context_system (universe_system_t)
 
 c_interface_scanner_setup (GLOB "*.c" "*.h")

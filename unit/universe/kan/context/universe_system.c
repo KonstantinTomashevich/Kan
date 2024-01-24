@@ -1,5 +1,8 @@
+#include <stddef.h>
+
 #include <kan/context/reflection_system.h>
 #include <kan/context/universe_system.h>
+#include <kan/context/update_system.h>
 
 struct universe_system_t
 {
@@ -33,6 +36,15 @@ static void on_reflection_generated (kan_context_system_handle_t other_system,
     }
 }
 
+static void on_update_run (kan_context_system_handle_t other_system)
+{
+    struct universe_system_t *system = (struct universe_system_t *) other_system;
+    if (system->universe != KAN_INVALID_UNIVERSE)
+    {
+        kan_universe_update (system->universe);
+    }
+}
+
 void universe_system_connect (kan_context_system_handle_t handle, kan_context_handle_t context)
 {
     struct universe_system_t *system = (struct universe_system_t *) handle;
@@ -42,6 +54,12 @@ void universe_system_connect (kan_context_system_handle_t handle, kan_context_ha
     if (reflection_system != KAN_INVALID_CONTEXT_SYSTEM_HANDLE)
     {
         kan_reflection_system_connect_on_generated (reflection_system, handle, on_reflection_generated);
+    }
+
+    kan_context_system_handle_t update_system = kan_context_query (context, KAN_CONTEXT_UPDATE_SYSTEM_NAME);
+    if (update_system != KAN_INVALID_CONTEXT_SYSTEM_HANDLE)
+    {
+        kan_update_system_connect_on_run (update_system, handle, on_update_run, 0u, NULL);
     }
 }
 
@@ -68,6 +86,12 @@ void universe_system_disconnect (kan_context_system_handle_t handle)
     if (reflection_system != KAN_INVALID_CONTEXT_SYSTEM_HANDLE)
     {
         kan_reflection_system_disconnect_on_generated (reflection_system, handle);
+    }
+
+    kan_context_system_handle_t update_system = kan_context_query (system->context, KAN_CONTEXT_UPDATE_SYSTEM_NAME);
+    if (update_system != KAN_INVALID_CONTEXT_SYSTEM_HANDLE)
+    {
+        kan_update_system_disconnect_on_run (update_system, handle);
     }
 }
 

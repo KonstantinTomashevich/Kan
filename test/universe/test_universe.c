@@ -4,6 +4,7 @@
 
 #include <kan/context/reflection_system.h>
 #include <kan/context/universe_system.h>
+#include <kan/context/update_system.h>
 #include <kan/testing/testing.h>
 #include <kan/universe/universe.h>
 
@@ -506,6 +507,7 @@ KAN_TEST_CASE (update_only)
     kan_context_handle_t context = kan_context_create (KAN_ALLOCATION_GROUP_IGNORE);
     KAN_TEST_CHECK (kan_context_request_system (context, KAN_CONTEXT_REFLECTION_SYSTEM_NAME, NULL))
     KAN_TEST_CHECK (kan_context_request_system (context, KAN_CONTEXT_UNIVERSE_SYSTEM_NAME, NULL))
+    KAN_TEST_CHECK (kan_context_request_system (context, KAN_CONTEXT_UPDATE_SYSTEM_NAME, NULL))
     kan_context_assembly (context);
 
     kan_context_system_handle_t universe_system_handle = kan_context_query (context, KAN_CONTEXT_UNIVERSE_SYSTEM_NAME);
@@ -513,6 +515,9 @@ KAN_TEST_CASE (update_only)
 
     kan_universe_t universe = kan_universe_system_get_universe (universe_system_handle);
     KAN_TEST_ASSERT (universe != KAN_INVALID_UNIVERSE)
+
+    kan_context_system_handle_t update_system = kan_context_query (context, KAN_CONTEXT_UPDATE_SYSTEM_NAME);
+    KAN_TEST_ASSERT (update_system != KAN_INVALID_CONTEXT_SYSTEM_HANDLE)
 
     struct kan_universe_world_definition_t definition;
     kan_universe_world_definition_init (&definition);
@@ -533,9 +538,9 @@ KAN_TEST_CASE (update_only)
     kan_universe_deploy_root (universe, &definition);
     kan_universe_world_definition_shutdown (&definition);
 
-    kan_universe_update (universe);
-    kan_universe_update (universe);
-    kan_universe_update (universe);
+    kan_update_system_run (update_system);
+    kan_update_system_run (update_system);
+    kan_update_system_run (update_system);
     kan_context_destroy (context);
 }
 
@@ -544,6 +549,7 @@ KAN_TEST_CASE (update_several_pipelines)
     kan_context_handle_t context = kan_context_create (KAN_ALLOCATION_GROUP_IGNORE);
     KAN_TEST_CHECK (kan_context_request_system (context, KAN_CONTEXT_REFLECTION_SYSTEM_NAME, NULL))
     KAN_TEST_CHECK (kan_context_request_system (context, KAN_CONTEXT_UNIVERSE_SYSTEM_NAME, NULL))
+    KAN_TEST_CHECK (kan_context_request_system (context, KAN_CONTEXT_UPDATE_SYSTEM_NAME, NULL))
     kan_context_assembly (context);
 
     kan_context_system_handle_t universe_system_handle = kan_context_query (context, KAN_CONTEXT_UNIVERSE_SYSTEM_NAME);
@@ -551,6 +557,9 @@ KAN_TEST_CASE (update_several_pipelines)
 
     kan_universe_t universe = kan_universe_system_get_universe (universe_system_handle);
     KAN_TEST_ASSERT (universe != KAN_INVALID_UNIVERSE)
+
+    kan_context_system_handle_t update_system = kan_context_query (context, KAN_CONTEXT_UPDATE_SYSTEM_NAME);
+    KAN_TEST_ASSERT (update_system != KAN_INVALID_CONTEXT_SYSTEM_HANDLE)
 
     struct kan_universe_world_definition_t definition;
     kan_universe_world_definition_init (&definition);
@@ -583,9 +592,9 @@ KAN_TEST_CASE (update_several_pipelines)
     kan_universe_deploy_root (universe, &definition);
     kan_universe_world_definition_shutdown (&definition);
 
-    kan_universe_update (universe);
-    kan_universe_update (universe);
-    kan_universe_update (universe);
+    kan_update_system_run (update_system);
+    kan_update_system_run (update_system);
+    kan_update_system_run (update_system);
     kan_context_destroy (context);
 }
 
@@ -594,6 +603,7 @@ KAN_TEST_CASE (update_mutator_multiple_threads)
     kan_context_handle_t context = kan_context_create (KAN_ALLOCATION_GROUP_IGNORE);
     KAN_TEST_CHECK (kan_context_request_system (context, KAN_CONTEXT_REFLECTION_SYSTEM_NAME, NULL))
     KAN_TEST_CHECK (kan_context_request_system (context, KAN_CONTEXT_UNIVERSE_SYSTEM_NAME, NULL))
+    KAN_TEST_CHECK (kan_context_request_system (context, KAN_CONTEXT_UPDATE_SYSTEM_NAME, NULL))
     kan_context_assembly (context);
 
     kan_context_system_handle_t universe_system_handle = kan_context_query (context, KAN_CONTEXT_UNIVERSE_SYSTEM_NAME);
@@ -601,6 +611,9 @@ KAN_TEST_CASE (update_mutator_multiple_threads)
 
     kan_universe_t universe = kan_universe_system_get_universe (universe_system_handle);
     KAN_TEST_ASSERT (universe != KAN_INVALID_UNIVERSE)
+
+    kan_context_system_handle_t update_system = kan_context_query (context, KAN_CONTEXT_UPDATE_SYSTEM_NAME);
+    KAN_TEST_ASSERT (update_system != KAN_INVALID_CONTEXT_SYSTEM_HANDLE)
 
     struct kan_universe_world_definition_t definition;
     kan_universe_world_definition_init (&definition);
@@ -625,7 +638,7 @@ KAN_TEST_CASE (update_mutator_multiple_threads)
     kan_universe_deploy_root (universe, &definition);
     kan_universe_world_definition_shutdown (&definition);
 
-    kan_universe_update (universe);
+    kan_update_system_run (update_system);
     kan_context_destroy (context);
 }
 
@@ -634,6 +647,7 @@ KAN_TEST_CASE (update_hierarchy)
     kan_context_handle_t context = kan_context_create (KAN_ALLOCATION_GROUP_IGNORE);
     KAN_TEST_CHECK (kan_context_request_system (context, KAN_CONTEXT_REFLECTION_SYSTEM_NAME, NULL))
     KAN_TEST_CHECK (kan_context_request_system (context, KAN_CONTEXT_UNIVERSE_SYSTEM_NAME, NULL))
+    KAN_TEST_CHECK (kan_context_request_system (context, KAN_CONTEXT_UPDATE_SYSTEM_NAME, NULL))
     kan_context_assembly (context);
 
     kan_context_system_handle_t universe_system_handle = kan_context_query (context, KAN_CONTEXT_UNIVERSE_SYSTEM_NAME);
@@ -641,6 +655,9 @@ KAN_TEST_CASE (update_hierarchy)
 
     kan_universe_t universe = kan_universe_system_get_universe (universe_system_handle);
     KAN_TEST_ASSERT (universe != KAN_INVALID_UNIVERSE)
+
+    kan_context_system_handle_t update_system = kan_context_query (context, KAN_CONTEXT_UPDATE_SYSTEM_NAME);
+    KAN_TEST_ASSERT (update_system != KAN_INVALID_CONTEXT_SYSTEM_HANDLE)
 
     kan_context_system_handle_t reflection_system_handle =
         kan_context_query (context, KAN_CONTEXT_REFLECTION_SYSTEM_NAME);
@@ -711,9 +728,9 @@ KAN_TEST_CASE (update_hierarchy)
     kan_universe_world_definition_shutdown (&definition);
     kan_reflection_patch_builder_destroy (patch_builder);
 
-    kan_universe_update (universe);
-    kan_universe_update (universe);
-    kan_universe_update (universe);
+    kan_update_system_run (update_system);
+    kan_update_system_run (update_system);
+    kan_update_system_run (update_system);
     kan_context_destroy (context);
 }
 

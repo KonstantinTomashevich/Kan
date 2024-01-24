@@ -154,7 +154,7 @@ CONTEXT_UPDATE_SYSTEM_API void update_system_destroy (kan_context_system_handle_
 }
 
 CONTEXT_UPDATE_SYSTEM_API struct kan_context_system_api_t KAN_CONTEXT_SYSTEM_API_NAME (update_system_t) = {
-    .name = "update_system_t",
+    .name = KAN_CONTEXT_UPDATE_SYSTEM_NAME,
     .create = update_system_create,
     .connect = update_system_connect,
     .connected_init = update_system_init,

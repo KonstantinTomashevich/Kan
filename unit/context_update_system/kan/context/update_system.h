@@ -22,6 +22,9 @@
 
 KAN_C_HEADER_BEGIN
 
+/// \brief System name for requirements and queries.
+#define KAN_CONTEXT_UPDATE_SYSTEM_NAME "update_system_t"
+
 typedef void (*kan_context_update_run_t) (kan_context_system_handle_t system);
 
 /// \brief Connect other system as update delegate.
