@@ -2253,6 +2253,14 @@ static struct struct_migration_node_t *migration_seed_add_struct (
                                     break;
 
                                 case KAN_REFLECTION_ARCHETYPE_STRUCT:
+                                    if (source_field->archetype_dynamic_array.item_archetype_struct.type_name ==
+                                            target_field->archetype_dynamic_array.item_archetype_struct.type_name &&
+                                        target_field->archetype_dynamic_array.item_archetype_struct.type_name ==
+                                            target_struct_data->name)
+                                    {
+                                        break;
+                                    }
+
                                     mappable = check_is_struct_mappable (
                                         migration_seed,
                                         source_field->archetype_dynamic_array.item_archetype_struct.type_name,
