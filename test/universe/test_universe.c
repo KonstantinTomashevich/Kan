@@ -22,7 +22,7 @@ struct counters_singleton_t
     uint64_t world_update_counters[WORLD_CHILD_UPDATE_TEST_DEPTH];
 };
 
-TEST_UNIVERSE_API void some_singleton_init (struct counters_singleton_t *data)
+TEST_UNIVERSE_API void counters_singleton_init (struct counters_singleton_t *data)
 {
     data->update_only_scheduler_executions = 0u;
     data->update_only_mutator_executions = 0u;
