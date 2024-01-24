@@ -2537,6 +2537,7 @@ static void world_migration_schedulers_mutators_migrate (struct universe_t *univ
                                                            .migrator = migrator,
                                                        })
 
+                        ++mutator_index;
                         break;
                     }
 
@@ -2544,6 +2545,7 @@ static void world_migration_schedulers_mutators_migrate (struct universe_t *univ
                     {
                         mutator_undeploy (mutator, old_reflection_registry);
                         mutator->api = &new_mutator_api_node->api;
+                        ++mutator_index;
                         break;
                     }
 
@@ -2560,6 +2562,7 @@ static void world_migration_schedulers_mutators_migrate (struct universe_t *univ
                     mutator_clean (universe, mutator, old_reflection_registry);
                     mutator->api = &new_mutator_api_node->api;
                     mutator_init (universe, mutator);
+                    ++mutator_index;
                 }
             }
             else
