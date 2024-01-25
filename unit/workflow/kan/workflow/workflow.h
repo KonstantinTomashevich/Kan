@@ -103,6 +103,8 @@ typedef uint64_t kan_workflow_graph_t;
 
 typedef uint64_t kan_workflow_graph_builder_t;
 
+#define KAN_INVALID_WORKFLOW_GRAPH_NODE 0u
+
 typedef uint64_t kan_workflow_graph_node_t;
 
 typedef uint64_t kan_workflow_user_data_t;

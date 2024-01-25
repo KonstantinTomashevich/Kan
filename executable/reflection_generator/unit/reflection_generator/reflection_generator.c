@@ -301,10 +301,10 @@ static void add_array_bootstrap_common_internals (enum kan_c_archetype_t archety
             kan_trivial_string_buffer_append_string (&io.output_buffer,
                                                      "            .item_archetype = "
                                                      "KAN_REFLECTION_ARCHETYPE_ENUM,\n");
-            kan_trivial_string_buffer_append_string (&io.output_buffer,
-                                                     "            .item_archetype_enum = {.type_name = \"");
+            kan_trivial_string_buffer_append_string (
+                &io.output_buffer, "            .item_archetype_enum = {.type_name = kan_string_intern (\"");
             kan_trivial_string_buffer_append_string (&io.output_buffer, type_name);
-            kan_trivial_string_buffer_append_string (&io.output_buffer, "\"},\n");
+            kan_trivial_string_buffer_append_string (&io.output_buffer, "\")},\n");
             kan_trivial_string_buffer_append_string (&io.output_buffer, "            .item_size = sizeof (int),\n");
             break;
 
@@ -312,10 +312,10 @@ static void add_array_bootstrap_common_internals (enum kan_c_archetype_t archety
             kan_trivial_string_buffer_append_string (&io.output_buffer,
                                                      "            .item_archetype = "
                                                      "KAN_REFLECTION_ARCHETYPE_STRUCT,\n");
-            kan_trivial_string_buffer_append_string (&io.output_buffer,
-                                                     "            .item_archetype_struct = {.type_name = \"");
+            kan_trivial_string_buffer_append_string (
+                &io.output_buffer, "            .item_archetype_struct = {.type_name = kan_string_intern (\"");
             kan_trivial_string_buffer_append_string (&io.output_buffer, type_name);
-            kan_trivial_string_buffer_append_string (&io.output_buffer, "\"},\n");
+            kan_trivial_string_buffer_append_string (&io.output_buffer, "\")},\n");
             kan_trivial_string_buffer_append_string (&io.output_buffer, "            .item_size = sizeof (struct ");
             kan_trivial_string_buffer_append_string (&io.output_buffer, type_name);
             kan_trivial_string_buffer_append_string (&io.output_buffer, "),\n");

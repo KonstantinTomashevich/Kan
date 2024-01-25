@@ -34,10 +34,10 @@ struct system_instance_node_t
     uint64_t connection_references_to_others;
     uint64_t initialization_references_to_me;
 
-    // Array of node pointers.
+    /// \meta reflection_dynamic_array_type = "struct system_instance_node_t *"
     struct kan_dynamic_array_t initialization_references_to_others;
 
-    // Array of node pointers.
+    /// \meta reflection_dynamic_array_type = "struct system_instance_node_t *"
     struct kan_dynamic_array_t connection_references_to_me;
 };
 

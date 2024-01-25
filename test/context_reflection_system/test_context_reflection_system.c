@@ -58,7 +58,9 @@ check_generated_system_create (kan_allocation_group_t group, void *user_config)
 }
 
 static void check_generated_system_received_reflection (kan_context_system_handle_t handle,
-                                                        kan_reflection_registry_t registry)
+                                                        kan_reflection_registry_t registry,
+                                                        kan_reflection_migration_seed_t migration_seed,
+                                                        kan_reflection_struct_migrator_t migrator)
 {
     struct check_generated_system_t *system = (struct check_generated_system_t *) handle;
     ++system->generated_calls_count;

@@ -80,5 +80,5 @@ kan_bool_t kan_event_queue_iterator_destroy (struct kan_event_queue_t *queue, ka
 {
     kan_atomic_int_add (&queue->total_iterators, -1);
     struct kan_event_queue_node_t *node = (struct kan_event_queue_node_t *) iterator;
-    return kan_atomic_int_add (&node->iterators_here, -1) == 1 ? KAN_TRUE : KAN_FALSE;
+    return kan_atomic_int_add (&node->iterators_here, -1) == 1;
 }

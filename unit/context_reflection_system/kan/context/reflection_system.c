@@ -336,48 +336,35 @@ static void reflection_system_generate (struct reflection_system_t *system)
 
         while (iterate_node)
         {
-            struct kan_cpu_task_list_node_t *next_node =
-                (struct kan_cpu_task_list_node_t *) kan_stack_group_allocator_allocate (
-                    &generation_context.temporary_allocator, sizeof (struct kan_cpu_task_list_node_t),
-                    _Alignof (struct kan_cpu_task_list_node_t));
+            KAN_CPU_TASK_LIST_USER_STRUCT (
+                &list_node, &generation_context.temporary_allocator, task_name, call_generation_iterate_task,
+                FOREGROUND, struct generation_iteration_task_user_data_t,
+                {
+                    .iterator =
+                        (struct generation_iterator_t) {
+                            .generation_context = &generation_context,
+                            .current_added_enum = generation_context.first_added_enum_previous_iteration,
+                            .current_added_struct = generation_context.first_added_struct_previous_iteration,
+                            .current_added_function = generation_context.first_added_function_previous_iteration,
+                            .current_changed_enum = generation_context.first_changed_enum_previous_iteration,
+                            .current_changed_struct = generation_context.first_changed_struct_previous_iteration,
+                            .current_changed_function = generation_context.first_changed_function_previous_iteration,
 
-            struct generation_iteration_task_user_data_t *user_data =
-                (struct generation_iteration_task_user_data_t *) kan_stack_group_allocator_allocate (
-                    &generation_context.temporary_allocator, sizeof (struct generation_iteration_task_user_data_t),
-                    _Alignof (struct generation_iteration_task_user_data_t));
-
-            user_data->iterator = (struct generation_iterator_t) {
-                .generation_context = &generation_context,
-                .current_added_enum = generation_context.first_added_enum_previous_iteration,
-                .current_added_struct = generation_context.first_added_struct_previous_iteration,
-                .current_added_function = generation_context.first_added_function_previous_iteration,
-                .current_changed_enum = generation_context.first_changed_enum_previous_iteration,
-                .current_changed_struct = generation_context.first_changed_struct_previous_iteration,
-                .current_changed_function = generation_context.first_changed_function_previous_iteration,
-
-                .current_added_enum_meta = generation_context.first_added_enum_meta_previous_iteration,
-                .current_added_enum_value_meta = generation_context.first_added_enum_value_meta_previous_iteration,
-                .current_added_struct_meta = generation_context.first_added_struct_meta_previous_iteration,
-                .current_added_struct_field_meta = generation_context.first_added_struct_field_meta_previous_iteration,
-                .current_added_function_meta = generation_context.first_added_function_meta_previous_iteration,
-                .current_added_function_argument_meta =
-                    generation_context.first_added_function_argument_meta_previous_iteration,
-            };
-
-            user_data->new_registry = new_registry;
-            user_data->iteration_index = iteration_index;
-            user_data->node = iterate_node;
-
-            next_node->task = (struct kan_cpu_task_t) {
-                .name = task_name,
-                .function = call_generation_iterate_task,
-                .user_data = (uint64_t) user_data,
-            };
-
-            next_node->queue = KAN_CPU_DISPATCH_QUEUE_FOREGROUND;
-            next_node->next = list_node;
-            list_node = next_node;
-
+                            .current_added_enum_meta = generation_context.first_added_enum_meta_previous_iteration,
+                            .current_added_enum_value_meta =
+                                generation_context.first_added_enum_value_meta_previous_iteration,
+                            .current_added_struct_meta = generation_context.first_added_struct_meta_previous_iteration,
+                            .current_added_struct_field_meta =
+                                generation_context.first_added_struct_field_meta_previous_iteration,
+                            .current_added_function_meta =
+                                generation_context.first_added_function_meta_previous_iteration,
+                            .current_added_function_argument_meta =
+                                generation_context.first_added_function_argument_meta_previous_iteration,
+                        },
+                    .new_registry = new_registry,
+                    .iteration_index = iteration_index,
+                    .node = iterate_node,
+                })
             iterate_node = iterate_node->next;
         }
 
@@ -404,15 +391,32 @@ static void reflection_system_generate (struct reflection_system_t *system)
     KAN_LOG (reflection_system, KAN_LOG_INFO, "Running generation callbacks.")
     struct generated_connection_node_t *generated_node = system->first_generated_connection;
 
+    kan_reflection_migration_seed_t migration_seed = KAN_INVALID_REFLECTION_MIGRATION_SEED;
+    kan_reflection_struct_migrator_t migrator = KAN_INVALID_REFLECTION_STRUCT_MIGRATOR;
+
+    if (system->current_registry != KAN_INVALID_REFLECTION_REGISTRY)
+    {
+        KAN_LOG (reflection_system, KAN_LOG_INFO, "Creating migration data.")
+        migration_seed = kan_reflection_migration_seed_build (system->current_registry, new_registry);
+        migrator = kan_reflection_struct_migrator_build (migration_seed);
+    }
+
     while (generated_node)
     {
-        generated_node->functor (generated_node->other_system, new_registry);
+        generated_node->functor (generated_node->other_system, new_registry, migration_seed, migrator);
         generated_node = generated_node->next;
     }
 
-    KAN_LOG (reflection_system, KAN_LOG_INFO, "Destroying old reflection registry.")
     if (system->current_registry != KAN_INVALID_REFLECTION_REGISTRY)
     {
+        KAN_LOG (reflection_system, KAN_LOG_INFO, "Migrating patches.")
+        kan_reflection_struct_migrator_migrate_patches (migrator, system->current_registry, new_registry);
+
+        KAN_LOG (reflection_system, KAN_LOG_INFO, "Destroying migration data.")
+        kan_reflection_struct_migrator_destroy (migrator);
+        kan_reflection_migration_seed_destroy (migration_seed);
+
+        KAN_LOG (reflection_system, KAN_LOG_INFO, "Destroying old reflection registry.")
         kan_reflection_registry_destroy (system->current_registry);
     }
 
@@ -533,13 +537,15 @@ void kan_reflection_system_connect_on_generated (kan_context_system_handle_t ref
 }
 
 void kan_reflection_system_disconnect_on_generated (kan_context_system_handle_t reflection_system,
-                                                    kan_context_system_handle_t other_system)
-{
-    DISCONNECT (generated)
-}
+                                                    kan_context_system_handle_t other_system) {DISCONNECT (generated)}
 
 #undef CONNECT
 #undef DISCONNECT
+
+kan_reflection_registry_t kan_reflection_system_get_registry (kan_context_system_handle_t reflection_system)
+{
+    return ((struct reflection_system_t *) reflection_system)->current_registry;
+}
 
 void kan_reflection_system_invalidate (kan_context_system_handle_t reflection_system)
 {
@@ -678,10 +684,8 @@ kan_reflection_system_generation_iterator_next_added_function_argument_meta (
     struct generation_iterator_t *iterator_data = (struct generation_iterator_t *) iterator;                           \
     kan_atomic_int_lock (&iterator_data->generation_context->this_iteration_submission_lock);                          \
                                                                                                                        \
-    struct ENTITY##_event_entry_node_t *node =                                                                         \
-        (struct ENTITY##_event_entry_node_t *) kan_stack_group_allocator_allocate (                                    \
-            &iterator_data->generation_context->temporary_allocator, sizeof (struct ENTITY##_event_entry_node_t),      \
-            _Alignof (struct ENTITY##_event_entry_node_t));                                                            \
+    struct ENTITY##_event_entry_node_t *node = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (                              \
+        &iterator_data->generation_context->temporary_allocator, struct ENTITY##_event_entry_node_t);                  \
                                                                                                                        \
     node->data = data;                                                                                                 \
     node->next = iterator_data->generation_context->first_##EVENT##_##ENTITY##_this_iteration;                         \
@@ -729,9 +733,8 @@ void kan_reflection_system_generation_iterator_change_function (kan_reflection_s
 #define ADD_META_EVENT_TOP_LEVEL(EVENT, ENTITY)                                                                        \
     struct generation_iterator_t *iterator_data = (struct generation_iterator_t *) iterator;                           \
     kan_atomic_int_lock (&iterator_data->generation_context->this_iteration_submission_lock);                          \
-    struct top_level_meta_node_t *node = (struct top_level_meta_node_t *) kan_stack_group_allocator_allocate (         \
-        &iterator_data->generation_context->temporary_allocator, sizeof (struct top_level_meta_node_t),                \
-        _Alignof (struct top_level_meta_node_t));                                                                      \
+    struct top_level_meta_node_t *node = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (                                    \
+        &iterator_data->generation_context->temporary_allocator, struct top_level_meta_node_t);                        \
                                                                                                                        \
     node->top_level_name = ENTITY##_name;                                                                              \
     node->meta_type_name = meta_type_name;                                                                             \
@@ -743,9 +746,8 @@ void kan_reflection_system_generation_iterator_change_function (kan_reflection_s
 #define ADD_META_EVENT_LOWER_LEVEL(EVENT, ENTITY, LOWER_ENTITY)                                                        \
     struct generation_iterator_t *iterator_data = (struct generation_iterator_t *) iterator;                           \
     kan_atomic_int_lock (&iterator_data->generation_context->this_iteration_submission_lock);                          \
-    struct lower_level_meta_node_t *node = (struct lower_level_meta_node_t *) kan_stack_group_allocator_allocate (     \
-        &iterator_data->generation_context->temporary_allocator, sizeof (struct lower_level_meta_node_t),              \
-        _Alignof (struct lower_level_meta_node_t));                                                                    \
+    struct lower_level_meta_node_t *node = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (                                  \
+        &iterator_data->generation_context->temporary_allocator, struct lower_level_meta_node_t);                      \
                                                                                                                        \
     node->top_level_name = ENTITY##_name;                                                                              \
     node->lower_level_name = LOWER_ENTITY##_name;                                                                      \

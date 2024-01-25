@@ -33,7 +33,7 @@ struct update_system_t
     kan_context_handle_t context;
     kan_allocation_group_t group;
 
-    // Array of update_callable_t. Ordered in execution order.
+    /// \meta reflection_dynamic_array_type = "struct update_callable_t"
     struct kan_dynamic_array_t update_sequence;
 
     uint64_t connection_request_count;
@@ -48,6 +48,7 @@ CONTEXT_UPDATE_SYSTEM_API kan_context_system_handle_t update_system_create (kan_
     system->group = group;
     kan_dynamic_array_init (&system->update_sequence, 0u, sizeof (struct update_callable_t),
                             _Alignof (struct update_callable_t), group);
+    system->connection_request_count = 0u;
     system->first_connection_request = NULL;
     return (kan_context_system_handle_t) system;
 }
@@ -154,7 +155,7 @@ CONTEXT_UPDATE_SYSTEM_API void update_system_destroy (kan_context_system_handle_
 }
 
 CONTEXT_UPDATE_SYSTEM_API struct kan_context_system_api_t KAN_CONTEXT_SYSTEM_API_NAME (update_system_t) = {
-    .name = "update_system_t",
+    .name = KAN_CONTEXT_UPDATE_SYSTEM_NAME,
     .create = update_system_create,
     .connect = update_system_connect,
     .connected_init = update_system_init,

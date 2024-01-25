@@ -64,7 +64,7 @@ REFLECTION_API kan_reflection_patch_builder_t kan_reflection_patch_builder_creat
 REFLECTION_API void kan_reflection_patch_builder_add_chunk (kan_reflection_patch_builder_t builder,
                                                             uint64_t offset,
                                                             uint64_t size,
-                                                            void *data);
+                                                            const void *data);
 
 /// \brief Attempts to build a patch from added chunks and registers it with given type in given registry.
 /// \details On completion, removes all added chunks and returns to initial state.
