@@ -121,11 +121,11 @@
 ///
 /// Scheduler deployment manual function is optional and must be named
 /// `kan_universe_scheduler_deploy_<you_scheduler_name>`, return `void` and accept listed in
-/// `kan_universe_scheduler_deploy_arguments_t` with one exception -- scheduler state should have your scheduler state 
+/// `kan_universe_scheduler_deploy_arguments_t` with one exception -- scheduler state should have your scheduler state
 /// type. It solves the same purpose as mutator deployment except it is not attached to any workflow graph.
 ///
 /// Scheduler execution manual function must be named kan_universe_scheduler_execute_<you_scheduler_name>`, return
-/// `void` and accept listed in `kan_universe_scheduler_execute_arguments_t` with one exception -- scheduler state 
+/// `void` and accept listed in `kan_universe_scheduler_execute_arguments_t` with one exception -- scheduler state
 /// should have your scheduler state type. For example:
 ///
 /// ```c
@@ -142,7 +142,7 @@
 ///
 /// Scheduler undeployment manual function is optional and must be named
 /// `kan_universe_scheduler_undeploy_<you_scheduler_name>`, return `void` and accept listed in
-/// `kan_universe_scheduler_undeploy_arguments_t` with one exception -- scheduler state should have your scheduler 
+/// `kan_universe_scheduler_undeploy_arguments_t` with one exception -- scheduler state should have your scheduler
 /// state type. It solves the same purpose as mutator undeployment.
 /// \endparblock
 ///
@@ -162,96 +162,96 @@
 /// - `kan_repository_indexed_insert_query_t`: `insert__<record_type_name>`, where `_t` suffix for type name might be
 ///   omitted. For example: `struct kan_repository_indexed_insert_query_t insert__object_record;`.
 ///
-/// - `kan_repository_indexed_sequence_read_query_t`: `read_sequence__<record_type_name>`, where `_t` suffix for type 
-///   name might be omitted. For example: 
+/// - `kan_repository_indexed_sequence_read_query_t`: `read_sequence__<record_type_name>`, where `_t` suffix for type
+///   name might be omitted. For example:
 ///   `struct kan_repository_indexed_sequence_read_query_t read_sequence__status_record;`.
 ///
 /// - `kan_repository_indexed_sequence_update_query_t`: `update_sequence__<record_type_name>`, where `_t` suffix for
-///   type name might be omitted. For example: 
+///   type name might be omitted. For example:
 ///   `struct kan_repository_indexed_sequence_update_query_t update_sequence__status_record;`.
 ///
 /// - `kan_repository_indexed_sequence_delete_query_t`: `delete_sequence__<record_type_name>`, where `_t` suffix for
-///   type name might be omitted. For example: 
+///   type name might be omitted. For example:
 ///   `struct kan_repository_indexed_sequence_delete_query_t delete_sequence__status_record;`.
 ///
 /// - `kan_repository_indexed_sequence_write_query_t`: `write_sequence__<record_type_name>`, where `_t` suffix for
-///   type name might be omitted. For example: 
+///   type name might be omitted. For example:
 ///   `struct kan_repository_indexed_sequence_write_query_t write_sequence__status_record;`.
 ///
 /// - `kan_repository_indexed_value_read_query_t`: `read_value__<record_type_name>__<path_to_field>`, where `_t` suffix
-///   for type name might be omitted and field names in path are separated by `__`. For example: 
+///   for type name might be omitted and field names in path are separated by `__`. For example:
 ///   `struct kan_repository_indexed_value_read_query_t read_value__object_record__some_struct__some_child;`.
 ///
 /// - `kan_repository_indexed_value_update_query_t`: `update_value__<record_type_name>__<path_to_field>`, where `_t`
-///   suffix for type name might be omitted and field names in path are separated by `__`. For example: 
+///   suffix for type name might be omitted and field names in path are separated by `__`. For example:
 ///   `struct kan_repository_indexed_value_update_query_t update_value__object_record__some_struct__some_child;`.
 ///
 /// - `kan_repository_indexed_value_delete_query_t`: `delete_value__<record_type_name>__<path_to_field>`, where `_t`
-///   suffix for type name might be omitted and field names in path are separated by `__`. For example: 
+///   suffix for type name might be omitted and field names in path are separated by `__`. For example:
 ///   `struct kan_repository_indexed_value_delete_query_t delete_value__object_record__some_struct__some_child;`.
 ///
 /// - `kan_repository_indexed_value_write_query_t`: `write_value__<record_type_name>__<path_to_field>`, where `_t`
-///   suffix for type name might be omitted and field names in path are separated by `__`. For example: 
+///   suffix for type name might be omitted and field names in path are separated by `__`. For example:
 ///   `struct kan_repository_indexed_value_write_query_t write_value__object_record__some_struct__some_child;`.
 ///
-/// - `kan_repository_indexed_signal_read_query_t`: `read_signal__<record_type_name>__<path_to_field>__<literal>`, 
-///   where `_t` suffix for type name might be omitted, field names in path are separated by `__` and literal is 
-///   unsigned signal value. For example: 
+/// - `kan_repository_indexed_signal_read_query_t`: `read_signal__<record_type_name>__<path_to_field>__<literal>`,
+///   where `_t` suffix for type name might be omitted, field names in path are separated by `__` and literal is
+///   unsigned signal value. For example:
 ///   `struct kan_repository_indexed_signal_read_query_t read_signal__object_record__some_field__1;`.
 ///
 /// - `kan_repository_indexed_signal_update_query_t`: `update_signal__<record_type_name>__<path_to_field>__<literal>`,
-///   where `_t` suffix for type name might be omitted, field names in path are separated by `__` and literal is 
-///   unsigned signal value. For example: 
+///   where `_t` suffix for type name might be omitted, field names in path are separated by `__` and literal is
+///   unsigned signal value. For example:
 ///   `struct kan_repository_indexed_signal_update_query_t update_signal__object_record__some_field__1;`.
 ///
 /// - `kan_repository_indexed_signal_delete_query_t`: `delete_signal__<record_type_name>__<path_to_field>__<literal>`,
-///   where `_t` suffix for type name might be omitted, field names in path are separated by `__` and literal is 
-///   unsigned signal value. For example: 
+///   where `_t` suffix for type name might be omitted, field names in path are separated by `__` and literal is
+///   unsigned signal value. For example:
 ///   `struct kan_repository_indexed_signal_delete_query_t delete_signal__object_record__some_field__1;`.
 ///
 /// - `kan_repository_indexed_signal_write_query_t`: `write_signal__<record_type_name>__<path_to_field>__<literal>`,
-///   where `_t` suffix for type name might be omitted, field names in path are separated by `__` and literal is 
-///   unsigned signal value. For example: 
+///   where `_t` suffix for type name might be omitted, field names in path are separated by `__` and literal is
+///   unsigned signal value. For example:
 ///   `struct kan_repository_indexed_signal_write_query_t write_signal__object_record__some_field__1;`.
 ///
-/// - `kan_repository_indexed_interval_read_query_t`: `read_interval__<record_type_name>__<path_to_field>`, where `_t` 
-///   suffix for type name might be omitted and field names in path are separated by `__`. For example: 
+/// - `kan_repository_indexed_interval_read_query_t`: `read_interval__<record_type_name>__<path_to_field>`, where `_t`
+///   suffix for type name might be omitted and field names in path are separated by `__`. For example:
 ///   `struct kan_repository_indexed_interval_read_query_t read_interval__object_record__some_struct__some_child;`.
 ///
-/// - `kan_repository_indexed_interval_update_query_t`: `update_interval__<record_type_name>__<path_to_field>`, where 
-///   `_t` suffix for type name might be omitted and field names in path are separated by `__`. For example: 
+/// - `kan_repository_indexed_interval_update_query_t`: `update_interval__<record_type_name>__<path_to_field>`, where
+///   `_t` suffix for type name might be omitted and field names in path are separated by `__`. For example:
 ///   `struct kan_repository_indexed_interval_update_query_t update_interval__object_record__some_struct__some_child;`.
 ///
-/// - `kan_repository_indexed_interval_delete_query_t`: `delete_interval__<record_type_name>__<path_to_field>`, where 
-///   `_t` suffix for type name might be omitted and field names in path are separated by `__`. For example: 
+/// - `kan_repository_indexed_interval_delete_query_t`: `delete_interval__<record_type_name>__<path_to_field>`, where
+///   `_t` suffix for type name might be omitted and field names in path are separated by `__`. For example:
 ///   `struct kan_repository_indexed_interval_delete_query_t delete_interval__object_record__some_struct__some_child;`.
 ///
 /// - `kan_repository_indexed_interval_write_query_t`: `write_interval__<record_type_name>__<path_to_field>`, where `_t`
-///   suffix for type name might be omitted and field names in path are separated by `__`. For example: 
+///   suffix for type name might be omitted and field names in path are separated by `__`. For example:
 ///   `struct kan_repository_indexed_interval_write_query_t write_interval__object_record__some_struct__some_child;`.
 ///
-/// - `kan_repository_indexed_space_read_query_t`: `read_space__<record_type_name>__<space_config_name>`, where `_t` 
+/// - `kan_repository_indexed_space_read_query_t`: `read_space__<record_type_name>__<space_config_name>`, where `_t`
 ///   suffix for type name might be omitted, query field must have `kan_universe_space_automated_lifetime_query_meta_t`
 ///   meta with parameters for creating the query and space config name is a name for config of type
-///   `kan_universe_space_configuration_t` that will be used to get space borders for the query creation. For example: 
+///   `kan_universe_space_configuration_t` that will be used to get space borders for the query creation. For example:
 ///   `struct kan_repository_indexed_space_read_query_t read_space__object_record__render_2d_space;`.
 ///
 /// - `kan_repository_indexed_space_update_query_t`: `update_space__<record_type_name>__<space_config_name>`, where `_t`
 ///   suffix for type name might be omitted, query field must have `kan_universe_space_automated_lifetime_query_meta_t`
 ///   meta with parameters for creating the query and space config name is a name for config of type
-///   `kan_universe_space_configuration_t` that will be used to get space borders for the query creation. For example: 
+///   `kan_universe_space_configuration_t` that will be used to get space borders for the query creation. For example:
 ///   `struct kan_repository_indexed_space_update_query_t update_space__object_record__render_2d_space;`.
 ///
 /// - `kan_repository_indexed_space_delete_query_t`: `delete_space__<record_type_name>__<space_config_name>`, where `_t`
 ///   suffix for type name might be omitted, query field must have `kan_universe_space_automated_lifetime_query_meta_t`
-///   with parameters for creating the query and space config name is a name for config of type 
-///   `kan_universe_space_configuration_t` that will be used to get space borders for the query creation. For example: 
+///   with parameters for creating the query and space config name is a name for config of type
+///   `kan_universe_space_configuration_t` that will be used to get space borders for the query creation. For example:
 ///   `struct kan_repository_indexed_space_delete_query_t delete_space__object_record__render_2d_space;`.
 ///
-/// - `kan_repository_indexed_space_write_query_t`: `write_space__<record_type_name>__<space_config_name>`, where `_t` 
+/// - `kan_repository_indexed_space_write_query_t`: `write_space__<record_type_name>__<space_config_name>`, where `_t`
 ///   suffix for type name might be omitted, query field must have `kan_universe_space_automated_lifetime_query_meta_t`
 ///   meta with parameters for creating the query and space config name is a name for config of type
-///   `kan_universe_space_configuration_t` that will be used to get space borders for the query creation. For example: 
+///   `kan_universe_space_configuration_t` that will be used to get space borders for the query creation. For example:
 ///   `struct kan_repository_indexed_space_write_query_t write_space__object_record__render_2d_space;`.
 ///
 /// - `kan_repository_event_insert_query_t`: `insert__<record_type_name>`, where `_t` suffix for type name might be
