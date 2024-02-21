@@ -152,7 +152,6 @@ struct script_state_dynamic_array_suffix_t
 
 struct script_state_patch_read_suffix_t
 {
-    kan_interned_string_t type_name;
     uint32_t blocks_total;
     uint32_t blocks_processed;
 };
@@ -165,6 +164,8 @@ struct script_state_patch_write_suffix_t
 
 struct script_state_patch_suffix_t
 {
+    kan_interned_string_t type_name;
+
     union
     {
         struct script_state_patch_read_suffix_t read;
@@ -510,7 +511,29 @@ static inline void add_command (struct generation_temporary_state_t *state, stru
         KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&state->temporary_allocator, struct script_command_temporary_node_t);
 
     new_node->next = NULL;
-    new_node->command = command;
+    new_node->command.type = command.type;
+    new_node->command.condition_index = command.condition_index;
+    new_node->command.offset = command.offset;
+
+    switch (command.type)
+    {
+    case SCRIPT_COMMAND_BLOCK:
+        new_node->command.block = command.block;
+        break;
+
+    case SCRIPT_COMMAND_STRING:
+    case SCRIPT_COMMAND_INTERNED_STRING:
+    case SCRIPT_COMMAND_BLOCK_DYNAMIC_ARRAY:
+    case SCRIPT_COMMAND_STRING_DYNAMIC_ARRAY:
+    case SCRIPT_COMMAND_INTERNED_STRING_DYNAMIC_ARRAY:
+    case SCRIPT_COMMAND_PATCH_DYNAMIC_ARRAY:
+    case SCRIPT_COMMAND_PATCH:
+        break;
+
+    case SCRIPT_COMMAND_STRUCT_DYNAMIC_ARRAY:
+        new_node->command.struct_dynamic_array = command.struct_dynamic_array;
+        break;
+    }
 
     if (state->last_command)
     {
@@ -804,7 +827,7 @@ static void script_storage_ensure_script_generated (struct script_storage_t *sto
             const uint32_t field_end = field->offset + field->size;
             if (field_index + 1u != state.struct_data->fields_count)
             {
-                struct kan_reflection_field_t *next_field = &state.struct_data->fields[field_index];
+                struct kan_reflection_field_t *next_field = &state.struct_data->fields[field_index + 1u];
                 if (!next_field->visibility_condition_field)
                 {
                     padding_to_include = next_field->offset - field_end;
@@ -847,7 +870,30 @@ static void script_storage_ensure_script_generated (struct script_storage_t *sto
 
     while (command)
     {
-        *command_output = command->command;
+        command_output->type = command->command.type;
+        command_output->condition_index = command->command.condition_index;
+        command_output->offset = command->command.offset;
+
+        switch (command->command.type)
+        {
+        case SCRIPT_COMMAND_BLOCK:
+            command_output->block = command->command.block;
+            break;
+
+        case SCRIPT_COMMAND_STRING:
+        case SCRIPT_COMMAND_INTERNED_STRING:
+        case SCRIPT_COMMAND_BLOCK_DYNAMIC_ARRAY:
+        case SCRIPT_COMMAND_STRING_DYNAMIC_ARRAY:
+        case SCRIPT_COMMAND_INTERNED_STRING_DYNAMIC_ARRAY:
+        case SCRIPT_COMMAND_PATCH_DYNAMIC_ARRAY:
+        case SCRIPT_COMMAND_PATCH:
+            break;
+
+        case SCRIPT_COMMAND_STRUCT_DYNAMIC_ARRAY:
+            command_output->struct_dynamic_array = command->command.struct_dynamic_array;
+            break;
+        }
+
         ++command_output;
         command = command->next;
     }
@@ -1246,15 +1292,15 @@ static uint32_t interned_string_registry_store_string (struct interned_string_re
         node = (struct interned_string_registry_node_t *) node->node.list_node.next;
     }
 
-    interned_string_registry_add_string_internal (registry, interned_string);
+    const int32_t index = interned_string_registry_add_string_internal (registry, interned_string);
     kan_atomic_int_unlock (&registry->store_lock);
-    return node->index;
+    return index;
 }
 
 static kan_interned_string_t interned_string_registry_load_string (struct interned_string_registry_t *registry,
                                                                    uint32_t index)
 {
-    KAN_ASSERT (kan_atomic_int_get (&registry->store_lock) == 0)
+    KAN_ASSERT (registry->load_only || kan_atomic_int_get (&registry->store_lock) == 0)
     if (index >= registry->index_to_value.size)
     {
         KAN_LOG (serialization_binary, KAN_LOG_ERROR,
@@ -1319,7 +1365,6 @@ static inline void serialization_common_state_init (
     KAN_ASSERT (state->script_storage != NULL);
     state->optional_string_registry = (struct interned_string_registry_t *) interned_string_registry;
     state->stream = stream;
-    KAN_ASSERT (kan_stream_is_readable (state->stream))
 
     kan_dynamic_array_init (&state->script_state_stack, 4u, sizeof (struct script_state_t),
                             _Alignof (struct script_state_t), serialization_allocation_group);
@@ -1396,6 +1441,8 @@ static inline void serialization_common_state_shutdown (struct serialization_com
     {
         serialization_common_state_pop_script_state (state);
     }
+
+    kan_dynamic_array_shutdown (&state->script_state_stack);
 }
 
 kan_serialization_binary_script_storage_t kan_serialization_binary_script_storage_create (
@@ -1459,6 +1506,7 @@ void kan_serialization_binary_script_storage_destroy (kan_serialization_binary_s
 
     kan_hash_storage_shutdown (&script_storage->script_storage);
     kan_hash_storage_shutdown (&script_storage->interned_string_lookup_storage);
+    kan_free_general (script_storage_allocation_group, script_storage, sizeof (struct script_storage_t));
 }
 
 kan_serialization_interned_string_registry_t kan_serialization_interned_string_registry_create_empty (void)
@@ -1471,7 +1519,7 @@ void kan_serialization_interned_string_registry_destroy (kan_serialization_inter
     struct interned_string_registry_t *data = (struct interned_string_registry_t *) registry;
     kan_dynamic_array_shutdown (&data->index_to_value);
 
-    if (data->load_only)
+    if (!data->load_only)
     {
         struct interned_string_registry_node_t *node =
             (struct interned_string_registry_node_t *) data->value_to_index.items.first;
@@ -1486,6 +1534,8 @@ void kan_serialization_interned_string_registry_destroy (kan_serialization_inter
 
         kan_hash_storage_shutdown (&data->value_to_index);
     }
+
+    kan_free_general (interned_string_registry_allocation_group, data, sizeof (struct interned_string_registry_t));
 }
 
 kan_serialization_interned_string_registry_reader_t kan_serialization_interned_string_registry_reader_create (
@@ -1664,6 +1714,8 @@ kan_serialization_binary_reader_t kan_serialization_binary_reader_create (
     kan_allocation_group_t deserialized_string_allocation_group)
 {
     ensure_statics_initialized ();
+    KAN_ASSERT (kan_stream_is_readable (stream))
+
     struct serialization_read_state_t *state = (struct serialization_read_state_t *) kan_allocate_general (
         serialization_allocation_group, sizeof (struct serialization_read_state_t),
         _Alignof (struct serialization_read_state_t));
@@ -1790,7 +1842,7 @@ static inline kan_bool_t ensure_dynamic_array_read_suffix_ready (struct serializ
 static inline kan_bool_t init_patch_read_suffix (struct serialization_read_state_t *state,
                                                  struct script_state_patch_suffix_t *suffix)
 {
-    if (!read_interned_string (state, &suffix->read.type_name) ||
+    if (!read_interned_string (state, &suffix->type_name) ||
         !read_array_or_patch_size (state, &suffix->read.blocks_total))
     {
         return KAN_FALSE;
@@ -1836,7 +1888,7 @@ static inline kan_bool_t read_patch_block (struct serialization_read_state_t *st
 {
     struct patch_block_info_t block_info;
     if (state->common.stream->operations->read (state->common.stream, sizeof (struct patch_block_info_t),
-                                                &block_info) == sizeof (struct patch_block_info_t))
+                                                &block_info) != sizeof (struct patch_block_info_t))
     {
         return KAN_FALSE;
     }
@@ -1847,7 +1899,7 @@ static inline kan_bool_t read_patch_block (struct serialization_read_state_t *st
     }
 
     struct interned_string_lookup_node_t *interned_string_lookup_node =
-        script_storage_get_or_create_interned_string_lookup (state->common.script_storage, suffix->read.type_name);
+        script_storage_get_or_create_interned_string_lookup (state->common.script_storage, suffix->type_name);
     script_storage_ensure_interned_string_lookup_generated (state->common.script_storage, interned_string_lookup_node);
 
     uint32_t current_offset = block_info.offset;
@@ -2060,10 +2112,21 @@ enum kan_serialization_state_t kan_serialization_binary_reader_step (kan_seriali
                 struct script_node_t *script_node = script_storage_get_or_create_script (
                     state->common.script_storage, command_to_process->struct_dynamic_array.type_name);
                 script_storage_ensure_script_generated (state->common.script_storage, script_node);
-                serialization_common_state_push_script_state (
-                    &state->common, script_node->script,
-                    ((uint8_t *) array->data) + array->item_size * top_state->suffix_dynamic_array.items_processed,
-                    KAN_FALSE);
+
+                const struct kan_reflection_struct_t *child_struct_data = kan_reflection_registry_query_struct (
+                    state->common.script_storage->registry, command_to_process->struct_dynamic_array.type_name);
+                KAN_ASSERT (child_struct_data)
+
+                uint8_t *instance_address =
+                    ((uint8_t *) array->data) + array->item_size * top_state->suffix_dynamic_array.items_processed;
+
+                if (child_struct_data->init)
+                {
+                    child_struct_data->init (child_struct_data->functor_user_data, instance_address);
+                }
+
+                serialization_common_state_push_script_state (&state->common, script_node->script, instance_address,
+                                                              KAN_FALSE);
 
                 ++top_state->suffix_dynamic_array.items_processed;
             }
@@ -2111,7 +2174,7 @@ enum kan_serialization_state_t kan_serialization_binary_reader_step (kan_seriali
                 if (top_state->suffix_patch_dynamic_array.current_patch.read.blocks_processed <
                     top_state->suffix_patch_dynamic_array.current_patch.read.blocks_total)
                 {
-                    if (!read_patch_block (state, &top_state->suffix_patch))
+                    if (!read_patch_block (state, &top_state->suffix_patch_dynamic_array.current_patch))
                     {
                         return KAN_SERIALIZATION_FAILED;
                     }
@@ -2129,8 +2192,9 @@ enum kan_serialization_state_t kan_serialization_binary_reader_step (kan_seriali
 
                     *patch = kan_reflection_patch_builder_build (
                         state->patch_builder, state->common.script_storage->registry,
-                        kan_reflection_registry_query_struct (state->common.script_storage->registry,
-                                                              top_state->suffix_patch.read.type_name));
+                        kan_reflection_registry_query_struct (
+                            state->common.script_storage->registry,
+                            top_state->suffix_patch_dynamic_array.current_patch.type_name));
                     ++top_state->suffix_patch_dynamic_array.array.items_processed;
 
                     if (top_state->suffix_patch_dynamic_array.array.items_processed <
@@ -2185,7 +2249,7 @@ enum kan_serialization_state_t kan_serialization_binary_reader_step (kan_seriali
                 *patch = kan_reflection_patch_builder_build (
                     state->patch_builder, state->common.script_storage->registry,
                     kan_reflection_registry_query_struct (state->common.script_storage->registry,
-                                                          top_state->suffix_patch.read.type_name));
+                                                          top_state->suffix_patch.type_name));
                 script_state_go_to_next_command (top_state);
             }
 
@@ -2198,16 +2262,23 @@ enum kan_serialization_state_t kan_serialization_binary_reader_step (kan_seriali
         script_state_go_to_next_command (top_state);
     }
 
-    // Update top state pointer in case if new state was pushed on top.
-    top_state =
-        &((struct script_state_t *) state->common.script_state_stack.data)[state->common.script_state_stack.size - 1u];
-
-    if (top_state->command_to_process_index >= top_state->script->commands_count)
+    while (KAN_TRUE)
     {
-        serialization_common_state_pop_script_state (&state->common);
-        if (state->common.script_state_stack.size == 0u)
+        // Update top state pointer in case if new state was pushed on top.
+        top_state = &((struct script_state_t *)
+                          state->common.script_state_stack.data)[state->common.script_state_stack.size - 1u];
+
+        if (top_state->command_to_process_index >= top_state->script->commands_count)
         {
-            return KAN_SERIALIZATION_FINISHED;
+            serialization_common_state_pop_script_state (&state->common);
+            if (state->common.script_state_stack.size == 0u)
+            {
+                return KAN_SERIALIZATION_FINISHED;
+            }
+        }
+        else
+        {
+            break;
         }
     }
 
@@ -2228,6 +2299,8 @@ void kan_serialization_binary_reader_destroy (kan_serialization_binary_reader_t 
     {
         kan_reflection_patch_builder_destroy (state->patch_builder);
     }
+
+    kan_free_general (serialization_allocation_group, state, sizeof (struct serialization_read_state_t));
 }
 
 kan_serialization_binary_writer_t kan_serialization_binary_writer_create (
@@ -2238,6 +2311,8 @@ kan_serialization_binary_writer_t kan_serialization_binary_writer_create (
     kan_serialization_interned_string_registry_t interned_string_registry)
 {
     ensure_statics_initialized ();
+    KAN_ASSERT (kan_stream_is_writeable (stream))
+
     struct serialization_write_state_t *state = (struct serialization_write_state_t *) kan_allocate_general (
         serialization_allocation_group, sizeof (struct serialization_write_state_t),
         _Alignof (struct serialization_write_state_t));
@@ -2320,6 +2395,7 @@ static inline kan_bool_t init_patch_write_suffix (struct serialization_write_sta
         return KAN_FALSE;
     }
 
+    suffix->type_name = kan_reflection_patch_get_type (patch)->name;
     suffix->write.current_iterator = kan_reflection_patch_begin (patch);
     suffix->write.end_iterator = kan_reflection_patch_end (patch);
     return KAN_TRUE;
@@ -2345,7 +2421,7 @@ static inline kan_bool_t write_patch_block (struct serialization_write_state_t *
     }
 
     struct interned_string_lookup_node_t *interned_string_lookup_node =
-        script_storage_get_or_create_interned_string_lookup (state->common.script_storage, suffix->read.type_name);
+        script_storage_get_or_create_interned_string_lookup (state->common.script_storage, suffix->type_name);
     script_storage_ensure_interned_string_lookup_generated (state->common.script_storage, interned_string_lookup_node);
 
     uint32_t current_offset = block_info.offset;
@@ -2588,16 +2664,18 @@ enum kan_serialization_state_t kan_serialization_binary_writer_step (kan_seriali
                 if (top_state->suffix_patch_dynamic_array.current_patch.write.current_iterator !=
                     top_state->suffix_patch_dynamic_array.current_patch.write.end_iterator)
                 {
-                    if (!write_patch_block (state, &top_state->suffix_patch))
+                    if (!write_patch_block (state, &top_state->suffix_patch_dynamic_array.current_patch))
                     {
                         return KAN_SERIALIZATION_FAILED;
                     }
 
-                    top_state->suffix_patch.write.current_iterator =
-                        kan_reflection_patch_iterator_next (top_state->suffix_patch.write.current_iterator);
+                    top_state->suffix_patch_dynamic_array.current_patch.write.current_iterator =
+                        kan_reflection_patch_iterator_next (
+                            top_state->suffix_patch_dynamic_array.current_patch.write.current_iterator);
                 }
 
-                if (top_state->suffix_patch.write.current_iterator == top_state->suffix_patch.write.end_iterator)
+                if (top_state->suffix_patch_dynamic_array.current_patch.write.current_iterator ==
+                    top_state->suffix_patch_dynamic_array.current_patch.write.end_iterator)
                 {
                     ++top_state->suffix_patch_dynamic_array.array.items_processed;
                     if (top_state->suffix_patch_dynamic_array.array.items_processed <
@@ -2663,16 +2741,23 @@ enum kan_serialization_state_t kan_serialization_binary_writer_step (kan_seriali
         script_state_go_to_next_command (top_state);
     }
 
-    // Update top state pointer in case if new state was pushed on top.
-    top_state =
-        &((struct script_state_t *) state->common.script_state_stack.data)[state->common.script_state_stack.size - 1u];
-
-    if (top_state->command_to_process_index >= top_state->script->commands_count)
+    while (KAN_TRUE)
     {
-        serialization_common_state_pop_script_state (&state->common);
-        if (state->common.script_state_stack.size == 0u)
+        // Update top state pointer in case if new state was pushed on top.
+        top_state = &((struct script_state_t *)
+                          state->common.script_state_stack.data)[state->common.script_state_stack.size - 1u];
+
+        if (top_state->command_to_process_index >= top_state->script->commands_count)
         {
-            return KAN_SERIALIZATION_FINISHED;
+            serialization_common_state_pop_script_state (&state->common);
+            if (state->common.script_state_stack.size == 0u)
+            {
+                return KAN_SERIALIZATION_FINISHED;
+            }
+        }
+        else
+        {
+            break;
         }
     }
 
@@ -2683,4 +2768,5 @@ void kan_serialization_binary_writer_destroy (kan_serialization_binary_writer_t 
 {
     struct serialization_write_state_t *state = (struct serialization_write_state_t *) writer;
     serialization_common_state_shutdown (&state->common);
+    kan_free_general (serialization_allocation_group, state, sizeof (struct serialization_write_state_t));
 }
