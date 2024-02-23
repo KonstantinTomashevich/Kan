@@ -6,6 +6,9 @@ target_include_directories (debug_break INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/d
 add_library (qsort INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/qsort/qsort.h")
 target_include_directories (qsort INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/qsort")
 
+# libfyaml
+add_subdirectory (libfyaml)
+
 # SDL3
 set (SDL_SHARED ON CACHE BOOL "We use double-set with cache to override third party project options for good.")
 set (SDL_SHARED ON)
