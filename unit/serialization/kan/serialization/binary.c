@@ -1786,6 +1786,42 @@ static inline kan_bool_t read_string_to_new_allocation (struct serialization_rea
     return KAN_TRUE;
 }
 
+static inline kan_bool_t read_interned_string_stateless (struct kan_stream_t *stream,
+                                                         struct interned_string_registry_t *string_registry,
+                                                         kan_interned_string_t *output)
+{
+    if (string_registry)
+    {
+        uint32_t index;
+        if (stream->operations->read (stream, sizeof (uint32_t), &index) != sizeof (uint32_t))
+        {
+            return KAN_FALSE;
+        }
+
+        *output = interned_string_registry_load_string (string_registry, index);
+        return KAN_TRUE;
+    }
+    else
+    {
+        uint32_t string_length;
+        if (stream->operations->read (stream, sizeof (uint32_t), &string_length) != sizeof (uint32_t))
+        {
+            return KAN_FALSE;
+        }
+
+        char *string_memory = kan_allocate_general (serialization_allocation_group, string_length, _Alignof (char));
+        if (stream->operations->read (stream, string_length, string_memory) != string_length)
+        {
+            kan_free_general (serialization_allocation_group, string_memory, string_length);
+            return KAN_FALSE;
+        }
+
+        *output = kan_char_sequence_intern (string_memory, string_memory + string_length);
+        kan_free_general (serialization_allocation_group, string_memory, string_length);
+        return KAN_TRUE;
+    }
+}
+
 static inline kan_bool_t read_interned_string (struct serialization_read_state_t *state, kan_interned_string_t *output)
 {
     if (state->common.optional_string_registry)
@@ -2325,19 +2361,18 @@ kan_serialization_binary_writer_t kan_serialization_binary_writer_create (
     return (kan_serialization_binary_writer_t) state;
 }
 
-static inline kan_bool_t write_string (struct serialization_write_state_t *state, const char *string_input)
+static inline kan_bool_t write_string_stateless (struct kan_stream_t *stream, const char *string_input)
 {
     const uint64_t string_length_wide = strlen (string_input);
     KAN_ASSERT (string_length_wide <= UINT32_MAX)
     const uint32_t string_length = (uint32_t) string_length_wide;
 
-    if (state->common.stream->operations->write (state->common.stream, sizeof (uint32_t), &string_length) !=
-        sizeof (uint32_t))
+    if (stream->operations->write (stream, sizeof (uint32_t), &string_length) != sizeof (uint32_t))
     {
         return KAN_FALSE;
     }
 
-    if (state->common.stream->operations->write (state->common.stream, string_length, string_input) != string_length)
+    if (stream->operations->write (stream, string_length, string_input) != string_length)
     {
         return KAN_FALSE;
     }
@@ -2345,16 +2380,27 @@ static inline kan_bool_t write_string (struct serialization_write_state_t *state
     return KAN_TRUE;
 }
 
-static inline kan_bool_t write_interned_string (struct serialization_write_state_t *state, kan_interned_string_t input)
+static inline kan_bool_t write_string (struct serialization_write_state_t *state, const char *string_input)
 {
-    if (state->common.optional_string_registry)
+    return write_string_stateless (state->common.stream, string_input);
+}
+
+static inline kan_bool_t write_interned_string_stateless (struct kan_stream_t *stream,
+                                                          struct interned_string_registry_t *string_registry,
+                                                          kan_interned_string_t input)
+{
+    if (string_registry)
     {
-        const uint32_t index = interned_string_registry_store_string (state->common.optional_string_registry, input);
-        return state->common.stream->operations->write (state->common.stream, sizeof (uint32_t), &index) ==
-               sizeof (uint32_t);
+        const uint32_t index = interned_string_registry_store_string (string_registry, input);
+        return stream->operations->write (stream, sizeof (uint32_t), &index) == sizeof (uint32_t);
     }
 
-    return write_string (state, input);
+    return write_string_stateless (stream, input);
+}
+
+static inline kan_bool_t write_interned_string (struct serialization_write_state_t *state, kan_interned_string_t input)
+{
+    return write_interned_string_stateless (state->common.stream, state->common.optional_string_registry, input);
 }
 
 static inline kan_bool_t write_array_or_patch_size (struct serialization_write_state_t *state, uint32_t input)
@@ -2769,4 +2815,23 @@ void kan_serialization_binary_writer_destroy (kan_serialization_binary_writer_t 
     struct serialization_write_state_t *state = (struct serialization_write_state_t *) writer;
     serialization_common_state_shutdown (&state->common);
     kan_free_general (serialization_allocation_group, state, sizeof (struct serialization_write_state_t));
+}
+
+kan_bool_t kan_serialization_binary_read_type_header (
+    struct kan_stream_t *stream,
+    kan_interned_string_t *type_name_output,
+    kan_serialization_interned_string_registry_t interned_string_registry)
+{
+    ensure_statics_initialized ();
+    return read_interned_string_stateless (stream, (struct interned_string_registry_t *) interned_string_registry,
+                                           type_name_output);
+}
+
+kan_bool_t kan_serialization_binary_write_type_header (
+    struct kan_stream_t *stream,
+    kan_interned_string_t type_name,
+    kan_serialization_interned_string_registry_t interned_string_registry)
+{
+    return write_interned_string_stateless (stream, (struct interned_string_registry_t *) interned_string_registry,
+                                            type_name);
 }

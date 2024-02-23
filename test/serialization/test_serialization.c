@@ -239,7 +239,6 @@ static void check_map_equality (struct map_t *source_map, struct map_t *deserial
     const kan_interned_string_t first_component_t = kan_string_intern ("first_component_t");
     const kan_interned_string_t second_component_t = kan_string_intern ("second_component_t");
 
-
     KAN_TEST_CHECK (source_map->name == deserialized_map->name)
     KAN_TEST_CHECK (source_map->objects.size == deserialized_map->objects.size)
     const uint64_t objects_to_check = KAN_MIN (source_map->objects.size, deserialized_map->objects.size);
@@ -329,6 +328,7 @@ static void save_map_binary (struct map_t *map,
     struct kan_stream_t *buffered_file_stream =
         kan_random_access_stream_buffer_open_for_write (direct_file_stream, 1024u);
 
+    KAN_TEST_CHECK (kan_serialization_binary_write_type_header (buffered_file_stream, map_t, string_registry))
     kan_serialization_binary_writer_t writer =
         kan_serialization_binary_writer_create (buffered_file_stream, map, map_t, script_storage, string_registry);
 
@@ -356,6 +356,9 @@ static void load_map_binary (struct map_t *map,
     struct kan_stream_t *direct_file_stream = kan_direct_file_stream_open_for_read ("map.bin", KAN_TRUE);
     struct kan_stream_t *buffered_file_stream =
         kan_random_access_stream_buffer_open_for_read (direct_file_stream, 1024u);
+
+    kan_interned_string_t header_type;
+    KAN_TEST_CHECK (kan_serialization_binary_read_type_header (buffered_file_stream, &header_type, string_registry))
 
     kan_serialization_binary_reader_t reader = kan_serialization_binary_reader_create (
         buffered_file_stream, map, map_t, script_storage, string_registry, KAN_ALLOCATION_GROUP_IGNORE);
