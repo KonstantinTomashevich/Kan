@@ -168,13 +168,12 @@ static inline void re2c_restore_saved_cursor (struct parser_t *parser)
 
  separator = [\x20\x0c\x0a\x0d\x09\x0b];
  identifier = [A-Za-z_][A-Za-z0-9_]*;
+ comment = "//" .* "\n";
 
- string_literal_block = "\"" (. | "\\\"") "\"";
- string_literal = string_literal_block (separator* string_literal_block)*;
+ string_literal_block = "\"" (. | "\\\"")* "\"";
+ string_literal = string_literal_block ((separator | comment)* string_literal_block)*;
  integer_literal = ("+" | "-")? [0-9]+;
  floating_literal = ("+" | "-")? [0-9]* "." [0-9]+;
-
- comment = "//" .* "\n";
  */
 
 static enum kan_readable_data_parser_response_t re2c_parse_first_value (struct parser_t *parser);
@@ -226,6 +225,7 @@ static inline const char *re2c_internalize_string_literal (struct parser_t *pars
                 if (*blocks_begin == '"' && *(blocks_begin - 1u) != '\\')
                 {
                     new_node->end = blocks_begin;
+                    ++blocks_begin;
                     break;
                 }
 
@@ -246,6 +246,10 @@ static inline const char *re2c_internalize_string_literal (struct parser_t *pars
                 first_block = new_node;
                 last_block = new_node;
             }
+        }
+        else
+        {
+            ++blocks_begin;
         }
     }
 
@@ -394,13 +398,13 @@ static enum kan_readable_data_parser_response_t re2c_parse_next_event (struct pa
         const char *output_target_array_index_end = NULL;
 
         /*!re2c
-         output_target = @output_target_identifier_begin identifier @output_target_identifier_end
+         output_target = @output_target_identifier_begin identifier ("." identifier)* @output_target_identifier_end
                          ("[" @output_target_array_index_begin [0-9]+ @output_target_array_index_end "]")?;
 
          output_target separator* "=" separator*
          {
-             re2c_save_output_target_to_event (parser, &parser->current_event.output, output_target_identifier_begin,
-                     output_target_identifier_end, output_target_array_index_begin,
+             re2c_save_output_target_to_event (parser, &parser->current_event.output_target,
+                     output_target_identifier_begin, output_target_identifier_end, output_target_array_index_begin,
                      output_target_array_index_end);
              return re2c_parse_first_value (parser);
          }
@@ -408,8 +412,8 @@ static enum kan_readable_data_parser_response_t re2c_parse_next_event (struct pa
          output_target separator* "{"
          {
              parser->current_event.type = KAN_READABLE_DATA_EVENT_STRUCTURAL_SETTER_BEGIN;
-             re2c_save_output_target_to_event (parser, &parser->current_event.output, output_target_identifier_begin,
-                     output_target_identifier_end, output_target_array_index_begin,
+             re2c_save_output_target_to_event (parser, &parser->current_event.output_target,
+                     output_target_identifier_begin, output_target_identifier_end, output_target_array_index_begin,
                      output_target_array_index_end);
              ++parser->opened_blocks;
              return KAN_READABLE_DATA_PARSER_RESPONSE_NEW_EVENT;
@@ -418,8 +422,8 @@ static enum kan_readable_data_parser_response_t re2c_parse_next_event (struct pa
          "+" output_target separator* "{"
          {
              parser->current_event.type = KAN_READABLE_DATA_EVENT_ARRAY_APPENDER_BEGIN;
-             re2c_save_output_target_to_event (parser, &parser->current_event.output, output_target_identifier_begin,
-                     output_target_identifier_end, output_target_array_index_begin,
+             re2c_save_output_target_to_event (parser, &parser->current_event.output_target,
+                     output_target_identifier_begin, output_target_identifier_end, output_target_array_index_begin,
                      output_target_array_index_end);
              ++parser->opened_blocks;
              return KAN_READABLE_DATA_PARSER_RESPONSE_NEW_EVENT;
@@ -810,7 +814,7 @@ enum kan_readable_data_parser_response_t kan_readable_data_parser_step (kan_read
     return re2c_parse_next_event (data);
 }
 
-struct kan_readable_data_event_t *kan_readable_data_parser_get_last_event (kan_readable_data_parser_t parser)
+const struct kan_readable_data_event_t *kan_readable_data_parser_get_last_event (kan_readable_data_parser_t parser)
 {
     struct parser_t *data = (struct parser_t *) parser;
     return &data->current_event;
@@ -954,7 +958,7 @@ kan_bool_t kan_readable_data_emitter_step (kan_readable_data_emitter_t emitter,
             return KAN_FALSE;
         }
 
-        if (!emit_output_target (data, &emit_event->output))
+        if (!emit_output_target (data, &emit_event->output_target))
         {
             return KAN_FALSE;
         }
@@ -998,7 +1002,7 @@ kan_bool_t kan_readable_data_emitter_step (kan_readable_data_emitter_t emitter,
             return KAN_FALSE;
         }
 
-        if (!emit_output_target (data, &emit_event->output))
+        if (!emit_output_target (data, &emit_event->output_target))
         {
             return KAN_FALSE;
         }
@@ -1042,7 +1046,7 @@ kan_bool_t kan_readable_data_emitter_step (kan_readable_data_emitter_t emitter,
             return KAN_FALSE;
         }
 
-        if (!emit_output_target (data, &emit_event->output))
+        if (!emit_output_target (data, &emit_event->output_target))
         {
             return KAN_FALSE;
         }
@@ -1086,7 +1090,7 @@ kan_bool_t kan_readable_data_emitter_step (kan_readable_data_emitter_t emitter,
             return KAN_FALSE;
         }
 
-        if (!emit_output_target (data, &emit_event->output))
+        if (!emit_output_target (data, &emit_event->output_target))
         {
             return KAN_FALSE;
         }
@@ -1124,7 +1128,7 @@ kan_bool_t kan_readable_data_emitter_step (kan_readable_data_emitter_t emitter,
             return KAN_FALSE;
         }
 
-        if (!emit_output_target (data, &emit_event->output))
+        if (!emit_output_target (data, &emit_event->output_target))
         {
             return KAN_FALSE;
         }
@@ -1148,7 +1152,7 @@ kan_bool_t kan_readable_data_emitter_step (kan_readable_data_emitter_t emitter,
             return KAN_FALSE;
         }
 
-        if (!emit_output_target (data, &emit_event->output))
+        if (!emit_output_target (data, &emit_event->output_target))
         {
             return KAN_FALSE;
         }

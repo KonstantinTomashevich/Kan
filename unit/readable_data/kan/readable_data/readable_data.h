@@ -89,7 +89,7 @@ struct kan_readable_data_floating_node_t
 struct kan_readable_data_event_t
 {
     enum kan_readable_data_event_type_t type;
-    struct kan_readable_data_output_target_t output;
+    struct kan_readable_data_output_target_t output_target;
 
     union
     {
@@ -114,7 +114,7 @@ READABLE_DATA_API kan_readable_data_parser_t kan_readable_data_parser_create (st
 READABLE_DATA_API enum kan_readable_data_parser_response_t kan_readable_data_parser_step (
     kan_readable_data_parser_t parser);
 
-READABLE_DATA_API struct kan_readable_data_event_t *kan_readable_data_parser_get_last_event (
+READABLE_DATA_API const struct kan_readable_data_event_t *kan_readable_data_parser_get_last_event (
     kan_readable_data_parser_t parser);
 
 READABLE_DATA_API void kan_readable_data_parser_destroy (kan_readable_data_parser_t parser);
