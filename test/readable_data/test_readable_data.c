@@ -552,7 +552,7 @@ KAN_TEST_CASE (human_input_corner_cases)
         "// Split everything here just for fun.\n"
         "\" readable\" \" data!\"\n"
         "health_max =     100\n"
-        "transform.position   = -1.34, 5.5");
+        "transform.position   = -1.34, 5.5\n");
 
     parse_file_and_check (events_to_emit, TEST_EVENTS_COUNT);
 #undef TEST_EVENTS_COUNT
