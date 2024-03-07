@@ -1,7 +1,5 @@
 #pragma once
 
-#include <reflection_api.h>
-
 #include <kan/api_common/c_header.h>
 #include <kan/error/critical.h>
 #include <kan/reflection/registry.h>
