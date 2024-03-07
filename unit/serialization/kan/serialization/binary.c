@@ -565,7 +565,7 @@ static inline void add_struct_commands (struct generation_temporary_state_t *sta
     for (uint32_t index = 0u; index < script_node->script->conditions_count; ++index, ++condition)
     {
         struct script_condition_t new_condition = *condition;
-        new_condition.absolute_source_offset += field_offset;
+        new_condition.absolute_source_offset += (uint32_t) field_offset;
 
         if (new_condition.parent_condition_index == SCRIPT_NO_CONDITION)
         {
@@ -592,7 +592,7 @@ static inline void add_struct_commands (struct generation_temporary_state_t *sta
             new_command.condition_index += condition_index_offset;
         }
 
-        new_command.offset += field_offset;
+        new_command.offset += (uint32_t) field_offset;
         add_command (state, new_command);
     }
 }
@@ -608,19 +608,19 @@ static inline void add_field_to_commands (struct generation_temporary_state_t *s
     case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
     case KAN_REFLECTION_ARCHETYPE_FLOATING:
     case KAN_REFLECTION_ARCHETYPE_ENUM:
-        add_command (state, build_block_command (condition_index, field->offset, field->size));
+        add_command (state, build_block_command (condition_index, (uint32_t) field->offset, (uint32_t) field->size));
         break;
 
     case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
-        add_command (state, build_string_command (condition_index, field->offset));
+        add_command (state, build_string_command (condition_index, (uint32_t) field->offset));
         break;
 
     case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:
-        add_command (state, build_interned_string_command (condition_index, field->offset));
+        add_command (state, build_interned_string_command (condition_index, (uint32_t) field->offset));
         break;
 
     case KAN_REFLECTION_ARCHETYPE_STRUCT:
-        add_struct_commands (state, field->archetype_struct.type_name, field->offset, condition_index);
+        add_struct_commands (state, field->archetype_struct.type_name, (uint32_t) field->offset, condition_index);
         break;
 
     case KAN_REFLECTION_ARCHETYPE_INLINE_ARRAY:
@@ -630,17 +630,17 @@ static inline void add_field_to_commands (struct generation_temporary_state_t *s
         case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
         case KAN_REFLECTION_ARCHETYPE_FLOATING:
         case KAN_REFLECTION_ARCHETYPE_ENUM:
-            add_command (state, build_block_command (condition_index, field->offset,
-                                                     field->archetype_inline_array.item_size *
-                                                         field->archetype_inline_array.item_count));
+            add_command (state, build_block_command (condition_index, (uint32_t) field->offset,
+                                                     (uint32_t) (field->archetype_inline_array.item_size *
+                                                                 field->archetype_inline_array.item_count)));
             break;
 
         case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
             for (uint64_t index = 0u; index < field->archetype_inline_array.item_count; ++index)
             {
-                add_command (state,
-                             build_string_command (condition_index,
-                                                   field->offset + field->archetype_inline_array.item_size * index));
+                add_command (state, build_string_command (
+                                        condition_index,
+                                        (uint32_t) (field->offset + field->archetype_inline_array.item_size * index)));
             }
 
             break;
@@ -648,9 +648,9 @@ static inline void add_field_to_commands (struct generation_temporary_state_t *s
         case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:
             for (uint64_t index = 0u; index < field->archetype_inline_array.item_count; ++index)
             {
-                add_command (state,
-                             build_interned_string_command (
-                                 condition_index, field->offset + field->archetype_inline_array.item_size * index));
+                add_command (state, build_interned_string_command (
+                                        condition_index,
+                                        (uint32_t) (field->offset + field->archetype_inline_array.item_size * index)));
             }
 
             break;
@@ -658,8 +658,9 @@ static inline void add_field_to_commands (struct generation_temporary_state_t *s
         case KAN_REFLECTION_ARCHETYPE_STRUCT:
             for (uint64_t index = 0u; index < field->archetype_inline_array.item_count; ++index)
             {
-                add_struct_commands (state, field->archetype_inline_array.item_archetype_struct.type_name,
-                                     field->offset + field->archetype_inline_array.item_size * index, condition_index);
+                add_struct_commands (
+                    state, field->archetype_inline_array.item_archetype_struct.type_name,
+                    (uint32_t) (field->offset + field->archetype_inline_array.item_size * index), condition_index);
             }
 
             break;
@@ -686,9 +687,9 @@ static inline void add_field_to_commands (struct generation_temporary_state_t *s
         case KAN_REFLECTION_ARCHETYPE_PATCH:
             for (uint64_t index = 0u; index < field->archetype_inline_array.item_count; ++index)
             {
-                add_command (state,
-                             build_patch_command (condition_index,
-                                                  field->offset + field->archetype_inline_array.item_size * index));
+                add_command (state, build_patch_command (
+                                        condition_index,
+                                        (uint32_t) (field->offset + field->archetype_inline_array.item_size * index)));
             }
 
             break;
@@ -703,21 +704,23 @@ static inline void add_field_to_commands (struct generation_temporary_state_t *s
         case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
         case KAN_REFLECTION_ARCHETYPE_FLOATING:
         case KAN_REFLECTION_ARCHETYPE_ENUM:
-            add_command (state, build_block_dynamic_array_command (condition_index, field->offset,
-                                                                   field->archetype_dynamic_array.item_size));
+            add_command (state,
+                         build_block_dynamic_array_command (condition_index, (uint32_t) field->offset,
+                                                            (uint32_t) field->archetype_dynamic_array.item_size));
             break;
 
         case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
-            add_command (state, build_string_dynamic_array_command (condition_index, field->offset));
+            add_command (state, build_string_dynamic_array_command (condition_index, (uint32_t) field->offset));
             break;
 
         case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:
-            add_command (state, build_interned_string_dynamic_array_command (condition_index, field->offset));
+            add_command (state,
+                         build_interned_string_dynamic_array_command (condition_index, (uint32_t) field->offset));
             break;
 
         case KAN_REFLECTION_ARCHETYPE_STRUCT:
             add_command (state, build_struct_dynamic_array_command (
-                                    condition_index, field->offset,
+                                    condition_index, (uint32_t) field->offset,
                                     field->archetype_dynamic_array.item_archetype_struct.type_name));
             break;
 
@@ -741,14 +744,14 @@ static inline void add_field_to_commands (struct generation_temporary_state_t *s
             break;
 
         case KAN_REFLECTION_ARCHETYPE_PATCH:
-            add_command (state, build_patch_dynamic_array_command (condition_index, field->offset));
+            add_command (state, build_patch_dynamic_array_command (condition_index, (uint32_t) field->offset));
             break;
         }
 
         break;
 
     case KAN_REFLECTION_ARCHETYPE_PATCH:
-        add_command (state, build_patch_command (condition_index, field->offset));
+        add_command (state, build_patch_command (condition_index, (uint32_t) field->offset));
         break;
 
     case KAN_REFLECTION_ARCHETYPE_EXTERNAL_POINTER:
@@ -824,18 +827,18 @@ static void script_storage_ensure_script_generated (struct script_storage_t *sto
         // It only makes sense to include paddings if we're not part of the union.
         if (condition_index == SCRIPT_NO_CONDITION)
         {
-            const uint32_t field_end = field->offset + field->size;
+            const uint32_t field_end = (uint32_t) (field->offset + field->size);
             if (field_index + 1u != state.struct_data->fields_count)
             {
                 struct kan_reflection_field_t *next_field = &state.struct_data->fields[field_index + 1u];
                 if (!next_field->visibility_condition_field)
                 {
-                    padding_to_include = next_field->offset - field_end;
+                    padding_to_include = (uint32_t)  (next_field->offset - field_end);
                 }
             }
             else if (field_end % state.struct_data->alignment != 0u)
             {
-                padding_to_include = state.struct_data->alignment - (field_end % state.struct_data->alignment);
+                padding_to_include = (uint32_t) (state.struct_data->alignment - (field_end % state.struct_data->alignment));
             }
         }
 
@@ -1397,7 +1400,7 @@ static inline void serialization_common_state_push_script_state (
 
         if (calculate_conditions)
         {
-            for (uint64_t index = 0u; index < script->conditions_count; ++index)
+            for (uint32_t index = 0u; index < script->conditions_count; ++index)
             {
                 calculate_condition (instance, script_state->condition_values, index,
                                      (struct script_condition_t *) script->data);
@@ -1405,7 +1408,7 @@ static inline void serialization_common_state_push_script_state (
         }
         else
         {
-            for (uint64_t index = 0u; index < script->conditions_count; ++index)
+            for (uint32_t index = 0u; index < script->conditions_count; ++index)
             {
                 script_state->condition_values[index] = SERIALIZATION_CONDITION_NOT_CALCULATED;
             }
@@ -1600,7 +1603,7 @@ enum kan_serialization_state_t kan_serialization_interned_string_registry_reader
     }
 #undef MAX_SIZE_ON_STACK
 
-    const uint32_t read = data->stream->operations->read (data->stream, string_length, read_buffer);
+    const uint32_t read = (uint32_t) data->stream->operations->read (data->stream, string_length, read_buffer);
     if (read == string_length)
     {
         read_buffer[string_length] = '\0';
@@ -2415,7 +2418,7 @@ static inline kan_bool_t ensure_dynamic_array_write_suffix_ready (struct seriali
 {
     if (!top_state->suffix_initialized)
     {
-        top_state->suffix_dynamic_array.items_total = array->size;
+        top_state->suffix_dynamic_array.items_total = (uint32_t) array->size;
         if (!write_array_or_patch_size (state, top_state->suffix_dynamic_array.items_total))
         {
             return KAN_FALSE;
@@ -2452,8 +2455,8 @@ static inline kan_bool_t write_patch_block (struct serialization_write_state_t *
 {
     struct kan_reflection_patch_chunk_info_t chunk = kan_reflection_patch_iterator_get (suffix->write.current_iterator);
     struct patch_block_info_t block_info;
-    block_info.offset = chunk.offset;
-    block_info.size = chunk.size;
+    block_info.offset = (uint32_t) chunk.offset;
+    block_info.size = (uint32_t) chunk.size;
 
     if (state->common.stream->operations->write (state->common.stream, sizeof (struct patch_block_info_t),
                                                  &block_info) != sizeof (struct patch_block_info_t))
@@ -2583,7 +2586,7 @@ enum kan_serialization_state_t kan_serialization_binary_writer_step (kan_seriali
         case SCRIPT_COMMAND_BLOCK_DYNAMIC_ARRAY:
         {
             struct kan_dynamic_array_t *array = (struct kan_dynamic_array_t *) address;
-            if (!write_array_or_patch_size (state, array->size))
+            if (!write_array_or_patch_size (state, (uint32_t) array->size))
             {
                 return KAN_SERIALIZATION_FAILED;
             }
@@ -2685,7 +2688,7 @@ enum kan_serialization_state_t kan_serialization_binary_writer_step (kan_seriali
             struct kan_dynamic_array_t *array = (struct kan_dynamic_array_t *) address;
             if (!top_state->suffix_initialized)
             {
-                top_state->suffix_dynamic_array.items_total = array->size;
+                top_state->suffix_dynamic_array.items_total = (uint32_t) array->size;
                 if (!write_array_or_patch_size (state, top_state->suffix_patch_dynamic_array.array.items_total))
                 {
                     return KAN_SERIALIZATION_FAILED;
