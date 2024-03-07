@@ -658,9 +658,9 @@ static inline void add_field_to_commands (struct generation_temporary_state_t *s
         case KAN_REFLECTION_ARCHETYPE_STRUCT:
             for (uint64_t index = 0u; index < field->archetype_inline_array.item_count; ++index)
             {
-                add_struct_commands (
-                    state, field->archetype_inline_array.item_archetype_struct.type_name,
-                    (uint32_t) (field->offset + field->archetype_inline_array.item_size * index), condition_index);
+                add_struct_commands (state, field->archetype_inline_array.item_archetype_struct.type_name,
+                                     (uint32_t) (field->offset + field->archetype_inline_array.item_size * index),
+                                     condition_index);
             }
 
             break;
@@ -833,12 +833,13 @@ static void script_storage_ensure_script_generated (struct script_storage_t *sto
                 struct kan_reflection_field_t *next_field = &state.struct_data->fields[field_index + 1u];
                 if (!next_field->visibility_condition_field)
                 {
-                    padding_to_include = (uint32_t)  (next_field->offset - field_end);
+                    padding_to_include = (uint32_t) (next_field->offset - field_end);
                 }
             }
             else if (field_end % state.struct_data->alignment != 0u)
             {
-                padding_to_include = (uint32_t) (state.struct_data->alignment - (field_end % state.struct_data->alignment));
+                padding_to_include =
+                    (uint32_t) (state.struct_data->alignment - (field_end % state.struct_data->alignment));
             }
         }
 
