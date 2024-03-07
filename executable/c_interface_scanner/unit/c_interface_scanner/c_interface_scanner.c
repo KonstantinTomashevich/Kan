@@ -35,6 +35,11 @@ static struct
 
 #define INPUT_BUFFER_SIZE 131072u // 128 kilobytes
 
+struct tags_t
+{
+    /*!stags:re2c format = 'const char *@@;';*/
+};
+
 static struct
 {
     struct kan_stream_t *input_stream;
@@ -49,6 +54,8 @@ static struct
     size_t cursor_symbol;
     size_t marker_line;
     size_t marker_symbol;
+
+    struct tags_t tags;
 } io = {
     .input_stream = NULL,
     .input_buffer = {0},
@@ -99,6 +106,19 @@ static int io_refill_buffer (void)
     io.cursor -= shift;
     io.marker -= shift;
     io.token -= shift;
+
+    const char **first_tag = (const char **) &io.tags;
+    const char **last_tag = first_tag + sizeof (struct tags_t) / sizeof (char *);
+
+    while (first_tag != last_tag)
+    {
+        if (*first_tag)
+        {
+            *first_tag -= shift;
+        }
+
+        ++first_tag;
+    }
 
     // Fill free space at the end of buffer with new data from file.
     io.limit += io.input_stream->operations->read (io.input_stream, INPUT_BUFFER_SIZE - used - 1u, io.limit);
@@ -353,9 +373,6 @@ static void optional_includable_object_finish (void)
 
 // Parse input using re2c
 
-// Define tag format.
-/*!stags:re2c format = 'const char *@@ = NULL;';*/
-
 // Helpers for re2c api.
 static void re2c_yyskip (void)
 {
@@ -399,6 +416,7 @@ static void re2c_yyrestore (void)
  re2c:define:YYSHIFTSTAG  = "@@{tag} += @@{shift};";
  re2c:eof = 0;
  re2c:tags = 1;
+ re2c:tags:expression = "io.tags.@@";
 */
 
 // Common captures.
