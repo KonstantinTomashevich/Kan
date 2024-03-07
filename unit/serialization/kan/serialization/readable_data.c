@@ -952,7 +952,7 @@ static inline kan_bool_t read_elemental_setter (struct reader_state_t *reader_st
     }
 
     uint64_t patch_single_value_read_buffer = 0u;
-    void *address;
+    void *address = NULL;
 
     switch (top_state->type)
     {
@@ -1053,7 +1053,7 @@ static inline kan_bool_t read_elemental_setter (struct reader_state_t *reader_st
 
             while (node)
             {
-                void *output_address;
+                void *output_address = NULL;
                 switch (top_state->type)
                 {
                 case READER_BLOCK_TYPE_STRUCT:
@@ -1108,7 +1108,7 @@ static inline kan_bool_t read_elemental_setter (struct reader_state_t *reader_st
                 return KAN_FALSE;
             }
 
-            void *output_address;
+            void *output_address = NULL;
             switch (top_state->type)
             {
             case READER_BLOCK_TYPE_STRUCT:
