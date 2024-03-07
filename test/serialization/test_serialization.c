@@ -394,8 +394,8 @@ static void save_map_rd (struct map_t *map, kan_reflection_registry_t registry)
     while (KAN_TRUE)
     {
         enum kan_serialization_state_t state = kan_serialization_rd_writer_step (writer);
-        buffered_file_stream->operations->flush(buffered_file_stream);
-        direct_file_stream->operations->flush(direct_file_stream);
+        buffered_file_stream->operations->flush (buffered_file_stream);
+        direct_file_stream->operations->flush (direct_file_stream);
         KAN_TEST_ASSERT (state != KAN_SERIALIZATION_FAILED)
 
         if (state == KAN_SERIALIZATION_FINISHED)

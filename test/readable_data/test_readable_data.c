@@ -73,8 +73,7 @@ static void parse_file_and_check (const struct kan_readable_data_event_t *events
                     strcmp (expected_event->output_target.identifier, parsed_event->output_target.identifier) == 0)
                 KAN_TEST_CHECK (expected_event->output_target.array_index == parsed_event->output_target.array_index)
 
-                struct kan_readable_data_value_node_t *expected_node =
-                    expected_event->setter_value_first;
+                struct kan_readable_data_value_node_t *expected_node = expected_event->setter_value_first;
                 struct kan_readable_data_value_node_t *parsed_node = parsed_event->setter_value_first;
 
                 while (expected_node && parsed_node)
