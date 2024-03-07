@@ -8,6 +8,7 @@
 #include <kan/reflection/generated_reflection.h>
 #include <kan/reflection/patch.h>
 #include <kan/serialization/binary.h>
+#include <kan/serialization/readable_data.h>
 #include <kan/stream/random_access_stream_buffer.h>
 #include <kan/testing/testing.h>
 
@@ -379,6 +380,64 @@ static void load_map_binary (struct map_t *map,
     kan_direct_file_stream_close (direct_file_stream);
 }
 
+static void save_map_rd (struct map_t *map, kan_reflection_registry_t registry)
+{
+    const kan_interned_string_t map_t = kan_string_intern ("map_t");
+    struct kan_stream_t *direct_file_stream = kan_direct_file_stream_open_for_write ("map.rd", KAN_TRUE);
+    struct kan_stream_t *buffered_file_stream =
+        kan_random_access_stream_buffer_open_for_write (direct_file_stream, 1024u);
+
+    KAN_TEST_CHECK (kan_serialization_rd_write_type_header (buffered_file_stream, map_t))
+    kan_serialization_rd_writer_t writer =
+        kan_serialization_rd_writer_create (buffered_file_stream, map, map_t, registry);
+
+    while (KAN_TRUE)
+    {
+        enum kan_serialization_state_t state = kan_serialization_rd_writer_step (writer);
+        buffered_file_stream->operations->flush(buffered_file_stream);
+        direct_file_stream->operations->flush(direct_file_stream);
+        KAN_TEST_ASSERT (state != KAN_SERIALIZATION_FAILED)
+
+        if (state == KAN_SERIALIZATION_FINISHED)
+        {
+            break;
+        }
+    }
+
+    kan_serialization_rd_writer_destroy (writer);
+    kan_random_access_stream_buffer_close (buffered_file_stream);
+    kan_direct_file_stream_close (direct_file_stream);
+}
+
+static void load_map_rd (struct map_t *map, kan_reflection_registry_t registry)
+{
+    const kan_interned_string_t map_t = kan_string_intern ("map_t");
+    struct kan_stream_t *direct_file_stream = kan_direct_file_stream_open_for_read ("map.rd", KAN_TRUE);
+    struct kan_stream_t *buffered_file_stream =
+        kan_random_access_stream_buffer_open_for_read (direct_file_stream, 1024u);
+
+    kan_interned_string_t header_type;
+    KAN_TEST_CHECK (kan_serialization_rd_read_type_header (buffered_file_stream, &header_type))
+
+    kan_serialization_rd_reader_t reader =
+        kan_serialization_rd_reader_create (buffered_file_stream, map, map_t, registry, KAN_ALLOCATION_GROUP_IGNORE);
+
+    while (KAN_TRUE)
+    {
+        enum kan_serialization_state_t state = kan_serialization_rd_reader_step (reader);
+        KAN_TEST_ASSERT (state != KAN_SERIALIZATION_FAILED)
+
+        if (state == KAN_SERIALIZATION_FINISHED)
+        {
+            break;
+        }
+    }
+
+    kan_serialization_rd_reader_destroy (reader);
+    kan_random_access_stream_buffer_close (buffered_file_stream);
+    kan_direct_file_stream_close (direct_file_stream);
+}
+
 KAN_REFLECTION_EXPECT_UNIT_REGISTRAR (test_serialization);
 
 KAN_TEST_CASE (binary_no_interned_string_registry)
@@ -479,4 +538,24 @@ KAN_TEST_CASE (binary_with_interned_string_registry)
 
     kan_serialization_interned_string_registry_destroy (interned_string_registry_write);
     kan_serialization_interned_string_registry_destroy (interned_string_registry_read);
+}
+
+KAN_TEST_CASE (readable_data)
+{
+    kan_reflection_registry_t registry = kan_reflection_registry_create ();
+    KAN_REFLECTION_UNIT_REGISTRAR_NAME (test_serialization) (registry);
+
+    struct map_t initial_map;
+    map_init (&initial_map);
+    fill_test_map (&initial_map, registry);
+    save_map_rd (&initial_map, registry);
+
+    struct map_t deserialized_map;
+    map_init (&deserialized_map);
+    load_map_rd (&deserialized_map, registry);
+
+    check_map_equality (&initial_map, &deserialized_map);
+    map_shutdown (&initial_map);
+    map_shutdown (&deserialized_map);
+    kan_reflection_registry_destroy (registry);
 }

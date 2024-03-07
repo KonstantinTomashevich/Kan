@@ -16,7 +16,7 @@ shared_library_include (
         ABSTRACT
         cpu_dispatch=kan cpu_profiler=none error=sdl file_system=stdcxx hash=djb2 log=kan memory=kan
         memory_profiler=none platform=sdl reflection=kan stream=kan threading=sdl
-        CONCRETE container serialization testing test_serialization)
+        CONCRETE container serialization readable_data testing test_serialization)
 
 shared_library_verify ()
 shared_library_copy_linked_artefacts ()
