@@ -165,32 +165,17 @@ struct kan_readable_data_output_target_t
     uint64_t array_index;
 };
 
-/// \brief Value node for describing values for identifier setters.
-struct kan_readable_data_identifier_node_t
+/// \brief Value node for describing values for setters.
+struct kan_readable_data_value_node_t
 {
-    struct kan_readable_data_identifier_node_t *next;
-    const char *identifier;
-};
-
-/// \brief Value node for describing values for string setters.
-struct kan_readable_data_string_node_t
-{
-    struct kan_readable_data_string_node_t *next;
-    const char *string;
-};
-
-/// \brief Value node for describing values for integer setters.
-struct kan_readable_data_integer_node_t
-{
-    struct kan_readable_data_integer_node_t *next;
-    int64_t integer;
-};
-
-/// \brief Value node for describing values for floating point number setters.
-struct kan_readable_data_floating_node_t
-{
-    struct kan_readable_data_floating_node_t *next;
-    double floating;
+    struct kan_readable_data_value_node_t *next;
+    union
+    {
+        const char *identifier;
+        const char *string;
+        int64_t integer;
+        double floating;
+    };
 };
 
 /// \brief Describes event for readable data format parsers and emitters.
@@ -201,13 +186,11 @@ struct kan_readable_data_event_t
     /// \brief Output target is left uninitialized for KAN_READABLE_DATA_EVENT_BLOCK_END.
     struct kan_readable_data_output_target_t output_target;
 
-    union
-    {
-        struct kan_readable_data_identifier_node_t *setter_value_first_identifier;
-        struct kan_readable_data_string_node_t *setter_value_first_string;
-        struct kan_readable_data_integer_node_t *setter_value_first_integer;
-        struct kan_readable_data_floating_node_t *setter_value_first_floating;
-    };
+    /// \brief Node with first setter value.
+    /// \details Guaranteed to be not NULL for KAN_READABLE_DATA_EVENT_ELEMENTAL_IDENTIFIER_SETTER,
+    ///          KAN_READABLE_DATA_EVENT_ELEMENTAL_STRING_SETTER, KAN_READABLE_DATA_EVENT_ELEMENTAL_INTEGER_SETTER and
+    ///          KAN_READABLE_DATA_EVENT_ELEMENTAL_FLOATING_SETTER. Uninitialized for other types.
+    struct kan_readable_data_value_node_t *setter_value_first;
 };
 
 /// \brief Describes readable data format parser responses.

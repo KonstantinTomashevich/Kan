@@ -73,9 +73,9 @@ static void parse_file_and_check (const struct kan_readable_data_event_t *events
                     strcmp (expected_event->output_target.identifier, parsed_event->output_target.identifier) == 0)
                 KAN_TEST_CHECK (expected_event->output_target.array_index == parsed_event->output_target.array_index)
 
-                struct kan_readable_data_identifier_node_t *expected_node =
-                    expected_event->setter_value_first_identifier;
-                struct kan_readable_data_identifier_node_t *parsed_node = parsed_event->setter_value_first_identifier;
+                struct kan_readable_data_value_node_t *expected_node =
+                    expected_event->setter_value_first;
+                struct kan_readable_data_value_node_t *parsed_node = parsed_event->setter_value_first;
 
                 while (expected_node && parsed_node)
                 {
@@ -95,8 +95,8 @@ static void parse_file_and_check (const struct kan_readable_data_event_t *events
                     strcmp (expected_event->output_target.identifier, parsed_event->output_target.identifier) == 0)
                 KAN_TEST_CHECK (expected_event->output_target.array_index == parsed_event->output_target.array_index)
 
-                struct kan_readable_data_string_node_t *expected_node = expected_event->setter_value_first_string;
-                struct kan_readable_data_string_node_t *parsed_node = parsed_event->setter_value_first_string;
+                struct kan_readable_data_value_node_t *expected_node = expected_event->setter_value_first;
+                struct kan_readable_data_value_node_t *parsed_node = parsed_event->setter_value_first;
 
                 while (expected_node && parsed_node)
                 {
@@ -116,8 +116,8 @@ static void parse_file_and_check (const struct kan_readable_data_event_t *events
                     strcmp (expected_event->output_target.identifier, parsed_event->output_target.identifier) == 0)
                 KAN_TEST_CHECK (expected_event->output_target.array_index == parsed_event->output_target.array_index)
 
-                struct kan_readable_data_integer_node_t *expected_node = expected_event->setter_value_first_integer;
-                struct kan_readable_data_integer_node_t *parsed_node = parsed_event->setter_value_first_integer;
+                struct kan_readable_data_value_node_t *expected_node = expected_event->setter_value_first;
+                struct kan_readable_data_value_node_t *parsed_node = parsed_event->setter_value_first;
 
                 while (expected_node && parsed_node)
                 {
@@ -137,8 +137,8 @@ static void parse_file_and_check (const struct kan_readable_data_event_t *events
                     strcmp (expected_event->output_target.identifier, parsed_event->output_target.identifier) == 0)
                 KAN_TEST_CHECK (expected_event->output_target.array_index == parsed_event->output_target.array_index)
 
-                struct kan_readable_data_floating_node_t *expected_node = expected_event->setter_value_first_floating;
-                struct kan_readable_data_floating_node_t *parsed_node = parsed_event->setter_value_first_floating;
+                struct kan_readable_data_value_node_t *expected_node = expected_event->setter_value_first;
+                struct kan_readable_data_value_node_t *parsed_node = parsed_event->setter_value_first;
 
                 while (expected_node && parsed_node)
                 {
@@ -183,7 +183,7 @@ KAN_TEST_CASE (emit_and_parse_all_elemental_setters)
 #define TEST_EVENTS_COUNT 6u
     struct kan_readable_data_event_t events_to_emit[TEST_EVENTS_COUNT];
 
-    struct kan_readable_data_identifier_node_t movement_config_identifier_node = {
+    struct kan_readable_data_value_node_t movement_config_identifier_node = {
         .next = NULL,
         .identifier = "mc_warrior",
     };
@@ -195,20 +195,20 @@ KAN_TEST_CASE (emit_and_parse_all_elemental_setters)
                 .identifier = "movement_config",
                 .array_index = KAN_READABLE_DATA_ARRAY_INDEX_NONE,
             },
-        .setter_value_first_identifier = &movement_config_identifier_node,
+        .setter_value_first = &movement_config_identifier_node,
     };
 
-    struct kan_readable_data_identifier_node_t some_enum_flags_third_node = {
+    struct kan_readable_data_value_node_t some_enum_flags_third_node = {
         .next = NULL,
         .identifier = "BITFLAG_THIRD",
     };
 
-    struct kan_readable_data_identifier_node_t some_enum_flags_second_node = {
+    struct kan_readable_data_value_node_t some_enum_flags_second_node = {
         .next = &some_enum_flags_third_node,
         .identifier = "BITFLAG_SECOND",
     };
 
-    struct kan_readable_data_identifier_node_t some_enum_flags_first_node = {
+    struct kan_readable_data_value_node_t some_enum_flags_first_node = {
         .next = &some_enum_flags_second_node,
         .identifier = "BITFLAG_FIRST",
     };
@@ -220,10 +220,10 @@ KAN_TEST_CASE (emit_and_parse_all_elemental_setters)
                 .identifier = "some_enum_flags",
                 .array_index = KAN_READABLE_DATA_ARRAY_INDEX_NONE,
             },
-        .setter_value_first_identifier = &some_enum_flags_first_node,
+        .setter_value_first = &some_enum_flags_first_node,
     };
 
-    struct kan_readable_data_string_node_t phrases_0_node = {
+    struct kan_readable_data_value_node_t phrases_0_node = {
         .next = NULL,
         .string = "Hello world!",
     };
@@ -235,10 +235,10 @@ KAN_TEST_CASE (emit_and_parse_all_elemental_setters)
                 .identifier = "phrases",
                 .array_index = 0u,
             },
-        .setter_value_first_string = &phrases_0_node,
+        .setter_value_first = &phrases_0_node,
     };
 
-    struct kan_readable_data_string_node_t phrases_1_node = {
+    struct kan_readable_data_value_node_t phrases_1_node = {
         .next = NULL,
         .string = "Hello readable data!",
     };
@@ -250,10 +250,10 @@ KAN_TEST_CASE (emit_and_parse_all_elemental_setters)
                 .identifier = "phrases",
                 .array_index = 1u,
             },
-        .setter_value_first_string = &phrases_1_node,
+        .setter_value_first = &phrases_1_node,
     };
 
-    struct kan_readable_data_integer_node_t health_max_node = {
+    struct kan_readable_data_value_node_t health_max_node = {
         .next = NULL,
         .integer = 100,
     };
@@ -265,15 +265,15 @@ KAN_TEST_CASE (emit_and_parse_all_elemental_setters)
                 .identifier = "health_max",
                 .array_index = KAN_READABLE_DATA_ARRAY_INDEX_NONE,
             },
-        .setter_value_first_integer = &health_max_node,
+        .setter_value_first = &health_max_node,
     };
 
-    struct kan_readable_data_floating_node_t position_y_node = {
+    struct kan_readable_data_value_node_t position_y_node = {
         .next = NULL,
         .floating = 5.5,
     };
 
-    struct kan_readable_data_floating_node_t position_x_node = {
+    struct kan_readable_data_value_node_t position_x_node = {
         .next = &position_y_node,
         .floating = -1.34,
     };
@@ -285,7 +285,7 @@ KAN_TEST_CASE (emit_and_parse_all_elemental_setters)
                 .identifier = "transform.position",
                 .array_index = KAN_READABLE_DATA_ARRAY_INDEX_NONE,
             },
-        .setter_value_first_floating = &position_x_node,
+        .setter_value_first = &position_x_node,
     };
 
     emit_to_file (events_to_emit, TEST_EVENTS_COUNT);
@@ -316,7 +316,7 @@ KAN_TEST_CASE (emit_and_parse_complex_setters)
             },
     };
 
-    struct kan_readable_data_floating_node_t max_velocity_node = {
+    struct kan_readable_data_value_node_t max_velocity_node = {
         .next = NULL,
         .floating = 10.0,
     };
@@ -328,10 +328,10 @@ KAN_TEST_CASE (emit_and_parse_complex_setters)
                 .identifier = "max_velocity",
                 .array_index = KAN_READABLE_DATA_ARRAY_INDEX_NONE,
             },
-        .setter_value_first_floating = &max_velocity_node,
+        .setter_value_first = &max_velocity_node,
     };
 
-    struct kan_readable_data_floating_node_t max_acceleration_node = {
+    struct kan_readable_data_value_node_t max_acceleration_node = {
         .next = NULL,
         .floating = 20.0,
     };
@@ -343,14 +343,14 @@ KAN_TEST_CASE (emit_and_parse_complex_setters)
                 .identifier = "max_acceleration",
                 .array_index = KAN_READABLE_DATA_ARRAY_INDEX_NONE,
             },
-        .setter_value_first_floating = &max_acceleration_node,
+        .setter_value_first = &max_acceleration_node,
     };
 
     events_to_emit[4u] = (struct kan_readable_data_event_t) {
         .type = KAN_READABLE_DATA_EVENT_BLOCK_END,
     };
 
-    struct kan_readable_data_identifier_node_t animation_graph_identifier_node = {
+    struct kan_readable_data_value_node_t animation_graph_identifier_node = {
         .next = NULL,
         .identifier = "mc_warrior",
     };
@@ -362,7 +362,7 @@ KAN_TEST_CASE (emit_and_parse_complex_setters)
                 .identifier = "animation_graph",
                 .array_index = KAN_READABLE_DATA_ARRAY_INDEX_NONE,
             },
-        .setter_value_first_identifier = &animation_graph_identifier_node,
+        .setter_value_first = &animation_graph_identifier_node,
     };
 
     events_to_emit[6u] = (struct kan_readable_data_event_t) {
@@ -378,7 +378,7 @@ KAN_TEST_CASE (emit_and_parse_complex_setters)
             },
     };
 
-    struct kan_readable_data_identifier_node_t weapon_0_node = {
+    struct kan_readable_data_value_node_t weapon_0_node = {
         .next = NULL,
         .identifier = "w_sword",
     };
@@ -390,7 +390,7 @@ KAN_TEST_CASE (emit_and_parse_complex_setters)
                 .identifier = "id",
                 .array_index = KAN_READABLE_DATA_ARRAY_INDEX_NONE,
             },
-        .setter_value_first_identifier = &weapon_0_node,
+        .setter_value_first = &weapon_0_node,
     };
 
     events_to_emit[9u] = (struct kan_readable_data_event_t) {
@@ -406,7 +406,7 @@ KAN_TEST_CASE (emit_and_parse_complex_setters)
             },
     };
 
-    struct kan_readable_data_identifier_node_t weapon_1_node = {
+    struct kan_readable_data_value_node_t weapon_1_node = {
         .next = NULL,
         .identifier = "w_bow",
     };
@@ -418,7 +418,7 @@ KAN_TEST_CASE (emit_and_parse_complex_setters)
                 .identifier = "id",
                 .array_index = KAN_READABLE_DATA_ARRAY_INDEX_NONE,
             },
-        .setter_value_first_identifier = &weapon_1_node,
+        .setter_value_first = &weapon_1_node,
     };
 
     events_to_emit[12u] = (struct kan_readable_data_event_t) {
@@ -435,7 +435,7 @@ KAN_TEST_CASE (human_input_corner_cases)
 #define TEST_EVENTS_COUNT 6u
     struct kan_readable_data_event_t events_to_emit[TEST_EVENTS_COUNT];
 
-    struct kan_readable_data_identifier_node_t movement_config_identifier_node = {
+    struct kan_readable_data_value_node_t movement_config_identifier_node = {
         .next = NULL,
         .identifier = "mc_warrior",
     };
@@ -447,20 +447,20 @@ KAN_TEST_CASE (human_input_corner_cases)
                 .identifier = "movement_config",
                 .array_index = KAN_READABLE_DATA_ARRAY_INDEX_NONE,
             },
-        .setter_value_first_identifier = &movement_config_identifier_node,
+        .setter_value_first = &movement_config_identifier_node,
     };
 
-    struct kan_readable_data_identifier_node_t some_enum_flags_third_node = {
+    struct kan_readable_data_value_node_t some_enum_flags_third_node = {
         .next = NULL,
         .identifier = "BITFLAG_THIRD",
     };
 
-    struct kan_readable_data_identifier_node_t some_enum_flags_second_node = {
+    struct kan_readable_data_value_node_t some_enum_flags_second_node = {
         .next = &some_enum_flags_third_node,
         .identifier = "BITFLAG_SECOND",
     };
 
-    struct kan_readable_data_identifier_node_t some_enum_flags_first_node = {
+    struct kan_readable_data_value_node_t some_enum_flags_first_node = {
         .next = &some_enum_flags_second_node,
         .identifier = "BITFLAG_FIRST",
     };
@@ -472,10 +472,10 @@ KAN_TEST_CASE (human_input_corner_cases)
                 .identifier = "some_enum_flags",
                 .array_index = KAN_READABLE_DATA_ARRAY_INDEX_NONE,
             },
-        .setter_value_first_identifier = &some_enum_flags_first_node,
+        .setter_value_first = &some_enum_flags_first_node,
     };
 
-    struct kan_readable_data_string_node_t phrases_0_node = {
+    struct kan_readable_data_value_node_t phrases_0_node = {
         .next = NULL,
         .string = "Hello world!",
     };
@@ -487,10 +487,10 @@ KAN_TEST_CASE (human_input_corner_cases)
                 .identifier = "phrases",
                 .array_index = 0u,
             },
-        .setter_value_first_string = &phrases_0_node,
+        .setter_value_first = &phrases_0_node,
     };
 
-    struct kan_readable_data_string_node_t phrases_1_node = {
+    struct kan_readable_data_value_node_t phrases_1_node = {
         .next = NULL,
         .string = "Hello readable data!",
     };
@@ -502,10 +502,10 @@ KAN_TEST_CASE (human_input_corner_cases)
                 .identifier = "phrases",
                 .array_index = 1u,
             },
-        .setter_value_first_string = &phrases_1_node,
+        .setter_value_first = &phrases_1_node,
     };
 
-    struct kan_readable_data_integer_node_t health_max_node = {
+    struct kan_readable_data_value_node_t health_max_node = {
         .next = NULL,
         .integer = 100,
     };
@@ -517,15 +517,15 @@ KAN_TEST_CASE (human_input_corner_cases)
                 .identifier = "health_max",
                 .array_index = KAN_READABLE_DATA_ARRAY_INDEX_NONE,
             },
-        .setter_value_first_integer = &health_max_node,
+        .setter_value_first = &health_max_node,
     };
 
-    struct kan_readable_data_floating_node_t position_y_node = {
+    struct kan_readable_data_value_node_t position_y_node = {
         .next = NULL,
         .floating = 5.5,
     };
 
-    struct kan_readable_data_floating_node_t position_x_node = {
+    struct kan_readable_data_value_node_t position_x_node = {
         .next = &position_y_node,
         .floating = -1.34,
     };
@@ -537,7 +537,7 @@ KAN_TEST_CASE (human_input_corner_cases)
                 .identifier = "transform.position",
                 .array_index = KAN_READABLE_DATA_ARRAY_INDEX_NONE,
             },
-        .setter_value_first_floating = &position_x_node,
+        .setter_value_first = &position_x_node,
     };
 
     save_text_to_file (

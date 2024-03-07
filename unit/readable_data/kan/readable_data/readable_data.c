@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include <kan/api_common/mute_third_party_warnings.h>
 #include <kan/container/list.h>
 #include <kan/container/stack_group_allocator.h>
 #include <kan/error/critical.h>
@@ -12,6 +13,11 @@
 #include <kan/threading/atomic.h>
 
 KAN_LOG_DEFINE_CATEGORY (readable_data);
+
+struct re2c_tags_t
+{
+    /*!stags:re2c format = 'const char *@@;';*/
+};
 
 struct parser_t
 {
@@ -35,6 +41,7 @@ struct parser_t
     size_t saved_symbol;
 
     size_t opened_blocks;
+    struct re2c_tags_t tags;
 
     char input_buffer[KAN_READABLE_DATA_PARSE_INPUT_BUFFER_SIZE];
 };
@@ -95,6 +102,19 @@ static int re2c_refill_buffer (struct parser_t *parser)
     parser->marker -= shift;
     parser->token -= shift;
 
+    const char **first_tag = (const char **) &parser->tags;
+    const char **last_tag = first_tag + sizeof (struct re2c_tags_t) / sizeof (char *);
+
+    while (first_tag != last_tag)
+    {
+        if (*first_tag)
+        {
+            *first_tag -= shift;
+        }
+
+        ++first_tag;
+    }
+
     // Fill free space at the end of buffer with new data from file.
     parser->limit += parser->stream->operations->read (
         parser->stream, KAN_READABLE_DATA_PARSE_INPUT_BUFFER_SIZE - used - 1u, parser->limit);
@@ -148,8 +168,6 @@ static inline void re2c_restore_saved_cursor (struct parser_t *parser)
     parser->cursor_symbol = parser->saved_symbol;
 }
 
-/*!stags:re2c format = 'const char *@@ = NULL;';*/
-
 /*!re2c
  re2c:api = custom;
  re2c:api:style = free-form;
@@ -165,6 +183,7 @@ static inline void re2c_restore_saved_cursor (struct parser_t *parser)
  re2c:define:YYSHIFTSTAG  = "@@{tag} += @@{shift};";
  re2c:eof = 0;
  re2c:tags = 1;
+ re2c:tags:expression = "parser->tags.@@";
 
  separator = [\x20\x0c\x0a\x0d\x09\x0b];
  identifier = [A-Za-z_][A-Za-z0-9_]*;
@@ -462,110 +481,59 @@ static enum kan_readable_data_parser_response_t re2c_parse_next_event (struct pa
     }
 }
 
+static inline void re2c_add_value_node (struct parser_t *parser, struct kan_readable_data_value_node_t *new_node)
+{
+    new_node->next = NULL;
+    if (parser->current_event.setter_value_first == NULL)
+    {
+        parser->current_event.setter_value_first = new_node;
+    }
+    else
+    {
+        // Not very efficient, but okay, because we're dealing with very small arrays almost always.
+        struct kan_readable_data_value_node_t *last_node = parser->current_event.setter_value_first;
+
+        while (last_node->next != NULL)
+        {
+            last_node = last_node->next;
+        }
+
+        last_node->next = new_node;
+    }
+}
+
 static inline void re2c_add_identifier_node (struct parser_t *parser,
                                              const char *literal_begin,
                                              const char *literal_end)
 {
-    struct kan_readable_data_identifier_node_t *new_node = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (
-        &parser->temporary_allocator, struct kan_readable_data_identifier_node_t);
-
-    new_node->next = NULL;
+    struct kan_readable_data_value_node_t *new_node =
+        KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&parser->temporary_allocator, struct kan_readable_data_value_node_t);
     new_node->identifier = re2c_internalize_identifier (parser, literal_begin, literal_end);
-
-    if (parser->current_event.setter_value_first_identifier == NULL)
-    {
-        parser->current_event.setter_value_first_identifier = new_node;
-    }
-    else
-    {
-        // Not very efficient, but okay, because we're dealing with very small arrays almost always.
-        struct kan_readable_data_identifier_node_t *last_node = parser->current_event.setter_value_first_identifier;
-
-        while (last_node->next != NULL)
-        {
-            last_node = last_node->next;
-        }
-
-        last_node->next = new_node;
-    }
+    re2c_add_value_node (parser, new_node);
 }
 
 static inline void re2c_add_string_node (struct parser_t *parser, const char *literal_begin, const char *literal_end)
 {
-    struct kan_readable_data_string_node_t *new_node =
-        KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&parser->temporary_allocator, struct kan_readable_data_string_node_t);
-
-    new_node->next = NULL;
+    struct kan_readable_data_value_node_t *new_node =
+        KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&parser->temporary_allocator, struct kan_readable_data_value_node_t);
     new_node->string = re2c_internalize_string_literal (parser, literal_begin, literal_end);
-
-    if (parser->current_event.setter_value_first_string == NULL)
-    {
-        parser->current_event.setter_value_first_string = new_node;
-    }
-    else
-    {
-        // Not very efficient, but okay, because we're dealing with very small arrays almost always.
-        struct kan_readable_data_string_node_t *last_node = parser->current_event.setter_value_first_string;
-
-        while (last_node->next != NULL)
-        {
-            last_node = last_node->next;
-        }
-
-        last_node->next = new_node;
-    }
+    re2c_add_value_node (parser, new_node);
 }
 
 static inline void re2c_add_integer_node (struct parser_t *parser, const char *literal_begin, const char *literal_end)
 {
-    struct kan_readable_data_integer_node_t *new_node = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (
-        &parser->temporary_allocator, struct kan_readable_data_integer_node_t);
-
-    new_node->next = NULL;
+    struct kan_readable_data_value_node_t *new_node =
+        KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&parser->temporary_allocator, struct kan_readable_data_value_node_t);
     new_node->integer = re2c_parse_integer (literal_begin, literal_end);
-
-    if (parser->current_event.setter_value_first_integer == NULL)
-    {
-        parser->current_event.setter_value_first_integer = new_node;
-    }
-    else
-    {
-        // Not very efficient, but okay, because we're dealing with very small arrays almost always.
-        struct kan_readable_data_integer_node_t *last_node = parser->current_event.setter_value_first_integer;
-
-        while (last_node->next != NULL)
-        {
-            last_node = last_node->next;
-        }
-
-        last_node->next = new_node;
-    }
+    re2c_add_value_node (parser, new_node);
 }
 
 static inline void re2c_add_floating_node (struct parser_t *parser, const char *literal_begin, const char *literal_end)
 {
-    struct kan_readable_data_floating_node_t *new_node = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (
-        &parser->temporary_allocator, struct kan_readable_data_floating_node_t);
-
-    new_node->next = NULL;
+    struct kan_readable_data_value_node_t *new_node =
+        KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&parser->temporary_allocator, struct kan_readable_data_value_node_t);
     new_node->floating = re2c_parse_floating (literal_begin, literal_end);
-
-    if (parser->current_event.setter_value_first_floating == NULL)
-    {
-        parser->current_event.setter_value_first_floating = new_node;
-    }
-    else
-    {
-        // Not very efficient, but okay, because we're dealing with very small arrays almost always.
-        struct kan_readable_data_floating_node_t *last_node = parser->current_event.setter_value_first_floating;
-
-        while (last_node->next != NULL)
-        {
-            last_node = last_node->next;
-        }
-
-        last_node->next = new_node;
-    }
+    re2c_add_value_node (parser, new_node);
 }
 
 static enum kan_readable_data_parser_response_t re2c_parse_first_value (struct parser_t *parser)
@@ -580,7 +548,7 @@ static enum kan_readable_data_parser_response_t re2c_parse_first_value (struct p
          @literal_begin identifier @literal_end
          {
              parser->current_event.type = KAN_READABLE_DATA_EVENT_ELEMENTAL_IDENTIFIER_SETTER;
-             parser->current_event.setter_value_first_identifier = NULL;
+             parser->current_event.setter_value_first = NULL;
              re2c_add_identifier_node (parser, literal_begin, literal_end);
              return re2c_parse_next_identifier_value (parser);
          }
@@ -588,7 +556,7 @@ static enum kan_readable_data_parser_response_t re2c_parse_first_value (struct p
          @literal_begin string_literal @literal_end
          {
              parser->current_event.type = KAN_READABLE_DATA_EVENT_ELEMENTAL_STRING_SETTER;
-             parser->current_event.setter_value_first_string = NULL;
+             parser->current_event.setter_value_first = NULL;
              re2c_add_string_node (parser, literal_begin, literal_end);
              return re2c_parse_next_string_value (parser);
          }
@@ -596,7 +564,7 @@ static enum kan_readable_data_parser_response_t re2c_parse_first_value (struct p
          @literal_begin integer_literal @literal_end
          {
              parser->current_event.type = KAN_READABLE_DATA_EVENT_ELEMENTAL_INTEGER_SETTER;
-             parser->current_event.setter_value_first_integer = NULL;
+             parser->current_event.setter_value_first = NULL;
              re2c_add_integer_node (parser, literal_begin, literal_end);
              return re2c_parse_next_integer_value (parser);
          }
@@ -604,7 +572,7 @@ static enum kan_readable_data_parser_response_t re2c_parse_first_value (struct p
          @literal_begin floating_literal @literal_end
          {
              parser->current_event.type = KAN_READABLE_DATA_EVENT_ELEMENTAL_FLOATING_SETTER;
-             parser->current_event.setter_value_first_floating = NULL;
+             parser->current_event.setter_value_first = NULL;
              re2c_add_floating_node (parser, literal_begin, literal_end);
              return re2c_parse_next_floating_value (parser);
          }
@@ -948,7 +916,7 @@ kan_bool_t kan_readable_data_emitter_step (kan_readable_data_emitter_t emitter,
     {
     case KAN_READABLE_DATA_EVENT_ELEMENTAL_IDENTIFIER_SETTER:
     {
-        if (!emit_event->setter_value_first_identifier)
+        if (!emit_event->setter_value_first)
         {
             return KAN_FALSE;
         }
@@ -968,10 +936,10 @@ kan_bool_t kan_readable_data_emitter_step (kan_readable_data_emitter_t emitter,
             return KAN_FALSE;
         }
 
-        struct kan_readable_data_identifier_node_t *node = emit_event->setter_value_first_identifier;
+        struct kan_readable_data_value_node_t *node = emit_event->setter_value_first;
         while (node)
         {
-            if (node != emit_event->setter_value_first_identifier)
+            if (node != emit_event->setter_value_first)
             {
                 if (data->stream->operations->write (data->stream, 2u, ", ") != 2u)
                 {
@@ -992,7 +960,7 @@ kan_bool_t kan_readable_data_emitter_step (kan_readable_data_emitter_t emitter,
 
     case KAN_READABLE_DATA_EVENT_ELEMENTAL_STRING_SETTER:
     {
-        if (!emit_event->setter_value_first_string)
+        if (!emit_event->setter_value_first)
         {
             return KAN_FALSE;
         }
@@ -1012,10 +980,10 @@ kan_bool_t kan_readable_data_emitter_step (kan_readable_data_emitter_t emitter,
             return KAN_FALSE;
         }
 
-        struct kan_readable_data_string_node_t *node = emit_event->setter_value_first_string;
+        struct kan_readable_data_value_node_t *node = emit_event->setter_value_first;
         while (node)
         {
-            if (node != emit_event->setter_value_first_string)
+            if (node != emit_event->setter_value_first)
             {
                 if (data->stream->operations->write (data->stream, 2u, ", ") != 2u)
                 {
@@ -1036,7 +1004,7 @@ kan_bool_t kan_readable_data_emitter_step (kan_readable_data_emitter_t emitter,
 
     case KAN_READABLE_DATA_EVENT_ELEMENTAL_INTEGER_SETTER:
     {
-        if (!emit_event->setter_value_first_integer)
+        if (!emit_event->setter_value_first)
         {
             return KAN_FALSE;
         }
@@ -1056,10 +1024,10 @@ kan_bool_t kan_readable_data_emitter_step (kan_readable_data_emitter_t emitter,
             return KAN_FALSE;
         }
 
-        struct kan_readable_data_integer_node_t *node = emit_event->setter_value_first_integer;
+        struct kan_readable_data_value_node_t *node = emit_event->setter_value_first;
         while (node)
         {
-            if (node != emit_event->setter_value_first_integer)
+            if (node != emit_event->setter_value_first)
             {
                 if (data->stream->operations->write (data->stream, 2u, ", ") != 2u)
                 {
@@ -1080,7 +1048,7 @@ kan_bool_t kan_readable_data_emitter_step (kan_readable_data_emitter_t emitter,
 
     case KAN_READABLE_DATA_EVENT_ELEMENTAL_FLOATING_SETTER:
     {
-        if (!emit_event->setter_value_first_floating)
+        if (!emit_event->setter_value_first)
         {
             return KAN_FALSE;
         }
@@ -1100,10 +1068,10 @@ kan_bool_t kan_readable_data_emitter_step (kan_readable_data_emitter_t emitter,
             return KAN_FALSE;
         }
 
-        struct kan_readable_data_floating_node_t *node = emit_event->setter_value_first_floating;
+        struct kan_readable_data_value_node_t *node = emit_event->setter_value_first;
         while (node)
         {
-            if (node != emit_event->setter_value_first_floating)
+            if (node != emit_event->setter_value_first)
             {
                 if (data->stream->operations->write (data->stream, 2u, ", ") != 2u)
                 {
