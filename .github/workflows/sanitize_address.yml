@@ -42,7 +42,7 @@ jobs:
 
       - name: Build
         working-directory: ${{env.BUILD_DIRECTORY}}
-        run: cmake --build . --target test_kan --config Debug -j 2
+        run: cmake --build . --target test_kan --config Debug -j 4
 
       - name: Test
         working-directory: ${{env.BUILD_DIRECTORY}}
