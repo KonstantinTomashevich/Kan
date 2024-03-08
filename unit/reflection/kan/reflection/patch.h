@@ -47,6 +47,8 @@ typedef uint64_t kan_reflection_patch_t;
 
 #define KAN_INVALID_REFLECTION_PATCH 0u
 
+#define KAN_INVALID_REFLECTION_PATCH_BUILDER 0u
+
 /// \brief Contains information about single patch chunk.
 struct kan_reflection_patch_chunk_info_t
 {
@@ -77,6 +79,9 @@ REFLECTION_API void kan_reflection_patch_builder_destroy (kan_reflection_patch_b
 
 /// \brief Gets type of structure for given patch.
 REFLECTION_API const struct kan_reflection_struct_t *kan_reflection_patch_get_type (kan_reflection_patch_t patch);
+
+/// \brief Gets count of chunks inside given patch.
+REFLECTION_API uint64_t kan_reflection_patch_get_chunks_count (kan_reflection_patch_t patch);
 
 /// \brief Applies given patch to given memory block.
 REFLECTION_API void kan_reflection_patch_apply (kan_reflection_patch_t patch, void *target);

@@ -1,0 +1,5 @@
+register_concrete (stream_kan)
+concrete_include (PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+concrete_sources ("*.c")
+concrete_require (SCOPE PRIVATE ABSTRACT error memory)
+concrete_implements_abstract (stream)

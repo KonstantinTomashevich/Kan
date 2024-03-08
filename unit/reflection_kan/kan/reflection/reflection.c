@@ -1827,6 +1827,12 @@ const struct kan_reflection_struct_t *kan_reflection_patch_get_type (kan_reflect
     return patch_data->type;
 }
 
+uint64_t kan_reflection_patch_get_chunks_count (kan_reflection_patch_t patch)
+{
+    struct compiled_patch_t *patch_data = (struct compiled_patch_t *) patch;
+    return patch_data->node_count;
+}
+
 void kan_reflection_patch_apply (kan_reflection_patch_t patch, void *target)
 {
     struct compiled_patch_t *patch_data = (struct compiled_patch_t *) patch;

@@ -70,7 +70,7 @@ jobs:
 
       - name: Build
         working-directory: ${{env.BUILD_DIRECTORY}}
-        run: cmake --build . --target test_kan --config ${{matrix.build_type}} -j 2
+        run: cmake --build . --target test_kan --config ${{matrix.build_type}} -j 4
 
       - name: Test
         working-directory: ${{env.BUILD_DIRECTORY}}
