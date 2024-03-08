@@ -65,7 +65,7 @@ SERIALIZATION_API void kan_serialization_rd_reader_destroy (kan_serialization_rd
 typedef uint64_t kan_serialization_rd_writer_t;
 
 /// \brief Creates new instance of writer in order to write given instance into given stream.
-/// \param stream Stream that server as output for writer.
+/// \param stream Stream that serves as output for writer.
 /// \param instance Instance of structure to be written.
 /// \param type_name Type name of the structure.
 /// \param reflection_registry Registry with reflection data for writing.

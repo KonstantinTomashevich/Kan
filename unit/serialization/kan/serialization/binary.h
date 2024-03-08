@@ -14,9 +14,9 @@
 ///
 /// \par Script storage
 /// \parblock
-/// Binary serialization internal script system to make serialization and deserialization faster. Instead of directly
-/// using reflection in reader and writer, binary serialization generates internal scripts that are then used by
-/// readers and writers. Scripts merge fields into blocks whenever possible, including recursively merging fields
+/// Binary serialization uses internal script system to make serialization and deserialization faster. Instead of
+/// directly using reflection in reader and writer, binary serialization generates internal scripts that are then used
+/// by readers and writers. Scripts merge fields into blocks whenever possible, including recursively merging fields
 /// from different substructures if possible. It greatly reduces count of IO operations and optimizes serialization
 /// speed, but has a side effect of serializing and deserializing padding bytes.
 /// \endparblock
@@ -30,7 +30,7 @@
 ///
 /// To combat this duplication we use interned string registry: special registry for interned strings that are used
 /// in serialization. If interned string registry is used, interned strings are serialized as 32-bit integers which
-/// greatly reduces their impact of serialized data size. Interned string registry is automatically populated during
+/// greatly reduces their impact on serialized data size. Interned string registry is automatically populated during
 /// serialization and can be then saved afterwards. To deserialize data, interned string registry must be deserialized
 /// first and passed to appropriate readers.
 /// \endparblock
@@ -56,7 +56,7 @@
 /// \par Type headers
 /// \parblock
 /// In some cases data type is unknown, therefore type header in the beginning of the stream is needed to read type
-/// name.  For reading and writing type headers use `kan_serialization_binary_read_type_header` and
+/// name. For reading and writing type headers use `kan_serialization_binary_read_type_header` and
 /// `kan_serialization_binary_write_type_header`. Type headers are allowed to use interned string registries like
 /// other serialization logic.
 /// \endparblock
