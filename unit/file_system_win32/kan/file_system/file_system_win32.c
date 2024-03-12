@@ -1,8 +1,8 @@
 #include <kan/api_common/mute_third_party_warnings.h>
 
 KAN_MUTE_THIRD_PARTY_WARNINGS_BEGIN
-#include <time.h>
 #include <Windows.h>
+#include <time.h>
 KAN_MUTE_THIRD_PARTY_WARNINGS_END
 
 #include <kan/error/critical.h>
