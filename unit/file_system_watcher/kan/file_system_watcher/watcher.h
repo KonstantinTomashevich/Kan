@@ -1,6 +1,6 @@
 #pragma once
 
-#include <file_system_api.h>
+#include <file_system_watcher_api.h>
 
 #include <kan/api_common/bool.h>
 #include <kan/api_common/c_header.h>
@@ -30,7 +30,7 @@ typedef uint64_t kan_file_system_watcher_iterator_t;
 enum kan_file_system_watcher_event_type_t
 {
     /// \brief File or directory added to tree.
-    KAN_FILE_SYSTEM_EVENT_TYPE_ADDED,
+    KAN_FILE_SYSTEM_EVENT_TYPE_ADDED = 0u,
 
     /// \brief File last modification date changed.
     KAN_FILE_SYSTEM_EVENT_TYPE_MODIFIED,
@@ -48,25 +48,25 @@ struct kan_file_system_watcher_event_t
 };
 
 /// \brief Creates file system watcher instance for directory at given path.
-FILE_SYSTEM_API kan_file_system_watcher_t kan_file_system_watcher_create (const char *directory_path);
+FILE_SYSTEM_WATCHER_API kan_file_system_watcher_t kan_file_system_watcher_create (const char *directory_path);
 
 /// \brief Destroys given file system watcher instance.
-FILE_SYSTEM_API void kan_file_system_watcher_destroy (kan_file_system_watcher_t watcher);
+FILE_SYSTEM_WATCHER_API void kan_file_system_watcher_destroy (kan_file_system_watcher_t watcher);
 
 /// \brief Creates iterator for observing file system events from given watcher.
-FILE_SYSTEM_API kan_file_system_watcher_iterator_t
+FILE_SYSTEM_WATCHER_API kan_file_system_watcher_iterator_t
 kan_file_system_watcher_iterator_create (kan_file_system_watcher_t watcher);
 
 /// \brief Extracts current event or NULL using given iterator for given watcher.
-FILE_SYSTEM_API const struct kan_file_system_watcher_event_t *kan_file_system_watcher_iterator_get (
+FILE_SYSTEM_WATCHER_API const struct kan_file_system_watcher_event_t *kan_file_system_watcher_iterator_get (
     kan_file_system_watcher_t watcher, kan_file_system_watcher_iterator_t iterator);
 
 /// \brief Advances given iterator for given watcher and returns new iterator.
-FILE_SYSTEM_API kan_file_system_watcher_iterator_t kan_file_system_watcher_iterator_advance (
+FILE_SYSTEM_WATCHER_API kan_file_system_watcher_iterator_t kan_file_system_watcher_iterator_advance (
     kan_file_system_watcher_t watcher, kan_file_system_watcher_iterator_t iterator);
 
 /// \brief Destroys given iterator for given watcher.
-FILE_SYSTEM_API void kan_file_system_watcher_iterator_destroy (kan_file_system_watcher_t watcher,
-                                                               kan_file_system_watcher_iterator_t iterator);
+FILE_SYSTEM_WATCHER_API void kan_file_system_watcher_iterator_destroy (kan_file_system_watcher_t watcher,
+                                                                       kan_file_system_watcher_iterator_t iterator);
 
 KAN_C_HEADER_END
