@@ -8,4 +8,6 @@ abstract_compile_definitions (KAN_FILE_SYSTEM_MAX_PATH_LENGTH=${KAN_FILE_SYSTEM_
 
 if (UNIX)
     abstract_register_implementation (NAME platform_default PARTS file_system_linux file_system_common)
+elseif (WIN32)
+    abstract_register_implementation (NAME platform_default PARTS file_system_win32 file_system_common)
 endif ()
