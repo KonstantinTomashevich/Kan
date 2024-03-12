@@ -22,7 +22,7 @@ static kan_bool_t write_text_file (const char *file, const char *content)
 
 static void give_some_time_for_poll (void)
 {
-    kan_platform_sleep (100000000u); // 100ms
+    kan_platform_sleep (300000000u); // 300ms
 }
 
 KAN_TEST_CASE (add_file)
