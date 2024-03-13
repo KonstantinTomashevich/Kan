@@ -57,11 +57,11 @@ FILE_SYSTEM_WATCHER_API void kan_file_system_watcher_destroy (kan_file_system_wa
 FILE_SYSTEM_WATCHER_API kan_file_system_watcher_iterator_t
 kan_file_system_watcher_iterator_create (kan_file_system_watcher_t watcher);
 
-/// \brief Extracts current event or NULL using given iterator for given watcher.
+/// \brief Extracts current event or NULL if there is no more events using given iterator for given watcher.
 FILE_SYSTEM_WATCHER_API const struct kan_file_system_watcher_event_t *kan_file_system_watcher_iterator_get (
     kan_file_system_watcher_t watcher, kan_file_system_watcher_iterator_t iterator);
 
-/// \brief Advances given iterator for given watcher and returns new iterator.
+/// \brief Advances given iterator for given watcher and returns new iterator value.
 FILE_SYSTEM_WATCHER_API kan_file_system_watcher_iterator_t kan_file_system_watcher_iterator_advance (
     kan_file_system_watcher_t watcher, kan_file_system_watcher_iterator_t iterator);
 
