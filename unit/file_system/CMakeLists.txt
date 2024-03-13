@@ -1,5 +1,13 @@
 register_abstract (file_system)
 abstract_include ("${CMAKE_CURRENT_SOURCE_DIR}")
 abstract_require (INTERFACE api_common stream)
-abstract_register_implementation (NAME stdcxx PARTS file_system_stdcxx)
 c_interface_scanner_setup (GLOB "*.h")
+
+set (KAN_FILE_SYSTEM_MAX_PATH_LENGTH "4096" CACHE STRING "Maximum absolute file path size.")
+abstract_compile_definitions (KAN_FILE_SYSTEM_MAX_PATH_LENGTH=${KAN_FILE_SYSTEM_MAX_PATH_LENGTH})
+
+if (UNIX)
+    abstract_register_implementation (NAME platform_default PARTS file_system_linux file_system_common)
+elseif (WIN32)
+    abstract_register_implementation (NAME platform_default PARTS file_system_win32 file_system_common)
+endif ()

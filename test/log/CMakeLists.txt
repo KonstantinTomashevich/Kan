@@ -2,8 +2,8 @@ register_concrete (test_log)
 concrete_sources ("*.c")
 concrete_require (SCOPE PUBLIC ABSTRACT log CONCRETE_INTERFACE testing)
 
-abstract_get_implementations (ABSTRACT log OUTPUT MEMORY_PROFILER_IMPLEMENTATIONS)
-foreach (IMPLEMENTATION ${MEMORY_PROFILER_IMPLEMENTATIONS})
+abstract_get_implementations (ABSTRACT log OUTPUT LOG_IMPLEMENTATIONS)
+foreach (IMPLEMENTATION ${LOG_IMPLEMENTATIONS})
     set (SHARED_NAME "test_log_${IMPLEMENTATION}")
     register_shared_library (${SHARED_NAME})
 
