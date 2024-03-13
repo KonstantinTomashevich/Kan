@@ -220,8 +220,8 @@ static void initial_poll_to_directory_recursive (struct watcher_t *watcher, stru
                 {
                 case KAN_FILE_SYSTEM_ENTRY_TYPE_UNKNOWN:
                     KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, file_system_watcher, KAN_LOG_WARNING,
-                             "Entry at \"%s\" has unknown type and will be ignored in snapshot.",
-                             watcher->path_container.path)
+                                         "Entry at \"%s\" has unknown type and will be ignored in snapshot.",
+                                         watcher->path_container.path)
                     break;
 
                 case KAN_FILE_SYSTEM_ENTRY_TYPE_FILE:
@@ -237,8 +237,8 @@ static void initial_poll_to_directory_recursive (struct watcher_t *watcher, stru
             else
             {
                 KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, file_system_watcher, KAN_LOG_ERROR,
-                         "Unable to query status of \"%s\", file system snapshot will be incomplete.",
-                         watcher->path_container.path)
+                                     "Unable to query status of \"%s\", file system snapshot will be incomplete.",
+                                     watcher->path_container.path)
             }
 
             kan_file_system_path_container_reset_length (&watcher->path_container, length_backup);
@@ -249,8 +249,8 @@ static void initial_poll_to_directory_recursive (struct watcher_t *watcher, stru
     else
     {
         KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, file_system_watcher, KAN_LOG_ERROR,
-                 "Unable to iterate directory \"%s\", file system snapshot will be incomplete.",
-                 watcher->path_container.path)
+                             "Unable to iterate directory \"%s\", file system snapshot will be incomplete.",
+                             watcher->path_container.path)
     }
 }
 
@@ -482,8 +482,8 @@ static void verification_poll_at_directory_recursive (struct watcher_t *watcher,
                 {
                 case KAN_FILE_SYSTEM_ENTRY_TYPE_UNKNOWN:
                     KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, file_system_watcher, KAN_LOG_WARNING,
-                             "Entry at \"%s\" has unknown type and will be ignored in snapshot.",
-                             watcher->path_container.path)
+                                         "Entry at \"%s\" has unknown type and will be ignored in snapshot.",
+                                         watcher->path_container.path)
                     break;
 
                 case KAN_FILE_SYSTEM_ENTRY_TYPE_FILE:
@@ -539,8 +539,8 @@ static void verification_poll_at_directory_recursive (struct watcher_t *watcher,
             else
             {
                 KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, file_system_watcher, KAN_LOG_ERROR,
-                         "Unable to query status of \"%s\", file system snapshot will be incomplete.",
-                         watcher->path_container.path)
+                                     "Unable to query status of \"%s\", file system snapshot will be incomplete.",
+                                     watcher->path_container.path)
             }
 
             kan_file_system_path_container_reset_length (&watcher->path_container, length_backup);
@@ -551,8 +551,8 @@ static void verification_poll_at_directory_recursive (struct watcher_t *watcher,
     else
     {
         KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, file_system_watcher, KAN_LOG_ERROR,
-                 "Unable to iterate directory \"%s\", file system snapshot will be incomplete.",
-                 watcher->path_container.path)
+                             "Unable to iterate directory \"%s\", file system snapshot will be incomplete.",
+                             watcher->path_container.path)
     }
 
     // Delete undiscovered entries.
