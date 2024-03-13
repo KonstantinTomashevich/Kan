@@ -371,7 +371,7 @@ static void send_file_removed_event (struct watcher_t *watcher, struct file_node
     kan_atomic_int_unlock (&watcher->event_queue_lock);
 }
 
-static void send_events_recursively_on_directory_removal (struct watcher_t *watcher, struct directory_node_t *directory)
+static void send_removal_events_to_directory_content (struct watcher_t *watcher, struct directory_node_t *directory)
 {
     // We assume that path container holds path to given directory.
 
@@ -380,7 +380,7 @@ static void send_events_recursively_on_directory_removal (struct watcher_t *watc
     {
         const uint64_t length_backup = watcher->path_container.length;
         kan_file_system_path_container_append (&watcher->path_container, child_directory->name);
-        send_events_recursively_on_directory_removal (watcher, child_directory);
+        send_removal_events_to_directory_content (watcher, child_directory);
         kan_file_system_path_container_reset_length (&watcher->path_container, length_backup);
         child_directory = child_directory->next_on_level_directory;
     }
@@ -391,8 +391,6 @@ static void send_events_recursively_on_directory_removal (struct watcher_t *watc
         send_file_removed_event (watcher, child_file);
         child_file = child_file->next;
     }
-
-    send_directory_removed_event (watcher, directory);
 }
 
 static inline struct directory_node_t *directory_find_child_directory_node (
@@ -569,7 +567,12 @@ static void verification_poll_at_directory_recursive (struct watcher_t *watcher,
         }
         else
         {
-            send_events_recursively_on_directory_removal (watcher, child_directory);
+            const uint64_t length_backup = watcher->path_container.length;
+            kan_file_system_path_container_append (&watcher->path_container, child_directory->name);
+            send_removal_events_to_directory_content (watcher, child_directory);
+            kan_file_system_path_container_reset_length (&watcher->path_container, length_backup);
+            send_directory_removed_event (watcher, child_directory);
+
             if (previous_child_directory)
             {
                 previous_child_directory->next_on_level_directory = next;
