@@ -162,6 +162,11 @@ KAN_TEST_CASE (add_directory)
             KAN_TEST_CHECK (event->entry_type == KAN_FILE_SYSTEM_ENTRY_TYPE_FILE)
             add_sub_2_found = KAN_TRUE;
         }
+        else
+        {
+            // Unexpected event.
+            KAN_TEST_CHECK (KAN_FALSE)
+        }
 
         iterator = kan_file_system_watcher_iterator_advance (watcher, iterator);
     }
@@ -222,6 +227,11 @@ KAN_TEST_CASE (remove_directory)
             KAN_TEST_CHECK (event->event_type == KAN_FILE_SYSTEM_EVENT_TYPE_REMOVED)
             KAN_TEST_CHECK (event->entry_type == KAN_FILE_SYSTEM_ENTRY_TYPE_FILE)
             remove_sub_2_found = KAN_TRUE;
+        }
+        else
+        {
+            // Unexpected event.
+            KAN_TEST_CHECK (KAN_FALSE)
         }
 
         iterator = kan_file_system_watcher_iterator_advance (watcher, iterator);
