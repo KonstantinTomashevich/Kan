@@ -1768,7 +1768,7 @@ int main (int argument_count, char **arguments_array)
             return RETURN_CODE_INPUT_IO_ERROR;
         }
 
-        kan_direct_file_stream_close (input_stream);
+        input_stream->operations->close (input_stream);
     }
 
     kan_trivial_string_buffer_init (&io.output_buffer, KAN_ALLOCATION_GROUP_IGNORE, OUTPUT_BUFFER_INITIAL_CAPACITY);
@@ -1808,12 +1808,12 @@ int main (int argument_count, char **arguments_array)
         io.output_buffer.size)
     {
         fprintf (stderr, "Output failed, exiting...\n");
-        kan_direct_file_stream_close (output_stream);
+        output_stream->operations->close (output_stream);
         shutdown ();
         return RETURN_CODE_IO_OUTPUT_FAILED;
     }
 
-    kan_direct_file_stream_close (output_stream);
+    output_stream->operations->close (output_stream);
     shutdown ();
     return RETURN_CODE_SUCCESS;
 }

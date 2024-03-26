@@ -64,12 +64,19 @@ static kan_bool_t seek (struct kan_stream_t *stream, enum kan_stream_seek_pivot 
     return KAN_FALSE;
 }
 
+static void close (struct kan_stream_t *stream)
+{
+    fclose (((struct file_stream_t *) stream)->file);
+    kan_free_batched (get_allocation_group (), stream);
+}
+
 static struct kan_stream_operations_t direct_file_stream_read_operations = {
     .read = read,
     .write = NULL,
     .flush = NULL,
     .tell = tell,
     .seek = seek,
+    .close = close,
 };
 
 static struct kan_stream_operations_t direct_file_stream_write_operations = {
@@ -78,6 +85,7 @@ static struct kan_stream_operations_t direct_file_stream_write_operations = {
     .flush = flush,
     .tell = tell,
     .seek = seek,
+    .close = close,
 };
 
 struct kan_stream_t *kan_direct_file_stream_open_for_read (const char *path, kan_bool_t binary)
@@ -106,10 +114,4 @@ struct kan_stream_t *kan_direct_file_stream_open_for_write (const char *path, ka
     }
 
     return NULL;
-}
-
-void kan_direct_file_stream_close (struct kan_stream_t *stream)
-{
-    fclose (((struct file_stream_t *) stream)->file);
-    kan_free_batched (get_allocation_group (), stream);
 }
