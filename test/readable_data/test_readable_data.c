@@ -173,8 +173,8 @@ static void parse_file_and_check (const struct kan_readable_data_event_t *events
 
     KAN_TEST_CHECK (event_index == events_count)
     kan_readable_data_parser_destroy (parser);
-    buffered_file_stream->operations->close(buffered_file_stream);
-    direct_file_stream->operations->close(direct_file_stream);
+    buffered_file_stream->operations->close (buffered_file_stream);
+    direct_file_stream->operations->close (direct_file_stream);
 }
 
 KAN_TEST_CASE (emit_and_parse_all_elemental_setters)

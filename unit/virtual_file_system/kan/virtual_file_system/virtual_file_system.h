@@ -6,6 +6,7 @@
 #include <kan/api_common/c_header.h>
 #include <kan/file_system/path_container.h>
 
+// TODO: Docs.
 // TODO: Do not forget thread safety notes. They're important and non-trivial here.
 
 KAN_C_HEADER_BEGIN

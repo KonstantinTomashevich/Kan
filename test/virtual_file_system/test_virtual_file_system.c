@@ -751,11 +751,10 @@ KAN_TEST_CASE (wathcer_unmount_and_mount)
 
     while ((event = kan_virtual_file_system_watcher_iterator_get (watcher, iterator)))
     {
-        KAN_TEST_CHECK (!workspace_log_txt_added || !workspace_index_added ||
-                        !workspace_no_extension_here_added || !workspace_data_pack_added || !workspace_added ||
-                        !packed_sub1_sub2_log_txt_added || !packed_sub1_sub2_no_extension_here_added ||
-                        !packed_sub1_sub2_added || !packed_sub1_index_added || !packed_sub1_added ||
-                        !packed_added)
+        KAN_TEST_CHECK (!workspace_log_txt_added || !workspace_index_added || !workspace_no_extension_here_added ||
+                        !workspace_data_pack_added || !workspace_added || !packed_sub1_sub2_log_txt_added ||
+                        !packed_sub1_sub2_no_extension_here_added || !packed_sub1_sub2_added ||
+                        !packed_sub1_index_added || !packed_sub1_added || !packed_added)
 
         KAN_TEST_CHECK (event->event_type == KAN_VIRTUAL_FILE_SYSTEM_EVENT_TYPE_ADDED)
         if (strcmp (event->path_container.path, "test/workspace/log.txt") == 0)
