@@ -22,7 +22,7 @@
 KAN_LOG_DEFINE_CATEGORY (virtual_file_system);
 // \c_interface_scanner_enable
 
-KAN_REFLECTION_EXPECT_UNIT_REGISTRAR (virtual_file_system_kan);
+KAN_REFLECTION_EXPECT_UNIT_REGISTRAR_LOCAL (virtual_file_system_kan);
 
 struct mount_point_real_t
 {
@@ -1858,7 +1858,11 @@ void kan_virtual_file_system_volume_destroy (kan_virtual_file_system_volume_t vo
 struct kan_virtual_file_system_directory_iterator_t kan_virtual_file_system_directory_iterator_create (
     kan_virtual_file_system_volume_t volume, const char *directory_path)
 {
-    struct directory_iterator_t iterator;
+    struct directory_iterator_t iterator = {
+        .type = DIRECTORY_ITERATOR_TYPE_REAL_DIRECTORY,
+        .real_file_system_iterator = KAN_INVALID_FILE_SYSTEM_DIRECTORY_ITERATOR,
+    };
+
     struct volume_t *volume_data = (struct volume_t *) volume;
     const char *path_iterator = directory_path;
     struct virtual_directory_t *current_directory = &volume_data->root_directory;
