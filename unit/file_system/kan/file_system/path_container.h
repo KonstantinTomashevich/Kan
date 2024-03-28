@@ -56,10 +56,10 @@ static inline void kan_file_system_path_container_copy (struct kan_file_system_p
 }
 
 /// \brief Appends given sub path to path container, automatically adding separator between base path and sub path.
-static inline void kan_file_system_path_container_append (struct kan_file_system_path_container_t *target_container,
-                                                          const char *sub_path)
+static inline void kan_file_system_path_container_append_char_sequence (
+    struct kan_file_system_path_container_t *target_container, const char *sub_path_begin, const char *sub_path_end)
 {
-    const uint64_t sub_path_length = strlen (sub_path);
+    const uint64_t sub_path_length = sub_path_end - sub_path_begin;
     const uint64_t new_length = target_container->length + 1u + sub_path_length;
     const uint64_t slash_position = target_container->length;
     const uint64_t sub_path_position = slash_position + 1u;
@@ -73,8 +73,16 @@ static inline void kan_file_system_path_container_append (struct kan_file_system
     if (sub_path_position < target_container->length)
     {
         const uint64_t to_copy = target_container->length - sub_path_position;
-        memcpy (&target_container->path[sub_path_position], sub_path, to_copy);
+        memcpy (&target_container->path[sub_path_position], sub_path_begin, to_copy);
     }
+}
+
+/// \brief Appends given sub path to path container, automatically adding separator between base path and sub path.
+static inline void kan_file_system_path_container_append (struct kan_file_system_path_container_t *target_container,
+                                                          const char *sub_path)
+{
+    const uint64_t sub_path_length = strlen (sub_path);
+    kan_file_system_path_container_append_char_sequence (target_container, sub_path, sub_path + sub_path_length);
 }
 
 /// \brief Appends given raw string to path container.
