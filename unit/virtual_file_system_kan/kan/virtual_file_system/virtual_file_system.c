@@ -880,7 +880,7 @@ static void inform_real_directory_added (struct file_system_watcher_t *watcher,
             }
             else
             {
-                KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, virtual_file_system, KAN_LOG_ERROR,
+                KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 3u, virtual_file_system, KAN_LOG_ERROR,
                                      "Failed to query entry at \"%s\" to simulate addition of virtual path \"%s\".",
                                      recursive_real_path->path, recursive_virtual_path->path)
             }
@@ -893,7 +893,7 @@ static void inform_real_directory_added (struct file_system_watcher_t *watcher,
     }
     else
     {
-        KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, virtual_file_system, KAN_LOG_ERROR,
+        KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 3u, virtual_file_system, KAN_LOG_ERROR,
                              "Failed to open directory iterator at \"%s\" to addition addition of virtual path \"%s\".",
                              recursive_real_path->path, recursive_virtual_path->path)
     }
@@ -990,7 +990,7 @@ static void inform_real_directory_removed (struct file_system_watcher_t *watcher
             }
             else
             {
-                KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, virtual_file_system, KAN_LOG_ERROR,
+                KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 3u, virtual_file_system, KAN_LOG_ERROR,
                                      "Failed to query entry at \"%s\" to simulate deletion of virtual path \"%s\".",
                                      recursive_real_path->path, recursive_virtual_path->path)
             }
@@ -1003,7 +1003,7 @@ static void inform_real_directory_removed (struct file_system_watcher_t *watcher
     }
     else
     {
-        KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, virtual_file_system, KAN_LOG_ERROR,
+        KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 3u, virtual_file_system, KAN_LOG_ERROR,
                              "Failed to open directory iterator at \"%s\" to simulate deletion of virtual path \"%s\".",
                              recursive_real_path->path, recursive_virtual_path->path)
     }
@@ -1890,9 +1890,10 @@ struct kan_virtual_file_system_directory_iterator_t kan_virtual_file_system_dire
             iterator.real_file_system_iterator = kan_file_system_directory_iterator_create (path_container.path);
             if (iterator.real_file_system_iterator == KAN_INVALID_FILE_SYSTEM_DIRECTORY_ITERATOR)
             {
-                KAN_LOG (virtual_file_system, KAN_LOG_ERROR,
-                         "Failed to create virtual file system iterator for virtual path \"%s\" (real path \"%s\").",
-                         directory_path, path_container.path)
+                KAN_LOG_WITH_BUFFER (
+                    KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, virtual_file_system, KAN_LOG_ERROR,
+                    "Failed to create virtual file system iterator for virtual path \"%s\" (real path \"%s\").",
+                    directory_path, path_container.path)
                 iterator.type = DIRECTORY_ITERATOR_TYPE_INVALID;
             }
 
@@ -2391,9 +2392,10 @@ kan_bool_t kan_virtual_file_system_make_directory (kan_virtual_file_system_volum
                 if (!kan_file_system_check_existence (path_container.path) &&
                     !kan_file_system_make_directory (path_container.path))
                 {
-                    KAN_LOG (virtual_file_system, KAN_LOG_ERROR,
-                             "Failed to create real directory \"%s\" in order to create virtual directory \"%s\".",
-                             path_container.path, path)
+                    KAN_LOG_WITH_BUFFER (
+                        KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, virtual_file_system, KAN_LOG_ERROR,
+                        "Failed to create real directory \"%s\" in order to create virtual directory \"%s\".",
+                        path_container.path, path)
                     return KAN_FALSE;
                 }
             }
@@ -2942,9 +2944,9 @@ kan_virtual_file_system_watcher_t kan_virtual_file_system_watcher_create (kan_vi
 
             if (!file_system_watcher_add_real_watcher (watcher, mount_point_real, path_container.path))
             {
-                KAN_LOG (virtual_file_system, KAN_LOG_ERROR,
-                         "Failed to create file system watcher \"%s\": unable to watch real path \"%s\".",
-                         directory_path, path_container.path)
+                KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, virtual_file_system, KAN_LOG_ERROR,
+                                     "Failed to create file system watcher \"%s\": unable to watch real path \"%s\".",
+                                     directory_path, path_container.path)
                 file_system_watcher_destroy (watcher);
                 return KAN_INVALID_VIRTUAL_FILE_SYSTEM_WATCHER;
             }
