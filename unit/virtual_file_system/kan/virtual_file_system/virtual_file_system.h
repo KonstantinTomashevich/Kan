@@ -36,7 +36,7 @@
 /// `kan_virtual_file_system_remove_empty_directory` on virtual directory with mount points will not delete directory
 /// as it won't be considered empty.
 ///
-/// Calling these functions on directories (that can be reparsed as any real path) results in the same behavior as
+/// Calling these functions on real directories (that can be reparsed as any real path) results in the same behavior as
 /// appropriate function calls inside real file system API.
 ///
 /// Any virtual directory, including volume root (which is technically a virtual directory too) can have mount points
@@ -46,14 +46,14 @@
 ///
 /// \par Real file system mount points
 /// \parblock
-/// Real file system mount points is the most trivial type of mount points. It commands virtual file system to reparse
+/// Real file system mount points is the most trivial type of mount point. It commands virtual file system to reparse
 /// part of the path to real file system path, allowing seamless access to real file system files under the hood.
 /// \endparblock
 ///
 /// \par Read-only packs
 /// \parblock
 /// Read only packs are special data structures that are optimized to store lots of files in single directory. Most
-/// filesystems handle these cases poorly and `fopen` in directory with lots of file might take several milliseconds
+/// filesystems handle these cases poorly and `fopen` in directories with lots of files might take several milliseconds
 /// to complete. Therefore, it is much more convenient to pack all the files into one file and operate on top of this
 /// file treating it as our own read only file system. This approach speeds up resource read operations.
 ///
@@ -79,6 +79,8 @@
 /// // After building all the packs, you can destroy the pack builder.
 /// kan_virtual_file_system_read_only_pack_builder_destroy (builder);
 /// ```
+///
+/// Keep in mind that neither input streams nor output stream are owned by builder. They must be closed manually.
 /// \endparblock
 ///
 /// \par File system watcher
@@ -92,9 +94,9 @@
 /// \par Thread safety
 /// \parblock
 /// Every volume provides its separate context, therefore operating on different volumes from different threads is safe.
-/// However, volume modification operations are not thread safe and follow readers-writer pattern: it is safe to call
-/// non-modifying operations from any thread unless there is other thread that can modify volume (for example, create
-/// directory or mount something).
+/// However, volume modification operations are not thread safe. Volumes follow readers-writer pattern: it is safe to
+/// call non-modifying operations from any thread unless there is other thread that can modify volume (for example,
+/// create directory or mount something).
 ///
 /// Read only pack builder is not thread safe.
 ///
