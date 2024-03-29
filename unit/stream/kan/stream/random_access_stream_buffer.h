@@ -24,7 +24,4 @@ STREAM_API struct kan_stream_t *kan_random_access_stream_buffer_open_for_read (s
 STREAM_API struct kan_stream_t *kan_random_access_stream_buffer_open_for_write (struct kan_stream_t *source_stream,
                                                                                 uint64_t buffer_size);
 
-/// \brief Closes buffered proxy stream. Does not close underlying source stream.
-STREAM_API void kan_random_access_stream_buffer_close (struct kan_stream_t *stream);
-
 KAN_C_HEADER_END

@@ -36,6 +36,7 @@ typedef uint64_t (*kan_stream_operation_tell) (struct kan_stream_t *stream);
 typedef kan_bool_t (*kan_stream_operation_seek) (struct kan_stream_t *stream,
                                                  enum kan_stream_seek_pivot pivot,
                                                  int64_t offset);
+typedef void (*kan_stream_operation_close) (struct kan_stream_t *stream);
 
 /// \brief Contains pointers to operations supported by category of streams.
 /// \details Operations are optional, for example readonly stream will have `NULL`s in ::write and ::flush as these
@@ -48,6 +49,7 @@ struct kan_stream_operations_t
     kan_stream_operation_flush flush;
     kan_stream_operation_tell tell;
     kan_stream_operation_seek seek;
+    kan_stream_operation_close close;
 };
 
 /// \brief Helper to check whether it is possible to read from stream.

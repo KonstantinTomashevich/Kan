@@ -16,6 +16,12 @@
 /// Keep in mind that events might be delayed due to how underlying implementation works (even OS-specific routines
 /// usually do not offer realtime delivery of file system events). Ordering is also not guaranteed.
 /// \endparblock
+///
+/// \par Thread safety
+/// \parblock
+/// All operations on file system watcher iterators are thread safe. The only requirement is that file system
+/// watcher should not be destroyed before all its iterators.
+/// \endparblock
 
 KAN_C_HEADER_BEGIN
 

@@ -21,7 +21,4 @@ FILE_SYSTEM_API struct kan_stream_t *kan_direct_file_stream_open_for_read (const
 /// \brief Attempts to open file under given path for write and returns stream pointer on success.
 FILE_SYSTEM_API struct kan_stream_t *kan_direct_file_stream_open_for_write (const char *path, kan_bool_t binary);
 
-/// \brief Closes given stream and releases its resources.
-FILE_SYSTEM_API void kan_direct_file_stream_close (struct kan_stream_t *stream);
-
 KAN_C_HEADER_END

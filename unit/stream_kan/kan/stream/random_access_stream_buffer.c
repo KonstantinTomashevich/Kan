@@ -290,12 +290,24 @@ static kan_bool_t buffered_seek (struct kan_stream_t *stream, enum kan_stream_se
     return KAN_TRUE;
 }
 
+static void buffered_close (struct kan_stream_t *stream)
+{
+    struct random_access_stream_buffer_t *data = (struct random_access_stream_buffer_t *) stream;
+    if (data->as_stream.operations->write)
+    {
+        buffered_flush (stream);
+    }
+
+    kan_free_general (get_allocation_group (), data, sizeof (struct random_access_stream_buffer_t) + data->buffer_size);
+}
+
 static struct kan_stream_operations_t random_access_stream_buffer_read_operations = {
     .read = buffered_read,
     .write = NULL,
     .flush = NULL,
     .tell = buffered_tell,
     .seek = buffered_seek,
+    .close = buffered_close,
 };
 
 static struct kan_stream_operations_t random_access_stream_buffer_write_operations = {
@@ -304,6 +316,7 @@ static struct kan_stream_operations_t random_access_stream_buffer_write_operatio
     .flush = buffered_flush,
     .tell = buffered_tell,
     .seek = buffered_seek,
+    .close = buffered_close,
 };
 
 struct kan_stream_t *kan_random_access_stream_buffer_open_for_read (struct kan_stream_t *source_stream,
@@ -354,15 +367,4 @@ struct kan_stream_t *kan_random_access_stream_buffer_open_for_write (struct kan_
     stream->stream_size = stream->source_stream->operations->tell (stream->source_stream);
     stream->source_stream->operations->seek (stream->source_stream, KAN_STREAM_SEEK_START, 0u);
     return (struct kan_stream_t *) stream;
-}
-
-void kan_random_access_stream_buffer_close (struct kan_stream_t *stream)
-{
-    struct random_access_stream_buffer_t *data = (struct random_access_stream_buffer_t *) stream;
-    if (data->as_stream.operations->write)
-    {
-        buffered_flush (stream);
-    }
-
-    kan_free_general (get_allocation_group (), data, sizeof (struct random_access_stream_buffer_t) + data->buffer_size);
 }

@@ -13,9 +13,19 @@
 /// \brief Converts unit name into external declaration of its reflection registrar function.
 #    define KAN_REFLECTION_EXPECT_UNIT_REGISTRAR(UNIT_NAME)                                                            \
         __declspec(dllimport) void KAN_REFLECTION_UNIT_REGISTRAR_NAME (UNIT_NAME) (kan_reflection_registry_t registry)
+
+/// \brief Converts unit name into external declaration of its reflection registrar function.
+/// \details This version adds export DLL linkage, because it is intended for getting reflection of the same unit.
+///          Not adding dllexport or adding dllimport results in linkage inconsistency warning.
+#    define KAN_REFLECTION_EXPECT_UNIT_REGISTRAR_LOCAL(UNIT_NAME) \
+        /* dllexport, because all reflection is by default exported. Need to preserve linkage consistency. */          \
+        __declspec(dllexport) void KAN_REFLECTION_UNIT_REGISTRAR_NAME (UNIT_NAME) (kan_reflection_registry_t registry)
 #else
 /// \brief Converts unit name into external declaration of its reflection registrar function.
 #    define KAN_REFLECTION_EXPECT_UNIT_REGISTRAR(UNIT_NAME)                                                            \
         void KAN_REFLECTION_UNIT_REGISTRAR_NAME (UNIT_NAME) (kan_reflection_registry_t registry)
+
+/// \brief Converts unit name into external declaration of its reflection registrar function.
+#    define KAN_REFLECTION_EXPECT_UNIT_REGISTRAR_LOCAL(UNIT_NAME) KAN_REFLECTION_EXPECT_UNIT_REGISTRAR (UNIT_NAME)
 #endif
 // clang-format on

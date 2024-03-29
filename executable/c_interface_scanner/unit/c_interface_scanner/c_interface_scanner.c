@@ -410,6 +410,7 @@ static void re2c_yyrestore (void)
  re2c:define:YYSKIP = "re2c_yyskip ();";
  re2c:define:YYBACKUP = "re2c_yybackup ();";
  re2c:define:YYRESTORE = "re2c_yyrestore ();";
+ re2c:define:YYSHIFT = "io.cursor += @@{shift};";
  re2c:define:YYFILL   = "io_refill_buffer () == 0";
  re2c:define:YYSTAGP = "@@{tag} = io.cursor;";
  re2c:define:YYSTAGN = "@@{tag} = NULL;";
@@ -541,13 +542,13 @@ static kan_bool_t parse_main (void)
          !use:default;
 
          // Some static global variable, skip it.
-         "static" separator+ type separator* identifier separator* ("[".*"]")? ("=" | ";")
+         "static" separator+ type separator* identifier separator* ("[".*"]")? / ("=" | ";")
          {
              continue;
          }
 
          // Some static function, skip it.
-         "static" separator+ type separator* identifier separator* "("
+         "static" separator+ ("inline" separator+)? type separator* identifier separator* "("
          {
              return parse_skip_until_round_braces_close (KAN_FALSE);
          }
@@ -961,11 +962,11 @@ int main (int argument_count, char **arguments_array)
     if (!parse_input ())
     {
         fprintf (stderr, "Parse failed, exiting...\n");
-        kan_direct_file_stream_close (io.input_stream);
+        io.input_stream->operations->close (io.input_stream);
         return RETURN_CODE_PARSE_FAILED;
     }
 
-    kan_direct_file_stream_close (io.input_stream);
+    io.input_stream->operations->close (io.input_stream);
     interface_file.interface = kan_c_interface_build (reporting.first);
 
     if (!interface_file.interface)
@@ -984,7 +985,7 @@ int main (int argument_count, char **arguments_array)
     if (!kan_c_interface_file_serialize (&interface_file, output_stream))
     {
         fprintf (stderr, "Serialization failed, exiting...\n");
-        kan_direct_file_stream_close (output_stream);
+        output_stream->operations->close (output_stream);
         return RETURN_CODE_SERIALIZATION_FAILED;
     }
 
@@ -995,7 +996,7 @@ int main (int argument_count, char **arguments_array)
         reporting.first = next;
     }
 
-    kan_direct_file_stream_close (output_stream);
+    output_stream->operations->close (output_stream);
     kan_c_interface_file_shutdown (&interface_file);
     return RETURN_CODE_SUCCESS;
 }
