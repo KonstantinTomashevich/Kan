@@ -380,6 +380,12 @@ static void insert_task_execute (uint64_t user_data)
     kan_repository_indexed_insertion_package_submit (&package);
 }
 
+// \meta reflection_function_meta = "kan_universe_mutator_execute_insert_from_multiple_threads"
+// \meta reflection_function_meta = "kan_universe_mutator_execute_validate_insert_from_multiple_threads"
+TEST_UNIVERSE_API struct kan_universe_mutator_group_meta_t multiple_threads_test_group = {
+    .group_name = "multiple_threads_test",
+};
+
 TEST_UNIVERSE_API void kan_universe_mutator_execute_insert_from_multiple_threads (
     kan_cpu_job_t job, struct insert_from_multiple_threads_state_t *state)
 {
@@ -720,13 +726,12 @@ KAN_TEST_CASE (update_mutator_multiple_threads)
     kan_universe_world_pipeline_definition_init (update_pipeline);
     update_pipeline->name = kan_string_intern ("update");
 
-    kan_dynamic_array_set_capacity (&update_pipeline->mutators, 3u);
+    kan_dynamic_array_set_capacity (&update_pipeline->mutators, 1u);
+    kan_dynamic_array_set_capacity (&update_pipeline->mutator_groups, 1u);
     *(kan_interned_string_t *) kan_dynamic_array_add_last (&update_pipeline->mutators) =
         kan_string_intern ("update_only");
-    *(kan_interned_string_t *) kan_dynamic_array_add_last (&update_pipeline->mutators) =
-        kan_string_intern ("insert_from_multiple_threads");
-    *(kan_interned_string_t *) kan_dynamic_array_add_last (&update_pipeline->mutators) =
-        kan_string_intern ("validate_insert_from_multiple_threads");
+    *(kan_interned_string_t *) kan_dynamic_array_add_last (&update_pipeline->mutator_groups) =
+        kan_string_intern ("multiple_threads_test");
 
     kan_universe_deploy_root (universe, &definition);
     kan_universe_world_definition_shutdown (&definition);
