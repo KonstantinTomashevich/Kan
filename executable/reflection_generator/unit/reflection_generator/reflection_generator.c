@@ -1567,7 +1567,6 @@ void add_registrar (void)
                         kan_trivial_string_buffer_append_string (&io.output_buffer, "\"), &");
                         kan_trivial_string_buffer_append_string (&io.output_buffer, symbol_data->name);
                         kan_trivial_string_buffer_append_string (&io.output_buffer, ");\n");
-                        break;
                     }
                     else if (meta->name == interned.reflection_enum_value_meta)
                     {
@@ -1596,8 +1595,6 @@ void add_registrar (void)
                             kan_trivial_string_buffer_append_string (&io.output_buffer, symbol_data->name);
                             kan_trivial_string_buffer_append_string (&io.output_buffer, ");\n");
                         }
-
-                        break;
                     }
                     else if (meta->name == interned.reflection_struct_meta)
                     {
@@ -1610,7 +1607,6 @@ void add_registrar (void)
                         kan_trivial_string_buffer_append_string (&io.output_buffer, "\"), &");
                         kan_trivial_string_buffer_append_string (&io.output_buffer, symbol_data->name);
                         kan_trivial_string_buffer_append_string (&io.output_buffer, ");\n");
-                        break;
                     }
                     else if (meta->name == interned.reflection_struct_field_meta)
                     {
@@ -1638,8 +1634,6 @@ void add_registrar (void)
                             kan_trivial_string_buffer_append_string (&io.output_buffer, symbol_data->name);
                             kan_trivial_string_buffer_append_string (&io.output_buffer, ");\n");
                         }
-
-                        break;
                     }
                     else if (meta->name == interned.reflection_function_meta)
                     {
@@ -1652,7 +1646,6 @@ void add_registrar (void)
                         kan_trivial_string_buffer_append_string (&io.output_buffer, "\"), &");
                         kan_trivial_string_buffer_append_string (&io.output_buffer, symbol_data->name);
                         kan_trivial_string_buffer_append_string (&io.output_buffer, ");\n");
-                        break;
                     }
                     else if (meta->name == interned.reflection_function_argument_meta)
                     {
@@ -1681,8 +1674,6 @@ void add_registrar (void)
                             kan_trivial_string_buffer_append_string (&io.output_buffer, symbol_data->name);
                             kan_trivial_string_buffer_append_string (&io.output_buffer, ");\n");
                         }
-
-                        break;
                     }
                 }
             }
