@@ -313,6 +313,10 @@ struct kan_universe_world_pipeline_definition_t
 
     /// \meta reflection_dynamic_array_type = "kan_interned_string_t"
     struct kan_dynamic_array_t mutators;
+
+    /// \meta reflection_dynamic_array_type = "kan_interned_string_t"
+    /// \brief See `kan_universe_mutator_group_meta_t`.
+    struct kan_dynamic_array_t mutator_groups;
 };
 
 UNIVERSE_API void kan_universe_world_pipeline_definition_init (struct kan_universe_world_pipeline_definition_t *data);
@@ -490,6 +494,14 @@ struct kan_universe_space_configuration_t
     double global_min;
     double global_max;
     double leaf_size;
+};
+
+/// \brief Meta for any mutator function, that adds this mutator to named group.
+/// \brief Mutator groups allow to add multiple mutators without knowing their exact names.
+///        It both provides convenience for configuration and abstraction for feature implementation.
+struct kan_universe_mutator_group_meta_t
+{
+    const char *group_name;
 };
 
 KAN_C_HEADER_END

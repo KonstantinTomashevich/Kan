@@ -51,6 +51,9 @@ struct mutator_t
 {
     kan_interned_string_t name;
     struct mutator_api_t *api;
+    kan_bool_t from_group;
+    kan_bool_t found_in_groups;
+    kan_bool_t added_during_migration;
     void *state;
 };
 
@@ -66,6 +69,9 @@ struct pipeline_t
 
     /// \meta reflection_dynamic_array_type = "struct mutator_t"
     struct kan_dynamic_array_t mutators;
+
+    /// \meta reflection_dynamic_array_type = "kan_interned_string"
+    struct kan_dynamic_array_t used_groups;
 };
 
 struct world_configuration_t
@@ -95,6 +101,13 @@ struct world_t
     struct kan_dynamic_array_t children;
 };
 
+struct group_multi_map_node_t
+{
+    struct kan_hash_storage_node_t node;
+    kan_interned_string_t group_name;
+    kan_interned_string_t mutator;
+};
+
 struct universe_t
 {
     kan_reflection_registry_t reflection_registry;
@@ -110,6 +123,7 @@ struct universe_t
 
     struct kan_hash_storage_t scheduler_api_storage;
     struct kan_hash_storage_t mutator_api_storage;
+    struct kan_hash_storage_t group_multi_map_storage;
 };
 
 enum query_type_t
@@ -175,6 +189,7 @@ static kan_interned_string_t interned_kan_repository_event_insert_query_t;
 static kan_interned_string_t interned_kan_repository_event_fetch_query_t;
 static kan_interned_string_t interned_kan_repository_meta_automatic_cascade_deletion_t;
 static kan_interned_string_t interned_kan_universe_space_automated_lifetime_query_meta_t;
+static kan_interned_string_t interned_kan_universe_mutator_group_meta_t;
 static kan_interned_string_t interned_kan_universe_scheduler_interface_run_pipeline;
 static kan_interned_string_t interned_kan_universe_scheduler_interface_update_child;
 static kan_interned_string_t interned_kan_universe_scheduler_interface_update_all_children;
@@ -249,6 +264,7 @@ static void ensure_interned_statics_initialized (void)
         kan_string_intern ("kan_repository_meta_automatic_cascade_deletion_t");
     interned_kan_universe_space_automated_lifetime_query_meta_t =
         kan_string_intern ("kan_universe_space_automated_lifetime_query_meta_t");
+    interned_kan_universe_mutator_group_meta_t = kan_string_intern ("kan_universe_mutator_group_meta_t");
 
     interned_kan_universe_scheduler_interface_run_pipeline =
         kan_string_intern ("kan_universe_scheduler_interface_run_pipeline");
@@ -1375,6 +1391,58 @@ static struct mutator_api_node_t *universe_get_or_create_mutator_api (struct uni
     return node;
 }
 
+static void add_mutator_to_groups (struct universe_t *universe,
+                                   kan_interned_string_t function_name,
+                                   kan_interned_string_t mutator_name)
+{
+    struct kan_reflection_function_meta_iterator_t iterator = kan_reflection_registry_query_function_meta (
+        universe->reflection_registry, function_name, interned_kan_universe_mutator_group_meta_t);
+
+    const struct kan_universe_mutator_group_meta_t *meta;
+    while ((meta = (const struct kan_universe_mutator_group_meta_t *) kan_reflection_function_meta_iterator_get (
+                &iterator)))
+    {
+        kan_interned_string_t group_name = kan_string_intern (meta->group_name);
+        const struct kan_hash_storage_bucket_t *bucket =
+            kan_hash_storage_query (&universe->group_multi_map_storage, (uint64_t) group_name);
+        struct group_multi_map_node_t *node = (struct group_multi_map_node_t *) bucket->first;
+        const struct group_multi_map_node_t *node_end =
+            (struct group_multi_map_node_t *) (bucket->last ? bucket->last->next : NULL);
+        kan_bool_t found = KAN_FALSE;
+
+        while (node != node_end)
+        {
+            if (node->group_name == group_name && node->mutator == mutator_name)
+            {
+                found = KAN_TRUE;
+                break;
+            }
+
+            node = (struct group_multi_map_node_t *) node->node.list_node.next;
+        }
+
+        if (!found)
+        {
+            struct group_multi_map_node_t *new_node = (struct group_multi_map_node_t *) kan_allocate_batched (
+                universe->api_allocation_group, sizeof (struct group_multi_map_node_t));
+            new_node->node.hash = (uint64_t) group_name;
+            new_node->group_name = group_name;
+            new_node->mutator = mutator_name;
+
+            if (universe->group_multi_map_storage.items.size >=
+                universe->group_multi_map_storage.bucket_count * KAN_UNIVERSE_GROUP_LOAD_FACTOR)
+            {
+                kan_hash_storage_set_bucket_count (&universe->group_multi_map_storage,
+                                                   universe->group_multi_map_storage.bucket_count * 2u);
+            }
+
+            kan_hash_storage_add (&universe->group_multi_map_storage, &new_node->node);
+        }
+
+        kan_reflection_function_meta_iterator_next (&iterator);
+    }
+}
+
 static void universe_fill_api_storages (struct universe_t *universe)
 {
     kan_reflection_registry_function_iterator_t function_iterator =
@@ -1458,6 +1526,8 @@ static void universe_fill_api_storages (struct universe_t *universe)
                 {
                     node->api.deploy = function;
                 }
+
+                add_mutator_to_groups (universe, function->name, name);
             }
             else if (strncmp (function->name + 21u, "execute_", 8u) == 0)
             {
@@ -1472,6 +1542,8 @@ static void universe_fill_api_storages (struct universe_t *universe)
                 {
                     node->api.execute = function;
                 }
+
+                add_mutator_to_groups (universe, function->name, name);
             }
             else if (strncmp (function->name + 21u, "undeploy_", 9u) == 0)
             {
@@ -1486,6 +1558,8 @@ static void universe_fill_api_storages (struct universe_t *universe)
                 {
                     node->api.undeploy = function;
                 }
+
+                add_mutator_to_groups (universe, function->name, name);
             }
             else
             {
@@ -1925,6 +1999,7 @@ static void world_clean_self_preserving_repository (struct universe_t *universe,
         }
 
         kan_dynamic_array_shutdown (&pipeline->mutators);
+        kan_dynamic_array_shutdown (&pipeline->used_groups);
     }
 
     kan_dynamic_array_reset (&world->pipelines);
@@ -2175,6 +2250,9 @@ static void mutator_init (struct universe_t *universe, struct mutator_t *mutator
     mutator->state = kan_allocate_batched (universe->mutators_allocation_group, mutator->api->type->size);
     // We use zeroes to check which automated queries weren't initialized yet.
     memset (mutator->state, 0u, mutator->api->type->size);
+    mutator->from_group = KAN_FALSE;
+    mutator->found_in_groups = KAN_FALSE;
+    mutator->added_during_migration = KAN_FALSE;
 
     if (mutator->api->type->init)
     {
@@ -2229,11 +2307,14 @@ void kan_universe_world_pipeline_definition_init (struct kan_universe_world_pipe
     data->name = NULL;
     kan_dynamic_array_init (&data->mutators, 0u, sizeof (kan_interned_string_t), _Alignof (kan_interned_string_t),
                             kan_allocation_group_stack_get ());
+    kan_dynamic_array_init (&data->mutator_groups, 0u, sizeof (kan_interned_string_t), _Alignof (kan_interned_string_t),
+                            kan_allocation_group_stack_get ());
 }
 
 void kan_universe_world_pipeline_definition_shutdown (struct kan_universe_world_pipeline_definition_t *data)
 {
     kan_dynamic_array_shutdown (&data->mutators);
+    kan_dynamic_array_shutdown (&data->mutator_groups);
 }
 
 UNIVERSE_API void kan_universe_world_definition_init (struct kan_universe_world_definition_t *data)
@@ -2355,6 +2436,8 @@ kan_universe_t kan_universe_create (kan_allocation_group_t group,
                            KAN_UNIVERSE_SCHEDULER_INITIAL_BUCKETS);
     kan_hash_storage_init (&universe->mutator_api_storage, universe->api_allocation_group,
                            KAN_UNIVERSE_MUTATOR_INITIAL_BUCKETS);
+    kan_hash_storage_init (&universe->group_multi_map_storage, universe->api_allocation_group,
+                           KAN_UNIVERSE_GROUP_INITIAL_BUCKETS);
 
     universe_fill_api_storages (universe);
     return (kan_universe_t) universe;
@@ -2507,12 +2590,88 @@ static void world_migration_schedulers_mutators_migrate (struct universe_t *univ
     for (uint64_t pipeline_index = 0u; pipeline_index < world->pipelines.size; ++pipeline_index)
     {
         struct pipeline_t *pipeline = &((struct pipeline_t *) world->pipelines.data)[pipeline_index];
+
+        // Groups might've changed due to migration.
+        // We need to remove mutators that we're added from groups, but no longer belong to them.
+        // Also, we need to add mutators that were added to groups due to migration.
+        for (uint64_t mutator_index = 0u; mutator_index < pipeline->mutators.size; ++mutator_index)
+        {
+            struct mutator_t *mutator = &((struct mutator_t *) pipeline->mutators.data)[mutator_index];
+            mutator->found_in_groups = KAN_FALSE;
+        }
+
+        for (uint64_t group_index = 0u; group_index < pipeline->used_groups.size; ++group_index)
+        {
+            kan_interned_string_t group_name = ((kan_interned_string_t *) pipeline->used_groups.data)[group_index];
+            const struct kan_hash_storage_bucket_t *bucket =
+                kan_hash_storage_query (&universe->group_multi_map_storage, (uint64_t) group_name);
+            struct group_multi_map_node_t *node = (struct group_multi_map_node_t *) bucket->first;
+            const struct group_multi_map_node_t *node_end =
+                (struct group_multi_map_node_t *) (bucket->last ? bucket->last->next : NULL);
+
+            while (node != node_end)
+            {
+                if (node->group_name == group_name)
+                {
+                    // Find mutator and mark it as found.
+                    kan_bool_t found = KAN_FALSE;
+
+                    for (uint64_t mutator_index = 0u; mutator_index < pipeline->mutators.size; ++mutator_index)
+                    {
+                        struct mutator_t *mutator = &((struct mutator_t *) pipeline->mutators.data)[mutator_index];
+                        if (mutator->name == node->mutator)
+                        {
+                            mutator->found_in_groups = KAN_TRUE;
+                            found = KAN_TRUE;
+                            break;
+                        }
+                    }
+
+                    if (!found)
+                    {
+                        struct mutator_api_node_t *mutator_node = universe_get_mutator_api (universe, node->mutator);
+                        if (mutator_node)
+                        {
+                            struct mutator_t *mutator =
+                                (struct mutator_t *) kan_dynamic_array_add_last (&pipeline->mutators);
+                            if (!mutator)
+                            {
+                                kan_dynamic_array_set_capacity (&pipeline->mutators, pipeline->mutators.size * 2u);
+                                mutator = (struct mutator_t *) kan_dynamic_array_add_last (&pipeline->mutators);
+                            }
+
+                            KAN_ASSERT (mutator)
+                            mutator->name = node->mutator;
+                            mutator->api = &mutator_node->api;
+                            mutator_init (universe, mutator);
+                            mutator->from_group = KAN_TRUE;
+                            mutator->added_during_migration = KAN_TRUE;
+                        }
+                        else
+                        {
+                            KAN_LOG (universe, KAN_LOG_ERROR,
+                                     "Unable to find mutator \"%s\" requested from group \"%s\".", node->mutator,
+                                     group_name)
+                        }
+                    }
+                }
+
+                node = (struct group_multi_map_node_t *) node->node.list_node.next;
+            }
+        }
+
         for (uint64_t mutator_index = 0u; mutator_index < pipeline->mutators.size;)
         {
             struct mutator_t *mutator = &((struct mutator_t *) pipeline->mutators.data)[mutator_index];
-            struct mutator_api_node_t *new_mutator_api_node = universe_get_mutator_api (universe, mutator->name);
+            if (mutator->added_during_migration)
+            {
+                mutator->added_during_migration = KAN_FALSE;
+                ++mutator_index;
+                continue;
+            }
 
-            if (new_mutator_api_node)
+            struct mutator_api_node_t *new_mutator_api_node = universe_get_mutator_api (universe, mutator->name);
+            if ((!mutator->from_group || mutator->found_in_groups) && new_mutator_api_node)
             {
                 if (new_mutator_api_node->api.type->name == mutator->api->type->name)
                 {
@@ -2817,9 +2976,73 @@ static void fill_world_from_definition (struct universe_t *universe,
         output->name = input->name;
         output->graph = KAN_INVALID_WORKFLOW_GRAPH;
 
-        kan_dynamic_array_init (&output->mutators, input->mutators.size, sizeof (struct mutator_t),
+        kan_dynamic_array_init (&output->used_groups, input->mutator_groups.size, sizeof (kan_interned_string_t),
+                                _Alignof (kan_interned_string_t), world->pipelines.allocation_group);
+
+        kan_dynamic_array_init (&output->mutators, input->mutator_groups.size, sizeof (struct mutator_t),
                                 _Alignof (struct mutator_t), world->pipelines.allocation_group);
 
+        for (uint64_t group_index = 0u; group_index < input->mutator_groups.size; ++group_index)
+        {
+            kan_interned_string_t group_name = ((kan_interned_string_t *) input->mutator_groups.data)[group_index];
+            kan_interned_string_t *group_name_output =
+                (kan_interned_string_t *) kan_dynamic_array_add_last (&output->used_groups);
+
+            if (!group_name_output)
+            {
+                kan_dynamic_array_set_capacity (&output->used_groups, output->used_groups.size * 2u);
+                group_name_output = (kan_interned_string_t *) kan_dynamic_array_add_last (&output->used_groups);
+            }
+
+            KAN_ASSERT (group_name_output)
+            *group_name_output = group_name;
+            kan_bool_t group_found = KAN_FALSE;
+
+            const struct kan_hash_storage_bucket_t *bucket =
+                kan_hash_storage_query (&universe->group_multi_map_storage, (uint64_t) group_name);
+            struct group_multi_map_node_t *node = (struct group_multi_map_node_t *) bucket->first;
+            const struct group_multi_map_node_t *node_end =
+                (struct group_multi_map_node_t *) (bucket->last ? bucket->last->next : NULL);
+
+            while (node != node_end)
+            {
+                if (node->group_name == group_name)
+                {
+                    group_found = KAN_TRUE;
+                    struct mutator_api_node_t *mutator_node = universe_get_mutator_api (universe, node->mutator);
+
+                    if (mutator_node)
+                    {
+                        struct mutator_t *mutator = (struct mutator_t *) kan_dynamic_array_add_last (&output->mutators);
+                        if (!mutator)
+                        {
+                            kan_dynamic_array_set_capacity (&output->mutators, output->mutators.size * 2u);
+                            mutator = (struct mutator_t *) kan_dynamic_array_add_last (&output->mutators);
+                        }
+
+                        KAN_ASSERT (mutator)
+                        mutator->name = node->mutator;
+                        mutator->api = &mutator_node->api;
+                        mutator_init (universe, mutator);
+                        mutator->from_group = KAN_TRUE;
+                    }
+                    else
+                    {
+                        KAN_LOG (universe, KAN_LOG_ERROR, "Unable to find mutator \"%s\" requested from group \"%s\".",
+                                 node->mutator, group_name)
+                    }
+                }
+
+                node = (struct group_multi_map_node_t *) node->node.list_node.next;
+            }
+
+            if (!group_found)
+            {
+                KAN_LOG (universe, KAN_LOG_ERROR, "Unable to find requested group \"%s\".", group_name)
+            }
+        }
+
+        kan_dynamic_array_set_capacity (&output->mutators, output->mutators.size + input->mutators.size);
         for (uint64_t mutator_index = 0u; mutator_index < input->mutators.size; ++mutator_index)
         {
             kan_interned_string_t requested_name = ((kan_interned_string_t *) input->mutators.data)[mutator_index];
@@ -2984,6 +3207,7 @@ void kan_universe_destroy (kan_universe_t universe)
 
     kan_hash_storage_shutdown (&universe_data->scheduler_api_storage);
     kan_hash_storage_shutdown (&universe_data->mutator_api_storage);
+    kan_hash_storage_shutdown (&universe_data->group_multi_map_storage);
     kan_free_general (universe_data->main_allocation_group, universe_data, sizeof (struct universe_t));
 }
 
