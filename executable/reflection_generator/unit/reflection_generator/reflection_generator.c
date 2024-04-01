@@ -870,20 +870,24 @@ static void add_functors (void)
                 continue;
             }
 
-            kan_trivial_string_buffer_append_string (&io.output_buffer, "struct ");
-            kan_trivial_string_buffer_append_string (&io.output_buffer, function->name);
-            kan_trivial_string_buffer_append_string (&io.output_buffer, "_call_arguments_t\n{\n");
-
-            for (uint64_t argument_index = 0u; argument_index < function->arguments_count; ++argument_index)
+            if (function->arguments_count > 0u)
             {
-                struct kan_c_variable_t *argument = &function->arguments[argument_index];
-                kan_trivial_string_buffer_append_string (&io.output_buffer, "    ");
-                append_argument_type (&argument->type);
-                kan_trivial_string_buffer_append_string (&io.output_buffer, argument->name);
-                kan_trivial_string_buffer_append_string (&io.output_buffer, ";\n");
+                kan_trivial_string_buffer_append_string (&io.output_buffer, "struct ");
+                kan_trivial_string_buffer_append_string (&io.output_buffer, function->name);
+                kan_trivial_string_buffer_append_string (&io.output_buffer, "_call_arguments_t\n{\n");
+
+                for (uint64_t argument_index = 0u; argument_index < function->arguments_count; ++argument_index)
+                {
+                    struct kan_c_variable_t *argument = &function->arguments[argument_index];
+                    kan_trivial_string_buffer_append_string (&io.output_buffer, "    ");
+                    append_argument_type (&argument->type);
+                    kan_trivial_string_buffer_append_string (&io.output_buffer, argument->name);
+                    kan_trivial_string_buffer_append_string (&io.output_buffer, ";\n");
+                }
+
+                kan_trivial_string_buffer_append_string (&io.output_buffer, "};\n\n");
             }
 
-            kan_trivial_string_buffer_append_string (&io.output_buffer, "};\n\n");
             const kan_interned_string_t functor_name = build_call_functor_name (function);
             kan_trivial_string_buffer_append_string (&io.output_buffer, "static void ");
             kan_trivial_string_buffer_append_string (&io.output_buffer, functor_name);

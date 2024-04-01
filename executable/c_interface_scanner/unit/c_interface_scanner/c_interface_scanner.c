@@ -778,9 +778,7 @@ static kan_bool_t parse_exported_function_arguments (void)
 
          "," { optional_includable_object_append_token (); continue; }
 
-         "void" { optional_includable_object_append_token (); continue; }
-
-         ")"
+         "void)" | ")"
          {
              optional_includable_object_append_token ();
              optional_includable_object_append_string (";");
