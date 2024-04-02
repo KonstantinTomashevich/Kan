@@ -3,8 +3,8 @@
 #include <stddef.h>
 #include <string.h>
 
+#include <kan/api_common/type_punning.h>
 #include <kan/container/hash_storage.h>
-#include <kan/hash/hash.h>
 #include <kan/log/logging.h>
 #include <kan/memory/allocation.h>
 #include <kan/reflection/generated_reflection.h>
@@ -35,6 +35,18 @@ struct resource_index_t
     struct kan_hash_storage_t native;
     struct kan_hash_storage_t third_party;
 };
+
+struct name_iterator_t
+{
+    kan_interned_string_t name;
+    struct resource_index_native_node_t *current;
+    struct resource_index_native_node_t *end;
+};
+
+_Static_assert (sizeof (struct name_iterator_t) <= sizeof (struct kan_resource_index_native_name_iterator_t),
+                "Sizes match.");
+_Static_assert (_Alignof (struct name_iterator_t) == _Alignof (struct kan_resource_index_native_name_iterator_t),
+                "Alignments match.");
 
 static kan_bool_t statics_initialized = KAN_FALSE;
 static kan_allocation_group_t main_group;
@@ -265,9 +277,8 @@ const char *kan_resource_index_get_native (kan_resource_index_t index,
                                            kan_interned_string_t name)
 {
     struct resource_index_t *index_data = (struct resource_index_t *) index;
-    const uint64_t hash = kan_hash_combine ((uint64_t) type, (uint64_t) name);
-
-    const struct kan_hash_storage_bucket_t *bucket = kan_hash_storage_query (&index_data->native, hash);
+    // Name is used as hash to avoid creating two hash storages.
+    const struct kan_hash_storage_bucket_t *bucket = kan_hash_storage_query (&index_data->native, (uint64_t) name);
     struct resource_index_native_node_t *node = (struct resource_index_native_node_t *) bucket->first;
     const struct resource_index_native_node_t *node_end =
         (struct resource_index_native_node_t *) (bucket->last ? bucket->last->next : NULL);
@@ -330,7 +341,8 @@ kan_bool_t kan_resource_index_add_native (kan_resource_index_t index,
     struct resource_index_t *index_data = (struct resource_index_t *) index;
     struct resource_index_native_node_t *node =
         kan_allocate_batched (instanced_group, sizeof (struct resource_index_native_node_t));
-    node->node.hash = kan_hash_combine ((uint64_t) type, (uint64_t) name);
+    // Name is used as hash to avoid creating two hash storages.
+    node->node.hash = (uint64_t) name;
 
     node->type = type;
     node->name = name;
@@ -382,6 +394,69 @@ kan_bool_t kan_resource_index_add_third_party (kan_resource_index_t index,
 
     kan_hash_storage_add (&index_data->third_party, &node->node);
     return KAN_TRUE;
+}
+
+static inline void name_iterator_repair (struct name_iterator_t *iterator)
+{
+    while (iterator->current != iterator->end)
+    {
+        if (iterator->current->name == iterator->name)
+        {
+            break;
+        }
+
+        iterator->current = (struct resource_index_native_node_t *) iterator->current->node.list_node.next;
+    }
+}
+
+struct kan_resource_index_native_name_iterator_t kan_resource_index_query_native_name (kan_resource_index_t index,
+                                                                                       kan_interned_string_t name)
+{
+    struct resource_index_t *index_data = (struct resource_index_t *) index;
+    // Name is used as hash to avoid creating two hash storages.
+    const struct kan_hash_storage_bucket_t *bucket = kan_hash_storage_query (&index_data->native, (uint64_t) name);
+
+    struct name_iterator_t iterator = {
+        .current = (struct resource_index_native_node_t *) bucket->first,
+        .end = (struct resource_index_native_node_t *) (bucket->last ? bucket->last->next : NULL),
+    };
+
+    name_iterator_repair (&iterator);
+    return KAN_PUN_TYPE (struct name_iterator_t, struct kan_resource_index_native_name_iterator_t, iterator);
+}
+
+kan_interned_string_t kan_resource_index_native_name_iterator_get_type (
+    struct kan_resource_index_native_name_iterator_t *iterator)
+{
+    struct name_iterator_t *data = (struct name_iterator_t *) iterator;
+    if (data->current != data->end)
+    {
+        return data->current->type;
+    }
+
+    return NULL;
+}
+
+const char *kan_resource_index_native_name_iterator_get_path (
+    struct kan_resource_index_native_name_iterator_t *iterator)
+{
+    struct name_iterator_t *data = (struct name_iterator_t *) iterator;
+    if (data->current != data->end)
+    {
+        return data->current->path;
+    }
+
+    return NULL;
+}
+
+void kan_resource_index_native_name_iterator_advance (struct kan_resource_index_native_name_iterator_t *iterator)
+{
+    struct name_iterator_t *data = (struct name_iterator_t *) iterator;
+    if (data->current != data->end)
+    {
+        data->current = (struct resource_index_native_node_t *) data->current->node.list_node.next;
+        name_iterator_repair (data);
+    }
 }
 
 void kan_resource_index_destroy (kan_resource_index_t index)

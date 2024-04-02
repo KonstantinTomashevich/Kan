@@ -92,6 +92,12 @@ RESOURCE_INDEX_API kan_allocation_group_t kan_serialized_resource_index_get_stri
 
 typedef uint64_t kan_resource_index_t;
 
+/// \brief Holds data for iterating over native resources with the same name but different types.
+struct kan_resource_index_native_name_iterator_t
+{
+    uint64_t implementation_data[3u];
+};
+
 /// \brief Creates new resource index.
 RESOURCE_INDEX_API kan_resource_index_t kan_resource_index_create (void);
 
@@ -124,6 +130,22 @@ RESOURCE_INDEX_API kan_bool_t kan_resource_index_add_third_party (kan_resource_i
                                                                   kan_interned_string_t name,
                                                                   const char *path,
                                                                   uint64_t size);
+
+/// \brief Creates iterator for iterating over native resources with the given name but different types.
+/// \warning Addition of new resources breaks these iterators!
+RESOURCE_INDEX_API struct kan_resource_index_native_name_iterator_t kan_resource_index_query_native_name (
+    kan_resource_index_t index, kan_interned_string_t name);
+
+/// \brief Returns type of native resource to which iterator points or `NULL` if there is no more resources.
+RESOURCE_INDEX_API kan_interned_string_t
+kan_resource_index_native_name_iterator_get_type (struct kan_resource_index_native_name_iterator_t *iterator);
+
+/// \brief Returns path to native resource to which iterator points or `NULL` if there is no more resources.
+RESOURCE_INDEX_API const char *kan_resource_index_native_name_iterator_get_path (
+    struct kan_resource_index_native_name_iterator_t *iterator);
+
+/// \brief Advances given iterator if possible.
+RESOURCE_INDEX_API void kan_resource_index_native_name_iterator_advance (struct kan_resource_index_native_name_iterator_t *iterator);
 
 /// \brief Destroys given resources index.
 RESOURCE_INDEX_API void kan_resource_index_destroy (kan_resource_index_t index);

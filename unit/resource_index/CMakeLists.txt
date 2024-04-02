@@ -3,7 +3,7 @@ concrete_include (PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
 concrete_sources ("*.c")
 
 concrete_require (SCOPE PUBLIC ABSTRACT reflection CONCRETE_INTERFACE container)
-concrete_require (SCOPE PRIVATE ABSTRACT hash log)
+concrete_require (SCOPE PRIVATE ABSTRACT log)
 
 c_interface_scanner_setup (GLOB "*.h" "*.c")
 reflection_generator_setup (GLOB "*.h" "*.c")
