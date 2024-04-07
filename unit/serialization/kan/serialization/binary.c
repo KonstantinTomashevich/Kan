@@ -1872,7 +1872,7 @@ static inline kan_bool_t ensure_dynamic_array_read_suffix_ready (struct serializ
 
         top_state->suffix_dynamic_array.items_processed = 0u;
         kan_dynamic_array_set_capacity (array, top_state->suffix_dynamic_array.items_total);
-        array->size = top_state->suffix_dynamic_array.items_total;
+        array->size = 0u;
         top_state->suffix_initialized = KAN_TRUE;
     }
 
@@ -2102,6 +2102,7 @@ enum kan_serialization_state_t kan_serialization_binary_reader_step (kan_seriali
                 }
 
                 ++top_state->suffix_dynamic_array.items_processed;
+                ++array->size;
             }
 
             if (top_state->suffix_dynamic_array.items_processed >= top_state->suffix_dynamic_array.items_total)
@@ -2129,6 +2130,7 @@ enum kan_serialization_state_t kan_serialization_binary_reader_step (kan_seriali
                 }
 
                 ++top_state->suffix_dynamic_array.items_processed;
+                ++array->size;
             }
 
             if (top_state->suffix_dynamic_array.items_processed >= top_state->suffix_dynamic_array.items_total)
@@ -2169,6 +2171,7 @@ enum kan_serialization_state_t kan_serialization_binary_reader_step (kan_seriali
                                                               KAN_FALSE);
 
                 ++top_state->suffix_dynamic_array.items_processed;
+                ++array->size;
             }
 
             if (top_state->suffix_dynamic_array.items_processed >= top_state->suffix_dynamic_array.items_total)
@@ -2204,7 +2207,7 @@ enum kan_serialization_state_t kan_serialization_binary_reader_step (kan_seriali
 
                 top_state->suffix_patch_dynamic_array.array.items_processed = 0u;
                 kan_dynamic_array_set_capacity (array, top_state->suffix_patch_dynamic_array.array.items_total);
-                array->size = top_state->suffix_patch_dynamic_array.array.items_total;
+                array->size = 0u;
                 top_state->suffix_initialized = KAN_TRUE;
             }
 
@@ -2236,6 +2239,7 @@ enum kan_serialization_state_t kan_serialization_binary_reader_step (kan_seriali
                             state->common.script_storage->registry,
                             top_state->suffix_patch_dynamic_array.current_patch.type_name));
                     ++top_state->suffix_patch_dynamic_array.array.items_processed;
+                    ++array->size;
 
                     if (top_state->suffix_patch_dynamic_array.array.items_processed <
                         top_state->suffix_patch_dynamic_array.array.items_total)
