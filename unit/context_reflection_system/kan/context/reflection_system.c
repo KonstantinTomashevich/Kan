@@ -23,6 +23,13 @@ struct populate_connection_node_t
     kan_context_reflection_populate_t functor;
 };
 
+struct finalize_connection_node_t
+{
+    struct finalize_connection_node_t *next;
+    kan_context_system_handle_t other_system;
+    kan_context_reflection_finalize_t functor;
+};
+
 struct generated_connection_node_t
 {
     struct generated_connection_node_t *next;
@@ -135,6 +142,7 @@ struct generation_iteration_task_user_data_t
 struct reflection_system_t
 {
     struct populate_connection_node_t *first_populate_connection;
+    struct finalize_connection_node_t *first_finalize_connection;
     struct generated_connection_node_t *first_generated_connection;
     struct generation_iterate_connection_node_t *first_generation_iterate_connection;
     kan_allocation_group_t group;
@@ -147,6 +155,7 @@ static kan_context_system_handle_t reflection_system_create (kan_allocation_grou
     struct reflection_system_t *system = (struct reflection_system_t *) kan_allocate_general (
         group, sizeof (struct reflection_system_t), _Alignof (struct reflection_system_t));
     system->first_populate_connection = NULL;
+    system->first_finalize_connection = NULL;
     system->first_generated_connection = NULL;
     system->first_generation_iterate_connection = NULL;
     system->group = group;
@@ -385,6 +394,15 @@ static void reflection_system_generate (struct reflection_system_t *system)
              generation_context.first_changed_struct_this_iteration ||
              generation_context.first_changed_function_this_iteration);
 
+    KAN_LOG (reflection_system, KAN_LOG_INFO, "Calling connected finalization functors.")
+    struct finalize_connection_node_t *finalize_node = system->first_finalize_connection;
+
+    while (finalize_node)
+    {
+        finalize_node->functor (finalize_node->other_system, new_registry);
+        finalize_node = finalize_node->next;
+    }
+
     KAN_LOG (reflection_system, KAN_LOG_INFO, "Generation finished.")
     kan_stack_group_allocator_shutdown (&generation_context.temporary_allocator);
 
@@ -534,6 +552,19 @@ void kan_reflection_system_connect_on_generated (kan_context_system_handle_t ref
                                                  kan_context_reflection_generated_t functor)
 {
     CONNECT (generated);
+}
+
+void kan_reflection_system_connect_on_finalize (kan_context_system_handle_t reflection_system,
+                                                kan_context_system_handle_t other_system,
+                                                kan_context_reflection_finalize_t functor)
+{
+    CONNECT (finalize);
+}
+
+void kan_reflection_system_disconnect_on_finalize (kan_context_system_handle_t reflection_system,
+                                                   kan_context_system_handle_t other_system)
+{
+    DISCONNECT (finalize)
 }
 
 void kan_reflection_system_disconnect_on_generated (kan_context_system_handle_t reflection_system,

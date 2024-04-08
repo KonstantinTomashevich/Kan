@@ -32,6 +32,10 @@
 ///   from the last iteration and submit new changes through received `kan_reflection_system_generation_iterator_t`.
 ///   Keep in mind that on first iteration there is no changes, only filled registry. Iterations are executed one
 ///   after another until no changes are made.
+/// - On-finalize connections are called. To connect other system to on-finalize routine use
+///   `kan_reflection_system_connect_on_finalize`. These connections can freely add everything to given registry.
+///   Goal of finalize is to add umbrella-like data that depends on everything generated, but should not trigger
+///   generation of other level of data. For example, universe mutator states that depend on reflection.
 /// - Now registry is considered generated and on-generated connections (`kan_reflection_system_connect_on_generated`)
 ///   are called.
 ///
@@ -60,6 +64,9 @@ KAN_C_HEADER_BEGIN
 #define KAN_CONTEXT_REFLECTION_SYSTEM_NAME "reflection_system_t"
 
 typedef void (*kan_context_reflection_populate_t) (kan_context_system_handle_t other_system,
+                                                   kan_reflection_registry_t registry);
+
+typedef void (*kan_context_reflection_finalize_t) (kan_context_system_handle_t other_system,
                                                    kan_reflection_registry_t registry);
 
 typedef void (*kan_context_reflection_generated_t) (kan_context_system_handle_t other_system,
@@ -92,6 +99,16 @@ CONTEXT_REFLECTION_SYSTEM_API void kan_reflection_system_connect_on_generation_i
 
 /// \brief Disconnect other system from on-generation-iterate delegates.
 CONTEXT_REFLECTION_SYSTEM_API void kan_reflection_system_disconnect_on_generation_iterate (
+    kan_context_system_handle_t reflection_system, kan_context_system_handle_t other_system);
+
+/// \brief Connect other system as on-finalize delegate.
+CONTEXT_REFLECTION_SYSTEM_API void kan_reflection_system_connect_on_finalize (
+    kan_context_system_handle_t reflection_system,
+    kan_context_system_handle_t other_system,
+    kan_context_reflection_finalize_t functor);
+
+/// \brief Disconnect other system from on-finalize delegates.
+CONTEXT_REFLECTION_SYSTEM_API void kan_reflection_system_disconnect_on_finalize (
     kan_context_system_handle_t reflection_system, kan_context_system_handle_t other_system);
 
 /// \brief Connect other system as on-generated delegate.
