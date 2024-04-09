@@ -44,6 +44,13 @@ struct generation_iterate_connection_node_t
     kan_context_reflection_generation_iterate_t functor;
 };
 
+struct cleanup_connection_node_t
+{
+    struct cleanup_connection_node_t *next;
+    kan_context_system_handle_t other_system;
+    kan_context_reflection_cleanup_t functor;
+};
+
 struct enum_event_entry_node_t
 {
     struct enum_event_entry_node_t *next;
@@ -145,6 +152,7 @@ struct reflection_system_t
     struct finalize_connection_node_t *first_finalize_connection;
     struct generated_connection_node_t *first_generated_connection;
     struct generation_iterate_connection_node_t *first_generation_iterate_connection;
+    struct cleanup_connection_node_t *first_cleanup_connection;
     kan_allocation_group_t group;
     kan_context_handle_t context;
     kan_reflection_registry_t current_registry;
@@ -158,6 +166,7 @@ static kan_context_system_handle_t reflection_system_create (kan_allocation_grou
     system->first_finalize_connection = NULL;
     system->first_generated_connection = NULL;
     system->first_generation_iterate_connection = NULL;
+    system->first_cleanup_connection = NULL;
     system->group = group;
     system->current_registry = KAN_INVALID_REFLECTION_REGISTRY;
 
@@ -417,6 +426,9 @@ static void reflection_system_generate (struct reflection_system_t *system)
         KAN_LOG (reflection_system, KAN_LOG_INFO, "Creating migration data.")
         migration_seed = kan_reflection_migration_seed_build (system->current_registry, new_registry);
         migrator = kan_reflection_struct_migrator_build (migration_seed);
+
+        KAN_LOG (reflection_system, KAN_LOG_INFO, "Migrating patches.")
+        kan_reflection_struct_migrator_migrate_patches (migrator, system->current_registry, new_registry);
     }
 
     while (generated_node)
@@ -427,15 +439,21 @@ static void reflection_system_generate (struct reflection_system_t *system)
 
     if (system->current_registry != KAN_INVALID_REFLECTION_REGISTRY)
     {
-        KAN_LOG (reflection_system, KAN_LOG_INFO, "Migrating patches.")
-        kan_reflection_struct_migrator_migrate_patches (migrator, system->current_registry, new_registry);
-
         KAN_LOG (reflection_system, KAN_LOG_INFO, "Destroying migration data.")
         kan_reflection_struct_migrator_destroy (migrator);
         kan_reflection_migration_seed_destroy (migration_seed);
 
         KAN_LOG (reflection_system, KAN_LOG_INFO, "Destroying old reflection registry.")
         kan_reflection_registry_destroy (system->current_registry);
+
+        KAN_LOG (reflection_system, KAN_LOG_INFO, "Calling connected cleanup functors.")
+        struct cleanup_connection_node_t *cleanup_node = system->first_cleanup_connection;
+
+        while (cleanup_node)
+        {
+            cleanup_node->functor (cleanup_node->other_system);
+            cleanup_node = cleanup_node->next;
+        }
     }
 
     system->current_registry = new_registry;
@@ -465,8 +483,10 @@ static void reflection_system_destroy (kan_context_system_handle_t handle)
 {
     struct reflection_system_t *system = (struct reflection_system_t *) handle;
     KAN_ASSERT (!system->first_populate_connection)
+    KAN_ASSERT (!system->first_finalize_connection)
     KAN_ASSERT (!system->first_generated_connection)
     KAN_ASSERT (!system->first_generation_iterate_connection)
+    KAN_ASSERT (!system->first_cleanup_connection)
 
     if (system->current_registry != KAN_INVALID_REFLECTION_REGISTRY)
     {
@@ -547,13 +567,6 @@ void kan_reflection_system_disconnect_on_generation_iterate (kan_context_system_
     DISCONNECT (generation_iterate)
 }
 
-void kan_reflection_system_connect_on_generated (kan_context_system_handle_t reflection_system,
-                                                 kan_context_system_handle_t other_system,
-                                                 kan_context_reflection_generated_t functor)
-{
-    CONNECT (generated);
-}
-
 void kan_reflection_system_connect_on_finalize (kan_context_system_handle_t reflection_system,
                                                 kan_context_system_handle_t other_system,
                                                 kan_context_reflection_finalize_t functor)
@@ -567,8 +580,28 @@ void kan_reflection_system_disconnect_on_finalize (kan_context_system_handle_t r
     DISCONNECT (finalize)
 }
 
+void kan_reflection_system_connect_on_generated (kan_context_system_handle_t reflection_system,
+                                                 kan_context_system_handle_t other_system,
+                                                 kan_context_reflection_generated_t functor)
+{
+    CONNECT (generated);
+}
+
 void kan_reflection_system_disconnect_on_generated (kan_context_system_handle_t reflection_system,
-                                                    kan_context_system_handle_t other_system) {DISCONNECT (generated)}
+                                                    kan_context_system_handle_t other_system)
+{
+    DISCONNECT (generated)
+}
+
+void kan_reflection_system_connect_on_cleanup (kan_context_system_handle_t reflection_system,
+                                               kan_context_system_handle_t other_system,
+                                               kan_context_reflection_cleanup_t functor)
+{
+    CONNECT (cleanup);
+}
+
+void kan_reflection_system_disconnect_on_cleanup (kan_context_system_handle_t reflection_system,
+                                                  kan_context_system_handle_t other_system) {DISCONNECT (cleanup)}
 
 #undef CONNECT
 #undef DISCONNECT

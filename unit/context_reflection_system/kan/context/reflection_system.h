@@ -38,6 +38,9 @@
 ///   generation of other level of data. For example, universe mutator states that depend on reflection.
 /// - Now registry is considered generated and on-generated connections (`kan_reflection_system_connect_on_generated`)
 ///   are called.
+/// - After all on-generated connections are executed, if old registry existed it is destroyed. After destruction of
+///   old registry on-cleanup connections are called. They provide opportunity for reflection generators to cleanup
+///   data is guaranteed to be unused now.
 ///
 /// This algorithm makes it possible to create complex interconnected generation logic without explicitly setting
 /// dependencies between different generators. It might not be good for performance, but makes generation a lot easier.
@@ -81,6 +84,8 @@ typedef void (*kan_context_reflection_generation_iterate_t) (kan_context_system_
                                                              kan_reflection_system_generation_iterator_t iterator,
                                                              uint64_t iteration_index);
 
+typedef void (*kan_context_reflection_cleanup_t) (kan_context_system_handle_t other_system);
+
 /// \brief Connect other system as on-populate delegate.
 CONTEXT_REFLECTION_SYSTEM_API void kan_reflection_system_connect_on_populate (
     kan_context_system_handle_t reflection_system,
@@ -119,6 +124,16 @@ CONTEXT_REFLECTION_SYSTEM_API void kan_reflection_system_connect_on_generated (
 
 /// \brief Disconnect other system from on-generated delegates.
 CONTEXT_REFLECTION_SYSTEM_API void kan_reflection_system_disconnect_on_generated (
+    kan_context_system_handle_t reflection_system, kan_context_system_handle_t other_system);
+
+/// \brief Connect other system as on-cleanup delegate.
+CONTEXT_REFLECTION_SYSTEM_API void kan_reflection_system_connect_on_cleanup (
+    kan_context_system_handle_t reflection_system,
+    kan_context_system_handle_t other_system,
+    kan_context_reflection_cleanup_t functor);
+
+/// \brief Disconnect other system from on-cleanup delegates.
+CONTEXT_REFLECTION_SYSTEM_API void kan_reflection_system_disconnect_on_cleanup (
     kan_context_system_handle_t reflection_system, kan_context_system_handle_t other_system);
 
 /// \brief Returns latest reflection registry if it exists.
