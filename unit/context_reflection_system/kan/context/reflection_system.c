@@ -1,4 +1,5 @@
 #include <stddef.h>
+#include <string.h>
 
 #include <kan/container/stack_group_allocator.h>
 #include <kan/context/reflection_system.h>
@@ -49,6 +50,18 @@ struct cleanup_connection_node_t
     struct cleanup_connection_node_t *next;
     kan_context_system_handle_t other_system;
     kan_context_reflection_cleanup_t functor;
+};
+
+struct reflection_generator_node_t
+{
+    struct reflection_generator_node_t *next;
+    void *instance;
+    kan_allocation_group_t instance_group;
+
+    const struct kan_reflection_struct_t *type;
+    const struct kan_reflection_function_t *bootstrap_function;
+    const struct kan_reflection_function_t *iterate_function;
+    const struct kan_reflection_function_t *finalize_function;
 };
 
 struct enum_event_entry_node_t
@@ -143,7 +156,8 @@ struct generation_iteration_task_user_data_t
     struct generation_iterator_t iterator;
     kan_reflection_registry_t new_registry;
     uint64_t iteration_index;
-    struct generation_iterate_connection_node_t *node;
+    struct generation_iterate_connection_node_t *connection_node;
+    struct reflection_generator_node_t *generator_node;
 };
 
 struct reflection_system_t
@@ -153,9 +167,13 @@ struct reflection_system_t
     struct generated_connection_node_t *first_generated_connection;
     struct generation_iterate_connection_node_t *first_generation_iterate_connection;
     struct cleanup_connection_node_t *first_cleanup_connection;
+
     kan_allocation_group_t group;
     kan_context_handle_t context;
     kan_reflection_registry_t current_registry;
+
+    kan_allocation_group_t reflection_generator_allocation_group;
+    struct reflection_generator_node_t *current_registry_first_generator;
 };
 
 static kan_context_system_handle_t reflection_system_create (kan_allocation_group_t group, void *user_config)
@@ -167,8 +185,13 @@ static kan_context_system_handle_t reflection_system_create (kan_allocation_grou
     system->first_generated_connection = NULL;
     system->first_generation_iterate_connection = NULL;
     system->first_cleanup_connection = NULL;
+
     system->group = group;
     system->current_registry = KAN_INVALID_REFLECTION_REGISTRY;
+
+    system->reflection_generator_allocation_group =
+        kan_allocation_group_get_child (system->group, "reflection_generators");
+    system->current_registry_first_generator = NULL;
 
     return (kan_context_system_handle_t) system;
 }
@@ -176,8 +199,162 @@ static kan_context_system_handle_t reflection_system_create (kan_allocation_grou
 static void call_generation_iterate_task (uint64_t user_data)
 {
     struct generation_iteration_task_user_data_t *data = (struct generation_iteration_task_user_data_t *) user_data;
-    data->node->functor (data->node->other_system, data->new_registry,
-                         (kan_reflection_system_generation_iterator_t) &data->iterator, data->iteration_index);
+    if (data->connection_node)
+    {
+        data->connection_node->functor (data->connection_node->other_system, data->new_registry,
+                                        (kan_reflection_system_generation_iterator_t) &data->iterator,
+                                        data->iteration_index);
+    }
+    else
+    {
+        KAN_ASSERT (data->generator_node)
+        if (data->generator_node->iterate_function)
+        {
+            struct
+            {
+                void *instance;
+                kan_reflection_registry_t registry;
+                kan_reflection_system_generation_iterator_t iterator;
+                uint64_t iteration_index;
+            } arguments = {
+                .instance = data->generator_node->instance,
+                .registry = data->new_registry,
+                .iterator = (kan_reflection_system_generation_iterator_t) &data->iterator,
+                .iteration_index = data->iteration_index,
+            };
+
+            data->generator_node->iterate_function->call (data->generator_node->iterate_function->call_user_data, NULL,
+                                                          &arguments);
+        }
+    }
+}
+
+static void add_to_reflection_generators_if_needed (kan_reflection_registry_t registry,
+                                                    const struct kan_reflection_struct_t *type,
+                                                    uint64_t current_iterator_for_bootstrap,
+                                                    struct reflection_generator_node_t **first_generator_node,
+                                                    kan_allocation_group_t allocation_group)
+{
+    if (strncmp (type->name, "kan_reflection_generator_", 25u) != 0)
+    {
+        // Not a reflection generator.
+        return;
+    }
+
+    const char *generator_name_begin = type->name + 25u;
+    const char *generator_name_end = generator_name_begin;
+
+    while (*generator_name_end)
+    {
+        ++generator_name_end;
+    }
+
+    if (generator_name_end - generator_name_begin > 2u && *(generator_name_end - 1u) == 't' &&
+        *(generator_name_end - 2u) == '_')
+    {
+        // Remove "_t" suffix.
+        generator_name_end -= 2u;
+    }
+
+    if (generator_name_begin == generator_name_end)
+    {
+        // Something wrong with naming, we cannot extract non-zero name.
+        return;
+    }
+
+    kan_interned_string_t generator_name = kan_char_sequence_intern (generator_name_begin, generator_name_end);
+    struct reflection_generator_node_t *node = (struct reflection_generator_node_t *) kan_allocate_batched (
+        allocation_group, sizeof (struct reflection_generator_node_t));
+
+    node->next = *first_generator_node;
+    *first_generator_node = node;
+
+    node->instance_group = kan_allocation_group_get_child (allocation_group, generator_name);
+    node->instance = kan_allocate_general (node->instance_group, type->size, type->alignment);
+
+    if (type->init)
+    {
+        type->init (type->functor_user_data, node->instance);
+    }
+
+    node->type = type;
+#define NAME_BUFFER_SIZE 256u
+    char name_buffer[NAME_BUFFER_SIZE];
+    snprintf (name_buffer, NAME_BUFFER_SIZE, "kan_reflection_generator_%s_bootstrap", generator_name);
+    node->bootstrap_function = kan_reflection_registry_query_function (registry, kan_string_intern (name_buffer));
+
+    snprintf (name_buffer, NAME_BUFFER_SIZE, "kan_reflection_generator_%s_iterate", generator_name);
+    node->iterate_function = kan_reflection_registry_query_function (registry, kan_string_intern (name_buffer));
+
+    snprintf (name_buffer, NAME_BUFFER_SIZE, "kan_reflection_generator_%s_finalize", generator_name);
+    node->finalize_function = kan_reflection_registry_query_function (registry, kan_string_intern (name_buffer));
+#undef NAME_BUFFER_SIZE
+
+    if (node->bootstrap_function)
+    {
+        if (node->bootstrap_function->arguments_count != 2u ||
+            node->bootstrap_function->arguments[0u].archetype != KAN_REFLECTION_ARCHETYPE_STRUCT_POINTER ||
+            node->bootstrap_function->arguments[0u].archetype_struct_pointer.type_name != type->name ||
+            node->bootstrap_function->arguments[1u].archetype != KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT ||
+            node->bootstrap_function->arguments[1u].size != sizeof (uint64_t))
+        {
+            KAN_LOG (reflection_system, KAN_LOG_ERROR,
+                     "Bootstrap function should have two arguments -- instance pointer and first iteration index. But "
+                     "\"%s\" is not compatible with this requirements.",
+                     node->bootstrap_function->name)
+            node->bootstrap_function = NULL;
+        }
+    }
+
+    if (node->iterate_function)
+    {
+        if (node->iterate_function->arguments_count != 4u ||
+            node->iterate_function->arguments[0u].archetype != KAN_REFLECTION_ARCHETYPE_STRUCT_POINTER ||
+            node->iterate_function->arguments[0u].archetype_struct_pointer.type_name != type->name ||
+            node->iterate_function->arguments[1u].archetype != KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT ||
+            node->iterate_function->arguments[1u].size != sizeof (uint64_t) ||
+            node->iterate_function->arguments[2u].archetype != KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT ||
+            node->iterate_function->arguments[2u].size != sizeof (uint64_t) ||
+            node->iterate_function->arguments[3u].archetype != KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT ||
+            node->iterate_function->arguments[3u].size != sizeof (uint64_t))
+        {
+            KAN_LOG (reflection_system, KAN_LOG_ERROR,
+                     "Iterate function should have 4 arguments -- instance pointer, registry, generation iterator and "
+                     "iteration index. But \"%s\" is not compatible with this requirements.",
+                     node->iterate_function->name)
+            node->iterate_function = NULL;
+        }
+    }
+
+    if (node->finalize_function)
+    {
+        if (node->finalize_function->arguments_count != 2u ||
+            node->finalize_function->arguments[0u].archetype != KAN_REFLECTION_ARCHETYPE_STRUCT_POINTER ||
+            node->finalize_function->arguments[0u].archetype_struct_pointer.type_name != type->name ||
+            node->finalize_function->arguments[1u].archetype != KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT ||
+            node->finalize_function->arguments[1u].size != sizeof (uint64_t))
+        {
+            KAN_LOG (reflection_system, KAN_LOG_ERROR,
+                     "Finalize function should have two arguments -- instance pointer and registry to finalize. But "
+                     "\"%s\" is not compatible with this requirements.",
+                     node->finalize_function->name)
+            node->finalize_function = NULL;
+        }
+    }
+
+    if (node->bootstrap_function)
+    {
+        struct
+        {
+            void *instance;
+            uint64_t first_iteration_index;
+        } arguments = {
+            .instance = node->instance,
+            .first_iteration_index = current_iterator_for_bootstrap,
+        };
+
+        node->bootstrap_function->call (node->bootstrap_function->call_user_data, NULL, &arguments);
+    }
 }
 
 static void reflection_system_generate (struct reflection_system_t *system)
@@ -194,6 +371,20 @@ static void reflection_system_generate (struct reflection_system_t *system)
     {
         populate_node->functor (populate_node->other_system, new_registry);
         populate_node = populate_node->next;
+    }
+
+    KAN_LOG (reflection_system, KAN_LOG_INFO, "Collecting initial reflection generators.")
+    struct reflection_generator_node_t *first_reflection_generator = NULL;
+
+    kan_reflection_registry_struct_iterator_t struct_iterator =
+        kan_reflection_registry_struct_iterator_create (new_registry);
+    const struct kan_reflection_struct_t *struct_to_scan;
+
+    while ((struct_to_scan = kan_reflection_registry_struct_iterator_get (struct_iterator)))
+    {
+        add_to_reflection_generators_if_needed (new_registry, struct_to_scan, 0u, &first_reflection_generator,
+                                                system->reflection_generator_allocation_group);
+        struct_iterator = kan_reflection_registry_struct_iterator_next (struct_iterator);
     }
 
     KAN_LOG (reflection_system, KAN_LOG_INFO, "Starting generation iteration.")
@@ -270,6 +461,9 @@ static void reflection_system_generate (struct reflection_system_t *system)
         {
             kan_reflection_registry_add_struct (new_registry,
                                                 generation_context.first_added_struct_this_iteration->data);
+            add_to_reflection_generators_if_needed (
+                new_registry, generation_context.first_added_struct_this_iteration->data, iteration_index,
+                &first_reflection_generator, system->reflection_generator_allocation_group);
             generation_context.first_added_struct_this_iteration =
                 generation_context.first_added_struct_this_iteration->next;
         }
@@ -381,9 +575,46 @@ static void reflection_system_generate (struct reflection_system_t *system)
                         },
                     .new_registry = new_registry,
                     .iteration_index = iteration_index,
-                    .node = iterate_node,
+                    .connection_node = iterate_node,
+                    .generator_node = NULL,
                 })
             iterate_node = iterate_node->next;
+        }
+
+        struct reflection_generator_node_t *reflection_generator_node = first_reflection_generator;
+        while (reflection_generator_node)
+        {
+            KAN_CPU_TASK_LIST_USER_STRUCT (
+                &list_node, &generation_context.temporary_allocator, task_name, call_generation_iterate_task,
+                FOREGROUND, struct generation_iteration_task_user_data_t,
+                {
+                    .iterator =
+                        (struct generation_iterator_t) {
+                            .generation_context = &generation_context,
+                            .current_added_enum = generation_context.first_added_enum_previous_iteration,
+                            .current_added_struct = generation_context.first_added_struct_previous_iteration,
+                            .current_added_function = generation_context.first_added_function_previous_iteration,
+                            .current_changed_enum = generation_context.first_changed_enum_previous_iteration,
+                            .current_changed_struct = generation_context.first_changed_struct_previous_iteration,
+                            .current_changed_function = generation_context.first_changed_function_previous_iteration,
+
+                            .current_added_enum_meta = generation_context.first_added_enum_meta_previous_iteration,
+                            .current_added_enum_value_meta =
+                                generation_context.first_added_enum_value_meta_previous_iteration,
+                            .current_added_struct_meta = generation_context.first_added_struct_meta_previous_iteration,
+                            .current_added_struct_field_meta =
+                                generation_context.first_added_struct_field_meta_previous_iteration,
+                            .current_added_function_meta =
+                                generation_context.first_added_function_meta_previous_iteration,
+                            .current_added_function_argument_meta =
+                                generation_context.first_added_function_argument_meta_previous_iteration,
+                        },
+                    .new_registry = new_registry,
+                    .iteration_index = iteration_index,
+                    .connection_node = NULL,
+                    .generator_node = reflection_generator_node,
+                })
+            reflection_generator_node = reflection_generator_node->next;
         }
 
         if (list_node)
@@ -394,6 +625,7 @@ static void reflection_system_generate (struct reflection_system_t *system)
             kan_cpu_job_wait (job);
         }
 
+        kan_stack_group_allocator_reset (&generation_context.temporary_allocator);
         ++iteration_index;
 
     } while (generation_context.first_added_enum_this_iteration ||
@@ -410,6 +642,28 @@ static void reflection_system_generate (struct reflection_system_t *system)
     {
         finalize_node->functor (finalize_node->other_system, new_registry);
         finalize_node = finalize_node->next;
+    }
+
+    struct reflection_generator_node_t *reflection_generator_node = first_reflection_generator;
+    while (reflection_generator_node)
+    {
+        struct reflection_generator_node_t *next = reflection_generator_node->next;
+        if (reflection_generator_node->finalize_function)
+        {
+            struct
+            {
+                void *instance;
+                kan_reflection_registry_t registry;
+            } arguments = {
+                .instance = reflection_generator_node->instance,
+                .registry = new_registry,
+            };
+
+            reflection_generator_node->finalize_function->call (
+                reflection_generator_node->finalize_function->call_user_data, NULL, &arguments);
+        }
+
+        reflection_generator_node = next;
     }
 
     KAN_LOG (reflection_system, KAN_LOG_INFO, "Generation finished.")
@@ -454,9 +708,27 @@ static void reflection_system_generate (struct reflection_system_t *system)
             cleanup_node->functor (cleanup_node->other_system);
             cleanup_node = cleanup_node->next;
         }
+
+        while (system->current_registry_first_generator)
+        {
+            struct reflection_generator_node_t *next = system->current_registry_first_generator->next;
+            if (system->current_registry_first_generator->type->shutdown)
+            {
+                system->current_registry_first_generator->type->shutdown (
+                    system->current_registry_first_generator->type->functor_user_data,
+                    system->current_registry_first_generator->instance);
+            }
+
+            kan_free_general (system->current_registry_first_generator->instance_group,
+                              system->current_registry_first_generator->instance,
+                              system->current_registry_first_generator->type->size);
+            kan_free_batched (system->reflection_generator_allocation_group, system->current_registry_first_generator);
+            system->current_registry_first_generator = next;
+        }
     }
 
     system->current_registry = new_registry;
+    system->current_registry_first_generator = first_reflection_generator;
     KAN_LOG (reflection_system, KAN_LOG_INFO, "Generation routine finished successfully.")
 }
 
@@ -491,6 +763,23 @@ static void reflection_system_destroy (kan_context_system_handle_t handle)
     if (system->current_registry != KAN_INVALID_REFLECTION_REGISTRY)
     {
         kan_reflection_registry_destroy (system->current_registry);
+    }
+
+    while (system->current_registry_first_generator)
+    {
+        struct reflection_generator_node_t *next = system->current_registry_first_generator->next;
+        if (system->current_registry_first_generator->type->shutdown)
+        {
+            system->current_registry_first_generator->type->shutdown (
+                system->current_registry_first_generator->type->functor_user_data,
+                system->current_registry_first_generator->instance);
+        }
+
+        kan_free_general (system->current_registry_first_generator->instance_group,
+                          system->current_registry_first_generator->instance,
+                          system->current_registry_first_generator->type->size);
+        kan_free_batched (system->reflection_generator_allocation_group, system->current_registry_first_generator);
+        system->current_registry_first_generator = next;
     }
 
     kan_free_general (system->group, system, sizeof (struct kan_context_system_api_t));

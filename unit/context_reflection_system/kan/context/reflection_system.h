@@ -54,6 +54,39 @@
 /// safe only during iterative generation and is not safe in other situations. This behaviour might be improved later.
 /// \endparblock
 ///
+/// \par Automatic reflection generators
+/// \parblock
+/// Reflection system supports extraction of special "automatic reflection generators" during reflection generation
+/// process. These generators might be created during population or by other generator during iteration stage.
+/// Reflection generators make it possible to augment reflection from reflection itself, making it a powerful and
+/// convenient tool to extend reflection generation.
+///
+/// Reflection generator itself is a structure, which name follows pattern "kan_reflection_generator_<name>_t", where
+/// name is an arbitrary name used to extract reflection generator functions from reflection. There are several
+/// functions that might be implemented for reflection generators:
+///
+/// - kan_reflection_generator_<name>_bootstrap (struct kan_reflection_generator_<name>_t *instance,
+///   uint64_t bootstrap_iteration_index): This function is always called after reflection generator creation and
+///   informs it about iteration index on which this generator is created.
+/// - kan_reflection_generator_<name>_iterate (struct kan_reflection_generator_<name>_t *instance,
+///   kan_reflection_registry_t registry, kan_reflection_system_generation_iterator_t iterator,
+///   uint64_t iteration_index): Called during generation iteration. Follows the same rules as for generation
+///   iteration connections.
+/// - kan_reflection_generator_<name>_finalize (struct kan_reflection_generator_<name>_t *instance,
+///   kan_reflection_registry_t registry): Called during finalize. Follows the same rules as for on-finalize
+///   connections.
+///
+/// There is an approximate reflection generator lifetime:
+/// - Reflection generator is discovered after population or after generation iteration.
+/// - Reflection generator instance is created and initialized.
+/// - `bootstrap` function for reflection generator is called.
+/// - During generation iteration, `iterate` function might be called several times and is called at least once.
+/// - After generation iteration, `finalize` is called.
+/// - Reflection generator persists after generation with its data, because it is expected to store the generated
+///   reflection data inside itself.
+/// - Reflection generator is shut down when registry with generated reflection data is destroyed.
+/// \endparblock
+///
 /// \par Thread safety
 /// \parblock
 /// Reflection system functions are not thread safe. `kan_reflection_system_generation_iterator_t` is not thread safe
