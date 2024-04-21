@@ -392,6 +392,9 @@ UNIVERSE_API void kan_universe_migrate (kan_universe_t universe,
                                         kan_reflection_migration_seed_t migration_seed,
                                         kan_reflection_struct_migrator_t migrator);
 
+/// \brief Returns universe reflection registry.
+UNIVERSE_API kan_reflection_registry_t kan_universe_get_reflection_registry (kan_universe_t universe);
+
 /// \brief Returns context to which this universe is bound.
 UNIVERSE_API kan_context_handle_t kan_universe_get_context (kan_universe_t universe);
 
