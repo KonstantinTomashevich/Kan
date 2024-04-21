@@ -4436,7 +4436,7 @@ static struct indexed_storage_node_t *query_indexed_storage_across_hierarchy (st
 }
 
 kan_repository_indexed_storage_t kan_repository_indexed_storage_open (kan_repository_t repository,
-                                                                      kan_interned_string_t type_name)
+                                                                      const char *type_name)
 {
     struct repository_t *repository_data = (struct repository_t *) repository;
     KAN_ASSERT (repository_data->mode == REPOSITORY_MODE_PLANNING)
@@ -8094,8 +8094,7 @@ static struct event_queue_node_t *event_queue_node_allocate (kan_allocation_grou
     return node;
 }
 
-kan_repository_event_storage_t kan_repository_event_storage_open (kan_repository_t repository,
-                                                                  kan_interned_string_t type_name)
+kan_repository_event_storage_t kan_repository_event_storage_open (kan_repository_t repository, const char *type_name)
 {
     struct repository_t *repository_data = (struct repository_t *) repository;
     KAN_ASSERT (repository_data->mode == REPOSITORY_MODE_PLANNING)
