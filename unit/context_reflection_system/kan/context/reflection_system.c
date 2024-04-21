@@ -274,7 +274,9 @@ static void add_to_reflection_generators_if_needed (kan_reflection_registry_t re
 
     if (type->init)
     {
+        kan_allocation_group_stack_push (node->instance_group);
         type->init (type->functor_user_data, node->instance);
+        kan_allocation_group_stack_pop ();
     }
 
     node->type = type;
