@@ -261,12 +261,12 @@ struct resource_provider_state_t
 
     struct kan_stream_t *serialized_index_stream;
     kan_serialization_binary_reader_t serialized_index_reader;
-    struct kan_serialized_resource_index_t serialized_index_read_buffer;
+    struct kan_resource_index_t serialized_index_read_buffer;
 
     struct kan_stream_t *string_registry_stream;
     kan_serialization_interned_string_registry_reader_t string_registry_reader;
 
-    kan_interned_string_t interned_kan_serialized_resource_index_t;
+    kan_interned_string_t interned_kan_resource_index_t;
     kan_interned_string_t interned_resource_provider_server;
 
     struct kan_repository_singleton_write_query_t write__kan_resource_provider_singleton;
@@ -460,7 +460,7 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void resource_provider_state_init (struct res
                                     kan_allocation_group_get_child (data->my_allocation_group, "temporary"),
                                     KAN_UNIVERSE_RESOURCE_PROVIDER_TEMPORARY_CHUNK_SIZE);
 
-    data->interned_kan_serialized_resource_index_t = kan_string_intern ("kan_serialized_resource_index_t");
+    data->interned_kan_resource_index_t = kan_string_intern ("kan_resource_index_t");
     data->interned_resource_provider_server = kan_string_intern ("resource_provider_server");
 }
 
@@ -823,14 +823,14 @@ static void instantiate_resource_index (struct resource_provider_state_t *state,
 {
     for (uint64_t type_index = 0u; type_index < state->serialized_index_read_buffer.native.size; ++type_index)
     {
-        struct kan_serialized_resource_index_native_container_t *container =
-            &((struct kan_serialized_resource_index_native_container_t *)
+        struct kan_resource_index_native_container_t *container =
+            &((struct kan_resource_index_native_container_t *)
                   state->serialized_index_read_buffer.native.data)[type_index];
 
         for (uint64_t item_index = 0u; item_index < container->items.size; ++item_index)
         {
-            struct kan_serialized_resource_index_native_item_t *item =
-                &((struct kan_serialized_resource_index_native_item_t *) container->items.data)[item_index];
+            struct kan_resource_index_native_item_t *item =
+                &((struct kan_resource_index_native_item_t *) container->items.data)[item_index];
 
             add_native_entry (state, container->type, item->name, item->format, item->path, string_registry);
         }
@@ -838,8 +838,8 @@ static void instantiate_resource_index (struct resource_provider_state_t *state,
 
     for (uint64_t item_index = 0u; item_index < state->serialized_index_read_buffer.third_party.size; ++item_index)
     {
-        struct kan_serialized_resource_index_third_party_item_t *item =
-            &((struct kan_serialized_resource_index_third_party_item_t *)
+        struct kan_resource_index_third_party_item_t *item =
+            &((struct kan_resource_index_third_party_item_t *)
                   state->serialized_index_read_buffer.third_party.data)[item_index];
 
         add_third_party_entry (state, item->name, item->size, item->path);
@@ -2282,14 +2282,14 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void mutator_template_execute_resource_provid
                 {
                     kan_serialization_interned_string_registry_t registry =
                         state->string_registry_reader == KAN_INVALID_SERIALIZATION_INTERNED_STRING_REGISTRY_READER ?
-                            KAN_INVALID_REFLECTION_REGISTRY :
+                            KAN_INVALID_SERIALIZATION_INTERNED_STRING_REGISTRY :
                             kan_serialization_interned_string_registry_reader_get (state->string_registry_reader);
 
-                    kan_serialized_resource_index_init (&state->serialized_index_read_buffer);
+                    kan_resource_index_init (&state->serialized_index_read_buffer);
                     state->serialized_index_reader = kan_serialization_binary_reader_create (
                         state->serialized_index_stream, &state->serialized_index_read_buffer,
-                        state->interned_kan_serialized_resource_index_t, state->shared_script_storage, registry,
-                        kan_serialized_resource_index_get_string_allocation_group ());
+                        state->interned_kan_resource_index_t, state->shared_script_storage, registry,
+                        kan_resource_index_get_string_allocation_group ());
                 }
 
                 switch (kan_serialization_binary_reader_step (state->serialized_index_reader))
@@ -2322,7 +2322,7 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void mutator_template_execute_resource_provid
                     }
 
                     instantiate_resource_index (state, string_registry);
-                    kan_serialized_resource_index_shutdown (&state->serialized_index_read_buffer);
+                    kan_resource_index_shutdown (&state->serialized_index_read_buffer);
                     kan_serialization_binary_reader_destroy (state->serialized_index_reader);
                     state->serialized_index_reader = KAN_INVALID_SERIALIZATION_BINARY_READER;
 
@@ -2346,7 +2346,7 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void mutator_template_execute_resource_provid
                         state->string_registry_reader = KAN_INVALID_SERIALIZATION_INTERNED_STRING_REGISTRY_READER;
                     }
 
-                    kan_serialized_resource_index_shutdown (&state->serialized_index_read_buffer);
+                    kan_resource_index_shutdown (&state->serialized_index_read_buffer);
                     kan_serialization_binary_reader_destroy (state->serialized_index_reader);
                     state->serialized_index_reader = KAN_INVALID_SERIALIZATION_BINARY_READER;
 
@@ -2474,7 +2474,7 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void mutator_template_undeploy_resource_provi
     {
         if (state->serialized_index_reader != KAN_INVALID_SERIALIZATION_BINARY_READER)
         {
-            kan_serialized_resource_index_shutdown (&state->serialized_index_read_buffer);
+            kan_resource_index_shutdown (&state->serialized_index_read_buffer);
             state->serialized_index_reader = KAN_INVALID_SERIALIZATION_BINARY_READER;
         }
 
