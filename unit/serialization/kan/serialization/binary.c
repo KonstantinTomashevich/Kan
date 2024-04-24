@@ -1704,7 +1704,7 @@ enum kan_serialization_state_t kan_serialization_interned_string_registry_writer
 void kan_serialization_interned_string_registry_writer_destroy (
     kan_serialization_interned_string_registry_writer_t writer)
 {
-    kan_free_general (interned_string_registry_read_allocation_group,
+    kan_free_general (interned_string_registry_write_allocation_group,
                       (struct interned_string_registry_writer_t *) writer,
                       sizeof (struct interned_string_registry_writer_t));
 }
