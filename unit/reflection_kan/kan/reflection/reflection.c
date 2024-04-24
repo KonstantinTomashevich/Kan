@@ -1397,7 +1397,6 @@ void kan_reflection_registry_destroy (kan_reflection_registry_t registry)
     }
 
     struct kan_bd_list_node_t *node = registry_struct->enum_storage.items.first;
-
     while (node)
     {
         struct kan_bd_list_node_t *next = node->next;

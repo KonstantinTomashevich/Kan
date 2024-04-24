@@ -3199,6 +3199,7 @@ static void value_index_shutdown_and_free (struct value_index_t *value_index)
     KAN_ASSERT (kan_atomic_int_get (&value_index->queries_count) == 0)
     kan_allocation_group_t value_index_allocation_group = value_index->storage->value_index_allocation_group;
     struct value_index_node_t *index_node = (struct value_index_node_t *) value_index->hash_storage.items.first;
+    KAN_ASSERT (value_index->hash_storage.items.size > 0u || !index_node)
 
     while (index_node)
     {
@@ -3892,7 +3893,9 @@ static void execute_migration (uint64_t user_data)
 
     if (data->new_type->init)
     {
+        kan_allocation_group_stack_push (data->allocation_group);
         data->new_type->init (data->new_type->functor_user_data, new_object);
+        kan_allocation_group_stack_pop ();
     }
 
     kan_reflection_struct_migrator_migrate_instance (data->migrator, data->new_type->name, old_object, new_object);
@@ -4270,7 +4273,9 @@ kan_repository_singleton_storage_t kan_repository_singleton_storage_open (kan_re
 
         if (storage->type->init)
         {
+            kan_allocation_group_stack_push (storage_allocation_group);
             storage->type->init (storage->type->functor_user_data, storage->singleton);
+            kan_allocation_group_stack_pop ();
         }
 
         observation_buffer_definition_init (&storage->observation_buffer);
@@ -4984,7 +4989,9 @@ struct kan_repository_indexed_insertion_package_t kan_repository_indexed_insert_
 
     if (query_data->storage->type->init)
     {
+        kan_allocation_group_stack_push (query_data->storage->records_allocation_group);
         query_data->storage->type->init (query_data->storage->type->functor_user_data, package.record);
+        kan_allocation_group_stack_pop ();
     }
 
     return KAN_PUN_TYPE (struct indexed_insertion_package_t, struct kan_repository_indexed_insertion_package_t,
@@ -6390,7 +6397,7 @@ static inline struct indexed_interval_cursor_t indexed_storage_interval_query_ex
         cursor.end_node = min_node;
     }
 
-    if (cursor.current_node)
+    if (cursor.current_node && cursor.current_node != cursor.end_node)
     {
         cursor.sub_node = cursor.current_node->first_sub_node;
     }
@@ -8183,7 +8190,9 @@ struct kan_repository_event_insertion_package_t kan_repository_event_insert_quer
     package.event = kan_allocate_batched (query_data->storage->allocation_group, query_data->storage->type->size);
     if (query_data->storage->type->init)
     {
+        kan_allocation_group_stack_push (query_data->storage->allocation_group);
         query_data->storage->type->init (query_data->storage->type->functor_user_data, package.event);
+        kan_allocation_group_stack_pop ();
     }
 
     return KAN_PUN_TYPE (struct event_insertion_package_t, struct kan_repository_event_insertion_package_t, package);
