@@ -84,4 +84,17 @@ RESOURCE_INDEX_API void kan_resource_index_shutdown (struct kan_resource_index_t
 /// \brief Returns allocation group for allocating serialized resource index strings during deserialization.
 RESOURCE_INDEX_API kan_allocation_group_t kan_resource_index_get_string_allocation_group (void);
 
+/// \brief Helper for adding native entry to resource index data structure.
+RESOURCE_INDEX_API void kan_resource_index_add_native_entry (struct kan_resource_index_t *index,
+                                                             kan_interned_string_t type,
+                                                             kan_interned_string_t name,
+                                                             enum kan_resource_index_native_item_format_t format,
+                                                             const char *path);
+
+/// \brief Helper for adding third party entry to resource index data structure.
+RESOURCE_INDEX_API void kan_resource_index_add_third_party_entry (struct kan_resource_index_t *index,
+                                                                  kan_interned_string_t name,
+                                                                  const char *path,
+                                                                  uint64_t size);
+
 KAN_C_HEADER_END

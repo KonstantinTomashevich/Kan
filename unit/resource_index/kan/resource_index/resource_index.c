@@ -102,3 +102,79 @@ kan_allocation_group_t kan_resource_index_get_string_allocation_group (void)
     ensure_statics_initialized ();
     return allocation_group;
 }
+
+RESOURCE_INDEX_API void kan_resource_index_add_native_entry (struct kan_resource_index_t *index,
+                                                             kan_interned_string_t type,
+                                                             kan_interned_string_t name,
+                                                             enum kan_resource_index_native_item_format_t format,
+                                                             const char *path)
+{
+    struct kan_dynamic_array_t *items_array = NULL;
+    for (uint64_t type_index = 0u; type_index < index->native.size; ++type_index)
+    {
+        struct kan_resource_index_native_container_t *container =
+            &((struct kan_resource_index_native_container_t *) index->native.data)[type_index];
+
+        if (container->type == type)
+        {
+            items_array = &container->items;
+            break;
+        }
+    }
+
+    if (!items_array)
+    {
+        void *spot = kan_dynamic_array_add_last (&index->native);
+        if (!spot)
+        {
+            kan_dynamic_array_set_capacity (&index->native, index->native.capacity * 2u);
+            spot = kan_dynamic_array_add_last (&index->native);
+        }
+
+        struct kan_resource_index_native_container_t *new_container =
+            (struct kan_resource_index_native_container_t *) spot;
+        kan_resource_index_native_container_init (new_container);
+        new_container->type = type;
+        items_array = &new_container->items;
+    }
+
+    void *spot = kan_dynamic_array_add_last (items_array);
+    if (!spot)
+    {
+        kan_dynamic_array_set_capacity (items_array, items_array->capacity * 2u);
+        spot = kan_dynamic_array_add_last (items_array);
+    }
+
+    struct kan_resource_index_native_item_t *item = (struct kan_resource_index_native_item_t *) spot;
+    kan_resource_index_native_item_init (item);
+    item->name = name;
+    item->format = format;
+
+    const uint64_t path_length = strlen (path);
+    item->path =
+        kan_allocate_general (kan_resource_index_get_string_allocation_group (), path_length + 1u, _Alignof (char));
+    memcpy (item->path, path, path_length + 1u);
+}
+
+RESOURCE_INDEX_API void kan_resource_index_add_third_party_entry (struct kan_resource_index_t *index,
+                                                                  kan_interned_string_t name,
+                                                                  const char *path,
+                                                                  uint64_t size)
+{
+    void *spot = kan_dynamic_array_add_last (&index->third_party);
+    if (!spot)
+    {
+        kan_dynamic_array_set_capacity (&index->third_party, index->third_party.capacity * 2u);
+        spot = kan_dynamic_array_add_last (&index->third_party);
+    }
+
+    struct kan_resource_index_third_party_item_t *item = (struct kan_resource_index_third_party_item_t *) spot;
+    kan_resource_index_third_party_item_init (item);
+    item->name = name;
+    item->size = size;
+
+    const uint64_t path_length = strlen (path);
+    item->path =
+        kan_allocate_general (kan_resource_index_get_string_allocation_group (), path_length + 1u, _Alignof (char));
+    memcpy (item->path, path, path_length + 1u);
+}
