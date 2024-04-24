@@ -10,6 +10,8 @@
 
 KAN_C_HEADER_BEGIN
 
+// TODO: Docs.
+
 #define KAN_RESOURCE_PROVIDER_MUTATOR_GROUP "resource_provider"
 #define KAN_RESOURCE_PROVIDER_CONFIGURATION "resource_provider"
 #define KAN_RESOURCE_PROVIDER_CONTAINER_TYPE_PREFIX "resource_provider_container_"

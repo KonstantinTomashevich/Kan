@@ -1006,12 +1006,12 @@ static void workflow_task_start_function (uint64_t user_data)
                                      KAN_CPU_DISPATCH_QUEUE_FOREGROUND);
 
     kan_cpu_task_handle_t task_handle = kan_cpu_job_dispatch_task (node->job,
-                               (struct kan_cpu_task_t) {
-                                   .name = node->name,
-                                   .function = workflow_task_execute_function,
-                                   .user_data = user_data,
-                               },
-                               KAN_CPU_DISPATCH_QUEUE_FOREGROUND);
+                                                                   (struct kan_cpu_task_t) {
+                                                                       .name = node->name,
+                                                                       .function = workflow_task_execute_function,
+                                                                       .user_data = user_data,
+                                                                   },
+                                                                   KAN_CPU_DISPATCH_QUEUE_FOREGROUND);
 
     if (task_handle != KAN_INVALID_CPU_TASK_HANDLE)
     {
