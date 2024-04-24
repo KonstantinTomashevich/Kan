@@ -346,7 +346,6 @@ static void save_map_binary (struct map_t *map,
 
     kan_serialization_binary_writer_destroy (writer);
     buffered_file_stream->operations->close (buffered_file_stream);
-    direct_file_stream->operations->close (direct_file_stream);
 }
 
 static void load_map_binary (struct map_t *map,
@@ -377,7 +376,6 @@ static void load_map_binary (struct map_t *map,
 
     kan_serialization_binary_reader_destroy (reader);
     buffered_file_stream->operations->close (buffered_file_stream);
-    direct_file_stream->operations->close (direct_file_stream);
 }
 
 static void save_map_rd (struct map_t *map, kan_reflection_registry_t registry)
@@ -406,7 +404,6 @@ static void save_map_rd (struct map_t *map, kan_reflection_registry_t registry)
 
     kan_serialization_rd_writer_destroy (writer);
     buffered_file_stream->operations->close (buffered_file_stream);
-    direct_file_stream->operations->close (direct_file_stream);
 }
 
 static void load_map_rd (struct map_t *map, kan_reflection_registry_t registry)
@@ -435,7 +432,6 @@ static void load_map_rd (struct map_t *map, kan_reflection_registry_t registry)
 
     kan_serialization_rd_reader_destroy (reader);
     buffered_file_stream->operations->close (buffered_file_stream);
-    direct_file_stream->operations->close (direct_file_stream);
 }
 
 // \c_interface_scanner_disable
@@ -501,7 +497,6 @@ KAN_TEST_CASE (binary_with_interned_string_registry)
 
     kan_serialization_interned_string_registry_writer_destroy (registry_writer);
     buffered_file_stream->operations->close (buffered_file_stream);
-    direct_file_stream->operations->close (direct_file_stream);
 
     direct_file_stream = kan_direct_file_stream_open_for_read ("string_registry.bin", KAN_TRUE);
     buffered_file_stream = kan_random_access_stream_buffer_open_for_read (direct_file_stream, 1024u);
@@ -525,7 +520,6 @@ KAN_TEST_CASE (binary_with_interned_string_registry)
 
     kan_serialization_interned_string_registry_reader_destroy (registry_reader);
     buffered_file_stream->operations->close (buffered_file_stream);
-    direct_file_stream->operations->close (direct_file_stream);
 
     struct map_t deserialized_map;
     map_init (&deserialized_map);
