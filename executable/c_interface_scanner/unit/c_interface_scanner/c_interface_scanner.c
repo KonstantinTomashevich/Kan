@@ -542,7 +542,7 @@ static kan_bool_t parse_main (void)
          !use:default;
 
          // Some static global variable, skip it.
-         "static" separator+ type separator* identifier separator* ("[".*"]")? / ("=" | ";")
+         "static" separator+ type separator* identifier separator* ("[".*"]")? separator* / ("=" | ";")
          {
              continue;
          }
@@ -778,9 +778,7 @@ static kan_bool_t parse_exported_function_arguments (void)
 
          "," { optional_includable_object_append_token (); continue; }
 
-         "void" { optional_includable_object_append_token (); continue; }
-
-         ")"
+         "void)" | ")"
          {
              optional_includable_object_append_token ();
              optional_includable_object_append_string (";");

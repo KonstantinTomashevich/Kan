@@ -20,7 +20,7 @@ foreach (IMPLEMENTATION ${REPOSITORY_IMPLEMENTATIONS})
             cpu_dispatch=kan cpu_profiler=none error=sdl hash=djb2 log=kan memory=kan memory_profiler=none
             platform=sdl reflection=kan repository=${IMPLEMENTATION} threading=sdl
 
-            CONCRETE container repository_reflection testing test_repository)
+            CONCRETE container testing test_repository)
 
     shared_library_verify ()
     shared_library_copy_linked_artefacts ()

@@ -298,6 +298,7 @@ static void buffered_close (struct kan_stream_t *stream)
         buffered_flush (stream);
     }
 
+    data->source_stream->operations->close (data->source_stream);
     kan_free_general (get_allocation_group (), data, sizeof (struct random_access_stream_buffer_t) + data->buffer_size);
 }
 

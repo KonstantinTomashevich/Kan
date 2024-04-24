@@ -17,9 +17,11 @@ void kan_bd_list_add (struct kan_bd_list_t *list, struct kan_bd_list_node_t *bef
     if (before)
     {
         node->previous = before->previous;
-        if (before->previous)
+        before->previous = node;
+
+        if (node->previous)
         {
-            before->previous->next = node;
+            node->previous->next = node;
         }
         else
         {

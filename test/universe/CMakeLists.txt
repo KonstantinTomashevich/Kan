@@ -39,8 +39,8 @@ shared_library_include (
         cpu_dispatch=kan cpu_profiler=none error=sdl hash=djb2 log=kan memory=kan memory_profiler=none platform=sdl
         reflection=kan repository=kan threading=sdl workflow=kan
         CONCRETE
-        container context context_reflection_system context_update_system testing repository_reflection
-        test_universe test_universe_post_migration test_universe_pre_migration universe)
+        container context context_reflection_system context_update_system testing test_universe
+        test_universe_post_migration test_universe_pre_migration universe)
 
 generate_artefact_context_data ()
 generate_artefact_reflection_data ()

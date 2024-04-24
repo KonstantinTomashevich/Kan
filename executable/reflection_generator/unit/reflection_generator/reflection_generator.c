@@ -774,13 +774,16 @@ static void add_variables (void)
                 continue;
             }
 
-            kan_trivial_string_buffer_append_string (&io.output_buffer,
-                                                     "static struct kan_reflection_argument_t reflection_");
-            kan_trivial_string_buffer_append_string (&io.output_buffer, function_data->name);
-            kan_trivial_string_buffer_append_string (&io.output_buffer, "_arguments[");
-            kan_trivial_string_buffer_append_unsigned_long (&io.output_buffer,
-                                                            (unsigned long) function_data->arguments_count);
-            kan_trivial_string_buffer_append_string (&io.output_buffer, "u];\n");
+            if (function_data->arguments_count > 0u)
+            {
+                kan_trivial_string_buffer_append_string (&io.output_buffer,
+                                                         "static struct kan_reflection_argument_t reflection_");
+                kan_trivial_string_buffer_append_string (&io.output_buffer, function_data->name);
+                kan_trivial_string_buffer_append_string (&io.output_buffer, "_arguments[");
+                kan_trivial_string_buffer_append_unsigned_long (&io.output_buffer,
+                                                                (unsigned long) function_data->arguments_count);
+                kan_trivial_string_buffer_append_string (&io.output_buffer, "u];\n");
+            }
 
             kan_trivial_string_buffer_append_string (&io.output_buffer,
                                                      "static struct kan_reflection_function_t reflection_");
@@ -870,20 +873,24 @@ static void add_functors (void)
                 continue;
             }
 
-            kan_trivial_string_buffer_append_string (&io.output_buffer, "struct ");
-            kan_trivial_string_buffer_append_string (&io.output_buffer, function->name);
-            kan_trivial_string_buffer_append_string (&io.output_buffer, "_call_arguments_t\n{\n");
-
-            for (uint64_t argument_index = 0u; argument_index < function->arguments_count; ++argument_index)
+            if (function->arguments_count > 0u)
             {
-                struct kan_c_variable_t *argument = &function->arguments[argument_index];
-                kan_trivial_string_buffer_append_string (&io.output_buffer, "    ");
-                append_argument_type (&argument->type);
-                kan_trivial_string_buffer_append_string (&io.output_buffer, argument->name);
-                kan_trivial_string_buffer_append_string (&io.output_buffer, ";\n");
+                kan_trivial_string_buffer_append_string (&io.output_buffer, "struct ");
+                kan_trivial_string_buffer_append_string (&io.output_buffer, function->name);
+                kan_trivial_string_buffer_append_string (&io.output_buffer, "_call_arguments_t\n{\n");
+
+                for (uint64_t argument_index = 0u; argument_index < function->arguments_count; ++argument_index)
+                {
+                    struct kan_c_variable_t *argument = &function->arguments[argument_index];
+                    kan_trivial_string_buffer_append_string (&io.output_buffer, "    ");
+                    append_argument_type (&argument->type);
+                    kan_trivial_string_buffer_append_string (&io.output_buffer, argument->name);
+                    kan_trivial_string_buffer_append_string (&io.output_buffer, ";\n");
+                }
+
+                kan_trivial_string_buffer_append_string (&io.output_buffer, "};\n\n");
             }
 
-            kan_trivial_string_buffer_append_string (&io.output_buffer, "};\n\n");
             const kan_interned_string_t functor_name = build_call_functor_name (function);
             kan_trivial_string_buffer_append_string (&io.output_buffer, "static void ");
             kan_trivial_string_buffer_append_string (&io.output_buffer, functor_name);
@@ -1473,9 +1480,17 @@ static void add_bootstrap (void)
             kan_trivial_string_buffer_append_unsigned_long (&io.output_buffer,
                                                             (unsigned long) function_data->arguments_count);
             kan_trivial_string_buffer_append_string (&io.output_buffer, "u,\n");
-            kan_trivial_string_buffer_append_string (&io.output_buffer, "        .arguments = reflection_");
-            kan_trivial_string_buffer_append_string (&io.output_buffer, function_data->name);
-            kan_trivial_string_buffer_append_string (&io.output_buffer, "_arguments,\n");
+
+            if (function_data->arguments_count > 0u)
+            {
+                kan_trivial_string_buffer_append_string (&io.output_buffer, "        .arguments = reflection_");
+                kan_trivial_string_buffer_append_string (&io.output_buffer, function_data->name);
+                kan_trivial_string_buffer_append_string (&io.output_buffer, "_arguments,\n");
+            }
+            else
+            {
+                kan_trivial_string_buffer_append_string (&io.output_buffer, "        .arguments = NULL,\n");
+            }
 
             kan_trivial_string_buffer_append_string (&io.output_buffer, "    };\n\n");
         }

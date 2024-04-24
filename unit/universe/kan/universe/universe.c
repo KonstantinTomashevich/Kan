@@ -55,6 +55,7 @@ struct mutator_t
     kan_bool_t found_in_groups;
     kan_bool_t added_during_migration;
     void *state;
+    kan_allocation_group_t state_allocation_group;
 };
 
 struct pipeline_t
@@ -90,6 +91,7 @@ struct world_t
     kan_interned_string_t scheduler_name;
     struct scheduler_api_t *scheduler_api;
     void *scheduler_state;
+    kan_allocation_group_t scheduler_state_allocation_group;
 
     /// \meta reflection_dynamic_array_type = "struct pipeline_t"
     struct kan_dynamic_array_t pipelines;
@@ -1930,15 +1932,21 @@ static struct world_t *world_create (struct universe_t *universe, struct world_t
 
 static void world_scheduler_init (struct universe_t *universe, struct world_t *world)
 {
+    world->scheduler_state_allocation_group =
+        kan_allocation_group_get_child (universe->schedulers_allocation_group, world->scheduler_api->type->name);
+
     world->scheduler_state =
-        kan_allocate_batched (universe->schedulers_allocation_group, world->scheduler_api->type->size);
+        kan_allocate_general (world->scheduler_state_allocation_group, world->scheduler_api->type->size,
+                              world->scheduler_api->type->alignment);
 
     // We use zeroes to check which automated queries weren't initialized yet.
     memset (world->scheduler_state, 0u, world->scheduler_api->type->size);
 
     if (world->scheduler_api->type->init)
     {
+        kan_allocation_group_stack_push (world->scheduler_state_allocation_group);
         world->scheduler_api->type->init (world->scheduler_api->type->functor_user_data, world->scheduler_state);
+        kan_allocation_group_stack_pop ();
     }
 }
 
@@ -1964,10 +1972,13 @@ static void world_scheduler_remove (struct universe_t *universe,
 
     if (world->scheduler_api->type->shutdown)
     {
+        kan_allocation_group_stack_push (world->scheduler_state_allocation_group);
         world->scheduler_api->type->shutdown (world->scheduler_api->type->functor_user_data, world->scheduler_state);
+        kan_allocation_group_stack_pop ();
     }
 
-    kan_free_batched (universe->schedulers_allocation_group, world->scheduler_state);
+    kan_free_general (world->scheduler_state_allocation_group, world->scheduler_state,
+                      world->scheduler_api->type->size);
     world->scheduler_name = NULL;
     world->scheduler_api = NULL;
     world->scheduler_state = NULL;
@@ -2247,7 +2258,10 @@ static void world_destroy (struct universe_t *universe, struct world_t *world)
 
 static void mutator_init (struct universe_t *universe, struct mutator_t *mutator)
 {
-    mutator->state = kan_allocate_batched (universe->mutators_allocation_group, mutator->api->type->size);
+    mutator->state_allocation_group =
+        kan_allocation_group_get_child (universe->mutators_allocation_group, mutator->api->type->name);
+    mutator->state =
+        kan_allocate_general (mutator->state_allocation_group, mutator->api->type->size, mutator->api->type->alignment);
     // We use zeroes to check which automated queries weren't initialized yet.
     memset (mutator->state, 0u, mutator->api->type->size);
     mutator->from_group = KAN_FALSE;
@@ -2256,7 +2270,9 @@ static void mutator_init (struct universe_t *universe, struct mutator_t *mutator
 
     if (mutator->api->type->init)
     {
+        kan_allocation_group_stack_push (mutator->state_allocation_group);
         mutator->api->type->init (mutator->api->type->functor_user_data, mutator->state);
+        kan_allocation_group_stack_pop ();
     }
 }
 
@@ -2282,10 +2298,12 @@ static void mutator_clean (struct universe_t *universe,
 
     if (mutator->api->type->shutdown)
     {
+        kan_allocation_group_stack_push (mutator->state_allocation_group);
         mutator->api->type->shutdown (mutator->api->type->functor_user_data, mutator->state);
+        kan_allocation_group_stack_pop ();
     }
 
-    kan_free_batched (universe->mutators_allocation_group, mutator->state);
+    kan_free_general (mutator->state_allocation_group, mutator->state, mutator->api->type->size);
 }
 
 void kan_universe_world_configuration_init (struct kan_universe_world_configuration_t *data)
@@ -2466,6 +2484,7 @@ static void undeploy_and_migrate_scheduler_execute (uint64_t user_data)
     }
 
     void *old_scheduler_state = data->world->scheduler_state;
+    kan_allocation_group_t old_scheduler_state_allocation_group = data->world->scheduler_state_allocation_group;
     world_scheduler_init (data->universe, data->world);
 
     kan_reflection_struct_migrator_migrate_instance (data->migrator, data->world->scheduler_api->type->name,
@@ -2479,7 +2498,7 @@ static void undeploy_and_migrate_scheduler_execute (uint64_t user_data)
         data->old_api->type->shutdown (data->old_api->type->functor_user_data, old_scheduler_state);
     }
 
-    kan_free_batched (data->universe->schedulers_allocation_group, old_scheduler_state);
+    kan_free_batched (old_scheduler_state_allocation_group, old_scheduler_state);
 }
 
 struct undeploy_and_migrate_mutator_user_data_t
@@ -2504,6 +2523,7 @@ static void undeploy_and_migrate_mutator_execute (uint64_t user_data)
     }
 
     void *old_mutator_state = data->mutator->state;
+    kan_allocation_group_t old_mutator_allocation_group = data->mutator->state_allocation_group;
     mutator_init (data->universe, data->mutator);
 
     kan_reflection_struct_migrator_migrate_instance (data->migrator, data->mutator->api->type->name, old_mutator_state,
@@ -2517,7 +2537,7 @@ static void undeploy_and_migrate_mutator_execute (uint64_t user_data)
         data->old_api->type->shutdown (data->old_api->type->functor_user_data, old_mutator_state);
     }
 
-    kan_free_batched (data->universe->mutators_allocation_group, old_mutator_state);
+    kan_free_batched (old_mutator_allocation_group, old_mutator_state);
 }
 
 static void world_migration_schedulers_mutators_migrate (struct universe_t *universe,
@@ -2901,6 +2921,12 @@ void kan_universe_migrate (kan_universe_t universe,
 
     kan_hash_storage_shutdown (&old_scheduler_api_storage);
     kan_hash_storage_shutdown (&old_mutator_api_storage);
+}
+
+kan_universe_world_t kan_universe_get_reflection_registry (kan_universe_t universe)
+{
+    struct universe_t *universe_data = (struct universe_t *) universe;
+    return (kan_universe_world_t) universe_data->reflection_registry;
 }
 
 kan_context_handle_t kan_universe_get_context (kan_universe_t universe)

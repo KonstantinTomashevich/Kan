@@ -34,17 +34,28 @@ static inline void kan_file_system_path_container_reset_length (struct kan_file_
     container->path[container->length] = '\0';
 }
 
+/// \brief Initializes path container by copying path from given char sequence.
+static inline void kan_file_system_path_container_copy_char_sequence (
+    struct kan_file_system_path_container_t *target_container,
+    const char *arbitrary_path_begin,
+    const char *arbitrary_path_end)
+{
+    const uint64_t arbitrary_path_length = arbitrary_path_end - arbitrary_path_begin;
+    kan_file_system_path_container_reset_length (target_container, arbitrary_path_length);
+
+    if (target_container->length > 0u)
+    {
+        memcpy (target_container->path, arbitrary_path_begin, target_container->length);
+    }
+}
+
 /// \brief Initializes path container by copying path from given string.
 static inline void kan_file_system_path_container_copy_string (
     struct kan_file_system_path_container_t *target_container, const char *arbitrary_path)
 {
     const uint64_t arbitrary_path_length = strlen (arbitrary_path);
-    kan_file_system_path_container_reset_length (target_container, arbitrary_path_length);
-
-    if (target_container->length > 0u)
-    {
-        memcpy (target_container->path, arbitrary_path, target_container->length);
-    }
+    kan_file_system_path_container_copy_char_sequence (target_container, arbitrary_path,
+                                                       arbitrary_path + arbitrary_path_length);
 }
 
 /// \brief Initializes path container by copying data from another path container.

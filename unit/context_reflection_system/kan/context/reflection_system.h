@@ -32,8 +32,15 @@
 ///   from the last iteration and submit new changes through received `kan_reflection_system_generation_iterator_t`.
 ///   Keep in mind that on first iteration there is no changes, only filled registry. Iterations are executed one
 ///   after another until no changes are made.
+/// - On-finalize connections are called. To connect other system to on-finalize routine use
+///   `kan_reflection_system_connect_on_finalize`. These connections can freely add everything to given registry.
+///   Goal of finalize is to add umbrella-like data that depends on everything generated, but should not trigger
+///   generation of other level of data. For example, universe mutator states that depend on reflection.
 /// - Now registry is considered generated and on-generated connections (`kan_reflection_system_connect_on_generated`)
 ///   are called.
+/// - After all on-generated connections are executed, if old registry existed it is destroyed. After destruction of
+///   old registry on-cleanup connections are called. They provide opportunity for reflection generators to cleanup
+///   data is guaranteed to be unused now.
 ///
 /// This algorithm makes it possible to create complex interconnected generation logic without explicitly setting
 /// dependencies between different generators. It might not be good for performance, but makes generation a lot easier.
@@ -45,6 +52,39 @@
 /// catch: if iterative generator has saved mutable pointer to generated entry, then it is technically safe to add
 /// more structure fields, enum values or function arguments and also rearrange them (without changing names). It is
 /// safe only during iterative generation and is not safe in other situations. This behaviour might be improved later.
+/// \endparblock
+///
+/// \par Automatic reflection generators
+/// \parblock
+/// Reflection system supports extraction of special "automatic reflection generators" during reflection generation
+/// process. These generators might be created during population or by other generator during iteration stage.
+/// Reflection generators make it possible to augment reflection from reflection itself, making it a powerful and
+/// convenient tool to extend reflection generation.
+///
+/// Reflection generator itself is a structure, which name follows pattern "kan_reflection_generator_<name>_t", where
+/// name is an arbitrary name used to extract reflection generator functions from reflection. There are several
+/// functions that might be implemented for reflection generators:
+///
+/// - kan_reflection_generator_<name>_bootstrap (struct kan_reflection_generator_<name>_t *instance,
+///   uint64_t bootstrap_iteration_index): This function is always called after reflection generator creation and
+///   informs it about iteration index on which this generator is created.
+/// - kan_reflection_generator_<name>_iterate (struct kan_reflection_generator_<name>_t *instance,
+///   kan_reflection_registry_t registry, kan_reflection_system_generation_iterator_t iterator,
+///   uint64_t iteration_index): Called during generation iteration. Follows the same rules as for generation
+///   iteration connections.
+/// - kan_reflection_generator_<name>_finalize (struct kan_reflection_generator_<name>_t *instance,
+///   kan_reflection_registry_t registry): Called during finalize. Follows the same rules as for on-finalize
+///   connections.
+///
+/// There is an approximate reflection generator lifetime:
+/// - Reflection generator is discovered after population or after generation iteration.
+/// - Reflection generator instance is created and initialized.
+/// - `bootstrap` function for reflection generator is called.
+/// - During generation iteration, `iterate` function might be called several times and is called at least once.
+/// - After generation iteration, `finalize` is called.
+/// - Reflection generator persists after generation with its data, because it is expected to store the generated
+///   reflection data inside itself.
+/// - Reflection generator is shut down when registry with generated reflection data is destroyed.
 /// \endparblock
 ///
 /// \par Thread safety
@@ -62,6 +102,9 @@ KAN_C_HEADER_BEGIN
 typedef void (*kan_context_reflection_populate_t) (kan_context_system_handle_t other_system,
                                                    kan_reflection_registry_t registry);
 
+typedef void (*kan_context_reflection_finalize_t) (kan_context_system_handle_t other_system,
+                                                   kan_reflection_registry_t registry);
+
 typedef void (*kan_context_reflection_generated_t) (kan_context_system_handle_t other_system,
                                                     kan_reflection_registry_t registry,
                                                     kan_reflection_migration_seed_t migration_seed,
@@ -73,6 +116,8 @@ typedef void (*kan_context_reflection_generation_iterate_t) (kan_context_system_
                                                              kan_reflection_registry_t registry,
                                                              kan_reflection_system_generation_iterator_t iterator,
                                                              uint64_t iteration_index);
+
+typedef void (*kan_context_reflection_cleanup_t) (kan_context_system_handle_t other_system);
 
 /// \brief Connect other system as on-populate delegate.
 CONTEXT_REFLECTION_SYSTEM_API void kan_reflection_system_connect_on_populate (
@@ -94,6 +139,16 @@ CONTEXT_REFLECTION_SYSTEM_API void kan_reflection_system_connect_on_generation_i
 CONTEXT_REFLECTION_SYSTEM_API void kan_reflection_system_disconnect_on_generation_iterate (
     kan_context_system_handle_t reflection_system, kan_context_system_handle_t other_system);
 
+/// \brief Connect other system as on-finalize delegate.
+CONTEXT_REFLECTION_SYSTEM_API void kan_reflection_system_connect_on_finalize (
+    kan_context_system_handle_t reflection_system,
+    kan_context_system_handle_t other_system,
+    kan_context_reflection_finalize_t functor);
+
+/// \brief Disconnect other system from on-finalize delegates.
+CONTEXT_REFLECTION_SYSTEM_API void kan_reflection_system_disconnect_on_finalize (
+    kan_context_system_handle_t reflection_system, kan_context_system_handle_t other_system);
+
 /// \brief Connect other system as on-generated delegate.
 CONTEXT_REFLECTION_SYSTEM_API void kan_reflection_system_connect_on_generated (
     kan_context_system_handle_t reflection_system,
@@ -102,6 +157,16 @@ CONTEXT_REFLECTION_SYSTEM_API void kan_reflection_system_connect_on_generated (
 
 /// \brief Disconnect other system from on-generated delegates.
 CONTEXT_REFLECTION_SYSTEM_API void kan_reflection_system_disconnect_on_generated (
+    kan_context_system_handle_t reflection_system, kan_context_system_handle_t other_system);
+
+/// \brief Connect other system as on-cleanup delegate.
+CONTEXT_REFLECTION_SYSTEM_API void kan_reflection_system_connect_on_cleanup (
+    kan_context_system_handle_t reflection_system,
+    kan_context_system_handle_t other_system,
+    kan_context_reflection_cleanup_t functor);
+
+/// \brief Disconnect other system from on-cleanup delegates.
+CONTEXT_REFLECTION_SYSTEM_API void kan_reflection_system_disconnect_on_cleanup (
     kan_context_system_handle_t reflection_system, kan_context_system_handle_t other_system);
 
 /// \brief Returns latest reflection registry if it exists.

@@ -121,11 +121,15 @@ static struct thread_local_storage_stack_t *ensure_thread_local_storage (void)
         if (thread_local_storage == KAN_THREAD_LOCAL_STORAGE_INVALID)
         {
             thread_local_storage = kan_thread_local_storage_create ();
-            kan_thread_local_storage_set (thread_local_storage, allocate_thread_local_storage_stack (),
-                                          free_thread_local_storage_stack);
         }
 
         kan_atomic_int_unlock (&thread_local_storage_initialization_lock);
+    }
+
+    if (!kan_thread_local_storage_get (thread_local_storage))
+    {
+        kan_thread_local_storage_set (thread_local_storage, allocate_thread_local_storage_stack (),
+                                      free_thread_local_storage_stack);
     }
 
     return kan_thread_local_storage_get (thread_local_storage);

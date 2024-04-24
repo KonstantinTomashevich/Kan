@@ -85,6 +85,8 @@ kan_serialization_interned_string_registry_create_empty (void);
 SERIALIZATION_API void kan_serialization_interned_string_registry_destroy (
     kan_serialization_interned_string_registry_t registry);
 
+#define KAN_INVALID_SERIALIZATION_INTERNED_STRING_REGISTRY_READER 0u
+
 typedef uint64_t kan_serialization_interned_string_registry_reader_t;
 
 /// \brief Creates reader for interned string registry stream.
@@ -106,6 +108,8 @@ kan_serialization_interned_string_registry_reader_get (kan_serialization_interne
 SERIALIZATION_API void kan_serialization_interned_string_registry_reader_destroy (
     kan_serialization_interned_string_registry_reader_t reader);
 
+#define KAN_INVALID_SERIALIZATION_INTERNED_STRING_REGISTRY_WRITER 0u
+
 typedef uint64_t kan_serialization_interned_string_registry_writer_t;
 
 /// \brief Creates new writer for given interned string registry.
@@ -120,6 +124,8 @@ SERIALIZATION_API enum kan_serialization_state_t kan_serialization_interned_stri
 /// \brief Destroys given interned string registry writer.
 SERIALIZATION_API void kan_serialization_interned_string_registry_writer_destroy (
     kan_serialization_interned_string_registry_writer_t writer);
+
+#define KAN_INVALID_SERIALIZATION_BINARY_READER 0u
 
 typedef uint64_t kan_serialization_binary_reader_t;
 
@@ -149,6 +155,8 @@ SERIALIZATION_API enum kan_serialization_state_t kan_serialization_binary_reader
 
 /// \brief Destroys given reader instance.
 SERIALIZATION_API void kan_serialization_binary_reader_destroy (kan_serialization_binary_reader_t reader);
+
+#define KAN_INVALID_SERIALIZATION_BINARY_WRITER 0u
 
 typedef uint64_t kan_serialization_binary_writer_t;
 

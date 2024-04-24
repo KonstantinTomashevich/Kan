@@ -329,9 +329,18 @@ static void check_generation_iterate_system_generation_iterate (kan_context_syst
     }
     else
     {
-        KAN_TEST_CHECK (kan_reflection_system_generation_iterator_next_added_struct (iterator) ==
-                        kan_string_intern ("generation_iterate_test_struct_t"));
-        KAN_TEST_CHECK (kan_reflection_system_generation_iterator_next_added_struct (iterator) == NULL);
+        kan_bool_t has_mine_among_added = KAN_FALSE;
+        kan_interned_string_t name;
+
+        while ((name = kan_reflection_system_generation_iterator_next_added_struct (iterator)))
+        {
+            if (name == kan_string_intern ("generation_iterate_test_struct_t"))
+            {
+                has_mine_among_added = KAN_TRUE;
+            }
+        }
+
+        KAN_TEST_CHECK (has_mine_among_added)
     }
 }
 
@@ -395,6 +404,108 @@ TEST_CONTEXT_REFLECTION_SYSTEM_API struct kan_context_system_api_t KAN_CONTEXT_S
 };
 // \c_interface_scanner_enable
 
+struct kan_reflection_generator_test_t
+{
+    uint64_t bootstrap_iteration_index;
+    struct kan_reflection_struct_t generated_iterate_struct;
+    struct kan_reflection_field_t generated_iterate_struct_fields[2u];
+    struct kan_reflection_struct_t generated_finalize_struct;
+    struct kan_reflection_field_t generated_finalize_struct_fields[2u];
+};
+
+TEST_CONTEXT_REFLECTION_SYSTEM_API void kan_reflection_generator_test_init (
+    struct kan_reflection_generator_test_t *instance)
+{
+    instance->bootstrap_iteration_index = 0u;
+
+    instance->generated_iterate_struct = (struct kan_reflection_struct_t) {
+        .name = kan_string_intern ("reflection_generation_iterate_struct_t"),
+        .size = 16u,
+        .alignment = 8u,
+        .init = NULL,
+        .shutdown = NULL,
+        .functor_user_data = 0u,
+        .fields_count = 2u,
+        .fields = instance->generated_iterate_struct_fields,
+    };
+
+    instance->generated_iterate_struct_fields[0u] = (struct kan_reflection_field_t) {
+        .name = kan_string_intern ("x"),
+        .offset = 0u,
+        .size = 8u,
+        .archetype = KAN_REFLECTION_ARCHETYPE_FLOATING,
+        .visibility_condition_field = NULL,
+        .visibility_condition_values_count = 0u,
+        .visibility_condition_values = NULL,
+    };
+
+    instance->generated_iterate_struct_fields[1u] = (struct kan_reflection_field_t) {
+        .name = kan_string_intern ("y"),
+        .offset = 8u,
+        .size = 8u,
+        .archetype = KAN_REFLECTION_ARCHETYPE_FLOATING,
+        .visibility_condition_field = NULL,
+        .visibility_condition_values_count = 0u,
+        .visibility_condition_values = NULL,
+    };
+
+    instance->generated_finalize_struct = (struct kan_reflection_struct_t) {
+        .name = kan_string_intern ("reflection_generation_finalize_struct_t"),
+        .size = 16u,
+        .alignment = 8u,
+        .init = NULL,
+        .shutdown = NULL,
+        .functor_user_data = 0u,
+        .fields_count = 2u,
+        .fields = instance->generated_finalize_struct_fields,
+    };
+
+    instance->generated_finalize_struct_fields[0u] = (struct kan_reflection_field_t) {
+        .name = kan_string_intern ("x"),
+        .offset = 0u,
+        .size = 8u,
+        .archetype = KAN_REFLECTION_ARCHETYPE_FLOATING,
+        .visibility_condition_field = NULL,
+        .visibility_condition_values_count = 0u,
+        .visibility_condition_values = NULL,
+    };
+
+    instance->generated_finalize_struct_fields[1u] = (struct kan_reflection_field_t) {
+        .name = kan_string_intern ("y"),
+        .offset = 8u,
+        .size = 8u,
+        .archetype = KAN_REFLECTION_ARCHETYPE_FLOATING,
+        .visibility_condition_field = NULL,
+        .visibility_condition_values_count = 0u,
+        .visibility_condition_values = NULL,
+    };
+}
+
+TEST_CONTEXT_REFLECTION_SYSTEM_API void kan_reflection_generator_test_bootstrap (
+    struct kan_reflection_generator_test_t *instance, uint64_t bootstrap_iteration)
+{
+    KAN_TEST_CHECK (bootstrap_iteration == 0u)
+    instance->bootstrap_iteration_index = bootstrap_iteration;
+}
+
+TEST_CONTEXT_REFLECTION_SYSTEM_API void kan_reflection_generator_test_iterate (
+    struct kan_reflection_generator_test_t *instance,
+    kan_reflection_registry_t registry,
+    kan_reflection_system_generation_iterator_t iterator,
+    uint64_t iteration_index)
+{
+    if (iteration_index == instance->bootstrap_iteration_index)
+    {
+        kan_reflection_system_generation_iterator_add_struct (iterator, &instance->generated_iterate_struct);
+    }
+}
+
+TEST_CONTEXT_REFLECTION_SYSTEM_API void kan_reflection_generator_test_finalize (
+    struct kan_reflection_generator_test_t *instance, kan_reflection_registry_t registry)
+{
+    kan_reflection_registry_add_struct (registry, &instance->generated_finalize_struct);
+}
+
 KAN_TEST_CASE (only_statics)
 {
     kan_context_handle_t context = kan_context_create (KAN_ALLOCATION_GROUP_IGNORE);
@@ -402,9 +513,11 @@ KAN_TEST_CASE (only_statics)
     struct check_generated_config_t check_config = {
         .enums_to_check_count = 1u,
         .enums_to_check = (kan_interned_string_t[]) {kan_string_intern ("static_enum_t")},
-        .structs_to_check_count = 2u,
+        .structs_to_check_count = 4u,
         .structs_to_check = (kan_interned_string_t[]) {kan_string_intern ("first_static_struct_t"),
-                                                       kan_string_intern ("second_static_struct_t")},
+                                                       kan_string_intern ("second_static_struct_t"),
+                                                       kan_string_intern ("reflection_generation_iterate_struct_t"),
+                                                       kan_string_intern ("reflection_generation_finalize_struct_t")},
         .functions_to_check_count = 1u,
         .functions_to_check = (kan_interned_string_t[]) {kan_string_intern ("static_function")},
     };
@@ -422,9 +535,11 @@ KAN_TEST_CASE (check_populate)
     struct check_generated_config_t check_config = {
         .enums_to_check_count = 1u,
         .enums_to_check = (kan_interned_string_t[]) {kan_string_intern ("static_enum_t")},
-        .structs_to_check_count = 3u,
+        .structs_to_check_count = 5u,
         .structs_to_check = (kan_interned_string_t[]) {kan_string_intern ("first_static_struct_t"),
                                                        kan_string_intern ("second_static_struct_t"),
+                                                       kan_string_intern ("reflection_generation_iterate_struct_t"),
+                                                       kan_string_intern ("reflection_generation_finalize_struct_t"),
                                                        kan_string_intern ("populate_test_struct_t")},
         .functions_to_check_count = 1u,
         .functions_to_check = (kan_interned_string_t[]) {kan_string_intern ("static_function")},
@@ -444,9 +559,11 @@ KAN_TEST_CASE (check_iterate)
     struct check_generated_config_t check_config = {
         .enums_to_check_count = 1u,
         .enums_to_check = (kan_interned_string_t[]) {kan_string_intern ("static_enum_t")},
-        .structs_to_check_count = 3u,
+        .structs_to_check_count = 5u,
         .structs_to_check = (kan_interned_string_t[]) {kan_string_intern ("first_static_struct_t"),
                                                        kan_string_intern ("second_static_struct_t"),
+                                                       kan_string_intern ("reflection_generation_iterate_struct_t"),
+                                                       kan_string_intern ("reflection_generation_finalize_struct_t"),
                                                        kan_string_intern ("generation_iterate_test_struct_t")},
         .functions_to_check_count = 1u,
         .functions_to_check = (kan_interned_string_t[]) {kan_string_intern ("static_function")},
@@ -466,9 +583,11 @@ KAN_TEST_CASE (combined)
     struct check_generated_config_t check_config = {
         .enums_to_check_count = 1u,
         .enums_to_check = (kan_interned_string_t[]) {kan_string_intern ("static_enum_t")},
-        .structs_to_check_count = 4u,
+        .structs_to_check_count = 6u,
         .structs_to_check = (kan_interned_string_t[]) {kan_string_intern ("first_static_struct_t"),
                                                        kan_string_intern ("second_static_struct_t"),
+                                                       kan_string_intern ("reflection_generation_iterate_struct_t"),
+                                                       kan_string_intern ("reflection_generation_finalize_struct_t"),
                                                        kan_string_intern ("populate_test_struct_t"),
                                                        kan_string_intern ("generation_iterate_test_struct_t")},
         .functions_to_check_count = 1u,
