@@ -402,6 +402,12 @@ static inline enum path_extraction_result_t path_extract_next_part (const char *
         return PATH_EXTRACTION_RESULT_FAILED;
     }
 
+    // Skip initial slashes.
+    while (**path_iterator == '/')
+    {
+        ++*path_iterator;
+    }
+
     *part_begin_output = *path_iterator;
     while (**path_iterator != '\0')
     {
@@ -1676,7 +1682,7 @@ kan_bool_t kan_virtual_file_system_volume_mount_real (kan_virtual_file_system_vo
             }
 
             struct mount_point_real_t *mount_point =
-                kan_allocate_batched (root_allocation_group, sizeof (struct mount_point_real_t));
+                kan_allocate_batched (hierarchy_allocation_group, sizeof (struct mount_point_real_t));
             mount_point->name = kan_char_sequence_intern (part_begin, part_end);
 
             mount_point->real_directory_path =
