@@ -23,7 +23,7 @@ static inline kan_bool_t ensure_mount_path_exists (kan_virtual_file_system_volum
     struct kan_file_system_path_container_t path_container;
     const char *last_separator = strrchr (path, '/');
 
-    if (last_separator || last_separator == path)
+    if (!last_separator || last_separator == path)
     {
         // No separator, therefore at the root and always exists.
         return KAN_TRUE;
