@@ -542,7 +542,7 @@ static kan_bool_t parse_main (void)
          !use:default;
 
          // Some static global variable, skip it.
-         "static" separator+ type separator* identifier separator* ("[".*"]")? / ("=" | ";")
+         "static" separator+ type separator* identifier separator* ("[".*"]")? separator* / ("=" | ";")
          {
              continue;
          }
