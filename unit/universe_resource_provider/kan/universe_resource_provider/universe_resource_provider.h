@@ -14,7 +14,16 @@ KAN_C_HEADER_BEGIN
 #define KAN_RESOURCE_PROVIDER_CONFIGURATION "resource_provider"
 #define KAN_RESOURCE_PROVIDER_CONTAINER_TYPE_PREFIX "resource_provider_container_"
 
+#define KAN_RESOURCE_PROVIDER_BEGIN_CHECKPOINT "resource_provider_begin"
+#define KAN_RESOURCE_PROVIDER_END_CHECKPOINT "resource_provider_end"
+
 #define KAN_RESOURCE_PROVIDER_CONTAINER_ID_NONE 0u
+
+struct kan_resource_third_party_data_t
+{
+    void *data;
+    uint64_t size;
+};
 
 struct kan_resource_request_t
 {
@@ -29,7 +38,7 @@ struct kan_resource_request_t
     union
     {
         uint64_t provided_container_id;
-        void *provided_third_party_data;
+        struct kan_resource_third_party_data_t provided_third_party;
     };
 };
 
@@ -63,19 +72,21 @@ struct kan_resource_provider_singleton_t
 UNIVERSE_RESOURCE_PROVIDER_API void kan_resource_provider_singleton_init (
     struct kan_resource_provider_singleton_t *instance);
 
-inline uint64_t kan_next_resource_request_id (struct kan_resource_provider_singleton_t *resource_provider)
+static inline uint64_t kan_next_resource_request_id (const struct kan_resource_provider_singleton_t *resource_provider)
 {
-    return kan_atomic_int_add (&resource_provider->request_id_counter, 1);
+    // Intentionally request const and de-const it to show that it is multithreading-safe function.
+    return kan_atomic_int_add ((struct kan_atomic_int_t *) &resource_provider->request_id_counter, 1);
 }
 
 struct kan_resource_provider_configuration_t
 {
     uint64_t scan_budget_ns;
     uint64_t load_budget_ns;
+    uint64_t add_wait_time_ns;
     uint64_t modify_wait_time_ns;
     kan_bool_t use_load_only_string_registry;
     kan_bool_t observe_file_system;
-    const char *resource_directory_path;
+    kan_interned_string_t resource_directory_path;
 };
 
 /// \brief Empty meta for marking types that should be supported by resource provider logic.
