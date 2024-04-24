@@ -142,11 +142,11 @@ void *kan_allocate_batched (kan_allocation_group_t group, uint64_t item_size)
         uint8_t *page_end = ((uint8_t *) page) + KAN_MEMORY_PAGED_ALLOCATOR_PAGE_SIZE;
         page->first_free = (struct batched_allocator_item_t *) item_data;
 
-        while (item_data < page_end)
+        while (item_data + item_size <= page_end)
         {
             struct batched_allocator_item_t *item = (struct batched_allocator_item_t *) item_data;
             uint8_t *next_data = item_data + item_size;
-            item->next_free = next_data >= page_end ? NULL : next_data;
+            item->next_free = next_data + item_size > page_end ? NULL : next_data;
             item_data = next_data;
         }
 
