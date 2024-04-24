@@ -534,7 +534,8 @@ static void job_report_task_finished (struct job_t *job)
 
                 if (job->completion_task.function)
                 {
-                    dispatch_task (NULL, job->completion_task, job->completion_task_queue);
+                    kan_cpu_task_detach (
+                        (kan_cpu_task_handle_t) dispatch_task (NULL, job->completion_task, job->completion_task_queue));
                 }
 
                 if (old_status_state == JOB_STATE_DETACHED)
@@ -631,7 +632,8 @@ void kan_cpu_job_release (kan_cpu_job_t job)
             if (new_status_bits == (JOB_STATE_COMPLETED << JOB_STATUS_TASK_COUNT_BITS) &&
                 job_data->completion_task.function)
             {
-                dispatch_task (NULL, job_data->completion_task, job_data->completion_task_queue);
+                kan_cpu_task_detach ((kan_cpu_task_handle_t) dispatch_task (NULL, job_data->completion_task,
+                                                                            job_data->completion_task_queue));
             }
 
             break;
