@@ -93,6 +93,7 @@
 /// \parblock
 /// - Creating, moving, destroying iterators is thread safe until no submission is done.
 /// - Cleaning oldest from single thread while operating on iterators from other threads is thread safe.
+///   Warning: it is unsafe to attempt cleaning oldest from several threads at once.
 /// - Submission is not thread safe in any scenario.
 /// \endparblock
 
