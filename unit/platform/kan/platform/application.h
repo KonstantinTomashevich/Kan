@@ -235,6 +235,9 @@ enum kan_platform_window_flag_t
 
 PLATFORM_API void kan_platform_application_event_init (struct kan_platform_application_event_t *instance);
 
+PLATFORM_API void kan_platform_application_event_move (struct kan_platform_application_event_t *from,
+                                                       struct kan_platform_application_event_t *to);
+
 PLATFORM_API void kan_platform_application_event_shutdown (struct kan_platform_application_event_t *instance);
 
 /// \brief Initializes application backend. Must be called on startup.
@@ -313,6 +316,7 @@ PLATFORM_API kan_bool_t kan_platform_application_window_set_title (kan_platform_
 PLATFORM_API const char *kan_platform_application_window_get_title (kan_platform_window_id_t window_id);
 
 /// \brief Updates window icon.
+/// \warning Pixel data is not copied and should be preserved by used.
 PLATFORM_API kan_bool_t kan_platform_application_window_set_icon (kan_platform_window_id_t window_id,
                                                                   kan_pixel_format_t pixel_format,
                                                                   uint32_t width,
@@ -430,7 +434,7 @@ PLATFORM_API kan_allocation_group_t kan_platform_application_get_clipboard_alloc
 
 /// \brief Extracts text from given clipboard using `kan_platform_application_get_clipboard_allocation_group`
 ///        for allocation. Returned text should be deallocated when no longer used.
-PLATFORM_API const char *kan_platform_application_extract_text_from_clipboard (void);
+PLATFORM_API char *kan_platform_application_extract_text_from_clipboard (void);
 
 /// \brief Puts given text into platform clipboard.
 PLATFORM_API void kan_platform_application_put_text_into_clipboard (const char *text);

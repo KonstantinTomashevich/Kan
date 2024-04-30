@@ -261,6 +261,84 @@ void kan_platform_application_event_init (struct kan_platform_application_event_
     instance->time_ns = 0u;
 }
 
+void kan_platform_application_event_move (struct kan_platform_application_event_t *from,
+                                          struct kan_platform_application_event_t *to)
+{
+    to->type = from->type;
+    to->time_ns = from->time_ns;
+
+    switch (from->type)
+    {
+    case KAN_PLATFORM_APPLICATION_EVENT_TYPE_QUIT:
+    case KAN_PLATFORM_APPLICATION_EVENT_TYPE_TERMINATING:
+    case KAN_PLATFORM_APPLICATION_EVENT_TYPE_LOW_MEMORY:
+    case KAN_PLATFORM_APPLICATION_EVENT_TYPE_ENTER_BACKGROUND:
+    case KAN_PLATFORM_APPLICATION_EVENT_TYPE_ENTER_FOREGROUND:
+    case KAN_PLATFORM_APPLICATION_EVENT_TYPE_LOCALE_CHANGED:
+    case KAN_PLATFORM_APPLICATION_EVENT_TYPE_SYSTEM_THEME_CHANGED:
+    case KAN_PLATFORM_APPLICATION_EVENT_TYPE_KEYMAP_CHANGED:
+    case KAN_PLATFORM_APPLICATION_EVENT_TYPE_CLIPBOARD_UPDATE:
+        break;
+
+    case KAN_PLATFORM_APPLICATION_EVENT_TYPE_DISPLAY_ORIENTATION_CHANGED:
+    case KAN_PLATFORM_APPLICATION_EVENT_TYPE_DISPLAY_ADDED:
+    case KAN_PLATFORM_APPLICATION_EVENT_TYPE_DISPLAY_REMOVED:
+    case KAN_PLATFORM_APPLICATION_EVENT_TYPE_DISPLAY_MOVED:
+    case KAN_PLATFORM_APPLICATION_EVENT_TYPE_DISPLAY_CONTENT_SCALE_CHANGED:
+        to->display = from->display;
+        break;
+
+    case KAN_PLATFORM_APPLICATION_EVENT_TYPE_WINDOW_SHOWN:
+    case KAN_PLATFORM_APPLICATION_EVENT_TYPE_WINDOW_HIDDEN:
+    case KAN_PLATFORM_APPLICATION_EVENT_TYPE_WINDOW_EXPOSED:
+    case KAN_PLATFORM_APPLICATION_EVENT_TYPE_WINDOW_MOVED:
+    case KAN_PLATFORM_APPLICATION_EVENT_TYPE_WINDOW_RESIZED:
+    case KAN_PLATFORM_APPLICATION_EVENT_TYPE_WINDOW_PIXEL_SIZE_CHANGED:
+    case KAN_PLATFORM_APPLICATION_EVENT_TYPE_WINDOW_MINIMIZED:
+    case KAN_PLATFORM_APPLICATION_EVENT_TYPE_WINDOW_MAXIMIZED:
+    case KAN_PLATFORM_APPLICATION_EVENT_TYPE_WINDOW_RESTORED:
+    case KAN_PLATFORM_APPLICATION_EVENT_TYPE_WINDOW_MOUSE_ENTER:
+    case KAN_PLATFORM_APPLICATION_EVENT_TYPE_WINDOW_MOUSE_LEAVE:
+    case KAN_PLATFORM_APPLICATION_EVENT_TYPE_WINDOW_FOCUS_GAINED:
+    case KAN_PLATFORM_APPLICATION_EVENT_TYPE_WINDOW_FOCUS_LOST:
+    case KAN_PLATFORM_APPLICATION_EVENT_TYPE_WINDOW_CLOSE_REQUESTED:
+    case KAN_PLATFORM_APPLICATION_EVENT_TYPE_WINDOW_DISPLAY_CHANGED:
+    case KAN_PLATFORM_APPLICATION_EVENT_TYPE_WINDOW_DISPLAY_SCALE_CHANGED:
+    case KAN_PLATFORM_APPLICATION_EVENT_TYPE_WINDOW_OCCLUDED:
+    case KAN_PLATFORM_APPLICATION_EVENT_TYPE_WINDOW_ENTER_FULLSCREEN:
+    case KAN_PLATFORM_APPLICATION_EVENT_TYPE_WINDOW_LEAVE_FULLSCREEN:
+    case KAN_PLATFORM_APPLICATION_EVENT_TYPE_WINDOW_DESTROYED:
+        to->window = from->window;
+        break;
+
+    case KAN_PLATFORM_APPLICATION_EVENT_TYPE_KEY_DOWN:
+    case KAN_PLATFORM_APPLICATION_EVENT_TYPE_KEY_UP:
+        to->keyboard = from->keyboard;
+        break;
+
+    case KAN_PLATFORM_APPLICATION_EVENT_TYPE_TEXT_EDITING:
+        to->text_editing = from->text_editing;
+        break;
+
+    case KAN_PLATFORM_APPLICATION_EVENT_TYPE_TEXT_INPUT:
+        to->text_input = from->text_input;
+        break;
+
+    case KAN_PLATFORM_APPLICATION_EVENT_TYPE_MOUSE_MOTION:
+        to->mouse_motion = from->mouse_motion;
+        break;
+
+    case KAN_PLATFORM_APPLICATION_EVENT_TYPE_MOUSE_BUTTON_DOWN:
+    case KAN_PLATFORM_APPLICATION_EVENT_TYPE_MOUSE_BUTTON_UP:
+        to->mouse_button = from->mouse_button;
+        break;
+
+    case KAN_PLATFORM_APPLICATION_EVENT_TYPE_MOUSE_WHEEL:
+        to->mouse_wheel = from->mouse_wheel;
+        break;
+    }
+}
+
 void kan_platform_application_event_shutdown (struct kan_platform_application_event_t *instance)
 {
     switch (instance->type)
@@ -1440,7 +1518,7 @@ kan_allocation_group_t kan_platform_application_get_clipboard_allocation_group (
     return application_clipboard_allocation_group;
 }
 
-const char *kan_platform_application_extract_text_from_clipboard (void)
+char *kan_platform_application_extract_text_from_clipboard (void)
 {
     char *sdl_text = SDL_GetClipboardText ();
     if (!sdl_text)
