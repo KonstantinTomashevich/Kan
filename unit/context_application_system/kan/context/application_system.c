@@ -312,7 +312,7 @@ void application_system_destroy (kan_context_system_handle_t handle)
     kan_free_general (system->group, system, sizeof (struct application_system_t));
 }
 
-struct kan_context_system_api_t KAN_CONTEXT_SYSTEM_API_NAME (application_system_t) = {
+CONTEXT_APPLICATION_SYSTEM_API struct kan_context_system_api_t KAN_CONTEXT_SYSTEM_API_NAME (application_system_t) = {
     .name = "application_system_t",
     .create = application_system_create,
     .connect = application_system_connect,
