@@ -80,8 +80,7 @@ void universe_system_init (kan_context_system_handle_t handle)
 
 void universe_system_shutdown (kan_context_system_handle_t handle)
 {
-    struct universe_system_t *system = (struct universe_system_t *) handle;
-    KAN_ASSERT (system->universe == KAN_INVALID_UNIVERSE)
+    KAN_ASSERT (((struct universe_system_t *) handle)->universe == KAN_INVALID_UNIVERSE)
 }
 
 void universe_system_disconnect (kan_context_system_handle_t handle)
