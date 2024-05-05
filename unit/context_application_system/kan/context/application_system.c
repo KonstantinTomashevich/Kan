@@ -184,6 +184,7 @@ struct application_system_t
     struct display_info_holder_t *first_display_info;
     struct window_info_holder_t *first_window_info;
     struct operation_t *first_operation;
+    struct operation_t *last_operation;
 
     struct kan_application_system_mouse_state_t mouse_state;
     char *clipboard_content;
@@ -235,6 +236,7 @@ kan_context_system_handle_t application_system_create (kan_allocation_group_t gr
     system->first_display_info = NULL;
     system->first_window_info = NULL;
     system->first_operation = NULL;
+    system->last_operation = NULL;
 
     system->clipboard_content = NULL;
     system->initial_clipboard_update_done = KAN_FALSE;
@@ -602,6 +604,7 @@ static inline void flush_operations (struct application_system_t *system)
 
     kan_stack_group_allocator_reset (&system->operation_temporary_allocator);
     system->first_operation = NULL;
+    system->last_operation = NULL;
 }
 
 static inline void clean_and_pull_events (struct application_system_t *system, kan_bool_t *needs_clipboard_update)
@@ -674,6 +677,7 @@ static inline void sync_info_and_clipboard (struct application_system_t *system,
             current_holder->info.orientation = kan_platform_application_get_display_orientation (display_id);
             current_holder->info.content_scale = kan_platform_application_get_display_content_scale (display_id);
 
+            current_holder->info.fullscreen_modes.size = 0u;
             kan_platform_application_get_fullscreen_display_modes (display_id, &current_holder->info.fullscreen_modes);
             kan_platform_application_get_current_display_mode (display_id, &current_holder->info.current_mode);
             kan_platform_application_get_desktop_display_mode (display_id, &current_holder->info.desktop_mode);
@@ -885,6 +889,21 @@ const struct kan_application_system_window_info_t *kan_application_system_get_wi
     return holder ? &holder->info : NULL;
 }
 
+static inline void insert_operation (struct application_system_t *system, struct operation_t *operation)
+{
+    operation->next = NULL;
+    if (system->last_operation)
+    {
+        system->last_operation->next = operation;
+        system->last_operation = operation;
+    }
+    else
+    {
+        system->first_operation = operation;
+        system->last_operation = operation;
+    }
+}
+
 kan_application_system_window_handle_t kan_application_system_window_create (kan_context_system_handle_t system_handle,
                                                                              const char *title,
                                                                              uint32_t width,
@@ -901,10 +920,11 @@ kan_application_system_window_handle_t kan_application_system_window_create (kan
         system->first_window_info->previous = window_info_holder;
     }
 
-    system->first_window_info = window_info_holder;
     window_info_holder->info.handle = (kan_application_system_window_handle_t) window_info_holder;
+    window_info_holder->info.id = KAN_INVALID_PLATFORM_WINDOW_ID;
     window_info_holder->previous = NULL;
     window_info_holder->next = system->first_window_info;
+    system->first_window_info = window_info_holder;
 
     struct operation_t *operation = kan_stack_group_allocator_allocate (
         &system->operation_temporary_allocator, sizeof (struct operation_t), _Alignof (struct operation_t));
@@ -919,10 +939,9 @@ kan_application_system_window_handle_t kan_application_system_window_create (kan
     char *title_on_stack =
         kan_stack_group_allocator_allocate (&system->operation_temporary_allocator, title_length + 1u, _Alignof (char));
     memcpy (title_on_stack, title, title_length + 1u);
-
     operation->window_create_suffix.title = title_on_stack;
-    operation->next = system->first_operation;
-    system->first_operation = operation;
+
+    insert_operation (system, operation);
     kan_atomic_int_unlock (&system->operation_submission_lock);
     return window_info_holder->info.handle;
 }
@@ -940,8 +959,7 @@ void kan_application_system_window_enter_fullscreen (kan_context_system_handle_t
     operation->window_enter_fullscreen_suffix.window_handle = window_handle;
     operation->window_enter_fullscreen_suffix.display_mode = display_mode;
 
-    operation->next = system->first_operation;
-    system->first_operation = operation;
+    insert_operation (system, operation);
     kan_atomic_int_unlock (&system->operation_submission_lock);
 }
 
@@ -955,9 +973,7 @@ void kan_application_system_window_leave_fullscreen (kan_context_system_handle_t
 
     operation->type = OPERATION_TYPE_WINDOW_LEAVE_FULLSCREEN;
     operation->window_parameterless_suffix.window_handle = window_handle;
-
-    operation->next = system->first_operation;
-    system->first_operation = operation;
+    insert_operation (system, operation);
     kan_atomic_int_unlock (&system->operation_submission_lock);
 }
 
@@ -970,7 +986,7 @@ void kan_application_system_window_set_title (kan_context_system_handle_t system
     struct operation_t *operation = kan_stack_group_allocator_allocate (
         &system->operation_temporary_allocator, sizeof (struct operation_t), _Alignof (struct operation_t));
 
-    operation->type = OPERATION_TYPE_WINDOW_CREATE;
+    operation->type = OPERATION_TYPE_WINDOW_SET_TITLE;
     operation->window_set_textual_parameter_suffix.window_handle = window_handle;
 
     const uint64_t title_length = strlen (title);
@@ -979,8 +995,7 @@ void kan_application_system_window_set_title (kan_context_system_handle_t system
     memcpy (title_on_stack, title, title_length + 1u);
 
     operation->window_set_textual_parameter_suffix.data = title_on_stack;
-    operation->next = system->first_operation;
-    system->first_operation = operation;
+    insert_operation (system, operation);
     kan_atomic_int_unlock (&system->operation_submission_lock);
 }
 
@@ -1003,8 +1018,7 @@ void kan_application_system_window_set_icon (kan_context_system_handle_t system_
     operation->window_set_icon_suffix.height = height;
     operation->window_set_icon_suffix.data = data;
 
-    operation->next = system->first_operation;
-    system->first_operation = operation;
+    insert_operation (system, operation);
     kan_atomic_int_unlock (&system->operation_submission_lock);
 }
 
@@ -1021,8 +1035,7 @@ void kan_application_system_window_set_bounds (kan_context_system_handle_t syste
     operation->window_set_bounds_suffix.window_handle = window_handle;
     operation->window_set_bounds_suffix.bounds = bounds;
 
-    operation->next = system->first_operation;
-    system->first_operation = operation;
+    insert_operation (system, operation);
     kan_atomic_int_unlock (&system->operation_submission_lock);
 }
 
@@ -1041,8 +1054,7 @@ void kan_application_system_window_set_minimum_size (kan_context_system_handle_t
     operation->window_set_size_limit_suffix.width = minimum_width;
     operation->window_set_size_limit_suffix.height = minimum_height;
 
-    operation->next = system->first_operation;
-    system->first_operation = operation;
+    insert_operation (system, operation);
     kan_atomic_int_unlock (&system->operation_submission_lock);
 }
 
@@ -1061,8 +1073,7 @@ void kan_application_system_window_set_maximum_size (kan_context_system_handle_t
     operation->window_set_size_limit_suffix.width = maximum_width;
     operation->window_set_size_limit_suffix.height = maximum_height;
 
-    operation->next = system->first_operation;
-    system->first_operation = operation;
+    insert_operation (system, operation);
     kan_atomic_int_unlock (&system->operation_submission_lock);
 }
 
@@ -1079,8 +1090,7 @@ void kan_application_system_window_set_bordered (kan_context_system_handle_t sys
     operation->window_set_boolean_parameter_suffix.window_handle = window_handle;
     operation->window_set_boolean_parameter_suffix.value = bordered;
 
-    operation->next = system->first_operation;
-    system->first_operation = operation;
+    insert_operation (system, operation);
     kan_atomic_int_unlock (&system->operation_submission_lock);
 }
 
@@ -1097,8 +1107,7 @@ void kan_application_system_window_set_resizable (kan_context_system_handle_t sy
     operation->window_set_boolean_parameter_suffix.window_handle = window_handle;
     operation->window_set_boolean_parameter_suffix.value = resizable;
 
-    operation->next = system->first_operation;
-    system->first_operation = operation;
+    insert_operation (system, operation);
     kan_atomic_int_unlock (&system->operation_submission_lock);
 }
 
@@ -1115,8 +1124,7 @@ void kan_application_system_window_set_always_on_top (kan_context_system_handle_
     operation->window_set_boolean_parameter_suffix.window_handle = window_handle;
     operation->window_set_boolean_parameter_suffix.value = always_on_top;
 
-    operation->next = system->first_operation;
-    system->first_operation = operation;
+    insert_operation (system, operation);
     kan_atomic_int_unlock (&system->operation_submission_lock);
 }
 
@@ -1131,8 +1139,7 @@ void kan_application_system_window_show (kan_context_system_handle_t system_hand
     operation->type = OPERATION_TYPE_WINDOW_SHOW;
     operation->window_parameterless_suffix.window_handle = window_handle;
 
-    operation->next = system->first_operation;
-    system->first_operation = operation;
+    insert_operation (system, operation);
     kan_atomic_int_unlock (&system->operation_submission_lock);
 }
 
@@ -1147,8 +1154,7 @@ void kan_application_system_window_hide (kan_context_system_handle_t system_hand
     operation->type = OPERATION_TYPE_WINDOW_HIDE;
     operation->window_parameterless_suffix.window_handle = window_handle;
 
-    operation->next = system->first_operation;
-    system->first_operation = operation;
+    insert_operation (system, operation);
     kan_atomic_int_unlock (&system->operation_submission_lock);
 }
 
@@ -1163,8 +1169,7 @@ void kan_application_system_window_raise (kan_context_system_handle_t system_han
     operation->type = OPERATION_TYPE_WINDOW_RAISE;
     operation->window_parameterless_suffix.window_handle = window_handle;
 
-    operation->next = system->first_operation;
-    system->first_operation = operation;
+    insert_operation (system, operation);
     kan_atomic_int_unlock (&system->operation_submission_lock);
 }
 
@@ -1179,8 +1184,7 @@ void kan_application_system_window_minimize (kan_context_system_handle_t system_
     operation->type = OPERATION_TYPE_WINDOW_MINIMIZE;
     operation->window_parameterless_suffix.window_handle = window_handle;
 
-    operation->next = system->first_operation;
-    system->first_operation = operation;
+    insert_operation (system, operation);
     kan_atomic_int_unlock (&system->operation_submission_lock);
 }
 
@@ -1195,8 +1199,7 @@ void kan_application_system_window_maximize (kan_context_system_handle_t system_
     operation->type = OPERATION_TYPE_WINDOW_MAXIMIZE;
     operation->window_parameterless_suffix.window_handle = window_handle;
 
-    operation->next = system->first_operation;
-    system->first_operation = operation;
+    insert_operation (system, operation);
     kan_atomic_int_unlock (&system->operation_submission_lock);
 }
 
@@ -1211,8 +1214,7 @@ void kan_application_system_window_restore (kan_context_system_handle_t system_h
     operation->type = OPERATION_TYPE_WINDOW_RESTORE;
     operation->window_parameterless_suffix.window_handle = window_handle;
 
-    operation->next = system->first_operation;
-    system->first_operation = operation;
+    insert_operation (system, operation);
     kan_atomic_int_unlock (&system->operation_submission_lock);
 }
 
@@ -1229,8 +1231,7 @@ void kan_application_system_window_set_mouse_grab (kan_context_system_handle_t s
     operation->window_set_boolean_parameter_suffix.window_handle = window_handle;
     operation->window_set_boolean_parameter_suffix.value = mouse_grab;
 
-    operation->next = system->first_operation;
-    system->first_operation = operation;
+    insert_operation (system, operation);
     kan_atomic_int_unlock (&system->operation_submission_lock);
 }
 
@@ -1247,8 +1248,7 @@ void kan_application_system_window_set_keyboard_grab (kan_context_system_handle_
     operation->window_set_boolean_parameter_suffix.window_handle = window_handle;
     operation->window_set_boolean_parameter_suffix.value = keyboard_grab;
 
-    operation->next = system->first_operation;
-    system->first_operation = operation;
+    insert_operation (system, operation);
     kan_atomic_int_unlock (&system->operation_submission_lock);
 }
 
@@ -1265,8 +1265,7 @@ void kan_application_system_window_set_opacity (kan_context_system_handle_t syst
     operation->window_set_floating_point_parameter_suffix.window_handle = window_handle;
     operation->window_set_floating_point_parameter_suffix.value = opacity;
 
-    operation->next = system->first_operation;
-    system->first_operation = operation;
+    insert_operation (system, operation);
     kan_atomic_int_unlock (&system->operation_submission_lock);
 }
 
@@ -1283,8 +1282,7 @@ void kan_application_window_set_focusable (kan_context_system_handle_t system_ha
     operation->window_set_boolean_parameter_suffix.window_handle = window_handle;
     operation->window_set_boolean_parameter_suffix.value = focusable;
 
-    operation->next = system->first_operation;
-    system->first_operation = operation;
+    insert_operation (system, operation);
     kan_atomic_int_unlock (&system->operation_submission_lock);
 }
 
@@ -1299,8 +1297,7 @@ void kan_application_system_window_destroy (kan_context_system_handle_t system_h
     operation->type = OPERATION_TYPE_WINDOW_DESTROY;
     operation->window_parameterless_suffix.window_handle = window_handle;
 
-    operation->next = system->first_operation;
-    system->first_operation = operation;
+    insert_operation (system, operation);
     kan_atomic_int_unlock (&system->operation_submission_lock);
 }
 
@@ -1324,8 +1321,7 @@ void kan_application_system_warp_mouse_global (kan_context_system_handle_t syste
     operation->warp_mouse_global_suffix.global_x = global_x;
     operation->warp_mouse_global_suffix.global_y = global_y;
 
-    operation->next = system->first_operation;
-    system->first_operation = operation;
+    insert_operation (system, operation);
     kan_atomic_int_unlock (&system->operation_submission_lock);
 }
 
@@ -1344,8 +1340,7 @@ void kan_application_system_warp_mouse_to_window (kan_context_system_handle_t sy
     operation->warp_mouse_to_window_suffix.local_x = local_x;
     operation->warp_mouse_to_window_suffix.local_y = local_y;
 
-    operation->next = system->first_operation;
-    system->first_operation = operation;
+    insert_operation (system, operation);
     kan_atomic_int_unlock (&system->operation_submission_lock);
 }
 
@@ -1359,8 +1354,7 @@ void kan_application_system_set_cursor_visible (kan_context_system_handle_t syst
     operation->type = OPERATION_TYPE_SET_CURSOR_VISIBLE;
     operation->set_cursor_visible_suffix.visible = cursor_visible;
 
-    operation->next = system->first_operation;
-    system->first_operation = operation;
+    insert_operation (system, operation);
     kan_atomic_int_unlock (&system->operation_submission_lock);
 }
 
@@ -1381,9 +1375,8 @@ void kan_application_system_clipboard_set_text (kan_context_system_handle_t syst
     const uint64_t text_length = strlen (text);
     char *text_copied = kan_allocate_general (system->operations_group, text_length + 1u, _Alignof (char));
     memcpy (text_copied, text, text_length + 1u);
-
     operation->clipboard_set_text_suffix.text = text_copied;
-    operation->next = system->first_operation;
-    system->first_operation = operation;
+
+    insert_operation (system, operation);
     kan_atomic_int_unlock (&system->operation_submission_lock);
 }
