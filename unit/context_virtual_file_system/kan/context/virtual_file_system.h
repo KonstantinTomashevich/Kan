@@ -32,16 +32,16 @@ KAN_C_HEADER_BEGIN
 struct kan_virtual_file_system_config_mount_real_t
 {
     struct kan_virtual_file_system_config_mount_real_t *next;
-    const char *mount_path;
-    const char *real_path;
+    char *mount_path;
+    char *real_path;
 };
 
 /// \brief Configuration item for mounting read only pack.
 struct kan_virtual_file_system_config_mount_read_only_pack_t
 {
     struct kan_virtual_file_system_config_mount_read_only_pack_t *next;
-    const char *mount_path;
-    const char *pack_real_path;
+    char *mount_path;
+    char *pack_real_path;
 };
 
 /// \brief Configuration type for context virtual file system.
