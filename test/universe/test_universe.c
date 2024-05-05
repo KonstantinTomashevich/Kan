@@ -631,8 +631,10 @@ KAN_TEST_CASE (update_only)
     update_pipeline->name = kan_string_intern ("update");
 
     kan_dynamic_array_set_capacity (&update_pipeline->mutators, 1u);
-    *(kan_interned_string_t *) kan_dynamic_array_add_last (&update_pipeline->mutators) =
-        kan_string_intern ("update_only");
+    *(struct kan_universe_world_pipeline_mutator_t *) kan_dynamic_array_add_last (&update_pipeline->mutators) =
+        (struct kan_universe_world_pipeline_mutator_t) {
+            .name = kan_string_intern ("update_only"),
+        };
 
     kan_universe_deploy_root (universe, &definition);
     kan_universe_world_definition_shutdown (&definition);
@@ -673,10 +675,14 @@ KAN_TEST_CASE (update_several_pipelines)
     update_pipeline->name = kan_string_intern ("update");
 
     kan_dynamic_array_set_capacity (&update_pipeline->mutators, 2u);
-    *(kan_interned_string_t *) kan_dynamic_array_add_last (&update_pipeline->mutators) =
-        kan_string_intern ("spawn_objects_if_not_exist");
-    *(kan_interned_string_t *) kan_dynamic_array_add_last (&update_pipeline->mutators) =
-        kan_string_intern ("delete_objects_and_fire_event");
+    *(struct kan_universe_world_pipeline_mutator_t *) kan_dynamic_array_add_last (&update_pipeline->mutators) =
+        (struct kan_universe_world_pipeline_mutator_t) {
+            .name = kan_string_intern ("spawn_objects_if_not_exist"),
+        };
+    *(struct kan_universe_world_pipeline_mutator_t *) kan_dynamic_array_add_last (&update_pipeline->mutators) =
+        (struct kan_universe_world_pipeline_mutator_t) {
+            .name = kan_string_intern ("delete_objects_and_fire_event"),
+        };
 
     struct kan_universe_world_pipeline_definition_t *second_update_pipeline =
         kan_dynamic_array_add_last (&definition.pipelines);
@@ -685,8 +691,10 @@ KAN_TEST_CASE (update_several_pipelines)
     second_update_pipeline->name = kan_string_intern ("second_update");
 
     kan_dynamic_array_set_capacity (&second_update_pipeline->mutators, 1u);
-    *(kan_interned_string_t *) kan_dynamic_array_add_last (&second_update_pipeline->mutators) =
-        kan_string_intern ("second_update_stub");
+    *(struct kan_universe_world_pipeline_mutator_t *) kan_dynamic_array_add_last (&second_update_pipeline->mutators) =
+        (struct kan_universe_world_pipeline_mutator_t) {
+            .name = kan_string_intern ("second_update_stub"),
+        };
 
     kan_universe_deploy_root (universe, &definition);
     kan_universe_world_definition_shutdown (&definition);
@@ -728,10 +736,16 @@ KAN_TEST_CASE (update_mutator_multiple_threads)
 
     kan_dynamic_array_set_capacity (&update_pipeline->mutators, 1u);
     kan_dynamic_array_set_capacity (&update_pipeline->mutator_groups, 1u);
-    *(kan_interned_string_t *) kan_dynamic_array_add_last (&update_pipeline->mutators) =
-        kan_string_intern ("update_only");
-    *(kan_interned_string_t *) kan_dynamic_array_add_last (&update_pipeline->mutator_groups) =
-        kan_string_intern ("multiple_threads_test");
+
+    *(struct kan_universe_world_pipeline_mutator_t *) kan_dynamic_array_add_last (&update_pipeline->mutators) =
+        (struct kan_universe_world_pipeline_mutator_t) {
+            .name = kan_string_intern ("update_only"),
+        };
+
+    *(struct kan_universe_world_pipeline_mutator_group_t *) kan_dynamic_array_add_last (
+        &update_pipeline->mutator_groups) = (struct kan_universe_world_pipeline_mutator_group_t) {
+        .name = kan_string_intern ("multiple_threads_test"),
+    };
 
     kan_universe_deploy_root (universe, &definition);
     kan_universe_world_definition_shutdown (&definition);
@@ -798,8 +812,10 @@ KAN_TEST_CASE (update_hierarchy)
         update_pipeline->name = kan_string_intern ("update");                                                          \
                                                                                                                        \
         kan_dynamic_array_set_capacity (&update_pipeline->mutators, 1u);                                               \
-        *(kan_interned_string_t *) kan_dynamic_array_add_last (&update_pipeline->mutators) =                           \
-            kan_string_intern ("world_update_counter");                                                                \
+        *(struct kan_universe_world_pipeline_mutator_t *) kan_dynamic_array_add_last (&update_pipeline->mutators) =    \
+            (struct kan_universe_world_pipeline_mutator_t) {                                                           \
+                .name = kan_string_intern ("world_update_counter"),                                                    \
+            };                                                                                                         \
     }
 
     BUILD_WORLD_DEFINITION (&definition, &_0u)
@@ -867,8 +883,10 @@ KAN_TEST_CASE (migration)
     update_pipeline->name = kan_string_intern ("update");
 
     kan_dynamic_array_set_capacity (&update_pipeline->mutators, 1u);
-    *(kan_interned_string_t *) kan_dynamic_array_add_last (&update_pipeline->mutators) =
-        kan_string_intern ("migration_mutator");
+    *(struct kan_universe_world_pipeline_mutator_t *) kan_dynamic_array_add_last (&update_pipeline->mutators) =
+        (struct kan_universe_world_pipeline_mutator_t) {
+            .name = kan_string_intern ("migration_mutator"),
+        };
 
     kan_universe_deploy_root (universe, &definition);
     kan_universe_world_definition_shutdown (&definition);

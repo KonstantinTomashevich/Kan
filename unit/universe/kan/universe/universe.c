@@ -2323,9 +2323,10 @@ void kan_universe_world_configuration_shutdown (struct kan_universe_world_config
 void kan_universe_world_pipeline_definition_init (struct kan_universe_world_pipeline_definition_t *data)
 {
     data->name = NULL;
-    kan_dynamic_array_init (&data->mutators, 0u, sizeof (kan_interned_string_t), _Alignof (kan_interned_string_t),
-                            kan_allocation_group_stack_get ());
-    kan_dynamic_array_init (&data->mutator_groups, 0u, sizeof (kan_interned_string_t), _Alignof (kan_interned_string_t),
+    kan_dynamic_array_init (&data->mutators, 0u, sizeof (struct kan_universe_world_pipeline_mutator_t),
+                            _Alignof (struct kan_universe_world_pipeline_mutator_t), kan_allocation_group_stack_get ());
+    kan_dynamic_array_init (&data->mutator_groups, 0u, sizeof (struct kan_universe_world_pipeline_mutator_group_t),
+                            _Alignof (struct kan_universe_world_pipeline_mutator_group_t),
                             kan_allocation_group_stack_get ());
 }
 
@@ -2943,7 +2944,7 @@ kan_universe_world_t kan_universe_get_root_world (kan_universe_t universe)
 
 static void fill_world_from_definition (struct universe_t *universe,
                                         struct world_t *world,
-                                        struct kan_universe_world_definition_t *definition)
+                                        const struct kan_universe_world_definition_t *definition)
 {
     KAN_ASSERT (world->name == definition->world_name)
     KAN_ASSERT (world->scheduler_name == NULL)
@@ -3010,7 +3011,8 @@ static void fill_world_from_definition (struct universe_t *universe,
 
         for (uint64_t group_index = 0u; group_index < input->mutator_groups.size; ++group_index)
         {
-            kan_interned_string_t group_name = ((kan_interned_string_t *) input->mutator_groups.data)[group_index];
+            kan_interned_string_t group_name =
+                ((struct kan_universe_world_pipeline_mutator_group_t *) input->mutator_groups.data)[group_index].name;
             kan_interned_string_t *group_name_output =
                 (kan_interned_string_t *) kan_dynamic_array_add_last (&output->used_groups);
 
@@ -3071,7 +3073,8 @@ static void fill_world_from_definition (struct universe_t *universe,
         kan_dynamic_array_set_capacity (&output->mutators, output->mutators.size + input->mutators.size);
         for (uint64_t mutator_index = 0u; mutator_index < input->mutators.size; ++mutator_index)
         {
-            kan_interned_string_t requested_name = ((kan_interned_string_t *) input->mutators.data)[mutator_index];
+            kan_interned_string_t requested_name =
+                ((struct kan_universe_world_pipeline_mutator_t *) input->mutators.data)[mutator_index].name;
             struct mutator_api_node_t *mutator_node = universe_get_mutator_api (universe, requested_name);
 
             if (mutator_node)
@@ -3093,7 +3096,7 @@ static void fill_world_from_definition (struct universe_t *universe,
 
 static void update_world_hierarchy_with_overlaps (struct universe_t *universe,
                                                   struct world_t *world_to_update,
-                                                  struct kan_universe_world_definition_t *new_definition)
+                                                  const struct kan_universe_world_definition_t *new_definition)
 {
     world_clean_self_preserving_repository (universe, world_to_update);
     fill_world_from_definition (universe, world_to_update, new_definition);
@@ -3125,7 +3128,7 @@ static void update_world_hierarchy_with_overlaps (struct universe_t *universe,
 }
 
 kan_universe_world_t kan_universe_deploy_root (kan_universe_t universe,
-                                               struct kan_universe_world_definition_t *definition)
+                                               const struct kan_universe_world_definition_t *definition)
 {
     struct universe_t *universe_data = (struct universe_t *) universe;
     KAN_ASSERT (!universe_data->root_world)
@@ -3139,7 +3142,7 @@ kan_universe_world_t kan_universe_deploy_root (kan_universe_t universe,
 
 kan_universe_world_t kan_universe_deploy_child (kan_universe_t universe,
                                                 kan_universe_world_t parent,
-                                                struct kan_universe_world_definition_t *definition)
+                                                const struct kan_universe_world_definition_t *definition)
 {
     struct universe_t *universe_data = (struct universe_t *) universe;
     KAN_ASSERT (universe_data->root_world)
@@ -3156,7 +3159,7 @@ kan_universe_world_t kan_universe_deploy_child (kan_universe_t universe,
 
 kan_universe_world_t kan_universe_redeploy (kan_universe_t universe,
                                             kan_universe_world_t world,
-                                            struct kan_universe_world_definition_t *definition)
+                                            const struct kan_universe_world_definition_t *definition)
 {
     struct universe_t *universe_data = (struct universe_t *) universe;
     KAN_ASSERT (universe_data->root_world)

@@ -306,15 +306,27 @@ UNIVERSE_API void kan_universe_world_configuration_init (struct kan_universe_wor
 
 UNIVERSE_API void kan_universe_world_configuration_shutdown (struct kan_universe_world_configuration_t *data);
 
+/// \brief Contains data about mutator added to pipeline definition.
+struct kan_universe_world_pipeline_mutator_t
+{
+    kan_interned_string_t name;
+};
+
+/// \brief Contains data about mutator group added to pipeline definition.
+struct kan_universe_world_pipeline_mutator_group_t
+{
+    kan_interned_string_t name;
+};
+
 /// \brief Contains pipeline name and names of mutators inside this pipeline.
 struct kan_universe_world_pipeline_definition_t
 {
     kan_interned_string_t name;
 
-    /// \meta reflection_dynamic_array_type = "kan_interned_string_t"
+    /// \meta reflection_dynamic_array_type = "struct kan_universe_world_pipeline_mutator_t"
     struct kan_dynamic_array_t mutators;
 
-    /// \meta reflection_dynamic_array_type = "kan_interned_string_t"
+    /// \meta reflection_dynamic_array_type = "struct kan_universe_world_pipeline_mutator_group_t"
     /// \brief See `kan_universe_mutator_group_meta_t`.
     struct kan_dynamic_array_t mutator_groups;
 };
@@ -404,18 +416,18 @@ UNIVERSE_API kan_universe_world_t kan_universe_get_root_world (kan_universe_t un
 /// \brief Deploys given definition as root world.
 /// \invariant There is no root world in this universe.
 UNIVERSE_API kan_universe_world_t kan_universe_deploy_root (kan_universe_t universe,
-                                                            struct kan_universe_world_definition_t *definition);
+                                                            const struct kan_universe_world_definition_t *definition);
 
 /// \brief Deploys given definition as child of given parent world.
 UNIVERSE_API kan_universe_world_t kan_universe_deploy_child (kan_universe_t universe,
                                                              kan_universe_world_t parent,
-                                                             struct kan_universe_world_definition_t *definition);
+                                                             const struct kan_universe_world_definition_t *definition);
 
 /// \brief Redeploys given definition inside given world by updating mutators and schedulers without changing data.
 /// \invariant Definition world name is equal to given world name.
 UNIVERSE_API kan_universe_world_t kan_universe_redeploy (kan_universe_t universe,
                                                          kan_universe_world_t world,
-                                                         struct kan_universe_world_definition_t *definition);
+                                                         const struct kan_universe_world_definition_t *definition);
 
 /// \brief Runs scheduler of root world if it exists in order to update worlds data.
 UNIVERSE_API void kan_universe_update (kan_universe_t universe);
