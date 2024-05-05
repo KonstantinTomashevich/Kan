@@ -1242,8 +1242,12 @@ static inline kan_bool_t structural_setter_open_struct (struct reader_state_t *r
         };
 
         KAN_ASSERT (new_state.struct_state.type)
-        new_state.struct_state.type->init (new_state.struct_state.type->functor_user_data,
-                                           new_state.struct_state.instance);
+        if (new_state.struct_state.type->init)
+        {
+            new_state.struct_state.type->init (new_state.struct_state.type->functor_user_data,
+                                               new_state.struct_state.instance);
+        }
+
         reader_state_push (reader_state, new_state);
         return KAN_TRUE;
     }
@@ -1530,7 +1534,11 @@ static inline kan_bool_t read_structural_setter (struct reader_state_t *reader_s
             };
 
             KAN_ASSERT (new_state.struct_state.type)
-            new_state.struct_state.type->init (new_state.struct_state.type->functor_user_data, array_address);
+            if (new_state.struct_state.type->init)
+            {
+                new_state.struct_state.type->init (new_state.struct_state.type->functor_user_data, array_address);
+            }
+
             reader_state_push (reader_state, new_state);
             return KAN_TRUE;
         }
@@ -1698,7 +1706,11 @@ static inline kan_bool_t read_array_appender (struct reader_state_t *reader_stat
         };
 
         KAN_ASSERT (new_state.struct_state.type)
-        new_state.struct_state.type->init (new_state.struct_state.type->functor_user_data, spot);
+        if (new_state.struct_state.type->init)
+        {
+            new_state.struct_state.type->init (new_state.struct_state.type->functor_user_data, spot);
+        }
+
         reader_state_push (reader_state, new_state);
         return KAN_TRUE;
     }
