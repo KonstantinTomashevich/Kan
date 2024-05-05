@@ -109,6 +109,20 @@ struct workflow_graph_header_t
     struct workflow_graph_node_t *start_nodes[];
 };
 
+static kan_bool_t statics_initialized = KAN_FALSE;
+static kan_interned_string_t task_start_name;
+static kan_interned_string_t task_finish_name;
+
+static void ensure_statics_initialized (void)
+{
+    if (!statics_initialized)
+    {
+        task_start_name = kan_string_intern ("workflow_task_start");
+        task_finish_name = kan_string_intern ("workflow_task_finish");
+        statics_initialized = KAN_TRUE;
+    }
+}
+
 #if defined(KAN_WORKFLOW_VERIFY)
 struct resource_info_node_t
 {
@@ -588,6 +602,7 @@ static void graph_builder_submit_node (struct graph_builder_t *builder, struct b
 
 kan_workflow_graph_builder_t kan_workflow_graph_builder_create (kan_allocation_group_t group)
 {
+    ensure_statics_initialized ();
     kan_allocation_group_t builder_group = kan_allocation_group_get_child (group, "workflow_graph_builder");
     struct graph_builder_t *builder =
         kan_allocate_general (builder_group, sizeof (struct graph_builder_t), _Alignof (struct graph_builder_t));
@@ -999,7 +1014,7 @@ static void workflow_task_start_function (uint64_t user_data)
     node->job = kan_cpu_job_create ();
     kan_cpu_job_set_completion_task (node->job,
                                      (struct kan_cpu_task_t) {
-                                         .name = node->name,
+                                         .name = task_finish_name,
                                          .function = workflow_task_finish_function,
                                          .user_data = user_data,
                                      },
@@ -1043,7 +1058,7 @@ static void workflow_task_finish_function (uint64_t user_data)
             kan_atomic_int_unlock (&node->header->temporary_allocator_lock);
 
             list_node->task = (struct kan_cpu_task_t) {
-                .name = outcome->name,
+                .name = task_start_name,
                 .function = workflow_task_start_function,
                 .user_data = (uint64_t) outcome,
             };
@@ -1085,7 +1100,7 @@ void kan_workflow_graph_execute (kan_workflow_graph_t graph)
     for (uint64_t start_index = 0u; start_index < graph_header->start_nodes_count; ++start_index)
     {
         struct workflow_graph_node_t *start = graph_header->start_nodes[start_index];
-        KAN_CPU_TASK_LIST_USER_VALUE (&first_list_node, &graph_header->temporary_allocator, start->name,
+        KAN_CPU_TASK_LIST_USER_VALUE (&first_list_node, &graph_header->temporary_allocator, task_start_name,
                                       workflow_task_start_function, FOREGROUND, start)
     }
 
