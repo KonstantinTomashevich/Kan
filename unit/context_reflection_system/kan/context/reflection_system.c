@@ -193,6 +193,7 @@ static kan_context_system_handle_t reflection_system_create (kan_allocation_grou
     system->first_generated_connection = NULL;
     system->first_generation_iterate_connection = NULL;
     system->first_cleanup_connection = NULL;
+    system->first_pre_shutdown_connection = NULL;
 
     system->group = group;
     system->current_registry = KAN_INVALID_REFLECTION_REGISTRY;
