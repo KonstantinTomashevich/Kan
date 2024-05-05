@@ -14,3 +14,8 @@ concrete_compile_definitions (
         PRIVATE
         KAN_CPU_PROFILER_TRACY_INITIAL_SECTION_BUCKETS=${KAN_CPU_PROFILER_TRACY_INITIAL_SECTION_BUCKETS}
         KAN_CPU_PROFILER_TRACY_SECTION_LOAD_FACTOR=${KAN_CPU_PROFILER_TRACY_SECTION_LOAD_FACTOR})
+
+# Fixup for Unix build -- we need to link to stdc++
+if (UNIX)
+    concrete_require (SCOPE PRIVATE THIRD_PARTY stdc++)
+endif ()

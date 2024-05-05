@@ -228,7 +228,7 @@ static void ensure_global_task_dispatcher_ready (void)
             global_task_dispatcher.allocation_group =
                 kan_allocation_group_get_child (kan_allocation_group_root (), "global_cpu_dispatcher");
             global_task_dispatcher.foreground_section = kan_cpu_section_get ("foreground_task");
-            global_task_dispatcher.foreground_section = kan_cpu_section_get ("background_task");
+            global_task_dispatcher.background_section = kan_cpu_section_get ("background_task");
 
             global_task_dispatcher.shutting_down = kan_atomic_int_init (0);
             global_task_dispatcher.threads_count = kan_platform_get_cpu_count ();

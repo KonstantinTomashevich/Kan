@@ -8,6 +8,7 @@
 #include <kan/container/hash_storage.h>
 #include <kan/container/stack_group_allocator.h>
 #include <kan/cpu_dispatch/task.h>
+#include <kan/cpu_profiler/markup.h>
 #include <kan/log/logging.h>
 #include <kan/memory/allocation.h>
 #include <kan/universe/universe.h>
@@ -126,6 +127,8 @@ struct universe_t
     struct kan_hash_storage_t scheduler_api_storage;
     struct kan_hash_storage_t mutator_api_storage;
     struct kan_hash_storage_t group_multi_map_storage;
+
+    kan_cpu_section_t update_section;
 };
 
 enum query_type_t
@@ -1447,6 +1450,9 @@ static void add_mutator_to_groups (struct universe_t *universe,
 
 static void universe_fill_api_storages (struct universe_t *universe)
 {
+    struct kan_cpu_section_execution_t execution;
+    kan_cpu_section_execution_init (&execution, kan_cpu_section_get ("universe_fill_api_storages"));
+
     kan_reflection_registry_function_iterator_t function_iterator =
         kan_reflection_registry_function_iterator_create (universe->reflection_registry);
 
@@ -1887,6 +1893,8 @@ static void universe_fill_api_storages (struct universe_t *universe)
 
         mutator_node = next;
     }
+
+    kan_cpu_section_execution_shutdown (&execution);
 }
 
 static struct world_t *world_create (struct universe_t *universe, struct world_t *parent, kan_interned_string_t name)
@@ -2458,6 +2466,7 @@ kan_universe_t kan_universe_create (kan_allocation_group_t group,
     kan_hash_storage_init (&universe->group_multi_map_storage, universe->api_allocation_group,
                            KAN_UNIVERSE_GROUP_INITIAL_BUCKETS);
 
+    universe->update_section = kan_cpu_section_get ("universe_update");
     universe_fill_api_storages (universe);
     return (kan_universe_t) universe;
 }
@@ -2858,6 +2867,9 @@ void kan_universe_migrate (kan_universe_t universe,
                            kan_reflection_struct_migrator_t migrator)
 {
     struct universe_t *universe_data = (struct universe_t *) universe;
+    struct kan_cpu_section_execution_t migrate_execution;
+    kan_cpu_section_execution_init (&migrate_execution, kan_cpu_section_get ("universe_migrate"));
+
     struct kan_hash_storage_t old_scheduler_api_storage = universe_data->scheduler_api_storage;
     struct kan_hash_storage_t old_mutator_api_storage = universe_data->mutator_api_storage;
 
@@ -2879,6 +2891,10 @@ void kan_universe_migrate (kan_universe_t universe,
             &temporary_allocator, kan_allocation_group_get_child (universe_data->main_allocation_group, "migration"),
             KAN_UNIVERSE_MIGRATION_INITIAL_STACK);
 
+        struct kan_cpu_section_execution_t mutators_schedulers_execution;
+        kan_cpu_section_execution_init (&mutators_schedulers_execution,
+                                        kan_cpu_section_get ("mutators_and_schedulers"));
+
         kan_cpu_job_t job = kan_cpu_job_create ();
         struct kan_cpu_task_list_node_t *task_list = NULL;
         world_migration_schedulers_mutators_migrate (universe_data, universe_data->root_world, old_registry,
@@ -2889,6 +2905,10 @@ void kan_universe_migrate (kan_universe_t universe,
         kan_cpu_job_wait (job);
         kan_stack_group_allocator_reset (&temporary_allocator);
 
+        kan_cpu_section_execution_shutdown (&mutators_schedulers_execution);
+        struct kan_cpu_section_execution_t configuration_execution;
+        kan_cpu_section_execution_init (&configuration_execution, kan_cpu_section_get ("configuration"));
+
         job = kan_cpu_job_create ();
         task_list = NULL;
         world_migrate_configuration (universe_data, universe_data->root_world, migration_seed, migrator, &task_list,
@@ -2898,6 +2918,7 @@ void kan_universe_migrate (kan_universe_t universe,
         kan_cpu_job_release (job);
         kan_cpu_job_wait (job);
         kan_stack_group_allocator_reset (&temporary_allocator);
+        kan_cpu_section_execution_shutdown (&configuration_execution);
 
         kan_repository_migrate (universe_data->root_world->repository, new_registry, migration_seed, migrator);
         world_deploy_hierarchy (universe_data, universe_data->root_world);
@@ -2922,6 +2943,7 @@ void kan_universe_migrate (kan_universe_t universe,
 
     kan_hash_storage_shutdown (&old_scheduler_api_storage);
     kan_hash_storage_shutdown (&old_mutator_api_storage);
+    kan_cpu_section_execution_shutdown (&migrate_execution);
 }
 
 kan_universe_world_t kan_universe_get_reflection_registry (kan_universe_t universe)
@@ -3132,11 +3154,15 @@ kan_universe_world_t kan_universe_deploy_root (kan_universe_t universe,
 {
     struct universe_t *universe_data = (struct universe_t *) universe;
     KAN_ASSERT (!universe_data->root_world)
+    struct kan_cpu_section_execution_t execution;
+    kan_cpu_section_execution_init (&execution, kan_cpu_section_get ("universe_deploy_root"));
 
     universe_data->root_world = world_create (universe_data, NULL, definition->world_name);
     update_world_hierarchy_with_overlaps (universe_data, universe_data->root_world, definition);
     world_deploy_hierarchy (universe_data, universe_data->root_world);
     kan_repository_enter_serving_mode (universe_data->root_world->repository);
+
+    kan_cpu_section_execution_shutdown (&execution);
     return (kan_universe_world_t) universe_data->root_world;
 }
 
@@ -3147,13 +3173,16 @@ kan_universe_world_t kan_universe_deploy_child (kan_universe_t universe,
     struct universe_t *universe_data = (struct universe_t *) universe;
     KAN_ASSERT (universe_data->root_world)
     KAN_ASSERT (parent != KAN_INVALID_UNIVERSE_WORLD)
-    kan_repository_enter_planning_mode (universe_data->root_world->repository);
+    struct kan_cpu_section_execution_t execution;
+    kan_cpu_section_execution_init (&execution, kan_cpu_section_get ("universe_deploy_child"));
 
+    kan_repository_enter_planning_mode (universe_data->root_world->repository);
     struct world_t *deploy_root = world_create (universe_data, (struct world_t *) parent, definition->world_name);
     update_world_hierarchy_with_overlaps (universe_data, deploy_root, definition);
     world_deploy_hierarchy (universe_data, deploy_root);
 
     kan_repository_enter_serving_mode (universe_data->root_world->repository);
+    kan_cpu_section_execution_shutdown (&execution);
     return (kan_universe_world_t) deploy_root;
 }
 
@@ -3164,13 +3193,16 @@ kan_universe_world_t kan_universe_redeploy (kan_universe_t universe,
     struct universe_t *universe_data = (struct universe_t *) universe;
     KAN_ASSERT (universe_data->root_world)
     KAN_ASSERT (world != KAN_INVALID_UNIVERSE_WORLD)
-    kan_repository_enter_planning_mode (universe_data->root_world->repository);
+    struct kan_cpu_section_execution_t execution;
+    kan_cpu_section_execution_init (&execution, kan_cpu_section_get ("universe_redeploy"));
 
+    kan_repository_enter_planning_mode (universe_data->root_world->repository);
     struct world_t *deploy_root = (struct world_t *) world;
     update_world_hierarchy_with_overlaps (universe_data, deploy_root, definition);
     world_deploy_hierarchy (universe_data, deploy_root);
 
     kan_repository_enter_serving_mode (universe_data->root_world->repository);
+    kan_cpu_section_execution_shutdown (&execution);
     return (kan_universe_world_t) deploy_root;
 }
 
@@ -3182,21 +3214,30 @@ static void update_world (struct world_t *world)
     }
 
     KAN_ASSERT (world->scheduler_api->execute)
+    struct kan_cpu_section_execution_t execution;
+    kan_cpu_section_execution_init (&execution, kan_cpu_section_get (world->name));
+
     struct kan_universe_scheduler_execute_arguments_t arguments = {
         .interface = (kan_universe_scheduler_interface_t) world,
         .scheduler_state = world->scheduler_state,
     };
 
     world->scheduler_api->execute->call (world->scheduler_api->execute->call_user_data, NULL, &arguments);
+    kan_cpu_section_execution_shutdown (&execution);
 }
 
 void kan_universe_update (kan_universe_t universe)
 {
     struct universe_t *universe_data = (struct universe_t *) universe;
+    struct kan_cpu_section_execution_t execution;
+    kan_cpu_section_execution_init (&execution, universe_data->update_section);
+
     if (universe_data->root_world)
     {
         update_world (universe_data->root_world);
     }
+
+    kan_cpu_section_execution_shutdown (&execution);
 }
 
 void kan_universe_undeploy_world (kan_universe_t universe, kan_universe_world_t world)
@@ -3204,10 +3245,13 @@ void kan_universe_undeploy_world (kan_universe_t universe, kan_universe_world_t 
     struct universe_t *universe_data = (struct universe_t *) universe;
     KAN_ASSERT (universe_data->root_world)
     KAN_ASSERT (world != KAN_INVALID_UNIVERSE_WORLD)
+    struct kan_cpu_section_execution_t execution;
+    kan_cpu_section_execution_init (&execution, kan_cpu_section_get ("universe_undeploy"));
 
     kan_repository_enter_planning_mode (universe_data->root_world->repository);
     world_destroy (universe_data, (struct world_t *) world);
     kan_repository_enter_serving_mode (universe_data->root_world->repository);
+    kan_cpu_section_execution_shutdown (&execution);
 }
 
 void kan_universe_destroy (kan_universe_t universe)
@@ -3244,6 +3288,9 @@ void kan_universe_scheduler_interface_run_pipeline (kan_universe_scheduler_inter
                                                     kan_interned_string_t pipeline_name)
 {
     struct world_t *world = (struct world_t *) interface;
+    struct kan_cpu_section_execution_t execution;
+    kan_cpu_section_execution_init (&execution, kan_cpu_section_get (pipeline_name));
+
     for (uint64_t pipeline_index = 0u; pipeline_index < world->pipelines.size; ++pipeline_index)
     {
         struct pipeline_t *pipeline = &((struct pipeline_t *) world->pipelines.data)[pipeline_index];
@@ -3257,6 +3304,8 @@ void kan_universe_scheduler_interface_run_pipeline (kan_universe_scheduler_inter
             break;
         }
     }
+
+    kan_cpu_section_execution_shutdown (&execution);
 }
 
 void kan_universe_scheduler_interface_update_all_children (kan_universe_scheduler_interface_t interface)

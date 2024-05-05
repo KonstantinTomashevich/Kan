@@ -30,6 +30,18 @@ struct plugin_system_t
     struct kan_dynamic_array_t plugins;
 };
 
+static kan_bool_t statics_initialized = KAN_FALSE;
+static kan_allocation_group_t config_allocation_group;
+
+static void ensure_statics_initialized (void)
+{
+    if (!statics_initialized)
+    {
+        config_allocation_group = kan_allocation_group_get_child (kan_allocation_group_root (), "plugin_system_config");
+        statics_initialized = KAN_TRUE;
+    }
+}
+
 kan_context_system_handle_t plugin_system_create (kan_allocation_group_t group, void *user_config)
 {
     struct plugin_system_t *system =
@@ -231,18 +243,6 @@ CONTEXT_PLUGIN_SYSTEM_API struct kan_context_system_api_t KAN_CONTEXT_SYSTEM_API
     .disconnect = plugin_system_disconnect,
     .destroy = plugin_system_destroy,
 };
-
-static kan_bool_t statics_initialized = KAN_FALSE;
-static kan_allocation_group_t config_allocation_group;
-
-static void ensure_statics_initialized (void)
-{
-    if (!statics_initialized)
-    {
-        config_allocation_group = kan_allocation_group_get_child (kan_allocation_group_root (), "plugin_system_config");
-        statics_initialized = KAN_TRUE;
-    }
-}
 
 void kan_plugin_system_config_init (struct kan_plugin_system_config_t *config)
 {

@@ -3,12 +3,14 @@
 #include <kan/context/reflection_system.h>
 #include <kan/context/universe_system.h>
 #include <kan/context/update_system.h>
+#include <kan/cpu_profiler/markup.h>
 
 struct universe_system_t
 {
     kan_context_handle_t context;
     kan_allocation_group_t group;
     kan_universe_t universe;
+    kan_cpu_section_t update_section;
 };
 
 kan_context_system_handle_t universe_system_create (kan_allocation_group_t group, void *user_config)
@@ -17,6 +19,7 @@ kan_context_system_handle_t universe_system_create (kan_allocation_group_t group
         kan_allocate_general (group, sizeof (struct universe_system_t), _Alignof (struct universe_system_t));
     system->group = group;
     system->universe = KAN_INVALID_UNIVERSE;
+    system->update_section = kan_cpu_section_get ("context_universe_system_update");
     return (kan_context_system_handle_t) system;
 }
 
@@ -39,10 +42,15 @@ static void on_reflection_generated (kan_context_system_handle_t other_system,
 static void on_update_run (kan_context_system_handle_t other_system)
 {
     struct universe_system_t *system = (struct universe_system_t *) other_system;
+    struct kan_cpu_section_execution_t execution;
+    kan_cpu_section_execution_init (&execution, system->update_section);
+
     if (system->universe != KAN_INVALID_UNIVERSE)
     {
         kan_universe_update (system->universe);
     }
+
+    kan_cpu_section_execution_shutdown (&execution);
 }
 
 static void on_reflection_pre_shutdown (kan_context_system_handle_t other_system)

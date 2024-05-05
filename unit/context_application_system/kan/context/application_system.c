@@ -225,8 +225,8 @@ kan_context_system_handle_t application_system_create (kan_allocation_group_t gr
     system->operations_group = kan_allocation_group_get_child (group, "operations");
     system->clipboard_group = kan_allocation_group_get_child (group, "clipboard");
 
-    system->sync_main_section = kan_cpu_section_get ("application_system_sync_in_main_thread");
-    system->sync_info_section = kan_cpu_section_get ("application_system_sync_info");
+    system->sync_main_section = kan_cpu_section_get ("context_application_system_sync_in_main_thread");
+    system->sync_info_section = kan_cpu_section_get ("sync_info");
 
     system->operation_submission_lock = kan_atomic_int_init (0);
     kan_stack_group_allocator_init (&system->operation_temporary_allocator, system->operations_group,

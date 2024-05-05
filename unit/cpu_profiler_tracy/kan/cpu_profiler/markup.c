@@ -56,6 +56,7 @@ kan_cpu_section_t kan_cpu_section_get (const char *name)
     struct section_node_t *new_node = kan_allocate_general (KAN_ALLOCATION_GROUP_IGNORE, sizeof (struct section_node_t),
                                                             _Alignof (struct section_node_t));
     new_node->node.hash = (uint64_t) interned_name;
+    new_node->name = interned_name;
     new_node->location.name = name;
     new_node->location.function = NULL;
     new_node->location.file = NULL;
