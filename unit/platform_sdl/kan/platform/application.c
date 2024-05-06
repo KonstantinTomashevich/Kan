@@ -405,12 +405,7 @@ void kan_platform_application_event_shutdown (struct kan_platform_application_ev
     }
 }
 
-static void application_shutdown (void)
-{
-    SDL_QuitSubSystem (SDL_INIT_VIDEO | SDL_INIT_EVENTS);
-}
-
-kan_bool_t kan_platform_application_initialize (void)
+kan_bool_t kan_platform_application_init (void)
 {
     KAN_ASSERT (!SDL_WasInit (SDL_INIT_VIDEO | SDL_INIT_EVENTS))
     if (SDL_InitSubSystem (SDL_INIT_VIDEO | SDL_INIT_EVENTS) != 0)
@@ -423,8 +418,13 @@ kan_bool_t kan_platform_application_initialize (void)
         kan_allocation_group_get_child (kan_allocation_group_root (), "platform_application");
     application_events_allocation_group = kan_allocation_group_get_child (application_allocation_group, "events");
     application_clipboard_allocation_group = kan_allocation_group_get_child (application_allocation_group, "clipboard");
-    atexit (application_shutdown);
     return KAN_TRUE;
+}
+
+void kan_platform_application_shutdown (void)
+{
+    KAN_ASSERT (SDL_WasInit (SDL_INIT_VIDEO | SDL_INIT_EVENTS))
+    SDL_QuitSubSystem (SDL_INIT_VIDEO | SDL_INIT_EVENTS);
 }
 
 kan_bool_t kan_platform_application_fetch_next_event (struct kan_platform_application_event_t *output)

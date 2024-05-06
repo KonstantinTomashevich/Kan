@@ -497,7 +497,7 @@ int kan_application_framework_run_with_configuration (
     char **arguments)
 {
     ensure_statics_initialized ();
-    if (!kan_platform_application_initialize ())
+    if (!kan_platform_application_init ())
     {
         return KAN_APPLICATION_FRAMEWORK_EXIT_CODE_FAILED_TO_INITIALIZE_PLATFORM;
     }
@@ -617,5 +617,6 @@ int kan_application_framework_run_with_configuration (
     }
 
     kan_context_destroy (context);
+    kan_platform_application_shutdown ();
     return result;
 }
