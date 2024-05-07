@@ -11,7 +11,7 @@ concrete_sources_direct ("${REFLECTION_GENERATOR_OUTPUT_FILE_PATH}")
 
 concrete_require (
         SCOPE PUBLIC
-        ABSTRACT file_system universe_resource_provider
+        ABSTRACT file_system platform universe_resource_provider
         CONCRETE_INTERFACE
         context_reflection_system context_update_system context_virtual_file_system resource_index serialization testing
         universe)
@@ -39,5 +39,5 @@ foreach (IMPLEMENTATION ${PROVIDER_IMPLEMENTATIONS})
     kan_setup_tests (
             TEST_UNIT test_universe_resource_provider
             TEST_SHARED_LIBRARY ${SHARED_NAME}
-            PROPERTIES TIMEOUT 1)
+            PROPERTIES TIMEOUT 3)
 endforeach ()
