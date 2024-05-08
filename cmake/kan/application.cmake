@@ -12,6 +12,9 @@ set (KAN_APPLICATION_RESOURCES_DIRECTORY_NAME "resources")
 # Path to static data template for application framework static launcher.
 set (KAN_APPLICATION_PROGRAM_LAUNCHER_STATICS_TEMPLATE "${CMAKE_SOURCE_DIR}/cmake/kan/application_launcher_statics.c")
 
+# Path to static data template for application framework tool.
+set (KAN_APPLICATION_TOOL_STATICS_TEMPLATE "${CMAKE_SOURCE_DIR}/cmake/kan/application_tool_statics.c")
+
 # Name of the used application framework static launcher implementation.
 set (KAN_APPLICATION_PROGRAM_LAUNCHER_IMPLEMENTATION "sdl")
 
@@ -381,15 +384,48 @@ function (application_generate)
         endif ()
     endforeach ()
 
-    # Generate core plugins development copy target.
+    # Generate plugin library copy targets.
 
-    add_custom_target ("${APPLICATION_NAME}_dev_core_plugins")
-    foreach (PLUGIN ${CORE_PLUGINS})
+    foreach (PLUGIN ${PLUGINS})
+        add_custom_target ("${PLUGIN}_dev_copy")
         setup_shared_library_copy (
                 LIBRARY "${PLUGIN}_library"
-                USER "${APPLICATION_NAME}_dev_core_plugins"
+                USER "${PLUGIN}_dev_copy"
                 OUTPUT ${DEV_PLUGINS_DIRECTORY}
                 DEPENDENCIES "${APPLICATION_NAME}_prepare_dev_directories")
+    endforeach ()
+
+    # Generate tool statics file.
+
+    set (STATICS_PLUGINS_DIRECTORY_PATH "\"${KAN_APPLICATION_PLUGINS_DIRECTORY_NAME}\"")
+    set (STATICS_PLUGINS)
+
+    foreach (PLUGIN ${PLUGINS})
+        string (APPEND STATICS_PLUGINS "    \"${PLUGIN}_library\",\n")
+        if ("${PLUGIN_GROUP}" IN_LIST CORE_GROUPS)
+            list (APPEND CORE_PLUGINS "${PLUGIN}")
+        endif ()
+    endforeach ()
+
+    set (STATICS_PATH "${CMAKE_CURRENT_BINARY_DIR}/Generated/${APPLICATION_NAME}_tool_statics.c")
+    configure_file ("${KAN_APPLICATION_TOOL_STATICS_TEMPLATE}" "${STATICS_PATH}")
+
+    register_concrete ("${APPLICATION_NAME}_tool_statics")
+    concrete_sources_direct ("${STATICS_PATH}")
+
+    # Generate resource binarizer executable.
+
+    register_executable ("${APPLICATION_NAME}_resource_binarizer")
+    executable_include (
+            CONCRETE
+            application_framework_resource_binarizer application_framework_tool "${APPLICATION_NAME}_tool_statics")
+
+    executable_link_shared_libraries ("${APPLICATION_NAME}_core_library")
+    executable_verify ()
+    executable_copy_linked_artefacts ()
+
+    foreach (PLUGIN ${PLUGINS})
+        add_dependencies ("${APPLICATION_NAME}_resource_binarizer" "${PLUGIN}_dev_copy")
     endforeach ()
 
     # Generate programs.
@@ -454,7 +490,6 @@ function (application_generate)
 
         register_concrete ("${PROGRAM}_launcher_statics")
         concrete_sources_direct ("${STATICS_PATH}")
-        concrete_require (SCOPE PUBLIC ABSTRACT application_framework_static_launcher)
 
         register_executable ("${PROGRAM}_launcher")
         executable_include (
@@ -465,18 +500,17 @@ function (application_generate)
         executable_verify ()
         executable_copy_linked_artefacts ()
 
+        foreach (PLUGIN ${CORE_PLUGINS})
+            add_dependencies ("${PROGRAM}_launcher" "${PLUGIN}_dev_copy")
+        endforeach ()
+
         foreach (PLUGIN ${PROGRAM_PLUGINS})
-            setup_shared_library_copy (
-                    LIBRARY "${PLUGIN}_library"
-                    USER "${PROGRAM}_launcher"
-                    OUTPUT ${DEV_PLUGINS_DIRECTORY}
-                    DEPENDENCIES "${APPLICATION_NAME}_prepare_dev_directories")
+            add_dependencies ("${PROGRAM}_launcher" "${PLUGIN}_dev_copy")
         endforeach ()
 
         add_dependencies ("${PROGRAM}_launcher"
                 "${PROGRAM}_dev_configuration"
-                "${APPLICATION_NAME}_dev_core_configuration"
-                "${APPLICATION_NAME}_dev_core_plugins")
+                "${APPLICATION_NAME}_dev_core_configuration")
 
     endforeach ()
 
