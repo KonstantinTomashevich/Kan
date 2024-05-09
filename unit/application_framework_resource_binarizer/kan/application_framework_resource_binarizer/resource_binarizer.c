@@ -86,18 +86,17 @@ static inline int execute (kan_context_handle_t context, const char *input_path,
     {
     }
 
+    kan_serialization_rd_reader_destroy (reader);
+    input_stream->operations->close (input_stream);
+
     if (state == KAN_SERIALIZATION_FAILED)
     {
         KAN_LOG (resource_binarizer, KAN_LOG_ERROR, "Input deserialization failed.")
-        kan_serialization_rd_reader_destroy (reader);
-        input_stream->operations->close (input_stream);
         free_instance (type, instance_allocation_group, instance_data);
         return EXIT_CODE_UNABLE_TO_READ_INPUT;
     }
 
     KAN_ASSERT (state == KAN_SERIALIZATION_FINISHED)
-    kan_serialization_rd_reader_destroy (reader);
-    input_stream->operations->close (input_stream);
     struct kan_stream_t *output_stream = kan_direct_file_stream_open_for_write (output_path, KAN_TRUE);
 
     if (!output_stream)
@@ -123,21 +122,18 @@ static inline int execute (kan_context_handle_t context, const char *input_path,
     {
     }
 
-    if (state == KAN_SERIALIZATION_FAILED)
-    {
-        KAN_LOG (resource_binarizer, KAN_LOG_ERROR, "Output serialization failed.")
-        kan_serialization_binary_writer_destroy (writer);
-        kan_serialization_binary_script_storage_destroy (storage);
-        output_stream->operations->close (output_stream);
-        free_instance (type, instance_allocation_group, instance_data);
-        return EXIT_CODE_UNABLE_TO_WRITE_OUTPUT;
-    }
-
-    KAN_ASSERT (state == KAN_SERIALIZATION_FINISHED)
     kan_serialization_binary_writer_destroy (writer);
     kan_serialization_binary_script_storage_destroy (storage);
     output_stream->operations->close (output_stream);
     free_instance (type, instance_allocation_group, instance_data);
+
+    if (state == KAN_SERIALIZATION_FAILED)
+    {
+        KAN_LOG (resource_binarizer, KAN_LOG_ERROR, "Output serialization failed.")
+        return EXIT_CODE_UNABLE_TO_WRITE_OUTPUT;
+    }
+
+    KAN_ASSERT (state == KAN_SERIALIZATION_FINISHED)
     return 0;
 }
 

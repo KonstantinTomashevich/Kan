@@ -428,6 +428,20 @@ function (application_generate)
         add_dependencies ("${APPLICATION_NAME}_resource_binarizer" "${PLUGIN}_dev_copy")
     endforeach ()
 
+    # Generate packer executable.
+
+    register_executable ("${APPLICATION_NAME}_packer")
+    executable_include (
+            CONCRETE application_framework_packer application_framework_tool "${APPLICATION_NAME}_tool_statics")
+
+    executable_link_shared_libraries ("${APPLICATION_NAME}_core_library")
+    executable_verify ()
+    executable_copy_linked_artefacts ()
+
+    foreach (PLUGIN ${PLUGINS})
+        add_dependencies ("${APPLICATION_NAME}_packer" "${PLUGIN}_dev_copy")
+    endforeach ()
+
     # Generate programs.
 
     get_target_property (PROGRAMS "${APPLICATION_NAME}" APPLICATION_PROGRAMS)
