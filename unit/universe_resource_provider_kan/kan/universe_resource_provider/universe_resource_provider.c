@@ -1651,38 +1651,6 @@ static inline void remove_third_party_entry_reference (struct resource_provider_
     }
 }
 
-static inline kan_interned_string_t extract_name_from_path (const char *path)
-{
-    const char *path_end = path;
-    const char *last_separator = NULL;
-
-    while (*path_end)
-    {
-        if (*path_end == '/')
-        {
-            last_separator = path_end;
-        }
-
-        ++path_end;
-    }
-
-    const char *name_begin = last_separator ? last_separator + 1u : path;
-    const char *name_end = path_end;
-
-    const uint64_t path_length = path_end - path;
-    if (path_length > 4u && *(path_end - 4u) == '.' && *(path_end - 3u) == 'b' && *(path_end - 2u) == 'i' &&
-        *(path_end - 1u) == 'n')
-    {
-        name_end = path_end - 4u;
-    }
-    else if (path_length > 3u && *(path_end - 3u) == '.' && *(path_end - 2u) == 'r' && *(path_end - 1u) == 'd')
-    {
-        name_end = path_end - 3u;
-    }
-
-    return kan_char_sequence_intern (name_begin, name_end);
-}
-
 static inline void on_file_added (struct resource_provider_state_t *state,
                                   struct resource_provider_private_singleton_t *private,
                                   const char *path)
@@ -1697,7 +1665,10 @@ static inline void on_file_added (struct resource_provider_state_t *state,
     addition->path = kan_allocate_general (addition->my_allocation_group, path_length + 1u, _Alignof (char));
     memcpy (addition->path, path, path_length + 1u);
 
-    addition->name_for_search = extract_name_from_path (path);
+    struct kan_resource_index_info_from_path_t info_from_path;
+    kan_resource_index_extract_info_from_path (path, &info_from_path);
+
+    addition->name_for_search = info_from_path.name;
     addition->investigate_after_ns = kan_platform_get_elapsed_nanoseconds () + state->add_wait_time_ns;
 
     kan_repository_indexed_insertion_package_submit (&package);
@@ -1772,10 +1743,13 @@ static inline void on_file_modified (struct resource_provider_state_t *state,
                                      kan_virtual_file_system_volume_t volume,
                                      const char *path)
 {
-    kan_interned_string_t name = extract_name_from_path (path);
+    struct kan_resource_index_info_from_path_t info_from_path;
+    kan_resource_index_extract_info_from_path (path, &info_from_path);
+
     {
         struct kan_repository_indexed_value_write_access_t access;
-        struct resource_provider_native_entry_t *entry = write_native_entry_by_path (state, name, path, &access);
+        struct resource_provider_native_entry_t *entry =
+            write_native_entry_by_path (state, info_from_path.name, path, &access);
 
         if (entry)
         {
@@ -1792,7 +1766,7 @@ static inline void on_file_modified (struct resource_provider_state_t *state,
     {
         struct kan_repository_indexed_value_write_access_t access;
         struct resource_provider_third_party_entry_t *entry =
-            write_third_party_entry_by_path (state, name, path, &access);
+            write_third_party_entry_by_path (state, info_from_path.name, path, &access);
 
         if (entry)
         {
@@ -1809,7 +1783,7 @@ static inline void on_file_modified (struct resource_provider_state_t *state,
     // If it is file waiting for addition, we need to shift investigate timer.
     {
         struct kan_repository_indexed_value_write_cursor_t cursor = kan_repository_indexed_value_write_query_execute (
-            &state->write_value__resource_provider_delayed_file_addition__name_for_search, &name);
+            &state->write_value__resource_provider_delayed_file_addition__name_for_search, &info_from_path.name);
 
         while (KAN_TRUE)
         {
@@ -1841,10 +1815,13 @@ static inline void on_file_removed (struct resource_provider_state_t *state,
                                     kan_virtual_file_system_volume_t volume,
                                     const char *path)
 {
-    kan_interned_string_t name = extract_name_from_path (path);
+    struct kan_resource_index_info_from_path_t info_from_path;
+    kan_resource_index_extract_info_from_path (path, &info_from_path);
+
     {
         struct kan_repository_indexed_value_write_access_t access;
-        struct resource_provider_native_entry_t *entry = write_native_entry_by_path (state, name, path, &access);
+        struct resource_provider_native_entry_t *entry =
+            write_native_entry_by_path (state, info_from_path.name, path, &access);
 
         if (entry)
         {
@@ -1858,7 +1835,7 @@ static inline void on_file_removed (struct resource_provider_state_t *state,
     {
         struct kan_repository_indexed_value_write_access_t access;
         struct resource_provider_third_party_entry_t *entry =
-            write_third_party_entry_by_path (state, name, path, &access);
+            write_third_party_entry_by_path (state, info_from_path.name, path, &access);
 
         if (entry)
         {
@@ -1872,7 +1849,7 @@ static inline void on_file_removed (struct resource_provider_state_t *state,
     // If it is file waiting for addition, we need to cancel investigation.
     {
         struct kan_repository_indexed_value_write_cursor_t cursor = kan_repository_indexed_value_write_query_execute (
-            &state->write_value__resource_provider_delayed_file_addition__name_for_search, &name);
+            &state->write_value__resource_provider_delayed_file_addition__name_for_search, &info_from_path.name);
 
         while (KAN_TRUE)
         {
@@ -2915,7 +2892,10 @@ static void generated_container_shutdown (uint64_t function_user_data, void *dat
         const uint64_t offset =
             kan_apply_alignment (offsetof (struct kan_resource_container_view_t, data_begin), boxed_type->alignment);
         uint8_t *address = (uint8_t *) data + offset;
+
+        kan_allocation_group_stack_push (((struct kan_resource_container_view_t *) data)->my_allocation_group);
         boxed_type->shutdown (boxed_type->functor_user_data, address);
+        kan_allocation_group_stack_pop ();
     }
 }
 
