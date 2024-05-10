@@ -306,27 +306,15 @@ UNIVERSE_API void kan_universe_world_configuration_init (struct kan_universe_wor
 
 UNIVERSE_API void kan_universe_world_configuration_shutdown (struct kan_universe_world_configuration_t *data);
 
-/// \brief Contains data about mutator added to pipeline definition.
-struct kan_universe_world_pipeline_mutator_t
-{
-    kan_interned_string_t name;
-};
-
-/// \brief Contains data about mutator group added to pipeline definition.
-struct kan_universe_world_pipeline_mutator_group_t
-{
-    kan_interned_string_t name;
-};
-
 /// \brief Contains pipeline name and names of mutators inside this pipeline.
 struct kan_universe_world_pipeline_definition_t
 {
     kan_interned_string_t name;
 
-    /// \meta reflection_dynamic_array_type = "struct kan_universe_world_pipeline_mutator_t"
+    /// \meta reflection_dynamic_array_type = "kan_interned_string_t"
     struct kan_dynamic_array_t mutators;
 
-    /// \meta reflection_dynamic_array_type = "struct kan_universe_world_pipeline_mutator_group_t"
+    /// \meta reflection_dynamic_array_type = "kan_interned_string_t"
     /// \brief See `kan_universe_mutator_group_meta_t`.
     struct kan_dynamic_array_t mutator_groups;
 };

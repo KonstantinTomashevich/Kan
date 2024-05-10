@@ -1425,16 +1425,12 @@ static void run_request_resources_and_check_test (kan_context_handle_t context)
     update_pipeline->name = kan_string_intern ("update");
 
     kan_dynamic_array_set_capacity (&update_pipeline->mutators, 1u);
-    *(struct kan_universe_world_pipeline_mutator_t *) kan_dynamic_array_add_last (&update_pipeline->mutators) =
-        (struct kan_universe_world_pipeline_mutator_t) {
-            .name = kan_string_intern ("request_resources_and_check"),
-        };
+    *(kan_interned_string_t *) kan_dynamic_array_add_last (&update_pipeline->mutators) =
+        kan_string_intern ("request_resources_and_check");
 
     kan_dynamic_array_set_capacity (&update_pipeline->mutator_groups, 1u);
-    *(struct kan_universe_world_pipeline_mutator_group_t *) kan_dynamic_array_add_last (
-        &update_pipeline->mutator_groups) = (struct kan_universe_world_pipeline_mutator_group_t) {
-        .name = kan_string_intern (KAN_RESOURCE_PROVIDER_MUTATOR_GROUP),
-    };
+    *(kan_interned_string_t *) kan_dynamic_array_add_last (&update_pipeline->mutator_groups) =
+        kan_string_intern (KAN_RESOURCE_PROVIDER_MUTATOR_GROUP);
 
     kan_universe_deploy_root (universe, &definition);
     kan_universe_world_definition_shutdown (&definition);
@@ -1563,16 +1559,12 @@ KAN_TEST_CASE (file_system_observation)
     update_pipeline->name = kan_string_intern ("update");
 
     kan_dynamic_array_set_capacity (&update_pipeline->mutators, 1u);
-    *(struct kan_universe_world_pipeline_mutator_t *) kan_dynamic_array_add_last (&update_pipeline->mutators) =
-        (struct kan_universe_world_pipeline_mutator_t) {
-            .name = kan_string_intern ("check_observation_and_reload"),
-        };
+    *(kan_interned_string_t *) kan_dynamic_array_add_last (&update_pipeline->mutators) =
+        kan_string_intern ("check_observation_and_reload");
 
     kan_dynamic_array_set_capacity (&update_pipeline->mutator_groups, 1u);
-    *(struct kan_universe_world_pipeline_mutator_group_t *) kan_dynamic_array_add_last (
-        &update_pipeline->mutator_groups) = (struct kan_universe_world_pipeline_mutator_group_t) {
-        .name = kan_string_intern (KAN_RESOURCE_PROVIDER_MUTATOR_GROUP),
-    };
+    *(kan_interned_string_t *) kan_dynamic_array_add_last (&update_pipeline->mutator_groups) =
+        kan_string_intern (KAN_RESOURCE_PROVIDER_MUTATOR_GROUP);
 
     kan_universe_deploy_root (universe, &definition);
     kan_universe_world_definition_shutdown (&definition);
@@ -1644,27 +1636,23 @@ KAN_TEST_CASE (indexing_stress_test)
     update_pipeline->name = kan_string_intern ("update");
 
     kan_dynamic_array_set_capacity (&update_pipeline->mutators, 1u);
-    *(struct kan_universe_world_pipeline_mutator_t *) kan_dynamic_array_add_last (&update_pipeline->mutators) =
-        (struct kan_universe_world_pipeline_mutator_t) {
-            .name = kan_string_intern ("indexed_stress_test"),
-        };
+    *(kan_interned_string_t *) kan_dynamic_array_add_last (&update_pipeline->mutators) =
+        kan_string_intern ("indexed_stress_test");
 
     kan_dynamic_array_set_capacity (&update_pipeline->mutator_groups, 1u);
-    *(struct kan_universe_world_pipeline_mutator_group_t *) kan_dynamic_array_add_last (
-        &update_pipeline->mutator_groups) = (struct kan_universe_world_pipeline_mutator_group_t) {
-        .name = kan_string_intern (KAN_RESOURCE_PROVIDER_MUTATOR_GROUP),
-    };
+    *(kan_interned_string_t *) kan_dynamic_array_add_last (&update_pipeline->mutator_groups) =
+        kan_string_intern (KAN_RESOURCE_PROVIDER_MUTATOR_GROUP);
 
     kan_universe_deploy_root (universe, &definition);
     kan_universe_world_definition_shutdown (&definition);
 
-    const uint64_t time_begin = kan_platform_get_elapsed_nanoseconds();
+    const uint64_t time_begin = kan_platform_get_elapsed_nanoseconds ();
     while (!global_test_finished)
     {
         kan_update_system_run (update_system);
     }
 
-    const uint64_t time_end = kan_platform_get_elapsed_nanoseconds();
+    const uint64_t time_end = kan_platform_get_elapsed_nanoseconds ();
     printf ("Indexed stress test raw time: %lluns\n", (unsigned long long) (time_end - time_begin));
     kan_context_destroy (context);
 }

@@ -1572,7 +1572,7 @@ static void universe_fill_api_storages (struct universe_t *universe)
             else
             {
                 KAN_LOG (universe_api_scan, KAN_LOG_ERROR,
-                         "Unable to detect mutator function type for function \"%s\".", function->name);
+                         "Unable to detect mutator function type for function \"%s\".", function->name)
             }
         }
 
@@ -1907,7 +1907,7 @@ static struct world_t *world_create (struct universe_t *universe, struct world_t
         {
             kan_dynamic_array_set_capacity (&parent->children, KAN_MAX (1u, parent->children.capacity * 2u));
             spot = kan_dynamic_array_add_last (&parent->children);
-            KAN_ASSERT (spot);
+            KAN_ASSERT (spot)
         }
 
         *(struct world_t **) spot = world;
@@ -2331,10 +2331,9 @@ void kan_universe_world_configuration_shutdown (struct kan_universe_world_config
 void kan_universe_world_pipeline_definition_init (struct kan_universe_world_pipeline_definition_t *data)
 {
     data->name = NULL;
-    kan_dynamic_array_init (&data->mutators, 0u, sizeof (struct kan_universe_world_pipeline_mutator_t),
-                            _Alignof (struct kan_universe_world_pipeline_mutator_t), kan_allocation_group_stack_get ());
-    kan_dynamic_array_init (&data->mutator_groups, 0u, sizeof (struct kan_universe_world_pipeline_mutator_group_t),
-                            _Alignof (struct kan_universe_world_pipeline_mutator_group_t),
+    kan_dynamic_array_init (&data->mutators, 0u, sizeof (kan_interned_string_t), _Alignof (kan_interned_string_t),
+                            kan_allocation_group_stack_get ());
+    kan_dynamic_array_init (&data->mutator_groups, 0u, sizeof (kan_interned_string_t), _Alignof (kan_interned_string_t),
                             kan_allocation_group_stack_get ());
 }
 
@@ -3033,8 +3032,7 @@ static void fill_world_from_definition (struct universe_t *universe,
 
         for (uint64_t group_index = 0u; group_index < input->mutator_groups.size; ++group_index)
         {
-            kan_interned_string_t group_name =
-                ((struct kan_universe_world_pipeline_mutator_group_t *) input->mutator_groups.data)[group_index].name;
+            kan_interned_string_t group_name = ((kan_interned_string_t *) input->mutator_groups.data)[group_index];
             kan_interned_string_t *group_name_output =
                 (kan_interned_string_t *) kan_dynamic_array_add_last (&output->used_groups);
 
@@ -3095,8 +3093,7 @@ static void fill_world_from_definition (struct universe_t *universe,
         kan_dynamic_array_set_capacity (&output->mutators, output->mutators.size + input->mutators.size);
         for (uint64_t mutator_index = 0u; mutator_index < input->mutators.size; ++mutator_index)
         {
-            kan_interned_string_t requested_name =
-                ((struct kan_universe_world_pipeline_mutator_t *) input->mutators.data)[mutator_index].name;
+            kan_interned_string_t requested_name = ((kan_interned_string_t *) input->mutators.data)[mutator_index];
             struct mutator_api_node_t *mutator_node = universe_get_mutator_api (universe, requested_name);
 
             if (mutator_node)
