@@ -917,7 +917,7 @@ void kan_reflection_system_disconnect_on_cleanup (kan_context_system_handle_t re
 
 void kan_reflection_system_connect_on_pre_shutdown (kan_context_system_handle_t reflection_system,
                                                     kan_context_system_handle_t other_system,
-                                                    kan_context_reflection_cleanup_t functor)
+                                                    kan_context_reflection_pre_shutdown_t functor)
 {
     CONNECT (pre_shutdown);
 }
