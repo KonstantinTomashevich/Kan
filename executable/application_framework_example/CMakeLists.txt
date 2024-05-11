@@ -8,10 +8,11 @@ application_core_include (
         threading=sdl virtual_file_system=kan workflow=kan
         CONCRETE
         application_framework container context context_application_system context_plugin_system
-        context_reflection_system context_update_system context_virtual_file_system resource_index readable_data
-        serialization testing universe)
+        context_reflection_system context_universe_world_definition_system context_update_system
+        context_virtual_file_system resource_index readable_data serialization testing universe)
 
 application_core_set_configuration ("${CMAKE_CURRENT_SOURCE_DIR}/configuration/core.rd")
+application_core_set_world_directory ("${CMAKE_CURRENT_SOURCE_DIR}/world")
 application_core_use_plugin_group (base)
 
 register_application_plugin (NAME base GROUP base)

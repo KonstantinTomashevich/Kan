@@ -14,6 +14,8 @@ struct test_data_type_t
     uint64_t y;
 };
 
+_Static_assert (_Alignof (struct test_data_type_t) == _Alignof (uint64_t), "Alignment has expected value.");
+
 // \meta reflection_struct_meta = "test_data_type_t"
 APPLICATION_FRAMEWORK_EXAMPLE_LOGIC_API struct kan_resource_provider_type_meta_t second_resource_type_meta = {0u};
 
@@ -32,16 +34,24 @@ APPLICATION_FRAMEWORK_EXAMPLE_LOGIC_API void kan_universe_scheduler_execute_plai
 struct test_singleton_t
 {
     kan_application_system_window_handle_t window_handle;
+    kan_bool_t test_request_added;
+    uint64_t test_request_id;
 };
 
 APPLICATION_FRAMEWORK_EXAMPLE_LOGIC_API void test_singleton_init (struct test_singleton_t *instance)
 {
     instance->window_handle = KAN_INVALID_APPLICATION_SYSTEM_WINDOW_HANDLE;
+    instance->test_request_added = KAN_FALSE;
 }
 
 struct test_mutator_state_t
 {
     struct kan_repository_singleton_write_query_t write__test_singleton;
+    struct kan_repository_singleton_read_query_t read__kan_resource_provider_singleton;
+    struct kan_repository_indexed_insert_query_t insert__kan_resource_request;
+    struct kan_repository_indexed_value_read_query_t read_value__kan_resource_request__request_id;
+    struct kan_repository_indexed_value_read_query_t
+        read_value__resource_provider_container_test_data_type__container_id;
 
     kan_context_system_handle_t application_system_handle;
     kan_application_system_event_iterator_t event_iterator;
@@ -94,13 +104,77 @@ APPLICATION_FRAMEWORK_EXAMPLE_LOGIC_API void kan_universe_mutator_execute_test_m
         singleton->window_handle =
             kan_application_system_window_create (state->application_system_handle, "Title placeholder", 600u, 400u,
                                                   KAN_PLATFORM_WINDOW_FLAG_SUPPORTS_VULKAN);
-         kan_application_system_window_raise (state->application_system_handle, singleton->window_handle);
+        kan_application_system_window_raise (state->application_system_handle, singleton->window_handle);
     }
+
+    if (!singleton->test_request_added)
+    {
+        kan_repository_singleton_read_access_t provider_access =
+            kan_repository_singleton_read_query_execute (&state->read__kan_resource_provider_singleton);
+
+        const struct kan_resource_provider_singleton_t *provider =
+            kan_repository_singleton_read_access_resolve (provider_access);
+
+        struct kan_repository_indexed_insertion_package_t package =
+            kan_repository_indexed_insert_query_execute (&state->insert__kan_resource_request);
+        struct kan_resource_request_t *request = kan_repository_indexed_insertion_package_get (&package);
+
+        request->request_id = kan_next_resource_request_id (provider);
+        request->type = kan_string_intern ("test_data_type_t");
+        request->name = kan_string_intern ("test");
+        request->priority = 0u;
+        singleton->test_request_id = request->request_id;
+        kan_repository_indexed_insertion_package_submit (&package);
+
+        kan_repository_singleton_read_access_close (provider_access);
+        singleton->test_request_added = KAN_TRUE;
+    }
+
+    uint64_t x = 0;
+    uint64_t y = 0;
+
+    struct kan_repository_indexed_value_read_cursor_t request_cursor = kan_repository_indexed_value_read_query_execute (
+        &state->read_value__kan_resource_request__request_id, &singleton->test_request_id);
+
+    struct kan_repository_indexed_value_read_access_t request_access =
+        kan_repository_indexed_value_read_cursor_next (&request_cursor);
+
+    const struct kan_resource_request_t *request = kan_repository_indexed_value_read_access_resolve (&request_access);
+    KAN_ASSERT (request)
+
+    if (request->provided_container_id != KAN_RESOURCE_PROVIDER_CONTAINER_ID_NONE)
+    {
+        struct kan_repository_indexed_value_read_cursor_t container_cursor =
+            kan_repository_indexed_value_read_query_execute (
+                &state->read_value__resource_provider_container_test_data_type__container_id,
+                &request->provided_container_id);
+
+        struct kan_repository_indexed_value_read_access_t container_access =
+            kan_repository_indexed_value_read_cursor_next (&container_cursor);
+
+        const struct kan_resource_container_view_t *view =
+            kan_repository_indexed_value_read_access_resolve (&container_access);
+        KAN_ASSERT (view)
+
+        if (view)
+        {
+            struct test_data_type_t *loaded_resource = (struct test_data_type_t *) view->data_begin;
+            x = loaded_resource->x;
+            y = loaded_resource->y;
+            kan_repository_indexed_value_read_access_close (&container_access);
+        }
+
+        kan_repository_indexed_value_read_cursor_close (&container_cursor);
+    }
+
+    kan_repository_indexed_value_read_access_close (&request_access);
+    kan_repository_indexed_value_read_cursor_close (&request_cursor);
 
 #define TITLE_BUFFER_SIZE 256u
     char buffer[TITLE_BUFFER_SIZE];
-    snprintf (buffer, TITLE_BUFFER_SIZE, "Seconds from startup: %llu.",
-              (unsigned long long) (kan_platform_get_elapsed_nanoseconds () / 1000000000ull));
+    snprintf (buffer, TITLE_BUFFER_SIZE, "Seconds from startup: %llu. X: %llu. Y: %llu.",
+              (unsigned long long) (kan_platform_get_elapsed_nanoseconds () / 1000000000ull), (unsigned long long) x,
+              (unsigned long long) y);
     kan_application_system_window_set_title (state->application_system_handle, singleton->window_handle, buffer);
 #undef TITLE_BUFFER_SIZE
 

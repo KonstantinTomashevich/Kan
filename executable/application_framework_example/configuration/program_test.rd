@@ -1,13 +1,9 @@
 //! kan_application_framework_program_configuration_t
 
-${PLUGINS}
+plugins = ${PLUGINS}
 
-program_world {
-    world_name = "test"
-    scheduler_name = "plain_update"
+${RESOURCE_DIRECTORIES}
 
-    +pipelines {
-        name = "update"
-        +mutators { name = "test_mutator" }
-    }
-}
+${RESOURCE_PACKS}
+
+program_world = "test/program_root"

@@ -12,4 +12,5 @@ concrete_sources_direct ("${REFLECTION_GENERATOR_OUTPUT_FILE_PATH}")
 concrete_require (
         SCOPE PUBLIC
         ABSTRACT platform universe_resource_provider
-        CONCRETE_INTERFACE application_framework context_application_system universe)
+        CONCRETE_INTERFACE application_framework context_application_system universe
+        INTERFACE application_framework_example_resources)
