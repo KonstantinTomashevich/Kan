@@ -31,6 +31,7 @@
 /// - Core library. Main dynamic library that contains common units that are required to launch any program in
 ///   application. For example, universe, context and context systems.
 /// - Core configuration. This configuration contains information that is required to launch any program in application.
+/// - World directory. This directory contains all worlds and is processed by universe world definition system.
 /// - Plugins. They contain additional program-specific logic that is loaded through reflection. For example specific
 ///   universe mutators and specific data types.
 /// - Program configurations. They configuration files contain instructions how to launch specific programs.
@@ -45,7 +46,7 @@
 /// and straightforward.
 ///
 /// Goal of the plugin system is to provide simple yet powerful tool for building modular applications. The fact that
-/// they only provide reflection makes it easy to understand them and work with them, but does not limit their
+/// they only provide reflection makes it easy to understand them and to work with them, but does not limit their
 /// capabilities as reflection is frequently used across different units. For example, universe unit is fully
 /// reflection-driven and schedulers, mutators and data types from plugins can be freely used with universe.
 /// \endparblock
@@ -59,12 +60,13 @@
 /// - It contains list of core plugins. These plugins are always loaded by every program, therefore it allows other
 ///   plugins to depend on them without introducing difficult dependency routines.
 /// - It contains list of resource directories and packs, that are used by all programs.
-/// - It contains definition for the universe root world, that is shared between all the programs. This world contains
-///   common pipelines and logic that is required by every program, for example resource management. Requiring all
-///   programs to have common world makes it possible to run several programs inside one universe if needed, which is
-///   useful for programs like editor: they would like to run game programs inside the same universe and context.
-/// - It contains name for plugin directory.
-/// - It contains name for mounted resource directory.
+/// - It contains name of the definition for the universe root world, that is shared between all the programs. This
+///   world contains common pipelines and logic that is required by every program, for example resource management.
+///   Requiring all programs to have common world makes it possible to run several programs inside one universe if
+///   needed, which is useful for programs like editor: they would like to run game programs inside the same universe
+///   and context. Definition is loaded through universe world definition system.
+/// - It contains path to plugin directory.
+/// - It contains path to world definitions directory.
 /// \endparblock
 ///
 /// \par Program configuration
@@ -73,8 +75,9 @@
 ///
 /// - It contains plugins that are being used by this program excluding core plugins.
 /// - It contains resource directories and packs that are specific to this program.
-/// - It contains program world definition, that is instanced as root world child. The reason for having separate
-///   shared root world and separate program worlds is described above.
+/// - It contains name for the program world definition, that is instanced as root world child. The reason for having
+///   separate shared root world and separate program worlds is described above. Definition is loaded through universe
+///   world definition system.
 /// \endparblock
 
 KAN_C_HEADER_BEGIN
@@ -88,21 +91,11 @@ KAN_C_HEADER_BEGIN
 /// \brief Application framework exit code when it failed to correctly assemble execution context.
 #define KAN_APPLICATION_FRAMEWORK_EXIT_CODE_FAILED_TO_ASSEMBLE_CONTEXT -3
 
+/// \brief Application framework exit code when it failed to find definitions for either root or program worlds.
+#define KAN_APPLICATION_FRAMEWORK_EXIT_CODE_FAILED_TO_FIND_WORLD_DEFINITIONS -4
+
 /// \brief Returns allocation group that should be used to allocate strings inside configuration structures.
 APPLICATION_FRAMEWORK_API kan_allocation_group_t kan_application_framework_get_configuration_allocation_group (void);
-
-/// \brief Describes system request for context unit.
-/// \details Currently system requests do not support having their own configuration.
-struct kan_application_framework_system_item_t
-{
-    kan_interned_string_t name;
-};
-
-/// \brief Describes plugin usage for application framework configuration.
-struct kan_application_framework_plugin_item_t
-{
-    kan_interned_string_t name;
-};
 
 /// \brief Describes used resource directory for application framework configuration.
 struct kan_application_framework_resource_directory_t
@@ -110,10 +103,15 @@ struct kan_application_framework_resource_directory_t
     /// \brief Real path to resource directory.
     char *path;
 
-    /// \brief Part of mount path for resource directory after
-    ///        kan_application_framework_core_configuration_t::resource_directory_name.
-    char *mount_name;
+    /// \brief Path to which this resource directory should be mounted.
+    char *mount_path;
 };
+
+APPLICATION_FRAMEWORK_API void kan_application_framework_resource_directory_init (
+    struct kan_application_framework_resource_directory_t *instance);
+
+APPLICATION_FRAMEWORK_API void kan_application_framework_resource_directory_shutdown (
+    struct kan_application_framework_resource_directory_t *instance);
 
 /// \brief Describes used resource read-only pack for application framework configuration.
 struct kan_application_framework_resource_pack_t
@@ -121,20 +119,25 @@ struct kan_application_framework_resource_pack_t
     /// \brief Real path to resource read-only pack.
     char *path;
 
-    /// \brief Part of mount path for resource read-only pack after
-    ///        kan_application_framework_core_configuration_t::resource_directory_name.
-    char *mount_name;
+    /// \brief Path to which this resource pack should be mounted.
+    char *mount_path;
 };
+
+APPLICATION_FRAMEWORK_API void kan_application_framework_resource_pack_init (
+    struct kan_application_framework_resource_pack_t *instance);
+
+APPLICATION_FRAMEWORK_API void kan_application_framework_resource_pack_shutdown (
+    struct kan_application_framework_resource_pack_t *instance);
 
 /// \brief Structure for application framework core configuration.
 struct kan_application_framework_core_configuration_t
 {
     /// \brief Additional user systems to be requested.
-    /// \meta reflection_dynamic_array_type = "struct kan_application_framework_system_item_t"
+    /// \meta reflection_dynamic_array_type = "kan_interned_string_t"
     struct kan_dynamic_array_t systems;
 
     /// \brief List of core plugins.
-    /// \meta reflection_dynamic_array_type = "struct kan_application_framework_plugin_item_t"
+    /// \meta reflection_dynamic_array_type = "kan_interned_string_t"
     struct kan_dynamic_array_t plugins;
 
     /// \brief List of core resource directories.
@@ -145,14 +148,20 @@ struct kan_application_framework_core_configuration_t
     /// \meta reflection_dynamic_array_type = "struct kan_application_framework_resource_pack_t"
     struct kan_dynamic_array_t resource_packs;
 
-    /// \brief Definition of the universe shared root world.
-    struct kan_universe_world_definition_t root_world;
+    /// \brief Name of the definition of the universe shared root world.
+    kan_interned_string_t root_world;
 
-    /// \brief Name of the plugin directory.
-    char *plugin_directory_name;
+    /// \brief Path to the the plugin directory.
+    char *plugin_directory_path;
 
-    /// \brief Name of the mounted resource directory.
-    char *resource_directory_name;
+    /// \brief Path to the the universe world definitions directory.
+    char *world_directory_path;
+
+    /// \brief Whether universe world definition directory should be observed for changes.
+    kan_bool_t observe_world_definitions;
+
+    /// \brief Delay between changes in universe world definition directory and definition reload.
+    uint64_t world_definition_rescan_delay_ns;
 };
 
 APPLICATION_FRAMEWORK_API void kan_application_framework_core_configuration_init (
@@ -165,7 +174,7 @@ APPLICATION_FRAMEWORK_API void kan_application_framework_core_configuration_shut
 struct kan_application_framework_program_configuration_t
 {
     /// \brief List of program-specific plugins.
-    /// \meta reflection_dynamic_array_type = "struct kan_application_framework_plugin_item_t"
+    /// \meta reflection_dynamic_array_type = "kan_interned_string_t"
     struct kan_dynamic_array_t plugins;
 
     /// \brief List of program-specific resource directories.
@@ -176,8 +185,8 @@ struct kan_application_framework_program_configuration_t
     /// \meta reflection_dynamic_array_type = "struct kan_application_framework_resource_pack_t"
     struct kan_dynamic_array_t resource_packs;
 
-    /// \brief Definition of the program-specific universe child world.
-    struct kan_universe_world_definition_t program_world;
+    /// \brief Name of the definition of the program-specific universe child world.
+    kan_interned_string_t program_world;
 };
 
 APPLICATION_FRAMEWORK_API void kan_application_framework_program_configuration_init (
