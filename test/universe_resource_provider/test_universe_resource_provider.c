@@ -1280,8 +1280,6 @@ struct indexed_stress_test_state_t
     struct kan_repository_singleton_read_query_t read__kan_resource_provider_singleton;
     struct kan_repository_indexed_insert_query_t insert__kan_resource_request;
     struct kan_repository_indexed_value_read_query_t read_value__kan_resource_request__request_id;
-    struct kan_repository_indexed_value_read_query_t
-        read_value__resource_provider_container_first_resource_type__container_id;
 };
 
 TEST_UNIVERSE_RESOURCE_PROVIDER_API void kan_universe_mutator_deploy_indexed_stress_test (
