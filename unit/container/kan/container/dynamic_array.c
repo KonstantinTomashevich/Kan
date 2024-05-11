@@ -83,6 +83,11 @@ void kan_dynamic_array_remove_swap_at (struct kan_dynamic_array_t *array, uint64
 
 void kan_dynamic_array_set_capacity (struct kan_dynamic_array_t *array, uint64_t new_capacity)
 {
+    if (new_capacity == array->capacity)
+    {
+        return;
+    }
+
     KAN_ASSERT (new_capacity >= array->size)
     uint8_t *new_data = NULL;
 
