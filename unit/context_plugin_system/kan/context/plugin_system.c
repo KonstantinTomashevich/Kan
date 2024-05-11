@@ -93,8 +93,8 @@ static inline void load_plugins (const char *path, struct kan_dynamic_array_t *a
             data->dynamic_library = kan_platform_dynamic_library_load (library_path_buffer);
             if (data->dynamic_library == KAN_INVALID_PLATFORM_DYNAMIC_LIBRARY)
             {
-                KAN_LOG (plugin_system, KAN_LOG_ERROR, "Failed to load dynamic library from \"%s\".",
-                         library_path_buffer)
+                KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, plugin_system, KAN_LOG_ERROR,
+                                     "Failed to load dynamic library from \"%s\".", library_path_buffer)
             }
 
             continue;
@@ -106,8 +106,8 @@ static inline void load_plugins (const char *path, struct kan_dynamic_array_t *a
             data->dynamic_library = kan_platform_dynamic_library_load (library_path_buffer);
             if (data->dynamic_library == KAN_INVALID_PLATFORM_DYNAMIC_LIBRARY)
             {
-                KAN_LOG (plugin_system, KAN_LOG_ERROR, "Failed to load dynamic library from \"%s\".",
-                         library_path_buffer)
+                KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, plugin_system, KAN_LOG_ERROR,
+                                     "Failed to load dynamic library from \"%s\".", library_path_buffer)
             }
 
             continue;
@@ -119,8 +119,8 @@ static inline void load_plugins (const char *path, struct kan_dynamic_array_t *a
             data->dynamic_library = kan_platform_dynamic_library_load (library_path_buffer);
             if (data->dynamic_library == KAN_INVALID_PLATFORM_DYNAMIC_LIBRARY)
             {
-                KAN_LOG (plugin_system, KAN_LOG_ERROR, "Failed to load dynamic library from \"%s\".",
-                         library_path_buffer)
+                KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, plugin_system, KAN_LOG_ERROR,
+                                     "Failed to load dynamic library from \"%s\".", library_path_buffer)
             }
 
             continue;
@@ -132,8 +132,8 @@ static inline void load_plugins (const char *path, struct kan_dynamic_array_t *a
             data->dynamic_library = kan_platform_dynamic_library_load (library_path_buffer);
             if (data->dynamic_library == KAN_INVALID_PLATFORM_DYNAMIC_LIBRARY)
             {
-                KAN_LOG (plugin_system, KAN_LOG_ERROR, "Failed to load dynamic library from \"%s\".",
-                         library_path_buffer)
+                KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, plugin_system, KAN_LOG_ERROR,
+                                     "Failed to load dynamic library from \"%s\".", library_path_buffer)
             }
 
             continue;

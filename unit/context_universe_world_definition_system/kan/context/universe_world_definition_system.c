@@ -138,16 +138,16 @@ static void scan_file (struct universe_world_definition_system_t *system,
     if (!extract_info_from_path (scan_path_container->path, scan_path_container->length,
                                  system->definitions_mount_path_length, &name, &is_binary))
     {
-        KAN_LOG (universe_world_definition_system, KAN_LOG_ERROR, "Unable to extract info about \"%s\".",
-                 scan_path_container->path)
+        KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, universe_world_definition_system, KAN_LOG_ERROR,
+                             "Unable to extract info about \"%s\".", scan_path_container->path)
         return;
     }
 
     struct kan_stream_t *stream = kan_virtual_file_stream_open_for_read (volume, scan_path_container->path);
     if (!stream)
     {
-        KAN_LOG (universe_world_definition_system, KAN_LOG_ERROR, "Failed to open read stream for \"%s\".",
-                 scan_path_container->path)
+        KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, universe_world_definition_system, KAN_LOG_ERROR,
+                             "Failed to open read stream for \"%s\".", scan_path_container->path)
         return;
     }
 
@@ -170,14 +170,14 @@ static void scan_file (struct universe_world_definition_system_t *system,
         if (!kan_serialization_binary_read_type_header (stream, &type_name,
                                                         KAN_INVALID_SERIALIZATION_INTERNED_STRING_REGISTRY))
         {
-            KAN_LOG (universe_world_definition_system, KAN_LOG_ERROR, "Failed to read binary type header \"%s\".",
-                     scan_path_container->path)
+            KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, universe_world_definition_system, KAN_LOG_ERROR,
+                                 "Failed to read binary type header \"%s\".", scan_path_container->path)
             deserialized = KAN_FALSE;
         }
         else if (type_name != expected_type_name)
         {
-            KAN_LOG (
-                universe_world_definition_system, KAN_LOG_ERROR,
+            KAN_LOG_WITH_BUFFER (
+                KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, universe_world_definition_system, KAN_LOG_ERROR,
                 "\"%s\" is not a world definition, only world definitions are expected in world definition sub path.",
                 scan_path_container->path)
             deserialized = KAN_FALSE;
@@ -196,8 +196,9 @@ static void scan_file (struct universe_world_definition_system_t *system,
             kan_serialization_binary_reader_destroy (reader);
             if (state == KAN_SERIALIZATION_FAILED)
             {
-                KAN_LOG (universe_world_definition_system, KAN_LOG_ERROR,
-                         "Failed to deserialize binary world definition \"%s\".", scan_path_container->path)
+                KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, universe_world_definition_system,
+                                     KAN_LOG_ERROR, "Failed to deserialize binary world definition \"%s\".",
+                                     scan_path_container->path)
                 deserialized = KAN_FALSE;
             }
 
@@ -218,8 +219,9 @@ static void scan_file (struct universe_world_definition_system_t *system,
         kan_serialization_rd_reader_destroy (reader);
         if (state == KAN_SERIALIZATION_FAILED)
         {
-            KAN_LOG (universe_world_definition_system, KAN_LOG_ERROR,
-                     "Failed to deserialize readable data world definition \"%s\".", scan_path_container->path)
+            KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, universe_world_definition_system, KAN_LOG_ERROR,
+                                 "Failed to deserialize readable data world definition \"%s\".",
+                                 scan_path_container->path)
             deserialized = KAN_FALSE;
         }
 
@@ -268,8 +270,8 @@ static void scan_directory (struct universe_world_definition_system_t *system,
             switch (status.type)
             {
             case KAN_VIRTUAL_FILE_SYSTEM_ENTRY_TYPE_UNKNOWN:
-                KAN_LOG (universe_world_definition_system, KAN_LOG_ERROR, "Entry \"%s\" has unknown type.",
-                         scan_path_container->path)
+                KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, universe_world_definition_system,
+                                     KAN_LOG_ERROR, "Entry \"%s\" has unknown type.", scan_path_container->path)
                 break;
 
             case KAN_VIRTUAL_FILE_SYSTEM_ENTRY_TYPE_FILE:
@@ -283,8 +285,8 @@ static void scan_directory (struct universe_world_definition_system_t *system,
         }
         else
         {
-            KAN_LOG (universe_world_definition_system, KAN_LOG_ERROR, "Failed to get status of \"%s\"",
-                     scan_path_container->path)
+            KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, universe_world_definition_system, KAN_LOG_ERROR,
+                                 "Failed to get status of \"%s\"", scan_path_container->path)
         }
 
         kan_file_system_path_container_reset_length (scan_path_container, path_length);
@@ -439,9 +441,9 @@ static void universe_world_definition_system_update (kan_context_system_handle_t
             }
             else
             {
-                KAN_LOG (universe_world_definition_system, KAN_LOG_ERROR,
-                         "Received event with file \"%s\", but unable to extract info about it.",
-                         event->path_container.path)
+                KAN_LOG_WITH_BUFFER (
+                    KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, universe_world_definition_system, KAN_LOG_ERROR,
+                    "Received event with file \"%s\", but unable to extract info about it.", event->path_container.path)
             }
         }
 
