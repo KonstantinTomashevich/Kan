@@ -507,7 +507,7 @@ static inline int build_resource_index (kan_reflection_registry_t registry)
                                                 script_storage, accompanying_string_registry);
 
     enum kan_serialization_state_t serialization_state;
-    while ((serialization_state = kan_serialization_binary_writer_step (writer)) != KAN_SERIALIZATION_IN_PROGRESS)
+    while ((serialization_state = kan_serialization_binary_writer_step (writer)) == KAN_SERIALIZATION_IN_PROGRESS)
     {
     }
 
