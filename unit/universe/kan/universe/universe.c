@@ -128,6 +128,7 @@ struct universe_t
     struct kan_hash_storage_t mutator_api_storage;
     struct kan_hash_storage_t group_multi_map_storage;
 
+    struct kan_dynamic_array_t environment_tags;
     kan_cpu_section_t update_section;
 };
 
@@ -2314,18 +2315,39 @@ static void mutator_clean (struct universe_t *universe,
     kan_free_general (mutator->state_allocation_group, mutator->state, mutator->api->type->size);
 }
 
-void kan_universe_world_configuration_init (struct kan_universe_world_configuration_t *data)
+void kan_universe_world_configuration_variant_init (struct kan_universe_world_configuration_variant_t *data)
 {
-    data->name = NULL;
+    kan_dynamic_array_init (&data->required_tags, 0u, sizeof (kan_interned_string_t), _Alignof (kan_interned_string_t),
+                            kan_allocation_group_stack_get ());
     data->data = KAN_INVALID_REFLECTION_PATCH;
 }
 
-void kan_universe_world_configuration_shutdown (struct kan_universe_world_configuration_t *data)
+void kan_universe_world_configuration_variant_shutdown (struct kan_universe_world_configuration_variant_t *data)
 {
+    kan_dynamic_array_shutdown (&data->required_tags);
     if (data->data != KAN_INVALID_REFLECTION_PATCH)
     {
         kan_reflection_patch_destroy (data->data);
     }
+}
+
+void kan_universe_world_configuration_init (struct kan_universe_world_configuration_t *data)
+{
+    data->name = NULL;
+    kan_dynamic_array_init (&data->variants, 0u, sizeof (struct kan_universe_world_configuration_variant_t),
+                            _Alignof (struct kan_universe_world_configuration_variant_t),
+                            kan_allocation_group_stack_get ());
+}
+
+void kan_universe_world_configuration_shutdown (struct kan_universe_world_configuration_t *data)
+{
+    for (uint64_t index = 0u; index < data->variants.size; ++index)
+    {
+        kan_universe_world_configuration_variant_shutdown (
+            &((struct kan_universe_world_configuration_variant_t *) data->variants.data)[index]);
+    }
+
+    kan_dynamic_array_shutdown (&data->variants);
 }
 
 void kan_universe_world_pipeline_definition_init (struct kan_universe_world_pipeline_definition_t *data)
@@ -2465,6 +2487,8 @@ kan_universe_t kan_universe_create (kan_allocation_group_t group,
     kan_hash_storage_init (&universe->group_multi_map_storage, universe->api_allocation_group,
                            KAN_UNIVERSE_GROUP_INITIAL_BUCKETS);
 
+    kan_dynamic_array_init (&universe->environment_tags, 0u, sizeof (kan_interned_string_t),
+                            _Alignof (kan_interned_string_t), universe->main_allocation_group);
     universe->update_section = kan_cpu_section_get ("universe_update");
     universe_fill_api_storages (universe);
     return (kan_universe_t) universe;
@@ -2963,6 +2987,22 @@ kan_universe_world_t kan_universe_get_root_world (kan_universe_t universe)
     return (kan_universe_world_t) universe_data->root_world;
 }
 
+void kan_universe_add_environment_tag (kan_universe_t universe, kan_interned_string_t environment_tag)
+{
+    struct universe_t *universe_data = (struct universe_t *) universe;
+    kan_interned_string_t *spot = kan_dynamic_array_add_last (&universe_data->environment_tags);
+
+    if (!spot)
+    {
+        kan_dynamic_array_set_capacity (&universe_data->environment_tags,
+                                        KAN_MAX (1u, universe_data->environment_tags.capacity * 2u));
+        spot = kan_dynamic_array_add_last (&universe_data->environment_tags);
+        KAN_ASSERT (spot)
+    }
+
+    *spot = environment_tag;
+}
+
 static void fill_world_from_definition (struct universe_t *universe,
                                         struct world_t *world,
                                         const struct kan_universe_world_definition_t *definition)
@@ -2980,13 +3020,62 @@ static void fill_world_from_definition (struct universe_t *universe,
     {
         struct kan_universe_world_configuration_t *input =
             &((struct kan_universe_world_configuration_t *) definition->configuration.data)[index];
+        struct kan_universe_world_configuration_variant_t *suitable_variant = NULL;
+
+        for (uint64_t variant_index = 0u; variant_index < input->variants.size; ++variant_index)
+        {
+            struct kan_universe_world_configuration_variant_t *variant =
+                &((struct kan_universe_world_configuration_variant_t *) input->variants.data)[variant_index];
+
+            if (variant->data == KAN_INVALID_REFLECTION_PATCH)
+            {
+                continue;
+            }
+
+            kan_bool_t requirement_met = KAN_TRUE;
+            for (uint64_t requirement_index = 0u; requirement_index < variant->required_tags.size; ++requirement_index)
+            {
+                kan_interned_string_t requirement =
+                    ((kan_interned_string_t *) variant->required_tags.data)[requirement_index];
+                kan_bool_t found = KAN_FALSE;
+
+                for (uint64_t tag_index = 0u; tag_index < universe->environment_tags.size; ++tag_index)
+                {
+                    kan_interned_string_t tag =
+                        ((kan_interned_string_t *) universe->environment_tags.data)[tag_index];
+
+                    if (tag == requirement)
+                    {
+                        found = KAN_TRUE;
+                        break;
+                    }
+                }
+
+                if (!found)
+                {
+                    requirement_met = KAN_FALSE;
+                    break;
+                }
+            }
+
+            if (requirement_met)
+            {
+                suitable_variant = variant;
+                break;
+            }
+        }
+
+        if (!suitable_variant)
+        {
+            continue;
+        }
 
         struct world_configuration_t *output =
             (struct world_configuration_t *) kan_dynamic_array_add_last (&world->configuration);
         KAN_ASSERT (output)
 
         output->name = input->name;
-        output->type = kan_reflection_patch_get_type (input->data);
+        output->type = kan_reflection_patch_get_type (suitable_variant->data);
 
         output->data = kan_allocate_batched (universe->configuration_allocation_group, output->type->size);
         if (output->type->init)
@@ -2994,9 +3083,10 @@ static void fill_world_from_definition (struct universe_t *universe,
             output->type->init (output->type->functor_user_data, output->data);
         }
 
-        kan_reflection_patch_apply (input->data, output->data);
+        kan_reflection_patch_apply (suitable_variant->data, output->data);
     }
 
+    kan_dynamic_array_set_capacity (&world->configuration, world->configuration.size);
     world->scheduler_name = definition->scheduler_name;
     struct scheduler_api_node_t *scheduler_node = universe_get_scheduler_api (universe, definition->scheduler_name);
 
@@ -3278,6 +3368,7 @@ void kan_universe_destroy (kan_universe_t universe)
     kan_hash_storage_shutdown (&universe_data->scheduler_api_storage);
     kan_hash_storage_shutdown (&universe_data->mutator_api_storage);
     kan_hash_storage_shutdown (&universe_data->group_multi_map_storage);
+    kan_dynamic_array_shutdown (&universe_data->environment_tags);
     kan_free_general (universe_data->main_allocation_group, universe_data, sizeof (struct universe_t));
 }
 

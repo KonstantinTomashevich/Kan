@@ -1409,11 +1409,14 @@ static void run_request_resources_and_check_test (kan_context_handle_t context)
     kan_reflection_patch_builder_destroy (patch_builder);
 
     kan_dynamic_array_set_capacity (&definition.configuration, 1u);
-    *(struct kan_universe_world_configuration_t *) kan_dynamic_array_add_last (&definition.configuration) =
-        (struct kan_universe_world_configuration_t) {
-            .name = kan_string_intern (KAN_RESOURCE_PROVIDER_CONFIGURATION),
-            .data = resource_provider_configuration_patch,
-        };
+    struct kan_universe_world_configuration_t *configuration = kan_dynamic_array_add_last (&definition.configuration);
+    kan_universe_world_configuration_init (configuration);
+    configuration->name = kan_string_intern (KAN_RESOURCE_PROVIDER_CONFIGURATION);
+    kan_dynamic_array_set_capacity (&configuration->variants, 1u);
+
+    struct kan_universe_world_configuration_variant_t *variant = kan_dynamic_array_add_last (&configuration->variants);
+    kan_universe_world_configuration_variant_init (variant);
+    variant->data = resource_provider_configuration_patch;
 
     kan_dynamic_array_set_capacity (&definition.pipelines, 1u);
     struct kan_universe_world_pipeline_definition_t *update_pipeline =
@@ -1543,11 +1546,14 @@ KAN_TEST_CASE (file_system_observation)
     kan_reflection_patch_builder_destroy (patch_builder);
 
     kan_dynamic_array_set_capacity (&definition.configuration, 1u);
-    *(struct kan_universe_world_configuration_t *) kan_dynamic_array_add_last (&definition.configuration) =
-        (struct kan_universe_world_configuration_t) {
-            .name = kan_string_intern (KAN_RESOURCE_PROVIDER_CONFIGURATION),
-            .data = resource_provider_configuration_patch,
-        };
+    struct kan_universe_world_configuration_t *configuration = kan_dynamic_array_add_last (&definition.configuration);
+    kan_universe_world_configuration_init (configuration);
+    configuration->name = kan_string_intern (KAN_RESOURCE_PROVIDER_CONFIGURATION);
+    kan_dynamic_array_set_capacity (&configuration->variants, 1u);
+
+    struct kan_universe_world_configuration_variant_t *variant = kan_dynamic_array_add_last (&configuration->variants);
+    kan_universe_world_configuration_variant_init (variant);
+    variant->data = resource_provider_configuration_patch;
 
     kan_dynamic_array_set_capacity (&definition.pipelines, 1u);
     struct kan_universe_world_pipeline_definition_t *update_pipeline =
@@ -1620,11 +1626,14 @@ KAN_TEST_CASE (indexing_stress_test)
     kan_reflection_patch_builder_destroy (patch_builder);
 
     kan_dynamic_array_set_capacity (&definition.configuration, 1u);
-    *(struct kan_universe_world_configuration_t *) kan_dynamic_array_add_last (&definition.configuration) =
-        (struct kan_universe_world_configuration_t) {
-            .name = kan_string_intern (KAN_RESOURCE_PROVIDER_CONFIGURATION),
-            .data = resource_provider_configuration_patch,
-        };
+    struct kan_universe_world_configuration_t *configuration = kan_dynamic_array_add_last (&definition.configuration);
+    kan_universe_world_configuration_init (configuration);
+    configuration->name = kan_string_intern (KAN_RESOURCE_PROVIDER_CONFIGURATION);
+    kan_dynamic_array_set_capacity (&configuration->variants, 1u);
+
+    struct kan_universe_world_configuration_variant_t *variant = kan_dynamic_array_add_last (&configuration->variants);
+    kan_universe_world_configuration_variant_init (variant);
+    variant->data = resource_provider_configuration_patch;
 
     kan_dynamic_array_set_capacity (&definition.pipelines, 1u);
     struct kan_universe_world_pipeline_definition_t *update_pipeline =

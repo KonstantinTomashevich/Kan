@@ -785,10 +785,16 @@ KAN_TEST_CASE (update_hierarchy)
         kan_dynamic_array_set_capacity (&(DEFINITION)->configuration, 1u);                                             \
         struct kan_universe_world_configuration_t *configuration =                                                     \
             kan_dynamic_array_add_last (&(DEFINITION)->configuration);                                                 \
+        kan_universe_world_configuration_init (configuration);                                                         \
         configuration->name = kan_string_intern ("counter");                                                           \
                                                                                                                        \
+        kan_dynamic_array_set_capacity (&configuration->variants, 1u);                                                 \
+        struct kan_universe_world_configuration_variant_t *variant =                                                   \
+            kan_dynamic_array_add_last (&configuration->variants);                                                     \
+        kan_universe_world_configuration_variant_init (variant);                                                       \
+                                                                                                                       \
         kan_reflection_patch_builder_add_chunk (patch_builder, 0u, 8u, INDEX);                                         \
-        configuration->data = kan_reflection_patch_builder_build (patch_builder, registry, config_type);               \
+        variant->data = kan_reflection_patch_builder_build (patch_builder, registry, config_type);                     \
                                                                                                                        \
         kan_dynamic_array_set_capacity (&(DEFINITION)->pipelines, 1u);                                                 \
         struct kan_universe_world_pipeline_definition_t *update_pipeline =                                             \
