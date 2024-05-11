@@ -12,6 +12,7 @@ set (SDL_SHARED ON)
 add_subdirectory (SDL)
 
 # Tracy
+set (TRACY_ON_DEMAND ON)
 add_subdirectory (tracy)
 
 # re2c
