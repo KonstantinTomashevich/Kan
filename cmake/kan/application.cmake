@@ -18,7 +18,7 @@ set (KAN_APPLICATION_TOOL_STATICS_TEMPLATE "${CMAKE_SOURCE_DIR}/cmake/kan/applic
 # Name of the used application framework static launcher implementation.
 set (KAN_APPLICATION_PROGRAM_LAUNCHER_IMPLEMENTATION "sdl")
 
-# Target properties, used to store application framework related data. Shouldn't be directly modified by used.
+# Target properties, used to store application framework related data. Shouldn't be directly modified by user.
 
 define_property (TARGET PROPERTY APPLICATION_CORE_ABSTRACT
         BRIEF_DOCS "Contains list of abstract implementations included by application core library."
@@ -31,6 +31,10 @@ define_property (TARGET PROPERTY APPLICATION_CORE_CONCRETE
 define_property (TARGET PROPERTY APPLICATION_CORE_CONFIGURATION
         BRIEF_DOCS "Contains path to application core configuration source file."
         FULL_DOCS "Configuration source file is configured with automatically provided plugins and directories.")
+
+define_property (TARGET PROPERTY APPLICATION_CORE_WORLD_DIRECTORY
+        BRIEF_DOCS "Contains path to application world directory folder."
+        FULL_DOCS "Contains path to application world directory folder.")
 
 define_property (TARGET PROPERTY APPLICATION_CORE_PLUGIN_GROUPS
         BRIEF_DOCS "Contains list of plugin groups used as core plugins."
@@ -71,6 +75,18 @@ define_property (TARGET PROPERTY APPLICATION_PROGRAM_CONFIGURATION
 define_property (TARGET PROPERTY APPLICATION_PROGRAM_PLUGIN_GROUPS
         BRIEF_DOCS "Contains list of plugin groups used as program plugins."
         FULL_DOCS "Contains list of plugin groups used as program plugins.")
+
+define_property (TARGET PROPERTY UNIT_RESOURCE_TARGETS
+        BRIEF_DOCS "List of targets that contain information about resources used by this unit."
+        FULL_DOCS "List of targets that contain information about resources used by this unit.")
+
+define_property (TARGET PROPERTY UNIT_RESOURCE_TARGET_TYPE
+        BRIEF_DOCS "Type of resource target. Either USUAL, CUSTOM or PRE_MADE."
+        FULL_DOCS "Type of resource target. Either USUAL, CUSTOM or PRE_MADE.")
+
+define_property (TARGET PROPERTY UNIT_RESOURCE_TARGET_SOURCE_DIRECTORY
+        BRIEF_DOCS "Contains absolute path to directory with source resource files."
+        FULL_DOCS "Contains absolute path to directory with source resource files.")
 
 # Starts application configuration registration routine.
 function (register_application NAME)
@@ -122,6 +138,13 @@ function (application_core_set_configuration CONFIGURATION)
     cmake_path (ABSOLUTE_PATH CONFIGURATION NORMALIZE)
     set_target_properties ("${APPLICATION_NAME}" PROPERTIES APPLICATION_CORE_CONFIGURATION "${CONFIGURATION}")
     message (STATUS "    Setting core configuration to \"${CONFIGURATION}\".")
+endfunction ()
+
+# Sets path to application core world directory.
+function (application_core_set_world_directory DIRECTORY)
+    cmake_path (ABSOLUTE_PATH DIRECTORY NORMALIZE)
+    set_target_properties ("${APPLICATION_NAME}" PROPERTIES APPLICATION_CORE_WORLD_DIRECTORY "${DIRECTORY}")
+    message (STATUS "    Setting core world directory to \"${DIRECTORY}\".")
 endfunction ()
 
 # Adds given plugin group to core plugins list.
@@ -275,7 +298,7 @@ function (application_generate)
 
     # The routine below generates build with separate plugin libraries, separate executables and core library.
     # It is good for development (as it allows plugin hot reload) and it is good for desktop platforms.
-    # But we'll need merged builds for mobile platforms.
+    # But we'll need merged builds for mobile platforms later.
 
     # Register core library first.
 
@@ -307,36 +330,6 @@ function (application_generate)
             COMMAND "${CMAKE_COMMAND}" -E make_directory "${DEV_PLUGINS_DIRECTORY}"
             COMMAND "${CMAKE_COMMAND}" -E make_directory "${DEV_RESOURCES_DIRECTORY}"
             COMMENT "Creating development build directories for application \"${APPLICATION_NAME}\".")
-
-    # Generate development core configuration.
-    get_target_property (CORE_CONFIGURATION "${APPLICATION_NAME}" APPLICATION_CORE_CONFIGURATION)
-    if (CORE_CONFIGURATION STREQUAL "CORE_CONFIGURATION-NOTFOUND")
-        message (FATAL_ERROR "There is no core configuration for application \"${APPLICATION_NAME}\"!")
-    endif ()
-
-    set (DEV_CORE_CONFIGURATOR_CONTENT)
-    foreach (PLUGIN ${CORE_PLUGINS})
-        string (APPEND DEV_CORE_CONFIGURATOR_CONTENT
-                "string (APPEND PLUGINS \"+plugins { name = \\\"${PLUGIN}_library\\\" }\\n\")\n")
-    endforeach ()
-
-    string (APPEND DEV_CORE_CONFIGURATOR_CONTENT
-            "set (PLUGINS_DIRECTORY_NAME \"${KAN_APPLICATION_PLUGINS_DIRECTORY_NAME}\")\n")
-
-    string (APPEND DEV_CORE_CONFIGURATOR_CONTENT
-            "set (RESOURCES_DIRECTORY_NAME \"${KAN_APPLICATION_RESOURCES_DIRECTORY_NAME}\")\n")
-
-    set (DEV_CORE_CONFIGURATION_PATH "${DEV_CONFIGURATION_DIRECTORY}/core.rd")
-    string (APPEND DEV_CORE_CONFIGURATOR_CONTENT
-            "configure_file (\"${CORE_CONFIGURATION}\" \"${DEV_CORE_CONFIGURATION_PATH}\")")
-
-    set (DEV_CORE_CONFIGURATOR_PATH "${DEV_BUILD_DIRECTORY}/${APPLICATION_NAME}_dev_core_config.cmake")
-    file (GENERATE OUTPUT "${DEV_CORE_CONFIGURATOR_PATH}" CONTENT "${DEV_CORE_CONFIGURATOR_CONTENT}")
-
-    add_custom_target ("${APPLICATION_NAME}_dev_core_configuration" ALL
-            DEPENDS "${APPLICATION_NAME}_prepare_dev_directories"
-            COMMAND "${CMAKE_COMMAND}" -P "${DEV_CORE_CONFIGURATOR_PATH}"
-            COMMENT "Building core configuration for application \"${APPLICATION_NAME}\".")
 
     # Generate core plugin libraries first, because other plugins depend on core plugins.
 
@@ -394,6 +387,74 @@ function (application_generate)
                 OUTPUT ${DEV_PLUGINS_DIRECTORY}
                 DEPENDENCIES "${APPLICATION_NAME}_prepare_dev_directories")
     endforeach ()
+
+    # Find core resource targets.
+
+    set (CORE_RESOURCE_TARGETS)
+
+    find_linked_targets_recursively (TARGET "${APPLICATION_NAME}_core_library" OUTPUT CORE_LINKED_TARGETS)
+    foreach (LINKED_TARGET ${CORE_LINKED_TARGETS})
+        get_target_property (THIS_RESOURCE_TARGETS "${LINKED_TARGET}" UNIT_RESOURCE_TARGETS)
+        if (NOT THIS_RESOURCE_TARGETS STREQUAL "THIS_RESOURCE_TARGETS-NOTFOUND")
+            list (APPEND CORE_RESOURCE_TARGETS ${THIS_RESOURCE_TARGETS})
+        endif ()
+    endforeach ()
+
+    foreach (PLUGIN ${CORE_PLUGINS})
+        find_linked_targets_recursively (TARGET "${PLUGIN}_library" OUTPUT PLUGIN_PLUGIN_TARGETS ARTEFACT_SCOPE)
+        foreach (PLUGIN_TARGET ${PLUGIN_PLUGIN_TARGETS})
+            get_target_property (THIS_RESOURCE_TARGETS "${PLUGIN_TARGET}" UNIT_RESOURCE_TARGETS)
+            if (NOT THIS_RESOURCE_TARGETS STREQUAL "THIS_RESOURCE_TARGETS-NOTFOUND")
+                list (APPEND CORE_RESOURCE_TARGETS ${THIS_RESOURCE_TARGETS})
+            endif ()
+        endforeach ()
+    endforeach ()
+
+    list (REMOVE_DUPLICATES CORE_RESOURCE_TARGETS)
+
+    # Generate development core configuration.
+
+    get_target_property (CORE_CONFIGURATION "${APPLICATION_NAME}" APPLICATION_CORE_CONFIGURATION)
+    if (CORE_CONFIGURATION STREQUAL "CORE_CONFIGURATION-NOTFOUND")
+        message (FATAL_ERROR "There is no core configuration for application \"${APPLICATION_NAME}\"!")
+    endif ()
+
+    get_target_property (CORE_WORLD_DIRECTORY "${APPLICATION_NAME}" APPLICATION_CORE_WORLD_DIRECTORY)
+    if (CORE_WORLD_DIRECTORY STREQUAL "CORE_WORLD_DIRECTORY-NOTFOUND")
+        message (FATAL_ERROR "There is no core world directory for application \"${APPLICATION_NAME}\"!")
+    endif ()
+
+    set (DEV_CORE_CONFIGURATOR_CONTENT)
+    foreach (PLUGIN ${CORE_PLUGINS})
+        string (APPEND DEV_CORE_CONFIGURATOR_CONTENT "list (APPEND PLUGINS_LIST \"\\\"${PLUGIN}_library\\\"\")\n")
+    endforeach ()
+
+    string (APPEND DEV_CORE_CONFIGURATOR_CONTENT "list (JOIN PLUGINS_LIST \", \" PLUGINS)\n")
+    foreach (RESOURCE_TARGET ${CORE_RESOURCE_TARGETS})
+        get_target_property (SOURCE_DIRECTORY "${RESOURCE_TARGET}" UNIT_RESOURCE_TARGET_SOURCE_DIRECTORY)
+        string (APPEND DEV_CORE_CONFIGURATOR_CONTENT "string (APPEND RESOURCE_DIRECTORIES \"+resource_directories ")
+        string (APPEND DEV_CORE_CONFIGURATOR_CONTENT "{ path = \\\"${SOURCE_DIRECTORY}\\\" mount_path = ")
+        string (APPEND DEV_CORE_CONFIGURATOR_CONTENT
+                "\\\"${KAN_APPLICATION_RESOURCES_DIRECTORY_NAME}/${RESOURCE_TARGET}\\\" }\\n\")\n")
+    endforeach ()
+
+    string (APPEND DEV_CORE_CONFIGURATOR_CONTENT
+            "set (PLUGINS_DIRECTORY_PATH \"${KAN_APPLICATION_PLUGINS_DIRECTORY_NAME}\")\n")
+    string (APPEND DEV_CORE_CONFIGURATOR_CONTENT
+            "set (WORLDS_DIRECTORY_PATH \"${CORE_WORLD_DIRECTORY}\")\n")
+    string (APPEND DEV_CORE_CONFIGURATOR_CONTENT "set (OBSERVE_WORLD_DEFINITIONS 1)\n")
+
+    set (DEV_CORE_CONFIGURATION_PATH "${DEV_CONFIGURATION_DIRECTORY}/core.rd")
+    string (APPEND DEV_CORE_CONFIGURATOR_CONTENT
+            "configure_file (\"${CORE_CONFIGURATION}\" \"${DEV_CORE_CONFIGURATION_PATH}\")")
+
+    set (DEV_CORE_CONFIGURATOR_PATH "${DEV_BUILD_DIRECTORY}/${APPLICATION_NAME}_dev_core_config.cmake")
+    file (GENERATE OUTPUT "${DEV_CORE_CONFIGURATOR_PATH}" CONTENT "${DEV_CORE_CONFIGURATOR_CONTENT}")
+
+    add_custom_target ("${APPLICATION_NAME}_dev_core_configuration" ALL
+            DEPENDS "${APPLICATION_NAME}_prepare_dev_directories"
+            COMMAND "${CMAKE_COMMAND}" -P "${DEV_CORE_CONFIGURATOR_PATH}"
+            COMMENT "Building core configuration for application \"${APPLICATION_NAME}\".")
 
     # Generate tool statics file.
 
@@ -466,33 +527,6 @@ function (application_generate)
             endforeach ()
         endif ()
 
-        # Generate program configuration.
-
-        get_target_property (PROGRAM_CONFIGURATION "${PROGRAM}" APPLICATION_PROGRAM_CONFIGURATION)
-        if (PROGRAM_CONFIGURATION STREQUAL "PROGRAM_CONFIGURATION-NOTFOUND")
-            message (FATAL_ERROR
-                    "There is no program \"${PROGRAM_NAME}\" configuration in application \"${APPLICATION_NAME}\"!")
-        endif ()
-
-        set (DEV_PROGRAM_CONFIGURATOR_CONTENT)
-        foreach (PLUGIN ${PROGRAM_PLUGINS})
-            string (APPEND DEV_PROGRAM_CONFIGURATOR_CONTENT
-                    "string (APPEND PLUGINS \"+plugins { name = \\\"${PLUGIN}_library\\\" }\\n\")\n")
-        endforeach ()
-
-        set (DEV_PROGRAM_CONFIGURATION_PATH "${DEV_CONFIGURATION_DIRECTORY}/program_${PROGRAM_NAME}.rd")
-        string (APPEND DEV_PROGRAM_CONFIGURATOR_CONTENT
-                "configure_file (\"${PROGRAM_CONFIGURATION}\" \"${DEV_PROGRAM_CONFIGURATION_PATH}\")")
-
-        set (DEV_PROGRAM_CONFIGURATOR_PATH
-                "${DEV_BUILD_DIRECTORY}/${APPLICATION_NAME}_dev_program_${PROGRAM_NAME}_config.cmake")
-        file (GENERATE OUTPUT "${DEV_PROGRAM_CONFIGURATOR_PATH}" CONTENT "${DEV_PROGRAM_CONFIGURATOR_CONTENT}")
-
-        add_custom_target ("${PROGRAM}_dev_configuration" ALL
-                DEPENDS "${APPLICATION_NAME}_prepare_dev_directories"
-                COMMAND "${CMAKE_COMMAND}" -P "${DEV_PROGRAM_CONFIGURATOR_PATH}"
-                COMMENT "Building program \"${PROGRAM_NAME}\" configuration for application \"${APPLICATION_NAME}\".")
-
         # Generate program executable.
 
         set (STATICS_CORE_CONFIGURATION_PATH "${KAN_APPLICATION_CONFIGURATION_DIRECTORY_NAME}/core.rd")
@@ -526,7 +560,163 @@ function (application_generate)
                 "${PROGRAM}_dev_configuration"
                 "${APPLICATION_NAME}_dev_core_configuration")
 
+        # Find program resource targets.
+
+        set (RESOURCE_TARGETS)
+
+        foreach (PLUGIN ${PROGRAM_PLUGINS})
+            find_linked_targets_recursively (TARGET "${PLUGIN}_library" OUTPUT PLUGIN_TARGETS ARTEFACT_SCOPE)
+            foreach (PLUGIN_TARGET ${PLUGIN_TARGETS})
+                get_target_property (THIS_RESOURCE_TARGETS "${PLUGIN_TARGET}" UNIT_RESOURCE_TARGETS)
+                if (NOT THIS_RESOURCE_TARGETS STREQUAL "THIS_RESOURCE_TARGETS-NOTFOUND")
+                    list (APPEND RESOURCE_TARGETS ${THIS_RESOURCE_TARGETS})
+                endif ()
+            endforeach ()
+        endforeach ()
+
+        list (REMOVE_DUPLICATES RESOURCE_TARGETS)
+
+        # Generate program configuration.
+
+        get_target_property (PROGRAM_CONFIGURATION "${PROGRAM}" APPLICATION_PROGRAM_CONFIGURATION)
+        if (PROGRAM_CONFIGURATION STREQUAL "PROGRAM_CONFIGURATION-NOTFOUND")
+            message (FATAL_ERROR
+                    "There is no program \"${PROGRAM_NAME}\" configuration in application \"${APPLICATION_NAME}\"!")
+        endif ()
+
+        set (DEV_PROGRAM_CONFIGURATOR_CONTENT)
+        foreach (PLUGIN ${PROGRAM_PLUGINS})
+            string (APPEND DEV_PROGRAM_CONFIGURATOR_CONTENT
+                    "list (APPEND PLUGINS_LIST \"\\\"${PLUGIN}_library\\\"\")\n")
+        endforeach ()
+
+        string (APPEND DEV_PROGRAM_CONFIGURATOR_CONTENT "list (JOIN PLUGINS_LIST \", \" PLUGINS)\n")
+        foreach (RESOURCE_TARGET ${RESOURCE_TARGETS})
+            get_target_property (SOURCE_DIRECTORY "${RESOURCE_TARGET}" UNIT_RESOURCE_TARGET_SOURCE_DIRECTORY)
+            string (APPEND DEV_PROGRAM_CONFIGURATOR_CONTENT
+                    "string (APPEND RESOURCE_DIRECTORIES \"+resource_directories ")
+
+            string (APPEND DEV_PROGRAM_CONFIGURATOR_CONTENT "{ path = \\\"${SOURCE_DIRECTORY}\\\" mount_path = ")
+            string (APPEND DEV_PROGRAM_CONFIGURATOR_CONTENT
+                    "\\\"${KAN_APPLICATION_RESOURCES_DIRECTORY_NAME}/${RESOURCE_TARGET}\\\" }\\n\")\n")
+        endforeach ()
+
+        set (DEV_PROGRAM_CONFIGURATION_PATH "${DEV_CONFIGURATION_DIRECTORY}/program_${PROGRAM_NAME}.rd")
+        string (APPEND DEV_PROGRAM_CONFIGURATOR_CONTENT
+                "configure_file (\"${PROGRAM_CONFIGURATION}\" \"${DEV_PROGRAM_CONFIGURATION_PATH}\")")
+
+        set (DEV_PROGRAM_CONFIGURATOR_PATH
+                "${DEV_BUILD_DIRECTORY}/${APPLICATION_NAME}_dev_program_${PROGRAM_NAME}_config.cmake")
+        file (GENERATE OUTPUT "${DEV_PROGRAM_CONFIGURATOR_PATH}" CONTENT "${DEV_PROGRAM_CONFIGURATOR_CONTENT}")
+
+        add_custom_target ("${PROGRAM}_dev_configuration" ALL
+                DEPENDS "${APPLICATION_NAME}_prepare_dev_directories"
+                COMMAND "${CMAKE_COMMAND}" -P "${DEV_PROGRAM_CONFIGURATOR_PATH}"
+                COMMENT "Building program \"${PROGRAM_NAME}\" configuration for application \"${APPLICATION_NAME}\".")
+
     endforeach ()
 
     message (STATUS "Application \"${APPLICATION_NAME}\" generation done.")
+endfunction ()
+
+# Intended only for internal use in this file. Adds resource target with given name to current unit.
+function (private_add_resource_target_to_unit NAME)
+    get_target_property (RESOURCE_TARGETS "${UNIT_NAME}" UNIT_RESOURCE_TARGETS)
+    if (RESOURCE_TARGETS STREQUAL "RESOURCE_TARGETS-NOTFOUND")
+        set (RESOURCE_TARGETS)
+    endif ()
+
+    list (APPEND RESOURCE_TARGETS "${UNIT_NAME}_resource_${NAME}")
+    set_target_properties ("${UNIT_NAME}" PROPERTIES UNIT_RESOURCE_TARGETS "${RESOURCE_TARGETS}")
+endfunction ()
+
+# Registers resource directory with USUAL type for current unit.
+# USUAL directories share common processing pipeline for packaging.
+# Arguments:
+# - NAME: Logical name of this resource directory.
+# - PATH: Path to resource directory with source files.
+# - DEPENDENCIES: Optional dependency targets that need to be executed before processing resources for packaging.
+function (register_application_usual_resource_directory)
+    cmake_parse_arguments (ARGUMENT "" "NAME;PATH" "DEPENDENCIES" ${ARGV})
+    if (DEFINED ARGUMENT_UNPARSED_ARGUMENTS OR
+            NOT DEFINED ARGUMENT_NAME OR
+            NOT DEFINED ARGUMENT_PATH)
+        message (FATAL_ERROR "Incorrect function arguments!")
+    endif ()
+
+    cmake_path (ABSOLUTE_PATH ARGUMENT_PATH NORMALIZE)
+    add_custom_target ("${UNIT_NAME}_resource_${ARGUMENT_NAME}" ALL)
+    set_target_properties ("${UNIT_NAME}_resource_${ARGUMENT_NAME}" PROPERTIES
+            UNIT_RESOURCE_TARGET_TYPE "USUAL"
+            UNIT_RESOURCE_TARGET_SOURCE_DIRECTORY "${ARGUMENT_PATH}")
+
+    if (DEFINED ARGUMENT_DEPENDENCIES)
+        add_dependencies ("${UNIT_NAME}_resource_${ARGUMENT_NAME}" "${ARGUMENT_DEPENDENCIES}")
+    endif ()
+
+    private_add_resource_target_to_unit ("${ARGUMENT_NAME}")
+    message (STATUS
+            "    Added usual resource directory under name \"${ARGUMENT_NAME}\" at path \"${ARGUMENT_PATH}\".")
+endfunction ()
+
+# Registers resource directory with CUSTOM type for current unit.
+# CUSTOM directories have their own commands for building files before packaging.
+# Arguments:
+# - NAME: Logical name of this resource directory.
+# - PATH: Path to resource directory with source files.
+# - BUILT_FILES: List of output files processed by custom pipeline that should be added as sources to this target.
+# - DEPENDENCIES: Optional dependency targets that need to be executed before processing resources for packaging.
+function (register_application_custom_resource_directory)
+    cmake_parse_arguments (ARGUMENT "" "NAME;PATH" "BUILT_FILES;DEPENDENCIES" ${ARGV})
+    if (DEFINED ARGUMENT_UNPARSED_ARGUMENTS OR
+            NOT DEFINED ARGUMENT_NAME OR
+            NOT DEFINED ARGUMENT_PATH OR
+            NOT DEFINED ARGUMENT_BUILT_FILES)
+        message (FATAL_ERROR "Incorrect function arguments!")
+    endif ()
+
+    cmake_path (ABSOLUTE_PATH ARGUMENT_PATH NORMALIZE)
+    add_custom_target ("${UNIT_NAME}_resource_${ARGUMENT_NAME}" ALL)
+    target_sources ("${UNIT_NAME}_resource_${ARGUMENT_NAME}" PRIVATE "${ARGUMENT_BUILT_FILES}")
+
+    set_target_properties ("${UNIT_NAME}_resource_${ARGUMENT_NAME}" PROPERTIES
+            UNIT_RESOURCE_TARGET_TYPE "CUSTOM"
+            UNIT_RESOURCE_TARGET_SOURCE_DIRECTORY "${ARGUMENT_PATH}")
+
+    if (DEFINED ARGUMENT_DEPENDENCIES)
+        add_dependencies ("${UNIT_NAME}_resource_${ARGUMENT_NAME}" "${ARGUMENT_DEPENDENCIES}")
+    endif ()
+
+    private_add_resource_target_to_unit ("${ARGUMENT_NAME}")
+    message (STATUS
+            "    Added custom resource directory under name \"${ARGUMENT_NAME}\" at path \"${ARGUMENT_PATH}\".")
+endfunction ()
+
+# Registers resource directory with PRE_MADE type for current unit.
+# PRE_MADE directories have no packaging steps as their resources are already ready for the game.
+# Arguments:
+# - NAME: Logical name of this resource directory.
+# - PATH: Path to resource directory with source files.
+# - DEPENDENCIES: Optional dependency targets that need to be executed before processing resources for packaging.
+function (register_application_pre_made_resource_directory)
+    cmake_parse_arguments (ARGUMENT "" "NAME;PATH" "DEPENDENCIES" ${ARGV})
+    if (DEFINED ARGUMENT_UNPARSED_ARGUMENTS OR
+            NOT DEFINED ARGUMENT_NAME OR
+            NOT DEFINED ARGUMENT_PATH)
+        message (FATAL_ERROR "Incorrect function arguments!")
+    endif ()
+
+    cmake_path (ABSOLUTE_PATH ARGUMENT_PATH NORMALIZE)
+    add_custom_target ("${UNIT_NAME}_resource_${ARGUMENT_NAME}" ALL)
+    set_target_properties ("${UNIT_NAME}_resource_${ARGUMENT_NAME}" PROPERTIES
+            UNIT_RESOURCE_TARGET_TYPE "PRE_MADE"
+            UNIT_RESOURCE_TARGET_SOURCE_DIRECTORY "${ARGUMENT_PATH}")
+
+    if (DEFINED ARGUMENT_DEPENDENCIES)
+        add_dependencies ("${UNIT_NAME}_resource_${ARGUMENT_NAME}" "${ARGUMENT_DEPENDENCIES}")
+    endif ()
+
+    private_add_resource_target_to_unit ("${ARGUMENT_NAME}")
+    message (STATUS
+            "    Added pre made resource directory under name \"${ARGUMENT_NAME}\" at path \"${ARGUMENT_PATH}\".")
 endfunction ()
