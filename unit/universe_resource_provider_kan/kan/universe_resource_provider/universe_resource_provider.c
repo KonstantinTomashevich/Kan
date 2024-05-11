@@ -1806,6 +1806,7 @@ static inline void on_file_modified (struct resource_provider_state_t *state,
             else
             {
                 kan_repository_indexed_value_write_cursor_close (&cursor);
+                break;
             }
         }
     }
@@ -1862,11 +1863,19 @@ static inline void on_file_removed (struct resource_provider_state_t *state,
 
             if (addition)
             {
-                kan_repository_indexed_value_write_access_delete (&access);
+                if (strcmp (addition->path, path) == 0)
+                {
+                    kan_repository_indexed_value_write_access_delete (&access);
+                }
+                else
+                {
+                    kan_repository_indexed_value_write_access_close (&access);
+                }
             }
             else
             {
                 kan_repository_indexed_value_write_cursor_close (&cursor);
+                break;
             }
         }
     }
