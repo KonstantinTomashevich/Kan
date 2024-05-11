@@ -6,6 +6,8 @@ ${RESOURCE_DIRECTORIES}
 
 ${RESOURCE_PACKS}
 
+environment_tags = ${ENVIRONMENT_TAGS}
+
 root_world = "core_root"
 plugin_directory_path = "${PLUGINS_DIRECTORY_PATH}"
 world_directory_path = "${WORLDS_DIRECTORY_PATH}"

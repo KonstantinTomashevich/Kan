@@ -32,13 +32,17 @@ define_property (TARGET PROPERTY APPLICATION_CORE_CONFIGURATION
         BRIEF_DOCS "Contains path to application core configuration source file."
         FULL_DOCS "Configuration source file is configured with automatically provided plugins and directories.")
 
-define_property (TARGET PROPERTY APPLICATION_CORE_WORLD_DIRECTORY
-        BRIEF_DOCS "Contains path to application world directory folder."
-        FULL_DOCS "Contains path to application world directory folder.")
-
 define_property (TARGET PROPERTY APPLICATION_CORE_PLUGIN_GROUPS
         BRIEF_DOCS "Contains list of plugin groups used as core plugins."
         FULL_DOCS "Contains list of plugin groups used as core plugins.")
+
+define_property (TARGET PROPERTY APPLICATION_WORLD_DIRECTORY
+        BRIEF_DOCS "Contains path to application world directory folder."
+        FULL_DOCS "Contains path to application world directory folder.")
+
+define_property (TARGET PROPERTY APPLICATION_DEVELOPMENT_ENVIRONMENT_TAGS
+        BRIEF_DOCS "Contains universe environment tags passed to development core configuration."
+        FULL_DOCS "Contains universe environment tags passed to development core configuration.")
 
 define_property (TARGET PROPERTY APPLICATION_PLUGINS
         BRIEF_DOCS "Contains list of internal plugin targets."
@@ -141,10 +145,23 @@ function (application_core_set_configuration CONFIGURATION)
 endfunction ()
 
 # Sets path to application core world directory.
-function (application_core_set_world_directory DIRECTORY)
+function (application_set_world_directory DIRECTORY)
     cmake_path (ABSOLUTE_PATH DIRECTORY NORMALIZE)
-    set_target_properties ("${APPLICATION_NAME}" PROPERTIES APPLICATION_CORE_WORLD_DIRECTORY "${DIRECTORY}")
+    set_target_properties ("${APPLICATION_NAME}" PROPERTIES APPLICATION_WORLD_DIRECTORY "${DIRECTORY}")
     message (STATUS "    Setting core world directory to \"${DIRECTORY}\".")
+endfunction ()
+
+# Sets path to application core world directory.
+function (application_add_development_environment_tag TAG)
+    message (STATUS "    Adding development environment tag \"${TAG}\".")
+    get_target_property (TAGS "${APPLICATION_NAME}" APPLICATION_DEVELOPMENT_ENVIRONMENT_TAGS)
+
+    if (TAGS STREQUAL "TAGS-NOTFOUND")
+        set (TAGS)
+    endif ()
+
+    list (APPEND TAGS "${TAG}")
+    set_target_properties ("${APPLICATION_NAME}" PROPERTIES APPLICATION_DEVELOPMENT_ENVIRONMENT_TAGS "${TAGS}")
 endfunction ()
 
 # Adds given plugin group to core plugins list.
@@ -419,9 +436,14 @@ function (application_generate)
         message (FATAL_ERROR "There is no core configuration for application \"${APPLICATION_NAME}\"!")
     endif ()
 
-    get_target_property (CORE_WORLD_DIRECTORY "${APPLICATION_NAME}" APPLICATION_CORE_WORLD_DIRECTORY)
+    get_target_property (CORE_WORLD_DIRECTORY "${APPLICATION_NAME}" APPLICATION_WORLD_DIRECTORY)
     if (CORE_WORLD_DIRECTORY STREQUAL "CORE_WORLD_DIRECTORY-NOTFOUND")
         message (FATAL_ERROR "There is no core world directory for application \"${APPLICATION_NAME}\"!")
+    endif ()
+
+    get_target_property (DEVELOPMENT_TAGS "${APPLICATION_NAME}" APPLICATION_DEVELOPMENT_ENVIRONMENT_TAGS)
+    if (DEVELOPMENT_TAGS STREQUAL "DEVELOPMENT_TAGS-NOTFOUND")
+        set (DEVELOPMENT_TAGS)
     endif ()
 
     set (DEV_CORE_CONFIGURATOR_CONTENT)
@@ -438,6 +460,12 @@ function (application_generate)
                 "\\\"${KAN_APPLICATION_RESOURCES_DIRECTORY_NAME}/${RESOURCE_TARGET}\\\" }\\n\")\n")
     endforeach ()
 
+    foreach (DEVELOPMENT_TAG ${DEVELOPMENT_TAGS})
+        string (APPEND DEV_CORE_CONFIGURATOR_CONTENT
+                "list (APPEND ENVIRONMENT_TAGS_LIST \"\\\"${DEVELOPMENT_TAG}\\\"\")\n")
+    endforeach ()
+
+    string (APPEND DEV_CORE_CONFIGURATOR_CONTENT "list (JOIN ENVIRONMENT_TAGS_LIST \", \" ENVIRONMENT_TAGS)\n")
     string (APPEND DEV_CORE_CONFIGURATOR_CONTENT
             "set (PLUGINS_DIRECTORY_PATH \"${KAN_APPLICATION_PLUGINS_DIRECTORY_NAME}\")\n")
     string (APPEND DEV_CORE_CONFIGURATOR_CONTENT

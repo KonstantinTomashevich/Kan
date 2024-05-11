@@ -96,6 +96,8 @@ void kan_application_framework_core_configuration_init (struct kan_application_f
                             _Alignof (struct kan_application_framework_resource_directory_t), config_allocation_group);
     kan_dynamic_array_init (&instance->resource_packs, 0u, sizeof (struct kan_application_framework_resource_pack_t),
                             _Alignof (struct kan_application_framework_resource_pack_t), config_allocation_group);
+    kan_dynamic_array_init (&instance->environment_tags, 0u, sizeof (kan_interned_string_t),
+                            _Alignof (kan_interned_string_t), config_allocation_group);
     instance->root_world = NULL;
     instance->plugin_directory_path = NULL;
     instance->world_directory_path = NULL;
@@ -123,6 +125,7 @@ void kan_application_framework_core_configuration_shutdown (
 
     kan_dynamic_array_shutdown (&instance->resource_directories);
     kan_dynamic_array_shutdown (&instance->resource_packs);
+    kan_dynamic_array_shutdown (&instance->environment_tags);
 
     if (instance->plugin_directory_path)
     {
@@ -595,6 +598,12 @@ int kan_application_framework_run_with_configuration (
         else
         {
             kan_universe_t universe = kan_universe_system_get_universe (universe_system);
+            for (uint64_t tag_index = 0u; tag_index < core_configuration->environment_tags.size; ++tag_index)
+            {
+                kan_universe_add_environment_tag (
+                    universe, ((kan_interned_string_t *) core_configuration->environment_tags.data)[tag_index]);
+            }
+
             kan_universe_world_t root_world = kan_universe_deploy_root (universe, root_definition);
             kan_universe_deploy_child (universe, root_world, child_definition);
             kan_cpu_section_t cooling_section = kan_cpu_section_get ("frame_cooling");

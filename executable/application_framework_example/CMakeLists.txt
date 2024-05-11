@@ -12,8 +12,10 @@ application_core_include (
         context_virtual_file_system resource_index readable_data serialization testing universe)
 
 application_core_set_configuration ("${CMAKE_CURRENT_SOURCE_DIR}/configuration/core.rd")
-application_core_set_world_directory ("${CMAKE_CURRENT_SOURCE_DIR}/world")
 application_core_use_plugin_group (base)
+
+application_set_world_directory ("${CMAKE_CURRENT_SOURCE_DIR}/world")
+application_add_development_environment_tag (development)
 
 register_application_plugin (NAME base GROUP base)
 application_plugin_include (ABSTRACT universe_resource_provider=kan)

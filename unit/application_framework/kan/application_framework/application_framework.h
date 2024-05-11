@@ -148,6 +148,10 @@ struct kan_application_framework_core_configuration_t
     /// \meta reflection_dynamic_array_type = "struct kan_application_framework_resource_pack_t"
     struct kan_dynamic_array_t resource_packs;
 
+    /// \brief List of environment tags that will be passed to universe.
+    /// \meta reflection_dynamic_array_type = "kan_interned_string_t"
+    struct kan_dynamic_array_t environment_tags;
+
     /// \brief Name of the definition of the universe shared root world.
     kan_interned_string_t root_world;
 
