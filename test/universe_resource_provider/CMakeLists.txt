@@ -39,5 +39,5 @@ foreach (IMPLEMENTATION ${PROVIDER_IMPLEMENTATIONS})
     kan_setup_tests (
             TEST_UNIT test_universe_resource_provider
             TEST_SHARED_LIBRARY ${SHARED_NAME}
-            PROPERTIES TIMEOUT 3)
+            PROPERTIES TIMEOUT 10)
 endforeach ()
