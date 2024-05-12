@@ -128,7 +128,7 @@ define_property (TARGET PROPERTY UNIT_RESOURCE_TARGET_SOURCE_DIRECTORY
 # Starts application configuration registration routine.
 function (register_application NAME)
     set (APPLICATION_NAME "${NAME}" PARENT_SCOPE)
-    add_custom_target ("${NAME}" ALL)
+    add_custom_target ("${NAME}")
     message (STATUS "Registering application \"${NAME}\".")
 endfunction ()
 
@@ -223,7 +223,7 @@ function (register_application_plugin)
 
     message (STATUS "    Registering plugin \"${PLUGIN_NAME}\" in group \"${PLUGIN_GROUP}\".")
     set (APPLICATION_PLUGIN_NAME "${PLUGIN_NAME}" PARENT_SCOPE)
-    add_custom_target ("${APPLICATION_NAME}_plugin_${PLUGIN_NAME}" ALL)
+    add_custom_target ("${APPLICATION_NAME}_plugin_${PLUGIN_NAME}")
     set_target_properties ("${APPLICATION_NAME}_plugin_${PLUGIN_NAME}" PROPERTIES
             APPLICATION_PLUGIN_NAME "${PLUGIN_NAME}"
             APPLICATION_PLUGIN_GROUP "${PLUGIN_GROUP}")
@@ -285,7 +285,7 @@ endfunction ()
 function (register_application_program NAME)
     message (STATUS "    Registering program \"${NAME}\".")
     set (APPLICATION_PROGRAM_NAME "${NAME}" PARENT_SCOPE)
-    add_custom_target ("${APPLICATION_NAME}_program_${NAME}" ALL)
+    add_custom_target ("${APPLICATION_NAME}_program_${NAME}")
     set_target_properties ("${APPLICATION_NAME}_program_${NAME}" PROPERTIES APPLICATION_PROGRAM_NAME "${NAME}")
 
     add_dependencies ("${APPLICATION_NAME}" "${APPLICATION_NAME}_program_${NAME}")
@@ -326,7 +326,7 @@ endfunction ()
 function (register_application_variant NAME)
     message (STATUS "    Registering variant \"${NAME}\".")
     set (APPLICATION_VARIANT_NAME "${NAME}" PARENT_SCOPE)
-    add_custom_target ("${APPLICATION_NAME}_variant_${NAME}" ALL)
+    add_custom_target ("${APPLICATION_NAME}_variant_${NAME}")
     set_target_properties ("${APPLICATION_NAME}_variant_${NAME}" PROPERTIES APPLICATION_VARIANT_NAME "${NAME}")
 
     add_dependencies ("${APPLICATION_NAME}" "${APPLICATION_NAME}_variant_${NAME}")
@@ -412,7 +412,7 @@ endfunction ()
 function (private_generate_resource_processing NAME RESOURCE_TARGETS)
     set (RESOURCE_LIST)
     set (PREPARATION_TARGET_NAME "${APPLICATION_NAME}_resources_${NAME}_prepare")
-    add_custom_target ("${PREPARATION_TARGET_NAME}" ALL)
+    add_custom_target ("${PREPARATION_TARGET_NAME}")
     message (STATUS "    Generating resource processing pipeline \"${NAME}\".")
 
     foreach (RESOURCE_TARGET ${RESOURCE_TARGETS})
@@ -488,7 +488,7 @@ function (private_generate_resource_processing NAME RESOURCE_TARGETS)
             set (INTERN_STRING_ARGUMENT "--intern-strings")
         endif ()
 
-        add_custom_target ("${PACKAGING_TARGET_NAME}" ALL
+        add_custom_target ("${PACKAGING_TARGET_NAME}"
                 COMMAND
                 "${APPLICATION_NAME}_packer"
                 "${PACKAGING_DIRECTORY}/resources.txt"
@@ -549,7 +549,7 @@ function (application_generate)
     set (DEV_PLUGINS_DIRECTORY "${DEV_BUILD_DIRECTORY}/${KAN_APPLICATION_PLUGINS_DIRECTORY_NAME}")
     set (DEV_RESOURCES_DIRECTORY "${DEV_BUILD_DIRECTORY}/${KAN_APPLICATION_RESOURCES_DIRECTORY_NAME}")
 
-    add_custom_target ("${APPLICATION_NAME}_prepare_dev_directories" ALL
+    add_custom_target ("${APPLICATION_NAME}_prepare_dev_directories"
             COMMAND "${CMAKE_COMMAND}" -E make_directory "${DEV_CONFIGURATION_DIRECTORY}"
             COMMAND "${CMAKE_COMMAND}" -E make_directory "${DEV_PLUGINS_DIRECTORY}"
             COMMAND "${CMAKE_COMMAND}" -E make_directory "${DEV_RESOURCES_DIRECTORY}"
@@ -677,7 +677,7 @@ function (application_generate)
     set (DEV_CORE_CONFIGURATOR_PATH "${DEV_BUILD_DIRECTORY}/${APPLICATION_NAME}_dev_core_config.cmake")
     file (GENERATE OUTPUT "${DEV_CORE_CONFIGURATOR_PATH}" CONTENT "${DEV_CORE_CONFIGURATOR_CONTENT}")
 
-    add_custom_target ("${APPLICATION_NAME}_dev_core_configuration" ALL
+    add_custom_target ("${APPLICATION_NAME}_dev_core_configuration"
             DEPENDS "${APPLICATION_NAME}_prepare_dev_directories"
             COMMAND "${CMAKE_COMMAND}" -P "${DEV_CORE_CONFIGURATOR_PATH}"
             COMMENT "Building core configuration for application \"${APPLICATION_NAME}\".")
@@ -818,7 +818,7 @@ function (application_generate)
                 "${DEV_BUILD_DIRECTORY}/${APPLICATION_NAME}_dev_program_${PROGRAM_NAME}_config.cmake")
         file (GENERATE OUTPUT "${DEV_PROGRAM_CONFIGURATOR_PATH}" CONTENT "${DEV_PROGRAM_CONFIGURATOR_CONTENT}")
 
-        add_custom_target ("${PROGRAM}_dev_configuration" ALL
+        add_custom_target ("${PROGRAM}_dev_configuration"
                 DEPENDS "${APPLICATION_NAME}_prepare_dev_directories"
                 COMMAND "${CMAKE_COMMAND}" -P "${DEV_PROGRAM_CONFIGURATOR_PATH}"
                 COMMENT "Building program \"${PROGRAM_NAME}\" configuration for application \"${APPLICATION_NAME}\".")
@@ -860,7 +860,7 @@ function (application_generate)
     foreach (VARIANT ${VARIANTS})
         get_target_property (NAME "${VARIANT}" APPLICATION_VARIANT_NAME)
         message (STATUS "    Generating variant \"${NAME}\".")
-        add_custom_target ("${VARIANT}_package" ALL)
+        add_custom_target ("${VARIANT}_package")
 
         # Set packaging directories.
 
@@ -870,7 +870,7 @@ function (application_generate)
         set (PACK_PLUGINS_DIRECTORY "${PACK_BUILD_DIRECTORY}/${KAN_APPLICATION_PLUGINS_DIRECTORY_NAME}")
         set (PACK_RESOURCES_DIRECTORY "${PACK_BUILD_DIRECTORY}/${KAN_APPLICATION_RESOURCES_DIRECTORY_NAME}")
 
-        add_custom_target ("${VARIANT}_prepare_directories" ALL
+        add_custom_target ("${VARIANT}_prepare_directories"
                 COMMAND "${CMAKE_COMMAND}" -E rm -rf "${PACK_BUILD_DIRECTORY}"
                 COMMAND "${CMAKE_COMMAND}" -E make_directory "${PACK_CONFIGURATION_DIRECTORY}"
                 COMMAND "${CMAKE_COMMAND}" -E make_directory "${PACK_PLUGINS_DIRECTORY}"
@@ -982,7 +982,7 @@ function (application_generate)
                 "${CMAKE_CURRENT_BINARY_DIR}/Generated/${APPLICATION_NAME}_variant_${NAME}_core_config.cmake")
         file (WRITE "${PACK_CORE_CONFIGURATOR_PATH}" "${PACK_CORE_CONFIGURATOR_CONTENT}")
 
-        add_custom_target ("${VARIANT}_core_configuration" ALL
+        add_custom_target ("${VARIANT}_core_configuration"
                 DEPENDS "${VARIANT}_prepare_directories"
                 COMMAND "${CMAKE_COMMAND}" -P "${PACK_CORE_CONFIGURATOR_PATH}"
                 COMMENT "Building core configuration for application \"${APPLICATION_NAME}\" variant \"${NAME}\".")
@@ -1046,7 +1046,7 @@ function (application_generate)
             set (COMMENT_PREFIX "Building program \"${PROGRAM_NAME}\" configuration for application ")
             set (COMMENT_SUFFIX "\"${APPLICATION_NAME}\" variant \"${NAME}\".")
 
-            add_custom_target ("${VARIANT}_program_${PROGRAM_NAME}_configuration" ALL
+            add_custom_target ("${VARIANT}_program_${PROGRAM_NAME}_configuration"
                     DEPENDS "${VARIANT}_prepare_directories"
                     COMMAND "${CMAKE_COMMAND}" -P "${PACK_PROGRAM_CONFIGURATOR_PATH}"
                     COMMENT "${COMMENT_PREFIX}${COMMENT_SUFFIX}")
@@ -1056,7 +1056,7 @@ function (application_generate)
 
         # Copy worlds.
 
-        add_custom_target ("${VARIANT}_copy_worlds" ALL
+        add_custom_target ("${VARIANT}_copy_worlds"
                 DEPENDS "${VARIANT}_prepare_directories"
                 COMMAND "${CMAKE_COMMAND}" -E copy_directory
                 "${WORLD_DIRECTORY}" "${PACK_BUILD_DIRECTORY}/${KAN_APPLICATION_PACKAGED_WORLD_DIRECTORY_NAME}"
@@ -1087,7 +1087,7 @@ function (application_generate)
                 set (COMMENT_PREFIX "Copying \"${RESOURCE_TARGET}\" resources for application ")
                 set (COMMENT_SUFFIX "\"${APPLICATION_NAME}\" variant \"${NAME}\".")
 
-                add_custom_target ("${VARIANT}_copy_${RESOURCE_TARGET}" ALL
+                add_custom_target ("${VARIANT}_copy_${RESOURCE_TARGET}"
                         DEPENDS "${VARIANT}_prepare_directories"
                         COMMAND
                         "${CMAKE_COMMAND}"
@@ -1105,7 +1105,7 @@ function (application_generate)
                 set (SOURCE_DIRECTORY
                         "${CMAKE_CURRENT_BINARY_DIR}/Generated/${APPLICATION_NAME}_resources_core_packaging")
 
-                add_custom_target ("${VARIANT}_copy_core_pack" ALL
+                add_custom_target ("${VARIANT}_copy_core_pack"
                         DEPENDS "${VARIANT}_prepare_directories" "${APPLICATION_NAME}_resources_core_packaging"
                         COMMAND
                         "${CMAKE_COMMAND}"
@@ -1127,7 +1127,7 @@ function (application_generate)
                     set (COMMENT_PREFIX "Copying plugin ${PLUGIN_NAME} resources for application ")
                     set (COMMENT_SUFFIX "\"${APPLICATION_NAME}\" variant \"${NAME}\".")
 
-                    add_custom_target ("${VARIANT}_copy_${PLUGIN_NAME}_pack" ALL
+                    add_custom_target ("${VARIANT}_copy_${PLUGIN_NAME}_pack"
                             DEPENDS "${VARIANT}_prepare_directories" "${PLUGIN_TARGET_NAME}"
                             COMMAND
                             "${CMAKE_COMMAND}"
@@ -1146,7 +1146,7 @@ function (application_generate)
 
         foreach (PROGRAM ${VARIANT_PROGRAMS})
             get_target_property (PROGRAM_NAME "${PROGRAM}" APPLICATION_PROGRAM_NAME)
-            add_custom_target ("${VARIANT}_copy_launcher_${PROGRAM_NAME}" ALL
+            add_custom_target ("${VARIANT}_copy_launcher_${PROGRAM_NAME}"
                     DEPENDS "${VARIANT}_prepare_directories" "${PROGRAM}_launcher"
                     COMMAND
                     ${CMAKE_COMMAND} -E copy_if_different
@@ -1190,7 +1190,7 @@ function (register_application_usual_resource_directory)
     endif ()
 
     cmake_path (ABSOLUTE_PATH ARGUMENT_PATH NORMALIZE)
-    add_custom_target ("${UNIT_NAME}_resource_${ARGUMENT_NAME}" ALL)
+    add_custom_target ("${UNIT_NAME}_resource_${ARGUMENT_NAME}")
     set_target_properties ("${UNIT_NAME}_resource_${ARGUMENT_NAME}" PROPERTIES
             UNIT_RESOURCE_TARGET_TYPE "USUAL"
             UNIT_RESOURCE_TARGET_SOURCE_DIRECTORY "${ARGUMENT_PATH}")
@@ -1221,7 +1221,7 @@ function (register_application_custom_resource_directory)
     endif ()
 
     cmake_path (ABSOLUTE_PATH ARGUMENT_PATH NORMALIZE)
-    add_custom_target ("${UNIT_NAME}_resource_${ARGUMENT_NAME}" ALL)
+    add_custom_target ("${UNIT_NAME}_resource_${ARGUMENT_NAME}")
     target_sources ("${UNIT_NAME}_resource_${ARGUMENT_NAME}" PRIVATE ${ARGUMENT_BUILT_FILES})
 
     set_target_properties ("${UNIT_NAME}_resource_${ARGUMENT_NAME}" PROPERTIES
@@ -1252,7 +1252,7 @@ function (register_application_pre_made_resource_directory)
     endif ()
 
     cmake_path (ABSOLUTE_PATH ARGUMENT_PATH NORMALIZE)
-    add_custom_target ("${UNIT_NAME}_resource_${ARGUMENT_NAME}" ALL)
+    add_custom_target ("${UNIT_NAME}_resource_${ARGUMENT_NAME}")
     set_target_properties ("${UNIT_NAME}_resource_${ARGUMENT_NAME}" PROPERTIES
             UNIT_RESOURCE_TARGET_TYPE "PRE_MADE"
             UNIT_RESOURCE_TARGET_SOURCE_DIRECTORY "${ARGUMENT_PATH}")
