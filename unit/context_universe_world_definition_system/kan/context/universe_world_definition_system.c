@@ -447,8 +447,8 @@ static void universe_world_definition_system_update (kan_context_system_handle_t
             }
         }
 
-        kan_virtual_file_system_watcher_iterator_advance (system->file_system_watcher,
-                                                          system->file_system_watcher_iterator);
+        system->file_system_watcher_iterator = kan_virtual_file_system_watcher_iterator_advance (
+            system->file_system_watcher, system->file_system_watcher_iterator);
     }
 
     struct rescan_stack_node_t *previous_node = NULL;
