@@ -463,6 +463,43 @@ function (private_generate_resource_processing NAME RESOURCE_TARGETS)
     endif ()
 endfunction ()
 
+# Intended only for internal use in this file.
+# Gathers all resource targets used by given list of plugins and outputs resulting list to OUTPUT variable.
+function (private_gather_plugins_resource_targets PLUGINS OUTPUT)
+    set (FOUND_RESOURCE_TARGETS)
+    foreach (PLUGIN ${PLUGINS})
+        find_linked_targets_recursively (TARGET "${PLUGIN}_library" OUTPUT PLUGIN_TARGETS ARTEFACT_SCOPE)
+        foreach (PLUGIN_TARGET ${PLUGIN_TARGETS})
+            get_target_property (THIS_RESOURCE_TARGETS "${PLUGIN_TARGET}" UNIT_RESOURCE_TARGETS)
+            if (NOT THIS_RESOURCE_TARGETS STREQUAL "THIS_RESOURCE_TARGETS-NOTFOUND")
+                list (APPEND FOUND_RESOURCE_TARGETS ${THIS_RESOURCE_TARGETS})
+            endif ()
+        endforeach ()
+    endforeach ()
+
+    list (REMOVE_DUPLICATES FOUND_RESOURCE_TARGETS)
+    set ("${OUTPUT}" "${FOUND_RESOURCE_TARGETS}" PARENT_SCOPE)
+endfunction ()
+
+# Intended only for internal use in this file.
+# Gathers all plugins referenced by given list of groups and outputs resulting list to OUTPUT variable.
+function (private_gather_plugins_from_groups GROUPS OUTPUT)
+    get_target_property (PLUGINS "${APPLICATION_NAME}" APPLICATION_PLUGINS)
+    if (PLUGINS STREQUAL "PLUGINS-NOTFOUND")
+        set (PLUGINS)
+    endif ()
+
+    set (FOUND_PLUGINS)
+    foreach (PLUGIN ${PLUGINS})
+        get_target_property (PLUGIN_GROUP "${PLUGIN}" APPLICATION_PLUGIN_GROUP)
+        if ("${PLUGIN_GROUP}" IN_LIST GROUPS)
+            list (APPEND FOUND_PLUGINS "${PLUGIN}")
+        endif ()
+    endforeach ()
+
+    set ("${OUTPUT}" "${FOUND_PLUGINS}" PARENT_SCOPE)
+endfunction ()
+
 # Uses data gathered by registration functions above to generate application shared libraries, executables and other
 # application related targets.
 function (application_generate)
@@ -480,12 +517,7 @@ function (application_generate)
 
     get_target_property (CORE_GROUPS "${APPLICATION_NAME}" APPLICATION_CORE_PLUGIN_GROUPS)
     if (NOT CORE_GROUPS STREQUAL "CORE_GROUPS-NOTFOUND")
-        foreach (PLUGIN ${PLUGINS})
-            get_target_property (PLUGIN_GROUP "${PLUGIN}" APPLICATION_PLUGIN_GROUP)
-            if ("${PLUGIN_GROUP}" IN_LIST CORE_GROUPS)
-                list (APPEND CORE_PLUGINS "${PLUGIN}")
-            endif ()
-        endforeach ()
+        private_gather_plugins_from_groups ("${CORE_GROUPS}" CORE_PLUGINS)
     endif ()
 
     # The routine below generates build with separate plugin libraries, separate executables and core library.
@@ -583,6 +615,7 @@ function (application_generate)
     # Find core resource targets.
 
     set (CORE_RESOURCE_TARGETS)
+    private_gather_plugins_resource_targets ("${CORE_PLUGINS}" "CORE_RESOURCE_TARGETS")
 
     find_linked_targets_recursively (TARGET "${APPLICATION_NAME}_core_library" OUTPUT CORE_LINKED_TARGETS)
     foreach (LINKED_TARGET ${CORE_LINKED_TARGETS})
@@ -590,16 +623,6 @@ function (application_generate)
         if (NOT THIS_RESOURCE_TARGETS STREQUAL "THIS_RESOURCE_TARGETS-NOTFOUND")
             list (APPEND CORE_RESOURCE_TARGETS ${THIS_RESOURCE_TARGETS})
         endif ()
-    endforeach ()
-
-    foreach (PLUGIN ${CORE_PLUGINS})
-        find_linked_targets_recursively (TARGET "${PLUGIN}_library" OUTPUT PLUGIN_PLUGIN_TARGETS ARTEFACT_SCOPE)
-        foreach (PLUGIN_TARGET ${PLUGIN_PLUGIN_TARGETS})
-            get_target_property (THIS_RESOURCE_TARGETS "${PLUGIN_TARGET}" UNIT_RESOURCE_TARGETS)
-            if (NOT THIS_RESOURCE_TARGETS STREQUAL "THIS_RESOURCE_TARGETS-NOTFOUND")
-                list (APPEND CORE_RESOURCE_TARGETS ${THIS_RESOURCE_TARGETS})
-            endif ()
-        endforeach ()
     endforeach ()
 
     list (REMOVE_DUPLICATES CORE_RESOURCE_TARGETS)
@@ -722,12 +745,7 @@ function (application_generate)
         get_target_property (PROGRAM_GROUPS "${PROGRAM}" APPLICATION_PROGRAM_PLUGIN_GROUPS)
 
         if (NOT PROGRAM_GROUPS STREQUAL "PROGRAM_GROUPS-NOTFOUND")
-            foreach (PLUGIN ${PLUGINS})
-                get_target_property (PLUGIN_GROUP "${PLUGIN}" APPLICATION_PLUGIN_GROUP)
-                if ("${PLUGIN_GROUP}" IN_LIST PROGRAM_GROUPS)
-                    list (APPEND PROGRAM_PLUGINS "${PLUGIN}")
-                endif ()
-            endforeach ()
+            private_gather_plugins_from_groups ("${PROGRAM_GROUPS}" PROGRAM_PLUGINS)
         endif ()
 
         # Generate program executable.
@@ -765,19 +783,7 @@ function (application_generate)
 
         # Find program resource targets.
 
-        set (RESOURCE_TARGETS)
-
-        foreach (PLUGIN ${PROGRAM_PLUGINS})
-            find_linked_targets_recursively (TARGET "${PLUGIN}_library" OUTPUT PLUGIN_TARGETS ARTEFACT_SCOPE)
-            foreach (PLUGIN_TARGET ${PLUGIN_TARGETS})
-                get_target_property (THIS_RESOURCE_TARGETS "${PLUGIN_TARGET}" UNIT_RESOURCE_TARGETS)
-                if (NOT THIS_RESOURCE_TARGETS STREQUAL "THIS_RESOURCE_TARGETS-NOTFOUND")
-                    list (APPEND RESOURCE_TARGETS ${THIS_RESOURCE_TARGETS})
-                endif ()
-            endforeach ()
-        endforeach ()
-
-        list (REMOVE_DUPLICATES RESOURCE_TARGETS)
+        private_gather_plugins_resource_targets ("${PROGRAM_PLUGINS}" "RESOURCE_TARGETS")
 
         # Generate program configuration.
 
@@ -990,12 +996,7 @@ function (application_generate)
             get_target_property (PROGRAM_GROUPS "${PROGRAM}" APPLICATION_PROGRAM_PLUGIN_GROUPS)
 
             if (NOT PROGRAM_GROUPS STREQUAL "PROGRAM_GROUPS-NOTFOUND")
-                foreach (PLUGIN ${PLUGINS})
-                    get_target_property (PLUGIN_GROUP "${PLUGIN}" APPLICATION_PLUGIN_GROUP)
-                    if ("${PLUGIN_GROUP}" IN_LIST PROGRAM_GROUPS)
-                        list (APPEND PROGRAM_PLUGINS "${PLUGIN}")
-                    endif ()
-                endforeach ()
+                private_gather_plugins_from_groups ("${PROGRAM_GROUPS}" PROGRAM_PLUGINS)
             endif ()
 
             get_target_property (PROGRAM_CONFIGURATION "${PROGRAM}" APPLICATION_PROGRAM_CONFIGURATION)
@@ -1012,18 +1013,7 @@ function (application_generate)
 
             string (APPEND PACK_PROGRAM_CONFIGURATOR_CONTENT "list (JOIN PLUGINS_LIST \", \" PLUGINS)\n")
             if (KAN_APPLICATION_PACK_WITH_RAW_RESOURCES)
-                set (RESOURCE_TARGETS)
-                foreach (PLUGIN ${PROGRAM_PLUGINS})
-                    find_linked_targets_recursively (TARGET "${PLUGIN}_library" OUTPUT PLUGIN_TARGETS ARTEFACT_SCOPE)
-                    foreach (PLUGIN_TARGET ${PLUGIN_TARGETS})
-                        get_target_property (THIS_RESOURCE_TARGETS "${PLUGIN_TARGET}" UNIT_RESOURCE_TARGETS)
-                        if (NOT THIS_RESOURCE_TARGETS STREQUAL "THIS_RESOURCE_TARGETS-NOTFOUND")
-                            list (APPEND RESOURCE_TARGETS ${THIS_RESOURCE_TARGETS})
-                        endif ()
-                    endforeach ()
-                endforeach ()
-
-                list (REMOVE_DUPLICATES RESOURCE_TARGETS)
+                private_gather_plugins_resource_targets ("${PROGRAM_PLUGINS}" "RESOURCE_TARGETS")
                 foreach (RESOURCE_TARGET ${RESOURCE_TARGETS})
                     set (RELATIVE_PATH "${KAN_APPLICATION_RESOURCES_DIRECTORY_NAME}/${RESOURCE_TARGET}")
                     string (APPEND PACK_PROGRAM_CONFIGURATOR_CONTENT
@@ -1033,7 +1023,6 @@ function (application_generate)
                 endforeach ()
 
             else ()
-                message (STATUS "$$$$ ${PROGRAM_PLUGINS}")
                 foreach (PLUGIN ${PROGRAM_PLUGINS})
                     get_target_property (PLUGIN_NAME "${PLUGIN}" APPLICATION_PLUGIN_NAME)
                     set (PACK_PATH "${KAN_APPLICATION_RESOURCES_DIRECTORY_NAME}/${PLUGIN_NAME}.pack")
