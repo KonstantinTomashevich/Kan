@@ -170,7 +170,7 @@ int main (int arguments_count, char *arguments[])
         return EXIT_CODE_INVALID_ARGUMENTS;
     }
 
-    kan_context_handle_t context = kan_application_framework_tool_create_context ();
+    kan_context_handle_t context = kan_application_framework_tool_create_context (arguments_count, arguments);
     const int result = execute (context, input_path, output_path);
     kan_context_destroy (context);
     return result;

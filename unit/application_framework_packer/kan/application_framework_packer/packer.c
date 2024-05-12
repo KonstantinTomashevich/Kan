@@ -395,11 +395,19 @@ static void intern_strings_task (uint64_t user_data)
     }
 
     stream = kan_random_access_stream_buffer_open_for_write (stream, KAN_PACKER_IO_BUFFER_SIZE);
+    if (!kan_serialization_binary_write_type_header (stream, node->type_name, interning_shared_context.string_registry))
+    {
+        free_instance (type, instance_data);
+        stream->operations->close (stream);
+        intern_strings_task_exit_with_error (node, "Failed to open output file.");
+        return;
+    }
+
     kan_serialization_binary_writer_t writer = kan_serialization_binary_writer_create (
         stream, instance_data, node->type_name, interning_shared_context.script_storage,
         interning_shared_context.string_registry);
 
-    while ((serialization_state = kan_serialization_binary_reader_step (reader)) == KAN_SERIALIZATION_IN_PROGRESS)
+    while ((serialization_state = kan_serialization_binary_writer_step (writer)) == KAN_SERIALIZATION_IN_PROGRESS)
     {
     }
 
@@ -442,6 +450,7 @@ static inline int perform_string_interning (kan_reflection_registry_t registry)
         {
             KAN_CPU_TASK_LIST_USER_VALUE (&first_task_node, &temporary_allocator, task_name, intern_strings_task,
                                           FOREGROUND, resource_node)
+            ++interning_shared_context.tasks_total;
         }
 
         resource_node = (struct resource_node_t *) resource_node->node.list_node.next;
@@ -545,7 +554,8 @@ static inline int save_accompanying_string_registry (void)
         kan_serialization_interned_string_registry_writer_create (stream, accompanying_string_registry);
 
     enum kan_serialization_state_t serialization_state;
-    while ((serialization_state = kan_serialization_interned_string_registry_writer_step (writer)))
+    while ((serialization_state = kan_serialization_interned_string_registry_writer_step (writer)) ==
+           KAN_SERIALIZATION_IN_PROGRESS)
     {
     }
 
@@ -556,6 +566,37 @@ static inline int save_accompanying_string_registry (void)
     {
         KAN_LOG (packer, KAN_LOG_ERROR, "Failed to serialize resource index accompanying string registry.")
         return EXIT_CODE_STRING_REGISTRY_FAILURE;
+    }
+
+    return 0;
+}
+
+static inline int add_to_pack (kan_virtual_file_system_read_only_pack_builder_t builder,
+                               const char *path,
+                               const char *path_in_pack)
+{
+    struct kan_stream_t *resource_stream = kan_direct_file_stream_open_for_read (path, KAN_TRUE);
+
+    if (!resource_stream)
+    {
+        // Need to finalize before destruction from outside.
+        kan_virtual_file_system_read_only_pack_builder_finalize (builder);
+        kan_virtual_file_system_read_only_pack_builder_destroy (builder);
+        KAN_LOG (packer, KAN_LOG_ERROR, "Failed to open resource stream for \"%s\".", path)
+        return EXIT_CODE_PACK_BUILDING_FAILURE;
+    }
+
+    resource_stream = kan_random_access_stream_buffer_open_for_read (resource_stream, KAN_PACKER_IO_BUFFER_SIZE);
+    const kan_bool_t added =
+        kan_virtual_file_system_read_only_pack_builder_add (builder, resource_stream, path_in_pack);
+
+    resource_stream->operations->close (resource_stream);
+
+    if (!added)
+    {
+        kan_virtual_file_system_read_only_pack_builder_destroy (builder);
+        KAN_LOG (packer, KAN_LOG_ERROR, "Failed to add resource from \"%s\" to pack.", path)
+        return EXIT_CODE_PACK_BUILDING_FAILURE;
     }
 
     return 0;
@@ -581,32 +622,22 @@ static inline int pack_resources (void)
         return EXIT_CODE_PACK_BUILDING_FAILURE;
     }
 
+    if (accompanying_string_registry != KAN_INVALID_SERIALIZATION_INTERNED_STRING_REGISTRY)
+    {
+        add_to_pack (builder,
+                     PACKER_TEMPORARY_DIRECTORY_NAME "/" KAN_RESOURCE_INDEX_ACCOMPANYING_STRING_REGISTRY_DEFAULT_NAME,
+                     KAN_RESOURCE_INDEX_ACCOMPANYING_STRING_REGISTRY_DEFAULT_NAME);
+    }
+
+    add_to_pack (builder, PACKER_TEMPORARY_DIRECTORY_NAME "/" KAN_RESOURCE_INDEX_DEFAULT_NAME,
+                 KAN_RESOURCE_INDEX_DEFAULT_NAME);
+
     struct resource_node_t *resource_node = (struct resource_node_t *) resources_storage.items.first;
     while (resource_node)
     {
-        struct kan_stream_t *resource_stream =
-            kan_direct_file_stream_open_for_read (resource_node->source_path, KAN_TRUE);
-
-        if (!resource_stream)
+        if (add_to_pack (builder, resource_node->source_path, fill_path_in_pack_buffer (resource_node)) != 0)
         {
             stream->operations->close (stream);
-            // Need to finalize before destruction from outside.
-            kan_virtual_file_system_read_only_pack_builder_finalize (builder);
-            kan_virtual_file_system_read_only_pack_builder_destroy (builder);
-            KAN_LOG (packer, KAN_LOG_ERROR, "Failed to open resource stream for \"%s\".", resource_node->source_path)
-            return EXIT_CODE_PACK_BUILDING_FAILURE;
-        }
-
-        resource_stream = kan_random_access_stream_buffer_open_for_read (resource_stream, KAN_PACKER_IO_BUFFER_SIZE);
-        const kan_bool_t added = kan_virtual_file_system_read_only_pack_builder_add (
-            builder, resource_stream, fill_path_in_pack_buffer (resource_node));
-        resource_stream->operations->close (resource_stream);
-
-        if (!added)
-        {
-            stream->operations->close (stream);
-            kan_virtual_file_system_read_only_pack_builder_destroy (builder);
-            KAN_LOG (packer, KAN_LOG_ERROR, "Failed to add resource from \"%s\" to pack.", resource_node->source_path)
             return EXIT_CODE_PACK_BUILDING_FAILURE;
         }
 
@@ -692,7 +723,7 @@ int main (int arguments_count, char *arguments[])
     parsed_arguments.input_list_path = arguments[1u];
     parsed_arguments.output_pack_path = arguments[2u];
 
-    kan_context_handle_t context = kan_application_framework_tool_create_context ();
+    kan_context_handle_t context = kan_application_framework_tool_create_context (arguments_count, arguments);
     const int result = execute (context);
     kan_context_destroy (context);
     return result;
