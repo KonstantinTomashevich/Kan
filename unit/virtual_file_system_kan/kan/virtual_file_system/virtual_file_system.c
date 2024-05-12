@@ -2762,6 +2762,7 @@ struct kan_stream_t *kan_virtual_file_stream_open_for_write (kan_virtual_file_sy
 
 kan_virtual_file_system_read_only_pack_builder_t kan_virtual_file_system_read_only_pack_builder_create (void)
 {
+    ensure_statics_initialized ();
     struct read_only_pack_builder_t *builder = (struct read_only_pack_builder_t *) kan_allocate_batched (
         read_only_pack_operation_allocation_group, sizeof (struct read_only_pack_builder_t));
 
