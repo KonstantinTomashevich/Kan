@@ -5,10 +5,10 @@
 
 #include <kan/container/dynamic_array.h>
 #include <kan/context/update_system.h>
+#include <kan/cpu_profiler/markup.h>
 #include <kan/error/critical.h>
 #include <kan/log/logging.h>
 #include <kan/memory/allocation.h>
-#include <kan/cpu_profiler/markup.h>
 
 KAN_LOG_DEFINE_CATEGORY (update_system);
 

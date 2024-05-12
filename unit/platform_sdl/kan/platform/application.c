@@ -408,7 +408,7 @@ void kan_platform_application_event_shutdown (struct kan_platform_application_ev
 
 kan_bool_t kan_platform_application_init (void)
 {
-    ensure_sdl_allocation_adapter_installed();
+    ensure_sdl_allocation_adapter_installed ();
     KAN_ASSERT (!SDL_WasInit (SDL_INIT_VIDEO | SDL_INIT_EVENTS))
 
     if (SDL_InitSubSystem (SDL_INIT_VIDEO | SDL_INIT_EVENTS) != 0)

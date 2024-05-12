@@ -106,7 +106,8 @@ static inline int execute (kan_context_handle_t context, const char *input_path,
     }
 
     output_stream = kan_random_access_stream_buffer_open_for_write (output_stream, KAN_RESOURCE_BINARIZER_IO_BUFFER);
-    if (!kan_serialization_binary_write_type_header (output_stream, type_name, KAN_INVALID_SERIALIZATION_INTERNED_STRING_REGISTRY))
+    if (!kan_serialization_binary_write_type_header (output_stream, type_name,
+                                                     KAN_INVALID_SERIALIZATION_INTERNED_STRING_REGISTRY))
     {
         KAN_LOG (resource_binarizer, KAN_LOG_ERROR, "Failed to write type header.")
         output_stream->operations->close (output_stream);

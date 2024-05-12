@@ -46,8 +46,8 @@ APPLICATION_FRAMEWORK_API char **kan_application_framework_system_get_arguments 
 
 /// \brief Returns minimum frame time in nanoseconds.
 /// \details Minimum frame time limits maximum FPS to save hardware resources.
-APPLICATION_FRAMEWORK_API uint64_t kan_application_framework_get_min_frame_time_ns (
-    kan_context_system_handle_t application_framework_system);
+APPLICATION_FRAMEWORK_API uint64_t
+kan_application_framework_get_min_frame_time_ns (kan_context_system_handle_t application_framework_system);
 
 /// \brief Sets minimum frame time in nanoseconds.
 APPLICATION_FRAMEWORK_API void kan_application_framework_set_min_frame_time_ns (

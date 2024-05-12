@@ -3,8 +3,8 @@
 #include <kan/context/application_framework_system.h>
 #include <kan/context/application_system.h>
 #include <kan/context/update_system.h>
-#include <kan/memory/allocation.h>
 #include <kan/cpu_profiler/markup.h>
+#include <kan/memory/allocation.h>
 
 struct application_framework_system_t
 {

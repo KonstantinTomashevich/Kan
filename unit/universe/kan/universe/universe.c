@@ -3041,8 +3041,7 @@ static void fill_world_from_definition (struct universe_t *universe,
 
                 for (uint64_t tag_index = 0u; tag_index < universe->environment_tags.size; ++tag_index)
                 {
-                    kan_interned_string_t tag =
-                        ((kan_interned_string_t *) universe->environment_tags.data)[tag_index];
+                    kan_interned_string_t tag = ((kan_interned_string_t *) universe->environment_tags.data)[tag_index];
 
                     if (tag == requirement)
                     {
