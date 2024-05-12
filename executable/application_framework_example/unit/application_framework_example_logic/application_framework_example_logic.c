@@ -2,7 +2,6 @@
 
 #include <stdio.h>
 
-#include <kan/context/application_framework_system.h>
 #include <kan/context/application_system.h>
 #include <kan/platform/precise_time.h>
 #include <kan/universe/universe.h>
@@ -55,7 +54,6 @@ struct test_mutator_state_t
 
     kan_context_system_handle_t application_system_handle;
     kan_application_system_event_iterator_t event_iterator;
-    kan_context_system_handle_t application_framework_system_handle;
 };
 
 APPLICATION_FRAMEWORK_EXAMPLE_LOGIC_API void kan_universe_mutator_deploy_test_mutator (
@@ -67,8 +65,6 @@ APPLICATION_FRAMEWORK_EXAMPLE_LOGIC_API void kan_universe_mutator_deploy_test_mu
 {
     kan_context_handle_t context = kan_universe_get_context (universe);
     state->application_system_handle = kan_context_query (context, KAN_CONTEXT_APPLICATION_SYSTEM_NAME);
-    state->application_framework_system_handle =
-        kan_context_query (context, KAN_CONTEXT_APPLICATION_FRAMEWORK_SYSTEM_NAME);
 
     if (state->application_system_handle != KAN_INVALID_CONTEXT_SYSTEM_HANDLE)
     {
@@ -79,21 +75,6 @@ APPLICATION_FRAMEWORK_EXAMPLE_LOGIC_API void kan_universe_mutator_deploy_test_mu
 APPLICATION_FRAMEWORK_EXAMPLE_LOGIC_API void kan_universe_mutator_execute_test_mutator (
     kan_cpu_job_t job, struct test_mutator_state_t *state)
 {
-    const struct kan_platform_application_event_t *event;
-    while (
-        (event = kan_application_system_event_iterator_get (state->application_system_handle, state->event_iterator)))
-    {
-        if (event->type == KAN_PLATFORM_APPLICATION_EVENT_TYPE_QUIT)
-        {
-            if (state->application_framework_system_handle != KAN_INVALID_CONTEXT_SYSTEM_HANDLE)
-            {
-                kan_application_framework_system_request_exit (state->application_framework_system_handle, 0);
-            }
-        }
-
-        state->event_iterator = kan_application_system_event_iterator_advance (state->event_iterator);
-    }
-
     kan_repository_singleton_write_access_t write_access =
         kan_repository_singleton_write_query_execute (&state->write__test_singleton);
     struct test_singleton_t *singleton =
