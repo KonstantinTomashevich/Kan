@@ -9,6 +9,12 @@ set (KAN_APPLICATION_PLUGINS_DIRECTORY_NAME "plugins")
 # Name of the directory to store resources.
 set (KAN_APPLICATION_RESOURCES_DIRECTORY_NAME "resources")
 
+# Name of the directory to store packaged variants of application.
+set (KAN_APPLICATION_PACKAGED_DIRECTORY_NAME "packaged")
+
+# Name of the directory to store universe world definitions in packaged variants of application.
+set (KAN_APPLICATION_PACKAGED_WORLD_DIRECTORY_NAME "world")
+
 # Path to static data template for application framework static launcher.
 set (KAN_APPLICATION_PROGRAM_LAUNCHER_STATICS_TEMPLATE "${CMAKE_SOURCE_DIR}/cmake/kan/application_launcher_statics.c")
 
@@ -24,6 +30,10 @@ option (KAN_APPLICATION_PACK_WITH_RAW_RESOURCES
 
 # Whether string interning for packing procedure is enabled.
 option (KAN_APPLICATION_PACKER_INTERN_STRINGS "Whether string interning for packing procedure is enabled." ON)
+
+# Whether to observe for world definition changes in packaged applications.
+option (KAN_APPLICATION_OBSERVE_WORLDS_IN_PACKAGED
+        "Whether to observe for world definition changes in packaged applications." OFF)
 
 # Target properties, used to store application framework related data. Shouldn't be directly modified by user.
 
@@ -86,6 +96,22 @@ define_property (TARGET PROPERTY APPLICATION_PROGRAM_CONFIGURATION
 define_property (TARGET PROPERTY APPLICATION_PROGRAM_PLUGIN_GROUPS
         BRIEF_DOCS "Contains list of plugin groups used as program plugins."
         FULL_DOCS "Contains list of plugin groups used as program plugins.")
+
+define_property (TARGET PROPERTY APPLICATION_VARIANTS
+        BRIEF_DOCS "Contains list of this application packaging variants."
+        FULL_DOCS "Contains list of this application packaging variants.")
+
+define_property (TARGET PROPERTY APPLICATION_VARIANT_NAME
+        BRIEF_DOCS "Contains name of application packaging variant."
+        FULL_DOCS "Contains name of application packaging variant.")
+
+define_property (TARGET PROPERTY APPLICATION_VARIANT_PROGRAMS
+        BRIEF_DOCS "Contains list of programs to be packaged using application packaging variant."
+        FULL_DOCS "Contains list of programs to be packaged using application packaging variant.")
+
+define_property (TARGET PROPERTY APPLICATION_VARIANT_ENVIRONMENT_TAGS
+        BRIEF_DOCS "Contains application variant environment tags."
+        FULL_DOCS "Contains application variant environment tags.")
 
 define_property (TARGET PROPERTY UNIT_RESOURCE_TARGETS
         BRIEF_DOCS "List of targets that contain information about resources used by this unit."
@@ -294,6 +320,54 @@ function (application_program_use_plugin_group GROUP)
     list (APPEND PLUGIN_GROUPS "${GROUP}")
     set_target_properties ("${APPLICATION_NAME}_program_${APPLICATION_PROGRAM_NAME}" PROPERTIES
             APPLICATION_PROGRAM_PLUGIN_GROUPS "${PLUGIN_GROUPS}")
+endfunction ()
+
+# Starts application packaging variant registration routine. Must be called inside application registration routine.
+function (register_application_variant NAME)
+    message (STATUS "    Registering variant \"${NAME}\".")
+    set (APPLICATION_VARIANT_NAME "${NAME}" PARENT_SCOPE)
+    add_custom_target ("${APPLICATION_NAME}_variant_${NAME}" ALL)
+    set_target_properties ("${APPLICATION_NAME}_variant_${NAME}" PROPERTIES APPLICATION_VARIANT_NAME "${NAME}")
+
+    add_dependencies ("${APPLICATION_NAME}" "${APPLICATION_NAME}_variant_${NAME}")
+    get_target_property (VARIANTS "${APPLICATION_NAME}" APPLICATION_VARIANTS)
+
+    if (VARIANTS STREQUAL "VARIANTS-NOTFOUND")
+        set (VARIANTS)
+    endif ()
+
+    list (APPEND VARIANTS "${APPLICATION_NAME}_variant_${NAME}")
+    set_target_properties ("${APPLICATION_NAME}" PROPERTIES APPLICATION_VARIANTS "${VARIANTS}")
+endfunction ()
+
+# Adds program with given name to application packaging variant.
+function (application_variant_add_program NAME)
+    get_target_property (PROGRAMS "${APPLICATION_NAME}_variant_${APPLICATION_VARIANT_NAME}"
+            APPLICATION_VARIANT_PROGRAMS)
+
+    if (PROGRAMS STREQUAL "PROGRAMS-NOTFOUND")
+        set (PROGRAMS)
+    endif ()
+
+    message (STATUS "        Add program \"${NAME}\".")
+    list (APPEND PROGRAMS "${APPLICATION_NAME}_program_${NAME}")
+    set_target_properties ("${APPLICATION_NAME}_variant_${APPLICATION_VARIANT_NAME}" PROPERTIES
+            APPLICATION_VARIANT_PROGRAMS "${PROGRAMS}")
+endfunction ()
+
+# Adds given environment tag to application packaging variant.
+function (application_variant_add_environment_tag TAG)
+    message (STATUS "        Adding environment tag \"${TAG}\".")
+    get_target_property (TAGS "${APPLICATION_NAME}_variant_${APPLICATION_VARIANT_NAME}"
+            APPLICATION_VARIANT_ENVIRONMENT_TAG)
+
+    if (TAGS STREQUAL "TAGS-NOTFOUND")
+        set (TAGS)
+    endif ()
+
+    list (APPEND TAGS "${TAG}")
+    set_target_properties ("${APPLICATION_NAME}_variant_${APPLICATION_VARIANT_NAME}" PROPERTIES
+            APPLICATION_VARIANT_ENVIRONMENT_TAGS "${TAGS}")
 endfunction ()
 
 # Intended only for internal use in this file.
@@ -537,8 +611,8 @@ function (application_generate)
         message (FATAL_ERROR "There is no core configuration for application \"${APPLICATION_NAME}\"!")
     endif ()
 
-    get_target_property (CORE_WORLD_DIRECTORY "${APPLICATION_NAME}" APPLICATION_WORLD_DIRECTORY)
-    if (CORE_WORLD_DIRECTORY STREQUAL "CORE_WORLD_DIRECTORY-NOTFOUND")
+    get_target_property (WORLD_DIRECTORY "${APPLICATION_NAME}" APPLICATION_WORLD_DIRECTORY)
+    if (WORLD_DIRECTORY STREQUAL "WORLD_DIRECTORY-NOTFOUND")
         message (FATAL_ERROR "There is no core world directory for application \"${APPLICATION_NAME}\"!")
     endif ()
 
@@ -570,7 +644,7 @@ function (application_generate)
     string (APPEND DEV_CORE_CONFIGURATOR_CONTENT
             "set (PLUGINS_DIRECTORY_PATH \"${KAN_APPLICATION_PLUGINS_DIRECTORY_NAME}\")\n")
     string (APPEND DEV_CORE_CONFIGURATOR_CONTENT
-            "set (WORLDS_DIRECTORY_PATH \"${CORE_WORLD_DIRECTORY}\")\n")
+            "set (WORLDS_DIRECTORY_PATH \"${WORLD_DIRECTORY}\")\n")
     string (APPEND DEV_CORE_CONFIGURATOR_CONTENT "set (OBSERVE_WORLD_DEFINITIONS 1)\n")
 
     set (DEV_CORE_CONFIGURATION_PATH "${DEV_CONFIGURATION_DIRECTORY}/core.rd")
@@ -767,9 +841,336 @@ function (application_generate)
         endforeach ()
     endif ()
 
-    message (STATUS "Application \"${APPLICATION_NAME}\": generating packaging targets.")
+    message (STATUS "Application \"${APPLICATION_NAME}\": generating packaging variants.")
 
-    # TODO: Packaging targets.
+    get_target_property (VARIANTS "${APPLICATION_NAME}" APPLICATION_VARIANTS)
+    if (VARIANTS STREQUAL "VARIANTS-NOTFOUND")
+        message (STATUS "    Application \"${APPLICATION_NAME}\" has no packaging variants.")
+        set (VARIANTS)
+    endif ()
+
+    # Generate variant package targets.
+
+    foreach (VARIANT ${VARIANTS})
+        get_target_property (NAME "${VARIANT}" APPLICATION_VARIANT_NAME)
+        message (STATUS "    Generating variant \"${NAME}\".")
+        add_custom_target ("${VARIANT}_package" ALL)
+
+        # Set packaging directories.
+
+        set (PACK_BUILD_DIRECTORY
+                "${CMAKE_CURRENT_BINARY_DIR}/${KAN_APPLICATION_PACKAGED_DIRECTORY_NAME}/${APPLICATION_NAME}/${NAME}")
+        set (PACK_CONFIGURATION_DIRECTORY "${PACK_BUILD_DIRECTORY}/${KAN_APPLICATION_CONFIGURATION_DIRECTORY_NAME}")
+        set (PACK_PLUGINS_DIRECTORY "${PACK_BUILD_DIRECTORY}/${KAN_APPLICATION_PLUGINS_DIRECTORY_NAME}")
+        set (PACK_RESOURCES_DIRECTORY "${PACK_BUILD_DIRECTORY}/${KAN_APPLICATION_RESOURCES_DIRECTORY_NAME}")
+
+        add_custom_target ("${VARIANT}_prepare_directories" ALL
+                COMMAND "${CMAKE_COMMAND}" -E rm -rf "${PACK_BUILD_DIRECTORY}"
+                COMMAND "${CMAKE_COMMAND}" -E make_directory "${PACK_CONFIGURATION_DIRECTORY}"
+                COMMAND "${CMAKE_COMMAND}" -E make_directory "${PACK_PLUGINS_DIRECTORY}"
+                COMMAND "${CMAKE_COMMAND}" -E make_directory "${PACK_RESOURCES_DIRECTORY}"
+                COMMENT "Creating packaging directories for application \"${APPLICATION_NAME}\" variant \"${NAME}\".")
+
+        # Copy core library.
+
+        setup_shared_library_copy (
+                LIBRARY "${APPLICATION_NAME}_core_library"
+                USER "${VARIANT}_package"
+                OUTPUT ${PACK_BUILD_DIRECTORY}
+                DEPENDENCIES "${VARIANT}_prepare_directories")
+
+        find_linked_shared_libraries (TARGET "${APPLICATION_NAME}_core_library" OUTPUT CORE_REQUIRED_LIBRARIES)
+        foreach (REQUIRED_LIBRARY ${CORE_REQUIRED_LIBRARIES})
+            setup_shared_library_copy (
+                    LIBRARY "${REQUIRED_LIBRARY}"
+                    USER "${VARIANT}_package"
+                    OUTPUT ${PACK_BUILD_DIRECTORY}
+                    DEPENDENCIES "${VARIANT}_prepare_directories")
+        endforeach ()
+
+        # Find plugins used by variant.
+
+        set (USED_PLUGINS ${CORE_PLUGINS})
+        get_target_property (VARIANT_PROGRAMS "${VARIANT}" APPLICATION_VARIANT_PROGRAMS)
+
+        if (VARIANT_PROGRAMS STREQUAL "VARIANT_PROGRAMS-NOTFOUND")
+            message (FATAL_ERROR "Application \"${APPLICATION_NAME}\" variant \"${NAME}\" has no programs!")
+        endif ()
+
+        foreach (PROGRAM ${VARIANT_PROGRAMS})
+            get_target_property (PROGRAM_GROUPS "${PROGRAM}" APPLICATION_PROGRAM_PLUGIN_GROUPS)
+            if (NOT PROGRAM_GROUPS STREQUAL "PROGRAM_GROUPS-NOTFOUND")
+                foreach (PLUGIN ${PLUGINS})
+                    get_target_property (PLUGIN_GROUP "${PLUGIN}" APPLICATION_PLUGIN_GROUP)
+                    if ("${PLUGIN_GROUP}" IN_LIST PROGRAM_GROUPS)
+                        list (APPEND USED_PLUGINS "${PLUGIN}")
+                    endif ()
+                endforeach ()
+            endif ()
+        endforeach ()
+
+        list (REMOVE_DUPLICATES USED_PLUGINS)
+
+        # Copy plugins used by variant.
+
+        foreach (PLUGIN ${USED_PLUGINS})
+            setup_shared_library_copy (
+                    LIBRARY "${PLUGIN}_library"
+                    USER "${VARIANT}_package"
+                    OUTPUT ${PACK_PLUGINS_DIRECTORY}
+                    DEPENDENCIES "${VARIANT}_prepare_directories")
+        endforeach ()
+
+        # Generate core configuration.
+
+        get_target_property (TAGS "${VARIANT}" APPLICATION_VARIANT_ENVIRONMENT_TAGS)
+        if (TAGS STREQUAL "TAGS-NOTFOUND")
+            set (TAGS)
+        endif ()
+
+        set (PACK_CORE_CONFIGURATOR_CONTENT)
+        foreach (PLUGIN ${CORE_PLUGINS})
+            string (APPEND PACK_CORE_CONFIGURATOR_CONTENT "list (APPEND PLUGINS_LIST \"\\\"${PLUGIN}_library\\\"\")\n")
+        endforeach ()
+
+        string (APPEND PACK_CORE_CONFIGURATOR_CONTENT "list (JOIN PLUGINS_LIST \", \" PLUGINS)\n")
+        if (KAN_APPLICATION_PACK_WITH_RAW_RESOURCES)
+            foreach (RESOURCE_TARGET ${CORE_RESOURCE_TARGETS})
+                string (APPEND PACK_CORE_CONFIGURATOR_CONTENT
+                        "string (APPEND RESOURCE_DIRECTORIES \"+resource_directories ")
+                string (APPEND PACK_CORE_CONFIGURATOR_CONTENT
+                        "{ path = \\\"${KAN_APPLICATION_RESOURCES_DIRECTORY_NAME}/${RESOURCE_TARGET}\\\"")
+                string (APPEND PACK_CORE_CONFIGURATOR_CONTENT
+                        "mount_path = \\\"${KAN_APPLICATION_RESOURCES_DIRECTORY_NAME}/${RESOURCE_TARGET}\\\" }\\n\")\n")
+            endforeach ()
+
+        elseif (TARGET "${APPLICATION_NAME}_resources_core_packaging")
+            string (APPEND PACK_CORE_CONFIGURATOR_CONTENT "string (APPEND RESOURCE_PACKS \"+resource_packs ")
+            string (APPEND PACK_CORE_CONFIGURATOR_CONTENT
+                    "{ path = \\\"${KAN_APPLICATION_RESOURCES_DIRECTORY_NAME}/core.pack\\\"")
+            string (APPEND PACK_CORE_CONFIGURATOR_CONTENT
+                    " mount_path = \\\"${KAN_APPLICATION_RESOURCES_DIRECTORY_NAME}/core\\\" }\\n\")\n")
+        endif ()
+
+        foreach (TAG ${TAGS})
+            string (APPEND PACK_CORE_CONFIGURATOR_CONTENT "list (APPEND ENVIRONMENT_TAGS_LIST \"\\\"${TAG}\\\"\")\n")
+        endforeach ()
+
+        string (APPEND PACK_CORE_CONFIGURATOR_CONTENT "list (JOIN ENVIRONMENT_TAGS_LIST \", \" ENVIRONMENT_TAGS)\n")
+        string (APPEND PACK_CORE_CONFIGURATOR_CONTENT
+                "set (PLUGINS_DIRECTORY_PATH \"${KAN_APPLICATION_PLUGINS_DIRECTORY_NAME}\")\n")
+        string (APPEND PACK_CORE_CONFIGURATOR_CONTENT
+                "set (WORLDS_DIRECTORY_PATH \"${KAN_APPLICATION_PACKAGED_WORLD_DIRECTORY_NAME}\")\n")
+
+        if (KAN_APPLICATION_OBSERVE_WORLDS_IN_PACKAGED)
+            string (APPEND PACK_CORE_CONFIGURATOR_CONTENT "set (OBSERVE_WORLD_DEFINITIONS 1)\n")
+        else ()
+            string (APPEND PACK_CORE_CONFIGURATOR_CONTENT "set (OBSERVE_WORLD_DEFINITIONS 0)\n")
+        endif ()
+
+        set (PACK_CORE_CONFIGURATION_PATH "${PACK_CONFIGURATION_DIRECTORY}/core.rd")
+        string (APPEND PACK_CORE_CONFIGURATOR_CONTENT
+                "configure_file (\"${CORE_CONFIGURATION}\" \"${PACK_CORE_CONFIGURATION_PATH}\")")
+
+        set (PACK_CORE_CONFIGURATOR_PATH
+                "${CMAKE_CURRENT_BINARY_DIR}/Generated/${APPLICATION_NAME}_variant_${NAME}_core_config.cmake")
+        file (WRITE "${PACK_CORE_CONFIGURATOR_PATH}" "${PACK_CORE_CONFIGURATOR_CONTENT}")
+
+        add_custom_target ("${VARIANT}_core_configuration" ALL
+                DEPENDS "${VARIANT}_prepare_directories"
+                COMMAND "${CMAKE_COMMAND}" -P "${PACK_CORE_CONFIGURATOR_PATH}"
+                COMMENT "Building core configuration for application \"${APPLICATION_NAME}\" variant \"${NAME}\".")
+        add_dependencies ("${VARIANT}_package" "${VARIANT}_core_configuration")
+
+        # Generate program configuration.
+
+        foreach (PROGRAM ${VARIANT_PROGRAMS})
+            get_target_property (PROGRAM_NAME "${PROGRAM}" APPLICATION_PROGRAM_NAME)
+            set (PROGRAM_PLUGINS)
+            get_target_property (PROGRAM_GROUPS "${PROGRAM}" APPLICATION_PROGRAM_PLUGIN_GROUPS)
+
+            if (NOT PROGRAM_GROUPS STREQUAL "PROGRAM_GROUPS-NOTFOUND")
+                foreach (PLUGIN ${PLUGINS})
+                    get_target_property (PLUGIN_GROUP "${PLUGIN}" APPLICATION_PLUGIN_GROUP)
+                    if ("${PLUGIN_GROUP}" IN_LIST PROGRAM_GROUPS)
+                        list (APPEND PROGRAM_PLUGINS "${PLUGIN}")
+                    endif ()
+                endforeach ()
+            endif ()
+
+            get_target_property (PROGRAM_CONFIGURATION "${PROGRAM}" APPLICATION_PROGRAM_CONFIGURATION)
+            if (PROGRAM_CONFIGURATION STREQUAL "PROGRAM_CONFIGURATION-NOTFOUND")
+                message (FATAL_ERROR
+                        "There is no program \"${PROGRAM_NAME}\" configuration in application \"${APPLICATION_NAME}\"!")
+            endif ()
+
+            set (PACK_PROGRAM_CONFIGURATOR_CONTENT)
+            foreach (PLUGIN ${PROGRAM_PLUGINS})
+                string (APPEND PACK_PROGRAM_CONFIGURATOR_CONTENT
+                        "list (APPEND PLUGINS_LIST \"\\\"${PLUGIN}_library\\\"\")\n")
+            endforeach ()
+
+            string (APPEND PACK_PROGRAM_CONFIGURATOR_CONTENT "list (JOIN PLUGINS_LIST \", \" PLUGINS)\n")
+            if (KAN_APPLICATION_PACK_WITH_RAW_RESOURCES)
+                set (RESOURCE_TARGETS)
+                foreach (PLUGIN ${PROGRAM_PLUGINS})
+                    find_linked_targets_recursively (TARGET "${PLUGIN}_library" OUTPUT PLUGIN_TARGETS ARTEFACT_SCOPE)
+                    foreach (PLUGIN_TARGET ${PLUGIN_TARGETS})
+                        get_target_property (THIS_RESOURCE_TARGETS "${PLUGIN_TARGET}" UNIT_RESOURCE_TARGETS)
+                        if (NOT THIS_RESOURCE_TARGETS STREQUAL "THIS_RESOURCE_TARGETS-NOTFOUND")
+                            list (APPEND RESOURCE_TARGETS ${THIS_RESOURCE_TARGETS})
+                        endif ()
+                    endforeach ()
+                endforeach ()
+
+                list (REMOVE_DUPLICATES RESOURCE_TARGETS)
+                foreach (RESOURCE_TARGET ${RESOURCE_TARGETS})
+                    set (RELATIVE_PATH "${KAN_APPLICATION_RESOURCES_DIRECTORY_NAME}/${RESOURCE_TARGET}")
+                    string (APPEND PACK_PROGRAM_CONFIGURATOR_CONTENT
+                            "string (APPEND RESOURCE_DIRECTORIES \"+resource_directories ")
+                    string (APPEND PACK_PROGRAM_CONFIGURATOR_CONTENT
+                            "{ path = \\\"${RELATIVE_PATH}\\\" mount_path = \\\"${RELATIVE_PATH}\\\" }\\n\")\n")
+                endforeach ()
+
+            else ()
+                message (STATUS "$$$$ ${PROGRAM_PLUGINS}")
+                foreach (PLUGIN ${PROGRAM_PLUGINS})
+                    get_target_property (PLUGIN_NAME "${PLUGIN}" APPLICATION_PLUGIN_NAME)
+                    set (PACK_PATH "${KAN_APPLICATION_RESOURCES_DIRECTORY_NAME}/${PLUGIN_NAME}.pack")
+                    set (MOUNT_PATH "${KAN_APPLICATION_RESOURCES_DIRECTORY_NAME}/${PLUGIN_NAME}")
+
+                    string (APPEND PACK_PROGRAM_CONFIGURATOR_CONTENT "string (APPEND RESOURCE_PACKS \"+resource_packs ")
+                    string (APPEND PACK_PROGRAM_CONFIGURATOR_CONTENT
+                            "{ path = \\\"${PACK_PATH}\\\" mount_path = \\\"${MOUNT_PATH}\\\" }\\n\")\n")
+                endforeach ()
+            endif ()
+
+            set (PACK_PROGRAM_CONFIGURATION_PATH "${PACK_CONFIGURATION_DIRECTORY}/program_${PROGRAM_NAME}.rd")
+            string (APPEND PACK_PROGRAM_CONFIGURATOR_CONTENT
+                    "configure_file (\"${PROGRAM_CONFIGURATION}\" \"${PACK_PROGRAM_CONFIGURATION_PATH}\")")
+
+            set (GENERATED_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/Generated")
+            set (PACK_PROGRAM_CONFIGURATOR_PATH
+                    "${GENERATED_DIRECTORY}/${APPLICATION_NAME}_variant_${NAME}_${PROGRAM_NAME}_config.cmake")
+            file (WRITE "${PACK_PROGRAM_CONFIGURATOR_PATH}" "${PACK_PROGRAM_CONFIGURATOR_CONTENT}")
+
+            set (COMMENT_PREFIX "Building program \"${PROGRAM_NAME}\" configuration for application ")
+            set (COMMENT_SUFFIX "\"${APPLICATION_NAME}\" variant \"${NAME}\".")
+
+            add_custom_target ("${VARIANT}_program_${PROGRAM_NAME}_configuration" ALL
+                    DEPENDS "${VARIANT}_prepare_directories"
+                    COMMAND "${CMAKE_COMMAND}" -P "${PACK_PROGRAM_CONFIGURATOR_PATH}"
+                    COMMENT "${COMMENT_PREFIX}${COMMENT_SUFFIX}")
+
+            add_dependencies ("${VARIANT}_package" "${VARIANT}_program_${PROGRAM_NAME}_configuration")
+        endforeach ()
+
+        # Copy worlds.
+
+        add_custom_target ("${VARIANT}_copy_worlds" ALL
+                DEPENDS "${VARIANT}_prepare_directories"
+                COMMAND "${CMAKE_COMMAND}" -E copy_directory
+                "${WORLD_DIRECTORY}" "${PACK_BUILD_DIRECTORY}/${KAN_APPLICATION_PACKAGED_WORLD_DIRECTORY_NAME}"
+                COMMENT "Copying worlds for application \"${APPLICATION_NAME}\" variant \"${NAME}\"."
+                VERBATIM)
+        add_dependencies ("${VARIANT}_package" "${VARIANT}_copy_worlds")
+
+        # Copy resources.
+
+        if (KAN_APPLICATION_PACK_WITH_RAW_RESOURCES)
+            set (RESOURCE_TARGETS ${CORE_RESOURCE_TARGETS})
+
+            foreach (PLUGIN ${USED_PLUGINS})
+                find_linked_targets_recursively (TARGET "${PLUGIN}_library" OUTPUT PLUGIN_TARGETS ARTEFACT_SCOPE)
+                if (NOT PLUGIN IN_LIST CORE_PLUGINS)
+                    foreach (PLUGIN_TARGET ${PLUGIN_TARGETS})
+                        get_target_property (THIS_RESOURCE_TARGETS "${PLUGIN_TARGET}" UNIT_RESOURCE_TARGETS)
+                        if (NOT THIS_RESOURCE_TARGETS STREQUAL "THIS_RESOURCE_TARGETS-NOTFOUND")
+                            list (APPEND RESOURCE_TARGETS ${THIS_RESOURCE_TARGETS})
+                        endif ()
+                    endforeach ()
+                endif ()
+            endforeach ()
+
+            list (REMOVE_DUPLICATES RESOURCE_TARGETS)
+            foreach (RESOURCE_TARGET ${RESOURCE_TARGETS})
+                get_target_property (SOURCE_DIRECTORY "${RESOURCE_TARGET}" UNIT_RESOURCE_TARGET_SOURCE_DIRECTORY)
+                set (COMMENT_PREFIX "Copying \"${RESOURCE_TARGET}\" resources for application ")
+                set (COMMENT_SUFFIX "\"${APPLICATION_NAME}\" variant \"${NAME}\".")
+
+                add_custom_target ("${VARIANT}_copy_${RESOURCE_TARGET}" ALL
+                        DEPENDS "${VARIANT}_prepare_directories"
+                        COMMAND
+                        "${CMAKE_COMMAND}"
+                        -E copy_directory
+                        "${SOURCE_DIRECTORY}"
+                        "${PACK_RESOURCES_DIRECTORY}/${RESOURCE_TARGET}"
+                        COMMENT "${COMMENT_PREFIX}${COMMENT_SUFFIX}"
+                        VERBATIM)
+
+                add_dependencies ("${VARIANT}_package" "${VARIANT}_copy_${RESOURCE_TARGET}")
+            endforeach ()
+
+        else ()
+            if (TARGET "${APPLICATION_NAME}_resources_core_packaging")
+                set (SOURCE_DIRECTORY
+                        "${CMAKE_CURRENT_BINARY_DIR}/Generated/${APPLICATION_NAME}_resources_core_packaging")
+
+                add_custom_target ("${VARIANT}_copy_core_pack" ALL
+                        DEPENDS "${VARIANT}_prepare_directories" "${APPLICATION_NAME}_resources_core_packaging"
+                        COMMAND
+                        "${CMAKE_COMMAND}"
+                        -E copy -t
+                        "${PACK_RESOURCES_DIRECTORY}"
+                        "${SOURCE_DIRECTORY}/core.pack"
+                        COMMENT "Copying core resources for application \"${APPLICATION_NAME}\" variant \"${NAME}\"."
+                        VERBATIM)
+
+                add_dependencies ("${VARIANT}_package" "${VARIANT}_copy_core_pack")
+            endif ()
+
+            foreach (PLUGIN ${USED_PLUGINS})
+                if (NOT PLUGIN IN_LIST CORE_PLUGINS)
+                    get_target_property (PLUGIN_NAME "${PLUGIN}" APPLICATION_PLUGIN_NAME)
+                    set (PLUGIN_TARGET_NAME "${APPLICATION_NAME}_resources_${PLUGIN_NAME}_packaging")
+
+                    set (SOURCE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/Generated/${PLUGIN_TARGET_NAME}")
+                    set (COMMENT_PREFIX "Copying plugin ${PLUGIN_NAME} resources for application ")
+                    set (COMMENT_SUFFIX "\"${APPLICATION_NAME}\" variant \"${NAME}\".")
+
+                    add_custom_target ("${VARIANT}_copy_${PLUGIN_NAME}_pack" ALL
+                            DEPENDS "${VARIANT}_prepare_directories" "${PLUGIN_TARGET_NAME}"
+                            COMMAND
+                            "${CMAKE_COMMAND}"
+                            -E copy -t
+                            "${PACK_RESOURCES_DIRECTORY}"
+                            "${SOURCE_DIRECTORY}/${PLUGIN_NAME}.pack"
+                            COMMENT "${COMMENT_PREFIX}${COMMENT_SUFFIX}"
+                            VERBATIM)
+
+                    add_dependencies ("${VARIANT}_package" "${VARIANT}_copy_${PLUGIN_NAME}_pack")
+                endif ()
+            endforeach ()
+        endif ()
+
+        # Copy launchers.
+
+        foreach (PROGRAM ${VARIANT_PROGRAMS})
+            get_target_property (PROGRAM_NAME "${PROGRAM}" APPLICATION_PROGRAM_NAME)
+            add_custom_target ("${VARIANT}_copy_launcher_${PROGRAM_NAME}" ALL
+                    DEPENDS "${VARIANT}_prepare_directories" "${PROGRAM}_launcher"
+                    COMMAND
+                    ${CMAKE_COMMAND} -E copy_if_different
+                    "$<TARGET_FILE:${PROGRAM}_launcher>"
+                    "${PACK_BUILD_DIRECTORY}"
+                    COMMENT
+                    "Copying program \"${PROGRAM_NAME}\" launcher for \"${APPLICATION_NAME}\" variant \"${NAME}\"."
+                    VERBATIM)
+
+            add_dependencies ("${VARIANT}_package" "${VARIANT}_copy_launcher_${PROGRAM_NAME}")
+        endforeach ()
+
+    endforeach ()
 
     message (STATUS "Application \"${APPLICATION_NAME}\" generation done.")
 endfunction ()

@@ -27,4 +27,8 @@ register_application_program (test)
 application_program_set_configuration ("${CMAKE_CURRENT_SOURCE_DIR}/configuration/program_test.rd")
 application_program_use_plugin_group (test)
 
+register_application_variant (test)
+application_variant_add_program (test)
+application_variant_add_environment_tag (packaged)
+
 application_generate ()
