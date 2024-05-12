@@ -16,6 +16,7 @@ KAN_MUTE_THIRD_PARTY_WARNINGS_END
 #include <kan/log/logging.h>
 #include <kan/memory/allocation.h>
 #include <kan/platform/application.h>
+#include <kan/platform/sdl_allocation_adapter.h>
 
 KAN_LOG_DEFINE_CATEGORY (platform_application);
 
@@ -407,7 +408,9 @@ void kan_platform_application_event_shutdown (struct kan_platform_application_ev
 
 kan_bool_t kan_platform_application_init (void)
 {
+    ensure_sdl_allocation_adapter_installed();
     KAN_ASSERT (!SDL_WasInit (SDL_INIT_VIDEO | SDL_INIT_EVENTS))
+
     if (SDL_InitSubSystem (SDL_INIT_VIDEO | SDL_INIT_EVENTS) != 0)
     {
         KAN_LOG (platform_application, KAN_LOG_CRITICAL_ERROR, "Failed to initialize SDL backend for application.")
