@@ -18,6 +18,13 @@ set (KAN_APPLICATION_TOOL_STATICS_TEMPLATE "${CMAKE_SOURCE_DIR}/cmake/kan/applic
 # Name of the used application framework static launcher implementation.
 set (KAN_APPLICATION_PROGRAM_LAUNCHER_IMPLEMENTATION "sdl")
 
+# Whether to use raw resources instead of processed ones for packing.
+option (KAN_APPLICATION_PACK_WITH_RAW_RESOURCES
+        "Whether to use raw resources instead of processed ones for packing." OFF)
+
+# Whether string interning for packing procedure is enabled.
+option (KAN_APPLICATION_PACKER_INTERN_STRINGS "Whether string interning for packing procedure is enabled." ON)
+
 # Target properties, used to store application framework related data. Shouldn't be directly modified by user.
 
 define_property (TARGET PROPERTY APPLICATION_CORE_ABSTRACT
@@ -289,10 +296,104 @@ function (application_program_use_plugin_group GROUP)
             APPLICATION_PROGRAM_PLUGIN_GROUPS "${PLUGIN_GROUPS}")
 endfunction ()
 
+# Intended only for internal use in this file.
+# Generates resource preparation and packing targets with given name and using given resource targets.
+function (private_generate_resource_processing NAME RESOURCE_TARGETS)
+    set (RESOURCE_LIST)
+    set (PREPARATION_TARGET_NAME "${APPLICATION_NAME}_resources_${NAME}_prepare")
+    add_custom_target ("${PREPARATION_TARGET_NAME}" ALL)
+    message (STATUS "    Generating resource processing pipeline \"${NAME}\".")
+
+    foreach (RESOURCE_TARGET ${RESOURCE_TARGETS})
+        message (STATUS "        Using resource target \"${RESOURCE_TARGET}\".")
+        get_target_property (TYPE "${RESOURCE_TARGET}" UNIT_RESOURCE_TARGET_TYPE)
+        get_target_property (SOURCE_DIRECTORY "${RESOURCE_TARGET}" UNIT_RESOURCE_TARGET_SOURCE_DIRECTORY)
+
+        if (TYPE STREQUAL "USUAL")
+            # Binarize readable data files, do not touch other files.
+            file (GLOB_RECURSE RESOURCES LIST_DIRECTORIES false RELATIVE "${SOURCE_DIRECTORY}" "${SOURCE_DIRECTORY}/*")
+
+            foreach (RESOURCE ${RESOURCES})
+                if (RESOURCE MATCHES "\\.rd$")
+                    # Readable data, we need to binarize it.
+                    set (RESOURCE_ABSOLUTE_SOURCE "${SOURCE_DIRECTORY}/${RESOURCE}")
+                    set (RESOURCE_ABSOLUTE_TARGET
+                            "${CMAKE_CURRENT_BINARY_DIR}/Generated/${PREPARATION_TARGET_NAME}/${RESOURCE}")
+                    string (REPLACE "\.rd" ".bin" RESOURCE_ABSOLUTE_TARGET "${RESOURCE_ABSOLUTE_TARGET}")
+
+                    add_custom_command (
+                            OUTPUT "${RESOURCE_ABSOLUTE_TARGET}"
+                            DEPENDS "${APPLICATION_NAME}_resource_binarizer" "${RESOURCE_ABSOLUTE_SOURCE}"
+                            COMMAND
+                            "${APPLICATION_NAME}_resource_binarizer"
+                            "${RESOURCE_ABSOLUTE_SOURCE}"
+                            "${RESOURCE_ABSOLUTE_TARGET}"
+                            COMMENT "Binarizing \"${RESOURCE_ABSOLUTE_SOURCE}\"."
+                            VERBATIM)
+
+                    target_sources ("${PREPARATION_TARGET_NAME}" PRIVATE "${RESOURCE_ABSOLUTE_TARGET}")
+                    list (APPEND RESOURCE_LIST "${RESOURCE_ABSOLUTE_TARGET}")
+
+                else ()
+                    list (APPEND RESOURCE_LIST "${SOURCE_DIRECTORY}/${RESOURCE}")
+                endif ()
+
+            endforeach ()
+
+
+        elseif (TYPE STREQUAL "CUSTOM")
+            # Add dependency and add all built resources to list.
+            add_dependencies ("${PREPARATION_TARGET_NAME}" "${RESOURCE_TARGET}")
+            get_target_property (BUILT_RESOURCES "${RESOURCE_TARGET}" SOURCES)
+
+            foreach (RESOURCE ${BUILT_RESOURCES})
+                cmake_path (ABSOLUTE_PATH RESOURCE NORMALIZE)
+                list (APPEND RESOURCE_LIST "${RESOURCE}")
+            endforeach ()
+
+        elseif (TYPE STREQUAL "PRE_MADE")
+            # Just append all resources to list.
+            file (GLOB_RECURSE RESOURCES LIST_DIRECTORIES false RELATIVE "${SOURCE_DIRECTORY}" "${SOURCE_DIRECTORY}/*")
+
+            foreach (RESOURCE ${RESOURCES})
+                list (APPEND RESOURCE_LIST "${SOURCE_DIRECTORY}/${RESOURCE}")
+            endforeach ()
+
+        else ()
+            message (SEND_ERROR "Unknown resource target type \"${TYPE}\".")
+        endif ()
+    endforeach ()
+
+    set (PACKAGING_TARGET_NAME "${APPLICATION_NAME}_resources_${NAME}_packaging")
+    set (PACKAGING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/Generated/${PACKAGING_TARGET_NAME}")
+
+    list (JOIN RESOURCE_LIST "\n" RESOURCES)
+    if (RESOURCES)
+        message (STATUS "    Generating resource packaging step for resource processing pipeline \"${NAME}\".")
+        file (WRITE "${PACKAGING_DIRECTORY}/resources.txt" "${RESOURCES}")
+        set (INTERN_STRING_ARGUMENT)
+
+        if (KAN_APPLICATION_PACKER_INTERN_STRINGS)
+            set (INTERN_STRING_ARGUMENT "--intern-strings")
+        endif ()
+
+        add_custom_target ("${PACKAGING_TARGET_NAME}" ALL
+                COMMAND
+                "${APPLICATION_NAME}_packer"
+                "${PACKAGING_DIRECTORY}/resources.txt"
+                "${PACKAGING_DIRECTORY}/${NAME}.pack"
+                ${INTERN_STRING_ARGUMENT}
+                WORKING_DIRECTORY ${PACKAGING_DIRECTORY}
+                VERBATIM)
+        add_dependencies ("${PACKAGING_TARGET_NAME}" "${PREPARATION_TARGET_NAME}")
+    endif ()
+endfunction ()
+
 # Uses data gathered by registration functions above to generate application shared libraries, executables and other
 # application related targets.
 function (application_generate)
     message (STATUS "Application \"${APPLICATION_NAME}\" registration done, generating...")
+    message (STATUS "Application \"${APPLICATION_NAME}\": generating development targets.")
 
     # Find core plugins, we'll need them later.
 
@@ -644,6 +745,32 @@ function (application_generate)
 
     endforeach ()
 
+    if (NOT KAN_APPLICATION_PACK_WITH_RAW_RESOURCES)
+        message (STATUS "Application \"${APPLICATION_NAME}\": generating resource processing targets.")
+
+        private_generate_resource_processing ("core" "${CORE_RESOURCE_TARGETS}")
+        foreach (PLUGIN ${PLUGINS})
+            if (NOT PLUGIN IN_LIST CORE_PLUGINS)
+                find_linked_targets_recursively (TARGET "${PLUGIN}_library" OUTPUT PLUGIN_TARGETS ARTEFACT_SCOPE)
+                set (RESOURCE_TARGETS)
+
+                foreach (PLUGIN_TARGET ${PLUGIN_TARGETS})
+                    get_target_property (THIS_RESOURCE_TARGETS "${PLUGIN_TARGET}" UNIT_RESOURCE_TARGETS)
+                    if (NOT THIS_RESOURCE_TARGETS STREQUAL "THIS_RESOURCE_TARGETS-NOTFOUND")
+                        list (APPEND RESOURCE_TARGETS ${THIS_RESOURCE_TARGETS})
+                    endif ()
+                endforeach ()
+
+                get_target_property (NAME "${PLUGIN}" APPLICATION_PLUGIN_NAME)
+                private_generate_resource_processing ("${NAME}" "${RESOURCE_TARGETS}")
+            endif ()
+        endforeach ()
+    endif ()
+
+    message (STATUS "Application \"${APPLICATION_NAME}\": generating packaging targets.")
+
+    # TODO: Packaging targets.
+
     message (STATUS "Application \"${APPLICATION_NAME}\" generation done.")
 endfunction ()
 
@@ -705,7 +832,7 @@ function (register_application_custom_resource_directory)
 
     cmake_path (ABSOLUTE_PATH ARGUMENT_PATH NORMALIZE)
     add_custom_target ("${UNIT_NAME}_resource_${ARGUMENT_NAME}" ALL)
-    target_sources ("${UNIT_NAME}_resource_${ARGUMENT_NAME}" PRIVATE "${ARGUMENT_BUILT_FILES}")
+    target_sources ("${UNIT_NAME}_resource_${ARGUMENT_NAME}" PRIVATE ${ARGUMENT_BUILT_FILES})
 
     set_target_properties ("${UNIT_NAME}_resource_${ARGUMENT_NAME}" PROPERTIES
             UNIT_RESOURCE_TARGET_TYPE "CUSTOM"
