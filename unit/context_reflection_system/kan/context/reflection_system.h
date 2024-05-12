@@ -99,6 +99,12 @@ KAN_C_HEADER_BEGIN
 /// \brief System name for requirements and queries.
 #define KAN_CONTEXT_REFLECTION_SYSTEM_NAME "reflection_system_t"
 
+/// \brief Name of the function that is used to register static reflection data.
+#define KAN_CONTEXT_REFLECTION_SYSTEM_REGISTRAR_FUNCTION kan_reflection_system_register_statics
+
+/// \brief String version of KAN_CONTEXT_REFLECTION_SYSTEM_REGISTRAR_FUNCTION.
+#define KAN_CONTEXT_REFLECTION_SYSTEM_REGISTRAR_FUNCTION_NAME "kan_reflection_system_register_statics"
+
 typedef void (*kan_context_reflection_populate_t) (kan_context_system_handle_t other_system,
                                                    kan_reflection_registry_t registry);
 
@@ -118,6 +124,8 @@ typedef void (*kan_context_reflection_generation_iterate_t) (kan_context_system_
                                                              uint64_t iteration_index);
 
 typedef void (*kan_context_reflection_cleanup_t) (kan_context_system_handle_t other_system);
+
+typedef void (*kan_context_reflection_pre_shutdown_t) (kan_context_system_handle_t other_system);
 
 /// \brief Connect other system as on-populate delegate.
 CONTEXT_REFLECTION_SYSTEM_API void kan_reflection_system_connect_on_populate (
@@ -167,6 +175,19 @@ CONTEXT_REFLECTION_SYSTEM_API void kan_reflection_system_connect_on_cleanup (
 
 /// \brief Disconnect other system from on-cleanup delegates.
 CONTEXT_REFLECTION_SYSTEM_API void kan_reflection_system_disconnect_on_cleanup (
+    kan_context_system_handle_t reflection_system, kan_context_system_handle_t other_system);
+
+/// \brief Connect other system as on-pre-shutdown delegate.
+/// \details Pre-shutdown delegate is needed to destroy everything that was using generated reflection data.
+///          As reflection users subscribe to on-generated, their shutdown will always be called after reflection
+///          system shutdown, but there will be no reflection at this moment.
+CONTEXT_REFLECTION_SYSTEM_API void kan_reflection_system_connect_on_pre_shutdown (
+    kan_context_system_handle_t reflection_system,
+    kan_context_system_handle_t other_system,
+    kan_context_reflection_pre_shutdown_t functor);
+
+/// \brief Disconnect other system from on-pre-shutdown delegates.
+CONTEXT_REFLECTION_SYSTEM_API void kan_reflection_system_disconnect_on_pre_shutdown (
     kan_context_system_handle_t reflection_system, kan_context_system_handle_t other_system);
 
 /// \brief Returns latest reflection registry if it exists.

@@ -2180,6 +2180,12 @@ kan_bool_t kan_virtual_file_system_query_entry (kan_virtual_file_system_volume_t
         if (mount_point_read_only_pack)
         {
             struct read_only_pack_directory_t *read_only_pack_directory = &mount_point_read_only_pack->root_directory;
+            if (!*path_iterator)
+            {
+                status->type = KAN_VIRTUAL_FILE_SYSTEM_ENTRY_TYPE_DIRECTORY;
+                return KAN_TRUE;
+            }
+
             switch (follow_read_only_pack_directory_path (&read_only_pack_directory, &path_iterator, &part_begin,
                                                           &part_end))
             {
@@ -2762,6 +2768,7 @@ struct kan_stream_t *kan_virtual_file_stream_open_for_write (kan_virtual_file_sy
 
 kan_virtual_file_system_read_only_pack_builder_t kan_virtual_file_system_read_only_pack_builder_create (void)
 {
+    ensure_statics_initialized ();
     struct read_only_pack_builder_t *builder = (struct read_only_pack_builder_t *) kan_allocate_batched (
         read_only_pack_operation_allocation_group, sizeof (struct read_only_pack_builder_t));
 

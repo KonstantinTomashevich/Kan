@@ -63,6 +63,8 @@ typedef uint64_t kan_application_system_display_info_iterator_t;
 
 typedef uint64_t kan_application_system_window_handle_t;
 
+#define KAN_INVALID_APPLICATION_SYSTEM_WINDOW_HANDLE 0u
+
 /// \brief Contains buffered information about available window.
 struct kan_application_system_window_info_t
 {

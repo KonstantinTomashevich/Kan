@@ -5,6 +5,7 @@
 
 #include <kan/container/dynamic_array.h>
 #include <kan/context/update_system.h>
+#include <kan/cpu_profiler/markup.h>
 #include <kan/error/critical.h>
 #include <kan/log/logging.h>
 #include <kan/memory/allocation.h>
@@ -38,6 +39,8 @@ struct update_system_t
 
     uint64_t connection_request_count;
     struct update_connection_request_t *first_connection_request;
+
+    kan_cpu_section_t update_section;
 };
 
 CONTEXT_UPDATE_SYSTEM_API kan_context_system_handle_t update_system_create (kan_allocation_group_t group,
@@ -50,6 +53,7 @@ CONTEXT_UPDATE_SYSTEM_API kan_context_system_handle_t update_system_create (kan_
                             _Alignof (struct update_callable_t), group);
     system->connection_request_count = 0u;
     system->first_connection_request = NULL;
+    system->update_section = kan_cpu_section_get ("context_update_system");
     return (kan_context_system_handle_t) system;
 }
 
@@ -217,9 +221,14 @@ void kan_update_system_disconnect_on_run (kan_context_system_handle_t update_sys
 void kan_update_system_run (kan_context_system_handle_t update_system)
 {
     struct update_system_t *system = (struct update_system_t *) update_system;
+    struct kan_cpu_section_execution_t execution;
+    kan_cpu_section_execution_init (&execution, system->update_section);
+
     for (uint64_t index = 0u; index < system->update_sequence.size; ++index)
     {
         struct update_callable_t *callable = &((struct update_callable_t *) system->update_sequence.data)[index];
         callable->functor (callable->system);
     }
+
+    kan_cpu_section_execution_shutdown (&execution);
 }

@@ -26,9 +26,20 @@ endfunction ()
 
 # Generates reflection statics for current artefact by scanning all units visible from current artefact.
 # Reflection statics are generated as separate single-file unit and are also included into resulting artefact.
+# Arguments:
+# - LOCAL_ONLY: optional flag argument. If passed, search for reflection registrars will be done in artefact scope.
 function (generate_artefact_reflection_data)
+    cmake_parse_arguments (OPTIONS "LOCAL_ONLY" "" "" ${ARGV})
+    if (DEFINED OPTIONS_UNPARSED_ARGUMENTS)
+        message (FATAL_ERROR "Incorrect function arguments!")
+    endif ()
+
     set (REGISTRARS)
-    find_linked_targets_recursively (TARGET "${ARTEFACT_NAME}" OUTPUT ALL_VISIBLE_TARGETS CHECK_VISIBILITY)
+    if (DEFINED OPTIONS_LOCAL_ONLY)
+        find_linked_targets_recursively (TARGET "${ARTEFACT_NAME}" OUTPUT ALL_VISIBLE_TARGETS ARTEFACT_SCOPE)
+    else ()
+        find_linked_targets_recursively (TARGET "${ARTEFACT_NAME}" OUTPUT ALL_VISIBLE_TARGETS CHECK_VISIBILITY)
+    endif ()
 
     foreach (VISIBLE_TARGET ${ALL_VISIBLE_TARGETS})
         get_target_property (REFLECTION_REGISTRARS "${VISIBLE_TARGET}" REFLECTION_REGISTRARS)

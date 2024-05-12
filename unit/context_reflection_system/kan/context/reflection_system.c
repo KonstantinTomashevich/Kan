@@ -12,9 +12,9 @@
 KAN_LOG_DEFINE_CATEGORY (reflection_system);
 
 #if defined(_WIN32)
-__declspec (dllimport) void kan_reflection_system_register_statics (kan_reflection_registry_t registry);
+__declspec (dllimport) void KAN_CONTEXT_REFLECTION_SYSTEM_REGISTRAR_FUNCTION (kan_reflection_registry_t registry);
 #else
-void kan_reflection_system_register_statics (kan_reflection_registry_t registry);
+void KAN_CONTEXT_REFLECTION_SYSTEM_REGISTRAR_FUNCTION (kan_reflection_registry_t registry);
 #endif
 
 struct populate_connection_node_t
@@ -48,6 +48,13 @@ struct generation_iterate_connection_node_t
 struct cleanup_connection_node_t
 {
     struct cleanup_connection_node_t *next;
+    kan_context_system_handle_t other_system;
+    kan_context_reflection_cleanup_t functor;
+};
+
+struct pre_shutdown_connection_node_t
+{
+    struct pre_shutdown_connection_node_t *next;
     kan_context_system_handle_t other_system;
     kan_context_reflection_cleanup_t functor;
 };
@@ -167,6 +174,7 @@ struct reflection_system_t
     struct generated_connection_node_t *first_generated_connection;
     struct generation_iterate_connection_node_t *first_generation_iterate_connection;
     struct cleanup_connection_node_t *first_cleanup_connection;
+    struct pre_shutdown_connection_node_t *first_pre_shutdown_connection;
 
     kan_allocation_group_t group;
     kan_context_handle_t context;
@@ -185,6 +193,7 @@ static kan_context_system_handle_t reflection_system_create (kan_allocation_grou
     system->first_generated_connection = NULL;
     system->first_generation_iterate_connection = NULL;
     system->first_cleanup_connection = NULL;
+    system->first_pre_shutdown_connection = NULL;
 
     system->group = group;
     system->current_registry = KAN_INVALID_REFLECTION_REGISTRY;
@@ -747,24 +756,14 @@ static void reflection_system_connected_init (kan_context_system_handle_t handle
 
 static void reflection_system_connected_shutdown (kan_context_system_handle_t handle)
 {
-}
-
-static void reflection_system_disconnect (kan_context_system_handle_t handle)
-{
-}
-
-static void reflection_system_destroy (kan_context_system_handle_t handle)
-{
     struct reflection_system_t *system = (struct reflection_system_t *) handle;
-    KAN_ASSERT (!system->first_populate_connection)
-    KAN_ASSERT (!system->first_finalize_connection)
-    KAN_ASSERT (!system->first_generated_connection)
-    KAN_ASSERT (!system->first_generation_iterate_connection)
-    KAN_ASSERT (!system->first_cleanup_connection)
+    KAN_LOG (reflection_system, KAN_LOG_INFO, "Calling pre-shutdown functors.")
+    struct pre_shutdown_connection_node_t *pre_shutdown_node = system->first_pre_shutdown_connection;
 
-    if (system->current_registry != KAN_INVALID_REFLECTION_REGISTRY)
+    while (pre_shutdown_node)
     {
-        kan_reflection_registry_destroy (system->current_registry);
+        pre_shutdown_node->functor (pre_shutdown_node->other_system);
+        pre_shutdown_node = pre_shutdown_node->next;
     }
 
     while (system->current_registry_first_generator)
@@ -784,6 +783,25 @@ static void reflection_system_destroy (kan_context_system_handle_t handle)
         system->current_registry_first_generator = next;
     }
 
+    if (system->current_registry != KAN_INVALID_REFLECTION_REGISTRY)
+    {
+        kan_reflection_registry_destroy (system->current_registry);
+    }
+}
+
+static void reflection_system_disconnect (kan_context_system_handle_t handle)
+{
+}
+
+static void reflection_system_destroy (kan_context_system_handle_t handle)
+{
+    struct reflection_system_t *system = (struct reflection_system_t *) handle;
+    KAN_ASSERT (!system->first_populate_connection)
+    KAN_ASSERT (!system->first_finalize_connection)
+    KAN_ASSERT (!system->first_generated_connection)
+    KAN_ASSERT (!system->first_generation_iterate_connection)
+    KAN_ASSERT (!system->first_cleanup_connection)
+    KAN_ASSERT (!system->first_pre_shutdown_connection)
     kan_free_general (system->group, system, sizeof (struct kan_context_system_api_t));
 }
 
@@ -892,7 +910,21 @@ void kan_reflection_system_connect_on_cleanup (kan_context_system_handle_t refle
 }
 
 void kan_reflection_system_disconnect_on_cleanup (kan_context_system_handle_t reflection_system,
-                                                  kan_context_system_handle_t other_system) {DISCONNECT (cleanup)}
+                                                  kan_context_system_handle_t other_system)
+{
+    DISCONNECT (pre_shutdown)
+}
+
+void kan_reflection_system_connect_on_pre_shutdown (kan_context_system_handle_t reflection_system,
+                                                    kan_context_system_handle_t other_system,
+                                                    kan_context_reflection_pre_shutdown_t functor)
+{
+    CONNECT (pre_shutdown);
+}
+
+void kan_reflection_system_disconnect_on_pre_shutdown (kan_context_system_handle_t reflection_system,
+                                                       kan_context_system_handle_t other_system) {
+    DISCONNECT (pre_shutdown)}
 
 #undef CONNECT
 #undef DISCONNECT

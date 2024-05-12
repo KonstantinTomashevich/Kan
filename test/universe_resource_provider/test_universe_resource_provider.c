@@ -3,6 +3,7 @@
 #include <test_universe_resource_provider_api.h>
 
 #include <stddef.h>
+#include <stdio.h>
 
 #include <kan/context/reflection_system.h>
 #include <kan/context/universe_system.h>
@@ -11,6 +12,7 @@
 #include <kan/file_system/entry.h>
 #include <kan/file_system/stream.h>
 #include <kan/memory_profiler/capture.h>
+#include <kan/platform/precise_time.h>
 #include <kan/reflection/generated_reflection.h>
 #include <kan/resource_index/resource_index.h>
 #include <kan/serialization/binary.h>
@@ -654,6 +656,99 @@ static void setup_rd_workspace (kan_reflection_registry_t registry, kan_bool_t m
     }
 }
 
+static void setup_indexing_stress_test_workspace (kan_reflection_registry_t registry)
+{
+    initialize_resources ();
+    kan_file_system_make_directory (WORKSPACE_SUB_DIRECTORY);
+
+    kan_serialization_binary_script_storage_t storage = kan_serialization_binary_script_storage_create (registry);
+    kan_serialization_interned_string_registry_t string_registry = KAN_INVALID_SERIALIZATION_INTERNED_STRING_REGISTRY;
+    string_registry = kan_serialization_interned_string_registry_create_empty ();
+
+    struct kan_resource_index_t resource_index;
+    kan_resource_index_init (&resource_index);
+
+    for (uint64_t index = 0u; index < 20000u; ++index)
+    {
+        char path_buffer[KAN_FILE_SYSTEM_MAX_PATH_LENGTH];
+        char indexed_path_buffer[KAN_FILE_SYSTEM_MAX_PATH_LENGTH];
+
+        snprintf (path_buffer, KAN_FILE_SYSTEM_MAX_PATH_LENGTH, "%s/dir%llu", WORKSPACE_SUB_DIRECTORY,
+                  (unsigned long long) (index % 20u));
+
+        if (!kan_file_system_check_existence (path_buffer))
+        {
+            kan_file_system_make_directory (path_buffer);
+        }
+
+        char name_buffer[256u];
+        snprintf (name_buffer, 256u, "file%llu", (unsigned long long) index);
+
+        snprintf (path_buffer, KAN_FILE_SYSTEM_MAX_PATH_LENGTH, "%s/dir%llu/%s.bin", WORKSPACE_SUB_DIRECTORY,
+                  (unsigned long long) (index % 20u), name_buffer);
+
+        snprintf (indexed_path_buffer, KAN_FILE_SYSTEM_MAX_PATH_LENGTH, "dir%llu/%s.bin",
+                  (unsigned long long) (index % 20u), name_buffer);
+
+        switch (index % 3u)
+        {
+        case 0u:
+            save_binary (path_buffer, &resource_alpha, kan_string_intern ("first_resource_type_t"), storage,
+                         string_registry, KAN_TRUE);
+            kan_resource_index_add_native_entry (&resource_index, kan_string_intern ("first_resource_type_t"),
+                                                 kan_string_intern (name_buffer),
+                                                 KAN_RESOURCE_INDEX_NATIVE_ITEM_FORMAT_BINARY, indexed_path_buffer);
+            break;
+
+        case 1u:
+            save_binary (path_buffer, &resource_beta, kan_string_intern ("first_resource_type_t"), storage,
+                         string_registry, KAN_TRUE);
+            kan_resource_index_add_native_entry (&resource_index, kan_string_intern ("first_resource_type_t"),
+                                                 kan_string_intern (name_buffer),
+                                                 KAN_RESOURCE_INDEX_NATIVE_ITEM_FORMAT_BINARY, indexed_path_buffer);
+            break;
+
+        case 2u:
+            save_binary (path_buffer, &resource_players, kan_string_intern ("second_resource_type_t"), storage,
+                         string_registry, KAN_TRUE);
+            kan_resource_index_add_native_entry (&resource_index, kan_string_intern ("second_resource_type_t"),
+                                                 kan_string_intern (name_buffer),
+                                                 KAN_RESOURCE_INDEX_NATIVE_ITEM_FORMAT_BINARY, indexed_path_buffer);
+            break;
+
+        case 3u:
+            save_binary (path_buffer, &resource_characters, kan_string_intern ("second_resource_type_t"), storage,
+                         string_registry, KAN_TRUE);
+            kan_resource_index_add_native_entry (&resource_index, kan_string_intern ("second_resource_type_t"),
+                                                 kan_string_intern (name_buffer),
+                                                 KAN_RESOURCE_INDEX_NATIVE_ITEM_FORMAT_BINARY, indexed_path_buffer);
+            break;
+        }
+    }
+
+    save_binary (WORKSPACE_SUB_DIRECTORY "/" KAN_RESOURCE_INDEX_DEFAULT_NAME, &resource_index,
+                 kan_string_intern ("kan_resource_index_t"), storage, string_registry, KAN_FALSE);
+    kan_resource_index_shutdown (&resource_index);
+
+    struct kan_stream_t *stream = kan_direct_file_stream_open_for_write (
+        WORKSPACE_SUB_DIRECTORY "/" KAN_RESOURCE_INDEX_ACCOMPANYING_STRING_REGISTRY_DEFAULT_NAME, KAN_TRUE);
+    KAN_TEST_ASSERT (stream)
+
+    kan_serialization_interned_string_registry_writer_t writer =
+        kan_serialization_interned_string_registry_writer_create (stream, string_registry);
+
+    enum kan_serialization_state_t state;
+    while ((state = kan_serialization_interned_string_registry_writer_step (writer)) == KAN_SERIALIZATION_IN_PROGRESS)
+    {
+    }
+
+    KAN_TEST_ASSERT (state == KAN_SERIALIZATION_FINISHED)
+    kan_serialization_interned_string_registry_writer_destroy (writer);
+    kan_serialization_interned_string_registry_destroy (string_registry);
+    stream->operations->close (stream);
+    kan_serialization_binary_script_storage_destroy (storage);
+}
+
 enum check_observation_and_reload_stage_t
 {
     CHECK_OBSERVATION_AND_RELOAD_STAGE_INIT = 0,
@@ -1167,6 +1262,89 @@ TEST_UNIVERSE_RESOURCE_PROVIDER_API void kan_universe_mutator_execute_check_obse
     kan_cpu_job_release (job);
 }
 
+struct indexed_stress_test_singleton_t
+{
+    kan_bool_t requests_created;
+    uint64_t request_id;
+};
+
+TEST_UNIVERSE_RESOURCE_PROVIDER_API void indexed_stress_test_singleton_init (
+    struct indexed_stress_test_singleton_t *instance)
+{
+    instance->requests_created = KAN_FALSE;
+}
+
+struct indexed_stress_test_state_t
+{
+    struct kan_repository_singleton_write_query_t write__indexed_stress_test_singleton;
+    struct kan_repository_singleton_read_query_t read__kan_resource_provider_singleton;
+    struct kan_repository_indexed_insert_query_t insert__kan_resource_request;
+    struct kan_repository_indexed_value_read_query_t read_value__kan_resource_request__request_id;
+};
+
+TEST_UNIVERSE_RESOURCE_PROVIDER_API void kan_universe_mutator_deploy_indexed_stress_test (
+    kan_universe_t universe,
+    kan_universe_world_t world,
+    kan_repository_t world_repository,
+    kan_workflow_graph_node_t workflow_node,
+    struct indexed_stress_test_state_t *state)
+{
+    kan_workflow_graph_node_depend_on (workflow_node, KAN_RESOURCE_PROVIDER_END_CHECKPOINT);
+}
+
+TEST_UNIVERSE_RESOURCE_PROVIDER_API void kan_universe_mutator_execute_indexed_stress_test (
+    kan_cpu_job_t job, struct indexed_stress_test_state_t *state)
+{
+    kan_repository_singleton_write_access_t singleton_access =
+        kan_repository_singleton_write_query_execute (&state->write__indexed_stress_test_singleton);
+
+    struct indexed_stress_test_singleton_t *singleton =
+        (struct indexed_stress_test_singleton_t *) kan_repository_singleton_write_access_resolve (singleton_access);
+
+    if (!singleton->requests_created)
+    {
+        kan_repository_singleton_read_access_t provider_access =
+            kan_repository_singleton_read_query_execute (&state->read__kan_resource_provider_singleton);
+
+        const struct kan_resource_provider_singleton_t *provider =
+            kan_repository_singleton_read_access_resolve (provider_access);
+
+        struct kan_repository_indexed_insertion_package_t package =
+            kan_repository_indexed_insert_query_execute (&state->insert__kan_resource_request);
+        struct kan_resource_request_t *request = kan_repository_indexed_insertion_package_get (&package);
+
+        request->request_id = kan_next_resource_request_id (provider);
+        request->type = kan_string_intern ("first_resource_type_t");
+        request->name = kan_string_intern ("file0");
+        request->priority = 0u;
+        singleton->request_id = request->request_id;
+        kan_repository_indexed_insertion_package_submit (&package);
+
+        kan_repository_singleton_read_access_close (provider_access);
+        singleton->requests_created = KAN_TRUE;
+    }
+
+    struct kan_repository_indexed_value_read_cursor_t request_cursor = kan_repository_indexed_value_read_query_execute (
+        &state->read_value__kan_resource_request__request_id, &singleton->request_id);
+
+    struct kan_repository_indexed_value_read_access_t request_access =
+        kan_repository_indexed_value_read_cursor_next (&request_cursor);
+
+    const struct kan_resource_request_t *request = kan_repository_indexed_value_read_access_resolve (&request_access);
+    KAN_TEST_ASSERT (request)
+
+    if (request->provided_container_id != KAN_RESOURCE_PROVIDER_CONTAINER_ID_NONE)
+    {
+        global_test_finished = KAN_TRUE;
+    }
+
+    kan_repository_indexed_value_read_access_close (&request_access);
+    kan_repository_indexed_value_read_cursor_close (&request_cursor);
+
+    kan_repository_singleton_write_access_close (singleton_access);
+    kan_cpu_job_release (job);
+}
+
 static kan_context_handle_t setup_context (void)
 {
     kan_context_handle_t context =
@@ -1231,11 +1409,14 @@ static void run_request_resources_and_check_test (kan_context_handle_t context)
     kan_reflection_patch_builder_destroy (patch_builder);
 
     kan_dynamic_array_set_capacity (&definition.configuration, 1u);
-    *(struct kan_universe_world_configuration_t *) kan_dynamic_array_add_last (&definition.configuration) =
-        (struct kan_universe_world_configuration_t) {
-            .name = kan_string_intern (KAN_RESOURCE_PROVIDER_CONFIGURATION),
-            .data = resource_provider_configuration_patch,
-        };
+    struct kan_universe_world_configuration_t *configuration = kan_dynamic_array_add_last (&definition.configuration);
+    kan_universe_world_configuration_init (configuration);
+    configuration->name = kan_string_intern (KAN_RESOURCE_PROVIDER_CONFIGURATION);
+    kan_dynamic_array_set_capacity (&configuration->variants, 1u);
+
+    struct kan_universe_world_configuration_variant_t *variant = kan_dynamic_array_add_last (&configuration->variants);
+    kan_universe_world_configuration_variant_init (variant);
+    variant->data = resource_provider_configuration_patch;
 
     kan_dynamic_array_set_capacity (&definition.pipelines, 1u);
     struct kan_universe_world_pipeline_definition_t *update_pipeline =
@@ -1365,11 +1546,14 @@ KAN_TEST_CASE (file_system_observation)
     kan_reflection_patch_builder_destroy (patch_builder);
 
     kan_dynamic_array_set_capacity (&definition.configuration, 1u);
-    *(struct kan_universe_world_configuration_t *) kan_dynamic_array_add_last (&definition.configuration) =
-        (struct kan_universe_world_configuration_t) {
-            .name = kan_string_intern (KAN_RESOURCE_PROVIDER_CONFIGURATION),
-            .data = resource_provider_configuration_patch,
-        };
+    struct kan_universe_world_configuration_t *configuration = kan_dynamic_array_add_last (&definition.configuration);
+    kan_universe_world_configuration_init (configuration);
+    configuration->name = kan_string_intern (KAN_RESOURCE_PROVIDER_CONFIGURATION);
+    kan_dynamic_array_set_capacity (&configuration->variants, 1u);
+
+    struct kan_universe_world_configuration_variant_t *variant = kan_dynamic_array_add_last (&configuration->variants);
+    kan_universe_world_configuration_variant_init (variant);
+    variant->data = resource_provider_configuration_patch;
 
     kan_dynamic_array_set_capacity (&definition.pipelines, 1u);
     struct kan_universe_world_pipeline_definition_t *update_pipeline =
@@ -1394,5 +1578,88 @@ KAN_TEST_CASE (file_system_observation)
         kan_update_system_run (update_system);
     }
 
+    kan_context_destroy (context);
+}
+
+KAN_TEST_CASE (indexing_stress_test)
+{
+    initialize_resources ();
+    kan_file_system_remove_directory_with_content (WORKSPACE_SUB_DIRECTORY);
+    kan_file_system_make_directory (WORKSPACE_SUB_DIRECTORY);
+    kan_context_handle_t context = setup_context ();
+
+    kan_context_system_handle_t reflection_system = kan_context_query (context, KAN_CONTEXT_REFLECTION_SYSTEM_NAME);
+    KAN_TEST_ASSERT (reflection_system != KAN_INVALID_CONTEXT_SYSTEM_HANDLE)
+    kan_reflection_registry_t registry = kan_reflection_system_get_registry (reflection_system);
+
+    kan_context_system_handle_t universe_system_handle = kan_context_query (context, KAN_CONTEXT_UNIVERSE_SYSTEM_NAME);
+    KAN_TEST_ASSERT (universe_system_handle != KAN_INVALID_CONTEXT_SYSTEM_HANDLE)
+
+    kan_universe_t universe = kan_universe_system_get_universe (universe_system_handle);
+    KAN_TEST_ASSERT (universe != KAN_INVALID_UNIVERSE)
+
+    kan_context_system_handle_t update_system = kan_context_query (context, KAN_CONTEXT_UPDATE_SYSTEM_NAME);
+    KAN_TEST_ASSERT (update_system != KAN_INVALID_CONTEXT_SYSTEM_HANDLE)
+    setup_indexing_stress_test_workspace (registry);
+
+    struct kan_universe_world_definition_t definition;
+    kan_universe_world_definition_init (&definition);
+    definition.world_name = kan_string_intern ("root_world");
+    definition.scheduler_name = kan_string_intern ("run_update");
+
+    struct kan_resource_provider_configuration_t resource_provider_configuration = {
+        .scan_budget_ns = 2000000u,
+        .load_budget_ns = 2000000u,
+        .add_wait_time_ns = 100000000u,
+        .modify_wait_time_ns = 100000000u,
+        .use_load_only_string_registry = KAN_TRUE,
+        .observe_file_system = KAN_TRUE,
+        .resource_directory_path = kan_string_intern (WORKSPACE_MOUNT_PATH),
+    };
+
+    kan_reflection_patch_builder_t patch_builder = kan_reflection_patch_builder_create ();
+    kan_reflection_patch_builder_add_chunk (patch_builder, 0u, sizeof (struct kan_resource_provider_configuration_t),
+                                            &resource_provider_configuration);
+    kan_reflection_patch_t resource_provider_configuration_patch = kan_reflection_patch_builder_build (
+        patch_builder, registry,
+        kan_reflection_registry_query_struct (registry, kan_string_intern ("kan_resource_provider_configuration_t")));
+    kan_reflection_patch_builder_destroy (patch_builder);
+
+    kan_dynamic_array_set_capacity (&definition.configuration, 1u);
+    struct kan_universe_world_configuration_t *configuration = kan_dynamic_array_add_last (&definition.configuration);
+    kan_universe_world_configuration_init (configuration);
+    configuration->name = kan_string_intern (KAN_RESOURCE_PROVIDER_CONFIGURATION);
+    kan_dynamic_array_set_capacity (&configuration->variants, 1u);
+
+    struct kan_universe_world_configuration_variant_t *variant = kan_dynamic_array_add_last (&configuration->variants);
+    kan_universe_world_configuration_variant_init (variant);
+    variant->data = resource_provider_configuration_patch;
+
+    kan_dynamic_array_set_capacity (&definition.pipelines, 1u);
+    struct kan_universe_world_pipeline_definition_t *update_pipeline =
+        kan_dynamic_array_add_last (&definition.pipelines);
+
+    kan_universe_world_pipeline_definition_init (update_pipeline);
+    update_pipeline->name = kan_string_intern ("update");
+
+    kan_dynamic_array_set_capacity (&update_pipeline->mutators, 1u);
+    *(kan_interned_string_t *) kan_dynamic_array_add_last (&update_pipeline->mutators) =
+        kan_string_intern ("indexed_stress_test");
+
+    kan_dynamic_array_set_capacity (&update_pipeline->mutator_groups, 1u);
+    *(kan_interned_string_t *) kan_dynamic_array_add_last (&update_pipeline->mutator_groups) =
+        kan_string_intern (KAN_RESOURCE_PROVIDER_MUTATOR_GROUP);
+
+    kan_universe_deploy_root (universe, &definition);
+    kan_universe_world_definition_shutdown (&definition);
+
+    const uint64_t time_begin = kan_platform_get_elapsed_nanoseconds ();
+    while (!global_test_finished)
+    {
+        kan_update_system_run (update_system);
+    }
+
+    const uint64_t time_end = kan_platform_get_elapsed_nanoseconds ();
+    printf ("Indexed stress test raw time: %lluns\n", (unsigned long long) (time_end - time_begin));
     kan_context_destroy (context);
 }

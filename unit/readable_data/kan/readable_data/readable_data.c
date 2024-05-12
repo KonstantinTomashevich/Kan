@@ -189,7 +189,7 @@ static inline void re2c_restore_saved_cursor (struct parser_t *parser)
  identifier = [A-Za-z_][A-Za-z0-9_]*;
  comment = "//" .* "\n";
 
- string_literal_block = "\"" (. | "\\\"")* "\"";
+ string_literal_block = "\"" ((. \ [\x22]) | "\\\"")* "\"";
  string_literal = string_literal_block ((separator | comment)* string_literal_block)*;
  integer_literal = ("+" | "-")? [0-9]+;
  floating_literal = ("+" | "-")? [0-9]* "." [0-9]+;

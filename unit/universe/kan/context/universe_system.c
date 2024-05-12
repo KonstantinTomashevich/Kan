@@ -3,12 +3,14 @@
 #include <kan/context/reflection_system.h>
 #include <kan/context/universe_system.h>
 #include <kan/context/update_system.h>
+#include <kan/cpu_profiler/markup.h>
 
 struct universe_system_t
 {
     kan_context_handle_t context;
     kan_allocation_group_t group;
     kan_universe_t universe;
+    kan_cpu_section_t update_section;
 };
 
 kan_context_system_handle_t universe_system_create (kan_allocation_group_t group, void *user_config)
@@ -17,6 +19,7 @@ kan_context_system_handle_t universe_system_create (kan_allocation_group_t group
         kan_allocate_general (group, sizeof (struct universe_system_t), _Alignof (struct universe_system_t));
     system->group = group;
     system->universe = KAN_INVALID_UNIVERSE;
+    system->update_section = kan_cpu_section_get ("context_universe_system_update");
     return (kan_context_system_handle_t) system;
 }
 
@@ -39,9 +42,24 @@ static void on_reflection_generated (kan_context_system_handle_t other_system,
 static void on_update_run (kan_context_system_handle_t other_system)
 {
     struct universe_system_t *system = (struct universe_system_t *) other_system;
+    struct kan_cpu_section_execution_t execution;
+    kan_cpu_section_execution_init (&execution, system->update_section);
+
     if (system->universe != KAN_INVALID_UNIVERSE)
     {
         kan_universe_update (system->universe);
+    }
+
+    kan_cpu_section_execution_shutdown (&execution);
+}
+
+static void on_reflection_pre_shutdown (kan_context_system_handle_t other_system)
+{
+    struct universe_system_t *system = (struct universe_system_t *) other_system;
+    if (system->universe != KAN_INVALID_UNIVERSE)
+    {
+        kan_universe_destroy (system->universe);
+        system->universe = KAN_INVALID_UNIVERSE;
     }
 }
 
@@ -54,6 +72,7 @@ void universe_system_connect (kan_context_system_handle_t handle, kan_context_ha
     if (reflection_system != KAN_INVALID_CONTEXT_SYSTEM_HANDLE)
     {
         kan_reflection_system_connect_on_generated (reflection_system, handle, on_reflection_generated);
+        kan_reflection_system_connect_on_pre_shutdown (reflection_system, handle, on_reflection_pre_shutdown);
     }
 
     kan_context_system_handle_t update_system = kan_context_query (context, KAN_CONTEXT_UPDATE_SYSTEM_NAME);
@@ -69,12 +88,7 @@ void universe_system_init (kan_context_system_handle_t handle)
 
 void universe_system_shutdown (kan_context_system_handle_t handle)
 {
-    struct universe_system_t *system = (struct universe_system_t *) handle;
-    if (system->universe != KAN_INVALID_UNIVERSE)
-    {
-        kan_universe_destroy (system->universe);
-        system->universe = KAN_INVALID_UNIVERSE;
-    }
+    KAN_ASSERT (((struct universe_system_t *) handle)->universe == KAN_INVALID_UNIVERSE)
 }
 
 void universe_system_disconnect (kan_context_system_handle_t handle)
@@ -86,6 +100,7 @@ void universe_system_disconnect (kan_context_system_handle_t handle)
     if (reflection_system != KAN_INVALID_CONTEXT_SYSTEM_HANDLE)
     {
         kan_reflection_system_disconnect_on_generated (reflection_system, handle);
+        kan_reflection_system_disconnect_on_pre_shutdown (reflection_system, handle);
     }
 
     kan_context_system_handle_t update_system = kan_context_query (system->context, KAN_CONTEXT_UPDATE_SYSTEM_NAME);

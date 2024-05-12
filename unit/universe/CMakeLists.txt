@@ -4,7 +4,7 @@ concrete_sources ("*.c")
 concrete_require (SCOPE PUBLIC ABSTRACT repository workflow CONCRETE_INTERFACE container context)
 concrete_require (
         SCOPE PRIVATE
-        ABSTRACT error log memory
+        ABSTRACT cpu_profiler error log memory
         CONCRETE_INTERFACE context_reflection_system context_update_system)
 register_context_system (universe_system_t)
 

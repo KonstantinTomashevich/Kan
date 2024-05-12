@@ -178,3 +178,43 @@ RESOURCE_INDEX_API void kan_resource_index_add_third_party_entry (struct kan_res
         kan_allocate_general (kan_resource_index_get_string_allocation_group (), path_length + 1u, _Alignof (char));
     memcpy (item->path, path, path_length + 1u);
 }
+
+void kan_resource_index_extract_info_from_path (const char *path, struct kan_resource_index_info_from_path_t *output)
+{
+    const char *path_end = path;
+    const char *last_separator = NULL;
+
+    while (*path_end)
+    {
+        if (*path_end == '/')
+        {
+            last_separator = path_end;
+        }
+
+        ++path_end;
+    }
+
+    const char *name_begin = last_separator ? last_separator + 1u : path;
+    const char *name_end = path_end;
+
+    const uint64_t path_length = path_end - path;
+    if (path_length > 4u && *(path_end - 4u) == '.' && *(path_end - 3u) == 'b' && *(path_end - 2u) == 'i' &&
+        *(path_end - 1u) == 'n')
+    {
+        name_end = path_end - 4u;
+        output->native = KAN_TRUE;
+        output->native_format = KAN_RESOURCE_INDEX_NATIVE_ITEM_FORMAT_BINARY;
+    }
+    else if (path_length > 3u && *(path_end - 3u) == '.' && *(path_end - 2u) == 'r' && *(path_end - 1u) == 'd')
+    {
+        name_end = path_end - 3u;
+        output->native = KAN_TRUE;
+        output->native_format = KAN_RESOURCE_INDEX_NATIVE_ITEM_FORMAT_READABLE_DATA;
+    }
+    else
+    {
+        output->native = KAN_FALSE;
+    }
+
+    output->name = kan_char_sequence_intern (name_begin, name_end);
+}

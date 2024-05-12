@@ -6,6 +6,7 @@
 #include <kan/api_common/bool.h>
 #include <kan/error/critical.h>
 #include <kan/platform/precise_time.h>
+#include <kan/platform/sdl_allocation_adapter.h>
 #include <kan/threading/atomic.h>
 
 static kan_bool_t subsystem_initialized = KAN_FALSE;
@@ -23,6 +24,7 @@ static void ensure_sdl_ready (void)
         kan_atomic_int_lock (&subsystem_initialized_lock);
         if (!subsystem_initialized)
         {
+            ensure_sdl_allocation_adapter_installed ();
             if (!SDL_WasInit (SDL_INIT_TIMER))
             {
                 if (SDL_InitSubSystem (SDL_INIT_TIMER) != 0)

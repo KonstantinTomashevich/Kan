@@ -29,7 +29,8 @@
 /// - Pipelines -- instances of workflow graphs built from mutators.
 /// - Scheduler -- logical object that decides which pipelines to execute during update.
 /// - Configuration -- arbitrary configuration, specified during world deployment, that is used to initialize
-///   scheduler and pipelines.
+///   scheduler and pipelines. Configuration data is selected as first suitable variant. Variant is suitable if
+///   universe has all required environment tags for this variant.
 ///
 /// Worlds are organized in tree-like hierarchy: there is a root world for every universe and every non-root world
 /// is a child of other world. Repository hierarchy mimics world hierarchy: repositories of child worlds are children
@@ -279,6 +280,14 @@
 /// is no child worlds with required names, new worlds will be created.
 /// \endparblock
 ///
+/// \par Environment tags
+/// \parblock
+/// Environment tags feature makes it possible to attach tags to universe that describe execution environment. Then
+/// these tags can be used to select appropriate configurations from world definitions. For example, it is possible
+/// to add development tag and then add it as required for development configurations, that add unnecessary features
+/// like resource change observation and resource hot reloading.
+/// \endparblock
+///
 /// \par Migration
 /// \parblock
 /// Universe supports automatic migration of data, mutators and schedulers to new reflection registry. It can be done
@@ -295,11 +304,28 @@
 
 KAN_C_HEADER_BEGIN
 
-/// \brief Contains world configuration name and patch with its data.
+/// \brief Describes one variant of world configuration.
+struct kan_universe_world_configuration_variant_t
+{
+    /// \meta reflection_dynamic_array_type = "kan_interned_string_t"
+    struct kan_dynamic_array_t required_tags;
+
+    kan_reflection_patch_t data;
+};
+
+UNIVERSE_API void kan_universe_world_configuration_variant_init (
+    struct kan_universe_world_configuration_variant_t *data);
+
+UNIVERSE_API void kan_universe_world_configuration_variant_shutdown (
+    struct kan_universe_world_configuration_variant_t *data);
+
+/// \brief Contains world configuration name and this configuration variants.
 struct kan_universe_world_configuration_t
 {
     kan_interned_string_t name;
-    kan_reflection_patch_t data;
+
+    /// \meta reflection_dynamic_array_type = "struct kan_universe_world_configuration_variant_t"
+    struct kan_dynamic_array_t variants;
 };
 
 UNIVERSE_API void kan_universe_world_configuration_init (struct kan_universe_world_configuration_t *data);
@@ -401,21 +427,25 @@ UNIVERSE_API kan_context_handle_t kan_universe_get_context (kan_universe_t unive
 /// \brief Returns root world of the universe if any.
 UNIVERSE_API kan_universe_world_t kan_universe_get_root_world (kan_universe_t universe);
 
+/// \brief Adds environment tag to the universe.
+/// \details Does not change deployed worlds. Only affects new deployments.
+UNIVERSE_API void kan_universe_add_environment_tag (kan_universe_t universe, kan_interned_string_t environment_tag);
+
 /// \brief Deploys given definition as root world.
 /// \invariant There is no root world in this universe.
 UNIVERSE_API kan_universe_world_t kan_universe_deploy_root (kan_universe_t universe,
-                                                            struct kan_universe_world_definition_t *definition);
+                                                            const struct kan_universe_world_definition_t *definition);
 
 /// \brief Deploys given definition as child of given parent world.
 UNIVERSE_API kan_universe_world_t kan_universe_deploy_child (kan_universe_t universe,
                                                              kan_universe_world_t parent,
-                                                             struct kan_universe_world_definition_t *definition);
+                                                             const struct kan_universe_world_definition_t *definition);
 
 /// \brief Redeploys given definition inside given world by updating mutators and schedulers without changing data.
 /// \invariant Definition world name is equal to given world name.
 UNIVERSE_API kan_universe_world_t kan_universe_redeploy (kan_universe_t universe,
                                                          kan_universe_world_t world,
-                                                         struct kan_universe_world_definition_t *definition);
+                                                         const struct kan_universe_world_definition_t *definition);
 
 /// \brief Runs scheduler of root world if it exists in order to update worlds data.
 UNIVERSE_API void kan_universe_update (kan_universe_t universe);

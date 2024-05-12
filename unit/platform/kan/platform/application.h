@@ -241,7 +241,10 @@ PLATFORM_API void kan_platform_application_event_move (struct kan_platform_appli
 PLATFORM_API void kan_platform_application_event_shutdown (struct kan_platform_application_event_t *instance);
 
 /// \brief Initializes application backend. Must be called on startup.
-PLATFORM_API kan_bool_t kan_platform_application_initialize (void);
+PLATFORM_API kan_bool_t kan_platform_application_init (void);
+
+/// \brief Shutdown application backend. Must be called before exiting program.
+PLATFORM_API void kan_platform_application_shutdown (void);
 
 /// \brief Pops next platform event from platform events queue.
 PLATFORM_API kan_bool_t kan_platform_application_fetch_next_event (struct kan_platform_application_event_t *output);

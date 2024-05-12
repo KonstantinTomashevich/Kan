@@ -16,6 +16,7 @@ KAN_MUTE_THIRD_PARTY_WARNINGS_END
 #include <kan/log/logging.h>
 #include <kan/memory/allocation.h>
 #include <kan/platform/application.h>
+#include <kan/platform/sdl_allocation_adapter.h>
 
 KAN_LOG_DEFINE_CATEGORY (platform_application);
 
@@ -405,14 +406,11 @@ void kan_platform_application_event_shutdown (struct kan_platform_application_ev
     }
 }
 
-static void application_shutdown (void)
+kan_bool_t kan_platform_application_init (void)
 {
-    SDL_QuitSubSystem (SDL_INIT_VIDEO | SDL_INIT_EVENTS);
-}
-
-kan_bool_t kan_platform_application_initialize (void)
-{
+    ensure_sdl_allocation_adapter_installed ();
     KAN_ASSERT (!SDL_WasInit (SDL_INIT_VIDEO | SDL_INIT_EVENTS))
+
     if (SDL_InitSubSystem (SDL_INIT_VIDEO | SDL_INIT_EVENTS) != 0)
     {
         KAN_LOG (platform_application, KAN_LOG_CRITICAL_ERROR, "Failed to initialize SDL backend for application.")
@@ -423,8 +421,13 @@ kan_bool_t kan_platform_application_initialize (void)
         kan_allocation_group_get_child (kan_allocation_group_root (), "platform_application");
     application_events_allocation_group = kan_allocation_group_get_child (application_allocation_group, "events");
     application_clipboard_allocation_group = kan_allocation_group_get_child (application_allocation_group, "clipboard");
-    atexit (application_shutdown);
     return KAN_TRUE;
+}
+
+void kan_platform_application_shutdown (void)
+{
+    KAN_ASSERT (SDL_WasInit (SDL_INIT_VIDEO | SDL_INIT_EVENTS))
+    SDL_QuitSubSystem (SDL_INIT_VIDEO | SDL_INIT_EVENTS);
 }
 
 kan_bool_t kan_platform_application_fetch_next_event (struct kan_platform_application_event_t *output)

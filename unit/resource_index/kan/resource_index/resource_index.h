@@ -97,4 +97,18 @@ RESOURCE_INDEX_API void kan_resource_index_add_third_party_entry (struct kan_res
                                                                   const char *path,
                                                                   uint64_t size);
 
+/// \brief Output data structure for kan_resource_index_extract_info_from_path.
+struct kan_resource_index_info_from_path_t
+{
+    kan_interned_string_t name;
+    kan_bool_t native;
+    enum kan_resource_index_native_item_format_t native_format;
+};
+
+/// \brief Extracts basic information about resource from its path.
+/// \details Extracting basic resource info from path is quite common across different units,
+///          therefore this logic was made part of resource index.
+RESOURCE_INDEX_API void kan_resource_index_extract_info_from_path (const char *path,
+                                                                   struct kan_resource_index_info_from_path_t *output);
+
 KAN_C_HEADER_END
