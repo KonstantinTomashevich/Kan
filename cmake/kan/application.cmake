@@ -177,14 +177,14 @@ function (application_core_set_configuration CONFIGURATION)
     message (STATUS "    Setting core configuration to \"${CONFIGURATION}\".")
 endfunction ()
 
-# Sets path to application core world directory.
+# Sets path to application world directory.
 function (application_set_world_directory DIRECTORY)
     cmake_path (ABSOLUTE_PATH DIRECTORY NORMALIZE)
     set_target_properties ("${APPLICATION_NAME}" PROPERTIES APPLICATION_WORLD_DIRECTORY "${DIRECTORY}")
     message (STATUS "    Setting core world directory to \"${DIRECTORY}\".")
 endfunction ()
 
-# Sets path to application core world directory.
+# Adds development-only environment tag to application.
 function (application_add_development_environment_tag TAG)
     message (STATUS "    Adding development environment tag \"${TAG}\".")
     get_target_property (TAGS "${APPLICATION_NAME}" APPLICATION_DEVELOPMENT_ENVIRONMENT_TAGS)
@@ -371,6 +371,43 @@ function (application_variant_add_environment_tag TAG)
 endfunction ()
 
 # Intended only for internal use in this file.
+# Gathers all resource targets used by given list of plugins and outputs resulting list to OUTPUT variable.
+function (private_gather_plugins_resource_targets PLUGINS OUTPUT)
+    set (FOUND_RESOURCE_TARGETS)
+    foreach (PLUGIN ${PLUGINS})
+        find_linked_targets_recursively (TARGET "${PLUGIN}_library" OUTPUT PLUGIN_TARGETS ARTEFACT_SCOPE)
+        foreach (PLUGIN_TARGET ${PLUGIN_TARGETS})
+            get_target_property (THIS_RESOURCE_TARGETS "${PLUGIN_TARGET}" UNIT_RESOURCE_TARGETS)
+            if (NOT THIS_RESOURCE_TARGETS STREQUAL "THIS_RESOURCE_TARGETS-NOTFOUND")
+                list (APPEND FOUND_RESOURCE_TARGETS ${THIS_RESOURCE_TARGETS})
+            endif ()
+        endforeach ()
+    endforeach ()
+
+    list (REMOVE_DUPLICATES FOUND_RESOURCE_TARGETS)
+    set ("${OUTPUT}" "${FOUND_RESOURCE_TARGETS}" PARENT_SCOPE)
+endfunction ()
+
+# Intended only for internal use in this file.
+# Gathers all plugins referenced by given list of groups and outputs resulting list to OUTPUT variable.
+function (private_gather_plugins_from_groups GROUPS OUTPUT)
+    get_target_property (PLUGINS "${APPLICATION_NAME}" APPLICATION_PLUGINS)
+    if (PLUGINS STREQUAL "PLUGINS-NOTFOUND")
+        set (PLUGINS)
+    endif ()
+
+    set (FOUND_PLUGINS)
+    foreach (PLUGIN ${PLUGINS})
+        get_target_property (PLUGIN_GROUP "${PLUGIN}" APPLICATION_PLUGIN_GROUP)
+        if ("${PLUGIN_GROUP}" IN_LIST GROUPS)
+            list (APPEND FOUND_PLUGINS "${PLUGIN}")
+        endif ()
+    endforeach ()
+
+    set ("${OUTPUT}" "${FOUND_PLUGINS}" PARENT_SCOPE)
+endfunction ()
+
+# Intended only for internal use in this file.
 # Generates resource preparation and packing targets with given name and using given resource targets.
 function (private_generate_resource_processing NAME RESOURCE_TARGETS)
     set (RESOURCE_LIST)
@@ -461,43 +498,6 @@ function (private_generate_resource_processing NAME RESOURCE_TARGETS)
                 VERBATIM)
         add_dependencies ("${PACKAGING_TARGET_NAME}" "${PREPARATION_TARGET_NAME}")
     endif ()
-endfunction ()
-
-# Intended only for internal use in this file.
-# Gathers all resource targets used by given list of plugins and outputs resulting list to OUTPUT variable.
-function (private_gather_plugins_resource_targets PLUGINS OUTPUT)
-    set (FOUND_RESOURCE_TARGETS)
-    foreach (PLUGIN ${PLUGINS})
-        find_linked_targets_recursively (TARGET "${PLUGIN}_library" OUTPUT PLUGIN_TARGETS ARTEFACT_SCOPE)
-        foreach (PLUGIN_TARGET ${PLUGIN_TARGETS})
-            get_target_property (THIS_RESOURCE_TARGETS "${PLUGIN_TARGET}" UNIT_RESOURCE_TARGETS)
-            if (NOT THIS_RESOURCE_TARGETS STREQUAL "THIS_RESOURCE_TARGETS-NOTFOUND")
-                list (APPEND FOUND_RESOURCE_TARGETS ${THIS_RESOURCE_TARGETS})
-            endif ()
-        endforeach ()
-    endforeach ()
-
-    list (REMOVE_DUPLICATES FOUND_RESOURCE_TARGETS)
-    set ("${OUTPUT}" "${FOUND_RESOURCE_TARGETS}" PARENT_SCOPE)
-endfunction ()
-
-# Intended only for internal use in this file.
-# Gathers all plugins referenced by given list of groups and outputs resulting list to OUTPUT variable.
-function (private_gather_plugins_from_groups GROUPS OUTPUT)
-    get_target_property (PLUGINS "${APPLICATION_NAME}" APPLICATION_PLUGINS)
-    if (PLUGINS STREQUAL "PLUGINS-NOTFOUND")
-        set (PLUGINS)
-    endif ()
-
-    set (FOUND_PLUGINS)
-    foreach (PLUGIN ${PLUGINS})
-        get_target_property (PLUGIN_GROUP "${PLUGIN}" APPLICATION_PLUGIN_GROUP)
-        if ("${PLUGIN_GROUP}" IN_LIST GROUPS)
-            list (APPEND FOUND_PLUGINS "${PLUGIN}")
-        endif ()
-    endforeach ()
-
-    set ("${OUTPUT}" "${FOUND_PLUGINS}" PARENT_SCOPE)
 endfunction ()
 
 # Uses data gathered by registration functions above to generate application shared libraries, executables and other

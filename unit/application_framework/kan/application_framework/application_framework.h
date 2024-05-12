@@ -60,13 +60,14 @@
 /// - It contains list of core plugins. These plugins are always loaded by every program, therefore it allows other
 ///   plugins to depend on them without introducing difficult dependency routines.
 /// - It contains list of resource directories and packs, that are used by all programs.
+/// - It contains list of environment tags that are passed to the universe.
 /// - It contains name of the definition for the universe root world, that is shared between all the programs. This
 ///   world contains common pipelines and logic that is required by every program, for example resource management.
 ///   Requiring all programs to have common world makes it possible to run several programs inside one universe if
 ///   needed, which is useful for programs like editor: they would like to run game programs inside the same universe
 ///   and context. Definition is loaded through universe world definition system.
 /// - It contains path to plugin directory.
-/// - It contains path to world definitions directory.
+/// - It contains path to world definitions directory and some minor settings for their management.
 /// \endparblock
 ///
 /// \par Program configuration
