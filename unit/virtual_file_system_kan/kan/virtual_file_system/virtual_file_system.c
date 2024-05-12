@@ -2180,6 +2180,12 @@ kan_bool_t kan_virtual_file_system_query_entry (kan_virtual_file_system_volume_t
         if (mount_point_read_only_pack)
         {
             struct read_only_pack_directory_t *read_only_pack_directory = &mount_point_read_only_pack->root_directory;
+            if (!*path_iterator)
+            {
+                status->type = KAN_VIRTUAL_FILE_SYSTEM_ENTRY_TYPE_DIRECTORY;
+                return KAN_TRUE;
+            }
+
             switch (follow_read_only_pack_directory_path (&read_only_pack_directory, &path_iterator, &part_begin,
                                                           &part_end))
             {
