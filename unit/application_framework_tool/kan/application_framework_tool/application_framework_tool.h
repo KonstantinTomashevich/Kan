@@ -20,6 +20,7 @@ extern uint64_t kan_application_framework_tool_plugins_count;
 extern char *kan_application_framework_tool_plugins[];
 
 /// \brief Creates and assembles minimal tool context with only plugin system and reflection system.
-APPLICATION_FRAMEWORK_TOOL_API kan_context_handle_t kan_application_framework_tool_create_context (void);
+APPLICATION_FRAMEWORK_TOOL_API kan_context_handle_t
+kan_application_framework_tool_create_context (uint64_t arguments_count, char **arguments);
 
 KAN_C_HEADER_END

@@ -5,12 +5,13 @@
 #include <kan/context/plugin_system.h>
 #include <kan/context/reflection_system.h>
 #include <kan/error/critical.h>
+#include <kan/file_system/path_container.h>
 #include <kan/log/logging.h>
 #include <kan/memory/allocation.h>
 
 KAN_LOG_DEFINE_CATEGORY (application_framework_tool);
 
-kan_context_handle_t kan_application_framework_tool_create_context (void)
+kan_context_handle_t kan_application_framework_tool_create_context (uint64_t arguments_count, char **arguments)
 {
     const kan_allocation_group_t context_group =
         kan_allocation_group_get_child (kan_allocation_group_root (), "tool_context");
@@ -22,12 +23,34 @@ kan_context_handle_t kan_application_framework_tool_create_context (void)
 
     if (has_plugins)
     {
+        // Calculate correct plugins directory from path to application.
+        // Tool applications should be runnable with any working directory, therefore we need this logic.
+
+        KAN_ASSERT (arguments_count > 0u)
+        const char *path_to_application = arguments[0u];
+        KAN_ASSERT (path_to_application[0u] != '\0')
+
+        struct kan_file_system_path_container_t path_container;
+        kan_file_system_path_container_copy_string (&path_container, path_to_application);
+        uint64_t check_index = path_container.length - 1u;
+
+        while (check_index > 0u)
+        {
+            if (path_container.path[check_index] == '/' || path_container.path[check_index] == '\\')
+            {
+                break;
+            }
+
+            --check_index;
+        }
+
+        kan_file_system_path_container_reset_length (&path_container, check_index);
+        kan_file_system_path_container_append (&path_container, kan_application_framework_tool_plugins_directory);
+
         kan_plugin_system_config_init (&plugin_system_config);
-        const uint64_t path_length = strlen (kan_application_framework_tool_plugins_directory);
-        plugin_system_config.plugin_directory_path =
-            kan_allocate_general (kan_plugin_system_config_get_allocation_group (), path_length + 1u, _Alignof (char));
-        memcpy (plugin_system_config.plugin_directory_path, kan_application_framework_tool_plugins_directory,
-                path_length + 1u);
+        plugin_system_config.plugin_directory_path = kan_allocate_general (
+            kan_plugin_system_config_get_allocation_group (), path_container.length + 1u, _Alignof (char));
+        memcpy (plugin_system_config.plugin_directory_path, path_container.path, path_container.length + 1u);
 
         for (uint64_t index = 0u; index < kan_application_framework_tool_plugins_count; ++index)
         {
