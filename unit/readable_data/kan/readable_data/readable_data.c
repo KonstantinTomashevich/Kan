@@ -227,7 +227,6 @@ static inline const char *re2c_internalize_string_literal (struct parser_t *pars
 {
     struct string_literal_block_node_t *first_block = NULL;
     struct string_literal_block_node_t *last_block = NULL;
-    uint64_t total_length = 0u;
 
     while (blocks_begin != blocks_end)
     {
@@ -252,9 +251,7 @@ static inline const char *re2c_internalize_string_literal (struct parser_t *pars
                 ++blocks_begin;
             }
 
-            total_length += new_node->end - new_node->begin;
             new_node->next = NULL;
-
             if (last_block)
             {
                 last_block->next = new_node;
@@ -272,22 +269,62 @@ static inline const char *re2c_internalize_string_literal (struct parser_t *pars
         }
     }
 
-    char *copy = kan_stack_group_allocator_allocate (&parser->temporary_allocator, total_length + 1u, _Alignof (char));
+    uint64_t length_with_escapes = 0u;
     struct string_literal_block_node_t *block = first_block;
+
+    while (block)
+    {
+        const char *input = block->begin;
+        kan_bool_t escaped = KAN_FALSE;
+
+        while (input < block->end)
+        {
+            if (*input == '\\' && !escaped)
+            {
+                ++input;
+            }
+            else
+            {
+                ++length_with_escapes;
+                ++input;
+            }
+        }
+
+        KAN_ASSERT (!escaped)
+        block = block->next;
+    }
+
+    char *copy =
+        kan_stack_group_allocator_allocate (&parser->temporary_allocator, length_with_escapes + 1u, _Alignof (char));
+    block = first_block;
     char *output = copy;
 
     while (block)
     {
-        if (block->end != block->begin)
+        const char *input = block->begin;
+        kan_bool_t escaped = KAN_FALSE;
+
+        while (input < block->end)
         {
-            memcpy (output, block->begin, block->end - block->begin);
-            output += block->end - block->begin;
+            if (*input == '\\' && !escaped)
+            {
+                escaped = KAN_TRUE;
+                ++input;
+            }
+            else
+            {
+                escaped = KAN_FALSE;
+                *output = *input;
+                ++output;
+                ++input;
+            }
         }
 
+        KAN_ASSERT (!escaped)
         block = block->next;
     }
 
-    copy[total_length] = '\0';
+    *output = '\0';
     return copy;
 }
 

@@ -103,6 +103,9 @@ void kan_application_framework_core_configuration_init (struct kan_application_f
     instance->world_directory_path = NULL;
     instance->observe_world_definitions = KAN_FALSE;
     instance->world_definition_rescan_delay_ns = 100000000u;
+    instance->enable_code_hot_reload = KAN_FALSE;
+    instance->code_hot_reload_delay_ns = 200000000u;
+    instance->auto_build_and_hot_reload_command = NULL;
 }
 
 void kan_application_framework_core_configuration_shutdown (
@@ -137,6 +140,12 @@ void kan_application_framework_core_configuration_shutdown (
     {
         kan_free_general (config_allocation_group, instance->world_directory_path,
                           strlen (instance->world_directory_path) + 1u);
+    }
+
+    if (instance->auto_build_and_hot_reload_command)
+    {
+        kan_free_general (config_allocation_group, instance->auto_build_and_hot_reload_command,
+                          strlen (instance->auto_build_and_hot_reload_command) + 1u);
     }
 }
 
@@ -376,6 +385,9 @@ static inline void setup_plugin_system_config (
         *(kan_interned_string_t *) kan_dynamic_array_add_last (&plugin_system_config->plugins) =
             ((kan_interned_string_t *) program_configuration->plugins.data)[index];
     }
+
+    plugin_system_config->enable_hot_reload = core_configuration->enable_code_hot_reload;
+    plugin_system_config->hot_reload_update_delay_ns = core_configuration->code_hot_reload_delay_ns;
 }
 
 static inline void add_resource_directories_to_virtual_file_system_config (
@@ -490,6 +502,8 @@ int kan_application_framework_run_with_configuration (
     struct kan_application_framework_system_config_t application_framework_system_config;
     application_framework_system_config.arguments_count = arguments_count;
     application_framework_system_config.arguments = arguments;
+    application_framework_system_config.auto_build_and_hot_reload_command =
+        core_configuration->enable_code_hot_reload ? core_configuration->auto_build_and_hot_reload_command : NULL;
 
     if (!kan_context_request_system (context, KAN_CONTEXT_APPLICATION_FRAMEWORK_SYSTEM_NAME,
                                      &application_framework_system_config))

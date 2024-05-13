@@ -1,4 +1,5 @@
 #include <stddef.h>
+#include <stdlib.h>
 
 #include <kan/context/application_framework_system.h>
 #include <kan/context/application_system.h>
@@ -13,6 +14,7 @@ struct application_framework_system_t
 
     uint64_t outer_arguments_count;
     char **outer_arguments;
+    char *outer_auto_build_and_hot_reload_command;
 
     kan_bool_t exit_requested;
     int exit_code;
@@ -33,11 +35,13 @@ kan_context_system_handle_t application_framework_system_create (kan_allocation_
         struct kan_application_framework_system_config_t *config = user_config;
         system->outer_arguments_count = config->arguments_count;
         system->outer_arguments = config->arguments;
+        system->outer_auto_build_and_hot_reload_command = config->auto_build_and_hot_reload_command;
     }
     else
     {
         system->outer_arguments_count = 0u;
         system->outer_arguments = NULL;
+        system->outer_auto_build_and_hot_reload_command = NULL;
     }
 
     system->exit_requested = KAN_FALSE;
@@ -49,28 +53,37 @@ kan_context_system_handle_t application_framework_system_create (kan_allocation_
 
 static void application_framework_system_update (kan_context_system_handle_t handle)
 {
-    struct application_framework_system_t *system = (struct application_framework_system_t *) handle;
+    struct application_framework_system_t *framework_system = (struct application_framework_system_t *) handle;
     struct kan_cpu_section_execution_t execution;
-    kan_cpu_section_execution_init (&execution, system->update_section);
+    kan_cpu_section_execution_init (&execution, framework_system->update_section);
 
     kan_context_system_handle_t application_system =
-        kan_context_query (system->context, KAN_CONTEXT_APPLICATION_SYSTEM_NAME);
+        kan_context_query (framework_system->context, KAN_CONTEXT_APPLICATION_SYSTEM_NAME);
 
     if (application_system != KAN_INVALID_CONTEXT_SYSTEM_HANDLE)
     {
         const struct kan_platform_application_event_t *event;
-        while ((event = kan_application_system_event_iterator_get (application_system, system->event_iterator)))
+        while (
+            (event = kan_application_system_event_iterator_get (application_system, framework_system->event_iterator)))
         {
             if (event->type == KAN_PLATFORM_APPLICATION_EVENT_TYPE_QUIT)
             {
-                if (!system->exit_requested)
+                if (!framework_system->exit_requested)
                 {
-                    system->exit_requested = KAN_TRUE;
-                    system->exit_code = 0;
+                    framework_system->exit_requested = KAN_TRUE;
+                    framework_system->exit_code = 0;
+                }
+            }
+            else if (event->type == KAN_PLATFORM_APPLICATION_EVENT_TYPE_WINDOW_FOCUS_GAINED)
+            {
+                if (!framework_system->exit_requested && framework_system->outer_auto_build_and_hot_reload_command)
+                {
+                    system (framework_system->outer_auto_build_and_hot_reload_command);
                 }
             }
 
-            system->event_iterator = kan_application_system_event_iterator_advance (system->event_iterator);
+            framework_system->event_iterator =
+                kan_application_system_event_iterator_advance (framework_system->event_iterator);
         }
     }
 

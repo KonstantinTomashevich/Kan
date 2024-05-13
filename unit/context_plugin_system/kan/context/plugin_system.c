@@ -5,11 +5,16 @@
 #include <kan/container/interned_string.h>
 #include <kan/context/plugin_system.h>
 #include <kan/context/reflection_system.h>
+#include <kan/context/update_system.h>
 #include <kan/error/critical.h>
 #include <kan/file_system/entry.h>
+#include <kan/file_system/path_container.h>
+#include <kan/file_system/stream.h>
+#include <kan/file_system_watcher/watcher.h>
 #include <kan/log/logging.h>
 #include <kan/memory/allocation.h>
 #include <kan/platform/dynamic_library.h>
+#include <kan/platform/precise_time.h>
 
 KAN_LOG_DEFINE_CATEGORY (plugin_system);
 
@@ -25,9 +30,16 @@ struct plugin_system_t
     kan_allocation_group_t group;
 
     char *plugins_directory_path;
+    kan_bool_t enable_hot_reload;
+    uint64_t hot_reload_update_delay_ns;
+    uint64_t hot_reload_directory_id;
 
     /// \meta reflection_dynamic_array_type = "struct plugin_data_t"
     struct kan_dynamic_array_t plugins;
+
+    uint64_t hot_reload_after_ns;
+    kan_file_system_watcher_t watcher;
+    kan_file_system_watcher_iterator_t watcher_iterator;
 };
 
 static kan_bool_t statics_initialized = KAN_FALSE;
@@ -56,6 +68,8 @@ kan_context_system_handle_t plugin_system_create (kan_allocation_group_t group, 
         system->plugins_directory_path = kan_allocate_general (group, path_length + 1u, _Alignof (char));
         memcpy (system->plugins_directory_path, config->plugin_directory_path, path_length + 1u);
 
+        system->enable_hot_reload = config->enable_hot_reload;
+        system->hot_reload_update_delay_ns = config->hot_reload_update_delay_ns;
         kan_dynamic_array_init (&system->plugins, config->plugins.size, sizeof (struct plugin_data_t),
                                 _Alignof (struct plugin_data_t), group);
 
@@ -71,11 +85,52 @@ kan_context_system_handle_t plugin_system_create (kan_allocation_group_t group, 
     else
     {
         system->plugins_directory_path = NULL;
+        system->enable_hot_reload = KAN_FALSE;
+        system->hot_reload_update_delay_ns = 0u;
         kan_dynamic_array_init (&system->plugins, 0u, sizeof (struct plugin_data_t), _Alignof (struct plugin_data_t),
                                 group);
     }
 
+    system->hot_reload_directory_id = 0u;
+    system->hot_reload_after_ns = UINT64_MAX;
+    system->watcher = KAN_INVALID_FILE_SYSTEM_WATCHER;
     return (kan_context_system_handle_t) system;
+}
+
+static inline kan_bool_t find_source_plugin_path (const char *source_path,
+                                                  const char *plugin_name,
+                                                  char *buffer,
+                                                  const char **output_extension)
+{
+    snprintf (buffer, KAN_FILE_SYSTEM_MAX_PATH_LENGTH, "%s/%s.dll", source_path, plugin_name);
+    if (kan_file_system_check_existence (buffer))
+    {
+        *output_extension = ".dll";
+        return KAN_TRUE;
+    }
+
+    snprintf (buffer, KAN_FILE_SYSTEM_MAX_PATH_LENGTH, "%s/%s.so", source_path, plugin_name);
+    if (kan_file_system_check_existence (buffer))
+    {
+        *output_extension = ".so";
+        return KAN_TRUE;
+    }
+
+    snprintf (buffer, KAN_FILE_SYSTEM_MAX_PATH_LENGTH, "%s/lib%s.so", source_path, plugin_name);
+    if (kan_file_system_check_existence (buffer))
+    {
+        *output_extension = ".so";
+        return KAN_TRUE;
+    }
+
+    snprintf (buffer, KAN_FILE_SYSTEM_MAX_PATH_LENGTH, "%s/lib%s.so.0", source_path, plugin_name);
+    if (kan_file_system_check_existence (buffer))
+    {
+        *output_extension = ".so.0";
+        return KAN_TRUE;
+    }
+
+    return KAN_FALSE;
 }
 
 static inline void load_plugins (const char *path, struct kan_dynamic_array_t *array)
@@ -84,11 +139,10 @@ static inline void load_plugins (const char *path, struct kan_dynamic_array_t *a
     {
         struct plugin_data_t *data = &((struct plugin_data_t *) array->data)[index];
         KAN_ASSERT (data->dynamic_library == KAN_INVALID_PLATFORM_DYNAMIC_LIBRARY)
-
         char library_path_buffer[KAN_FILE_SYSTEM_MAX_PATH_LENGTH];
-        snprintf (library_path_buffer, KAN_FILE_SYSTEM_MAX_PATH_LENGTH, "%s/%s.dll", path, data->name);
+        const char *extension;
 
-        if (kan_file_system_check_existence (library_path_buffer))
+        if (find_source_plugin_path (path, data->name, library_path_buffer, &extension))
         {
             data->dynamic_library = kan_platform_dynamic_library_load (library_path_buffer);
             if (data->dynamic_library == KAN_INVALID_PLATFORM_DYNAMIC_LIBRARY)
@@ -96,51 +150,12 @@ static inline void load_plugins (const char *path, struct kan_dynamic_array_t *a
                 KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, plugin_system, KAN_LOG_ERROR,
                                      "Failed to load dynamic library from \"%s\".", library_path_buffer)
             }
-
-            continue;
         }
-
-        snprintf (library_path_buffer, KAN_FILE_SYSTEM_MAX_PATH_LENGTH, "%s/%s.so", path, data->name);
-        if (kan_file_system_check_existence (library_path_buffer))
+        else
         {
-            data->dynamic_library = kan_platform_dynamic_library_load (library_path_buffer);
-            if (data->dynamic_library == KAN_INVALID_PLATFORM_DYNAMIC_LIBRARY)
-            {
-                KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, plugin_system, KAN_LOG_ERROR,
-                                     "Failed to load dynamic library from \"%s\".", library_path_buffer)
-            }
-
-            continue;
+            KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, plugin_system, KAN_LOG_ERROR,
+                                 "Unable to find dynamic library \"%s\" at directory \"%s\".", data->name, path)
         }
-
-        snprintf (library_path_buffer, KAN_FILE_SYSTEM_MAX_PATH_LENGTH, "%s/lib%s.so", path, data->name);
-        if (kan_file_system_check_existence (library_path_buffer))
-        {
-            data->dynamic_library = kan_platform_dynamic_library_load (library_path_buffer);
-            if (data->dynamic_library == KAN_INVALID_PLATFORM_DYNAMIC_LIBRARY)
-            {
-                KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, plugin_system, KAN_LOG_ERROR,
-                                     "Failed to load dynamic library from \"%s\".", library_path_buffer)
-            }
-
-            continue;
-        }
-
-        snprintf (library_path_buffer, KAN_FILE_SYSTEM_MAX_PATH_LENGTH, "%s/lib%s.so.0", path, data->name);
-        if (kan_file_system_check_existence (library_path_buffer))
-        {
-            data->dynamic_library = kan_platform_dynamic_library_load (library_path_buffer);
-            if (data->dynamic_library == KAN_INVALID_PLATFORM_DYNAMIC_LIBRARY)
-            {
-                KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, plugin_system, KAN_LOG_ERROR,
-                                     "Failed to load dynamic library from \"%s\".", library_path_buffer)
-            }
-
-            continue;
-        }
-
-        KAN_LOG (plugin_system, KAN_LOG_ERROR, "Unable to find dynamic library \"%s\" at directory \"%s\".", data->name,
-                 path)
     }
 }
 
@@ -181,6 +196,168 @@ static void on_reflection_populate (kan_context_system_handle_t other_system, ka
     }
 }
 
+static inline void build_hot_reload_directory_path (struct kan_file_system_path_container_t *path_container,
+                                                    const char *base_path,
+                                                    uint64_t hot_reload_id)
+{
+    kan_file_system_path_container_copy_string (path_container, base_path);
+    char suffix_buffer[KAN_PLUGIN_SYSTEM_HOT_RELOAD_SUFFIX_BUFFER];
+    snprintf (suffix_buffer, KAN_PLUGIN_SYSTEM_HOT_RELOAD_SUFFIX_BUFFER, "_%llu", (unsigned long long) hot_reload_id);
+    kan_file_system_path_container_add_suffix (path_container, suffix_buffer);
+}
+
+static inline void update_hot_reload_id (struct plugin_system_t *system)
+{
+    while (KAN_TRUE)
+    {
+        struct kan_file_system_path_container_t path_container;
+        build_hot_reload_directory_path (&path_container, system->plugins_directory_path,
+                                         system->hot_reload_directory_id);
+
+        if (!kan_file_system_check_existence (path_container.path) &&
+            kan_file_system_make_directory (path_container.path))
+        {
+            break;
+        }
+
+        ++system->hot_reload_directory_id;
+    }
+}
+
+static inline void init_hot_reload_directory (struct plugin_system_t *system)
+{
+    for (uint64_t index = 0u; index < system->plugins.size; ++index)
+    {
+        struct plugin_data_t *data = &((struct plugin_data_t *) system->plugins.data)[index];
+        char library_path_buffer[KAN_FILE_SYSTEM_MAX_PATH_LENGTH];
+        const char *extension;
+
+        if (find_source_plugin_path (system->plugins_directory_path, data->name, library_path_buffer, &extension))
+        {
+            struct kan_stream_t *input_stream = kan_direct_file_stream_open_for_read (library_path_buffer, KAN_TRUE);
+            if (!input_stream)
+            {
+                KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, plugin_system, KAN_LOG_ERROR,
+                                     "Failed to open for read dynamic library \"%s\" for copying.", library_path_buffer)
+                continue;
+            }
+
+            struct kan_file_system_path_container_t output_path_container;
+            build_hot_reload_directory_path (&output_path_container, system->plugins_directory_path,
+                                             system->hot_reload_directory_id);
+
+            kan_file_system_path_container_append (&output_path_container, data->name);
+            kan_file_system_path_container_add_suffix (&output_path_container, extension);
+            struct kan_stream_t *output_stream =
+                kan_direct_file_stream_open_for_write (output_path_container.path, KAN_TRUE);
+
+            if (!output_stream)
+            {
+                KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, plugin_system, KAN_LOG_ERROR,
+                                     "Failed to open for write dynamic library \"%s\" for copying.",
+                                     output_path_container.path)
+                continue;
+            }
+
+            char copy_buffer[KAN_PLUGIN_SYSTEM_HOT_RELOAD_IO_BUFFER];
+            while (KAN_TRUE)
+            {
+                const uint64_t read =
+                    input_stream->operations->read (input_stream, KAN_PLUGIN_SYSTEM_HOT_RELOAD_IO_BUFFER, copy_buffer);
+
+                if (read == 0u)
+                {
+                    break;
+                }
+
+                const uint64_t written = output_stream->operations->write (output_stream, read, copy_buffer);
+                if (written != read)
+                {
+                    KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, plugin_system, KAN_LOG_ERROR,
+                                         "Failed to copy dynamic library \"%s\" to \"%s\".", library_path_buffer,
+                                         output_path_container.path)
+                    break;
+                }
+            }
+
+            input_stream->operations->close (input_stream);
+            output_stream->operations->close (output_stream);
+        }
+        else
+        {
+            KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, plugin_system, KAN_LOG_ERROR,
+                                 "Unable to find dynamic library \"%s\" at directory \"%s\".", data->name,
+                                 system->plugins_directory_path)
+        }
+    }
+}
+
+static inline void delete_hot_reload_directory (struct plugin_system_t *system, uint64_t directory_id)
+{
+    struct kan_file_system_path_container_t path_container;
+    build_hot_reload_directory_path (&path_container, system->plugins_directory_path, directory_id);
+
+    if (!kan_file_system_remove_directory_with_content (path_container.path))
+    {
+        KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, plugin_system, KAN_LOG_ERROR,
+                             "Failed to remove hot reload directory \"%s\".", path_container.path)
+    }
+}
+
+void plugin_system_on_update (kan_context_system_handle_t handle)
+{
+    struct plugin_system_t *system = (struct plugin_system_t *) handle;
+    KAN_ASSERT (system->enable_hot_reload)
+    const struct kan_file_system_watcher_event_t *event;
+
+    while ((event = kan_file_system_watcher_iterator_get (system->watcher, system->watcher_iterator)))
+    {
+        if (event->entry_type == KAN_FILE_SYSTEM_ENTRY_TYPE_FILE)
+        {
+            system->hot_reload_after_ns = kan_platform_get_elapsed_nanoseconds () + system->hot_reload_update_delay_ns;
+        }
+
+        system->watcher_iterator = kan_file_system_watcher_iterator_advance (system->watcher, system->watcher_iterator);
+    }
+
+    if (kan_platform_get_elapsed_nanoseconds () >= system->hot_reload_after_ns)
+    {
+        const uint64_t old_directory_id = system->hot_reload_directory_id;
+        update_hot_reload_id (system);
+        init_hot_reload_directory (system);
+
+        struct kan_dynamic_array_t plugins_copy;
+        kan_dynamic_array_init (&plugins_copy, system->plugins.size, sizeof (struct plugin_data_t),
+                                _Alignof (struct plugin_data_t), system->plugins.allocation_group);
+
+        for (uint64_t index = 0u; index < system->plugins.size; ++index)
+        {
+            struct plugin_data_t *source_data = &((struct plugin_data_t *) system->plugins.data)[index];
+            struct plugin_data_t *target_data = &((struct plugin_data_t *) plugins_copy.data)[index];
+            target_data->dynamic_library = source_data->dynamic_library;
+            source_data->dynamic_library = KAN_INVALID_PLATFORM_DYNAMIC_LIBRARY;
+        }
+
+        struct kan_file_system_path_container_t path_container;
+        build_hot_reload_directory_path (&path_container, system->plugins_directory_path,
+                                         system->hot_reload_directory_id);
+        load_plugins (path_container.path, &system->plugins);
+
+        kan_context_system_handle_t reflection_system =
+            kan_context_query (system->context, KAN_CONTEXT_REFLECTION_SYSTEM_NAME);
+
+        if (reflection_system != KAN_INVALID_CONTEXT_SYSTEM_HANDLE)
+        {
+            kan_reflection_system_invalidate (reflection_system);
+        }
+
+        unload_plugins (&plugins_copy);
+        kan_dynamic_array_shutdown (&plugins_copy);
+        delete_hot_reload_directory (system, old_directory_id);
+        system->hot_reload_after_ns = UINT64_MAX;
+    }
+}
+
 void plugin_system_connect (kan_context_system_handle_t handle, kan_context_handle_t context)
 {
     struct plugin_system_t *system = (struct plugin_system_t *) handle;
@@ -193,14 +370,42 @@ void plugin_system_connect (kan_context_system_handle_t handle, kan_context_hand
     {
         kan_reflection_system_connect_on_populate (reflection_system, handle, on_reflection_populate);
     }
+
+    if (system->enable_hot_reload)
+    {
+        kan_context_system_handle_t update_system = kan_context_query (system->context, KAN_CONTEXT_UPDATE_SYSTEM_NAME);
+        if (update_system != KAN_INVALID_CONTEXT_SYSTEM_HANDLE)
+        {
+            kan_update_system_connect_on_run (update_system, handle, plugin_system_on_update, 0u, NULL);
+        }
+    }
 }
 
 void plugin_system_init (kan_context_system_handle_t handle)
 {
     struct plugin_system_t *system = (struct plugin_system_t *) handle;
+    if (system->enable_hot_reload)
+    {
+        update_hot_reload_id (system);
+        init_hot_reload_directory (system);
+
+        system->watcher = kan_file_system_watcher_create (system->plugins_directory_path);
+        system->watcher_iterator = kan_file_system_watcher_iterator_create (system->watcher);
+    }
+
     if (system->plugins_directory_path)
     {
-        load_plugins (system->plugins_directory_path, &system->plugins);
+        if (system->enable_hot_reload)
+        {
+            struct kan_file_system_path_container_t path_container;
+            build_hot_reload_directory_path (&path_container, system->plugins_directory_path,
+                                             system->hot_reload_directory_id);
+            load_plugins (path_container.path, &system->plugins);
+        }
+        else
+        {
+            load_plugins (system->plugins_directory_path, &system->plugins);
+        }
     }
 }
 
@@ -208,6 +413,17 @@ void plugin_system_shutdown (kan_context_system_handle_t handle)
 {
     struct plugin_system_t *system = (struct plugin_system_t *) handle;
     unload_plugins (&system->plugins);
+
+    if (system->watcher != KAN_INVALID_FILE_SYSTEM_WATCHER)
+    {
+        kan_file_system_watcher_iterator_destroy (system->watcher, system->watcher_iterator);
+        kan_file_system_watcher_destroy (system->watcher);
+    }
+
+    if (system->enable_hot_reload)
+    {
+        delete_hot_reload_directory (system, system->hot_reload_directory_id);
+    }
 }
 
 void plugin_system_disconnect (kan_context_system_handle_t handle)
@@ -219,6 +435,15 @@ void plugin_system_disconnect (kan_context_system_handle_t handle)
     if (reflection_system != KAN_INVALID_CONTEXT_SYSTEM_HANDLE)
     {
         kan_reflection_system_disconnect_on_populate (reflection_system, handle);
+    }
+
+    if (system->enable_hot_reload)
+    {
+        kan_context_system_handle_t update_system = kan_context_query (system->context, KAN_CONTEXT_UPDATE_SYSTEM_NAME);
+        if (update_system != KAN_INVALID_CONTEXT_SYSTEM_HANDLE)
+        {
+            kan_update_system_disconnect_on_run (update_system, handle);
+        }
     }
 }
 
@@ -248,6 +473,7 @@ void kan_plugin_system_config_init (struct kan_plugin_system_config_t *config)
 {
     ensure_statics_initialized ();
     config->plugin_directory_path = NULL;
+    config->enable_hot_reload = KAN_FALSE;
     kan_dynamic_array_init (&config->plugins, KAN_PLUGIN_SYSTEM_PLUGINS_INITIAL_SIZE, sizeof (kan_interned_string_t),
                             _Alignof (kan_interned_string_t), config_allocation_group);
 }
