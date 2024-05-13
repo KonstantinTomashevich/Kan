@@ -105,6 +105,7 @@ void kan_application_framework_core_configuration_init (struct kan_application_f
     instance->world_definition_rescan_delay_ns = 100000000u;
     instance->enable_code_hot_reload = KAN_FALSE;
     instance->code_hot_reload_delay_ns = 200000000u;
+    instance->auto_build_and_hot_reload_command = NULL;
 }
 
 void kan_application_framework_core_configuration_shutdown (
@@ -495,6 +496,8 @@ int kan_application_framework_run_with_configuration (
     struct kan_application_framework_system_config_t application_framework_system_config;
     application_framework_system_config.arguments_count = arguments_count;
     application_framework_system_config.arguments = arguments;
+    application_framework_system_config.auto_build_and_hot_reload_command =
+        core_configuration->enable_code_hot_reload ? core_configuration->auto_build_and_hot_reload_command : NULL;
 
     if (!kan_context_request_system (context, KAN_CONTEXT_APPLICATION_FRAMEWORK_SYSTEM_NAME,
                                      &application_framework_system_config))

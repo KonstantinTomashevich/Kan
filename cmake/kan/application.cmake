@@ -24,6 +24,10 @@ set (KAN_APPLICATION_TOOL_STATICS_TEMPLATE "${CMAKE_SOURCE_DIR}/cmake/kan/applic
 # Name of the used application framework static launcher implementation.
 set (KAN_APPLICATION_PROGRAM_LAUNCHER_IMPLEMENTATION "sdl")
 
+# Whether to enable auto build and hot reload commands for development builds.
+option (KAN_APPLICATION_ENABLE_AUTO_BUILD_AND_HOT_RELOAD
+        "Whether to enable auto build and hot reload commands for development builds." ON)
+
 # Whether to use raw resources instead of processed ones for packing.
 option (KAN_APPLICATION_PACK_WITH_RAW_RESOURCES
         "Whether to use raw resources instead of processed ones for packing." OFF)
@@ -680,6 +684,15 @@ function (application_generate)
             "set (WORLDS_DIRECTORY_PATH \"${WORLD_DIRECTORY}\")\n")
     string (APPEND DEV_CORE_CONFIGURATOR_CONTENT "set (OBSERVE_WORLD_DEFINITIONS 1)\n")
     string (APPEND DEV_CORE_CONFIGURATOR_CONTENT "set (ENABLE_CODE_HOT_RELOAD 1)\n")
+
+    if (KAN_APPLICATION_ENABLE_AUTO_BUILD_AND_HOT_RELOAD)
+        string (APPEND DEV_CORE_CONFIGURATOR_CONTENT "set (AUTO_CODE_HOT_RELOAD_COMMAND ")
+        string (APPEND DEV_CORE_CONFIGURATOR_CONTENT
+                "\"auto_build_and_hot_reload_command = \\\"\\\\\\\"${CMAKE_COMMAND}\\\\\\\" ")
+        string (APPEND DEV_CORE_CONFIGURATOR_CONTENT "--build \\\\\\\"${CMAKE_BINARY_DIR}\\\\\\\" ")
+        string (APPEND DEV_CORE_CONFIGURATOR_CONTENT
+                "--target \\\\\\\"${APPLICATION_NAME}_dev_all_plugins\\\\\\\"\\\"\")\n")
+    endif ()
 
     set (DEV_CORE_CONFIGURATION_PATH "${DEV_CONFIGURATION_DIRECTORY}/core.rd")
     string (APPEND DEV_CORE_CONFIGURATOR_CONTENT

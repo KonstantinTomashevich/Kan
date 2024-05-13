@@ -175,6 +175,10 @@ struct kan_application_framework_core_configuration_t
     /// \brief Delay in nanoseconds between changes to original dynamic libraries and code hot reload.
     /// \details Needed to make sure that build system was able to write everything.
     uint64_t code_hot_reload_delay_ns;
+
+    /// \brief If ::enable_code_hot_reload and not NULL, this command is executed every time any application window
+    ///        is focused in order to update and hot reload plugins if there are any changes.
+    char *auto_build_and_hot_reload_command;
 };
 
 APPLICATION_FRAMEWORK_API void kan_application_framework_core_configuration_init (
