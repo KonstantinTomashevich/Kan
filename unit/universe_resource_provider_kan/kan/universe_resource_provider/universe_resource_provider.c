@@ -238,9 +238,15 @@ struct resource_provider_delayed_file_addition_t
 
 struct resource_provider_execution_shared_state_t
 {
+    /// \meta reflection_ignore_struct_field
     struct kan_atomic_int_t workers_left;
+
+    /// \meta reflection_ignore_struct_field
     struct kan_atomic_int_t concurrency_lock;
+
+    //// \meta reflection_ignore_struct_field
     struct kan_repository_indexed_interval_descending_write_cursor_t loading_operation_cursor;
+
     uint64_t end_time_ns;
 };
 
@@ -349,7 +355,10 @@ _Static_assert (_Alignof (struct resource_provider_state_t) ==
 struct generated_container_type_node_t
 {
     struct generated_container_type_node_t *next;
+
+    /// \meta reflection_ignore_struct_field
     struct kan_reflection_struct_t type;
+
     const struct kan_reflection_struct_t *source_type;
 };
 
@@ -360,9 +369,16 @@ struct kan_reflection_generator_universe_resource_provider_t
     struct generated_container_type_node_t *first_container_type;
     uint64_t container_types_count;
 
+    /// \meta reflection_ignore_struct_field
     struct kan_reflection_struct_t mutator_type;
+
+     /// \meta reflection_ignore_struct_field
     struct kan_reflection_function_t mutator_deploy_function;
+
+    /// \meta reflection_ignore_struct_field
     struct kan_reflection_function_t mutator_execute_function;
+
+    /// \meta reflection_ignore_struct_field
     struct kan_reflection_function_t mutator_undeploy_function;
 
     kan_interned_string_t interned_kan_resource_provider_type_meta_t;

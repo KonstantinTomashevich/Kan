@@ -17,7 +17,13 @@
 ///
 /// \par Hot reload
 /// \parblock
-/// TODO: Hot reload will be implemented later as part of hot reload feature.
+/// If requested, plugin system supports hot reload technique. When hot reload is enabled:
+/// - Plugin dynamic libraries are copied to separate directory in order to let original dynamic libraries be editable.
+/// - Original plugins directory is observed for changes.
+/// - When changes are detected, hot reload is triggered.
+/// - New directory is created for new version of plugins and they're copied there.
+/// - Reflection invalidation triggered and reflection is repopulated from new plugins.
+/// - Old plugins are unloaded and their temporary directory is deleted.
 /// \endparblock
 ///
 /// \par Thread safety
@@ -37,6 +43,12 @@ struct kan_plugin_system_config_t
 
     /// \meta reflection_dynamic_array_type = "kan_interned_string_t"
     struct kan_dynamic_array_t plugins;
+
+    /// \brief Whether plugin hot reload is enabled.
+    kan_bool_t enable_hot_reload;
+
+    /// \brief If ::enable_hot_reload, plugin hot reload is triggered with this delay after changes.
+    uint64_t hot_reload_update_delay_ns;
 };
 
 CONTEXT_PLUGIN_SYSTEM_API void kan_plugin_system_config_init (struct kan_plugin_system_config_t *config);

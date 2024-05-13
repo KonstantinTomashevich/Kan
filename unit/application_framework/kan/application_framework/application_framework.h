@@ -68,6 +68,7 @@
 ///   and context. Definition is loaded through universe world definition system.
 /// - It contains path to plugin directory.
 /// - It contains path to world definitions directory and some minor settings for their management.
+/// - It contains configuration for plugin code hot reload.
 /// \endparblock
 ///
 /// \par Program configuration
@@ -167,6 +168,13 @@ struct kan_application_framework_core_configuration_t
 
     /// \brief Delay between changes in universe world definition directory and definition reload.
     uint64_t world_definition_rescan_delay_ns;
+
+    /// \brief Whether code hot reload is enabled.
+    kan_bool_t enable_code_hot_reload;
+
+    /// \brief Delay in nanoseconds between changes to original dynamic libraries and code hot reload.
+    /// \details Needed to make sure that build system was able to write everything.
+    uint64_t code_hot_reload_delay_ns;
 };
 
 APPLICATION_FRAMEWORK_API void kan_application_framework_core_configuration_init (

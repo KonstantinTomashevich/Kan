@@ -35,6 +35,10 @@ option (KAN_APPLICATION_PACKER_INTERN_STRINGS "Whether string interning for pack
 option (KAN_APPLICATION_OBSERVE_WORLDS_IN_PACKAGED
         "Whether to observe for world definition changes in packaged applications." OFF)
 
+# Whether to enable code hot reload in packaged applications.
+option (KAN_APPLICATION_ENABLE_CODE_HOT_RELOAD_IN_PACKAGED
+        "Whether to enable code hot reload in packaged applications." OFF)
+
 # Target properties, used to store application framework related data. Shouldn't be directly modified by user.
 
 define_property (TARGET PROPERTY APPLICATION_CORE_ABSTRACT
@@ -555,6 +559,10 @@ function (application_generate)
             COMMAND "${CMAKE_COMMAND}" -E make_directory "${DEV_RESOURCES_DIRECTORY}"
             COMMENT "Creating development build directories for application \"${APPLICATION_NAME}\".")
 
+    # Reserve target for plugin build for hot reloading.
+
+    add_custom_target ("${APPLICATION_NAME}_dev_all_plugins")
+
     # Generate core plugin libraries first, because other plugins depend on core plugins.
 
     foreach (PLUGIN ${CORE_PLUGINS})
@@ -610,6 +618,8 @@ function (application_generate)
                 USER "${PLUGIN}_dev_copy"
                 OUTPUT ${DEV_PLUGINS_DIRECTORY}
                 DEPENDENCIES "${APPLICATION_NAME}_prepare_dev_directories")
+
+        add_dependencies ("${APPLICATION_NAME}_dev_all_plugins" "${PLUGIN}_dev_copy")
     endforeach ()
 
     # Find core resource targets.
@@ -669,6 +679,7 @@ function (application_generate)
     string (APPEND DEV_CORE_CONFIGURATOR_CONTENT
             "set (WORLDS_DIRECTORY_PATH \"${WORLD_DIRECTORY}\")\n")
     string (APPEND DEV_CORE_CONFIGURATOR_CONTENT "set (OBSERVE_WORLD_DEFINITIONS 1)\n")
+    string (APPEND DEV_CORE_CONFIGURATOR_CONTENT "set (ENABLE_CODE_HOT_RELOAD 1)\n")
 
     set (DEV_CORE_CONFIGURATION_PATH "${DEV_CONFIGURATION_DIRECTORY}/core.rd")
     string (APPEND DEV_CORE_CONFIGURATOR_CONTENT
@@ -972,6 +983,12 @@ function (application_generate)
             string (APPEND PACK_CORE_CONFIGURATOR_CONTENT "set (OBSERVE_WORLD_DEFINITIONS 1)\n")
         else ()
             string (APPEND PACK_CORE_CONFIGURATOR_CONTENT "set (OBSERVE_WORLD_DEFINITIONS 0)\n")
+        endif ()
+
+        if (KAN_APPLICATION_ENABLE_CODE_HOT_RELOAD_IN_PACKAGED)
+            string (APPEND PACK_CORE_CONFIGURATOR_CONTENT "set (ENABLE_CODE_HOT_RELOAD 1)\n")
+        else ()
+            string (APPEND PACK_CORE_CONFIGURATOR_CONTENT "set (ENABLE_CODE_HOT_RELOAD 0)\n")
         endif ()
 
         set (PACK_CORE_CONFIGURATION_PATH "${PACK_CONFIGURATION_DIRECTORY}/core.rd")
