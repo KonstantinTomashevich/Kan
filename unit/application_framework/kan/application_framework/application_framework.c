@@ -141,6 +141,12 @@ void kan_application_framework_core_configuration_shutdown (
         kan_free_general (config_allocation_group, instance->world_directory_path,
                           strlen (instance->world_directory_path) + 1u);
     }
+
+    if (instance->auto_build_and_hot_reload_command)
+    {
+        kan_free_general (config_allocation_group, instance->auto_build_and_hot_reload_command,
+                          strlen (instance->auto_build_and_hot_reload_command) + 1u);
+    }
 }
 
 void kan_application_framework_program_configuration_init (
