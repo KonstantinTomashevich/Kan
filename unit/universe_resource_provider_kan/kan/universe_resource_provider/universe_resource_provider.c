@@ -372,7 +372,7 @@ struct kan_reflection_generator_universe_resource_provider_t
     /// \meta reflection_ignore_struct_field
     struct kan_reflection_struct_t mutator_type;
 
-     /// \meta reflection_ignore_struct_field
+    /// \meta reflection_ignore_struct_field
     struct kan_reflection_function_t mutator_deploy_function;
 
     /// \meta reflection_ignore_struct_field
