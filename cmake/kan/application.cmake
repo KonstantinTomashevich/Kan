@@ -688,7 +688,7 @@ function (application_generate)
     if (KAN_APPLICATION_ENABLE_AUTO_BUILD_AND_HOT_RELOAD)
         string (APPEND DEV_CORE_CONFIGURATOR_CONTENT "set (AUTO_CODE_HOT_RELOAD_COMMAND ")
         string (APPEND DEV_CORE_CONFIGURATOR_CONTENT
-                "\"auto_build_and_hot_reload_command = \\\"\\\\\\\"${CMAKE_COMMAND}\\\\\\\" ")
+                "\"auto_build_and_hot_reload_command = \\\"${CMAKE_COMMAND} ")
         string (APPEND DEV_CORE_CONFIGURATOR_CONTENT "--build \\\\\\\"${CMAKE_BINARY_DIR}\\\\\\\" ")
         string (APPEND DEV_CORE_CONFIGURATOR_CONTENT
                 "--target \\\\\\\"${APPLICATION_NAME}_dev_all_plugins\\\\\\\"\\\"\")\n")
