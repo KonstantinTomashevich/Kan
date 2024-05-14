@@ -1,3 +1,6 @@
+# cglm
+add_subdirectory (cglm)
+
 # debugbreak
 add_library (debug_break INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/debugbreak/debugbreak.h")
 target_include_directories (debug_break INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/debugbreak")

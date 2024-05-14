@@ -16,3 +16,6 @@
 [submodule "third_party/qsort"]
 	path = third_party/qsort
 	url = https://github.com/svpv/qsort.git
+[submodule "third_party/cglm"]
+	path = third_party/cglm
+	url = https://github.com/recp/cglm
