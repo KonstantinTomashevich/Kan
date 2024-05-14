@@ -1,7 +1,7 @@
 //! kan_universe_world_definition_t
 
 world_name = "core"
-scheduler_name = "plain_update"
+scheduler_name = "single_pipeline_no_time"
 
 +configuration {
     name = "resource_provider"

@@ -3,9 +3,9 @@
 #include <stdio.h>
 
 #include <kan/context/application_system.h>
-#include <kan/platform/precise_time.h>
 #include <kan/universe/universe.h>
 #include <kan/universe_resource_provider/universe_resource_provider.h>
+#include <kan/universe_time/universe_time.h>
 
 struct test_data_type_t
 {
@@ -17,18 +17,6 @@ _Static_assert (_Alignof (struct test_data_type_t) == _Alignof (uint64_t), "Alig
 
 // \meta reflection_struct_meta = "test_data_type_t"
 APPLICATION_FRAMEWORK_EXAMPLE_LOGIC_API struct kan_resource_provider_type_meta_t second_resource_type_meta = {0u};
-
-struct plain_update_state_t
-{
-    uint64_t stub;
-};
-
-APPLICATION_FRAMEWORK_EXAMPLE_LOGIC_API void kan_universe_scheduler_execute_plain_update (
-    kan_universe_scheduler_interface_t interface, struct plain_update_state_t *state)
-{
-    kan_universe_scheduler_interface_run_pipeline (interface, kan_string_intern ("update"));
-    kan_universe_scheduler_interface_update_all_children (interface);
-}
 
 struct test_singleton_t
 {
@@ -46,6 +34,8 @@ APPLICATION_FRAMEWORK_EXAMPLE_LOGIC_API void test_singleton_init (struct test_si
 struct test_mutator_state_t
 {
     struct kan_repository_singleton_write_query_t write__test_singleton;
+    struct kan_repository_singleton_read_query_t read__kan_time_singleton;
+
     struct kan_repository_singleton_read_query_t read__kan_resource_provider_singleton;
     struct kan_repository_indexed_insert_query_t insert__kan_resource_request;
     struct kan_repository_indexed_value_read_query_t read_value__kan_resource_request__request_id;
@@ -151,14 +141,19 @@ APPLICATION_FRAMEWORK_EXAMPLE_LOGIC_API void kan_universe_mutator_execute_test_m
     kan_repository_indexed_value_read_access_close (&request_access);
     kan_repository_indexed_value_read_cursor_close (&request_cursor);
 
+    kan_repository_singleton_read_access_t time_access =
+        kan_repository_singleton_read_query_execute (&state->read__kan_time_singleton);
+    const struct kan_time_singleton_t *time = kan_repository_singleton_read_access_resolve (time_access);
+
 #define TITLE_BUFFER_SIZE 256u
     char buffer[TITLE_BUFFER_SIZE];
-    snprintf (buffer, TITLE_BUFFER_SIZE, "Seconds from startup: %llu. X: %llu. Y: %llu.",
-              (unsigned long long) (kan_platform_get_elapsed_nanoseconds () / 1000000000ull), (unsigned long long) x,
+    snprintf (buffer, TITLE_BUFFER_SIZE, "Visual time: %.3f seconds. Visual delta: %.3f seconds. X: %llu. Y: %llu.",
+              (float) (time->visual_time_ns) / 1e9f, (float) (time->visual_delta_ns) / 1e9f, (unsigned long long) x,
               (unsigned long long) y);
     kan_application_system_window_set_title (state->application_system_handle, singleton->window_handle, buffer);
 #undef TITLE_BUFFER_SIZE
 
+    kan_repository_singleton_read_access_close (time_access);
     kan_repository_singleton_write_access_close (write_access);
 
     kan_cpu_job_release (job);
