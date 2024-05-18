@@ -32,3 +32,17 @@
 
 #    define KAN_MUTE_UNINITIALIZED_WARNINGS_END _Pragma ("GCC diagnostic pop")
 #endif
+
+#if defined(_MSC_VER) && !defined(__clang__)
+#    define KAN_MUTE_POINTER_CONVERSION_WARNINGS_BEGIN _Pragma ("warning (push)")
+#    define KAN_MUTE_POINTER_CONVERSION_WARNINGS_END _Pragma ("warning (pop)")
+#else
+// clang-format off
+#    define KAN_MUTE_POINTER_CONVERSION_WARNINGS_BEGIN                                                                 \
+        _Pragma ("GCC diagnostic push")                                                                                \
+        _Pragma ("GCC diagnostic ignored \"-Wpragmas\"")                                                               \
+        _Pragma ("GCC diagnostic ignored \"-Wincompatible-pointer-types\"")
+// clang-format on
+
+#    define KAN_MUTE_POINTER_CONVERSION_WARNINGS_END _Pragma ("GCC diagnostic pop")
+#endif
