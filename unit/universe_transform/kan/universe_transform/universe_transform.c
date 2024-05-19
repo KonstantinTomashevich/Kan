@@ -4,7 +4,9 @@
 #include <kan/universe_time/universe_time.h>
 #include <kan/universe_transform/universe_transform.h>
 
+// \c_interface_scanner_disable
 KAN_LOG_DEFINE_CATEGORY (universe_transform);
+// \c_interface_scanner_enable
 
 // \meta reflection_struct_meta = "kan_transform_2_component_t"
 UNIVERSE_TRANSFORM_API struct kan_repository_meta_automatic_cascade_deletion_t
@@ -117,7 +119,7 @@ void kan_transform_3_component_init (struct kan_transform_3_component_t *instanc
     {                                                                                                                  \
         struct kan_repository_indexed_value_read_cursor_t cursor = kan_repository_indexed_value_read_query_execute (   \
             &queries->read_value__kan_transform_##TRANSFORM_DIMENSION##_component__parent_object_id,                   \
-            &component->parent_object_id);                                                                             \
+            &component->object_id);                                                                                    \
                                                                                                                        \
         while (KAN_TRUE)                                                                                               \
         {                                                                                                              \
@@ -133,10 +135,10 @@ void kan_transform_3_component_init (struct kan_transform_3_component_t *instanc
                                                                                                                        \
                 kan_atomic_int_lock (&mutable_child_component->TRANSFORM_TYPE##_global_lock);                          \
                 mutable_child_component->TRANSFORM_TYPE##_global_dirty = KAN_TRUE;                                     \
-                kan_atomic_int_unlock (&mutable_child_component->TRANSFORM_TYPE##_global_lock);                        \
                                                                                                                        \
                 kan_transform_##TRANSFORM_DIMENSION##_invalidate_children_##TRANSFORM_TYPE##_global (                  \
                     queries, mutable_child_component);                                                                 \
+                kan_atomic_int_unlock (&mutable_child_component->TRANSFORM_TYPE##_global_lock);                        \
                 kan_repository_indexed_value_read_access_close (&access);                                              \
             }                                                                                                          \
             else                                                                                                       \
@@ -218,7 +220,9 @@ void kan_transform_2_get_logical_global (struct kan_transform_2_queries_t *queri
                                                                                                                        \
         kan_float_matrix_##MATRIX_DIMENSION##_to_transform_##TRANSFORM_DIMENSION (                                     \
             &result_matrix, &mutable_component->TRANSFORM_TYPE##_global);                                              \
+        *output = mutable_component->TRANSFORM_TYPE##_global;                                                          \
         mutable_component->TRANSFORM_TYPE##_global_dirty = KAN_FALSE;                                                  \
+        kan_repository_indexed_value_read_access_close (&parent_access);                                               \
     }                                                                                                                  \
     else                                                                                                               \
     {                                                                                                                  \

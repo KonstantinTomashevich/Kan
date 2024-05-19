@@ -35,6 +35,8 @@ struct CGLM_ALIGN_MAT kan_math_align_as_cglm_mat_t
 
 // \c_interface_scanner_enable
 
+#define KAN_PI CGLM_PI
+
 /// \brief 2 dimensional integer vector type.
 struct kan_integer_vector_2_t
 {
@@ -253,19 +255,19 @@ static inline struct kan_integer_vector_4_t kan_make_integer_vector_4_t (int x, 
 }
 
 /// \brief Convenience constructor function for kan_float_vector_2_t.
-static inline struct kan_float_vector_2_t kan_make_float_vector_2_t (int x, int y)
+static inline struct kan_float_vector_2_t kan_make_float_vector_2_t (float x, float y)
 {
     return (struct kan_float_vector_2_t) {.x = x, .y = y};
 }
 
 /// \brief Convenience constructor function for kan_float_vector_3_t.
-static inline struct kan_float_vector_3_t kan_make_float_vector_3_t (int x, int y, int z)
+static inline struct kan_float_vector_3_t kan_make_float_vector_3_t (float x, float y, float z)
 {
     return (struct kan_float_vector_3_t) {.x = x, .y = y, .z = z};
 }
 
 /// \brief Convenience constructor function for kan_float_vector_4_t.
-static inline struct kan_float_vector_4_t kan_make_float_vector_4_t (int x, int y, int z, int w)
+static inline struct kan_float_vector_4_t kan_make_float_vector_4_t (float x, float y, float z, float w)
 {
     struct kan_float_vector_4_t vector;
     vector.x = x;
@@ -273,6 +275,17 @@ static inline struct kan_float_vector_4_t kan_make_float_vector_4_t (int x, int 
     vector.z = z;
     vector.w = w;
     return vector;
+}
+
+/// \brief Constructor for creating quaternions from euler angles.
+static inline struct kan_float_vector_4_t kan_make_quaternion_from_euler (float x, float y, float z)
+{
+    struct kan_float_vector_4_t result;
+    KAN_MUTE_POINTER_CONVERSION_WARNINGS_BEGIN
+    vec3 angles = {x, y, z};
+    glm_euler_xyz_quat (&angles, &result);
+    KAN_MUTE_POINTER_CONVERSION_WARNINGS_END
+    return result;
 }
 
 /// \brief Linear interpolation for single floating point number.
