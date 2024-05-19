@@ -13,28 +13,6 @@ KAN_MUTE_THIRD_PARTY_WARNINGS_END
 
 KAN_C_HEADER_BEGIN
 
-// \c_interface_scanner_disable
-
-/// \brief Stub for forcing alignment.
-struct CGLM_ALIGN (8) kan_math_align_as_8_t
-{
-    float stub;
-};
-
-/// \brief Stub for forcing alignment.
-struct CGLM_ALIGN (16) kan_math_align_as_16_t
-{
-    float stub;
-};
-
-/// \brief Stub for forcing alignment.
-struct CGLM_ALIGN_MAT kan_math_align_as_cglm_mat_t
-{
-    float stub;
-};
-
-// \c_interface_scanner_enable
-
 #define KAN_PI CGLM_PI
 
 /// \brief 2 dimensional integer vector type.
@@ -98,13 +76,10 @@ struct kan_float_vector_4_t
     float y;
     float z;
     float w;
-
-    // \c_interface_scanner_disable
-    KAN_MUTE_THIRD_PARTY_WARNINGS_BEGIN
-    struct kan_math_align_as_16_t align_stub[0u];
-    KAN_MUTE_THIRD_PARTY_WARNINGS_END
-    // \c_interface_scanner_enable
-};
+}
+// \c_interface_scanner_disable
+CGLM_ALIGN (16);
+// \c_interface_scanner_enable
 
 _Static_assert (sizeof (struct kan_float_vector_4_t) == sizeof (vec4), "Size validation.");
 _Static_assert (_Alignof (struct kan_float_vector_4_t) == _Alignof (vec4), "Alignment validation.");
@@ -147,13 +122,10 @@ struct kan_float_matrix_2x2_t
 {
     struct kan_float_vector_2_t row_0;
     struct kan_float_vector_2_t row_1;
-
-    // \c_interface_scanner_disable
-    KAN_MUTE_THIRD_PARTY_WARNINGS_BEGIN
-    struct kan_math_align_as_16_t align_stub[0u];
-    KAN_MUTE_THIRD_PARTY_WARNINGS_END
-    // \c_interface_scanner_enable
-};
+}
+// \c_interface_scanner_disable
+CGLM_ALIGN (16);
+// \c_interface_scanner_enable
 
 _Static_assert (sizeof (struct kan_float_matrix_2x2_t) == sizeof (mat2), "Size validation.");
 _Static_assert (_Alignof (struct kan_float_matrix_2x2_t) == _Alignof (mat2), "Alignment validation.");
@@ -185,13 +157,10 @@ struct kan_float_matrix_4x4_t
     struct kan_float_vector_4_t row_1;
     struct kan_float_vector_4_t row_2;
     struct kan_float_vector_4_t row_3;
-
-    // \c_interface_scanner_disable
-    KAN_MUTE_THIRD_PARTY_WARNINGS_BEGIN
-    struct kan_math_align_as_cglm_mat_t align_stub[0u];
-    KAN_MUTE_THIRD_PARTY_WARNINGS_END
-    // \c_interface_scanner_enable
-};
+}
+// \c_interface_scanner_disable
+CGLM_ALIGN_MAT;
+// \c_interface_scanner_enable
 
 _Static_assert (sizeof (struct kan_float_matrix_4x4_t) == sizeof (mat4), "Size validation.");
 _Static_assert (_Alignof (struct kan_float_matrix_4x4_t) == _Alignof (mat4), "Alignment validation.");
