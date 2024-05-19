@@ -11,8 +11,9 @@ concrete_sources_direct ("${REFLECTION_GENERATOR_OUTPUT_FILE_PATH}")
 
 concrete_require (
         SCOPE PUBLIC
-        CONCRETE_INTERFACE context_reflection_system context_update_system testing universe
-        universe_single_pipeline_scheduler universe_time universe_transform)
+        CONCRETE_INTERFACE
+        context_reflection_system context_update_system testing universe universe_single_pipeline_scheduler
+        universe_time universe_transform)
 
 register_shared_library (test_universe_transform_library)
 shared_library_include (

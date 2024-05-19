@@ -557,17 +557,18 @@ static void visual_transform_sync_2_calculate_execute (uint64_t user_data)
                                                                                                                        \
     const uint64_t source_time_ns = time->visual_time_ns - time->visual_delta_ns;                                      \
     const uint64_t target_time_ns = component->logical_local_time_ns;                                                  \
-    if (!component->visual_synced_at_least_once)                                                                       \
-    {                                                                                                                  \
-        component->visual_synced_at_least_once = KAN_TRUE;                                                             \
-        component->visual_local = component->logical_local;                                                            \
-    }                                                                                                                  \
-    else if (source_time_ns < target_time_ns)                                                                          \
+                                                                                                                       \
+    if (component->visual_synced_at_least_once && source_time_ns < target_time_ns)                                    \
     {                                                                                                                  \
         const uint64_t max_delta_ns = target_time_ns - source_time_ns;                                                 \
         const uint64_t delta_ns = KAN_MIN (time->visual_delta_ns, max_delta_ns);                                       \
         const float alpha = ((float) delta_ns) / ((float) max_delta_ns);                                               \
         kan_transform_##TRANSFORM_DIMENSIONS##_interpolate_visual (component, alpha);                                  \
+    }                                                                                                                  \
+    else                                                                                                               \
+    {                                                                                                                  \
+        component->visual_synced_at_least_once = KAN_TRUE;                                                             \
+        component->visual_local = component->logical_local;                                                            \
     }                                                                                                                  \
                                                                                                                        \
     component->visual_sync_needed = time->visual_time_ns < component->logical_local_time_ns;                           \

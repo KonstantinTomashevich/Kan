@@ -52,6 +52,7 @@ UNIVERSE_PAIR_PIPELINE_SCHEDULER_API void kan_universe_scheduler_execute_pair_pi
     kan_repository_singleton_write_access_close (time_access);
 
     // Advance logical time until logical time is ahead.
+
     const uint64_t logical_advance_begin_ns = kan_platform_get_elapsed_nanoseconds ();
     const uint64_t logical_advance_begin_time = time->logical_time_ns;
 
