@@ -1,7 +1,7 @@
 //! kan_universe_world_definition_t
 
 world_name = "test"
-scheduler_name = "plain_update"
+scheduler_name = "single_pipeline"
 
 +pipelines {
     name = "update"

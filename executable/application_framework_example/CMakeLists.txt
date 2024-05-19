@@ -18,7 +18,9 @@ application_set_world_directory ("${CMAKE_CURRENT_SOURCE_DIR}/world")
 application_add_development_environment_tag (development)
 
 register_application_plugin (NAME base GROUP base)
-application_plugin_include (ABSTRACT universe_resource_provider=kan)
+application_plugin_include (
+        ABSTRACT universe_resource_provider=kan
+        CONCRETE universe_single_pipeline_scheduler universe_time)
 
 register_application_plugin (NAME logic GROUP test)
 application_plugin_include (ABSTRACT CONCRETE application_framework_example_logic)
