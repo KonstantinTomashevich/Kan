@@ -66,7 +66,7 @@ UNIVERSE_PAIR_PIPELINE_SCHEDULER_API void kan_universe_scheduler_execute_pair_pi
         if (advance_time_spent > logical_advance_max_ns)
         {
             time->visual_time_ns = time->logical_time_ns;
-            time->visual_delta_ns = time->logical_time_ns - logical_advance_begin_time ;
+            time->visual_delta_ns = time->logical_time_ns - logical_advance_begin_time;
 
             kan_repository_singleton_write_access_close (time_access);
             break;
