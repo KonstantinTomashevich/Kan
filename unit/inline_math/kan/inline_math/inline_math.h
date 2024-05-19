@@ -390,6 +390,16 @@ static inline void kan_float_matrix_4x4_inverse (const struct kan_float_matrix_4
     KAN_MUTE_POINTER_CONVERSION_WARNINGS_END
 }
 
+/// \brief Creates identity 2d transformation.
+static inline struct kan_transform_2_t kan_transform_2_get_identity (void)
+{
+    return (struct kan_transform_2_t) {
+        .location = {0.0f, 0.0f},
+        .rotation = 0.0f,
+        .scale = {1.0f, 1.0f},
+    };
+}
+
 /// \brief Converts 2d transform to 3x3 matrix.
 static inline void kan_transform_2_to_float_matrix_3x3 (const struct kan_transform_2_t *transform,
                                                         struct kan_float_matrix_3x3_t *matrix)
@@ -410,6 +420,16 @@ static inline void kan_float_matrix_3x3_to_transform_2 (const struct kan_float_m
     transform->rotation = atan2f (matrix->row_0.y, matrix->row_0.x);
     transform->scale.x = sqrtf (matrix->row_0.x * matrix->row_0.x + matrix->row_0.y * matrix->row_0.y);
     transform->scale.y = sqrtf (matrix->row_1.x * matrix->row_1.x + matrix->row_1.y * matrix->row_1.y);
+}
+
+/// \brief Creates identity 3d transformation.
+static inline struct kan_transform_3_t kan_transform_3_get_identity (void)
+{
+    return (struct kan_transform_3_t) {
+        .location = kan_make_float_vector_3_t (0.0f, 0.0f, 0.0f),
+        .rotation = kan_make_float_vector_4_t (0.0f, 0.0f, 0.0f, 1.0f),
+        .scale = kan_make_float_vector_3_t (1.0f, 1.0f, 1.0f),
+    };
 }
 
 /// \brief Converts 3d transform to 4x4 matrix.
