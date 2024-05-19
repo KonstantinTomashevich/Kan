@@ -34,7 +34,14 @@
 #endif
 
 #if defined(_MSC_VER) && !defined(__clang__)
-#    define KAN_MUTE_POINTER_CONVERSION_WARNINGS_BEGIN _Pragma ("warning (push)")
+// clang-format off
+#    define KAN_MUTE_POINTER_CONVERSION_WARNINGS_BEGIN \
+        _Pragma ("warning (push)")                     \
+        _Pragma ("warning (disable : 4024)")           \
+        _Pragma ("warning (disable : 4047)")           \
+        _Pragma ("warning (disable : 4090)")          \
+        _Pragma ("warning (disable : 4133)")
+// clang-format on
 #    define KAN_MUTE_POINTER_CONVERSION_WARNINGS_END _Pragma ("warning (pop)")
 #else
 // clang-format off
