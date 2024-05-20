@@ -480,7 +480,7 @@ static const char *capture_meta_value_end;
  */
 
 /*!rules:re2c:skip_comments
- ("//".+) | ("/""*" (((. \ [\x2a]) | "\n")+ "*" (. \ [\x2f]))+ "/") { continue; }
+ ("//".+) | ("/""*" (((. \ [\x2a]) | "\n")+ "*" (. \ [\x2f]))* ((. \ [\x2a]) | "\n")+ "*""/") { continue; }
  */
 
 /*!rules:re2c:parse_meta
