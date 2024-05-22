@@ -75,6 +75,13 @@
 /// name KAN_RESOURCE_PROVIDER_CONFIGURATION and this configuration should have `kan_resource_provider_configuration_t`
 /// type. More about configuration variables in described in its documentation.
 /// \endparblock
+///
+/// \par Entries
+/// \parblock
+/// Information about resources, visible to resource provider, is stored in globally accessible entries:
+/// `kan_resource_native_entry_t` and `kan_resource_third_party_entry_t`. User can read these entries if it is needed
+/// to query available resource for some operation.
+/// \endparblock
 
 KAN_C_HEADER_BEGIN
 
@@ -204,6 +211,40 @@ struct kan_resource_provider_configuration_t
     /// \brief Path to virtual directory with resources, that is used as resource root directory.
     kan_interned_string_t resource_directory_path;
 };
+
+/// \brief Provides information about native resource entry visible to resource provider.
+struct kan_resource_native_entry_t
+{
+    /// \brief Internal id used to bind implementation suffix to the entry.
+    uint64_t internal_id;
+
+    kan_interned_string_t type;
+    kan_interned_string_t name;
+    char *path;
+    kan_allocation_group_t my_allocation_group;
+};
+
+UNIVERSE_RESOURCE_PROVIDER_API void kan_resource_native_entry_init (struct kan_resource_native_entry_t *instance);
+
+UNIVERSE_RESOURCE_PROVIDER_API void kan_resource_native_entry_shutdown (struct kan_resource_native_entry_t *instance);
+
+/// \brief Provides information about third party resource entry visible to resource provider.
+struct kan_resource_third_party_entry_t
+{
+    /// \brief Internal id used to bind implementation suffix to the entry.
+    uint64_t internal_id;
+
+    kan_interned_string_t name;
+    uint64_t size;
+    char *path;
+    kan_allocation_group_t my_allocation_group;
+};
+
+UNIVERSE_RESOURCE_PROVIDER_API void kan_resource_third_party_entry_init (
+    struct kan_resource_third_party_entry_t *instance);
+
+UNIVERSE_RESOURCE_PROVIDER_API void kan_resource_third_party_entry_shutdown (
+    struct kan_resource_third_party_entry_t *instance);
 
 /// \brief Empty meta for marking types for native resources that should be supported by resource provider logic.
 struct kan_resource_provider_type_meta_t
