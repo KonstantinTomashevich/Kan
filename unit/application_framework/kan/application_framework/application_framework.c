@@ -184,7 +184,6 @@ void kan_application_framework_program_configuration_shutdown (
 }
 
 KAN_REFLECTION_EXPECT_UNIT_REGISTRAR_LOCAL (application_framework);
-KAN_REFLECTION_EXPECT_UNIT_REGISTRAR (universe);
 
 static inline kan_bool_t is_path_to_binary (const char *path)
 {
@@ -208,7 +207,6 @@ int kan_application_framework_run (const char *core_configuration_path,
 
     kan_reflection_registry_t temporary_registry = kan_reflection_registry_create ();
     KAN_REFLECTION_UNIT_REGISTRAR_NAME (application_framework) (temporary_registry);
-    KAN_REFLECTION_UNIT_REGISTRAR_NAME (universe) (temporary_registry);
     kan_serialization_binary_script_storage_t temporary_script_storage =
         kan_serialization_binary_script_storage_create (temporary_registry);
 
