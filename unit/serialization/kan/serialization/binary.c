@@ -303,12 +303,8 @@ static struct script_node_t *script_storage_get_or_create_script (struct script_
         node->script_generation_lock = kan_atomic_int_init (0);
         node->script = NULL;
 
-        if (storage->script_storage.items.size >=
-            storage->script_storage.bucket_count * KAN_SERIALIZATION_BINARY_SCRIPT_LOAD_FACTOR)
-        {
-            kan_hash_storage_set_bucket_count (&storage->script_storage, storage->script_storage.bucket_count * 2u);
-        }
-
+        kan_hash_storage_update_bucket_count_default (&storage->script_storage,
+                                                      KAN_SERIALIZATION_BINARY_SCRIPT_INITIAL_BUCKETS);
         kan_hash_storage_add (&storage->script_storage, &node->node);
     }
 
@@ -949,13 +945,8 @@ static struct interned_string_lookup_node_t *script_storage_get_or_create_intern
         node->interned_string_absolute_positions_count = 0u;
         node->interned_string_absolute_positions = NULL;
 
-        if (storage->interned_string_lookup_storage.items.size >=
-            storage->interned_string_lookup_storage.bucket_count * KAN_SERIALIZATION_BINARY_INTERNED_STRING_LOAD_FACTOR)
-        {
-            kan_hash_storage_set_bucket_count (&storage->interned_string_lookup_storage,
-                                               storage->interned_string_lookup_storage.bucket_count * 2u);
-        }
-
+        kan_hash_storage_update_bucket_count_default (&storage->interned_string_lookup_storage,
+                                                      KAN_SERIALIZATION_BINARY_INTERNED_STRING_BUCKETS);
         kan_hash_storage_add (&storage->interned_string_lookup_storage, &node->node);
     }
 
@@ -1221,7 +1212,7 @@ static struct interned_string_registry_t *interned_string_registry_create (kan_b
 
     kan_dynamic_array_init (
         &registry->index_to_value,
-        KAN_SERIALIZATION_BINARY_INTERNED_REGISTRY_BUCKETS * KAN_SERIALIZATION_BINARY_INTERNED_REGISTRY_LOAD_FACTOR,
+        KAN_SERIALIZATION_BINARY_INTERNED_REGISTRY_BUCKETS * KAN_CONTAINER_HASH_STORAGE_DEFAULT_LOAD_FACTOR,
         sizeof (kan_interned_string_t), _Alignof (kan_interned_string_t), interned_string_registry_allocation_group);
 
     registry->load_only = load_only;
@@ -1261,12 +1252,8 @@ static uint32_t interned_string_registry_add_string_internal (struct interned_st
         node->value = interned_string;
         node->index = index;
 
-        if (registry->value_to_index.items.size >=
-            registry->value_to_index.bucket_count * KAN_SERIALIZATION_BINARY_INTERNED_REGISTRY_LOAD_FACTOR)
-        {
-            kan_hash_storage_set_bucket_count (&registry->value_to_index, registry->value_to_index.bucket_count * 2u);
-        }
-
+        kan_hash_storage_update_bucket_count_default (&registry->value_to_index,
+                                                      KAN_SERIALIZATION_BINARY_INTERNED_REGISTRY_BUCKETS);
         kan_hash_storage_add (&registry->value_to_index, &node->node);
     }
 

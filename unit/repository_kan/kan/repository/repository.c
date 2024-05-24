@@ -2628,11 +2628,8 @@ static kan_bool_t return_uniqueness_watcher_register (struct return_uniqueness_w
 
     if (watcher->unique_count > KAN_REPOSITORY_UNIQUENESS_WATCHER_SIMPLICITY_LIMIT)
     {
-        if (watcher->hash_storage.bucket_count * KAN_REPOSITORY_UNIQUENESS_WATCHER_LOAD_FACTOR <=
-            watcher->hash_storage.items.size)
-        {
-            kan_hash_storage_set_bucket_count (&watcher->hash_storage, watcher->hash_storage.bucket_count * 2u);
-        }
+        kan_hash_storage_update_bucket_count_default (&watcher->hash_storage,
+                                                      KAN_REPOSITORY_UNIQUENESS_WATCHER_INITIAL_BUCKETS);
 
         kan_atomic_int_lock (temporary_allocator_lock);
         struct return_uniqueness_watcher_hash_node_t *hash_node = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (
@@ -3101,16 +3098,6 @@ static struct value_index_node_t *value_index_query_node_from_hash (struct value
     }
 
     return NULL;
-}
-
-static void value_index_reset_buckets_if_needed (struct value_index_t *index)
-{
-    if (index->hash_storage.bucket_count * KAN_REPOSITORY_VALUE_INDEX_LOAD_FACTOR <= index->hash_storage.items.size)
-    {
-        kan_hash_storage_set_bucket_count (&index->hash_storage, index->hash_storage.bucket_count * 2u);
-    }
-
-    // TODO: Set smaller bucket count if there is too many buckets?
 }
 
 static void value_index_insert_record (struct value_index_t *index, struct indexed_storage_record_node_t *record_node)
@@ -4289,13 +4276,8 @@ kan_repository_singleton_storage_t kan_repository_singleton_storage_open (kan_re
         storage->safeguard_access_status = kan_atomic_int_init (0);
 #endif
 
-        if (repository_data->singleton_storages.bucket_count * KAN_REPOSITORY_SINGLETON_STORAGE_LOAD_FACTOR <=
-            repository_data->singleton_storages.items.size)
-        {
-            kan_hash_storage_set_bucket_count (&repository_data->singleton_storages,
-                                               repository_data->singleton_storages.bucket_count * 2u);
-        }
-
+        kan_hash_storage_update_bucket_count_default (&repository_data->singleton_storages,
+                                                      KAN_REPOSITORY_SINGLETON_STORAGE_INITIAL_BUCKETS);
         kan_hash_storage_add (&repository_data->singleton_storages, &storage->node);
     }
 
@@ -4503,13 +4485,8 @@ kan_repository_indexed_storage_t kan_repository_indexed_storage_open (kan_reposi
         storage->interval_index_allocation_group = kan_allocation_group_get_child (indices_group, "interval");
         storage->space_index_allocation_group = kan_allocation_group_get_child (indices_group, "space");
 
-        if (repository_data->indexed_storages.bucket_count * KAN_REPOSITORY_EVENT_STORAGE_LOAD_FACTOR <=
-            repository_data->indexed_storages.items.size)
-        {
-            kan_hash_storage_set_bucket_count (&repository_data->indexed_storages,
-                                               repository_data->indexed_storages.bucket_count * 2u);
-        }
-
+        kan_hash_storage_update_bucket_count_default (&repository_data->indexed_storages,
+                                                      KAN_REPOSITORY_INDEXED_STORAGE_INITIAL_BUCKETS);
         kan_hash_storage_add (&repository_data->indexed_storages, &storage->node);
     }
 
@@ -4834,7 +4811,8 @@ static void indexed_storage_perform_maintenance (struct indexed_storage_node_t *
     struct value_index_t *value_index = storage->first_value_index;
     while (value_index)
     {
-        value_index_reset_buckets_if_needed (value_index);
+        kan_hash_storage_update_bucket_count_default (&value_index->hash_storage,
+                                                      KAN_REPOSITORY_VALUE_INDEX_INITIAL_BUCKETS);
         value_index = value_index->next;
     }
 
@@ -8138,13 +8116,8 @@ kan_repository_event_storage_t kan_repository_event_storage_open (kan_repository
         storage->safeguard_access_status = kan_atomic_int_init (0);
 #endif
 
-        if (repository_data->event_storages.bucket_count * KAN_REPOSITORY_EVENT_STORAGE_LOAD_FACTOR <=
-            repository_data->event_storages.items.size)
-        {
-            kan_hash_storage_set_bucket_count (&repository_data->event_storages,
-                                               repository_data->event_storages.bucket_count * 2u);
-        }
-
+        kan_hash_storage_update_bucket_count_default (&repository_data->event_storages,
+                                                      KAN_REPOSITORY_EVENT_STORAGE_INITIAL_BUCKETS);
         kan_hash_storage_add (&repository_data->event_storages, &storage->node);
     }
 

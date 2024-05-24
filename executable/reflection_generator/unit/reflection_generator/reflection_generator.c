@@ -358,11 +358,7 @@ static void register_functor (kan_interned_string_t functor_name)
     node->node.hash = (uint64_t) functor_name;
     node->name = functor_name;
 
-    if (functor_registry.items.size >= functor_registry.bucket_count * KAN_REFLECTION_GENERATOR_FUNCTORS_LOAD_FACTOR)
-    {
-        kan_hash_storage_set_bucket_count (&functor_registry, functor_registry.bucket_count * 2u);
-    }
-
+    kan_hash_storage_update_bucket_count_default (&functor_registry, KAN_REFLECTION_GENERATOR_FUNCTORS_INITIAL_BUCKETS);
     kan_hash_storage_add (&functor_registry, &node->node);
 }
 

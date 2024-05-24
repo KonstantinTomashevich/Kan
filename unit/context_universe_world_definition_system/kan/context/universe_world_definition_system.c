@@ -235,13 +235,8 @@ static void scan_file (struct universe_world_definition_system_t *system,
         return;
     }
 
-    if (system->stored_world_definitions.items.size >=
-        system->stored_world_definitions.bucket_count * KAN_UNIVERSE_WORLD_DEFINITION_SYSTEM_LOAD_FACTOR)
-    {
-        kan_hash_storage_set_bucket_count (&system->stored_world_definitions,
-                                           system->stored_world_definitions.bucket_count * 2u);
-    }
-
+    kan_hash_storage_update_bucket_count_default (&system->stored_world_definitions,
+                                                  KAN_UNIVERSE_WORLD_DEFINITION_SYSTEM_BUCKETS);
     kan_hash_storage_add (&system->stored_world_definitions, &node->node);
 }
 

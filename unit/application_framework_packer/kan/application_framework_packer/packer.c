@@ -217,11 +217,7 @@ static inline kan_bool_t register_resource (char *source_path, kan_serialization
     node->source_path = kan_allocate_general (resources_allocation_group, path_length + 1u, _Alignof (char));
     memcpy (node->source_path, source_path, path_length + 1u);
 
-    if (resources_storage.items.size >= resources_storage.bucket_count * KAN_PACKER_RESOURCE_STORAGE_LOAD_FACTOR)
-    {
-        kan_hash_storage_set_bucket_count (&resources_storage, resources_storage.bucket_count * 2u);
-    }
-
+    kan_hash_storage_update_bucket_count_default (&resources_storage, KAN_PACKER_RESOURCE_STORAGE_BUCKETS);
     kan_hash_storage_add (&resources_storage, &node->node);
     return KAN_TRUE;
 }

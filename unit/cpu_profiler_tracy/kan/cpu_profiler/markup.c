@@ -63,11 +63,7 @@ kan_cpu_section_t kan_cpu_section_get (const char *name)
     new_node->location.line = 0u;
     new_node->location.color = ((rand () % 255u) << 24u) | ((rand () % 255u) << 16u) | ((rand () % 255u) << 8u);
 
-    if (section_storage.items.size >= section_storage.bucket_count * KAN_CPU_PROFILER_TRACY_SECTION_LOAD_FACTOR)
-    {
-        kan_hash_storage_set_bucket_count (&section_storage, section_storage.bucket_count * 2u);
-    }
-
+    kan_hash_storage_update_bucket_count_default (&section_storage, KAN_CPU_PROFILER_TRACY_INITIAL_SECTION_BUCKETS);
     kan_hash_storage_add (&section_storage, &new_node->node);
     kan_atomic_int_unlock (&section_storage_lock);
     return (kan_cpu_section_t) new_node;

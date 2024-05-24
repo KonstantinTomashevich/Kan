@@ -425,13 +425,7 @@ kan_bool_t kan_reflection_registry_add_enum (kan_reflection_registry_t registry,
     node->node.hash = (uint64_t) enum_reflection->name;
     node->enum_reflection = enum_reflection;
 
-    if (registry_struct->enum_storage.items.size >=
-        registry_struct->enum_storage.bucket_count * KAN_REFLECTION_ENUM_LOAD_FACTOR)
-    {
-        kan_hash_storage_set_bucket_count (&registry_struct->enum_storage,
-                                           registry_struct->enum_storage.bucket_count * 2u);
-    }
-
+    kan_hash_storage_update_bucket_count_default (&registry_struct->enum_storage, KAN_REFLECTION_ENUM_INITIAL_BUCKETS);
     kan_hash_storage_add (&registry_struct->enum_storage, &node->node);
     return KAN_TRUE;
 }
@@ -450,13 +444,8 @@ void kan_reflection_registry_add_enum_meta (kan_reflection_registry_t registry,
     node->meta_type_name = meta_type_name;
     node->meta = meta;
 
-    if (registry_struct->enum_meta_storage.items.size >=
-        registry_struct->enum_meta_storage.bucket_count * KAN_REFLECTION_ENUM_META_LOAD_FACTOR)
-    {
-        kan_hash_storage_set_bucket_count (&registry_struct->enum_meta_storage,
-                                           registry_struct->enum_meta_storage.bucket_count * 2u);
-    }
-
+    kan_hash_storage_update_bucket_count_default (&registry_struct->enum_meta_storage,
+                                                  KAN_REFLECTION_ENUM_META_INITIAL_BUCKETS);
     kan_hash_storage_add (&registry_struct->enum_meta_storage, &node->node);
 }
 
@@ -477,13 +466,8 @@ void kan_reflection_registry_add_enum_value_meta (kan_reflection_registry_t regi
     node->meta_type_name = meta_type_name;
     node->meta = meta;
 
-    if (registry_struct->enum_value_meta_storage.items.size >=
-        registry_struct->enum_value_meta_storage.bucket_count * KAN_REFLECTION_ENUM_VALUE_META_LOAD_FACTOR)
-    {
-        kan_hash_storage_set_bucket_count (&registry_struct->enum_value_meta_storage,
-                                           registry_struct->enum_value_meta_storage.bucket_count * 2u);
-    }
-
+    kan_hash_storage_update_bucket_count_default (&registry_struct->enum_value_meta_storage,
+                                                  KAN_REFLECTION_ENUM_VALUE_META_INITIAL_BUCKETS);
     kan_hash_storage_add (&registry_struct->enum_value_meta_storage, &node->node);
 }
 
@@ -569,13 +553,8 @@ kan_bool_t kan_reflection_registry_add_struct (kan_reflection_registry_t registr
     node->node.hash = (uint64_t) struct_reflection->name;
     node->struct_reflection = struct_reflection;
 
-    if (registry_struct->struct_storage.items.size >=
-        registry_struct->struct_storage.bucket_count * KAN_REFLECTION_STRUCT_LOAD_FACTOR)
-    {
-        kan_hash_storage_set_bucket_count (&registry_struct->struct_storage,
-                                           registry_struct->struct_storage.bucket_count * 2u);
-    }
-
+    kan_hash_storage_update_bucket_count_default (&registry_struct->struct_storage,
+                                                  KAN_REFLECTION_STRUCT_INITIAL_BUCKETS);
     kan_hash_storage_add (&registry_struct->struct_storage, &node->node);
     return KAN_TRUE;
 }
@@ -594,13 +573,8 @@ void kan_reflection_registry_add_struct_meta (kan_reflection_registry_t registry
     node->meta_type_name = meta_type_name;
     node->meta = meta;
 
-    if (registry_struct->struct_meta_storage.items.size >=
-        registry_struct->struct_meta_storage.bucket_count * KAN_REFLECTION_STRUCT_META_LOAD_FACTOR)
-    {
-        kan_hash_storage_set_bucket_count (&registry_struct->struct_meta_storage,
-                                           registry_struct->struct_meta_storage.bucket_count * 2u);
-    }
-
+    kan_hash_storage_update_bucket_count_default (&registry_struct->struct_meta_storage,
+                                                  KAN_REFLECTION_STRUCT_META_INITIAL_BUCKETS);
     kan_hash_storage_add (&registry_struct->struct_meta_storage, &node->node);
 }
 
@@ -621,13 +595,8 @@ void kan_reflection_registry_add_struct_field_meta (kan_reflection_registry_t re
     node->meta_type_name = meta_type_name;
     node->meta = meta;
 
-    if (registry_struct->struct_field_meta_storage.items.size >=
-        registry_struct->struct_field_meta_storage.bucket_count * KAN_REFLECTION_STRUCT_FIELD_META_LOAD_FACTOR)
-    {
-        kan_hash_storage_set_bucket_count (&registry_struct->struct_field_meta_storage,
-                                           registry_struct->struct_field_meta_storage.bucket_count * 2u);
-    }
-
+    kan_hash_storage_update_bucket_count_default (&registry_struct->struct_field_meta_storage,
+                                                  KAN_REFLECTION_STRUCT_FIELD_META_INITIAL_BUCKETS);
     kan_hash_storage_add (&registry_struct->struct_field_meta_storage, &node->node);
 }
 
@@ -707,13 +676,8 @@ kan_bool_t kan_reflection_registry_add_function (kan_reflection_registry_t regis
     node->node.hash = (uint64_t) function_reflection->name;
     node->function_reflection = function_reflection;
 
-    if (registry_struct->function_storage.items.size >=
-        registry_struct->function_storage.bucket_count * KAN_REFLECTION_FUNCTION_LOAD_FACTOR)
-    {
-        kan_hash_storage_set_bucket_count (&registry_struct->function_storage,
-                                           registry_struct->function_storage.bucket_count * 2u);
-    }
-
+    kan_hash_storage_update_bucket_count_default (&registry_struct->function_storage,
+                                                  KAN_REFLECTION_FUNCTION_INITIAL_BUCKETS);
     kan_hash_storage_add (&registry_struct->function_storage, &node->node);
     return KAN_TRUE;
 }
@@ -732,13 +696,8 @@ void kan_reflection_registry_add_function_meta (kan_reflection_registry_t regist
     node->meta_type_name = meta_type_name;
     node->meta = meta;
 
-    if (registry_struct->function_meta_storage.items.size >=
-        registry_struct->function_meta_storage.bucket_count * KAN_REFLECTION_FUNCTION_META_LOAD_FACTOR)
-    {
-        kan_hash_storage_set_bucket_count (&registry_struct->function_meta_storage,
-                                           registry_struct->function_meta_storage.bucket_count * 2u);
-    }
-
+    kan_hash_storage_update_bucket_count_default (&registry_struct->function_meta_storage,
+                                                  KAN_REFLECTION_FUNCTION_META_INITIAL_BUCKETS);
     kan_hash_storage_add (&registry_struct->function_meta_storage, &node->node);
 }
 
@@ -759,14 +718,8 @@ void kan_reflection_registry_add_function_argument_meta (kan_reflection_registry
     node->meta_type_name = meta_type_name;
     node->meta = meta;
 
-    if (registry_struct->function_argument_meta_storage.items.size >=
-        registry_struct->function_argument_meta_storage.bucket_count *
-            KAN_REFLECTION_FUNCTION_ARGUMENT_META_LOAD_FACTOR)
-    {
-        kan_hash_storage_set_bucket_count (&registry_struct->function_argument_meta_storage,
-                                           registry_struct->function_argument_meta_storage.bucket_count * 2u);
-    }
-
+    kan_hash_storage_update_bucket_count_default (&registry_struct->function_argument_meta_storage,
+                                                  KAN_REFLECTION_FUNCTION_ARGUMENT_META_INITIAL_BUCKETS);
     kan_hash_storage_add (&registry_struct->function_argument_meta_storage, &node->node);
 }
 
@@ -1980,12 +1933,8 @@ static void migration_seed_add_enums (struct migration_seed_t *migration_seed,
             node->seed.status = KAN_REFLECTION_MIGRATION_REMOVED;
         }
 
-        if (migration_seed->enums.items.size >=
-            migration_seed->enums.bucket_count * KAN_REFLECTION_MIGRATION_ENUM_SEED_LOAD_FACTOR)
-        {
-            kan_hash_storage_set_bucket_count (&migration_seed->enums, migration_seed->enums.bucket_count * 2u);
-        }
-
+        kan_hash_storage_update_bucket_count_default (&migration_seed->enums,
+                                                      KAN_REFLECTION_MIGRATION_ENUM_SEED_INITIAL_BUCKETS);
         kan_hash_storage_add (&migration_seed->enums, &node->node);
         enum_iterator = kan_reflection_registry_enum_iterator_next (enum_iterator);
     }
@@ -2314,12 +2263,8 @@ static struct struct_migration_node_t *migration_seed_add_struct (
         node->seed.status = KAN_REFLECTION_MIGRATION_REMOVED;
     }
 
-    if (migration_seed->structs.items.size >=
-        migration_seed->structs.bucket_count * KAN_REFLECTION_MIGRATION_ENUM_SEED_LOAD_FACTOR)
-    {
-        kan_hash_storage_set_bucket_count (&migration_seed->structs, migration_seed->structs.bucket_count * 2u);
-    }
-
+    kan_hash_storage_update_bucket_count_default (&migration_seed->structs,
+                                                  KAN_REFLECTION_MIGRATION_STRUCT_SEED_INITIAL_BUCKETS);
     kan_hash_storage_add (&migration_seed->structs, &node->node);
     return node;
 }
@@ -3226,12 +3171,8 @@ static struct struct_migrator_node_t *migrator_add_struct (struct migrator_t *mi
         node = node->next;
     }
 
-    if (migrator->struct_migrators.items.size >=
-        migrator->struct_migrators.bucket_count * KAN_REFLECTION_MIGRATION_STRUCT_SEED_LOAD_FACTOR)
-    {
-        kan_hash_storage_set_bucket_count (&migration_seed->enums, migration_seed->enums.bucket_count * 2u);
-    }
-
+    kan_hash_storage_update_bucket_count_default (&migrator->struct_migrators,
+                                                  KAN_REFLECTION_MIGRATION_STRUCT_SEED_INITIAL_BUCKETS);
     kan_hash_storage_add (&migrator->struct_migrators, &struct_migrator->node);
     kan_stack_allocator_load_top (algorithm_allocator, saved_stack_top);
     return struct_migrator;

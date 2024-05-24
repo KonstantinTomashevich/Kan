@@ -1524,13 +1524,8 @@ static kan_bool_t mount_point_read_only_pack_load_item (struct mount_point_read_
             file_node->offset = item->offset;
             file_node->size = item->size;
 
-            if (current_directory->files.items.size >=
-                KAN_VIRTUAL_FILE_SYSTEM_ROPACK_DIRECTORY_LOAD_FACTOR * current_directory->files.bucket_count)
-            {
-                kan_hash_storage_set_bucket_count (&current_directory->files,
-                                                   current_directory->files.bucket_count * 2u);
-            }
-
+            kan_hash_storage_update_bucket_count_default (&current_directory->files,
+                                                          KAN_VIRTUAL_FILE_SYSTEM_ROPACK_DIRECTORY_INITIAL_ITEMS);
             kan_hash_storage_add (&current_directory->files, &file_node->node);
             return KAN_TRUE;
         }

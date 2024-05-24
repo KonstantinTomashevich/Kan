@@ -4,7 +4,9 @@
 
 #include <stdint.h>
 
+#include <kan/api_common/bool.h>
 #include <kan/api_common/c_header.h>
+#include <kan/api_common/min_max.h>
 #include <kan/container/list.h>
 #include <kan/memory_profiler/allocation_group.h>
 
@@ -107,6 +109,7 @@ struct kan_hash_storage_t
 {
     kan_allocation_group_t bucket_allocation_group;
     uint64_t bucket_count;
+    uint64_t empty_buckets;
     struct kan_hash_storage_bucket_t *buckets;
     struct kan_bd_list_t items;
 };
@@ -133,5 +136,33 @@ CONTAINER_API void kan_hash_storage_set_bucket_count (struct kan_hash_storage_t 
 /// \details Keep in mind that nodes lifetime is managed by user and therefore all nodes should be manually freed
 ///          before shutting down hash storage.
 CONTAINER_API void kan_hash_storage_shutdown (struct kan_hash_storage_t *storage);
+
+/// \brief Implements default strategy for update hash storage bucket count to appropriate values.
+static inline void kan_hash_storage_update_bucket_count_default (struct kan_hash_storage_t *storage,
+                                                                 uint64_t min_bucket_count_to_preserve)
+{
+    const kan_bool_t can_grow =
+        storage->empty_buckets * KAN_CONTAINER_HASH_STORAGE_DEFAULT_EBM < storage->bucket_count ||
+        storage->bucket_count <= KAN_CONTAINER_HASH_STORAGE_DEFAULT_MIN_FOR_EBM;
+
+    const kan_bool_t has_many_items =
+        storage->items.size >= storage->bucket_count * KAN_CONTAINER_HASH_STORAGE_DEFAULT_LOAD_FACTOR;
+
+    const kan_bool_t can_shrink =
+        storage->empty_buckets * KAN_CONTAINER_HASH_STORAGE_DEFAULT_EBM >= storage->bucket_count &&
+        storage->bucket_count > min_bucket_count_to_preserve;
+
+    if (can_grow && has_many_items)
+    {
+        kan_hash_storage_set_bucket_count (
+            storage, storage->bucket_count * KAN_MAX (2u, storage->items.size / storage->bucket_count *
+                                                              KAN_CONTAINER_HASH_STORAGE_DEFAULT_LOAD_FACTOR));
+    }
+    else if (can_shrink)
+    {
+        kan_hash_storage_set_bucket_count (
+            storage, KAN_MAX (min_bucket_count_to_preserve, storage->bucket_count - storage->empty_buckets));
+    }
+}
 
 KAN_C_HEADER_END

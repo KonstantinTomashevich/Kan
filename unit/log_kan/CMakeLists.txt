@@ -6,12 +6,10 @@ concrete_implements_abstract (log)
 
 set (KAN_LOG_CATEGORIES_INITIAL_BUCKETS "16" CACHE STRING
         "Initial count of buckets for interned strings hash storage.")
-set (KAN_LOG_CATEGORIES_LOAD_FACTOR "4" CACHE STRING "Target count of interned strings per bucket.")
 set (KAN_LOG_CATEGORIES_CALLBACK_ARRAY_INITIAL_SIZE "4" CACHE STRING "Initial size of log callback dynamic array.")
 
 concrete_compile_definitions (
         PRIVATE
         KAN_LOG_CATEGORIES_INITIAL_BUCKETS=${KAN_LOG_CATEGORIES_INITIAL_BUCKETS}
-        KAN_LOG_CATEGORIES_LOAD_FACTOR=${KAN_LOG_CATEGORIES_LOAD_FACTOR}
         KAN_LOG_CATEGORIES_CALLBACK_ARRAY_INITIAL_SIZE=${KAN_LOG_CATEGORIES_CALLBACK_ARRAY_INITIAL_SIZE})
 c_interface_scanner_setup (GLOB "*.c" "*.h")

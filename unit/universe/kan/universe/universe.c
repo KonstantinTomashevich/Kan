@@ -1334,13 +1334,8 @@ static struct scheduler_api_node_t *universe_get_or_create_scheduler_api (struct
         node->api.execute = NULL;
         node->api.undeploy = NULL;
 
-        if (universe->scheduler_api_storage.items.size >=
-            universe->scheduler_api_storage.bucket_count * KAN_UNIVERSE_SCHEDULER_LOAD_FACTOR)
-        {
-            kan_hash_storage_set_bucket_count (&universe->scheduler_api_storage,
-                                               universe->scheduler_api_storage.bucket_count * 2u);
-        }
-
+        kan_hash_storage_update_bucket_count_default (&universe->scheduler_api_storage,
+                                                      KAN_UNIVERSE_SCHEDULER_INITIAL_BUCKETS);
         kan_hash_storage_add (&universe->scheduler_api_storage, &node->node);
     }
 
@@ -1384,13 +1379,8 @@ static struct mutator_api_node_t *universe_get_or_create_mutator_api (struct uni
         node->api.execute = NULL;
         node->api.undeploy = NULL;
 
-        if (universe->mutator_api_storage.items.size >=
-            universe->mutator_api_storage.bucket_count * KAN_UNIVERSE_MUTATOR_LOAD_FACTOR)
-        {
-            kan_hash_storage_set_bucket_count (&universe->mutator_api_storage,
-                                               universe->mutator_api_storage.bucket_count * 2u);
-        }
-
+        kan_hash_storage_update_bucket_count_default (&universe->mutator_api_storage,
+                                                      KAN_UNIVERSE_MUTATOR_INITIAL_BUCKETS);
         kan_hash_storage_add (&universe->mutator_api_storage, &node->node);
     }
 
@@ -1435,13 +1425,8 @@ static void add_mutator_to_groups (struct universe_t *universe,
             new_node->group_name = group_name;
             new_node->mutator = mutator_name;
 
-            if (universe->group_multi_map_storage.items.size >=
-                universe->group_multi_map_storage.bucket_count * KAN_UNIVERSE_GROUP_LOAD_FACTOR)
-            {
-                kan_hash_storage_set_bucket_count (&universe->group_multi_map_storage,
-                                                   universe->group_multi_map_storage.bucket_count * 2u);
-            }
-
+            kan_hash_storage_update_bucket_count_default (&universe->group_multi_map_storage,
+                                                          KAN_UNIVERSE_GROUP_INITIAL_BUCKETS);
             kan_hash_storage_add (&universe->group_multi_map_storage, &new_node->node);
         }
 
