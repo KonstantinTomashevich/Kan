@@ -1854,6 +1854,70 @@ KAN_TEST_CASE (indexed_automatic_events)
     kan_reflection_registry_destroy (registry);
 }
 
+KAN_TEST_CASE (on_delete_event_after_destroy)
+{
+    kan_reflection_registry_t registry = kan_reflection_registry_create ();
+    KAN_REFLECTION_UNIT_REGISTRAR_NAME (repository) (registry);
+    KAN_REFLECTION_UNIT_REGISTRAR_NAME (test_repository) (registry);
+
+    kan_repository_t repository = kan_repository_create_root (KAN_ALLOCATION_GROUP_IGNORE, registry);
+    kan_repository_t child_repository = kan_repository_create_child(repository, "child");
+
+    kan_repository_indexed_storage_t status_storage =
+        kan_repository_indexed_storage_open (child_repository, "status_record_t");
+
+    kan_repository_event_storage_t on_delete_storage =
+        kan_repository_event_storage_open (repository, "status_record_on_delete_event_t");
+
+    struct kan_repository_indexed_insert_query_t insert_status;
+    kan_repository_indexed_insert_query_init (&insert_status, status_storage);
+
+    struct kan_repository_event_fetch_query_t fetch_on_delete;
+    kan_repository_event_fetch_query_init (&fetch_on_delete, on_delete_storage);
+
+    kan_repository_enter_serving_mode (repository);
+    check_no_event (&fetch_on_delete);
+
+    insert_status_record (&insert_status, (struct status_record_t) {.object_id = 1u,
+                                                                    .observable_alive = KAN_TRUE,
+                                                                    .observable_poisoned = KAN_FALSE,
+                                                                    .observable_stunned = KAN_FALSE,
+                                                                    .observable_boosted = KAN_FALSE});
+
+    insert_status_record (&insert_status, (struct status_record_t) {.object_id = 2u,
+                                                                    .observable_alive = KAN_FALSE,
+                                                                    .observable_poisoned = KAN_FALSE,
+                                                                    .observable_stunned = KAN_FALSE,
+                                                                    .observable_boosted = KAN_FALSE});
+
+    insert_status_record (&insert_status, (struct status_record_t) {.object_id = 3u,
+                                                                    .observable_alive = KAN_TRUE,
+                                                                    .observable_poisoned = KAN_FALSE,
+                                                                    .observable_stunned = KAN_FALSE,
+                                                                    .observable_boosted = KAN_FALSE});
+
+    check_no_event (&fetch_on_delete);
+    kan_repository_schedule_child_destroy (child_repository);
+    kan_repository_enter_planning_mode (repository);
+    kan_repository_indexed_insert_query_shutdown (&insert_status);
+    kan_repository_enter_serving_mode (repository);
+
+    check_status_delete_event (&fetch_on_delete,
+                               (struct status_record_on_delete_event_t) {.object_id = 1u, .was_alive = KAN_TRUE});
+
+    check_status_delete_event (&fetch_on_delete,
+                               (struct status_record_on_delete_event_t) {.object_id = 2u, .was_alive = KAN_FALSE});
+
+    check_status_delete_event (&fetch_on_delete,
+                               (struct status_record_on_delete_event_t) {.object_id = 3u, .was_alive = KAN_TRUE});
+
+    kan_repository_enter_planning_mode (repository);
+    kan_repository_event_fetch_query_shutdown (&fetch_on_delete);
+
+    kan_repository_destroy (repository);
+    kan_reflection_registry_destroy (registry);
+}
+
 KAN_TEST_CASE (indexed_signal_operations)
 {
     kan_reflection_registry_t registry = kan_reflection_registry_create ();
