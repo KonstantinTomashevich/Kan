@@ -8,6 +8,8 @@ set (KAN_CONTAINER_STRING_INTERNING_STACK_SIZE "1048576" CACHE STRING
         "Size of stack instance for string interning logic.")
 set (KAN_CONTAINER_STRING_INTERNING_INITIAL_BUCKETS "8192" CACHE STRING
         "Initial count of buckets for interned strings hash storage.")
+set (KAN_CONTAINER_HASH_STORAGE_DEFAULT_LOAD_FACTOR "4" CACHE STRING
+        "Default target count of items inside bucket for hash storage.")
 set (KAN_CONTAINER_HASH_STORAGE_DEFAULT_EBM "4" CACHE STRING
         "Default multiplier to check is there too much or not enough empty buckets for resizing.")
 set (KAN_CONTAINER_HASH_STORAGE_DEFAULT_MIN_FOR_EBM "16" CACHE STRING
