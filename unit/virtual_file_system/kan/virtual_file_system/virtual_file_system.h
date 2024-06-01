@@ -105,6 +105,19 @@
 /// use.
 /// \endparblock
 
+// TODO: We need real mount point overlay system for modding support, like it is done for Hugo and Jekyll site
+//       generators. For example, we would have raw_resources_unit_1 mount point and there is 2 installed mods:
+//       mods/mod1 and mods/mod2 with resources/raw_resources_unit_1 subdirectories. Then we should mount everything
+//       and prefer files from overlays over files from base directory if they exist.
+//       This needs to be supported in a way, that it is usable both for the game, for baking pipeline (to bake game
+//       resources with mods) and for game editor (to edit mods). Additional caution should be applied in editor case:
+//       base directory should be treated as read only and every edition should be made to mod directory, including
+//       creation of new files and file modifications (when saving modified file, save it to mod overlay directory
+//       instead). Also, caution should be taken with file system watchers: if file is created in overlay and it exists
+//       in base, it should be reported as modification, also if file was deleted in overlay and exists in base, it
+//       should be reported as modification too.
+//       Also, we need some way to mark files as deleted in overlay to hide base directory files.
+
 KAN_C_HEADER_BEGIN
 
 typedef uint64_t kan_virtual_file_system_volume_t;
