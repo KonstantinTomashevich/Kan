@@ -332,6 +332,13 @@ UNIVERSE_API void kan_universe_world_configuration_init (struct kan_universe_wor
 
 UNIVERSE_API void kan_universe_world_configuration_shutdown (struct kan_universe_world_configuration_t *data);
 
+/// \brief Describes injected dependency between two workflow checkpoints.
+struct kan_universe_world_checkpoint_dependency_t
+{
+    kan_interned_string_t dependency_checkpoint;
+    kan_interned_string_t dependendant_checkpoint;
+};
+
 /// \brief Contains pipeline name and names of mutators inside this pipeline.
 struct kan_universe_world_pipeline_definition_t
 {
@@ -343,6 +350,9 @@ struct kan_universe_world_pipeline_definition_t
     /// \meta reflection_dynamic_array_type = "kan_interned_string_t"
     /// \brief See `kan_universe_mutator_group_meta_t`.
     struct kan_dynamic_array_t mutator_groups;
+
+    /// \meta reflection_dynamic_array_type = "struct kan_universe_world_checkpoint_dependency_t"
+    struct kan_dynamic_array_t checkpoint_dependencies;
 };
 
 UNIVERSE_API void kan_universe_world_pipeline_definition_init (struct kan_universe_world_pipeline_definition_t *data);

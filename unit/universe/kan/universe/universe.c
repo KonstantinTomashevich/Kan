@@ -74,6 +74,9 @@ struct pipeline_t
 
     /// \meta reflection_dynamic_array_type = "kan_interned_string"
     struct kan_dynamic_array_t used_groups;
+
+    /// \meta reflection_dynamic_array_type = "struct kan_universe_world_checkpoint_dependency_t"
+    struct kan_dynamic_array_t checkpoint_dependencies;
 };
 
 struct world_configuration_t
@@ -2005,6 +2008,7 @@ static void world_clean_self_preserving_repository (struct universe_t *universe,
 
         kan_dynamic_array_shutdown (&pipeline->mutators);
         kan_dynamic_array_shutdown (&pipeline->used_groups);
+        kan_dynamic_array_shutdown (&pipeline->checkpoint_dependencies);
     }
 
     kan_dynamic_array_reset (&world->pipelines);
@@ -2144,6 +2148,16 @@ static void world_collect_deployment_tasks (struct universe_t *universe,
 static void finish_pipeline_deployment_execute (uint64_t user_data)
 {
     struct pipeline_t *pipeline = (struct pipeline_t *) user_data;
+    for (uint64_t dependency_index = 0u; dependency_index < pipeline->checkpoint_dependencies.size; ++dependency_index)
+    {
+        struct kan_universe_world_checkpoint_dependency_t *dependency =
+            &((struct kan_universe_world_checkpoint_dependency_t *)
+                  pipeline->checkpoint_dependencies.data)[dependency_index];
+
+        kan_workflow_graph_builder_register_checkpoint_dependency (pipeline->graph, dependency->dependency_checkpoint,
+                                                                   dependency->dependendant_checkpoint);
+    }
+
     kan_workflow_graph_t graph = kan_workflow_graph_builder_finalize (pipeline->graph_builder);
 
     if (graph == KAN_INVALID_WORKFLOW_GRAPH)
@@ -2357,12 +2371,16 @@ void kan_universe_world_pipeline_definition_init (struct kan_universe_world_pipe
                             kan_allocation_group_stack_get ());
     kan_dynamic_array_init (&data->mutator_groups, 0u, sizeof (kan_interned_string_t), _Alignof (kan_interned_string_t),
                             kan_allocation_group_stack_get ());
+    kan_dynamic_array_init (
+        &data->checkpoint_dependencies, 0u, sizeof (struct kan_universe_world_checkpoint_dependency_t),
+        _Alignof (struct kan_universe_world_checkpoint_dependency_t), kan_allocation_group_stack_get ());
 }
 
 void kan_universe_world_pipeline_definition_shutdown (struct kan_universe_world_pipeline_definition_t *data)
 {
     kan_dynamic_array_shutdown (&data->mutators);
     kan_dynamic_array_shutdown (&data->mutator_groups);
+    kan_dynamic_array_shutdown (&data->checkpoint_dependencies);
 }
 
 UNIVERSE_API void kan_universe_world_definition_init (struct kan_universe_world_definition_t *data)
@@ -3122,6 +3140,11 @@ static void fill_world_from_definition (struct universe_t *universe,
         kan_dynamic_array_init (&output->mutators, input->mutator_groups.size, sizeof (struct mutator_t),
                                 _Alignof (struct mutator_t), world->pipelines.allocation_group);
 
+        kan_dynamic_array_init (&output->checkpoint_dependencies, input->checkpoint_dependencies.size,
+                                sizeof (struct kan_universe_world_checkpoint_dependency_t),
+                                _Alignof (struct kan_universe_world_checkpoint_dependency_t),
+                                world->pipelines.allocation_group);
+
         for (uint64_t group_index = 0u; group_index < input->mutator_groups.size; ++group_index)
         {
             kan_interned_string_t group_name = ((kan_interned_string_t *) input->mutator_groups.data)[group_index];
@@ -3201,6 +3224,19 @@ static void fill_world_from_definition (struct universe_t *universe,
             {
                 KAN_LOG (universe, KAN_LOG_ERROR, "Unable to find requested mutator \"%s\".", requested_name)
             }
+        }
+
+        for (uint64_t dependency_index = 0u; dependency_index < input->checkpoint_dependencies.size; ++dependency_index)
+        {
+            struct kan_universe_world_checkpoint_dependency_t *dependency_input =
+                &((struct kan_universe_world_checkpoint_dependency_t *)
+                      input->checkpoint_dependencies.data)[dependency_index];
+
+            struct kan_universe_world_checkpoint_dependency_t *dependency_output =
+                kan_dynamic_array_add_last (&output->checkpoint_dependencies);
+
+            KAN_ASSERT (dependency_output)
+            *dependency_output = *dependency_input;
         }
     }
 }
