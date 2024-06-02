@@ -170,6 +170,9 @@ struct kan_resource_provider_singleton_t
     /// \brief When set to true, resource provider will stop serving, unload all the data and start rescan from scratch.
     /// \details Automatically reset to false when rescanning is started.
     kan_bool_t request_rescan;
+
+    /// \brief Whether resource provider finished scanning for resources and is able to provide full list of entries.
+    kan_bool_t scan_done;
 };
 
 UNIVERSE_RESOURCE_PROVIDER_API void kan_resource_provider_singleton_init (
@@ -215,8 +218,8 @@ struct kan_resource_provider_configuration_t
 /// \brief Provides information about native resource entry visible to resource provider.
 struct kan_resource_native_entry_t
 {
-    /// \brief Internal id used to bind implementation suffix to the entry.
-    uint64_t internal_id;
+    /// \brief Id for attaching additional data to the entry.
+    uint64_t attachment_id;
 
     kan_interned_string_t type;
     kan_interned_string_t name;
@@ -231,8 +234,8 @@ UNIVERSE_RESOURCE_PROVIDER_API void kan_resource_native_entry_shutdown (struct k
 /// \brief Provides information about third party resource entry visible to resource provider.
 struct kan_resource_third_party_entry_t
 {
-    /// \brief Internal id used to bind implementation suffix to the entry.
-    uint64_t internal_id;
+    /// \brief Id for attaching additional data to the entry.
+    uint64_t attachment_id;
 
     kan_interned_string_t name;
     uint64_t size;

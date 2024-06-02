@@ -44,7 +44,7 @@ struct resource_provider_private_singleton_t
 
     uint64_t container_id_counter;
 
-    uint64_t internal_id_counter;
+    uint64_t attachment_id_counter;
 
     /// \meta reflection_dynamic_array_type = "struct scan_item_task_t"
     struct kan_dynamic_array_t scan_item_stack;
@@ -58,7 +58,7 @@ struct resource_provider_private_singleton_t
 
 struct resource_provider_native_entry_suffix_t
 {
-    uint64_t internal_id;
+    uint64_t attachment_id;
     uint64_t request_count;
 
     enum kan_resource_index_native_item_format_t format;
@@ -75,7 +75,7 @@ struct resource_provider_native_entry_suffix_t
 
 struct resource_provider_third_party_entry_suffix_t
 {
-    uint64_t internal_id;
+    uint64_t attachment_id;
     uint64_t request_count;
 
     uint8_t *loaded_data;
@@ -318,21 +318,22 @@ struct resource_provider_state_t
 
     struct kan_repository_indexed_value_read_query_t read_value__kan_resource_native_entry__name;
     struct kan_repository_indexed_value_update_query_t update_value__kan_resource_native_entry__name;
-    struct kan_repository_indexed_value_update_query_t update_value__kan_resource_native_entry__internal_id;
+    struct kan_repository_indexed_value_update_query_t update_value__kan_resource_native_entry__attachment_id;
 
     struct kan_repository_indexed_value_update_query_t update_value__kan_resource_third_party_entry__name;
-    struct kan_repository_indexed_value_update_query_t update_value__kan_resource_third_party_entry__internal_id;
+    struct kan_repository_indexed_value_update_query_t update_value__kan_resource_third_party_entry__attachment_id;
 
     struct kan_repository_indexed_value_write_query_t write_value__kan_resource_native_entry__name;
     struct kan_repository_indexed_value_write_query_t write_value__kan_resource_third_party_entry__name;
 
-    struct kan_repository_indexed_value_update_query_t update_value__resource_provider_native_entry_suffix__internal_id;
-    struct kan_repository_indexed_value_write_query_t write_value__resource_provider_native_entry_suffix__internal_id;
+    struct kan_repository_indexed_value_update_query_t
+        update_value__resource_provider_native_entry_suffix__attachment_id;
+    struct kan_repository_indexed_value_write_query_t write_value__resource_provider_native_entry_suffix__attachment_id;
 
     struct kan_repository_indexed_value_update_query_t
-        update_value__resource_provider_third_party_entry_suffix__internal_id;
+        update_value__resource_provider_third_party_entry_suffix__attachment_id;
     struct kan_repository_indexed_value_write_query_t
-        write_value__resource_provider_third_party_entry_suffix__internal_id;
+        write_value__resource_provider_third_party_entry_suffix__attachment_id;
 
     struct kan_repository_indexed_interval_update_query_t
         update_interval__resource_provider_native_entry_suffix__reload_after_real_time_ns;
@@ -403,7 +404,7 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void resource_provider_private_singleton_init
 {
     data->status = RESOURCE_PROVIDER_STATUS_NOT_INITIALIZED;
     data->container_id_counter = KAN_RESOURCE_PROVIDER_CONTAINER_ID_NONE + 1u;
-    data->internal_id_counter = 0u;
+    data->attachment_id_counter = 0u;
 
     kan_dynamic_array_init (&data->scan_item_stack, 0u, sizeof (struct scan_item_task_t),
                             _Alignof (struct scan_item_task_t), kan_allocation_group_stack_get ());
@@ -606,13 +607,13 @@ static void add_native_entry (struct resource_provider_state_t *state,
                               const char *path,
                               kan_serialization_interned_string_registry_t string_registry)
 {
-    const uint64_t internal_id = private->internal_id_counter++;
+    const uint64_t attachment_id = private->attachment_id_counter++;
 
     struct kan_repository_indexed_insertion_package_t package =
         kan_repository_indexed_insert_query_execute (&state->insert__kan_resource_native_entry);
     struct kan_resource_native_entry_t *entry = kan_repository_indexed_insertion_package_get (&package);
 
-    entry->internal_id = internal_id;
+    entry->attachment_id = attachment_id;
     entry->type = type_name;
     entry->name = name;
 
@@ -623,7 +624,7 @@ static void add_native_entry (struct resource_provider_state_t *state,
 
     package = kan_repository_indexed_insert_query_execute (&state->insert__resource_provider_native_entry_suffix);
     struct resource_provider_native_entry_suffix_t *suffix = kan_repository_indexed_insertion_package_get (&package);
-    suffix->internal_id = internal_id;
+    suffix->attachment_id = attachment_id;
     suffix->format = format;
     suffix->string_registry = string_registry;
     kan_repository_indexed_insertion_package_submit (&package);
@@ -635,13 +636,13 @@ static void add_third_party_entry (struct resource_provider_state_t *state,
                                    uint64_t size,
                                    const char *path)
 {
-    const uint64_t internal_id = private->internal_id_counter++;
+    const uint64_t attachment_id = private->attachment_id_counter++;
 
     struct kan_repository_indexed_insertion_package_t package =
         kan_repository_indexed_insert_query_execute (&state->insert__kan_resource_third_party_entry);
     struct kan_resource_third_party_entry_t *entry = kan_repository_indexed_insertion_package_get (&package);
 
-    entry->internal_id = internal_id;
+    entry->attachment_id = attachment_id;
     entry->name = name;
     entry->size = size;
 
@@ -653,7 +654,7 @@ static void add_third_party_entry (struct resource_provider_state_t *state,
     package = kan_repository_indexed_insert_query_execute (&state->insert__resource_provider_third_party_entry_suffix);
     struct resource_provider_third_party_entry_suffix_t *suffix =
         kan_repository_indexed_insertion_package_get (&package);
-    suffix->internal_id = internal_id;
+    suffix->attachment_id = attachment_id;
     kan_repository_indexed_insertion_package_submit (&package);
 }
 
@@ -672,7 +673,7 @@ static inline struct resource_provider_native_entry_suffix_t *write_native_suffi
 {
     struct kan_repository_indexed_value_write_cursor_t suffix_cursor =
         kan_repository_indexed_value_write_query_execute (
-            &state->write_value__resource_provider_native_entry_suffix__internal_id, &entry->internal_id);
+            &state->write_value__resource_provider_native_entry_suffix__attachment_id, &entry->attachment_id);
 
     *access_output = kan_repository_indexed_value_write_cursor_next (&suffix_cursor);
     kan_repository_indexed_value_write_cursor_close (&suffix_cursor);
@@ -690,7 +691,7 @@ static inline struct resource_provider_third_party_entry_suffix_t *write_third_p
 {
     struct kan_repository_indexed_value_write_cursor_t suffix_cursor =
         kan_repository_indexed_value_write_query_execute (
-            &state->write_value__resource_provider_third_party_entry_suffix__internal_id, &entry->internal_id);
+            &state->write_value__resource_provider_third_party_entry_suffix__attachment_id, &entry->attachment_id);
 
     *access_output = kan_repository_indexed_value_write_cursor_next (&suffix_cursor);
     kan_repository_indexed_value_write_cursor_close (&suffix_cursor);
@@ -1602,7 +1603,7 @@ static inline struct resource_provider_native_entry_suffix_t *update_native_suff
 {
     struct kan_repository_indexed_value_update_cursor_t suffix_cursor =
         kan_repository_indexed_value_update_query_execute (
-            &state->update_value__resource_provider_native_entry_suffix__internal_id, &entry->internal_id);
+            &state->update_value__resource_provider_native_entry_suffix__attachment_id, &entry->attachment_id);
 
     *access_output = kan_repository_indexed_value_update_cursor_next (&suffix_cursor);
     kan_repository_indexed_value_update_cursor_close (&suffix_cursor);
@@ -1670,7 +1671,7 @@ static inline struct resource_provider_third_party_entry_suffix_t *update_third_
 {
     struct kan_repository_indexed_value_update_cursor_t suffix_cursor =
         kan_repository_indexed_value_update_query_execute (
-            &state->update_value__resource_provider_third_party_entry_suffix__internal_id, &entry->internal_id);
+            &state->update_value__resource_provider_third_party_entry_suffix__attachment_id, &entry->attachment_id);
 
     *access_output = kan_repository_indexed_value_update_cursor_next (&suffix_cursor);
     kan_repository_indexed_value_update_cursor_close (&suffix_cursor);
@@ -2287,7 +2288,7 @@ static inline void process_delayed_reload (struct resource_provider_state_t *sta
         {
             struct kan_repository_indexed_value_update_cursor_t entry_cursor =
                 kan_repository_indexed_value_update_query_execute (
-                    &state->update_value__kan_resource_native_entry__internal_id, &suffix->internal_id);
+                    &state->update_value__kan_resource_native_entry__attachment_id, &suffix->attachment_id);
 
             struct kan_repository_indexed_value_update_access_t entry_access =
                 kan_repository_indexed_value_update_cursor_next (&entry_cursor);
@@ -2358,7 +2359,7 @@ static inline void process_delayed_reload (struct resource_provider_state_t *sta
         {
             struct kan_repository_indexed_value_update_cursor_t entry_cursor =
                 kan_repository_indexed_value_update_query_execute (
-                    &state->update_value__kan_resource_third_party_entry__internal_id, &suffix->internal_id);
+                    &state->update_value__kan_resource_third_party_entry__attachment_id, &suffix->attachment_id);
 
             struct kan_repository_indexed_value_update_access_t entry_access =
                 kan_repository_indexed_value_update_cursor_next (&entry_cursor);
@@ -2811,6 +2812,7 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void mutator_template_execute_resource_provid
         prepare_for_scanning (state, private);
         private->status = RESOURCE_PROVIDER_STATUS_SCANNING;
         public->request_rescan = KAN_FALSE;
+        public->scan_done = KAN_FALSE;
     }
 
     if (private->status == RESOURCE_PROVIDER_STATUS_SCANNING &&
@@ -2970,6 +2972,7 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void mutator_template_execute_resource_provid
                 kan_virtual_file_system_close_context_write_access (state->virtual_file_system);
             }
 
+            public->scan_done = KAN_TRUE;
             private->status = RESOURCE_PROVIDER_STATUS_SERVING;
         }
     }
@@ -3573,6 +3576,7 @@ void kan_resource_provider_singleton_init (struct kan_resource_provider_singleto
 {
     instance->request_id_counter = kan_atomic_int_init (0);
     instance->request_rescan = KAN_FALSE;
+    instance->scan_done = KAN_FALSE;
 }
 
 void kan_resource_native_entry_init (struct kan_resource_native_entry_t *instance)
