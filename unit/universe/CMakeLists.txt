@@ -1,15 +1,15 @@
 register_concrete (universe)
 concrete_include (PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 concrete_sources ("*.c")
-concrete_require (SCOPE PUBLIC ABSTRACT repository workflow CONCRETE_INTERFACE container context)
+concrete_require (SCOPE PUBLIC ABSTRACT repository workflow CONCRETE_INTERFACE container context THIRD_PARTY qsort)
 concrete_require (
         SCOPE PRIVATE
         ABSTRACT cpu_profiler error log memory
         CONCRETE_INTERFACE context_reflection_system context_update_system)
 register_context_system (universe_system_t)
 
-c_interface_scanner_setup (GLOB "*.c" "*.h")
-reflection_generator_setup (GLOB "*.h")
+c_interface_scanner_setup (DIRECT "kan/universe/universe.h")
+reflection_generator_setup (DIRECT "kan/universe/universe.h")
 register_unit_reflection ()
 
 reflection_generator_get_output_file_path (REFLECTION_GENERATOR_OUTPUT_FILE_PATH)

@@ -14,6 +14,7 @@
 #include <kan/serialization/binary.h>
 #include <kan/serialization/readable_data.h>
 #include <kan/stream/random_access_stream_buffer.h>
+#include <kan/universe/reflection_system_generator_helpers.h>
 #include <kan/universe/universe.h>
 #include <kan/universe_resource_provider/universe_resource_provider.h>
 #include <kan/virtual_file_system/virtual_file_system.h>
@@ -355,7 +356,7 @@ struct resource_provider_state_t
     /// \meta reflection_ignore_struct_field
     struct resource_provider_execution_shared_state_t execution_shared_state;
 
-    uint64_t native_container_types_count;
+    uint64_t trailing_data_count;
 
     /// \meta reflection_ignore_struct_field
     uint64_t trailing_data[0u];
@@ -365,9 +366,9 @@ _Static_assert (_Alignof (struct resource_provider_state_t) ==
                     _Alignof (struct resource_provider_native_container_type_data_t),
                 "Alignment matches.");
 
-struct generated_container_type_node_t
+struct universe_resource_provider_generated_container_type_node_t
 {
-    struct generated_container_type_node_t *next;
+    struct universe_resource_provider_generated_container_type_node_t *next;
 
     /// \meta reflection_ignore_struct_field
     struct kan_reflection_struct_t type;
@@ -379,7 +380,7 @@ struct kan_reflection_generator_universe_resource_provider_t
 {
     uint64_t boostrap_iteration;
     kan_allocation_group_t generated_reflection_group;
-    struct generated_container_type_node_t *first_container_type;
+    struct universe_resource_provider_generated_container_type_node_t *first_container_type;
     uint64_t container_types_count;
 
     /// \meta reflection_ignore_struct_field
@@ -1071,30 +1072,8 @@ static inline struct kan_resource_native_entry_t *update_native_entry (
 static inline struct resource_provider_native_container_type_data_t *query_container_type_data (
     struct resource_provider_state_t *state, kan_interned_string_t type)
 {
-    uint64_t left = 0u;
-    uint64_t right = state->native_container_types_count;
-    struct resource_provider_native_container_type_data_t *types =
-        (struct resource_provider_native_container_type_data_t *) state->trailing_data;
-
-    while (left < right)
-    {
-        uint64_t middle = (left + right) / 2u;
-
-        if (type < types[middle].contained_type_name)
-        {
-            right = middle;
-        }
-        else if (type > types[middle].contained_type_name)
-        {
-            left = middle + 1u;
-        }
-        else
-        {
-            return &types[middle];
-        }
-    }
-
-    return NULL;
+    KAN_UNIVERSE_REFLECTION_GENERATOR_FIND_GENERATED_STATE (struct resource_provider_native_container_type_data_t,
+                                                            contained_type_name, type);
 }
 
 static inline struct kan_resource_container_view_t *native_container_create (
@@ -3134,23 +3113,17 @@ static void generated_container_shutdown (uint64_t function_user_data, void *dat
     }
 }
 
-static void reflection_generation_iteration_check_type (
+static inline void reflection_generation_iteration_check_type (
     struct kan_reflection_generator_universe_resource_provider_t *instance,
     kan_reflection_registry_t registry,
     const struct kan_reflection_struct_t *type,
+    const struct kan_resource_provider_type_meta_t *meta,
     kan_reflection_system_generation_iterator_t generation_iterator)
 {
-    struct kan_reflection_struct_meta_iterator_t meta_iterator = kan_reflection_registry_query_struct_meta (
-        registry, type->name, instance->interned_kan_resource_provider_type_meta_t);
-
-    if (!kan_reflection_struct_meta_iterator_get (&meta_iterator))
-    {
-        // Not marked as resource type.
-        return;
-    }
-
-    struct generated_container_type_node_t *node = (struct generated_container_type_node_t *) kan_allocate_batched (
-        instance->generated_reflection_group, sizeof (struct generated_container_type_node_t));
+    struct universe_resource_provider_generated_container_type_node_t *node =
+        (struct universe_resource_provider_generated_container_type_node_t *) kan_allocate_batched (
+            instance->generated_reflection_group,
+            sizeof (struct universe_resource_provider_generated_container_type_node_t));
 
     node->source_type = type;
     node->next = instance->first_container_type;
@@ -3205,328 +3178,83 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void kan_reflection_generator_universe_resour
     kan_reflection_system_generation_iterator_t iterator,
     uint64_t iteration_index)
 {
-    if (iteration_index == instance->boostrap_iteration)
-    {
-        kan_reflection_registry_struct_iterator_t struct_iterator =
-            kan_reflection_registry_struct_iterator_create (registry);
-        const struct kan_reflection_struct_t *type;
-
-        while ((type = kan_reflection_registry_struct_iterator_get (struct_iterator)))
-        {
-            reflection_generation_iteration_check_type (instance, registry, type, iterator);
-            struct_iterator = kan_reflection_registry_struct_iterator_next (struct_iterator);
-        }
-    }
-    else
-    {
-        kan_interned_string_t type_name;
-        while ((type_name = kan_reflection_system_generation_iterator_next_added_struct (iterator)))
-        {
-            const struct kan_reflection_struct_t *type = kan_reflection_registry_query_struct (registry, type_name);
-            if (type)
-            {
-                reflection_generation_iteration_check_type (instance, registry, type, iterator);
-            }
-        }
-
-        struct kan_reflection_system_added_struct_meta_t added_meta;
-        while ((added_meta = kan_reflection_system_generation_iterator_next_added_struct_meta (iterator)).struct_name)
-        {
-            if (added_meta.meta_type_name == instance->interned_kan_resource_provider_type_meta_t)
-            {
-                kan_bool_t already_added = KAN_FALSE;
-                // Not the most effective search, but should be okay enough here.
-                // We can use hash storage for faster search, but it seems like an overkill,
-                // because it is only needed here.
-                struct generated_container_type_node_t *node = instance->first_container_type;
-
-                while (node)
-                {
-                    if (node->source_type->name == added_meta.struct_name)
-                    {
-                        already_added = KAN_TRUE;
-                        break;
-                    }
-
-                    node = node->next;
-                }
-
-                if (!already_added)
-                {
-                    const struct kan_reflection_struct_t *type =
-                        kan_reflection_registry_query_struct (registry, added_meta.struct_name);
-
-                    if (type)
-                    {
-                        reflection_generation_iteration_check_type (instance, registry, type, iterator);
-                    }
-                }
-            }
-        }
-    }
+    KAN_UNIVERSE_REFLECTION_GENERATOR_ITERATE_TYPES_WITH_META (
+        struct kan_resource_provider_type_meta_t, instance->interned_kan_resource_provider_type_meta_t,
+        reflection_generation_iteration_check_type, struct universe_resource_provider_generated_container_type_node_t,
+        first_container_type, source_type)
 }
 
-static void generated_mutator_init (uint64_t function_user_data, void *data)
+static inline void generated_mutator_init_node (
+    struct resource_provider_native_container_type_data_t *mutator_node,
+    struct universe_resource_provider_generated_container_type_node_t *generated_node)
 {
-    struct kan_reflection_generator_universe_resource_provider_t *instance =
-        (struct kan_reflection_generator_universe_resource_provider_t *) function_user_data;
-
-    struct resource_provider_state_t *base_state = (struct resource_provider_state_t *) data;
-    resource_provider_state_init (base_state);
-    base_state->native_container_types_count = instance->container_types_count;
-
-    struct generated_container_type_node_t *node = instance->first_container_type;
-    struct resource_provider_native_container_type_data_t *mutator_node =
-        (struct resource_provider_native_container_type_data_t *) base_state->trailing_data;
-
-    while (node)
-    {
-        mutator_node->contained_type_name = node->source_type->name;
-        mutator_node->container_type_name = node->type.name;
-        mutator_node->contained_type_alignment = node->source_type->alignment;
-
-        node = node->next;
-        ++mutator_node;
-    }
+    mutator_node->contained_type_name = generated_node->source_type->name;
+    mutator_node->container_type_name = generated_node->type.name;
+    mutator_node->contained_type_alignment = generated_node->source_type->alignment;
 }
 
-static void generated_mutator_deploy (kan_reflection_functor_user_data_t user_data,
-                                      void *return_address,
-                                      void *arguments_address)
+static inline void generated_mutator_deploy_node (kan_repository_t world_repository,
+                                                  struct resource_provider_native_container_type_data_t *node)
 {
-    struct
-    {
-        kan_universe_t universe;
-        kan_universe_world_t world;
-        kan_repository_t world_repository;
-        kan_workflow_graph_node_t workflow_node;
-        struct resource_provider_state_t *state;
-    } *arguments = arguments_address;
+    kan_repository_indexed_storage_t storage =
+        kan_repository_indexed_storage_open (world_repository, node->container_type_name);
 
-    mutator_template_deploy_resource_provider (arguments->universe, arguments->world, arguments->world_repository,
-                                               arguments->workflow_node, arguments->state);
-    struct resource_provider_native_container_type_data_t *mutator_nodes =
-        (struct resource_provider_native_container_type_data_t *) arguments->state->trailing_data;
+    const char *container_id_name = "container_id";
+    struct kan_repository_field_path_t container_id_path = {
+        .reflection_path_length = 1u,
+        &container_id_name,
+    };
 
-    for (uint64_t index = 0u; index < arguments->state->native_container_types_count; ++index)
-    {
-        struct resource_provider_native_container_type_data_t *node = &mutator_nodes[index];
-        kan_repository_indexed_storage_t storage =
-            kan_repository_indexed_storage_open (arguments->world_repository, node->container_type_name);
-
-        const char *container_id_name = "container_id";
-        struct kan_repository_field_path_t container_id_path = {
-            .reflection_path_length = 1u,
-            &container_id_name,
-        };
-
-        kan_repository_indexed_insert_query_init (&node->insert_query, storage);
-        kan_repository_indexed_value_update_query_init (&node->update_by_id_query, storage, container_id_path);
-        kan_repository_indexed_value_delete_query_init (&node->delete_by_id_query, storage, container_id_path);
-    }
+    kan_repository_indexed_insert_query_init (&node->insert_query, storage);
+    kan_repository_indexed_value_update_query_init (&node->update_by_id_query, storage, container_id_path);
+    kan_repository_indexed_value_delete_query_init (&node->delete_by_id_query, storage, container_id_path);
 }
 
-static void generated_mutator_execute (kan_reflection_functor_user_data_t user_data,
-                                       void *return_address,
-                                       void *arguments_address)
+static inline void generated_mutator_undeploy_node (struct resource_provider_native_container_type_data_t *node)
 {
-    struct
-    {
-        kan_cpu_job_t job;
-        struct resource_provider_state_t *state;
-    } *arguments = arguments_address;
-
-    mutator_template_execute_resource_provider (arguments->job, arguments->state);
+    kan_repository_indexed_insert_query_shutdown (&node->insert_query);
+    kan_repository_indexed_value_update_query_shutdown (&node->update_by_id_query);
+    kan_repository_indexed_value_delete_query_shutdown (&node->delete_by_id_query);
 }
 
-static void generated_mutator_undeploy (kan_reflection_functor_user_data_t user_data,
-                                        void *return_address,
-                                        void *arguments_address)
+static inline void generated_mutator_shutdown_node (struct resource_provider_native_container_type_data_t *node)
 {
-    struct
-    {
-        struct resource_provider_state_t *state;
-    } *arguments = arguments_address;
-
-    mutator_template_undeploy_resource_provider (arguments->state);
-    struct resource_provider_native_container_type_data_t *mutator_nodes =
-        (struct resource_provider_native_container_type_data_t *) arguments->state->trailing_data;
-
-    for (uint64_t index = 0u; index < arguments->state->native_container_types_count; ++index)
-    {
-        kan_repository_indexed_insert_query_shutdown (&mutator_nodes[index].insert_query);
-        kan_repository_indexed_value_update_query_shutdown (&mutator_nodes[index].update_by_id_query);
-        kan_repository_indexed_value_delete_query_shutdown (&mutator_nodes[index].delete_by_id_query);
-    }
 }
 
-static void generated_mutator_shutdown (uint64_t function_user_data, void *data)
-{
-    struct resource_provider_state_t *base_state = (struct resource_provider_state_t *) data;
-    resource_provider_state_shutdown (base_state);
-}
+// \c_interface_scanner_disable
+KAN_UNIVERSE_REFLECTION_GENERATOR_MUTATOR_FUNCTIONS (generated_mutator,
+                                                     struct kan_reflection_generator_universe_resource_provider_t,
+                                                     struct universe_resource_provider_generated_container_type_node_t,
+                                                     instance->container_types_count,
+                                                     instance->first_container_type,
+                                                     struct resource_provider_state_t,
+                                                     struct resource_provider_native_container_type_data_t,
+                                                     resource_provider_state_init,
+                                                     mutator_template_deploy_resource_provider,
+                                                     mutator_template_execute_resource_provider,
+                                                     mutator_template_undeploy_resource_provider,
+                                                     resource_provider_state_shutdown)
+// \c_interface_scanner_enable
 
 UNIVERSE_RESOURCE_PROVIDER_KAN_API void kan_reflection_generator_universe_resource_provider_finalize (
     struct kan_reflection_generator_universe_resource_provider_t *instance, kan_reflection_registry_t registry)
 {
     if (instance->container_types_count > 0u)
     {
-        struct generated_container_type_node_t **nodes_array_to_sort = kan_allocate_general (
-            instance->generated_reflection_group, sizeof (void *) * instance->container_types_count, _Alignof (void *));
+#define KAN_UNIVERSE_REFLECTION_GENERATOR_SORT_TYPE_NODES_LESS(first_index, second_index)                              \
+    (KAN_UNIVERSE_REFLECTION_GENERATOR_SORT_TYPE_NODES_ARRAY[first_index]->source_type->name <                         \
+     KAN_UNIVERSE_REFLECTION_GENERATOR_SORT_TYPE_NODES_ARRAY[second_index]->source_type->name)
 
-        struct generated_container_type_node_t *node = instance->first_container_type;
-        uint64_t output_index = 0u;
-
-        while (node)
-        {
-            nodes_array_to_sort[output_index] = node;
-            ++output_index;
-            node = node->next;
-        }
-
-        {
-#define LESS(first_index, second_index)                                                                                \
-    (nodes_array_to_sort[first_index]->source_type->name < nodes_array_to_sort[second_index]->source_type->name)
-
-#define SWAP(first_index, second_index)                                                                                \
-    node = nodes_array_to_sort[first_index], nodes_array_to_sort[first_index] = nodes_array_to_sort[second_index],     \
-    nodes_array_to_sort[second_index] = node
-
-            QSORT ((unsigned long) instance->container_types_count, LESS, SWAP);
-#undef LESS
-#undef SWAP
-        }
-
-        for (uint64_t node_index = 0u; node_index < instance->container_types_count; ++node_index)
-        {
-            if (node_index + 1u < instance->container_types_count)
-            {
-                nodes_array_to_sort[node_index]->next = nodes_array_to_sort[node_index + 1u];
-            }
-            else
-            {
-                nodes_array_to_sort[node_index]->next = NULL;
-            }
-        }
-
-        instance->first_container_type = nodes_array_to_sort[0u];
-        kan_free_general (instance->generated_reflection_group, nodes_array_to_sort,
-                          sizeof (void *) * instance->container_types_count);
+        KAN_UNIVERSE_REFLECTION_GENERATOR_SORT_TYPE_NODES (
+            instance->container_types_count, struct universe_resource_provider_generated_container_type_node_t,
+            instance->first_container_type, instance->generated_reflection_group);
+#undef KAN_UNIVERSE_REFLECTION_GENERATOR_SORT_TYPE_NODES_LESS
     }
 
-    instance->mutator_type.name = kan_string_intern ("generated_resource_provider_state_t");
-    instance->mutator_type.alignment = _Alignof (struct resource_provider_state_t);
-    instance->mutator_type.size =
-        sizeof (struct resource_provider_state_t) +
-        sizeof (struct resource_provider_native_container_type_data_t) * instance->container_types_count;
-
-    instance->mutator_type.functor_user_data = (uint64_t) instance;
-    instance->mutator_type.init = generated_mutator_init;
-    instance->mutator_type.shutdown = generated_mutator_shutdown;
-
-    instance->mutator_type.fields_count = 2u;
-    instance->mutator_type.fields =
-        kan_allocate_general (instance->generated_reflection_group, sizeof (struct kan_reflection_field_t) * 2u,
-                              _Alignof (struct kan_reflection_field_t));
-
-    instance->mutator_type.fields[0u].name = kan_string_intern ("base_mutator_state");
-    instance->mutator_type.fields[0u].offset = 0u;
-    instance->mutator_type.fields[0u].size = sizeof (struct resource_provider_state_t);
-    instance->mutator_type.fields[0u].archetype = KAN_REFLECTION_ARCHETYPE_STRUCT;
-    instance->mutator_type.fields[0u].archetype_struct.type_name = kan_string_intern ("resource_provider_state_t");
-    instance->mutator_type.fields[0u].visibility_condition_field = NULL;
-    instance->mutator_type.fields[0u].visibility_condition_values_count = 0u;
-    instance->mutator_type.fields[0u].visibility_condition_values = NULL;
-
-    instance->mutator_type.fields[1u].name = kan_string_intern ("container_types");
-    instance->mutator_type.fields[1u].offset = sizeof (struct resource_provider_state_t);
-    instance->mutator_type.fields[1u].size =
-        sizeof (struct resource_provider_native_container_type_data_t) * instance->container_types_count;
-    instance->mutator_type.fields[1u].archetype = KAN_REFLECTION_ARCHETYPE_INLINE_ARRAY;
-    instance->mutator_type.fields[1u].archetype_inline_array.item_count = instance->container_types_count;
-    instance->mutator_type.fields[1u].archetype_inline_array.item_size =
-        sizeof (struct resource_provider_native_container_type_data_t);
-    instance->mutator_type.fields[1u].archetype_inline_array.size_field = NULL;
-    instance->mutator_type.fields[1u].archetype_inline_array.item_archetype = KAN_REFLECTION_ARCHETYPE_STRUCT;
-    instance->mutator_type.fields[1u].archetype_inline_array.item_archetype_struct.type_name =
-        kan_string_intern ("resource_provider_native_container_type_data_t");
-    instance->mutator_type.fields[1u].visibility_condition_field = NULL;
-    instance->mutator_type.fields[1u].visibility_condition_values_count = 0u;
-    instance->mutator_type.fields[1u].visibility_condition_values = NULL;
-
-    instance->mutator_deploy_function.name =
-        kan_string_intern ("kan_universe_mutator_deploy_generated_resource_provider");
-    instance->mutator_deploy_function.call = generated_mutator_deploy;
-    instance->mutator_deploy_function.call_user_data = 0u;
-
-    instance->mutator_deploy_function.return_type.size = 0u;
-    instance->mutator_deploy_function.return_type.archetype = KAN_REFLECTION_ARCHETYPE_SIGNED_INT;
-
-    instance->mutator_deploy_function.arguments_count = 5u;
-    instance->mutator_deploy_function.arguments =
-        kan_allocate_general (instance->generated_reflection_group, sizeof (struct kan_reflection_argument_t) * 5u,
-                              _Alignof (struct kan_reflection_argument_t));
-
-    instance->mutator_deploy_function.arguments[0u].name = kan_string_intern ("universe");
-    instance->mutator_deploy_function.arguments[0u].size = sizeof (kan_universe_t);
-    instance->mutator_deploy_function.arguments[0u].archetype = KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT;
-
-    instance->mutator_deploy_function.arguments[1u].name = kan_string_intern ("world");
-    instance->mutator_deploy_function.arguments[1u].size = sizeof (kan_universe_world_t);
-    instance->mutator_deploy_function.arguments[1u].archetype = KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT;
-
-    instance->mutator_deploy_function.arguments[2u].name = kan_string_intern ("world_repository");
-    instance->mutator_deploy_function.arguments[2u].size = sizeof (kan_repository_t);
-    instance->mutator_deploy_function.arguments[2u].archetype = KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT;
-
-    instance->mutator_deploy_function.arguments[3u].name = kan_string_intern ("workflow_node");
-    instance->mutator_deploy_function.arguments[3u].size = sizeof (kan_workflow_graph_node_t);
-    instance->mutator_deploy_function.arguments[3u].archetype = KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT;
-
-    instance->mutator_deploy_function.arguments[4u].name = kan_string_intern ("state");
-    instance->mutator_deploy_function.arguments[4u].size = sizeof (void *);
-    instance->mutator_deploy_function.arguments[4u].archetype = KAN_REFLECTION_ARCHETYPE_STRUCT_POINTER;
-    instance->mutator_deploy_function.arguments[4u].archetype_struct_pointer.type_name = instance->mutator_type.name;
-
-    instance->mutator_execute_function.name =
-        kan_string_intern ("kan_universe_mutator_execute_generated_resource_provider");
-    instance->mutator_execute_function.call = generated_mutator_execute;
-    instance->mutator_execute_function.call_user_data = 0u;
-
-    instance->mutator_execute_function.return_type.size = 0u;
-    instance->mutator_execute_function.return_type.archetype = KAN_REFLECTION_ARCHETYPE_SIGNED_INT;
-
-    instance->mutator_execute_function.arguments_count = 2u;
-    instance->mutator_execute_function.arguments =
-        kan_allocate_general (instance->generated_reflection_group, sizeof (struct kan_reflection_argument_t) * 2u,
-                              _Alignof (struct kan_reflection_argument_t));
-
-    instance->mutator_execute_function.arguments[0u].name = kan_string_intern ("job");
-    instance->mutator_execute_function.arguments[0u].size = sizeof (kan_cpu_job_t);
-    instance->mutator_execute_function.arguments[0u].archetype = KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT;
-
-    instance->mutator_execute_function.arguments[1u].name = kan_string_intern ("state");
-    instance->mutator_execute_function.arguments[1u].size = sizeof (void *);
-    instance->mutator_execute_function.arguments[1u].archetype = KAN_REFLECTION_ARCHETYPE_STRUCT_POINTER;
-    instance->mutator_execute_function.arguments[1u].archetype_struct_pointer.type_name = instance->mutator_type.name;
-
-    instance->mutator_undeploy_function.name =
-        kan_string_intern ("kan_universe_mutator_undeploy_generated_resource_provider");
-    instance->mutator_undeploy_function.call = generated_mutator_undeploy;
-    instance->mutator_undeploy_function.call_user_data = 0u;
-
-    instance->mutator_undeploy_function.return_type.size = 0u;
-    instance->mutator_undeploy_function.return_type.archetype = KAN_REFLECTION_ARCHETYPE_SIGNED_INT;
-
-    instance->mutator_undeploy_function.arguments_count = 1u;
-    instance->mutator_undeploy_function.arguments =
-        kan_allocate_general (instance->generated_reflection_group, sizeof (struct kan_reflection_argument_t) * 1u,
-                              _Alignof (struct kan_reflection_argument_t));
-
-    instance->mutator_undeploy_function.arguments[0u].name = kan_string_intern ("state");
-    instance->mutator_undeploy_function.arguments[0u].size = sizeof (void *);
-    instance->mutator_undeploy_function.arguments[0u].archetype = KAN_REFLECTION_ARCHETYPE_STRUCT_POINTER;
-    instance->mutator_undeploy_function.arguments[0u].archetype_struct_pointer.type_name = instance->mutator_type.name;
+    KAN_UNIVERSE_REFLECTION_GENERATOR_FILL_MUTATOR (
+        instance->mutator, "generated_resource_provider_state_t", resource_provider_state_t,
+        resource_provider_native_container_type_data_t, instance->container_types_count, generated_resource_provider,
+        generated_mutator);
 
     kan_reflection_registry_add_struct (registry, &instance->mutator_type);
     kan_reflection_registry_add_function (registry, &instance->mutator_deploy_function);
@@ -3540,10 +3268,10 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void kan_reflection_generator_universe_resour
 UNIVERSE_RESOURCE_PROVIDER_KAN_API void kan_reflection_generator_universe_resource_provider_shutdown (
     struct kan_reflection_generator_universe_resource_provider_t *instance)
 {
-    struct generated_container_type_node_t *node = instance->first_container_type;
+    struct universe_resource_provider_generated_container_type_node_t *node = instance->first_container_type;
     while (node)
     {
-        struct generated_container_type_node_t *next = node->next;
+        struct universe_resource_provider_generated_container_type_node_t *next = node->next;
 
         // We do not generate visibility data for containers, therefore we can just deallocate fields.
         kan_free_general (instance->generated_reflection_group, node->type.fields,
