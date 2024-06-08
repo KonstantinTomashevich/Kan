@@ -18,6 +18,7 @@
 #include <kan/universe/universe.h>
 #include <kan/universe_resource_provider/universe_resource_provider.h>
 #include <kan/virtual_file_system/virtual_file_system.h>
+#include <kan/resource_pipeline/resource_pipeline.h>
 
 // \c_interface_scanner_disable
 KAN_LOG_DEFINE_CATEGORY (universe_resource_provider);
@@ -395,7 +396,7 @@ struct kan_reflection_generator_universe_resource_provider_t
     /// \meta reflection_ignore_struct_field
     struct kan_reflection_function_t mutator_undeploy_function;
 
-    kan_interned_string_t interned_kan_resource_provider_type_meta_t;
+    kan_interned_string_t interned_kan_resource_pipeline_resource_type_meta_t;
     kan_interned_string_t interned_container_id;
     kan_interned_string_t interned_stored_resource;
 };
@@ -1088,7 +1089,7 @@ static inline struct kan_resource_container_view_t *native_container_create (
     {
         KAN_LOG (universe_resource_provider, KAN_LOG_ERROR,
                  "Unable to find container type for resource type \"%s\". Resources types should have "
-                 "\"kan_resource_provider_type_meta_t\" meta attached.",
+                 "\"kan_resource_pipeline_resource_type_meta_t\" meta attached.",
                  type)
         return NULL;
     }
@@ -1117,7 +1118,7 @@ static inline struct kan_resource_container_view_t *native_container_update (
     {
         KAN_LOG (universe_resource_provider, KAN_LOG_ERROR,
                  "Unable to find container type for resource type \"%s\". Resources types should have "
-                 "\"kan_resource_provider_type_meta_t\" meta attached.",
+                 "\"kan_resource_pipeline_resource_type_meta_t\" meta attached.",
                  type)
         return NULL;
     }
@@ -1149,7 +1150,7 @@ static inline void native_container_delete (struct resource_provider_state_t *st
     {
         KAN_LOG (universe_resource_provider, KAN_LOG_ERROR,
                  "Unable to find container type for resource type \"%s\". Resources types should have "
-                 "\"kan_resource_provider_type_meta_t\" meta attached.",
+                 "\"kan_resource_pipeline_resource_type_meta_t\" meta attached.",
                  type)
         return;
     }
@@ -3072,7 +3073,7 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void kan_reflection_generator_universe_resour
     instance->first_container_type = NULL;
     instance->container_types_count = 0u;
 
-    instance->interned_kan_resource_provider_type_meta_t = kan_string_intern ("kan_resource_provider_type_meta_t");
+    instance->interned_kan_resource_pipeline_resource_type_meta_t = kan_string_intern ("kan_resource_pipeline_resource_type_meta_t");
     instance->interned_container_id = kan_string_intern ("container_id");
     instance->interned_stored_resource = kan_string_intern ("stored_resource");
 }
@@ -3117,7 +3118,7 @@ static inline void reflection_generation_iteration_check_type (
     struct kan_reflection_generator_universe_resource_provider_t *instance,
     kan_reflection_registry_t registry,
     const struct kan_reflection_struct_t *type,
-    const struct kan_resource_provider_type_meta_t *meta,
+    const struct kan_resource_pipeline_resource_type_meta_t *meta,
     kan_reflection_system_generation_iterator_t generation_iterator)
 {
     struct universe_resource_provider_generated_container_type_node_t *node =
@@ -3179,7 +3180,7 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void kan_reflection_generator_universe_resour
     uint64_t iteration_index)
 {
     KAN_UNIVERSE_REFLECTION_GENERATOR_ITERATE_TYPES_WITH_META (
-        struct kan_resource_provider_type_meta_t, instance->interned_kan_resource_provider_type_meta_t,
+        struct kan_resource_pipeline_resource_type_meta_t, instance->interned_kan_resource_pipeline_resource_type_meta_t,
         reflection_generation_iteration_check_type, struct universe_resource_provider_generated_container_type_node_t,
         first_container_type, source_type)
 }

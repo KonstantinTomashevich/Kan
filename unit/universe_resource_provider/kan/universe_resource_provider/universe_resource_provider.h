@@ -35,8 +35,8 @@
 ///
 /// To make reflected structure usable for native resources, it must first be registered as supported by resource
 /// provider. It is required in order to generate appropriate accompanying reflection types that are used as utility
-/// inside resource provider. In order to register type, instance of `kan_resource_provider_type_meta_t` meta must
-/// be added to this type. With this meta, type will be automatically found and registered properly.
+/// inside resource provider. In order to register type, instance of `kan_resource_pipeline_resource_type_meta_t` meta
+/// must be added to this type. With this meta, type will be automatically found and registered properly.
 ///
 /// Native resource files should have "bin" or "rd" extensions depending on their format. Native resource name is its
 /// file name without "bin" or "rd" extension.
@@ -248,11 +248,5 @@ UNIVERSE_RESOURCE_PROVIDER_API void kan_resource_third_party_entry_init (
 
 UNIVERSE_RESOURCE_PROVIDER_API void kan_resource_third_party_entry_shutdown (
     struct kan_resource_third_party_entry_t *instance);
-
-/// \brief Empty meta for marking types for native resources that should be supported by resource provider logic.
-struct kan_resource_provider_type_meta_t
-{
-    uint64_t stub;
-};
 
 KAN_C_HEADER_END

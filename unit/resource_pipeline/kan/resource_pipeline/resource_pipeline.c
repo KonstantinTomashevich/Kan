@@ -48,18 +48,18 @@ kan_resource_pipeline_type_info_storage_query_type_node (
 
 static inline kan_bool_t is_resource_type (kan_reflection_registry_t registry,
                                            const struct kan_reflection_struct_t *struct_data,
-                                           kan_interned_string_t interned_kan_resource_provider_type_meta_t)
+                                           kan_interned_string_t interned_kan_resource_pipeline_resource_type_meta_t)
 
 {
     struct kan_reflection_struct_meta_iterator_t meta_iterator = kan_reflection_registry_query_struct_meta (
-        registry, struct_data->name, interned_kan_resource_provider_type_meta_t);
+        registry, struct_data->name, interned_kan_resource_pipeline_resource_type_meta_t);
     return kan_reflection_struct_meta_iterator_get (&meta_iterator) ? KAN_TRUE : KAN_FALSE;
 }
 
 static inline void kan_resource_pipeline_type_info_node_add_field (
     struct kan_resource_pipeline_reference_type_info_node_t *type_node,
     const struct kan_reflection_field_t *field,
-    const struct kan_resource_pipeline_meta_t *meta)
+    const struct kan_resource_pipeline_reference_meta_t *meta)
 {
     void *spot = kan_dynamic_array_add_last (&type_node->fields_to_check);
     if (!spot)
@@ -71,7 +71,10 @@ static inline void kan_resource_pipeline_type_info_node_add_field (
     *(struct kan_resource_pipeline_reference_field_info_t *) spot =
         (struct kan_resource_pipeline_reference_field_info_t) {
             .field = field,
-            .reference_meta = meta,
+            .is_leaf_field = meta ? KAN_TRUE : KAN_FALSE,
+            .type = meta ? kan_string_intern (meta->type) : NULL,
+            .compilation_usage =
+                meta ? meta->compilation_usage : KAN_RESOURCE_REFERENCE_COMPILATION_USAGE_TYPE_NOT_NEEDED,
         };
 }
 
@@ -96,8 +99,8 @@ kan_resource_pipeline_type_info_storage_get_or_create_node (
     kan_reflection_registry_t registry,
     const struct kan_reflection_struct_t *root_struct_data,
     const struct kan_reflection_struct_t *struct_data,
-    kan_interned_string_t interned_kan_resource_provider_type_meta_t,
-    kan_interned_string_t interned_kan_resource_pipeline_meta_t)
+    kan_interned_string_t interned_kan_resource_pipeline_resource_type_meta_t,
+    kan_interned_string_t interned_kan_resource_reference_pipeline_meta_t)
 {
     struct kan_resource_pipeline_reference_type_info_node_t *type_node =
         kan_resource_pipeline_type_info_storage_query_type_node (storage, struct_data->name);
@@ -126,7 +129,7 @@ kan_resource_pipeline_type_info_storage_get_or_create_node (
     kan_hash_storage_add (&storage->scanned_types, &type_node->node);
 
     const kan_bool_t root_is_resource_type =
-        is_resource_type (registry, root_struct_data, interned_kan_resource_provider_type_meta_t);
+        is_resource_type (registry, root_struct_data, interned_kan_resource_pipeline_resource_type_meta_t);
     type_node->is_resource_type = root_struct_data == struct_data && root_is_resource_type;
     type_node->contains_patches = KAN_FALSE;
 
@@ -239,9 +242,9 @@ kan_resource_pipeline_type_info_storage_get_or_create_node (
         {
             struct kan_reflection_struct_field_meta_iterator_t meta_iterator =
                 kan_reflection_registry_query_struct_field_meta (registry, struct_data->name, field_data->name,
-                                                                 interned_kan_resource_pipeline_meta_t);
+                                                                 interned_kan_resource_reference_pipeline_meta_t);
 
-            const struct kan_resource_pipeline_meta_t *meta =
+            const struct kan_resource_pipeline_reference_meta_t *meta =
                 kan_reflection_struct_field_meta_iterator_get (&meta_iterator);
 
             if (meta)
@@ -254,15 +257,16 @@ kan_resource_pipeline_type_info_storage_get_or_create_node (
                 if (root_is_resource_type)
                 {
                     const struct kan_reflection_struct_t *referenced_type =
-                        kan_reflection_registry_query_struct (registry, meta->type);
+                        kan_reflection_registry_query_struct (registry, kan_string_intern (meta->type));
 
                     if (referenced_type &&
-                        is_resource_type (registry, referenced_type, interned_kan_resource_provider_type_meta_t))
+                        is_resource_type (registry, referenced_type, interned_kan_resource_pipeline_resource_type_meta_t))
                     {
                         struct kan_resource_pipeline_reference_type_info_node_t *referenced_type_node =
                             kan_resource_pipeline_type_info_storage_get_or_create_node (
                                 storage, registry, referenced_type, referenced_type,
-                                interned_kan_resource_provider_type_meta_t, interned_kan_resource_pipeline_meta_t);
+                                interned_kan_resource_pipeline_resource_type_meta_t,
+                                interned_kan_resource_reference_pipeline_meta_t);
 
                         kan_resource_pipeline_type_info_node_add_referencer (referenced_type_node,
                                                                              root_struct_data->name);
@@ -286,8 +290,8 @@ kan_resource_pipeline_type_info_storage_get_or_create_node (
 
             struct kan_resource_pipeline_reference_type_info_node_t *child_type_node =
                 kan_resource_pipeline_type_info_storage_get_or_create_node (
-                    storage, registry, root_struct_data, child_type, interned_kan_resource_provider_type_meta_t,
-                    interned_kan_resource_pipeline_meta_t);
+                    storage, registry, root_struct_data, child_type, interned_kan_resource_pipeline_resource_type_meta_t,
+                    interned_kan_resource_reference_pipeline_meta_t);
 
             if (child_type_node->fields_to_check.size > 0u)
             {
@@ -313,18 +317,18 @@ static inline void kan_resource_pipeline_type_info_storage_scan (
     struct kan_resource_pipeline_reference_type_info_storage_t *storage, kan_reflection_registry_t registry)
 {
     kan_reflection_registry_struct_iterator_t iterator = kan_reflection_registry_struct_iterator_create (registry);
-    const kan_interned_string_t interned_kan_resource_provider_type_meta_t =
-        kan_string_intern ("kan_resource_provider_type_meta_t");
-    const kan_interned_string_t interned_kan_resource_pipeline_meta_t =
-        kan_string_intern ("kan_resource_pipeline_meta_t");
+    const kan_interned_string_t interned_kan_resource_pipeline_resource_type_meta_t =
+        kan_string_intern ("kan_resource_pipeline_resource_type_meta_t");
+    const kan_interned_string_t interned_kan_resource_pipeline_reference_meta_t =
+        kan_string_intern ("kan_resource_pipeline_reference_meta_t");
     const struct kan_reflection_struct_t *struct_data;
 
     // Prepare data.
     while ((struct_data = kan_reflection_registry_struct_iterator_get (iterator)))
     {
         kan_resource_pipeline_type_info_storage_get_or_create_node (storage, registry, struct_data, struct_data,
-                                                                    interned_kan_resource_provider_type_meta_t,
-                                                                    interned_kan_resource_pipeline_meta_t);
+                                                                    interned_kan_resource_pipeline_resource_type_meta_t,
+                                                                    interned_kan_resource_pipeline_reference_meta_t);
         iterator = kan_reflection_registry_struct_iterator_next (iterator);
     }
 
@@ -591,9 +595,8 @@ static void kan_resource_pipeline_detect_inside_patch_part (
             const uint64_t offset_in_chunk = field_offset - chunk_info.offset;
             const void *address = (const uint8_t *) chunk_info.data + offset_in_chunk;
 
-            kan_resource_pipeline_detected_container_add_reference (output_container, field_info->reference_meta->type,
-                                                                    *(kan_interned_string_t *) address,
-                                                                    field_info->reference_meta->compilation_usage);
+            kan_resource_pipeline_detected_container_add_reference (
+                output_container, field_info->type, *(kan_interned_string_t *) address, field_info->compilation_usage);
             break;
         }
 
@@ -655,9 +658,9 @@ static void kan_resource_pipeline_detect_inside_patch_part (
                     const uint64_t offset_in_chunk = item_offset - chunk_info.offset;
                     const void *address = (const uint8_t *) chunk_info.data + offset_in_chunk;
 
-                    kan_resource_pipeline_detected_container_add_reference (
-                        output_container, field_info->reference_meta->type, *(kan_interned_string_t *) address,
-                        field_info->reference_meta->compilation_usage);
+                    kan_resource_pipeline_detected_container_add_reference (output_container, field_info->type,
+                                                                            *(kan_interned_string_t *) address,
+                                                                            field_info->compilation_usage);
                 }
 
                 break;
@@ -692,10 +695,11 @@ static inline void kan_resource_pipeline_detect_inside_patch (
                                                     kan_reflection_patch_begin (patch), output_container);
 }
 
-void kan_resource_pipeline_detect_references (struct kan_resource_pipeline_reference_type_info_storage_t *storage,
-                                   kan_interned_string_t referencer_type_name,
-                                   const void *referencer_data,
-                                   struct kan_resource_pipeline_detected_reference_container_t *output_container)
+void kan_resource_pipeline_detect_references (
+    struct kan_resource_pipeline_reference_type_info_storage_t *storage,
+    kan_interned_string_t referencer_type_name,
+    const void *referencer_data,
+    struct kan_resource_pipeline_detected_reference_container_t *output_container)
 {
     struct kan_resource_pipeline_reference_type_info_node_t *type_node =
         kan_resource_pipeline_type_info_storage_query_type_node (storage, referencer_type_name);
@@ -722,7 +726,7 @@ void kan_resource_pipeline_detect_references (struct kan_resource_pipeline_refer
             continue;
         }
 
-        if (field_info->reference_meta)
+        if (field_info->is_leaf_field)
         {
             switch (field_info->field->archetype)
             {
@@ -739,9 +743,9 @@ void kan_resource_pipeline_detect_references (struct kan_resource_pipeline_refer
                 break;
 
             case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:
-                kan_resource_pipeline_detected_container_add_reference (
-                    output_container, field_info->reference_meta->type, *(kan_interned_string_t *) field_address,
-                    field_info->reference_meta->compilation_usage);
+                kan_resource_pipeline_detected_container_add_reference (output_container, field_info->type,
+                                                                        *(kan_interned_string_t *) field_address,
+                                                                        field_info->compilation_usage);
                 break;
 
             case KAN_REFLECTION_ARCHETYPE_INLINE_ARRAY:
@@ -750,9 +754,8 @@ void kan_resource_pipeline_detect_references (struct kan_resource_pipeline_refer
                 for (uint64_t index = 0u; index < size; ++index)
                 {
                     kan_resource_pipeline_detected_container_add_reference (
-                        output_container, field_info->reference_meta->type,
-                        ((kan_interned_string_t *) field_address)[index],
-                        field_info->reference_meta->compilation_usage);
+                        output_container, field_info->type, ((kan_interned_string_t *) field_address)[index],
+                        field_info->compilation_usage);
                 }
 
                 break;
@@ -767,8 +770,8 @@ void kan_resource_pipeline_detect_references (struct kan_resource_pipeline_refer
                 for (uint64_t index = 0u; index < array->size; ++index)
                 {
                     kan_resource_pipeline_detected_container_add_reference (
-                        output_container, field_info->reference_meta->type,
-                        ((kan_interned_string_t *) array->data)[index], field_info->reference_meta->compilation_usage);
+                        output_container, field_info->type, ((kan_interned_string_t *) array->data)[index],
+                        field_info->compilation_usage);
                 }
 
                 break;

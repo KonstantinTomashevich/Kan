@@ -208,7 +208,7 @@ struct kan_reflection_generator_universe_resource_reference_t
     /// \meta reflection_ignore_struct_field
     struct kan_reflection_function_t mutator_undeploy_function;
 
-    kan_interned_string_t interned_kan_resource_provider_type_meta_t;
+    kan_interned_string_t interned_kan_resource_pipeline_resource_type_meta_t;
 };
 
 static inline struct resource_reference_manager_native_container_type_data_t *query_resource_type_data (
@@ -1308,7 +1308,7 @@ UNIVERSE_RESOURCE_REFERENCE_KAN_API void kan_reflection_generator_universe_resou
         kan_allocation_group_get_child (kan_allocation_group_stack_get (), "generated_reflection");
     instance->first_resource_type = NULL;
     instance->resource_types_count = 0u;
-    instance->interned_kan_resource_provider_type_meta_t = kan_string_intern ("kan_resource_provider_type_meta_t");
+    instance->interned_kan_resource_pipeline_resource_type_meta_t = kan_string_intern ("kan_resource_pipeline_resource_type_meta_t");
 }
 
 UNIVERSE_RESOURCE_REFERENCE_KAN_API void kan_reflection_generator_universe_resource_reference_bootstrap (
@@ -1321,7 +1321,7 @@ static inline void reflection_generation_iteration_check_type (
     struct kan_reflection_generator_universe_resource_reference_t *instance,
     kan_reflection_registry_t registry,
     const struct kan_reflection_struct_t *type,
-    const struct kan_resource_provider_type_meta_t *meta,
+    const struct kan_resource_pipeline_resource_type_meta_t *meta,
     kan_reflection_system_generation_iterator_t generation_iterator)
 {
     struct universe_resource_reference_type_node_t *node =
@@ -1341,7 +1341,7 @@ UNIVERSE_RESOURCE_REFERENCE_KAN_API void kan_reflection_generator_universe_resou
     uint64_t iteration_index)
 {
     KAN_UNIVERSE_REFLECTION_GENERATOR_ITERATE_TYPES_WITH_META (
-        struct kan_resource_provider_type_meta_t, instance->interned_kan_resource_provider_type_meta_t,
+        struct kan_resource_pipeline_resource_type_meta_t, instance->interned_kan_resource_pipeline_resource_type_meta_t,
         reflection_generation_iteration_check_type, struct universe_resource_reference_type_node_t, first_resource_type,
         resource_type)
 }
