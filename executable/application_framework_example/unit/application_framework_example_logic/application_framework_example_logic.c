@@ -3,6 +3,7 @@
 #include <stdio.h>
 
 #include <kan/context/application_system.h>
+#include <kan/resource_pipeline/resource_pipeline.h>
 #include <kan/universe/universe.h>
 #include <kan/universe_resource_provider/universe_resource_provider.h>
 #include <kan/universe_time/universe_time.h>
@@ -16,7 +17,8 @@ struct test_data_type_t
 _Static_assert (_Alignof (struct test_data_type_t) == _Alignof (uint64_t), "Alignment has expected value.");
 
 // \meta reflection_struct_meta = "test_data_type_t"
-APPLICATION_FRAMEWORK_EXAMPLE_LOGIC_API struct kan_resource_provider_type_meta_t second_resource_type_meta = {0u};
+APPLICATION_FRAMEWORK_EXAMPLE_LOGIC_API struct kan_resource_pipeline_resource_type_meta_t second_resource_type_meta = {
+    0u};
 
 struct test_singleton_t
 {
@@ -72,9 +74,9 @@ APPLICATION_FRAMEWORK_EXAMPLE_LOGIC_API void kan_universe_mutator_execute_test_m
 
     if (singleton->window_handle == KAN_INVALID_APPLICATION_SYSTEM_WINDOW_HANDLE)
     {
-        singleton->window_handle =
-            kan_application_system_window_create (state->application_system_handle, "Title placeholder", 600u, 400u,
-                                                  KAN_PLATFORM_WINDOW_FLAG_SUPPORTS_VULKAN);
+        singleton->window_handle = kan_application_system_window_create (
+            state->application_system_handle, "Title placeholder", 600u, 400u,
+            KAN_PLATFORM_WINDOW_FLAG_SUPPORTS_VULKAN | KAN_PLATFORM_WINDOW_FLAG_RESIZABLE);
         kan_application_system_window_raise (state->application_system_handle, singleton->window_handle);
     }
 
