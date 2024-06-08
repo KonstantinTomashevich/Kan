@@ -259,8 +259,8 @@ kan_resource_pipeline_type_info_storage_get_or_create_node (
                     const struct kan_reflection_struct_t *referenced_type =
                         kan_reflection_registry_query_struct (registry, kan_string_intern (meta->type));
 
-                    if (referenced_type &&
-                        is_resource_type (registry, referenced_type, interned_kan_resource_pipeline_resource_type_meta_t))
+                    if (referenced_type && is_resource_type (registry, referenced_type,
+                                                             interned_kan_resource_pipeline_resource_type_meta_t))
                     {
                         struct kan_resource_pipeline_reference_type_info_node_t *referenced_type_node =
                             kan_resource_pipeline_type_info_storage_get_or_create_node (
@@ -290,7 +290,8 @@ kan_resource_pipeline_type_info_storage_get_or_create_node (
 
             struct kan_resource_pipeline_reference_type_info_node_t *child_type_node =
                 kan_resource_pipeline_type_info_storage_get_or_create_node (
-                    storage, registry, root_struct_data, child_type, interned_kan_resource_pipeline_resource_type_meta_t,
+                    storage, registry, root_struct_data, child_type,
+                    interned_kan_resource_pipeline_resource_type_meta_t,
                     interned_kan_resource_reference_pipeline_meta_t);
 
             if (child_type_node->fields_to_check.size > 0u)

@@ -1,6 +1,6 @@
 #pragma once
 
-#include <application_framework_resource_builder_api.h>
+#include <application_framework_resource_builder_main_api.h>
 
 #include <kan/api_common/c_header.h>
 #include <kan/container/dynamic_array.h>
@@ -12,7 +12,7 @@
 KAN_C_HEADER_BEGIN
 
 /// \brief Allocation group used for project data allocation.
-APPLICATION_FRAMEWORK_RESOURCE_BUILDER_API kan_allocation_group_t
+APPLICATION_FRAMEWORK_RESOURCE_BUILDER_MAIN_API kan_allocation_group_t
 kan_application_resource_project_allocation_group_get (void);
 
 /// \brief Defines one resource building target.
@@ -33,10 +33,10 @@ struct kan_application_resource_target_t
     struct kan_dynamic_array_t visible_targets;
 };
 
-APPLICATION_FRAMEWORK_RESOURCE_BUILDER_API void kan_application_resource_target_init (
+APPLICATION_FRAMEWORK_RESOURCE_BUILDER_MAIN_API void kan_application_resource_target_init (
     struct kan_application_resource_target_t *instance);
 
-APPLICATION_FRAMEWORK_RESOURCE_BUILDER_API void kan_application_resource_target_shutdown (
+APPLICATION_FRAMEWORK_RESOURCE_BUILDER_MAIN_API void kan_application_resource_target_shutdown (
     struct kan_application_resource_target_t *instance);
 
 /// \brief Defines project format for resource builder.
@@ -67,10 +67,10 @@ struct kan_application_resource_project_t
     kan_bool_t use_string_interning;
 };
 
-APPLICATION_FRAMEWORK_RESOURCE_BUILDER_API void kan_application_resource_project_init (
+APPLICATION_FRAMEWORK_RESOURCE_BUILDER_MAIN_API void kan_application_resource_project_init (
     struct kan_application_resource_project_t *instance);
 
-APPLICATION_FRAMEWORK_RESOURCE_BUILDER_API void kan_application_resource_project_shutdown (
+APPLICATION_FRAMEWORK_RESOURCE_BUILDER_MAIN_API void kan_application_resource_project_shutdown (
     struct kan_application_resource_project_t *instance);
 
 KAN_C_HEADER_END

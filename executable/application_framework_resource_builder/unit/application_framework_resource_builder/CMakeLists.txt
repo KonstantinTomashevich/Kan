@@ -1,4 +1,4 @@
-register_concrete (application_framework_resource_builder)
+register_concrete (application_framework_resource_builder_main)
 concrete_include (PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 concrete_sources ("*.c")
 concrete_require (

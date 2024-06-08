@@ -1,5 +1,5 @@
 #include <kan/api_common/min_max.h>
-#include <kan/application_framework_resource_builder/project.h>
+#include <kan/application_framework_resource_builder_main/project.h>
 #include <kan/container/hash_storage.h>
 #include <kan/context/context.h>
 #include <kan/context/plugin_system.h>
@@ -736,7 +736,7 @@ static void target_shutdown (struct target_t *instance)
     kan_dynamic_array_shutdown (&instance->visible_targets);
 }
 
-KAN_REFLECTION_EXPECT_UNIT_REGISTRAR_LOCAL (application_framework_resource_builder);
+KAN_REFLECTION_EXPECT_UNIT_REGISTRAR_LOCAL (application_framework_resource_builder_main);
 
 static int read_project (const char *path, struct kan_application_resource_project_t *project)
 {
@@ -749,7 +749,7 @@ static int read_project (const char *path, struct kan_application_resource_proje
 
     input_stream = kan_random_access_stream_buffer_open_for_read (input_stream, KAN_RESOURCE_BUILDER_IO_BUFFER);
     kan_reflection_registry_t local_registry = kan_reflection_registry_create ();
-    KAN_REFLECTION_UNIT_REGISTRAR_NAME (application_framework_resource_builder) (local_registry);
+    KAN_REFLECTION_UNIT_REGISTRAR_NAME (application_framework_resource_builder_main) (local_registry);
     int result = 0;
 
     kan_serialization_rd_reader_t reader = kan_serialization_rd_reader_create (
@@ -811,7 +811,7 @@ static kan_context_handle_t create_context (const struct kan_application_resourc
 
     if (!kan_context_request_system (context, KAN_CONTEXT_PLUGIN_SYSTEM_NAME, &plugin_system_config))
     {
-        KAN_LOG (application_framework_tool, KAN_LOG_ERROR, "Failed to request plugin system.")
+        KAN_LOG (application_framework_resource_builder, KAN_LOG_ERROR, "Failed to request plugin system.")
     }
 
     if (!kan_context_request_system (context, KAN_CONTEXT_REFLECTION_SYSTEM_NAME, NULL))

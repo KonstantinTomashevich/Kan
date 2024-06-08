@@ -1861,7 +1861,7 @@ KAN_TEST_CASE (on_delete_event_after_destroy)
     KAN_REFLECTION_UNIT_REGISTRAR_NAME (test_repository) (registry);
 
     kan_repository_t repository = kan_repository_create_root (KAN_ALLOCATION_GROUP_IGNORE, registry);
-    kan_repository_t child_repository = kan_repository_create_child(repository, "child");
+    kan_repository_t child_repository = kan_repository_create_child (repository, "child");
 
     kan_repository_indexed_storage_t status_storage =
         kan_repository_indexed_storage_open (child_repository, "status_record_t");

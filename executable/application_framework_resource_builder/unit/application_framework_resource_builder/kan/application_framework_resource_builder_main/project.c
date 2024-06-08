@@ -1,6 +1,6 @@
 #include <string.h>
 
-#include <kan/application_framework_resource_builder/project.h>
+#include <kan/application_framework_resource_builder_main/project.h>
 #include <kan/memory/allocation.h>
 
 static kan_allocation_group_t allocation_group;

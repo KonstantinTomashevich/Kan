@@ -1308,7 +1308,8 @@ UNIVERSE_RESOURCE_REFERENCE_KAN_API void kan_reflection_generator_universe_resou
         kan_allocation_group_get_child (kan_allocation_group_stack_get (), "generated_reflection");
     instance->first_resource_type = NULL;
     instance->resource_types_count = 0u;
-    instance->interned_kan_resource_pipeline_resource_type_meta_t = kan_string_intern ("kan_resource_pipeline_resource_type_meta_t");
+    instance->interned_kan_resource_pipeline_resource_type_meta_t =
+        kan_string_intern ("kan_resource_pipeline_resource_type_meta_t");
 }
 
 UNIVERSE_RESOURCE_REFERENCE_KAN_API void kan_reflection_generator_universe_resource_reference_bootstrap (
@@ -1341,9 +1342,9 @@ UNIVERSE_RESOURCE_REFERENCE_KAN_API void kan_reflection_generator_universe_resou
     uint64_t iteration_index)
 {
     KAN_UNIVERSE_REFLECTION_GENERATOR_ITERATE_TYPES_WITH_META (
-        struct kan_resource_pipeline_resource_type_meta_t, instance->interned_kan_resource_pipeline_resource_type_meta_t,
-        reflection_generation_iteration_check_type, struct universe_resource_reference_type_node_t, first_resource_type,
-        resource_type)
+        struct kan_resource_pipeline_resource_type_meta_t,
+        instance->interned_kan_resource_pipeline_resource_type_meta_t, reflection_generation_iteration_check_type,
+        struct universe_resource_reference_type_node_t, first_resource_type, resource_type)
 }
 
 static inline void generated_mutator_init_node (
