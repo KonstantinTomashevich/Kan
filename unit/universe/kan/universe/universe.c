@@ -609,11 +609,12 @@ static void deploy_automated_lifetime_queries (kan_reflection_registry_t registr
             char queried_type_name_mutable[KAN_UNIVERSE_MAX_AUTOMATED_QUERY_TYPE_LENGTH];
             KAN_ASSERT (name_parts[0u].end - name_parts[0u].begin + 2u < KAN_UNIVERSE_MAX_AUTOMATED_QUERY_TYPE_LENGTH)
             strncpy (queried_type_name_mutable, name_parts[0u].begin, name_parts[0u].end - name_parts[0u].begin);
+            const uint64_t length = name_parts[0u].end - name_parts[0u].begin;
+            queried_type_name_mutable[length] = '\0';
 
             kan_interned_string_t queried_type_name = kan_string_intern (queried_type_name_mutable);
             if (!kan_reflection_registry_query_struct (registry, queried_type_name))
             {
-                const uint64_t length = name_parts[0u].end - name_parts[0u].begin;
                 queried_type_name_mutable[length] = '_';
                 queried_type_name_mutable[length + 1u] = 't';
                 queried_type_name_mutable[length + 2u] = '\0';
