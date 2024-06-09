@@ -5037,6 +5037,10 @@ static struct indexed_storage_dirty_record_node_t *indexed_storage_allocate_dirt
         node->observation_buffer_memory = kan_stack_group_allocator_allocate (
             &storage->temporary_allocator, storage->observation_buffer.buffer_size, OBSERVATION_BUFFER_CHUNK_ALIGNMENT);
     }
+    else
+    {
+        node->observation_buffer_memory = NULL;
+    }
 
     kan_atomic_int_unlock (&storage->maintenance_lock);
     return node;
@@ -8898,6 +8902,10 @@ static void prepare_singleton_storage (uint64_t user_data)
             data->storage->observation_buffer_memory =
                 kan_allocate_general (data->storage->automation_allocation_group,
                                       data->storage->observation_buffer.buffer_size, OBSERVATION_BUFFER_ALIGNMENT);
+        }
+        else
+        {
+            data->storage->observation_buffer_memory = NULL;
         }
     }
 
