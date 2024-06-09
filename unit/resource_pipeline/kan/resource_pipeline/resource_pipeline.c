@@ -324,12 +324,29 @@ static inline void kan_resource_pipeline_type_info_storage_scan (
         kan_string_intern ("kan_resource_pipeline_reference_meta_t");
     const struct kan_reflection_struct_t *struct_data;
 
-    // Prepare data.
+    // Start by scanning only resource types to avoid issues when resource types are scanned as part of records that
+    // store them in runtime (for example resource provider containers).
+    while ((struct_data = kan_reflection_registry_struct_iterator_get (iterator)))
+    {
+        if (is_resource_type (registry, struct_data, interned_kan_resource_pipeline_resource_type_meta_t))
+        {
+            kan_resource_pipeline_type_info_storage_get_or_create_node (
+                storage, registry, struct_data, struct_data, interned_kan_resource_pipeline_resource_type_meta_t,
+                interned_kan_resource_pipeline_reference_meta_t);
+        }
+
+        iterator = kan_reflection_registry_struct_iterator_next (iterator);
+    }
+
+    // Add everything else, otherwise we can miss on patchable types.
+    iterator = kan_reflection_registry_struct_iterator_create (registry);
+
     while ((struct_data = kan_reflection_registry_struct_iterator_get (iterator)))
     {
         kan_resource_pipeline_type_info_storage_get_or_create_node (storage, registry, struct_data, struct_data,
                                                                     interned_kan_resource_pipeline_resource_type_meta_t,
                                                                     interned_kan_resource_pipeline_reference_meta_t);
+
         iterator = kan_reflection_registry_struct_iterator_next (iterator);
     }
 
@@ -372,9 +389,12 @@ static inline void kan_resource_pipeline_type_info_storage_scan (
             kan_hash_storage_remove (&storage->scanned_types, &type_node->node);
             kan_resource_pipeline_type_info_node_free (storage, type_node);
         }
+        else
+        {
+            kan_dynamic_array_set_capacity (&type_node->fields_to_check, type_node->fields_to_check.size);
+            kan_dynamic_array_set_capacity (&type_node->referencer_types, type_node->referencer_types.size);
+        }
 
-        kan_dynamic_array_set_capacity (&type_node->fields_to_check, type_node->fields_to_check.size);
-        kan_dynamic_array_set_capacity (&type_node->referencer_types, type_node->referencer_types.size);
         type_node = next;
     }
 
@@ -441,6 +461,17 @@ static inline void kan_resource_pipeline_detected_container_add_reference (
     if (!name)
     {
         return;
+    }
+
+    for (uint64_t index = 0u; index < container->detected_references.size; ++index)
+    {
+        struct kan_resource_pipeline_detected_reference_t *reference =
+            &((struct kan_resource_pipeline_detected_reference_t *) container->detected_references.data)[index];
+
+        if (reference->name == name && reference->type == type && reference->compilation_usage == compilation_usage)
+        {
+            return;
+        }
     }
 
     struct kan_resource_pipeline_detected_reference_t *spot =
@@ -557,16 +588,16 @@ static void kan_resource_pipeline_detect_inside_patch_part (
         kan_reflection_patch_iterator_t field_search_iterator = search_since_iterator;
         struct kan_reflection_patch_chunk_info_t chunk_info = kan_reflection_patch_iterator_get (field_search_iterator);
 
-        while (field_offset + field_info->field->size < chunk_info.offset ||
+        while (field_offset + field_info->field->size <= chunk_info.offset ||
                field_offset >= chunk_info.offset + chunk_info.size)
         {
             field_search_iterator = kan_reflection_patch_iterator_next (field_search_iterator);
-            chunk_info = kan_reflection_patch_iterator_get (field_search_iterator);
-
             if (field_search_iterator == kan_reflection_patch_end (patch))
             {
                 break;
             }
+
+            chunk_info = kan_reflection_patch_iterator_get (field_search_iterator);
         }
 
         if (field_search_iterator == kan_reflection_patch_end (patch))

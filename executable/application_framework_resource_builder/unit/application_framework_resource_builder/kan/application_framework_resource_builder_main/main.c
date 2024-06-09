@@ -1738,8 +1738,8 @@ static void process_native_node_compilation (uint64_t user_data)
         node->loaded_references_from_cache = KAN_FALSE;
 
         const kan_bool_t cache_is_up_to_date =
-            reference_cache_time_ns >= source_time_ns &&
-            reference_cache_time_ns >= global.newest_loaded_plugin_last_modification_file_time_ns;
+            reference_cache_time_ns > source_time_ns &&
+            reference_cache_time_ns > global.newest_loaded_plugin_last_modification_file_time_ns;
 
         if (cache_is_up_to_date)
         {

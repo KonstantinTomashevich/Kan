@@ -19,7 +19,9 @@
 #include <kan/universe_resource_reference/universe_resource_reference.h>
 #include <kan/virtual_file_system/virtual_file_system.h>
 
+// \c_interface_scanner_disable
 KAN_LOG_DEFINE_CATEGORY (universe_resource_reference);
+// \c_interface_scanner_enable
 
 // \meta reflection_function_meta = "kan_universe_mutator_execute_resource_reference_manager"
 UNIVERSE_RESOURCE_REFERENCE_KAN_API struct kan_universe_mutator_group_meta_t resource_reference_mutator_group = {
@@ -285,7 +287,8 @@ static inline void reset_outer_references_operation (struct resource_reference_m
 static inline void send_outer_references_operation_response (struct resource_reference_manager_state_t *state,
                                                              kan_interned_string_t type,
                                                              kan_interned_string_t name,
-                                                             kan_bool_t successful)
+                                                             kan_bool_t successful,
+                                                             uint64_t entry_attachment_id)
 {
     struct kan_repository_event_insertion_package_t package =
         kan_repository_event_insert_query_execute (&state->insert__kan_resource_update_outer_references_response_event);
@@ -297,6 +300,7 @@ static inline void send_outer_references_operation_response (struct resource_ref
         event->type = type;
         event->name = name;
         event->successful = successful;
+        event->entry_attachment_id = entry_attachment_id;
         kan_repository_event_insertion_package_submit (&package);
     }
 }
@@ -334,7 +338,7 @@ static inline void delete_all_ongoing_operations (struct resource_reference_mana
         if (operation)
         {
             reset_outer_references_operation (state, operation);
-            send_outer_references_operation_response (state, operation->type, operation->name, KAN_FALSE);
+            send_outer_references_operation_response (state, operation->type, operation->name, KAN_FALSE, 0u);
             kan_repository_indexed_sequence_write_access_delete (&access);
         }
         else
@@ -683,7 +687,6 @@ static inline void publish_references (struct resource_reference_manager_state_t
                                        uint64_t file_time_ns)
 {
     uint64_t reference_output_index = 0u;
-
     struct kan_repository_indexed_value_write_cursor_t reference_cursor =
         kan_repository_indexed_value_write_query_execute (
             &state->write_value__kan_resource_native_entry_outer_reference__attachment_id, &entry->attachment_id);
@@ -713,8 +716,6 @@ static inline void publish_references (struct resource_reference_manager_state_t
             {
                 kan_repository_indexed_value_write_access_delete (&reference_access);
             }
-
-            break;
         }
         else
         {
@@ -811,14 +812,14 @@ static inline kan_bool_t update_references_from_cache (struct resource_reference
             }
             else
             {
-                KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, universe_resource_references, KAN_LOG_ERROR,
+                KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, universe_resource_reference, KAN_LOG_ERROR,
                                      "Failed to get status of cache file \"%s\".", cache_path)
                 successful = KAN_FALSE;
             }
         }
         else
         {
-            KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, universe_resource_references, KAN_LOG_ERROR,
+            KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, universe_resource_reference, KAN_LOG_ERROR,
                                  "Failed to deserialize cache file \"%s\".", cache_path)
             successful = KAN_FALSE;
         }
@@ -827,7 +828,7 @@ static inline kan_bool_t update_references_from_cache (struct resource_reference
     }
     else
     {
-        KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, universe_resource_references, KAN_LOG_ERROR,
+        KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, universe_resource_reference, KAN_LOG_ERROR,
                              "Failed to open cache file \"%s\" for read.", cache_path)
         successful = KAN_FALSE;
     }
@@ -855,7 +856,7 @@ static inline uint64_t write_references_to_cache (
     {
         stream = kan_random_access_stream_buffer_open_for_write (stream, KAN_UNIVERSE_RESOURCE_REFERENCE_IO_BUFFER);
         kan_serialization_binary_writer_t writer = kan_serialization_binary_writer_create (
-            stream, &container, kan_string_intern ("kan_resource_pipeline_detected_reference_container_t"),
+            stream, container, kan_string_intern ("kan_resource_pipeline_detected_reference_container_t"),
             state->binary_script_storage, KAN_INVALID_SERIALIZATION_INTERNED_STRING_REGISTRY);
 
         enum kan_serialization_state_t serialization_state;
@@ -868,14 +869,14 @@ static inline uint64_t write_references_to_cache (
 
         if (serialization_state == KAN_SERIALIZATION_FAILED)
         {
-            KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, universe_resource_references, KAN_LOG_ERROR,
+            KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, universe_resource_reference, KAN_LOG_ERROR,
                                  "Failed to write cache file \"%s\".", cache_path.path)
             kan_virtual_file_system_remove_file (volume, cache_path.path);
         }
     }
     else
     {
-        KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, universe_resource_references, KAN_LOG_ERROR,
+        KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, universe_resource_reference, KAN_LOG_ERROR,
                              "Failed to open cache file \"%s\" for write.", cache_path.path)
     }
 
@@ -888,7 +889,7 @@ static inline uint64_t write_references_to_cache (
     else
     {
         kan_virtual_file_system_close_context_write_access (state->virtual_file_system);
-        KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, universe_resource_references, KAN_LOG_ERROR,
+        KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, universe_resource_reference, KAN_LOG_ERROR,
                              "Failed to get status of cache file \"%s\".", cache_path.path)
         return 0u;
     }
@@ -936,11 +937,11 @@ static void execute_shared_serve (uint64_t user_data)
 
         if (!entry)
         {
-            KAN_LOG (universe_resource_references, KAN_LOG_ERROR,
+            KAN_LOG (universe_resource_reference, KAN_LOG_ERROR,
                      "Failed to process outer references request as its entry \"%s\" of type \"%s\" does not exist.",
                      operation->name, operation->type)
 
-            send_outer_references_operation_response (state, operation->type, operation->name, KAN_FALSE);
+            send_outer_references_operation_response (state, operation->type, operation->name, KAN_FALSE, 0u);
             fail_all_references_to_type_operation (state, operation->entry_attachment_id);
             reset_outer_references_operation (state, operation);
             kan_repository_indexed_sequence_write_access_delete (&operation_access);
@@ -968,14 +969,15 @@ static void execute_shared_serve (uint64_t user_data)
             kan_virtual_file_system_close_context_read_access (state->virtual_file_system);
 
             const kan_bool_t cache_is_up_to_date =
-                cache_update_time_ns >= source_update_time_ns && cache_update_time_ns >= plugin_update_time_ns;
+                cache_update_time_ns > source_update_time_ns && cache_update_time_ns > plugin_update_time_ns;
 
             const kan_bool_t update_not_needed =
-                transient_update_time_ns >= cache_update_time_ns && cache_is_up_to_date;
+                transient_update_time_ns > cache_update_time_ns && cache_is_up_to_date;
 
             if (update_not_needed)
             {
-                send_outer_references_operation_response (state, operation->type, operation->name, KAN_TRUE);
+                send_outer_references_operation_response (state, operation->type, operation->name, KAN_TRUE,
+                                                          entry->attachment_id);
                 reset_outer_references_operation (state, operation);
                 kan_repository_indexed_sequence_write_access_delete (&operation_access);
                 break;
@@ -984,7 +986,8 @@ static void execute_shared_serve (uint64_t user_data)
             if (cache_is_up_to_date)
             {
                 kan_bool_t successful = update_references_from_cache (state, entry, cache_path.path);
-                send_outer_references_operation_response (state, operation->type, operation->name, successful);
+                send_outer_references_operation_response (state, operation->type, operation->name, successful,
+                                                          entry->attachment_id);
 
                 if (!successful)
                 {
@@ -1013,6 +1016,8 @@ static void execute_shared_serve (uint64_t user_data)
             kan_repository_indexed_insertion_package_submit (&request_package);
 
             operation->state = RESOURCE_OUTER_REFERENCES_OPERATION_STATE_WAITING_RESOURCE;
+            operation->resource_request_id = request->request_id;
+
             kan_repository_indexed_sequence_write_access_close (&operation_access);
             kan_repository_singleton_read_access_close (provider_access);
             break;
@@ -1033,12 +1038,13 @@ static void execute_shared_serve (uint64_t user_data)
 
             if (!request)
             {
-                KAN_LOG (universe_resource_references, KAN_LOG_ERROR,
+                KAN_LOG (universe_resource_reference, KAN_LOG_ERROR,
                          "Failed to process outer references request for entry \"%s\" of type \"%s\": lost resource "
                          "request due to internal error.",
                          operation->name, operation->type)
 
-                send_outer_references_operation_response (state, operation->type, operation->name, KAN_FALSE);
+                send_outer_references_operation_response (state, operation->type, operation->name, KAN_FALSE,
+                                                          entry->attachment_id);
                 fail_all_references_to_type_operation (state, operation->entry_attachment_id);
                 reset_outer_references_operation (state, operation);
                 kan_repository_indexed_sequence_write_access_delete (&operation_access);
@@ -1057,7 +1063,7 @@ static void execute_shared_serve (uint64_t user_data)
 
             if (!type_data)
             {
-                KAN_LOG (universe_resource_references, KAN_LOG_ERROR,
+                KAN_LOG (universe_resource_reference, KAN_LOG_ERROR,
                          "Failed to process outer references request for entry \"%s\" of type \"%s\": its type is not "
                          "registered among accessible resource types due to internal error.",
                          operation->name, operation->type)
@@ -1091,7 +1097,8 @@ static void execute_shared_serve (uint64_t user_data)
             publish_references (state, entry, &reference_container, cache_file_time);
             kan_resource_pipeline_detected_reference_container_shutdown (&reference_container);
 
-            send_outer_references_operation_response (state, operation->type, operation->name, KAN_TRUE);
+            send_outer_references_operation_response (state, operation->type, operation->name, KAN_TRUE,
+                                                      entry->attachment_id);
             kan_repository_indexed_value_read_access_close (&container_access);
             kan_repository_indexed_value_delete_access_delete (&request_access);
             kan_repository_indexed_sequence_write_access_delete (&operation_access);
@@ -1176,7 +1183,7 @@ UNIVERSE_RESOURCE_REFERENCE_KAN_API void mutator_template_execute_resource_refer
                      "Unable to find native resource \"%s\" of type \"%s\" in order to collect its outer references.",
                      outer_references_request->name, outer_references_request->type)
             send_outer_references_operation_response (state, outer_references_request->type,
-                                                      outer_references_request->name, KAN_FALSE);
+                                                      outer_references_request->name, KAN_FALSE, 0u);
         }
 
         kan_repository_event_read_access_close (&event_access);

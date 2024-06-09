@@ -56,6 +56,9 @@ struct kan_resource_update_outer_references_response_event_t
     kan_interned_string_t type;
     kan_interned_string_t name;
     kan_bool_t successful;
+
+    /// \brief Entry attachment id is added to make parsing response result more convenient.
+    uint64_t entry_attachment_id;
 };
 
 /// \brief Requests outer reference attachments to be update on all native entries that can reference given type.

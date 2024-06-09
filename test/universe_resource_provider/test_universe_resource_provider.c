@@ -11,7 +11,6 @@
 #include <kan/context/virtual_file_system.h>
 #include <kan/file_system/entry.h>
 #include <kan/file_system/stream.h>
-#include <kan/memory_profiler/capture.h>
 #include <kan/platform/precise_time.h>
 #include <kan/reflection/generated_reflection.h>
 #include <kan/resource_index/resource_index.h>
