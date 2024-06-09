@@ -14,7 +14,7 @@
 ///
 /// \par Resource marking
 /// \parblock
-/// Resource types should be marked with `kan_resource_pipeline_resource_type_meta_t` empty meta to be visible for
+/// Resource types should be marked with `kan_resource_pipeline_resource_type_meta_t` meta to be visible for
 /// reflection-based resource logic.
 /// \endparblock
 ///
@@ -25,7 +25,8 @@
 /// will be stored in `kan_resource_pipeline_reference_type_info_storage_t`, which allows to make reference detection
 /// algorithm faster. Then, references can be extracted from every resource type using
 /// `kan_resource_pipeline_detect_references` into serializable (and therefore cacheable)
-/// `kan_resource_pipeline_detected_reference_container_t`. \endparblock
+/// `kan_resource_pipeline_detected_reference_container_t`.
+/// \endparblock
 ///
 /// \par Compilation
 /// \parblock
@@ -36,10 +37,12 @@
 
 KAN_C_HEADER_BEGIN
 
-/// \brief Empty meta for marking types for native resources that should be supported by resource logic.
+/// \brief Meta for marking types for native resources that should be supported by resource logic.
 struct kan_resource_pipeline_resource_type_meta_t
 {
-    uint64_t stub;
+    /// \brief If true, resource is considered as root for resource packing mechanism.
+    /// \details Only root resources and resources recursively referenced by them are packed by resource builder.
+    kan_bool_t root;
 };
 
 /// \brief Describes whether and how reference is used in resource compilation routine if any.

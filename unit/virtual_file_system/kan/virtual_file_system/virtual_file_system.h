@@ -117,6 +117,7 @@
 //       in base, it should be reported as modification, also if file was deleted in overlay and exists in base, it
 //       should be reported as modification too.
 //       Also, we need some way to mark files as deleted in overlay to hide base directory files.
+//       Also, implementing directory iterators in this case would be non-trivial.
 
 KAN_C_HEADER_BEGIN
 

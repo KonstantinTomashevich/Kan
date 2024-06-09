@@ -40,7 +40,8 @@ _Static_assert (_Alignof (struct first_resource_type_t) == _Alignof (uint64_t),
                 "Alignment does not require additional offset calculations.");
 
 // \meta reflection_struct_meta = "first_resource_type_t"
-TEST_UNIVERSE_RESOURCE_PROVIDER_API struct kan_resource_pipeline_resource_type_meta_t first_resource_type_meta = {0u};
+TEST_UNIVERSE_RESOURCE_PROVIDER_API struct kan_resource_pipeline_resource_type_meta_t first_resource_type_meta = {
+    .root = KAN_TRUE};
 
 struct second_resource_type_t
 {
@@ -52,7 +53,8 @@ _Static_assert (_Alignof (struct second_resource_type_t) == _Alignof (uint64_t),
                 "Alignment does not require additional offset calculations.");
 
 // \meta reflection_struct_meta = "second_resource_type_t"
-TEST_UNIVERSE_RESOURCE_PROVIDER_API struct kan_resource_pipeline_resource_type_meta_t second_resource_type_meta = {0u};
+TEST_UNIVERSE_RESOURCE_PROVIDER_API struct kan_resource_pipeline_resource_type_meta_t second_resource_type_meta = {
+    .root = KAN_TRUE};
 
 static struct first_resource_type_t resource_alpha = {
     64u, KAN_TRUE, KAN_FALSE, KAN_TRUE, KAN_FALSE,

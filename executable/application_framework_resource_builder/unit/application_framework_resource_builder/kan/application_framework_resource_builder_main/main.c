@@ -179,7 +179,10 @@ static struct native_entry_node_t *native_entry_node_create (struct target_t *ta
         return NULL;
     }
 
-    if (!find_singular_struct_meta (source_type_name, interned_kan_resource_pipeline_resource_type_meta_t))
+    const struct kan_resource_pipeline_resource_type_meta_t *resource_type_meta =
+        find_singular_struct_meta (source_type_name, interned_kan_resource_pipeline_resource_type_meta_t);
+
+    if (!resource_type_meta)
     {
         KAN_LOG (application_framework_resource_builder, KAN_LOG_ERROR,
                  "Found resource type \"%s\", but it doesn't have resource meta.", source_type_name)
@@ -241,7 +244,7 @@ static struct native_entry_node_t *native_entry_node_create (struct target_t *ta
     node->compilation_status = COMPILATION_STATUS_NOT_YET;
     node->pending_compilation_status = COMPILATION_STATUS_NOT_YET;
 
-    node->should_be_included_in_pack = KAN_FALSE;
+    node->should_be_included_in_pack = resource_type_meta->root;
     node->loaded_references_from_cache = KAN_FALSE;
     node->in_active_compilation_queue = KAN_FALSE;
     node->queued_for_resource_management = KAN_FALSE;
@@ -2776,23 +2779,9 @@ int main (int argument_count, char **argument_values)
 
                 while (native_node)
                 {
-                    kan_bool_t is_root_type = KAN_FALSE;
-                    for (uint64_t root_type_index = 0u; root_type_index < global.project.root_types.size;
-                         ++root_type_index)
+                    // Start by compiling nodes that are already scheduled for packing as roots.
+                    if (native_node->should_be_included_in_pack)
                     {
-                        kan_interned_string_t root_type =
-                            ((kan_interned_string_t *) global.project.root_types.data)[root_type_index];
-
-                        if (native_node->source_type->name == root_type)
-                        {
-                            is_root_type = KAN_TRUE;
-                            break;
-                        }
-                    }
-
-                    if (is_root_type)
-                    {
-                        native_node->should_be_included_in_pack = KAN_TRUE;
                         schedule_new_compilation (native_node);
                     }
 
@@ -2899,5 +2888,5 @@ int main (int argument_count, char **argument_values)
     return result;
 }
 
-// TODO: Move this to executable as it has main?
+// TODO: Refactor to use virtual file system, so it can be integrated with directory overlays easily in the future?
 // TODO: Do not forget to delete old tools: binarizer, packer and application_framework_tool library.

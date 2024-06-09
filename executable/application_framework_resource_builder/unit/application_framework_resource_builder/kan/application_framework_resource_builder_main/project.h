@@ -53,10 +53,6 @@ struct kan_application_resource_project_t
     /// \meta reflection_dynamic_array_type = "struct kan_application_resource_target_t"
     struct kan_dynamic_array_t targets;
 
-    /// \brief List of types that should be always packed and serve as roots for used resources scan.
-    /// \meta reflection_dynamic_array_type = "kan_interned_string_t"
-    struct kan_dynamic_array_t root_types;
-
     /// \brief Path to directory that is used as shared reference cache (might be shared with editors).
     char *reference_cache_absolute_directory;
 

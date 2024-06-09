@@ -53,8 +53,6 @@ void kan_application_resource_project_init (struct kan_application_resource_proj
                             allocation_group);
     kan_dynamic_array_init (&instance->targets, 0u, sizeof (struct kan_application_resource_target_t),
                             _Alignof (struct kan_application_resource_target_t), allocation_group);
-    kan_dynamic_array_init (&instance->root_types, 0u, sizeof (kan_interned_string_t), _Alignof (kan_interned_string_t),
-                            allocation_group);
     instance->reference_cache_absolute_directory = NULL;
     instance->output_absolute_directory = NULL;
     instance->use_string_interning = KAN_TRUE;
@@ -77,7 +75,6 @@ void kan_application_resource_project_shutdown (struct kan_application_resource_
 
     kan_dynamic_array_shutdown (&instance->plugins);
     kan_dynamic_array_shutdown (&instance->targets);
-    kan_dynamic_array_shutdown (&instance->root_types);
 
     if (instance->reference_cache_absolute_directory)
     {
