@@ -46,7 +46,8 @@ struct resource_provider_private_singleton_t
 
     uint64_t container_id_counter;
 
-    uint64_t attachment_id_counter;
+    /// \meta reflection_ignore_struct_field
+    struct kan_atomic_int_t attachment_id_counter;
 
     /// \meta reflection_dynamic_array_type = "struct scan_item_task_t"
     struct kan_dynamic_array_t scan_item_stack;
@@ -406,7 +407,7 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void resource_provider_private_singleton_init
 {
     data->status = RESOURCE_PROVIDER_STATUS_NOT_INITIALIZED;
     data->container_id_counter = KAN_RESOURCE_PROVIDER_CONTAINER_ID_NONE + 1u;
-    data->attachment_id_counter = 0u;
+    data->attachment_id_counter = kan_atomic_int_init (0);
 
     kan_dynamic_array_init (&data->scan_item_stack, 0u, sizeof (struct scan_item_task_t),
                             _Alignof (struct scan_item_task_t), kan_allocation_group_stack_get ());
@@ -609,8 +610,7 @@ static void add_native_entry (struct resource_provider_state_t *state,
                               const char *path,
                               kan_serialization_interned_string_registry_t string_registry)
 {
-    const uint64_t attachment_id = private->attachment_id_counter++;
-
+    const uint64_t attachment_id = (uint64_t) kan_atomic_int_add (&private->attachment_id_counter, 1);
     struct kan_repository_indexed_insertion_package_t package =
         kan_repository_indexed_insert_query_execute (&state->insert__kan_resource_native_entry);
     struct kan_resource_native_entry_t *entry = kan_repository_indexed_insertion_package_get (&package);
@@ -638,7 +638,7 @@ static void add_third_party_entry (struct resource_provider_state_t *state,
                                    uint64_t size,
                                    const char *path)
 {
-    const uint64_t attachment_id = private->attachment_id_counter++;
+    const uint64_t attachment_id = (uint64_t) kan_atomic_int_add (&private->attachment_id_counter, 1);
 
     struct kan_repository_indexed_insertion_package_t package =
         kan_repository_indexed_insert_query_execute (&state->insert__kan_resource_third_party_entry);
