@@ -24,12 +24,16 @@
 
 #define ERROR_CODE_INCORRECT_ARGUMENTS -1
 #define ERROR_CODE_FAILED_TO_READ_PROJECT -2
-#define ERROR_CODE_OUTPUT_DIRECTORY_DOES_NOT_EXIST -3
+#define ERROR_CODE_VFS_SETUP_FAILURE -3
 #define ERROR_CODE_FAILED_TO_SETUP_TARGETS -4
 #define ERROR_CODE_FAILED_TO_SCAN_TARGETS -5
 #define ERROR_CODE_FAILED_TO_COMPILE_RESOURCES -6
 #define ERROR_CODE_FAILED_TO_INTERN_STRING -7
 #define ERROR_CODE_FAILED_TO_PACK_TARGETS -8
+
+#define VFS_TARGETS_DIRECTORY "targets"
+#define VFS_RAW_REFERENCE_CACHE_DIRECTORY "reference_cache"
+#define VFS_OUTPUT_DIRECTORY "output"
 
 #define SUB_DIRECTORY_COMPILED_CACHE "compiled_cache"
 #define SUB_DIRECTORY_COMPILED_REFERENCE_CACHE "compiled_reference_cache"
@@ -51,6 +55,7 @@ static struct
 {
     struct kan_stack_group_allocator_t temporary_allocator;
     uint64_t newest_loaded_plugin_last_modification_file_time_ns;
+    kan_virtual_file_system_volume_t volume;
 
     kan_reflection_registry_t registry;
     kan_serialization_binary_script_storage_t binary_script_storage;
@@ -224,11 +229,10 @@ static struct native_entry_node_t *native_entry_node_create (struct target_t *ta
     memcpy (node->source_path, source_path, source_path_length + 1u);
 
     struct kan_file_system_path_container_t compiled_path;
-    kan_file_system_path_container_copy_string (&compiled_path, global.project.output_absolute_directory);
-    kan_file_system_path_container_append (&compiled_path, SUB_DIRECTORY_COMPILED_CACHE);
+    kan_file_system_path_container_copy_string (&compiled_path, VFS_OUTPUT_DIRECTORY "/" SUB_DIRECTORY_COMPILED_CACHE);
     kan_file_system_path_container_append (&compiled_path, node->compiled_type->name);
 
-    kan_file_system_make_directory (compiled_path.path);
+    kan_virtual_file_system_make_directory (global.volume, compiled_path.path);
     kan_file_system_path_container_append (&compiled_path, node->name);
     kan_file_system_path_container_add_suffix (&compiled_path, ".bin");
 
@@ -262,7 +266,7 @@ static void *load_native_data (const struct kan_reflection_struct_t *type,
                                const char *path,
                                kan_serialization_interned_string_registry_t interned_string_registry)
 {
-    struct kan_stream_t *input_stream = kan_direct_file_stream_open_for_read (path, KAN_TRUE);
+    struct kan_stream_t *input_stream = kan_virtual_file_stream_open_for_read (global.volume, path);
     if (!input_stream)
     {
         KAN_LOG (application_framework_resource_builder, KAN_LOG_ERROR, "Failed to open resource at path \"%s\".", path)
@@ -394,7 +398,7 @@ static kan_bool_t save_native_data (void *data,
                                     kan_serialization_interned_string_registry_t interned_string_registry,
                                     kan_bool_t with_header)
 {
-    struct kan_stream_t *stream = kan_direct_file_stream_open_for_write (path, KAN_TRUE);
+    struct kan_stream_t *stream = kan_virtual_file_stream_open_for_write (global.volume, path);
     if (!stream)
     {
         KAN_LOG (application_framework_resource_builder, KAN_LOG_ERROR, "Failed open \"%s\" for write.", path)
@@ -512,7 +516,7 @@ static struct third_party_entry_node_t *third_party_entry_node_create (struct ta
 
 static void *load_third_party_data (struct third_party_entry_node_t *node)
 {
-    struct kan_stream_t *input_stream = kan_direct_file_stream_open_for_read (node->path, KAN_TRUE);
+    struct kan_stream_t *input_stream = kan_virtual_file_stream_open_for_read (global.volume, node->path);
     if (!input_stream)
     {
         KAN_LOG (application_framework_resource_builder, KAN_LOG_ERROR, "Unable to open resource file \"%s\".",
@@ -743,7 +747,7 @@ KAN_REFLECTION_EXPECT_UNIT_REGISTRAR_LOCAL (application_framework_resource_build
 
 static int read_project (const char *path, struct kan_application_resource_project_t *project)
 {
-    struct kan_stream_t *input_stream = kan_direct_file_stream_open_for_read (path, KAN_TRUE);
+    struct kan_stream_t *input_stream = kan_virtual_file_stream_open_for_read (global.volume, path);
     if (!input_stream)
     {
         KAN_LOG (application_framework_resource_builder, KAN_LOG_ERROR, "Failed to open project at \"%s\".", path)
@@ -897,7 +901,7 @@ static void scan_file (struct target_t *target, struct kan_file_system_path_cont
     if (info.native)
     {
         kan_interned_string_t type_name;
-        struct kan_stream_t *stream = kan_direct_file_stream_open_for_read (path_container->path, KAN_TRUE);
+        struct kan_stream_t *stream = kan_virtual_file_stream_open_for_read (global.volume, path_container->path);
 
         if (!stream)
         {
@@ -980,8 +984,8 @@ static void scan_file (struct target_t *target, struct kan_file_system_path_cont
             return;
         }
 
-        struct kan_file_system_entry_status_t status;
-        if (!kan_file_system_query_entry (path_container->path, &status))
+        struct kan_virtual_file_system_entry_status_t status;
+        if (!kan_virtual_file_system_query_entry (global.volume, path_container->path, &status))
         {
             KAN_LOG (application_framework_resource_builder, KAN_LOG_ERROR, "Unable to query status of \"%s\".",
                      path_container->path)
@@ -1014,10 +1018,11 @@ static void scan_file (struct target_t *target, struct kan_file_system_path_cont
 
 static void scan_directory (struct target_t *target, struct kan_file_system_path_container_t *path_container)
 {
-    kan_file_system_directory_iterator_t iterator = kan_file_system_directory_iterator_create (path_container->path);
+    struct kan_virtual_file_system_directory_iterator_t iterator =
+        kan_virtual_file_system_directory_iterator_create (global.volume, path_container->path);
     const char *item_name;
 
-    while ((item_name = kan_file_system_directory_iterator_advance (iterator)))
+    while ((item_name = kan_virtual_file_system_directory_iterator_advance (&iterator)))
     {
         if ((item_name[0u] == '.' && item_name[1u] == '\0') ||
             (item_name[0u] == '.' && item_name[1u] == '.' && item_name[2u] == '\0'))
@@ -1028,23 +1033,23 @@ static void scan_directory (struct target_t *target, struct kan_file_system_path
 
         const uint64_t old_length = path_container->length;
         kan_file_system_path_container_append (path_container, item_name);
-        struct kan_file_system_entry_status_t status;
+        struct kan_virtual_file_system_entry_status_t status;
 
-        if (kan_file_system_query_entry (path_container->path, &status))
+        if (kan_virtual_file_system_query_entry (global.volume, path_container->path, &status))
         {
             switch (status.type)
             {
-            case KAN_FILE_SYSTEM_ENTRY_TYPE_UNKNOWN:
+            case KAN_VIRTUAL_FILE_SYSTEM_ENTRY_TYPE_UNKNOWN:
                 KAN_LOG (application_framework_resource_builder, KAN_LOG_ERROR, "Entry \"%s\" has unknown type.",
                          path_container->path)
                 kan_atomic_int_add (&global.errors_count, 1);
                 break;
 
-            case KAN_FILE_SYSTEM_ENTRY_TYPE_FILE:
+            case KAN_VIRTUAL_FILE_SYSTEM_ENTRY_TYPE_FILE:
                 scan_file (target, path_container);
                 break;
 
-            case KAN_FILE_SYSTEM_ENTRY_TYPE_DIRECTORY:
+            case KAN_VIRTUAL_FILE_SYSTEM_ENTRY_TYPE_DIRECTORY:
                 scan_directory (target, path_container);
                 break;
             }
@@ -1058,6 +1063,8 @@ static void scan_directory (struct target_t *target, struct kan_file_system_path
 
         kan_file_system_path_container_reset_length (path_container, old_length);
     }
+
+    kan_virtual_file_system_directory_iterator_destroy (&iterator);
 }
 
 static void scan_target_for_resources (uint64_t user_data)
@@ -1065,13 +1072,9 @@ static void scan_target_for_resources (uint64_t user_data)
     struct target_t *target = (struct target_t *) user_data;
     struct kan_file_system_path_container_t path_container;
 
-    for (uint64_t root_directory_index = 0u; root_directory_index < target->source->directories.size;
-         ++root_directory_index)
-    {
-        const char *root_directory = ((const char **) target->source->directories.data)[root_directory_index];
-        kan_file_system_path_container_copy_string (&path_container, root_directory);
-        scan_directory (target, &path_container);
-    }
+    kan_file_system_path_container_copy_string (&path_container, VFS_TARGETS_DIRECTORY);
+    kan_file_system_path_container_append (&path_container, target->name);
+    scan_directory (target, &path_container);
 
     KAN_LOG (application_framework_resource_builder, KAN_LOG_INFO, "[Target \"%s\"] Done scanning for resources.",
              target->name)
@@ -1388,7 +1391,7 @@ static void manage_resources_third_party (uint64_t user_data)
 static inline void form_references_cache_directory_path (struct native_entry_node_t *node,
                                                          struct kan_file_system_path_container_t *output)
 {
-    kan_file_system_path_container_copy_string (output, global.project.reference_cache_absolute_directory);
+    kan_file_system_path_container_copy_string (output, VFS_RAW_REFERENCE_CACHE_DIRECTORY);
     kan_file_system_path_container_append (output, node->source_type->name);
 }
 
@@ -1402,8 +1405,8 @@ static inline void form_references_cache_item_path (struct native_entry_node_t *
 static inline void form_compiled_references_cache_directory_path (struct native_entry_node_t *node,
                                                                   struct kan_file_system_path_container_t *output)
 {
-    kan_file_system_path_container_copy_string (output, global.project.output_absolute_directory);
-    kan_file_system_path_container_append (output, SUB_DIRECTORY_COMPILED_REFERENCE_CACHE);
+    kan_file_system_path_container_copy_string (output,
+                                                VFS_OUTPUT_DIRECTORY "/" SUB_DIRECTORY_COMPILED_REFERENCE_CACHE);
     kan_file_system_path_container_append (output, node->source_type->name);
 }
 
@@ -1416,8 +1419,8 @@ static inline void form_compiled_references_cache_item_path (struct native_entry
 
 static inline uint64_t get_file_last_modification_time_ns (const char *path)
 {
-    struct kan_file_system_entry_status_t status;
-    if (kan_file_system_query_entry (path, &status))
+    struct kan_virtual_file_system_entry_status_t status;
+    if (kan_virtual_file_system_query_entry (global.volume, path, &status))
     {
         return status.last_modification_time_ns;
     }
@@ -1430,7 +1433,7 @@ static inline kan_bool_t read_detected_references_cache (
     struct kan_resource_pipeline_detected_reference_container_t *container,
     const char *path)
 {
-    struct kan_stream_t *stream = kan_direct_file_stream_open_for_read (path, KAN_TRUE);
+    struct kan_stream_t *stream = kan_virtual_file_stream_open_for_read (global.volume, path);
     if (!stream)
     {
         // Reference cache failures are warnings, because we can always load resource itself.
@@ -1676,10 +1679,10 @@ static void save_compiled_references_to_cache (struct native_entry_node_t *node)
 {
     struct kan_file_system_path_container_t path_container;
     form_compiled_references_cache_directory_path (node, &path_container);
-    kan_file_system_make_directory (path_container.path);
+    kan_virtual_file_system_make_directory (global.volume, path_container.path);
 
     form_compiled_references_cache_item_path (node, &path_container);
-    struct kan_stream_t *stream = kan_direct_file_stream_open_for_write (path_container.path, KAN_TRUE);
+    struct kan_stream_t *stream = kan_virtual_file_stream_open_for_write (global.volume, path_container.path);
 
     if (!stream)
     {
@@ -1842,7 +1845,7 @@ static void process_native_node_compilation (uint64_t user_data)
 
         if (all_compiled_dependencies_ready)
         {
-            if (kan_file_system_check_existence (node->compiled_path) &&
+            if (kan_virtual_file_system_check_existence (global.volume, node->compiled_path) &&
                 is_compiled_data_newer_than_dependencies (node))
             {
                 struct kan_file_system_path_container_t path_container;
@@ -2308,11 +2311,9 @@ static void intern_strings_in_native (uint64_t user_data)
 
     kan_free_general (nodes_allocation_group, node->compiled_path, strlen (node->compiled_path) + 1u);
     struct kan_file_system_path_container_t new_path_container;
-    kan_file_system_path_container_copy_string (&new_path_container, global.project.output_absolute_directory);
-    kan_file_system_path_container_append (&new_path_container, SUB_DIRECTORY_TEMPORARY);
-
+    kan_file_system_path_container_copy_string (&new_path_container, VFS_OUTPUT_DIRECTORY "/" SUB_DIRECTORY_TEMPORARY);
     kan_file_system_path_container_append (&new_path_container, node->compiled_type->name);
-    kan_file_system_make_directory (new_path_container.path);
+    kan_virtual_file_system_make_directory (global.volume, new_path_container.path);
     kan_file_system_path_container_append (&new_path_container, node->name);
     kan_file_system_path_container_add_suffix (&new_path_container, ".bin");
 
@@ -2350,8 +2351,7 @@ static inline void form_third_party_node_path_in_pack (struct third_party_entry_
 
 static inline void form_temporary_index_path (struct target_t *target, struct kan_file_system_path_container_t *output)
 {
-    kan_file_system_path_container_copy_string (output, global.project.output_absolute_directory);
-    kan_file_system_path_container_append (output, SUB_DIRECTORY_TEMPORARY);
+    kan_file_system_path_container_copy_string (output, VFS_OUTPUT_DIRECTORY "/" SUB_DIRECTORY_TEMPORARY);
     kan_file_system_path_container_append (output, target->name);
     kan_file_system_path_container_add_suffix (output, KAN_RESOURCE_INDEX_DEFAULT_NAME);
 }
@@ -2359,8 +2359,7 @@ static inline void form_temporary_index_path (struct target_t *target, struct ka
 static inline void form_temporary_string_registry_path (struct target_t *target,
                                                         struct kan_file_system_path_container_t *output)
 {
-    kan_file_system_path_container_copy_string (output, global.project.output_absolute_directory);
-    kan_file_system_path_container_append (output, SUB_DIRECTORY_TEMPORARY);
+    kan_file_system_path_container_copy_string (output, VFS_OUTPUT_DIRECTORY "/" SUB_DIRECTORY_TEMPORARY);
     kan_file_system_path_container_append (output, target->name);
     kan_file_system_path_container_add_suffix (output, KAN_RESOURCE_INDEX_ACCOMPANYING_STRING_REGISTRY_DEFAULT_NAME);
 }
@@ -2369,7 +2368,7 @@ static inline kan_bool_t add_to_pack (kan_virtual_file_system_read_only_pack_bui
                                       const char *path,
                                       const char *path_in_pack)
 {
-    struct kan_stream_t *resource_stream = kan_direct_file_stream_open_for_read (path, KAN_TRUE);
+    struct kan_stream_t *resource_stream = kan_virtual_file_stream_open_for_read (global.volume, path);
     if (!resource_stream)
     {
         // Need to finalize before destruction from outside.
@@ -2451,7 +2450,7 @@ static void pack_target (uint64_t user_data)
                  target->name)
 
         form_temporary_string_registry_path (target, &path_container);
-        struct kan_stream_t *stream = kan_direct_file_stream_open_for_write (path_container.path, KAN_TRUE);
+        struct kan_stream_t *stream = kan_virtual_file_stream_open_for_write (global.volume, path_container.path);
 
         if (!stream)
         {
@@ -2487,10 +2486,10 @@ static void pack_target (uint64_t user_data)
 
     KAN_LOG (application_framework_resource_builder, KAN_LOG_INFO, "[Target \"%s\"] Packing...", target->name)
 
-    kan_file_system_path_container_copy_string (&path_container, global.project.output_absolute_directory);
+    kan_file_system_path_container_copy_string (&path_container, VFS_OUTPUT_DIRECTORY);
     kan_file_system_path_container_append (&path_container, target->name);
     kan_file_system_path_container_add_suffix (&path_container, ".pack");
-    struct kan_stream_t *stream = kan_direct_file_stream_open_for_write (path_container.path, KAN_TRUE);
+    struct kan_stream_t *stream = kan_virtual_file_stream_open_for_write (global.volume, path_container.path);
 
     if (!stream)
     {
@@ -2608,31 +2607,33 @@ int main (int argument_count, char **argument_values)
     KAN_LOG (application_framework_resource_builder, KAN_LOG_INFO, "Reading project...")
     kan_application_resource_project_init (&global.project);
     int result = read_project (argument_values[1u], &global.project);
+    global.volume = kan_virtual_file_system_volume_create ();
 
     if (result == 0)
     {
-        KAN_LOG (application_framework_resource_builder, KAN_LOG_INFO, "Checking directories...")
-        if (!kan_file_system_check_existence (global.project.output_absolute_directory))
+        KAN_LOG (application_framework_resource_builder, KAN_LOG_INFO, "Preparing virtual file system...")
+        if (!kan_virtual_file_system_volume_mount_real (global.volume, VFS_OUTPUT_DIRECTORY,
+                                                        global.project.output_absolute_directory))
         {
-            KAN_LOG (application_framework_resource_builder, KAN_LOG_ERROR, "Output directory \"%s\" does not exist.",
+            KAN_LOG (application_framework_resource_builder, KAN_LOG_ERROR, "Unable to mount output directory \"%s\".",
                      global.project.output_absolute_directory)
-            result = ERROR_CODE_OUTPUT_DIRECTORY_DOES_NOT_EXIST;
+            result = ERROR_CODE_VFS_SETUP_FAILURE;
         }
 
-        struct kan_file_system_path_container_t path_container;
-        kan_file_system_path_container_copy_string (&path_container, global.project.output_absolute_directory);
-        const uint64_t base_length = path_container.length;
+        if (!kan_virtual_file_system_volume_mount_real (global.volume, VFS_RAW_REFERENCE_CACHE_DIRECTORY,
+                                                        global.project.reference_cache_absolute_directory))
+        {
+            KAN_LOG (application_framework_resource_builder, KAN_LOG_ERROR,
+                     "Unable to mount reference cache directory \"%s\".",
+                     global.project.reference_cache_absolute_directory)
+            result = ERROR_CODE_VFS_SETUP_FAILURE;
+        }
 
-        kan_file_system_path_container_append (&path_container, SUB_DIRECTORY_COMPILED_CACHE);
-        kan_file_system_make_directory (path_container.path);
-
-        kan_file_system_path_container_reset_length (&path_container, base_length);
-        kan_file_system_path_container_append (&path_container, SUB_DIRECTORY_COMPILED_REFERENCE_CACHE);
-        kan_file_system_make_directory (path_container.path);
-
-        kan_file_system_path_container_reset_length (&path_container, base_length);
-        kan_file_system_path_container_append (&path_container, SUB_DIRECTORY_TEMPORARY);
-        kan_file_system_make_directory (path_container.path);
+        kan_virtual_file_system_make_directory (global.volume, VFS_TARGETS_DIRECTORY);
+        kan_virtual_file_system_make_directory (global.volume, VFS_OUTPUT_DIRECTORY "/" SUB_DIRECTORY_COMPILED_CACHE);
+        kan_virtual_file_system_make_directory (global.volume,
+                                                VFS_OUTPUT_DIRECTORY "/" SUB_DIRECTORY_COMPILED_REFERENCE_CACHE);
+        kan_virtual_file_system_make_directory (global.volume, VFS_OUTPUT_DIRECTORY "/" SUB_DIRECTORY_TEMPORARY);
     }
 
     if (result == 0)
@@ -2672,6 +2673,30 @@ int main (int argument_count, char **argument_values)
 
             build_target->name = project_target->name;
             build_target->source = project_target;
+
+            struct kan_file_system_path_container_t target_directory;
+            kan_file_system_path_container_copy_string (&target_directory, VFS_TARGETS_DIRECTORY);
+            kan_file_system_path_container_append (&target_directory, project_target->name);
+            kan_virtual_file_system_make_directory (global.volume, target_directory.path);
+
+            for (uint64_t directory_index = 0u; directory_index < project_target->directories.size; ++directory_index)
+            {
+                const char *directory = ((const char **) project_target->directories.data)[directory_index];
+                const uint64_t length = target_directory.length;
+
+                char index_string[8u];
+                snprintf (index_string, 8u, "%lu", (unsigned long) directory_index);
+                kan_file_system_path_container_append (&target_directory, index_string);
+
+                if (kan_virtual_file_system_volume_mount_real (global.volume, target_directory.path, directory))
+                {
+                    KAN_LOG (application_framework_resource_builder, KAN_LOG_ERROR, "Unable to mount \"%s\" at \"%s\".",
+                             directory, target_directory.path)
+                    kan_atomic_int_add (&global.errors_count, 1);
+                }
+
+                kan_file_system_path_container_reset_length (&target_directory, length);
+            }
 
             if (global.project.use_string_interning)
             {
@@ -2879,14 +2904,12 @@ int main (int argument_count, char **argument_values)
         kan_context_destroy (context);
     }
 
-    struct kan_file_system_path_container_t path_container;
-    kan_file_system_path_container_copy_string (&path_container, global.project.output_absolute_directory);
-    kan_file_system_path_container_append (&path_container, SUB_DIRECTORY_TEMPORARY);
-    kan_file_system_remove_directory_with_content (path_container.path);
+    kan_virtual_file_system_remove_directory_with_content (global.volume,
+                                                           VFS_OUTPUT_DIRECTORY "/" SUB_DIRECTORY_TEMPORARY);
+    kan_virtual_file_system_volume_destroy (global.volume);
 
     kan_application_resource_project_shutdown (&global.project);
     return result;
 }
 
-// TODO: Refactor to use virtual file system, so it can be integrated with directory overlays easily in the future?
 // TODO: Do not forget to delete old tools: binarizer, packer and application_framework_tool library.
