@@ -43,6 +43,10 @@ option (KAN_APPLICATION_OBSERVE_WORLDS_IN_PACKAGED
 option (KAN_APPLICATION_ENABLE_CODE_HOT_RELOAD_IN_PACKAGED
         "Whether to enable code hot reload in packaged applications." OFF)
 
+# Whether to enable code hot reload verification target generation.
+option (KAN_APPLICATION_GENERATE_CODE_HOT_RELOAD_TEST
+        "Whether to enable code hot reload verification target generation." ON)
+
 # Target properties, used to store application framework related data. Shouldn't be directly modified by user.
 
 define_property (TARGET PROPERTY APPLICATION_CORE_ABSTRACT
@@ -214,6 +218,21 @@ function (application_set_world_directory DIRECTORY)
     cmake_path (ABSOLUTE_PATH DIRECTORY NORMALIZE)
     set_target_properties ("${APPLICATION_NAME}" PROPERTIES APPLICATION_WORLD_DIRECTORY "${DIRECTORY}")
     message (STATUS "    Setting core world directory to \"${DIRECTORY}\".")
+
+    if (KAN_APPLICATION_GENERATE_CODE_HOT_RELOAD_TEST)
+        message (STATUS "        Adding code hot reload test world.")
+        if (NOT EXISTS "${DIRECTORY}/optional")
+            file (MAKE_DIRECTORY "${DIRECTORY}/optional")
+        endif ()
+
+        file (COPY_FILE
+                "${CMAKE_SOURCE_DIR}/cmake/kan/verify_code_hot_reload_world.rd"
+                "${DIRECTORY}/optional/verify_code_hot_reload.rd")
+
+    else ()
+        message (STATUS "        Removing code hot reload test world.")
+        file (REMOVE "${DIRECTORY}/optional/verify_code_hot_reload.rd")
+    endif ()
 endfunction ()
 
 # Adds development-only environment tag to application.
@@ -572,9 +591,66 @@ function (private_generate_resource_processing NAME RESOURCE_TARGETS)
     endif ()
 endfunction ()
 
+# Intended only for internal use in this file.
+# Macro, because it needs to add new program and variant to application.
+# Adds test program that ensures that:
+# - There is nothing in this application that breaks hot reload for trivial change.
+# - This application reflection structure is coherent and hot reloadable when all plugins are loaded.
+#   For example, if someone forgot to ignore kan_atomic_int_t field somewhere, this would fail.
+macro (private_generate_code_hot_reload_test)
+    message (STATUS "Application \"${APPLICATION_NAME}\" generates test program for code hot reload verification...")
+
+    # Register verification plugin.
+
+    register_application_plugin (NAME verify_code_hot_reload GROUP verify_code_hot_reload)
+    application_plugin_include (CONCRETE "application_framework_verify_code_hot_reload")
+
+    # Get all plugin groups as we need to verify that reflection structure is okay in every plugin.
+
+    set (PLUGIN_GROUPS)
+    get_target_property (PLUGINS "${APPLICATION_NAME}" APPLICATION_PLUGINS)
+
+    if (PLUGINS STREQUAL "PLUGINS-NOTFOUND")
+        set (PLUGINS)
+    endif ()
+
+    get_target_property (CORE_GROUPS "${APPLICATION_NAME}" APPLICATION_CORE_PLUGIN_GROUPS)
+    if (CORE_GROUPS STREQUAL "CORE_GROUPS-NOTFOUND")
+        set (CORE_GROUPS)
+    endif ()
+
+    foreach (PLUGIN ${PLUGINS})
+        get_target_property (PLUGIN_GROUP "${PLUGIN}" APPLICATION_PLUGIN_GROUP)
+        if (NOT "${PLUGIN_GROUP}" IN_LIST CORE_GROUPS)
+            list (APPEND PLUGIN_GROUPS "${PLUGIN_GROUP}")
+        endif ()
+    endforeach ()
+
+    list (REMOVE_DUPLICATES PLUGIN_GROUPS)
+
+    # Register verification program.
+
+    register_application_program (verify_code_hot_reload)
+    application_program_set_configuration ("${CMAKE_SOURCE_DIR}/cmake/kan/verify_code_hot_reload_configuration.rd")
+    application_program_use_as_test_in_development_mode (
+            ARGUMENTS "${CMAKE_COMMAND}" "${CMAKE_BINARY_DIR}" "${APPLICATION_NAME}_dev_all_plugins"
+            # We need really big timeout due to slow machines on GitHub Actions.
+            PROPERTIES RUN_SERIAL ON TIMEOUT 1200 LABELS SLOW)
+
+    foreach (PLUGIN_GROUP ${PLUGIN_GROUPS})
+        application_program_use_plugin_group ("${PLUGIN_GROUP}")
+    endforeach ()
+
+    # We not need variant as we're not testing code hot reload in packaged mode (as it is usually disabled).
+endmacro ()
+
 # Uses data gathered by registration functions above to generate application shared libraries, executables and other
 # application related targets.
 function (application_generate)
+    if (KAN_APPLICATION_GENERATE_CODE_HOT_RELOAD_TEST)
+        private_generate_code_hot_reload_test ()
+    endif ()
+
     message (STATUS "Application \"${APPLICATION_NAME}\" registration done, generating...")
     message (STATUS "Application \"${APPLICATION_NAME}\": generating development targets.")
 
