@@ -4076,10 +4076,15 @@ static void repository_migrate_internal (struct repository_t *repository,
         const struct kan_reflection_struct_t *old_type = singleton_storage_node->type;
         const struct kan_reflection_struct_t *new_type =
             kan_reflection_registry_query_struct (new_registry, old_type->name);
-        singleton_storage_node->type = new_type;
 
         const struct kan_reflection_struct_migration_seed_t *seed =
             kan_reflection_migration_seed_get_for_struct (migration_seed, old_type->name);
+
+        // Resetting type for removed storages results in incorrect destruction.
+        if (seed->status != KAN_REFLECTION_MIGRATION_REMOVED)
+        {
+            singleton_storage_node->type = new_type;
+        }
 
         switch (seed->status)
         {
@@ -4122,10 +4127,15 @@ static void repository_migrate_internal (struct repository_t *repository,
         const struct kan_reflection_struct_t *old_type = indexed_storage_node->type;
         const struct kan_reflection_struct_t *new_type =
             kan_reflection_registry_query_struct (new_registry, old_type->name);
-        indexed_storage_node->type = new_type;
 
         const struct kan_reflection_struct_migration_seed_t *seed =
             kan_reflection_migration_seed_get_for_struct (migration_seed, old_type->name);
+
+        // Resetting type for removed storages results in incorrect destruction.
+        if (seed->status != KAN_REFLECTION_MIGRATION_REMOVED)
+        {
+            indexed_storage_node->type = new_type;
+        }
 
         switch (seed->status)
         {
@@ -4278,10 +4288,15 @@ static void repository_migrate_internal (struct repository_t *repository,
         const struct kan_reflection_struct_t *old_type = event_storage_node->type;
         const struct kan_reflection_struct_t *new_type =
             kan_reflection_registry_query_struct (new_registry, old_type->name);
-        event_storage_node->type = new_type;
 
         const struct kan_reflection_struct_migration_seed_t *seed =
             kan_reflection_migration_seed_get_for_struct (migration_seed, old_type->name);
+
+        // Resetting type for removed storages results in incorrect destruction.
+        if (seed->status != KAN_REFLECTION_MIGRATION_REMOVED)
+        {
+            event_storage_node->type = new_type;
+        }
 
         switch (seed->status)
         {
