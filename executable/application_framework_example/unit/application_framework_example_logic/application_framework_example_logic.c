@@ -53,7 +53,6 @@ struct test_mutator_state_t
 
     kan_context_system_handle_t application_system_handle;
     kan_context_system_handle_t application_framework_system_handle;
-    kan_application_system_event_iterator_t event_iterator;
 
     kan_bool_t test_mode;
     kan_bool_t test_passed;
@@ -72,11 +71,6 @@ APPLICATION_FRAMEWORK_EXAMPLE_LOGIC_API void kan_universe_mutator_deploy_test_mu
     state->application_system_handle = kan_context_query (context, KAN_CONTEXT_APPLICATION_SYSTEM_NAME);
     state->application_framework_system_handle =
         kan_context_query (context, KAN_CONTEXT_APPLICATION_FRAMEWORK_SYSTEM_NAME);
-
-    if (state->application_system_handle != KAN_INVALID_CONTEXT_SYSTEM_HANDLE)
-    {
-        state->event_iterator = kan_application_system_event_iterator_create (state->application_system_handle);
-    }
 
     if (state->application_framework_system_handle != KAN_INVALID_CONTEXT_SYSTEM_HANDLE)
     {
@@ -221,13 +215,4 @@ APPLICATION_FRAMEWORK_EXAMPLE_LOGIC_API void kan_universe_mutator_execute_test_m
     }
 
     kan_cpu_job_release (job);
-}
-
-APPLICATION_FRAMEWORK_EXAMPLE_LOGIC_API void kan_universe_mutator_undeploy_test_mutator (
-    struct test_mutator_state_t *state)
-{
-    if (state->application_system_handle != KAN_INVALID_CONTEXT_SYSTEM_HANDLE)
-    {
-        kan_application_system_event_iterator_destroy (state->application_system_handle, state->event_iterator);
-    }
 }
