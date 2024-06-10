@@ -1,12 +1,19 @@
 #include <application_framework_example_logic_api.h>
 
 #include <stdio.h>
+#include <string.h>
 
+#include <kan/context/application_framework_system.h>
 #include <kan/context/application_system.h>
+#include <kan/log/logging.h>
 #include <kan/resource_pipeline/resource_pipeline.h>
 #include <kan/universe/universe.h>
 #include <kan/universe_resource_provider/universe_resource_provider.h>
 #include <kan/universe_time/universe_time.h>
+
+// \c_interface_scanner_disable
+KAN_LOG_DEFINE_CATEGORY (application_framework_example_logic_test_mode);
+// \c_interface_scanner_enable
 
 struct test_data_type_t
 {
@@ -45,7 +52,13 @@ struct test_mutator_state_t
         read_value__resource_provider_container_test_data_type__container_id;
 
     kan_context_system_handle_t application_system_handle;
+    kan_context_system_handle_t application_framework_system_handle;
     kan_application_system_event_iterator_t event_iterator;
+
+    kan_bool_t test_mode;
+    kan_bool_t test_passed;
+    kan_bool_t test_asset_loaded;
+    uint64_t test_frames_count;
 };
 
 APPLICATION_FRAMEWORK_EXAMPLE_LOGIC_API void kan_universe_mutator_deploy_test_mutator (
@@ -57,11 +70,29 @@ APPLICATION_FRAMEWORK_EXAMPLE_LOGIC_API void kan_universe_mutator_deploy_test_mu
 {
     kan_context_handle_t context = kan_universe_get_context (universe);
     state->application_system_handle = kan_context_query (context, KAN_CONTEXT_APPLICATION_SYSTEM_NAME);
+    state->application_framework_system_handle =
+        kan_context_query (context, KAN_CONTEXT_APPLICATION_FRAMEWORK_SYSTEM_NAME);
 
     if (state->application_system_handle != KAN_INVALID_CONTEXT_SYSTEM_HANDLE)
     {
         state->event_iterator = kan_application_system_event_iterator_create (state->application_system_handle);
     }
+
+    if (state->application_framework_system_handle != KAN_INVALID_CONTEXT_SYSTEM_HANDLE)
+    {
+        state->test_mode =
+            kan_application_framework_system_get_arguments_count (state->application_framework_system_handle) == 2 &&
+            strcmp (kan_application_framework_system_get_arguments (state->application_framework_system_handle)[1],
+                    "--test") == 0;
+    }
+    else
+    {
+        state->test_mode = KAN_FALSE;
+    }
+
+    state->test_passed = KAN_TRUE;
+    state->test_asset_loaded = KAN_FALSE;
+    state->test_frames_count = 0u;
 }
 
 APPLICATION_FRAMEWORK_EXAMPLE_LOGIC_API void kan_universe_mutator_execute_test_mutator (
@@ -117,6 +148,7 @@ APPLICATION_FRAMEWORK_EXAMPLE_LOGIC_API void kan_universe_mutator_execute_test_m
 
     if (request->provided_container_id != KAN_RESOURCE_PROVIDER_CONTAINER_ID_NONE)
     {
+        state->test_asset_loaded = KAN_TRUE;
         struct kan_repository_indexed_value_read_cursor_t container_cursor =
             kan_repository_indexed_value_read_query_execute (
                 &state->read_value__resource_provider_container_test_data_type__container_id,
@@ -134,6 +166,13 @@ APPLICATION_FRAMEWORK_EXAMPLE_LOGIC_API void kan_universe_mutator_execute_test_m
             struct test_data_type_t *loaded_resource = (struct test_data_type_t *) view->data_begin;
             x = loaded_resource->x;
             y = loaded_resource->y;
+
+            if (x != 3u || y != 5u)
+            {
+                state->test_passed = KAN_FALSE;
+                KAN_LOG (application_framework_example_logic_test_mode, KAN_LOG_INFO, "Unexpected x or y.")
+            }
+
             kan_repository_indexed_value_read_access_close (&container_access);
         }
 
@@ -157,6 +196,29 @@ APPLICATION_FRAMEWORK_EXAMPLE_LOGIC_API void kan_universe_mutator_execute_test_m
 
     kan_repository_singleton_read_access_close (time_access);
     kan_repository_singleton_write_access_close (write_access);
+
+    if (state->test_mode)
+    {
+        if (30u < ++state->test_frames_count)
+        {
+            KAN_LOG (application_framework_example_logic_test_mode, KAN_LOG_INFO, "Shutting down...")
+            if (!state->test_asset_loaded)
+            {
+                state->test_passed = KAN_FALSE;
+                KAN_LOG (application_framework_example_logic_test_mode, KAN_LOG_ERROR, "Failed to load asset.")
+            }
+
+            KAN_ASSERT (state->application_framework_system_handle != KAN_INVALID_CONTEXT_SYSTEM_HANDLE)
+            if (state->test_passed)
+            {
+                kan_application_framework_system_request_exit (state->application_framework_system_handle, 0);
+            }
+            else
+            {
+                kan_application_framework_system_request_exit (state->application_framework_system_handle, -1);
+            }
+        }
+    }
 
     kan_cpu_job_release (job);
 }

@@ -105,6 +105,30 @@ define_property (TARGET PROPERTY APPLICATION_PROGRAM_PLUGIN_GROUPS
         BRIEF_DOCS "Contains list of plugin groups used as program plugins."
         FULL_DOCS "Contains list of plugin groups used as program plugins.")
 
+define_property (TARGET PROPERTY APPLICATION_PROGRAM_USE_AS_TEST_IN_DEVELOPMENT_MODE
+        BRIEF_DOCS "Whether to add variant execution in development configuration to CTest."
+        FULL_DOCS "Whether to add variant execution in development configuration to CTest.")
+
+define_property (TARGET PROPERTY APPLICATION_PROGRAM_TEST_IN_DEVELOPMENT_MODE_ARGUMENTS
+        BRIEF_DOCS "Contains additional arguments for test execution in development mode."
+        FULL_DOCS "Contains additional arguments for test execution in development mode.")
+
+define_property (TARGET PROPERTY APPLICATION_PROGRAM_TEST_IN_DEVELOPMENT_MODE_PROPERTIES
+        BRIEF_DOCS "Contains additional properties for test execution in development mode."
+        FULL_DOCS "Contains additional properties for test execution in development mode.")
+
+define_property (TARGET PROPERTY APPLICATION_PROGRAM_USE_AS_TEST_IN_PACKAGED_MODE
+        BRIEF_DOCS "Whether to add variant execution in packaged configuration to CTest."
+        FULL_DOCS "Whether to add variant execution in packaged configuration to CTest.")
+
+define_property (TARGET PROPERTY APPLICATION_PROGRAM_TEST_IN_PACKAGED_MODE_ARGUMENTS
+        BRIEF_DOCS "Contains additional arguments for test execution in packaged mode."
+        FULL_DOCS "Contains additional arguments for test execution in packaged mode.")
+
+define_property (TARGET PROPERTY APPLICATION_PROGRAM_TEST_IN_PACKAGED_MODE_PROPERTIES
+        BRIEF_DOCS "Contains additional properties for test execution in packaged mode."
+        FULL_DOCS "Contains additional properties for test execution in packaged mode.")
+
 define_property (TARGET PROPERTY APPLICATION_VARIANTS
         BRIEF_DOCS "Contains list of this application packaging variants."
         FULL_DOCS "Contains list of this application packaging variants.")
@@ -328,6 +352,46 @@ function (application_program_use_plugin_group GROUP)
     list (APPEND PLUGIN_GROUPS "${GROUP}")
     set_target_properties ("${APPLICATION_NAME}_program_${APPLICATION_PROGRAM_NAME}" PROPERTIES
             APPLICATION_PROGRAM_PLUGIN_GROUPS "${PLUGIN_GROUPS}")
+endfunction ()
+
+# Makes it possible to use this program executable as test in development mode.
+# Arguments:
+# - ARGUMENTS: Arguments passed to program when executing it as test.
+# - PROPERTIES: Properties for test setup.
+function (application_program_use_as_test_in_development_mode)
+    cmake_parse_arguments (TEST "" "" "ARGUMENTS;PROPERTIES" ${ARGV})
+    if (DEFINED TEST_UNPARSED_ARGUMENTS)
+        message (FATAL_ERROR "Incorrect function arguments!")
+    endif ()
+
+    message (STATUS "        Use as test in development mode.")
+    message (STATUS "            Arguments: ${TEST_ARGUMENTS}.")
+    message (STATUS "            Properties: ${TEST_PROPERTIES}.")
+
+    set_target_properties ("${APPLICATION_NAME}_program_${APPLICATION_PROGRAM_NAME}" PROPERTIES
+            APPLICATION_PROGRAM_USE_AS_TEST_IN_DEVELOPMENT_MODE 1
+            APPLICATION_PROGRAM_TEST_IN_DEVELOPMENT_MODE_ARGUMENTS "${TEST_ARGUMENTS}"
+            APPLICATION_PROGRAM_TEST_IN_DEVELOPMENT_MODE_PROPERTIES "${TEST_PROPERTIES}")
+endfunction ()
+
+# Makes it possible to use this program executable as test in packaged mode.
+# Arguments:
+# - ARGUMENTS: Arguments passed to program when executing it as test.
+# - PROPERTIES: Properties for test setup.
+function (application_program_use_as_test_in_packaged_mode)
+    cmake_parse_arguments (TEST "" "" "ARGUMENTS;PROPERTIES" ${ARGV})
+    if (DEFINED TEST_UNPARSED_ARGUMENTS)
+        message (FATAL_ERROR "Incorrect function arguments!")
+    endif ()
+
+    message (STATUS "        Use as test in packaged mode.")
+    message (STATUS "            Arguments: ${TEST_ARGUMENTS}.")
+    message (STATUS "            Properties: ${TEST_PROPERTIES}.")
+
+    set_target_properties ("${APPLICATION_NAME}_program_${APPLICATION_PROGRAM_NAME}" PROPERTIES
+            APPLICATION_PROGRAM_USE_AS_TEST_IN_PACKAGED_MODE 1
+            APPLICATION_PROGRAM_TEST_IN_PACKAGED_MODE_ARGUMENTS "${TEST_ARGUMENTS}"
+            APPLICATION_PROGRAM_TEST_IN_PACKAGED_MODE_PROPERTIES "${TEST_PROPERTIES}")
 endfunction ()
 
 # Starts application packaging variant registration routine. Must be called inside application registration routine.
@@ -847,6 +911,33 @@ function (application_generate)
                 COMMAND "${CMAKE_COMMAND}" -P "${DEV_PROGRAM_CONFIGURATOR_PATH}"
                 COMMENT "Building program \"${PROGRAM_NAME}\" configuration for application \"${APPLICATION_NAME}\".")
 
+        # Add program executable to tests if request.
+
+        get_target_property (IS_TEST "${PROGRAM}" APPLICATION_PROGRAM_USE_AS_TEST_IN_DEVELOPMENT_MODE)
+        if (${IS_TEST})
+            get_target_property (TEST_ARGUMENTS "${PROGRAM}" APPLICATION_PROGRAM_TEST_IN_DEVELOPMENT_MODE_ARGUMENTS)
+            if (TEST_ARGUMENTS STREQUAL "TEST_ARGUMENTS-NOTFOUND")
+                set (TEST_ARGUMENTS)
+            endif ()
+
+            get_target_property (TEST_PROPERTIES "${PROGRAM}" APPLICATION_PROGRAM_TEST_IN_DEVELOPMENT_MODE_PROPERTIES)
+            if (TEST_PROPERTIES STREQUAL "TEST_PROPERTIES-NOTFOUND")
+                unset (TEST_PROPERTIES)
+            endif ()
+
+            add_test (NAME "${PROGRAM}_test_in_development"
+                    COMMAND "${PROGRAM}_launcher" ${TEST_ARGUMENTS}
+                    WORKING_DIRECTORY "$<TARGET_FILE_DIR:${PROGRAM}_launcher>"
+                    COMMAND_EXPAND_LISTS)
+
+            if (DEFINED TEST_PROPERTIES)
+                message (STATUS "$$$ ${TEST_PROPERTIES}")
+                set_tests_properties ("${PROGRAM}_test_in_development" PROPERTIES ${TEST_PROPERTIES})
+            endif ()
+
+            add_dependencies (test_kan "${PROGRAM}_launcher")
+        endif ()
+
     endforeach ()
 
     if (NOT KAN_APPLICATION_PACK_WITH_RAW_RESOURCES)
@@ -1187,6 +1278,33 @@ function (application_generate)
                     VERBATIM)
 
             add_dependencies ("${VARIANT}_package" "${VARIANT}_copy_launcher_${PROGRAM_NAME}")
+
+            # Add program executable to tests if request.
+
+            get_target_property (IS_TEST "${PROGRAM}" APPLICATION_PROGRAM_USE_AS_TEST_IN_PACKAGED_MODE)
+            if (${IS_TEST})
+                get_target_property (TEST_ARGUMENTS "${PROGRAM}" APPLICATION_PROGRAM_TEST_IN_PACKAGED_MODE_ARGUMENTS)
+                if (TEST_ARGUMENTS STREQUAL "TEST_ARGUMENTS-NOTFOUND")
+                    set (TEST_ARGUMENTS)
+                endif ()
+
+                get_target_property (TEST_PROPERTIES "${PROGRAM}" APPLICATION_PROGRAM_TEST_IN_PACKAGED_MODE_PROPERTIES)
+                if (TEST_PROPERTIES STREQUAL "TEST_PROPERTIES-NOTFOUND")
+                    unset (TEST_PROPERTIES)
+                endif ()
+
+                add_test (NAME "${PROGRAM}_test_in_packaged"
+                        COMMAND "${PACK_BUILD_DIRECTORY}/$<TARGET_FILE_NAME:${PROGRAM}_launcher>" ${TEST_ARGUMENTS}
+                        WORKING_DIRECTORY "${PACK_BUILD_DIRECTORY}"
+                        COMMAND_EXPAND_LISTS)
+
+                if (DEFINED TEST_PROPERTIES)
+                    message (STATUS "$$$ ${TEST_PROPERTIES}")
+                    set_tests_properties ("${PROGRAM}_test_in_packaged" PROPERTIES ${TEST_PROPERTIES})
+                endif ()
+
+                add_dependencies (test_kan "${VARIANT}_package")
+            endif ()
         endforeach ()
 
     endforeach ()
