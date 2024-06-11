@@ -255,7 +255,7 @@ static inline void init_hot_reload_directory (struct plugin_system_t *system)
     for (uint64_t index = 0u; index < system->plugins.size; ++index)
     {
         struct plugin_data_t *data = &((struct plugin_data_t *) system->plugins.data)[index];
-        char library_path_buffer[KAN_FILE_SYSTEM_MAX_PATH_LENGTH];
+        char library_path_buffer[KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u];
         const char *extension;
 
         if (find_source_plugin_path (system->plugins_directory_path, data->name, library_path_buffer, &extension))
@@ -263,7 +263,7 @@ static inline void init_hot_reload_directory (struct plugin_system_t *system)
             struct kan_stream_t *input_stream = kan_direct_file_stream_open_for_read (library_path_buffer, KAN_TRUE);
             if (!input_stream)
             {
-                KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, plugin_system, KAN_LOG_ERROR,
+                KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 3u, plugin_system, KAN_LOG_ERROR,
                                      "Failed to open for read dynamic library \"%s\" for copying.", library_path_buffer)
                 continue;
             }
@@ -311,7 +311,7 @@ static inline void init_hot_reload_directory (struct plugin_system_t *system)
         }
         else
         {
-            KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 4u, plugin_system, KAN_LOG_ERROR,
+            KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, plugin_system, KAN_LOG_ERROR,
                                  "Unable to find dynamic library \"%s\" at directory \"%s\".", data->name,
                                  system->plugins_directory_path)
         }
