@@ -140,7 +140,7 @@ static inline uint32_t window_flags_to_sdl_flags (enum kan_platform_window_flag_
     return sdl_flags;
 }
 
-static inline enum kan_platform_window_flag_t sdl_flags_to_window_flags (uint32_t sdl_flags)
+static inline enum kan_platform_window_flag_t sdl_flags_to_window_flags (uint64_t sdl_flags)
 {
     enum kan_platform_window_flag_t flags = 0u;
     if (sdl_flags & SDL_WINDOW_FULLSCREEN)
@@ -1007,7 +1007,7 @@ kan_bool_t kan_platform_application_window_enter_fullscreen (kan_platform_window
         SDL_GetClosestFullscreenDisplayMode (SDL_GetDisplayForWindow (window), (int) display_mode->width,
                                              (int) display_mode->height, display_mode->refresh_rate, KAN_TRUE);
 
-    if (closest_mode->format != display_mode->pixel_format || closest_mode->w != (int) display_mode->width ||
+    if ((uint32_t) closest_mode->format != display_mode->pixel_format || closest_mode->w != (int) display_mode->width ||
         closest_mode->h != (int) display_mode->height ||
         fabs (closest_mode->refresh_rate - display_mode->refresh_rate) > 0.01f ||
         fabs (closest_mode->pixel_density - display_mode->pixel_density) > 0.01f)
