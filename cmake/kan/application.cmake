@@ -577,7 +577,14 @@ endmacro ()
 # application related targets.
 function (application_generate)
     if (KAN_APPLICATION_GENERATE_CODE_HOT_RELOAD_TEST)
-        private_generate_code_hot_reload_test ()
+        if (NOT WIN32)
+            private_generate_code_hot_reload_test ()
+        else ()
+            # Due to how DLL locking works on Windows, it is impossible to correctly execute code hot reload
+            # verification test no matter what. Therefore we're disabling these tests on Windows.
+            message (STATUS
+                    "Application \"${APPLICATION_NAME}\" cannot generate program for hot reload verification on WIN32.")
+        endif ()
     endif ()
 
     message (STATUS "Application \"${APPLICATION_NAME}\" registration done, generating...")
