@@ -940,7 +940,7 @@ static void scan_file (struct target_t *target, struct kan_file_system_path_cont
 
     if (info.native)
     {
-        kan_interned_string_t type_name;
+        kan_interned_string_t type_name = NULL;
         struct kan_stream_t *stream = kan_virtual_file_stream_open_for_read (global.volume, path_container->path);
 
         if (!stream)
