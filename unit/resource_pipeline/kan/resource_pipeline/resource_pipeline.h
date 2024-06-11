@@ -1,6 +1,6 @@
 #pragma once
 
-#include <resource_reference_api.h>
+#include <resource_pipeline_api.h>
 
 #include <kan/api_common/bool.h>
 #include <kan/api_common/c_header.h>
@@ -132,18 +132,18 @@ struct kan_resource_pipeline_reference_type_info_storage_t
 };
 
 /// \brief Builds reference type info storage from given registry, allocating it in given allocation group.
-RESOURCE_REFERENCE_API void kan_resource_pipeline_reference_type_info_storage_build (
+RESOURCE_PIPELINE_API void kan_resource_pipeline_reference_type_info_storage_build (
     struct kan_resource_pipeline_reference_type_info_storage_t *storage,
     kan_allocation_group_t allocation_group,
     kan_reflection_registry_t registry);
 
 /// \brief Queries resource type info node for particular type.
-RESOURCE_REFERENCE_API const struct kan_resource_pipeline_reference_type_info_node_t *
+RESOURCE_PIPELINE_API const struct kan_resource_pipeline_reference_type_info_node_t *
 kan_resource_pipeline_reference_type_info_storage_query (
     struct kan_resource_pipeline_reference_type_info_storage_t *storage, kan_interned_string_t type_name);
 
 /// \brief Frees resource type info storage and its resources.
-RESOURCE_REFERENCE_API void kan_resource_pipeline_reference_type_info_storage_shutdown (
+RESOURCE_PIPELINE_API void kan_resource_pipeline_reference_type_info_storage_shutdown (
     struct kan_resource_pipeline_reference_type_info_storage_t *storage);
 
 /// \brief Describes reference that was detected during scan for references.
@@ -161,14 +161,14 @@ struct kan_resource_pipeline_detected_reference_container_t
     struct kan_dynamic_array_t detected_references;
 };
 
-RESOURCE_REFERENCE_API void kan_resource_pipeline_detected_reference_container_init (
+RESOURCE_PIPELINE_API void kan_resource_pipeline_detected_reference_container_init (
     struct kan_resource_pipeline_detected_reference_container_t *instance);
 
-RESOURCE_REFERENCE_API void kan_resource_pipeline_detected_reference_container_shutdown (
+RESOURCE_PIPELINE_API void kan_resource_pipeline_detected_reference_container_shutdown (
     struct kan_resource_pipeline_detected_reference_container_t *instance);
 
 /// \brief Detects all references in given referencer instance and outputs them to given container.
-RESOURCE_REFERENCE_API void kan_resource_pipeline_detect_references (
+RESOURCE_PIPELINE_API void kan_resource_pipeline_detect_references (
     struct kan_resource_pipeline_reference_type_info_storage_t *storage,
     kan_interned_string_t referencer_type_name,
     const void *referencer_data,
