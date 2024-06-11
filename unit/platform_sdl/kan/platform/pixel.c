@@ -1,7 +1,7 @@
 #include <kan/api_common/mute_third_party_warnings.h>
 
 KAN_MUTE_THIRD_PARTY_WARNINGS_BEGIN
-#include <SDL_pixels.h>
+#include <SDL3/SDL_pixels.h>
 KAN_MUTE_THIRD_PARTY_WARNINGS_END
 
 #include <kan/platform/pixel.h>

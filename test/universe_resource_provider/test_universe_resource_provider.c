@@ -42,7 +42,8 @@ _Static_assert (_Alignof (struct first_resource_type_t) == _Alignof (uint64_t),
 TEST_UNIVERSE_RESOURCE_PROVIDER_API struct kan_resource_pipeline_resource_type_meta_t first_resource_type_meta = {
     .root = KAN_TRUE,
     .compilation_output_type_name = NULL,
-    .compile = NULL,};
+    .compile = NULL,
+};
 
 struct second_resource_type_t
 {
@@ -57,7 +58,8 @@ _Static_assert (_Alignof (struct second_resource_type_t) == _Alignof (uint64_t),
 TEST_UNIVERSE_RESOURCE_PROVIDER_API struct kan_resource_pipeline_resource_type_meta_t second_resource_type_meta = {
     .root = KAN_TRUE,
     .compilation_output_type_name = NULL,
-    .compile = NULL,};
+    .compile = NULL,
+};
 
 static struct first_resource_type_t resource_alpha = {
     64u, KAN_TRUE, KAN_FALSE, KAN_TRUE, KAN_FALSE,

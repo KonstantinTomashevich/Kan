@@ -1,4 +1,4 @@
-#include <SDL_mutex.h>
+#include <SDL3/SDL_mutex.h>
 
 #include <kan/log/logging.h>
 #include <kan/threading/conditional_variable.h>

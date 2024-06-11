@@ -5,7 +5,7 @@
 
 #include <kan/api_common/mute_third_party_warnings.h>
 KAN_MUTE_THIRD_PARTY_WARNINGS_BEGIN
-#include <SDL_messagebox.h>
+#include <SDL3/SDL_messagebox.h>
 KAN_MUTE_THIRD_PARTY_WARNINGS_END
 
 #include <kan/container/hash_storage.h>

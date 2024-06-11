@@ -1,5 +1,5 @@
-#include <SDL_keycode.h>
-#include <SDL_scancode.h>
+#include <SDL3/SDL_keycode.h>
+#include <SDL3/SDL_scancode.h>
 
 #include <kan/platform/keyboard.h>
 

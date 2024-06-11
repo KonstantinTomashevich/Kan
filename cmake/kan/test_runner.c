@@ -1,4 +1,4 @@
-#include <SDL_main.h>
+#include <SDL3/SDL_main.h>
 
 #include <kan/testing/testing.h>
 

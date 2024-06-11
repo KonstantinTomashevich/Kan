@@ -24,9 +24,6 @@ set (KAN_APPLICATION_PACKAGED_WORLD_DIRECTORY_NAME "world")
 # Path to static data template for application framework static launcher.
 set (KAN_APPLICATION_PROGRAM_LAUNCHER_STATICS_TEMPLATE "${CMAKE_SOURCE_DIR}/cmake/kan/application_launcher_statics.c")
 
-# Path to static data template for application framework tool.
-set (KAN_APPLICATION_TOOL_STATICS_TEMPLATE "${CMAKE_SOURCE_DIR}/cmake/kan/application_tool_statics.c")
-
 # Name of the used application framework static launcher implementation.
 set (KAN_APPLICATION_PROGRAM_LAUNCHER_IMPLEMENTATION "sdl")
 
@@ -778,24 +775,6 @@ function (application_generate)
             DEPENDS "${APPLICATION_NAME}_prepare_dev_directories"
             COMMAND "${CMAKE_COMMAND}" -P "${DEV_CORE_CONFIGURATOR_PATH}"
             COMMENT "Building core configuration for application \"${APPLICATION_NAME}\".")
-
-    # Generate tool statics file.
-
-    set (STATICS_PLUGINS_DIRECTORY_PATH "\"${KAN_APPLICATION_PLUGINS_DIRECTORY_NAME}\"")
-    set (STATICS_PLUGINS)
-
-    foreach (PLUGIN ${PLUGINS})
-        string (APPEND STATICS_PLUGINS "    \"${PLUGIN}_library\",\n")
-        if ("${PLUGIN_GROUP}" IN_LIST CORE_GROUPS)
-            list (APPEND CORE_PLUGINS "${PLUGIN}")
-        endif ()
-    endforeach ()
-
-    set (STATICS_PATH "${CMAKE_CURRENT_BINARY_DIR}/Generated/${APPLICATION_NAME}_tool_statics.c")
-    configure_file ("${KAN_APPLICATION_TOOL_STATICS_TEMPLATE}" "${STATICS_PATH}")
-
-    register_concrete ("${APPLICATION_NAME}_tool_statics")
-    concrete_sources_direct ("${STATICS_PATH}")
 
     # Generate resource builder executable.
 

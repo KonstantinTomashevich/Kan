@@ -971,8 +971,7 @@ static void execute_shared_serve (uint64_t user_data)
             const kan_bool_t cache_is_up_to_date =
                 cache_update_time_ns > source_update_time_ns && cache_update_time_ns > plugin_update_time_ns;
 
-            const kan_bool_t update_not_needed =
-                transient_update_time_ns > cache_update_time_ns && cache_is_up_to_date;
+            const kan_bool_t update_not_needed = transient_update_time_ns > cache_update_time_ns && cache_is_up_to_date;
 
             if (update_not_needed)
             {

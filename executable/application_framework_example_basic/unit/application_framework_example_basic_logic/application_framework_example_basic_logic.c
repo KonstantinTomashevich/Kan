@@ -27,7 +27,8 @@ _Static_assert (_Alignof (struct test_data_type_t) == _Alignof (uint64_t), "Alig
 APPLICATION_FRAMEWORK_EXAMPLE_BASIC_LOGIC_API struct kan_resource_pipeline_resource_type_meta_t test_data_type_meta = {
     .root = KAN_TRUE,
     .compilation_output_type_name = NULL,
-    .compile = NULL,};
+    .compile = NULL,
+};
 
 struct test_singleton_t
 {

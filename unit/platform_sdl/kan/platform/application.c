@@ -1,11 +1,11 @@
 #include <kan/api_common/mute_third_party_warnings.h>
 
 KAN_MUTE_THIRD_PARTY_WARNINGS_BEGIN
-#include <SDL_clipboard.h>
-#include <SDL_events.h>
-#include <SDL_init.h>
-#include <SDL_mouse.h>
-#include <SDL_video.h>
+#include <SDL3/SDL_clipboard.h>
+#include <SDL3/SDL_events.h>
+#include <SDL3/SDL_init.h>
+#include <SDL3/SDL_mouse.h>
+#include <SDL3/SDL_video.h>
 KAN_MUTE_THIRD_PARTY_WARNINGS_END
 
 #include <math.h>

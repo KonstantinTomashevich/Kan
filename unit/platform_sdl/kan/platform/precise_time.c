@@ -1,7 +1,7 @@
 #include <stdlib.h>
 
-#include <SDL_init.h>
-#include <SDL_timer.h>
+#include <SDL3/SDL_init.h>
+#include <SDL3/SDL_timer.h>
 
 #include <kan/api_common/bool.h>
 #include <kan/error/critical.h>
