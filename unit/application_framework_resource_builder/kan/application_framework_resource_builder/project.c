@@ -1,6 +1,6 @@
 #include <string.h>
 
-#include <kan/application_framework_resource_builder_main/project.h>
+#include <kan/application_framework_resource_builder/project.h>
 #include <kan/memory/allocation.h>
 
 static kan_allocation_group_t allocation_group;
@@ -48,7 +48,7 @@ void kan_application_resource_target_shutdown (struct kan_application_resource_t
 void kan_application_resource_project_init (struct kan_application_resource_project_t *instance)
 {
     ensure_statics_initialized ();
-    instance->plugin_absolute_directory = NULL;
+    instance->plugin_relative_directory = NULL;
     kan_dynamic_array_init (&instance->plugins, 0u, sizeof (kan_interned_string_t), _Alignof (kan_interned_string_t),
                             allocation_group);
     kan_dynamic_array_init (&instance->targets, 0u, sizeof (struct kan_application_resource_target_t),
@@ -60,10 +60,10 @@ void kan_application_resource_project_init (struct kan_application_resource_proj
 
 void kan_application_resource_project_shutdown (struct kan_application_resource_project_t *instance)
 {
-    if (instance->plugin_absolute_directory)
+    if (instance->plugin_relative_directory)
     {
-        kan_free_general (allocation_group, instance->plugin_absolute_directory,
-                          strlen (instance->plugin_absolute_directory) + 1u);
+        kan_free_general (allocation_group, instance->plugin_relative_directory,
+                          strlen (instance->plugin_relative_directory) + 1u);
     }
 
     for (uint64_t target_index = 0u; target_index < instance->targets.size; ++target_index)

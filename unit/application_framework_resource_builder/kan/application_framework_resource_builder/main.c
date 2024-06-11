@@ -1,5 +1,5 @@
 #include <kan/api_common/min_max.h>
-#include <kan/application_framework_resource_builder_main/project.h>
+#include <kan/application_framework_resource_builder/project.h>
 #include <kan/container/hash_storage.h>
 #include <kan/context/context.h>
 #include <kan/context/plugin_system.h>
@@ -49,7 +49,6 @@ static kan_allocation_group_t loaded_third_party_entries_allocation_group;
 static kan_allocation_group_t temporary_allocation_group;
 
 static kan_interned_string_t interned_kan_resource_pipeline_resource_type_meta_t;
-static kan_interned_string_t interned_kan_resource_pipeline_compilable_meta_t;
 
 static struct
 {
@@ -151,6 +150,7 @@ struct target_t
 {
     kan_interned_string_t name;
     struct kan_application_resource_target_t *source;
+    kan_bool_t requested_for_build;
 
     struct kan_hash_storage_t native;
     struct kan_hash_storage_t third_party;
@@ -195,19 +195,19 @@ static struct native_entry_node_t *native_entry_node_create (struct target_t *ta
         return NULL;
     }
 
-    const struct kan_resource_pipeline_compilable_meta_t *compilable =
-        find_singular_struct_meta (source_type_name, interned_kan_resource_pipeline_compilable_meta_t);
-
     const struct kan_reflection_struct_t *compiled_type = source_type;
-    if (compilable)
+    if (resource_type_meta->compile)
     {
-        compiled_type =
-            kan_reflection_registry_query_struct (global.registry, kan_string_intern (compilable->result_type_name));
+        compiled_type = resource_type_meta->compilation_output_type_name ?
+                            kan_reflection_registry_query_struct (
+                                global.registry, kan_string_intern (resource_type_meta->compilation_output_type_name)) :
+                            source_type;
+
         if (!compiled_type)
         {
             KAN_LOG (application_framework_resource_builder, KAN_LOG_ERROR,
                      "Resource type \"%s\" should be compiled into \"%s\", but there is no such type in registry.",
-                     source_type_name, compilable->result_type_name)
+                     source_type_name, resource_type_meta->compilation_output_type_name)
             kan_atomic_int_add (&global.errors_count, 1);
             return NULL;
         }
@@ -221,7 +221,7 @@ static struct native_entry_node_t *native_entry_node_create (struct target_t *ta
 
     node->source_type = source_type;
     node->compiled_type = compiled_type;
-    node->compile_functor = compilable ? compilable->compile : NULL;
+    node->compile_functor = resource_type_meta->compile;
 
     node->name = resource_name;
     const uint64_t source_path_length = strlen (source_path);
@@ -280,7 +280,9 @@ static void *load_native_data (const struct kan_reflection_struct_t *type,
 
     if (type->init)
     {
+        kan_allocation_group_stack_push (loaded_native_entries_allocation_group);
         type->init (type->functor_user_data, data);
+        kan_allocation_group_stack_pop ();
     }
 
     const uint64_t length = strlen (path);
@@ -381,7 +383,9 @@ static void *load_native_data (const struct kan_reflection_struct_t *type,
     {
         if (type->shutdown)
         {
+            kan_allocation_group_stack_push (loaded_native_entries_allocation_group);
             type->shutdown (type->functor_user_data, data);
+            kan_allocation_group_stack_pop ();
         }
 
         kan_free_general (loaded_native_entries_allocation_group, data, type->size);
@@ -447,7 +451,9 @@ static void native_entry_node_unload_source (struct native_entry_node_t *node)
     {
         if (node->source_type->shutdown)
         {
+            kan_allocation_group_stack_push (loaded_native_entries_allocation_group);
             node->source_type->shutdown (node->source_type->functor_user_data, node->source_data);
+            kan_allocation_group_stack_pop ();
         }
 
         kan_free_general (loaded_native_entries_allocation_group, node->source_data, node->source_type->size);
@@ -461,7 +467,9 @@ static void native_entry_node_unload_compiled (struct native_entry_node_t *node)
     {
         if (node->compiled_type->shutdown)
         {
+            kan_allocation_group_stack_push (loaded_native_entries_allocation_group);
             node->compiled_type->shutdown (node->compiled_type->functor_user_data, node->compiled_data);
+            kan_allocation_group_stack_pop ();
         }
 
         kan_free_general (loaded_native_entries_allocation_group, node->compiled_data, node->compiled_type->size);
@@ -563,6 +571,7 @@ static void target_init (struct target_t *instance)
 {
     instance->name = NULL;
     instance->source = NULL;
+    instance->requested_for_build = KAN_FALSE;
 
     kan_hash_storage_init (&instance->native, nodes_allocation_group, KAN_RESOURCE_BUILDER_TARGET_NODES_BUCKETS);
     kan_hash_storage_init (&instance->third_party, nodes_allocation_group, KAN_RESOURCE_BUILDER_TARGET_NODES_BUCKETS);
@@ -743,11 +752,11 @@ static void target_shutdown (struct target_t *instance)
     kan_dynamic_array_shutdown (&instance->visible_targets);
 }
 
-KAN_REFLECTION_EXPECT_UNIT_REGISTRAR_LOCAL (application_framework_resource_builder_main);
+KAN_REFLECTION_EXPECT_UNIT_REGISTRAR_LOCAL (application_framework_resource_builder);
 
 static int read_project (const char *path, struct kan_application_resource_project_t *project)
 {
-    struct kan_stream_t *input_stream = kan_virtual_file_stream_open_for_read (global.volume, path);
+    struct kan_stream_t *input_stream = kan_direct_file_stream_open_for_read (path, KAN_TRUE);
     if (!input_stream)
     {
         KAN_LOG (application_framework_resource_builder, KAN_LOG_ERROR, "Failed to open project at \"%s\".", path)
@@ -756,7 +765,7 @@ static int read_project (const char *path, struct kan_application_resource_proje
 
     input_stream = kan_random_access_stream_buffer_open_for_read (input_stream, KAN_RESOURCE_BUILDER_IO_BUFFER);
     kan_reflection_registry_t local_registry = kan_reflection_registry_create ();
-    KAN_REFLECTION_UNIT_REGISTRAR_NAME (application_framework_resource_builder_main) (local_registry);
+    KAN_REFLECTION_UNIT_REGISTRAR_NAME (application_framework_resource_builder) (local_registry);
     int result = 0;
 
     kan_serialization_rd_reader_t reader = kan_serialization_rd_reader_create (
@@ -785,7 +794,8 @@ static int read_project (const char *path, struct kan_application_resource_proje
     return result;
 }
 
-static kan_context_handle_t create_context (const struct kan_application_resource_project_t *project)
+static kan_context_handle_t create_context (const struct kan_application_resource_project_t *project,
+                                            const char *executable_path)
 {
     const kan_allocation_group_t context_group =
         kan_allocation_group_get_child (kan_allocation_group_root (), "builder_context");
@@ -795,10 +805,26 @@ static kan_context_handle_t create_context (const struct kan_application_resourc
     kan_plugin_system_config_init (&plugin_system_config);
     plugin_system_config.enable_hot_reload = KAN_FALSE;
 
-    const uint64_t plugin_path_length = strlen (project->plugin_absolute_directory);
-    plugin_system_config.plugin_directory_path =
-        kan_allocate_general (kan_plugin_system_config_get_allocation_group (), plugin_path_length, _Alignof (char));
-    memcpy (plugin_system_config.plugin_directory_path, project->plugin_absolute_directory, plugin_path_length + 1u);
+    struct kan_file_system_path_container_t path_container;
+    kan_file_system_path_container_copy_string (&path_container, executable_path);
+    uint64_t check_index = path_container.length - 1u;
+
+    while (check_index > 0u)
+    {
+        if (path_container.path[check_index] == '/' || path_container.path[check_index] == '\\')
+        {
+            break;
+        }
+
+        --check_index;
+    }
+
+    kan_file_system_path_container_reset_length (&path_container, check_index);
+    kan_file_system_path_container_append (&path_container, project->plugin_relative_directory);
+
+    plugin_system_config.plugin_directory_path = kan_allocate_general (kan_plugin_system_config_get_allocation_group (),
+                                                                       path_container.length + 1u, _Alignof (char));
+    memcpy (plugin_system_config.plugin_directory_path, path_container.path, path_container.length + 1u);
 
     for (uint64_t index = 0u; index < project->plugins.size; ++index)
     {
@@ -840,7 +866,8 @@ static void target_collect_references (uint64_t build_target_index, uint64_t pro
     for (uint64_t visible_target_index = 0u; visible_target_index < build_target->visible_targets.size;
          ++visible_target_index)
     {
-        struct target_t *visible_target = &((struct target_t *) global.targets.data)[visible_target_index];
+        struct target_t *visible_target =
+            &((struct target_t *) build_target->visible_targets.data)[visible_target_index];
         if (visible_target->name == project_target->name)
         {
             // Already added, skip.
@@ -848,16 +875,29 @@ static void target_collect_references (uint64_t build_target_index, uint64_t pro
         }
     }
 
-    void *spot = kan_dynamic_array_add_last (&build_target->visible_targets);
-    if (!spot)
+    // Don't add self (happens during recursion root call).
+    if (build_target_index != project_target_index)
     {
-        kan_dynamic_array_set_capacity (&build_target->visible_targets,
-                                        KAN_MAX (1u, build_target->visible_targets.size * 2u));
-        spot = kan_dynamic_array_add_last (&build_target->visible_targets);
-        KAN_ASSERT (spot)
+        void *spot = kan_dynamic_array_add_last (&build_target->visible_targets);
+        if (!spot)
+        {
+            kan_dynamic_array_set_capacity (&build_target->visible_targets,
+                                            KAN_MAX (1u, build_target->visible_targets.size * 2u));
+            spot = kan_dynamic_array_add_last (&build_target->visible_targets);
+            KAN_ASSERT (spot)
+        }
+
+        struct target_t *new_visible_target = &((struct target_t *) global.targets.data)[project_target_index];
+        *(struct target_t **) spot = new_visible_target;
+
+        if (build_target->requested_for_build && !new_visible_target->requested_for_build)
+        {
+            KAN_LOG (application_framework_resource_builder, KAN_LOG_INFO,
+                     "Adding target \"%s\" to build as it is visible to other build targets.", new_visible_target->name)
+            new_visible_target->requested_for_build = KAN_TRUE;
+        }
     }
 
-    *(struct target_t **) spot = &((struct target_t *) global.targets.data)[project_target_index];
     for (uint64_t visible_name_index = 0u; visible_name_index < project_target->visible_targets.size;
          ++visible_name_index)
     {
@@ -1219,6 +1259,11 @@ static void recursively_add_to_pack (struct native_entry_node_t *node)
         {
             struct native_entry_node_t *referenced =
                 target_query_global_native_by_compiled_type (node->target, reference->type, reference->name);
+
+            if (!referenced)
+            {
+                referenced = target_query_global_native_by_source_type (node->target, reference->type, reference->name);
+            }
 
             if (referenced)
             {
@@ -1675,15 +1720,23 @@ static kan_bool_t is_compiled_data_newer_than_dependencies (struct native_entry_
     return KAN_TRUE;
 }
 
-static void save_compiled_references_to_cache (struct native_entry_node_t *node)
+static void save_references_to_cache (struct native_entry_node_t *node, kan_bool_t compiled)
 {
     struct kan_file_system_path_container_t path_container;
-    form_compiled_references_cache_directory_path (node, &path_container);
-    kan_virtual_file_system_make_directory (global.volume, path_container.path);
+    if (compiled)
+    {
+        form_compiled_references_cache_directory_path (node, &path_container);
+        kan_virtual_file_system_make_directory (global.volume, path_container.path);
+        form_compiled_references_cache_item_path (node, &path_container);
+    }
+    else
+    {
+        form_references_cache_directory_path (node, &path_container);
+        kan_virtual_file_system_make_directory (global.volume, path_container.path);
+        form_references_cache_item_path (node, &path_container);
+    }
 
-    form_compiled_references_cache_item_path (node, &path_container);
     struct kan_stream_t *stream = kan_virtual_file_stream_open_for_write (global.volume, path_container.path);
-
     if (!stream)
     {
         KAN_LOG (application_framework_resource_builder, KAN_LOG_ERROR,
@@ -1694,7 +1747,7 @@ static void save_compiled_references_to_cache (struct native_entry_node_t *node)
 
     stream = kan_random_access_stream_buffer_open_for_write (stream, KAN_RESOURCE_BUILDER_IO_BUFFER);
     kan_serialization_binary_writer_t writer = kan_serialization_binary_writer_create (
-        stream, &node->compiled_detected_references,
+        stream, compiled ? &node->compiled_detected_references : &node->source_detected_references,
         kan_string_intern ("kan_resource_pipeline_detected_reference_container_t"), global.binary_script_storage,
         KAN_INVALID_SERIALIZATION_INTERNED_STRING_REGISTRY);
 
@@ -1709,8 +1762,8 @@ static void save_compiled_references_to_cache (struct native_entry_node_t *node)
     if (serialization_state == KAN_SERIALIZATION_FAILED)
     {
         KAN_LOG (application_framework_resource_builder, KAN_LOG_ERROR,
-                 "[Target \"%s\"] Failed to save compiled native resource \"%s\" of type \"%s\" reference cache.",
-                 node->target->name, node->name, node->source_type->name)
+                 "[Target \"%s\"] Failed to save %s native resource \"%s\" of type \"%s\" reference cache.",
+                 node->target->name, compiled ? "compiled" : "source", node->name, node->source_type->name)
     }
 
     KAN_ASSERT (serialization_state == KAN_SERIALIZATION_FINISHED)
@@ -1729,7 +1782,7 @@ static void process_native_node_compilation (uint64_t user_data)
 
     case COMPILATION_STATUS_REQUESTED:
     {
-        KAN_LOG (application_framework_resource_builder, KAN_LOG_ERROR,
+        KAN_LOG (application_framework_resource_builder, KAN_LOG_INFO,
                  "[Target \"%s\"] Processing request to compile native resource \"%s\" of type \"%s\".",
                  node->target->name, node->name, node->source_type->name)
 
@@ -1781,12 +1834,13 @@ static void process_native_node_compilation (uint64_t user_data)
             return;
         }
 
-        KAN_LOG (application_framework_resource_builder, KAN_LOG_ERROR,
+        KAN_LOG (application_framework_resource_builder, KAN_LOG_INFO,
                  "[Target \"%s\"] Detecting reference of native resource \"%s\" of type \"%s\".", node->target->name,
                  node->name, node->source_type->name)
 
         kan_resource_pipeline_detect_references (&global.reference_type_info_storage, node->source_type->name,
                                                  node->source_data, &node->source_detected_references);
+        save_references_to_cache (node, KAN_FALSE);
 
         if (request_compiled_dependencies (node))
         {
@@ -1849,11 +1903,11 @@ static void process_native_node_compilation (uint64_t user_data)
                 is_compiled_data_newer_than_dependencies (node))
             {
                 struct kan_file_system_path_container_t path_container;
-                form_references_cache_item_path (node, &path_container);
+                form_compiled_references_cache_item_path (node, &path_container);
 
                 if (read_detected_references_cache (node, &node->compiled_detected_references, path_container.path))
                 {
-                    KAN_LOG (application_framework_resource_builder, KAN_LOG_ERROR,
+                    KAN_LOG (application_framework_resource_builder, KAN_LOG_INFO,
                              "[Target \"%s\"] Native resource \"%s\" of type \"%s\" is up to date.", node->target->name,
                              node->name, node->source_type->name)
                     node->pending_compilation_status = COMPILATION_STATUS_FINISHED;
@@ -1912,7 +1966,7 @@ static void process_native_node_compilation (uint64_t user_data)
         // Won't be needed after compilation.
         remove_native_source_reference (node);
 
-        KAN_LOG (application_framework_resource_builder, KAN_LOG_ERROR,
+        KAN_LOG (application_framework_resource_builder, KAN_LOG_INFO,
                  "[Target \"%s\"] Compiling native resource \"%s\" of type \"%s\".", node->target->name, node->name,
                  node->source_type->name)
         uint64_t dependencies_count = 0u;
@@ -1985,8 +2039,13 @@ static void process_native_node_compilation (uint64_t user_data)
             }
         }
 
-        if (everything_ready_for_compilation)
+        if (!everything_ready_for_compilation)
         {
+            KAN_LOG (application_framework_resource_builder, KAN_LOG_ERROR,
+                     "[Target \"%s\"] Failed to compile native resource \"%s\" of type \"%s\" as not all dependencies "
+                     "are ready.",
+                     node->target->name, node->name, node->source_type->name)
+
             kan_atomic_int_add (&global.errors_count, 1);
             node->pending_compilation_status = COMPILATION_STATUS_FAILED;
             return;
@@ -2011,6 +2070,7 @@ static void process_native_node_compilation (uint64_t user_data)
                 {
                     dependency_array[dependency_index].type = reference->type;
                     dependency_array[dependency_index].name = reference->name;
+
                     if (reference->type)
                     {
                         struct native_entry_node_t *dependency =
@@ -2037,7 +2097,7 @@ static void process_native_node_compilation (uint64_t user_data)
                     KAN_ASSERT (dependency)
                     KAN_ASSERT (dependency->compiled_data)
 
-                    dependency_array[dependency_index].type = reference->type;
+                    dependency_array[dependency_index].type = dependency->compiled_type->name;
                     dependency_array[dependency_index].name = reference->name;
                     dependency_array[dependency_index].data = dependency->compiled_data;
                     ++dependency_index;
@@ -2053,7 +2113,9 @@ static void process_native_node_compilation (uint64_t user_data)
 
             if (node->compiled_type->init)
             {
+                kan_allocation_group_stack_push (loaded_native_entries_allocation_group);
                 node->compiled_type->init (node->compiled_type->functor_user_data, node->compiled_data);
+                kan_allocation_group_stack_pop ();
             }
 
             const kan_bool_t compiled =
@@ -2083,7 +2145,7 @@ static void process_native_node_compilation (uint64_t user_data)
                 kan_resource_pipeline_detect_references (&global.reference_type_info_storage, node->compiled_type->name,
                                                          node->compiled_data, &node->compiled_detected_references);
 
-                save_compiled_references_to_cache (node);
+                save_references_to_cache (node, KAN_TRUE);
                 node->pending_compilation_status = COMPILATION_STATUS_FINISHED;
             }
             else
@@ -2115,7 +2177,7 @@ static void process_native_node_compilation (uint64_t user_data)
             kan_resource_pipeline_detect_references (&global.reference_type_info_storage, node->source_type->name,
                                                      node->source_data, &node->compiled_detected_references);
 
-            save_compiled_references_to_cache (node);
+            save_references_to_cache (node, KAN_TRUE);
             node->pending_compilation_status = COMPILATION_STATUS_FINISHED;
         }
 
@@ -2202,6 +2264,12 @@ static void compilation_loop (void)
 
             native_node->in_active_compilation_queue = KAN_TRUE;
             native_node->next_node_in_compilation_queue = global.compilation_active_queue;
+
+            if (native_node->next_node_in_compilation_queue)
+            {
+                native_node->next_node_in_compilation_queue->previous_node_in_compilation_queue = native_node;
+            }
+
             global.compilation_active_queue = native_node;
             ++actual_active_nodes;
 
@@ -2584,10 +2652,11 @@ static void pack_target (uint64_t user_data)
 
 int main (int argument_count, char **argument_values)
 {
-    if (argument_count != 2)
+    if (argument_count < 3)
     {
-        KAN_LOG (application_framework_resource_builder, KAN_LOG_ERROR,
-                 "Incorrect number of arguments. Expected 1 argument: path to resource project file.")
+        KAN_LOG (
+            application_framework_resource_builder, KAN_LOG_ERROR,
+            "Incorrect number of arguments. Expected arguments: <path_to_resource_project_file> targets_to_build...")
         return ERROR_CODE_INCORRECT_ARGUMENTS;
     }
 
@@ -2602,7 +2671,6 @@ int main (int argument_count, char **argument_values)
 
     interned_kan_resource_pipeline_resource_type_meta_t =
         kan_string_intern ("kan_resource_pipeline_resource_type_meta_t");
-    interned_kan_resource_pipeline_compilable_meta_t = kan_string_intern ("kan_resource_pipeline_compilable_meta_t");
 
     KAN_LOG (application_framework_resource_builder, KAN_LOG_INFO, "Reading project...")
     kan_application_resource_project_init (&global.project);
@@ -2638,7 +2706,7 @@ int main (int argument_count, char **argument_values)
 
     if (result == 0)
     {
-        kan_context_handle_t context = create_context (&global.project);
+        kan_context_handle_t context = create_context (&global.project, argument_values[0u]);
         kan_stack_group_allocator_init (&global.temporary_allocator, temporary_allocation_group,
                                         KAN_RESOURCE_BUILDER_TEMPORARY_STACK);
 
@@ -2662,6 +2730,29 @@ int main (int argument_count, char **argument_values)
         kan_dynamic_array_init (&global.targets, global.project.targets.size, sizeof (struct target_t),
                                 _Alignof (struct target_t), targets_allocation_group);
 
+        for (int argument_index = 2; argument_index < argument_count; ++argument_index)
+        {
+            kan_bool_t found = KAN_FALSE;
+            for (uint64_t target_index = 0u; target_index < global.project.targets.size; ++target_index)
+            {
+                struct kan_application_resource_target_t *project_target =
+                    &((struct kan_application_resource_target_t *) global.project.targets.data)[target_index];
+
+                if (strcmp (project_target->name, argument_values[argument_index]) == 0)
+                {
+                    found = KAN_TRUE;
+                    break;
+                }
+            }
+
+            if (!found)
+            {
+                KAN_LOG (application_framework_resource_builder, KAN_LOG_ERROR,
+                         "Unable to find requested target \"%s\".", argument_values[argument_index])
+                kan_atomic_int_add (&global.errors_count, 1);
+            }
+        }
+
         for (uint64_t target_index = 0u; target_index < global.project.targets.size; ++target_index)
         {
             struct kan_application_resource_target_t *project_target =
@@ -2670,6 +2761,15 @@ int main (int argument_count, char **argument_values)
             struct target_t *build_target = kan_dynamic_array_add_last (&global.targets);
             KAN_ASSERT (build_target)
             target_init (build_target);
+
+            for (int argument_index = 2; argument_index < argument_count; ++argument_index)
+            {
+                if (strcmp (project_target->name, argument_values[argument_index]) == 0)
+                {
+                    build_target->requested_for_build = KAN_TRUE;
+                    break;
+                }
+            }
 
             build_target->name = project_target->name;
             build_target->source = project_target;
@@ -2688,7 +2788,7 @@ int main (int argument_count, char **argument_values)
                 snprintf (index_string, 8u, "%lu", (unsigned long) directory_index);
                 kan_file_system_path_container_append (&target_directory, index_string);
 
-                if (kan_virtual_file_system_volume_mount_real (global.volume, target_directory.path, directory))
+                if (!kan_virtual_file_system_volume_mount_real (global.volume, target_directory.path, directory))
                 {
                     KAN_LOG (application_framework_resource_builder, KAN_LOG_ERROR, "Unable to mount \"%s\" at \"%s\".",
                              directory, target_directory.path)
@@ -2724,9 +2824,12 @@ int main (int argument_count, char **argument_values)
 
             for (uint64_t target_index = 0u; target_index < global.targets.size; ++target_index)
             {
-                KAN_CPU_TASK_LIST_USER_VALUE (&task_list, &global.temporary_allocator, task_name,
-                                              scan_target_for_resources, FOREGROUND,
-                                              &((struct target_t *) global.targets.data)[target_index])
+                struct target_t *target = &((struct target_t *) global.targets.data)[target_index];
+                if (target->requested_for_build)
+                {
+                    KAN_CPU_TASK_LIST_USER_VALUE (&task_list, &global.temporary_allocator, task_name,
+                                                  scan_target_for_resources, FOREGROUND, target)
+                }
             }
 
             if (task_list)
@@ -2871,8 +2974,12 @@ int main (int argument_count, char **argument_values)
 
             for (uint64_t target_index = 0u; target_index < global.targets.size; ++target_index)
             {
-                KAN_CPU_TASK_LIST_USER_VALUE (&task_list, &global.temporary_allocator, task_name, pack_target,
-                                              FOREGROUND, &((struct target_t *) global.targets.data)[target_index])
+                struct target_t *target = &((struct target_t *) global.targets.data)[target_index];
+                if (target->requested_for_build)
+                {
+                    KAN_CPU_TASK_LIST_USER_VALUE (&task_list, &global.temporary_allocator, task_name, pack_target,
+                                                  FOREGROUND, target)
+                }
             }
 
             if (task_list)
@@ -2911,5 +3018,3 @@ int main (int argument_count, char **argument_values)
     kan_application_resource_project_shutdown (&global.project);
     return result;
 }
-
-// TODO: Do not forget to delete old tools: binarizer, packer and application_framework_tool library.
