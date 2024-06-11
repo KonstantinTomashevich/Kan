@@ -1533,7 +1533,7 @@ void add_registrar (void)
                 &io.output_buffer, "    success = kan_reflection_registry_add_enum (registry, &reflection_");
             kan_trivial_string_buffer_append_string (&io.output_buffer, interface->enums[enum_index].name);
             kan_trivial_string_buffer_append_string (&io.output_buffer, "_data);\n");
-            kan_trivial_string_buffer_append_string (&io.output_buffer, "    KAN_ASSERT (success);\n");
+            kan_trivial_string_buffer_append_string (&io.output_buffer, "    KAN_ASSERT (success)\n");
         }
 
         for (uint64_t struct_index = 0u; struct_index < interface->structs_count; ++struct_index)
@@ -1547,7 +1547,7 @@ void add_registrar (void)
                 &io.output_buffer, "    success = kan_reflection_registry_add_struct (registry, &reflection_");
             kan_trivial_string_buffer_append_string (&io.output_buffer, interface->structs[struct_index].name);
             kan_trivial_string_buffer_append_string (&io.output_buffer, "_data);\n");
-            kan_trivial_string_buffer_append_string (&io.output_buffer, "    KAN_ASSERT (success);\n");
+            kan_trivial_string_buffer_append_string (&io.output_buffer, "    KAN_ASSERT (success)\n");
         }
 
         for (uint64_t function_index = 0u; function_index < interface->functions_count; ++function_index)
@@ -1561,7 +1561,7 @@ void add_registrar (void)
                 &io.output_buffer, "    success = kan_reflection_registry_add_function (registry, &reflection_");
             kan_trivial_string_buffer_append_string (&io.output_buffer, interface->functions[function_index].name);
             kan_trivial_string_buffer_append_string (&io.output_buffer, "_data);\n");
-            kan_trivial_string_buffer_append_string (&io.output_buffer, "    KAN_ASSERT (success);\n");
+            kan_trivial_string_buffer_append_string (&io.output_buffer, "    KAN_ASSERT (success)\n");
         }
 
         for (uint64_t symbol_index = 0u; symbol_index < interface->symbols_count; ++symbol_index)
