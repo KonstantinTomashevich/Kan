@@ -100,12 +100,13 @@ APPLICATION_FRAMEWORK_VERIFY_CODE_HOT_RELOAD_API void kan_universe_mutator_execu
     {
         // Initiate hot reload.
         KAN_ASSERT (kan_application_framework_system_get_arguments_count (state->application_framework_system_handle) ==
-                    4)
+                    5)
         char **arguments = kan_application_framework_system_get_arguments (state->application_framework_system_handle);
 
         const char *cmake = arguments[1u];
         const char *build_directory = arguments[2u];
         const char *target = arguments[3u];
+        const char *config = arguments[4u];
 
 #define COMMAND_BUFFER_SIZE 4096u
         char command_buffer[COMMAND_BUFFER_SIZE];
@@ -120,8 +121,8 @@ APPLICATION_FRAMEWORK_VERIFY_CODE_HOT_RELOAD_API void kan_universe_mutator_execu
 
         if (result == 0)
         {
-            snprintf (command_buffer, COMMAND_BUFFER_SIZE, "\"%s\" --build \"%s\" --target \"%s\"", cmake,
-                      build_directory, target);
+            snprintf (command_buffer, COMMAND_BUFFER_SIZE, "\"%s\" --build \"%s\" --target \"%s\" --config \"%s\"",
+                      cmake, build_directory, target, config);
             result = system (command_buffer);
 
             if (result != 0)

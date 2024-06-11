@@ -106,28 +106,28 @@ static inline kan_bool_t find_source_plugin_path (const char *source_path,
                                                   char *buffer,
                                                   const char **output_extension)
 {
-    snprintf (buffer, KAN_FILE_SYSTEM_MAX_PATH_LENGTH, "%s/%s.dll", source_path, plugin_name);
+    snprintf (buffer, KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, "%s/%s.dll", source_path, plugin_name);
     if (kan_file_system_check_existence (buffer))
     {
         *output_extension = ".dll";
         return KAN_TRUE;
     }
 
-    snprintf (buffer, KAN_FILE_SYSTEM_MAX_PATH_LENGTH, "%s/%s.so", source_path, plugin_name);
+    snprintf (buffer, KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, "%s/%s.so", source_path, plugin_name);
     if (kan_file_system_check_existence (buffer))
     {
         *output_extension = ".so";
         return KAN_TRUE;
     }
 
-    snprintf (buffer, KAN_FILE_SYSTEM_MAX_PATH_LENGTH, "%s/lib%s.so", source_path, plugin_name);
+    snprintf (buffer, KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, "%s/lib%s.so", source_path, plugin_name);
     if (kan_file_system_check_existence (buffer))
     {
         *output_extension = ".so";
         return KAN_TRUE;
     }
 
-    snprintf (buffer, KAN_FILE_SYSTEM_MAX_PATH_LENGTH, "%s/lib%s.so.0", source_path, plugin_name);
+    snprintf (buffer, KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, "%s/lib%s.so.0", source_path, plugin_name);
     if (kan_file_system_check_existence (buffer))
     {
         *output_extension = ".so.0";

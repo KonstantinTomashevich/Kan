@@ -535,7 +535,8 @@ macro (private_generate_code_hot_reload_test)
     register_application_program (verify_code_hot_reload)
     application_program_set_configuration ("${CMAKE_SOURCE_DIR}/cmake/kan/verify_code_hot_reload_configuration.rd")
     application_program_use_as_test_in_development_mode (
-            ARGUMENTS "${CMAKE_COMMAND}" "${CMAKE_BINARY_DIR}" "${APPLICATION_NAME}_dev_all_plugins"
+            ARGUMENTS
+            "${CMAKE_COMMAND}" "${CMAKE_BINARY_DIR}" "${APPLICATION_NAME}_dev_all_plugins" "$<CONFIG>"
             # We need really big timeout due to slow machines on GitHub Actions.
             PROPERTIES RUN_SERIAL ON TIMEOUT 1200 LABELS SLOW)
 
