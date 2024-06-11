@@ -87,7 +87,7 @@ static void application_framework_system_update (kan_context_system_handle_t han
                     if (result != 0)
                     {
                         KAN_LOG (context_application_framework_system, KAN_LOG_ERROR,
-                                 "Failed to execute hot reload, command returned code %d.", result)
+                                 "Failed to execute hot reload trigger command, it returned code %d.", result)
                     }
                 }
             }
