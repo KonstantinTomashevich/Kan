@@ -1136,6 +1136,8 @@ UNIVERSE_RESOURCE_REFERENCE_KAN_API void mutator_template_execute_resource_refer
         // If provider scan is not done, we cannot do anything.
         // In case of rescan (in the editor due to remounts, for example), we should cancel all operations.
         delete_all_ongoing_operations (state);
+        kan_repository_singleton_read_access_close (provider_access);
+        kan_cpu_job_release (job);
         return;
     }
 
