@@ -299,7 +299,7 @@ static inline void init_hot_reload_directory (struct plugin_system_t *system)
                 const uint64_t written = output_stream->operations->write (output_stream, read, copy_buffer);
                 if (written != read)
                 {
-                    KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, plugin_system, KAN_LOG_ERROR,
+                    KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 4u, plugin_system, KAN_LOG_ERROR,
                                          "Failed to copy dynamic library \"%s\" to \"%s\".", library_path_buffer,
                                          output_path_container.path)
                     break;
@@ -311,7 +311,7 @@ static inline void init_hot_reload_directory (struct plugin_system_t *system)
         }
         else
         {
-            KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, plugin_system, KAN_LOG_ERROR,
+            KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 4u, plugin_system, KAN_LOG_ERROR,
                                  "Unable to find dynamic library \"%s\" at directory \"%s\".", data->name,
                                  system->plugins_directory_path)
         }

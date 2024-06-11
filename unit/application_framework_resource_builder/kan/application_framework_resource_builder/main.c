@@ -945,8 +945,8 @@ static void scan_file (struct target_t *target, struct kan_file_system_path_cont
 
         if (!stream)
         {
-            KAN_LOG (application_framework_resource_builder, KAN_LOG_ERROR,
-                     "Failed to open native entry at \"%s\" for read.", path_container->path)
+            KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, application_framework_resource_builder,
+                                 KAN_LOG_ERROR, "Failed to open native entry at \"%s\" for read.", path_container->path)
             kan_atomic_int_add (&global.errors_count, 1);
             return;
         }
@@ -958,8 +958,9 @@ static void scan_file (struct target_t *target, struct kan_file_system_path_cont
             if (!kan_serialization_binary_read_type_header (stream, &type_name,
                                                             KAN_INVALID_SERIALIZATION_INTERNED_STRING_REGISTRY))
             {
-                KAN_LOG (application_framework_resource_builder, KAN_LOG_ERROR,
-                         "Failed to read type header from native entry at \"%s\".", path_container->path)
+                KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, application_framework_resource_builder,
+                                     KAN_LOG_ERROR, "Failed to read type header from native entry at \"%s\".",
+                                     path_container->path)
                 kan_atomic_int_add (&global.errors_count, 1);
                 stream->operations->close (stream);
                 return;
@@ -970,8 +971,9 @@ static void scan_file (struct target_t *target, struct kan_file_system_path_cont
         case KAN_RESOURCE_INDEX_NATIVE_ITEM_FORMAT_READABLE_DATA:
             if (!kan_serialization_rd_read_type_header (stream, &type_name))
             {
-                KAN_LOG (application_framework_resource_builder, KAN_LOG_ERROR,
-                         "Failed to read type header from native entry at \"%s\".", path_container->path)
+                KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, application_framework_resource_builder,
+                                     KAN_LOG_ERROR, "Failed to read type header from native entry at \"%s\".",
+                                     path_container->path)
                 kan_atomic_int_add (&global.errors_count, 1);
                 stream->operations->close (stream);
                 return;
@@ -985,9 +987,10 @@ static void scan_file (struct target_t *target, struct kan_file_system_path_cont
 
         if (collision)
         {
-            KAN_LOG (application_framework_resource_builder, KAN_LOG_ERROR,
-                     "Found collision: two native resources with the same type and name at \"%s\" and at \"%s\".",
-                     path_container->path, collision->source_path)
+            KAN_LOG_WITH_BUFFER (
+                KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, application_framework_resource_builder, KAN_LOG_ERROR,
+                "Found collision: two native resources with the same type and name at \"%s\" and at \"%s\".",
+                path_container->path, collision->source_path)
             kan_atomic_int_add (&global.errors_count, 1);
             return;
         }
@@ -1007,19 +1010,21 @@ static void scan_file (struct target_t *target, struct kan_file_system_path_cont
     {
         if (strcmp (info.name, KAN_RESOURCE_INDEX_DEFAULT_NAME) == 0)
         {
-            KAN_LOG (application_framework_resource_builder, KAN_LOG_ERROR,
-                     "We do not expect indices in raw resources, they're shipping only. But we found one at \"%s\".",
-                     path_container->path)
+            KAN_LOG_WITH_BUFFER (
+                KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, application_framework_resource_builder, KAN_LOG_ERROR,
+                "We do not expect indices in raw resources, they're shipping only. But we found one at \"%s\".",
+                path_container->path)
             kan_atomic_int_add (&global.errors_count, 1);
             return;
         }
 
         if (strcmp (info.name, KAN_RESOURCE_INDEX_ACCOMPANYING_STRING_REGISTRY_DEFAULT_NAME) == 0)
         {
-            KAN_LOG (application_framework_resource_builder, KAN_LOG_ERROR,
-                     "We do not expect accompanying string registries in raw resources, they're shipping only. But we "
-                     "found one at \"%s\".",
-                     path_container->path)
+            KAN_LOG_WITH_BUFFER (
+                KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, application_framework_resource_builder, KAN_LOG_ERROR,
+                "We do not expect accompanying string registries in raw resources, they're shipping only. But we "
+                "found one at \"%s\".",
+                path_container->path)
             kan_atomic_int_add (&global.errors_count, 1);
             return;
         }
@@ -1027,8 +1032,8 @@ static void scan_file (struct target_t *target, struct kan_file_system_path_cont
         struct kan_virtual_file_system_entry_status_t status;
         if (!kan_virtual_file_system_query_entry (global.volume, path_container->path, &status))
         {
-            KAN_LOG (application_framework_resource_builder, KAN_LOG_ERROR, "Unable to query status of \"%s\".",
-                     path_container->path)
+            KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, application_framework_resource_builder,
+                                 KAN_LOG_ERROR, "Unable to query status of \"%s\".", path_container->path)
             kan_atomic_int_add (&global.errors_count, 1);
             return;
         }
@@ -1036,9 +1041,10 @@ static void scan_file (struct target_t *target, struct kan_file_system_path_cont
         struct third_party_entry_node_t *collision = target_query_local_third_party (target, info.name);
         if (collision)
         {
-            KAN_LOG (application_framework_resource_builder, KAN_LOG_ERROR,
-                     "Found collision: two third party resources with the same name at \"%s\" and at \"%s\".",
-                     path_container->path, collision->path)
+            KAN_LOG_WITH_BUFFER (
+                KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, application_framework_resource_builder, KAN_LOG_ERROR,
+                "Found collision: two third party resources with the same name at \"%s\" and at \"%s\".",
+                path_container->path, collision->path)
             kan_atomic_int_add (&global.errors_count, 1);
             return;
         }
@@ -1080,8 +1086,8 @@ static void scan_directory (struct target_t *target, struct kan_file_system_path
             switch (status.type)
             {
             case KAN_VIRTUAL_FILE_SYSTEM_ENTRY_TYPE_UNKNOWN:
-                KAN_LOG (application_framework_resource_builder, KAN_LOG_ERROR, "Entry \"%s\" has unknown type.",
-                         path_container->path)
+                KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, application_framework_resource_builder,
+                                     KAN_LOG_ERROR, "Entry \"%s\" has unknown type.", path_container->path)
                 kan_atomic_int_add (&global.errors_count, 1);
                 break;
 
@@ -1096,8 +1102,8 @@ static void scan_directory (struct target_t *target, struct kan_file_system_path
         }
         else
         {
-            KAN_LOG (application_framework_resource_builder, KAN_LOG_ERROR, "Failed to query status of entry \"%s\".",
-                     path_container->path)
+            KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, application_framework_resource_builder,
+                                 KAN_LOG_ERROR, "Failed to query status of entry \"%s\".", path_container->path)
             kan_atomic_int_add (&global.errors_count, 1);
         }
 
@@ -2522,8 +2528,9 @@ static void pack_target (uint64_t user_data)
 
         if (!stream)
         {
-            KAN_LOG (application_framework_resource_builder, KAN_LOG_ERROR,
-                     "[Target \"%s\"] Failed to open \"%s\" for write.", target->name, path_container.path)
+            KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, application_framework_resource_builder,
+                                 KAN_LOG_ERROR, "[Target \"%s\"] Failed to open \"%s\" for write.", target->name,
+                                 path_container.path)
             kan_atomic_int_add (&global.errors_count, 1);
             return;
         }
@@ -2561,8 +2568,9 @@ static void pack_target (uint64_t user_data)
 
     if (!stream)
     {
-        KAN_LOG (application_framework_resource_builder, KAN_LOG_ERROR,
-                 "[Target \"%s\"] Failed to open \"%s\" for write.", target->name, path_container.path)
+        KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, application_framework_resource_builder,
+                             KAN_LOG_ERROR, "[Target \"%s\"] Failed to open \"%s\" for write.", target->name,
+                             path_container.path)
         kan_atomic_int_add (&global.errors_count, 1);
         return;
     }
@@ -2576,9 +2584,9 @@ static void pack_target (uint64_t user_data)
         form_temporary_string_registry_path (target, &path_container);
         if (!add_to_pack (builder, path_container.path, KAN_RESOURCE_INDEX_ACCOMPANYING_STRING_REGISTRY_DEFAULT_NAME))
         {
-            KAN_LOG (application_framework_resource_builder, KAN_LOG_ERROR,
-                     "[Target \"%s\"] Failed to add \"%s\" to pack at \"%s\".", target->name, path_container.path,
-                     KAN_RESOURCE_INDEX_ACCOMPANYING_STRING_REGISTRY_DEFAULT_NAME)
+            KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, application_framework_resource_builder,
+                                 KAN_LOG_ERROR, "[Target \"%s\"] Failed to add \"%s\" to pack at \"%s\".", target->name,
+                                 path_container.path, KAN_RESOURCE_INDEX_ACCOMPANYING_STRING_REGISTRY_DEFAULT_NAME)
             kan_atomic_int_add (&global.errors_count, 1);
             stream->operations->close (stream);
             return;
@@ -2588,9 +2596,9 @@ static void pack_target (uint64_t user_data)
     form_temporary_index_path (target, &path_container);
     if (!add_to_pack (builder, path_container.path, KAN_RESOURCE_INDEX_DEFAULT_NAME))
     {
-        KAN_LOG (application_framework_resource_builder, KAN_LOG_ERROR,
-                 "[Target \"%s\"] Failed to add \"%s\" to pack at \"%s\".", target->name, path_container.path,
-                 KAN_RESOURCE_INDEX_DEFAULT_NAME)
+        KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, application_framework_resource_builder,
+                             KAN_LOG_ERROR, "[Target \"%s\"] Failed to add \"%s\" to pack at \"%s\".", target->name,
+                             path_container.path, KAN_RESOURCE_INDEX_DEFAULT_NAME)
         kan_atomic_int_add (&global.errors_count, 1);
         stream->operations->close (stream);
         return;
@@ -2604,9 +2612,9 @@ static void pack_target (uint64_t user_data)
             form_native_node_path_in_pack (native_node, &path_container);
             if (!add_to_pack (builder, native_node->compiled_path, path_container.path))
             {
-                KAN_LOG (application_framework_resource_builder, KAN_LOG_ERROR,
-                         "[Target \"%s\"] Failed to add \"%s\" to pack at \"%s\".", target->name,
-                         native_node->compiled_path, path_container.path)
+                KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, application_framework_resource_builder,
+                                     KAN_LOG_ERROR, "[Target \"%s\"] Failed to add \"%s\" to pack at \"%s\".",
+                                     target->name, native_node->compiled_path, path_container.path)
                 kan_atomic_int_add (&global.errors_count, 1);
                 stream->operations->close (stream);
                 return;
@@ -2624,9 +2632,9 @@ static void pack_target (uint64_t user_data)
             form_third_party_node_path_in_pack (third_party_node, &path_container);
             if (!add_to_pack (builder, third_party_node->path, path_container.path))
             {
-                KAN_LOG (application_framework_resource_builder, KAN_LOG_ERROR,
-                         "[Target \"%s\"] Failed to add \"%s\" to pack at \"%s\".", target->name,
-                         third_party_node->path, path_container.path)
+                KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, application_framework_resource_builder,
+                                     KAN_LOG_ERROR, "[Target \"%s\"] Failed to add \"%s\" to pack at \"%s\".",
+                                     target->name, third_party_node->path, path_container.path)
                 kan_atomic_int_add (&global.errors_count, 1);
                 stream->operations->close (stream);
                 return;
@@ -2784,14 +2792,15 @@ int main (int argument_count, char **argument_values)
                 const char *directory = ((const char **) project_target->directories.data)[directory_index];
                 const uint64_t length = target_directory.length;
 
-                char index_string[8u];
-                snprintf (index_string, 8u, "%lu", (unsigned long) directory_index);
+                char index_string[32u];
+                snprintf (index_string, 32u, "%lu", (unsigned long) directory_index);
                 kan_file_system_path_container_append (&target_directory, index_string);
 
                 if (!kan_virtual_file_system_volume_mount_real (global.volume, target_directory.path, directory))
                 {
-                    KAN_LOG (application_framework_resource_builder, KAN_LOG_ERROR, "Unable to mount \"%s\" at \"%s\".",
-                             directory, target_directory.path)
+                    KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, application_framework_resource_builder,
+                                         KAN_LOG_ERROR, "Unable to mount \"%s\" at \"%s\".", directory,
+                                         target_directory.path)
                     kan_atomic_int_add (&global.errors_count, 1);
                 }
 
