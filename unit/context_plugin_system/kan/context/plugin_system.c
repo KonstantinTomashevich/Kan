@@ -106,28 +106,28 @@ static inline kan_bool_t find_source_plugin_path (const char *source_path,
                                                   char *buffer,
                                                   const char **output_extension)
 {
-    snprintf (buffer, KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 3u, "%s/%s.dll", source_path, plugin_name);
+    snprintf (buffer, KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, "%s/%s.dll", source_path, plugin_name);
     if (kan_file_system_check_existence (buffer))
     {
         *output_extension = ".dll";
         return KAN_TRUE;
     }
 
-    snprintf (buffer, KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 3u, "%s/%s.so", source_path, plugin_name);
+    snprintf (buffer, KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, "%s/%s.so", source_path, plugin_name);
     if (kan_file_system_check_existence (buffer))
     {
         *output_extension = ".so";
         return KAN_TRUE;
     }
 
-    snprintf (buffer, KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 3u, "%s/lib%s.so", source_path, plugin_name);
+    snprintf (buffer, KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, "%s/lib%s.so", source_path, plugin_name);
     if (kan_file_system_check_existence (buffer))
     {
         *output_extension = ".so";
         return KAN_TRUE;
     }
 
-    snprintf (buffer, KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 3u, "%s/lib%s.so.0", source_path, plugin_name);
+    snprintf (buffer, KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, "%s/lib%s.so.0", source_path, plugin_name);
     if (kan_file_system_check_existence (buffer))
     {
         *output_extension = ".so.0";
@@ -146,7 +146,7 @@ static inline void load_plugins (const char *path,
     {
         struct plugin_data_t *data = &((struct plugin_data_t *) array->data)[index];
         KAN_ASSERT (data->dynamic_library == KAN_INVALID_PLATFORM_DYNAMIC_LIBRARY)
-        char library_path_buffer[KAN_FILE_SYSTEM_MAX_PATH_LENGTH];
+        char library_path_buffer[KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u];
         const char *extension;
 
         if (find_source_plugin_path (path, data->name, library_path_buffer, &extension))
