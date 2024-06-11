@@ -155,7 +155,7 @@ static inline void load_plugins (const char *path,
             if (data->dynamic_library == KAN_INVALID_PLATFORM_DYNAMIC_LIBRARY)
             {
                 data->last_loaded_file_time_stamp_ns = 0u;
-                KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, plugin_system, KAN_LOG_ERROR,
+                KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 3u, plugin_system, KAN_LOG_ERROR,
                                      "Failed to load dynamic library from \"%s\".", library_path_buffer)
             }
             else
@@ -171,7 +171,7 @@ static inline void load_plugins (const char *path,
                 }
                 else
                 {
-                    KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, plugin_system, KAN_LOG_ERROR,
+                    KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 3u, plugin_system, KAN_LOG_ERROR,
                                          "Failed to query entry status of \"%s\".", library_path_buffer)
                     data->last_loaded_file_time_stamp_ns = 0u;
                 }
