@@ -3020,10 +3020,16 @@ int main (int argument_count, char **argument_values)
         kan_context_destroy (context);
     }
 
+    // TODO: Remove these logs.
+    KAN_LOG (application_framework_resource_builder, KAN_LOG_INFO, "C1.")
     kan_virtual_file_system_remove_directory_with_content (global.volume,
                                                            VFS_OUTPUT_DIRECTORY "/" SUB_DIRECTORY_TEMPORARY);
+    KAN_LOG (application_framework_resource_builder, KAN_LOG_INFO, "C2.")
     kan_virtual_file_system_volume_destroy (global.volume);
+    KAN_LOG (application_framework_resource_builder, KAN_LOG_INFO, "C3.")
 
     kan_application_resource_project_shutdown (&global.project);
+    KAN_LOG (application_framework_resource_builder, KAN_LOG_INFO, "C4.")
+    KAN_LOG (application_framework_resource_builder, KAN_LOG_INFO, "Returning %d", result)
     return result;
 }
