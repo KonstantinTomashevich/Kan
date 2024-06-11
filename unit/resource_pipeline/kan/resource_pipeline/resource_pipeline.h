@@ -30,12 +30,29 @@
 ///
 /// \par Compilation
 /// \parblock
-/// Resources can be marked as compilable using `kan_resource_pipeline_compilable_meta_t`. It means that they must be
-/// processed and updated by compilation function that prepares them for release version of the game. Compilation might
-/// result in change of resource type if it is requested in meta.
+/// Resources can be marked as compilable if they specify `compile` functor in
+/// `kan_resource_pipeline_resource_type_meta_t`. Making them compilable means that during resource build additional
+/// empty instance of resource will be created and this instance should be filled by compile functor. By executing
+/// compilation, it is possible to get rid of unnecessary data and optimize data structure. Also, it is possible to
+/// select another resource type as compilation target type for further optimizations.
 /// \endparblock
 
 KAN_C_HEADER_BEGIN
+
+/// \brief Contains information about loaded compilation dependency and its data.
+struct kan_resource_pipeline_compilation_dependency_t
+{
+    kan_interned_string_t type;
+    kan_interned_string_t name;
+    void *data;
+};
+
+/// \brief Declares signature for resource compilation.
+typedef kan_bool_t (*kan_resource_pipeline_compile_functor_t) (
+    void *input_instance,
+    void *output_instance,
+    uint64_t dependencies_count,
+    struct kan_resource_pipeline_compilation_dependency_t *dependencies);
 
 /// \brief Meta for marking types for native resources that should be supported by resource logic.
 struct kan_resource_pipeline_resource_type_meta_t
@@ -43,6 +60,12 @@ struct kan_resource_pipeline_resource_type_meta_t
     /// \brief If true, resource is considered as root for resource packing mechanism.
     /// \details Only root resources and resources recursively referenced by them are packed by resource builder.
     kan_bool_t root;
+
+    /// \brief Name of the output resource type for compilation. Can be null if it is equal to the resource raw type.
+    const char *compilation_output_type_name;
+
+    /// \brief Compilation function if compilation should be executed.
+    kan_resource_pipeline_compile_functor_t compile;
 };
 
 /// \brief Describes whether and how reference is used in resource compilation routine if any.
@@ -150,30 +173,5 @@ RESOURCE_REFERENCE_API void kan_resource_pipeline_detect_references (
     kan_interned_string_t referencer_type_name,
     const void *referencer_data,
     struct kan_resource_pipeline_detected_reference_container_t *output_container);
-
-/// \brief Contains information about loaded compilation dependency and its data.
-struct kan_resource_pipeline_compilation_dependency_t
-{
-    kan_interned_string_t type;
-    kan_interned_string_t name;
-    void *data;
-};
-
-/// \brief Declares signature for resource compilation.
-typedef kan_bool_t (*kan_resource_pipeline_compile_functor_t) (
-    void *input_instance,
-    void *output_instance,
-    uint64_t dependencies_count,
-    struct kan_resource_pipeline_compilation_dependency_t *dependencies);
-
-/// \brief Adds compilation function to resource type.
-struct kan_resource_pipeline_compilable_meta_t
-{
-    /// \brief Name of the output resource type for compilation.
-    const char *result_type_name;
-
-    /// \brief Compilation function.
-    kan_resource_pipeline_compile_functor_t compile;
-};
 
 KAN_C_HEADER_END
