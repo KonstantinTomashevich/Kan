@@ -1,4 +1,4 @@
-#include <application_framework_example_logic_api.h>
+#include <application_framework_example_basic_logic_api.h>
 
 #include <stdio.h>
 #include <string.h>
@@ -12,7 +12,7 @@
 #include <kan/universe_time/universe_time.h>
 
 // \c_interface_scanner_disable
-KAN_LOG_DEFINE_CATEGORY (application_framework_example_logic_test_mode);
+KAN_LOG_DEFINE_CATEGORY (application_framework_example_basic_logic_test_mode);
 // \c_interface_scanner_enable
 
 struct test_data_type_t
@@ -24,8 +24,10 @@ struct test_data_type_t
 _Static_assert (_Alignof (struct test_data_type_t) == _Alignof (uint64_t), "Alignment has expected value.");
 
 // \meta reflection_struct_meta = "test_data_type_t"
-APPLICATION_FRAMEWORK_EXAMPLE_LOGIC_API struct kan_resource_pipeline_resource_type_meta_t second_resource_type_meta = {
-    .root = KAN_TRUE};
+APPLICATION_FRAMEWORK_EXAMPLE_BASIC_LOGIC_API struct kan_resource_pipeline_resource_type_meta_t test_data_type_meta = {
+    .root = KAN_TRUE,
+    .compilation_output_type_name = NULL,
+    .compile = NULL,};
 
 struct test_singleton_t
 {
@@ -34,7 +36,7 @@ struct test_singleton_t
     uint64_t test_request_id;
 };
 
-APPLICATION_FRAMEWORK_EXAMPLE_LOGIC_API void test_singleton_init (struct test_singleton_t *instance)
+APPLICATION_FRAMEWORK_EXAMPLE_BASIC_LOGIC_API void test_singleton_init (struct test_singleton_t *instance)
 {
     instance->window_handle = KAN_INVALID_APPLICATION_SYSTEM_WINDOW_HANDLE;
     instance->test_request_added = KAN_FALSE;
@@ -60,7 +62,7 @@ struct test_mutator_state_t
     uint64_t test_frames_count;
 };
 
-APPLICATION_FRAMEWORK_EXAMPLE_LOGIC_API void kan_universe_mutator_deploy_test_mutator (
+APPLICATION_FRAMEWORK_EXAMPLE_BASIC_LOGIC_API void kan_universe_mutator_deploy_test_mutator (
     kan_universe_t universe,
     kan_universe_world_t world,
     kan_repository_t world_repository,
@@ -89,7 +91,7 @@ APPLICATION_FRAMEWORK_EXAMPLE_LOGIC_API void kan_universe_mutator_deploy_test_mu
     state->test_frames_count = 0u;
 }
 
-APPLICATION_FRAMEWORK_EXAMPLE_LOGIC_API void kan_universe_mutator_execute_test_mutator (
+APPLICATION_FRAMEWORK_EXAMPLE_BASIC_LOGIC_API void kan_universe_mutator_execute_test_mutator (
     kan_cpu_job_t job, struct test_mutator_state_t *state)
 {
     kan_repository_singleton_write_access_t write_access =
@@ -164,7 +166,7 @@ APPLICATION_FRAMEWORK_EXAMPLE_LOGIC_API void kan_universe_mutator_execute_test_m
             if (x != 3u || y != 5u)
             {
                 state->test_passed = KAN_FALSE;
-                KAN_LOG (application_framework_example_logic_test_mode, KAN_LOG_INFO, "Unexpected x or y.")
+                KAN_LOG (application_framework_example_basic_logic_test_mode, KAN_LOG_INFO, "Unexpected x or y.")
             }
 
             kan_repository_indexed_value_read_access_close (&container_access);
@@ -195,11 +197,11 @@ APPLICATION_FRAMEWORK_EXAMPLE_LOGIC_API void kan_universe_mutator_execute_test_m
     {
         if (30u < ++state->test_frames_count)
         {
-            KAN_LOG (application_framework_example_logic_test_mode, KAN_LOG_INFO, "Shutting down...")
+            KAN_LOG (application_framework_example_basic_logic_test_mode, KAN_LOG_INFO, "Shutting down...")
             if (!state->test_asset_loaded)
             {
                 state->test_passed = KAN_FALSE;
-                KAN_LOG (application_framework_example_logic_test_mode, KAN_LOG_ERROR, "Failed to load asset.")
+                KAN_LOG (application_framework_example_basic_logic_test_mode, KAN_LOG_ERROR, "Failed to load asset.")
             }
 
             KAN_ASSERT (state->application_framework_system_handle != KAN_INVALID_CONTEXT_SYSTEM_HANDLE)
