@@ -1319,7 +1319,7 @@ function (application_generate)
             add_custom_target ("${VARIANT}_copy_launcher_${PROGRAM_NAME}"
                     DEPENDS "${VARIANT}_prepare_directories" "${PROGRAM}_launcher"
                     COMMAND
-                    ${CMAKE_COMMAND} -E copy_if_different
+                    ${CMAKE_COMMAND} -E copy
                     "$<TARGET_FILE:${PROGRAM}_launcher>"
                     "${PACK_BUILD_DIRECTORY}"
                     COMMENT
