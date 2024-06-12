@@ -51,8 +51,10 @@ struct task_node_t
 
 struct task_dispatcher_t
 {
-    struct task_node_t *foreground_tasks;
-    struct task_node_t *background_tasks;
+    struct task_node_t *foreground_tasks_first;
+    struct task_node_t *foreground_tasks_last;
+    struct task_node_t *background_tasks_first;
+    struct task_node_t *background_tasks_last;
 
     kan_mutex_handle_t task_mutex;
     kan_conditional_variable_handle_t worker_wake_up_condition;
@@ -89,8 +91,8 @@ static kan_thread_result_t worker_thread_function (kan_thread_user_data_t user_d
 
         while (KAN_TRUE)
         {
-            const kan_bool_t no_foreground_tasks = global_task_dispatcher.foreground_tasks == NULL;
-            const kan_bool_t no_background_tasks = global_task_dispatcher.background_tasks == NULL;
+            const kan_bool_t no_foreground_tasks = global_task_dispatcher.foreground_tasks_first == NULL;
+            const kan_bool_t no_background_tasks = global_task_dispatcher.background_tasks_first == NULL;
             const kan_bool_t under_background_limit =
                 (uint64_t) kan_atomic_int_get (&global_task_dispatcher.background_threads_count) <
                 global_task_dispatcher.background_threads_limit;
@@ -113,16 +115,36 @@ static kan_thread_result_t worker_thread_function (kan_thread_user_data_t user_d
 
             if (!no_background_tasks && under_background_limit)
             {
-                task = global_task_dispatcher.background_tasks;
-                global_task_dispatcher.background_tasks = task->next;
+                task = global_task_dispatcher.background_tasks_first;
+                global_task_dispatcher.background_tasks_first = task->next;
+
+                if (task->next)
+                {
+                    task->next->previous = NULL;
+                }
+                else
+                {
+                    global_task_dispatcher.background_tasks_last = NULL;
+                }
+
                 kan_atomic_int_add (&global_task_dispatcher.background_threads_count, 1);
                 executing_background_task = KAN_TRUE;
             }
             else
             {
-                KAN_ASSERT (!no_foreground_tasks);
-                task = global_task_dispatcher.foreground_tasks;
-                global_task_dispatcher.foreground_tasks = task->next;
+                KAN_ASSERT (!no_foreground_tasks)
+                task = global_task_dispatcher.foreground_tasks_first;
+                global_task_dispatcher.foreground_tasks_first = task->next;
+
+                if (task->next)
+                {
+                    task->next->previous = NULL;
+                }
+                else
+                {
+                    global_task_dispatcher.foreground_tasks_last = NULL;
+                }
+
                 executing_background_task = KAN_FALSE;
             }
 
@@ -218,8 +240,11 @@ static void ensure_global_task_dispatcher_ready (void)
 
         if (!global_task_dispatcher_ready)
         {
-            global_task_dispatcher.foreground_tasks = NULL;
-            global_task_dispatcher.background_tasks = NULL;
+            global_task_dispatcher.foreground_tasks_first = NULL;
+            global_task_dispatcher.foreground_tasks_last = NULL;
+            global_task_dispatcher.background_tasks_first = NULL;
+            global_task_dispatcher.background_tasks_last = NULL;
+
             global_task_dispatcher.task_mutex = kan_mutex_create ();
             KAN_ASSERT (global_task_dispatcher.task_mutex != KAN_INVALID_MUTEX_HANDLE)
             global_task_dispatcher.worker_wake_up_condition = kan_conditional_variable_create ();
@@ -280,23 +305,35 @@ static struct task_node_t *dispatch_task (struct job_t *job,
     switch (queue)
     {
     case KAN_CPU_DISPATCH_QUEUE_FOREGROUND:
-        task_node->next = global_task_dispatcher.foreground_tasks;
-        if (global_task_dispatcher.foreground_tasks)
+        task_node->previous = global_task_dispatcher.foreground_tasks_last;
+        global_task_dispatcher.foreground_tasks_last = task_node;
+        task_node->next = NULL;
+
+        if (task_node->previous)
         {
-            global_task_dispatcher.foreground_tasks->previous = task_node;
+            task_node->previous->next = task_node;
+        }
+        else
+        {
+            global_task_dispatcher.foreground_tasks_first = task_node;
         }
 
-        global_task_dispatcher.foreground_tasks = task_node;
         break;
 
     case KAN_CPU_DISPATCH_QUEUE_BACKGROUND:
-        task_node->next = global_task_dispatcher.background_tasks;
-        if (global_task_dispatcher.background_tasks)
+        task_node->previous = global_task_dispatcher.background_tasks_last;
+        global_task_dispatcher.background_tasks_last = task_node;
+        task_node->next = NULL;
+
+        if (task_node->previous)
         {
-            global_task_dispatcher.background_tasks->previous = task_node;
+            task_node->previous->next = task_node;
+        }
+        else
+        {
+            global_task_dispatcher.background_tasks_first = task_node;
         }
 
-        global_task_dispatcher.background_tasks = task_node;
         break;
     }
 
@@ -379,24 +416,32 @@ static void dispatch_task_list (struct job_t *job, struct kan_cpu_task_list_node
     kan_mutex_lock (global_task_dispatcher.task_mutex);
     if (foreground_begin)
     {
-        if (global_task_dispatcher.foreground_tasks)
+        foreground_begin->previous = global_task_dispatcher.foreground_tasks_last;
+        if (global_task_dispatcher.foreground_tasks_last)
         {
-            foreground_end->next = global_task_dispatcher.foreground_tasks;
-            global_task_dispatcher.foreground_tasks->previous = foreground_end;
+            global_task_dispatcher.foreground_tasks_last->next = foreground_begin;
+        }
+        else
+        {
+            global_task_dispatcher.foreground_tasks_first = foreground_begin;
         }
 
-        global_task_dispatcher.foreground_tasks = foreground_begin;
+        global_task_dispatcher.foreground_tasks_last = foreground_end;
     }
 
     if (background_begin)
     {
-        if (global_task_dispatcher.background_tasks)
+        background_begin->previous = global_task_dispatcher.background_tasks_last;
+        if (global_task_dispatcher.background_tasks_last)
         {
-            background_end->next = global_task_dispatcher.background_tasks;
-            global_task_dispatcher.background_tasks->previous = background_end;
+            global_task_dispatcher.background_tasks_last->next = background_begin;
+        }
+        else
+        {
+            global_task_dispatcher.background_tasks_first = background_begin;
         }
 
-        global_task_dispatcher.background_tasks = background_begin;
+        global_task_dispatcher.background_tasks_last = background_end;
     }
 
     kan_mutex_unlock (global_task_dispatcher.task_mutex);
@@ -439,13 +484,24 @@ kan_bool_t kan_cpu_task_cancel (kan_cpu_task_handle_t task)
             task_node->next->previous = task_node->previous;
         }
 
-        if (global_task_dispatcher.foreground_tasks == task_node)
+        if (global_task_dispatcher.foreground_tasks_first == task_node)
         {
-            global_task_dispatcher.foreground_tasks = task_node->next;
+            global_task_dispatcher.foreground_tasks_first = task_node->next;
         }
-        else if (global_task_dispatcher.background_tasks == task_node)
+
+        if (global_task_dispatcher.foreground_tasks_last == task_node)
         {
-            global_task_dispatcher.background_tasks = task_node->next;
+            global_task_dispatcher.foreground_tasks_last = task_node->previous;
+        }
+
+        if (global_task_dispatcher.background_tasks_first == task_node)
+        {
+            global_task_dispatcher.background_tasks_first = task_node->next;
+        }
+
+        if (global_task_dispatcher.background_tasks_last == task_node)
+        {
+            global_task_dispatcher.background_tasks_last = task_node->previous;
         }
 
         const kan_bool_t successfully_set =
