@@ -3986,6 +3986,18 @@ static void repository_prepare_for_migration_internal (struct repository_t *repo
         if (seed->status == KAN_REFLECTION_MIGRATION_REMOVED)
         {
             indexed_storage_node->scheduled_for_destroy = KAN_TRUE;
+            struct indexed_storage_record_node_t *record_node =
+                (struct indexed_storage_record_node_t *) indexed_storage_node->records.first;
+
+            while (record_node)
+            {
+                lifetime_event_triggers_definition_fire_with_destroy_check (
+                    &indexed_storage_node->on_delete_events_triggers, record_node->record);
+
+                cascade_deleters_definition_fire_with_destroy_check (&indexed_storage_node->cascade_deleters,
+                                                                     record_node->record);
+                record_node = (struct indexed_storage_record_node_t *) record_node->list_node.next;
+            }
         }
 
         indexed_storage_node = (struct indexed_storage_node_t *) indexed_storage_node->node.list_node.next;

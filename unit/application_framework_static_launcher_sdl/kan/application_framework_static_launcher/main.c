@@ -7,6 +7,8 @@ extern const char *program_configuration_path;
 
 const char *__asan_default_options (void)
 {
+    // Currently, asan leak detector has issues with SDL3 that we're not able to fix right now.
+    // Therefore, we're disabling leak detection for SDL-driven applications.
     return "detect_leaks=0";
 }
 

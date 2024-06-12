@@ -113,8 +113,8 @@ define_property (TARGET PROPERTY APPLICATION_PROGRAM_PLUGIN_GROUPS
         FULL_DOCS "Contains list of plugin groups used as program plugins.")
 
 define_property (TARGET PROPERTY APPLICATION_PROGRAM_USE_AS_TEST_IN_DEVELOPMENT_MODE
-        BRIEF_DOCS "Whether to add variant execution in development configuration to CTest."
-        FULL_DOCS "Whether to add variant execution in development configuration to CTest.")
+        BRIEF_DOCS "Whether to add program execution in development configuration to CTest."
+        FULL_DOCS "Whether to add program execution in development configuration to CTest.")
 
 define_property (TARGET PROPERTY APPLICATION_PROGRAM_TEST_IN_DEVELOPMENT_MODE_ARGUMENTS
         BRIEF_DOCS "Contains additional arguments for test execution in development mode."
@@ -125,8 +125,8 @@ define_property (TARGET PROPERTY APPLICATION_PROGRAM_TEST_IN_DEVELOPMENT_MODE_PR
         FULL_DOCS "Contains additional properties for test execution in development mode.")
 
 define_property (TARGET PROPERTY APPLICATION_PROGRAM_USE_AS_TEST_IN_PACKAGED_MODE
-        BRIEF_DOCS "Whether to add variant execution in packaged configuration to CTest."
-        FULL_DOCS "Whether to add variant execution in packaged configuration to CTest.")
+        BRIEF_DOCS "Whether to add program execution in packaged configuration to CTest."
+        FULL_DOCS "Whether to add program execution in packaged configuration to CTest.")
 
 define_property (TARGET PROPERTY APPLICATION_PROGRAM_TEST_IN_PACKAGED_MODE_ARGUMENTS
         BRIEF_DOCS "Contains additional arguments for test execution in packaged mode."
@@ -494,12 +494,11 @@ function (private_gather_plugins_from_groups GROUPS OUTPUT)
 endfunction ()
 
 # Intended only for internal use in this file.
-# Macro, because it needs to add new program and variant to application.
 # Adds test program that ensures that:
 # - There is nothing in this application that breaks hot reload for trivial change.
 # - This application reflection structure is coherent and hot reloadable when all plugins are loaded.
 #   For example, if someone forgot to ignore kan_atomic_int_t field somewhere, this would fail.
-macro (private_generate_code_hot_reload_test)
+function (private_generate_code_hot_reload_test)
     message (STATUS "Application \"${APPLICATION_NAME}\" generates test program for code hot reload verification...")
 
     # Register verification plugin.
@@ -544,8 +543,8 @@ macro (private_generate_code_hot_reload_test)
         application_program_use_plugin_group ("${PLUGIN_GROUP}")
     endforeach ()
 
-    # We not need variant as we're not testing code hot reload in packaged mode (as it is usually disabled).
-endmacro ()
+    # We do not need variant as we're not testing code hot reload in packaged mode (as it is usually disabled).
+endfunction ()
 
 # Intended only for internal use in this file.
 # Macro for ease of use and simplicity.

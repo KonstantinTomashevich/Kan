@@ -2865,7 +2865,7 @@ static struct struct_migrator_node_t *migrator_add_struct (struct migrator_t *mi
     // there is a catch: if struct that needs migration is inside struct that doesn't, then we need to still call
     // migrator commands on it.
     //
-    // Therefore, we're construction fully capable migration scripts even for structs that do not need migration,
+    // Therefore, we're constructing fully capable migration scripts even for structs that do not need migration,
 
     for (uint64_t field_index = 0u; field_index < source_struct->fields_count; ++field_index)
     {

@@ -42,7 +42,7 @@ APPLICATION_FRAMEWORK_RESOURCE_BUILDER_API void kan_application_resource_target_
 /// \brief Defines project format for resource builder.
 struct kan_application_resource_project_t
 {
-    /// \brief Path to absolute directory with plugin to be loaded.
+    /// \brief Relative path to directory with plugin to be loaded.
     char *plugin_relative_directory;
 
     /// \brief List of plugin names to be loaded.
@@ -53,10 +53,10 @@ struct kan_application_resource_project_t
     /// \meta reflection_dynamic_array_type = "struct kan_application_resource_target_t"
     struct kan_dynamic_array_t targets;
 
-    /// \brief Path to directory that is used as shared reference cache (might be shared with editors).
+    /// \brief Absolute path to directory that is used as shared reference cache (might be shared with editors).
     char *reference_cache_absolute_directory;
 
-    /// \brief Path to directory to save output.
+    /// \brief Absolute path to directory to save output.
     char *output_absolute_directory;
 
     /// \brief Whether to enable string interning pass for data compression.
