@@ -505,6 +505,12 @@ static void verification_poll_at_directory_recursive (struct watcher_t *watcher,
 
                     if (file_node)
                     {
+                        KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, file_system_watcher, KAN_LOG_ERROR,
+                                             "File: %s. Size: %lu. Last time: %lu. Status size: %lu. Status time: %lu.",
+                                             watcher->path_container.path, (unsigned long) file_node->size,
+                                             (unsigned long) file_node->last_modification_time_ns,
+                                             (unsigned long) status.size, (unsigned long) status.type)
+
                         if (file_node->size != status.size ||
                             file_node->last_modification_time_ns != status.last_modification_time_ns)
                         {
