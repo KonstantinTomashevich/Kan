@@ -509,7 +509,8 @@ static void verification_poll_at_directory_recursive (struct watcher_t *watcher,
                                              "File: %s. Size: %lu. Last time: %lu. Status size: %lu. Status time: %lu.",
                                              watcher->path_container.path, (unsigned long) file_node->size,
                                              (unsigned long) file_node->last_modification_time_ns,
-                                             (unsigned long) status.size, (unsigned long) status.type)
+                                             (unsigned long) status.size,
+                                             (unsigned long) status.last_modification_time_ns)
 
                         if (file_node->size != status.size ||
                             file_node->last_modification_time_ns != status.last_modification_time_ns)
@@ -660,7 +661,7 @@ static void poll_task_function (uint64_t user_data)
 
         kan_free_general (watcher_allocation_group, watcher, sizeof (struct watcher_t));
 
-        // TODO: Temporary log.
+        // TODO: Temporary logs. Clean this file.
         KAN_LOG (file_system_watcher, KAN_LOG_ERROR, "FS DEAD")
         return;
     }
@@ -699,6 +700,7 @@ kan_file_system_watcher_t kan_file_system_watcher_create (const char *directory_
     watcher_data->marked_for_destroy = kan_atomic_int_init (0);
     watcher_data->last_poll_time_ns = 0u;
     kan_file_system_path_container_copy_string (&watcher_data->path_container, directory_path);
+    KAN_LOG (file_system_watcher, KAN_LOG_ERROR, "Created FS watcher for %s", directory_path)
 
     schedule_poll (watcher_data);
     return (kan_file_system_watcher_t) watcher_data;
