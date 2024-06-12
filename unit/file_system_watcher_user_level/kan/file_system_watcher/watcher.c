@@ -22,6 +22,7 @@ struct file_node_t
     struct file_node_t *next;
     kan_interned_string_t name;
     kan_interned_string_t extension;
+    uint64_t size;
     uint64_t last_modification_time_ns;
     kan_bool_t mark_found;
 };
@@ -179,6 +180,7 @@ static void directory_node_append_file (struct directory_node_t *directory,
     struct file_node_t *file = file_node_allocate ();
     split_entry_name (entry_name, &file->name, &file->extension);
 
+    file->size = status->size;
     file->last_modification_time_ns = status->last_modification_time_ns;
     file->mark_found = KAN_TRUE;
 
@@ -503,9 +505,11 @@ static void verification_poll_at_directory_recursive (struct watcher_t *watcher,
 
                     if (file_node)
                     {
-                        if (file_node->last_modification_time_ns != status.last_modification_time_ns)
+                        if (file_node->size != status.size ||
+                            file_node->last_modification_time_ns != status.last_modification_time_ns)
                         {
                             send_file_modified_event (watcher);
+                            file_node->size = status.size;
                             file_node->last_modification_time_ns = status.last_modification_time_ns;
                         }
 
