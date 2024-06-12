@@ -1,6 +1,6 @@
 register_abstract (universe_resource_provider)
 abstract_include ("${CMAKE_CURRENT_SOURCE_DIR}")
-abstract_require (CONCRETE_INTERFACE universe)
+abstract_require (CONCRETE_INTERFACE resource_pipeline universe)
 abstract_register_implementation (NAME kan PARTS universe_resource_provider_kan universe_resource_provider_reflection)
 
 c_interface_scanner_setup (GLOB "*.h")

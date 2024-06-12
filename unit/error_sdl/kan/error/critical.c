@@ -5,7 +5,7 @@
 
 #include <kan/api_common/mute_third_party_warnings.h>
 KAN_MUTE_THIRD_PARTY_WARNINGS_BEGIN
-#include <SDL_messagebox.h>
+#include <SDL3/SDL_messagebox.h>
 KAN_MUTE_THIRD_PARTY_WARNINGS_END
 
 #include <kan/container/hash_storage.h>
@@ -35,7 +35,6 @@ static kan_bool_t critical_error_context_ready = KAN_FALSE;
 static struct critical_error_context_t critical_error_context;
 
 #define SKIPPED_CRITICAL_ERROR_INFO_STORAGE_INITIAL_BUCKETS 8u
-#define SKIPPED_CRITICAL_ERROR_INFO_STORAGE_LOAD_FACTOR 4u
 
 static inline void kan_critical_error_context_ensure (void)
 {
@@ -127,14 +126,8 @@ void kan_critical_error (const char *message, const char *file, int line)
             node->file = file;
             node->line = line;
 
-            if (critical_error_context.skipped_error_storage.items.size >=
-                critical_error_context.skipped_error_storage.bucket_count *
-                    SKIPPED_CRITICAL_ERROR_INFO_STORAGE_LOAD_FACTOR)
-            {
-                kan_hash_storage_set_bucket_count (&critical_error_context.skipped_error_storage,
-                                                   critical_error_context.skipped_error_storage.bucket_count * 2u);
-            }
-
+            kan_hash_storage_update_bucket_count_default (&critical_error_context.skipped_error_storage,
+                                                          SKIPPED_CRITICAL_ERROR_INFO_STORAGE_INITIAL_BUCKETS);
             kan_hash_storage_add (&critical_error_context.skipped_error_storage, &node->node);
 
             kan_mutex_unlock (critical_error_context.interactive_mutex);

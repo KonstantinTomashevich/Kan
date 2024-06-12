@@ -55,7 +55,7 @@ struct mutator_t
     kan_bool_t from_group;
     kan_bool_t found_in_groups;
     kan_bool_t added_during_migration;
-    void *state;
+    uint64_t *state;
     kan_allocation_group_t state_allocation_group;
 };
 
@@ -74,6 +74,9 @@ struct pipeline_t
 
     /// \meta reflection_dynamic_array_type = "kan_interned_string"
     struct kan_dynamic_array_t used_groups;
+
+    /// \meta reflection_dynamic_array_type = "struct kan_universe_world_checkpoint_dependency_t"
+    struct kan_dynamic_array_t checkpoint_dependencies;
 };
 
 struct world_configuration_t
@@ -606,11 +609,12 @@ static void deploy_automated_lifetime_queries (kan_reflection_registry_t registr
             char queried_type_name_mutable[KAN_UNIVERSE_MAX_AUTOMATED_QUERY_TYPE_LENGTH];
             KAN_ASSERT (name_parts[0u].end - name_parts[0u].begin + 2u < KAN_UNIVERSE_MAX_AUTOMATED_QUERY_TYPE_LENGTH)
             strncpy (queried_type_name_mutable, name_parts[0u].begin, name_parts[0u].end - name_parts[0u].begin);
+            const uint64_t length = name_parts[0u].end - name_parts[0u].begin;
+            queried_type_name_mutable[length] = '\0';
 
             kan_interned_string_t queried_type_name = kan_string_intern (queried_type_name_mutable);
             if (!kan_reflection_registry_query_struct (registry, queried_type_name))
             {
-                const uint64_t length = name_parts[0u].end - name_parts[0u].begin;
                 queried_type_name_mutable[length] = '_';
                 queried_type_name_mutable[length + 1u] = 't';
                 queried_type_name_mutable[length + 2u] = '\0';
@@ -1334,13 +1338,8 @@ static struct scheduler_api_node_t *universe_get_or_create_scheduler_api (struct
         node->api.execute = NULL;
         node->api.undeploy = NULL;
 
-        if (universe->scheduler_api_storage.items.size >=
-            universe->scheduler_api_storage.bucket_count * KAN_UNIVERSE_SCHEDULER_LOAD_FACTOR)
-        {
-            kan_hash_storage_set_bucket_count (&universe->scheduler_api_storage,
-                                               universe->scheduler_api_storage.bucket_count * 2u);
-        }
-
+        kan_hash_storage_update_bucket_count_default (&universe->scheduler_api_storage,
+                                                      KAN_UNIVERSE_SCHEDULER_INITIAL_BUCKETS);
         kan_hash_storage_add (&universe->scheduler_api_storage, &node->node);
     }
 
@@ -1384,13 +1383,8 @@ static struct mutator_api_node_t *universe_get_or_create_mutator_api (struct uni
         node->api.execute = NULL;
         node->api.undeploy = NULL;
 
-        if (universe->mutator_api_storage.items.size >=
-            universe->mutator_api_storage.bucket_count * KAN_UNIVERSE_MUTATOR_LOAD_FACTOR)
-        {
-            kan_hash_storage_set_bucket_count (&universe->mutator_api_storage,
-                                               universe->mutator_api_storage.bucket_count * 2u);
-        }
-
+        kan_hash_storage_update_bucket_count_default (&universe->mutator_api_storage,
+                                                      KAN_UNIVERSE_MUTATOR_INITIAL_BUCKETS);
         kan_hash_storage_add (&universe->mutator_api_storage, &node->node);
     }
 
@@ -1435,13 +1429,8 @@ static void add_mutator_to_groups (struct universe_t *universe,
             new_node->group_name = group_name;
             new_node->mutator = mutator_name;
 
-            if (universe->group_multi_map_storage.items.size >=
-                universe->group_multi_map_storage.bucket_count * KAN_UNIVERSE_GROUP_LOAD_FACTOR)
-            {
-                kan_hash_storage_set_bucket_count (&universe->group_multi_map_storage,
-                                                   universe->group_multi_map_storage.bucket_count * 2u);
-            }
-
+            kan_hash_storage_update_bucket_count_default (&universe->group_multi_map_storage,
+                                                          KAN_UNIVERSE_GROUP_INITIAL_BUCKETS);
             kan_hash_storage_add (&universe->group_multi_map_storage, &new_node->node);
         }
 
@@ -2020,6 +2009,7 @@ static void world_clean_self_preserving_repository (struct universe_t *universe,
 
         kan_dynamic_array_shutdown (&pipeline->mutators);
         kan_dynamic_array_shutdown (&pipeline->used_groups);
+        kan_dynamic_array_shutdown (&pipeline->checkpoint_dependencies);
     }
 
     kan_dynamic_array_reset (&world->pipelines);
@@ -2159,6 +2149,16 @@ static void world_collect_deployment_tasks (struct universe_t *universe,
 static void finish_pipeline_deployment_execute (uint64_t user_data)
 {
     struct pipeline_t *pipeline = (struct pipeline_t *) user_data;
+    for (uint64_t dependency_index = 0u; dependency_index < pipeline->checkpoint_dependencies.size; ++dependency_index)
+    {
+        struct kan_universe_world_checkpoint_dependency_t *dependency =
+            &((struct kan_universe_world_checkpoint_dependency_t *)
+                  pipeline->checkpoint_dependencies.data)[dependency_index];
+
+        kan_workflow_graph_builder_register_checkpoint_dependency (pipeline->graph, dependency->dependency_checkpoint,
+                                                                   dependency->dependendant_checkpoint);
+    }
+
     kan_workflow_graph_t graph = kan_workflow_graph_builder_finalize (pipeline->graph_builder);
 
     if (graph == KAN_INVALID_WORKFLOW_GRAPH)
@@ -2232,6 +2232,17 @@ static void world_deploy_hierarchy (struct universe_t *universe, struct world_t 
     kan_stack_group_allocator_shutdown (&temporary_allocator);
 }
 
+static void world_prepare_repository_for_destroy (struct universe_t *universe, struct world_t *world)
+{
+    while (world->children.size > 0u)
+    {
+        struct world_t *child = ((struct world_t **) world->children.data)[0u];
+        world_prepare_repository_for_destroy (universe, child);
+    }
+
+    kan_repository_schedule_child_destroy (world->repository);
+}
+
 static void world_destroy (struct universe_t *universe, struct world_t *world)
 {
     world_clean_self_preserving_repository (universe, world);
@@ -2244,7 +2255,11 @@ static void world_destroy (struct universe_t *universe, struct world_t *world)
     kan_dynamic_array_shutdown (&world->pipelines);
     kan_dynamic_array_shutdown (&world->configuration);
     kan_dynamic_array_shutdown (&world->children);
-    kan_repository_destroy (world->repository);
+
+    if (world == universe->root_world)
+    {
+        kan_repository_destroy (world->repository);
+    }
 
     if (world->parent)
     {
@@ -2357,12 +2372,16 @@ void kan_universe_world_pipeline_definition_init (struct kan_universe_world_pipe
                             kan_allocation_group_stack_get ());
     kan_dynamic_array_init (&data->mutator_groups, 0u, sizeof (kan_interned_string_t), _Alignof (kan_interned_string_t),
                             kan_allocation_group_stack_get ());
+    kan_dynamic_array_init (
+        &data->checkpoint_dependencies, 0u, sizeof (struct kan_universe_world_checkpoint_dependency_t),
+        _Alignof (struct kan_universe_world_checkpoint_dependency_t), kan_allocation_group_stack_get ());
 }
 
 void kan_universe_world_pipeline_definition_shutdown (struct kan_universe_world_pipeline_definition_t *data)
 {
     kan_dynamic_array_shutdown (&data->mutators);
     kan_dynamic_array_shutdown (&data->mutator_groups);
+    kan_dynamic_array_shutdown (&data->checkpoint_dependencies);
 }
 
 UNIVERSE_API void kan_universe_world_definition_init (struct kan_universe_world_definition_t *data)
@@ -2517,6 +2536,7 @@ static void undeploy_and_migrate_scheduler_execute (uint64_t user_data)
     }
 
     void *old_scheduler_state = data->world->scheduler_state;
+    const uint64_t old_scheduler_size = data->world->scheduler_api->type->size;
     kan_allocation_group_t old_scheduler_state_allocation_group = data->world->scheduler_state_allocation_group;
     world_scheduler_init (data->universe, data->world);
 
@@ -2531,7 +2551,7 @@ static void undeploy_and_migrate_scheduler_execute (uint64_t user_data)
         data->old_api->type->shutdown (data->old_api->type->functor_user_data, old_scheduler_state);
     }
 
-    kan_free_batched (old_scheduler_state_allocation_group, old_scheduler_state);
+    kan_free_general (old_scheduler_state_allocation_group, old_scheduler_state, old_scheduler_size);
 }
 
 struct undeploy_and_migrate_mutator_user_data_t
@@ -2556,6 +2576,7 @@ static void undeploy_and_migrate_mutator_execute (uint64_t user_data)
     }
 
     void *old_mutator_state = data->mutator->state;
+    const uint64_t old_mutator_size = data->old_api->type->size;
     kan_allocation_group_t old_mutator_allocation_group = data->mutator->state_allocation_group;
     mutator_init (data->universe, data->mutator);
 
@@ -2570,7 +2591,7 @@ static void undeploy_and_migrate_mutator_execute (uint64_t user_data)
         data->old_api->type->shutdown (data->old_api->type->functor_user_data, old_mutator_state);
     }
 
-    kan_free_batched (old_mutator_allocation_group, old_mutator_state);
+    kan_free_general (old_mutator_allocation_group, old_mutator_state, old_mutator_size);
 }
 
 static void world_migration_schedulers_mutators_migrate (struct universe_t *universe,
@@ -2907,6 +2928,7 @@ void kan_universe_migrate (kan_universe_t universe,
 
     if (universe_data->root_world)
     {
+        kan_repository_prepare_for_migration (universe_data->root_world->repository, migration_seed);
         kan_repository_enter_planning_mode (universe_data->root_world->repository);
 
         struct kan_stack_group_allocator_t temporary_allocator;
@@ -3119,6 +3141,11 @@ static void fill_world_from_definition (struct universe_t *universe,
         kan_dynamic_array_init (&output->mutators, input->mutator_groups.size, sizeof (struct mutator_t),
                                 _Alignof (struct mutator_t), world->pipelines.allocation_group);
 
+        kan_dynamic_array_init (&output->checkpoint_dependencies, input->checkpoint_dependencies.size,
+                                sizeof (struct kan_universe_world_checkpoint_dependency_t),
+                                _Alignof (struct kan_universe_world_checkpoint_dependency_t),
+                                world->pipelines.allocation_group);
+
         for (uint64_t group_index = 0u; group_index < input->mutator_groups.size; ++group_index)
         {
             kan_interned_string_t group_name = ((kan_interned_string_t *) input->mutator_groups.data)[group_index];
@@ -3198,6 +3225,19 @@ static void fill_world_from_definition (struct universe_t *universe,
             {
                 KAN_LOG (universe, KAN_LOG_ERROR, "Unable to find requested mutator \"%s\".", requested_name)
             }
+        }
+
+        for (uint64_t dependency_index = 0u; dependency_index < input->checkpoint_dependencies.size; ++dependency_index)
+        {
+            struct kan_universe_world_checkpoint_dependency_t *dependency_input =
+                &((struct kan_universe_world_checkpoint_dependency_t *)
+                      input->checkpoint_dependencies.data)[dependency_index];
+
+            struct kan_universe_world_checkpoint_dependency_t *dependency_output =
+                kan_dynamic_array_add_last (&output->checkpoint_dependencies);
+
+            KAN_ASSERT (dependency_output)
+            *dependency_output = *dependency_input;
         }
     }
 }
@@ -3334,6 +3374,7 @@ void kan_universe_undeploy_world (kan_universe_t universe, kan_universe_world_t 
     struct kan_cpu_section_execution_t execution;
     kan_cpu_section_execution_init (&execution, kan_cpu_section_get ("universe_undeploy"));
 
+    world_prepare_repository_for_destroy (universe_data, (struct world_t *) world);
     kan_repository_enter_planning_mode (universe_data->root_world->repository);
     world_destroy (universe_data, (struct world_t *) world);
     kan_repository_enter_serving_mode (universe_data->root_world->repository);
@@ -3345,6 +3386,7 @@ void kan_universe_destroy (kan_universe_t universe)
     struct universe_t *universe_data = (struct universe_t *) universe;
     if (universe_data->root_world)
     {
+        // We do not need to prepare repository for destroy here as we destroy root repository anyway.
         kan_repository_enter_planning_mode (universe_data->root_world->repository);
         world_destroy (universe_data, universe_data->root_world);
     }

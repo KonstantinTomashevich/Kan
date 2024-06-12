@@ -161,22 +161,13 @@ static inline void register_resource (struct kan_hash_storage_t *hash_storage,
         return;
     }
 
-    if (hash_storage->bucket_count * KAN_WORKFLOW_RESOURCE_LOAD_FACTOR < hash_storage->items.size)
-    {
-        kan_hash_storage_set_bucket_count (hash_storage, hash_storage->bucket_count * 2u);
-    }
-
     struct resource_info_node_t *node =
         KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (temporary_allocator, struct resource_info_node_t);
     node->node.hash = (uint64_t) resource_name;
     node->name = resource_name;
     node->id = *id_counter;
 
-    if (hash_storage->bucket_count * KAN_WORKFLOW_RESOURCE_LOAD_FACTOR <= hash_storage->items.size)
-    {
-        kan_hash_storage_set_bucket_count (hash_storage, hash_storage->bucket_count * 2u);
-    }
-
+    kan_hash_storage_update_bucket_count_default (hash_storage, KAN_WORKFLOW_RESOURCE_INITIAL_BUCKETS);
     kan_hash_storage_add (hash_storage, &node->node);
     ++*id_counter;
 }
@@ -591,11 +582,7 @@ static struct building_graph_node_t *graph_builder_create_node (struct graph_bui
 static void graph_builder_submit_node (struct graph_builder_t *builder, struct building_graph_node_t *node)
 {
     kan_atomic_int_lock (&builder->node_submission_lock);
-    if (builder->nodes.bucket_count * KAN_WORKFLOW_GRAPH_NODES_LOAD_FACTOR < builder->nodes.items.size)
-    {
-        kan_hash_storage_set_bucket_count (&builder->nodes, builder->nodes.bucket_count * 2u);
-    }
-
+    kan_hash_storage_update_bucket_count_default (&builder->nodes, KAN_WORKFLOW_GRAPH_NODES_INITIAL_BUCKETS);
     kan_hash_storage_add (&builder->nodes, &node->node);
     kan_atomic_int_unlock (&builder->node_submission_lock);
 }

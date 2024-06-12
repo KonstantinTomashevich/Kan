@@ -1,4 +1,4 @@
-#include <SDL_thread.h>
+#include <SDL3/SDL_thread.h>
 
 #include <kan/error/critical.h>
 #include <kan/log/logging.h>
@@ -32,7 +32,7 @@ const char *kan_thread_get_name (kan_thread_handle_t handle)
 
 kan_thread_handle_t kan_current_thread (void)
 {
-    return (kan_thread_handle_t) SDL_ThreadID ();
+    return (kan_thread_handle_t) SDL_GetCurrentThreadID ();
 }
 
 const char *kan_current_thread_set_priority (enum kan_thread_priority_t priority)

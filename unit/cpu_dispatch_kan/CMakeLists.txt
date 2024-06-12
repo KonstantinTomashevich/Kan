@@ -5,6 +5,10 @@ concrete_require (SCOPE PRIVATE ABSTRACT cpu_profiler error memory platform thre
 concrete_implements_abstract (cpu_dispatch)
 c_interface_scanner_setup (GLOB "*.c" "*.h")
 
+if (NOT MSVC)
+    concrete_require (SCOPE PRIVATE THIRD_PARTY m)
+endif ()
+
 set (KAN_CPU_DISPATCHER_MAX_BACKGROUND_PERCENTAGE "50" CACHE STRING
         "The maximum percentage of global CPU dispatcher threads that execute background tasks.")
 

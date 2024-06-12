@@ -9,6 +9,7 @@ void kan_hash_storage_init (struct kan_hash_storage_t *storage,
 {
     storage->bucket_allocation_group = bucket_allocation_group;
     storage->bucket_count = initial_bucket_count;
+    storage->empty_buckets = storage->bucket_count;
 
     // General allocation as we're allocation potentially huge block of memory of non-regular size.
     storage->buckets =
@@ -33,6 +34,7 @@ void kan_hash_storage_add (struct kan_hash_storage_t *storage, struct kan_hash_s
     if (!bucket->last)
     {
         bucket->last = &node->list_node;
+        --storage->empty_buckets;
     }
 }
 
@@ -45,6 +47,7 @@ void kan_hash_storage_remove (struct kan_hash_storage_t *storage, struct kan_has
     {
         bucket->first = NULL;
         bucket->last = NULL;
+        ++storage->empty_buckets;
     }
     else if (list_node == bucket->first)
     {
@@ -65,6 +68,11 @@ const struct kan_hash_storage_bucket_t *kan_hash_storage_query (struct kan_hash_
 
 void kan_hash_storage_set_bucket_count (struct kan_hash_storage_t *storage, uint64_t bucket_count)
 {
+    if (storage->bucket_count == bucket_count)
+    {
+        return;
+    }
+
     struct kan_hash_storage_t temporary_storage = *storage;
     kan_hash_storage_init (storage, temporary_storage.bucket_allocation_group, bucket_count);
 

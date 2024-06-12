@@ -95,12 +95,8 @@ kan_interned_string_t kan_char_sequence_intern (const char *begin, const char *e
     strncpy (node->string, begin, string_length);
     node->string[string_length] = '\0';
 
-    if (context.hash_storage.items.size >=
-        context.hash_storage.bucket_count * KAN_CONTAINER_STRING_INTERNING_LOAD_FACTOR)
-    {
-        kan_hash_storage_set_bucket_count (&context.hash_storage, context.hash_storage.bucket_count * 2u);
-    }
-
+    kan_hash_storage_update_bucket_count_default (&context.hash_storage,
+                                                  KAN_CONTAINER_STRING_INTERNING_INITIAL_BUCKETS);
     kan_hash_storage_add (&context.hash_storage, &node->node);
     kan_atomic_int_unlock (&lock);
     return node->string;

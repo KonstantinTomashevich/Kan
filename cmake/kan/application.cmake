@@ -9,6 +9,12 @@ set (KAN_APPLICATION_PLUGINS_DIRECTORY_NAME "plugins")
 # Name of the directory to store resources.
 set (KAN_APPLICATION_RESOURCES_DIRECTORY_NAME "resources")
 
+# Name of the build/editor-time directory to be used as storage resource reference caches.
+set (KAN_APPLICATION_RC_DIRECTORY_NAME "reference_cache")
+
+# Name of the build-time directory to be used as workspace for resource builder.
+set (KAN_APPLICATION_RBW_DIRECTORY_NAME "resource_builder_workspace")
+
 # Name of the directory to store packaged variants of application.
 set (KAN_APPLICATION_PACKAGED_DIRECTORY_NAME "packaged")
 
@@ -17,9 +23,6 @@ set (KAN_APPLICATION_PACKAGED_WORLD_DIRECTORY_NAME "world")
 
 # Path to static data template for application framework static launcher.
 set (KAN_APPLICATION_PROGRAM_LAUNCHER_STATICS_TEMPLATE "${CMAKE_SOURCE_DIR}/cmake/kan/application_launcher_statics.c")
-
-# Path to static data template for application framework tool.
-set (KAN_APPLICATION_TOOL_STATICS_TEMPLATE "${CMAKE_SOURCE_DIR}/cmake/kan/application_tool_statics.c")
 
 # Name of the used application framework static launcher implementation.
 set (KAN_APPLICATION_PROGRAM_LAUNCHER_IMPLEMENTATION "sdl")
@@ -42,6 +45,10 @@ option (KAN_APPLICATION_OBSERVE_WORLDS_IN_PACKAGED
 # Whether to enable code hot reload in packaged applications.
 option (KAN_APPLICATION_ENABLE_CODE_HOT_RELOAD_IN_PACKAGED
         "Whether to enable code hot reload in packaged applications." OFF)
+
+# Whether to enable code hot reload verification target generation.
+option (KAN_APPLICATION_GENERATE_CODE_HOT_RELOAD_TEST
+        "Whether to enable code hot reload verification target generation." ON)
 
 # Target properties, used to store application framework related data. Shouldn't be directly modified by user.
 
@@ -105,6 +112,30 @@ define_property (TARGET PROPERTY APPLICATION_PROGRAM_PLUGIN_GROUPS
         BRIEF_DOCS "Contains list of plugin groups used as program plugins."
         FULL_DOCS "Contains list of plugin groups used as program plugins.")
 
+define_property (TARGET PROPERTY APPLICATION_PROGRAM_USE_AS_TEST_IN_DEVELOPMENT_MODE
+        BRIEF_DOCS "Whether to add program execution in development configuration to CTest."
+        FULL_DOCS "Whether to add program execution in development configuration to CTest.")
+
+define_property (TARGET PROPERTY APPLICATION_PROGRAM_TEST_IN_DEVELOPMENT_MODE_ARGUMENTS
+        BRIEF_DOCS "Contains additional arguments for test execution in development mode."
+        FULL_DOCS "Contains additional arguments for test execution in development mode.")
+
+define_property (TARGET PROPERTY APPLICATION_PROGRAM_TEST_IN_DEVELOPMENT_MODE_PROPERTIES
+        BRIEF_DOCS "Contains additional properties for test execution in development mode."
+        FULL_DOCS "Contains additional properties for test execution in development mode.")
+
+define_property (TARGET PROPERTY APPLICATION_PROGRAM_USE_AS_TEST_IN_PACKAGED_MODE
+        BRIEF_DOCS "Whether to add program execution in packaged configuration to CTest."
+        FULL_DOCS "Whether to add program execution in packaged configuration to CTest.")
+
+define_property (TARGET PROPERTY APPLICATION_PROGRAM_TEST_IN_PACKAGED_MODE_ARGUMENTS
+        BRIEF_DOCS "Contains additional arguments for test execution in packaged mode."
+        FULL_DOCS "Contains additional arguments for test execution in packaged mode.")
+
+define_property (TARGET PROPERTY APPLICATION_PROGRAM_TEST_IN_PACKAGED_MODE_PROPERTIES
+        BRIEF_DOCS "Contains additional properties for test execution in packaged mode."
+        FULL_DOCS "Contains additional properties for test execution in packaged mode.")
+
 define_property (TARGET PROPERTY APPLICATION_VARIANTS
         BRIEF_DOCS "Contains list of this application packaging variants."
         FULL_DOCS "Contains list of this application packaging variants.")
@@ -121,17 +152,9 @@ define_property (TARGET PROPERTY APPLICATION_VARIANT_ENVIRONMENT_TAGS
         BRIEF_DOCS "Contains application variant environment tags."
         FULL_DOCS "Contains application variant environment tags.")
 
-define_property (TARGET PROPERTY UNIT_RESOURCE_TARGETS
-        BRIEF_DOCS "List of targets that contain information about resources used by this unit."
-        FULL_DOCS "List of targets that contain information about resources used by this unit.")
-
-define_property (TARGET PROPERTY UNIT_RESOURCE_TARGET_TYPE
-        BRIEF_DOCS "Type of resource target. Either USUAL, CUSTOM or PRE_MADE."
-        FULL_DOCS "Type of resource target. Either USUAL, CUSTOM or PRE_MADE.")
-
-define_property (TARGET PROPERTY UNIT_RESOURCE_TARGET_SOURCE_DIRECTORY
-        BRIEF_DOCS "Contains absolute path to directory with source resource files."
-        FULL_DOCS "Contains absolute path to directory with source resource files.")
+define_property (TARGET PROPERTY UNIT_RESOURCE_DIRECTORIES
+        BRIEF_DOCS "List of resource directories that are used by this unit."
+        FULL_DOCS "List of resource directories that are used by this unit.")
 
 # Starts application configuration registration routine.
 function (register_application NAME)
@@ -190,6 +213,21 @@ function (application_set_world_directory DIRECTORY)
     cmake_path (ABSOLUTE_PATH DIRECTORY NORMALIZE)
     set_target_properties ("${APPLICATION_NAME}" PROPERTIES APPLICATION_WORLD_DIRECTORY "${DIRECTORY}")
     message (STATUS "    Setting core world directory to \"${DIRECTORY}\".")
+
+    if (KAN_APPLICATION_GENERATE_CODE_HOT_RELOAD_TEST)
+        message (STATUS "        Adding code hot reload test world.")
+        if (NOT EXISTS "${DIRECTORY}/optional")
+            file (MAKE_DIRECTORY "${DIRECTORY}/optional")
+        endif ()
+
+        file (COPY_FILE
+                "${CMAKE_SOURCE_DIR}/cmake/kan/verify_code_hot_reload_world.rd"
+                "${DIRECTORY}/optional/verify_code_hot_reload.rd")
+
+    else ()
+        message (STATUS "        Removing code hot reload test world.")
+        file (REMOVE "${DIRECTORY}/optional/verify_code_hot_reload.rd")
+    endif ()
 endfunction ()
 
 # Adds development-only environment tag to application.
@@ -330,6 +368,46 @@ function (application_program_use_plugin_group GROUP)
             APPLICATION_PROGRAM_PLUGIN_GROUPS "${PLUGIN_GROUPS}")
 endfunction ()
 
+# Makes it possible to use this program executable as test in development mode.
+# Arguments:
+# - ARGUMENTS: Arguments passed to program when executing it as test.
+# - PROPERTIES: Properties for test setup.
+function (application_program_use_as_test_in_development_mode)
+    cmake_parse_arguments (TEST "" "" "ARGUMENTS;PROPERTIES" ${ARGV})
+    if (DEFINED TEST_UNPARSED_ARGUMENTS)
+        message (FATAL_ERROR "Incorrect function arguments!")
+    endif ()
+
+    message (STATUS "        Use as test in development mode.")
+    message (STATUS "            Arguments: ${TEST_ARGUMENTS}.")
+    message (STATUS "            Properties: ${TEST_PROPERTIES}.")
+
+    set_target_properties ("${APPLICATION_NAME}_program_${APPLICATION_PROGRAM_NAME}" PROPERTIES
+            APPLICATION_PROGRAM_USE_AS_TEST_IN_DEVELOPMENT_MODE 1
+            APPLICATION_PROGRAM_TEST_IN_DEVELOPMENT_MODE_ARGUMENTS "${TEST_ARGUMENTS}"
+            APPLICATION_PROGRAM_TEST_IN_DEVELOPMENT_MODE_PROPERTIES "${TEST_PROPERTIES}")
+endfunction ()
+
+# Makes it possible to use this program executable as test in packaged mode.
+# Arguments:
+# - ARGUMENTS: Arguments passed to program when executing it as test.
+# - PROPERTIES: Properties for test setup.
+function (application_program_use_as_test_in_packaged_mode)
+    cmake_parse_arguments (TEST "" "" "ARGUMENTS;PROPERTIES" ${ARGV})
+    if (DEFINED TEST_UNPARSED_ARGUMENTS)
+        message (FATAL_ERROR "Incorrect function arguments!")
+    endif ()
+
+    message (STATUS "        Use as test in packaged mode.")
+    message (STATUS "            Arguments: ${TEST_ARGUMENTS}.")
+    message (STATUS "            Properties: ${TEST_PROPERTIES}.")
+
+    set_target_properties ("${APPLICATION_NAME}_program_${APPLICATION_PROGRAM_NAME}" PROPERTIES
+            APPLICATION_PROGRAM_USE_AS_TEST_IN_PACKAGED_MODE 1
+            APPLICATION_PROGRAM_TEST_IN_PACKAGED_MODE_ARGUMENTS "${TEST_ARGUMENTS}"
+            APPLICATION_PROGRAM_TEST_IN_PACKAGED_MODE_PROPERTIES "${TEST_PROPERTIES}")
+endfunction ()
+
 # Starts application packaging variant registration routine. Must be called inside application registration routine.
 function (register_application_variant NAME)
     message (STATUS "    Registering variant \"${NAME}\".")
@@ -379,21 +457,21 @@ function (application_variant_add_environment_tag TAG)
 endfunction ()
 
 # Intended only for internal use in this file.
-# Gathers all resource targets used by given list of plugins and outputs resulting list to OUTPUT variable.
-function (private_gather_plugins_resource_targets PLUGINS OUTPUT)
-    set (FOUND_RESOURCE_TARGETS)
+# Gathers all resource directories used by given list of plugins and outputs resulting list to OUTPUT variable.
+function (private_gather_plugins_resource_directories PLUGINS OUTPUT)
+    set (FOUND_RESOURCE_DIRECTORIES)
     foreach (PLUGIN ${PLUGINS})
         find_linked_targets_recursively (TARGET "${PLUGIN}_library" OUTPUT PLUGIN_TARGETS ARTEFACT_SCOPE)
         foreach (PLUGIN_TARGET ${PLUGIN_TARGETS})
-            get_target_property (THIS_RESOURCE_TARGETS "${PLUGIN_TARGET}" UNIT_RESOURCE_TARGETS)
-            if (NOT THIS_RESOURCE_TARGETS STREQUAL "THIS_RESOURCE_TARGETS-NOTFOUND")
-                list (APPEND FOUND_RESOURCE_TARGETS ${THIS_RESOURCE_TARGETS})
+            get_target_property (THIS_RESOURCE_DIRECTORIES "${PLUGIN_TARGET}" UNIT_RESOURCE_DIRECTORIES)
+            if (NOT THIS_RESOURCE_DIRECTORIES STREQUAL "THIS_RESOURCE_DIRECTORIES-NOTFOUND")
+                list (APPEND FOUND_RESOURCE_DIRECTORIES ${THIS_RESOURCE_DIRECTORIES})
             endif ()
         endforeach ()
     endforeach ()
 
-    list (REMOVE_DUPLICATES FOUND_RESOURCE_TARGETS)
-    set ("${OUTPUT}" "${FOUND_RESOURCE_TARGETS}" PARENT_SCOPE)
+    list (REMOVE_DUPLICATES FOUND_RESOURCE_DIRECTORIES)
+    set ("${OUTPUT}" "${FOUND_RESOURCE_DIRECTORIES}" PARENT_SCOPE)
 endfunction ()
 
 # Intended only for internal use in this file.
@@ -416,101 +494,98 @@ function (private_gather_plugins_from_groups GROUPS OUTPUT)
 endfunction ()
 
 # Intended only for internal use in this file.
-# Generates resource preparation and packing targets with given name and using given resource targets.
-function (private_generate_resource_processing NAME RESOURCE_TARGETS)
-    set (RESOURCE_LIST)
-    set (PREPARATION_TARGET_NAME "${APPLICATION_NAME}_resources_${NAME}_prepare")
-    add_custom_target ("${PREPARATION_TARGET_NAME}")
-    message (STATUS "    Generating resource processing pipeline \"${NAME}\".")
+# Adds test program that ensures that:
+# - There is nothing in this application that breaks hot reload for trivial change.
+# - This application reflection structure is coherent and hot reloadable when all plugins are loaded.
+#   For example, if someone forgot to ignore kan_atomic_int_t field somewhere, this would fail.
+function (private_generate_code_hot_reload_test)
+    message (STATUS "Application \"${APPLICATION_NAME}\" generates test program for code hot reload verification...")
 
-    foreach (RESOURCE_TARGET ${RESOURCE_TARGETS})
-        message (STATUS "        Using resource target \"${RESOURCE_TARGET}\".")
-        get_target_property (TYPE "${RESOURCE_TARGET}" UNIT_RESOURCE_TARGET_TYPE)
-        get_target_property (SOURCE_DIRECTORY "${RESOURCE_TARGET}" UNIT_RESOURCE_TARGET_SOURCE_DIRECTORY)
+    # Register verification plugin.
 
-        if (TYPE STREQUAL "USUAL")
-            # Binarize readable data files, do not touch other files.
-            file (GLOB_RECURSE RESOURCES LIST_DIRECTORIES false RELATIVE "${SOURCE_DIRECTORY}" "${SOURCE_DIRECTORY}/*")
+    register_application_plugin (NAME verify_code_hot_reload GROUP verify_code_hot_reload)
+    application_plugin_include (CONCRETE "application_framework_verify_code_hot_reload")
 
-            foreach (RESOURCE ${RESOURCES})
-                if (RESOURCE MATCHES "\\.rd$")
-                    # Readable data, we need to binarize it.
-                    set (RESOURCE_ABSOLUTE_SOURCE "${SOURCE_DIRECTORY}/${RESOURCE}")
-                    set (RESOURCE_ABSOLUTE_TARGET
-                            "${CMAKE_CURRENT_BINARY_DIR}/Generated/${PREPARATION_TARGET_NAME}/${RESOURCE}")
-                    string (REPLACE "\.rd" ".bin" RESOURCE_ABSOLUTE_TARGET "${RESOURCE_ABSOLUTE_TARGET}")
+    # Get all plugin groups as we need to verify that reflection structure is okay in every plugin.
 
-                    add_custom_command (
-                            OUTPUT "${RESOURCE_ABSOLUTE_TARGET}"
-                            DEPENDS "${APPLICATION_NAME}_resource_binarizer" "${RESOURCE_ABSOLUTE_SOURCE}"
-                            COMMAND
-                            "${APPLICATION_NAME}_resource_binarizer"
-                            "${RESOURCE_ABSOLUTE_SOURCE}"
-                            "${RESOURCE_ABSOLUTE_TARGET}"
-                            COMMENT "Binarizing \"${RESOURCE_ABSOLUTE_SOURCE}\"."
-                            VERBATIM)
+    set (PLUGIN_GROUPS)
+    get_target_property (PLUGINS "${APPLICATION_NAME}" APPLICATION_PLUGINS)
 
-                    target_sources ("${PREPARATION_TARGET_NAME}" PRIVATE "${RESOURCE_ABSOLUTE_TARGET}")
-                    list (APPEND RESOURCE_LIST "${RESOURCE_ABSOLUTE_TARGET}")
+    if (PLUGINS STREQUAL "PLUGINS-NOTFOUND")
+        set (PLUGINS)
+    endif ()
 
-                else ()
-                    list (APPEND RESOURCE_LIST "${SOURCE_DIRECTORY}/${RESOURCE}")
-                endif ()
+    get_target_property (CORE_GROUPS "${APPLICATION_NAME}" APPLICATION_CORE_PLUGIN_GROUPS)
+    if (CORE_GROUPS STREQUAL "CORE_GROUPS-NOTFOUND")
+        set (CORE_GROUPS)
+    endif ()
 
-            endforeach ()
-
-
-        elseif (TYPE STREQUAL "CUSTOM")
-            # Add dependency and add all built resources to list.
-            add_dependencies ("${PREPARATION_TARGET_NAME}" "${RESOURCE_TARGET}")
-            get_target_property (BUILT_RESOURCES "${RESOURCE_TARGET}" SOURCES)
-
-            foreach (RESOURCE ${BUILT_RESOURCES})
-                cmake_path (ABSOLUTE_PATH RESOURCE NORMALIZE)
-                list (APPEND RESOURCE_LIST "${RESOURCE}")
-            endforeach ()
-
-        elseif (TYPE STREQUAL "PRE_MADE")
-            # Just append all resources to list.
-            file (GLOB_RECURSE RESOURCES LIST_DIRECTORIES false RELATIVE "${SOURCE_DIRECTORY}" "${SOURCE_DIRECTORY}/*")
-
-            foreach (RESOURCE ${RESOURCES})
-                list (APPEND RESOURCE_LIST "${SOURCE_DIRECTORY}/${RESOURCE}")
-            endforeach ()
-
-        else ()
-            message (SEND_ERROR "Unknown resource target type \"${TYPE}\".")
+    foreach (PLUGIN ${PLUGINS})
+        get_target_property (PLUGIN_GROUP "${PLUGIN}" APPLICATION_PLUGIN_GROUP)
+        if (NOT "${PLUGIN_GROUP}" IN_LIST CORE_GROUPS)
+            list (APPEND PLUGIN_GROUPS "${PLUGIN_GROUP}")
         endif ()
     endforeach ()
 
-    set (PACKAGING_TARGET_NAME "${APPLICATION_NAME}_resources_${NAME}_packaging")
-    set (PACKAGING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/Generated/${PACKAGING_TARGET_NAME}")
+    list (REMOVE_DUPLICATES PLUGIN_GROUPS)
 
-    list (JOIN RESOURCE_LIST "\n" RESOURCES)
-    if (RESOURCES)
-        message (STATUS "    Generating resource packaging step for resource processing pipeline \"${NAME}\".")
-        file (WRITE "${PACKAGING_DIRECTORY}/resources.txt" "${RESOURCES}")
-        set (INTERN_STRING_ARGUMENT)
+    # Register verification program.
 
-        if (KAN_APPLICATION_PACKER_INTERN_STRINGS)
-            set (INTERN_STRING_ARGUMENT "--intern-strings")
+    register_application_program (verify_code_hot_reload)
+    application_program_set_configuration ("${CMAKE_SOURCE_DIR}/cmake/kan/verify_code_hot_reload_configuration.rd")
+    application_program_use_as_test_in_development_mode (
+            ARGUMENTS
+            "${CMAKE_COMMAND}" "${CMAKE_BINARY_DIR}" "${APPLICATION_NAME}_dev_all_plugins" "$<CONFIG>"
+            # We need big timeout due to slow machines on GitHub Actions.
+            PROPERTIES RUN_SERIAL ON TIMEOUT 60 LABELS SLOW)
+
+    foreach (PLUGIN_GROUP ${PLUGIN_GROUPS})
+        application_program_use_plugin_group ("${PLUGIN_GROUP}")
+    endforeach ()
+
+    # We do not need variant as we're not testing code hot reload in packaged mode (as it is usually disabled).
+endfunction ()
+
+# Intended only for internal use in this file.
+# Macro for ease of use and simplicity.
+# Provides easy generation of minimal mount names for resource directories.
+macro (private_generate_resource_directory_mount_name DIRECTORY)
+    set (CURRENT_BASE_PATH "${DIRECTORY}")
+    while (TRUE)
+        cmake_path (HAS_PARENT_PATH CURRENT_BASE_PATH BASE_HAS_PARENT_PATH)
+        if (NOT BASE_HAS_PARENT_PATH)
+            message (SEND_ERROR "Failed to generate mount name for directory \"${DIRECTORY}\".")
+            set (MOUNT_NAME "error")
+            break ()
         endif ()
 
-        add_custom_target ("${PACKAGING_TARGET_NAME}"
-                COMMAND
-                "${APPLICATION_NAME}_packer"
-                "${PACKAGING_DIRECTORY}/resources.txt"
-                "${PACKAGING_DIRECTORY}/${NAME}.pack"
-                ${INTERN_STRING_ARGUMENT}
-                WORKING_DIRECTORY ${PACKAGING_DIRECTORY}
-                VERBATIM)
-        add_dependencies ("${PACKAGING_TARGET_NAME}" "${PREPARATION_TARGET_NAME}")
-    endif ()
-endfunction ()
+        cmake_path (GET CURRENT_BASE_PATH PARENT_PATH CURRENT_BASE_PATH)
+        string (LENGTH "${CURRENT_BASE_PATH}" CURRENT_BASE_PATH_LENGTH)
+        math (EXPR CURRENT_BASE_PATH_LENGTH "${CURRENT_BASE_PATH_LENGTH} + 1")
+        string (SUBSTRING "${DIRECTORY}" "${CURRENT_BASE_PATH_LENGTH}" -1 MOUNT_NAME)
+        string (MAKE_C_IDENTIFIER "${MOUNT_NAME}" MOUNT_NAME)
+
+        if (NOT "${MOUNT_NAME}" IN_LIST USED_MOUNT_NAMES)
+            list (APPEND USED_MOUNT_NAMES "${MOUNT_NAME}")
+            break ()
+        endif ()
+    endwhile ()
+endmacro ()
 
 # Uses data gathered by registration functions above to generate application shared libraries, executables and other
 # application related targets.
 function (application_generate)
+    if (KAN_APPLICATION_GENERATE_CODE_HOT_RELOAD_TEST)
+        if (NOT WIN32)
+            private_generate_code_hot_reload_test ()
+        else ()
+            # Due to how DLL locking works on Windows, it is impossible to correctly execute code hot reload
+            # verification test no matter what. Therefore we're disabling these tests on Windows.
+            message (STATUS
+                    "Application \"${APPLICATION_NAME}\" cannot generate program for hot reload verification on WIN32.")
+        endif ()
+    endif ()
+
     message (STATUS "Application \"${APPLICATION_NAME}\" registration done, generating...")
     message (STATUS "Application \"${APPLICATION_NAME}\": generating development targets.")
 
@@ -628,18 +703,18 @@ function (application_generate)
 
     # Find core resource targets.
 
-    set (CORE_RESOURCE_TARGETS)
-    private_gather_plugins_resource_targets ("${CORE_PLUGINS}" "CORE_RESOURCE_TARGETS")
+    set (CORE_RESOURCE_DIRECTORIES)
+    private_gather_plugins_resource_directories ("${CORE_PLUGINS}" "CORE_RESOURCE_DIRECTORIES")
 
     find_linked_targets_recursively (TARGET "${APPLICATION_NAME}_core_library" OUTPUT CORE_LINKED_TARGETS)
     foreach (LINKED_TARGET ${CORE_LINKED_TARGETS})
-        get_target_property (THIS_RESOURCE_TARGETS "${LINKED_TARGET}" UNIT_RESOURCE_TARGETS)
-        if (NOT THIS_RESOURCE_TARGETS STREQUAL "THIS_RESOURCE_TARGETS-NOTFOUND")
-            list (APPEND CORE_RESOURCE_TARGETS ${THIS_RESOURCE_TARGETS})
+        get_target_property (THIS_RESOURCE_DIRECTORIES "${LINKED_TARGET}" UNIT_RESOURCE_DIRECTORIES)
+        if (NOT THIS_RESOURCE_DIRECTORIES STREQUAL "THIS_RESOURCE_DIRECTORIES-NOTFOUND")
+            list (APPEND CORE_RESOURCE_DIRECTORIES ${THIS_RESOURCE_DIRECTORIES})
         endif ()
     endforeach ()
 
-    list (REMOVE_DUPLICATES CORE_RESOURCE_TARGETS)
+    list (REMOVE_DUPLICATES CORE_RESOURCE_DIRECTORIES)
 
     # Generate development core configuration.
 
@@ -664,12 +739,14 @@ function (application_generate)
     endforeach ()
 
     string (APPEND DEV_CORE_CONFIGURATOR_CONTENT "list (JOIN PLUGINS_LIST \", \" PLUGINS)\n")
-    foreach (RESOURCE_TARGET ${CORE_RESOURCE_TARGETS})
-        get_target_property (SOURCE_DIRECTORY "${RESOURCE_TARGET}" UNIT_RESOURCE_TARGET_SOURCE_DIRECTORY)
+    set (USED_MOUNT_NAMES)
+
+    foreach (RESOURCE_DIRECTORY ${CORE_RESOURCE_DIRECTORIES})
+        private_generate_resource_directory_mount_name ("${RESOURCE_DIRECTORY}")
         string (APPEND DEV_CORE_CONFIGURATOR_CONTENT "string (APPEND RESOURCE_DIRECTORIES \"+resource_directories ")
-        string (APPEND DEV_CORE_CONFIGURATOR_CONTENT "{ path = \\\"${SOURCE_DIRECTORY}\\\" mount_path = ")
+        string (APPEND DEV_CORE_CONFIGURATOR_CONTENT "{ path = \\\"${RESOURCE_DIRECTORY}\\\" mount_path = ")
         string (APPEND DEV_CORE_CONFIGURATOR_CONTENT
-                "\\\"${KAN_APPLICATION_RESOURCES_DIRECTORY_NAME}/${RESOURCE_TARGET}\\\" }\\n\")\n")
+                "\\\"${KAN_APPLICATION_RESOURCES_DIRECTORY_NAME}/${MOUNT_NAME}\\\" }\\n\")\n")
     endforeach ()
 
     foreach (DEVELOPMENT_TAG ${DEVELOPMENT_TAGS})
@@ -706,51 +783,17 @@ function (application_generate)
             COMMAND "${CMAKE_COMMAND}" -P "${DEV_CORE_CONFIGURATOR_PATH}"
             COMMENT "Building core configuration for application \"${APPLICATION_NAME}\".")
 
-    # Generate tool statics file.
+    # Generate resource builder executable.
 
-    set (STATICS_PLUGINS_DIRECTORY_PATH "\"${KAN_APPLICATION_PLUGINS_DIRECTORY_NAME}\"")
-    set (STATICS_PLUGINS)
-
-    foreach (PLUGIN ${PLUGINS})
-        string (APPEND STATICS_PLUGINS "    \"${PLUGIN}_library\",\n")
-        if ("${PLUGIN_GROUP}" IN_LIST CORE_GROUPS)
-            list (APPEND CORE_PLUGINS "${PLUGIN}")
-        endif ()
-    endforeach ()
-
-    set (STATICS_PATH "${CMAKE_CURRENT_BINARY_DIR}/Generated/${APPLICATION_NAME}_tool_statics.c")
-    configure_file ("${KAN_APPLICATION_TOOL_STATICS_TEMPLATE}" "${STATICS_PATH}")
-
-    register_concrete ("${APPLICATION_NAME}_tool_statics")
-    concrete_sources_direct ("${STATICS_PATH}")
-
-    # Generate resource binarizer executable.
-
-    register_executable ("${APPLICATION_NAME}_resource_binarizer")
-    executable_include (
-            CONCRETE
-            application_framework_resource_binarizer application_framework_tool "${APPLICATION_NAME}_tool_statics")
+    register_executable ("${APPLICATION_NAME}_resource_builder")
+    executable_include (CONCRETE application_framework_resource_builder)
 
     executable_link_shared_libraries ("${APPLICATION_NAME}_core_library")
     executable_verify ()
     executable_copy_linked_artefacts ()
 
     foreach (PLUGIN ${PLUGINS})
-        add_dependencies ("${APPLICATION_NAME}_resource_binarizer" "${PLUGIN}_dev_copy")
-    endforeach ()
-
-    # Generate packer executable.
-
-    register_executable ("${APPLICATION_NAME}_packer")
-    executable_include (
-            CONCRETE application_framework_packer application_framework_tool "${APPLICATION_NAME}_tool_statics")
-
-    executable_link_shared_libraries ("${APPLICATION_NAME}_core_library")
-    executable_verify ()
-    executable_copy_linked_artefacts ()
-
-    foreach (PLUGIN ${PLUGINS})
-        add_dependencies ("${APPLICATION_NAME}_packer" "${PLUGIN}_dev_copy")
+        add_dependencies ("${APPLICATION_NAME}_resource_builder" "${PLUGIN}_dev_copy")
     endforeach ()
 
     # Generate programs.
@@ -807,7 +850,7 @@ function (application_generate)
 
         # Find program resource targets.
 
-        private_gather_plugins_resource_targets ("${PROGRAM_PLUGINS}" "RESOURCE_TARGETS")
+        private_gather_plugins_resource_directories ("${PROGRAM_PLUGINS}" "RESOURCE_DIRECTORIES")
 
         # Generate program configuration.
 
@@ -824,14 +867,17 @@ function (application_generate)
         endforeach ()
 
         string (APPEND DEV_PROGRAM_CONFIGURATOR_CONTENT "list (JOIN PLUGINS_LIST \", \" PLUGINS)\n")
-        foreach (RESOURCE_TARGET ${RESOURCE_TARGETS})
-            get_target_property (SOURCE_DIRECTORY "${RESOURCE_TARGET}" UNIT_RESOURCE_TARGET_SOURCE_DIRECTORY)
+        set (USED_MOUNT_NAMES)
+
+        foreach (RESOURCE_DIRECTORY ${RESOURCE_DIRECTORIES})
+            private_generate_resource_directory_mount_name ("${RESOURCE_DIRECTORY}")
+
             string (APPEND DEV_PROGRAM_CONFIGURATOR_CONTENT
                     "string (APPEND RESOURCE_DIRECTORIES \"+resource_directories ")
 
-            string (APPEND DEV_PROGRAM_CONFIGURATOR_CONTENT "{ path = \\\"${SOURCE_DIRECTORY}\\\" mount_path = ")
+            string (APPEND DEV_PROGRAM_CONFIGURATOR_CONTENT "{ path = \\\"${RESOURCE_DIRECTORY}\\\" mount_path = ")
             string (APPEND DEV_PROGRAM_CONFIGURATOR_CONTENT
-                    "\\\"${KAN_APPLICATION_RESOURCES_DIRECTORY_NAME}/${RESOURCE_TARGET}\\\" }\\n\")\n")
+                    "\\\"${KAN_APPLICATION_RESOURCES_DIRECTORY_NAME}/${MOUNT_NAME}\\\" }\\n\")\n")
         endforeach ()
 
         set (DEV_PROGRAM_CONFIGURATION_PATH "${DEV_CONFIGURATION_DIRECTORY}/program_${PROGRAM_NAME}.rd")
@@ -847,29 +893,110 @@ function (application_generate)
                 COMMAND "${CMAKE_COMMAND}" -P "${DEV_PROGRAM_CONFIGURATOR_PATH}"
                 COMMENT "Building program \"${PROGRAM_NAME}\" configuration for application \"${APPLICATION_NAME}\".")
 
+        # Add program executable to tests if request.
+
+        get_target_property (IS_TEST "${PROGRAM}" APPLICATION_PROGRAM_USE_AS_TEST_IN_DEVELOPMENT_MODE)
+        if (${IS_TEST})
+            get_target_property (TEST_ARGUMENTS "${PROGRAM}" APPLICATION_PROGRAM_TEST_IN_DEVELOPMENT_MODE_ARGUMENTS)
+            if (TEST_ARGUMENTS STREQUAL "TEST_ARGUMENTS-NOTFOUND")
+                set (TEST_ARGUMENTS)
+            endif ()
+
+            get_target_property (TEST_PROPERTIES "${PROGRAM}" APPLICATION_PROGRAM_TEST_IN_DEVELOPMENT_MODE_PROPERTIES)
+            if (TEST_PROPERTIES STREQUAL "TEST_PROPERTIES-NOTFOUND")
+                unset (TEST_PROPERTIES)
+            endif ()
+
+            add_test (NAME "${PROGRAM}_test_in_development"
+                    COMMAND "${PROGRAM}_launcher" ${TEST_ARGUMENTS}
+                    WORKING_DIRECTORY "$<TARGET_FILE_DIR:${PROGRAM}_launcher>"
+                    COMMAND_EXPAND_LISTS)
+
+            if (DEFINED TEST_PROPERTIES)
+                set_tests_properties ("${PROGRAM}_test_in_development" PROPERTIES ${TEST_PROPERTIES})
+            endif ()
+
+            add_dependencies (test_kan "${PROGRAM}_launcher")
+        endif ()
+
     endforeach ()
 
-    if (NOT KAN_APPLICATION_PACK_WITH_RAW_RESOURCES)
-        message (STATUS "Application \"${APPLICATION_NAME}\": generating resource processing targets.")
+    # Generate resource builder project.
 
-        private_generate_resource_processing ("core" "${CORE_RESOURCE_TARGETS}")
-        foreach (PLUGIN ${PLUGINS})
-            if (NOT PLUGIN IN_LIST CORE_PLUGINS)
-                find_linked_targets_recursively (TARGET "${PLUGIN}_library" OUTPUT PLUGIN_TARGETS ARTEFACT_SCOPE)
-                set (RESOURCE_TARGETS)
+    message (STATUS "Application \"${APPLICATION_NAME}\": generating resource builder project.")
+    string (APPEND PROJECT_CONTENT "//! kan_application_resource_project_t\n\n")
+    string (APPEND PROJECT_CONTENT "plugin_relative_directory = \"${KAN_APPLICATION_PLUGINS_DIRECTORY_NAME}\"\n")
+    string (APPEND PROJECT_CONTENT "plugins =\n")
+    set (COMMA "")
 
-                foreach (PLUGIN_TARGET ${PLUGIN_TARGETS})
-                    get_target_property (THIS_RESOURCE_TARGETS "${PLUGIN_TARGET}" UNIT_RESOURCE_TARGETS)
-                    if (NOT THIS_RESOURCE_TARGETS STREQUAL "THIS_RESOURCE_TARGETS-NOTFOUND")
-                        list (APPEND RESOURCE_TARGETS ${THIS_RESOURCE_TARGETS})
-                    endif ()
-                endforeach ()
+    foreach (PLUGIN ${PLUGINS})
+        string (APPEND PROJECT_CONTENT "${COMMA}    \"${PLUGIN}_library\"")
+        set (COMMA ",\n")
+    endforeach ()
 
-                get_target_property (NAME "${PLUGIN}" APPLICATION_PLUGIN_NAME)
-                private_generate_resource_processing ("${NAME}" "${RESOURCE_TARGETS}")
-            endif ()
+    string (APPEND PROJECT_CONTENT "\n\n")
+    string (APPEND PROJECT_CONTENT "+targets {\n")
+    string (APPEND PROJECT_CONTENT "    name = core\n")
+
+    if (CORE_RESOURCE_DIRECTORIES)
+        string (APPEND PROJECT_CONTENT "    directories =\n")
+
+        foreach (DIRECTORY ${CORE_RESOURCE_DIRECTORIES})
+            string (APPEND PROJECT_CONTENT "        \"${DIRECTORY}\",\n")
         endforeach ()
     endif ()
+
+    string (APPEND PROJECT_CONTENT "}\n\n")
+    foreach (PLUGIN ${PLUGINS})
+        if (NOT PLUGIN IN_LIST CORE_PLUGINS)
+            string (APPEND PROJECT_CONTENT "+targets {\n")
+            string (APPEND PROJECT_CONTENT "    name = ${PLUGIN}\n")
+
+            private_gather_plugins_resource_directories ("${PLUGIN}" PLUGIN_DIRECTORIES)
+            if (PLUGIN_DIRECTORIES)
+                string (APPEND PROJECT_CONTENT "    directories =\n")
+                set (COMMA "")
+
+                foreach (DIRECTORY ${PLUGIN_DIRECTORIES})
+                    string (APPEND PROJECT_CONTENT "${COMMA}        \"${DIRECTORY}\"")
+                    set (COMMA ",\n")
+                endforeach ()
+
+                string (APPEND PROJECT_CONTENT "\n")
+            endif ()
+
+            string (APPEND PROJECT_CONTENT "    visible_targets = core\n")
+            string (APPEND PROJECT_CONTENT "}\n\n")
+        endif ()
+    endforeach ()
+
+    set (RC_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/${KAN_APPLICATION_RC_DIRECTORY_NAME}")
+    file (MAKE_DIRECTORY "${RC_DIRECTORY}")
+
+    set (RBW_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/${KAN_APPLICATION_RBW_DIRECTORY_NAME}")
+    file (MAKE_DIRECTORY "${RBW_DIRECTORY}")
+
+    string (APPEND PROJECT_CONTENT "reference_cache_absolute_directory = \"${RC_DIRECTORY}\"\n")
+    string (APPEND PROJECT_CONTENT "output_absolute_directory = \"${RBW_DIRECTORY}\"\n")
+
+    if (KAN_APPLICATION_PACKER_INTERN_STRINGS)
+        string (APPEND PROJECT_CONTENT "use_string_interning = 1\n")
+    else ()
+        string (APPEND PROJECT_CONTENT "use_string_interning = 0\n")
+    endif ()
+
+    set (RESOURCE_PROJECT_PATH "${CMAKE_CURRENT_BINARY_DIR}/resource_project.rd")
+    file (CONFIGURE OUTPUT "${RESOURCE_PROJECT_PATH}" CONTENT "${PROJECT_CONTENT}")
+
+    # Add application resource builder job pool
+
+    get_property (JOB_POOLS GLOBAL PROPERTY JOB_POOLS)
+    if (JOB_POOLS STREQUAL "JOB_POOLS-NOTFOUND")
+        set (JOB_POOLS)
+    endif ()
+
+    list (APPEND JOB_POOLS "${APPLICATION_NAME}_resource_builder_pool=1")
+    set_property (GLOBAL PROPERTY JOB_POOLS ${JOB_POOLS})
 
     message (STATUS "Application \"${APPLICATION_NAME}\": generating packaging variants.")
 
@@ -965,13 +1092,15 @@ function (application_generate)
 
         string (APPEND PACK_CORE_CONFIGURATOR_CONTENT "list (JOIN PLUGINS_LIST \", \" PLUGINS)\n")
         if (KAN_APPLICATION_PACK_WITH_RAW_RESOURCES)
-            foreach (RESOURCE_TARGET ${CORE_RESOURCE_TARGETS})
+            set (USED_MOUNT_NAMES)
+            foreach (RESOURCE_DIRECTORY ${CORE_RESOURCE_DIRECTORIES})
+                private_generate_resource_directory_mount_name ("${RESOURCE_DIRECTORY}")
                 string (APPEND PACK_CORE_CONFIGURATOR_CONTENT
                         "string (APPEND RESOURCE_DIRECTORIES \"+resource_directories ")
                 string (APPEND PACK_CORE_CONFIGURATOR_CONTENT
-                        "{ path = \\\"${KAN_APPLICATION_RESOURCES_DIRECTORY_NAME}/${RESOURCE_TARGET}\\\"")
+                        "{ path = \\\"${KAN_APPLICATION_RESOURCES_DIRECTORY_NAME}/${MOUNT_NAME}\\\"")
                 string (APPEND PACK_CORE_CONFIGURATOR_CONTENT
-                        "mount_path = \\\"${KAN_APPLICATION_RESOURCES_DIRECTORY_NAME}/${RESOURCE_TARGET}\\\" }\\n\")\n")
+                        "mount_path = \\\"${KAN_APPLICATION_RESOURCES_DIRECTORY_NAME}/${MOUNT_NAME}\\\" }\\n\")\n")
             endforeach ()
 
         elseif (TARGET "${APPLICATION_NAME}_resources_core_packaging")
@@ -1043,9 +1172,12 @@ function (application_generate)
 
             string (APPEND PACK_PROGRAM_CONFIGURATOR_CONTENT "list (JOIN PLUGINS_LIST \", \" PLUGINS)\n")
             if (KAN_APPLICATION_PACK_WITH_RAW_RESOURCES)
-                private_gather_plugins_resource_targets ("${PROGRAM_PLUGINS}" "RESOURCE_TARGETS")
-                foreach (RESOURCE_TARGET ${RESOURCE_TARGETS})
-                    set (RELATIVE_PATH "${KAN_APPLICATION_RESOURCES_DIRECTORY_NAME}/${RESOURCE_TARGET}")
+                private_gather_plugins_resource_directories ("${PROGRAM_PLUGINS}" "RESOURCE_DIRECTORIES")
+                set (USED_MOUNT_NAMES)
+
+                foreach (RESOURCE_DIRECTORY ${RESOURCE_DIRECTORIES})
+                    private_generate_resource_directory_mount_name ("${RESOURCE_DIRECTORY}")
+                    set (RELATIVE_PATH "${KAN_APPLICATION_RESOURCES_DIRECTORY_NAME}/${MOUNT_NAME}")
                     string (APPEND PACK_PROGRAM_CONFIGURATOR_CONTENT
                             "string (APPEND RESOURCE_DIRECTORIES \"+resource_directories ")
                     string (APPEND PACK_PROGRAM_CONFIGURATOR_CONTENT
@@ -1055,7 +1187,7 @@ function (application_generate)
             else ()
                 foreach (PLUGIN ${PROGRAM_PLUGINS})
                     get_target_property (PLUGIN_NAME "${PLUGIN}" APPLICATION_PLUGIN_NAME)
-                    set (PACK_PATH "${KAN_APPLICATION_RESOURCES_DIRECTORY_NAME}/${PLUGIN_NAME}.pack")
+                    set (PACK_PATH "${KAN_APPLICATION_RESOURCES_DIRECTORY_NAME}/${PLUGIN}.pack")
                     set (MOUNT_PATH "${KAN_APPLICATION_RESOURCES_DIRECTORY_NAME}/${PLUGIN_NAME}")
 
                     string (APPEND PACK_PROGRAM_CONFIGURATOR_CONTENT "string (APPEND RESOURCE_PACKS \"+resource_packs ")
@@ -1097,46 +1229,55 @@ function (application_generate)
         # Copy resources.
 
         if (KAN_APPLICATION_PACK_WITH_RAW_RESOURCES)
-            set (RESOURCE_TARGETS ${CORE_RESOURCE_TARGETS})
+            private_gather_plugins_resource_directories ("${USED_PLUGINS}" RESOURCE_DIRECTORIES)
+            list (REMOVE_DUPLICATES RESOURCE_DIRECTORIES)
+            set (USED_MOUNT_NAMES)
 
-            foreach (PLUGIN ${USED_PLUGINS})
-                find_linked_targets_recursively (TARGET "${PLUGIN}_library" OUTPUT PLUGIN_TARGETS ARTEFACT_SCOPE)
-                if (NOT PLUGIN IN_LIST CORE_PLUGINS)
-                    foreach (PLUGIN_TARGET ${PLUGIN_TARGETS})
-                        get_target_property (THIS_RESOURCE_TARGETS "${PLUGIN_TARGET}" UNIT_RESOURCE_TARGETS)
-                        if (NOT THIS_RESOURCE_TARGETS STREQUAL "THIS_RESOURCE_TARGETS-NOTFOUND")
-                            list (APPEND RESOURCE_TARGETS ${THIS_RESOURCE_TARGETS})
-                        endif ()
-                    endforeach ()
-                endif ()
-            endforeach ()
+            foreach (RESOURCE_DIRECTORY ${RESOURCE_DIRECTORIES})
+                private_generate_resource_directory_mount_name ("${RESOURCE_DIRECTORY}")
 
-            list (REMOVE_DUPLICATES RESOURCE_TARGETS)
-            foreach (RESOURCE_TARGET ${RESOURCE_TARGETS})
-                get_target_property (SOURCE_DIRECTORY "${RESOURCE_TARGET}" UNIT_RESOURCE_TARGET_SOURCE_DIRECTORY)
-                set (COMMENT_PREFIX "Copying \"${RESOURCE_TARGET}\" resources for application ")
+                set (COMMENT_PREFIX "Copying \"${RESOURCE_DIRECTORY}\" resources for application ")
                 set (COMMENT_SUFFIX "\"${APPLICATION_NAME}\" variant \"${NAME}\".")
 
-                add_custom_target ("${VARIANT}_copy_${RESOURCE_TARGET}"
+                add_custom_target ("${VARIANT}_copy_${MOUNT_NAME}"
                         DEPENDS "${VARIANT}_prepare_directories"
                         COMMAND
                         "${CMAKE_COMMAND}"
                         -E copy_directory
-                        "${SOURCE_DIRECTORY}"
-                        "${PACK_RESOURCES_DIRECTORY}/${RESOURCE_TARGET}"
+                        "${RESOURCE_DIRECTORY}"
+                        "${PACK_RESOURCES_DIRECTORY}/${MOUNT_NAME}"
                         COMMENT "${COMMENT_PREFIX}${COMMENT_SUFFIX}"
                         VERBATIM)
 
-                add_dependencies ("${VARIANT}_package" "${VARIANT}_copy_${RESOURCE_TARGET}")
+                add_dependencies ("${VARIANT}_package" "${VARIANT}_copy_${MOUNT_NAME}")
             endforeach ()
 
         else ()
+            set (BUILDER_TARGETS)
+            foreach (PLUGIN ${USED_PLUGINS})
+                if (NOT PLUGIN IN_LIST CORE_PLUGINS)
+                    list (APPEND BUILDER_TARGETS "${PLUGIN}")
+                endif ()
+            endforeach ()
+
+            add_custom_target ("${VARIANT}_build_resources"
+                    DEPENDS
+                    "${VARIANT}_prepare_directories"
+                    "${APPLICATION_NAME}_resource_builder"
+                    ${CORE_PLUGINS}
+                    ${USED_PLUGINS}
+                    COMMAND "${APPLICATION_NAME}_resource_builder" "${RESOURCE_PROJECT_PATH}" ${BUILDER_TARGETS}
+                    JOB_POOL "${APPLICATION_NAME}_resource_builder_pool"
+                    COMMENT "Running resource builder for application \"${APPLICATION_NAME}\" variant \"${NAME}\"."
+                    COMMAND_EXPAND_LISTS
+                    VERBATIM)
+
             if (TARGET "${APPLICATION_NAME}_resources_core_packaging")
                 set (SOURCE_DIRECTORY
                         "${CMAKE_CURRENT_BINARY_DIR}/Generated/${APPLICATION_NAME}_resources_core_packaging")
 
                 add_custom_target ("${VARIANT}_copy_core_pack"
-                        DEPENDS "${VARIANT}_prepare_directories" "${APPLICATION_NAME}_resources_core_packaging"
+                        DEPENDS "${VARIANT}_prepare_directories" "${VARIANT}_build_resources"
                         COMMAND
                         "${CMAKE_COMMAND}"
                         -E copy -t
@@ -1153,17 +1294,16 @@ function (application_generate)
                     get_target_property (PLUGIN_NAME "${PLUGIN}" APPLICATION_PLUGIN_NAME)
                     set (PLUGIN_TARGET_NAME "${APPLICATION_NAME}_resources_${PLUGIN_NAME}_packaging")
 
-                    set (SOURCE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/Generated/${PLUGIN_TARGET_NAME}")
                     set (COMMENT_PREFIX "Copying plugin ${PLUGIN_NAME} resources for application ")
                     set (COMMENT_SUFFIX "\"${APPLICATION_NAME}\" variant \"${NAME}\".")
 
                     add_custom_target ("${VARIANT}_copy_${PLUGIN_NAME}_pack"
-                            DEPENDS "${VARIANT}_prepare_directories" "${PLUGIN_TARGET_NAME}"
+                            DEPENDS "${VARIANT}_prepare_directories" "${VARIANT}_build_resources"
                             COMMAND
                             "${CMAKE_COMMAND}"
                             -E copy -t
                             "${PACK_RESOURCES_DIRECTORY}"
-                            "${SOURCE_DIRECTORY}/${PLUGIN_NAME}.pack"
+                            "${RBW_DIRECTORY}/${PLUGIN}.pack"
                             COMMENT "${COMMENT_PREFIX}${COMMENT_SUFFIX}"
                             VERBATIM)
 
@@ -1187,6 +1327,32 @@ function (application_generate)
                     VERBATIM)
 
             add_dependencies ("${VARIANT}_package" "${VARIANT}_copy_launcher_${PROGRAM_NAME}")
+
+            # Add program executable to tests if request.
+
+            get_target_property (IS_TEST "${PROGRAM}" APPLICATION_PROGRAM_USE_AS_TEST_IN_PACKAGED_MODE)
+            if (${IS_TEST})
+                get_target_property (TEST_ARGUMENTS "${PROGRAM}" APPLICATION_PROGRAM_TEST_IN_PACKAGED_MODE_ARGUMENTS)
+                if (TEST_ARGUMENTS STREQUAL "TEST_ARGUMENTS-NOTFOUND")
+                    set (TEST_ARGUMENTS)
+                endif ()
+
+                get_target_property (TEST_PROPERTIES "${PROGRAM}" APPLICATION_PROGRAM_TEST_IN_PACKAGED_MODE_PROPERTIES)
+                if (TEST_PROPERTIES STREQUAL "TEST_PROPERTIES-NOTFOUND")
+                    unset (TEST_PROPERTIES)
+                endif ()
+
+                add_test (NAME "${PROGRAM}_test_in_packaged"
+                        COMMAND "${PACK_BUILD_DIRECTORY}/$<TARGET_FILE_NAME:${PROGRAM}_launcher>" ${TEST_ARGUMENTS}
+                        WORKING_DIRECTORY "${PACK_BUILD_DIRECTORY}"
+                        COMMAND_EXPAND_LISTS)
+
+                if (DEFINED TEST_PROPERTIES)
+                    set_tests_properties ("${PROGRAM}_test_in_packaged" PROPERTIES ${TEST_PROPERTIES})
+                endif ()
+
+                add_dependencies (test_kan "${VARIANT}_package")
+            endif ()
         endforeach ()
 
     endforeach ()
@@ -1194,104 +1360,16 @@ function (application_generate)
     message (STATUS "Application \"${APPLICATION_NAME}\" generation done.")
 endfunction ()
 
-# Intended only for internal use in this file. Adds resource target with given name to current unit.
-function (private_add_resource_target_to_unit NAME)
-    get_target_property (RESOURCE_TARGETS "${UNIT_NAME}" UNIT_RESOURCE_TARGETS)
-    if (RESOURCE_TARGETS STREQUAL "RESOURCE_TARGETS-NOTFOUND")
-        set (RESOURCE_TARGETS)
+# Registers resource directory for current unit.
+function (register_application_resource_directory PATH)
+    cmake_path (ABSOLUTE_PATH PATH NORMALIZE)
+    get_target_property (RESOURCE_DIRECTORIES "${UNIT_NAME}" UNIT_RESOURCE_DIRECTORIES)
+
+    if (RESOURCE_DIRECTORIES STREQUAL "RESOURCE_DIRECTORIES-NOTFOUND")
+        set (RESOURCE_DIRECTORIES)
     endif ()
 
-    list (APPEND RESOURCE_TARGETS "${UNIT_NAME}_resource_${NAME}")
-    set_target_properties ("${UNIT_NAME}" PROPERTIES UNIT_RESOURCE_TARGETS "${RESOURCE_TARGETS}")
-endfunction ()
-
-# Registers resource directory with USUAL type for current unit.
-# USUAL directories share common processing pipeline for packaging.
-# Arguments:
-# - NAME: Logical name of this resource directory.
-# - PATH: Path to resource directory with source files.
-# - DEPENDENCIES: Optional dependency targets that need to be executed before processing resources for packaging.
-function (register_application_usual_resource_directory)
-    cmake_parse_arguments (ARGUMENT "" "NAME;PATH" "DEPENDENCIES" ${ARGV})
-    if (DEFINED ARGUMENT_UNPARSED_ARGUMENTS OR
-            NOT DEFINED ARGUMENT_NAME OR
-            NOT DEFINED ARGUMENT_PATH)
-        message (FATAL_ERROR "Incorrect function arguments!")
-    endif ()
-
-    cmake_path (ABSOLUTE_PATH ARGUMENT_PATH NORMALIZE)
-    add_custom_target ("${UNIT_NAME}_resource_${ARGUMENT_NAME}")
-    set_target_properties ("${UNIT_NAME}_resource_${ARGUMENT_NAME}" PROPERTIES
-            UNIT_RESOURCE_TARGET_TYPE "USUAL"
-            UNIT_RESOURCE_TARGET_SOURCE_DIRECTORY "${ARGUMENT_PATH}")
-
-    if (DEFINED ARGUMENT_DEPENDENCIES)
-        add_dependencies ("${UNIT_NAME}_resource_${ARGUMENT_NAME}" "${ARGUMENT_DEPENDENCIES}")
-    endif ()
-
-    private_add_resource_target_to_unit ("${ARGUMENT_NAME}")
-    message (STATUS
-            "    Added usual resource directory under name \"${ARGUMENT_NAME}\" at path \"${ARGUMENT_PATH}\".")
-endfunction ()
-
-# Registers resource directory with CUSTOM type for current unit.
-# CUSTOM directories have their own commands for building files before packaging.
-# Arguments:
-# - NAME: Logical name of this resource directory.
-# - PATH: Path to resource directory with source files.
-# - BUILT_FILES: List of output files processed by custom pipeline that should be added as sources to this target.
-# - DEPENDENCIES: Optional dependency targets that need to be executed before processing resources for packaging.
-function (register_application_custom_resource_directory)
-    cmake_parse_arguments (ARGUMENT "" "NAME;PATH" "BUILT_FILES;DEPENDENCIES" ${ARGV})
-    if (DEFINED ARGUMENT_UNPARSED_ARGUMENTS OR
-            NOT DEFINED ARGUMENT_NAME OR
-            NOT DEFINED ARGUMENT_PATH OR
-            NOT DEFINED ARGUMENT_BUILT_FILES)
-        message (FATAL_ERROR "Incorrect function arguments!")
-    endif ()
-
-    cmake_path (ABSOLUTE_PATH ARGUMENT_PATH NORMALIZE)
-    add_custom_target ("${UNIT_NAME}_resource_${ARGUMENT_NAME}")
-    target_sources ("${UNIT_NAME}_resource_${ARGUMENT_NAME}" PRIVATE ${ARGUMENT_BUILT_FILES})
-
-    set_target_properties ("${UNIT_NAME}_resource_${ARGUMENT_NAME}" PROPERTIES
-            UNIT_RESOURCE_TARGET_TYPE "CUSTOM"
-            UNIT_RESOURCE_TARGET_SOURCE_DIRECTORY "${ARGUMENT_PATH}")
-
-    if (DEFINED ARGUMENT_DEPENDENCIES)
-        add_dependencies ("${UNIT_NAME}_resource_${ARGUMENT_NAME}" "${ARGUMENT_DEPENDENCIES}")
-    endif ()
-
-    private_add_resource_target_to_unit ("${ARGUMENT_NAME}")
-    message (STATUS
-            "    Added custom resource directory under name \"${ARGUMENT_NAME}\" at path \"${ARGUMENT_PATH}\".")
-endfunction ()
-
-# Registers resource directory with PRE_MADE type for current unit.
-# PRE_MADE directories have no packaging steps as their resources are already ready for the game.
-# Arguments:
-# - NAME: Logical name of this resource directory.
-# - PATH: Path to resource directory with source files.
-# - DEPENDENCIES: Optional dependency targets that need to be executed before processing resources for packaging.
-function (register_application_pre_made_resource_directory)
-    cmake_parse_arguments (ARGUMENT "" "NAME;PATH" "DEPENDENCIES" ${ARGV})
-    if (DEFINED ARGUMENT_UNPARSED_ARGUMENTS OR
-            NOT DEFINED ARGUMENT_NAME OR
-            NOT DEFINED ARGUMENT_PATH)
-        message (FATAL_ERROR "Incorrect function arguments!")
-    endif ()
-
-    cmake_path (ABSOLUTE_PATH ARGUMENT_PATH NORMALIZE)
-    add_custom_target ("${UNIT_NAME}_resource_${ARGUMENT_NAME}")
-    set_target_properties ("${UNIT_NAME}_resource_${ARGUMENT_NAME}" PROPERTIES
-            UNIT_RESOURCE_TARGET_TYPE "PRE_MADE"
-            UNIT_RESOURCE_TARGET_SOURCE_DIRECTORY "${ARGUMENT_PATH}")
-
-    if (DEFINED ARGUMENT_DEPENDENCIES)
-        add_dependencies ("${UNIT_NAME}_resource_${ARGUMENT_NAME}" "${ARGUMENT_DEPENDENCIES}")
-    endif ()
-
-    private_add_resource_target_to_unit ("${ARGUMENT_NAME}")
-    message (STATUS
-            "    Added pre made resource directory under name \"${ARGUMENT_NAME}\" at path \"${ARGUMENT_PATH}\".")
+    list (APPEND RESOURCE_DIRECTORIES "${PATH}")
+    set_target_properties ("${UNIT_NAME}" PROPERTIES UNIT_RESOURCE_DIRECTORIES "${RESOURCE_DIRECTORIES}")
+    message (STATUS "    Added resource directory at path \"${PATH}\".")
 endfunction ()

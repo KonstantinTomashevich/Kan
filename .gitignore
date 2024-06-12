@@ -6,3 +6,6 @@ settings.json
 # Local builds.
 Build
 build
+
+# Code hot reload test world.
+**/optional/verify_code_hot_reload.rd

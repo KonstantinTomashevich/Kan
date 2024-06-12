@@ -101,6 +101,20 @@
 /// package should be either submitted (which confirms insertion) or undone (which cancels insertion).
 /// \endparblock
 ///
+/// \par Destruction routine
+/// \parblock
+/// Destruction of full repository hierarchy is quite straightforward, but it is not the case for partial destruction
+/// (when some children repositories are destroyed). It is due to the fact that children repositories might have
+/// automatic on delete events and cascade deleters that modify content of their parent repositories. It makes it
+/// impossible to destroy child repository in planning mode as we need to modify parent repositories content.
+///
+/// Therefore, it was decided that to destroy child repository user should declare this intent during serving mode using
+/// `kan_repository_schedule_child_destroy`. Then child repository on delete events and cascade deleters will be
+/// inspected and executed during next time repositories enter planning mode (before switch to planning is made).
+/// Then user will be able to destroy queries related to child repository and this repository will be fully deleted
+/// during next time repositories enter serving mode (before switch to serving is made).
+/// \endparblock
+///
 /// \par Thread safety
 /// \parblock
 /// Repository aims to be easy to use in multithreaded environments and therefore provides its own thread safety rules.
@@ -430,12 +444,12 @@ struct kan_repository_indexed_space_read_query_t
 
 struct kan_repository_indexed_space_shape_read_cursor_t
 {
-    uint64_t implementation_data_64[22u];
+    uint64_t implementation_data_64[23u];
 };
 
 struct kan_repository_indexed_space_ray_read_cursor_t
 {
-    uint64_t implementation_data_64[32u];
+    uint64_t implementation_data_64[33u];
 };
 
 struct kan_repository_indexed_space_read_access_t
@@ -450,12 +464,12 @@ struct kan_repository_indexed_space_update_query_t
 
 struct kan_repository_indexed_space_shape_update_cursor_t
 {
-    uint64_t implementation_data_64[22u];
+    uint64_t implementation_data_64[23u];
 };
 
 struct kan_repository_indexed_space_ray_update_cursor_t
 {
-    uint64_t implementation_data_64[32u];
+    uint64_t implementation_data_64[33u];
 };
 
 struct kan_repository_indexed_space_update_access_t
@@ -470,12 +484,12 @@ struct kan_repository_indexed_space_delete_query_t
 
 struct kan_repository_indexed_space_shape_delete_cursor_t
 {
-    uint64_t implementation_data_64[22u];
+    uint64_t implementation_data_64[23u];
 };
 
 struct kan_repository_indexed_space_ray_delete_cursor_t
 {
-    uint64_t implementation_data_64[32u];
+    uint64_t implementation_data_64[33u];
 };
 
 struct kan_repository_indexed_space_delete_access_t
@@ -490,12 +504,12 @@ struct kan_repository_indexed_space_write_query_t
 
 struct kan_repository_indexed_space_shape_write_cursor_t
 {
-    uint64_t implementation_data_64[22u];
+    uint64_t implementation_data_64[23u];
 };
 
 struct kan_repository_indexed_space_ray_write_cursor_t
 {
-    uint64_t implementation_data_64[32u];
+    uint64_t implementation_data_64[33u];
 };
 
 struct kan_repository_indexed_space_write_access_t
@@ -539,7 +553,17 @@ REPOSITORY_API kan_repository_t kan_repository_create_child (kan_repository_t pa
 /// \invariant Should be called in serving mode.
 REPOSITORY_API void kan_repository_enter_planning_mode (kan_repository_t root_repository);
 
+/// \brief Informs repository hierarchy about the intent to migrate it using given migration seed.
+/// \invariant Should be called on root repository.
+/// \invariant Should be called in serving mode.
+REPOSITORY_API void kan_repository_prepare_for_migration (kan_repository_t root_repository,
+                                                          kan_reflection_migration_seed_t migration_seed);
+
 /// \brief Migrates repository hierarchy data to new registry using given seed and migrator.
+/// \invariant `kan_repository_prepare_for_migration` with the same seed should be called earlier.
+///            The reasons are the same as for deferred destruction: during migration some storages might be destroyed
+///            due to the deletion of their types. We need to plan ahead and execute on delete events and cascade
+///            deleters.
 /// \invariant Should be called on root repository.
 /// \invariant Should be called in planning mode.
 REPOSITORY_API void kan_repository_migrate (kan_repository_t root_repository,
@@ -1727,6 +1751,13 @@ REPOSITORY_API void kan_repository_event_fetch_query_shutdown (struct kan_reposi
 /// \invariant Should be called in planning mode.
 REPOSITORY_API void kan_repository_enter_serving_mode (kan_repository_t root_repository);
 
+/// \brief Marks child repository for destruction during nearest enter to planning and back to serving modes.
+/// \invariant Should be called on child repository.
+/// \invariant Should be called in serving mode.
+/// \details Read more about reasons for deferred destruction in "Destruction routine" paragraph.
+REPOSITORY_API void kan_repository_schedule_child_destroy (kan_repository_t child_repository);
+
+/// \invariant Should be called on root repository.
 /// \invariant Should be called in planning mode.
 REPOSITORY_API void kan_repository_destroy (kan_repository_t repository);
 

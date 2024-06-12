@@ -63,11 +63,7 @@ kan_log_category_t kan_log_category_get (const char *name)
     node->name = interned_name;
     node->verbosity = KAN_LOG_DEFAULT;
 
-    if (category_storage.items.size >= category_storage.bucket_count * KAN_LOG_CATEGORIES_LOAD_FACTOR)
-    {
-        kan_hash_storage_set_bucket_count (&category_storage, category_storage.bucket_count * 2u);
-    }
-
+    kan_hash_storage_update_bucket_count_default (&category_storage, KAN_LOG_CATEGORIES_INITIAL_BUCKETS);
     kan_hash_storage_add (&category_storage, &node->node);
     kan_atomic_int_unlock (&category_context_lock);
     return (kan_log_category_t) node;

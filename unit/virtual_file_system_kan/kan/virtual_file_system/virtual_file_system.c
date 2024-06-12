@@ -1524,13 +1524,8 @@ static kan_bool_t mount_point_read_only_pack_load_item (struct mount_point_read_
             file_node->offset = item->offset;
             file_node->size = item->size;
 
-            if (current_directory->files.items.size >=
-                KAN_VIRTUAL_FILE_SYSTEM_ROPACK_DIRECTORY_LOAD_FACTOR * current_directory->files.bucket_count)
-            {
-                kan_hash_storage_set_bucket_count (&current_directory->files,
-                                                   current_directory->files.bucket_count * 2u);
-            }
-
+            kan_hash_storage_update_bucket_count_default (&current_directory->files,
+                                                          KAN_VIRTUAL_FILE_SYSTEM_ROPACK_DIRECTORY_INITIAL_ITEMS);
             kan_hash_storage_add (&current_directory->files, &file_node->node);
             return KAN_TRUE;
         }
@@ -1650,7 +1645,7 @@ kan_bool_t kan_virtual_file_system_volume_mount_real (kan_virtual_file_system_vo
     struct volume_t *volume_data = (struct volume_t *) volume;
     const char *path_iterator = mount_path;
     struct virtual_directory_t *current_directory = &volume_data->root_directory;
-    const char *part_begin;
+    const char *part_begin = "silence_not_initialized_warnings";
     const char *part_end;
 
     switch (follow_virtual_directory_path (&current_directory, &path_iterator, &part_begin, &part_end))
@@ -1719,7 +1714,7 @@ kan_bool_t kan_virtual_file_system_volume_mount_read_only_pack (kan_virtual_file
     struct volume_t *volume_data = (struct volume_t *) volume;
     const char *path_iterator = mount_path;
     struct virtual_directory_t *current_directory = &volume_data->root_directory;
-    const char *part_begin;
+    const char *part_begin = "silence_not_initialized_warnings";
     const char *part_end;
 
     switch (follow_virtual_directory_path (&current_directory, &path_iterator, &part_begin, &part_end))
@@ -1766,7 +1761,7 @@ kan_bool_t kan_virtual_file_system_volume_unmount (kan_virtual_file_system_volum
     struct volume_t *volume_data = (struct volume_t *) volume;
     const char *path_iterator = mount_path;
     struct virtual_directory_t *current_directory = &volume_data->root_directory;
-    const char *part_begin;
+    const char *part_begin = "silence_not_initialized_warnings";
     const char *part_end;
 
     switch (follow_virtual_directory_path (&current_directory, &path_iterator, &part_begin, &part_end))
@@ -1872,7 +1867,7 @@ struct kan_virtual_file_system_directory_iterator_t kan_virtual_file_system_dire
     struct volume_t *volume_data = (struct volume_t *) volume;
     const char *path_iterator = directory_path;
     struct virtual_directory_t *current_directory = &volume_data->root_directory;
-    const char *part_begin;
+    const char *part_begin = "silence_not_initialized_warnings";
     const char *part_end;
 
     switch (follow_virtual_directory_path (&current_directory, &path_iterator, &part_begin, &part_end))
@@ -2129,7 +2124,7 @@ kan_bool_t kan_virtual_file_system_query_entry (kan_virtual_file_system_volume_t
     struct volume_t *volume_data = (struct volume_t *) volume;
     const char *path_iterator = path;
     struct virtual_directory_t *current_directory = &volume_data->root_directory;
-    const char *part_begin;
+    const char *part_begin = "silence_not_initialized_warnings";
     const char *part_end;
 
     switch (follow_virtual_directory_path (&current_directory, &path_iterator, &part_begin, &part_end))
@@ -2247,7 +2242,7 @@ kan_bool_t kan_virtual_file_system_check_existence (kan_virtual_file_system_volu
     struct volume_t *volume_data = (struct volume_t *) volume;
     const char *path_iterator = path;
     struct virtual_directory_t *current_directory = &volume_data->root_directory;
-    const char *part_begin;
+    const char *part_begin = "silence_not_initialized_warnings";
     const char *part_end;
 
     switch (follow_virtual_directory_path (&current_directory, &path_iterator, &part_begin, &part_end))
@@ -2320,7 +2315,7 @@ kan_bool_t kan_virtual_file_system_remove_file (kan_virtual_file_system_volume_t
     struct volume_t *volume_data = (struct volume_t *) volume;
     const char *path_iterator = path;
     struct virtual_directory_t *current_directory = &volume_data->root_directory;
-    const char *part_begin;
+    const char *part_begin = "silence_not_initialized_warnings";
     const char *part_end;
 
     switch (follow_virtual_directory_path (&current_directory, &path_iterator, &part_begin, &part_end))
@@ -2371,7 +2366,7 @@ kan_bool_t kan_virtual_file_system_make_directory (kan_virtual_file_system_volum
     struct volume_t *volume_data = (struct volume_t *) volume;
     const char *path_iterator = path;
     struct virtual_directory_t *current_directory = &volume_data->root_directory;
-    const char *part_begin;
+    const char *part_begin = "silence_not_initialized_warnings";
     const char *part_end;
 
     switch (follow_virtual_directory_path (&current_directory, &path_iterator, &part_begin, &part_end))
@@ -2479,7 +2474,7 @@ kan_bool_t kan_virtual_file_system_remove_directory_with_content (kan_virtual_fi
     struct volume_t *volume_data = (struct volume_t *) volume;
     const char *path_iterator = path;
     struct virtual_directory_t *current_directory = &volume_data->root_directory;
-    const char *part_begin;
+    const char *part_begin = "silence_not_initialized_warnings";
     const char *part_end;
 
     switch (follow_virtual_directory_path (&current_directory, &path_iterator, &part_begin, &part_end))
@@ -2545,7 +2540,7 @@ kan_bool_t kan_virtual_file_system_remove_empty_directory (kan_virtual_file_syst
     struct volume_t *volume_data = (struct volume_t *) volume;
     const char *path_iterator = path;
     struct virtual_directory_t *current_directory = &volume_data->root_directory;
-    const char *part_begin;
+    const char *part_begin = "silence_not_initialized_warnings";
     const char *part_end;
 
     switch (follow_virtual_directory_path (&current_directory, &path_iterator, &part_begin, &part_end))
@@ -2618,7 +2613,7 @@ struct kan_stream_t *kan_virtual_file_stream_open_for_read (kan_virtual_file_sys
     struct volume_t *volume_data = (struct volume_t *) volume;
     const char *path_iterator = path;
     struct virtual_directory_t *current_directory = &volume_data->root_directory;
-    const char *part_begin;
+    const char *part_begin = "silence_not_initialized_warnings";
     const char *part_end;
 
     switch (follow_virtual_directory_path (&current_directory, &path_iterator, &part_begin, &part_end))
@@ -2719,7 +2714,7 @@ struct kan_stream_t *kan_virtual_file_stream_open_for_write (kan_virtual_file_sy
     struct volume_t *volume_data = (struct volume_t *) volume;
     const char *path_iterator = path;
     struct virtual_directory_t *current_directory = &volume_data->root_directory;
-    const char *part_begin;
+    const char *part_begin = "silence_not_initialized_warnings";
     const char *part_end;
 
     switch (follow_virtual_directory_path (&current_directory, &path_iterator, &part_begin, &part_end))
@@ -2940,7 +2935,7 @@ kan_virtual_file_system_watcher_t kan_virtual_file_system_watcher_create (kan_vi
     struct volume_t *volume_data = (struct volume_t *) volume;
     const char *path_iterator = directory_path;
     struct virtual_directory_t *current_directory = &volume_data->root_directory;
-    const char *part_begin;
+    const char *part_begin = "silence_not_initialized_warnings";
     const char *part_end;
 
     switch (follow_virtual_directory_path (&current_directory, &path_iterator, &part_begin, &part_end))

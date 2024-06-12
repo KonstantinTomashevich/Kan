@@ -4,6 +4,7 @@
 
 #include <kan/api_common/c_header.h>
 #include <kan/container/dynamic_array.h>
+#include <kan/context/context.h>
 
 /// \file
 /// \brief Contains API for context plugin system -- system for loading reflection-driven plugins.
@@ -57,5 +58,9 @@ CONTEXT_PLUGIN_SYSTEM_API void kan_plugin_system_config_init (struct kan_plugin_
 CONTEXT_PLUGIN_SYSTEM_API kan_allocation_group_t kan_plugin_system_config_get_allocation_group (void);
 
 CONTEXT_PLUGIN_SYSTEM_API void kan_plugin_system_config_shutdown (struct kan_plugin_system_config_t *config);
+
+/// \brief Returns newest last modification time in nanoseconds among loaded plugins.
+CONTEXT_PLUGIN_SYSTEM_API uint64_t
+kan_plugin_system_get_newest_loaded_plugin_last_modification_file_time_ns (kan_context_system_handle_t plugin_system);
 
 KAN_C_HEADER_END

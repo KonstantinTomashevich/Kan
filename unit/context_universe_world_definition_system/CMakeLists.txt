@@ -13,14 +13,10 @@ c_interface_scanner_setup (GLOB "*.c" "*.h")
 set (KAN_UNIVERSE_WORLD_DEFINITION_SYSTEM_BUCKETS "16" CACHE STRING
         "Initial count of buckets for universe world definition system storage.")
 
-set (KAN_UNIVERSE_WORLD_DEFINITION_SYSTEM_LOAD_FACTOR "4" CACHE STRING
-        "Target count of world definitions per bucket in universe world definition system storage.")
-
 set (KAN_UNIVERSE_WORLD_DEFINITION_SYSTEM_IO_BUFFER "4096" CACHE STRING
         "Size of a buffer to universe world definition system io operations.")
 
 concrete_compile_definitions (
         PRIVATE
         KAN_UNIVERSE_WORLD_DEFINITION_SYSTEM_BUCKETS=${KAN_UNIVERSE_WORLD_DEFINITION_SYSTEM_BUCKETS}
-        KAN_UNIVERSE_WORLD_DEFINITION_SYSTEM_LOAD_FACTOR=${KAN_UNIVERSE_WORLD_DEFINITION_SYSTEM_LOAD_FACTOR}
         KAN_UNIVERSE_WORLD_DEFINITION_SYSTEM_IO_BUFFER=${KAN_UNIVERSE_WORLD_DEFINITION_SYSTEM_IO_BUFFER})

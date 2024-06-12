@@ -443,7 +443,11 @@ static inline void kan_float_matrix_4x4_to_transform_3 (const struct kan_float_m
 {
     KAN_MUTE_POINTER_CONVERSION_WARNINGS_BEGIN
     mat4 rotation_matrix;
-    glm_decompose (matrix, &transform->location, rotation_matrix, &transform->scale);
+    vec4 location_4;
+    glm_decompose (matrix, location_4, rotation_matrix, &transform->scale);
+    transform->location.x = location_4[0u];
+    transform->location.y = location_4[1u];
+    transform->location.z = location_4[2u];
     glm_mat4_quat (rotation_matrix, &transform->rotation);
     KAN_MUTE_POINTER_CONVERSION_WARNINGS_END
 }

@@ -3,7 +3,7 @@
 #include <string.h>
 
 KAN_MUTE_UNINITIALIZED_WARNINGS_BEGIN
-#include <SDL_stdinc.h>
+#include <SDL3/SDL_stdinc.h>
 KAN_MUTE_UNINITIALIZED_WARNINGS_END
 
 #include <kan/api_common/alignment.h>

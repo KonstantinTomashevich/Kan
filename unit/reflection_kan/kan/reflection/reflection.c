@@ -425,13 +425,7 @@ kan_bool_t kan_reflection_registry_add_enum (kan_reflection_registry_t registry,
     node->node.hash = (uint64_t) enum_reflection->name;
     node->enum_reflection = enum_reflection;
 
-    if (registry_struct->enum_storage.items.size >=
-        registry_struct->enum_storage.bucket_count * KAN_REFLECTION_ENUM_LOAD_FACTOR)
-    {
-        kan_hash_storage_set_bucket_count (&registry_struct->enum_storage,
-                                           registry_struct->enum_storage.bucket_count * 2u);
-    }
-
+    kan_hash_storage_update_bucket_count_default (&registry_struct->enum_storage, KAN_REFLECTION_ENUM_INITIAL_BUCKETS);
     kan_hash_storage_add (&registry_struct->enum_storage, &node->node);
     return KAN_TRUE;
 }
@@ -450,13 +444,8 @@ void kan_reflection_registry_add_enum_meta (kan_reflection_registry_t registry,
     node->meta_type_name = meta_type_name;
     node->meta = meta;
 
-    if (registry_struct->enum_meta_storage.items.size >=
-        registry_struct->enum_meta_storage.bucket_count * KAN_REFLECTION_ENUM_META_LOAD_FACTOR)
-    {
-        kan_hash_storage_set_bucket_count (&registry_struct->enum_meta_storage,
-                                           registry_struct->enum_meta_storage.bucket_count * 2u);
-    }
-
+    kan_hash_storage_update_bucket_count_default (&registry_struct->enum_meta_storage,
+                                                  KAN_REFLECTION_ENUM_META_INITIAL_BUCKETS);
     kan_hash_storage_add (&registry_struct->enum_meta_storage, &node->node);
 }
 
@@ -477,13 +466,8 @@ void kan_reflection_registry_add_enum_value_meta (kan_reflection_registry_t regi
     node->meta_type_name = meta_type_name;
     node->meta = meta;
 
-    if (registry_struct->enum_value_meta_storage.items.size >=
-        registry_struct->enum_value_meta_storage.bucket_count * KAN_REFLECTION_ENUM_VALUE_META_LOAD_FACTOR)
-    {
-        kan_hash_storage_set_bucket_count (&registry_struct->enum_value_meta_storage,
-                                           registry_struct->enum_value_meta_storage.bucket_count * 2u);
-    }
-
+    kan_hash_storage_update_bucket_count_default (&registry_struct->enum_value_meta_storage,
+                                                  KAN_REFLECTION_ENUM_VALUE_META_INITIAL_BUCKETS);
     kan_hash_storage_add (&registry_struct->enum_value_meta_storage, &node->node);
 }
 
@@ -569,13 +553,8 @@ kan_bool_t kan_reflection_registry_add_struct (kan_reflection_registry_t registr
     node->node.hash = (uint64_t) struct_reflection->name;
     node->struct_reflection = struct_reflection;
 
-    if (registry_struct->struct_storage.items.size >=
-        registry_struct->struct_storage.bucket_count * KAN_REFLECTION_STRUCT_LOAD_FACTOR)
-    {
-        kan_hash_storage_set_bucket_count (&registry_struct->struct_storage,
-                                           registry_struct->struct_storage.bucket_count * 2u);
-    }
-
+    kan_hash_storage_update_bucket_count_default (&registry_struct->struct_storage,
+                                                  KAN_REFLECTION_STRUCT_INITIAL_BUCKETS);
     kan_hash_storage_add (&registry_struct->struct_storage, &node->node);
     return KAN_TRUE;
 }
@@ -594,13 +573,8 @@ void kan_reflection_registry_add_struct_meta (kan_reflection_registry_t registry
     node->meta_type_name = meta_type_name;
     node->meta = meta;
 
-    if (registry_struct->struct_meta_storage.items.size >=
-        registry_struct->struct_meta_storage.bucket_count * KAN_REFLECTION_STRUCT_META_LOAD_FACTOR)
-    {
-        kan_hash_storage_set_bucket_count (&registry_struct->struct_meta_storage,
-                                           registry_struct->struct_meta_storage.bucket_count * 2u);
-    }
-
+    kan_hash_storage_update_bucket_count_default (&registry_struct->struct_meta_storage,
+                                                  KAN_REFLECTION_STRUCT_META_INITIAL_BUCKETS);
     kan_hash_storage_add (&registry_struct->struct_meta_storage, &node->node);
 }
 
@@ -621,13 +595,8 @@ void kan_reflection_registry_add_struct_field_meta (kan_reflection_registry_t re
     node->meta_type_name = meta_type_name;
     node->meta = meta;
 
-    if (registry_struct->struct_field_meta_storage.items.size >=
-        registry_struct->struct_field_meta_storage.bucket_count * KAN_REFLECTION_STRUCT_FIELD_META_LOAD_FACTOR)
-    {
-        kan_hash_storage_set_bucket_count (&registry_struct->struct_field_meta_storage,
-                                           registry_struct->struct_field_meta_storage.bucket_count * 2u);
-    }
-
+    kan_hash_storage_update_bucket_count_default (&registry_struct->struct_field_meta_storage,
+                                                  KAN_REFLECTION_STRUCT_FIELD_META_INITIAL_BUCKETS);
     kan_hash_storage_add (&registry_struct->struct_field_meta_storage, &node->node);
 }
 
@@ -707,13 +676,8 @@ kan_bool_t kan_reflection_registry_add_function (kan_reflection_registry_t regis
     node->node.hash = (uint64_t) function_reflection->name;
     node->function_reflection = function_reflection;
 
-    if (registry_struct->function_storage.items.size >=
-        registry_struct->function_storage.bucket_count * KAN_REFLECTION_FUNCTION_LOAD_FACTOR)
-    {
-        kan_hash_storage_set_bucket_count (&registry_struct->function_storage,
-                                           registry_struct->function_storage.bucket_count * 2u);
-    }
-
+    kan_hash_storage_update_bucket_count_default (&registry_struct->function_storage,
+                                                  KAN_REFLECTION_FUNCTION_INITIAL_BUCKETS);
     kan_hash_storage_add (&registry_struct->function_storage, &node->node);
     return KAN_TRUE;
 }
@@ -732,13 +696,8 @@ void kan_reflection_registry_add_function_meta (kan_reflection_registry_t regist
     node->meta_type_name = meta_type_name;
     node->meta = meta;
 
-    if (registry_struct->function_meta_storage.items.size >=
-        registry_struct->function_meta_storage.bucket_count * KAN_REFLECTION_FUNCTION_META_LOAD_FACTOR)
-    {
-        kan_hash_storage_set_bucket_count (&registry_struct->function_meta_storage,
-                                           registry_struct->function_meta_storage.bucket_count * 2u);
-    }
-
+    kan_hash_storage_update_bucket_count_default (&registry_struct->function_meta_storage,
+                                                  KAN_REFLECTION_FUNCTION_META_INITIAL_BUCKETS);
     kan_hash_storage_add (&registry_struct->function_meta_storage, &node->node);
 }
 
@@ -759,14 +718,8 @@ void kan_reflection_registry_add_function_argument_meta (kan_reflection_registry
     node->meta_type_name = meta_type_name;
     node->meta = meta;
 
-    if (registry_struct->function_argument_meta_storage.items.size >=
-        registry_struct->function_argument_meta_storage.bucket_count *
-            KAN_REFLECTION_FUNCTION_ARGUMENT_META_LOAD_FACTOR)
-    {
-        kan_hash_storage_set_bucket_count (&registry_struct->function_argument_meta_storage,
-                                           registry_struct->function_argument_meta_storage.bucket_count * 2u);
-    }
-
+    kan_hash_storage_update_bucket_count_default (&registry_struct->function_argument_meta_storage,
+                                                  KAN_REFLECTION_FUNCTION_ARGUMENT_META_INITIAL_BUCKETS);
     kan_hash_storage_add (&registry_struct->function_argument_meta_storage, &node->node);
 }
 
@@ -1980,12 +1933,8 @@ static void migration_seed_add_enums (struct migration_seed_t *migration_seed,
             node->seed.status = KAN_REFLECTION_MIGRATION_REMOVED;
         }
 
-        if (migration_seed->enums.items.size >=
-            migration_seed->enums.bucket_count * KAN_REFLECTION_MIGRATION_ENUM_SEED_LOAD_FACTOR)
-        {
-            kan_hash_storage_set_bucket_count (&migration_seed->enums, migration_seed->enums.bucket_count * 2u);
-        }
-
+        kan_hash_storage_update_bucket_count_default (&migration_seed->enums,
+                                                      KAN_REFLECTION_MIGRATION_ENUM_SEED_INITIAL_BUCKETS);
         kan_hash_storage_add (&migration_seed->enums, &node->node);
         enum_iterator = kan_reflection_registry_enum_iterator_next (enum_iterator);
     }
@@ -2314,12 +2263,8 @@ static struct struct_migration_node_t *migration_seed_add_struct (
         node->seed.status = KAN_REFLECTION_MIGRATION_REMOVED;
     }
 
-    if (migration_seed->structs.items.size >=
-        migration_seed->structs.bucket_count * KAN_REFLECTION_MIGRATION_ENUM_SEED_LOAD_FACTOR)
-    {
-        kan_hash_storage_set_bucket_count (&migration_seed->structs, migration_seed->structs.bucket_count * 2u);
-    }
-
+    kan_hash_storage_update_bucket_count_default (&migration_seed->structs,
+                                                  KAN_REFLECTION_MIGRATION_STRUCT_SEED_INITIAL_BUCKETS);
     kan_hash_storage_add (&migration_seed->structs, &node->node);
     return node;
 }
@@ -2911,180 +2856,138 @@ static struct struct_migrator_node_t *migrator_add_struct (struct migrator_t *mi
     void *saved_stack_top = kan_stack_allocator_save_top (algorithm_allocator);
     struct migrator_command_temporary_queues_t queues = {0u, NULL, NULL, 0u, NULL, NULL, 0u, NULL, NULL,
                                                          0u, NULL, NULL, 0u, NULL, NULL, 0u, NULL, NULL};
+
     KAN_ASSERT (struct_migration_node->seed.status != KAN_REFLECTION_MIGRATION_REMOVED)
+    // Even when migration is not needed, we cannot just generate copy command due to handle-like fields.
+    // Copying these fields without zeroing out old ones results in double-free on handle-like data.
+    //
+    // There is an objection that structs that do not need migration shouldn't be migrated at all. It sounds true, but
+    // there is a catch: if struct that needs migration is inside struct that doesn't, then we need to still call
+    // migrator commands on it.
+    //
+    // Therefore, we're constructing fully capable migration scripts even for structs that do not need migration,
 
-    if (struct_migration_node->seed.status == KAN_REFLECTION_MIGRATION_NOT_NEEDED)
+    for (uint64_t field_index = 0u; field_index < source_struct->fields_count; ++field_index)
     {
-        struct migrator_command_copy_t copy_command;
-        copy_command.absolute_source_offset = 0u;
-        copy_command.absolute_target_offset = 0u;
-        copy_command.size = source_struct->size;
-        copy_command.condition_index = MIGRATOR_CONDITION_INDEX_NONE;
-        migrator_add_copy_command (copy_command, algorithm_allocator, &queues);
-    }
-    else
-    {
-        for (uint64_t field_index = 0u; field_index < source_struct->fields_count; ++field_index)
+        const struct kan_reflection_field_t *source_field = &source_struct->fields[field_index];
+        const struct kan_reflection_field_t *target_field = struct_migration_node->seed.field_remap[field_index];
+
+        if (!target_field)
         {
-            const struct kan_reflection_field_t *source_field = &source_struct->fields[field_index];
-            const struct kan_reflection_field_t *target_field = struct_migration_node->seed.field_remap[field_index];
+            // No field mapped, skipping migration.
+            continue;
+        }
 
-            if (!target_field)
+        // TODO: It is unknown how to react to visibility condition changes.
+        //       Is it even possible to implement properly?
+
+        uint64_t condition_index = MIGRATOR_CONDITION_INDEX_NONE;
+        if (source_field->visibility_condition_field)
+        {
+            condition_index =
+                migrator_add_condition (migrator_construct_condition (source_field), algorithm_allocator, &queues);
+        }
+
+        switch (source_field->archetype)
+        {
+        case KAN_REFLECTION_ARCHETYPE_SIGNED_INT:
+        case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
+        case KAN_REFLECTION_ARCHETYPE_FLOATING:
+            migrator_add_numeric_commands (source_field->offset, target_field->offset, source_field->size,
+                                           target_field->size, source_field->archetype, condition_index,
+                                           algorithm_allocator, &queues);
+            break;
+
+        case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
+        case KAN_REFLECTION_ARCHETYPE_EXTERNAL_POINTER:
+        case KAN_REFLECTION_ARCHETYPE_STRUCT_POINTER:
+        case KAN_REFLECTION_ARCHETYPE_PATCH:
+            KAN_ASSERT (source_field->size == target_field->size)
+            migrator_add_handle_commands (source_field->offset, target_field->offset, source_field->size,
+                                          condition_index, algorithm_allocator, &queues);
+            break;
+
+        case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:
+            migrator_add_interned_string_commands (source_field->offset, target_field->offset, condition_index,
+                                                   algorithm_allocator, &queues);
+            break;
+
+        case KAN_REFLECTION_ARCHETYPE_ENUM:
+            KAN_ASSERT (source_field->archetype_enum.type_name == target_field->archetype_enum.type_name)
+            migrator_add_enum_commands (source_field->offset, target_field->offset,
+                                        source_field->archetype_enum.type_name, migration_seed, condition_index,
+                                        algorithm_allocator, &queues);
+            break;
+
+        case KAN_REFLECTION_ARCHETYPE_STRUCT:
+            KAN_ASSERT (source_field->archetype_struct.type_name == target_field->archetype_struct.type_name)
+            migrator_add_struct_commands (source_field->offset, target_field->offset,
+                                          source_field->archetype_struct.type_name, migrator, migration_seed,
+                                          condition_index, algorithm_allocator, &queues);
+            break;
+
+        case KAN_REFLECTION_ARCHETYPE_INLINE_ARRAY:
+        {
+            // TODO: Currently we treat inline arrays as always full.
+            //       It should be technically okay unless inline array contains structs with dynamic arrays.
+            //       We can rewrite inline array migration as separate command in order to take size field into
+            //       account, but it will make migration slower as it will block current command-level
+            //       optimizations from happening.
+            const uint64_t items_count =
+                source_field->archetype_inline_array.item_count < target_field->archetype_inline_array.item_count ?
+                    source_field->archetype_inline_array.item_count :
+                    target_field->archetype_inline_array.item_count;
+
+            for (uint64_t item_index = 0u; item_index < items_count; ++item_index)
             {
-                // No field mapped, skipping migration.
-                continue;
-            }
+                const uint64_t source_offset =
+                    source_field->offset + source_field->archetype_inline_array.item_size * item_index;
+                const uint64_t target_offset =
+                    target_field->offset + target_field->archetype_inline_array.item_size * item_index;
 
-            // TODO: It is unknown how to react to visibility condition changes.
-            //       Is it even possible to implement properly?
-
-            uint64_t condition_index = MIGRATOR_CONDITION_INDEX_NONE;
-            if (source_field->visibility_condition_field)
-            {
-                condition_index =
-                    migrator_add_condition (migrator_construct_condition (source_field), algorithm_allocator, &queues);
-            }
-
-            switch (source_field->archetype)
-            {
-            case KAN_REFLECTION_ARCHETYPE_SIGNED_INT:
-            case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
-            case KAN_REFLECTION_ARCHETYPE_FLOATING:
-                migrator_add_numeric_commands (source_field->offset, target_field->offset, source_field->size,
-                                               target_field->size, source_field->archetype, condition_index,
-                                               algorithm_allocator, &queues);
-                break;
-
-            case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
-            case KAN_REFLECTION_ARCHETYPE_EXTERNAL_POINTER:
-            case KAN_REFLECTION_ARCHETYPE_STRUCT_POINTER:
-            case KAN_REFLECTION_ARCHETYPE_PATCH:
-                KAN_ASSERT (source_field->size == target_field->size)
-                migrator_add_handle_commands (source_field->offset, target_field->offset, source_field->size,
-                                              condition_index, algorithm_allocator, &queues);
-                break;
-
-            case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:
-                migrator_add_interned_string_commands (source_field->offset, target_field->offset, condition_index,
-                                                       algorithm_allocator, &queues);
-                break;
-
-            case KAN_REFLECTION_ARCHETYPE_ENUM:
-                KAN_ASSERT (source_field->archetype_enum.type_name == target_field->archetype_enum.type_name)
-                migrator_add_enum_commands (source_field->offset, target_field->offset,
-                                            source_field->archetype_enum.type_name, migration_seed, condition_index,
-                                            algorithm_allocator, &queues);
-                break;
-
-            case KAN_REFLECTION_ARCHETYPE_STRUCT:
-                KAN_ASSERT (source_field->archetype_struct.type_name == target_field->archetype_struct.type_name)
-                migrator_add_struct_commands (source_field->offset, target_field->offset,
-                                              source_field->archetype_struct.type_name, migrator, migration_seed,
-                                              condition_index, algorithm_allocator, &queues);
-                break;
-
-            case KAN_REFLECTION_ARCHETYPE_INLINE_ARRAY:
-            {
-                // TODO: Currently we treat inline arrays as always full.
-                //       It should be technically okay unless inline array contains structs with dynamic arrays.
-                //       We can rewrite inline array migration as separate command in order to take size field into
-                //       account, but it will make migration slower as it will block current command-level
-                //       optimizations from happening.
-                const uint64_t items_count =
-                    source_field->archetype_inline_array.item_count < target_field->archetype_inline_array.item_count ?
-                        source_field->archetype_inline_array.item_count :
-                        target_field->archetype_inline_array.item_count;
-
-                for (uint64_t item_index = 0u; item_index < items_count; ++item_index)
-                {
-                    const uint64_t source_offset =
-                        source_field->offset + source_field->archetype_inline_array.item_size * item_index;
-                    const uint64_t target_offset =
-                        target_field->offset + target_field->archetype_inline_array.item_size * item_index;
-
-                    switch (source_field->archetype_inline_array.item_archetype)
-                    {
-                    case KAN_REFLECTION_ARCHETYPE_SIGNED_INT:
-                    case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
-                    case KAN_REFLECTION_ARCHETYPE_FLOATING:
-                        migrator_add_numeric_commands (source_offset, target_offset,
-                                                       source_field->archetype_inline_array.item_size,
-                                                       target_field->archetype_inline_array.item_size,
-                                                       source_field->archetype_inline_array.item_archetype,
-                                                       condition_index, algorithm_allocator, &queues);
-                        break;
-
-                    case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
-                    case KAN_REFLECTION_ARCHETYPE_EXTERNAL_POINTER:
-                    case KAN_REFLECTION_ARCHETYPE_STRUCT_POINTER:
-                    case KAN_REFLECTION_ARCHETYPE_PATCH:
-                        KAN_ASSERT (source_field->archetype_inline_array.item_size ==
-                                    target_field->archetype_inline_array.item_size)
-                        migrator_add_handle_commands (source_offset, target_offset,
-                                                      source_field->archetype_inline_array.item_size, condition_index,
-                                                      algorithm_allocator, &queues);
-                        break;
-
-                    case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:
-                        migrator_add_interned_string_commands (source_offset, target_offset, condition_index,
-                                                               algorithm_allocator, &queues);
-                        break;
-
-                    case KAN_REFLECTION_ARCHETYPE_ENUM:
-                        KAN_ASSERT (source_field->archetype_inline_array.item_archetype_enum.type_name ==
-                                    target_field->archetype_inline_array.item_archetype_enum.type_name)
-                        migrator_add_enum_commands (source_offset, target_offset,
-                                                    source_field->archetype_inline_array.item_archetype_enum.type_name,
-                                                    migration_seed, condition_index, algorithm_allocator, &queues);
-                        break;
-
-                    case KAN_REFLECTION_ARCHETYPE_STRUCT:
-                        KAN_ASSERT (source_field->archetype_inline_array.item_archetype_struct.type_name ==
-                                    target_field->archetype_inline_array.item_archetype_struct.type_name)
-                        migrator_add_struct_commands (
-                            source_offset, target_offset,
-                            source_field->archetype_inline_array.item_archetype_struct.type_name, migrator,
-                            migration_seed, condition_index, algorithm_allocator, &queues);
-                        break;
-
-                    case KAN_REFLECTION_ARCHETYPE_INLINE_ARRAY:
-                    case KAN_REFLECTION_ARCHETYPE_DYNAMIC_ARRAY:
-                        KAN_ASSERT (KAN_FALSE)
-                        break;
-                    }
-                }
-
-                break;
-            }
-
-            case KAN_REFLECTION_ARCHETYPE_DYNAMIC_ARRAY:
-            {
-                kan_bool_t can_copy = KAN_FALSE;
-                switch (source_field->archetype_dynamic_array.item_archetype)
+                switch (source_field->archetype_inline_array.item_archetype)
                 {
                 case KAN_REFLECTION_ARCHETYPE_SIGNED_INT:
                 case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
                 case KAN_REFLECTION_ARCHETYPE_FLOATING:
-                    can_copy = source_field->archetype_dynamic_array.item_size ==
-                               target_field->archetype_dynamic_array.item_size;
+                    migrator_add_numeric_commands (source_offset, target_offset,
+                                                   source_field->archetype_inline_array.item_size,
+                                                   target_field->archetype_inline_array.item_size,
+                                                   source_field->archetype_inline_array.item_archetype, condition_index,
+                                                   algorithm_allocator, &queues);
                     break;
 
                 case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
-                case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:
                 case KAN_REFLECTION_ARCHETYPE_EXTERNAL_POINTER:
                 case KAN_REFLECTION_ARCHETYPE_STRUCT_POINTER:
                 case KAN_REFLECTION_ARCHETYPE_PATCH:
-                    can_copy = KAN_TRUE;
+                    KAN_ASSERT (source_field->archetype_inline_array.item_size ==
+                                target_field->archetype_inline_array.item_size)
+                    migrator_add_handle_commands (source_offset, target_offset,
+                                                  source_field->archetype_inline_array.item_size, condition_index,
+                                                  algorithm_allocator, &queues);
+                    break;
+
+                case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:
+                    migrator_add_interned_string_commands (source_offset, target_offset, condition_index,
+                                                           algorithm_allocator, &queues);
                     break;
 
                 case KAN_REFLECTION_ARCHETYPE_ENUM:
-                    can_copy = migrator_query_is_enum_copyable (
-                        migration_seed, source_field->archetype_dynamic_array.item_archetype_enum.type_name);
+                    KAN_ASSERT (source_field->archetype_inline_array.item_archetype_enum.type_name ==
+                                target_field->archetype_inline_array.item_archetype_enum.type_name)
+                    migrator_add_enum_commands (source_offset, target_offset,
+                                                source_field->archetype_inline_array.item_archetype_enum.type_name,
+                                                migration_seed, condition_index, algorithm_allocator, &queues);
                     break;
 
                 case KAN_REFLECTION_ARCHETYPE_STRUCT:
-                    can_copy = migrator_query_is_struct_copyable (
-                        migration_seed, source_field->archetype_dynamic_array.item_archetype_struct.type_name);
+                    KAN_ASSERT (source_field->archetype_inline_array.item_archetype_struct.type_name ==
+                                target_field->archetype_inline_array.item_archetype_struct.type_name)
+                    migrator_add_struct_commands (source_offset, target_offset,
+                                                  source_field->archetype_inline_array.item_archetype_struct.type_name,
+                                                  migrator, migration_seed, condition_index, algorithm_allocator,
+                                                  &queues);
                     break;
 
                 case KAN_REFLECTION_ARCHETYPE_INLINE_ARRAY:
@@ -3092,36 +2995,75 @@ static struct struct_migrator_node_t *migrator_add_struct (struct migrator_t *mi
                     KAN_ASSERT (KAN_FALSE)
                     break;
                 }
+            }
 
-                if (can_copy)
-                {
-                    struct migrator_command_copy_t copy_command;
-                    copy_command.absolute_source_offset = source_field->offset;
-                    copy_command.absolute_target_offset = target_field->offset;
-                    copy_command.size = source_field->size;
-                    copy_command.condition_index = condition_index;
-                    migrator_add_copy_command (copy_command, algorithm_allocator, &queues);
+            break;
+        }
 
-                    struct migrator_command_set_zero_t set_zero_command;
-                    set_zero_command.absolute_source_offset = source_field->offset;
-                    set_zero_command.size = sizeof (uint64_t) + sizeof (uint64_t) + sizeof (uint8_t *);
-                    set_zero_command.condition_index = condition_index;
-                    migrator_add_set_zero_command (set_zero_command, algorithm_allocator, &queues);
-                }
-                else
-                {
-                    struct migrator_command_adapt_dynamic_array_t adapt_command;
-                    adapt_command.source_field = source_field;
-                    adapt_command.absolute_source_offset = source_field->offset;
-                    adapt_command.target_field = target_field;
-                    adapt_command.absolute_target_offset = target_field->offset;
-                    adapt_command.condition_index = condition_index;
-                    migrator_add_adapt_dynamic_array_command (adapt_command, algorithm_allocator, &queues);
-                }
+        case KAN_REFLECTION_ARCHETYPE_DYNAMIC_ARRAY:
+        {
+            kan_bool_t can_copy = KAN_FALSE;
+            switch (source_field->archetype_dynamic_array.item_archetype)
+            {
+            case KAN_REFLECTION_ARCHETYPE_SIGNED_INT:
+            case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
+            case KAN_REFLECTION_ARCHETYPE_FLOATING:
+                can_copy =
+                    source_field->archetype_dynamic_array.item_size == target_field->archetype_dynamic_array.item_size;
+                break;
 
+            case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
+            case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:
+            case KAN_REFLECTION_ARCHETYPE_EXTERNAL_POINTER:
+            case KAN_REFLECTION_ARCHETYPE_STRUCT_POINTER:
+            case KAN_REFLECTION_ARCHETYPE_PATCH:
+                can_copy = KAN_TRUE;
+                break;
+
+            case KAN_REFLECTION_ARCHETYPE_ENUM:
+                can_copy = migrator_query_is_enum_copyable (
+                    migration_seed, source_field->archetype_dynamic_array.item_archetype_enum.type_name);
+                break;
+
+            case KAN_REFLECTION_ARCHETYPE_STRUCT:
+                can_copy = migrator_query_is_struct_copyable (
+                    migration_seed, source_field->archetype_dynamic_array.item_archetype_struct.type_name);
+                break;
+
+            case KAN_REFLECTION_ARCHETYPE_INLINE_ARRAY:
+            case KAN_REFLECTION_ARCHETYPE_DYNAMIC_ARRAY:
+                KAN_ASSERT (KAN_FALSE)
                 break;
             }
+
+            if (can_copy)
+            {
+                struct migrator_command_copy_t copy_command;
+                copy_command.absolute_source_offset = source_field->offset;
+                copy_command.absolute_target_offset = target_field->offset;
+                copy_command.size = source_field->size;
+                copy_command.condition_index = condition_index;
+                migrator_add_copy_command (copy_command, algorithm_allocator, &queues);
+
+                struct migrator_command_set_zero_t set_zero_command;
+                set_zero_command.absolute_source_offset = source_field->offset;
+                set_zero_command.size = sizeof (uint64_t) + sizeof (uint64_t) + sizeof (uint8_t *);
+                set_zero_command.condition_index = condition_index;
+                migrator_add_set_zero_command (set_zero_command, algorithm_allocator, &queues);
             }
+            else
+            {
+                struct migrator_command_adapt_dynamic_array_t adapt_command;
+                adapt_command.source_field = source_field;
+                adapt_command.absolute_source_offset = source_field->offset;
+                adapt_command.target_field = target_field;
+                adapt_command.absolute_target_offset = target_field->offset;
+                adapt_command.condition_index = condition_index;
+                migrator_add_adapt_dynamic_array_command (adapt_command, algorithm_allocator, &queues);
+            }
+
+            break;
+        }
         }
     }
 
@@ -3226,12 +3168,8 @@ static struct struct_migrator_node_t *migrator_add_struct (struct migrator_t *mi
         node = node->next;
     }
 
-    if (migrator->struct_migrators.items.size >=
-        migrator->struct_migrators.bucket_count * KAN_REFLECTION_MIGRATION_STRUCT_SEED_LOAD_FACTOR)
-    {
-        kan_hash_storage_set_bucket_count (&migration_seed->enums, migration_seed->enums.bucket_count * 2u);
-    }
-
+    kan_hash_storage_update_bucket_count_default (&migrator->struct_migrators,
+                                                  KAN_REFLECTION_MIGRATION_STRUCT_SEED_INITIAL_BUCKETS);
     kan_hash_storage_add (&migrator->struct_migrators, &struct_migrator->node);
     kan_stack_allocator_load_top (algorithm_allocator, saved_stack_top);
     return struct_migrator;

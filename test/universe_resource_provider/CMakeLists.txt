@@ -29,7 +29,7 @@ foreach (IMPLEMENTATION ${PROVIDER_IMPLEMENTATIONS})
             threading=sdl universe_resource_provider=${IMPLEMENTATION} virtual_file_system=kan workflow=kan
             CONCRETE
             container context context_reflection_system context_update_system context_virtual_file_system resource_index
-            readable_data serialization testing test_universe_resource_provider universe)
+            resource_pipeline readable_data serialization testing test_universe_resource_provider universe)
 
     generate_artefact_context_data ()
     generate_artefact_reflection_data ()

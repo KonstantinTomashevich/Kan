@@ -236,11 +236,7 @@ kan_bool_t kan_context_request_system (kan_context_handle_t handle, const char *
     kan_dynamic_array_init (&node->connection_references_to_me, KAN_CONTEXT_SYSTEM_CONNECTIONS_INITIAL_COUNT,
                             sizeof (void *), _Alignof (void *), context->group);
 
-    if (context->systems.bucket_count * KAN_CONTEXT_SYSTEM_LOAD_FACTOR <= context->systems.items.size)
-    {
-        kan_hash_storage_set_bucket_count (&context->systems, context->systems.bucket_count * 2u);
-    }
-
+    kan_hash_storage_update_bucket_count_default (&context->systems, KAN_CONTEXT_SYSTEM_INITIAL_BUCKETS);
     kan_hash_storage_add (&context->systems, &node->node);
     return KAN_TRUE;
 }

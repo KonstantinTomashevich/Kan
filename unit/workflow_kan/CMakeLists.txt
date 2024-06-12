@@ -7,28 +7,20 @@ c_interface_scanner_setup (GLOB "*.c" "*.h")
 
 set (KAN_WORKFLOW_GRAPH_NODES_INITIAL_BUCKETS "64" CACHE STRING
         "Initial count of buckets for storing workflow graph nodes during build process.")
-set (KAN_WORKFLOW_GRAPH_NODES_LOAD_FACTOR "4" CACHE STRING "Target count of workflow nodes in a bucket.")
-
 set (KAN_WORKFLOW_GRAPH_NODE_INFO_ARRAY_INITIAL_CAPACITY "8" CACHE STRING
         "Initial capacity of arrays inside node that store accesses and dependencies.")
-
 set (KAN_WORKFLOW_RESOURCE_INITIAL_BUCKETS "64" CACHE STRING
         "Initial count of buckets for storing registered resources during verification.")
-set (KAN_WORKFLOW_RESOURCE_LOAD_FACTOR "4" CACHE STRING "Target count of register resources nodes in a bucket.")
-
 set (KAN_WORKFLOW_VERIFICATION_STACK_SIZE "524288" CACHE STRING
         "Size of one stack for verification algorithm stack group allocator.")
-
 set (KAN_WORKFLOW_EXECUTION_STACK_SIZE "65536" CACHE STRING
         "Size of one stack for workflow execution algorithm stack group allocator.")
 
 concrete_compile_definitions (
         PRIVATE
         KAN_WORKFLOW_GRAPH_NODES_INITIAL_BUCKETS=${KAN_WORKFLOW_GRAPH_NODES_INITIAL_BUCKETS}
-        KAN_WORKFLOW_GRAPH_NODES_LOAD_FACTOR=${KAN_WORKFLOW_GRAPH_NODES_LOAD_FACTOR}
         KAN_WORKFLOW_GRAPH_NODE_INFO_ARRAY_INITIAL_CAPACITY=${KAN_WORKFLOW_GRAPH_NODE_INFO_ARRAY_INITIAL_CAPACITY}
         KAN_WORKFLOW_RESOURCE_INITIAL_BUCKETS=${KAN_WORKFLOW_RESOURCE_INITIAL_BUCKETS}
-        KAN_WORKFLOW_RESOURCE_LOAD_FACTOR=${KAN_WORKFLOW_RESOURCE_LOAD_FACTOR}
         KAN_WORKFLOW_VERIFICATION_STACK_SIZE=${KAN_WORKFLOW_VERIFICATION_STACK_SIZE}
         KAN_WORKFLOW_EXECUTION_STACK_SIZE=${KAN_WORKFLOW_EXECUTION_STACK_SIZE})
 

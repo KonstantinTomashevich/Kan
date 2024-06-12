@@ -358,11 +358,7 @@ static void register_functor (kan_interned_string_t functor_name)
     node->node.hash = (uint64_t) functor_name;
     node->name = functor_name;
 
-    if (functor_registry.items.size >= functor_registry.bucket_count * KAN_REFLECTION_GENERATOR_FUNCTORS_LOAD_FACTOR)
-    {
-        kan_hash_storage_set_bucket_count (&functor_registry, functor_registry.bucket_count * 2u);
-    }
-
+    kan_hash_storage_update_bucket_count_default (&functor_registry, KAN_REFLECTION_GENERATOR_FUNCTORS_INITIAL_BUCKETS);
     kan_hash_storage_add (&functor_registry, &node->node);
 }
 
@@ -621,6 +617,7 @@ static void add_header (void)
                                              "#include <kan/api_common/bool.h>\n"
                                              "#include <kan/api_common/mute_third_party_warnings.h>\n"
                                              "#include <kan/container/interned_string.h>\n"
+                                             "#include <kan/error/critical.h>\n"
                                              "#include <kan/reflection/generated_reflection.h>\n"
                                              "#include <kan/reflection/registry.h>\n\n");
 
@@ -1514,7 +1511,8 @@ void add_registrar (void)
     kan_trivial_string_buffer_append_string (&io.output_buffer,
                                              ") (kan_reflection_registry_t registry)\n"
                                              "{\n"
-                                             "    ensure_reflection_is_ready ();\n\n");
+                                             "    ensure_reflection_is_ready ();\n"
+                                             "    kan_bool_t success;\n\n");
 
     for (uint64_t file_index = 0u; file_index < arguments.input_files_count; ++file_index)
     {
@@ -1531,10 +1529,11 @@ void add_registrar (void)
                 continue;
             }
 
-            kan_trivial_string_buffer_append_string (&io.output_buffer,
-                                                     "    kan_reflection_registry_add_enum (registry, &reflection_");
+            kan_trivial_string_buffer_append_string (
+                &io.output_buffer, "    success = kan_reflection_registry_add_enum (registry, &reflection_");
             kan_trivial_string_buffer_append_string (&io.output_buffer, interface->enums[enum_index].name);
             kan_trivial_string_buffer_append_string (&io.output_buffer, "_data);\n");
+            kan_trivial_string_buffer_append_string (&io.output_buffer, "    KAN_ASSERT (success)\n");
         }
 
         for (uint64_t struct_index = 0u; struct_index < interface->structs_count; ++struct_index)
@@ -1544,10 +1543,11 @@ void add_registrar (void)
                 continue;
             }
 
-            kan_trivial_string_buffer_append_string (&io.output_buffer,
-                                                     "    kan_reflection_registry_add_struct (registry, &reflection_");
+            kan_trivial_string_buffer_append_string (
+                &io.output_buffer, "    success = kan_reflection_registry_add_struct (registry, &reflection_");
             kan_trivial_string_buffer_append_string (&io.output_buffer, interface->structs[struct_index].name);
             kan_trivial_string_buffer_append_string (&io.output_buffer, "_data);\n");
+            kan_trivial_string_buffer_append_string (&io.output_buffer, "    KAN_ASSERT (success)\n");
         }
 
         for (uint64_t function_index = 0u; function_index < interface->functions_count; ++function_index)
@@ -1558,9 +1558,10 @@ void add_registrar (void)
             }
 
             kan_trivial_string_buffer_append_string (
-                &io.output_buffer, "    kan_reflection_registry_add_function (registry, &reflection_");
+                &io.output_buffer, "    success = kan_reflection_registry_add_function (registry, &reflection_");
             kan_trivial_string_buffer_append_string (&io.output_buffer, interface->functions[function_index].name);
             kan_trivial_string_buffer_append_string (&io.output_buffer, "_data);\n");
+            kan_trivial_string_buffer_append_string (&io.output_buffer, "    KAN_ASSERT (success)\n");
         }
 
         for (uint64_t symbol_index = 0u; symbol_index < interface->symbols_count; ++symbol_index)

@@ -1,4 +1,4 @@
-#include <SDL_loadso.h>
+#include <SDL3/SDL_loadso.h>
 
 #include <kan/log/logging.h>
 #include <kan/platform/dynamic_library.h>

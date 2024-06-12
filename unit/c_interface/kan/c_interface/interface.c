@@ -68,12 +68,8 @@ static uint64_t encode_interned_string (struct string_encoding_context_t *contex
     new_node->string = string;
     new_node->value = context->order.size;
 
-    if (context->hash_storage.items.size >=
-        context->hash_storage.bucket_count * KAN_C_INTERFACE_STRING_ENCODING_LOAD_FACTOR)
-    {
-        kan_hash_storage_set_bucket_count (&context->hash_storage, context->hash_storage.bucket_count * 2u);
-    }
-
+    kan_hash_storage_update_bucket_count_default (&context->hash_storage,
+                                                  KAN_C_INTERFACE_STRING_ENCODING_INITIAL_BUCKETS);
     kan_hash_storage_add (&context->hash_storage, &new_node->node);
 
     kan_interned_string_t *in_order = kan_dynamic_array_add_last (&context->order);

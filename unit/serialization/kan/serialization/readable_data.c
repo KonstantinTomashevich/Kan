@@ -2101,6 +2101,12 @@ static inline kan_bool_t emit_single_string_setter (struct writer_state_t *write
                                                     uint64_t array_index,
                                                     const void *address)
 {
+    if (!*(char **) address)
+    {
+        // Just skip empty strings, they should be nullified by initializers either way.
+        return KAN_TRUE;
+    }
+
     struct kan_readable_data_event_t event;
     event.type = KAN_READABLE_DATA_EVENT_ELEMENTAL_STRING_SETTER;
     event.output_target.identifier = name;

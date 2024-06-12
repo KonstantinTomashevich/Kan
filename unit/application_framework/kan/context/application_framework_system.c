@@ -5,7 +5,12 @@
 #include <kan/context/application_system.h>
 #include <kan/context/update_system.h>
 #include <kan/cpu_profiler/markup.h>
+#include <kan/log/logging.h>
 #include <kan/memory/allocation.h>
+
+// \c_interface_scanner_disable
+KAN_LOG_DEFINE_CATEGORY (context_application_framework_system);
+// \c_interface_scanner_enable
 
 struct application_framework_system_t
 {
@@ -78,7 +83,12 @@ static void application_framework_system_update (kan_context_system_handle_t han
             {
                 if (!framework_system->exit_requested && framework_system->outer_auto_build_and_hot_reload_command)
                 {
-                    system (framework_system->outer_auto_build_and_hot_reload_command);
+                    const int result = system (framework_system->outer_auto_build_and_hot_reload_command);
+                    if (result != 0)
+                    {
+                        KAN_LOG (context_application_framework_system, KAN_LOG_ERROR,
+                                 "Failed to execute hot reload trigger command, its return code is %d.", result)
+                    }
                 }
             }
 
