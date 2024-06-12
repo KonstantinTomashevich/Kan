@@ -101,7 +101,7 @@ APPLICATION_FRAMEWORK_VERIFY_CODE_HOT_RELOAD_API void kan_universe_mutator_execu
 
     if (singleton->test_frame == 15u &&
         // If reload was somehow skipped, request it again.
-        (kan_platform_get_elapsed_nanoseconds () - singleton->reload_request_time) > 500000000u)
+        kan_platform_get_elapsed_nanoseconds () - singleton->reload_request_time > 500000000u)
     {
         // Initiate hot reload.
         KAN_ASSERT (kan_application_framework_system_get_arguments_count (state->application_framework_system_handle) ==
