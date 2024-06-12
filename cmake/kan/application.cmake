@@ -537,8 +537,8 @@ macro (private_generate_code_hot_reload_test)
     application_program_use_as_test_in_development_mode (
             ARGUMENTS
             "${CMAKE_COMMAND}" "${CMAKE_BINARY_DIR}" "${APPLICATION_NAME}_dev_all_plugins" "$<CONFIG>"
-            # We need really big timeout due to slow machines on GitHub Actions.
-            PROPERTIES RUN_SERIAL ON TIMEOUT 1200 LABELS SLOW)
+            # We need big timeout due to slow machines on GitHub Actions.
+            PROPERTIES RUN_SERIAL ON TIMEOUT 60 LABELS SLOW)
 
     foreach (PLUGIN_GROUP ${PLUGIN_GROUPS})
         application_program_use_plugin_group ("${PLUGIN_GROUP}")
