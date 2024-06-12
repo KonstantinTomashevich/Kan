@@ -154,11 +154,11 @@ KAN_TEST_CASE (add_directory)
     kan_bool_t add_sub_1_found = KAN_FALSE;
     kan_bool_t add_sub_2_found = KAN_FALSE;
 
+    // We need to be cautious about the case when file creation is read as addition+modification.
     const struct kan_file_system_watcher_event_t *event;
+
     while ((event = kan_file_system_watcher_iterator_get (watcher, iterator)))
     {
-        KAN_TEST_CHECK (!add_sub_found || !add_sub_1_found || !add_sub_2_found)
-
         if (strcmp (event->path_container.path, "test_directory/watched/sub") == 0)
         {
             KAN_TEST_CHECK (!add_sub_found)
@@ -168,17 +168,31 @@ KAN_TEST_CASE (add_directory)
         }
         else if (strcmp (event->path_container.path, "test_directory/watched/sub/1.txt") == 0)
         {
-            KAN_TEST_CHECK (!add_sub_1_found)
-            KAN_TEST_CHECK (event->event_type == KAN_FILE_SYSTEM_EVENT_TYPE_ADDED)
-            KAN_TEST_CHECK (event->entry_type == KAN_FILE_SYSTEM_ENTRY_TYPE_FILE)
-            add_sub_1_found = KAN_TRUE;
+            if (add_sub_1_found)
+            {
+                KAN_TEST_CHECK (event->event_type == KAN_FILE_SYSTEM_EVENT_TYPE_MODIFIED)
+                KAN_TEST_CHECK (event->entry_type == KAN_FILE_SYSTEM_ENTRY_TYPE_FILE)
+            }
+            else
+            {
+                KAN_TEST_CHECK (event->event_type == KAN_FILE_SYSTEM_EVENT_TYPE_ADDED)
+                KAN_TEST_CHECK (event->entry_type == KAN_FILE_SYSTEM_ENTRY_TYPE_FILE)
+                add_sub_1_found = KAN_TRUE;
+            }
         }
         else if (strcmp (event->path_container.path, "test_directory/watched/sub/2.txt") == 0)
         {
-            KAN_TEST_CHECK (!add_sub_2_found)
-            KAN_TEST_CHECK (event->event_type == KAN_FILE_SYSTEM_EVENT_TYPE_ADDED)
-            KAN_TEST_CHECK (event->entry_type == KAN_FILE_SYSTEM_ENTRY_TYPE_FILE)
-            add_sub_2_found = KAN_TRUE;
+            if (add_sub_2_found)
+            {
+                KAN_TEST_CHECK (event->event_type == KAN_FILE_SYSTEM_EVENT_TYPE_MODIFIED)
+                KAN_TEST_CHECK (event->entry_type == KAN_FILE_SYSTEM_ENTRY_TYPE_FILE)
+            }
+            else
+            {
+                KAN_TEST_CHECK (event->event_type == KAN_FILE_SYSTEM_EVENT_TYPE_ADDED)
+                KAN_TEST_CHECK (event->entry_type == KAN_FILE_SYSTEM_ENTRY_TYPE_FILE)
+                add_sub_2_found = KAN_TRUE;
+            }
         }
         else
         {
