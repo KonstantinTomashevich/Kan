@@ -654,7 +654,9 @@ static void poll_task_function (uint64_t user_data)
         return;
     }
 
-    if (kan_platform_get_elapsed_nanoseconds () - watcher->last_poll_time_ns >= KAN_FILE_SYSTEM_WATCHER_UL_MIN_DELAY_NS)
+    if (kan_platform_get_elapsed_nanoseconds () - watcher->last_poll_time_ns >=
+            KAN_FILE_SYSTEM_WATCHER_UL_MIN_DELAY_NS ||
+        watcher->last_poll_time_ns == 0u)
     {
         KAN_LOG (file_system_watcher, KAN_LOG_ERROR, "FS POLL")
         if (watcher->root_directory)
