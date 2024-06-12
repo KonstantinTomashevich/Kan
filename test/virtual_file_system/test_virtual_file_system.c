@@ -450,8 +450,17 @@ KAN_TEST_CASE (watcher_add_file)
     KAN_TEST_CHECK (event->entry_type == KAN_VIRTUAL_FILE_SYSTEM_ENTRY_TYPE_FILE)
     KAN_TEST_CHECK (strcmp (event->path_container.path, "test/watched/something/mounted/a/test3.txt") == 0)
 
+    // File addition might be reported as creation + modification, because file is created by stream open operation and
+    // data is written by stream write operation and watcher might encounter state between these two operations.
     iterator = kan_virtual_file_system_watcher_iterator_advance (watcher, iterator);
-    KAN_TEST_CHECK (!kan_virtual_file_system_watcher_iterator_get (watcher, iterator))
+
+    while ((event = kan_virtual_file_system_watcher_iterator_get (watcher, iterator)))
+    {
+        KAN_TEST_CHECK (event->event_type == KAN_VIRTUAL_FILE_SYSTEM_EVENT_TYPE_MODIFIED)
+        KAN_TEST_CHECK (event->entry_type == KAN_VIRTUAL_FILE_SYSTEM_ENTRY_TYPE_FILE)
+        KAN_TEST_CHECK (strcmp (event->path_container.path, "test/watched/something/mounted/a/test3.txt") == 0)
+        iterator = kan_virtual_file_system_watcher_iterator_advance (watcher, iterator);
+    }
 
     kan_virtual_file_system_watcher_iterator_destroy (watcher, iterator);
     kan_virtual_file_system_watcher_destroy (watcher);
@@ -483,8 +492,17 @@ KAN_TEST_CASE (watcher_modify_file)
     KAN_TEST_CHECK (event->entry_type == KAN_VIRTUAL_FILE_SYSTEM_ENTRY_TYPE_FILE)
     KAN_TEST_CHECK (strcmp (event->path_container.path, "test/watched/something/mounted/a/test2.txt") == 0)
 
+    // File write might be processed as several operations in some cases and watcher might observe state between two
+    // writes. Therefore, we need to be able to correctly process several modification events.
     iterator = kan_virtual_file_system_watcher_iterator_advance (watcher, iterator);
-    KAN_TEST_CHECK (!kan_virtual_file_system_watcher_iterator_get (watcher, iterator))
+
+    while ((event = kan_virtual_file_system_watcher_iterator_get (watcher, iterator)))
+    {
+        KAN_TEST_CHECK (event->event_type == KAN_VIRTUAL_FILE_SYSTEM_EVENT_TYPE_MODIFIED)
+        KAN_TEST_CHECK (event->entry_type == KAN_VIRTUAL_FILE_SYSTEM_ENTRY_TYPE_FILE)
+        KAN_TEST_CHECK (strcmp (event->path_container.path, "test/watched/something/mounted/a/test2.txt") == 0)
+        iterator = kan_virtual_file_system_watcher_iterator_advance (watcher, iterator);
+    }
 
     kan_virtual_file_system_watcher_iterator_destroy (watcher, iterator);
     kan_virtual_file_system_watcher_destroy (watcher);
