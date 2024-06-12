@@ -4,6 +4,7 @@
 
 #include <kan/context/application_framework_system.h>
 #include <kan/log/logging.h>
+#include <kan/platform/precise_time.h>
 #include <kan/universe/universe.h>
 
 // \c_interface_scanner_disable
@@ -25,12 +26,14 @@ APPLICATION_FRAMEWORK_VERIFY_CODE_HOT_RELOAD_API void kan_universe_scheduler_exe
 struct verify_code_hot_test_singleton_t
 {
     uint64_t test_frame;
+    uint64_t reload_request_time;
 };
 
 APPLICATION_FRAMEWORK_VERIFY_CODE_HOT_RELOAD_API void verify_code_hot_test_singleton_init (
     struct verify_code_hot_test_singleton_t *instance)
 {
     instance->test_frame = 0u;
+    instance->reload_request_time = 0u;
 }
 
 struct some_shared_struct_t
@@ -64,7 +67,7 @@ APPLICATION_FRAMEWORK_VERIFY_CODE_HOT_RELOAD_API void kan_universe_mutator_deplo
     kan_context_handle_t context = kan_universe_get_context (universe);
     state->application_framework_system_handle =
         kan_context_query (context, KAN_CONTEXT_APPLICATION_FRAMEWORK_SYSTEM_NAME);
-    KAN_LOG (application_framework_verify_code_hot_reload, KAN_LOG_ERROR, "Deployed first stage.")
+    KAN_LOG (application_framework_verify_code_hot_reload, KAN_LOG_INFO, "Deployed first stage.")
 }
 
 APPLICATION_FRAMEWORK_VERIFY_CODE_HOT_RELOAD_API void kan_universe_mutator_execute_verify_code_hot_reload (
@@ -96,7 +99,9 @@ APPLICATION_FRAMEWORK_VERIFY_CODE_HOT_RELOAD_API void kan_universe_mutator_execu
         kan_repository_indexed_insertion_package_submit (&package);
     }
 
-    if (singleton->test_frame == 15u)
+    if (singleton->test_frame == 15u &&
+        // If reload was somehow skipped, request it again.
+        (kan_platform_get_elapsed_nanoseconds () - singleton->reload_request_time) > 500000000u)
     {
         // Initiate hot reload.
         KAN_ASSERT (kan_application_framework_system_get_arguments_count (state->application_framework_system_handle) ==
@@ -117,6 +122,7 @@ APPLICATION_FRAMEWORK_VERIFY_CODE_HOT_RELOAD_API void kan_universe_mutator_execu
         if (result != 0)
         {
             KAN_LOG (application_framework_verify_code_hot_reload, KAN_LOG_ERROR, "Failed to regenerate CMake.")
+            kan_application_framework_system_request_exit (state->application_framework_system_handle, -1);
         }
 
         if (result == 0)
@@ -128,11 +134,15 @@ APPLICATION_FRAMEWORK_VERIFY_CODE_HOT_RELOAD_API void kan_universe_mutator_execu
             if (result != 0)
             {
                 KAN_LOG (application_framework_verify_code_hot_reload, KAN_LOG_ERROR, "Failed to rebuild plugins.")
+                kan_application_framework_system_request_exit (state->application_framework_system_handle, -1);
+            }
+            else
+            {
+                singleton->reload_request_time = kan_platform_get_elapsed_nanoseconds ();
             }
         }
 
 #undef COMMAND_BUFFER_SIZE
-        singleton->test_frame = 16u;
     }
     else if (singleton->test_frame < 15u)
     {
