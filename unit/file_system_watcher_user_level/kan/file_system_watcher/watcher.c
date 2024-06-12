@@ -524,9 +524,9 @@ static void verification_poll_at_directory_recursive (struct watcher_t *watcher,
                     else
                     {
                         KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, file_system_watcher, KAN_LOG_ERROR,
-                                             "NEW! File: %s. Size: %lu. Last time: %lu.",
-                                             watcher->path_container.path, (unsigned long) file_node->size,
-                                             (unsigned long) file_node->last_modification_time_ns)
+                                             "NEW! File: %s. Size: %lu. Last time: %lu.", watcher->path_container.path,
+                                             (unsigned long) status.size,
+                                             (unsigned long) status.last_modification_time_ns)
 
                         directory_node_append_file (directory, entry_name, &status);
                         send_file_added_event (watcher);
