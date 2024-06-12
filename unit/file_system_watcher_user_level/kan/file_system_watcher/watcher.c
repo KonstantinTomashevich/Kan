@@ -669,21 +669,12 @@ static void poll_task_function (uint64_t user_data)
         return;
     }
 
-    if (kan_platform_get_elapsed_nanoseconds () - watcher->last_poll_time_ns >=
-            KAN_FILE_SYSTEM_WATCHER_UL_MIN_DELAY_NS ||
-        watcher->last_poll_time_ns == 0u)
+    if (kan_platform_get_elapsed_nanoseconds () - watcher->last_poll_time_ns >= KAN_FILE_SYSTEM_WATCHER_UL_MIN_DELAY_NS)
     {
         KAN_LOG (file_system_watcher, KAN_LOG_ERROR, "FS POLL")
-        if (watcher->root_directory)
-        {
-            verification_poll_at_directory_recursive (watcher, watcher->root_directory);
-        }
-        else
-        {
-            watcher->root_directory = directory_node_create (NULL);
-            initial_poll_to_directory_recursive (watcher, watcher->root_directory);
-        }
 
+        KAN_ASSERT (watcher->root_directory)
+        verification_poll_at_directory_recursive (watcher, watcher->root_directory);
         watcher->last_poll_time_ns = kan_platform_get_elapsed_nanoseconds ();
     }
 
@@ -704,6 +695,14 @@ kan_file_system_watcher_t kan_file_system_watcher_create (const char *directory_
     watcher_data->last_poll_time_ns = 0u;
     kan_file_system_path_container_copy_string (&watcher_data->path_container, directory_path);
     KAN_LOG (file_system_watcher, KAN_LOG_ERROR, "Created FS watcher for %s", directory_path)
+
+    // Doing initial poll as background task on some worker thread seems like a good idea at first,
+    // but it has one issue: there is a potential window between watcher creation and initial poll
+    // where user can create new files and they will be considered already existing, therefore
+    // producing hard to track bugs.
+    watcher_data->root_directory = directory_node_create (NULL);
+    initial_poll_to_directory_recursive (watcher_data, watcher_data->root_directory);
+    watcher_data->last_poll_time_ns = kan_platform_get_elapsed_nanoseconds ();
 
     schedule_poll (watcher_data);
     return (kan_file_system_watcher_t) watcher_data;
