@@ -144,7 +144,7 @@ static void schedule_poll (struct watcher_t *watcher)
     if (handle == KAN_INVALID_CPU_TASK_HANDLE)
     {
         KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, file_system_watcher, KAN_LOG_ERROR,
-                             "Failed to schedule poll for watcher at \"%s\".", watcher->path_container.path);
+                             "Failed to schedule poll for watcher at \"%s\".", watcher->path_container.path)
     }
     else
     {
@@ -619,6 +619,9 @@ static void verification_poll_at_directory_recursive (struct watcher_t *watcher,
 
 static void poll_task_function (uint64_t user_data)
 {
+    // TODO: Temporary log.
+    KAN_LOG (file_system_watcher, KAN_LOG_ERROR, "FS POLL")
+
     struct watcher_t *watcher = (struct watcher_t *) user_data;
     if (kan_atomic_int_get (&watcher->marked_for_destroy))
     {
@@ -636,6 +639,9 @@ static void poll_task_function (uint64_t user_data)
         }
 
         kan_free_general (watcher_allocation_group, watcher, sizeof (struct watcher_t));
+
+        // TODO: Temporary log.
+        KAN_LOG (file_system_watcher, KAN_LOG_ERROR, "FS DEAD")
         return;
     }
 
