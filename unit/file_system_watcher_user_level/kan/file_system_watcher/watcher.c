@@ -230,6 +230,9 @@ static void initial_poll_to_directory_recursive (struct watcher_t *watcher, stru
                     break;
 
                 case KAN_FILE_SYSTEM_ENTRY_TYPE_FILE:
+                    KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, file_system_watcher, KAN_LOG_ERROR,
+                                         "Initial poll found file \"%s\".", watcher->path_container.path)
+
                     directory_node_append_file (directory, entry_name, &status);
                     break;
 
