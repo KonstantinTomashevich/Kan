@@ -6,6 +6,7 @@
 #include <kan/file_system_watcher/watcher.h>
 #include <kan/log/logging.h>
 #include <kan/memory/allocation.h>
+#include <kan/platform/precise_time.h>
 
 KAN_LOG_DEFINE_CATEGORY (file_system_watcher);
 
@@ -46,6 +47,8 @@ struct watcher_t
     struct kan_atomic_int_t event_queue_lock;
     struct kan_event_queue_t event_queue;
     struct kan_atomic_int_t marked_for_destroy;
+
+    uint64_t last_poll_time_ns;
 
     /// \details Stores initial path by default. Used by recursive algorithms to store current recurrent path.
     struct kan_file_system_path_container_t path_container;
@@ -270,6 +273,7 @@ static void send_directory_added_event (struct watcher_t *watcher)
         kan_event_queue_submit_end (&watcher->event_queue, &allocate_event_queue_node ()->node);
     }
 
+    KAN_LOG (file_system_watcher, KAN_LOG_ERROR, "FS ADD DIR")
     kan_atomic_int_unlock (&watcher->event_queue_lock);
 }
 
@@ -290,6 +294,7 @@ static void send_directory_removed_event (struct watcher_t *watcher, struct dire
         kan_event_queue_submit_end (&watcher->event_queue, &allocate_event_queue_node ()->node);
     }
 
+    KAN_LOG (file_system_watcher, KAN_LOG_ERROR, "FS REM DIR")
     kan_atomic_int_unlock (&watcher->event_queue_lock);
 }
 
@@ -309,6 +314,7 @@ static void send_file_added_event (struct watcher_t *watcher)
         kan_event_queue_submit_end (&watcher->event_queue, &allocate_event_queue_node ()->node);
     }
 
+    KAN_LOG (file_system_watcher, KAN_LOG_ERROR, "FS ADD FILE")
     kan_atomic_int_unlock (&watcher->event_queue_lock);
 }
 
@@ -328,6 +334,7 @@ static void send_file_modified_event (struct watcher_t *watcher)
         kan_event_queue_submit_end (&watcher->event_queue, &allocate_event_queue_node ()->node);
     }
 
+    KAN_LOG (file_system_watcher, KAN_LOG_ERROR, "FS MOD FILE")
     kan_atomic_int_unlock (&watcher->event_queue_lock);
 }
 
@@ -368,6 +375,7 @@ static void send_file_removed_event (struct watcher_t *watcher, struct file_node
         kan_event_queue_submit_end (&watcher->event_queue, &allocate_event_queue_node ()->node);
     }
 
+    KAN_LOG (file_system_watcher, KAN_LOG_ERROR, "FS REM FILE")
     kan_atomic_int_unlock (&watcher->event_queue_lock);
 }
 
@@ -619,9 +627,6 @@ static void verification_poll_at_directory_recursive (struct watcher_t *watcher,
 
 static void poll_task_function (uint64_t user_data)
 {
-    // TODO: Temporary log.
-    KAN_LOG (file_system_watcher, KAN_LOG_ERROR, "FS POLL")
-
     struct watcher_t *watcher = (struct watcher_t *) user_data;
     if (kan_atomic_int_get (&watcher->marked_for_destroy))
     {
@@ -645,14 +650,20 @@ static void poll_task_function (uint64_t user_data)
         return;
     }
 
-    if (watcher->root_directory)
+    if (kan_platform_get_elapsed_nanoseconds () - watcher->last_poll_time_ns >= KAN_FILE_SYSTEM_WATCHER_UL_MIN_DELAY_NS)
     {
-        verification_poll_at_directory_recursive (watcher, watcher->root_directory);
-    }
-    else
-    {
-        watcher->root_directory = directory_node_create (NULL);
-        initial_poll_to_directory_recursive (watcher, watcher->root_directory);
+        KAN_LOG (file_system_watcher, KAN_LOG_ERROR, "FS POLL")
+        if (watcher->root_directory)
+        {
+            verification_poll_at_directory_recursive (watcher, watcher->root_directory);
+        }
+        else
+        {
+            watcher->root_directory = directory_node_create (NULL);
+            initial_poll_to_directory_recursive (watcher, watcher->root_directory);
+        }
+
+        watcher->last_poll_time_ns = kan_platform_get_elapsed_nanoseconds ();
     }
 
     // Schedule next poll.
@@ -669,6 +680,7 @@ kan_file_system_watcher_t kan_file_system_watcher_create (const char *directory_
     watcher_data->event_queue_lock = kan_atomic_int_init (0);
     kan_event_queue_init (&watcher_data->event_queue, &allocate_event_queue_node ()->node);
     watcher_data->marked_for_destroy = kan_atomic_int_init (0);
+    watcher_data->last_poll_time_ns = 0u;
     kan_file_system_path_container_copy_string (&watcher_data->path_container, directory_path);
 
     schedule_poll (watcher_data);
