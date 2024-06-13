@@ -32,7 +32,7 @@ jobs:
           submodules: recursive
 
       - name: Install Ninja (Windows)
-        if: matrix.os == 'macos-12'
+        if: matrix.os == 'windows-2022'
         run: choco install ninja
 
       - name: Install Ninja (Ubuntu)
