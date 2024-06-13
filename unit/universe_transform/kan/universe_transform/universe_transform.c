@@ -476,7 +476,7 @@ UNIVERSE_TRANSFORM_API void kan_universe_mutator_execute_visual_transform_sync_2
         {                                                                                                              \
             KAN_CPU_TASK_LIST_USER_STRUCT (                                                                            \
                 &task_node, &state->temporary_allocator, state->task_name,                                             \
-                visual_transform_sync_##TRANSFORM_DIMENSIONS##_invalidate_execute, FOREGROUND,                         \
+                visual_transform_sync_##TRANSFORM_DIMENSIONS##_invalidate_execute,                                     \
                 struct visual_transform_sync_##TRANSFORM_DIMENSIONS##_invalidate_task_user_data_t,                     \
                 {                                                                                                      \
                     .source_state = state,                                                                             \
@@ -604,7 +604,7 @@ UNIVERSE_TRANSFORM_API void kan_universe_mutator_execute_visual_transform_sync_2
         {                                                                                                              \
             KAN_CPU_TASK_LIST_USER_STRUCT (                                                                            \
                 &task_node, &state->temporary_allocator, state->task_name,                                             \
-                visual_transform_sync_##TRANSFORM_DIMENSIONS##_calculate_execute, FOREGROUND,                          \
+                visual_transform_sync_##TRANSFORM_DIMENSIONS##_calculate_execute,                                      \
                 struct visual_transform_sync_##TRANSFORM_DIMENSIONS##_calculate_task_user_data_t,                      \
                 {                                                                                                      \
                     .source_state = state,                                                                             \

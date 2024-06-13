@@ -4052,9 +4052,7 @@ void kan_reflection_struct_migrator_migrate_patches (kan_reflection_struct_migra
                 .user_data = (uint64_t) next_task_data,
             };
 
-            task_list_node->queue = KAN_CPU_DISPATCH_QUEUE_FOREGROUND;
             task_list = task_list_node;
-
             next_task_data = NULL;
             patches_in_task = 0u;
         }

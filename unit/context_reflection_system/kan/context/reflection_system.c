@@ -561,7 +561,7 @@ static void reflection_system_generate (struct reflection_system_t *system)
         {
             KAN_CPU_TASK_LIST_USER_STRUCT (
                 &list_node, &generation_context.temporary_allocator, task_name, call_generation_iterate_task,
-                FOREGROUND, struct generation_iteration_task_user_data_t,
+                struct generation_iteration_task_user_data_t,
                 {
                     .iterator =
                         (struct generation_iterator_t) {
@@ -597,7 +597,7 @@ static void reflection_system_generate (struct reflection_system_t *system)
         {
             KAN_CPU_TASK_LIST_USER_STRUCT (
                 &list_node, &generation_context.temporary_allocator, task_name, call_generation_iterate_task,
-                FOREGROUND, struct generation_iteration_task_user_data_t,
+                struct generation_iteration_task_user_data_t,
                 {
                     .iterator =
                         (struct generation_iterator_t) {

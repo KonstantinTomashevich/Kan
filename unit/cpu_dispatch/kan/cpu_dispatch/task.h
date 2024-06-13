@@ -26,18 +26,10 @@
 /// \par Task lifecycle
 /// \parblock
 /// After you've dispatched task, it is registered inside internal task dispatcher and you receive handle that allows
-/// you to interact with dispatched task. For example, query whether it is finished using kan_cpu_task_is_finished or
-/// cancel it using kan_cpu_task_cancel. When you don't need handle anymore, you should detach it using
-/// kan_cpu_task_detach to avoid memory leak as task info is stored until handle is detached. Detaching does not cancel
-/// or stop task execution, therefore you can detach right after dispatch.
-/// \endparblock
-///
-/// \par Task queues
-/// \parblock
-/// There are two queues for tasks: foreground and background. Foreground queue is optimized for relatively small
-/// tasks that keep application running and responsive. Background queue is optimized for relatively big tasks that
-/// need more time to be processed and do not actively block application. Other than that, implementations are allowed
-/// to handle queues in a way that fits implementation better.
+/// you to interact with dispatched task. For example, query whether it is finished using kan_cpu_task_is_finished.
+/// When you don't need handle anymore, you should detach it using kan_cpu_task_detach to avoid memory leak as task info
+/// is stored until handle is detached. Detaching does not cancel or stop task execution, therefore you can detach right
+/// after dispatch.
 /// \endparblock
 
 KAN_C_HEADER_BEGIN
@@ -54,26 +46,15 @@ struct kan_cpu_task_t
     kan_cpu_task_user_data_t user_data;
 };
 
-/// \brief Enumerates task queues.
-enum kan_cpu_dispatch_queue_t
-{
-    KAN_CPU_DISPATCH_QUEUE_FOREGROUND = 0u,
-    KAN_CPU_DISPATCH_QUEUE_BACKGROUND,
-};
-
 typedef uint64_t kan_cpu_task_handle_t;
 
 #define KAN_INVALID_CPU_TASK_HANDLE 0u
 
-/// \brief Dispatches single task and adds it to appropriate queue.
-CPU_DISPATCH_API kan_cpu_task_handle_t kan_cpu_task_dispatch (struct kan_cpu_task_t task,
-                                                              enum kan_cpu_dispatch_queue_t queue);
+/// \brief Dispatches single task.
+CPU_DISPATCH_API kan_cpu_task_handle_t kan_cpu_task_dispatch (struct kan_cpu_task_t task);
 
 /// \brief Checks whether task is finished.
 CPU_DISPATCH_API kan_bool_t kan_cpu_task_is_finished (kan_cpu_task_handle_t task);
-
-/// \brief Cancels task unless it is already executing. Returns whether task was cancelled.
-CPU_DISPATCH_API kan_bool_t kan_cpu_task_cancel (kan_cpu_task_handle_t task);
 
 /// \brief Detaches task handle and allows dispatcher to free resources when needed. Handle is no longer usable.
 CPU_DISPATCH_API void kan_cpu_task_detach (kan_cpu_task_handle_t task);
@@ -83,7 +64,6 @@ struct kan_cpu_task_list_node_t
 {
     struct kan_cpu_task_list_node_t *next;
     struct kan_cpu_task_t task;
-    enum kan_cpu_dispatch_queue_t queue;
 
     /// \brief Field for storing dispatched task handle after dispatch.
     kan_cpu_task_handle_t dispatch_handle;
@@ -98,10 +78,9 @@ CPU_DISPATCH_API void kan_cpu_task_dispatch_list (struct kan_cpu_task_list_node_
 /// \param TEMPORARY_ALLOCATOR Pointer to stack group allocator used for temporary allocation of user data and cpu task.
 /// \param NAME Name of the task. Interned string.
 /// \param FUNCTION Task function to be executed.
-/// \param QUEUE Name of the queue to be used: FOREGROUND or BACKGROUND.
 /// \param USER_TYPE User structure name with `struct` prefix.
 /// \param ... User data designated initializer
-#define KAN_CPU_TASK_LIST_USER_STRUCT(LIST_HEAD, TEMPORARY_ALLOCATOR, NAME, FUNCTION, QUEUE, USER_TYPE, ...)           \
+#define KAN_CPU_TASK_LIST_USER_STRUCT(LIST_HEAD, TEMPORARY_ALLOCATOR, NAME, FUNCTION, USER_TYPE, ...)                  \
     {                                                                                                                  \
         _Static_assert (sizeof (USER_TYPE) > sizeof (uint64_t),                                                        \
                         "Do not use this for user data that can fit in 64 bits.");                                     \
@@ -118,7 +97,6 @@ CPU_DISPATCH_API void kan_cpu_task_dispatch_list (struct kan_cpu_task_list_node_
             .user_data = (uint64_t) user_data,                                                                         \
         };                                                                                                             \
                                                                                                                        \
-        new_node->queue = KAN_CPU_DISPATCH_QUEUE_##QUEUE;                                                              \
         new_node->next = *LIST_HEAD;                                                                                   \
         *LIST_HEAD = new_node;                                                                                         \
     }
@@ -129,9 +107,8 @@ CPU_DISPATCH_API void kan_cpu_task_dispatch_list (struct kan_cpu_task_list_node_
 /// \param TEMPORARY_ALLOCATOR Pointer to stack group allocator used for temporary allocation of cpu task.
 /// \param NAME Name of the task. Interned string.
 /// \param FUNCTION Task function to be executed.
-/// \param QUEUE Name of the queue to be used: FOREGROUND or BACKGROUND.
 /// \param USER_VALUE User value that can be converted to `uint64_t`.
-#define KAN_CPU_TASK_LIST_USER_VALUE(LIST_HEAD, TEMPORARY_ALLOCATOR, NAME, FUNCTION, QUEUE, USER_VALUE)                \
+#define KAN_CPU_TASK_LIST_USER_VALUE(LIST_HEAD, TEMPORARY_ALLOCATOR, NAME, FUNCTION, USER_VALUE)                       \
     {                                                                                                                  \
         _Static_assert (sizeof (USER_VALUE) <= sizeof (uint64_t),                                                      \
                         "Do not use this for user data that cannot fit in 64 bits.");                                  \
@@ -145,7 +122,6 @@ CPU_DISPATCH_API void kan_cpu_task_dispatch_list (struct kan_cpu_task_list_node_
             .user_data = (uint64_t) USER_VALUE,                                                                        \
         };                                                                                                             \
                                                                                                                        \
-        new_node->queue = KAN_CPU_DISPATCH_QUEUE_##QUEUE;                                                              \
         new_node->next = *LIST_HEAD;                                                                                   \
         *LIST_HEAD = new_node;                                                                                         \
     }

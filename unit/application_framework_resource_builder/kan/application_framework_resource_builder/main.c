@@ -2319,7 +2319,7 @@ static void compilation_loop (void)
         {
             KAN_ASSERT (native_node->queued_for_resource_management)
             KAN_CPU_TASK_LIST_USER_VALUE (&task_list, &global.temporary_allocator, interned_manage_resources_native,
-                                          manage_resources_native, FOREGROUND, native_node)
+                                          manage_resources_native, native_node)
             native_node = native_node->next_node_in_resource_management_queue;
         }
 
@@ -2329,7 +2329,7 @@ static void compilation_loop (void)
             KAN_ASSERT (third_party_node->queued_for_resource_management)
             KAN_CPU_TASK_LIST_USER_VALUE (&task_list, &global.temporary_allocator,
                                           interned_manage_resources_third_party, manage_resources_third_party,
-                                          FOREGROUND, third_party_node)
+                                          third_party_node)
             third_party_node = third_party_node->next_node_in_resource_management_queue;
         }
 
@@ -2353,7 +2353,7 @@ static void compilation_loop (void)
             KAN_ASSERT (native_node->in_active_compilation_queue)
             KAN_CPU_TASK_LIST_USER_VALUE (&task_list, &global.temporary_allocator,
                                           interned_process_native_node_compilation, process_native_node_compilation,
-                                          FOREGROUND, native_node)
+                                          native_node)
             native_node = native_node->next_node_in_compilation_queue;
         }
 
@@ -2837,7 +2837,7 @@ int main (int argument_count, char **argument_values)
                 if (target->requested_for_build)
                 {
                     KAN_CPU_TASK_LIST_USER_VALUE (&task_list, &global.temporary_allocator, task_name,
-                                                  scan_target_for_resources, FOREGROUND, target)
+                                                  scan_target_for_resources, target)
                 }
             }
 
@@ -2872,7 +2872,7 @@ int main (int argument_count, char **argument_values)
                 while (native_node)
                 {
                     KAN_CPU_TASK_LIST_USER_VALUE (&task_list, &global.temporary_allocator, task_name,
-                                                  scan_native_for_name_collisions, FOREGROUND, native_node)
+                                                  scan_native_for_name_collisions, native_node)
                     native_node = (struct native_entry_node_t *) native_node->node.list_node.next;
                 }
 
@@ -2882,7 +2882,7 @@ int main (int argument_count, char **argument_values)
                 while (third_party_node)
                 {
                     KAN_CPU_TASK_LIST_USER_VALUE (&task_list, &global.temporary_allocator, task_name,
-                                                  scan_third_party_for_name_collisions, FOREGROUND, third_party_node)
+                                                  scan_third_party_for_name_collisions, third_party_node)
                     third_party_node = (struct third_party_entry_node_t *) third_party_node->node.list_node.next;
                 }
             }
@@ -2951,7 +2951,7 @@ int main (int argument_count, char **argument_values)
                     if (native_node->should_be_included_in_pack)
                     {
                         KAN_CPU_TASK_LIST_USER_VALUE (&task_list, &global.temporary_allocator, task_name,
-                                                      intern_strings_in_native, FOREGROUND, native_node)
+                                                      intern_strings_in_native, native_node)
                     }
 
                     native_node = (struct native_entry_node_t *) native_node->node.list_node.next;
@@ -2987,7 +2987,7 @@ int main (int argument_count, char **argument_values)
                 if (target->requested_for_build)
                 {
                     KAN_CPU_TASK_LIST_USER_VALUE (&task_list, &global.temporary_allocator, task_name, pack_target,
-                                                  FOREGROUND, target)
+                                                  target)
                 }
             }
 

@@ -23,13 +23,13 @@
 /// After job is created, it is in assembly state. It means that it waits for all required tasks to be dispatched in
 /// job context using kan_cpu_job_dispatch_task or kan_cpu_job_dispatch_task_list. All tasks, dispatched using these
 /// functions, will be registered as dependencies of this job. Keep in mind, that tasks, dispatched that way, are
-/// added to the queues like any other tasks and might be executed right away. But job cannot be completed in assembly
-/// state, therefore it is safe. To report that all tasks are added and job can be completed, you need to release job
-/// using kan_cpu_job_release. Only after this point completion task might be dispatched, even if all other tasks were
-/// finished during assembly state. After transitioning to release state, you can either wait for the job or detach
-/// from it. Either way, once kan_cpu_job_detach or kan_cpu_job_wait exits, job handle is no longer valid. Detaching
-/// does not stop the job, it only allows implementation to free its resources on completion. Also, cancelled tasks
-/// do not block their job from completing, they'll just be ignored.
+/// added to the execution queue like any other tasks and might be executed right away. But job cannot be completed in
+/// assembly state, therefore it is safe. To report that all tasks are added and job can be completed, you need to
+/// release job using kan_cpu_job_release. Only after this point completion task might be dispatched, even if all other
+/// tasks were finished during assembly state. After transitioning to release state, you can either wait for the job or
+/// detach from it. Either way, once kan_cpu_job_detach or kan_cpu_job_wait exits, job handle is no longer valid.
+/// Detaching does not stop the job, it only allows implementation to free its resources on completion. Also, cancelled
+/// tasks do not block their job from completing, they'll just be ignored.
 /// \endparblock
 
 KAN_C_HEADER_BEGIN
@@ -42,14 +42,10 @@ typedef uint64_t kan_cpu_job_t;
 CPU_DISPATCH_API kan_cpu_job_t kan_cpu_job_create (void);
 
 /// \brief Sets task to be dispatched on job completion.
-CPU_DISPATCH_API void kan_cpu_job_set_completion_task (kan_cpu_job_t job,
-                                                       struct kan_cpu_task_t completion_task,
-                                                       enum kan_cpu_dispatch_queue_t completion_task_queue);
+CPU_DISPATCH_API void kan_cpu_job_set_completion_task (kan_cpu_job_t job, struct kan_cpu_task_t completion_task);
 
 /// \brief Dispatches task inside job context.
-CPU_DISPATCH_API kan_cpu_task_handle_t kan_cpu_job_dispatch_task (kan_cpu_job_t job,
-                                                                  struct kan_cpu_task_t task,
-                                                                  enum kan_cpu_dispatch_queue_t queue);
+CPU_DISPATCH_API kan_cpu_task_handle_t kan_cpu_job_dispatch_task (kan_cpu_job_t job, struct kan_cpu_task_t task);
 
 /// \brief Dispatches task list inside job context.
 CPU_DISPATCH_API void kan_cpu_job_dispatch_task_list (kan_cpu_job_t job, struct kan_cpu_task_list_node_t *list);
