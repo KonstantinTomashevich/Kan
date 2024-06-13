@@ -28,7 +28,6 @@ struct job_t
 {
     struct kan_atomic_int_t status;
     struct kan_cpu_task_t completion_task;
-    enum kan_cpu_dispatch_queue_t completion_task_queue;
 
     kan_conditional_variable_handle_t await_condition;
     kan_mutex_handle_t await_condition_mutex;
@@ -42,7 +41,6 @@ struct job_t
 
 struct task_node_t
 {
-    struct task_node_t *previous;
     struct task_node_t *next;
     struct job_t *job;
     struct kan_cpu_task_t task;
@@ -51,20 +49,17 @@ struct task_node_t
 
 struct task_dispatcher_t
 {
-    struct task_node_t *foreground_tasks;
-    struct task_node_t *background_tasks;
+    struct task_node_t *tasks_first;
+    struct task_node_t *tasks_last;
 
     kan_mutex_handle_t task_mutex;
     kan_conditional_variable_handle_t worker_wake_up_condition;
 
     kan_allocation_group_t allocation_group;
-    kan_cpu_section_t foreground_section;
-    kan_cpu_section_t background_section;
+    kan_cpu_section_t execution_section;
 
     struct kan_atomic_int_t shutting_down;
     uint64_t threads_count;
-    struct kan_atomic_int_t background_threads_count;
-    uint64_t background_threads_limit;
     kan_thread_handle_t *threads;
 };
 
@@ -84,18 +79,11 @@ static kan_thread_result_t worker_thread_function (kan_thread_user_data_t user_d
         }
 
         struct task_node_t *task = NULL;
-        kan_bool_t executing_background_task = KAN_FALSE;
         kan_mutex_lock (global_task_dispatcher.task_mutex);
 
         while (KAN_TRUE)
         {
-            const kan_bool_t no_foreground_tasks = global_task_dispatcher.foreground_tasks == NULL;
-            const kan_bool_t no_background_tasks = global_task_dispatcher.background_tasks == NULL;
-            const kan_bool_t under_background_limit =
-                (uint64_t) kan_atomic_int_get (&global_task_dispatcher.background_threads_count) <
-                global_task_dispatcher.background_threads_limit;
-
-            if (no_foreground_tasks && (no_background_tasks || !under_background_limit))
+            if (!global_task_dispatcher.tasks_first)
             {
                 kan_conditional_variable_wait (global_task_dispatcher.worker_wake_up_condition,
                                                global_task_dispatcher.task_mutex);
@@ -111,24 +99,13 @@ static kan_thread_result_t worker_thread_function (kan_thread_user_data_t user_d
                 }
             }
 
-            if (!no_background_tasks && under_background_limit)
-            {
-                task = global_task_dispatcher.background_tasks;
-                global_task_dispatcher.background_tasks = task->next;
-                kan_atomic_int_add (&global_task_dispatcher.background_threads_count, 1);
-                executing_background_task = KAN_TRUE;
-            }
-            else
-            {
-                KAN_ASSERT (!no_foreground_tasks);
-                task = global_task_dispatcher.foreground_tasks;
-                global_task_dispatcher.foreground_tasks = task->next;
-                executing_background_task = KAN_FALSE;
-            }
+            KAN_ASSERT (global_task_dispatcher.tasks_first)
+            task = global_task_dispatcher.tasks_first;
+            global_task_dispatcher.tasks_first = task->next;
 
-            if (task->next)
+            if (task == global_task_dispatcher.tasks_last)
             {
-                task->next->previous = NULL;
+                global_task_dispatcher.tasks_last = NULL;
             }
 
             break;
@@ -136,9 +113,7 @@ static kan_thread_result_t worker_thread_function (kan_thread_user_data_t user_d
 
         kan_mutex_unlock (global_task_dispatcher.task_mutex);
         struct kan_cpu_section_execution_t task_type_section_execution;
-        kan_cpu_section_execution_init (&task_type_section_execution, executing_background_task ?
-                                                                          global_task_dispatcher.background_section :
-                                                                          global_task_dispatcher.foreground_section);
+        kan_cpu_section_execution_init (&task_type_section_execution, global_task_dispatcher.execution_section);
 
         while (KAN_TRUE)
         {
@@ -183,17 +158,6 @@ static kan_thread_result_t worker_thread_function (kan_thread_user_data_t user_d
             kan_free_batched (global_task_dispatcher.allocation_group, task);
         }
 
-        if (executing_background_task)
-        {
-            const uint64_t was_background_threads =
-                (uint64_t) kan_atomic_int_add (&global_task_dispatcher.background_threads_count, -1);
-
-            if (was_background_threads == global_task_dispatcher.background_threads_limit)
-            {
-                kan_conditional_variable_signal_all (global_task_dispatcher.worker_wake_up_condition);
-            }
-        }
-
         kan_cpu_section_execution_shutdown (&task_type_section_execution);
     }
 }
@@ -218,8 +182,9 @@ static void ensure_global_task_dispatcher_ready (void)
 
         if (!global_task_dispatcher_ready)
         {
-            global_task_dispatcher.foreground_tasks = NULL;
-            global_task_dispatcher.background_tasks = NULL;
+            global_task_dispatcher.tasks_first = NULL;
+            global_task_dispatcher.tasks_last = NULL;
+
             global_task_dispatcher.task_mutex = kan_mutex_create ();
             KAN_ASSERT (global_task_dispatcher.task_mutex != KAN_INVALID_MUTEX_HANDLE)
             global_task_dispatcher.worker_wake_up_condition = kan_conditional_variable_create ();
@@ -227,16 +192,10 @@ static void ensure_global_task_dispatcher_ready (void)
 
             global_task_dispatcher.allocation_group =
                 kan_allocation_group_get_child (kan_allocation_group_root (), "global_cpu_dispatcher");
-            global_task_dispatcher.foreground_section = kan_cpu_section_get ("foreground_task");
-            global_task_dispatcher.background_section = kan_cpu_section_get ("background_task");
+            global_task_dispatcher.execution_section = kan_cpu_section_get ("cpu_dispatch_task");
 
             global_task_dispatcher.shutting_down = kan_atomic_int_init (0);
             global_task_dispatcher.threads_count = kan_platform_get_cpu_count ();
-            global_task_dispatcher.background_threads_count = kan_atomic_int_init (0);
-
-            global_task_dispatcher.background_threads_limit =
-                (uint64_t) ceilf (((float) global_task_dispatcher.threads_count) *
-                                  ((float) KAN_CPU_DISPATCHER_MAX_BACKGROUND_PERCENTAGE) * 0.01f);
 
             global_task_dispatcher.threads = kan_allocate_general (
                 global_task_dispatcher.allocation_group,
@@ -257,9 +216,7 @@ static void ensure_global_task_dispatcher_ready (void)
     }
 }
 
-static struct task_node_t *dispatch_task (struct job_t *job,
-                                          struct kan_cpu_task_t task,
-                                          enum kan_cpu_dispatch_queue_t queue)
+static struct task_node_t *dispatch_task (struct job_t *job, struct kan_cpu_task_t task)
 {
     ensure_global_task_dispatcher_ready ();
     struct task_node_t *task_node = (struct task_node_t *) kan_allocate_batched (
@@ -267,7 +224,6 @@ static struct task_node_t *dispatch_task (struct job_t *job,
     task_node->job = job;
     task_node->task = task;
     task_node->state = kan_atomic_int_init (TASK_STATE_QUEUED);
-    task_node->previous = NULL;
 
     if (job)
     {
@@ -277,27 +233,17 @@ static struct task_node_t *dispatch_task (struct job_t *job,
     }
 
     kan_mutex_lock (global_task_dispatcher.task_mutex);
-    switch (queue)
+    task_node->next = NULL;
+
+    if (global_task_dispatcher.tasks_last)
     {
-    case KAN_CPU_DISPATCH_QUEUE_FOREGROUND:
-        task_node->next = global_task_dispatcher.foreground_tasks;
-        if (global_task_dispatcher.foreground_tasks)
-        {
-            global_task_dispatcher.foreground_tasks->previous = task_node;
-        }
-
-        global_task_dispatcher.foreground_tasks = task_node;
-        break;
-
-    case KAN_CPU_DISPATCH_QUEUE_BACKGROUND:
-        task_node->next = global_task_dispatcher.background_tasks;
-        if (global_task_dispatcher.background_tasks)
-        {
-            global_task_dispatcher.background_tasks->previous = task_node;
-        }
-
-        global_task_dispatcher.background_tasks = task_node;
-        break;
+        global_task_dispatcher.tasks_last->next = task_node;
+        global_task_dispatcher.tasks_last = task_node;
+    }
+    else
+    {
+        global_task_dispatcher.tasks_first = task_node;
+        global_task_dispatcher.tasks_last = task_node;
     }
 
     kan_mutex_unlock (global_task_dispatcher.task_mutex);
@@ -311,10 +257,8 @@ static void dispatch_task_list (struct job_t *job, struct kan_cpu_task_list_node
     KAN_ASSERT (tasks)
 
     uint64_t count = 0u;
-    struct task_node_t *foreground_begin = NULL;
-    struct task_node_t *foreground_end = NULL;
-    struct task_node_t *background_begin = NULL;
-    struct task_node_t *background_end = NULL;
+    struct task_node_t *begin = NULL;
+    struct task_node_t *end = NULL;
 
     while (tasks)
     {
@@ -323,46 +267,18 @@ static void dispatch_task_list (struct job_t *job, struct kan_cpu_task_list_node
         task_node->job = job;
         task_node->task = tasks->task;
         task_node->state = kan_atomic_int_init (TASK_STATE_QUEUED);
-        task_node->previous = NULL;
         tasks->dispatch_handle = (kan_cpu_task_handle_t) task_node;
+        task_node->next = NULL;
 
-        switch (tasks->queue)
+        if (end)
         {
-        case KAN_CPU_DISPATCH_QUEUE_FOREGROUND:
-            if (foreground_end)
-            {
-                task_node->previous = foreground_end;
-                task_node->next = NULL;
-                foreground_end->next = task_node;
-                foreground_end = task_node;
-            }
-            else
-            {
-                foreground_begin = task_node;
-                foreground_end = task_node;
-                task_node->previous = NULL;
-                task_node->next = NULL;
-            }
-
-            break;
-
-        case KAN_CPU_DISPATCH_QUEUE_BACKGROUND:
-            if (background_end)
-            {
-                task_node->previous = background_end;
-                task_node->next = NULL;
-                background_end->next = task_node;
-                background_end = task_node;
-            }
-            else
-            {
-                background_begin = task_node;
-                background_end = task_node;
-                task_node->previous = NULL;
-                task_node->next = NULL;
-            }
-
-            break;
+            end->next = task_node;
+            end = task_node;
+        }
+        else
+        {
+            begin = task_node;
+            end = task_node;
         }
 
         ++count;
@@ -377,93 +293,33 @@ static void dispatch_task_list (struct job_t *job, struct kan_cpu_task_list_node
     }
 
     kan_mutex_lock (global_task_dispatcher.task_mutex);
-    if (foreground_begin)
+    if (begin)
     {
-        if (global_task_dispatcher.foreground_tasks)
+        if (global_task_dispatcher.tasks_last)
         {
-            foreground_end->next = global_task_dispatcher.foreground_tasks;
-            global_task_dispatcher.foreground_tasks->previous = foreground_end;
+            global_task_dispatcher.tasks_last->next = begin;
+        }
+        else
+        {
+            global_task_dispatcher.tasks_first = begin;
         }
 
-        global_task_dispatcher.foreground_tasks = foreground_begin;
-    }
-
-    if (background_begin)
-    {
-        if (global_task_dispatcher.background_tasks)
-        {
-            background_end->next = global_task_dispatcher.background_tasks;
-            global_task_dispatcher.background_tasks->previous = background_end;
-        }
-
-        global_task_dispatcher.background_tasks = background_begin;
+        global_task_dispatcher.tasks_last = end;
     }
 
     kan_mutex_unlock (global_task_dispatcher.task_mutex);
     kan_conditional_variable_signal_all (global_task_dispatcher.worker_wake_up_condition);
 }
 
-kan_cpu_task_handle_t kan_cpu_task_dispatch (struct kan_cpu_task_t task, enum kan_cpu_dispatch_queue_t queue)
+kan_cpu_task_handle_t kan_cpu_task_dispatch (struct kan_cpu_task_t task)
 {
-    return (kan_cpu_task_handle_t) dispatch_task (NULL, task, queue);
+    return (kan_cpu_task_handle_t) dispatch_task (NULL, task);
 }
 
 kan_bool_t kan_cpu_task_is_finished (kan_cpu_task_handle_t task)
 {
     struct task_node_t *task_node = (struct task_node_t *) task;
     return kan_atomic_int_get (&task_node->state) == TASK_STATE_FINISHED;
-}
-
-kan_bool_t kan_cpu_task_cancel (kan_cpu_task_handle_t task)
-{
-    struct task_node_t *task_node = (struct task_node_t *) task;
-    kan_bool_t cancelled;
-
-    // We need to lock dispatcher right away, otherwise queued task might be dequeued while we're thinking.
-    kan_mutex_lock (global_task_dispatcher.task_mutex);
-
-    if (kan_atomic_int_get (&task_node->state) != TASK_STATE_QUEUED)
-    {
-        cancelled = KAN_FALSE;
-    }
-    else
-    {
-        cancelled = KAN_TRUE;
-        if (task_node->previous)
-        {
-            task_node->previous->next = task_node->next;
-        }
-
-        if (task_node->next)
-        {
-            task_node->next->previous = task_node->previous;
-        }
-
-        if (global_task_dispatcher.foreground_tasks == task_node)
-        {
-            global_task_dispatcher.foreground_tasks = task_node->next;
-        }
-        else if (global_task_dispatcher.background_tasks == task_node)
-        {
-            global_task_dispatcher.background_tasks = task_node->next;
-        }
-
-        const kan_bool_t successfully_set =
-            kan_atomic_int_compare_and_set (&task_node->state, TASK_STATE_QUEUED, TASK_STATE_FINISHED);
-
-        // Can only happen if API is violated.
-        KAN_ASSERT (successfully_set)
-    }
-
-    kan_mutex_unlock (global_task_dispatcher.task_mutex);
-
-    // Unsafe for the same case, asserted above, but it can only happen if API is violated.
-    if (cancelled && task_node->job)
-    {
-        job_report_task_finished (task_node->job);
-    }
-
-    return cancelled;
 }
 
 void kan_cpu_task_detach (kan_cpu_task_handle_t task)
@@ -534,8 +390,7 @@ static void job_report_task_finished (struct job_t *job)
 
                 if (job->completion_task.function)
                 {
-                    kan_cpu_task_detach (
-                        (kan_cpu_task_handle_t) dispatch_task (NULL, job->completion_task, job->completion_task_queue));
+                    kan_cpu_task_detach ((kan_cpu_task_handle_t) dispatch_task (NULL, job->completion_task));
                 }
 
                 if (old_status_state == JOB_STATE_DETACHED)
@@ -567,7 +422,6 @@ kan_cpu_job_t kan_cpu_job_create (void)
     struct job_t *job = (struct job_t *) kan_allocate_batched (job_allocation_group, sizeof (struct job_t));
     job->status = kan_atomic_int_init (JOB_STATUS_INITIAL);
     job->completion_task = (struct kan_cpu_task_t) {.name = NULL, .function = NULL, .user_data = 0u};
-    job->completion_task_queue = KAN_CPU_DISPATCH_QUEUE_FOREGROUND;
 
     // Intentionally create only if someone wait for job to be completed.
     job->await_condition = KAN_INVALID_CONDITIONAL_VARIABLE_HANDLE;
@@ -575,25 +429,20 @@ kan_cpu_job_t kan_cpu_job_create (void)
     return (kan_cpu_job_t) job;
 }
 
-void kan_cpu_job_set_completion_task (kan_cpu_job_t job,
-                                      struct kan_cpu_task_t completion_task,
-                                      enum kan_cpu_dispatch_queue_t completion_task_queue)
+void kan_cpu_job_set_completion_task (kan_cpu_job_t job, struct kan_cpu_task_t completion_task)
 {
     struct job_t *job_data = (struct job_t *) job;
     KAN_ASSERT ((((unsigned int) kan_atomic_int_get (&job_data->status)) >> JOB_STATUS_TASK_COUNT_BITS) ==
                 JOB_STATE_ASSEMBLING)
     job_data->completion_task = completion_task;
-    job_data->completion_task_queue = completion_task_queue;
 }
 
-kan_cpu_task_handle_t kan_cpu_job_dispatch_task (kan_cpu_job_t job,
-                                                 struct kan_cpu_task_t task,
-                                                 enum kan_cpu_dispatch_queue_t queue)
+kan_cpu_task_handle_t kan_cpu_job_dispatch_task (kan_cpu_job_t job, struct kan_cpu_task_t task)
 {
     struct job_t *job_data = (struct job_t *) job;
     KAN_ASSERT ((((unsigned int) kan_atomic_int_get (&job_data->status)) >> JOB_STATUS_TASK_COUNT_BITS) ==
                 JOB_STATE_ASSEMBLING)
-    return (kan_cpu_task_handle_t) dispatch_task (job_data, task, queue);
+    return (kan_cpu_task_handle_t) dispatch_task (job_data, task);
 }
 
 void kan_cpu_job_dispatch_task_list (kan_cpu_job_t job, struct kan_cpu_task_list_node_t *list)
@@ -632,8 +481,7 @@ void kan_cpu_job_release (kan_cpu_job_t job)
             if (new_status_bits == (JOB_STATE_COMPLETED << JOB_STATUS_TASK_COUNT_BITS) &&
                 job_data->completion_task.function)
             {
-                kan_cpu_task_detach ((kan_cpu_task_handle_t) dispatch_task (NULL, job_data->completion_task,
-                                                                            job_data->completion_task_queue));
+                kan_cpu_task_detach ((kan_cpu_task_handle_t) dispatch_task (NULL, job_data->completion_task));
             }
 
             break;

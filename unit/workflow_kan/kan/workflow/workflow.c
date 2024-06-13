@@ -999,21 +999,18 @@ static void workflow_task_start_function (uint64_t user_data)
 {
     struct workflow_graph_node_t *node = (struct workflow_graph_node_t *) user_data;
     node->job = kan_cpu_job_create ();
-    kan_cpu_job_set_completion_task (node->job,
-                                     (struct kan_cpu_task_t) {
-                                         .name = task_finish_name,
-                                         .function = workflow_task_finish_function,
-                                         .user_data = user_data,
-                                     },
-                                     KAN_CPU_DISPATCH_QUEUE_FOREGROUND);
+    kan_cpu_job_set_completion_task (node->job, (struct kan_cpu_task_t) {
+                                                    .name = task_finish_name,
+                                                    .function = workflow_task_finish_function,
+                                                    .user_data = user_data,
+                                                });
 
-    kan_cpu_task_handle_t task_handle = kan_cpu_job_dispatch_task (node->job,
-                                                                   (struct kan_cpu_task_t) {
-                                                                       .name = node->name,
-                                                                       .function = workflow_task_execute_function,
-                                                                       .user_data = user_data,
-                                                                   },
-                                                                   KAN_CPU_DISPATCH_QUEUE_FOREGROUND);
+    kan_cpu_task_handle_t task_handle =
+        kan_cpu_job_dispatch_task (node->job, (struct kan_cpu_task_t) {
+                                                  .name = node->name,
+                                                  .function = workflow_task_execute_function,
+                                                  .user_data = user_data,
+                                              });
 
     if (task_handle != KAN_INVALID_CPU_TASK_HANDLE)
     {
@@ -1050,7 +1047,6 @@ static void workflow_task_finish_function (uint64_t user_data)
                 .user_data = (uint64_t) outcome,
             };
 
-            list_node->queue = KAN_CPU_DISPATCH_QUEUE_FOREGROUND;
             list_node->next = first_list_node;
             first_list_node = list_node;
         }
@@ -1088,7 +1084,7 @@ void kan_workflow_graph_execute (kan_workflow_graph_t graph)
     {
         struct workflow_graph_node_t *start = graph_header->start_nodes[start_index];
         KAN_CPU_TASK_LIST_USER_VALUE (&first_list_node, &graph_header->temporary_allocator, task_start_name,
-                                      workflow_task_start_function, FOREGROUND, start)
+                                      workflow_task_start_function, start)
     }
 
     kan_cpu_task_dispatch_list (first_list_node);

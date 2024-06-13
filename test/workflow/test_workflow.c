@@ -245,13 +245,11 @@ static void multi_threaded_node_function (kan_cpu_job_t job, kan_workflow_user_d
 
     for (uint64_t index = 0u; index < MULTI_THREAD_NODE_SUB_TASKS; ++index)
     {
-        kan_cpu_job_dispatch_task (job,
-                                   (struct kan_cpu_task_t) {
-                                       .name = kan_string_intern ("multithreaded_task"),
-                                       .function = multi_threaded_sub_task,
-                                       .user_data = (uint64_t) state,
-                                   },
-                                   KAN_CPU_DISPATCH_QUEUE_FOREGROUND);
+        kan_cpu_job_dispatch_task (job, (struct kan_cpu_task_t) {
+                                            .name = kan_string_intern ("multithreaded_task"),
+                                            .function = multi_threaded_sub_task,
+                                            .user_data = (uint64_t) state,
+                                        });
 
         // Spend some time by sleeping.
         kan_platform_sleep (1000u);

@@ -395,7 +395,7 @@ TEST_UNIVERSE_API void kan_universe_mutator_execute_insert_from_multiple_threads
     for (uint64_t index = 0u; index < 16u; ++index)
     {
         KAN_CPU_TASK_LIST_USER_STRUCT (&tasks_head, &state->task_data_allocator, state->task_name, insert_task_execute,
-                                       FOREGROUND, struct insert_task_user_data_t,
+                                       struct insert_task_user_data_t,
                                        {
                                            .state = state,
                                            .index = index,

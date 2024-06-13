@@ -2115,7 +2115,7 @@ static void world_collect_deployment_tasks (struct universe_t *universe,
                                             struct kan_stack_group_allocator_t *temporary_allocator)
 {
     KAN_CPU_TASK_LIST_USER_STRUCT (list_node, temporary_allocator, interned_deploy_scheduler, deploy_scheduler_execute,
-                                   FOREGROUND, struct deploy_scheduler_user_data_t,
+                                   struct deploy_scheduler_user_data_t,
                                    {
                                        .universe = universe,
                                        .world = world,
@@ -2134,7 +2134,7 @@ static void world_collect_deployment_tasks (struct universe_t *universe,
         {
             struct mutator_t *mutator = &((struct mutator_t *) pipeline->mutators.data)[mutator_index];
             KAN_CPU_TASK_LIST_USER_STRUCT (
-                list_node, temporary_allocator, interned_deploy_mutator, deploy_mutator_execute, FOREGROUND,
+                list_node, temporary_allocator, interned_deploy_mutator, deploy_mutator_execute,
                 struct deploy_mutator_user_data_t,
                 {
                     .universe = universe,
@@ -2180,7 +2180,7 @@ static void world_finish_deployment (struct universe_t *universe,
     {
         struct pipeline_t *pipeline = &((struct pipeline_t *) world->pipelines.data)[index];
         KAN_CPU_TASK_LIST_USER_VALUE (list_node, temporary_allocator, interned_finish_pipeline_deployment,
-                                      finish_pipeline_deployment_execute, FOREGROUND, pipeline)
+                                      finish_pipeline_deployment_execute, pipeline)
     }
 
     for (uint64_t index = 0u; index < world->children.size; ++index)
@@ -2617,17 +2617,16 @@ static void world_migration_schedulers_mutators_migrate (struct universe_t *univ
                 struct scheduler_api_t *old_api = world->scheduler_api;
                 world->scheduler_api = &new_scheduler_api_node->api;
 
-                KAN_CPU_TASK_LIST_USER_STRUCT (first_task_node, temporary_allocator,
-                                               interned_undeploy_and_migrate_scheduler,
-                                               undeploy_and_migrate_scheduler_execute, FOREGROUND,
-                                               struct undeploy_and_migrate_scheduler_user_data_t,
-                                               {
-                                                   .universe = universe,
-                                                   .world = world,
-                                                   .old_registry = old_reflection_registry,
-                                                   .old_api = old_api,
-                                                   .migrator = migrator,
-                                               })
+                KAN_CPU_TASK_LIST_USER_STRUCT (
+                    first_task_node, temporary_allocator, interned_undeploy_and_migrate_scheduler,
+                    undeploy_and_migrate_scheduler_execute, struct undeploy_and_migrate_scheduler_user_data_t,
+                    {
+                        .universe = universe,
+                        .world = world,
+                        .old_registry = old_reflection_registry,
+                        .old_api = old_api,
+                        .migrator = migrator,
+                    })
 
                 break;
             }
@@ -2760,17 +2759,16 @@ static void world_migration_schedulers_mutators_migrate (struct universe_t *univ
                         struct mutator_api_t *old_api = mutator->api;
                         mutator->api = &new_mutator_api_node->api;
 
-                        KAN_CPU_TASK_LIST_USER_STRUCT (first_task_node, temporary_allocator,
-                                                       interned_undeploy_and_migrate_mutator,
-                                                       undeploy_and_migrate_mutator_execute, FOREGROUND,
-                                                       struct undeploy_and_migrate_mutator_user_data_t,
-                                                       {
-                                                           .universe = universe,
-                                                           .mutator = mutator,
-                                                           .old_registry = old_reflection_registry,
-                                                           .old_api = old_api,
-                                                           .migrator = migrator,
-                                                       })
+                        KAN_CPU_TASK_LIST_USER_STRUCT (
+                            first_task_node, temporary_allocator, interned_undeploy_and_migrate_mutator,
+                            undeploy_and_migrate_mutator_execute, struct undeploy_and_migrate_mutator_user_data_t,
+                            {
+                                .universe = universe,
+                                .mutator = mutator,
+                                .old_registry = old_reflection_registry,
+                                .old_api = old_api,
+                                .migrator = migrator,
+                            })
 
                         ++mutator_index;
                         break;
@@ -2871,8 +2869,7 @@ static void world_migrate_configuration (struct universe_t *universe,
             KAN_ASSERT (new_type)
 
             KAN_CPU_TASK_LIST_USER_STRUCT (first_task_node, temporary_allocator, interned_migrate_configuration,
-                                           migrate_configuration_execute, FOREGROUND,
-                                           struct migrate_configuration_user_data_t,
+                                           migrate_configuration_execute, struct migrate_configuration_user_data_t,
                                            {
                                                .configuration = configuration,
                                                .new_type = new_type,

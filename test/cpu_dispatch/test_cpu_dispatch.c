@@ -51,13 +51,11 @@ static void dispatch_separately (kan_cpu_job_t job,
 
         if (job == KAN_INVALID_CPU_JOB)
         {
-            handles_output[index] = kan_cpu_task_dispatch (
-                task, index % 5u == 0u ? KAN_CPU_DISPATCH_QUEUE_BACKGROUND : KAN_CPU_DISPATCH_QUEUE_FOREGROUND);
+            handles_output[index] = kan_cpu_task_dispatch (task);
         }
         else
         {
-            handles_output[index] = kan_cpu_job_dispatch_task (
-                job, task, index % 5u == 0u ? KAN_CPU_DISPATCH_QUEUE_BACKGROUND : KAN_CPU_DISPATCH_QUEUE_FOREGROUND);
+            handles_output[index] = kan_cpu_job_dispatch_task (job, task);
         }
     }
 }
@@ -82,8 +80,6 @@ static void dispatch_as_list (kan_cpu_job_t job,
             .function = test_task_function,
             .user_data = (uint64_t) &user_data_output[index],
         };
-
-        nodes[index].queue = index % 5u == 0u ? KAN_CPU_DISPATCH_QUEUE_BACKGROUND : KAN_CPU_DISPATCH_QUEUE_FOREGROUND;
     }
 
     if (job == KAN_INVALID_CPU_JOB)
@@ -128,33 +124,6 @@ KAN_TEST_CASE (execute_1000_tasks_separate_dispatch)
     kan_cpu_task_handle_t handles[1000u];
     struct test_task_user_data_t user_data[1000u];
     dispatch_separately (KAN_INVALID_CPU_JOB, handles, user_data, 1000u);
-    wait_until_all_finished (handles, 1000u);
-
-    for (uint64_t index = 0u; index < 1000u; ++index)
-    {
-        kan_cpu_task_detach (handles[index]);
-    }
-}
-
-// Full name is too much to bear for the Windows without long file paths.
-// execute_1000_tasks_separate_dispatch_cancell_middle_100
-KAN_TEST_CASE (execute_1000_tasks_sd_cm100)
-{
-    kan_cpu_task_handle_t handles[1000u];
-    struct test_task_user_data_t user_data[1000u];
-    dispatch_separately (KAN_INVALID_CPU_JOB, handles, user_data, 1000u);
-
-    uint64_t cancelled = 0u;
-    for (uint64_t index = 450u; index < 550u; ++index)
-    {
-        if (kan_cpu_task_cancel (handles[index]))
-        {
-            ++cancelled;
-        }
-    }
-
-    // Sometimes, some of the tasks are already running, therefore we might not be able to cancel everything.
-    KAN_TEST_CHECK (cancelled > 95u)
     wait_until_all_finished (handles, 1000u);
 
     for (uint64_t index = 0u; index < 1000u; ++index)
@@ -244,8 +213,8 @@ KAN_TEST_CASE (job_1000_tasks_detach)
     kan_cpu_task_handle_t handles[1000u];
     struct test_task_user_data_t user_data[1000u];
     const kan_cpu_job_t job = kan_cpu_job_create ();
-
     dispatch_as_list (job, handles, user_data, 1000u);
+
     for (uint64_t index = 0u; index < 1000u; ++index)
     {
         kan_cpu_task_detach (handles[index]);
@@ -280,13 +249,11 @@ KAN_TEST_CASE (job_1000_completion_task)
     completion_task_user_data.work_done = kan_atomic_int_init (0);
     const kan_cpu_job_t job = kan_cpu_job_create ();
 
-    kan_cpu_job_set_completion_task (job,
-                                     (struct kan_cpu_task_t) {
-                                         .name = kan_string_intern ("completion_task"),
-                                         .function = test_task_function,
-                                         .user_data = (uint64_t) &completion_task_user_data,
-                                     },
-                                     KAN_CPU_DISPATCH_QUEUE_FOREGROUND);
+    kan_cpu_job_set_completion_task (job, (struct kan_cpu_task_t) {
+                                              .name = kan_string_intern ("completion_task"),
+                                              .function = test_task_function,
+                                              .user_data = (uint64_t) &completion_task_user_data,
+                                          });
 
     dispatch_as_list (job, handles, user_data, 1000u);
     for (uint64_t index = 0u; index < 1000u; ++index)

@@ -4103,7 +4103,7 @@ static void repository_migrate_internal (struct repository_t *repository,
         case KAN_REFLECTION_MIGRATION_NEEDED:
         {
             KAN_CPU_TASK_LIST_USER_STRUCT (&context->task_list, &context->allocator, migration_task_name,
-                                           execute_migration, FOREGROUND, struct record_migration_user_data_t,
+                                           execute_migration, struct record_migration_user_data_t,
                                            {
                                                .record_pointer = &singleton_storage_node->singleton,
                                                .allocation_group = singleton_storage_node->allocation_group,
@@ -4262,7 +4262,7 @@ static void repository_migrate_internal (struct repository_t *repository,
             while (node)
             {
                 KAN_CPU_TASK_LIST_USER_STRUCT (&context->task_list, &context->allocator, migration_task_name,
-                                               execute_migration, FOREGROUND, struct record_migration_user_data_t,
+                                               execute_migration, struct record_migration_user_data_t,
                                                {
                                                    .record_pointer = &node->record,
                                                    .allocation_group = indexed_storage_node->allocation_group,
@@ -4318,7 +4318,7 @@ static void repository_migrate_internal (struct repository_t *repository,
             while (&node->node != event_storage_node->event_queue.next_placeholder)
             {
                 KAN_CPU_TASK_LIST_USER_STRUCT (&context->task_list, &context->allocator, migration_task_name,
-                                               execute_migration, FOREGROUND, struct record_migration_user_data_t,
+                                               execute_migration, struct record_migration_user_data_t,
                                                {
                                                    .record_pointer = &node->event,
                                                    .allocation_group = event_storage_node->allocation_group,
@@ -9148,8 +9148,7 @@ static void repository_prepare_storages (struct repository_t *repository, struct
     while (singleton_storage_node)
     {
         KAN_CPU_TASK_LIST_USER_STRUCT (&context->task_list, &context->allocator, switch_to_serving_task_name,
-                                       prepare_singleton_storage, FOREGROUND,
-                                       struct singleton_switch_to_serving_user_data_t,
+                                       prepare_singleton_storage, struct singleton_switch_to_serving_user_data_t,
                                        {
                                            .storage = singleton_storage_node,
                                            .repository = repository,
@@ -9163,8 +9162,7 @@ static void repository_prepare_storages (struct repository_t *repository, struct
     while (indexed_storage_node)
     {
         KAN_CPU_TASK_LIST_USER_STRUCT (&context->task_list, &context->allocator, switch_to_serving_task_name,
-                                       prepare_indexed_storage, FOREGROUND,
-                                       struct indexed_switch_to_serving_user_data_t,
+                                       prepare_indexed_storage, struct indexed_switch_to_serving_user_data_t,
                                        {
                                            .storage = indexed_storage_node,
                                            .repository = repository,

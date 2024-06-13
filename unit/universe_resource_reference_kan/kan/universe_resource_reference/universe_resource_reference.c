@@ -1288,8 +1288,7 @@ UNIVERSE_RESOURCE_REFERENCE_KAN_API void mutator_template_execute_resource_refer
     for (uint64_t worker_index = 0u; worker_index < cpu_count; ++worker_index)
     {
         KAN_CPU_TASK_LIST_USER_VALUE (&task_list_node, &state->temporary_allocator,
-                                      state->interned_resource_reference_manager_server, execute_shared_serve,
-                                      FOREGROUND, state)
+                                      state->interned_resource_reference_manager_server, execute_shared_serve, state)
     }
 
     kan_cpu_job_dispatch_and_detach_task_list (job, task_list_node);

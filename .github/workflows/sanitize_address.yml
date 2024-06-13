@@ -46,11 +46,11 @@ jobs:
 
       - name: Test
         working-directory: ${{env.BUILD_DIRECTORY}}
-        run: ctest --build-config Debug
+        run: ctest --build-config Debug --timeout 2
 
       - name: Upload test results
         if: ${{ success() }} || ${{ failure() }}
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: test_results_sanitize_address
           path: ${{env.BUILD_DIRECTORY}}/Testing/Temporary

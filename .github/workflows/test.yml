@@ -74,11 +74,11 @@ jobs:
 
       - name: Test
         working-directory: ${{env.BUILD_DIRECTORY}}
-        run: ctest --build-config ${{matrix.build_type}} --verbose
+        run: ctest --build-config ${{matrix.build_type}} --timeout 2
 
       - name: Upload test results
         if: ${{ success() }} || ${{ failure() }}
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: test_results_${{matrix.build_type}}_${{matrix.os}}_${{matrix.toolchain}}
           path: ${{env.BUILD_DIRECTORY}}/Testing/Temporary
