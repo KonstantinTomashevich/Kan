@@ -1,12 +1,12 @@
 #include <kan/container/event_queue.h>
 #include <kan/container/interned_string.h>
-#include <kan/cpu_dispatch/task.h>
 #include <kan/error/critical.h>
 #include <kan/file_system/entry.h>
 #include <kan/file_system_watcher/watcher.h>
 #include <kan/log/logging.h>
 #include <kan/memory/allocation.h>
 #include <kan/platform/precise_time.h>
+#include <kan/threading/thread.h>
 
 KAN_LOG_DEFINE_CATEGORY (file_system_watcher);
 
@@ -22,7 +22,6 @@ struct file_node_t
     struct file_node_t *next;
     kan_interned_string_t name;
     kan_interned_string_t extension;
-    uint64_t size;
     uint64_t last_modification_time_ns;
     kan_bool_t mark_found;
 };
@@ -44,12 +43,11 @@ struct event_queue_node_t
 
 struct watcher_t
 {
+    struct watcher_t *next_watcher;
     struct directory_node_t *root_directory;
     struct kan_atomic_int_t event_queue_lock;
     struct kan_event_queue_t event_queue;
     struct kan_atomic_int_t marked_for_destroy;
-
-    uint64_t last_poll_time_ns;
 
     /// \details Stores initial path by default. Used by recursive algorithms to store current recurrent path.
     struct kan_file_system_path_container_t path_container;
@@ -58,10 +56,13 @@ struct watcher_t
 static kan_bool_t statics_initialized = KAN_FALSE;
 static struct kan_atomic_int_t statics_initialization_lock = {.value = 0};
 
-static kan_interned_string_t cpu_task_name;
 static kan_allocation_group_t watcher_allocation_group;
 static kan_allocation_group_t hierarchy_allocation_group;
 static kan_allocation_group_t event_allocation_group;
+
+static struct kan_atomic_int_t server_thread_access_lock;
+static kan_bool_t server_thread_running = KAN_FALSE;
+struct watcher_t *serve_queue = NULL;
 
 static void ensure_statics_initialized (void)
 {
@@ -70,12 +71,12 @@ static void ensure_statics_initialized (void)
         kan_atomic_int_lock (&statics_initialization_lock);
         if (!statics_initialized)
         {
-            cpu_task_name = kan_string_intern ("file_system_poll");
             watcher_allocation_group =
                 kan_allocation_group_get_child (kan_allocation_group_root (), "file_system_watcher");
             hierarchy_allocation_group = kan_allocation_group_get_child (watcher_allocation_group, "hierarchy");
             event_allocation_group = kan_allocation_group_get_child (watcher_allocation_group, "event");
             statics_initialized = KAN_TRUE;
+            server_thread_access_lock = kan_atomic_int_init (0);
         }
 
         kan_atomic_int_unlock (&statics_initialization_lock);
@@ -134,28 +135,6 @@ static void directory_node_destroy (struct directory_node_t *node)
     kan_free_batched (hierarchy_allocation_group, node);
 }
 
-static void poll_task_function (uint64_t user_data);
-
-static void schedule_poll (struct watcher_t *watcher)
-{
-    struct kan_cpu_task_t task = {
-        .name = cpu_task_name,
-        .function = poll_task_function,
-        .user_data = (kan_cpu_task_user_data_t) watcher,
-    };
-
-    const kan_cpu_task_handle_t handle = kan_cpu_task_dispatch (task, KAN_CPU_DISPATCH_QUEUE_BACKGROUND);
-    if (handle == KAN_INVALID_CPU_TASK_HANDLE)
-    {
-        KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, file_system_watcher, KAN_LOG_ERROR,
-                             "Failed to schedule poll for watcher at \"%s\".", watcher->path_container.path)
-    }
-    else
-    {
-        kan_cpu_task_detach (handle);
-    }
-}
-
 static inline void split_entry_name (const char *entry_name,
                                      kan_interned_string_t *name_output,
                                      kan_interned_string_t *extension_output)
@@ -180,7 +159,6 @@ static void directory_node_append_file (struct directory_node_t *directory,
     struct file_node_t *file = file_node_allocate ();
     split_entry_name (entry_name, &file->name, &file->extension);
 
-    file->size = status->size;
     file->last_modification_time_ns = status->last_modification_time_ns;
     file->mark_found = KAN_TRUE;
 
@@ -230,9 +208,6 @@ static void initial_poll_to_directory_recursive (struct watcher_t *watcher, stru
                     break;
 
                 case KAN_FILE_SYSTEM_ENTRY_TYPE_FILE:
-                    KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, file_system_watcher, KAN_LOG_ERROR,
-                                         "Initial poll found file \"%s\".", watcher->path_container.path)
-
                     directory_node_append_file (directory, entry_name, &status);
                     break;
 
@@ -278,7 +253,6 @@ static void send_directory_added_event (struct watcher_t *watcher)
         kan_event_queue_submit_end (&watcher->event_queue, &allocate_event_queue_node ()->node);
     }
 
-    KAN_LOG (file_system_watcher, KAN_LOG_ERROR, "FS ADD DIR")
     kan_atomic_int_unlock (&watcher->event_queue_lock);
 }
 
@@ -299,7 +273,6 @@ static void send_directory_removed_event (struct watcher_t *watcher, struct dire
         kan_event_queue_submit_end (&watcher->event_queue, &allocate_event_queue_node ()->node);
     }
 
-    KAN_LOG (file_system_watcher, KAN_LOG_ERROR, "FS REM DIR")
     kan_atomic_int_unlock (&watcher->event_queue_lock);
 }
 
@@ -319,7 +292,6 @@ static void send_file_added_event (struct watcher_t *watcher)
         kan_event_queue_submit_end (&watcher->event_queue, &allocate_event_queue_node ()->node);
     }
 
-    KAN_LOG (file_system_watcher, KAN_LOG_ERROR, "FS ADD FILE")
     kan_atomic_int_unlock (&watcher->event_queue_lock);
 }
 
@@ -339,7 +311,6 @@ static void send_file_modified_event (struct watcher_t *watcher)
         kan_event_queue_submit_end (&watcher->event_queue, &allocate_event_queue_node ()->node);
     }
 
-    KAN_LOG (file_system_watcher, KAN_LOG_ERROR, "FS MOD FILE")
     kan_atomic_int_unlock (&watcher->event_queue_lock);
 }
 
@@ -380,7 +351,6 @@ static void send_file_removed_event (struct watcher_t *watcher, struct file_node
         kan_event_queue_submit_end (&watcher->event_queue, &allocate_event_queue_node ()->node);
     }
 
-    KAN_LOG (file_system_watcher, KAN_LOG_ERROR, "FS REM FILE")
     kan_atomic_int_unlock (&watcher->event_queue_lock);
 }
 
@@ -508,18 +478,9 @@ static void verification_poll_at_directory_recursive (struct watcher_t *watcher,
 
                     if (file_node)
                     {
-                        KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, file_system_watcher, KAN_LOG_ERROR,
-                                             "File: %s. Size: %lu. Last time: %lu. Status size: %lu. Status time: %lu.",
-                                             watcher->path_container.path, (unsigned long) file_node->size,
-                                             (unsigned long) file_node->last_modification_time_ns,
-                                             (unsigned long) status.size,
-                                             (unsigned long) status.last_modification_time_ns)
-
-                        if (file_node->size != status.size ||
-                            file_node->last_modification_time_ns != status.last_modification_time_ns)
+                        if (file_node->last_modification_time_ns != status.last_modification_time_ns)
                         {
                             send_file_modified_event (watcher);
-                            file_node->size = status.size;
                             file_node->last_modification_time_ns = status.last_modification_time_ns;
                         }
 
@@ -527,11 +488,6 @@ static void verification_poll_at_directory_recursive (struct watcher_t *watcher,
                     }
                     else
                     {
-                        KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, file_system_watcher, KAN_LOG_ERROR,
-                                             "NEW! File: %s. Size: %lu. Last time: %lu.", watcher->path_container.path,
-                                             (unsigned long) status.size,
-                                             (unsigned long) status.last_modification_time_ns)
-
                         directory_node_append_file (directory, entry_name, &status);
                         send_file_added_event (watcher);
                     }
@@ -644,42 +600,98 @@ static void verification_poll_at_directory_recursive (struct watcher_t *watcher,
     }
 }
 
-static void poll_task_function (uint64_t user_data)
+static int server_thread (void *user_data)
 {
-    struct watcher_t *watcher = (struct watcher_t *) user_data;
-    if (kan_atomic_int_get (&watcher->marked_for_destroy))
+    while (KAN_TRUE)
     {
-        if (watcher->root_directory)
+        // Check watchers and execute scheduled deletion. Exit if no watchers.
+        kan_atomic_int_lock (&server_thread_access_lock);
+        struct watcher_t *previous = NULL;
+        struct watcher_t *watcher = serve_queue;
+
+        while (watcher)
         {
-            directory_node_destroy (watcher->root_directory);
+            struct watcher_t *next = watcher->next_watcher;
+            if (kan_atomic_int_get (&watcher->marked_for_destroy))
+            {
+                if (watcher->root_directory)
+                {
+                    directory_node_destroy (watcher->root_directory);
+                }
+
+                struct event_queue_node_t *queue_node = (struct event_queue_node_t *) watcher->event_queue.oldest;
+                while (queue_node)
+                {
+                    struct event_queue_node_t *next_event = (struct event_queue_node_t *) queue_node->node.next;
+                    kan_free_general (event_allocation_group, queue_node, sizeof (struct event_queue_node_t));
+                    queue_node = next_event;
+                }
+
+                kan_free_general (watcher_allocation_group, watcher, sizeof (struct watcher_t));
+                if (previous)
+                {
+                    previous->next_watcher = next;
+                }
+                else
+                {
+                    serve_queue = next;
+                }
+            }
+            else
+            {
+                previous = watcher;
+            }
+
+            watcher = next;
         }
 
-        struct event_queue_node_t *queue_node = (struct event_queue_node_t *) watcher->event_queue.oldest;
-        while (queue_node)
+        if (!serve_queue)
         {
-            struct event_queue_node_t *next = (struct event_queue_node_t *) queue_node->node.next;
-            kan_free_general (event_allocation_group, queue_node, sizeof (struct event_queue_node_t));
-            queue_node = next;
+            // If there is no one to serve -- exit thread.
+            server_thread_running = KAN_FALSE;
+            kan_atomic_int_unlock (&server_thread_access_lock);
+            return 0;
         }
 
-        kan_free_general (watcher_allocation_group, watcher, sizeof (struct watcher_t));
+        watcher = serve_queue;
+        kan_atomic_int_unlock (&server_thread_access_lock);
 
-        // TODO: Temporary logs. Clean this file.
-        KAN_LOG (file_system_watcher, KAN_LOG_ERROR, "FS DEAD")
-        return;
+        // We've captured serve queue value in watcher and there is no one who changes next pointers.
+        // Therefore we can safely iterate and serve watchers.
+
+        const uint64_t serve_start = kan_platform_get_elapsed_nanoseconds ();
+
+        while (watcher)
+        {
+            KAN_ASSERT (watcher->root_directory)
+            verification_poll_at_directory_recursive (watcher, watcher->root_directory);
+            watcher = watcher->next_watcher;
+        }
+
+        const uint64_t serve_end = kan_platform_get_elapsed_nanoseconds ();
+        const uint64_t serve_time = serve_end - serve_start;
+
+        if (serve_time < KAN_FILE_SYSTEM_WATCHER_UL_MIN_FRAME_NS)
+        {
+            kan_platform_sleep (KAN_FILE_SYSTEM_WATCHER_UL_MIN_FRAME_NS - serve_time);
+        }
     }
+}
 
-    if (kan_platform_get_elapsed_nanoseconds () - watcher->last_poll_time_ns >= KAN_FILE_SYSTEM_WATCHER_UL_MIN_DELAY_NS)
+static void register_new_watcher (struct watcher_t *watcher)
+{
+    kan_atomic_int_lock (&server_thread_access_lock);
+    watcher->next_watcher = serve_queue;
+    serve_queue = watcher;
+
+    if (!server_thread_running)
     {
-        KAN_LOG (file_system_watcher, KAN_LOG_ERROR, "FS POLL")
-
-        KAN_ASSERT (watcher->root_directory)
-        verification_poll_at_directory_recursive (watcher, watcher->root_directory);
-        watcher->last_poll_time_ns = kan_platform_get_elapsed_nanoseconds ();
+        kan_thread_handle_t thread = kan_thread_create ("file_system_watcher_server", server_thread, NULL);
+        kan_thread_detach (thread);
+        server_thread_running = KAN_TRUE;
     }
 
-    // Schedule next poll.
-    schedule_poll (watcher);
+    kan_atomic_int_unlock (&server_thread_access_lock);
 }
 
 kan_file_system_watcher_t kan_file_system_watcher_create (const char *directory_path)
@@ -692,9 +704,7 @@ kan_file_system_watcher_t kan_file_system_watcher_create (const char *directory_
     watcher_data->event_queue_lock = kan_atomic_int_init (0);
     kan_event_queue_init (&watcher_data->event_queue, &allocate_event_queue_node ()->node);
     watcher_data->marked_for_destroy = kan_atomic_int_init (0);
-    watcher_data->last_poll_time_ns = 0u;
     kan_file_system_path_container_copy_string (&watcher_data->path_container, directory_path);
-    KAN_LOG (file_system_watcher, KAN_LOG_ERROR, "Created FS watcher for %s", directory_path)
 
     // Doing initial poll as background task on some worker thread seems like a good idea at first,
     // but it has one issue: there is a potential window between watcher creation and initial poll
@@ -702,9 +712,8 @@ kan_file_system_watcher_t kan_file_system_watcher_create (const char *directory_
     // producing hard to track bugs.
     watcher_data->root_directory = directory_node_create (NULL);
     initial_poll_to_directory_recursive (watcher_data, watcher_data->root_directory);
-    watcher_data->last_poll_time_ns = kan_platform_get_elapsed_nanoseconds ();
 
-    schedule_poll (watcher_data);
+    register_new_watcher (watcher_data);
     return (kan_file_system_watcher_t) watcher_data;
 }
 

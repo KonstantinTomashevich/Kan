@@ -24,6 +24,12 @@ kan_thread_result_t kan_thread_wait (kan_thread_handle_t handle)
     return (kan_thread_result_t) sdl_result;
 }
 
+void kan_thread_detach (kan_thread_handle_t handle)
+{
+    void *sdl_handle = (void *) handle;
+    SDL_DetachThread (sdl_handle);
+}
+
 const char *kan_thread_get_name (kan_thread_handle_t handle)
 {
     void *sdl_handle = (void *) handle;
