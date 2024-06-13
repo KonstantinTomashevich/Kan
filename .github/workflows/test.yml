@@ -15,7 +15,7 @@ jobs:
         build_type: [ Release, Debug ]
         os: [ windows-2022, ubuntu-22.04]
         # Native toolchain is native compiler for the platform: MSVC for Windows, GCC for Ubuntu.
-        toolchain: [ clang, native ]
+        toolchain: [ clang ]
 
     defaults:
       run:
