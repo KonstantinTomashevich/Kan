@@ -15,7 +15,7 @@ jobs:
         build_type: [ Release, Debug ]
         os: [ windows-2022, ubuntu-22.04]
         # Native toolchain is native compiler for the platform: MSVC for Windows, GCC for Ubuntu.
-        toolchain: [ clang ]
+        toolchain: [ clang, native ]
 
     defaults:
       run:
@@ -44,19 +44,23 @@ jobs:
 
       - name: Windows - Select clang toolset
         if: matrix.os == 'windows-2022' && matrix.toolchain == 'clang'
-        shell: cmd
-        run: >
-          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat" &&
-          (echo|set /p DUMMY="CC=" >> %GITHUB_ENV% && where clang-cl >> %GITHUB_ENV%) &&
-          (echo|set /p DUMMY="CXX=" >> %GITHUB_ENV% && where clang-cl >> %GITHUB_ENV%)
+        run: |
+          echo "CC=clang-cl" >> $Env:GITHUB_ENV
+          echo "CXX=clang-cl" >> $Env:GITHUB_ENV
 
       - name: Windows - Select msvc toolset
         if: matrix.os == 'windows-2022' && matrix.toolchain == 'native'
+        run: |
+          echo "CC=cl" >> $Env:GITHUB_ENV
+          echo "CXX=cl" >> $Env:GITHUB_ENV
+
+      - name: Configure (Windows)
+        if: matrix.os == 'windows-2022'
+        working-directory: ${{env.BUILD_DIRECTORY}}
         shell: cmd
         run: >
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat" &&
-          (echo|set /p DUMMY="CC=" >> %GITHUB_ENV% && where cl >> %GITHUB_ENV%) &&
-          (echo|set /p DUMMY="CXX=" >> %GITHUB_ENV% && where cl >> %GITHUB_ENV%)
+          cmake ${{github.workspace}} -G "Ninja Multi-Config" -DCMAKE_BUILD_TYPE=${{matrix.build_type}}
 
       - name: Ubuntu - Select gcc toolset
         if: matrix.os == 'ubuntu-22.04' && matrix.toolchain == 'native'
@@ -70,7 +74,8 @@ jobs:
           echo "CC=clang" >> $Env:GITHUB_ENV
           echo "CXX=clang" >> $Env:GITHUB_ENV
 
-      - name: Configure
+      - name: Configure (Ubuntu)
+        if: matrix.os == 'ubuntu-22.04'
         working-directory: ${{env.BUILD_DIRECTORY}}
         run: cmake ${{github.workspace}} -G "Ninja Multi-Config" -DCMAKE_BUILD_TYPE=${{matrix.build_type}}
 
