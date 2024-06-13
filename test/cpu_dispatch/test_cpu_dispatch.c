@@ -208,20 +208,34 @@ KAN_TEST_CASE (job_1000_tasks_list_dispatch)
     kan_cpu_job_wait (job);
 }
 
+#include <stdio.h>
+
 KAN_TEST_CASE (job_1000_tasks_detach)
 {
     kan_cpu_task_handle_t handles[1000u];
     struct test_task_user_data_t user_data[1000u];
     const kan_cpu_job_t job = kan_cpu_job_create ();
 
+    fprintf (stderr, "Debug Stage 1\n");
+
     dispatch_as_list (job, handles, user_data, 1000u);
+
+    fprintf (stderr, "Debug Stage 2\n");
+
     for (uint64_t index = 0u; index < 1000u; ++index)
     {
         kan_cpu_task_detach (handles[index]);
     }
 
+    fprintf (stderr, "Debug Stage 3\n");
+
     kan_cpu_job_release (job);
+
+    fprintf (stderr, "Debug Stage 4\n");
+
     kan_cpu_job_detach (job);
+
+    fprintf (stderr, "Debug Stage 5\n");
 
     while (KAN_TRUE)
     {
@@ -239,6 +253,8 @@ KAN_TEST_CASE (job_1000_tasks_detach)
             break;
         }
     }
+
+    fprintf (stderr, "Debug Stage 6\n");
 }
 
 KAN_TEST_CASE (job_1000_completion_task)
@@ -255,14 +271,26 @@ KAN_TEST_CASE (job_1000_completion_task)
                                               .user_data = (uint64_t) &completion_task_user_data,
                                           });
 
+    fprintf (stderr, "Debug Stage 1\n");
+
     dispatch_as_list (job, handles, user_data, 1000u);
+
+    fprintf (stderr, "Debug Stage 2\n");
+
     for (uint64_t index = 0u; index < 1000u; ++index)
     {
         kan_cpu_task_detach (handles[index]);
     }
 
+    fprintf (stderr, "Debug Stage 3\n");
+
     kan_cpu_job_release (job);
+
+    fprintf (stderr, "Debug Stage 4\n");
+
     kan_cpu_job_detach (job);
+
+    fprintf (stderr, "Debug Stage 5\n");
 
     while (KAN_TRUE)
     {
@@ -271,4 +299,6 @@ KAN_TEST_CASE (job_1000_completion_task)
             break;
         }
     }
+
+    fprintf (stderr, "Debug Stage 6\n");
 }
