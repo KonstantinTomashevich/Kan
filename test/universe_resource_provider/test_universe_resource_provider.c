@@ -828,22 +828,25 @@ TEST_UNIVERSE_RESOURCE_PROVIDER_API void kan_universe_mutator_execute_check_obse
         const struct kan_resource_provider_singleton_t *provider =
             kan_repository_singleton_read_access_resolve (provider_access);
 
-        struct kan_repository_indexed_insertion_package_t package =
-            kan_repository_indexed_insert_query_execute (&state->insert__kan_resource_request);
-        struct kan_resource_request_t *request = kan_repository_indexed_insertion_package_get (&package);
+        if (provider->scan_done)
+        {
+            struct kan_repository_indexed_insertion_package_t package =
+                kan_repository_indexed_insert_query_execute (&state->insert__kan_resource_request);
+            struct kan_resource_request_t *request = kan_repository_indexed_insertion_package_get (&package);
 
-        request->request_id = kan_next_resource_request_id (provider);
-        request->type = kan_string_intern ("first_resource_type_t");
-        request->name = kan_string_intern ("alpha");
-        request->priority = 0u;
-        singleton->request_id = request->request_id;
-        kan_repository_indexed_insertion_package_submit (&package);
+            request->request_id = kan_next_resource_request_id (provider);
+            request->type = kan_string_intern ("first_resource_type_t");
+            request->name = kan_string_intern ("alpha");
+            request->priority = 0u;
+            singleton->request_id = request->request_id;
+            kan_repository_indexed_insertion_package_submit (&package);
+
+            singleton->stage = CHECK_OBSERVATION_AND_RELOAD_STAGE_ADD_ALPHA;
+            save_rd (WORKSPACE_SUB_DIRECTORY "/alpha.rd", &resource_alpha, kan_string_intern ("first_resource_type_t"),
+                     state->current_registry);
+        }
 
         kan_repository_singleton_read_access_close (provider_access);
-        singleton->stage = CHECK_OBSERVATION_AND_RELOAD_STAGE_ADD_ALPHA;
-
-        save_rd (WORKSPACE_SUB_DIRECTORY "/alpha.rd", &resource_alpha, kan_string_intern ("first_resource_type_t"),
-                 state->current_registry);
         break;
     }
 
