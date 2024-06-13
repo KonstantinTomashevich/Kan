@@ -45,13 +45,13 @@ jobs:
       - name: Windows - Select clang toolset
         if: matrix.os == 'windows-2022' && matrix.toolchain == 'clang'
         run: |
-          echo "CC=clang-cl" >> $Env:GITHUB_ENV
+          echo "CC=clang-cl -c" >> $Env:GITHUB_ENV
           echo "CXX=clang-cl" >> $Env:GITHUB_ENV
 
       - name: Windows - Select msvc toolset
         if: matrix.os == 'windows-2022' && matrix.toolchain == 'native'
         run: |
-          echo "CC=cl" >> $Env:GITHUB_ENV
+          echo "CC=cl -c" >> $Env:GITHUB_ENV
           echo "CXX=cl" >> $Env:GITHUB_ENV
 
       - name: Configure (Windows)
