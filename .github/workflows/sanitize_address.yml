@@ -46,7 +46,7 @@ jobs:
 
       - name: Test
         working-directory: ${{env.BUILD_DIRECTORY}}
-        run: ctest --build-config Debug
+        run: ctest --build-config Debug --timeout 2
 
       - name: Upload test results
         if: ${{ success() }} || ${{ failure() }}

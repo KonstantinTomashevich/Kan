@@ -74,7 +74,7 @@ jobs:
 
       - name: Test
         working-directory: ${{env.BUILD_DIRECTORY}}
-        run: ctest --build-config ${{matrix.build_type}}
+        run: ctest --build-config ${{matrix.build_type}} --timeout 2
 
       - name: Upload test results
         if: ${{ success() }} || ${{ failure() }}
