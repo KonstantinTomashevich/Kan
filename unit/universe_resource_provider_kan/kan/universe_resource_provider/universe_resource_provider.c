@@ -1776,6 +1776,12 @@ static inline void on_file_added (struct resource_provider_state_t *state,
                                   struct resource_provider_private_singleton_t *private,
                                   const char *path)
 {
+    // Skip first "/" in order to have same path format for scanned and observed files.
+    if (path && path[0u] == '/')
+    {
+        ++path;
+    }
+
     struct kan_repository_indexed_insertion_package_t package =
         kan_repository_indexed_insert_query_execute (&state->insert__resource_provider_delayed_file_addition);
 
@@ -1801,6 +1807,11 @@ static inline struct kan_resource_native_entry_t *write_native_entry_by_path (
     const char *path,
     struct kan_repository_indexed_value_write_access_t *access_output)
 {
+    if (path && path[0u] == '\\')
+    {
+        ++path;
+    }
+
     struct kan_repository_indexed_value_write_cursor_t cursor =
         kan_repository_indexed_value_write_query_execute (&state->write_value__kan_resource_native_entry__name, &name);
 
@@ -1822,6 +1833,8 @@ static inline struct kan_resource_native_entry_t *write_native_entry_by_path (
             *access_output = access;
             return entry;
         }
+
+        kan_repository_indexed_value_write_access_close (&access);
     }
 
     return NULL;
@@ -1863,6 +1876,12 @@ static inline void on_file_modified (struct resource_provider_state_t *state,
                                      kan_virtual_file_system_volume_t volume,
                                      const char *path)
 {
+    // Skip first "/" in order to have same path format for scanned and observed files.
+    if (path && path[0u] == '/')
+    {
+        ++path;
+    }
+
     struct kan_resource_index_info_from_path_t info_from_path;
     kan_resource_index_extract_info_from_path (path, &info_from_path);
 
@@ -1948,6 +1967,12 @@ static inline void on_file_removed (struct resource_provider_state_t *state,
                                     kan_virtual_file_system_volume_t volume,
                                     const char *path)
 {
+    // Skip first "/" in order to have same path format for scanned and observed files.
+    if (path && path[0u] == '/')
+    {
+        ++path;
+    }
+
     struct kan_resource_index_info_from_path_t info_from_path;
     kan_resource_index_extract_info_from_path (path, &info_from_path);
 
