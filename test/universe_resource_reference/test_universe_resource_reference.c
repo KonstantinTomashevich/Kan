@@ -10,6 +10,7 @@
 #include <kan/context/virtual_file_system.h>
 #include <kan/file_system/entry.h>
 #include <kan/file_system/stream.h>
+#include <kan/platform/precise_time.h>
 #include <kan/reflection/generated_reflection.h>
 #include <kan/reflection/patch.h>
 #include <kan/resource_pipeline/resource_pipeline.h>
@@ -595,6 +596,7 @@ enum outer_reference_caching_test_stage_t
     OUTER_REFERENCE_CACHING_TEST_STAGE_FIRST_SCAN_DONE,
     OUTER_REFERENCE_CACHING_TEST_STAGE_SECOND_SCAN_REQUESTED,
     OUTER_REFERENCE_CACHING_TEST_STAGE_SECOND_SCAN_DONE,
+    OUTER_REFERENCE_CACHING_TEST_STAGE_CHANGED_WAITING_FOR_CHANGE_DETECTION,
     OUTER_REFERENCE_CACHING_TEST_STAGE_CHANGED_SCAN_REQUESTED,
     OUTER_REFERENCE_CACHING_TEST_STAGE_CHANGED_SCAN_DONE,
 };
@@ -610,6 +612,7 @@ struct outer_reference_caching_test_state_t
 
     // Test internal state is saved in mutator for simplicity as we're not planning hot reloading in tests.
     enum outer_reference_caching_test_stage_t stage;
+    uint64_t wait_for_change_detection_unti_ns;
 };
 
 TEST_UNIVERSE_RESOURCE_REFERENCE_API void kan_universe_mutator_deploy_outer_reference_caching_test (
@@ -622,6 +625,7 @@ TEST_UNIVERSE_RESOURCE_REFERENCE_API void kan_universe_mutator_deploy_outer_refe
     kan_workflow_graph_node_depend_on (workflow_node, KAN_RESOURCE_REFERENCE_END_CHECKPOINT);
     state->registry = kan_universe_get_reflection_registry (universe);
     state->stage = OUTER_REFERENCE_CACHING_TEST_STAGE_INIT;
+    state->wait_for_change_detection_unti_ns = 0u;
 }
 
 TEST_UNIVERSE_RESOURCE_REFERENCE_API void kan_universe_mutator_execute_outer_reference_caching_test (
@@ -649,21 +653,27 @@ TEST_UNIVERSE_RESOURCE_REFERENCE_API void kan_universe_mutator_execute_outer_ref
     case OUTER_REFERENCE_CACHING_TEST_STAGE_SECOND_SCAN_DONE:
     {
         // Overwrite prototype to change file and expect cache to be invalidated.
-        // One ms sleeps are added to make sure that there is no error due to missed cache invalidation.
         save_prototype_2 (state->registry, WORKSPACE_RESOURCES_SUB_DIRECTORY "/prototype_1.rd");
+        state->wait_for_change_detection_unti_ns = kan_platform_get_elapsed_nanoseconds () + 300000000u;
+        state->stage = OUTER_REFERENCE_CACHING_TEST_STAGE_CHANGED_WAITING_FOR_CHANGE_DETECTION;
+        break;
+    }
 
-        request_outer_references (&state->insert__kan_resource_update_outer_references_request_event,
-                                  kan_string_intern ("resource_prototype_t"), kan_string_intern ("prototype_1"));
-        state->stage = OUTER_REFERENCE_CACHING_TEST_STAGE_CHANGED_SCAN_REQUESTED;
+    case OUTER_REFERENCE_CACHING_TEST_STAGE_CHANGED_WAITING_FOR_CHANGE_DETECTION:
+    {
+        // We need to give internal logic enough time to safely detect file change.
+        if (kan_platform_get_elapsed_nanoseconds () > state->wait_for_change_detection_unti_ns)
+        {
+            request_outer_references (&state->insert__kan_resource_update_outer_references_request_event,
+                                      kan_string_intern ("resource_prototype_t"), kan_string_intern ("prototype_1"));
+            state->stage = OUTER_REFERENCE_CACHING_TEST_STAGE_CHANGED_SCAN_REQUESTED;
+        }
+
         break;
     }
 
     case OUTER_REFERENCE_CACHING_TEST_STAGE_CHANGED_SCAN_DONE:
         break;
-    }
-
-    if (state->stage == OUTER_REFERENCE_CACHING_TEST_STAGE_INIT)
-    {
     }
 
     const struct kan_resource_update_outer_references_response_event_t *response;
@@ -738,6 +748,7 @@ TEST_UNIVERSE_RESOURCE_REFERENCE_API void kan_universe_mutator_execute_outer_ref
             case OUTER_REFERENCE_CACHING_TEST_STAGE_INIT:
             case OUTER_REFERENCE_CACHING_TEST_STAGE_FIRST_SCAN_DONE:
             case OUTER_REFERENCE_CACHING_TEST_STAGE_SECOND_SCAN_DONE:
+            case OUTER_REFERENCE_CACHING_TEST_STAGE_CHANGED_WAITING_FOR_CHANGE_DETECTION:
             case OUTER_REFERENCE_CACHING_TEST_STAGE_CHANGED_SCAN_DONE:
                 KAN_TEST_CHECK (KAN_FALSE)
                 break;
@@ -831,7 +842,7 @@ static void run_test (kan_context_handle_t context, kan_interned_string_t test_m
         .add_wait_time_ns = 100000000u,
         .modify_wait_time_ns = 100000000u,
         .use_load_only_string_registry = KAN_TRUE,
-        .observe_file_system = KAN_FALSE,
+        .observe_file_system = KAN_TRUE,
         .resource_directory_path = kan_string_intern (WORKSPACE_RESOURCES_MOUNT_PATH),
     };
 
