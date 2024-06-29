@@ -472,9 +472,9 @@ static const char *capture_meta_value_end;
 
 /*!rules:re2c:default
  "//" separator* "\\c_interface_scanner_disable" separator*
- { if (!parse_skip_until_enabled ()) { return KAN_FALSE; } continue; }
- "/""*" { if (!parse_subroutine_multi_line_comment ()) { return KAN_FALSE; } continue; }
- "//" { if (!parse_subroutine_single_line_comment ()) { return KAN_FALSE; } continue; }
+ { if (!parse_skip_until_enabled ()) { return PARSE_RESPONSE_FAILED; } continue; }
+ "/""*" { if (!parse_subroutine_multi_line_comment ()) { return PARSE_RESPONSE_FAILED; } continue; }
+ "//" { if (!parse_subroutine_single_line_comment ()) { return PARSE_RESPONSE_FAILED; } continue; }
 
  separator | any_preprocessor { optional_includable_object_append_token (); continue; }
 
@@ -482,7 +482,7 @@ static const char *capture_meta_value_end;
  {
      fprintf (stderr, "Error. [%ld:%ld]: Unable to parse next token. Parser: %s. Symbol code: 0x%x.\n",
          (long) io.cursor_line, (long) io.cursor_symbol, __func__, (int) *io.cursor);
-     return KAN_FALSE;
+     return PARSE_RESPONSE_FAILED;
  }
  */
 
@@ -678,7 +678,7 @@ static enum parse_response_t parse_struct (void)
              {
                  fprintf (stderr, "Error. [%ld:%ld]: Nested unions aren't supported.\n",
                      (long) io.cursor_line, (long) io.cursor_symbol);
-                 return KAN_FALSE;
+                 return PARSE_RESPONSE_FAILED;
              }
 
              inside_union = KAN_TRUE;
