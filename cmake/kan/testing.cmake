@@ -9,21 +9,32 @@ add_custom_target (test_kan COMMENT "All tests must be dependencies of this targ
 # Setups CTest test runners by scanning test unit sources and generating simple runner executables.
 # Arguments:
 # - TEST_UNIT: name of the unit that contains tests to be executed. Sources are scanned for KAN_TEST_CASE macro.
+#              This argument is only used when sources are not directly specified through TEST_SOURCES argument.
 # - TEST_SHARED_LIBRARY: name of the shared library to which test runner must link.
+# - TEST_SOURCES: list of sources to scan for KAN_TEST_CASE macro. Overrides TEST_UNIT argument.
 # - PROPERTIES: value of this argument is redirect to set_tests_properties for every generated test.
 function (kan_setup_tests)
-    cmake_parse_arguments (SETUP "" "TEST_UNIT;TEST_SHARED_LIBRARY" "PROPERTIES" ${ARGV})
-    if (DEFINED SETUP_UNPARSED_ARGUMENTS OR
-            NOT DEFINED SETUP_TEST_UNIT OR
+    cmake_parse_arguments (SETUP "" "TEST_UNIT;TEST_SHARED_LIBRARY" "TEST_SOURCES;PROPERTIES" ${ARGV})
+    if (DEFINED SETUP_UNPARSED_ARGUMENTS OR (
+            NOT DEFINED SETUP_TEST_UNIT AND NOT DEFINED SETUP_TEST_SOURCES) OR
             NOT DEFINED SETUP_TEST_SHARED_LIBRARY)
         message (FATAL_ERROR "Incorrect function arguments!")
     endif ()
 
-    message (STATUS "Setting up tests from \"${SETUP_TEST_UNIT}\" using \"${SETUP_TEST_SHARED_LIBRARY}\" library.")
-    get_target_property (TEST_SOURCES "${SETUP_TEST_UNIT}" SOURCES)
-    file (MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/Generated")
+    if (NOT DEFINED SETUP_TEST_SOURCES)
+        message (STATUS "Setting up tests from \"${SETUP_TEST_UNIT}\" using \"${SETUP_TEST_SHARED_LIBRARY}\" library.")
+        get_target_property (TEST_SOURCES "${SETUP_TEST_UNIT}" SOURCES)
+    else ()
+        message (STATUS "Setting up tests using \"${SETUP_TEST_SHARED_LIBRARY}\" library.")
+        set (TEST_SOURCES ${SETUP_TEST_SOURCES})
+    endif ()
 
+    file (MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/Generated")
     foreach (TEST_SOURCE ${TEST_SOURCES})
+        if (NOT IS_ABSOLUTE "${TEST_SOURCE}")
+            set (TEST_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/${TEST_SOURCE}")
+        endif ()
+
         if (NOT EXISTS "${TEST_SOURCE}" OR "${TEST_SOURCE}" MATCHES ".*/Generated/.*")
             continue ()
         endif ()

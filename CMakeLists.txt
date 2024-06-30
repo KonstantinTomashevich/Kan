@@ -29,6 +29,7 @@ include ("${CMAKE_CURRENT_SOURCE_DIR}/cmake/kan/global_options.cmake")
 include ("${CMAKE_CURRENT_SOURCE_DIR}/cmake/kan/reflection_generator.cmake")
 include ("${CMAKE_CURRENT_SOURCE_DIR}/cmake/kan/reflection_statics.cmake")
 include ("${CMAKE_CURRENT_SOURCE_DIR}/cmake/kan/testing.cmake")
+include ("${CMAKE_CURRENT_SOURCE_DIR}/cmake/kan/universe.cmake")
 
 # Must be called from root CMakeLists.txt, otherwise CTest configuration won't be placed into binary root.
 enable_testing ()
