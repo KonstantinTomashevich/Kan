@@ -1,13 +1,6 @@
 register_concrete (test_universe_transform)
 concrete_include (PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
-concrete_sources ("*.c")
-
-c_interface_scanner_setup (GLOB "*.c")
-reflection_generator_setup (GLOB "*.c")
-register_unit_reflection ()
-
-reflection_generator_get_output_file_path (REFLECTION_GENERATOR_OUTPUT_FILE_PATH)
-concrete_sources_direct ("${REFLECTION_GENERATOR_OUTPUT_FILE_PATH}")
+universe_concrete_setup_sources (GLOB "*.c")
 
 concrete_require (
         SCOPE PUBLIC
@@ -31,6 +24,6 @@ shared_library_verify ()
 shared_library_copy_linked_artefacts ()
 
 kan_setup_tests (
-        TEST_UNIT test_universe_transform
         TEST_SHARED_LIBRARY test_universe_transform_library
+        TEST_SOURCES "test_universe_transform.c"
         PROPERTIES TIMEOUT 2)

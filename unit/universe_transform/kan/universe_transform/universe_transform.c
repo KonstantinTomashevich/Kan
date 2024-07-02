@@ -4,6 +4,9 @@
 #include <kan/universe_time/universe_time.h>
 #include <kan/universe_transform/universe_transform.h>
 
+// We're not using universe preprocessor here as we're utilizing macros to write the same logic for 2d and 3d.
+// However, the might be changed in the future.
+
 // \c_interface_scanner_disable
 KAN_LOG_DEFINE_CATEGORY (universe_transform);
 // \c_interface_scanner_enable

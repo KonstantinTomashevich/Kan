@@ -1,5 +1,7 @@
 register_concrete (universe_resource_reference_kan)
 concrete_include (PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+universe_concrete_setup_sources (GLOB "*.c")
+concrete_implements_abstract (universe_resource_reference)
 
 concrete_require (
         SCOPE PRIVATE
@@ -7,9 +9,6 @@ concrete_require (
         CONCRETE_INTERFACE
         context_plugin_system context_reflection_system context_virtual_file_system serialization resource_pipeline
         universe_resource_reference_reflection)
-
-universe_concrete_setup_sources (GLOB "*.c")
-concrete_implements_abstract (universe_resource_reference)
 
 set (KAN_UNIVERSE_RESOURCE_REFERENCE_TEMPORARY_STACK "2048" CACHE STRING
         "Size of a chunk for temporary group stack for worker-related allocations.")
