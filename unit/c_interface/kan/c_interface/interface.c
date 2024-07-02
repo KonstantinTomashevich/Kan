@@ -430,30 +430,29 @@ struct encoded_strings_info_t
     kan_interned_string_t *strings;
 };
 
-static struct encoded_strings_info_t deserialize_encoded_strings (struct kan_stream_t *stream)
+static kan_bool_t deserialize_encoded_strings (struct kan_stream_t *stream, struct encoded_strings_info_t *output)
 {
-    struct encoded_strings_info_t info;
-    info.count = 0u;
-    info.strings = NULL;
+    output->count = 0u;
+    output->strings = NULL;
 
     uint32_t serialized_count;
     if (stream->operations->read (stream, sizeof (uint32_t), &serialized_count) != sizeof (uint32_t))
     {
-        return info;
+        return KAN_FALSE;
     }
 
-    info.count = serialized_count;
-    if (info.count == 0u)
+    output->count = serialized_count;
+    if (output->count == 0u)
     {
-        info.strings = NULL;
-        return info;
+        return KAN_TRUE;
     }
 
-    info.strings = kan_allocate_general (kan_c_interface_allocation_group (),
-                                         sizeof (kan_interned_string_t) * info.count, _Alignof (kan_interned_string_t));
+    output->strings =
+        kan_allocate_general (kan_c_interface_allocation_group (), sizeof (kan_interned_string_t) * output->count,
+                              _Alignof (kan_interned_string_t));
     char buffer[KAN_C_INTERFACE_ENCODED_STRING_MAX_LENGTH + 1u];
 
-    for (uint64_t index = 0u; index < info.count; ++index)
+    for (uint64_t index = 0u; index < output->count; ++index)
     {
         uint8_t serialized_length;
         if (stream->operations->read (stream, sizeof (uint8_t), &serialized_length) == sizeof (uint8_t))
@@ -461,19 +460,18 @@ static struct encoded_strings_info_t deserialize_encoded_strings (struct kan_str
             if (stream->operations->read (stream, serialized_length, buffer) == serialized_length)
             {
                 buffer[serialized_length] = '\0';
-                info.strings[index] = kan_string_intern (buffer);
+                output->strings[index] = kan_string_intern (buffer);
                 continue;
             }
         }
 
         // Failed, free memory and exit.
-        kan_free_general (kan_c_interface_allocation_group (), info.strings,
-                          sizeof (kan_interned_string_t) * info.count);
-        info.strings = NULL;
-        break;
+        kan_free_general (kan_c_interface_allocation_group (), output->strings,
+                          sizeof (kan_interned_string_t) * output->count);
+        return KAN_FALSE;
     }
 
-    return info;
+    return KAN_TRUE;
 }
 
 static kan_bool_t meta_attachment_deserialize (struct kan_c_meta_attachment_t *attachment,
@@ -719,9 +717,9 @@ struct kan_c_interface_t *kan_c_interface_deserialize (struct kan_stream_t *stre
     interface->symbols = NULL;
 
     kan_bool_t result = KAN_TRUE;
-    struct encoded_strings_info_t info = deserialize_encoded_strings (stream);
+    struct encoded_strings_info_t info;
 
-    if (info.strings)
+    if (deserialize_encoded_strings (stream, &info))
     {
         result = c_interface_deserialize (interface, &info, stream);
         kan_free_general (kan_c_interface_allocation_group (), info.strings,
