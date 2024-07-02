@@ -2263,7 +2263,7 @@ static inline enum parse_response_t process_block_exit (void)
             }
 
             break;
-            
+
         case PROCESS_QUERY_TYPE_SIGNAL_READ:
             if (!output_use_output_line () ||
                 !output_indexed_close_access_unguarded (process.stack_top->name, "signal", "read") ||
@@ -2273,9 +2273,9 @@ static inline enum parse_response_t process_block_exit (void)
                 fprintf (stderr, "Failure during output.\n");
                 return PARSE_RESPONSE_FAILED;
             }
-            
+
             break;
-            
+
         case PROCESS_QUERY_TYPE_SIGNAL_UPDATE:
             if (!output_use_output_line () ||
                 !output_indexed_close_access_unguarded (process.stack_top->name, "signal", "update") ||
@@ -2285,9 +2285,9 @@ static inline enum parse_response_t process_block_exit (void)
                 fprintf (stderr, "Failure during output.\n");
                 return PARSE_RESPONSE_FAILED;
             }
-            
+
             break;
-            
+
         case PROCESS_QUERY_TYPE_SIGNAL_DELETE:
             if (!output_use_output_line () ||
                 !output_indexed_close_access_unguarded (process.stack_top->name, "signal", "delete") ||
@@ -2297,9 +2297,9 @@ static inline enum parse_response_t process_block_exit (void)
                 fprintf (stderr, "Failure during output.\n");
                 return PARSE_RESPONSE_FAILED;
             }
-            
+
             break;
-            
+
         case PROCESS_QUERY_TYPE_SIGNAL_WRITE:
             if (!output_use_output_line () ||
                 !output_indexed_close_access_unguarded (process.stack_top->name, "signal", "write") ||
@@ -2309,7 +2309,7 @@ static inline enum parse_response_t process_block_exit (void)
                 fprintf (stderr, "Failure during output.\n");
                 return PARSE_RESPONSE_FAILED;
             }
-            
+
             break;
 
         case PROCESS_QUERY_TYPE_INTERVAL_ASCENDING_READ:
@@ -2478,10 +2478,10 @@ static inline kan_bool_t output_query_access_close_unguarded (struct process_que
 
     case PROCESS_QUERY_TYPE_VALUE_WRITE:
         return output_indexed_close_access_unguarded (query_node->name, "value", "write");
-        
+
     case PROCESS_QUERY_TYPE_SIGNAL_READ:
         return output_indexed_close_access_unguarded (query_node->name, "signal", "read");
-        
+
     case PROCESS_QUERY_TYPE_SIGNAL_UPDATE:
         return output_indexed_close_access_unguarded (query_node->name, "signal", "update");
 
@@ -2552,10 +2552,10 @@ static inline kan_bool_t output_query_cursor_close_unguarded (struct process_que
 
     case PROCESS_QUERY_TYPE_VALUE_WRITE:
         return output_indexed_close_cursor_unguarded (query_node->name, "value", "", "write");
-        
+
     case PROCESS_QUERY_TYPE_SIGNAL_READ:
         return output_indexed_close_cursor_unguarded (query_node->name, "signal", "", "read");
-        
+
     case PROCESS_QUERY_TYPE_SIGNAL_UPDATE:
         return output_indexed_close_cursor_unguarded (query_node->name, "signal", "", "update");
 
@@ -2855,7 +2855,7 @@ static inline enum parse_response_t process_access_delete (const char *name_begi
         }
 
         break;
-        
+
     case PROCESS_QUERY_TYPE_SIGNAL_DELETE:
         if (!output_string ("kan_repository_indexed_signal_delete_access_delete (&") || !output_string (name) ||
             !output_string ("_access);\n"))
@@ -2863,7 +2863,7 @@ static inline enum parse_response_t process_access_delete (const char *name_begi
             fprintf (stderr, "Failure during output.\n");
             return PARSE_RESPONSE_FAILED;
         }
-        
+
         break;
 
     case PROCESS_QUERY_TYPE_SIGNAL_WRITE:

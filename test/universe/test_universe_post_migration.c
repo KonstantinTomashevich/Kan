@@ -1,8 +1,8 @@
 #include <test_universe_post_migration_api.h>
 
 #include <kan/testing/testing.h>
-#include <kan/universe/universe.h>
 #include <kan/universe/preprocessor_markup.h>
+#include <kan/universe/universe.h>
 
 // We need those defines to trick the reflection generator and generate reflection with the fake equal names.
 #define migration_counters_singleton_init migration_counters_singleton_init_1
