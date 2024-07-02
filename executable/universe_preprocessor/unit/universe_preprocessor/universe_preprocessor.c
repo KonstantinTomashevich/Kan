@@ -98,6 +98,13 @@ struct scanned_indexed_field_query_t
     char field_path[KAN_UNIVERSE_PREPROCESSOR_TARGET_PATH_MAX_LENGTH];
 };
 
+struct scanned_signal_query_t
+{
+    kan_interned_string_t type;
+    char field_path[KAN_UNIVERSE_PREPROCESSOR_TARGET_PATH_MAX_LENGTH];
+    char signal_value[KAN_UNIVERSE_PREPROCESSOR_SIGNAL_VALUE_MAX_LENGTH];
+};
+
 struct scanned_state_t
 {
     kan_interned_string_t name;
@@ -134,6 +141,18 @@ struct scanned_state_t
 
     /// \meta reflection_dynamic_array_type = "struct scanned_indexed_field_query_t"
     struct kan_dynamic_array_t indexed_value_write_queries;
+
+    /// \meta reflection_dynamic_array_type = "struct scanned_signal_query_t"
+    struct kan_dynamic_array_t indexed_signal_read_queries;
+
+    /// \meta reflection_dynamic_array_type = "struct scanned_signal_query_t"
+    struct kan_dynamic_array_t indexed_signal_update_queries;
+
+    /// \meta reflection_dynamic_array_type = "struct scanned_signal_query_t"
+    struct kan_dynamic_array_t indexed_signal_delete_queries;
+
+    /// \meta reflection_dynamic_array_type = "struct scanned_signal_query_t"
+    struct kan_dynamic_array_t indexed_signal_write_queries;
 
     /// \meta reflection_dynamic_array_type = "struct scanned_indexed_field_query_t"
     struct kan_dynamic_array_t indexed_interval_read_queries;
@@ -176,6 +195,10 @@ enum process_query_type_t
     PROCESS_QUERY_TYPE_VALUE_UPDATE,
     PROCESS_QUERY_TYPE_VALUE_DELETE,
     PROCESS_QUERY_TYPE_VALUE_WRITE,
+    PROCESS_QUERY_TYPE_SIGNAL_READ,
+    PROCESS_QUERY_TYPE_SIGNAL_UPDATE,
+    PROCESS_QUERY_TYPE_SIGNAL_DELETE,
+    PROCESS_QUERY_TYPE_SIGNAL_WRITE,
     PROCESS_QUERY_TYPE_INTERVAL_ASCENDING_READ,
     PROCESS_QUERY_TYPE_INTERVAL_ASCENDING_UPDATE,
     PROCESS_QUERY_TYPE_INTERVAL_ASCENDING_DELETE,
@@ -306,6 +329,19 @@ static void scanned_state_init (struct scanned_state_t *state)
                             sizeof (struct scanned_indexed_field_query_t),
                             _Alignof (struct scanned_indexed_field_query_t), scan.allocation_group);
 
+    kan_dynamic_array_init (&state->indexed_signal_read_queries, KAN_UNIVERSE_PREPROCESSOR_QUERY_INITIAL_SLOTS,
+                            sizeof (struct scanned_signal_query_t), _Alignof (struct scanned_signal_query_t),
+                            scan.allocation_group);
+    kan_dynamic_array_init (&state->indexed_signal_update_queries, KAN_UNIVERSE_PREPROCESSOR_QUERY_INITIAL_SLOTS,
+                            sizeof (struct scanned_signal_query_t), _Alignof (struct scanned_signal_query_t),
+                            scan.allocation_group);
+    kan_dynamic_array_init (&state->indexed_signal_delete_queries, KAN_UNIVERSE_PREPROCESSOR_QUERY_INITIAL_SLOTS,
+                            sizeof (struct scanned_signal_query_t), _Alignof (struct scanned_signal_query_t),
+                            scan.allocation_group);
+    kan_dynamic_array_init (&state->indexed_signal_write_queries, KAN_UNIVERSE_PREPROCESSOR_QUERY_INITIAL_SLOTS,
+                            sizeof (struct scanned_signal_query_t), _Alignof (struct scanned_signal_query_t),
+                            scan.allocation_group);
+
     kan_dynamic_array_init (&state->indexed_interval_read_queries, KAN_UNIVERSE_PREPROCESSOR_QUERY_INITIAL_SLOTS,
                             sizeof (struct scanned_indexed_field_query_t),
                             _Alignof (struct scanned_indexed_field_query_t), scan.allocation_group);
@@ -338,6 +374,10 @@ static void scanned_state_shutdown (struct scanned_state_t *state)
     kan_dynamic_array_shutdown (&state->indexed_value_update_queries);
     kan_dynamic_array_shutdown (&state->indexed_value_delete_queries);
     kan_dynamic_array_shutdown (&state->indexed_value_write_queries);
+    kan_dynamic_array_shutdown (&state->indexed_signal_read_queries);
+    kan_dynamic_array_shutdown (&state->indexed_signal_update_queries);
+    kan_dynamic_array_shutdown (&state->indexed_signal_delete_queries);
+    kan_dynamic_array_shutdown (&state->indexed_signal_write_queries);
     kan_dynamic_array_shutdown (&state->indexed_interval_read_queries);
     kan_dynamic_array_shutdown (&state->indexed_interval_update_queries);
     kan_dynamic_array_shutdown (&state->indexed_interval_delete_queries);
@@ -614,6 +654,100 @@ static inline kan_bool_t scan_value (const char *name_begin,
     return KAN_TRUE;
 }
 
+static inline kan_bool_t insert_unique_scanned_signal_query_into_array (struct kan_dynamic_array_t *array,
+                                                                        kan_interned_string_t type,
+                                                                        const char *field_begin,
+                                                                        const char *field_end,
+                                                                        const char *value_begin,
+                                                                        const char *value_end)
+{
+    const uint64_t field_length = field_end - field_begin;
+    if (field_length > KAN_UNIVERSE_PREPROCESSOR_TARGET_PATH_MAX_LENGTH - 1u)
+    {
+        fprintf (stderr, "Error. [%ld:%ld]: Found field path \"%s\" that is longer than maximum %d.\n",
+                 (long) io.cursor_line, (long) io.cursor_symbol, kan_char_sequence_intern (field_begin, field_end),
+                 (int) (KAN_UNIVERSE_PREPROCESSOR_TARGET_PATH_MAX_LENGTH - 1u));
+        return KAN_FALSE;
+    }
+
+    const uint64_t value_length = value_end - value_begin;
+    if (value_length > KAN_UNIVERSE_PREPROCESSOR_SIGNAL_VALUE_MAX_LENGTH - 1u)
+    {
+        fprintf (stderr, "Error. [%ld:%ld]: Found signal value literal \"%s\" that is longer than maximum %d.\n",
+                 (long) io.cursor_line, (long) io.cursor_symbol, kan_char_sequence_intern (value_begin, value_end),
+                 (int) (KAN_UNIVERSE_PREPROCESSOR_TARGET_PATH_MAX_LENGTH - 1u));
+        return KAN_FALSE;
+    }
+
+    for (uint64_t index = 0u; index < array->size; ++index)
+    {
+        struct scanned_signal_query_t *query = &((struct scanned_signal_query_t *) array->data)[index];
+        if (query->type == type && strncmp (field_begin, query->field_path, field_length) == 0 &&
+            strncmp (value_begin, query->signal_value, value_length) == 0)
+        {
+            // Already present.
+            return KAN_TRUE;
+        }
+    }
+
+    struct scanned_signal_query_t *spot = kan_dynamic_array_add_last (array);
+    if (!spot)
+    {
+        kan_dynamic_array_set_capacity (array, KAN_MAX (1u, array->size * 2u));
+        spot = kan_dynamic_array_add_last (array);
+        KAN_ASSERT (spot)
+    }
+
+    spot->type = type;
+    memcpy (spot->field_path, field_begin, field_length);
+    spot->field_path[field_length] = '\0';
+    memcpy (spot->signal_value, value_begin, value_length);
+    spot->signal_value[value_length] = '\0';
+    return KAN_TRUE;
+}
+
+static inline kan_bool_t scan_signal (const char *name_begin,
+                                      const char *name_end,
+                                      enum indexed_access_type_t access,
+                                      const char *type_begin,
+                                      const char *type_end,
+                                      const char *field_begin,
+                                      const char *field_end,
+                                      const char *value_begin,
+                                      const char *value_end)
+{
+    if (!scan_ensure_state_bound ())
+    {
+        return KAN_FALSE;
+    }
+
+    struct scanned_state_t *state = &((struct scanned_state_t *) scan.states.data)[scan.scan_bound_state_index];
+    struct kan_dynamic_array_t *target_array = NULL;
+
+    switch (access)
+    {
+    case INDEXED_ACCESS_TYPE_READ:
+        target_array = &state->indexed_signal_read_queries;
+        break;
+
+    case INDEXED_ACCESS_TYPE_UPDATE:
+        target_array = &state->indexed_signal_update_queries;
+        break;
+
+    case INDEXED_ACCESS_TYPE_DELETE:
+        target_array = &state->indexed_signal_delete_queries;
+        break;
+
+    case INDEXED_ACCESS_TYPE_WRITE:
+        target_array = &state->indexed_signal_write_queries;
+        break;
+    }
+
+    insert_unique_scanned_signal_query_into_array (target_array, kan_char_sequence_intern (type_begin, type_end),
+                                                   field_begin, field_end, value_begin, value_end);
+    return KAN_TRUE;
+}
+
 static inline kan_bool_t scan_interval (const char *name_begin,
                                         const char *name_end,
                                         enum indexed_access_type_t access,
@@ -848,7 +982,7 @@ static inline enum parse_response_t process_generate_state_queries (const char *
 
     for (uint64_t index = 0u; index < state->singleton_write_queries.size; ++index)
     {
-        if (!output_string ("struct kan_repository_singleton_write_query_t read__") ||
+        if (!output_string ("struct kan_repository_singleton_write_query_t write__") ||
             !output_string (((kan_interned_string_t *) state->singleton_write_queries.data)[index]) ||
             !output_string (";\n"))
         {
@@ -962,6 +1096,62 @@ static inline enum parse_response_t process_generate_state_queries (const char *
         if (!output_string ("struct kan_repository_indexed_value_write_query_t write_value__") ||
             !output_string (query->type) || !output_string ("__") || !output_field_path (query->field_path) ||
             !output_string (";\n"))
+        {
+            fprintf (stderr, "Failure during output.\n");
+            return PARSE_RESPONSE_FAILED;
+        }
+    }
+
+    for (uint64_t index = 0u; index < state->indexed_signal_read_queries.size; ++index)
+    {
+        struct scanned_signal_query_t *query =
+            &((struct scanned_signal_query_t *) state->indexed_signal_read_queries.data)[index];
+
+        if (!output_string ("struct kan_repository_indexed_signal_read_query_t read_value__") ||
+            !output_string (query->type) || !output_string ("__") || !output_field_path (query->field_path) ||
+            !output_string ("__") || !output_string (query->signal_value) || !output_string (";\n"))
+        {
+            fprintf (stderr, "Failure during output.\n");
+            return PARSE_RESPONSE_FAILED;
+        }
+    }
+
+    for (uint64_t index = 0u; index < state->indexed_signal_update_queries.size; ++index)
+    {
+        struct scanned_signal_query_t *query =
+            &((struct scanned_signal_query_t *) state->indexed_signal_update_queries.data)[index];
+
+        if (!output_string ("struct kan_repository_indexed_signal_update_query_t update_value__") ||
+            !output_string (query->type) || !output_string ("__") || !output_field_path (query->field_path) ||
+            !output_string ("__") || !output_string (query->signal_value) || !output_string (";\n"))
+        {
+            fprintf (stderr, "Failure during output.\n");
+            return PARSE_RESPONSE_FAILED;
+        }
+    }
+
+    for (uint64_t index = 0u; index < state->indexed_signal_delete_queries.size; ++index)
+    {
+        struct scanned_signal_query_t *query =
+            &((struct scanned_signal_query_t *) state->indexed_signal_delete_queries.data)[index];
+
+        if (!output_string ("struct kan_repository_indexed_signal_delete_query_t delete_value__") ||
+            !output_string (query->type) || !output_string ("__") || !output_field_path (query->field_path) ||
+            !output_string ("__") || !output_string (query->signal_value) || !output_string (";\n"))
+        {
+            fprintf (stderr, "Failure during output.\n");
+            return PARSE_RESPONSE_FAILED;
+        }
+    }
+
+    for (uint64_t index = 0u; index < state->indexed_signal_write_queries.size; ++index)
+    {
+        struct scanned_signal_query_t *query =
+            &((struct scanned_signal_query_t *) state->indexed_signal_write_queries.data)[index];
+
+        if (!output_string ("struct kan_repository_indexed_signal_write_query_t write_value__") ||
+            !output_string (query->type) || !output_string ("__") || !output_field_path (query->field_path) ||
+            !output_string ("__") || !output_string (query->signal_value) || !output_string (";\n"))
         {
             fprintf (stderr, "Failure during output.\n");
             return PARSE_RESPONSE_FAILED;
@@ -1457,6 +1647,150 @@ static inline enum parse_response_t process_value_write (const char *name_begin,
     return PARSE_RESPONSE_BLOCK_PROCESSED;
 }
 
+static inline kan_bool_t output_signal_begin (kan_interned_string_t name,
+                                              const char *type_begin,
+                                              const char *type_end,
+                                              const char *if_const,
+                                              const char *access,
+                                              const char *field_begin,
+                                              const char *field_end,
+                                              const char *signal_value_begin,
+                                              const char *signal_value_end)
+{
+    // Should be ensured by previous pass.
+    KAN_ASSERT (process.bound_state)
+
+    return output_use_output_line () && output_string ("struct kan_repository_indexed_signal_") &&
+           output_string (access) && output_string ("_cursor_t ") && output_string (name) &&
+           output_string ("_cursor = kan_repository_indexed_signal_") && output_string (access) &&
+           output_string ("_query_execute (&(") && output_string (process.bound_state_path) && output_string (")->") &&
+           output_string (access) && output_string ("_signal__") && output_sequence (type_begin, type_end) &&
+           output_string ("__") && output_field_path_sequence (field_begin, field_end) && output_string ("__") &&
+           output_sequence (signal_value_begin, signal_value_end) &&
+           output_string (");\nwhile (KAN_TRUE)\n{\n    struct kan_repository_indexed_signal_") &&
+           output_string (access) && output_string ("_access_t ") && output_string (name) &&
+           output_string ("_access = kan_repository_indexed_signal_") && output_string (access) &&
+           output_string ("_cursor_next (&") && output_string (name) && output_string ("_cursor);\n    ") &&
+           output_string (if_const) && output_string ("struct ") && output_sequence (type_begin, type_end) &&
+           output_string (" *") && output_string (name) && output_string (" = kan_repository_indexed_signal_") &&
+           output_string (access) && output_string ("_access_resolve (&") && output_string (name) &&
+           output_string ("_access);\n    kan_bool_t ") && output_string (name) &&
+           output_string ("_access_expired = KAN_FALSE;\n    if (") && output_string (name) && output_string (")\n") &&
+           output_use_source_line ();
+}
+
+static inline enum parse_response_t process_signal_read (const char *name_begin,
+                                                         const char *name_end,
+                                                         const char *type_begin,
+                                                         const char *type_end,
+                                                         const char *field_begin,
+                                                         const char *field_end,
+                                                         const char *signal_value_begin,
+                                                         const char *signal_value_end)
+{
+    if (!output_markup_macro_comment ())
+    {
+        fprintf (stderr, "Failure during output.\n");
+        return PARSE_RESPONSE_FAILED;
+    }
+
+    kan_interned_string_t name = kan_char_sequence_intern (name_begin, name_end);
+    push_query_stack_node (name, PROCESS_QUERY_TYPE_SIGNAL_READ);
+
+    if (!output_signal_begin (name, type_begin, type_end, "const ", "read", field_begin, field_end, signal_value_begin,
+                              signal_value_end))
+    {
+        fprintf (stderr, "Failure during output.\n");
+        return PARSE_RESPONSE_FAILED;
+    }
+
+    return PARSE_RESPONSE_BLOCK_PROCESSED;
+}
+
+static inline enum parse_response_t process_signal_update (const char *name_begin,
+                                                           const char *name_end,
+                                                           const char *type_begin,
+                                                           const char *type_end,
+                                                           const char *field_begin,
+                                                           const char *field_end,
+                                                           const char *signal_value_begin,
+                                                           const char *signal_value_end)
+{
+    if (!output_markup_macro_comment ())
+    {
+        fprintf (stderr, "Failure during output.\n");
+        return PARSE_RESPONSE_FAILED;
+    }
+
+    kan_interned_string_t name = kan_char_sequence_intern (name_begin, name_end);
+    push_query_stack_node (name, PROCESS_QUERY_TYPE_SIGNAL_UPDATE);
+
+    if (!output_signal_begin (name, type_begin, type_end, "", "update", field_begin, field_end, signal_value_begin,
+                              signal_value_end))
+    {
+        fprintf (stderr, "Failure during output.\n");
+        return PARSE_RESPONSE_FAILED;
+    }
+
+    return PARSE_RESPONSE_BLOCK_PROCESSED;
+}
+
+static inline enum parse_response_t process_signal_delete (const char *name_begin,
+                                                           const char *name_end,
+                                                           const char *type_begin,
+                                                           const char *type_end,
+                                                           const char *field_begin,
+                                                           const char *field_end,
+                                                           const char *signal_value_begin,
+                                                           const char *signal_value_end)
+{
+    if (!output_markup_macro_comment ())
+    {
+        fprintf (stderr, "Failure during output.\n");
+        return PARSE_RESPONSE_FAILED;
+    }
+
+    kan_interned_string_t name = kan_char_sequence_intern (name_begin, name_end);
+    push_query_stack_node (name, PROCESS_QUERY_TYPE_SIGNAL_DELETE);
+
+    if (!output_signal_begin (name, type_begin, type_end, "const ", "delete", field_begin, field_end,
+                              signal_value_begin, signal_value_end))
+    {
+        fprintf (stderr, "Failure during output.\n");
+        return PARSE_RESPONSE_FAILED;
+    }
+
+    return PARSE_RESPONSE_BLOCK_PROCESSED;
+}
+
+static inline enum parse_response_t process_signal_write (const char *name_begin,
+                                                          const char *name_end,
+                                                          const char *type_begin,
+                                                          const char *type_end,
+                                                          const char *field_begin,
+                                                          const char *field_end,
+                                                          const char *signal_value_begin,
+                                                          const char *signal_value_end)
+{
+    if (!output_markup_macro_comment ())
+    {
+        fprintf (stderr, "Failure during output.\n");
+        return PARSE_RESPONSE_FAILED;
+    }
+
+    kan_interned_string_t name = kan_char_sequence_intern (name_begin, name_end);
+    push_query_stack_node (name, PROCESS_QUERY_TYPE_SIGNAL_WRITE);
+
+    if (!output_signal_begin (name, type_begin, type_end, "", "write", field_begin, field_end, signal_value_begin,
+                              signal_value_end))
+    {
+        fprintf (stderr, "Failure during output.\n");
+        return PARSE_RESPONSE_FAILED;
+    }
+
+    return PARSE_RESPONSE_BLOCK_PROCESSED;
+}
+
 static inline kan_bool_t output_interval_begin (kan_interned_string_t name,
                                                 const char *type_begin,
                                                 const char *type_end,
@@ -1474,12 +1808,12 @@ static inline kan_bool_t output_interval_begin (kan_interned_string_t name,
     KAN_ASSERT (process.bound_state)
 
     return output_use_output_line () && output_string ("struct kan_repository_indexed_interval_") &&
-           output_string (access) && output_string ("_cursor_t ") && output_string (name) &&
-           output_string ("_cursor = kan_repository_indexed_interval_") && output_string (direction) &&
-           output_string ("_") && output_string (access) && output_string ("_query_execute (&(") &&
-           output_string (process.bound_state_path) && output_string (")->") && output_string (access) &&
-           output_string ("_interval__") && output_sequence (type_begin, type_end) && output_string ("__") &&
-           output_field_path_sequence (field_begin, field_end) && output_string (", ") &&
+           output_string (direction) && output_string ("_") && output_string (access) && output_string ("_cursor_t ") &&
+           output_string (name) && output_string ("_cursor = kan_repository_indexed_interval_") &&
+           output_string (access) && output_string ("_query_execute_") && output_string (direction) &&
+           output_string (" (&(") && output_string (process.bound_state_path) && output_string (")->") &&
+           output_string (access) && output_string ("_interval__") && output_sequence (type_begin, type_end) &&
+           output_string ("__") && output_field_path_sequence (field_begin, field_end) && output_string (", ") &&
            output_sequence (argument_min_begin, argument_min_end) && output_string (", ") &&
            output_sequence (argument_max_begin, argument_max_end) &&
            output_string (");\nwhile (KAN_TRUE)\n{\n    struct kan_repository_indexed_interval_") &&
@@ -1929,6 +2263,54 @@ static inline enum parse_response_t process_block_exit (void)
             }
 
             break;
+            
+        case PROCESS_QUERY_TYPE_SIGNAL_READ:
+            if (!output_use_output_line () ||
+                !output_indexed_close_access_unguarded (process.stack_top->name, "signal", "read") ||
+                !output_use_source_line () || !output_sequence (io.token, io.cursor) ||
+                !output_indexed_end (process.stack_top->name, "signal", "", "read"))
+            {
+                fprintf (stderr, "Failure during output.\n");
+                return PARSE_RESPONSE_FAILED;
+            }
+            
+            break;
+            
+        case PROCESS_QUERY_TYPE_SIGNAL_UPDATE:
+            if (!output_use_output_line () ||
+                !output_indexed_close_access_unguarded (process.stack_top->name, "signal", "update") ||
+                !output_use_source_line () || !output_sequence (io.token, io.cursor) ||
+                !output_indexed_end (process.stack_top->name, "signal", "", "update"))
+            {
+                fprintf (stderr, "Failure during output.\n");
+                return PARSE_RESPONSE_FAILED;
+            }
+            
+            break;
+            
+        case PROCESS_QUERY_TYPE_SIGNAL_DELETE:
+            if (!output_use_output_line () ||
+                !output_indexed_close_access_unguarded (process.stack_top->name, "signal", "delete") ||
+                !output_use_source_line () || !output_sequence (io.token, io.cursor) ||
+                !output_indexed_end (process.stack_top->name, "signal", "", "delete"))
+            {
+                fprintf (stderr, "Failure during output.\n");
+                return PARSE_RESPONSE_FAILED;
+            }
+            
+            break;
+            
+        case PROCESS_QUERY_TYPE_SIGNAL_WRITE:
+            if (!output_use_output_line () ||
+                !output_indexed_close_access_unguarded (process.stack_top->name, "signal", "write") ||
+                !output_use_source_line () || !output_sequence (io.token, io.cursor) ||
+                !output_indexed_end (process.stack_top->name, "signal", "", "write"))
+            {
+                fprintf (stderr, "Failure during output.\n");
+                return PARSE_RESPONSE_FAILED;
+            }
+            
+            break;
 
         case PROCESS_QUERY_TYPE_INTERVAL_ASCENDING_READ:
             if (!output_use_output_line () ||
@@ -2096,6 +2478,18 @@ static inline kan_bool_t output_query_access_close_unguarded (struct process_que
 
     case PROCESS_QUERY_TYPE_VALUE_WRITE:
         return output_indexed_close_access_unguarded (query_node->name, "value", "write");
+        
+    case PROCESS_QUERY_TYPE_SIGNAL_READ:
+        return output_indexed_close_access_unguarded (query_node->name, "signal", "read");
+        
+    case PROCESS_QUERY_TYPE_SIGNAL_UPDATE:
+        return output_indexed_close_access_unguarded (query_node->name, "signal", "update");
+
+    case PROCESS_QUERY_TYPE_SIGNAL_DELETE:
+        return output_indexed_close_access_unguarded (query_node->name, "signal", "delete");
+
+    case PROCESS_QUERY_TYPE_SIGNAL_WRITE:
+        return output_indexed_close_access_unguarded (query_node->name, "signal", "write");
 
     case PROCESS_QUERY_TYPE_INTERVAL_ASCENDING_READ:
     case PROCESS_QUERY_TYPE_INTERVAL_DESCENDING_READ:
@@ -2158,6 +2552,18 @@ static inline kan_bool_t output_query_cursor_close_unguarded (struct process_que
 
     case PROCESS_QUERY_TYPE_VALUE_WRITE:
         return output_indexed_close_cursor_unguarded (query_node->name, "value", "", "write");
+        
+    case PROCESS_QUERY_TYPE_SIGNAL_READ:
+        return output_indexed_close_cursor_unguarded (query_node->name, "signal", "", "read");
+        
+    case PROCESS_QUERY_TYPE_SIGNAL_UPDATE:
+        return output_indexed_close_cursor_unguarded (query_node->name, "signal", "", "update");
+
+    case PROCESS_QUERY_TYPE_SIGNAL_DELETE:
+        return output_indexed_close_cursor_unguarded (query_node->name, "signal", "", "delete");
+
+    case PROCESS_QUERY_TYPE_SIGNAL_WRITE:
+        return output_indexed_close_cursor_unguarded (query_node->name, "signal", "", "write");
 
     case PROCESS_QUERY_TYPE_INTERVAL_ASCENDING_READ:
         return output_indexed_close_cursor_unguarded (query_node->name, "interval", "ascending_", "read");
@@ -2396,6 +2802,8 @@ static inline enum parse_response_t process_access_delete (const char *name_begi
     case PROCESS_QUERY_TYPE_SEQUENCE_UPDATE:
     case PROCESS_QUERY_TYPE_VALUE_READ:
     case PROCESS_QUERY_TYPE_VALUE_UPDATE:
+    case PROCESS_QUERY_TYPE_SIGNAL_READ:
+    case PROCESS_QUERY_TYPE_SIGNAL_UPDATE:
     case PROCESS_QUERY_TYPE_INTERVAL_ASCENDING_READ:
     case PROCESS_QUERY_TYPE_INTERVAL_ASCENDING_UPDATE:
     case PROCESS_QUERY_TYPE_INTERVAL_DESCENDING_READ:
@@ -2440,6 +2848,26 @@ static inline enum parse_response_t process_access_delete (const char *name_begi
 
     case PROCESS_QUERY_TYPE_VALUE_WRITE:
         if (!output_string ("kan_repository_indexed_value_write_access_delete (&") || !output_string (name) ||
+            !output_string ("_access);\n"))
+        {
+            fprintf (stderr, "Failure during output.\n");
+            return PARSE_RESPONSE_FAILED;
+        }
+
+        break;
+        
+    case PROCESS_QUERY_TYPE_SIGNAL_DELETE:
+        if (!output_string ("kan_repository_indexed_signal_delete_access_delete (&") || !output_string (name) ||
+            !output_string ("_access);\n"))
+        {
+            fprintf (stderr, "Failure during output.\n");
+            return PARSE_RESPONSE_FAILED;
+        }
+        
+        break;
+
+    case PROCESS_QUERY_TYPE_SIGNAL_WRITE:
+        if (!output_string ("kan_repository_indexed_signal_write_access_delete (&") || !output_string (name) ||
             !output_string ("_access);\n"))
         {
             fprintf (stderr, "Failure during output.\n");
@@ -2556,6 +2984,7 @@ static enum parse_response_t scan_phase_singleton (enum singleton_access_type_t 
 static enum parse_response_t scan_phase_indexed_insert (void);
 static enum parse_response_t scan_phase_sequence (enum indexed_access_type_t access_type);
 static enum parse_response_t scan_phase_value (enum indexed_access_type_t access_type);
+static enum parse_response_t scan_phase_signal (enum indexed_access_type_t access_type);
 static enum parse_response_t scan_phase_interval (enum indexed_access_type_t access_type);
 static enum parse_response_t scan_phase_event_insert (void);
 static enum parse_response_t scan_phase_event_fetch (void);
@@ -2579,6 +3008,10 @@ static enum parse_response_t scan_phase_main (void)
          "KAN_UP_VALUE_UPDATE" separator* "(" { return scan_phase_value (INDEXED_ACCESS_TYPE_UPDATE); }
          "KAN_UP_VALUE_DELETE" separator* "(" { return scan_phase_value (INDEXED_ACCESS_TYPE_DELETE); }
          "KAN_UP_VALUE_WRITE" separator* "(" { return scan_phase_value (INDEXED_ACCESS_TYPE_WRITE); }
+         "KAN_UP_SIGNAL_READ" separator* "(" { return scan_phase_signal (INDEXED_ACCESS_TYPE_READ); }
+         "KAN_UP_SIGNAL_UPDATE" separator* "(" { return scan_phase_signal (INDEXED_ACCESS_TYPE_UPDATE); }
+         "KAN_UP_SIGNAL_DELETE" separator* "(" { return scan_phase_signal (INDEXED_ACCESS_TYPE_DELETE); }
+         "KAN_UP_SIGNAL_WRITE" separator* "(" { return scan_phase_signal (INDEXED_ACCESS_TYPE_WRITE); }
          "KAN_UP_INTERVAL_ASCENDING_READ" separator* "(" { return scan_phase_interval (INDEXED_ACCESS_TYPE_READ); }
          "KAN_UP_INTERVAL_ASCENDING_UPDATE" separator* "(" { return scan_phase_interval (INDEXED_ACCESS_TYPE_UPDATE); }
          "KAN_UP_INTERVAL_ASCENDING_DELETE" separator* "(" { return scan_phase_interval (INDEXED_ACCESS_TYPE_DELETE); }
@@ -2781,6 +3214,43 @@ static enum parse_response_t scan_phase_value (enum indexed_access_type_t access
          {
              return scan_value (name_begin, name_end, access_type, type_begin, type_end, field_begin, field_end,
                  argument_begin, argument_end) ?
+                 PARSE_RESPONSE_BLOCK_PROCESSED : PARSE_RESPONSE_FAILED;
+         }
+
+         $
+         {
+             fprintf (stderr, "Error. Reached end of file while scanning indexed insert macro.");
+             return PARSE_RESPONSE_FAILED;
+         }
+         */
+    }
+}
+
+static enum parse_response_t scan_phase_signal (enum indexed_access_type_t access_type)
+{
+    while (KAN_TRUE)
+    {
+        const char *name_begin;
+        const char *name_end;
+        const char *type_begin;
+        const char *type_end;
+        const char *field_begin;
+        const char *field_end;
+        const char *value_begin;
+        const char *value_end;
+
+        io.token = io.cursor;
+        /*!re2c
+         !use:error_on_unknown;
+
+         separator* @name_begin [A-Za-z_][A-Za-z0-9_]* @name_end separator* ","
+         separator* @type_begin [A-Za-z_][A-Za-z0-9_]* @type_end separator* ","
+         separator* @field_begin ([A-Za-z0-9_] | ".")+ @field_end separator* ","
+         separator* @value_begin [0-9]+ @value_end separator* ")"
+         separator* "{"
+         {
+             return scan_signal (name_begin, name_end, access_type, type_begin, type_end, field_begin, field_end,
+                 value_begin, value_end) ?
                  PARSE_RESPONSE_BLOCK_PROCESSED : PARSE_RESPONSE_FAILED;
          }
 
@@ -3015,6 +3485,50 @@ static enum parse_response_t process_phase_main (void)
          (" "* "\n")?
          {
              return process_value_write (name_begin, name_end, type_begin, type_end, field_begin, field_end,
+                 argument_begin, argument_end);
+         }
+
+         "KAN_UP_SIGNAL_READ" separator* "("
+         separator* @name_begin [A-Za-z_][A-Za-z0-9_]* @name_end separator* ","
+         separator* @type_begin [A-Za-z_][A-Za-z0-9_]* @type_end separator* ","
+         separator* @field_begin ([A-Za-z0-9_] | ".")+ @field_end separator* ","
+         separator* @argument_begin [0-9]+ @argument_end separator* ")"
+         (" "* "\n")?
+         {
+             return process_signal_read (name_begin, name_end, type_begin, type_end, field_begin, field_end,
+                 argument_begin, argument_end);
+         }
+
+         "KAN_UP_SIGNAL_UPDATE" separator* "("
+         separator* @name_begin [A-Za-z_][A-Za-z0-9_]* @name_end separator* ","
+         separator* @type_begin [A-Za-z_][A-Za-z0-9_]* @type_end separator* ","
+         separator* @field_begin ([A-Za-z0-9_] | ".")+ @field_end separator* ","
+         separator* @argument_begin [0-9]+ @argument_end separator* ")"
+         (" "* "\n")?
+         {
+             return process_signal_update (name_begin, name_end, type_begin, type_end, field_begin, field_end,
+                 argument_begin, argument_end);
+         }
+
+         "KAN_UP_SIGNAL_DELETE" separator* "("
+         separator* @name_begin [A-Za-z_][A-Za-z0-9_]* @name_end separator* ","
+         separator* @type_begin [A-Za-z_][A-Za-z0-9_]* @type_end separator* ","
+         separator* @field_begin ([A-Za-z0-9_] | ".")+ @field_end separator* ","
+         separator* @argument_begin [0-9]+ @argument_end separator* ")"
+         (" "* "\n")?
+         {
+             return process_signal_delete (name_begin, name_end, type_begin, type_end, field_begin, field_end,
+                 argument_begin, argument_end);
+         }
+
+         "KAN_UP_SIGNAL_WRITE" separator* "("
+         separator* @name_begin [A-Za-z_][A-Za-z0-9_]* @name_end separator* ","
+         separator* @type_begin [A-Za-z_][A-Za-z0-9_]* @type_end separator* ","
+         separator* @field_begin ([A-Za-z0-9_] | ".")+ @field_end separator* ","
+         separator* @argument_begin [0-9]+ @argument_end separator* ")"
+         (" "* "\n")?
+         {
+             return process_signal_write (name_begin, name_end, type_begin, type_end, field_begin, field_end,
                  argument_begin, argument_end);
          }
 

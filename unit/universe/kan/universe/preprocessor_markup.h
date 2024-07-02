@@ -1,5 +1,7 @@
 #pragma once
 
+#include <stddef.h>
+
 #include <kan/api_common/c_header.h>
 #include <kan/universe/universe.h>
 
@@ -109,7 +111,9 @@ KAN_C_HEADER_BEGIN
 /// \endparblock
 
 /// \brief Declares state with given name and outputs list of query fields associated with this state.
-#define KAN_UP_GENERATE_STATE_QUERIES(STATE_NAME) /* No highlight-time replacement. */
+#define KAN_UP_GENERATE_STATE_QUERIES(STATE_NAME)                                                                      \
+    /* Highlight-autocomplete replacement. */                                                                          \
+    uint64_t STATE_NAME##_fake_placeholder_field;
 
 /// \brief Binds state by name with given path for all queries below (until another bind overrides it).
 #define KAN_UP_BIND_STATE(STATE_NAME, STATE_PATH) /* No highlight-time replacement. */
@@ -219,6 +223,30 @@ KAN_C_HEADER_BEGIN
     /* Highlight-autocomplete replacement. */                                                                          \
     struct TYPE *NAME = NULL;                                                                                          \
     const void *NAME##_argument_user = ARGUMENT_POINTER;                                                               \
+    for (uint64_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
+
+/// \brief Header for indexed signal read query.
+#define KAN_UP_SIGNAL_READ(NAME, TYPE, FIELD, NUMERIC_CONSTANT)                                                        \
+    /* Highlight-autocomplete replacement. */                                                                          \
+    const struct TYPE *NAME = NULL;                                                                                    \
+    for (uint64_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
+
+/// \brief Header for indexed signal update query.
+#define KAN_UP_SIGNAL_UPDATE(NAME, TYPE, FIELD, NUMERIC_CONSTANT)                                                      \
+    /* Highlight-autocomplete replacement. */                                                                          \
+    struct TYPE *NAME = NULL;                                                                                          \
+    for (uint64_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
+
+/// \brief Header for indexed signal delete query.
+#define KAN_UP_SIGNAL_DELETE(NAME, TYPE, FIELD, NUMERIC_CONSTANT)                                                      \
+    /* Highlight-autocomplete replacement. */                                                                          \
+    const struct TYPE *NAME = NULL;                                                                                    \
+    for (uint64_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
+
+/// \brief Header for indexed signal write query.
+#define KAN_UP_SIGNAL_WRITE(NAME, TYPE, FIELD, NUMERIC_CONSTANT)                                                       \
+    /* Highlight-autocomplete replacement. */                                                                          \
+    struct TYPE *NAME = NULL;                                                                                          \
     for (uint64_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
 
 /// \brief Header for indexed interval ascending read query.
