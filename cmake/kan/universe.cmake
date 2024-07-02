@@ -6,8 +6,9 @@
 # Arguments:
 # - DIRECT: list of sources that are specified directly.
 # - GLOB: list of patterns that are used to scan for sources.
+# - SKIP_REFLECTION_REGISTRATION: if set, register_unit_reflection call is skipped.
 function (universe_concrete_setup_sources)
-    cmake_parse_arguments (SOURCE "" "" "DIRECT;GLOB" ${ARGV})
+    cmake_parse_arguments (SOURCE "SKIP_REFLECTION_REGISTRATION" "" "DIRECT;GLOB" ${ARGV})
     if (DEFINED SOURCE_UNPARSED_ARGUMENTS OR (NOT DEFINED SOURCE_DIRECT AND NOT DEFINED SOURCE_GLOB))
         message (FATAL_ERROR "Incorrect function arguments!")
     endif ()
@@ -54,7 +55,10 @@ function (universe_concrete_setup_sources)
     concrete_highlight_direct (${SOURCES})
     c_interface_scanner_setup (GLOB "*.h" DIRECT ${OUTPUTS})
     reflection_generator_setup (GLOB "*.h" DIRECT ${OUTPUTS})
-    register_unit_reflection ()
+
+    if (NOT SOURCE_SKIP_REFLECTION_REGISTRATION)
+        register_unit_reflection ()
+    endif ()
 
     reflection_generator_get_output_file_path (REFLECTION_GENERATOR_OUTPUT_FILE_PATH)
     concrete_sources_direct ("${REFLECTION_GENERATOR_OUTPUT_FILE_PATH}")
