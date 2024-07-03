@@ -57,8 +57,7 @@
 #if defined(_MSC_VER) && !defined(__clang__)
 // clang-format off
 #    define KAN_MUTE_UNREACHABLE_WARNINGS_BEGIN                                                                        \
-        _Pragma ("warning (push)")                                                                                     \
-        _Pragma ("warning (disable : 4702)")
+        _Pragma ("warning (push, 0)")
 // clang-format on
 #    define KAN_MUTE_UNREACHABLE_WARNINGS_END _Pragma ("warning (pop)")
 #else
