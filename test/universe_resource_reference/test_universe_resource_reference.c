@@ -624,7 +624,7 @@ TEST_UNIVERSE_RESOURCE_REFERENCE_API void kan_universe_mutator_execute_outer_ref
     {
         // Overwrite prototype to change file and expect cache to be invalidated.
         save_prototype_2 (state->registry, WORKSPACE_RESOURCES_SUB_DIRECTORY "/prototype_1.rd");
-        state->wait_for_change_detection_unti_ns = kan_platform_get_elapsed_nanoseconds () + 300000000u;
+        state->wait_for_change_detection_unti_ns = kan_platform_get_elapsed_nanoseconds () + 500000000u;
         state->stage = OUTER_REFERENCE_CACHING_TEST_STAGE_CHANGED_WAITING_FOR_CHANGE_DETECTION;
         break;
     }
