@@ -12,7 +12,7 @@ KAN_C_HEADER_BEGIN
 ///
 /// \par Motivation
 /// \parblock
-/// Query API is versatile, but a bit too verbose in most cases. Verbosity of this API makes it more difficult to
+/// Query API is versatile, but it is a bit too verbose in most cases. Verbosity of this API makes it more difficult to
 /// write and read mutator code. Therefore, it was decided to introduce special custom preprocessor that uses
 /// macro-driven markup to automatically generate verbose code for common use cases.
 /// \endparblock
@@ -41,7 +41,7 @@ KAN_C_HEADER_BEGIN
 ///
 /// \par Usage basics
 /// \parblock
-/// Foundation for query usage is state: structure that will contain repository query instances. To declare state,
+/// Foundation for query usage is a state: structure that will contain repository query instances. To declare state,
 /// use `KAN_UP_GENERATE_STATE_QUERIES` inside any structure you need:
 ///
 /// ```c
@@ -53,9 +53,9 @@ KAN_C_HEADER_BEGIN
 ///
 /// State name argument is later used for binding states.
 ///
-/// Binding state means that all queries below (until another binding) are working with state that has given name and
-/// which instance pointer will be available at given state path. If you're using standardized state pointer in every
-/// function, which is an advised approach for universe, you can bind state only once for all functions.
+/// Binding state means that all queries below (until another binding) are working with the state that has given name
+/// and which instance pointer will be available at given state path. If you're using standardized state pointer in
+/// every function, which is an advised approach for universe, you can bind state only once for all functions.
 ///
 /// When state is declared and bound, you can use query macros. They are split into several groups:
 ///
@@ -100,7 +100,7 @@ KAN_C_HEADER_BEGIN
 /// - Space queries are not supported, because it is unclear how to automatically generate them inside state as
 ///   they require additional meta generation for their state fields, which is out of scope for now.
 /// - `KAN_UP_QUERY_BREAK` and `KAN_UP_QUERY_CONTINUE ` should be used with care: they're just break and continue
-///   keywords that manage accesses and cursors before executing, therefore using them inside normal `for` or
+///   keywords that manage accesses and cursors before executing, therefore using them inside normal `for`, `switch` or
 ///   `while` will result in undefined behavior.
 /// \endparblock
 ///
