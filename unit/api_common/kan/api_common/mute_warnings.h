@@ -64,7 +64,7 @@
 #else
 // clang-format off
 #    define KAN_MUTE_UNREACHABLE_WARNINGS_BEGIN                                                                        \
-        _Pragma ("GCC diagnostic push")                                                                                \
+        _Pragma ("GCC diagnostic push")
 // clang-format on
 
 #    define KAN_MUTE_UNREACHABLE_WARNINGS_END _Pragma ("GCC diagnostic pop")
