@@ -83,6 +83,12 @@ static kan_thread_result_t worker_thread_function (kan_thread_user_data_t user_d
 
         while (KAN_TRUE)
         {
+            if (kan_atomic_int_get (&global_task_dispatcher.shutting_down))
+            {
+                kan_mutex_unlock (global_task_dispatcher.task_mutex);
+                return 0;
+            }
+
             if (!global_task_dispatcher.tasks_first)
             {
                 kan_conditional_variable_wait (global_task_dispatcher.worker_wake_up_condition,
@@ -164,7 +170,9 @@ static kan_thread_result_t worker_thread_function (kan_thread_user_data_t user_d
 
 static void shutdown_global_task_dispatcher (void)
 {
+    kan_mutex_lock (global_task_dispatcher.task_mutex);
     kan_atomic_int_set (&global_task_dispatcher.shutting_down, 1);
+    kan_mutex_unlock (global_task_dispatcher.task_mutex);
     kan_conditional_variable_signal_all (global_task_dispatcher.worker_wake_up_condition);
 
     for (uint64_t index = 0u; index < global_task_dispatcher.threads_count; ++index)
