@@ -1,4 +1,4 @@
-#include <kan/api_common/mute_third_party_warnings.h>
+#include <kan/api_common/mute_warnings.h>
 
 KAN_MUTE_THIRD_PARTY_WARNINGS_BEGIN
 #include <Windows.h>
