@@ -68,6 +68,9 @@ function (add_common_compile_options)
                     /wd4116
                     # Zero length arrays greatly increase readability for classes and structs with dynamic sizes.
                     /wd4200
+                    # Unfortunately, in VS2022 it is impossible for some reason to disable this warning locally in
+                    # specific code fragment. Therefore, we disable it globally.
+                    /wd4702
                     # Currently we're okay with assignments on conditional expressions.
                     /wd4706)
         else ()

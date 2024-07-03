@@ -2103,16 +2103,6 @@ static inline kan_bool_t output_event_end (void)
            output_use_source_line ();
 }
 
-static kan_bool_t output_begin_possibly_unreachable_code_unguarded (void)
-{
-    return output_string ("KAN_MUTE_UNREACHABLE_WARNINGS_BEGIN\n");
-}
-
-static kan_bool_t output_end_possibly_unreachable_code_unguarded (void)
-{
-    return output_string ("KAN_MUTE_UNREACHABLE_WARNINGS_END\n");
-}
-
 static inline enum parse_response_t process_block_exit (void)
 {
     --process.blocks;
@@ -2147,10 +2137,9 @@ static inline enum parse_response_t process_block_exit (void)
         switch (process.stack_top->query_type)
         {
         case PROCESS_QUERY_TYPE_SINGLETON_READ:
-            if (!output_use_output_line () || !output_begin_possibly_unreachable_code_unguarded () ||
+            if (!output_use_output_line () ||
                 !output_singleton_close_access_unguarded (process.stack_top->name, "read") ||
-                !output_end_possibly_unreachable_code_unguarded () || !output_use_source_line () ||
-                (!shared_block && !output_sequence (io.token, io.cursor)))
+                !output_use_source_line () || (!shared_block && !output_sequence (io.token, io.cursor)))
             {
                 fprintf (stderr, "Failure during output.\n");
                 return PARSE_RESPONSE_FAILED;
@@ -2159,10 +2148,9 @@ static inline enum parse_response_t process_block_exit (void)
             break;
 
         case PROCESS_QUERY_TYPE_SINGLETON_WRITE:
-            if (!output_use_output_line () || !output_begin_possibly_unreachable_code_unguarded () ||
+            if (!output_use_output_line () ||
                 !output_singleton_close_access_unguarded (process.stack_top->name, "write") ||
-                !output_end_possibly_unreachable_code_unguarded () || !output_use_source_line () ||
-                (!shared_block && !output_sequence (io.token, io.cursor)))
+                !output_use_source_line () || (!shared_block && !output_sequence (io.token, io.cursor)))
             {
                 fprintf (stderr, "Failure during output.\n");
                 return PARSE_RESPONSE_FAILED;
@@ -2171,10 +2159,8 @@ static inline enum parse_response_t process_block_exit (void)
             break;
 
         case PROCESS_QUERY_TYPE_INDEXED_INSERT:
-            if (!output_use_output_line () || !output_begin_possibly_unreachable_code_unguarded () ||
-                !output_indexed_insert_submit_unguarded (process.stack_top->name) ||
-                !output_end_possibly_unreachable_code_unguarded () || !output_use_source_line () ||
-                !output_sequence (io.token, io.cursor))
+            if (!output_use_output_line () || !output_indexed_insert_submit_unguarded (process.stack_top->name) ||
+                !output_use_source_line () || !output_sequence (io.token, io.cursor))
             {
                 fprintf (stderr, "Failure during output.\n");
                 return PARSE_RESPONSE_FAILED;
@@ -2183,10 +2169,9 @@ static inline enum parse_response_t process_block_exit (void)
             break;
 
         case PROCESS_QUERY_TYPE_SEQUENCE_READ:
-            if (!output_use_output_line () || !output_begin_possibly_unreachable_code_unguarded () ||
+            if (!output_use_output_line () ||
                 !output_indexed_close_access_unguarded (process.stack_top->name, "sequence", "read") ||
-                !output_end_possibly_unreachable_code_unguarded () || !output_use_source_line () ||
-                !output_sequence (io.token, io.cursor) ||
+                !output_use_source_line () || !output_sequence (io.token, io.cursor) ||
                 !output_indexed_end (process.stack_top->name, "sequence", "", "read"))
             {
                 fprintf (stderr, "Failure during output.\n");
@@ -2196,10 +2181,9 @@ static inline enum parse_response_t process_block_exit (void)
             break;
 
         case PROCESS_QUERY_TYPE_SEQUENCE_UPDATE:
-            if (!output_use_output_line () || !output_begin_possibly_unreachable_code_unguarded () ||
+            if (!output_use_output_line () ||
                 !output_indexed_close_access_unguarded (process.stack_top->name, "sequence", "update") ||
-                !output_end_possibly_unreachable_code_unguarded () || !output_use_source_line () ||
-                !output_sequence (io.token, io.cursor) ||
+                !output_use_source_line () || !output_sequence (io.token, io.cursor) ||
                 !output_indexed_end (process.stack_top->name, "sequence", "", "update"))
             {
                 fprintf (stderr, "Failure during output.\n");
@@ -2209,10 +2193,9 @@ static inline enum parse_response_t process_block_exit (void)
             break;
 
         case PROCESS_QUERY_TYPE_SEQUENCE_DELETE:
-            if (!output_use_output_line () || !output_begin_possibly_unreachable_code_unguarded () ||
+            if (!output_use_output_line () ||
                 !output_indexed_close_access_unguarded (process.stack_top->name, "sequence", "delete") ||
-                !output_end_possibly_unreachable_code_unguarded () || !output_use_source_line () ||
-                !output_sequence (io.token, io.cursor) ||
+                !output_use_source_line () || !output_sequence (io.token, io.cursor) ||
                 !output_indexed_end (process.stack_top->name, "sequence", "", "delete"))
             {
                 fprintf (stderr, "Failure during output.\n");
@@ -2222,10 +2205,9 @@ static inline enum parse_response_t process_block_exit (void)
             break;
 
         case PROCESS_QUERY_TYPE_SEQUENCE_WRITE:
-            if (!output_use_output_line () || !output_begin_possibly_unreachable_code_unguarded () ||
+            if (!output_use_output_line () ||
                 !output_indexed_close_access_unguarded (process.stack_top->name, "sequence", "write") ||
-                !output_end_possibly_unreachable_code_unguarded () || !output_use_source_line () ||
-                !output_sequence (io.token, io.cursor) ||
+                !output_use_source_line () || !output_sequence (io.token, io.cursor) ||
                 !output_indexed_end (process.stack_top->name, "sequence", "", "write"))
             {
                 fprintf (stderr, "Failure during output.\n");
@@ -2235,10 +2217,9 @@ static inline enum parse_response_t process_block_exit (void)
             break;
 
         case PROCESS_QUERY_TYPE_VALUE_READ:
-            if (!output_use_output_line () || !output_begin_possibly_unreachable_code_unguarded () ||
+            if (!output_use_output_line () ||
                 !output_indexed_close_access_unguarded (process.stack_top->name, "value", "read") ||
-                !output_end_possibly_unreachable_code_unguarded () || !output_use_source_line () ||
-                !output_sequence (io.token, io.cursor) ||
+                !output_use_source_line () || !output_sequence (io.token, io.cursor) ||
                 !output_indexed_end (process.stack_top->name, "value", "", "read"))
             {
                 fprintf (stderr, "Failure during output.\n");
@@ -2248,10 +2229,9 @@ static inline enum parse_response_t process_block_exit (void)
             break;
 
         case PROCESS_QUERY_TYPE_VALUE_UPDATE:
-            if (!output_use_output_line () || !output_begin_possibly_unreachable_code_unguarded () ||
+            if (!output_use_output_line () ||
                 !output_indexed_close_access_unguarded (process.stack_top->name, "value", "update") ||
-                !output_end_possibly_unreachable_code_unguarded () || !output_use_source_line () ||
-                !output_sequence (io.token, io.cursor) ||
+                !output_use_source_line () || !output_sequence (io.token, io.cursor) ||
                 !output_indexed_end (process.stack_top->name, "value", "", "update"))
             {
                 fprintf (stderr, "Failure during output.\n");
@@ -2261,10 +2241,9 @@ static inline enum parse_response_t process_block_exit (void)
             break;
 
         case PROCESS_QUERY_TYPE_VALUE_DELETE:
-            if (!output_use_output_line () || !output_begin_possibly_unreachable_code_unguarded () ||
+            if (!output_use_output_line () ||
                 !output_indexed_close_access_unguarded (process.stack_top->name, "value", "delete") ||
-                !output_end_possibly_unreachable_code_unguarded () || !output_use_source_line () ||
-                !output_sequence (io.token, io.cursor) ||
+                !output_use_source_line () || !output_sequence (io.token, io.cursor) ||
                 !output_indexed_end (process.stack_top->name, "value", "", "delete"))
             {
                 fprintf (stderr, "Failure during output.\n");
@@ -2274,10 +2253,9 @@ static inline enum parse_response_t process_block_exit (void)
             break;
 
         case PROCESS_QUERY_TYPE_VALUE_WRITE:
-            if (!output_use_output_line () || !output_begin_possibly_unreachable_code_unguarded () ||
+            if (!output_use_output_line () ||
                 !output_indexed_close_access_unguarded (process.stack_top->name, "value", "write") ||
-                !output_end_possibly_unreachable_code_unguarded () || !output_use_source_line () ||
-                !output_sequence (io.token, io.cursor) ||
+                !output_use_source_line () || !output_sequence (io.token, io.cursor) ||
                 !output_indexed_end (process.stack_top->name, "value", "", "write"))
             {
                 fprintf (stderr, "Failure during output.\n");
@@ -2287,10 +2265,9 @@ static inline enum parse_response_t process_block_exit (void)
             break;
 
         case PROCESS_QUERY_TYPE_SIGNAL_READ:
-            if (!output_use_output_line () || !output_begin_possibly_unreachable_code_unguarded () ||
+            if (!output_use_output_line () ||
                 !output_indexed_close_access_unguarded (process.stack_top->name, "signal", "read") ||
-                !output_end_possibly_unreachable_code_unguarded () || !output_use_source_line () ||
-                !output_sequence (io.token, io.cursor) ||
+                !output_use_source_line () || !output_sequence (io.token, io.cursor) ||
                 !output_indexed_end (process.stack_top->name, "signal", "", "read"))
             {
                 fprintf (stderr, "Failure during output.\n");
@@ -2300,10 +2277,9 @@ static inline enum parse_response_t process_block_exit (void)
             break;
 
         case PROCESS_QUERY_TYPE_SIGNAL_UPDATE:
-            if (!output_use_output_line () || !output_begin_possibly_unreachable_code_unguarded () ||
+            if (!output_use_output_line () ||
                 !output_indexed_close_access_unguarded (process.stack_top->name, "signal", "update") ||
-                !output_end_possibly_unreachable_code_unguarded () || !output_use_source_line () ||
-                !output_sequence (io.token, io.cursor) ||
+                !output_use_source_line () || !output_sequence (io.token, io.cursor) ||
                 !output_indexed_end (process.stack_top->name, "signal", "", "update"))
             {
                 fprintf (stderr, "Failure during output.\n");
@@ -2313,10 +2289,9 @@ static inline enum parse_response_t process_block_exit (void)
             break;
 
         case PROCESS_QUERY_TYPE_SIGNAL_DELETE:
-            if (!output_use_output_line () || !output_begin_possibly_unreachable_code_unguarded () ||
+            if (!output_use_output_line () ||
                 !output_indexed_close_access_unguarded (process.stack_top->name, "signal", "delete") ||
-                !output_end_possibly_unreachable_code_unguarded () || !output_use_source_line () ||
-                !output_sequence (io.token, io.cursor) ||
+                !output_use_source_line () || !output_sequence (io.token, io.cursor) ||
                 !output_indexed_end (process.stack_top->name, "signal", "", "delete"))
             {
                 fprintf (stderr, "Failure during output.\n");
@@ -2326,10 +2301,9 @@ static inline enum parse_response_t process_block_exit (void)
             break;
 
         case PROCESS_QUERY_TYPE_SIGNAL_WRITE:
-            if (!output_use_output_line () || !output_begin_possibly_unreachable_code_unguarded () ||
+            if (!output_use_output_line () ||
                 !output_indexed_close_access_unguarded (process.stack_top->name, "signal", "write") ||
-                !output_end_possibly_unreachable_code_unguarded () || !output_use_source_line () ||
-                !output_sequence (io.token, io.cursor) ||
+                !output_use_source_line () || !output_sequence (io.token, io.cursor) ||
                 !output_indexed_end (process.stack_top->name, "signal", "", "write"))
             {
                 fprintf (stderr, "Failure during output.\n");
@@ -2339,10 +2313,9 @@ static inline enum parse_response_t process_block_exit (void)
             break;
 
         case PROCESS_QUERY_TYPE_INTERVAL_ASCENDING_READ:
-            if (!output_use_output_line () || !output_begin_possibly_unreachable_code_unguarded () ||
+            if (!output_use_output_line () ||
                 !output_indexed_close_access_unguarded (process.stack_top->name, "interval", "read") ||
-                !output_end_possibly_unreachable_code_unguarded () || !output_use_source_line () ||
-                !output_sequence (io.token, io.cursor) ||
+                !output_use_source_line () || !output_sequence (io.token, io.cursor) ||
                 !output_indexed_end (process.stack_top->name, "interval", "ascending_", "read"))
             {
                 fprintf (stderr, "Failure during output.\n");
@@ -2352,10 +2325,9 @@ static inline enum parse_response_t process_block_exit (void)
             break;
 
         case PROCESS_QUERY_TYPE_INTERVAL_ASCENDING_UPDATE:
-            if (!output_use_output_line () || !output_begin_possibly_unreachable_code_unguarded () ||
+            if (!output_use_output_line () ||
                 !output_indexed_close_access_unguarded (process.stack_top->name, "interval", "update") ||
-                !output_end_possibly_unreachable_code_unguarded () || !output_use_source_line () ||
-                !output_sequence (io.token, io.cursor) ||
+                !output_use_source_line () || !output_sequence (io.token, io.cursor) ||
                 !output_indexed_end (process.stack_top->name, "interval", "ascending_", "update"))
             {
                 fprintf (stderr, "Failure during output.\n");
@@ -2365,10 +2337,9 @@ static inline enum parse_response_t process_block_exit (void)
             break;
 
         case PROCESS_QUERY_TYPE_INTERVAL_ASCENDING_DELETE:
-            if (!output_use_output_line () || !output_begin_possibly_unreachable_code_unguarded () ||
+            if (!output_use_output_line () ||
                 !output_indexed_close_access_unguarded (process.stack_top->name, "interval", "delete") ||
-                !output_end_possibly_unreachable_code_unguarded () || !output_use_source_line () ||
-                !output_sequence (io.token, io.cursor) ||
+                !output_use_source_line () || !output_sequence (io.token, io.cursor) ||
                 !output_indexed_end (process.stack_top->name, "interval", "ascending_", "delete"))
             {
                 fprintf (stderr, "Failure during output.\n");
@@ -2378,10 +2349,9 @@ static inline enum parse_response_t process_block_exit (void)
             break;
 
         case PROCESS_QUERY_TYPE_INTERVAL_ASCENDING_WRITE:
-            if (!output_use_output_line () || !output_begin_possibly_unreachable_code_unguarded () ||
+            if (!output_use_output_line () ||
                 !output_indexed_close_access_unguarded (process.stack_top->name, "interval", "write") ||
-                !output_end_possibly_unreachable_code_unguarded () || !output_use_source_line () ||
-                !output_sequence (io.token, io.cursor) ||
+                !output_use_source_line () || !output_sequence (io.token, io.cursor) ||
                 !output_indexed_end (process.stack_top->name, "interval", "ascending_", "write"))
             {
                 fprintf (stderr, "Failure during output.\n");
@@ -2391,10 +2361,9 @@ static inline enum parse_response_t process_block_exit (void)
             break;
 
         case PROCESS_QUERY_TYPE_INTERVAL_DESCENDING_READ:
-            if (!output_use_output_line () || !output_begin_possibly_unreachable_code_unguarded () ||
+            if (!output_use_output_line () ||
                 !output_indexed_close_access_unguarded (process.stack_top->name, "interval", "read") ||
-                !output_end_possibly_unreachable_code_unguarded () || !output_use_source_line () ||
-                !output_sequence (io.token, io.cursor) ||
+                !output_use_source_line () || !output_sequence (io.token, io.cursor) ||
                 !output_indexed_end (process.stack_top->name, "interval", "descending_", "read"))
             {
                 fprintf (stderr, "Failure during output.\n");
@@ -2404,10 +2373,9 @@ static inline enum parse_response_t process_block_exit (void)
             break;
 
         case PROCESS_QUERY_TYPE_INTERVAL_DESCENDING_UPDATE:
-            if (!output_use_output_line () || !output_begin_possibly_unreachable_code_unguarded () ||
+            if (!output_use_output_line () ||
                 !output_indexed_close_access_unguarded (process.stack_top->name, "interval", "update") ||
-                !output_end_possibly_unreachable_code_unguarded () || !output_use_source_line () ||
-                !output_sequence (io.token, io.cursor) ||
+                !output_use_source_line () || !output_sequence (io.token, io.cursor) ||
                 !output_indexed_end (process.stack_top->name, "interval", "descending_", "update"))
             {
                 fprintf (stderr, "Failure during output.\n");
@@ -2417,10 +2385,9 @@ static inline enum parse_response_t process_block_exit (void)
             break;
 
         case PROCESS_QUERY_TYPE_INTERVAL_DESCENDING_DELETE:
-            if (!output_use_output_line () || !output_begin_possibly_unreachable_code_unguarded () ||
+            if (!output_use_output_line () ||
                 !output_indexed_close_access_unguarded (process.stack_top->name, "interval", "delete") ||
-                !output_end_possibly_unreachable_code_unguarded () || !output_use_source_line () ||
-                !output_sequence (io.token, io.cursor) ||
+                !output_use_source_line () || !output_sequence (io.token, io.cursor) ||
                 !output_indexed_end (process.stack_top->name, "interval", "descending_", "delete"))
             {
                 fprintf (stderr, "Failure during output.\n");
@@ -2430,10 +2397,9 @@ static inline enum parse_response_t process_block_exit (void)
             break;
 
         case PROCESS_QUERY_TYPE_INTERVAL_DESCENDING_WRITE:
-            if (!output_use_output_line () || !output_begin_possibly_unreachable_code_unguarded () ||
+            if (!output_use_output_line () ||
                 !output_indexed_close_access_unguarded (process.stack_top->name, "interval", "write") ||
-                !output_end_possibly_unreachable_code_unguarded () || !output_use_source_line () ||
-                !output_sequence (io.token, io.cursor) ||
+                !output_use_source_line () || !output_sequence (io.token, io.cursor) ||
                 !output_indexed_end (process.stack_top->name, "interval", "descending_", "write"))
             {
                 fprintf (stderr, "Failure during output.\n");
@@ -2443,10 +2409,8 @@ static inline enum parse_response_t process_block_exit (void)
             break;
 
         case PROCESS_QUERY_TYPE_EVENT_INSERT:
-            if (!output_use_output_line () || !output_begin_possibly_unreachable_code_unguarded () ||
-                !output_event_insert_submit_unguarded (process.stack_top->name) ||
-                !output_end_possibly_unreachable_code_unguarded () || !output_use_source_line () ||
-                !output_sequence (io.token, io.cursor))
+            if (!output_use_output_line () || !output_event_insert_submit_unguarded (process.stack_top->name) ||
+                !output_use_source_line () || !output_sequence (io.token, io.cursor))
             {
                 fprintf (stderr, "Failure during output.\n");
                 return PARSE_RESPONSE_FAILED;
@@ -2455,10 +2419,8 @@ static inline enum parse_response_t process_block_exit (void)
             break;
 
         case PROCESS_QUERY_TYPE_EVENT_FETCH:
-            if (!output_use_output_line () || !output_begin_possibly_unreachable_code_unguarded () ||
-                !output_event_close_access_unguarded (process.stack_top->name) ||
-                !output_end_possibly_unreachable_code_unguarded () || !output_use_source_line () ||
-                !output_sequence (io.token, io.cursor) || !output_event_end ())
+            if (!output_use_output_line () || !output_event_close_access_unguarded (process.stack_top->name) ||
+                !output_use_source_line () || !output_sequence (io.token, io.cursor) || !output_event_end ())
             {
                 fprintf (stderr, "Failure during output.\n");
                 return PARSE_RESPONSE_FAILED;
