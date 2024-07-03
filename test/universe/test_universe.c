@@ -7,6 +7,7 @@
 #include <kan/context/update_system.h>
 #include <kan/reflection/generated_reflection.h>
 #include <kan/testing/testing.h>
+#include <kan/universe/preprocessor_markup.h>
 #include <kan/universe/universe.h>
 
 #define WORLD_CHILD_UPDATE_TEST_DEPTH 3u
@@ -102,188 +103,151 @@ struct world_configuration_counter_index_t
 
 struct run_only_update_state_t
 {
-    struct kan_repository_singleton_write_query_t write__counters_singleton;
+    KAN_UP_GENERATE_STATE_QUERIES (run_only_update)
+    KAN_UP_BIND_STATE (run_only_update, state)
 };
 
 TEST_UNIVERSE_API void kan_universe_scheduler_execute_run_only_update (kan_universe_scheduler_interface_t interface,
                                                                        struct run_only_update_state_t *state)
 {
-    kan_repository_singleton_write_access_t access =
-        kan_repository_singleton_write_query_execute (&state->write__counters_singleton);
-
-    struct counters_singleton_t *counters =
-        (struct counters_singleton_t *) kan_repository_singleton_write_access_resolve (access);
-    KAN_TEST_ASSERT (counters)
-
-    KAN_TEST_CHECK (counters->update_only_scheduler_executions == counters->update_only_mutator_executions)
-    ++counters->update_only_scheduler_executions;
-    kan_repository_singleton_write_access_close (access);
+    {
+        KAN_UP_SINGLETON_WRITE (counters, counters_singleton_t)
+        {
+            KAN_TEST_CHECK (counters->update_only_scheduler_executions == counters->update_only_mutator_executions)
+            ++counters->update_only_scheduler_executions;
+        }
+    }
 
     // We need to close all accesses before running pipelines.
     kan_universe_scheduler_interface_run_pipeline (interface, kan_string_intern ("update"));
 
-    access = kan_repository_singleton_write_query_execute (&state->write__counters_singleton);
-    counters = (struct counters_singleton_t *) kan_repository_singleton_write_access_resolve (access);
-    KAN_TEST_ASSERT (counters)
-    KAN_TEST_CHECK (counters->update_only_scheduler_executions == counters->update_only_mutator_executions)
-    kan_repository_singleton_write_access_close (access);
+    {
+        KAN_UP_SINGLETON_WRITE (counters, counters_singleton_t)
+        {
+            KAN_TEST_CHECK (counters->update_only_scheduler_executions == counters->update_only_mutator_executions)
+        }
+    }
 }
 
 struct update_only_state_t
 {
-    struct kan_repository_singleton_write_query_t write__counters_singleton;
+    KAN_UP_GENERATE_STATE_QUERIES (update_only)
+    KAN_UP_BIND_STATE (update_only, state)
 };
 
 TEST_UNIVERSE_API void kan_universe_mutator_execute_update_only (kan_cpu_job_t job, struct update_only_state_t *state)
 {
-    kan_repository_singleton_write_access_t access =
-        kan_repository_singleton_write_query_execute (&state->write__counters_singleton);
+    KAN_UP_SINGLETON_WRITE (counters, counters_singleton_t)
+    {
+        ++counters->update_only_mutator_executions;
+    }
 
-    struct counters_singleton_t *counters =
-        (struct counters_singleton_t *) kan_repository_singleton_write_access_resolve (access);
-    KAN_TEST_ASSERT (counters)
-
-    ++counters->update_only_mutator_executions;
-    kan_repository_singleton_write_access_close (access);
-
-    kan_cpu_job_release (job);
+    KAN_UP_MUTATOR_RETURN;
 }
 
 struct double_update_state_t
 {
-    struct kan_repository_singleton_write_query_t write__counters_singleton;
-    struct kan_repository_event_fetch_query_t fetch__manual_event;
+    KAN_UP_GENERATE_STATE_QUERIES (double_update)
+    KAN_UP_BIND_STATE (double_update, state)
 };
 
 TEST_UNIVERSE_API void kan_universe_scheduler_execute_double_update (kan_universe_scheduler_interface_t interface,
                                                                      struct double_update_state_t *state)
 {
-    kan_repository_singleton_write_access_t access =
-        kan_repository_singleton_write_query_execute (&state->write__counters_singleton);
-
-    struct counters_singleton_t *counters =
-        (struct counters_singleton_t *) kan_repository_singleton_write_access_resolve (access);
-    KAN_TEST_ASSERT (counters)
-    ++counters->double_update_scheduler_executions;
-    kan_repository_singleton_write_access_close (access);
+    {
+        KAN_UP_SINGLETON_WRITE (counters, counters_singleton_t)
+        {
+            ++counters->double_update_scheduler_executions;
+        }
+    }
 
     kan_universe_scheduler_interface_run_pipeline (interface, kan_string_intern ("update"));
 
-    struct kan_repository_event_read_access_t event_access =
-        kan_repository_event_fetch_query_next (&state->fetch__manual_event);
-
-    const struct manual_event_t *event =
-        (const struct manual_event_t *) kan_repository_event_read_access_resolve (&event_access);
-
-    if (event)
+    KAN_UP_EVENT_FETCH (event, manual_event_t)
     {
-        kan_repository_event_read_access_close (&event_access);
         kan_universe_scheduler_interface_run_pipeline (interface, kan_string_intern ("second_update"));
     }
 
-    access = kan_repository_singleton_write_query_execute (&state->write__counters_singleton);
-    counters = (struct counters_singleton_t *) kan_repository_singleton_write_access_resolve (access);
-    KAN_TEST_ASSERT (counters)
-    KAN_TEST_CHECK (counters->double_update_scheduler_executions ==
-                    counters->double_update_second_mutator_executions + 1u)
-    kan_repository_singleton_write_access_close (access);
+    {
+        KAN_UP_SINGLETON_WRITE (counters, counters_singleton_t)
+        {
+            KAN_TEST_CHECK (counters->double_update_scheduler_executions ==
+                            counters->double_update_second_mutator_executions + 1u)
+        }
+    }
 }
 
 struct second_update_stub_state_t
 {
-    struct kan_repository_singleton_write_query_t write__counters_singleton;
+    KAN_UP_GENERATE_STATE_QUERIES (second_update_stub)
+    KAN_UP_BIND_STATE (second_update_stub, state)
 };
 
 TEST_UNIVERSE_API void kan_universe_mutator_execute_second_update_stub (kan_cpu_job_t job,
                                                                         struct second_update_stub_state_t *state)
 {
-    kan_repository_singleton_write_access_t access =
-        kan_repository_singleton_write_query_execute (&state->write__counters_singleton);
+    KAN_UP_SINGLETON_WRITE (counters, counters_singleton_t)
+    {
+        ++counters->double_update_second_mutator_executions;
+    }
 
-    struct counters_singleton_t *counters =
-        (struct counters_singleton_t *) kan_repository_singleton_write_access_resolve (access);
-    KAN_TEST_ASSERT (counters)
-
-    ++counters->double_update_second_mutator_executions;
-    kan_repository_singleton_write_access_close (access);
-
-    kan_cpu_job_release (job);
+    KAN_UP_MUTATOR_RETURN;
 }
 
 struct spawn_objects_if_not_exist_state_t
 {
-    struct kan_repository_indexed_insert_query_t insert__object_record;
-    struct kan_repository_indexed_insert_query_t insert__status_record;
-    struct kan_repository_indexed_sequence_read_query_t read_sequence__status_record;
+    KAN_UP_GENERATE_STATE_QUERIES (spawn_objects_if_not_exist)
+    KAN_UP_BIND_STATE (spawn_objects_if_not_exist, state)
 };
 
 TEST_UNIVERSE_API void kan_universe_mutator_execute_spawn_objects_if_not_exist (
     kan_cpu_job_t job, struct spawn_objects_if_not_exist_state_t *state)
 {
-    kan_bool_t should_insert = KAN_FALSE;
-
+    kan_bool_t should_insert = KAN_TRUE;
+    KAN_UP_SEQUENCE_READ (should_insert_check, status_record_t)
     {
-        struct kan_repository_indexed_sequence_read_cursor_t cursor =
-            kan_repository_indexed_sequence_read_query_execute (&state->read_sequence__status_record);
-
-        struct kan_repository_indexed_sequence_read_access_t access =
-            kan_repository_indexed_sequence_read_cursor_next (&cursor);
-        should_insert = kan_repository_indexed_sequence_read_access_resolve (&access) == NULL;
-
-        kan_repository_indexed_sequence_read_access_close (&access);
-        kan_repository_indexed_sequence_read_cursor_close (&cursor);
+        should_insert = KAN_FALSE;
     }
 
     if (should_insert)
     {
-        struct kan_repository_indexed_insertion_package_t package;
-
         {
-            package = kan_repository_indexed_insert_query_execute (&state->insert__object_record);
-            struct object_record_t *object =
-                (struct object_record_t *) kan_repository_indexed_insertion_package_get (&package);
-
-            object->object_id = 1u;
-            object->parent_object_id = INVALID_PARENT_OBJECT_ID;
-            object->data_x = 1u;
-            object->data_y = 2u;
-
-            kan_repository_indexed_insertion_package_submit (&package);
+            KAN_UP_INDEXED_INSERT (object, object_record_t)
+            {
+                object->object_id = 1u;
+                object->parent_object_id = INVALID_PARENT_OBJECT_ID;
+                object->data_x = 1u;
+                object->data_y = 2u;
+            }
         }
 
         {
-            package = kan_repository_indexed_insert_query_execute (&state->insert__object_record);
-            struct object_record_t *object =
-                (struct object_record_t *) kan_repository_indexed_insertion_package_get (&package);
+            KAN_UP_INDEXED_INSERT (object, object_record_t)
+            {
+                object->object_id = 2u;
+                object->parent_object_id = INVALID_PARENT_OBJECT_ID;
+                object->data_x = 1u;
+                object->data_y = 2u;
+            }
 
-            object->object_id = 2u;
-            object->parent_object_id = INVALID_PARENT_OBJECT_ID;
-            object->data_x = 1u;
-            object->data_y = 2u;
-
-            kan_repository_indexed_insertion_package_submit (&package);
-
-            package = kan_repository_indexed_insert_query_execute (&state->insert__status_record);
-            struct status_record_t *status =
-                (struct status_record_t *) kan_repository_indexed_insertion_package_get (&package);
-
-            status->object_id = 2u;
-            status->alive = KAN_TRUE;
-            status->poisoned = KAN_FALSE;
-            status->stunned = KAN_FALSE;
-            status->boosted = KAN_FALSE;
-
-            kan_repository_indexed_insertion_package_submit (&package);
+            KAN_UP_INDEXED_INSERT (status, status_record_t)
+            {
+                status->object_id = 2u;
+                status->alive = KAN_TRUE;
+                status->poisoned = KAN_FALSE;
+                status->stunned = KAN_FALSE;
+                status->boosted = KAN_FALSE;
+            }
         }
     }
 
-    kan_cpu_job_release (job);
+    KAN_UP_MUTATOR_RETURN;
 }
 
 struct delete_objects_and_fire_event_state_t
 {
-    struct kan_repository_indexed_sequence_delete_query_t delete_sequence__object_record;
-    struct kan_repository_event_insert_query_t insert__manual_event;
+    KAN_UP_GENERATE_STATE_QUERIES (delete_objects_and_fire_event)
+    KAN_UP_BIND_STATE (delete_objects_and_fire_event, state)
 };
 
 TEST_UNIVERSE_API void kan_universe_mutator_deploy_delete_objects_and_fire_event (
@@ -301,45 +265,27 @@ TEST_UNIVERSE_API void kan_universe_mutator_execute_delete_objects_and_fire_even
     kan_cpu_job_t job, struct delete_objects_and_fire_event_state_t *state)
 {
     uint64_t deleted_count = 0u;
-    struct kan_repository_indexed_sequence_delete_cursor_t cursor =
-        kan_repository_indexed_sequence_delete_query_execute (&state->delete_sequence__object_record);
-
-    while (KAN_TRUE)
+    KAN_UP_SEQUENCE_DELETE (object, object_record_t)
     {
-        struct kan_repository_indexed_sequence_delete_access_t access =
-            kan_repository_indexed_sequence_delete_cursor_next (&cursor);
-
-        if (kan_repository_indexed_sequence_delete_access_resolve (&access))
-        {
-            kan_repository_indexed_sequence_delete_access_delete (&access);
-            ++deleted_count;
-        }
-        else
-        {
-            kan_repository_indexed_sequence_delete_cursor_close (&cursor);
-            break;
-        }
+        KAN_UP_ACCESS_DELETE (object);
+        ++deleted_count;
     }
 
     if (deleted_count > 0u)
     {
-        struct kan_repository_event_insertion_package_t package =
-            kan_repository_event_insert_query_execute (&state->insert__manual_event);
-
-        struct manual_event_t *event = (struct manual_event_t *) kan_repository_event_insertion_package_get (&package);
-        if (event)
+        KAN_UP_EVENT_INSERT (event, manual_event_t)
         {
             event->some_data = 1u;
-            kan_repository_event_insertion_package_submit (&package);
         }
     }
 
-    kan_cpu_job_release (job);
+    KAN_UP_MUTATOR_RETURN;
 }
 
 struct insert_from_multiple_threads_state_t
 {
-    struct kan_repository_indexed_insert_query_t insert__object_record;
+    KAN_UP_GENERATE_STATE_QUERIES (insert_from_multiple_threads)
+    KAN_UP_BIND_STATE (insert_from_multiple_threads, state)
 
     /// \meta reflection_ignore_struct_field
     struct kan_stack_group_allocator_t task_data_allocator;
@@ -368,16 +314,15 @@ struct insert_task_user_data_t
 static void insert_task_execute (uint64_t user_data)
 {
     struct insert_task_user_data_t *data = (struct insert_task_user_data_t *) user_data;
-    struct kan_repository_indexed_insertion_package_t package =
-        kan_repository_indexed_insert_query_execute (&data->state->insert__object_record);
+    struct insert_from_multiple_threads_state_t *state = data->state;
 
-    struct object_record_t *object = (struct object_record_t *) kan_repository_indexed_insertion_package_get (&package);
-    object->object_id = data->index;
-    object->parent_object_id = INVALID_PARENT_OBJECT_ID;
-    object->data_x = data->index + 3u;
-    object->data_y = data->index * 2u;
-
-    kan_repository_indexed_insertion_package_submit (&package);
+    KAN_UP_INDEXED_INSERT (object, object_record_t)
+    {
+        object->object_id = data->index;
+        object->parent_object_id = INVALID_PARENT_OBJECT_ID;
+        object->data_x = data->index + 3u;
+        object->data_y = data->index * 2u;
+    }
 }
 
 // \meta reflection_function_meta = "kan_universe_mutator_execute_insert_from_multiple_threads"
@@ -403,7 +348,7 @@ TEST_UNIVERSE_API void kan_universe_mutator_execute_insert_from_multiple_threads
     }
 
     kan_cpu_job_dispatch_and_detach_task_list (job, tasks_head);
-    kan_cpu_job_release (job);
+    KAN_UP_MUTATOR_RETURN;
 }
 
 TEST_UNIVERSE_API void kan_universe_mutator_undeploy_insert_from_multiple_threads (
@@ -414,44 +359,31 @@ TEST_UNIVERSE_API void kan_universe_mutator_undeploy_insert_from_multiple_thread
 
 struct validate_insert_from_multiple_threads_state_t
 {
-    struct kan_repository_indexed_interval_read_query_t read_interval__object_record__object_id;
+    KAN_UP_GENERATE_STATE_QUERIES (validate_insert_from_multiple_threads)
+    KAN_UP_BIND_STATE (validate_insert_from_multiple_threads, state)
 };
 
 TEST_UNIVERSE_API void kan_universe_mutator_execute_validate_insert_from_multiple_threads (
     kan_cpu_job_t job, struct validate_insert_from_multiple_threads_state_t *state)
 {
     uint64_t count = 0u;
-    struct kan_repository_indexed_interval_ascending_read_cursor_t cursor =
-        kan_repository_indexed_interval_read_query_execute_ascending (&state->read_interval__object_record__object_id,
-                                                                      NULL, NULL);
-
-    while (KAN_TRUE)
+    KAN_UP_INTERVAL_ASCENDING_READ (object, object_record_t, object_id, NULL, NULL)
     {
-        struct kan_repository_indexed_interval_read_access_t access =
-            kan_repository_indexed_interval_ascending_read_cursor_next (&cursor);
-
-        const struct object_record_t *object = kan_repository_indexed_interval_read_access_resolve (&access);
-        if (!object)
-        {
-            kan_repository_indexed_interval_ascending_read_cursor_close (&cursor);
-            break;
-        }
-
         KAN_TEST_CHECK (object->object_id == count)
         KAN_TEST_CHECK (object->parent_object_id == INVALID_PARENT_OBJECT_ID)
         KAN_TEST_CHECK (object->data_x == count + 3u)
         KAN_TEST_CHECK (object->data_y == count * 2u)
         ++count;
-        kan_repository_indexed_interval_read_access_close (&access);
     }
 
     KAN_TEST_CHECK (count == 16u)
-    kan_cpu_job_release (job);
+    KAN_UP_MUTATOR_RETURN;
 }
 
 struct update_with_children_state_t
 {
-    struct kan_repository_singleton_read_query_t read__counters_singleton;
+    KAN_UP_GENERATE_STATE_QUERIES (update_with_children)
+    KAN_UP_BIND_STATE (update_with_children, state)
 };
 
 TEST_UNIVERSE_API void kan_universe_scheduler_execute_update_with_children (
@@ -460,24 +392,20 @@ TEST_UNIVERSE_API void kan_universe_scheduler_execute_update_with_children (
     kan_universe_scheduler_interface_run_pipeline (interface, kan_string_intern ("update"));
     kan_universe_scheduler_interface_update_all_children (interface);
 
-    kan_repository_singleton_read_access_t access =
-        kan_repository_singleton_read_query_execute (&state->read__counters_singleton);
-
-    const struct counters_singleton_t *counters =
-        (const struct counters_singleton_t *) kan_repository_singleton_read_access_resolve (access);
-    KAN_TEST_ASSERT (counters);
-
-    for (uint64_t index = 1u; index < WORLD_CHILD_UPDATE_TEST_DEPTH; ++index)
+    KAN_UP_SINGLETON_READ (counters, counters_singleton_t)
     {
-        KAN_TEST_CHECK (counters->world_update_counters[index - 1u] == counters->world_update_counters[index])
+        for (uint64_t index = 1u; index < WORLD_CHILD_UPDATE_TEST_DEPTH; ++index)
+        {
+            KAN_TEST_CHECK (counters->world_update_counters[index - 1u] == counters->world_update_counters[index])
+        }
     }
-
-    kan_repository_singleton_read_access_close (access);
 }
 
 struct world_update_counter_state_t
 {
-    struct kan_repository_singleton_write_query_t write__counters_singleton;
+    KAN_UP_GENERATE_STATE_QUERIES (world_update_counter)
+    KAN_UP_BIND_STATE (world_update_counter, state)
+
     uint64_t world_counter_index;
 };
 
@@ -496,17 +424,12 @@ TEST_UNIVERSE_API void kan_universe_mutator_deploy_world_update_counter (kan_uni
 TEST_UNIVERSE_API void kan_universe_mutator_execute_world_update_counter (kan_cpu_job_t job,
                                                                           struct world_update_counter_state_t *state)
 {
-    kan_repository_singleton_write_access_t access =
-        kan_repository_singleton_write_query_execute (&state->write__counters_singleton);
+    KAN_UP_SINGLETON_WRITE (counters, counters_singleton_t)
+    {
+        ++counters->world_update_counters[state->world_counter_index];
+    }
 
-    struct counters_singleton_t *counters =
-        (struct counters_singleton_t *) kan_repository_singleton_write_access_resolve (access);
-    KAN_TEST_ASSERT (counters)
-
-    ++counters->world_update_counters[state->world_counter_index];
-    kan_repository_singleton_write_access_close (access);
-
-    kan_cpu_job_release (job);
+    KAN_UP_MUTATOR_RETURN;
 }
 
 KAN_REFLECTION_EXPECT_UNIT_REGISTRAR (test_universe_pre_migration);

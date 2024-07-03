@@ -1,4 +1,4 @@
-#include <kan/api_common/mute_third_party_warnings.h>
+#include <kan/api_common/mute_warnings.h>
 
 #include <string.h>
 

@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#include <kan/api_common/mute_third_party_warnings.h>
+#include <kan/api_common/mute_warnings.h>
 #include <kan/container/list.h>
 #include <kan/container/stack_group_allocator.h>
 #include <kan/error/critical.h>

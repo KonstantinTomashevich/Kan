@@ -10,6 +10,7 @@ add_custom_command (
         COMMENT "Generate readable_data code from re2c template."
         COMMAND re2c "${GENERATION_SOURCE}" -o "${GENERATION_OUTPUT}")
 
+concrete_highlight_direct ("${GENERATION_SOURCE}")
 concrete_sources_direct ("${GENERATION_OUTPUT}")
 concrete_require (SCOPE PUBLIC INTERFACE stream)
 concrete_require (SCOPE PRIVATE ABSTRACT error log memory CONCRETE_INTERFACE container)

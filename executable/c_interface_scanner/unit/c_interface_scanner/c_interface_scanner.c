@@ -40,6 +40,13 @@ struct tags_t
     /*!stags:re2c format = 'const char *@@;';*/
 };
 
+enum parse_response_t
+{
+    PARSE_RESPONSE_FINISHED = 0u,
+    PARSE_RESPONSE_FAILED,
+    PARSE_RESPONSE_BLOCK_PROCESSED,
+};
+
 static struct
 {
     struct kan_stream_t *input_stream;
@@ -465,9 +472,9 @@ static const char *capture_meta_value_end;
 
 /*!rules:re2c:default
  "//" separator* "\\c_interface_scanner_disable" separator*
- { if (!parse_skip_until_enabled ()) { return KAN_FALSE; } continue; }
- "/""*" { if (!parse_subroutine_multi_line_comment ()) { return KAN_FALSE; } continue; }
- "//" { if (!parse_subroutine_single_line_comment ()) { return KAN_FALSE; } continue; }
+ { if (!parse_skip_until_enabled ()) { return PARSE_RESPONSE_FAILED; } continue; }
+ "/""*" { if (!parse_subroutine_multi_line_comment ()) { return PARSE_RESPONSE_FAILED; } continue; }
+ "//" { if (!parse_subroutine_single_line_comment ()) { return PARSE_RESPONSE_FAILED; } continue; }
 
  separator | any_preprocessor { optional_includable_object_append_token (); continue; }
 
@@ -475,7 +482,7 @@ static const char *capture_meta_value_end;
  {
      fprintf (stderr, "Error. [%ld:%ld]: Unable to parse next token. Parser: %s. Symbol code: 0x%x.\n",
          (long) io.cursor_line, (long) io.cursor_symbol, __func__, (int) *io.cursor);
-     return KAN_FALSE;
+     return PARSE_RESPONSE_FAILED;
  }
  */
 
@@ -521,19 +528,19 @@ static const char *capture_meta_value_end;
  }
  */
 
-static kan_bool_t parse_main (void);
-static kan_bool_t parse_enum (void);
-static kan_bool_t parse_struct (void);
-static kan_bool_t parse_exported_symbol_begin (void);
-static kan_bool_t parse_exported_function_arguments (void);
-static kan_bool_t parse_skip_until_round_braces_close (kan_bool_t append_token);
-static kan_bool_t parse_skip_until_curly_braces_close (void);
+static enum parse_response_t parse_main (void);
+static enum parse_response_t parse_enum (void);
+static enum parse_response_t parse_struct (void);
+static enum parse_response_t parse_exported_symbol_begin (void);
+static enum parse_response_t parse_exported_function_arguments (void);
+static enum parse_response_t parse_skip_until_round_braces_close (kan_bool_t append_token);
+static enum parse_response_t parse_skip_until_curly_braces_close (void);
 
 static kan_bool_t parse_skip_until_enabled (void);
 static kan_bool_t parse_subroutine_multi_line_comment (void);
 static kan_bool_t parse_subroutine_single_line_comment (void);
 
-static kan_bool_t parse_main (void)
+static enum parse_response_t parse_main (void)
 {
     while (KAN_TRUE)
     {
@@ -589,7 +596,7 @@ static kan_bool_t parse_main (void)
          {
              fprintf (stderr, "Error. [%ld:%ld]: Encountered struct/enum hiding typedef, it confuses parser.\n",
                 (long) io.cursor_line, (long) io.cursor_symbol);
-             return KAN_FALSE;
+             return PARSE_RESPONSE_FAILED;
          }
 
          // We ignore usual typedefs.
@@ -607,12 +614,12 @@ static kan_bool_t parse_main (void)
          "=" (separator | [a-zA-Z0-9+*_] | "-" | "/" | ")" | "(" )* ";"
          { optional_includable_object_append_string (";"); continue; }
 
-         $ { return KAN_TRUE; }
+         $ { return PARSE_RESPONSE_FINISHED; }
          */
     }
 }
 
-static kan_bool_t parse_enum (void)
+static enum parse_response_t parse_enum (void)
 {
     while (KAN_TRUE)
     {
@@ -631,14 +638,14 @@ static kan_bool_t parse_enum (void)
 
          "," { optional_includable_object_append_token (); continue; }
 
-         "}" { optional_includable_object_append_token (); report_enum_end (); return parse_main (); }
+         "}" { optional_includable_object_append_token (); report_enum_end (); return PARSE_RESPONSE_BLOCK_PROCESSED; }
 
-         $ { fprintf (stderr, "Error. Reached end of file while parsing enum."); return KAN_FALSE; }
+         $ { fprintf (stderr, "Error. Reached end of file while parsing enum."); return PARSE_RESPONSE_FAILED; }
          */
     }
 }
 
-static kan_bool_t parse_struct (void)
+static enum parse_response_t parse_struct (void)
 {
     kan_bool_t inside_union = KAN_FALSE;
     while (KAN_TRUE)
@@ -671,7 +678,7 @@ static kan_bool_t parse_struct (void)
              {
                  fprintf (stderr, "Error. [%ld:%ld]: Nested unions aren't supported.\n",
                      (long) io.cursor_line, (long) io.cursor_symbol);
-                 return KAN_FALSE;
+                 return PARSE_RESPONSE_FAILED;
              }
 
              inside_union = KAN_TRUE;
@@ -690,15 +697,15 @@ static kan_bool_t parse_struct (void)
              }
 
              report_struct_end ();
-             return parse_main ();
+             return PARSE_RESPONSE_BLOCK_PROCESSED;
          }
 
-         $ { fprintf (stderr, "Error. Reached end of file while parsing structure."); return KAN_FALSE; }
+         $ { fprintf (stderr, "Error. Reached end of file while parsing structure."); return PARSE_RESPONSE_FAILED; }
          */
     }
 }
 
-static kan_bool_t parse_exported_symbol_begin (void)
+static enum parse_response_t parse_exported_symbol_begin (void)
 {
     while (KAN_TRUE)
     {
@@ -740,19 +747,19 @@ static kan_bool_t parse_exported_symbol_begin (void)
                  capture_identifier_begin,
                  capture_identifier_end,
                  capture_array_suffix_begin == capture_array_suffix_end ? KAN_FALSE : KAN_TRUE);
-             return parse_main ();
+             return PARSE_RESPONSE_BLOCK_PROCESSED;
          }
 
          $
          {
              fprintf (stderr, "Error. Reached end of file while expecting function or symbol declaration.");
-             return KAN_FALSE;
+             return PARSE_RESPONSE_FAILED;
          }
          */
     }
 }
 
-static kan_bool_t parse_exported_function_arguments (void)
+static enum parse_response_t parse_exported_function_arguments (void)
 {
     while (KAN_TRUE)
     {
@@ -783,15 +790,19 @@ static kan_bool_t parse_exported_function_arguments (void)
              optional_includable_object_append_token ();
              optional_includable_object_append_string (";");
              report_exported_function_end ();
-             return parse_main ();
+             return PARSE_RESPONSE_BLOCK_PROCESSED;
          }
 
-         $ { fprintf (stderr, "Error. Reached end of file while parsing function arguments."); return KAN_FALSE; }
+         $
+         {
+             fprintf (stderr, "Error. Reached end of file while parsing function arguments.");
+             return PARSE_RESPONSE_FAILED;
+         }
          */
     }
 }
 
-static kan_bool_t parse_skip_until_round_braces_close (kan_bool_t append_token)
+static enum parse_response_t parse_skip_until_round_braces_close (kan_bool_t append_token)
 {
     size_t left_to_close = 1u;
     while (KAN_TRUE)
@@ -821,20 +832,23 @@ static kan_bool_t parse_skip_until_round_braces_close (kan_bool_t append_token)
              --left_to_close;
              if (left_to_close == 0u)
              {
-                 return parse_main ();
+                 return PARSE_RESPONSE_BLOCK_PROCESSED;
              }
 
              continue;
          }
 
          * { if (append_token) { optional_includable_object_append_token (); } continue; }
-         $ { fprintf (stderr, "Error. Reached end of file while waiting for round braces to close."); return KAN_FALSE;
+         $
+         {
+             fprintf (stderr, "Error. Reached end of file while waiting for round braces to close.");
+             return PARSE_RESPONSE_FAILED;
          }
         */
     }
 }
 
-static kan_bool_t parse_skip_until_curly_braces_close (void)
+static enum parse_response_t parse_skip_until_curly_braces_close (void)
 {
     size_t left_to_close = 1u;
     while (KAN_TRUE)
@@ -854,14 +868,17 @@ static kan_bool_t parse_skip_until_curly_braces_close (void)
              --left_to_close;
              if (left_to_close == 0u)
              {
-                 return parse_main ();
+                 return PARSE_RESPONSE_BLOCK_PROCESSED;
              }
 
              continue;
          }
 
          * { continue; }
-         $ { fprintf (stderr, "Error. Reached end of file while waiting for curly braces to close."); return KAN_FALSE;
+         $
+         {
+             fprintf (stderr, "Error. Reached end of file while waiting for curly braces to close.");
+             return PARSE_RESPONSE_FAILED;
          }
         */
     }
@@ -923,9 +940,14 @@ static kan_bool_t parse_subroutine_single_line_comment (void)
 static kan_bool_t parse_input (void)
 {
     optional_includable_object_begin ();
-    kan_bool_t result = parse_main ();
+    enum parse_response_t response;
+
+    while ((response = parse_main ()) == PARSE_RESPONSE_BLOCK_PROCESSED)
+    {
+    }
+
     optional_includable_object_finish ();
-    return result;
+    return response == PARSE_RESPONSE_FINISHED;
 }
 
 int main (int argument_count, char **arguments_array)

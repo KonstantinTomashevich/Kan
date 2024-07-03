@@ -15,6 +15,7 @@
 #include <kan/serialization/binary.h>
 #include <kan/serialization/readable_data.h>
 #include <kan/stream/random_access_stream_buffer.h>
+#include <kan/universe/preprocessor_markup.h>
 #include <kan/universe/reflection_system_generator_helpers.h>
 #include <kan/universe/universe.h>
 #include <kan/universe_resource_provider/universe_resource_provider.h>
@@ -300,60 +301,10 @@ struct resource_provider_state_t
     kan_interned_string_t interned_kan_resource_index_t;
     kan_interned_string_t interned_resource_provider_server;
 
-    struct kan_repository_singleton_write_query_t write__kan_resource_provider_singleton;
-    struct kan_repository_singleton_write_query_t write__resource_provider_private_singleton;
+    KAN_UP_GENERATE_STATE_QUERIES (resource_provider)
+    KAN_UP_BIND_STATE (resource_provider, state)
 
-    struct kan_repository_indexed_insert_query_t insert__kan_resource_native_entry;
-    struct kan_repository_indexed_insert_query_t insert__resource_provider_native_entry_suffix;
-    struct kan_repository_indexed_insert_query_t insert__kan_resource_third_party_entry;
-    struct kan_repository_indexed_insert_query_t insert__resource_provider_third_party_entry_suffix;
-
-    struct kan_repository_indexed_sequence_write_query_t write_sequence__kan_resource_native_entry;
-    struct kan_repository_indexed_sequence_write_query_t write_sequence__kan_resource_third_party_entry;
-
-    struct kan_repository_event_fetch_query_t fetch__resource_request_on_insert_event;
-    struct kan_repository_event_fetch_query_t fetch__resource_request_on_change_event;
-    struct kan_repository_event_fetch_query_t fetch__resource_request_on_delete_event;
-
-    struct kan_repository_indexed_value_read_query_t read_value__kan_resource_request__name;
-    struct kan_repository_indexed_value_update_query_t update_value__kan_resource_request__name;
-    struct kan_repository_indexed_value_update_query_t update_value__kan_resource_request__request_id;
-
-    struct kan_repository_indexed_value_read_query_t read_value__kan_resource_native_entry__name;
-    struct kan_repository_indexed_value_update_query_t update_value__kan_resource_native_entry__name;
-    struct kan_repository_indexed_value_update_query_t update_value__kan_resource_native_entry__attachment_id;
-
-    struct kan_repository_indexed_value_update_query_t update_value__kan_resource_third_party_entry__name;
-    struct kan_repository_indexed_value_update_query_t update_value__kan_resource_third_party_entry__attachment_id;
-
-    struct kan_repository_indexed_value_write_query_t write_value__kan_resource_native_entry__name;
-    struct kan_repository_indexed_value_write_query_t write_value__kan_resource_third_party_entry__name;
-
-    struct kan_repository_indexed_value_update_query_t
-        update_value__resource_provider_native_entry_suffix__attachment_id;
-    struct kan_repository_indexed_value_write_query_t write_value__resource_provider_native_entry_suffix__attachment_id;
-
-    struct kan_repository_indexed_value_update_query_t
-        update_value__resource_provider_third_party_entry_suffix__attachment_id;
-    struct kan_repository_indexed_value_write_query_t
-        write_value__resource_provider_third_party_entry_suffix__attachment_id;
-
-    struct kan_repository_indexed_interval_update_query_t
-        update_interval__resource_provider_native_entry_suffix__reload_after_real_time_ns;
-    struct kan_repository_indexed_interval_update_query_t
-        update_interval__resource_provider_third_party_entry_suffix__reload_after_real_time_ns;
-
-    struct kan_repository_indexed_insert_query_t insert__resource_provider_delayed_file_addition;
-    struct kan_repository_indexed_value_write_query_t
-        write_value__resource_provider_delayed_file_addition__name_for_search;
-    struct kan_repository_indexed_interval_write_query_t
-        write_interval__resource_provider_delayed_file_addition__investigate_after_ns;
-
-    struct kan_repository_indexed_insert_query_t insert__resource_provider_loading_operation;
     struct kan_repository_indexed_interval_write_query_t write_interval__resource_provider_loading_operation__priority;
-    struct kan_repository_indexed_value_delete_query_t delete_value__resource_provider_loading_operation__target_name;
-
-    struct kan_repository_event_insert_query_t insert__kan_resource_request_updated_event;
 
     /// \meta reflection_ignore_struct_field
     struct resource_provider_execution_shared_state_t execution_shared_state;
@@ -611,25 +562,23 @@ static void add_native_entry (struct resource_provider_state_t *state,
                               kan_serialization_interned_string_registry_t string_registry)
 {
     const uint64_t attachment_id = (uint64_t) kan_atomic_int_add (&private->attachment_id_counter, 1);
-    struct kan_repository_indexed_insertion_package_t package =
-        kan_repository_indexed_insert_query_execute (&state->insert__kan_resource_native_entry);
-    struct kan_resource_native_entry_t *entry = kan_repository_indexed_insertion_package_get (&package);
+    KAN_UP_INDEXED_INSERT (entry, kan_resource_native_entry_t)
+    {
+        entry->attachment_id = attachment_id;
+        entry->type = type_name;
+        entry->name = name;
 
-    entry->attachment_id = attachment_id;
-    entry->type = type_name;
-    entry->name = name;
+        const uint64_t path_length = strlen (path);
+        entry->path = kan_allocate_general (entry->my_allocation_group, path_length + 1u, _Alignof (char));
+        memcpy (entry->path, path, path_length + 1u);
+    }
 
-    const uint64_t path_length = strlen (path);
-    entry->path = kan_allocate_general (entry->my_allocation_group, path_length + 1u, _Alignof (char));
-    memcpy (entry->path, path, path_length + 1u);
-    kan_repository_indexed_insertion_package_submit (&package);
-
-    package = kan_repository_indexed_insert_query_execute (&state->insert__resource_provider_native_entry_suffix);
-    struct resource_provider_native_entry_suffix_t *suffix = kan_repository_indexed_insertion_package_get (&package);
-    suffix->attachment_id = attachment_id;
-    suffix->format = format;
-    suffix->string_registry = string_registry;
-    kan_repository_indexed_insertion_package_submit (&package);
+    KAN_UP_INDEXED_INSERT (suffix, resource_provider_native_entry_suffix_t)
+    {
+        suffix->attachment_id = attachment_id;
+        suffix->format = format;
+        suffix->string_registry = string_registry;
+    }
 }
 
 static void add_third_party_entry (struct resource_provider_state_t *state,
@@ -639,124 +588,65 @@ static void add_third_party_entry (struct resource_provider_state_t *state,
                                    const char *path)
 {
     const uint64_t attachment_id = (uint64_t) kan_atomic_int_add (&private->attachment_id_counter, 1);
+    KAN_UP_INDEXED_INSERT (entry, kan_resource_third_party_entry_t)
+    {
+        entry->attachment_id = attachment_id;
+        entry->name = name;
+        entry->size = size;
 
-    struct kan_repository_indexed_insertion_package_t package =
-        kan_repository_indexed_insert_query_execute (&state->insert__kan_resource_third_party_entry);
-    struct kan_resource_third_party_entry_t *entry = kan_repository_indexed_insertion_package_get (&package);
+        const uint64_t path_length = strlen (path);
+        entry->path = kan_allocate_general (entry->my_allocation_group, path_length + 1u, _Alignof (char));
+        memcpy (entry->path, path, path_length + 1u);
+    }
 
-    entry->attachment_id = attachment_id;
-    entry->name = name;
-    entry->size = size;
-
-    const uint64_t path_length = strlen (path);
-    entry->path = kan_allocate_general (entry->my_allocation_group, path_length + 1u, _Alignof (char));
-    memcpy (entry->path, path, path_length + 1u);
-    kan_repository_indexed_insertion_package_submit (&package);
-
-    package = kan_repository_indexed_insert_query_execute (&state->insert__resource_provider_third_party_entry_suffix);
-    struct resource_provider_third_party_entry_suffix_t *suffix =
-        kan_repository_indexed_insertion_package_get (&package);
-    suffix->attachment_id = attachment_id;
-    kan_repository_indexed_insertion_package_submit (&package);
+    KAN_UP_INDEXED_INSERT (suffix, resource_provider_third_party_entry_suffix_t)
+    {
+        suffix->attachment_id = attachment_id;
+    }
 }
 
 static inline void unload_native_entry (struct resource_provider_state_t *state,
                                         struct kan_resource_native_entry_t *entry,
                                         struct resource_provider_native_entry_suffix_t *entry_suffix);
 
+static inline void cancel_native_entry_loading (struct resource_provider_state_t *state,
+                                                struct kan_resource_native_entry_t *entry,
+                                                struct resource_provider_native_entry_suffix_t *entry_suffix);
+
 static inline void unload_third_party_entry (struct resource_provider_state_t *state,
                                              struct kan_resource_third_party_entry_t *entry,
                                              struct resource_provider_third_party_entry_suffix_t *entry_suffix);
 
-static inline struct resource_provider_native_entry_suffix_t *write_native_suffix (
-    struct resource_provider_state_t *state,
-    struct kan_resource_native_entry_t *entry,
-    struct kan_repository_indexed_value_write_access_t *access_output)
-{
-    struct kan_repository_indexed_value_write_cursor_t suffix_cursor =
-        kan_repository_indexed_value_write_query_execute (
-            &state->write_value__resource_provider_native_entry_suffix__attachment_id, &entry->attachment_id);
-
-    *access_output = kan_repository_indexed_value_write_cursor_next (&suffix_cursor);
-    kan_repository_indexed_value_write_cursor_close (&suffix_cursor);
-
-    struct resource_provider_native_entry_suffix_t *suffix =
-        kan_repository_indexed_value_write_access_resolve (access_output);
-    KAN_ASSERT (suffix)
-    return suffix;
-}
-
-static inline struct resource_provider_third_party_entry_suffix_t *write_third_party_suffix (
-    struct resource_provider_state_t *state,
-    struct kan_resource_third_party_entry_t *entry,
-    struct kan_repository_indexed_value_write_access_t *access_output)
-{
-    struct kan_repository_indexed_value_write_cursor_t suffix_cursor =
-        kan_repository_indexed_value_write_query_execute (
-            &state->write_value__resource_provider_third_party_entry_suffix__attachment_id, &entry->attachment_id);
-
-    *access_output = kan_repository_indexed_value_write_cursor_next (&suffix_cursor);
-    kan_repository_indexed_value_write_cursor_close (&suffix_cursor);
-
-    struct resource_provider_third_party_entry_suffix_t *suffix =
-        kan_repository_indexed_value_write_access_resolve (access_output);
-    KAN_ASSERT (suffix)
-    return suffix;
-}
+static inline void cancel_third_party_entry_loading (struct resource_provider_state_t *state,
+                                                     struct kan_resource_third_party_entry_t *entry,
+                                                     struct resource_provider_third_party_entry_suffix_t *entry_suffix);
 
 static void clear_entries (struct resource_provider_state_t *state)
 {
-    struct kan_repository_indexed_sequence_write_cursor_t cursor =
-        kan_repository_indexed_sequence_write_query_execute (&state->write_sequence__kan_resource_native_entry);
-
-    while (KAN_TRUE)
+    KAN_UP_SEQUENCE_WRITE (native_entry, kan_resource_native_entry_t)
     {
-        struct kan_repository_indexed_sequence_write_access_t access =
-            kan_repository_indexed_sequence_write_cursor_next (&cursor);
-
-        struct kan_resource_native_entry_t *entry =
-            (struct kan_resource_native_entry_t *) kan_repository_indexed_sequence_write_access_resolve (&access);
-
-        if (entry)
+        KAN_UP_VALUE_WRITE (suffix, resource_provider_native_entry_suffix_t, attachment_id,
+                            &native_entry->attachment_id)
         {
-            struct kan_repository_indexed_value_write_access_t suffix_access;
-            struct resource_provider_native_entry_suffix_t *suffix = write_native_suffix (state, entry, &suffix_access);
-            unload_native_entry (state, entry, suffix);
-            kan_repository_indexed_sequence_write_access_delete (&access);
-            kan_repository_indexed_value_write_access_delete (&suffix_access);
+            unload_native_entry (state, native_entry, suffix);
+            cancel_native_entry_loading (state, native_entry, suffix);
+            KAN_UP_ACCESS_DELETE (suffix);
         }
-        else
-        {
-            kan_repository_indexed_sequence_write_cursor_close (&cursor);
-            break;
-        }
+
+        KAN_UP_ACCESS_DELETE (native_entry);
     }
 
-    cursor =
-        kan_repository_indexed_sequence_write_query_execute (&state->write_sequence__kan_resource_third_party_entry);
-
-    while (KAN_TRUE)
+    KAN_UP_SEQUENCE_WRITE (third_party_entry, kan_resource_third_party_entry_t)
     {
-        struct kan_repository_indexed_sequence_write_access_t access =
-            kan_repository_indexed_sequence_write_cursor_next (&cursor);
-
-        struct kan_resource_third_party_entry_t *entry =
-            (struct kan_resource_third_party_entry_t *) kan_repository_indexed_sequence_write_access_resolve (&access);
-
-        if (entry)
+        KAN_UP_VALUE_WRITE (suffix, resource_provider_third_party_entry_suffix_t, attachment_id,
+                            &third_party_entry->attachment_id)
         {
-            struct kan_repository_indexed_value_write_access_t suffix_access;
-            struct resource_provider_third_party_entry_suffix_t *suffix =
-                write_third_party_suffix (state, entry, &suffix_access);
-            unload_third_party_entry (state, entry, suffix);
-            kan_repository_indexed_sequence_write_access_delete (&access);
-            kan_repository_indexed_value_write_access_delete (&suffix_access);
+            unload_third_party_entry (state, third_party_entry, suffix);
+            cancel_third_party_entry_loading (state, third_party_entry, suffix);
+            KAN_UP_ACCESS_DELETE (suffix);
         }
-        else
-        {
-            kan_repository_indexed_sequence_write_cursor_close (&cursor);
-            break;
-        }
+
+        KAN_UP_ACCESS_DELETE (third_party_entry);
     }
 }
 
@@ -1002,74 +892,6 @@ static void instantiate_resource_index (struct resource_provider_state_t *state,
     }
 }
 
-static inline const struct kan_resource_native_entry_t *read_native_entry (
-    struct resource_provider_state_t *state,
-    kan_interned_string_t type,
-    kan_interned_string_t name,
-    struct kan_repository_indexed_value_read_access_t *access_output)
-{
-    struct kan_repository_indexed_value_read_cursor_t cursor =
-        kan_repository_indexed_value_read_query_execute (&state->read_value__kan_resource_native_entry__name, &name);
-
-    while (KAN_TRUE)
-    {
-        struct kan_repository_indexed_value_read_access_t access =
-            kan_repository_indexed_value_read_cursor_next (&cursor);
-
-        const struct kan_resource_native_entry_t *entry = kan_repository_indexed_value_read_access_resolve (&access);
-        if (!entry)
-        {
-            kan_repository_indexed_value_read_cursor_close (&cursor);
-            return NULL;
-        }
-
-        if (entry->type == type)
-        {
-            kan_repository_indexed_value_read_cursor_close (&cursor);
-            *access_output = access;
-            return entry;
-        }
-
-        kan_repository_indexed_value_read_access_close (&access);
-    }
-
-    return NULL;
-}
-
-static inline struct kan_resource_native_entry_t *update_native_entry (
-    struct resource_provider_state_t *state,
-    kan_interned_string_t type,
-    kan_interned_string_t name,
-    struct kan_repository_indexed_value_update_access_t *access_output)
-{
-    struct kan_repository_indexed_value_update_cursor_t cursor = kan_repository_indexed_value_update_query_execute (
-        &state->update_value__kan_resource_native_entry__name, &name);
-
-    while (KAN_TRUE)
-    {
-        struct kan_repository_indexed_value_update_access_t access =
-            kan_repository_indexed_value_update_cursor_next (&cursor);
-
-        struct kan_resource_native_entry_t *entry = kan_repository_indexed_value_update_access_resolve (&access);
-        if (!entry)
-        {
-            kan_repository_indexed_value_update_cursor_close (&cursor);
-            return NULL;
-        }
-
-        if (entry->type == type)
-        {
-            kan_repository_indexed_value_update_cursor_close (&cursor);
-            *access_output = access;
-            return entry;
-        }
-
-        kan_repository_indexed_value_update_access_close (&access);
-    }
-
-    return NULL;
-}
-
 static inline struct resource_provider_native_container_type_data_t *query_container_type_data (
     struct resource_provider_state_t *state, kan_interned_string_t type)
 {
@@ -1174,30 +996,11 @@ static inline uint64_t gather_request_priority (struct resource_provider_state_t
                                                 kan_interned_string_t name)
 {
     uint64_t priority = 0u;
-    struct kan_repository_indexed_value_read_cursor_t request_cursor =
-        kan_repository_indexed_value_read_query_execute (&state->read_value__kan_resource_request__name, &name);
-
-    while (KAN_TRUE)
+    KAN_UP_VALUE_READ (request, kan_resource_request_t, name, &name)
     {
-        struct kan_repository_indexed_value_read_access_t access =
-            kan_repository_indexed_value_read_cursor_next (&request_cursor);
-
-        struct kan_resource_request_t *request =
-            (struct kan_resource_request_t *) kan_repository_indexed_value_read_access_resolve (&access);
-
-        if (request)
+        if (request->type == type)
         {
-            if (request->type == type)
-            {
-                priority = KAN_MAX (priority, request->priority);
-            }
-
-            kan_repository_indexed_value_read_access_close (&access);
-        }
-        else
-        {
-            kan_repository_indexed_value_read_cursor_close (&request_cursor);
-            break;
+            priority = KAN_MAX (priority, request->priority);
         }
     }
 
@@ -1232,17 +1035,10 @@ static inline void update_request_provided_data (struct resource_provider_state_
 
     if (changed)
     {
-        struct kan_repository_event_insertion_package_t package =
-            kan_repository_event_insert_query_execute (&state->insert__kan_resource_request_updated_event);
-
-        struct kan_resource_request_updated_event_t *event =
-            (struct kan_resource_request_updated_event_t *) kan_repository_event_insertion_package_get (&package);
-
-        if (event)
+        KAN_UP_EVENT_INSERT (event, kan_resource_request_updated_event_t)
         {
             event->type = request->type;
             event->request_id = request->request_id;
-            kan_repository_event_insertion_package_submit (&package);
         }
     }
 }
@@ -1254,30 +1050,11 @@ static inline void update_requests (struct resource_provider_state_t *state,
                                     void *third_party_data,
                                     uint64_t third_party_data_size)
 {
-    struct kan_repository_indexed_value_update_cursor_t request_cursor =
-        kan_repository_indexed_value_update_query_execute (&state->update_value__kan_resource_request__name, &name);
-
-    while (KAN_TRUE)
+    KAN_UP_VALUE_UPDATE (request, kan_resource_request_t, name, &name)
     {
-        struct kan_repository_indexed_value_update_access_t access =
-            kan_repository_indexed_value_update_cursor_next (&request_cursor);
-
-        struct kan_resource_request_t *request =
-            (struct kan_resource_request_t *) kan_repository_indexed_value_update_access_resolve (&access);
-
-        if (request)
+        if (request->type == type)
         {
-            if (request->type == type)
-            {
-                update_request_provided_data (state, request, container_id, third_party_data, third_party_data_size);
-            }
-
-            kan_repository_indexed_value_update_access_close (&access);
-        }
-        else
-        {
-            kan_repository_indexed_value_update_cursor_close (&request_cursor);
-            break;
+            update_request_provided_data (state, request, container_id, third_party_data, third_party_data_size);
         }
     }
 }
@@ -1286,33 +1063,11 @@ static inline void loading_operation_cancel (struct resource_provider_state_t *s
                                              kan_interned_string_t type,
                                              kan_interned_string_t name)
 {
-    struct kan_repository_indexed_value_delete_cursor_t cursor = kan_repository_indexed_value_delete_query_execute (
-        &state->delete_value__resource_provider_loading_operation__target_name, &name);
-
-    while (KAN_TRUE)
+    KAN_UP_VALUE_DELETE (operation, resource_provider_loading_operation_t, target_name, &name)
     {
-        struct kan_repository_indexed_value_delete_access_t access =
-            kan_repository_indexed_value_delete_cursor_next (&cursor);
-
-        const struct resource_provider_loading_operation_t *operation =
-            (const struct resource_provider_loading_operation_t *) kan_repository_indexed_value_delete_access_resolve (
-                &access);
-
-        if (operation)
+        if (operation->target_type == type)
         {
-            if (operation->target_type == type)
-            {
-                kan_repository_indexed_value_delete_access_delete (&access);
-            }
-            else
-            {
-                kan_repository_indexed_value_delete_access_close (&access);
-            }
-        }
-        else
-        {
-            kan_repository_indexed_value_delete_cursor_close (&cursor);
-            break;
+            KAN_UP_ACCESS_DELETE (operation);
         }
     }
 }
@@ -1419,34 +1174,30 @@ static inline void schedule_native_entry_loading (struct resource_provider_state
     }
 
     entry_suffix->loading_container_id = container_view->container_id;
-    struct kan_repository_indexed_insertion_package_t package =
-        kan_repository_indexed_insert_query_execute (&state->insert__resource_provider_loading_operation);
-
-    struct resource_provider_loading_operation_t *operation =
-        (struct resource_provider_loading_operation_t *) kan_repository_indexed_insertion_package_get (&package);
-
-    operation->priority = gather_request_priority (state, entry->type, entry->name);
-    operation->target_type = entry->type;
-    operation->target_name = entry->name;
-    operation->stream = stream;
-    operation->native.format_cache = entry_suffix->format;
-    operation->native.used_registry = state->reflection_registry;
-
-    switch (entry_suffix->format)
+    KAN_UP_INDEXED_INSERT (operation, resource_provider_loading_operation_t)
     {
-    case KAN_RESOURCE_INDEX_NATIVE_ITEM_FORMAT_BINARY:
-        operation->native.binary_reader =
-            kan_serialization_binary_reader_create (stream, data_begin, entry->type, state->shared_script_storage,
-                                                    entry_suffix->string_registry, container_view->my_allocation_group);
-        break;
+        operation->priority = gather_request_priority (state, entry->type, entry->name);
+        operation->target_type = entry->type;
+        operation->target_name = entry->name;
+        operation->stream = stream;
+        operation->native.format_cache = entry_suffix->format;
+        operation->native.used_registry = state->reflection_registry;
 
-    case KAN_RESOURCE_INDEX_NATIVE_ITEM_FORMAT_READABLE_DATA:
-        operation->native.readable_data_reader = kan_serialization_rd_reader_create (
-            stream, data_begin, entry->type, state->reflection_registry, container_view->my_allocation_group);
-        break;
+        switch (entry_suffix->format)
+        {
+        case KAN_RESOURCE_INDEX_NATIVE_ITEM_FORMAT_BINARY:
+            operation->native.binary_reader = kan_serialization_binary_reader_create (
+                stream, data_begin, entry->type, state->shared_script_storage, entry_suffix->string_registry,
+                container_view->my_allocation_group);
+            break;
+
+        case KAN_RESOURCE_INDEX_NATIVE_ITEM_FORMAT_READABLE_DATA:
+            operation->native.readable_data_reader = kan_serialization_rd_reader_create (
+                stream, data_begin, entry->type, state->reflection_registry, container_view->my_allocation_group);
+            break;
+        }
     }
 
-    kan_repository_indexed_insertion_package_submit (&package);
     kan_repository_indexed_insertion_package_submit (&container_package);
 }
 
@@ -1478,32 +1229,6 @@ static inline void cancel_native_entry_loading (struct resource_provider_state_t
     entry_suffix->loading_container_id = KAN_RESOURCE_PROVIDER_CONTAINER_ID_NONE;
 }
 
-static inline struct kan_resource_third_party_entry_t *update_third_party_entry (
-    struct resource_provider_state_t *state,
-    kan_interned_string_t name,
-    struct kan_repository_indexed_value_update_access_t *access_output)
-{
-    struct kan_repository_indexed_value_update_cursor_t cursor = kan_repository_indexed_value_update_query_execute (
-        &state->update_value__kan_resource_third_party_entry__name, &name);
-    *access_output = kan_repository_indexed_value_update_cursor_next (&cursor);
-
-#if defined(KAN_WITH_ASSERT)
-    // Check that there is no duplicate third party names.
-    struct kan_repository_indexed_value_update_access_t next_access =
-        kan_repository_indexed_value_update_cursor_next (&cursor);
-
-    if (kan_repository_indexed_value_update_access_resolve (&next_access))
-    {
-        KAN_ASSERT (KAN_FALSE)
-        kan_repository_indexed_value_update_access_close (&next_access);
-    }
-#endif
-
-    kan_repository_indexed_value_update_cursor_close (&cursor);
-    return (struct kan_resource_third_party_entry_t *) kan_repository_indexed_value_update_access_resolve (
-        access_output);
-}
-
 static inline void schedule_third_party_entry_loading (
     struct resource_provider_state_t *state,
     struct kan_resource_third_party_entry_t *entry,
@@ -1531,20 +1256,16 @@ static inline void schedule_third_party_entry_loading (
     entry_suffix->loading_data = kan_allocate_general (entry->my_allocation_group, entry->size, _Alignof (uint64_t));
     entry_suffix->loading_data_size = entry->size;
 
-    struct kan_repository_indexed_insertion_package_t package =
-        kan_repository_indexed_insert_query_execute (&state->insert__resource_provider_loading_operation);
-
-    struct resource_provider_loading_operation_t *operation =
-        (struct resource_provider_loading_operation_t *) kan_repository_indexed_insertion_package_get (&package);
-
-    operation->priority = gather_request_priority (state, NULL, entry->name);
-    operation->target_type = NULL;
-    operation->target_name = entry->name;
-    operation->stream = stream;
-    operation->third_party.offset = 0u;
-    operation->third_party.size = entry->size;
-    operation->third_party.data = entry_suffix->loading_data;
-    kan_repository_indexed_insertion_package_submit (&package);
+    KAN_UP_INDEXED_INSERT (operation, resource_provider_loading_operation_t)
+    {
+        operation->priority = gather_request_priority (state, NULL, entry->name);
+        operation->target_type = NULL;
+        operation->target_name = entry->name;
+        operation->stream = stream;
+        operation->third_party.offset = 0u;
+        operation->third_party.size = entry->size;
+        operation->third_party.data = entry_suffix->loading_data;
+    }
 }
 
 static inline void unload_third_party_entry (struct resource_provider_state_t *state,
@@ -1576,370 +1297,216 @@ static inline void cancel_third_party_entry_loading (struct resource_provider_st
     entry_suffix->loading_data_size = 0u;
 }
 
-static inline struct resource_provider_native_entry_suffix_t *update_native_suffix (
-    struct resource_provider_state_t *state,
-    const struct kan_resource_native_entry_t *entry,
-    struct kan_repository_indexed_value_update_access_t *access_output)
-{
-    struct kan_repository_indexed_value_update_cursor_t suffix_cursor =
-        kan_repository_indexed_value_update_query_execute (
-            &state->update_value__resource_provider_native_entry_suffix__attachment_id, &entry->attachment_id);
-
-    *access_output = kan_repository_indexed_value_update_cursor_next (&suffix_cursor);
-    kan_repository_indexed_value_update_cursor_close (&suffix_cursor);
-
-    struct resource_provider_native_entry_suffix_t *suffix =
-        kan_repository_indexed_value_update_access_resolve (access_output);
-    KAN_ASSERT (suffix)
-    return suffix;
-}
-
 static inline void add_native_entry_reference (struct resource_provider_state_t *state,
                                                struct resource_provider_private_singleton_t *private,
                                                uint64_t request_id,
                                                kan_interned_string_t type,
                                                kan_interned_string_t name)
 {
-    struct kan_repository_indexed_value_update_access_t entry_access;
-    struct kan_resource_native_entry_t *entry = update_native_entry (state, type, name, &entry_access);
-
-    if (entry)
+    KAN_UP_VALUE_UPDATE (entry, kan_resource_native_entry_t, name, &name)
     {
-        struct kan_repository_indexed_value_update_access_t suffix_access;
-        struct resource_provider_native_entry_suffix_t *suffix = update_native_suffix (state, entry, &suffix_access);
-        ++suffix->request_count;
-
-        if (suffix->loaded_container_id != KAN_RESOURCE_PROVIDER_CONTAINER_ID_NONE)
+        if (entry->type == type)
         {
-            struct kan_repository_indexed_value_update_cursor_t request_cursor =
-                kan_repository_indexed_value_update_query_execute (
-                    &state->update_value__kan_resource_request__request_id, &request_id);
-
-            struct kan_repository_indexed_value_update_access_t request_access =
-                kan_repository_indexed_value_update_cursor_next (&request_cursor);
-
-            struct kan_resource_request_t *request =
-                (struct kan_resource_request_t *) kan_repository_indexed_value_update_access_resolve (&request_access);
-
-            if (request)
+            KAN_UP_VALUE_UPDATE (suffix, resource_provider_native_entry_suffix_t, attachment_id, &entry->attachment_id)
             {
-                update_request_provided_data (state, request, suffix->loaded_container_id, NULL, 0u);
-                kan_repository_indexed_value_update_access_close (&request_access);
+                ++suffix->request_count;
+                if (suffix->loaded_container_id != KAN_RESOURCE_PROVIDER_CONTAINER_ID_NONE)
+                {
+                    KAN_UP_VALUE_UPDATE (request, kan_resource_request_t, request_id, &request_id)
+                    {
+                        update_request_provided_data (state, request, suffix->loaded_container_id, NULL, 0u);
+                    }
+                }
+                else if (suffix->loading_container_id == KAN_RESOURCE_PROVIDER_CONTAINER_ID_NONE)
+                {
+                    schedule_native_entry_loading (state, private, entry, suffix);
+                }
+
+                KAN_UP_QUERY_RETURN_VOID;
             }
 
-            kan_repository_indexed_value_update_cursor_close (&request_cursor);
+            KAN_LOG (universe_resource_provider, KAN_LOG_ERROR,
+                     "Unable to find suffix of requested native resource \"%s\" of type \"%s\".", name, type)
+            KAN_UP_QUERY_RETURN_VOID;
         }
-        else if (suffix->loading_container_id == KAN_RESOURCE_PROVIDER_CONTAINER_ID_NONE)
-        {
-            schedule_native_entry_loading (state, private, entry, suffix);
-        }
-
-        kan_repository_indexed_value_update_access_close (&suffix_access);
-        kan_repository_indexed_value_update_access_close (&entry_access);
     }
-    else
-    {
-        KAN_LOG (universe_resource_provider, KAN_LOG_ERROR,
-                 "Unable to find requested native resource \"%s\" of type \"%s\".", name, type)
-    }
-}
 
-static inline struct resource_provider_third_party_entry_suffix_t *update_third_party_suffix (
-    struct resource_provider_state_t *state,
-    const struct kan_resource_third_party_entry_t *entry,
-    struct kan_repository_indexed_value_update_access_t *access_output)
-{
-    struct kan_repository_indexed_value_update_cursor_t suffix_cursor =
-        kan_repository_indexed_value_update_query_execute (
-            &state->update_value__resource_provider_third_party_entry_suffix__attachment_id, &entry->attachment_id);
-
-    *access_output = kan_repository_indexed_value_update_cursor_next (&suffix_cursor);
-    kan_repository_indexed_value_update_cursor_close (&suffix_cursor);
-
-    struct resource_provider_third_party_entry_suffix_t *suffix =
-        kan_repository_indexed_value_update_access_resolve (access_output);
-    KAN_ASSERT (suffix)
-    return suffix;
+    KAN_LOG (universe_resource_provider, KAN_LOG_ERROR,
+             "Unable to find requested native resource \"%s\" of type \"%s\".", name, type)
 }
 
 static inline void add_third_party_entry_reference (struct resource_provider_state_t *state,
                                                     uint64_t request_id,
                                                     kan_interned_string_t name)
 {
-    struct kan_repository_indexed_value_update_access_t entry_access;
-    struct kan_resource_third_party_entry_t *entry = update_third_party_entry (state, name, &entry_access);
-
-    if (entry)
+    KAN_UP_VALUE_UPDATE (entry, kan_resource_third_party_entry_t, name, &name)
     {
-        struct kan_repository_indexed_value_update_access_t suffix_access;
-        struct resource_provider_third_party_entry_suffix_t *suffix =
-            update_third_party_suffix (state, entry, &suffix_access);
-        ++suffix->request_count;
-
-        if (suffix->loaded_data)
+        KAN_UP_VALUE_UPDATE (suffix, resource_provider_third_party_entry_suffix_t, attachment_id, &entry->attachment_id)
         {
-            struct kan_repository_indexed_value_update_cursor_t request_cursor =
-                kan_repository_indexed_value_update_query_execute (
-                    &state->update_value__kan_resource_request__request_id, &request_id);
-
-            struct kan_repository_indexed_value_update_access_t request_access =
-                kan_repository_indexed_value_update_cursor_next (&request_cursor);
-
-            struct kan_resource_request_t *request =
-                (struct kan_resource_request_t *) kan_repository_indexed_value_update_access_resolve (&request_access);
-
-            if (request)
+            ++suffix->request_count;
+            if (suffix->loaded_data)
             {
-                update_request_provided_data (state, request, KAN_RESOURCE_PROVIDER_CONTAINER_ID_NONE,
-                                              suffix->loaded_data, suffix->loaded_data_size);
-                kan_repository_indexed_value_update_access_close (&request_access);
+                KAN_UP_VALUE_UPDATE (request, kan_resource_request_t, request_id, &request_id)
+                {
+                    update_request_provided_data (state, request, KAN_RESOURCE_PROVIDER_CONTAINER_ID_NONE,
+                                                  suffix->loaded_data, suffix->loaded_data_size);
+                }
+            }
+            else if (!suffix->loading_data)
+            {
+                schedule_third_party_entry_loading (state, entry, suffix);
             }
 
-            kan_repository_indexed_value_update_cursor_close (&request_cursor);
-        }
-        else if (!suffix->loading_data)
-        {
-            schedule_third_party_entry_loading (state, entry, suffix);
+            KAN_UP_QUERY_RETURN_VOID;
         }
 
-        kan_repository_indexed_value_update_access_close (&suffix_access);
-        kan_repository_indexed_value_update_access_close (&entry_access);
+        KAN_LOG (universe_resource_provider, KAN_LOG_ERROR,
+                 "Unable to find suffix of requested third party resource \"%s\".", name)
+        KAN_UP_QUERY_RETURN_VOID;
     }
-    else
-    {
-        KAN_LOG (universe_resource_provider, KAN_LOG_ERROR, "Unable to find requested third party resource \"%s\".",
-                 name)
-    }
+
+    KAN_LOG (universe_resource_provider, KAN_LOG_ERROR, "Unable to find requested third party resource \"%s\".", name)
 }
 
 static inline void remove_native_entry_reference (struct resource_provider_state_t *state,
                                                   kan_interned_string_t type,
                                                   kan_interned_string_t name)
 {
-    struct kan_repository_indexed_value_update_access_t entry_access;
-    struct kan_resource_native_entry_t *entry = update_native_entry (state, type, name, &entry_access);
-
-    if (entry)
+    KAN_UP_VALUE_UPDATE (entry, kan_resource_native_entry_t, name, &name)
     {
-        struct kan_repository_indexed_value_update_access_t suffix_access;
-        struct resource_provider_native_entry_suffix_t *suffix = update_native_suffix (state, entry, &suffix_access);
-        KAN_ASSERT (suffix->request_count > 0u)
-        --suffix->request_count;
-
-        if (suffix->request_count == 0u)
+        if (entry->type == type)
         {
-            unload_native_entry (state, entry, suffix);
-            cancel_native_entry_loading (state, entry, suffix);
-        }
+            KAN_UP_VALUE_UPDATE (suffix, resource_provider_native_entry_suffix_t, attachment_id, &entry->attachment_id)
+            {
+                KAN_ASSERT (suffix->request_count > 0u)
+                --suffix->request_count;
 
-        kan_repository_indexed_value_update_access_close (&suffix_access);
-        kan_repository_indexed_value_update_access_close (&entry_access);
+                if (suffix->request_count == 0u)
+                {
+                    unload_native_entry (state, entry, suffix);
+                    cancel_native_entry_loading (state, entry, suffix);
+                }
+
+                KAN_UP_QUERY_RETURN_VOID;
+            }
+
+            KAN_LOG (universe_resource_provider, KAN_LOG_ERROR,
+                     "Unable to find suffix of requested native resource \"%s\" of type \"%s\".", name, type)
+            KAN_UP_QUERY_RETURN_VOID;
+        }
     }
-    else
-    {
-        KAN_LOG (universe_resource_provider, KAN_LOG_ERROR,
-                 "Unable to find requested native resource \"%s\" of type \"%s\".", name, type)
-    }
+
+    KAN_LOG (universe_resource_provider, KAN_LOG_ERROR,
+             "Unable to find requested native resource \"%s\" of type \"%s\".", name, type)
 }
 
 static inline void remove_third_party_entry_reference (struct resource_provider_state_t *state,
                                                        kan_interned_string_t name)
 {
-    struct kan_repository_indexed_value_update_access_t entry_access;
-    struct kan_resource_third_party_entry_t *entry = update_third_party_entry (state, name, &entry_access);
-
-    if (entry)
+    KAN_UP_VALUE_UPDATE (entry, kan_resource_third_party_entry_t, name, &name)
     {
-        struct kan_repository_indexed_value_update_access_t suffix_access;
-        struct resource_provider_third_party_entry_suffix_t *suffix =
-            update_third_party_suffix (state, entry, &suffix_access);
-        KAN_ASSERT (suffix->request_count > 0u)
-        --suffix->request_count;
-
-        if (suffix->request_count == 0u)
+        KAN_UP_VALUE_UPDATE (suffix, resource_provider_third_party_entry_suffix_t, attachment_id, &entry->attachment_id)
         {
-            unload_third_party_entry (state, entry, suffix);
-            cancel_third_party_entry_loading (state, entry, suffix);
+            KAN_ASSERT (suffix->request_count > 0u)
+            --suffix->request_count;
+
+            if (suffix->request_count == 0u)
+            {
+                unload_third_party_entry (state, entry, suffix);
+                cancel_third_party_entry_loading (state, entry, suffix);
+            }
+
+            KAN_UP_QUERY_RETURN_VOID;
         }
 
-        kan_repository_indexed_value_update_access_close (&suffix_access);
-        kan_repository_indexed_value_update_access_close (&entry_access);
+        KAN_LOG (universe_resource_provider, KAN_LOG_ERROR,
+                 "Unable to find suffix of requested third party resource \"%s\".", name)
+        KAN_UP_QUERY_RETURN_VOID;
     }
-    else
-    {
-        KAN_LOG (universe_resource_provider, KAN_LOG_ERROR, "Unable to find requested third party resource \"%s\".",
-                 name)
-    }
+
+    KAN_LOG (universe_resource_provider, KAN_LOG_ERROR, "Unable to find requested third party resource \"%s\".", name)
 }
 
 static inline void on_file_added (struct resource_provider_state_t *state,
                                   struct resource_provider_private_singleton_t *private,
                                   const char *path)
 {
-    struct kan_repository_indexed_insertion_package_t package =
-        kan_repository_indexed_insert_query_execute (&state->insert__resource_provider_delayed_file_addition);
-
-    struct resource_provider_delayed_file_addition_t *addition =
-        (struct resource_provider_delayed_file_addition_t *) kan_repository_indexed_insertion_package_get (&package);
-
-    const uint64_t path_length = strlen (path);
-    addition->path = kan_allocate_general (addition->my_allocation_group, path_length + 1u, _Alignof (char));
-    memcpy (addition->path, path, path_length + 1u);
-
-    struct kan_resource_index_info_from_path_t info_from_path;
-    kan_resource_index_extract_info_from_path (path, &info_from_path);
-
-    addition->name_for_search = info_from_path.name;
-    addition->investigate_after_ns = kan_platform_get_elapsed_nanoseconds () + state->add_wait_time_ns;
-
-    kan_repository_indexed_insertion_package_submit (&package);
-}
-
-static inline struct kan_resource_native_entry_t *write_native_entry_by_path (
-    struct resource_provider_state_t *state,
-    kan_interned_string_t name,
-    const char *path,
-    struct kan_repository_indexed_value_write_access_t *access_output)
-{
-    struct kan_repository_indexed_value_write_cursor_t cursor =
-        kan_repository_indexed_value_write_query_execute (&state->write_value__kan_resource_native_entry__name, &name);
-
-    while (KAN_TRUE)
+    // Skip first "/" in order to have same path format for scanned and observed files.
+    if (path && path[0u] == '/')
     {
-        struct kan_repository_indexed_value_write_access_t access =
-            kan_repository_indexed_value_write_cursor_next (&cursor);
-
-        struct kan_resource_native_entry_t *entry = kan_repository_indexed_value_write_access_resolve (&access);
-        if (!entry)
-        {
-            kan_repository_indexed_value_write_cursor_close (&cursor);
-            return NULL;
-        }
-
-        if (strcmp (entry->path, path) == 0)
-        {
-            kan_repository_indexed_value_write_cursor_close (&cursor);
-            *access_output = access;
-            return entry;
-        }
+        ++path;
     }
 
-    return NULL;
-}
-
-static inline struct kan_resource_third_party_entry_t *write_third_party_entry_by_path (
-    struct resource_provider_state_t *state,
-    kan_interned_string_t name,
-    const char *path,
-    struct kan_repository_indexed_value_write_access_t *access_output)
-{
-    struct kan_repository_indexed_value_write_cursor_t cursor = kan_repository_indexed_value_write_query_execute (
-        &state->write_value__kan_resource_third_party_entry__name, &name);
-
-    while (KAN_TRUE)
+    KAN_UP_INDEXED_INSERT (addition, resource_provider_delayed_file_addition_t)
     {
-        struct kan_repository_indexed_value_write_access_t access =
-            kan_repository_indexed_value_write_cursor_next (&cursor);
+        const uint64_t path_length = strlen (path);
+        addition->path = kan_allocate_general (addition->my_allocation_group, path_length + 1u, _Alignof (char));
+        memcpy (addition->path, path, path_length + 1u);
 
-        struct kan_resource_third_party_entry_t *entry = kan_repository_indexed_value_write_access_resolve (&access);
-        if (!entry)
-        {
-            kan_repository_indexed_value_write_cursor_close (&cursor);
-            return NULL;
-        }
+        struct kan_resource_index_info_from_path_t info_from_path;
+        kan_resource_index_extract_info_from_path (path, &info_from_path);
 
-        if (strcmp (entry->path, path) == 0)
-        {
-            kan_repository_indexed_value_write_cursor_close (&cursor);
-            *access_output = access;
-            return entry;
-        }
+        addition->name_for_search = info_from_path.name;
+        addition->investigate_after_ns = kan_platform_get_elapsed_nanoseconds () + state->add_wait_time_ns;
     }
-
-    return NULL;
 }
 
 static inline void on_file_modified (struct resource_provider_state_t *state,
                                      kan_virtual_file_system_volume_t volume,
                                      const char *path)
 {
+    // Skip first "/" in order to have same path format for scanned and observed files.
+    if (path && path[0u] == '/')
+    {
+        ++path;
+    }
+
     struct kan_resource_index_info_from_path_t info_from_path;
     kan_resource_index_extract_info_from_path (path, &info_from_path);
 
+    KAN_UP_VALUE_WRITE (native_entry, kan_resource_native_entry_t, name, &info_from_path.name)
     {
-        struct kan_repository_indexed_value_write_access_t access;
-        struct kan_resource_native_entry_t *entry =
-            write_native_entry_by_path (state, info_from_path.name, path, &access);
-
-        if (entry)
+        if (strcmp (path, native_entry->path) == 0)
         {
-            struct kan_repository_indexed_value_update_access_t suffix_access;
-            struct resource_provider_native_entry_suffix_t *suffix =
-                update_native_suffix (state, entry, &suffix_access);
-
-            if (suffix->request_count > 0u)
+            KAN_UP_VALUE_UPDATE (suffix, resource_provider_native_entry_suffix_t, attachment_id,
+                                 &native_entry->attachment_id)
             {
-                suffix->reload_after_real_time_ns =
-                    kan_platform_get_elapsed_nanoseconds () + state->modify_wait_time_ns;
-            }
+                if (suffix->request_count > 0u)
+                {
+                    suffix->reload_after_real_time_ns =
+                        kan_platform_get_elapsed_nanoseconds () + state->modify_wait_time_ns;
+                }
 
-            kan_repository_indexed_value_update_access_close (&suffix_access);
-            kan_repository_indexed_value_write_access_close (&access);
-            return;
+                KAN_UP_QUERY_RETURN_VOID;
+            }
         }
     }
 
+    KAN_UP_VALUE_WRITE (third_party_entry, kan_resource_third_party_entry_t, name, &info_from_path.name)
     {
-        struct kan_repository_indexed_value_write_access_t access;
-        struct kan_resource_third_party_entry_t *entry =
-            write_third_party_entry_by_path (state, info_from_path.name, path, &access);
-
-        if (entry)
+        if (strcmp (path, third_party_entry->path) == 0)
         {
-            struct kan_repository_indexed_value_update_access_t suffix_access;
-            struct resource_provider_third_party_entry_suffix_t *suffix =
-                update_third_party_suffix (state, entry, &suffix_access);
-
-            if (suffix->request_count > 0u)
+            KAN_UP_VALUE_UPDATE (suffix, resource_provider_third_party_entry_suffix_t, attachment_id,
+                                 &third_party_entry->attachment_id)
             {
-                suffix->reload_after_real_time_ns =
-                    kan_platform_get_elapsed_nanoseconds () + state->modify_wait_time_ns;
-            }
+                if (suffix->request_count > 0u)
+                {
+                    suffix->reload_after_real_time_ns =
+                        kan_platform_get_elapsed_nanoseconds () + state->modify_wait_time_ns;
+                }
 
-            kan_repository_indexed_value_update_access_close (&suffix_access);
-            kan_repository_indexed_value_write_access_close (&access);
-            return;
+                KAN_UP_QUERY_RETURN_VOID;
+            }
         }
     }
 
     // If it is file waiting for addition, we need to shift investigate timer.
+    KAN_UP_VALUE_WRITE (addition, resource_provider_delayed_file_addition_t, name_for_search, &info_from_path.name)
     {
-        struct kan_repository_indexed_value_write_cursor_t cursor = kan_repository_indexed_value_write_query_execute (
-            &state->write_value__resource_provider_delayed_file_addition__name_for_search, &info_from_path.name);
-
-        while (KAN_TRUE)
+        if (strcmp (path, addition->path) == 0)
         {
-            struct kan_repository_indexed_value_write_access_t access =
-                kan_repository_indexed_value_write_cursor_next (&cursor);
-
-            struct resource_provider_delayed_file_addition_t *addition =
-                (struct resource_provider_delayed_file_addition_t *) kan_repository_indexed_value_write_access_resolve (
-                    &access);
-
-            if (addition)
-            {
-                if (strcmp (addition->path, path) == 0)
-                {
-                    addition->investigate_after_ns = kan_platform_get_elapsed_nanoseconds () + state->add_wait_time_ns;
-                }
-
-                kan_repository_indexed_value_write_access_close (&access);
-            }
-            else
-            {
-                kan_repository_indexed_value_write_cursor_close (&cursor);
-                break;
-            }
+            addition->investigate_after_ns = kan_platform_get_elapsed_nanoseconds () + state->add_wait_time_ns;
+            KAN_UP_QUERY_RETURN_VOID;
         }
     }
 }
@@ -1948,74 +1515,56 @@ static inline void on_file_removed (struct resource_provider_state_t *state,
                                     kan_virtual_file_system_volume_t volume,
                                     const char *path)
 {
+    // Skip first "/" in order to have same path format for scanned and observed files.
+    if (path && path[0u] == '/')
+    {
+        ++path;
+    }
+
     struct kan_resource_index_info_from_path_t info_from_path;
     kan_resource_index_extract_info_from_path (path, &info_from_path);
 
+    KAN_UP_VALUE_WRITE (native_entry, kan_resource_native_entry_t, name, &info_from_path.name)
     {
-        struct kan_repository_indexed_value_write_access_t access;
-        struct kan_resource_native_entry_t *entry =
-            write_native_entry_by_path (state, info_from_path.name, path, &access);
-
-        if (entry)
+        if (strcmp (path, native_entry->path) == 0)
         {
-            struct kan_repository_indexed_value_write_access_t suffix_access;
-            struct resource_provider_native_entry_suffix_t *suffix = write_native_suffix (state, entry, &suffix_access);
-            unload_native_entry (state, entry, suffix);
-            cancel_native_entry_loading (state, entry, suffix);
-            kan_repository_indexed_value_write_access_delete (&suffix_access);
-            kan_repository_indexed_value_write_access_delete (&access);
-            return;
+            KAN_UP_VALUE_WRITE (suffix, resource_provider_native_entry_suffix_t, attachment_id,
+                                &native_entry->attachment_id)
+            {
+                unload_native_entry (state, native_entry, suffix);
+                cancel_native_entry_loading (state, native_entry, suffix);
+                KAN_UP_ACCESS_DELETE (suffix);
+            }
+
+            KAN_UP_ACCESS_DELETE (native_entry);
+            KAN_UP_QUERY_RETURN_VOID;
         }
     }
 
+    KAN_UP_VALUE_WRITE (third_party_entry, kan_resource_third_party_entry_t, name, &info_from_path.name)
     {
-        struct kan_repository_indexed_value_write_access_t access;
-        struct kan_resource_third_party_entry_t *entry =
-            write_third_party_entry_by_path (state, info_from_path.name, path, &access);
-
-        if (entry)
+        if (strcmp (path, third_party_entry->path) == 0)
         {
-            struct kan_repository_indexed_value_write_access_t suffix_access;
-            struct resource_provider_third_party_entry_suffix_t *suffix =
-                write_third_party_suffix (state, entry, &suffix_access);
-            unload_third_party_entry (state, entry, suffix);
-            cancel_third_party_entry_loading (state, entry, suffix);
-            kan_repository_indexed_value_write_access_delete (&suffix_access);
-            kan_repository_indexed_value_write_access_delete (&access);
-            return;
+            KAN_UP_VALUE_WRITE (suffix, resource_provider_third_party_entry_suffix_t, attachment_id,
+                                &third_party_entry->attachment_id)
+            {
+                unload_third_party_entry (state, third_party_entry, suffix);
+                cancel_third_party_entry_loading (state, third_party_entry, suffix);
+                KAN_UP_ACCESS_DELETE (suffix);
+            }
+
+            KAN_UP_ACCESS_DELETE (third_party_entry);
+            KAN_UP_QUERY_RETURN_VOID;
         }
     }
 
     // If it is file waiting for addition, we need to cancel investigation.
+    KAN_UP_VALUE_WRITE (addition, resource_provider_delayed_file_addition_t, name_for_search, &info_from_path.name)
     {
-        struct kan_repository_indexed_value_write_cursor_t cursor = kan_repository_indexed_value_write_query_execute (
-            &state->write_value__resource_provider_delayed_file_addition__name_for_search, &info_from_path.name);
-
-        while (KAN_TRUE)
+        if (strcmp (path, addition->path) == 0)
         {
-            struct kan_repository_indexed_value_write_access_t access =
-                kan_repository_indexed_value_write_cursor_next (&cursor);
-
-            struct resource_provider_delayed_file_addition_t *addition =
-                (struct resource_provider_delayed_file_addition_t *) kan_repository_indexed_value_write_access_resolve (
-                    &access);
-
-            if (addition)
-            {
-                if (strcmp (addition->path, path) == 0)
-                {
-                    kan_repository_indexed_value_write_access_delete (&access);
-                }
-                else
-                {
-                    kan_repository_indexed_value_write_access_close (&access);
-                }
-            }
-            else
-            {
-                kan_repository_indexed_value_write_cursor_close (&cursor);
-                break;
-            }
+            KAN_UP_ACCESS_DELETE (addition);
+            KAN_UP_QUERY_RETURN_VOID;
         }
     }
 }
@@ -2023,30 +1572,15 @@ static inline void on_file_removed (struct resource_provider_state_t *state,
 static inline void process_request_on_insert (struct resource_provider_state_t *state,
                                               struct resource_provider_private_singleton_t *private)
 {
-    while (KAN_TRUE)
+    KAN_UP_EVENT_FETCH (event, resource_request_on_insert_event_t)
     {
-        struct kan_repository_event_read_access_t access =
-            kan_repository_event_fetch_query_next (&state->fetch__resource_request_on_insert_event);
-
-        struct resource_request_on_insert_event_t *event =
-            (struct resource_request_on_insert_event_t *) kan_repository_event_read_access_resolve (&access);
-
-        if (event)
+        if (event->type)
         {
-            if (event->type)
-            {
-                add_native_entry_reference (state, private, event->request_id, event->type, event->name);
-            }
-            else
-            {
-                add_third_party_entry_reference (state, event->request_id, event->name);
-            }
-
-            kan_repository_event_read_access_close (&access);
+            add_native_entry_reference (state, private, event->request_id, event->type, event->name);
         }
         else
         {
-            break;
+            add_third_party_entry_reference (state, event->request_id, event->name);
         }
     }
 }
@@ -2054,69 +1588,39 @@ static inline void process_request_on_insert (struct resource_provider_state_t *
 static inline void process_request_on_change (struct resource_provider_state_t *state,
                                               struct resource_provider_private_singleton_t *private)
 {
-    while (KAN_TRUE)
+    KAN_UP_EVENT_FETCH (event, resource_request_on_change_event_t)
     {
-        struct kan_repository_event_read_access_t access =
-            kan_repository_event_fetch_query_next (&state->fetch__resource_request_on_change_event);
-
-        struct resource_request_on_change_event_t *event =
-            (struct resource_request_on_change_event_t *) kan_repository_event_read_access_resolve (&access);
-
-        if (event)
+        if (event->old_type)
         {
-            if (event->old_type)
-            {
-                remove_native_entry_reference (state, event->old_type, event->old_name);
-            }
-            else
-            {
-                remove_third_party_entry_reference (state, event->old_name);
-            }
-
-            if (event->new_type)
-            {
-                add_native_entry_reference (state, private, event->request_id, event->new_type, event->new_name);
-            }
-            else
-            {
-                add_third_party_entry_reference (state, event->request_id, event->new_name);
-            }
-
-            kan_repository_event_read_access_close (&access);
+            remove_native_entry_reference (state, event->old_type, event->old_name);
         }
         else
         {
-            break;
+            remove_third_party_entry_reference (state, event->old_name);
+        }
+
+        if (event->new_type)
+        {
+            add_native_entry_reference (state, private, event->request_id, event->new_type, event->new_name);
+        }
+        else
+        {
+            add_third_party_entry_reference (state, event->request_id, event->new_name);
         }
     }
 }
 
 static inline void process_request_on_delete (struct resource_provider_state_t *state)
 {
-    while (KAN_TRUE)
+    KAN_UP_EVENT_FETCH (event, resource_request_on_delete_event_t)
     {
-        struct kan_repository_event_read_access_t access =
-            kan_repository_event_fetch_query_next (&state->fetch__resource_request_on_delete_event);
-
-        struct resource_request_on_delete_event_t *event =
-            (struct resource_request_on_delete_event_t *) kan_repository_event_read_access_resolve (&access);
-
-        if (event)
+        if (event->type)
         {
-            if (event->type)
-            {
-                remove_native_entry_reference (state, event->type, event->name);
-            }
-            else
-            {
-                remove_third_party_entry_reference (state, event->name);
-            }
-
-            kan_repository_event_read_access_close (&access);
+            remove_native_entry_reference (state, event->type, event->name);
         }
         else
         {
-            break;
+            remove_third_party_entry_reference (state, event->name);
         }
     }
 }
@@ -2148,30 +1652,11 @@ static inline void process_file_addition (struct resource_provider_state_t *stat
     }
 
     uint64_t request_count = 0u;
-    struct kan_repository_indexed_value_read_cursor_t cursor = kan_repository_indexed_value_read_query_execute (
-        &state->read_value__kan_resource_request__name, &scan_result.name);
-
-    while (KAN_TRUE)
+    KAN_UP_VALUE_READ (request, kan_resource_request_t, name, &scan_result.name)
     {
-        struct kan_repository_indexed_value_read_access_t access =
-            kan_repository_indexed_value_read_cursor_next (&cursor);
-
-        struct kan_resource_request_t *request =
-            (struct kan_resource_request_t *) kan_repository_indexed_value_read_access_resolve (&access);
-
-        if (request)
+        if (request->type == scan_result.type)
         {
-            if (request->type == scan_result.type)
-            {
-                ++request_count;
-            }
-
-            kan_repository_indexed_value_read_access_close (&access);
-        }
-        else
-        {
-            kan_repository_indexed_value_read_cursor_close (&cursor);
-            break;
+            ++request_count;
         }
     }
 
@@ -2179,40 +1664,37 @@ static inline void process_file_addition (struct resource_provider_state_t *stat
     {
         if (scan_result.type)
         {
-            struct kan_repository_indexed_value_update_access_t entry_access;
-            struct kan_resource_native_entry_t *entry =
-                update_native_entry (state, scan_result.type, scan_result.name, &entry_access);
-            KAN_ASSERT (entry)
+            KAN_UP_VALUE_UPDATE (entry, kan_resource_native_entry_t, name, &scan_result.name)
+            {
+                if (entry->type == scan_result.type)
+                {
+                    KAN_UP_VALUE_UPDATE (suffix, resource_provider_native_entry_suffix_t, attachment_id,
+                                         &entry->attachment_id)
+                    {
+                        suffix->request_count = request_count;
+                        KAN_ASSERT (suffix->loaded_container_id == KAN_RESOURCE_PROVIDER_CONTAINER_ID_NONE &&
+                                    suffix->loading_container_id == KAN_RESOURCE_PROVIDER_CONTAINER_ID_NONE)
 
-            struct kan_repository_indexed_value_update_access_t suffix_access;
-            struct resource_provider_native_entry_suffix_t *suffix =
-                update_native_suffix (state, entry, &suffix_access);
-
-            suffix->request_count = request_count;
-            KAN_ASSERT (suffix->loaded_container_id == KAN_RESOURCE_PROVIDER_CONTAINER_ID_NONE &&
-                        suffix->loading_container_id == KAN_RESOURCE_PROVIDER_CONTAINER_ID_NONE)
-
-            schedule_native_entry_loading (state, private, entry, suffix);
-            kan_repository_indexed_value_update_access_close (&suffix_access);
-            kan_repository_indexed_value_update_access_close (&entry_access);
+                        schedule_native_entry_loading (state, private, entry, suffix);
+                        KAN_UP_QUERY_RETURN_VOID;
+                    }
+                }
+            }
         }
         else
         {
-            struct kan_repository_indexed_value_update_access_t entry_access;
-            struct kan_resource_third_party_entry_t *entry =
-                update_third_party_entry (state, scan_result.name, &entry_access);
-            KAN_ASSERT (entry)
+            KAN_UP_VALUE_UPDATE (entry, kan_resource_third_party_entry_t, name, &scan_result.name)
+            {
+                KAN_UP_VALUE_UPDATE (suffix, resource_provider_third_party_entry_suffix_t, attachment_id,
+                                     &entry->attachment_id)
+                {
+                    suffix->request_count = request_count;
+                    KAN_ASSERT (suffix->loaded_data == NULL && suffix->loading_data == NULL)
 
-            struct kan_repository_indexed_value_update_access_t suffix_access;
-            struct resource_provider_third_party_entry_suffix_t *suffix =
-                update_third_party_suffix (state, entry, &suffix_access);
-
-            suffix->request_count = request_count;
-            KAN_ASSERT (suffix->loaded_data == NULL && suffix->loading_data == NULL)
-
-            schedule_third_party_entry_loading (state, entry, suffix);
-            kan_repository_indexed_value_update_access_close (&suffix_access);
-            kan_repository_indexed_value_update_access_close (&entry_access);
+                    schedule_third_party_entry_loading (state, entry, suffix);
+                    KAN_UP_QUERY_RETURN_VOID;
+                }
+            }
         }
     }
 }
@@ -2221,30 +1703,11 @@ static inline void process_delayed_addition (struct resource_provider_state_t *s
                                              struct resource_provider_private_singleton_t *private)
 {
     const uint64_t current_real_time = kan_platform_get_elapsed_nanoseconds ();
-    struct kan_repository_indexed_interval_ascending_write_cursor_t cursor =
-        kan_repository_indexed_interval_write_query_execute_ascending (
-            &state->write_interval__resource_provider_delayed_file_addition__investigate_after_ns, NULL,
-            &current_real_time);
-
-    while (KAN_TRUE)
+    KAN_UP_INTERVAL_ASCENDING_WRITE (delayed_addition, resource_provider_delayed_file_addition_t, investigate_after_ns,
+                                     NULL, &current_real_time)
     {
-        struct kan_repository_indexed_interval_write_access_t access =
-            kan_repository_indexed_interval_ascending_write_cursor_next (&cursor);
-
-        struct resource_provider_delayed_file_addition_t *delayed_addition =
-            (struct resource_provider_delayed_file_addition_t *) kan_repository_indexed_interval_write_access_resolve (
-                &access);
-
-        if (delayed_addition)
-        {
-            process_file_addition (state, private, delayed_addition->path);
-            kan_repository_indexed_interval_write_access_delete (&access);
-        }
-        else
-        {
-            kan_repository_indexed_interval_ascending_write_cursor_close (&cursor);
-            break;
-        }
+        process_file_addition (state, private, delayed_addition->path);
+        KAN_UP_ACCESS_DELETE (delayed_addition);
     }
 }
 
@@ -2252,35 +1715,14 @@ static inline void process_delayed_reload (struct resource_provider_state_t *sta
                                            struct resource_provider_private_singleton_t *private)
 {
     const uint64_t current_real_time = kan_platform_get_elapsed_nanoseconds ();
-    struct kan_repository_indexed_interval_ascending_update_cursor_t cursor =
-        kan_repository_indexed_interval_update_query_execute_ascending (
-            &state->update_interval__resource_provider_native_entry_suffix__reload_after_real_time_ns, NULL,
-            &current_real_time);
-
-    while (KAN_TRUE)
+    KAN_UP_INTERVAL_ASCENDING_UPDATE (native_suffix, resource_provider_native_entry_suffix_t, reload_after_real_time_ns,
+                                      NULL, &current_real_time)
     {
-        struct kan_repository_indexed_interval_update_access_t suffix_access =
-            kan_repository_indexed_interval_ascending_update_cursor_next (&cursor);
-        struct resource_provider_native_entry_suffix_t *suffix =
-            kan_repository_indexed_interval_update_access_resolve (&suffix_access);
-
-        if (suffix)
+        KAN_UP_VALUE_UPDATE (entry, kan_resource_native_entry_t, attachment_id, &native_suffix->attachment_id)
         {
-            struct kan_repository_indexed_value_update_cursor_t entry_cursor =
-                kan_repository_indexed_value_update_query_execute (
-                    &state->update_value__kan_resource_native_entry__attachment_id, &suffix->attachment_id);
-
-            struct kan_repository_indexed_value_update_access_t entry_access =
-                kan_repository_indexed_value_update_cursor_next (&entry_cursor);
-            struct kan_resource_native_entry_t *entry =
-                kan_repository_indexed_value_update_access_resolve (&entry_access);
-
-            KAN_ASSERT (entry)
-            kan_repository_indexed_value_update_cursor_close (&entry_cursor);
-
-            if (suffix->request_count > 0u)
+            if (native_suffix->request_count > 0u)
             {
-                cancel_native_entry_loading (state, entry, suffix);
+                cancel_native_entry_loading (state, entry, native_suffix);
 
                 // Read type header in case if type was modified.
                 kan_virtual_file_system_volume_t volume =
@@ -2292,11 +1734,11 @@ static inline void process_delayed_reload (struct resource_provider_state_t *sta
                 if (stream)
                 {
                     kan_interned_string_t new_type;
-                    if (read_type_header (stream, entry, suffix, &new_type))
+                    if (read_type_header (stream, entry, native_suffix, &new_type))
                     {
                         if (entry->type != new_type)
                         {
-                            unload_native_entry (state, entry, suffix);
+                            unload_native_entry (state, entry, native_suffix);
                             entry->type = new_type;
                         }
                     }
@@ -2310,48 +1752,22 @@ static inline void process_delayed_reload (struct resource_provider_state_t *sta
                              entry->name, entry->type, entry->path)
                 }
 
-                schedule_native_entry_loading (state, private, entry, suffix);
+                schedule_native_entry_loading (state, private, entry, native_suffix);
             }
 
-            suffix->reload_after_real_time_ns = UINT64_MAX;
-            kan_repository_indexed_value_update_access_close (&entry_access);
-            kan_repository_indexed_interval_update_access_close (&suffix_access);
-        }
-        else
-        {
-            kan_repository_indexed_interval_ascending_update_cursor_close (&cursor);
-            break;
+            native_suffix->reload_after_real_time_ns = UINT64_MAX;
+            KAN_UP_QUERY_BREAK;
         }
     }
 
-    cursor = kan_repository_indexed_interval_update_query_execute_ascending (
-        &state->update_interval__resource_provider_third_party_entry_suffix__reload_after_real_time_ns, NULL,
-        &current_real_time);
-
-    while (KAN_TRUE)
+    KAN_UP_INTERVAL_ASCENDING_UPDATE (third_party_suffix, resource_provider_third_party_entry_suffix_t,
+                                      reload_after_real_time_ns, NULL, &current_real_time)
     {
-        struct kan_repository_indexed_interval_update_access_t suffix_access =
-            kan_repository_indexed_interval_ascending_update_cursor_next (&cursor);
-        struct resource_provider_third_party_entry_suffix_t *suffix =
-            kan_repository_indexed_interval_update_access_resolve (&suffix_access);
-
-        if (suffix)
+        KAN_UP_VALUE_UPDATE (entry, kan_resource_third_party_entry_t, attachment_id, &third_party_suffix->attachment_id)
         {
-            struct kan_repository_indexed_value_update_cursor_t entry_cursor =
-                kan_repository_indexed_value_update_query_execute (
-                    &state->update_value__kan_resource_third_party_entry__attachment_id, &suffix->attachment_id);
-
-            struct kan_repository_indexed_value_update_access_t entry_access =
-                kan_repository_indexed_value_update_cursor_next (&entry_cursor);
-            struct kan_resource_third_party_entry_t *entry =
-                kan_repository_indexed_value_update_access_resolve (&entry_access);
-
-            KAN_ASSERT (entry)
-            kan_repository_indexed_value_update_cursor_close (&entry_cursor);
-
-            if (suffix->request_count > 0u)
+            if (third_party_suffix->request_count > 0u)
             {
-                cancel_third_party_entry_loading (state, entry, suffix);
+                cancel_third_party_entry_loading (state, entry, third_party_suffix);
 
                 // Update third party size.
                 struct kan_virtual_file_system_entry_status_t status;
@@ -2370,17 +1786,11 @@ static inline void process_delayed_reload (struct resource_provider_state_t *sta
                 }
 
                 kan_virtual_file_system_close_context_read_access (state->virtual_file_system);
-                schedule_third_party_entry_loading (state, entry, suffix);
+                schedule_third_party_entry_loading (state, entry, third_party_suffix);
             }
 
-            suffix->reload_after_real_time_ns = UINT64_MAX;
-            kan_repository_indexed_value_update_access_close (&entry_access);
-            kan_repository_indexed_interval_update_access_close (&suffix_access);
-        }
-        else
-        {
-            kan_repository_indexed_interval_ascending_update_cursor_close (&cursor);
-            break;
+            third_party_suffix->reload_after_real_time_ns = UINT64_MAX;
+            KAN_UP_QUERY_BREAK;
         }
     }
 }
@@ -2431,90 +1841,96 @@ static void execute_shared_serve (uint64_t user_data)
             resource_provider_loading_operation_destroy_native (loading_operation);
             loading_operation->stream->operations->close (loading_operation->stream);
 
-            struct kan_repository_indexed_value_read_access_t entry_access;
-            const struct kan_resource_native_entry_t *entry = read_native_entry (
-                state, loading_operation->target_type, loading_operation->target_name, &entry_access);
+            kan_bool_t entry_found = KAN_FALSE;
+            kan_bool_t other_error = KAN_FALSE;
 
-            if (!entry)
+            KAN_UP_VALUE_READ (entry, kan_resource_native_entry_t, name, &loading_operation->target_name)
+            {
+                if (entry->type == loading_operation->target_type)
+                {
+                    entry_found = KAN_TRUE;
+                    kan_virtual_file_system_volume_t volume =
+                        kan_virtual_file_system_get_context_volume_for_read (state->virtual_file_system);
+
+                    loading_operation->stream = kan_virtual_file_stream_open_for_read (volume, entry->path);
+                    kan_virtual_file_system_close_context_read_access (state->virtual_file_system);
+
+                    if (!loading_operation->stream)
+                    {
+                        KAN_LOG (
+                            universe_resource_provider, KAN_LOG_ERROR,
+                            "Unable to restart loading of \"%s\" of type \"%s\" as stream can no longer be opened. "
+                            "Internal handling error?",
+                            loading_operation->target_name, loading_operation->target_type)
+
+                        other_error = KAN_TRUE;
+                        KAN_UP_QUERY_BREAK;
+                    }
+
+                    loading_operation->stream = kan_random_access_stream_buffer_open_for_read (
+                        loading_operation->stream, KAN_UNIVERSE_RESOURCE_PROVIDER_READ_BUFFER);
+
+                    KAN_UP_VALUE_UPDATE (suffix, resource_provider_native_entry_suffix_t, attachment_id,
+                                         &entry->attachment_id)
+                    {
+                        if (!skip_type_header (loading_operation->stream, entry, suffix))
+                        {
+                            other_error = KAN_TRUE;
+                            KAN_UP_QUERY_BREAK;
+                        }
+
+                        struct kan_repository_indexed_value_update_access_t container_view_access;
+                        uint8_t *container_data_begin;
+                        struct kan_resource_container_view_t *container_view =
+                            native_container_update (state, entry->type, suffix->loading_container_id,
+                                                     &container_view_access, &container_data_begin);
+
+                        if (!container_view)
+                        {
+                            KAN_LOG (
+                                universe_resource_provider, KAN_LOG_ERROR,
+                                "Unable to restart loading of \"%s\" of type \"%s\" as loading container is absent. "
+                                "Internal handling error?",
+                                loading_operation->target_name, loading_operation->target_type)
+
+                            other_error = KAN_TRUE;
+                            KAN_UP_QUERY_BREAK;
+                        }
+
+                        switch (suffix->format)
+                        {
+                        case KAN_RESOURCE_INDEX_NATIVE_ITEM_FORMAT_BINARY:
+                            loading_operation->native.binary_reader = kan_serialization_binary_reader_create (
+                                loading_operation->stream, container_data_begin, entry->type,
+                                state->shared_script_storage, suffix->string_registry,
+                                container_view->my_allocation_group);
+                            break;
+
+                        case KAN_RESOURCE_INDEX_NATIVE_ITEM_FORMAT_READABLE_DATA:
+                            loading_operation->native.readable_data_reader = kan_serialization_rd_reader_create (
+                                loading_operation->stream, container_data_begin, entry->type,
+                                state->reflection_registry, container_view->my_allocation_group);
+                            break;
+                        }
+                    }
+
+                    KAN_UP_QUERY_BREAK;
+                }
+            }
+
+            if (!entry_found)
             {
                 KAN_LOG (universe_resource_provider, KAN_LOG_ERROR,
                          "Unable to restart loading of \"%s\" of type \"%s\" as native entry no longer exists. "
                          "Internal handling error?",
                          loading_operation->target_name, loading_operation->target_type)
+            }
 
+            if (!entry_found || other_error)
+            {
                 kan_repository_indexed_interval_write_access_delete (&loading_operation_access);
                 continue;
             }
-
-            kan_virtual_file_system_volume_t volume =
-                kan_virtual_file_system_get_context_volume_for_read (state->virtual_file_system);
-
-            loading_operation->stream = kan_virtual_file_stream_open_for_read (volume, entry->path);
-            kan_virtual_file_system_close_context_read_access (state->virtual_file_system);
-
-            if (!loading_operation->stream)
-            {
-                KAN_LOG (universe_resource_provider, KAN_LOG_ERROR,
-                         "Unable to restart loading of \"%s\" of type \"%s\" as stream can no longer be opened. "
-                         "Internal handling error?",
-                         loading_operation->target_name, loading_operation->target_type)
-
-                kan_repository_indexed_value_read_access_close (&entry_access);
-                kan_repository_indexed_interval_write_access_delete (&loading_operation_access);
-                continue;
-            }
-
-            loading_operation->stream = kan_random_access_stream_buffer_open_for_read (
-                loading_operation->stream, KAN_UNIVERSE_RESOURCE_PROVIDER_READ_BUFFER);
-
-            struct kan_repository_indexed_value_update_access_t suffix_access;
-            struct resource_provider_native_entry_suffix_t *suffix =
-                update_native_suffix (state, entry, &suffix_access);
-
-            if (!skip_type_header (loading_operation->stream, entry, suffix))
-            {
-                kan_repository_indexed_value_read_access_close (&entry_access);
-                kan_repository_indexed_value_update_access_close (&suffix_access);
-                kan_repository_indexed_interval_write_access_delete (&loading_operation_access);
-                continue;
-            }
-
-            struct kan_repository_indexed_value_update_access_t container_view_access;
-            uint8_t *container_data_begin;
-            struct kan_resource_container_view_t *container_view = native_container_update (
-                state, entry->type, suffix->loading_container_id, &container_view_access, &container_data_begin);
-
-            if (!container_view)
-            {
-                KAN_LOG (universe_resource_provider, KAN_LOG_ERROR,
-                         "Unable to restart loading of \"%s\" of type \"%s\" as loading container is absent. "
-                         "Internal handling error?",
-                         loading_operation->target_name, loading_operation->target_type)
-
-                kan_repository_indexed_value_read_access_close (&entry_access);
-                kan_repository_indexed_value_update_access_close (&suffix_access);
-                kan_repository_indexed_interval_write_access_delete (&loading_operation_access);
-                continue;
-            }
-
-            switch (suffix->format)
-            {
-            case KAN_RESOURCE_INDEX_NATIVE_ITEM_FORMAT_BINARY:
-                loading_operation->native.binary_reader = kan_serialization_binary_reader_create (
-                    loading_operation->stream, container_data_begin, entry->type, state->shared_script_storage,
-                    suffix->string_registry, container_view->my_allocation_group);
-                break;
-
-            case KAN_RESOURCE_INDEX_NATIVE_ITEM_FORMAT_READABLE_DATA:
-                loading_operation->native.readable_data_reader = kan_serialization_rd_reader_create (
-                    loading_operation->stream, container_data_begin, entry->type, state->reflection_registry,
-                    container_view->my_allocation_group);
-                break;
-            }
-
-            kan_repository_indexed_value_update_access_close (&container_view_access);
-            kan_repository_indexed_value_update_access_close (&suffix_access);
-            kan_repository_indexed_value_read_access_close (&entry_access);
         }
 
         // Process serialization.
@@ -2633,23 +2049,21 @@ static void execute_shared_serve (uint64_t user_data)
                 KAN_LOG (universe_resource_provider, KAN_LOG_DEBUG, "Loaded native resource \"%s\" of type \"%s\".",
                          loading_operation->target_name, loading_operation->target_type)
 
-                struct kan_repository_indexed_value_update_access_t entry_access;
-                struct kan_resource_native_entry_t *entry = update_native_entry (
-                    state, loading_operation->target_type, loading_operation->target_name, &entry_access);
-
-                if (entry)
+                KAN_UP_VALUE_READ (entry, kan_resource_native_entry_t, name, &loading_operation->target_name)
                 {
-                    struct kan_repository_indexed_value_update_access_t suffix_access;
-                    struct resource_provider_native_entry_suffix_t *suffix =
-                        update_native_suffix (state, entry, &suffix_access);
+                    if (entry->type == loading_operation->target_type)
+                    {
+                        KAN_UP_VALUE_UPDATE (suffix, resource_provider_native_entry_suffix_t, attachment_id,
+                                             &entry->attachment_id)
+                        {
+                            native_container_delete (state, entry->type, suffix->loaded_container_id);
+                            suffix->loaded_container_id = suffix->loading_container_id;
+                            suffix->loading_container_id = KAN_RESOURCE_PROVIDER_CONTAINER_ID_NONE;
+                            update_requests (state, entry->type, entry->name, suffix->loaded_container_id, NULL, 0u);
+                        }
 
-                    native_container_delete (state, entry->type, suffix->loaded_container_id);
-                    suffix->loaded_container_id = suffix->loading_container_id;
-                    suffix->loading_container_id = KAN_RESOURCE_PROVIDER_CONTAINER_ID_NONE;
-                    update_requests (state, entry->type, entry->name, suffix->loaded_container_id, NULL, 0u);
-
-                    kan_repository_indexed_value_update_access_close (&suffix_access);
-                    kan_repository_indexed_value_update_access_close (&entry_access);
+                        KAN_UP_QUERY_BREAK;
+                    }
                 }
             }
             else
@@ -2657,31 +2071,27 @@ static void execute_shared_serve (uint64_t user_data)
                 KAN_LOG (universe_resource_provider, KAN_LOG_DEBUG, "Loaded third party resource \"%s\".",
                          loading_operation->target_name)
 
-                struct kan_repository_indexed_value_update_access_t entry_access;
-                struct kan_resource_third_party_entry_t *entry =
-                    update_third_party_entry (state, loading_operation->target_name, &entry_access);
-
-                if (entry)
+                KAN_UP_VALUE_READ (entry, kan_resource_third_party_entry_t, name, &loading_operation->target_name)
                 {
-                    struct kan_repository_indexed_value_update_access_t suffix_access;
-                    struct resource_provider_third_party_entry_suffix_t *suffix =
-                        update_third_party_suffix (state, entry, &suffix_access);
-
-                    if (suffix->loaded_data)
+                    KAN_UP_VALUE_UPDATE (suffix, resource_provider_third_party_entry_suffix_t, attachment_id,
+                                         &entry->attachment_id)
                     {
-                        kan_free_general (suffix->my_allocation_group, suffix->loaded_data, suffix->loaded_data_size);
+                        if (suffix->loaded_data)
+                        {
+                            kan_free_general (suffix->my_allocation_group, suffix->loaded_data,
+                                              suffix->loaded_data_size);
+                        }
+
+                        suffix->loaded_data = suffix->loading_data;
+                        suffix->loaded_data_size = suffix->loading_data_size;
+                        suffix->loading_data = NULL;
+                        suffix->loading_data_size = 0u;
+
+                        update_requests (state, NULL, entry->name, KAN_RESOURCE_PROVIDER_CONTAINER_ID_NONE,
+                                         suffix->loaded_data, suffix->loaded_data_size);
                     }
 
-                    suffix->loaded_data = suffix->loading_data;
-                    suffix->loaded_data_size = suffix->loading_data_size;
-                    suffix->loading_data = NULL;
-                    suffix->loading_data_size = 0u;
-
-                    update_requests (state, NULL, entry->name, KAN_RESOURCE_PROVIDER_CONTAINER_ID_NONE,
-                                     suffix->loaded_data, suffix->loaded_data_size);
-
-                    kan_repository_indexed_value_update_access_close (&suffix_access);
-                    kan_repository_indexed_value_update_access_close (&entry_access);
+                    KAN_UP_QUERY_BREAK;
                 }
             }
 
@@ -2696,21 +2106,19 @@ static void execute_shared_serve (uint64_t user_data)
                          "Failed to load native resource \"%s\" of type \"%s\": serialization error.",
                          loading_operation->target_name, loading_operation->target_type)
 
-                struct kan_repository_indexed_value_update_access_t entry_access;
-                struct kan_resource_native_entry_t *entry = update_native_entry (
-                    state, loading_operation->target_type, loading_operation->target_name, &entry_access);
-
-                if (entry)
+                KAN_UP_VALUE_READ (entry, kan_resource_native_entry_t, name, &loading_operation->target_name)
                 {
-                    struct kan_repository_indexed_value_update_access_t suffix_access;
-                    struct resource_provider_native_entry_suffix_t *suffix =
-                        update_native_suffix (state, entry, &suffix_access);
+                    if (entry->type == loading_operation->target_type)
+                    {
+                        KAN_UP_VALUE_UPDATE (suffix, resource_provider_native_entry_suffix_t, attachment_id,
+                                             &entry->attachment_id)
+                        {
+                            native_container_delete (state, entry->type, suffix->loading_container_id);
+                            suffix->loading_container_id = KAN_RESOURCE_PROVIDER_CONTAINER_ID_NONE;
+                        }
 
-                    native_container_delete (state, entry->type, suffix->loading_container_id);
-                    suffix->loading_container_id = KAN_RESOURCE_PROVIDER_CONTAINER_ID_NONE;
-
-                    kan_repository_indexed_value_update_access_close (&suffix_access);
-                    kan_repository_indexed_value_update_access_close (&entry_access);
+                        KAN_UP_QUERY_BREAK;
+                    }
                 }
             }
             else
@@ -2719,26 +2127,22 @@ static void execute_shared_serve (uint64_t user_data)
                          "Failed to load third party resource \"%s\": serialization error.",
                          loading_operation->target_name)
 
-                struct kan_repository_indexed_value_update_access_t entry_access;
-                struct kan_resource_third_party_entry_t *entry =
-                    update_third_party_entry (state, loading_operation->target_name, &entry_access);
-
-                if (entry)
+                KAN_UP_VALUE_READ (entry, kan_resource_third_party_entry_t, name, &loading_operation->target_name)
                 {
-                    struct kan_repository_indexed_value_update_access_t suffix_access;
-                    struct resource_provider_third_party_entry_suffix_t *suffix =
-                        update_third_party_suffix (state, entry, &suffix_access);
-
-                    if (suffix->loading_data)
+                    KAN_UP_VALUE_UPDATE (suffix, resource_provider_third_party_entry_suffix_t, attachment_id,
+                                         &entry->attachment_id)
                     {
-                        kan_free_general (suffix->my_allocation_group, suffix->loading_data, suffix->loading_data_size);
+                        if (suffix->loading_data)
+                        {
+                            kan_free_general (suffix->my_allocation_group, suffix->loading_data,
+                                              suffix->loading_data_size);
+                        }
+
+                        suffix->loading_data = NULL;
+                        suffix->loading_data_size = 0u;
                     }
 
-                    suffix->loading_data = NULL;
-                    suffix->loading_data_size = 0u;
-
-                    kan_repository_indexed_value_update_access_close (&suffix_access);
-                    kan_repository_indexed_value_update_access_close (&entry_access);
+                    KAN_UP_QUERY_BREAK;
                 }
             }
 
@@ -2755,277 +2159,269 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void mutator_template_execute_resource_provid
     kan_cpu_job_t job, struct resource_provider_state_t *state)
 {
     const uint64_t begin_time = kan_platform_get_elapsed_nanoseconds ();
-
-    kan_repository_singleton_write_access_t public_access =
-        kan_repository_singleton_write_query_execute (&state->write__kan_resource_provider_singleton);
-    struct kan_resource_provider_singleton_t *public =
-        (struct kan_resource_provider_singleton_t *) kan_repository_singleton_write_access_resolve (public_access);
-
-    kan_repository_singleton_write_access_t private_access =
-        kan_repository_singleton_write_query_execute (&state->write__resource_provider_private_singleton);
-    struct resource_provider_private_singleton_t *private =
-        (struct resource_provider_private_singleton_t *) kan_repository_singleton_write_access_resolve (private_access);
-
-    if (private->status == RESOURCE_PROVIDER_STATUS_NOT_INITIALIZED)
+    KAN_UP_SINGLETON_WRITE (public, kan_resource_provider_singleton_t)
+    KAN_UP_SINGLETON_WRITE (private, resource_provider_private_singleton_t)
     {
-        prepare_for_scanning (state, private);
-        private->status = RESOURCE_PROVIDER_STATUS_SCANNING;
-    }
-
-    if (private->status == RESOURCE_PROVIDER_STATUS_SERVING && public->request_rescan)
-    {
-        clear_entries (state);
-        for (uint64_t index = 0u; index < private->loaded_string_registries.size; ++index)
+        if (private->status == RESOURCE_PROVIDER_STATUS_NOT_INITIALIZED)
         {
-            kan_serialization_interned_string_registry_destroy (
-                ((kan_serialization_interned_string_registry_t *) private->loaded_string_registries.data)[index]);
+            prepare_for_scanning (state, private);
+            private->status = RESOURCE_PROVIDER_STATUS_SCANNING;
         }
 
-        kan_dynamic_array_reset (&private->loaded_string_registries);
-        if (private->resource_watcher != KAN_INVALID_VIRTUAL_FILE_SYSTEM_WATCHER)
+        if (private->status == RESOURCE_PROVIDER_STATUS_SERVING && public->request_rescan)
         {
-            kan_virtual_file_system_watcher_iterator_destroy (private->resource_watcher,
-                                                              private->resource_watcher_iterator);
-            kan_virtual_file_system_watcher_destroy (private->resource_watcher);
+            clear_entries (state);
+            for (uint64_t index = 0u; index < private->loaded_string_registries.size; ++index)
+            {
+                kan_serialization_interned_string_registry_destroy (
+                    ((kan_serialization_interned_string_registry_t *) private->loaded_string_registries.data)[index]);
+            }
+
+            kan_dynamic_array_reset (&private->loaded_string_registries);
+            if (private->resource_watcher != KAN_INVALID_VIRTUAL_FILE_SYSTEM_WATCHER)
+            {
+                kan_virtual_file_system_watcher_iterator_destroy (private->resource_watcher,
+                                                                  private->resource_watcher_iterator);
+                kan_virtual_file_system_watcher_destroy (private->resource_watcher);
+            }
+
+            prepare_for_scanning (state, private);
+            private->status = RESOURCE_PROVIDER_STATUS_SCANNING;
+            public->request_rescan = KAN_FALSE;
+            public->scan_done = KAN_FALSE;
         }
 
-        prepare_for_scanning (state, private);
-        private->status = RESOURCE_PROVIDER_STATUS_SCANNING;
-        public->request_rescan = KAN_FALSE;
-        public->scan_done = KAN_FALSE;
-    }
-
-    if (private->status == RESOURCE_PROVIDER_STATUS_SCANNING &&
-        begin_time + state->scan_budget_ns > kan_platform_get_elapsed_nanoseconds ())
-    {
-        kan_virtual_file_system_volume_t volume =
-            kan_virtual_file_system_get_context_volume_for_read (state->virtual_file_system);
-
-        while (private->scan_item_stack.size > 0u &&
-               begin_time + state->scan_budget_ns > kan_platform_get_elapsed_nanoseconds ())
-        {
-            if (state->string_registry_stream)
-            {
-                if (state->string_registry_reader == KAN_INVALID_SERIALIZATION_INTERNED_STRING_REGISTRY_READER)
-                {
-                    state->string_registry_reader = kan_serialization_interned_string_registry_reader_create (
-                        state->string_registry_stream, state->use_load_only_string_registry);
-                }
-
-                switch (kan_serialization_interned_string_registry_reader_step (state->string_registry_reader))
-                {
-                case KAN_SERIALIZATION_IN_PROGRESS:
-                    break;
-
-                case KAN_SERIALIZATION_FINISHED:
-                    state->string_registry_stream->operations->close (state->string_registry_stream);
-                    state->string_registry_stream = NULL;
-                    break;
-
-                case KAN_SERIALIZATION_FAILED:
-                    KAN_LOG (universe_resource_provider, KAN_LOG_ERROR,
-                             "Failed to deserialize string registry, its directory will be skipped.")
-
-                    kan_serialization_interned_string_registry_reader_destroy (state->string_registry_reader);
-                    state->string_registry_reader = KAN_INVALID_SERIALIZATION_INTERNED_STRING_REGISTRY_READER;
-
-                    state->string_registry_stream->operations->close (state->string_registry_stream);
-                    state->string_registry_stream = NULL;
-
-                    state->serialized_index_stream->operations->close (state->serialized_index_stream);
-                    state->serialized_index_stream = NULL;
-
-                    // Destroy last scan task that issued this read procedure.
-                    destroy_scan_item_task (private, private->scan_item_stack.size - 1u);
-                    break;
-                }
-
-                continue;
-            }
-
-            if (state->serialized_index_stream)
-            {
-                if (state->serialized_index_reader == KAN_INVALID_SERIALIZATION_BINARY_READER)
-                {
-                    kan_serialization_interned_string_registry_t registry =
-                        state->string_registry_reader == KAN_INVALID_SERIALIZATION_INTERNED_STRING_REGISTRY_READER ?
-                            KAN_INVALID_SERIALIZATION_INTERNED_STRING_REGISTRY :
-                            kan_serialization_interned_string_registry_reader_get (state->string_registry_reader);
-
-                    kan_resource_index_init (&state->serialized_index_read_buffer);
-                    state->serialized_index_reader = kan_serialization_binary_reader_create (
-                        state->serialized_index_stream, &state->serialized_index_read_buffer,
-                        state->interned_kan_resource_index_t, state->shared_script_storage, registry,
-                        kan_resource_index_get_string_allocation_group ());
-                }
-
-                switch (kan_serialization_binary_reader_step (state->serialized_index_reader))
-                {
-                case KAN_SERIALIZATION_IN_PROGRESS:
-                    break;
-
-                case KAN_SERIALIZATION_FINISHED:
-                {
-                    kan_serialization_interned_string_registry_t string_registry =
-                        KAN_INVALID_SERIALIZATION_INTERNED_STRING_REGISTRY;
-
-                    if (state->string_registry_reader != KAN_INVALID_SERIALIZATION_INTERNED_STRING_REGISTRY_READER)
-                    {
-                        string_registry =
-                            kan_serialization_interned_string_registry_reader_get (state->string_registry_reader);
-
-                        void *spot = kan_dynamic_array_add_last (&private->loaded_string_registries);
-                        if (!spot)
-                        {
-                            kan_dynamic_array_set_capacity (&private->loaded_string_registries,
-                                                            private->loaded_string_registries.capacity * 2u);
-                            spot = kan_dynamic_array_add_last (&private->loaded_string_registries);
-                            KAN_ASSERT (spot)
-                        }
-
-                        *(kan_serialization_interned_string_registry_t *) spot = string_registry;
-                        kan_serialization_interned_string_registry_reader_destroy (state->string_registry_reader);
-                        state->string_registry_reader = KAN_INVALID_SERIALIZATION_INTERNED_STRING_REGISTRY_READER;
-                    }
-
-                    instantiate_resource_index (state, private, string_registry);
-                    kan_resource_index_shutdown (&state->serialized_index_read_buffer);
-                    kan_serialization_binary_reader_destroy (state->serialized_index_reader);
-                    state->serialized_index_reader = KAN_INVALID_SERIALIZATION_BINARY_READER;
-
-                    state->serialized_index_stream->operations->close (state->serialized_index_stream);
-                    state->serialized_index_stream = NULL;
-
-                    // Destroy last scan task that issued this read procedure.
-                    destroy_scan_item_task (private, private->scan_item_stack.size - 1u);
-                    break;
-                }
-
-                case KAN_SERIALIZATION_FAILED:
-                    KAN_LOG (universe_resource_provider, KAN_LOG_ERROR,
-                             "Failed to deserialize resource index, its directory will be skipped.")
-
-                    if (state->string_registry_reader != KAN_INVALID_SERIALIZATION_INTERNED_STRING_REGISTRY_READER)
-                    {
-                        kan_serialization_interned_string_registry_destroy (
-                            kan_serialization_interned_string_registry_reader_get (state->string_registry_reader));
-                        kan_serialization_interned_string_registry_reader_destroy (state->string_registry_reader);
-                        state->string_registry_reader = KAN_INVALID_SERIALIZATION_INTERNED_STRING_REGISTRY_READER;
-                    }
-
-                    kan_resource_index_shutdown (&state->serialized_index_read_buffer);
-                    kan_serialization_binary_reader_destroy (state->serialized_index_reader);
-                    state->serialized_index_reader = KAN_INVALID_SERIALIZATION_BINARY_READER;
-
-                    state->serialized_index_stream->operations->close (state->serialized_index_stream);
-                    state->serialized_index_stream = NULL;
-
-                    // Destroy last scan task that issued this read procedure.
-                    destroy_scan_item_task (private, private->scan_item_stack.size - 1u);
-                    break;
-                }
-
-                continue;
-            }
-
-            uint64_t task_index = private->scan_item_stack.size - 1u;
-            if (scan_item (state, private, volume,
-                           ((struct scan_item_task_t *) private->scan_item_stack.data)[task_index].path))
-            {
-                destroy_scan_item_task (private, task_index);
-            }
-        }
-
-        kan_virtual_file_system_close_context_read_access (state->virtual_file_system);
-        if (private->scan_item_stack.size == 0u)
-        {
-            kan_dynamic_array_set_capacity (&private->scan_item_stack, 0u);
-            kan_dynamic_array_set_capacity (&private->loaded_string_registries, private->loaded_string_registries.size);
-
-            if (state->observe_file_system)
-            {
-                volume = kan_virtual_file_system_get_context_volume_for_write (state->virtual_file_system);
-                private->resource_watcher =
-                    kan_virtual_file_system_watcher_create (volume, state->resource_directory_path);
-                private->resource_watcher_iterator =
-                    kan_virtual_file_system_watcher_iterator_create (private->resource_watcher);
-                kan_virtual_file_system_close_context_write_access (state->virtual_file_system);
-            }
-
-            public->scan_done = KAN_TRUE;
-            private->status = RESOURCE_PROVIDER_STATUS_SERVING;
-        }
-    }
-
-    if (private->status == RESOURCE_PROVIDER_STATUS_SERVING &&
-        begin_time + state->load_budget_ns > kan_platform_get_elapsed_nanoseconds ())
-    {
-        // Events need to be always processed in order to keep everything up to date.
-        // Therefore, load budget does not affect event processing.
-
-        if (private->resource_watcher != KAN_INVALID_VIRTUAL_FILE_SYSTEM_WATCHER)
+        if (private->status == RESOURCE_PROVIDER_STATUS_SCANNING &&
+            begin_time + state->scan_budget_ns > kan_platform_get_elapsed_nanoseconds ())
         {
             kan_virtual_file_system_volume_t volume =
                 kan_virtual_file_system_get_context_volume_for_read (state->virtual_file_system);
-            const struct kan_virtual_file_system_watcher_event_t *event;
 
-            while ((event = kan_virtual_file_system_watcher_iterator_get (private->resource_watcher,
-                                                                          private->resource_watcher_iterator)))
+            while (private->scan_item_stack.size > 0u &&
+                   begin_time + state->scan_budget_ns > kan_platform_get_elapsed_nanoseconds ())
             {
-                if (event->entry_type == KAN_VIRTUAL_FILE_SYSTEM_ENTRY_TYPE_FILE)
+                if (state->string_registry_stream)
                 {
-                    switch (event->event_type)
+                    if (state->string_registry_reader == KAN_INVALID_SERIALIZATION_INTERNED_STRING_REGISTRY_READER)
                     {
-                    case KAN_VIRTUAL_FILE_SYSTEM_EVENT_TYPE_ADDED:
-                        on_file_added (state, private, event->path_container.path);
+                        state->string_registry_reader = kan_serialization_interned_string_registry_reader_create (
+                            state->string_registry_stream, state->use_load_only_string_registry);
+                    }
+
+                    switch (kan_serialization_interned_string_registry_reader_step (state->string_registry_reader))
+                    {
+                    case KAN_SERIALIZATION_IN_PROGRESS:
                         break;
 
-                    case KAN_VIRTUAL_FILE_SYSTEM_EVENT_TYPE_MODIFIED:
-                        on_file_modified (state, volume, event->path_container.path);
+                    case KAN_SERIALIZATION_FINISHED:
+                        state->string_registry_stream->operations->close (state->string_registry_stream);
+                        state->string_registry_stream = NULL;
                         break;
 
-                    case KAN_VIRTUAL_FILE_SYSTEM_EVENT_TYPE_REMOVED:
-                        on_file_removed (state, volume, event->path_container.path);
+                    case KAN_SERIALIZATION_FAILED:
+                        KAN_LOG (universe_resource_provider, KAN_LOG_ERROR,
+                                 "Failed to deserialize string registry, its directory will be skipped.")
+
+                        kan_serialization_interned_string_registry_reader_destroy (state->string_registry_reader);
+                        state->string_registry_reader = KAN_INVALID_SERIALIZATION_INTERNED_STRING_REGISTRY_READER;
+
+                        state->string_registry_stream->operations->close (state->string_registry_stream);
+                        state->string_registry_stream = NULL;
+
+                        state->serialized_index_stream->operations->close (state->serialized_index_stream);
+                        state->serialized_index_stream = NULL;
+
+                        // Destroy last scan task that issued this read procedure.
+                        destroy_scan_item_task (private, private->scan_item_stack.size - 1u);
                         break;
                     }
+
+                    continue;
                 }
 
-                private->resource_watcher_iterator = kan_virtual_file_system_watcher_iterator_advance (
-                    private->resource_watcher, private->resource_watcher_iterator);
+                if (state->serialized_index_stream)
+                {
+                    if (state->serialized_index_reader == KAN_INVALID_SERIALIZATION_BINARY_READER)
+                    {
+                        kan_serialization_interned_string_registry_t registry =
+                            state->string_registry_reader == KAN_INVALID_SERIALIZATION_INTERNED_STRING_REGISTRY_READER ?
+                                KAN_INVALID_SERIALIZATION_INTERNED_STRING_REGISTRY :
+                                kan_serialization_interned_string_registry_reader_get (state->string_registry_reader);
+
+                        kan_resource_index_init (&state->serialized_index_read_buffer);
+                        state->serialized_index_reader = kan_serialization_binary_reader_create (
+                            state->serialized_index_stream, &state->serialized_index_read_buffer,
+                            state->interned_kan_resource_index_t, state->shared_script_storage, registry,
+                            kan_resource_index_get_string_allocation_group ());
+                    }
+
+                    switch (kan_serialization_binary_reader_step (state->serialized_index_reader))
+                    {
+                    case KAN_SERIALIZATION_IN_PROGRESS:
+                        break;
+
+                    case KAN_SERIALIZATION_FINISHED:
+                    {
+                        kan_serialization_interned_string_registry_t string_registry =
+                            KAN_INVALID_SERIALIZATION_INTERNED_STRING_REGISTRY;
+
+                        if (state->string_registry_reader != KAN_INVALID_SERIALIZATION_INTERNED_STRING_REGISTRY_READER)
+                        {
+                            string_registry =
+                                kan_serialization_interned_string_registry_reader_get (state->string_registry_reader);
+
+                            void *spot = kan_dynamic_array_add_last (&private->loaded_string_registries);
+                            if (!spot)
+                            {
+                                kan_dynamic_array_set_capacity (&private->loaded_string_registries,
+                                                                private->loaded_string_registries.capacity * 2u);
+                                spot = kan_dynamic_array_add_last (&private->loaded_string_registries);
+                                KAN_ASSERT (spot)
+                            }
+
+                            *(kan_serialization_interned_string_registry_t *) spot = string_registry;
+                            kan_serialization_interned_string_registry_reader_destroy (state->string_registry_reader);
+                            state->string_registry_reader = KAN_INVALID_SERIALIZATION_INTERNED_STRING_REGISTRY_READER;
+                        }
+
+                        instantiate_resource_index (state, private, string_registry);
+                        kan_resource_index_shutdown (&state->serialized_index_read_buffer);
+                        kan_serialization_binary_reader_destroy (state->serialized_index_reader);
+                        state->serialized_index_reader = KAN_INVALID_SERIALIZATION_BINARY_READER;
+
+                        state->serialized_index_stream->operations->close (state->serialized_index_stream);
+                        state->serialized_index_stream = NULL;
+
+                        // Destroy last scan task that issued this read procedure.
+                        destroy_scan_item_task (private, private->scan_item_stack.size - 1u);
+                        break;
+                    }
+
+                    case KAN_SERIALIZATION_FAILED:
+                        KAN_LOG (universe_resource_provider, KAN_LOG_ERROR,
+                                 "Failed to deserialize resource index, its directory will be skipped.")
+
+                        if (state->string_registry_reader != KAN_INVALID_SERIALIZATION_INTERNED_STRING_REGISTRY_READER)
+                        {
+                            kan_serialization_interned_string_registry_destroy (
+                                kan_serialization_interned_string_registry_reader_get (state->string_registry_reader));
+                            kan_serialization_interned_string_registry_reader_destroy (state->string_registry_reader);
+                            state->string_registry_reader = KAN_INVALID_SERIALIZATION_INTERNED_STRING_REGISTRY_READER;
+                        }
+
+                        kan_resource_index_shutdown (&state->serialized_index_read_buffer);
+                        kan_serialization_binary_reader_destroy (state->serialized_index_reader);
+                        state->serialized_index_reader = KAN_INVALID_SERIALIZATION_BINARY_READER;
+
+                        state->serialized_index_stream->operations->close (state->serialized_index_stream);
+                        state->serialized_index_stream = NULL;
+
+                        // Destroy last scan task that issued this read procedure.
+                        destroy_scan_item_task (private, private->scan_item_stack.size - 1u);
+                        break;
+                    }
+
+                    continue;
+                }
+
+                uint64_t task_index = private->scan_item_stack.size - 1u;
+                if (scan_item (state, private, volume,
+                               ((struct scan_item_task_t *) private->scan_item_stack.data)[task_index].path))
+                {
+                    destroy_scan_item_task (private, task_index);
+                }
             }
 
             kan_virtual_file_system_close_context_read_access (state->virtual_file_system);
+            if (private->scan_item_stack.size == 0u)
+            {
+                kan_dynamic_array_set_capacity (&private->scan_item_stack, 0u);
+                kan_dynamic_array_set_capacity (&private->loaded_string_registries,
+                                                private->loaded_string_registries.size);
+
+                if (state->observe_file_system)
+                {
+                    volume = kan_virtual_file_system_get_context_volume_for_write (state->virtual_file_system);
+                    private->resource_watcher =
+                        kan_virtual_file_system_watcher_create (volume, state->resource_directory_path);
+                    private->resource_watcher_iterator =
+                        kan_virtual_file_system_watcher_iterator_create (private->resource_watcher);
+                    kan_virtual_file_system_close_context_write_access (state->virtual_file_system);
+                }
+
+                public->scan_done = KAN_TRUE;
+                private->status = RESOURCE_PROVIDER_STATUS_SERVING;
+            }
         }
 
-        process_request_on_insert (state, private);
-        process_request_on_change (state, private);
-        process_request_on_delete (state);
-        process_delayed_addition (state, private);
-        process_delayed_reload (state, private);
-
-        kan_stack_group_allocator_reset (&state->temporary_allocator);
-        const uint64_t cpu_count = kan_platform_get_cpu_count ();
-        struct kan_cpu_task_list_node_t *task_list_node = NULL;
-
-        state->execution_shared_state.workers_left = kan_atomic_int_init ((int) cpu_count);
-        state->execution_shared_state.concurrency_lock = kan_atomic_int_init (0);
-        state->execution_shared_state.loading_operation_cursor =
-            kan_repository_indexed_interval_write_query_execute_descending (
-                &state->write_interval__resource_provider_loading_operation__priority, NULL, NULL);
-        state->execution_shared_state.end_time_ns = begin_time + state->load_budget_ns;
-
-        for (uint64_t worker_index = 0u; worker_index < cpu_count; ++worker_index)
+        if (private->status == RESOURCE_PROVIDER_STATUS_SERVING &&
+            begin_time + state->load_budget_ns > kan_platform_get_elapsed_nanoseconds ())
         {
-            KAN_CPU_TASK_LIST_USER_VALUE (&task_list_node, &state->temporary_allocator,
-                                          state->interned_resource_provider_server, execute_shared_serve, state)
-        }
+            // Events need to be always processed in order to keep everything up to date.
+            // Therefore, load budget does not affect event processing.
 
-        kan_cpu_job_dispatch_and_detach_task_list (job, task_list_node);
+            if (private->resource_watcher != KAN_INVALID_VIRTUAL_FILE_SYSTEM_WATCHER)
+            {
+                kan_virtual_file_system_volume_t volume =
+                    kan_virtual_file_system_get_context_volume_for_read (state->virtual_file_system);
+                const struct kan_virtual_file_system_watcher_event_t *event;
+
+                while ((event = kan_virtual_file_system_watcher_iterator_get (private->resource_watcher,
+                                                                              private->resource_watcher_iterator)))
+                {
+                    if (event->entry_type == KAN_VIRTUAL_FILE_SYSTEM_ENTRY_TYPE_FILE)
+                    {
+                        switch (event->event_type)
+                        {
+                        case KAN_VIRTUAL_FILE_SYSTEM_EVENT_TYPE_ADDED:
+                            on_file_added (state, private, event->path_container.path);
+                            break;
+
+                        case KAN_VIRTUAL_FILE_SYSTEM_EVENT_TYPE_MODIFIED:
+                            on_file_modified (state, volume, event->path_container.path);
+                            break;
+
+                        case KAN_VIRTUAL_FILE_SYSTEM_EVENT_TYPE_REMOVED:
+                            on_file_removed (state, volume, event->path_container.path);
+                            break;
+                        }
+                    }
+
+                    private->resource_watcher_iterator = kan_virtual_file_system_watcher_iterator_advance (
+                        private->resource_watcher, private->resource_watcher_iterator);
+                }
+
+                kan_virtual_file_system_close_context_read_access (state->virtual_file_system);
+            }
+
+            process_request_on_insert (state, private);
+            process_request_on_change (state, private);
+            process_request_on_delete (state);
+            process_delayed_addition (state, private);
+            process_delayed_reload (state, private);
+
+            kan_stack_group_allocator_reset (&state->temporary_allocator);
+            const uint64_t cpu_count = kan_platform_get_cpu_count ();
+            struct kan_cpu_task_list_node_t *task_list_node = NULL;
+
+            state->execution_shared_state.workers_left = kan_atomic_int_init ((int) cpu_count);
+            state->execution_shared_state.concurrency_lock = kan_atomic_int_init (0);
+            state->execution_shared_state.loading_operation_cursor =
+                kan_repository_indexed_interval_write_query_execute_descending (
+                    &state->write_interval__resource_provider_loading_operation__priority, NULL, NULL);
+            state->execution_shared_state.end_time_ns = begin_time + state->load_budget_ns;
+
+            for (uint64_t worker_index = 0u; worker_index < cpu_count; ++worker_index)
+            {
+                KAN_CPU_TASK_LIST_USER_VALUE (&task_list_node, &state->temporary_allocator,
+                                              state->interned_resource_provider_server, execute_shared_serve, state)
+            }
+
+            kan_cpu_job_dispatch_and_detach_task_list (job, task_list_node);
+        }
     }
 
-    kan_repository_singleton_write_access_close (public_access);
-    kan_repository_singleton_write_access_close (private_access);
-    kan_cpu_job_release (job);
+    KAN_UP_MUTATOR_RETURN;
 }
 
 UNIVERSE_RESOURCE_PROVIDER_KAN_API void mutator_template_undeploy_resource_provider (

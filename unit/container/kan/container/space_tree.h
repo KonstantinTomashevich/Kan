@@ -7,7 +7,7 @@
 #include <kan/api_common/alignment.h>
 #include <kan/api_common/bool.h>
 #include <kan/api_common/c_header.h>
-#include <kan/api_common/mute_third_party_warnings.h>
+#include <kan/api_common/mute_warnings.h>
 #include <kan/memory_profiler/allocation_group.h>
 
 /// \file

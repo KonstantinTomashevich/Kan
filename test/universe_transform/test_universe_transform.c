@@ -10,6 +10,9 @@
 #include <kan/universe_time/universe_time.h>
 #include <kan/universe_transform/universe_transform.h>
 
+// We're not using universe preprocessor here as we're utilizing macros to write the same logic for 2d and 3d.
+// However, the might be changed in the future.
+
 static kan_context_handle_t create_context (void)
 {
     kan_context_handle_t context =

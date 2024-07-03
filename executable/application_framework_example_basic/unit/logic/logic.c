@@ -7,6 +7,7 @@
 #include <kan/context/application_system.h>
 #include <kan/log/logging.h>
 #include <kan/resource_pipeline/resource_pipeline.h>
+#include <kan/universe/preprocessor_markup.h>
 #include <kan/universe/universe.h>
 #include <kan/universe_resource_provider/universe_resource_provider.h>
 #include <kan/universe_time/universe_time.h>
@@ -45,14 +46,8 @@ APPLICATION_FRAMEWORK_EXAMPLE_BASIC_LOGIC_API void test_singleton_init (struct t
 
 struct test_mutator_state_t
 {
-    struct kan_repository_singleton_write_query_t write__test_singleton;
-    struct kan_repository_singleton_read_query_t read__kan_time_singleton;
-
-    struct kan_repository_singleton_read_query_t read__kan_resource_provider_singleton;
-    struct kan_repository_indexed_insert_query_t insert__kan_resource_request;
-    struct kan_repository_indexed_value_read_query_t read_value__kan_resource_request__request_id;
-    struct kan_repository_indexed_value_read_query_t
-        read_value__resource_provider_container_test_data_type__container_id;
+    KAN_UP_GENERATE_STATE_QUERIES (test_mutator)
+    KAN_UP_BIND_STATE (test_mutator, state)
 
     kan_context_system_handle_t application_system_handle;
     kan_context_system_handle_t application_framework_system_handle;
@@ -95,127 +90,98 @@ APPLICATION_FRAMEWORK_EXAMPLE_BASIC_LOGIC_API void kan_universe_mutator_deploy_t
 APPLICATION_FRAMEWORK_EXAMPLE_BASIC_LOGIC_API void kan_universe_mutator_execute_test_mutator (
     kan_cpu_job_t job, struct test_mutator_state_t *state)
 {
-    kan_repository_singleton_write_access_t write_access =
-        kan_repository_singleton_write_query_execute (&state->write__test_singleton);
-    struct test_singleton_t *singleton =
-        (struct test_singleton_t *) kan_repository_singleton_write_access_resolve (write_access);
-
-    if (singleton->window_handle == KAN_INVALID_APPLICATION_SYSTEM_WINDOW_HANDLE)
+    KAN_UP_SINGLETON_WRITE (singleton, test_singleton_t)
     {
-        singleton->window_handle = kan_application_system_window_create (
-            state->application_system_handle, "Title placeholder", 600u, 400u,
-            KAN_PLATFORM_WINDOW_FLAG_SUPPORTS_VULKAN | KAN_PLATFORM_WINDOW_FLAG_RESIZABLE);
-        kan_application_system_window_raise (state->application_system_handle, singleton->window_handle);
-    }
-
-    if (!singleton->test_request_added)
-    {
-        kan_repository_singleton_read_access_t provider_access =
-            kan_repository_singleton_read_query_execute (&state->read__kan_resource_provider_singleton);
-
-        const struct kan_resource_provider_singleton_t *provider =
-            kan_repository_singleton_read_access_resolve (provider_access);
-
-        struct kan_repository_indexed_insertion_package_t package =
-            kan_repository_indexed_insert_query_execute (&state->insert__kan_resource_request);
-        struct kan_resource_request_t *request = kan_repository_indexed_insertion_package_get (&package);
-
-        request->request_id = kan_next_resource_request_id (provider);
-        request->type = kan_string_intern ("test_data_type_t");
-        request->name = kan_string_intern ("test");
-        request->priority = 0u;
-        singleton->test_request_id = request->request_id;
-        kan_repository_indexed_insertion_package_submit (&package);
-
-        kan_repository_singleton_read_access_close (provider_access);
-        singleton->test_request_added = KAN_TRUE;
-    }
-
-    uint64_t x = 0;
-    uint64_t y = 0;
-
-    struct kan_repository_indexed_value_read_cursor_t request_cursor = kan_repository_indexed_value_read_query_execute (
-        &state->read_value__kan_resource_request__request_id, &singleton->test_request_id);
-
-    struct kan_repository_indexed_value_read_access_t request_access =
-        kan_repository_indexed_value_read_cursor_next (&request_cursor);
-
-    const struct kan_resource_request_t *request = kan_repository_indexed_value_read_access_resolve (&request_access);
-    KAN_ASSERT (request)
-
-    if (request->provided_container_id != KAN_RESOURCE_PROVIDER_CONTAINER_ID_NONE)
-    {
-        state->test_asset_loaded = KAN_TRUE;
-        struct kan_repository_indexed_value_read_cursor_t container_cursor =
-            kan_repository_indexed_value_read_query_execute (
-                &state->read_value__resource_provider_container_test_data_type__container_id,
-                &request->provided_container_id);
-
-        struct kan_repository_indexed_value_read_access_t container_access =
-            kan_repository_indexed_value_read_cursor_next (&container_cursor);
-
-        const struct kan_resource_container_view_t *view =
-            kan_repository_indexed_value_read_access_resolve (&container_access);
-        KAN_ASSERT (view)
-
-        if (view)
+        if (singleton->window_handle == KAN_INVALID_APPLICATION_SYSTEM_WINDOW_HANDLE)
         {
-            struct test_data_type_t *loaded_resource = (struct test_data_type_t *) view->data_begin;
-            x = loaded_resource->x;
-            y = loaded_resource->y;
-
-            if (x != 3u || y != 5u)
-            {
-                state->test_passed = KAN_FALSE;
-                KAN_LOG (application_framework_example_basic_logic_test_mode, KAN_LOG_INFO, "Unexpected x or y.")
-            }
-
-            kan_repository_indexed_value_read_access_close (&container_access);
+            singleton->window_handle = kan_application_system_window_create (
+                state->application_system_handle, "Title placeholder", 600u, 400u,
+                KAN_PLATFORM_WINDOW_FLAG_SUPPORTS_VULKAN | KAN_PLATFORM_WINDOW_FLAG_RESIZABLE);
+            kan_application_system_window_raise (state->application_system_handle, singleton->window_handle);
         }
 
-        kan_repository_indexed_value_read_cursor_close (&container_cursor);
-    }
+        if (!singleton->test_request_added)
+        {
+            KAN_UP_SINGLETON_READ (provider, kan_resource_provider_singleton_t)
+            {
+                KAN_UP_INDEXED_INSERT (request, kan_resource_request_t)
+                {
+                    request->request_id = kan_next_resource_request_id (provider);
+                    request->type = kan_string_intern ("test_data_type_t");
+                    request->name = kan_string_intern ("test");
+                    request->priority = 0u;
+                    singleton->test_request_id = request->request_id;
+                }
+            }
 
-    kan_repository_indexed_value_read_access_close (&request_access);
-    kan_repository_indexed_value_read_cursor_close (&request_cursor);
+            singleton->test_request_added = KAN_TRUE;
+        }
 
-    kan_repository_singleton_read_access_t time_access =
-        kan_repository_singleton_read_query_execute (&state->read__kan_time_singleton);
-    const struct kan_time_singleton_t *time = kan_repository_singleton_read_access_resolve (time_access);
+        uint64_t x = 0;
+        uint64_t y = 0;
+
+        KAN_UP_VALUE_READ (request, kan_resource_request_t, request_id, &singleton->test_request_id)
+        {
+            if (request->provided_container_id != KAN_RESOURCE_PROVIDER_CONTAINER_ID_NONE)
+            {
+                state->test_asset_loaded = KAN_TRUE;
+                KAN_UP_VALUE_READ (view, resource_provider_container_test_data_type_t, container_id,
+                                   &request->provided_container_id)
+                {
+                    struct test_data_type_t *loaded_resource =
+                        (struct test_data_type_t *) ((struct kan_resource_container_view_t *) view)->data_begin;
+
+                    x = loaded_resource->x;
+                    y = loaded_resource->y;
+
+                    if (x != 3u || y != 5u)
+                    {
+                        state->test_passed = KAN_FALSE;
+                        KAN_LOG (application_framework_example_basic_logic_test_mode, KAN_LOG_INFO,
+                                 "Unexpected x or y.")
+                    }
+                }
+            }
+        }
 
 #define TITLE_BUFFER_SIZE 256u
-    char buffer[TITLE_BUFFER_SIZE];
-    snprintf (buffer, TITLE_BUFFER_SIZE, "Visual time: %.3f seconds. Visual delta: %.3f seconds. X: %llu. Y: %llu.",
-              (float) (time->visual_time_ns) / 1e9f, (float) (time->visual_delta_ns) / 1e9f, (unsigned long long) x,
-              (unsigned long long) y);
-    kan_application_system_window_set_title (state->application_system_handle, singleton->window_handle, buffer);
+        char buffer[TITLE_BUFFER_SIZE];
+
+        KAN_UP_SINGLETON_READ (time, kan_time_singleton_t)
+        {
+            snprintf (buffer, TITLE_BUFFER_SIZE,
+                      "Visual time: %.3f seconds. Visual delta: %.3f seconds. X: %llu. Y: %llu.",
+                      (float) (time->visual_time_ns) / 1e9f, (float) (time->visual_delta_ns) / 1e9f,
+                      (unsigned long long) x, (unsigned long long) y);
+        }
+
+        kan_application_system_window_set_title (state->application_system_handle, singleton->window_handle, buffer);
 #undef TITLE_BUFFER_SIZE
 
-    kan_repository_singleton_read_access_close (time_access);
-    kan_repository_singleton_write_access_close (write_access);
-
-    if (state->test_mode)
-    {
-        if (30u < ++state->test_frames_count)
+        if (state->test_mode)
         {
-            KAN_LOG (application_framework_example_basic_logic_test_mode, KAN_LOG_INFO, "Shutting down...")
-            if (!state->test_asset_loaded)
+            if (30u < ++state->test_frames_count)
             {
-                state->test_passed = KAN_FALSE;
-                KAN_LOG (application_framework_example_basic_logic_test_mode, KAN_LOG_ERROR, "Failed to load asset.")
-            }
+                KAN_LOG (application_framework_example_basic_logic_test_mode, KAN_LOG_INFO, "Shutting down...")
+                if (!state->test_asset_loaded)
+                {
+                    state->test_passed = KAN_FALSE;
+                    KAN_LOG (application_framework_example_basic_logic_test_mode, KAN_LOG_ERROR,
+                             "Failed to load asset.")
+                }
 
-            KAN_ASSERT (state->application_framework_system_handle != KAN_INVALID_CONTEXT_SYSTEM_HANDLE)
-            if (state->test_passed)
-            {
-                kan_application_framework_system_request_exit (state->application_framework_system_handle, 0);
-            }
-            else
-            {
-                kan_application_framework_system_request_exit (state->application_framework_system_handle, -1);
+                KAN_ASSERT (state->application_framework_system_handle != KAN_INVALID_CONTEXT_SYSTEM_HANDLE)
+                if (state->test_passed)
+                {
+                    kan_application_framework_system_request_exit (state->application_framework_system_handle, 0);
+                }
+                else
+                {
+                    kan_application_framework_system_request_exit (state->application_framework_system_handle, -1);
+                }
             }
         }
     }
 
-    kan_cpu_job_release (job);
+    KAN_UP_MUTATOR_RETURN;
 }

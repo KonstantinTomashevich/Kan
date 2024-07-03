@@ -1,11 +1,14 @@
 #include <kan/platform/precise_time.h>
+#include <kan/universe/preprocessor_markup.h>
 #include <kan/universe/universe.h>
 #include <kan/universe_single_pipeline_scheduler/universe_single_pipeline_scheduler.h>
 #include <kan/universe_time/universe_time.h>
 
 struct universe_single_pipeline_scheduler_state_t
 {
-    struct kan_repository_singleton_write_query_t write__kan_time_singleton;
+    KAN_UP_GENERATE_STATE_QUERIES (universe_single_pipeline_scheduler)
+    KAN_UP_BIND_STATE (universe_single_pipeline_scheduler, state)
+
     uint64_t last_update_time_ns;
     kan_interned_string_t pipeline_name;
 };
@@ -25,18 +28,16 @@ UNIVERSE_SINGLE_PIPELINE_SCHEDULER_API void kan_universe_scheduler_execute_singl
     const uint64_t delta_ns = state->last_update_time_ns == UINT64_MAX ? 0u : current_time - state->last_update_time_ns;
     state->last_update_time_ns = current_time;
 
-    kan_repository_singleton_write_access_t access =
-        kan_repository_singleton_write_query_execute (&state->write__kan_time_singleton);
-    struct kan_time_singleton_t *time = kan_repository_singleton_write_access_resolve (access);
+    KAN_UP_SINGLETON_WRITE (time, kan_time_singleton_t)
+    {
+        const uint64_t scaled_delta_ns = (uint64_t) (((float) delta_ns) * time->scale);
+        time->logical_time_ns += scaled_delta_ns;
+        time->logical_delta_ns = scaled_delta_ns;
 
-    const uint64_t scaled_delta_ns = (uint64_t) (((float) delta_ns) * time->scale);
-    time->logical_time_ns += scaled_delta_ns;
-    time->logical_delta_ns = scaled_delta_ns;
-
-    time->visual_time_ns += scaled_delta_ns;
-    time->visual_delta_ns = scaled_delta_ns;
-    time->visual_unscaled_delta_ns = delta_ns;
-    kan_repository_singleton_write_access_close (access);
+        time->visual_time_ns += scaled_delta_ns;
+        time->visual_delta_ns = scaled_delta_ns;
+        time->visual_unscaled_delta_ns = delta_ns;
+    }
 
     kan_universe_scheduler_interface_run_pipeline (interface, state->pipeline_name);
     kan_universe_scheduler_interface_update_all_children (interface);
