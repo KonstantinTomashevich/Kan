@@ -3,21 +3,17 @@
 
 #include <kan/api_common/alignment.h>
 #include <kan/api_common/min_max.h>
-#include <kan/container/hash_storage.h>
 #include <kan/container/stack_group_allocator.h>
 #include <kan/error/critical.h>
 #include <kan/log/logging.h>
-#include <kan/memory/allocation.h>
 #include <kan/render_pipeline_language/parser.h>
 #include <kan/threading/atomic.h>
 
 KAN_LOG_DEFINE_CATEGORY (rpl_parser);
 
-// TODO: Rewrite parser to avoid hash storages and use stack group allocator for all allocations.
-
 struct parser_option_t
 {
-    struct kan_hash_storage_node_t node;
+    struct parser_option_t *next;
     kan_interned_string_t name;
     enum kan_rpl_option_scope_t scope;
     enum kan_rpl_option_type_t type;
@@ -163,7 +159,7 @@ struct parser_setting_data_t
 
 struct parser_setting_t
 {
-    struct kan_hash_storage_node_t node;
+    struct parser_setting_t *next;
     struct parser_setting_data_t setting;
 };
 
@@ -191,7 +187,7 @@ struct parser_declaration_t
 
 struct parser_struct_t
 {
-    struct kan_hash_storage_node_t node;
+    struct parser_struct_t *next;
     kan_interned_string_t name;
     struct parser_declaration_t *first_declaration;
 
@@ -202,7 +198,7 @@ struct parser_struct_t
 
 struct parser_buffer_t
 {
-    struct kan_hash_storage_node_t node;
+    struct parser_buffer_t *next;
     kan_interned_string_t name;
     enum kan_rpl_buffer_type_t type;
     struct parser_declaration_t *first_declaration;
@@ -220,7 +216,7 @@ struct parser_setting_list_item_t
 
 struct parser_sampler_t
 {
-    struct kan_hash_storage_node_t node;
+    struct parser_sampler_t *next;
     kan_interned_string_t name;
     enum kan_rpl_sampler_type_t type;
     struct parser_setting_list_item_t *first_setting;
@@ -232,7 +228,7 @@ struct parser_sampler_t
 
 struct parser_function_t
 {
-    struct kan_hash_storage_node_t node;
+    struct parser_function_t *next;
     kan_interned_string_t return_type_name;
     kan_interned_string_t name;
     struct parser_declaration_t *first_argument;
@@ -245,17 +241,29 @@ struct parser_function_t
 
 struct parser_processing_data_t
 {
-    struct kan_hash_storage_t options;
-    struct kan_hash_storage_t settings;
-    struct kan_hash_storage_t structs;
-    struct kan_hash_storage_t buffers;
-    struct kan_hash_storage_t samplers;
-    struct kan_hash_storage_t functions;
+    struct parser_option_t *first_option;
+    uint64_t option_count;
+
+    struct parser_setting_t *first_setting;
+    uint64_t setting_count;
+
+    struct parser_struct_t *first_struct;
+    uint64_t struct_count;
+
+    struct parser_buffer_t *first_buffer;
+    uint64_t buffer_count;
+
+    struct parser_sampler_t *first_sampler;
+    uint64_t sampler_count;
+
+    struct parser_function_t *first_function;
+    uint64_t function_count;
 };
 
 struct rpl_parser_t
 {
     kan_interned_string_t log_name;
+    struct kan_stack_group_allocator_t allocator;
     struct parser_processing_data_t processing_data;
 };
 
@@ -364,11 +372,15 @@ static inline void ensure_statics_initialized (void)
     }
 }
 
-static inline struct parser_expression_tree_node_t *parser_expression_tree_node_create (
-    enum kan_rpl_expression_node_type_t type, kan_interned_string_t source_log_name, uint64_t source_line)
+static inline struct parser_expression_tree_node_t *parser_expression_tree_node_new (
+    struct rpl_parser_t *parser,
+    enum kan_rpl_expression_node_type_t type,
+    kan_interned_string_t source_log_name,
+    uint64_t source_line)
 {
     struct parser_expression_tree_node_t *node =
-        kan_allocate_batched (rpl_parser_allocation_group, sizeof (struct parser_expression_tree_node_t));
+        kan_stack_group_allocator_allocate (&parser->allocator, sizeof (struct parser_expression_tree_node_t),
+                                            _Alignof (struct parser_expression_tree_node_t));
 
     node->parent_expression = NULL;
     node->type = type;
@@ -462,104 +474,12 @@ static inline struct parser_expression_tree_node_t *parser_expression_tree_node_
     return node;
 }
 
-static inline void parser_expression_tree_node_destroy (struct parser_expression_tree_node_t *node)
+static inline struct parser_declaration_t *parser_declaration_new (struct rpl_parser_t *parser,
+                                                                   kan_interned_string_t source_log_name,
+                                                                   uint64_t source_line)
 {
-    if (!node)
-    {
-        return;
-    }
-
-#define DESTROY_LIST(NAME)                                                                                             \
-    {                                                                                                                  \
-        struct parser_expression_list_item_t *item = NAME;                                                             \
-        while (item)                                                                                                   \
-        {                                                                                                              \
-            struct parser_expression_list_item_t *next = item->next;                                                   \
-            parser_expression_tree_node_destroy (item->expression);                                                    \
-            kan_free_batched (rpl_parser_allocation_group, item);                                                      \
-            item = next;                                                                                               \
-        }                                                                                                              \
-    }
-
-    switch (node->type)
-    {
-    case KAN_RPL_EXPRESSION_NODE_TYPE_NOPE:
-    case KAN_RPL_EXPRESSION_NODE_TYPE_IDENTIFIER:
-    case KAN_RPL_EXPRESSION_NODE_TYPE_INTEGER_LITERAL:
-    case KAN_RPL_EXPRESSION_NODE_TYPE_FLOATING_LITERAL:
-    case KAN_RPL_EXPRESSION_NODE_TYPE_BREAK:
-    case KAN_RPL_EXPRESSION_NODE_TYPE_CONTINUE:
-        break;
-
-    case KAN_RPL_EXPRESSION_NODE_TYPE_VARIABLE_DECLARATION:
-    {
-        DESTROY_LIST (node->variable_declaration.array_size_list)
-        break;
-    }
-
-    case KAN_RPL_EXPRESSION_NODE_TYPE_BINARY_OPERATION:
-        parser_expression_tree_node_destroy (node->binary_operation.left_operand_expression);
-        parser_expression_tree_node_destroy (node->binary_operation.right_operand_expression);
-        break;
-
-    case KAN_RPL_EXPRESSION_NODE_TYPE_UNARY_OPERATION:
-        parser_expression_tree_node_destroy (node->unary_operation.operand_expression);
-        break;
-
-    case KAN_RPL_EXPRESSION_NODE_TYPE_SCOPE:
-        DESTROY_LIST (node->scope_expressions_list)
-        break;
-
-    case KAN_RPL_EXPRESSION_NODE_TYPE_FUNCTION_CALL:
-        DESTROY_LIST (node->function_call.arguments)
-        break;
-
-    case KAN_RPL_EXPRESSION_NODE_TYPE_CONSTRUCTOR:
-        DESTROY_LIST (node->constructor.arguments)
-        break;
-
-    case KAN_RPL_EXPRESSION_NODE_TYPE_IF:
-        parser_expression_tree_node_destroy (node->if_.condition_expression);
-        parser_expression_tree_node_destroy (node->if_.true_expression);
-        parser_expression_tree_node_destroy (node->if_.false_expression);
-        break;
-
-    case KAN_RPL_EXPRESSION_NODE_TYPE_FOR:
-        parser_expression_tree_node_destroy (node->for_.init_expression);
-        parser_expression_tree_node_destroy (node->for_.condition_expression);
-        parser_expression_tree_node_destroy (node->for_.step_expression);
-        parser_expression_tree_node_destroy (node->for_.body_expression);
-        break;
-
-    case KAN_RPL_EXPRESSION_NODE_TYPE_WHILE:
-        parser_expression_tree_node_destroy (node->while_.condition_expression);
-        parser_expression_tree_node_destroy (node->while_.body_expression);
-        break;
-
-    case KAN_RPL_EXPRESSION_NODE_TYPE_CONDITIONAL_SCOPE:
-        parser_expression_tree_node_destroy (node->conditional_scope.condition_expression);
-        parser_expression_tree_node_destroy (node->conditional_scope.body_expression);
-        break;
-
-    case KAN_RPL_EXPRESSION_NODE_TYPE_CONDITIONAL_ALIAS:
-        parser_expression_tree_node_destroy (node->conditional_alias.condition_expression);
-        parser_expression_tree_node_destroy (node->conditional_alias.body_expression);
-        break;
-
-    case KAN_RPL_EXPRESSION_NODE_TYPE_RETURN:
-        parser_expression_tree_node_destroy (node->return_expression);
-        break;
-    }
-
-#undef DESTROY_LIST
-    kan_free_batched (rpl_parser_allocation_group, node);
-}
-
-static inline struct parser_declaration_t *parser_declaration_create (kan_interned_string_t source_log_name,
-                                                                      uint64_t source_line)
-{
-    struct parser_declaration_t *declaration =
-        kan_allocate_batched (rpl_parser_allocation_group, sizeof (struct parser_declaration_t));
+    struct parser_declaration_t *declaration = kan_stack_group_allocator_allocate (
+        &parser->allocator, sizeof (struct parser_declaration_t), _Alignof (struct parser_declaration_t));
     declaration->next = NULL;
     declaration->declaration.name = NULL;
     declaration->declaration.type = NULL;
@@ -571,44 +491,14 @@ static inline struct parser_declaration_t *parser_declaration_create (kan_intern
     return declaration;
 }
 
-static inline void parser_destroy_declaration_meta (struct parser_declaration_meta_item_t *meta_item)
+static inline struct parser_struct_t *parser_struct_new (struct rpl_parser_t *parser,
+                                                         kan_interned_string_t name,
+                                                         kan_interned_string_t source_log_name,
+                                                         uint64_t source_line)
 {
-    while (meta_item)
-    {
-        struct parser_declaration_meta_item_t *next = meta_item->next;
-        kan_free_batched (rpl_parser_allocation_group, meta_item);
-        meta_item = next;
-    }
-}
-
-static void parser_declaration_destroy (struct parser_declaration_t *instance)
-{
-    if (!instance)
-    {
-        return;
-    }
-
-    struct parser_expression_list_item_t *list_item = instance->declaration.array_size_list;
-    while (list_item)
-    {
-        struct parser_expression_list_item_t *next = list_item->next;
-        parser_expression_tree_node_destroy (list_item->expression);
-        kan_free_batched (rpl_parser_allocation_group, list_item);
-        list_item = next;
-    }
-
-    parser_destroy_declaration_meta (instance->first_meta);
-    parser_expression_tree_node_destroy (instance->conditional);
-    parser_declaration_destroy (instance->next);
-}
-
-static inline struct parser_struct_t *parser_struct_create (kan_interned_string_t name,
-                                                            kan_interned_string_t source_log_name,
-                                                            uint64_t source_line)
-{
-    struct parser_struct_t *instance =
-        kan_allocate_batched (rpl_parser_allocation_group, sizeof (struct parser_struct_t));
-    instance->node.hash = (uint64_t) name;
+    struct parser_struct_t *instance = kan_stack_group_allocator_allocate (
+        &parser->allocator, sizeof (struct parser_struct_t), _Alignof (struct parser_struct_t));
+    instance->next = NULL;
     instance->name = name;
     instance->first_declaration = NULL;
     instance->conditional = NULL;
@@ -617,19 +507,14 @@ static inline struct parser_struct_t *parser_struct_create (kan_interned_string_
     return instance;
 }
 
-static inline void parser_struct_destroy (struct parser_struct_t *instance)
+static inline struct parser_buffer_t *parser_buffer_new (struct rpl_parser_t *parser,
+                                                         kan_interned_string_t name,
+                                                         kan_interned_string_t source_log_name,
+                                                         uint64_t source_line)
 {
-    parser_declaration_destroy (instance->first_declaration);
-    parser_expression_tree_node_destroy (instance->conditional);
-}
-
-static inline struct parser_buffer_t *parser_buffer_create (kan_interned_string_t name,
-                                                            kan_interned_string_t source_log_name,
-                                                            uint64_t source_line)
-{
-    struct parser_buffer_t *instance =
-        kan_allocate_batched (rpl_parser_allocation_group, sizeof (struct parser_buffer_t));
-    instance->node.hash = (uint64_t) name;
+    struct parser_buffer_t *instance = kan_stack_group_allocator_allocate (
+        &parser->allocator, sizeof (struct parser_buffer_t), _Alignof (struct parser_buffer_t));
+    instance->next = NULL;
     instance->name = name;
     instance->first_declaration = NULL;
     instance->conditional = NULL;
@@ -638,20 +523,15 @@ static inline struct parser_buffer_t *parser_buffer_create (kan_interned_string_
     return instance;
 }
 
-static inline void parser_buffer_destroy (struct parser_buffer_t *instance)
+static inline struct parser_sampler_t *parser_sampler_new (struct rpl_parser_t *parser,
+                                                           kan_interned_string_t name,
+                                                           enum kan_rpl_sampler_type_t type,
+                                                           kan_interned_string_t source_log_name,
+                                                           uint64_t source_line)
 {
-    parser_declaration_destroy (instance->first_declaration);
-    parser_expression_tree_node_destroy (instance->conditional);
-}
-
-static inline struct parser_sampler_t *parser_sampler_create (kan_interned_string_t name,
-                                                              enum kan_rpl_sampler_type_t type,
-                                                              kan_interned_string_t source_log_name,
-                                                              uint64_t source_line)
-{
-    struct parser_sampler_t *instance =
-        kan_allocate_batched (rpl_parser_allocation_group, sizeof (struct parser_sampler_t));
-    instance->node.hash = (uint64_t) name;
+    struct parser_sampler_t *instance = kan_stack_group_allocator_allocate (
+        &parser->allocator, sizeof (struct parser_sampler_t), _Alignof (struct parser_sampler_t));
+    instance->next = NULL;
     instance->name = name;
     instance->type = type;
     instance->first_setting = NULL;
@@ -661,28 +541,15 @@ static inline struct parser_sampler_t *parser_sampler_create (kan_interned_strin
     return instance;
 }
 
-static inline void parser_sampler_destroy (struct parser_sampler_t *instance)
+static inline struct parser_function_t *parser_function_new (struct rpl_parser_t *parser,
+                                                             kan_interned_string_t name,
+                                                             kan_interned_string_t return_type_name,
+                                                             kan_interned_string_t source_log_name,
+                                                             uint64_t source_line)
 {
-    struct parser_setting_list_item_t *item = instance->first_setting;
-    while (item)
-    {
-        struct parser_setting_list_item_t *next = item->next;
-        parser_expression_tree_node_destroy (item->setting.conditional);
-        kan_free_batched (rpl_parser_allocation_group, item);
-        item = next;
-    }
-
-    parser_expression_tree_node_destroy (instance->conditional);
-}
-
-static inline struct parser_function_t *parser_function_create (kan_interned_string_t name,
-                                                                kan_interned_string_t return_type_name,
-                                                                kan_interned_string_t source_log_name,
-                                                                uint64_t source_line)
-{
-    struct parser_function_t *instance =
-        kan_allocate_batched (rpl_parser_allocation_group, sizeof (struct parser_function_t));
-    instance->node.hash = (uint64_t) name;
+    struct parser_function_t *instance = kan_stack_group_allocator_allocate (
+        &parser->allocator, sizeof (struct parser_function_t), _Alignof (struct parser_function_t));
+    instance->next = NULL;
     instance->name = name;
     instance->return_type_name = return_type_name;
     instance->first_argument = NULL;
@@ -693,80 +560,25 @@ static inline struct parser_function_t *parser_function_create (kan_interned_str
     return instance;
 }
 
-static inline void parser_function_destroy (struct parser_function_t *instance)
-{
-    parser_declaration_destroy (instance->first_argument);
-    parser_expression_tree_node_destroy (instance->body_expression);
-    parser_expression_tree_node_destroy (instance->conditional);
-}
-
 static inline void parser_processing_data_init (struct parser_processing_data_t *instance)
 {
-    kan_hash_storage_init (&instance->options, rpl_parser_allocation_group, KAN_RPL_PARSER_OPTIONS_INITIAL_BUCKETS);
-    kan_hash_storage_init (&instance->settings, rpl_parser_allocation_group, KAN_RPL_PARSER_SETTINGS_INITIAL_BUCKETS);
-    kan_hash_storage_init (&instance->structs, rpl_parser_allocation_group, KAN_RPL_PARSER_STRUCTS_INITIAL_BUCKETS);
-    kan_hash_storage_init (&instance->buffers, rpl_parser_allocation_group, KAN_RPL_PARSER_BUFFERS_INITIAL_BUCKETS);
-    kan_hash_storage_init (&instance->samplers, rpl_parser_allocation_group, KAN_RPL_PARSER_SAMPLERS_INITIAL_BUCKETS);
-    kan_hash_storage_init (&instance->functions, rpl_parser_allocation_group, KAN_RPL_PARSER_FUNCTIONS_INITIAL_BUCKETS);
-}
+    instance->first_option = NULL;
+    instance->option_count = 0u;
 
-static inline void parser_processing_data_shutdown (struct parser_processing_data_t *instance)
-{
-    struct parser_option_t *option = (struct parser_option_t *) instance->options.items.first;
-    while (option)
-    {
-        struct parser_option_t *next = (struct parser_option_t *) option->node.list_node.next;
-        kan_free_batched (rpl_parser_allocation_group, option);
-        option = next;
-    }
+    instance->first_setting = NULL;
+    instance->setting_count = 0u;
 
-    struct parser_setting_t *setting = (struct parser_setting_t *) instance->settings.items.first;
-    while (setting)
-    {
-        struct parser_setting_t *next = (struct parser_setting_t *) setting->node.list_node.next;
-        parser_expression_tree_node_destroy (setting->setting.conditional);
-        kan_free_batched (rpl_parser_allocation_group, setting);
-        setting = next;
-    }
+    instance->first_struct = NULL;
+    instance->struct_count = 0u;
 
-    struct parser_struct_t *struct_data = (struct parser_struct_t *) instance->structs.items.first;
-    while (struct_data)
-    {
-        struct parser_struct_t *next = (struct parser_struct_t *) struct_data->node.list_node.next;
-        parser_struct_destroy (struct_data);
-        struct_data = next;
-    }
+    instance->first_buffer = NULL;
+    instance->buffer_count = 0u;
 
-    struct parser_buffer_t *buffer = (struct parser_buffer_t *) instance->buffers.items.first;
-    while (buffer)
-    {
-        struct parser_buffer_t *next = (struct parser_buffer_t *) buffer->node.list_node.next;
-        parser_buffer_destroy (buffer);
-        buffer = next;
-    }
+    instance->first_sampler = NULL;
+    instance->sampler_count = 0u;
 
-    struct parser_sampler_t *sampler = (struct parser_sampler_t *) instance->samplers.items.first;
-    while (sampler)
-    {
-        struct parser_sampler_t *next = (struct parser_sampler_t *) sampler->node.list_node.next;
-        parser_sampler_destroy (sampler);
-        sampler = next;
-    }
-
-    struct parser_function_t *function = (struct parser_function_t *) instance->functions.items.first;
-    while (function)
-    {
-        struct parser_function_t *next = (struct parser_function_t *) function->node.list_node.next;
-        parser_function_destroy (function);
-        function = next;
-    }
-
-    kan_hash_storage_shutdown (&instance->options);
-    kan_hash_storage_shutdown (&instance->settings);
-    kan_hash_storage_shutdown (&instance->structs);
-    kan_hash_storage_shutdown (&instance->buffers);
-    kan_hash_storage_shutdown (&instance->samplers);
-    kan_hash_storage_shutdown (&instance->functions);
+    instance->first_function = NULL;
+    instance->function_count = 0u;
 }
 
 static int re2c_refill_buffer (struct dynamic_parser_state_t *parser)
@@ -839,19 +651,15 @@ static inline void re2c_restore_saved_cursor (struct dynamic_parser_state_t *par
 
 static inline struct parser_option_t *rpl_parser_find_option (struct rpl_parser_t *parser, kan_interned_string_t name)
 {
-    const struct kan_hash_storage_bucket_t *bucket =
-        kan_hash_storage_query (&parser->processing_data.options, (uint64_t) name);
-    struct parser_option_t *node = (struct parser_option_t *) bucket->first;
-    const struct parser_option_t *node_end = (struct parser_option_t *) (bucket->last ? bucket->last->next : NULL);
-
-    while (node != node_end)
+    struct parser_option_t *option = parser->processing_data.first_option;
+    while (option)
     {
-        if (node->name == name)
+        if (option->name == name)
         {
-            return node;
+            return option;
         }
 
-        node = (struct parser_option_t *) node->node.list_node.next;
+        option = option->next;
     }
 
     return NULL;
@@ -892,17 +700,17 @@ static inline kan_bool_t parse_main_option_flag (struct rpl_parser_t *parser,
         return KAN_FALSE;
     }
 
-    struct parser_option_t *node = kan_allocate_batched (rpl_parser_allocation_group, sizeof (struct parser_option_t));
+    struct parser_option_t *node = kan_stack_group_allocator_allocate (
+        &parser->allocator, sizeof (struct parser_option_t), _Alignof (struct parser_option_t));
 
-    node->node.hash = (uint64_t) name;
+    node->next = parser->processing_data.first_option;
+    parser->processing_data.first_option = node;
+    ++parser->processing_data.option_count;
+
     node->name = name;
     node->scope = scope;
     node->type = KAN_RPL_OPTION_TYPE_FLAG;
     node->flag_default_value = value;
-
-    kan_hash_storage_update_bucket_count_default (&parser->processing_data.options,
-                                                  KAN_RPL_PARSER_OPTIONS_INITIAL_BUCKETS);
-    kan_hash_storage_add (&parser->processing_data.options, &node->node);
     return KAN_TRUE;
 }
 
@@ -979,17 +787,17 @@ static inline kan_bool_t parse_main_option_count (struct rpl_parser_t *parser,
         return KAN_FALSE;
     }
 
-    struct parser_option_t *node = kan_allocate_batched (rpl_parser_allocation_group, sizeof (struct parser_option_t));
+    struct parser_option_t *node = kan_stack_group_allocator_allocate (
+        &parser->allocator, sizeof (struct parser_option_t), _Alignof (struct parser_option_t));
 
-    node->node.hash = (uint64_t) name;
+    node->next = parser->processing_data.first_option;
+    parser->processing_data.first_option = node;
+    ++parser->processing_data.option_count;
+
     node->name = name;
     node->scope = scope;
     node->type = KAN_RPL_OPTION_TYPE_COUNT;
     node->count_default_value = parse_unsigned_integer_value (parser, state, literal_begin, literal_end);
-
-    kan_hash_storage_update_bucket_count_default (&parser->processing_data.options,
-                                                  KAN_RPL_PARSER_OPTIONS_INITIAL_BUCKETS);
-    kan_hash_storage_add (&parser->processing_data.options, &node->node);
     return KAN_TRUE;
 }
 
@@ -1021,8 +829,6 @@ static struct parser_expression_tree_node_t *parse_detached_conditional (struct 
         KAN_LOG (rpl_parser, KAN_LOG_ERROR,
                  "[%s:%s] [%ld:%ld]: Expected closing brace \")\" at the end of child grouped expression.",
                  parser->log_name, state->source_log_name, (long) state->cursor_line, (long) state->cursor_symbol)
-
-        parser_expression_tree_node_destroy (parsed_node);
         return NULL;
     }
 
@@ -1036,12 +842,14 @@ static inline kan_bool_t parse_main_setting_flag (struct rpl_parser_t *parser,
                                                   const char *name_end,
                                                   kan_bool_t value)
 {
-    kan_interned_string_t name = kan_char_sequence_intern (name_begin, name_end);
-    struct parser_setting_t *node =
-        kan_allocate_batched (rpl_parser_allocation_group, sizeof (struct parser_setting_t));
+    struct parser_setting_t *node = kan_stack_group_allocator_allocate (
+        &parser->allocator, sizeof (struct parser_setting_t), _Alignof (struct parser_setting_t));
 
-    node->node.hash = (uint64_t) name;
-    node->setting.name = name;
+    node->next = parser->processing_data.first_setting;
+    parser->processing_data.first_setting = node;
+    ++parser->processing_data.setting_count;
+
+    node->setting.name = kan_char_sequence_intern (name_begin, name_end);
     node->setting.type = KAN_RPL_SETTING_TYPE_FLAG;
     node->setting.flag = value;
 
@@ -1050,10 +858,6 @@ static inline kan_bool_t parse_main_setting_flag (struct rpl_parser_t *parser,
 
     node->setting.source_log_name = state->source_log_name;
     node->setting.source_line = state->cursor_line;
-
-    kan_hash_storage_update_bucket_count_default (&parser->processing_data.settings,
-                                                  KAN_RPL_PARSER_OPTIONS_INITIAL_BUCKETS);
-    kan_hash_storage_add (&parser->processing_data.settings, &node->node);
     return KAN_TRUE;
 }
 
@@ -1064,12 +868,14 @@ static inline kan_bool_t parse_main_setting_integer (struct rpl_parser_t *parser
                                                      const char *literal_begin,
                                                      const char *literal_end)
 {
-    kan_interned_string_t name = kan_char_sequence_intern (name_begin, name_end);
-    struct parser_setting_t *node =
-        kan_allocate_batched (rpl_parser_allocation_group, sizeof (struct parser_setting_t));
+    struct parser_setting_t *node = kan_stack_group_allocator_allocate (
+        &parser->allocator, sizeof (struct parser_setting_t), _Alignof (struct parser_setting_t));
 
-    node->node.hash = (uint64_t) name;
-    node->setting.name = name;
+    node->next = parser->processing_data.first_setting;
+    parser->processing_data.first_setting = node;
+    ++parser->processing_data.setting_count;
+
+    node->setting.name = kan_char_sequence_intern (name_begin, name_end);
     node->setting.type = KAN_RPL_SETTING_TYPE_INTEGER;
 
     const kan_bool_t negative = *literal_begin == '-';
@@ -1082,7 +888,8 @@ static inline kan_bool_t parse_main_setting_integer (struct rpl_parser_t *parser
     if (unsigned_value > INT64_MAX)
     {
         KAN_LOG (rpl_parser, KAN_LOG_WARNING, "[%s:%s] [%ld:%ld]: Setting \"%s\" integer value is too big.",
-                 parser->log_name, state->source_log_name, (long) state->cursor_line, (long) state->cursor_symbol, name)
+                 parser->log_name, state->source_log_name, (long) state->cursor_line, (long) state->cursor_symbol,
+                 node->setting.name)
         return KAN_FALSE;
     }
 
@@ -1097,10 +904,6 @@ static inline kan_bool_t parse_main_setting_integer (struct rpl_parser_t *parser
 
     node->setting.source_log_name = state->source_log_name;
     node->setting.source_line = state->cursor_line;
-
-    kan_hash_storage_update_bucket_count_default (&parser->processing_data.settings,
-                                                  KAN_RPL_PARSER_SETTINGS_INITIAL_BUCKETS);
-    kan_hash_storage_add (&parser->processing_data.settings, &node->node);
     return KAN_TRUE;
 }
 
@@ -1111,12 +914,14 @@ static inline kan_bool_t parse_main_setting_floating (struct rpl_parser_t *parse
                                                       const char *literal_begin,
                                                       const char *literal_end)
 {
-    kan_interned_string_t name = kan_char_sequence_intern (name_begin, name_end);
-    struct parser_setting_t *node =
-        kan_allocate_batched (rpl_parser_allocation_group, sizeof (struct parser_setting_t));
+    struct parser_setting_t *node = kan_stack_group_allocator_allocate (
+        &parser->allocator, sizeof (struct parser_setting_t), _Alignof (struct parser_setting_t));
 
-    node->node.hash = (uint64_t) name;
-    node->setting.name = name;
+    node->next = parser->processing_data.first_setting;
+    parser->processing_data.first_setting = node;
+    ++parser->processing_data.setting_count;
+
+    node->setting.name = kan_char_sequence_intern (name_begin, name_end);
     node->setting.type = KAN_RPL_SETTING_TYPE_FLOATING;
 
     const kan_bool_t negative = *literal_begin == '-';
@@ -1138,10 +943,6 @@ static inline kan_bool_t parse_main_setting_floating (struct rpl_parser_t *parse
 
     node->setting.source_log_name = state->source_log_name;
     node->setting.source_line = state->cursor_line;
-
-    kan_hash_storage_update_bucket_count_default (&parser->processing_data.settings,
-                                                  KAN_RPL_PARSER_SETTINGS_INITIAL_BUCKETS);
-    kan_hash_storage_add (&parser->processing_data.settings, &node->node);
     return KAN_TRUE;
 }
 
@@ -1152,12 +953,14 @@ static inline kan_bool_t parse_main_setting_string (struct rpl_parser_t *parser,
                                                     const char *literal_begin,
                                                     const char *literal_end)
 {
-    kan_interned_string_t name = kan_char_sequence_intern (name_begin, name_end);
-    struct parser_setting_t *node =
-        kan_allocate_batched (rpl_parser_allocation_group, sizeof (struct parser_setting_t));
+    struct parser_setting_t *node = kan_stack_group_allocator_allocate (
+        &parser->allocator, sizeof (struct parser_setting_t), _Alignof (struct parser_setting_t));
 
-    node->node.hash = (uint64_t) name;
-    node->setting.name = name;
+    node->next = parser->processing_data.first_setting;
+    parser->processing_data.first_setting = node;
+    ++parser->processing_data.setting_count;
+
+    node->setting.name = kan_char_sequence_intern (name_begin, name_end);
     node->setting.type = KAN_RPL_SETTING_TYPE_STRING;
     node->setting.string = kan_char_sequence_intern (literal_begin, literal_end);
 
@@ -1166,10 +969,6 @@ static inline kan_bool_t parse_main_setting_string (struct rpl_parser_t *parser,
 
     node->setting.source_log_name = state->source_log_name;
     node->setting.source_line = state->cursor_line;
-
-    kan_hash_storage_update_bucket_count_default (&parser->processing_data.settings,
-                                                  KAN_RPL_PARSER_SETTINGS_INITIAL_BUCKETS);
-    kan_hash_storage_add (&parser->processing_data.settings, &node->node);
     return KAN_TRUE;
 }
 
@@ -1177,99 +976,26 @@ static struct parser_declaration_t *parse_declarations (struct rpl_parser_t *par
                                                         struct dynamic_parser_state_t *state,
                                                         enum parser_declaration_list_type_t list_type);
 
-static inline struct parser_struct_t *rpl_parser_find_struct (struct rpl_parser_t *parser, kan_interned_string_t name)
-{
-    const struct kan_hash_storage_bucket_t *bucket =
-        kan_hash_storage_query (&parser->processing_data.structs, (uint64_t) name);
-    struct parser_struct_t *node = (struct parser_struct_t *) bucket->first;
-    const struct parser_struct_t *node_end = (struct parser_struct_t *) (bucket->last ? bucket->last->next : NULL);
-
-    while (node != node_end)
-    {
-        if (node->name == name)
-        {
-            return node;
-        }
-
-        node = (struct parser_struct_t *) node->node.list_node.next;
-    }
-
-    return NULL;
-}
-
-static inline kan_bool_t ensure_struct_name_unique (struct rpl_parser_t *parser,
-                                                    struct dynamic_parser_state_t *state,
-                                                    kan_interned_string_t name)
-{
-    if (rpl_parser_find_struct (parser, name))
-    {
-        KAN_LOG (rpl_parser, KAN_LOG_ERROR, "[%s:%s] [%ld:%ld]: Struct \"%s\" is already defined.", parser->log_name,
-                 state->source_log_name, (long) state->cursor_line, (long) state->cursor_symbol, name)
-        return KAN_FALSE;
-    }
-
-    return KAN_TRUE;
-}
-
 static inline kan_bool_t parse_main_struct (struct rpl_parser_t *parser,
                                             struct dynamic_parser_state_t *state,
                                             const char *name_begin,
                                             const char *name_end)
 {
     kan_interned_string_t name = kan_char_sequence_intern (name_begin, name_end);
-    if (!ensure_struct_name_unique (parser, state, name))
-    {
-        return KAN_FALSE;
-    }
+    struct parser_struct_t *new_struct = parser_struct_new (parser, name, state->source_log_name, state->cursor_line);
 
-    struct parser_struct_t *new_struct = parser_struct_create (name, state->source_log_name, state->cursor_line);
     new_struct->conditional = state->detached_conditional;
     state->detached_conditional = NULL;
     new_struct->first_declaration = parse_declarations (parser, state, PARSER_DECLARATION_LIST_TYPE_FIELDS);
 
     if (!new_struct->first_declaration)
     {
-        parser_struct_destroy (new_struct);
         return KAN_FALSE;
     }
 
-    kan_hash_storage_update_bucket_count_default (&parser->processing_data.structs,
-                                                  KAN_RPL_PARSER_STRUCTS_INITIAL_BUCKETS);
-    kan_hash_storage_add (&parser->processing_data.structs, &new_struct->node);
-    return KAN_TRUE;
-}
-
-static inline struct parser_buffer_t *rpl_parser_find_buffer (struct rpl_parser_t *parser, kan_interned_string_t name)
-{
-    const struct kan_hash_storage_bucket_t *bucket =
-        kan_hash_storage_query (&parser->processing_data.buffers, (uint64_t) name);
-    struct parser_buffer_t *node = (struct parser_buffer_t *) bucket->first;
-    const struct parser_buffer_t *node_end = (struct parser_buffer_t *) (bucket->last ? bucket->last->next : NULL);
-
-    while (node != node_end)
-    {
-        if (node->name == name)
-        {
-            return node;
-        }
-
-        node = (struct parser_buffer_t *) node->node.list_node.next;
-    }
-
-    return NULL;
-}
-
-static inline kan_bool_t ensure_buffer_name_unique (struct rpl_parser_t *parser,
-                                                    struct dynamic_parser_state_t *state,
-                                                    kan_interned_string_t name)
-{
-    if (rpl_parser_find_buffer (parser, name))
-    {
-        KAN_LOG (rpl_parser, KAN_LOG_ERROR, "[%s:%s] [%ld:%ld]: Buffer \"%s\" is already defined.", parser->log_name,
-                 state->source_log_name, (long) state->cursor_line, (long) state->cursor_symbol, name)
-        return KAN_FALSE;
-    }
-
+    new_struct->next = parser->processing_data.first_struct;
+    parser->processing_data.first_struct = new_struct;
+    ++parser->processing_data.struct_count;
     return KAN_TRUE;
 }
 
@@ -1279,13 +1005,8 @@ static inline kan_bool_t parse_main_buffer (struct rpl_parser_t *parser,
                                             const char *name_begin,
                                             const char *name_end)
 {
-    kan_interned_string_t name = kan_char_sequence_intern (name_begin, name_end);
-    if (!ensure_buffer_name_unique (parser, state, name))
-    {
-        return KAN_FALSE;
-    }
-
-    struct parser_buffer_t *new_buffer = parser_buffer_create (name, state->source_log_name, state->cursor_line);
+    struct parser_buffer_t *new_buffer = parser_buffer_new (parser, kan_char_sequence_intern (name_begin, name_end),
+                                                            state->source_log_name, state->cursor_line);
     new_buffer->type = type;
     new_buffer->conditional = state->detached_conditional;
     state->detached_conditional = NULL;
@@ -1293,57 +1014,12 @@ static inline kan_bool_t parse_main_buffer (struct rpl_parser_t *parser,
 
     if (!new_buffer->first_declaration)
     {
-        parser_buffer_destroy (new_buffer);
         return KAN_FALSE;
     }
 
-    kan_hash_storage_update_bucket_count_default (&parser->processing_data.buffers,
-                                                  KAN_RPL_PARSER_STRUCTS_INITIAL_BUCKETS);
-    kan_hash_storage_add (&parser->processing_data.buffers, &new_buffer->node);
-    return KAN_TRUE;
-}
-
-static inline struct parser_sampler_t *rpl_parser_find_sampler (struct rpl_parser_t *parser, kan_interned_string_t name)
-{
-    const struct kan_hash_storage_bucket_t *bucket =
-        kan_hash_storage_query (&parser->processing_data.samplers, (uint64_t) name);
-    struct parser_sampler_t *node = (struct parser_sampler_t *) bucket->first;
-    const struct parser_sampler_t *node_end = (struct parser_sampler_t *) (bucket->last ? bucket->last->next : NULL);
-
-    while (node != node_end)
-    {
-        if (node->name == name)
-        {
-            return node;
-        }
-
-        node = (struct parser_sampler_t *) node->node.list_node.next;
-    }
-
-    return NULL;
-}
-
-static inline struct parser_function_t *rpl_parser_find_function (struct rpl_parser_t *parser,
-                                                                  kan_interned_string_t name);
-
-static inline kan_bool_t ensure_sampler_name_unique (struct rpl_parser_t *parser,
-                                                     struct dynamic_parser_state_t *state,
-                                                     kan_interned_string_t name)
-{
-    if (rpl_parser_find_sampler (parser, name))
-    {
-        KAN_LOG (rpl_parser, KAN_LOG_ERROR, "[%s:%s] [%ld:%ld]: Sampler \"%s\" is already defined.", parser->log_name,
-                 state->source_log_name, (long) state->cursor_line, (long) state->cursor_symbol, name)
-        return KAN_FALSE;
-    }
-
-    if (rpl_parser_find_function (parser, name))
-    {
-        KAN_LOG (rpl_parser, KAN_LOG_ERROR, "[%s:%s] [%ld:%ld]: Sampler \"%s\" is occupied by function.",
-                 parser->log_name, state->source_log_name, (long) state->cursor_line, (long) state->cursor_symbol, name)
-        return KAN_FALSE;
-    }
-
+    new_buffer->next = parser->processing_data.first_buffer;
+    parser->processing_data.first_buffer = new_buffer;
+    ++parser->processing_data.buffer_count;
     return KAN_TRUE;
 }
 
@@ -1352,41 +1028,6 @@ static kan_bool_t parse_main_sampler (struct rpl_parser_t *parser,
                                       enum kan_rpl_sampler_type_t type,
                                       const char *name_begin,
                                       const char *name_end);
-
-static inline struct parser_function_t *rpl_parser_find_function (struct rpl_parser_t *parser,
-                                                                  kan_interned_string_t name)
-{
-    const struct kan_hash_storage_bucket_t *bucket =
-        kan_hash_storage_query (&parser->processing_data.functions, (uint64_t) name);
-    struct parser_function_t *node = (struct parser_function_t *) bucket->first;
-    const struct parser_function_t *node_end = (struct parser_function_t *) (bucket->last ? bucket->last->next : NULL);
-
-    while (node != node_end)
-    {
-        if (node->name == name)
-        {
-            return node;
-        }
-
-        node = (struct parser_function_t *) node->node.list_node.next;
-    }
-
-    return NULL;
-}
-
-static inline kan_bool_t ensure_function_name_unique (struct rpl_parser_t *parser,
-                                                      struct dynamic_parser_state_t *state,
-                                                      kan_interned_string_t name)
-{
-    if (rpl_parser_find_function (parser, name))
-    {
-        KAN_LOG (rpl_parser, KAN_LOG_ERROR, "[%s:%s] [%ld:%ld]: Function \"%s\" is already defined.", parser->log_name,
-                 state->source_log_name, (long) state->cursor_line, (long) state->cursor_symbol, name)
-        return KAN_FALSE;
-    }
-
-    return KAN_TRUE;
-}
 
 static kan_bool_t parse_main_function (struct rpl_parser_t *parser,
                                        struct dynamic_parser_state_t *state,
@@ -1411,7 +1052,6 @@ static kan_bool_t parse_main (struct rpl_parser_t *parser, struct dynamic_parser
 #define CHECKED(...)                                                                                                   \
     if (!(__VA_ARGS__))                                                                                                \
     {                                                                                                                  \
-        parser_expression_tree_node_destroy (state->detached_conditional);                                             \
         return KAN_FALSE;                                                                                              \
     }                                                                                                                  \
     continue;
@@ -1530,7 +1170,6 @@ static kan_bool_t parse_main (struct rpl_parser_t *parser, struct dynamic_parser
              KAN_LOG (rpl_parser, KAN_LOG_ERROR,
                       "[%s:%s] [%ld:%ld]: Encountered unknown expression at global scope.",
                       parser->log_name, state->source_log_name, (long) state->cursor_line, (long) state->cursor_symbol)
-             parser_expression_tree_node_destroy (state->detached_conditional);
              return KAN_FALSE;
          }
          $
@@ -1540,7 +1179,6 @@ static kan_bool_t parse_main (struct rpl_parser_t *parser, struct dynamic_parser
                  KAN_LOG (rpl_parser, KAN_LOG_ERROR,
                           "[%s:%s]: Encountered detached conditional at the end of file.",
                           parser->log_name, state->source_log_name)
-                 parser_expression_tree_node_destroy (state->detached_conditional);
                  return KAN_FALSE;
              }
 
@@ -1728,7 +1366,6 @@ static kan_bool_t parse_expression_array_access (struct rpl_parser_t *parser,
 
     parsed_node->parent_expression = node->parent_expression;
     parse_expression_replace_in_parent (expression_parse_state, node, parsed_node);
-    parser_expression_tree_node_destroy (node);
 
     if (*state->cursor != ']')
     {
@@ -1870,7 +1507,6 @@ static kan_bool_t parse_expression_operand_child_grouped_expression (
 
     parsed_node->parent_expression = node->parent_expression;
     parse_expression_replace_in_parent (expression_parse_state, node, parsed_node);
-    parser_expression_tree_node_destroy (node);
 
     if (*state->cursor != ')')
     {
@@ -1901,8 +1537,8 @@ static kan_bool_t parse_expression_unary_operation (struct rpl_parser_t *parser,
     struct parser_expression_tree_node_t *node = expression_parse_state->current_node;
     KAN_ASSERT (node && node->type == KAN_RPL_EXPRESSION_NODE_TYPE_NOPE)
 
-    struct parser_expression_tree_node_t *operation_node = parser_expression_tree_node_create (
-        KAN_RPL_EXPRESSION_NODE_TYPE_UNARY_OPERATION, state->source_log_name, state->cursor_line);
+    struct parser_expression_tree_node_t *operation_node = parser_expression_tree_node_new (
+        parser, KAN_RPL_EXPRESSION_NODE_TYPE_UNARY_OPERATION, state->source_log_name, state->cursor_line);
     operation_node->unary_operation.unary_operation = operation;
 
     parse_expression_replace_in_parent (expression_parse_state, node, operation_node);
@@ -1928,12 +1564,12 @@ static kan_bool_t parse_expression_binary_operation (struct rpl_parser_t *parser
     }
 
     const uint64_t priority = binary_operation_priority[operation];
-    struct parser_expression_tree_node_t *operation_node = parser_expression_tree_node_create (
-        KAN_RPL_EXPRESSION_NODE_TYPE_BINARY_OPERATION, state->source_log_name, state->cursor_line);
+    struct parser_expression_tree_node_t *operation_node = parser_expression_tree_node_new (
+        parser, KAN_RPL_EXPRESSION_NODE_TYPE_BINARY_OPERATION, state->source_log_name, state->cursor_line);
     operation_node->binary_operation.binary_operation = operation;
 
-    struct parser_expression_tree_node_t *next_operand_placeholder = parser_expression_tree_node_create (
-        KAN_RPL_EXPRESSION_NODE_TYPE_NOPE, state->source_log_name, state->cursor_line);
+    struct parser_expression_tree_node_t *next_operand_placeholder = parser_expression_tree_node_new (
+        parser, KAN_RPL_EXPRESSION_NODE_TYPE_NOPE, state->source_log_name, state->cursor_line);
     next_operand_placeholder->parent_expression = operation_node;
 
     switch (binary_operation_direction[operation])
@@ -2035,8 +1671,8 @@ static struct parser_expression_tree_node_t *parse_expression (struct rpl_parser
 {
     struct expression_parse_state_t expression_parse_state = {
         .expecting_operand = KAN_TRUE,
-        .current_node = parser_expression_tree_node_create (KAN_RPL_EXPRESSION_NODE_TYPE_NOPE, state->source_log_name,
-                                                            state->cursor_line),
+        .current_node = parser_expression_tree_node_new (parser, KAN_RPL_EXPRESSION_NODE_TYPE_NOPE,
+                                                         state->source_log_name, state->cursor_line),
     };
 
     while (KAN_TRUE)
@@ -2048,18 +1684,9 @@ static struct parser_expression_tree_node_t *parse_expression (struct rpl_parser
         const char *literal_begin;
         const char *literal_end;
 
-#define GET_STATE_PARENT                                                                                               \
-    struct parser_expression_tree_node_t *state_parent = expression_parse_state.current_node;                          \
-    while (state_parent->parent_expression)                                                                            \
-    {                                                                                                                  \
-        state_parent = state_parent->parent_expression;                                                                \
-    }
-
 #define CHECKED(...)                                                                                                   \
     if (!(__VA_ARGS__))                                                                                                \
     {                                                                                                                  \
-        GET_STATE_PARENT;                                                                                              \
-        parser_expression_tree_node_destroy (state_parent);                                                            \
         return NULL;                                                                                                   \
     }                                                                                                                  \
     continue;
@@ -2264,13 +1891,16 @@ static struct parser_expression_tree_node_t *parse_expression (struct rpl_parser
                           (long) state->cursor_symbol)
 
                  re2c_restore_saved_cursor (state);
-                 GET_STATE_PARENT;
-                 parser_expression_tree_node_destroy (state_parent);
                  return NULL;
              }
 
              re2c_restore_saved_cursor (state);
-             GET_STATE_PARENT;
+             struct parser_expression_tree_node_t *state_parent = expression_parse_state.current_node;
+             while (state_parent->parent_expression)
+             {
+                 state_parent = state_parent->parent_expression;
+             }
+
              return state_parent;
          }
 
@@ -2279,8 +1909,6 @@ static struct parser_expression_tree_node_t *parse_expression (struct rpl_parser
              KAN_LOG (rpl_parser, KAN_LOG_ERROR,
                       "[%s:%s] [%ld:%ld]: Encountered unknown construct while parsing expression.",
                       parser->log_name, state->source_log_name, (long) state->cursor_line, (long) state->cursor_symbol)
-             GET_STATE_PARENT;
-             parser_expression_tree_node_destroy (state_parent);
              return NULL;
          }
 
@@ -2289,14 +1917,11 @@ static struct parser_expression_tree_node_t *parse_expression (struct rpl_parser
              KAN_LOG (rpl_parser, KAN_LOG_ERROR,
                       "[%s:%s] [%ld:%ld]: Encountered end of file while parsing expression.",
                       parser->log_name, state->source_log_name, (long) state->cursor_line, (long) state->cursor_symbol)
-             GET_STATE_PARENT;
-             parser_expression_tree_node_destroy (state_parent);
              return NULL;
          }
          */
 
 #undef CHECKED
-#undef GET_STATE_PARENT
     }
 }
 
@@ -2317,7 +1942,9 @@ static kan_bool_t parse_call_arguments (struct rpl_parser_t *parser,
         }
 
         struct parser_expression_list_item_t *item =
-            kan_allocate_batched (rpl_parser_allocation_group, sizeof (struct parser_expression_list_item_t));
+            kan_stack_group_allocator_allocate (&parser->allocator, sizeof (struct parser_expression_list_item_t),
+                                                _Alignof (struct parser_expression_list_item_t));
+
         item->next = NULL;
         item->expression = expression;
 
@@ -2366,8 +1993,10 @@ static kan_bool_t parse_declarations_finish_item (struct rpl_parser_t *parser,
                  return KAN_FALSE;
              }
 
-             struct parser_expression_list_item_t *new_item =
-                     kan_allocate_batched (rpl_parser_allocation_group, sizeof (struct parser_expression_list_item_t));
+             struct parser_expression_list_item_t *new_item = kan_stack_group_allocator_allocate (
+                     &parser->allocator, sizeof (struct parser_expression_list_item_t),
+                     _Alignof (struct parser_expression_list_item_t));
+
              new_item->next = NULL;
              new_item->expression = array_size_expression;
 
@@ -2434,8 +2063,10 @@ static struct parser_declaration_meta_item_t *parse_declarations_meta (struct rp
         /*!re2c
          @name_begin identifier @name_end separator* ("," | ")")
          {
-             struct parser_declaration_meta_item_t *new_item = kan_allocate_batched (
-                     rpl_parser_allocation_group, sizeof (struct parser_declaration_meta_item_t));
+             struct parser_declaration_meta_item_t *new_item = kan_stack_group_allocator_allocate (
+                     &parser->allocator, sizeof (struct parser_declaration_meta_item_t),
+                     _Alignof (struct parser_declaration_meta_item_t));
+
              new_item->meta = kan_char_sequence_intern (name_begin, name_end);
              new_item->next = meta_item;
              meta_item = new_item;
@@ -2459,8 +2090,6 @@ static struct parser_declaration_meta_item_t *parse_declarations_meta (struct rp
              KAN_LOG (rpl_parser, KAN_LOG_ERROR,
                       "[%s:%s] [%ld:%ld]: Encountered unknown expression while reading meta list.",
                       parser->log_name, state->source_log_name, (long) state->cursor_line, (long) state->cursor_symbol)
-
-             parser_destroy_declaration_meta (meta_item);
              return NULL;
          }
          $
@@ -2468,8 +2097,6 @@ static struct parser_declaration_meta_item_t *parse_declarations_meta (struct rp
              KAN_LOG (rpl_parser, KAN_LOG_ERROR,
                       "[%s:%s] [%ld:%ld]: Encountered end of file while reading meta list.",
                       parser->log_name, state->source_log_name, (long) state->cursor_line, (long) state->cursor_symbol)
-
-             parser_destroy_declaration_meta (meta_item);
              return NULL;
          }
          */
@@ -2498,7 +2125,6 @@ static struct parser_declaration_t *parse_declarations (struct rpl_parser_t *par
              state->detached_conditional = parse_detached_conditional (parser, state);
              if (!state->detached_conditional)
              {
-                 parser_declaration_destroy (first_declaration);
                  return NULL;
              }
 
@@ -2510,8 +2136,6 @@ static struct parser_declaration_t *parse_declarations (struct rpl_parser_t *par
              struct parser_declaration_meta_item_t *new_meta = parse_declarations_meta (parser, state);
              if (!new_meta)
              {
-                 parser_declaration_destroy (first_declaration);
-                 parser_destroy_declaration_meta (detached_meta);
                  return NULL;
              }
 
@@ -2535,8 +2159,8 @@ static struct parser_declaration_t *parse_declarations (struct rpl_parser_t *par
 
          @name_begin identifier @name_end
          {
-             struct parser_declaration_t *new_declaration = parser_declaration_create (
-                     state->source_log_name, state->cursor_line);
+             struct parser_declaration_t *new_declaration = parser_declaration_new (
+                     parser, state->source_log_name, state->cursor_line);
              new_declaration->declaration.type = kan_char_sequence_intern (name_begin, name_end);
 
              if (last_declaration)
@@ -2557,7 +2181,6 @@ static struct parser_declaration_t *parse_declarations (struct rpl_parser_t *par
 
              if (!parse_declarations_finish_item (parser, state, &new_declaration->declaration))
              {
-                 parser_declaration_destroy (first_declaration);
                  return NULL;
              }
 
@@ -2571,8 +2194,6 @@ static struct parser_declaration_t *parse_declarations (struct rpl_parser_t *par
                                   "[%s:%s] [%ld:%ld]: Encountered declaration that is not finished by \";\".",
                                   parser->log_name, state->source_log_name, (long) state->cursor_line,
                                   (long) state->cursor_symbol)
-                         parser_declaration_destroy (first_declaration);
-                         parser_destroy_declaration_meta (detached_meta);
                          return NULL;
                      }
 
@@ -2591,8 +2212,6 @@ static struct parser_declaration_t *parse_declarations (struct rpl_parser_t *par
                                      "[%s:%s] [%ld:%ld]: Encountered detached meta at the end of declaration list.",
                                      parser->log_name, state->source_log_name, (long) state->cursor_line,
                                      (long) state->cursor_symbol)
-                             parser_declaration_destroy (first_declaration);
-                             parser_destroy_declaration_meta (detached_meta);
                              return NULL;
                          }
 
@@ -2604,8 +2223,6 @@ static struct parser_declaration_t *parse_declarations (struct rpl_parser_t *par
                                   "[%s:%s] [%ld:%ld]: Encountered declaration that is not finished by \",\".",
                                   parser->log_name, state->source_log_name, (long) state->cursor_line,
                                   (long) state->cursor_symbol)
-                         parser_declaration_destroy (first_declaration);
-                         parser_destroy_declaration_meta (detached_meta);
                          return NULL;
                      }
 
@@ -2626,8 +2243,6 @@ static struct parser_declaration_t *parse_declarations (struct rpl_parser_t *par
                              "[%s:%s] [%ld:%ld]: Encountered detached meta at the end of declaration list.",
                              parser->log_name, state->source_log_name, (long) state->cursor_line,
                              (long) state->cursor_symbol)
-                     parser_declaration_destroy (first_declaration);
-                     parser_destroy_declaration_meta (detached_meta);
                      return NULL;
                  }
 
@@ -2637,9 +2252,6 @@ static struct parser_declaration_t *parse_declarations (struct rpl_parser_t *par
              KAN_LOG (rpl_parser, KAN_LOG_ERROR,
                       "[%s:%s] [%ld:%ld]: Encountered unknown expression while reading declaration list.",
                       parser->log_name, state->source_log_name, (long) state->cursor_line, (long) state->cursor_symbol)
-
-             parser_declaration_destroy (first_declaration);
-             parser_destroy_declaration_meta (detached_meta);
              return NULL;
          }
 
@@ -2654,14 +2266,11 @@ static struct parser_declaration_t *parse_declarations (struct rpl_parser_t *par
                               " arguments.",
                               parser->log_name, state->source_log_name, (long) state->cursor_line,
                               (long) state->cursor_symbol)
-
-                     parser_declaration_destroy (first_declaration);
-                     parser_destroy_declaration_meta (detached_meta);
                      return NULL;
                  }
 
                  // Create special empty declaration to indicate absence of arguments with successful parse.
-                 first_declaration = parser_declaration_create (state->source_log_name, state->cursor_line);
+                 first_declaration = parser_declaration_new (parser, state->source_log_name, state->cursor_line);
                  first_declaration->declaration.type = interned_void;
                  return first_declaration;
              }
@@ -2669,9 +2278,6 @@ static struct parser_declaration_t *parse_declarations (struct rpl_parser_t *par
              KAN_LOG (rpl_parser, KAN_LOG_ERROR,
                       "[%s:%s] [%ld:%ld]: Encountered unknown expression while reading declaration list.",
                       parser->log_name, state->source_log_name, (long) state->cursor_line, (long) state->cursor_symbol)
-
-             parser_declaration_destroy (first_declaration);
-             parser_destroy_declaration_meta (detached_meta);
              return NULL;
          }
 
@@ -2683,9 +2289,6 @@ static struct parser_declaration_t *parse_declarations (struct rpl_parser_t *par
              KAN_LOG (rpl_parser, KAN_LOG_ERROR,
                       "[%s:%s] [%ld:%ld]: Encountered unknown expression while reading declaration list.",
                       parser->log_name, state->source_log_name, (long) state->cursor_line, (long) state->cursor_symbol)
-
-             parser_declaration_destroy (first_declaration);
-             parser_destroy_declaration_meta (detached_meta);
              return NULL;
          }
          $
@@ -2693,9 +2296,6 @@ static struct parser_declaration_t *parse_declarations (struct rpl_parser_t *par
              KAN_LOG (rpl_parser, KAN_LOG_ERROR,
                       "[%s:%s] [%ld:%ld]: Encountered end of file while reading declaration list.",
                       parser->log_name, state->source_log_name, (long) state->cursor_line, (long) state->cursor_symbol)
-
-             parser_declaration_destroy (first_declaration);
-             parser_destroy_declaration_meta (detached_meta);
              return NULL;
          }
          */
@@ -2710,8 +2310,8 @@ static inline kan_bool_t parse_sampler_setting_flag (struct rpl_parser_t *parser
                                                      kan_bool_t value)
 {
     kan_interned_string_t name = kan_char_sequence_intern (name_begin, name_end);
-    struct parser_setting_list_item_t *item =
-        kan_allocate_batched (rpl_parser_allocation_group, sizeof (struct parser_setting_t));
+    struct parser_setting_list_item_t *item = kan_stack_group_allocator_allocate (
+        &parser->allocator, sizeof (struct parser_setting_list_item_t), _Alignof (struct parser_setting_list_item_t));
 
     item->setting.name = name;
     item->setting.type = KAN_RPL_SETTING_TYPE_FLAG;
@@ -2739,8 +2339,8 @@ static inline kan_bool_t parse_sampler_setting_integer (struct rpl_parser_t *par
                                                         const char *literal_end)
 {
     kan_interned_string_t name = kan_char_sequence_intern (name_begin, name_end);
-    struct parser_setting_list_item_t *item =
-        kan_allocate_batched (rpl_parser_allocation_group, sizeof (struct parser_setting_t));
+    struct parser_setting_list_item_t *item = kan_stack_group_allocator_allocate (
+        &parser->allocator, sizeof (struct parser_setting_list_item_t), _Alignof (struct parser_setting_list_item_t));
 
     item->setting.name = name;
     item->setting.type = KAN_RPL_SETTING_TYPE_INTEGER;
@@ -2787,8 +2387,8 @@ static inline kan_bool_t parse_sampler_setting_floating (struct rpl_parser_t *pa
                                                          const char *literal_end)
 {
     kan_interned_string_t name = kan_char_sequence_intern (name_begin, name_end);
-    struct parser_setting_list_item_t *item =
-        kan_allocate_batched (rpl_parser_allocation_group, sizeof (struct parser_setting_t));
+    struct parser_setting_list_item_t *item = kan_stack_group_allocator_allocate (
+        &parser->allocator, sizeof (struct parser_setting_list_item_t), _Alignof (struct parser_setting_list_item_t));
 
     item->setting.name = name;
     item->setting.type = KAN_RPL_SETTING_TYPE_FLOATING;
@@ -2829,8 +2429,8 @@ static inline kan_bool_t parse_sampler_setting_string (struct rpl_parser_t *pars
                                                        const char *literal_end)
 {
     kan_interned_string_t name = kan_char_sequence_intern (name_begin, name_end);
-    struct parser_setting_list_item_t *item =
-        kan_allocate_batched (rpl_parser_allocation_group, sizeof (struct parser_setting_t));
+    struct parser_setting_list_item_t *item = kan_stack_group_allocator_allocate (
+        &parser->allocator, sizeof (struct parser_setting_list_item_t), _Alignof (struct parser_setting_list_item_t));
 
     item->setting.name = name;
     item->setting.type = KAN_RPL_SETTING_TYPE_STRING;
@@ -2938,28 +2538,20 @@ static kan_bool_t parse_main_sampler (struct rpl_parser_t *parser,
                                       const char *name_begin,
                                       const char *name_end)
 {
-    kan_interned_string_t name = kan_char_sequence_intern (name_begin, name_end);
-    if (!ensure_sampler_name_unique (parser, state, name))
-    {
-        return KAN_FALSE;
-    }
-
-    struct parser_sampler_t *sampler = parser_sampler_create (name, type, state->source_log_name, state->cursor_line);
+    struct parser_sampler_t *sampler = parser_sampler_new (parser, kan_char_sequence_intern (name_begin, name_end),
+                                                           type, state->source_log_name, state->cursor_line);
     sampler->conditional = state->detached_conditional;
     state->detached_conditional = NULL;
 
     if (parse_sampler_settings (parser, state, sampler))
     {
-        kan_hash_storage_update_bucket_count_default (&parser->processing_data.samplers,
-                                                      KAN_RPL_PARSER_SAMPLERS_INITIAL_BUCKETS);
-        kan_hash_storage_add (&parser->processing_data.samplers, &sampler->node);
+        sampler->next = parser->processing_data.first_sampler;
+        parser->processing_data.first_sampler = sampler;
+        ++parser->processing_data.sampler_count;
         return KAN_TRUE;
     }
-    else
-    {
-        parser_sampler_destroy (sampler);
-        return KAN_FALSE;
-    }
+
+    return KAN_FALSE;
 }
 
 static struct parser_expression_tree_node_t *parse_scope (struct rpl_parser_t *parser,
@@ -3036,28 +2628,26 @@ static struct parser_expression_tree_node_t *expect_variable_declaration (struct
         return NULL;
     }
 
-    struct parser_expression_tree_node_t *variable_declaration = parser_expression_tree_node_create (
-        KAN_RPL_EXPRESSION_NODE_TYPE_VARIABLE_DECLARATION, state->source_log_name, state->saved_line);
+    struct parser_expression_tree_node_t *variable_declaration = parser_expression_tree_node_new (
+        parser, KAN_RPL_EXPRESSION_NODE_TYPE_VARIABLE_DECLARATION, state->source_log_name, state->saved_line);
     variable_declaration->variable_declaration.type = type_name;
 
     if (!parse_declarations_finish_item (parser, state, &variable_declaration->variable_declaration))
     {
-        parser_expression_tree_node_destroy (variable_declaration);
         return NULL;
     }
 
     if (*state->cursor == '=')
     {
         ++state->cursor;
-        struct parser_expression_tree_node_t *assignment = parser_expression_tree_node_create (
-            KAN_RPL_EXPRESSION_NODE_TYPE_BINARY_OPERATION, state->source_log_name, state->saved_line);
+        struct parser_expression_tree_node_t *assignment = parser_expression_tree_node_new (
+            parser, KAN_RPL_EXPRESSION_NODE_TYPE_BINARY_OPERATION, state->source_log_name, state->saved_line);
         assignment->binary_operation.binary_operation = KAN_RPL_BINARY_OPERATION_ASSIGN;
         assignment->binary_operation.left_operand_expression = variable_declaration;
         assignment->binary_operation.right_operand_expression = parse_expression (parser, state);
 
         if (!assignment->binary_operation.right_operand_expression)
         {
-            parser_expression_tree_node_destroy (assignment);
             return NULL;
         }
 
@@ -3066,7 +2656,6 @@ static struct parser_expression_tree_node_t *expect_variable_declaration (struct
             KAN_LOG (rpl_parser, KAN_LOG_ERROR,
                      "[%s:%s] [%ld:%ld]: Variable declaration with assignment should be finished with \";\".",
                      parser->log_name, state->source_log_name, (long) state->cursor_line, (long) state->cursor_symbol)
-            parser_expression_tree_node_destroy (assignment);
             return NULL;
         }
 
@@ -3083,7 +2672,6 @@ static struct parser_expression_tree_node_t *expect_variable_declaration (struct
         KAN_LOG (rpl_parser, KAN_LOG_ERROR,
                  "[%s:%s] [%ld:%ld]: Expected either \";\" or \"=\" after variable name in declaration.",
                  parser->log_name, state->source_log_name, (long) state->cursor_line, (long) state->cursor_symbol)
-        parser_expression_tree_node_destroy (variable_declaration);
         return NULL;
     }
 }
@@ -3092,7 +2680,6 @@ static struct parser_expression_tree_node_t *parse_if_after_keyword (struct rpl_
                                                                      struct dynamic_parser_state_t *state)
 {
     struct parser_expression_tree_node_t *condition_expression = parse_expression (parser, state);
-
     if (!condition_expression)
     {
         return NULL;
@@ -3102,19 +2689,17 @@ static struct parser_expression_tree_node_t *parse_if_after_keyword (struct rpl_
     {
         KAN_LOG (rpl_parser, KAN_LOG_ERROR, "[%s:%s] [%ld:%ld]: Expected \")\" after if condition.", parser->log_name,
                  state->source_log_name, (long) state->cursor_line, (long) state->cursor_symbol)
-        parser_expression_tree_node_destroy (condition_expression);
         return NULL;
     }
 
     ++state->cursor;
-    struct parser_expression_tree_node_t *if_expression = parser_expression_tree_node_create (
-        KAN_RPL_EXPRESSION_NODE_TYPE_IF, state->source_log_name, state->cursor_line);
+    struct parser_expression_tree_node_t *if_expression = parser_expression_tree_node_new (
+        parser, KAN_RPL_EXPRESSION_NODE_TYPE_IF, state->source_log_name, state->cursor_line);
     if_expression->if_.condition_expression = condition_expression;
     if_expression->if_.true_expression = expect_scope (parser, state);
 
     if (!if_expression->if_.true_expression)
     {
-        parser_expression_tree_node_destroy (if_expression);
         return NULL;
     }
 
@@ -3130,7 +2715,6 @@ static struct parser_expression_tree_node_t *parse_if_after_keyword (struct rpl_
              if_expression->if_.false_expression = parse_if_after_keyword (parser, state);
              if (!if_expression->if_.false_expression)
              {
-                 parser_expression_tree_node_destroy (if_expression);
                  return NULL;
              }
 
@@ -3142,7 +2726,6 @@ static struct parser_expression_tree_node_t *parse_if_after_keyword (struct rpl_
              if_expression->if_.false_expression = expect_scope (parser, state);
              if (!if_expression->if_.false_expression)
              {
-                 parser_expression_tree_node_destroy (if_expression);
                  return NULL;
              }
 
@@ -3160,20 +2743,18 @@ static struct parser_expression_tree_node_t *parse_if_after_keyword (struct rpl_
 static struct parser_expression_tree_node_t *parse_for_after_keyword (struct rpl_parser_t *parser,
                                                                       struct dynamic_parser_state_t *state)
 {
-    struct parser_expression_tree_node_t *for_expression = parser_expression_tree_node_create (
-        KAN_RPL_EXPRESSION_NODE_TYPE_FOR, state->source_log_name, state->cursor_line);
+    struct parser_expression_tree_node_t *for_expression = parser_expression_tree_node_new (
+        parser, KAN_RPL_EXPRESSION_NODE_TYPE_FOR, state->source_log_name, state->cursor_line);
     for_expression->for_.init_expression = expect_variable_declaration (parser, state);
 
     if (!for_expression->for_.init_expression)
     {
-        parser_expression_tree_node_destroy (for_expression);
         return NULL;
     }
 
     for_expression->for_.condition_expression = parse_expression (parser, state);
     if (!for_expression->for_.condition_expression)
     {
-        parser_expression_tree_node_destroy (for_expression);
         return NULL;
     }
 
@@ -3181,7 +2762,6 @@ static struct parser_expression_tree_node_t *parse_for_after_keyword (struct rpl
     {
         KAN_LOG (rpl_parser, KAN_LOG_ERROR, "[%s:%s] [%ld:%ld]: Expected \";\" after for condition.", parser->log_name,
                  state->source_log_name, (long) state->cursor_line, (long) state->cursor_symbol)
-        parser_expression_tree_node_destroy (for_expression);
         return NULL;
     }
 
@@ -3190,7 +2770,6 @@ static struct parser_expression_tree_node_t *parse_for_after_keyword (struct rpl
 
     if (!for_expression->for_.step_expression)
     {
-        parser_expression_tree_node_destroy (for_expression);
         return NULL;
     }
 
@@ -3198,7 +2777,6 @@ static struct parser_expression_tree_node_t *parse_for_after_keyword (struct rpl
     {
         KAN_LOG (rpl_parser, KAN_LOG_ERROR, "[%s:%s] [%ld:%ld]: Expected \")\" after for step expression.",
                  parser->log_name, state->source_log_name, (long) state->cursor_line, (long) state->cursor_symbol)
-        parser_expression_tree_node_destroy (for_expression);
         return NULL;
     }
 
@@ -3207,7 +2785,6 @@ static struct parser_expression_tree_node_t *parse_for_after_keyword (struct rpl
 
     if (!for_expression->for_.body_expression)
     {
-        parser_expression_tree_node_destroy (for_expression);
         return NULL;
     }
 
@@ -3217,8 +2794,8 @@ static struct parser_expression_tree_node_t *parse_for_after_keyword (struct rpl
 static struct parser_expression_tree_node_t *parse_scope (struct rpl_parser_t *parser,
                                                           struct dynamic_parser_state_t *state)
 {
-    struct parser_expression_tree_node_t *scope_expression = parser_expression_tree_node_create (
-        KAN_RPL_EXPRESSION_NODE_TYPE_SCOPE, state->source_log_name, state->saved_line);
+    struct parser_expression_tree_node_t *scope_expression = parser_expression_tree_node_new (
+        parser, KAN_RPL_EXPRESSION_NODE_TYPE_SCOPE, state->source_log_name, state->saved_line);
     struct parser_expression_list_item_t *last_item = NULL;
 
 #define DOES_NOT_SUPPORT_CONDITIONAL                                                                                   \
@@ -3226,8 +2803,6 @@ static struct parser_expression_tree_node_t *parse_scope (struct rpl_parser_t *p
     {                                                                                                                  \
         KAN_LOG (rpl_parser, KAN_LOG_ERROR, "[%s:%s] [%ld:%ld]: This expression does not support conditional prefix.", \
                  parser->log_name, state->source_log_name, (long) state->cursor_line, (long) state->cursor_symbol)     \
-                                                                                                                       \
-        parser_expression_tree_node_destroy (scope_expression);                                                        \
         return NULL;                                                                                                   \
     }
 
@@ -3237,8 +2812,6 @@ static struct parser_expression_tree_node_t *parse_scope (struct rpl_parser_t *p
         KAN_LOG (rpl_parser, KAN_LOG_ERROR,                                                                            \
                  "[%s:%s] [%ld:%ld]: Encountered expression that is not finished by \";\" as expected.",               \
                  parser->log_name, state->source_log_name, (long) state->cursor_line, (long) state->cursor_symbol)     \
-                                                                                                                       \
-        parser_expression_tree_node_destroy (scope_expression);                                                        \
         return NULL;                                                                                                   \
     }                                                                                                                  \
                                                                                                                        \
@@ -3246,7 +2819,8 @@ static struct parser_expression_tree_node_t *parse_scope (struct rpl_parser_t *p
 
 #define ADD_EXPRESSION(EXPRESSION)                                                                                     \
     struct parser_expression_list_item_t *new_item =                                                                   \
-        kan_allocate_batched (rpl_parser_allocation_group, sizeof (struct parser_expression_list_item_t));             \
+        kan_stack_group_allocator_allocate (&parser->allocator, sizeof (struct parser_expression_list_item_t),         \
+                                            _Alignof (struct parser_expression_list_item_t));                          \
     new_item->next = NULL;                                                                                             \
     new_item->expression = EXPRESSION;                                                                                 \
                                                                                                                        \
@@ -3274,7 +2848,6 @@ static struct parser_expression_tree_node_t *parse_scope (struct rpl_parser_t *p
              state->detached_conditional = parse_detached_conditional (parser, state);
              if (!state->detached_conditional)
              {
-                 parser_expression_tree_node_destroy (scope_expression);
                  return NULL;
              }
 
@@ -3291,11 +2864,11 @@ static struct parser_expression_tree_node_t *parse_scope (struct rpl_parser_t *p
              if (name_begin)
              {
                  struct parser_expression_tree_node_t *return_expression =
-                 parser_expression_tree_node_create (KAN_RPL_EXPRESSION_NODE_TYPE_RETURN, state->source_log_name,
-                                                     state->saved_line);
+                         parser_expression_tree_node_new (parser, KAN_RPL_EXPRESSION_NODE_TYPE_RETURN,
+                                                          state->source_log_name, state->saved_line);
                  return_expression->return_expression =
-                         parser_expression_tree_node_create (KAN_RPL_EXPRESSION_NODE_TYPE_IDENTIFIER,
-                                 state->source_log_name, state->saved_line);
+                         parser_expression_tree_node_new (parser, KAN_RPL_EXPRESSION_NODE_TYPE_IDENTIFIER,
+                                                          state->source_log_name, state->saved_line);
                  return_expression->return_expression->identifier = kan_char_sequence_intern (name_begin, name_end);
 
                  ADD_EXPRESSION (return_expression);
@@ -3310,7 +2883,6 @@ static struct parser_expression_tree_node_t *parse_scope (struct rpl_parser_t *p
 
              if (!declaration)
              {
-                 parser_expression_tree_node_destroy (scope_expression);
                  return NULL;
              }
 
@@ -3323,16 +2895,14 @@ static struct parser_expression_tree_node_t *parse_scope (struct rpl_parser_t *p
              if (state->detached_conditional)
              {
                  struct parser_expression_tree_node_t *expression =
-                     parser_expression_tree_node_create (KAN_RPL_EXPRESSION_NODE_TYPE_CONDITIONAL_SCOPE,
-                                                         state->source_log_name, state->saved_line);
+                     parser_expression_tree_node_new (parser, KAN_RPL_EXPRESSION_NODE_TYPE_CONDITIONAL_SCOPE,
+                                                      state->source_log_name, state->saved_line);
                  expression->conditional_scope.condition_expression = state->detached_conditional;
                  state->detached_conditional = NULL;
                  expression->conditional_scope.body_expression = parse_scope (parser, state);
 
                  if (!expression->conditional_scope.body_expression)
                  {
-                     parser_expression_tree_node_destroy (expression);
-                     parser_expression_tree_node_destroy (scope_expression);
                      return NULL;
                  }
 
@@ -3343,7 +2913,6 @@ static struct parser_expression_tree_node_t *parse_scope (struct rpl_parser_t *p
                  struct parser_expression_tree_node_t *new_scope = parse_scope (parser, state);
                  if (!new_scope)
                  {
-                     parser_expression_tree_node_destroy (scope_expression);
                      return NULL;
                  }
 
@@ -3360,7 +2929,6 @@ static struct parser_expression_tree_node_t *parse_scope (struct rpl_parser_t *p
 
              if (!expression)
              {
-                 parser_expression_tree_node_destroy (scope_expression);
                  return NULL;
              }
 
@@ -3375,7 +2943,6 @@ static struct parser_expression_tree_node_t *parse_scope (struct rpl_parser_t *p
 
              if (!expression)
              {
-                 parser_expression_tree_node_destroy (scope_expression);
                  return NULL;
              }
 
@@ -3390,7 +2957,6 @@ static struct parser_expression_tree_node_t *parse_scope (struct rpl_parser_t *p
 
              if (!condition_expression)
              {
-                 parser_expression_tree_node_destroy (scope_expression);
                  return NULL;
              }
 
@@ -3400,8 +2966,6 @@ static struct parser_expression_tree_node_t *parse_scope (struct rpl_parser_t *p
                           "[%s:%s] [%ld:%ld]: While condition is not finished by \")\" as expected.",
                           parser->log_name, state->source_log_name, (long) state->cursor_line,
                           (long) state->cursor_symbol)
-                 parser_expression_tree_node_destroy (condition_expression);
-                 parser_expression_tree_node_destroy (scope_expression);
                  return NULL;
              }
 
@@ -3410,14 +2974,12 @@ static struct parser_expression_tree_node_t *parse_scope (struct rpl_parser_t *p
 
              if (!body_expression)
              {
-                  parser_expression_tree_node_destroy (condition_expression);
-                  parser_expression_tree_node_destroy (scope_expression);
                   return NULL;
              }
 
              struct parser_expression_tree_node_t *while_expression =
-                 parser_expression_tree_node_create (KAN_RPL_EXPRESSION_NODE_TYPE_WHILE, state->source_log_name,
-                                                     state->saved_line);
+                 parser_expression_tree_node_new (parser, KAN_RPL_EXPRESSION_NODE_TYPE_WHILE, state->source_log_name,
+                                                  state->saved_line);
              while_expression->while_.condition_expression = condition_expression;
              while_expression->while_.body_expression = body_expression;
              ADD_EXPRESSION (while_expression);
@@ -3432,20 +2994,18 @@ static struct parser_expression_tree_node_t *parse_scope (struct rpl_parser_t *p
                           "[%s:%s] [%ld:%ld]: Alias expression must have conditional prefix.",
                           parser->log_name, state->source_log_name, (long) state->cursor_line,
                           (long) state->cursor_symbol)
-                 parser_expression_tree_node_destroy (scope_expression);
                  return NULL;
              }
 
              struct parser_expression_tree_node_t *body_expression = parse_expression (parser, state);
              if (!body_expression)
              {
-                  parser_expression_tree_node_destroy (scope_expression);
                   return NULL;
              }
 
              struct parser_expression_tree_node_t *alias_expression =
-                 parser_expression_tree_node_create (KAN_RPL_EXPRESSION_NODE_TYPE_CONDITIONAL_ALIAS,
-                                                     state->source_log_name, state->saved_line);
+                 parser_expression_tree_node_new (parser, KAN_RPL_EXPRESSION_NODE_TYPE_CONDITIONAL_ALIAS,
+                                                  state->source_log_name, state->saved_line);
              alias_expression->conditional_alias.condition_expression = state->detached_conditional;
              state->detached_conditional = NULL;
              alias_expression->conditional_alias.identifier = kan_char_sequence_intern (name_begin, name_end);
@@ -3458,7 +3018,6 @@ static struct parser_expression_tree_node_t *parse_scope (struct rpl_parser_t *p
                           "[%s:%s] [%ld:%ld]: Alias expression is not finished by \")\" as expected.",
                           parser->log_name, state->source_log_name, (long) state->cursor_line,
                           (long) state->cursor_symbol)
-                 parser_expression_tree_node_destroy (scope_expression);
                  return NULL;
              }
 
@@ -3470,8 +3029,8 @@ static struct parser_expression_tree_node_t *parse_scope (struct rpl_parser_t *p
          {
              DOES_NOT_SUPPORT_CONDITIONAL
              struct parser_expression_tree_node_t *break_expression =
-                 parser_expression_tree_node_create (KAN_RPL_EXPRESSION_NODE_TYPE_BREAK, state->source_log_name,
-                                                     state->saved_line);
+                 parser_expression_tree_node_new (parser, KAN_RPL_EXPRESSION_NODE_TYPE_BREAK, state->source_log_name,
+                                                  state->saved_line);
              ADD_EXPRESSION (break_expression);
              continue;
          }
@@ -3480,8 +3039,8 @@ static struct parser_expression_tree_node_t *parse_scope (struct rpl_parser_t *p
          {
              DOES_NOT_SUPPORT_CONDITIONAL
              struct parser_expression_tree_node_t *continue_expression =
-                 parser_expression_tree_node_create (KAN_RPL_EXPRESSION_NODE_TYPE_CONTINUE, state->source_log_name,
-                                                     state->saved_line);
+                 parser_expression_tree_node_new (parser, KAN_RPL_EXPRESSION_NODE_TYPE_CONTINUE, state->source_log_name,
+                                                  state->saved_line);
              ADD_EXPRESSION (continue_expression);
              continue;
          }
@@ -3490,8 +3049,8 @@ static struct parser_expression_tree_node_t *parse_scope (struct rpl_parser_t *p
          {
              DOES_NOT_SUPPORT_CONDITIONAL
              struct parser_expression_tree_node_t *return_expression =
-                 parser_expression_tree_node_create (KAN_RPL_EXPRESSION_NODE_TYPE_RETURN, state->source_log_name,
-                                                     state->saved_line);
+                 parser_expression_tree_node_new (parser, KAN_RPL_EXPRESSION_NODE_TYPE_RETURN, state->source_log_name,
+                                                  state->saved_line);
              return_expression->return_expression = NULL;
 
              ADD_EXPRESSION (return_expression);
@@ -3505,13 +3064,12 @@ static struct parser_expression_tree_node_t *parse_scope (struct rpl_parser_t *p
              struct parser_expression_tree_node_t *value_expression = parse_expression (parser, state);
              if (!value_expression)
              {
-                  parser_expression_tree_node_destroy (scope_expression);
                   return NULL;
              }
 
              struct parser_expression_tree_node_t *return_expression =
-                 parser_expression_tree_node_create (KAN_RPL_EXPRESSION_NODE_TYPE_RETURN, state->source_log_name,
-                                                     state->saved_line);
+                 parser_expression_tree_node_new (parser, KAN_RPL_EXPRESSION_NODE_TYPE_RETURN, state->source_log_name,
+                                                  state->saved_line);
              return_expression->return_expression = value_expression;
 
              ADD_EXPRESSION (return_expression);
@@ -3528,7 +3086,6 @@ static struct parser_expression_tree_node_t *parse_scope (struct rpl_parser_t *p
 
              if (!next_expression)
              {
-                  parser_expression_tree_node_destroy (scope_expression);
                   return NULL;
              }
 
@@ -3552,7 +3109,6 @@ static struct parser_expression_tree_node_t *parse_scope (struct rpl_parser_t *p
              KAN_LOG (rpl_parser, KAN_LOG_ERROR,
                       "[%s:%s] [%ld:%ld]: Encountered end of file while reading scope block.",
                       parser->log_name, state->source_log_name, (long) state->cursor_line, (long) state->cursor_symbol)
-             parser_expression_tree_node_destroy (scope_expression);
              return NULL;
          }
          */
@@ -3570,39 +3126,29 @@ static kan_bool_t parse_main_function (struct rpl_parser_t *parser,
                                        const char *type_name_begin,
                                        const char *type_name_end)
 {
-    kan_interned_string_t name = kan_char_sequence_intern (name_begin, name_end);
-    kan_interned_string_t type_name = kan_char_sequence_intern (type_name_begin, type_name_end);
+    struct parser_function_t *function = parser_function_new (parser, kan_char_sequence_intern (name_begin, name_end),
+                                                              kan_char_sequence_intern (type_name_begin, type_name_end),
+                                                              state->source_log_name, state->cursor_line);
 
-    if (!ensure_function_name_unique (parser, state, name))
-    {
-        return KAN_FALSE;
-    }
-
-    struct parser_function_t *function =
-        parser_function_create (name, type_name, state->source_log_name, state->cursor_line);
     function->conditional = state->detached_conditional;
     state->detached_conditional = NULL;
     function->first_argument = parse_declarations (parser, state, PARSER_DECLARATION_LIST_TYPE_ARGUMENTS);
 
     if (!function->first_argument)
     {
-        parser_function_destroy (function);
         return KAN_FALSE;
     }
 
     function->body_expression = expect_scope (parser, state);
     if (function->body_expression)
     {
-        kan_hash_storage_update_bucket_count_default (&parser->processing_data.functions,
-                                                      KAN_RPL_PARSER_FUNCTIONS_INITIAL_BUCKETS);
-        kan_hash_storage_add (&parser->processing_data.functions, &function->node);
+        function->next = parser->processing_data.first_function;
+        parser->processing_data.first_function = function;
+        ++parser->processing_data.function_count;
         return KAN_TRUE;
     }
-    else
-    {
-        parser_function_destroy (function);
-        return KAN_FALSE;
-    }
+
+    return KAN_FALSE;
 }
 
 void kan_rpl_expression_node_init (struct kan_rpl_expression_node_t *instance)
@@ -3811,6 +3357,7 @@ kan_rpl_parser_t kan_rpl_parser_create (kan_interned_string_t log_name)
     struct rpl_parser_t *parser = kan_allocate_general (rpl_parser_allocation_group, sizeof (struct rpl_parser_t),
                                                         _Alignof (struct rpl_parser_t));
     parser->log_name = log_name;
+    kan_stack_group_allocator_init (&parser->allocator, rpl_parser_allocation_group, KAN_RPL_PARSER_STACK_GROUP_SIZE);
     parser_processing_data_init (&parser->processing_data);
     return (uint64_t) parser;
 }
@@ -3839,8 +3386,8 @@ kan_bool_t kan_rpl_parser_add_source (kan_rpl_parser_t parser, const char *sourc
 
 static kan_bool_t build_intermediate_options (struct rpl_parser_t *instance, struct kan_rpl_intermediate_t *output)
 {
-    kan_dynamic_array_set_capacity (&output->options, instance->processing_data.options.items.size);
-    struct parser_option_t *source_option = (struct parser_option_t *) instance->processing_data.options.items.first;
+    kan_dynamic_array_set_capacity (&output->options, instance->processing_data.option_count);
+    struct parser_option_t *source_option = instance->processing_data.first_option;
 
     while (source_option)
     {
@@ -3862,7 +3409,7 @@ static kan_bool_t build_intermediate_options (struct rpl_parser_t *instance, str
             break;
         }
 
-        source_option = (struct parser_option_t *) source_option->node.list_node.next;
+        source_option = source_option->next;
     }
 
     return KAN_TRUE;
@@ -4105,9 +3652,8 @@ static kan_bool_t build_intermediate_setting (struct rpl_parser_t *instance,
 
 static kan_bool_t build_intermediate_settings (struct rpl_parser_t *instance, struct kan_rpl_intermediate_t *output)
 {
-    kan_dynamic_array_set_capacity (&output->settings, instance->processing_data.settings.items.size);
-    struct parser_setting_t *source_setting =
-        (struct parser_setting_t *) instance->processing_data.settings.items.first;
+    kan_dynamic_array_set_capacity (&output->settings, instance->processing_data.setting_count);
+    struct parser_setting_t *source_setting = instance->processing_data.first_setting;
     kan_bool_t result = KAN_TRUE;
 
     while (source_setting)
@@ -4121,7 +3667,7 @@ static kan_bool_t build_intermediate_settings (struct rpl_parser_t *instance, st
             result = KAN_FALSE;
         }
 
-        source_setting = (struct parser_setting_t *) source_setting->node.list_node.next;
+        source_setting = source_setting->next;
     }
 
     return result;
@@ -4217,8 +3763,8 @@ static kan_bool_t build_intermediate_declarations (struct rpl_parser_t *instance
 static kan_bool_t build_intermediate_structs (struct rpl_parser_t *instance, struct kan_rpl_intermediate_t *output)
 {
     kan_bool_t result = KAN_TRUE;
-    kan_dynamic_array_set_capacity (&output->structs, instance->processing_data.structs.items.size);
-    struct parser_struct_t *struct_data = (struct parser_struct_t *) instance->processing_data.structs.items.first;
+    kan_dynamic_array_set_capacity (&output->structs, instance->processing_data.struct_count);
+    struct parser_struct_t *struct_data = instance->processing_data.first_struct;
 
     while (struct_data)
     {
@@ -4241,7 +3787,7 @@ static kan_bool_t build_intermediate_structs (struct rpl_parser_t *instance, str
             result = KAN_FALSE;
         }
 
-        struct_data = (struct parser_struct_t *) struct_data->node.list_node.next;
+        struct_data = struct_data->next;
     }
 
     return result;
@@ -4250,8 +3796,8 @@ static kan_bool_t build_intermediate_structs (struct rpl_parser_t *instance, str
 static kan_bool_t build_intermediate_buffers (struct rpl_parser_t *instance, struct kan_rpl_intermediate_t *output)
 {
     kan_bool_t result = KAN_TRUE;
-    kan_dynamic_array_set_capacity (&output->buffers, instance->processing_data.buffers.items.size);
-    struct parser_buffer_t *source_buffer = (struct parser_buffer_t *) instance->processing_data.buffers.items.first;
+    kan_dynamic_array_set_capacity (&output->buffers, instance->processing_data.buffer_count);
+    struct parser_buffer_t *source_buffer = instance->processing_data.first_buffer;
 
     while (source_buffer)
     {
@@ -4275,7 +3821,7 @@ static kan_bool_t build_intermediate_buffers (struct rpl_parser_t *instance, str
             result = KAN_FALSE;
         }
 
-        source_buffer = (struct parser_buffer_t *) source_buffer->node.list_node.next;
+        source_buffer = source_buffer->next;
     }
 
     return result;
@@ -4284,9 +3830,8 @@ static kan_bool_t build_intermediate_buffers (struct rpl_parser_t *instance, str
 static kan_bool_t build_intermediate_samplers (struct rpl_parser_t *instance, struct kan_rpl_intermediate_t *output)
 {
     kan_bool_t result = KAN_TRUE;
-    kan_dynamic_array_set_capacity (&output->samplers, instance->processing_data.samplers.items.size);
-    struct parser_sampler_t *source_sampler =
-        (struct parser_sampler_t *) instance->processing_data.samplers.items.first;
+    kan_dynamic_array_set_capacity (&output->samplers, instance->processing_data.sampler_count);
+    struct parser_sampler_t *source_sampler = instance->processing_data.first_sampler;
 
     while (source_sampler)
     {
@@ -4331,7 +3876,7 @@ static kan_bool_t build_intermediate_samplers (struct rpl_parser_t *instance, st
             result = KAN_FALSE;
         }
 
-        source_sampler = (struct parser_sampler_t *) source_sampler->node.list_node.next;
+        source_sampler = source_sampler->next;
     }
 
     return result;
@@ -4340,8 +3885,8 @@ static kan_bool_t build_intermediate_samplers (struct rpl_parser_t *instance, st
 static kan_bool_t build_intermediate_functions (struct rpl_parser_t *instance, struct kan_rpl_intermediate_t *output)
 {
     kan_bool_t result = KAN_TRUE;
-    kan_dynamic_array_set_capacity (&output->functions, instance->processing_data.functions.items.size);
-    struct parser_function_t *function = (struct parser_function_t *) instance->processing_data.functions.items.first;
+    kan_dynamic_array_set_capacity (&output->functions, instance->processing_data.function_count);
+    struct parser_function_t *function = instance->processing_data.first_function;
 
     while (function)
     {
@@ -4374,7 +3919,7 @@ static kan_bool_t build_intermediate_functions (struct rpl_parser_t *instance, s
             result = KAN_FALSE;
         }
 
-        function = (struct parser_function_t *) function->node.list_node.next;
+        function = function->next;
     }
 
     return result;
@@ -4392,6 +3937,6 @@ kan_bool_t kan_rpl_parser_build_intermediate (kan_rpl_parser_t parser, struct ka
 void kan_rpl_parser_destroy (kan_rpl_parser_t parser)
 {
     struct rpl_parser_t *instance = (struct rpl_parser_t *) parser;
-    parser_processing_data_shutdown (&instance->processing_data);
+    kan_stack_group_allocator_shutdown (&instance->allocator);
     kan_free_general (rpl_parser_allocation_group, instance, sizeof (struct rpl_parser_t));
 }
