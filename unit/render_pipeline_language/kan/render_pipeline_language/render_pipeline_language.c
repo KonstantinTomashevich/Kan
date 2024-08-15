@@ -1,6 +1,9 @@
 #include <stddef.h>
 #include <string.h>
 
+#include <spirv/unified1/GLSL.std.450.h>
+#include <spirv/unified1/spirv.h>
+
 #include <kan/api_common/alignment.h>
 #include <kan/api_common/min_max.h>
 #include <kan/container/hash_storage.h>
@@ -369,7 +372,7 @@ struct inbuilt_vector_type_t
     uint32_t items_count;
     enum kan_rpl_meta_variable_type_t meta_type;
 
-    const char *glsl_name;
+    uint32_t spirv_id;
 };
 
 struct inbuilt_matrix_type_t
@@ -380,7 +383,7 @@ struct inbuilt_matrix_type_t
     uint32_t columns;
     enum kan_rpl_meta_variable_type_t meta_type;
 
-    const char *glsl_name;
+    uint32_t spirv_id;
 };
 
 struct validation_type_info_t
@@ -408,6 +411,90 @@ struct validation_scope_t
     struct kan_rpl_expression_node_t *loop_expression;
 };
 
+enum spirv_fixed_ids_t
+{
+    SPIRV_FIXED_ID_INVALID = 0u,
+
+    SPIRV_FIXED_ID_TYPE_VOID = 1u,
+    SPIRV_FIXED_ID_TYPE_BOOLEAN,
+    SPIRV_FIXED_ID_TYPE_FLOAT,
+    SPIRV_FIXED_ID_TYPE_INTEGER,
+
+    SPIRV_FIXED_ID_TYPE_F2,
+    SPIRV_FIXED_ID_TYPE_F3,
+    SPIRV_FIXED_ID_TYPE_F4,
+
+    SPIRV_FIXED_ID_TYPE_I2,
+    SPIRV_FIXED_ID_TYPE_I3,
+    SPIRV_FIXED_ID_TYPE_I4,
+
+    SPIRV_FIXED_ID_TYPE_F3X3,
+    SPIRV_FIXED_ID_TYPE_F4X4,
+
+    SPIRV_FIXED_ID_GLSL_LIBRARY,
+
+    SPIRV_FIXED_ID_END,
+};
+
+struct spirv_arbitrary_instruction_item_t
+{
+    struct spirv_arbitrary_instruction_item_t *next;
+    uint32_t code[];
+};
+
+struct spirv_arbitrary_instruction_section_t
+{
+    struct spirv_arbitrary_instruction_item_t *first;
+    struct spirv_arbitrary_instruction_item_t *last;
+};
+
+struct spirv_struct_type_t
+{
+    struct spirv_struct_type_t *next;
+    struct kan_rpl_struct_t *struct_data;
+    uint32_t type_id;
+
+    /// \details Invalid ids for fields that aren't allowed by conditionals.
+    uint32_t field_ids[];
+};
+
+struct spirv_buffer_id_t
+{
+    struct spirv_buffer_id_t *next;
+    struct kan_rpl_buffer_t *buffer;
+
+    /// \details Single buffer variable id if collapsed buffer, ids of all fields if unwrapped buffer,
+    ///          filtered out fields have invalid id in this case.
+    uint32_t ids[];
+};
+
+struct spirv_function_id_t
+{
+    struct spirv_function_id_t *next;
+    struct kan_rpl_function_t *function;
+    uint32_t id;
+};
+
+struct spirv_generation_context_t
+{
+    uint32_t current_bound;
+    uint32_t code_word_count;
+    kan_bool_t emit_result;
+    enum kan_rpl_pipeline_stage_t stage;
+
+    struct spirv_struct_type_t *first_struct_id;
+    struct spirv_buffer_id_t *first_buffer_id;
+    struct spirv_function_id_t *first_function_id;
+
+    struct spirv_arbitrary_instruction_section_t debug_section;
+    struct spirv_arbitrary_instruction_section_t annotation_section;
+    struct spirv_arbitrary_instruction_section_t type_section;
+    struct spirv_arbitrary_instruction_section_t global_variable_section;
+    struct spirv_arbitrary_instruction_section_t functions_section;
+
+    struct kan_stack_group_allocator_t temporary_allocator;
+};
+
 static kan_bool_t statics_initialized = KAN_FALSE;
 static kan_allocation_group_t rpl_allocation_group;
 static kan_allocation_group_t rpl_parser_allocation_group;
@@ -417,6 +504,7 @@ static kan_allocation_group_t rpl_meta_allocation_group;
 static kan_allocation_group_t rpl_emission_allocation_group;
 static kan_allocation_group_t rpl_emitter_allocation_group;
 static kan_allocation_group_t rpl_emitter_validation_allocation_group;
+static kan_allocation_group_t rpl_emitter_generation_allocation_group;
 
 static uint64_t unary_operation_priority = 11u;
 
@@ -540,6 +628,8 @@ static inline void ensure_statics_initialized (void)
         rpl_emitter_allocation_group = kan_allocation_group_get_child (rpl_allocation_group, "emitter");
         rpl_emitter_validation_allocation_group =
             kan_allocation_group_get_child (rpl_emitter_allocation_group, "validation");
+        rpl_emitter_generation_allocation_group =
+            kan_allocation_group_get_child (rpl_emitter_allocation_group, "generation");
 
         interned_fill = kan_string_intern ("fill");
         interned_wireframe = kan_string_intern ("wireframe");
@@ -574,7 +664,7 @@ static inline void ensure_statics_initialized (void)
             .item = INBUILT_TYPE_ITEM_FLOAT,
             .items_count = 1u,
             .meta_type = KAN_RPL_META_VARIABLE_TYPE_F1,
-            .glsl_name = "float",
+            .spirv_id = SPIRV_FIXED_ID_TYPE_FLOAT,
         };
 
         type_f2 = (struct inbuilt_vector_type_t) {
@@ -582,7 +672,7 @@ static inline void ensure_statics_initialized (void)
             .item = INBUILT_TYPE_ITEM_FLOAT,
             .items_count = 2u,
             .meta_type = KAN_RPL_META_VARIABLE_TYPE_F2,
-            .glsl_name = "vec2",
+            .spirv_id = SPIRV_FIXED_ID_TYPE_F2,
         };
 
         type_f3 = (struct inbuilt_vector_type_t) {
@@ -590,7 +680,7 @@ static inline void ensure_statics_initialized (void)
             .item = INBUILT_TYPE_ITEM_FLOAT,
             .items_count = 3u,
             .meta_type = KAN_RPL_META_VARIABLE_TYPE_F3,
-            .glsl_name = "vec3",
+            .spirv_id = SPIRV_FIXED_ID_TYPE_F3,
         };
 
         type_f4 = (struct inbuilt_vector_type_t) {
@@ -598,7 +688,7 @@ static inline void ensure_statics_initialized (void)
             .item = INBUILT_TYPE_ITEM_FLOAT,
             .items_count = 4u,
             .meta_type = KAN_RPL_META_VARIABLE_TYPE_F4,
-            .glsl_name = "vec4",
+            .spirv_id = SPIRV_FIXED_ID_TYPE_F4,
         };
 
         type_i1 = (struct inbuilt_vector_type_t) {
@@ -606,7 +696,7 @@ static inline void ensure_statics_initialized (void)
             .item = INBUILT_TYPE_ITEM_INTEGER,
             .items_count = 1u,
             .meta_type = KAN_RPL_META_VARIABLE_TYPE_I1,
-            .glsl_name = "int",
+            .spirv_id = SPIRV_FIXED_ID_TYPE_INTEGER,
         };
 
         type_i2 = (struct inbuilt_vector_type_t) {
@@ -614,7 +704,7 @@ static inline void ensure_statics_initialized (void)
             .item = INBUILT_TYPE_ITEM_INTEGER,
             .items_count = 2u,
             .meta_type = KAN_RPL_META_VARIABLE_TYPE_I2,
-            .glsl_name = "ivec2",
+            .spirv_id = SPIRV_FIXED_ID_TYPE_I2,
         };
 
         type_i3 = (struct inbuilt_vector_type_t) {
@@ -622,7 +712,7 @@ static inline void ensure_statics_initialized (void)
             .item = INBUILT_TYPE_ITEM_INTEGER,
             .items_count = 3u,
             .meta_type = KAN_RPL_META_VARIABLE_TYPE_I3,
-            .glsl_name = "ivec3",
+            .spirv_id = SPIRV_FIXED_ID_TYPE_I3,
         };
 
         type_i4 = (struct inbuilt_vector_type_t) {
@@ -630,7 +720,7 @@ static inline void ensure_statics_initialized (void)
             .item = INBUILT_TYPE_ITEM_INTEGER,
             .items_count = 4u,
             .meta_type = KAN_RPL_META_VARIABLE_TYPE_I4,
-            .glsl_name = "ivec4",
+            .spirv_id = SPIRV_FIXED_ID_TYPE_I4,
         };
 
         type_f3x3 = (struct inbuilt_matrix_type_t) {
@@ -639,7 +729,7 @@ static inline void ensure_statics_initialized (void)
             .rows = 3u,
             .columns = 3u,
             .meta_type = KAN_RPL_META_VARIABLE_TYPE_F3X3,
-            .glsl_name = "mat3",
+            .spirv_id = SPIRV_FIXED_ID_TYPE_F3X3,
         };
 
         type_f4x4 = (struct inbuilt_matrix_type_t) {
@@ -648,7 +738,7 @@ static inline void ensure_statics_initialized (void)
             .rows = 4u,
             .columns = 4u,
             .meta_type = KAN_RPL_META_VARIABLE_TYPE_F4X4,
-            .glsl_name = "mat4",
+            .spirv_id = SPIRV_FIXED_ID_TYPE_F4X4,
         };
 
         statics_initialized = KAN_TRUE;
@@ -3621,9 +3711,27 @@ static struct parser_expression_tree_node_t *parse_scope (struct rpl_parser_t *p
              continue;
          }
 
-         (identifier separator+ identifier separator* (";" | "=")) | (identifier separator* "[")
+         ("return" separator+ @name_begin identifier @name_end separator* ";") |
+         (identifier separator+ identifier separator* (";" | "=")) |
+         (identifier separator* "[")
          {
              DOES_NOT_SUPPORT_CONDITIONAL
+
+             // Parser ad-hoc: "return variable;" looks like a declaration for the parser.
+             if (name_begin)
+             {
+                 struct parser_expression_tree_node_t *return_expression =
+                 parser_expression_tree_node_create (KAN_RPL_EXPRESSION_NODE_TYPE_RETURN, state->source_log_name,
+                                                     state->saved_line);
+                 return_expression->return_expression =
+                         parser_expression_tree_node_create (KAN_RPL_EXPRESSION_NODE_TYPE_IDENTIFIER,
+                                 state->source_log_name, state->saved_line);
+                 return_expression->return_expression->identifier = kan_char_sequence_intern (name_begin, name_end);
+
+                 ADD_EXPRESSION (return_expression);
+                 continue;
+             }
+
              // We've encountered something that definitely looks like part of
              // variable declaration (not a function call of anything else).
              // In this case we restore cursor and read it properly.
@@ -3805,6 +3913,19 @@ static struct parser_expression_tree_node_t *parse_scope (struct rpl_parser_t *p
                  parser_expression_tree_node_create (KAN_RPL_EXPRESSION_NODE_TYPE_CONTINUE, state->source_log_name,
                                                      state->saved_line);
              ADD_EXPRESSION (continue_expression);
+             continue;
+         }
+
+         "return" separator* ";"
+         {
+             DOES_NOT_SUPPORT_CONDITIONAL
+             struct parser_expression_tree_node_t *return_expression =
+                 parser_expression_tree_node_create (KAN_RPL_EXPRESSION_NODE_TYPE_RETURN, state->source_log_name,
+                                                     state->saved_line);
+             return_expression->return_expression = NULL;
+
+             ADD_EXPRESSION (return_expression);
+             CHECK_EXPRESSION_SEMICOLON;
              continue;
          }
 
@@ -4371,7 +4492,7 @@ static kan_bool_t build_intermediate_expression (struct rpl_parser_t *instance,
 
         if (expression->if_.false_expression)
         {
-            BUILD_SUB_EXPRESSION (false_node, 1u, expression->if_.false_expression)
+            BUILD_SUB_EXPRESSION (false_node, 2u, expression->if_.false_expression)
         }
 
         break;
@@ -4422,9 +4543,13 @@ static kan_bool_t build_intermediate_expression (struct rpl_parser_t *instance,
 
     case KAN_RPL_EXPRESSION_NODE_TYPE_RETURN:
     {
-        kan_dynamic_array_set_capacity (&output->children, 1u);
-        output->children.size = 1u;
-        BUILD_SUB_EXPRESSION (node, 0u, expression->return_expression)
+        if (expression->return_expression)
+        {
+            kan_dynamic_array_set_capacity (&output->children, 1u);
+            output->children.size = 1u;
+            BUILD_SUB_EXPRESSION (node, 0u, expression->return_expression)
+        }
+
         break;
     }
     }
@@ -6124,7 +6249,6 @@ static kan_bool_t validate_buffer (struct rpl_emitter_t *instance, struct kan_rp
             break;
 
         case KAN_RPL_BUFFER_TYPE_VERTEX_STAGE_OUTPUT:
-        case KAN_RPL_BUFFER_TYPE_FRAGMENT_STAGE_OUTPUT:
         case KAN_RPL_BUFFER_TYPE_READ_ONLY_STORAGE:
         case KAN_RPL_BUFFER_TYPE_INSTANCED_READ_ONLY_STORAGE:
             break;
@@ -6133,6 +6257,27 @@ static kan_bool_t validate_buffer (struct rpl_emitter_t *instance, struct kan_rp
         case KAN_RPL_BUFFER_TYPE_INSTANCED_UNIFORM:
             if (!validate_declarations_for_16_alignment_compatibility (instance, declaration))
             {
+                validation_result = KAN_FALSE;
+            }
+
+            break;
+
+        case KAN_RPL_BUFFER_TYPE_FRAGMENT_STAGE_OUTPUT:
+            if (declaration->type_name != type_f4.name)
+            {
+                KAN_LOG (rpl_emitter, KAN_LOG_ERROR,
+                         "[%s:%s] [%ld] Declaration \"%s\" has type \"%s\", but fragment outputs can only be f4's.",
+                         instance->log_name, declaration->source_name, (long) declaration->source_line,
+                         declaration->name, declaration->type_name)
+                validation_result = KAN_FALSE;
+            }
+
+            if (declaration->array_sizes.size > 0u)
+            {
+                KAN_LOG (rpl_emitter, KAN_LOG_ERROR,
+                         "[%s:%s] [%ld] Declaration \"%s\" is an array, but fragment outputs can only be f4's.",
+                         instance->log_name, declaration->source_name, (long) declaration->source_line,
+                         declaration->name)
                 validation_result = KAN_FALSE;
             }
 
@@ -7644,32 +7789,127 @@ static kan_bool_t validate_expression (struct rpl_emitter_t *instance,
 
     case KAN_RPL_EXPRESSION_NODE_TYPE_RETURN:
     {
-        if (validate_expression (instance, scope, &((struct kan_rpl_expression_node_t *) expression->children.data)[0u],
-                                 type_output, KAN_TRUE))
+        if (expression->children.size == 1u)
         {
-            if (type_output->type != scope->function->return_type_name)
+            if (validate_expression (instance, scope,
+                                     &((struct kan_rpl_expression_node_t *) expression->children.data)[0u], type_output,
+                                     KAN_TRUE))
             {
-                KAN_LOG (rpl_emitter, KAN_LOG_ERROR,
-                         "[%s:%s] [%ld] Found return with type \"%s\" but function return type is \"%s\".",
-                         instance->log_name, expression->source_name, (long) expression->source_line, type_output->type,
-                         scope->function->return_type_name)
-                return KAN_FALSE;
-            }
-            else if (type_output->array_sizes)
-            {
-                KAN_LOG (rpl_emitter, KAN_LOG_ERROR,
-                         "[%s:%s] [%ld] Found return with array type, which is not supported.", instance->log_name,
-                         expression->source_name, (long) expression->source_line)
-                return KAN_FALSE;
-            }
+                if (type_output->type != scope->function->return_type_name)
+                {
+                    KAN_LOG (rpl_emitter, KAN_LOG_ERROR,
+                             "[%s:%s] [%ld] Found return with type \"%s\" but function return type is \"%s\".",
+                             instance->log_name, expression->source_name, (long) expression->source_line,
+                             type_output->type, scope->function->return_type_name)
+                    return KAN_FALSE;
+                }
+                else if (type_output->array_sizes)
+                {
+                    KAN_LOG (rpl_emitter, KAN_LOG_ERROR,
+                             "[%s:%s] [%ld] Found return with array type, which is not supported.", instance->log_name,
+                             expression->source_name, (long) expression->source_line)
+                    return KAN_FALSE;
+                }
 
-            return KAN_TRUE;
+                return KAN_TRUE;
+            }
+            else
+            {
+                return KAN_FALSE;
+            }
         }
         else
         {
+            if (scope->function->return_type_name == interned_void)
+            {
+                return KAN_TRUE;
+            }
+
+            KAN_LOG (rpl_emitter, KAN_LOG_ERROR, "[%s:%s] [%ld] Found empty return in function that returns values.",
+                     instance->log_name, expression->source_name, (long) expression->source_line)
             return KAN_FALSE;
         }
     }
+    }
+
+    KAN_ASSERT (KAN_FALSE)
+    return KAN_FALSE;
+}
+
+static kan_bool_t validate_ends_with_return (struct rpl_emitter_t *instance,
+                                             struct kan_rpl_expression_node_t *expression)
+{
+    switch (expression->type)
+    {
+    case KAN_RPL_EXPRESSION_NODE_TYPE_NOPE:
+    case KAN_RPL_EXPRESSION_NODE_TYPE_IDENTIFIER:
+    case KAN_RPL_EXPRESSION_NODE_TYPE_INTEGER_LITERAL:
+    case KAN_RPL_EXPRESSION_NODE_TYPE_FLOATING_LITERAL:
+    case KAN_RPL_EXPRESSION_NODE_TYPE_VARIABLE_DECLARATION:
+    case KAN_RPL_EXPRESSION_NODE_TYPE_BINARY_OPERATION:
+    case KAN_RPL_EXPRESSION_NODE_TYPE_UNARY_OPERATION:
+    case KAN_RPL_EXPRESSION_NODE_TYPE_FUNCTION_CALL:
+    case KAN_RPL_EXPRESSION_NODE_TYPE_CONSTRUCTOR:
+    case KAN_RPL_EXPRESSION_NODE_TYPE_CONDITIONAL_SCOPE:
+    case KAN_RPL_EXPRESSION_NODE_TYPE_CONDITIONAL_ALIAS:
+    case KAN_RPL_EXPRESSION_NODE_TYPE_BREAK:
+    case KAN_RPL_EXPRESSION_NODE_TYPE_CONTINUE:
+        KAN_LOG (rpl_emitter, KAN_LOG_ERROR,
+                 "[%s:%s] [%ld] Expected return after this line as it seems to be the last in execution graph.",
+                 instance->log_name, expression->source_name, (long) expression->source_line)
+        return KAN_FALSE;
+
+    case KAN_RPL_EXPRESSION_NODE_TYPE_SCOPE:
+        if (expression->children.size == 0u)
+        {
+            KAN_LOG (rpl_emitter, KAN_LOG_ERROR,
+                     "[%s:%s] [%ld] Expected return after this line as it seems to be the last in execution graph.",
+                     instance->log_name, expression->source_name, (long) expression->source_line)
+            return KAN_FALSE;
+        }
+
+        return validate_ends_with_return (
+            instance,
+            &((struct kan_rpl_expression_node_t *) expression->children.data)[expression->children.size - 1u]);
+
+    case KAN_RPL_EXPRESSION_NODE_TYPE_IF:
+    {
+        if (expression->children.size == 3u)
+        {
+            kan_bool_t both_valid = KAN_TRUE;
+            if (!validate_ends_with_return (instance,
+                                            &((struct kan_rpl_expression_node_t *) expression->children.data)[1u]))
+            {
+                both_valid = KAN_FALSE;
+            }
+
+            if (!validate_ends_with_return (instance,
+                                            &((struct kan_rpl_expression_node_t *) expression->children.data)[2u]))
+            {
+                both_valid = KAN_FALSE;
+            }
+
+            return both_valid;
+        }
+        else
+        {
+            KAN_LOG (rpl_emitter, KAN_LOG_ERROR,
+                     "[%s:%s] [%ld] Expected return after this \"if\" as it is the last block in execution graph.",
+                     instance->log_name, expression->source_name, (long) expression->source_line)
+            return KAN_FALSE;
+        }
+    }
+
+    case KAN_RPL_EXPRESSION_NODE_TYPE_FOR:
+        return validate_ends_with_return (instance,
+                                          &((struct kan_rpl_expression_node_t *) expression->children.data)[3u]);
+
+    case KAN_RPL_EXPRESSION_NODE_TYPE_WHILE:
+        return validate_ends_with_return (instance,
+                                          &((struct kan_rpl_expression_node_t *) expression->children.data)[1u]);
+
+    case KAN_RPL_EXPRESSION_NODE_TYPE_RETURN:
+        return KAN_TRUE;
     }
 
     KAN_ASSERT (KAN_FALSE)
@@ -7729,8 +7969,15 @@ static kan_bool_t validate_function (struct rpl_emitter_t *instance, struct kan_
         validation_result = KAN_FALSE;
     }
 
+    if (function->return_type_name != interned_void)
+    {
+        if (!validate_ends_with_return (instance, &function->body))
+        {
+            validation_result = KAN_FALSE;
+        }
+    }
+
     validation_scope_clean_variables (&scope);
-    // Path for improvement: existence of return statement on all execution paths is not yet validated.
     return validation_result;
 }
 
@@ -8154,10 +8401,23 @@ kan_bool_t kan_rpl_emitter_emit_meta (kan_rpl_emitter_t emitter, struct kan_rpl_
         struct kan_rpl_buffer_t *buffer =
             &((struct kan_rpl_buffer_t *) instance->intermediate->buffers.data)[buffer_index];
 
-        if (buffer->type == KAN_RPL_BUFFER_TYPE_VERTEX_STAGE_OUTPUT ||
-            buffer->type == KAN_RPL_BUFFER_TYPE_FRAGMENT_STAGE_OUTPUT ||
-            evaluate_conditional (instance, &buffer->conditional, KAN_TRUE) != CONDITIONAL_EVALUATION_RESULT_TRUE)
+        if (buffer->type == KAN_RPL_BUFFER_TYPE_VERTEX_STAGE_OUTPUT)
         {
+            continue;
+        }
+
+        if (evaluate_conditional (instance, &buffer->conditional, KAN_TRUE) != CONDITIONAL_EVALUATION_RESULT_TRUE)
+        {
+            continue;
+        }
+
+        if (buffer->type == KAN_RPL_BUFFER_TYPE_FRAGMENT_STAGE_OUTPUT)
+        {
+            if (instance->pipeline_type == KAN_RPL_PIPELINE_TYPE_GRAPHICS_CLASSIC)
+            {
+                meta_output->graphics_classic_settings.fragment_output_count += buffer->fields.size;
+            }
+
             continue;
         }
 
@@ -8228,199 +8488,258 @@ kan_bool_t kan_rpl_emitter_emit_meta (kan_rpl_emitter_t emitter, struct kan_rpl_
     return KAN_TRUE;
 }
 
-static inline void emit_code_output_string (struct kan_dynamic_array_t *code_output, const char *code)
+static inline uint32_t *spirv_new_instruction (struct spirv_generation_context_t *context,
+                                               struct spirv_arbitrary_instruction_section_t *section,
+                                               uint32_t word_count)
 {
-    const uint64_t length = strlen (code);
-    if (code_output->size + length > code_output->capacity)
+    struct spirv_arbitrary_instruction_item_t *item = kan_stack_group_allocator_allocate (
+        &context->temporary_allocator,
+        sizeof (struct spirv_arbitrary_instruction_item_t) + sizeof (uint32_t) * word_count,
+        _Alignof (struct spirv_arbitrary_instruction_item_t));
+
+    item->next = NULL;
+    item->code[0u] = word_count << SpvWordCountShift;
+    ;
+
+    if (section->last)
     {
-        kan_dynamic_array_set_capacity (code_output, KAN_MAX (code_output->size + length, code_output->size * 2u));
+        section->last->next = item;
+        section->last = item;
+    }
+    else
+    {
+        section->first = item;
+        section->last = item;
     }
 
-    memcpy (((char *) code_output->data) + code_output->size, code, length);
-    code_output->size += length;
+    context->code_word_count += word_count;
+    return item->code;
 }
 
-static inline void emit_code_output_unsigned (struct kan_dynamic_array_t *code_output, uint64_t value)
+static inline uint32_t spirv_to_word_length (uint32_t length)
 {
-    char value_buffer[32u];
-    snprintf (value_buffer, 32u, "%llu", (unsigned long long) value);
-    emit_code_output_string (code_output, value_buffer);
+    return (length + 1u) % sizeof (uint32_t) == 0u ? (length + 1u) / sizeof (uint32_t) :
+                                                     1u + (length + 1u) / sizeof (uint32_t);
 }
 
-static inline void emit_code_glsl_internal_declarations (struct rpl_emitter_t *instance,
-                                                         struct kan_dynamic_array_t *declarations,
-                                                         struct kan_dynamic_array_t *code_output)
+static inline void spirv_generate_op_name (struct spirv_generation_context_t *context,
+                                           uint32_t for_id,
+                                           const char *name)
 {
-    for (uint64_t declaration_index = 0u; declaration_index < declarations->size; ++declaration_index)
+    const uint32_t length = (uint32_t) strlen (name);
+    const uint32_t word_length = spirv_to_word_length (length);
+    uint32_t *code = spirv_new_instruction (context, &context->debug_section, 2u + word_length);
+    code[0u] |= SpvOpCodeMask & SpvOpName;
+    code[1u] = for_id;
+    code[1u + word_length] = 0u;
+    memcpy ((uint8_t *) (code + 2u), name, length);
+}
+
+static void spirv_generate_standard_types (struct spirv_generation_context_t *context)
+{
+    spirv_generate_op_name (context, SPIRV_FIXED_ID_TYPE_VOID, "void");
+    spirv_generate_op_name (context, SPIRV_FIXED_ID_TYPE_BOOLEAN, "bool");
+    spirv_generate_op_name (context, SPIRV_FIXED_ID_TYPE_FLOAT, "f1");
+    spirv_generate_op_name (context, SPIRV_FIXED_ID_TYPE_INTEGER, "i1");
+    spirv_generate_op_name (context, SPIRV_FIXED_ID_TYPE_F2, "f2");
+    spirv_generate_op_name (context, SPIRV_FIXED_ID_TYPE_F3, "f3");
+    spirv_generate_op_name (context, SPIRV_FIXED_ID_TYPE_F4, "f4");
+    spirv_generate_op_name (context, SPIRV_FIXED_ID_TYPE_I2, "i2");
+    spirv_generate_op_name (context, SPIRV_FIXED_ID_TYPE_I3, "i3");
+    spirv_generate_op_name (context, SPIRV_FIXED_ID_TYPE_I4, "i4");
+    spirv_generate_op_name (context, SPIRV_FIXED_ID_TYPE_F3X3, "f3x3");
+    spirv_generate_op_name (context, SPIRV_FIXED_ID_TYPE_F4X4, "f4x4");
+
+    uint32_t *code = spirv_new_instruction (context, &context->type_section, 2u);
+    code[0u] |= SpvOpCodeMask & SpvOpTypeVoid;
+    code[1u] = SPIRV_FIXED_ID_TYPE_VOID;
+
+    code = spirv_new_instruction (context, &context->type_section, 2u);
+    code[0u] |= SpvOpCodeMask & SpvOpTypeBool;
+    code[1u] = SPIRV_FIXED_ID_TYPE_BOOLEAN;
+
+    code = spirv_new_instruction (context, &context->type_section, 3u);
+    code[0u] |= SpvOpCodeMask & SpvOpTypeFloat;
+    code[1u] = SPIRV_FIXED_ID_TYPE_FLOAT;
+    code[2u] = 32u;
+
+    code = spirv_new_instruction (context, &context->type_section, 4u);
+    code[0u] |= SpvOpCodeMask & SpvOpTypeInt;
+    code[1u] = SPIRV_FIXED_ID_TYPE_INTEGER;
+    code[2u] = 32u;
+    code[3u] = 1u; // Signed.
+
+    code = spirv_new_instruction (context, &context->type_section, 4u);
+    code[0u] |= SpvOpCodeMask & SpvOpTypeVector;
+    code[1u] = SPIRV_FIXED_ID_TYPE_F2;
+    code[2u] = SPIRV_FIXED_ID_TYPE_FLOAT;
+    code[3u] = 2u;
+
+    code = spirv_new_instruction (context, &context->type_section, 4u);
+    code[0u] |= SpvOpCodeMask & SpvOpTypeVector;
+    code[1u] = SPIRV_FIXED_ID_TYPE_F3;
+    code[2u] = SPIRV_FIXED_ID_TYPE_FLOAT;
+    code[3u] = 3u;
+
+    code = spirv_new_instruction (context, &context->type_section, 4u);
+    code[0u] |= SpvOpCodeMask & SpvOpTypeVector;
+    code[1u] = SPIRV_FIXED_ID_TYPE_F4;
+    code[2u] = SPIRV_FIXED_ID_TYPE_FLOAT;
+    code[3u] = 4u;
+
+    code = spirv_new_instruction (context, &context->type_section, 4u);
+    code[0u] |= SpvOpCodeMask & SpvOpTypeVector;
+    code[1u] = SPIRV_FIXED_ID_TYPE_I2;
+    code[2u] = SPIRV_FIXED_ID_TYPE_INTEGER;
+    code[3u] = 2u;
+
+    code = spirv_new_instruction (context, &context->type_section, 4u);
+    code[0u] |= SpvOpCodeMask & SpvOpTypeVector;
+    code[1u] = SPIRV_FIXED_ID_TYPE_I3;
+    code[2u] = SPIRV_FIXED_ID_TYPE_INTEGER;
+    code[3u] = 3u;
+
+    code = spirv_new_instruction (context, &context->type_section, 4u);
+    code[0u] |= SpvOpCodeMask & SpvOpTypeVector;
+    code[1u] = SPIRV_FIXED_ID_TYPE_I4;
+    code[2u] = SPIRV_FIXED_ID_TYPE_INTEGER;
+    code[3u] = 4u;
+
+    code = spirv_new_instruction (context, &context->type_section, 4u);
+    code[0u] |= SpvOpCodeMask & SpvOpTypeMatrix;
+    code[1u] = SPIRV_FIXED_ID_TYPE_F3X3;
+    code[2u] = SPIRV_FIXED_ID_TYPE_F3;
+    code[3u] = 3u;
+
+    code = spirv_new_instruction (context, &context->type_section, 4u);
+    code[0u] |= SpvOpCodeMask & SpvOpTypeMatrix;
+    code[1u] = SPIRV_FIXED_ID_TYPE_F4X4;
+    code[2u] = SPIRV_FIXED_ID_TYPE_F4;
+    code[3u] = 4u;
+}
+
+static void spirv_init_generation_context (struct spirv_generation_context_t *context,
+                                           enum kan_rpl_pipeline_stage_t stage)
+{
+    context->current_bound = (uint32_t) SPIRV_FIXED_ID_END;
+    context->code_word_count = 0u;
+    context->emit_result = KAN_TRUE;
+    context->stage = stage;
+
+    context->first_struct_id = NULL;
+    context->first_buffer_id = NULL;
+    context->first_function_id = NULL;
+
+    context->debug_section.first = NULL;
+    context->debug_section.last = NULL;
+    context->annotation_section.first = NULL;
+    context->annotation_section.last = NULL;
+    context->type_section.first = NULL;
+    context->type_section.last = NULL;
+    context->global_variable_section.first = NULL;
+    context->global_variable_section.last = NULL;
+    context->functions_section.first = NULL;
+    context->functions_section.last = NULL;
+
+    kan_stack_group_allocator_init (&context->temporary_allocator, rpl_emitter_generation_allocation_group,
+                                    KAN_RPL_PARSER_SPIRV_GENERATION_TEMPORARY_SIZE);
+
+    spirv_generate_standard_types (context);
+}
+
+static inline void spirv_copy_instructions (uint32_t **output,
+                                            struct spirv_arbitrary_instruction_item_t *instruction_item)
+{
+    while (instruction_item)
     {
-        struct kan_rpl_declaration_t *declaration =
-            &((struct kan_rpl_declaration_t *) declarations->data)[declaration_index];
-
-        // We don't care about whether instance options are allowed as we should've validated it already.
-        if (evaluate_conditional (instance, &declaration->conditional, KAN_TRUE) != CONDITIONAL_EVALUATION_RESULT_TRUE)
-        {
-            continue;
-        }
-
-        emit_code_output_string (code_output, "    ");
-        struct inbuilt_vector_type_t *vector_type;
-        struct inbuilt_matrix_type_t *matrix_type;
-
-        if ((vector_type = find_inbuilt_vector_type (declaration->type_name)))
-        {
-            emit_code_output_string (code_output, vector_type->glsl_name);
-        }
-        else if ((matrix_type = find_inbuilt_matrix_type (declaration->type_name)))
-        {
-            emit_code_output_string (code_output, matrix_type->glsl_name);
-        }
-        else
-        {
-            emit_code_output_string (code_output, declaration->type_name);
-        }
-
-        emit_code_output_string (code_output, " ");
-        emit_code_output_string (code_output, declaration->name);
-
-        for (uint64_t dimension = 0u; dimension < declaration->array_sizes.size; ++dimension)
-        {
-            struct kan_rpl_expression_node_t *node =
-                &((struct kan_rpl_expression_node_t *) declaration->array_sizes.data)[dimension];
-            struct compile_time_evaluation_value_t value = evaluate_compile_time_expression (instance, node, KAN_FALSE);
-
-            if (value.type == CONDITIONAL_EVALUATION_VALUE_TYPE_INTEGER)
-            {
-                emit_code_output_string (code_output, "[");
-                emit_code_output_unsigned (code_output, (uint64_t) value.integer_value);
-                emit_code_output_string (code_output, "]");
-            }
-        }
-
-        emit_code_output_string (code_output, ";\n");
+        const uint32_t word_count = (*instruction_item->code & ~SpvOpCodeMask) >> SpvWordCountShift;
+        memcpy (*output, instruction_item->code, word_count * sizeof (uint32_t));
+        *output += word_count;
+        instruction_item = instruction_item->next;
     }
 }
 
-kan_bool_t kan_rpl_emitter_emit_code_glsl (kan_rpl_emitter_t emitter,
-                                           enum kan_rpl_pipeline_stage_t stage,
-                                           struct kan_dynamic_array_t *code_output)
+static kan_bool_t spirv_finalize_generation_context (struct spirv_generation_context_t *context,
+                                                     struct rpl_emitter_t *instance,
+                                                     kan_interned_string_t entry_function_name,
+                                                     struct kan_dynamic_array_t *code_output)
+{
+    struct spirv_arbitrary_instruction_section_t base_section;
+    base_section.first = NULL;
+    base_section.last = NULL;
+
+    switch (instance->pipeline_type)
+    {
+    case KAN_RPL_PIPELINE_TYPE_GRAPHICS_CLASSIC:
+    {
+        uint32_t *op_shader_capability = spirv_new_instruction (context, &base_section, 2u);
+        *op_shader_capability |= SpvOpCodeMask & SpvOpCapability;
+        *(op_shader_capability + 1u) = SpvCapabilityShader;
+        break;
+    }
+    }
+
+    static const char glsl_library_padded[] = "GLSL.std.450\0\0\0";
+    _Static_assert (sizeof (glsl_library_padded) % sizeof (uint32_t) == 0u, "GLSL library name is really padded.");
+    uint32_t *op_glsl_import =
+        spirv_new_instruction (context, &base_section, 2u + sizeof (glsl_library_padded) / sizeof (uint32_t));
+    op_glsl_import[0u] |= SpvOpCodeMask & SpvOpExtInstImport;
+    op_glsl_import[1u] = (uint32_t) SPIRV_FIXED_ID_GLSL_LIBRARY;
+    memcpy (&op_glsl_import[2u], glsl_library_padded, sizeof (glsl_library_padded));
+
+    switch (instance->pipeline_type)
+    {
+    case KAN_RPL_PIPELINE_TYPE_GRAPHICS_CLASSIC:
+    {
+        uint32_t *op_memory_model = spirv_new_instruction (context, &base_section, 3u);
+        op_memory_model[0u] |= SpvOpCodeMask & SpvOpMemoryModel;
+        op_memory_model[1u] = SpvAddressingModelLogical;
+        op_memory_model[2u] = SpvMemoryModelGLSL450;
+        break;
+    }
+    }
+
+    // TODO: Generate entry point.
+
+    kan_dynamic_array_set_capacity (code_output, (uint64_t) (5u + context->code_word_count) * sizeof (uint32_t));
+    code_output->size = code_output->capacity;
+
+    uint32_t *output = (uint32_t *) code_output->data;
+    output[0u] = SpvMagicNumber;
+    output[1u] = SpvVersion;
+    output[2u] = 0u;
+    output[3u] = context->current_bound;
+    output[4u] = 0u;
+    output += 5u;
+
+    spirv_copy_instructions (&output, base_section.first);
+    spirv_copy_instructions (&output, context->debug_section.first);
+    spirv_copy_instructions (&output, context->annotation_section.first);
+    spirv_copy_instructions (&output, context->type_section.first);
+    spirv_copy_instructions (&output, context->global_variable_section.first);
+    spirv_copy_instructions (&output, context->functions_section.first);
+
+    kan_stack_group_allocator_shutdown (&context->temporary_allocator);
+    return context->emit_result;
+}
+
+kan_bool_t kan_rpl_emitter_emit_code_spirv (kan_rpl_emitter_t emitter,
+                                            kan_interned_string_t entry_function_name,
+                                            enum kan_rpl_pipeline_stage_t stage,
+                                            struct kan_dynamic_array_t *code_output)
 {
     struct rpl_emitter_t *instance = (struct rpl_emitter_t *) emitter;
-    for (uint64_t struct_index = 0u; struct_index < instance->intermediate->structs.size; ++struct_index)
-    {
-        struct kan_rpl_struct_t *struct_data =
-            &((struct kan_rpl_struct_t *) instance->intermediate->structs.data)[struct_index];
+    struct spirv_generation_context_t context;
+    spirv_init_generation_context (&context, stage);
 
-        // We don't care about whether instance options are allowed as we should've validated it already.
-        if (evaluate_conditional (instance, &struct_data->conditional, KAN_TRUE) != CONDITIONAL_EVALUATION_RESULT_TRUE)
-        {
-            continue;
-        }
+    // TODO: Scan for used functions and only generated used functions, used buffers and used structs.
 
-        emit_code_output_string (code_output, "struct ");
-        emit_code_output_string (code_output, struct_data->name);
-        emit_code_output_string (code_output, "\n{\n");
-        emit_code_glsl_internal_declarations (instance, &struct_data->fields, code_output);
-        emit_code_output_string (code_output, "};\n\n");
-    }
-
-    uint64_t data_buffer_binding_index = 0u;
-    for (uint64_t buffer_index = 0u; buffer_index < instance->intermediate->buffers.size; ++buffer_index)
-    {
-        struct kan_rpl_buffer_t *buffer =
-            &((struct kan_rpl_buffer_t *) instance->intermediate->buffers.data)[buffer_index];
-
-        // We don't care about whether instance options are allowed as we should've validated it already.
-        if (evaluate_conditional (instance, &buffer->conditional, KAN_TRUE) != CONDITIONAL_EVALUATION_RESULT_TRUE)
-        {
-            continue;
-        }
-
-        switch (buffer->type)
-        {
-        case KAN_RPL_BUFFER_TYPE_VERTEX_ATTRIBUTE:
-            // TODO: Implement.
-            break;
-
-        case KAN_RPL_BUFFER_TYPE_UNIFORM:
-            emit_code_output_string (code_output, "layout (std140, binding = ");
-            emit_code_output_unsigned (code_output, data_buffer_binding_index);
-            ++data_buffer_binding_index;
-            emit_code_output_string (code_output, ") uniform _type_");
-            emit_code_output_string (code_output, buffer->name);
-            emit_code_output_string (code_output, "\n{\n");
-            emit_code_glsl_internal_declarations (instance, &buffer->fields, code_output);
-            emit_code_output_string (code_output, "} ");
-            emit_code_output_string (code_output, buffer->name);
-            emit_code_output_string (code_output, ";\n\n");
-            break;
-
-        case KAN_RPL_BUFFER_TYPE_READ_ONLY_STORAGE:
-            emit_code_output_string (code_output, "layout (std430, binding = ");
-            emit_code_output_unsigned (code_output, data_buffer_binding_index);
-            ++data_buffer_binding_index;
-            emit_code_output_string (code_output, ") buffer _type_");
-            emit_code_output_string (code_output, buffer->name);
-            emit_code_output_string (code_output, "\n{\n");
-            emit_code_glsl_internal_declarations (instance, &buffer->fields, code_output);
-            emit_code_output_string (code_output, "} ");
-            emit_code_output_string (code_output, buffer->name);
-            emit_code_output_string (code_output, ";\n\n");
-            break;
-
-        case KAN_RPL_BUFFER_TYPE_INSTANCED_ATTRIBUTE:
-            // TODO: Implement.
-            break;
-
-        case KAN_RPL_BUFFER_TYPE_INSTANCED_UNIFORM:
-            emit_code_output_string (code_output, "struct _struct_type_");
-            emit_code_output_string (code_output, buffer->name);
-            emit_code_output_string (code_output, "\n{\n");
-            emit_code_glsl_internal_declarations (instance, &buffer->fields, code_output);
-            emit_code_output_string (code_output, "};\n\n");
-
-            emit_code_output_string (code_output, "layout (std140, binding = ");
-            emit_code_output_unsigned (code_output, data_buffer_binding_index);
-            ++data_buffer_binding_index;
-            emit_code_output_string (code_output, ") uniform _type_");
-            emit_code_output_string (code_output, buffer->name);
-            emit_code_output_string (code_output, "\n{\n    _struct_type_");
-            emit_code_output_string (code_output, buffer->name);
-            emit_code_output_string (code_output, "    data[];\n} ");
-            emit_code_output_string (code_output, buffer->name);
-            emit_code_output_string (code_output, ";\n\n");
-            break;
-
-        case KAN_RPL_BUFFER_TYPE_INSTANCED_READ_ONLY_STORAGE:
-            emit_code_output_string (code_output, "struct _struct_type_");
-            emit_code_output_string (code_output, buffer->name);
-            emit_code_output_string (code_output, "\n{\n");
-            emit_code_glsl_internal_declarations (instance, &buffer->fields, code_output);
-            emit_code_output_string (code_output, "};\n\n");
-
-            emit_code_output_string (code_output, "layout (std430, binding = ");
-            emit_code_output_unsigned (code_output, data_buffer_binding_index);
-            ++data_buffer_binding_index;
-            emit_code_output_string (code_output, ") buffer _type_");
-            emit_code_output_string (code_output, buffer->name);
-            emit_code_output_string (code_output, "\n{\n    _struct_type_");
-            emit_code_output_string (code_output, buffer->name);
-            emit_code_output_string (code_output, " data[];\n} ");
-            emit_code_output_string (code_output, buffer->name);
-            emit_code_output_string (code_output, ";\n\n");
-            break;
-
-        case KAN_RPL_BUFFER_TYPE_VERTEX_STAGE_OUTPUT:
-            // TODO: Implement.
-            break;
-
-        case KAN_RPL_BUFFER_TYPE_FRAGMENT_STAGE_OUTPUT:
-            // TODO: Implement.
-            break;
-        }
-    }
+    // TODO: While generating buffer variables, iteration should still be done on all buffers in order
+    //       to correctly generated bindings and locations.
 
     // TODO: Implement.
-    return KAN_TRUE;
+
+    return spirv_finalize_generation_context (&context, instance, entry_function_name, code_output);
 }
 
 void kan_rpl_emitter_destroy (kan_rpl_emitter_t emitter)

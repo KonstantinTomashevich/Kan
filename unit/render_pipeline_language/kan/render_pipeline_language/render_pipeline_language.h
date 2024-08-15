@@ -385,6 +385,8 @@ struct kan_rpl_graphics_classic_pipeline_settings_t
 
     kan_bool_t depth_test;
     kan_bool_t depth_write;
+
+    uint64_t fragment_output_count;
 };
 
 static inline struct kan_rpl_graphics_classic_pipeline_settings_t kan_rpl_graphics_classic_pipeline_settings_default (
@@ -395,6 +397,7 @@ static inline struct kan_rpl_graphics_classic_pipeline_settings_t kan_rpl_graphi
         .cull_mode = KAN_RPL_CULL_MODE_BACK,
         .depth_test = KAN_TRUE,
         .depth_write = KAN_TRUE,
+        .fragment_output_count = 0u,
     };
 }
 
@@ -576,9 +579,10 @@ RENDER_PIPELINE_LANGUAGE_API kan_bool_t kan_rpl_emitter_validate (kan_rpl_emitte
 RENDER_PIPELINE_LANGUAGE_API kan_bool_t kan_rpl_emitter_emit_meta (kan_rpl_emitter_t emitter,
                                                                    struct kan_rpl_meta_t *meta_output);
 
-RENDER_PIPELINE_LANGUAGE_API kan_bool_t kan_rpl_emitter_emit_code_glsl (kan_rpl_emitter_t emitter,
-                                                                        enum kan_rpl_pipeline_stage_t stage,
-                                                                        struct kan_dynamic_array_t *code_output);
+RENDER_PIPELINE_LANGUAGE_API kan_bool_t kan_rpl_emitter_emit_code_spirv (kan_rpl_emitter_t emitter,
+                                                                         kan_interned_string_t entry_function_name,
+                                                                         enum kan_rpl_pipeline_stage_t stage,
+                                                                         struct kan_dynamic_array_t *code_output);
 
 RENDER_PIPELINE_LANGUAGE_API void kan_rpl_emitter_destroy (kan_rpl_emitter_t emitter);
 

@@ -14,6 +14,9 @@ set (SDL_SHARED ON CACHE BOOL "We use double-set with cache to override third pa
 set (SDL_SHARED ON)
 add_subdirectory (SDL)
 
+# SPIRV-Headers
+add_subdirectory (SPIRV-Headers)
+
 # Tracy
 set (TRACY_ON_DEMAND ON)
 add_subdirectory (tracy)
