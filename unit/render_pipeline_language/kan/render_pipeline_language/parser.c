@@ -220,6 +220,7 @@ struct parser_sampler_t
     kan_interned_string_t name;
     enum kan_rpl_sampler_type_t type;
     struct parser_setting_list_item_t *first_setting;
+    struct parser_setting_list_item_t *last_setting;
 
     struct parser_expression_tree_node_t *conditional;
     kan_interned_string_t source_log_name;
@@ -242,21 +243,27 @@ struct parser_function_t
 struct parser_processing_data_t
 {
     struct parser_option_t *first_option;
+    struct parser_option_t *last_option;
     uint64_t option_count;
 
     struct parser_setting_t *first_setting;
+    struct parser_setting_t *last_setting;
     uint64_t setting_count;
 
     struct parser_struct_t *first_struct;
+    struct parser_struct_t *last_struct;
     uint64_t struct_count;
 
     struct parser_buffer_t *first_buffer;
+    struct parser_buffer_t *last_buffer;
     uint64_t buffer_count;
 
     struct parser_sampler_t *first_sampler;
+    struct parser_sampler_t *last_sampler;
     uint64_t sampler_count;
 
     struct parser_function_t *first_function;
+    struct parser_function_t *last_function;
     uint64_t function_count;
 };
 
@@ -535,6 +542,7 @@ static inline struct parser_sampler_t *parser_sampler_new (struct rpl_parser_t *
     instance->name = name;
     instance->type = type;
     instance->first_setting = NULL;
+    instance->last_setting = NULL;
     instance->conditional = NULL;
     instance->source_log_name = source_log_name;
     instance->source_line = source_line;
@@ -563,21 +571,26 @@ static inline struct parser_function_t *parser_function_new (struct rpl_parser_t
 static inline void parser_processing_data_init (struct parser_processing_data_t *instance)
 {
     instance->first_option = NULL;
+    instance->last_option = NULL;
     instance->option_count = 0u;
 
     instance->first_setting = NULL;
+    instance->last_setting = NULL;
     instance->setting_count = 0u;
 
     instance->first_struct = NULL;
+    instance->last_struct = NULL;
     instance->struct_count = 0u;
 
     instance->first_buffer = NULL;
+    instance->last_buffer = NULL;
     instance->buffer_count = 0u;
 
     instance->first_sampler = NULL;
     instance->sampler_count = 0u;
 
     instance->first_function = NULL;
+    instance->last_function = NULL;
     instance->function_count = 0u;
 }
 
@@ -703,8 +716,17 @@ static inline kan_bool_t parse_main_option_flag (struct rpl_parser_t *parser,
     struct parser_option_t *node = kan_stack_group_allocator_allocate (
         &parser->allocator, sizeof (struct parser_option_t), _Alignof (struct parser_option_t));
 
-    node->next = parser->processing_data.first_option;
-    parser->processing_data.first_option = node;
+    node->next = NULL;
+    if (parser->processing_data.last_option)
+    {
+        parser->processing_data.last_option->next = node;
+    }
+    else
+    {
+        parser->processing_data.first_option = node;
+    }
+
+    parser->processing_data.last_option = node;
     ++parser->processing_data.option_count;
 
     node->name = name;
@@ -790,8 +812,17 @@ static inline kan_bool_t parse_main_option_count (struct rpl_parser_t *parser,
     struct parser_option_t *node = kan_stack_group_allocator_allocate (
         &parser->allocator, sizeof (struct parser_option_t), _Alignof (struct parser_option_t));
 
-    node->next = parser->processing_data.first_option;
-    parser->processing_data.first_option = node;
+    node->next = NULL;
+    if (parser->processing_data.last_option)
+    {
+        parser->processing_data.last_option->next = node;
+    }
+    else
+    {
+        parser->processing_data.first_option = node;
+    }
+
+    parser->processing_data.last_option = node;
     ++parser->processing_data.option_count;
 
     node->name = name;
@@ -845,8 +876,17 @@ static inline kan_bool_t parse_main_setting_flag (struct rpl_parser_t *parser,
     struct parser_setting_t *node = kan_stack_group_allocator_allocate (
         &parser->allocator, sizeof (struct parser_setting_t), _Alignof (struct parser_setting_t));
 
-    node->next = parser->processing_data.first_setting;
-    parser->processing_data.first_setting = node;
+    node->next = NULL;
+    if (parser->processing_data.last_setting)
+    {
+        parser->processing_data.last_setting->next = node;
+    }
+    else
+    {
+        parser->processing_data.first_setting = node;
+    }
+
+    parser->processing_data.last_setting = node;
     ++parser->processing_data.setting_count;
 
     node->setting.name = kan_char_sequence_intern (name_begin, name_end);
@@ -871,8 +911,17 @@ static inline kan_bool_t parse_main_setting_integer (struct rpl_parser_t *parser
     struct parser_setting_t *node = kan_stack_group_allocator_allocate (
         &parser->allocator, sizeof (struct parser_setting_t), _Alignof (struct parser_setting_t));
 
-    node->next = parser->processing_data.first_setting;
-    parser->processing_data.first_setting = node;
+    node->next = NULL;
+    if (parser->processing_data.last_setting)
+    {
+        parser->processing_data.last_setting->next = node;
+    }
+    else
+    {
+        parser->processing_data.first_setting = node;
+    }
+
+    parser->processing_data.last_setting = node;
     ++parser->processing_data.setting_count;
 
     node->setting.name = kan_char_sequence_intern (name_begin, name_end);
@@ -917,8 +966,17 @@ static inline kan_bool_t parse_main_setting_floating (struct rpl_parser_t *parse
     struct parser_setting_t *node = kan_stack_group_allocator_allocate (
         &parser->allocator, sizeof (struct parser_setting_t), _Alignof (struct parser_setting_t));
 
-    node->next = parser->processing_data.first_setting;
-    parser->processing_data.first_setting = node;
+    node->next = NULL;
+    if (parser->processing_data.last_setting)
+    {
+        parser->processing_data.last_setting->next = node;
+    }
+    else
+    {
+        parser->processing_data.first_setting = node;
+    }
+
+    parser->processing_data.last_setting = node;
     ++parser->processing_data.setting_count;
 
     node->setting.name = kan_char_sequence_intern (name_begin, name_end);
@@ -956,8 +1014,17 @@ static inline kan_bool_t parse_main_setting_string (struct rpl_parser_t *parser,
     struct parser_setting_t *node = kan_stack_group_allocator_allocate (
         &parser->allocator, sizeof (struct parser_setting_t), _Alignof (struct parser_setting_t));
 
-    node->next = parser->processing_data.first_setting;
-    parser->processing_data.first_setting = node;
+    node->next = NULL;
+    if (parser->processing_data.last_setting)
+    {
+        parser->processing_data.last_setting->next = node;
+    }
+    else
+    {
+        parser->processing_data.first_setting = node;
+    }
+
+    parser->processing_data.last_setting = node;
     ++parser->processing_data.setting_count;
 
     node->setting.name = kan_char_sequence_intern (name_begin, name_end);
@@ -993,8 +1060,17 @@ static inline kan_bool_t parse_main_struct (struct rpl_parser_t *parser,
         return KAN_FALSE;
     }
 
-    new_struct->next = parser->processing_data.first_struct;
-    parser->processing_data.first_struct = new_struct;
+    new_struct->next = NULL;
+    if (parser->processing_data.last_struct)
+    {
+        parser->processing_data.last_struct->next = new_struct;
+    }
+    else
+    {
+        parser->processing_data.first_struct = new_struct;
+    }
+
+    parser->processing_data.last_struct = new_struct;
     ++parser->processing_data.struct_count;
     return KAN_TRUE;
 }
@@ -1017,8 +1093,17 @@ static inline kan_bool_t parse_main_buffer (struct rpl_parser_t *parser,
         return KAN_FALSE;
     }
 
-    new_buffer->next = parser->processing_data.first_buffer;
-    parser->processing_data.first_buffer = new_buffer;
+    new_buffer->next = NULL;
+    if (parser->processing_data.last_buffer)
+    {
+        parser->processing_data.last_buffer->next = new_buffer;
+    }
+    else
+    {
+        parser->processing_data.first_buffer = new_buffer;
+    }
+
+    parser->processing_data.last_buffer = new_buffer;
     ++parser->processing_data.buffer_count;
     return KAN_TRUE;
 }
@@ -2323,10 +2408,17 @@ static inline kan_bool_t parse_sampler_setting_flag (struct rpl_parser_t *parser
     item->setting.source_log_name = state->source_log_name;
     item->setting.source_line = state->cursor_line;
 
-    // We can push to the beginning as order of settings should not matter.
-    item->next = sampler->first_setting;
-    sampler->first_setting = item;
+    item->next = NULL;
+    if (sampler->last_setting)
+    {
+        sampler->last_setting->next = item;
+    }
+    else
+    {
+        sampler->first_setting = item;
+    }
 
+    sampler->last_setting = item;
     return KAN_TRUE;
 }
 
@@ -2371,10 +2463,17 @@ static inline kan_bool_t parse_sampler_setting_integer (struct rpl_parser_t *par
     item->setting.source_log_name = state->source_log_name;
     item->setting.source_line = state->cursor_line;
 
-    // We can push to the beginning as order of settings should not matter.
-    item->next = sampler->first_setting;
-    sampler->first_setting = item;
+    item->next = NULL;
+    if (sampler->last_setting)
+    {
+        sampler->last_setting->next = item;
+    }
+    else
+    {
+        sampler->first_setting = item;
+    }
 
+    sampler->last_setting = item;
     return KAN_TRUE;
 }
 
@@ -2413,10 +2512,17 @@ static inline kan_bool_t parse_sampler_setting_floating (struct rpl_parser_t *pa
     item->setting.source_log_name = state->source_log_name;
     item->setting.source_line = state->cursor_line;
 
-    // We can push to the beginning as order of settings should not matter.
-    item->next = sampler->first_setting;
-    sampler->first_setting = item;
+    item->next = NULL;
+    if (sampler->last_setting)
+    {
+        sampler->last_setting->next = item;
+    }
+    else
+    {
+        sampler->first_setting = item;
+    }
 
+    sampler->last_setting = item;
     return KAN_TRUE;
 }
 
@@ -2442,10 +2548,17 @@ static inline kan_bool_t parse_sampler_setting_string (struct rpl_parser_t *pars
     item->setting.source_log_name = state->source_log_name;
     item->setting.source_line = state->cursor_line;
 
-    // We can push to the beginning as order of settings should not matter.
-    item->next = sampler->first_setting;
-    sampler->first_setting = item;
+    item->next = NULL;
+    if (sampler->last_setting)
+    {
+        sampler->last_setting->next = item;
+    }
+    else
+    {
+        sampler->first_setting = item;
+    }
 
+    sampler->last_setting = item;
     return KAN_TRUE;
 }
 
@@ -2545,8 +2658,17 @@ static kan_bool_t parse_main_sampler (struct rpl_parser_t *parser,
 
     if (parse_sampler_settings (parser, state, sampler))
     {
-        sampler->next = parser->processing_data.first_sampler;
-        parser->processing_data.first_sampler = sampler;
+        sampler->next = NULL;
+        if (parser->processing_data.last_sampler)
+        {
+            parser->processing_data.last_sampler->next = sampler;
+        }
+        else
+        {
+            parser->processing_data.first_sampler = sampler;
+        }
+
+        parser->processing_data.last_sampler = sampler;
         ++parser->processing_data.sampler_count;
         return KAN_TRUE;
     }
@@ -3142,8 +3264,17 @@ static kan_bool_t parse_main_function (struct rpl_parser_t *parser,
     function->body_expression = expect_scope (parser, state);
     if (function->body_expression)
     {
-        function->next = parser->processing_data.first_function;
-        parser->processing_data.first_function = function;
+        function->next = NULL;
+        if (parser->processing_data.last_function)
+        {
+            parser->processing_data.last_function->next = function;
+        }
+        else
+        {
+            parser->processing_data.first_function = function;
+        }
+
+        parser->processing_data.last_function = function;
         ++parser->processing_data.function_count;
         return KAN_TRUE;
     }
