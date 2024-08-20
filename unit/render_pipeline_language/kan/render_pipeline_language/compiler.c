@@ -67,8 +67,10 @@ struct compiler_instance_setting_node_t
 
 struct compiler_instance_variable_t
 {
-    kan_interned_string_t type_name;
     kan_interned_string_t name;
+    struct inbuilt_vector_type_t *type_if_vector;
+    struct inbuilt_matrix_type_t *type_if_matrix;
+    struct compiler_instance_struct_node_t *type_if_struct;
 
     uint64_t array_dimensions_count;
     uint64_t *array_dimensions;
@@ -98,6 +100,27 @@ struct compiler_instance_struct_node_t
     uint32_t source_line;
 };
 
+struct flattening_name_generation_buffer_t
+{
+    uint64_t length;
+    char buffer[KAN_RPL_COMPILER_INSTANCE_MAX_FLAT_NAME_LENGTH];
+};
+
+struct compiler_instance_buffer_flattened_declaration_t
+{
+    struct compiler_instance_buffer_flattened_declaration_t *next;
+    struct compiler_instance_declaration_node_t *source_declaration;
+    kan_interned_string_t readable_name;
+};
+
+struct compiler_instance_buffer_flattening_graph_node_t
+{
+    struct compiler_instance_buffer_flattening_graph_node_t *next_on_level;
+    struct compiler_instance_buffer_flattening_graph_node_t *first_child;
+    kan_interned_string_t name;
+    struct compiler_instance_buffer_flattened_declaration_t *flattened_result;
+};
+
 struct compiler_instance_buffer_node_t
 {
     struct compiler_instance_buffer_node_t *next;
@@ -105,6 +128,10 @@ struct compiler_instance_buffer_node_t
     enum kan_rpl_buffer_type_t type;
     kan_bool_t used;
     struct compiler_instance_declaration_node_t *first_field;
+
+    struct compiler_instance_buffer_flattening_graph_node_t *flattening_graph_base;
+    struct compiler_instance_buffer_flattened_declaration_t *first_flattened_declaration;
+    struct compiler_instance_buffer_flattened_declaration_t *last_flattened_declaration;
 
     kan_interned_string_t module_name;
     kan_interned_string_t source_name;
@@ -420,14 +447,14 @@ static struct inbuilt_vector_type_t type_i1;
 static struct inbuilt_vector_type_t type_i2;
 static struct inbuilt_vector_type_t type_i3;
 static struct inbuilt_vector_type_t type_i4;
-// static struct inbuilt_vector_type_t *vector_types[] = {&type_f1, &type_f2, &type_f3, &type_f4,
-//                                                        &type_i1, &type_i2, &type_i3, &type_i4};
+static struct inbuilt_vector_type_t *vector_types[] = {&type_f1, &type_f2, &type_f3, &type_f4,
+                                                       &type_i1, &type_i2, &type_i3, &type_i4};
 // static struct inbuilt_vector_type_t *floating_vector_types[] = {&type_f1, &type_f2, &type_f3, &type_f4};
 // static struct inbuilt_vector_type_t *integer_vector_types[] = {&type_i1, &type_i2, &type_i3, &type_i4};
 
 static struct inbuilt_matrix_type_t type_f3x3;
 static struct inbuilt_matrix_type_t type_f4x4;
-// static struct inbuilt_matrix_type_t *matrix_types[] = {&type_f3x3, &type_f4x4};
+static struct inbuilt_matrix_type_t *matrix_types[] = {&type_f3x3, &type_f4x4};
 
 static inline void ensure_statics_initialized (void)
 {
@@ -554,6 +581,32 @@ static inline void ensure_statics_initialized (void)
 
         statics_initialized = KAN_TRUE;
     }
+}
+
+static inline struct inbuilt_vector_type_t *find_inbuilt_vector_type (kan_interned_string_t name)
+{
+    for (uint64_t index = 0u; index < sizeof (vector_types) / sizeof (vector_types[0u]); ++index)
+    {
+        if (vector_types[index]->name == name)
+        {
+            return vector_types[index];
+        }
+    }
+
+    return NULL;
+}
+
+static inline struct inbuilt_matrix_type_t *find_inbuilt_matrix_type (kan_interned_string_t name)
+{
+    for (uint64_t index = 0u; index < sizeof (matrix_types) / sizeof (matrix_types[0u]); ++index)
+    {
+        if (matrix_types[index]->name == name)
+        {
+            return matrix_types[index];
+        }
+    }
+
+    return NULL;
 }
 
 void kan_rpl_meta_parameter_init (struct kan_rpl_meta_parameter_t *instance)
@@ -1420,6 +1473,32 @@ static inline kan_bool_t resolve_array_dimensions (struct rpl_compiler_context_t
     return result;
 }
 
+static kan_bool_t resolve_use_struct (struct rpl_compiler_context_t *context,
+                                      struct rpl_compiler_instance_t *instance,
+                                      kan_interned_string_t name,
+                                      struct compiler_instance_struct_node_t **output);
+
+static inline kan_bool_t resolve_variable_type (struct rpl_compiler_context_t *context,
+                                                struct rpl_compiler_instance_t *instance,
+                                                kan_interned_string_t intermediate_log_name,
+                                                struct compiler_instance_variable_t *variable,
+                                                kan_interned_string_t type_name,
+                                                kan_interned_string_t declaration_name,
+                                                kan_interned_string_t source_name,
+                                                uint64_t source_line)
+{
+    if (!(variable->type_if_vector = find_inbuilt_vector_type (type_name)) &&
+        !(variable->type_if_matrix = find_inbuilt_matrix_type (type_name)) &&
+        !resolve_use_struct (context, instance, type_name, &variable->type_if_struct))
+    {
+        KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR, "[%s:%s:%s:%ld] Declaration \"%s\" type \"%s\" is unknown.",
+                 context->log_name, intermediate_log_name, source_name, (long) source_line, declaration_name, type_name)
+        return KAN_FALSE;
+    }
+
+    return KAN_TRUE;
+}
+
 static kan_bool_t resolve_declarations (struct rpl_compiler_context_t *context,
                                         struct rpl_compiler_instance_t *instance,
                                         kan_interned_string_t intermediate_log_name,
@@ -1450,8 +1529,17 @@ static kan_bool_t resolve_declarations (struct rpl_compiler_context_t *context,
                 _Alignof (struct compiler_instance_declaration_node_t));
 
             target_declaration->next = NULL;
-            target_declaration->variable.type_name = source_declaration->type_name;
             target_declaration->variable.name = source_declaration->name;
+            target_declaration->variable.type_if_vector = NULL;
+            target_declaration->variable.type_if_matrix = NULL;
+            target_declaration->variable.type_if_struct = NULL;
+
+            if (!resolve_variable_type (context, instance, intermediate_log_name, &target_declaration->variable,
+                                        source_declaration->type_name, source_declaration->name,
+                                        source_declaration->source_name, source_declaration->source_line))
+            {
+                result = KAN_FALSE;
+            }
 
             if (!resolve_array_dimensions (context, instance, intermediate_log_name, &target_declaration->variable,
                                            &source_declaration->array_sizes, instance_options_allowed))
@@ -1504,6 +1592,160 @@ static kan_bool_t resolve_declarations (struct rpl_compiler_context_t *context,
     return result;
 }
 
+static inline void flattening_name_generation_buffer_reset (struct flattening_name_generation_buffer_t *buffer,
+                                                            uint64_t to_length)
+{
+    buffer->length = KAN_MIN (KAN_RPL_COMPILER_INSTANCE_MAX_FLAT_NAME_LENGTH - 1u, to_length);
+    buffer->buffer[buffer->length] = '\0';
+}
+
+static inline void flattening_name_generation_buffer_append (struct flattening_name_generation_buffer_t *buffer,
+                                                             const char *name)
+{
+    const uint64_t sub_name_length = strlen (name);
+    const uint64_t new_length = buffer->length + 1u + sub_name_length;
+    const uint64_t dot_position = buffer->length;
+    const uint64_t sub_name_position = dot_position + 1u;
+    flattening_name_generation_buffer_reset (buffer, new_length);
+
+    if (dot_position < buffer->length)
+    {
+        buffer->buffer[dot_position] = '.';
+    }
+
+    if (sub_name_position < buffer->length)
+    {
+        const uint64_t to_copy = buffer->length - sub_name_position;
+        memcpy (&buffer->buffer[sub_name_position], name, to_copy);
+    }
+}
+
+static kan_bool_t flatten_buffer_process_field (struct rpl_compiler_context_t *context,
+                                                struct rpl_compiler_instance_t *instance,
+                                                struct compiler_instance_buffer_node_t *buffer,
+                                                struct compiler_instance_declaration_node_t *declaration,
+                                                struct compiler_instance_buffer_flattening_graph_node_t *output_node,
+                                                struct flattening_name_generation_buffer_t *name_generation_buffer)
+{
+    kan_bool_t result = KAN_TRUE;
+    if (declaration->variable.type_if_vector || declaration->variable.type_if_matrix)
+    {
+        // Reached leaf.
+        struct compiler_instance_buffer_flattened_declaration_t *flattened = kan_stack_group_allocator_allocate (
+            &instance->resolve_allocator, sizeof (struct compiler_instance_buffer_flattened_declaration_t),
+            _Alignof (struct compiler_instance_buffer_flattened_declaration_t));
+
+        flattened->next = NULL;
+        flattened->source_declaration = declaration;
+        flattened->readable_name = kan_string_intern (name_generation_buffer->buffer);
+
+        if (buffer->last_flattened_declaration)
+        {
+            buffer->last_flattened_declaration->next = flattened;
+        }
+        else
+        {
+            buffer->first_flattened_declaration = flattened;
+        }
+
+        buffer->last_flattened_declaration = flattened;
+        output_node->flattened_result = flattened;
+    }
+    else if (declaration->variable.type_if_struct)
+    {
+        // Process struct node.
+        struct compiler_instance_buffer_flattening_graph_node_t *last_root = NULL;
+        struct compiler_instance_declaration_node_t *field = declaration->variable.type_if_struct->first_field;
+
+        while (field)
+        {
+            struct compiler_instance_buffer_flattening_graph_node_t *new_root = kan_stack_group_allocator_allocate (
+                &instance->resolve_allocator, sizeof (struct compiler_instance_buffer_flattening_graph_node_t),
+                _Alignof (struct compiler_instance_buffer_flattening_graph_node_t));
+
+            new_root->next_on_level = NULL;
+            new_root->first_child = NULL;
+            new_root->name = field->variable.name;
+            new_root->flattened_result = NULL;
+
+            const uint64_t length = name_generation_buffer->length;
+            flattening_name_generation_buffer_append (name_generation_buffer, field->variable.name);
+
+            if (!flatten_buffer_process_field (context, instance, buffer, field, new_root, name_generation_buffer))
+            {
+                result = KAN_FALSE;
+            }
+
+            flattening_name_generation_buffer_reset (name_generation_buffer, length);
+
+            if (last_root)
+            {
+                last_root->next_on_level = new_root;
+            }
+            else
+            {
+                output_node->first_child = new_root;
+            }
+
+            last_root = new_root;
+            field = field->next;
+        }
+    }
+
+    return result;
+}
+
+static kan_bool_t flatten_buffer (struct rpl_compiler_context_t *context,
+                                  struct rpl_compiler_instance_t *instance,
+                                  struct compiler_instance_buffer_node_t *buffer)
+{
+    kan_bool_t result = KAN_TRUE;
+    struct flattening_name_generation_buffer_t name_generation_buffer;
+    const uint64_t buffer_name_length = strlen (buffer->name);
+    const uint64_t to_copy = KAN_MIN (KAN_RPL_COMPILER_INSTANCE_MAX_FLAT_NAME_LENGTH - 1u, buffer_name_length);
+
+    flattening_name_generation_buffer_reset (&name_generation_buffer, to_copy);
+    memcpy (name_generation_buffer.buffer, buffer->name, to_copy);
+
+    struct compiler_instance_buffer_flattening_graph_node_t *last_root = NULL;
+    struct compiler_instance_declaration_node_t *field = buffer->first_field;
+
+    while (field)
+    {
+        struct compiler_instance_buffer_flattening_graph_node_t *new_root = kan_stack_group_allocator_allocate (
+            &instance->resolve_allocator, sizeof (struct compiler_instance_buffer_flattening_graph_node_t),
+            _Alignof (struct compiler_instance_buffer_flattening_graph_node_t));
+
+        new_root->next_on_level = NULL;
+        new_root->first_child = NULL;
+        new_root->name = field->variable.name;
+        new_root->flattened_result = NULL;
+
+        const uint64_t length = name_generation_buffer.length;
+        flattening_name_generation_buffer_append (&name_generation_buffer, field->variable.name);
+
+        if (!flatten_buffer_process_field (context, instance, buffer, field, new_root, &name_generation_buffer))
+        {
+            result = KAN_FALSE;
+        }
+
+        flattening_name_generation_buffer_reset (&name_generation_buffer, length);
+        if (last_root)
+        {
+            last_root->next_on_level = new_root;
+        }
+        else
+        {
+            buffer->flattening_graph_base = new_root;
+        }
+
+        last_root = new_root;
+        field = field->next;
+    }
+
+    return result;
+}
+
 static kan_bool_t resolve_buffers (struct rpl_compiler_context_t *context,
                                    struct rpl_compiler_instance_t *instance,
                                    struct kan_rpl_intermediate_t *intermediate)
@@ -1533,6 +1775,15 @@ static kan_bool_t resolve_buffers (struct rpl_compiler_context_t *context,
 
             if (!resolve_declarations (context, instance, intermediate->log_name, &source_buffer->fields,
                                        &target_buffer->first_field, KAN_FALSE))
+            {
+                result = KAN_FALSE;
+            }
+
+            target_buffer->flattening_graph_base = NULL;
+            target_buffer->first_flattened_declaration = NULL;
+            target_buffer->last_flattened_declaration = NULL;
+
+            if (result && !flatten_buffer (context, instance, target_buffer))
             {
                 result = KAN_FALSE;
             }
@@ -1693,15 +1944,19 @@ static kan_bool_t is_buffer_can_be_accessed_from_stage (struct compiler_instance
     return KAN_TRUE;
 }
 
-static kan_bool_t resolve_potential_struct_usage (struct rpl_compiler_context_t *context,
-                                                  struct rpl_compiler_instance_t *instance,
-                                                  kan_interned_string_t name)
+static kan_bool_t resolve_use_struct (struct rpl_compiler_context_t *context,
+                                      struct rpl_compiler_instance_t *instance,
+                                      kan_interned_string_t name,
+                                      struct compiler_instance_struct_node_t **output)
 {
+    *output = NULL;
     struct compiler_instance_struct_node_t *struct_node = instance->first_struct;
+
     while (struct_node)
     {
         if (struct_node->name == name)
         {
+            *output = struct_node;
             // Already resolved.
             return KAN_TRUE;
         }
@@ -1721,11 +1976,11 @@ static kan_bool_t resolve_potential_struct_usage (struct rpl_compiler_context_t 
         for (uint64_t struct_index = 0u; struct_index < intermediate->structs.size; ++struct_index)
         {
             struct kan_rpl_struct_t *struct_data =
-                ((struct kan_rpl_struct_t **) intermediate->structs.data)[struct_index];
+                &((struct kan_rpl_struct_t *) intermediate->structs.data)[struct_index];
 
             if (struct_data->name == name)
             {
-                switch (evaluate_conditional (context, intermediate->log_name, &struct_data->conditional, KAN_TRUE))
+                switch (evaluate_conditional (context, intermediate->log_name, &struct_data->conditional, KAN_FALSE))
                 {
                 case CONDITIONAL_EVALUATION_RESULT_FAILED:
                     resolve_successful = KAN_FALSE;
@@ -1757,37 +2012,24 @@ static kan_bool_t resolve_potential_struct_usage (struct rpl_compiler_context_t 
         return KAN_FALSE;
     }
 
-    // Possibly not a struct type, therefore we don't fail validation here,
-    // it will be validated during code generation.
     if (!intermediate_struct)
     {
-        return KAN_TRUE;
+        KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR, "[%s] Unable to find struct \"%s\".", context->log_name, name)
+        return KAN_FALSE;
     }
 
     struct_node = kan_stack_group_allocator_allocate (&instance->resolve_allocator,
                                                       sizeof (struct compiler_instance_struct_node_t),
                                                       _Alignof (struct compiler_instance_struct_node_t));
+    *output = struct_node;
 
     struct_node->name = name;
     struct_node->module_name = intermediate_log_name;
     struct_node->source_name = intermediate_struct->source_name;
     struct_node->source_line = intermediate_struct->source_line;
 
-    if (resolve_declarations (context, instance, intermediate_log_name, &intermediate_struct->fields,
-                              &struct_node->first_field, KAN_FALSE))
-    {
-        struct compiler_instance_declaration_node_t *declaration = struct_node->first_field;
-        while (declaration)
-        {
-            if (!resolve_potential_struct_usage (context, instance, declaration->variable.type_name))
-            {
-                resolve_successful = KAN_FALSE;
-            }
-
-            declaration = declaration->next;
-        }
-    }
-    else
+    if (!resolve_declarations (context, instance, intermediate_log_name, &intermediate_struct->fields,
+                               &struct_node->first_field, KAN_FALSE))
     {
         resolve_successful = KAN_FALSE;
     }
@@ -1818,7 +2060,7 @@ static kan_bool_t resolve_use_buffer (struct rpl_compiler_context_t *context,
     {
         if (access_node->buffer == buffer)
         {
-            // Already used, no need fop further verification.
+            // Already used, no need for further verification.
             return KAN_TRUE;
         }
 
@@ -1868,23 +2110,8 @@ static kan_bool_t resolve_use_buffer (struct rpl_compiler_context_t *context,
         }
     }
 
-    kan_bool_t resolved = KAN_TRUE;
-    if (!buffer->used)
-    {
-        struct compiler_instance_declaration_node_t *declaration = buffer->first_field;
-        while (declaration)
-        {
-            if (!resolve_potential_struct_usage (context, instance, declaration->variable.type_name))
-            {
-                resolved = KAN_FALSE;
-            }
-
-            declaration = declaration->next;
-        }
-    }
-
     buffer->used = KAN_TRUE;
-    return resolved;
+    return KAN_TRUE;
 }
 
 static kan_bool_t resolve_use_sampler (struct rpl_compiler_instance_t *instance,
@@ -2127,18 +2354,20 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
     case KAN_RPL_EXPRESSION_NODE_TYPE_VARIABLE_DECLARATION:
     {
         new_expression->type = COMPILER_INSTANCE_EXPRESSION_TYPE_VARIABLE_DECLARATION;
-        new_expression->variable.type_name = expression->variable_declaration.type_name;
         new_expression->variable.name = expression->variable_declaration.variable_name;
         new_expression->variable.array_dimensions_count = expression->children.size;
 
         kan_bool_t resolved = KAN_TRUE;
-        if (!resolve_array_dimensions (context, instance, new_expression->module_name, &new_expression->variable,
-                                       &expression->children, KAN_TRUE))
+        if (!resolve_variable_type (context, instance, new_expression->module_name, &new_expression->variable,
+                                    expression->variable_declaration.type_name,
+                                    expression->variable_declaration.variable_name, expression->source_name,
+                                    expression->source_line))
         {
             resolved = KAN_FALSE;
         }
 
-        if (!resolve_potential_struct_usage (context, instance, new_expression->variable.type_name))
+        if (!resolve_array_dimensions (context, instance, new_expression->module_name, &new_expression->variable,
+                                       &expression->children, KAN_TRUE))
         {
             resolved = KAN_FALSE;
         }
@@ -2252,9 +2481,14 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
             resolved = KAN_FALSE;
         }
 
-        if (!resolve_potential_struct_usage (context, instance, expression->constructor_type_name))
+        if (!find_inbuilt_vector_type (expression->constructor_type_name) &&
+            !find_inbuilt_matrix_type (expression->constructor_type_name))
         {
-            resolved = KAN_FALSE;
+            struct compiler_instance_struct_node_t *temporary_mute;
+            if (!resolve_use_struct (context, instance, expression->constructor_type_name, &temporary_mute))
+            {
+                resolved = KAN_FALSE;
+            }
         }
 
         return resolved;
