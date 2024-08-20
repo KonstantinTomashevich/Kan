@@ -587,6 +587,7 @@ static inline void parser_processing_data_init (struct parser_processing_data_t 
     instance->buffer_count = 0u;
 
     instance->first_sampler = NULL;
+    instance->last_sampler = NULL;
     instance->sampler_count = 0u;
 
     instance->first_function = NULL;
