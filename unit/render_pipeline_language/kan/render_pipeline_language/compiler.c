@@ -197,13 +197,16 @@ struct compiler_instance_expression_list_item_t
 
 struct compiler_instance_function_call_suffix_t
 {
-    kan_interned_string_t function_name;
+    struct compiler_instance_function_node_t *if_function;
+    struct compiler_instance_sampler_node_t *if_sampler;
     struct compiler_instance_expression_list_item_t *first_argument;
 };
 
 struct compiler_instance_constructor_suffix_t
 {
-    kan_interned_string_t type_name;
+    struct inbuilt_vector_type_t *type_if_vector;
+    struct inbuilt_matrix_type_t *type_if_matrix;
+    struct compiler_instance_struct_node_t *type_if_struct;
     struct compiler_instance_expression_list_item_t *first_argument;
 };
 
@@ -271,7 +274,9 @@ struct compiler_instance_function_node_t
 {
     struct compiler_instance_function_node_t *next;
     kan_interned_string_t name;
-    kan_interned_string_t return_type;
+    struct inbuilt_vector_type_t *return_type_if_vector;
+    struct inbuilt_matrix_type_t *return_type_if_matrix;
+    struct compiler_instance_struct_node_t *return_type_if_struct;
 
     struct compiler_instance_declaration_node_t *first_argument;
     struct compiler_instance_expression_node_t *body;
@@ -623,7 +628,9 @@ static inline void ensure_statics_initialized (void)
         glsl_450_sqrt = (struct compiler_instance_function_node_t) {
             .next = NULL,
             .name = kan_string_intern ("sqrt"),
-            .return_type = kan_string_intern ("f1"),
+            .return_type_if_vector = &type_f1,
+            .return_type_if_matrix = NULL,
+            .return_type_if_struct = NULL,
             .first_argument = glsl_450_sqrt_arguments,
             .body = NULL,
             .has_stage_specific_access = KAN_FALSE,
@@ -659,7 +666,9 @@ static inline void ensure_statics_initialized (void)
         shader_standard_vertex_stage_output_position = (struct compiler_instance_function_node_t) {
             .next = NULL,
             .name = kan_string_intern ("vertex_stage_output_position"),
-            .return_type = kan_string_intern ("void"),
+            .return_type_if_vector = NULL,
+            .return_type_if_matrix = NULL,
+            .return_type_if_struct = NULL,
             .first_argument = shader_standard_vertex_stage_output_position_arguments,
             .body = NULL,
             .has_stage_specific_access = KAN_TRUE,
@@ -2654,8 +2663,9 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
     case KAN_RPL_EXPRESSION_NODE_TYPE_FUNCTION_CALL:
     {
         new_expression->type = COMPILER_INSTANCE_EXPRESSION_TYPE_FUNCTION_CALL;
-        new_expression->function_call.function_name = expression->function_name;
         kan_bool_t resolved = KAN_TRUE;
+        new_expression->function_call.if_function = NULL;
+        new_expression->function_call.if_sampler = NULL;
 
         if (!resolve_expression_array (context, instance, resolve_scope, &expression->children,
                                        &new_expression->function_call.first_argument))
@@ -2668,6 +2678,7 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
         {
             if (sampler->name == expression->function_name)
             {
+                new_expression->function_call.if_sampler = sampler;
                 if (!resolve_use_sampler (instance, resolve_scope->function, sampler))
                 {
                     resolved = KAN_FALSE;
@@ -2681,22 +2692,35 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
 
         if (!sampler)
         {
-            struct compiler_instance_function_node_t *temporary_mute;
             if (!resolve_function_by_name (context, instance, expression->function_name,
-                                           resolve_scope->function->required_stage, &temporary_mute))
+                                           resolve_scope->function->required_stage,
+                                           &new_expression->function_call.if_function))
             {
                 resolved = KAN_FALSE;
             }
         }
 
+        // TODO: Validate call.
         return resolved;
     }
 
     case KAN_RPL_EXPRESSION_NODE_TYPE_CONSTRUCTOR:
     {
         new_expression->type = COMPILER_INSTANCE_EXPRESSION_TYPE_CONSTRUCTOR;
-        new_expression->constructor.type_name = expression->constructor_type_name;
         kan_bool_t resolved = KAN_TRUE;
+
+        if (!(new_expression->constructor.type_if_vector =
+                  find_inbuilt_vector_type (expression->constructor_type_name)) &&
+            !(new_expression->constructor.type_if_matrix =
+                  find_inbuilt_matrix_type (expression->constructor_type_name)) &&
+            !resolve_use_struct (context, instance, expression->constructor_type_name,
+                                 &new_expression->constructor.type_if_struct))
+        {
+            KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR, "[%s:%s:%s:%ld] Constructor \"%s\" type is unknown.",
+                     context->log_name, new_expression->module_name, new_expression->source_name,
+                     (long) new_expression->source_line, expression->constructor_type_name)
+            resolved = KAN_FALSE;
+        }
 
         if (!resolve_expression_array (context, instance, resolve_scope, &expression->children,
                                        &new_expression->constructor.first_argument))
@@ -2704,16 +2728,7 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
             resolved = KAN_FALSE;
         }
 
-        if (!find_inbuilt_vector_type (expression->constructor_type_name) &&
-            !find_inbuilt_matrix_type (expression->constructor_type_name))
-        {
-            struct compiler_instance_struct_node_t *temporary_mute;
-            if (!resolve_use_struct (context, instance, expression->constructor_type_name, &temporary_mute))
-            {
-                resolved = KAN_FALSE;
-            }
-        }
-
+        // TODO: Validate construction.
         return resolved;
     }
 
@@ -2726,6 +2741,7 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
                                  &((struct kan_rpl_expression_node_t *) expression->children.data)[0u],
                                  &new_expression->if_.condition, KAN_TRUE))
         {
+            // TODO: Validate that condition is boolean.
             resolved = KAN_FALSE;
         }
 
@@ -2775,6 +2791,7 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
                                  &((struct kan_rpl_expression_node_t *) expression->children.data)[1u],
                                  &new_expression->for_.condition, KAN_TRUE))
         {
+            // TODO: Validate that condition is boolean.
             resolved = KAN_FALSE;
         }
 
@@ -2803,6 +2820,7 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
                                  &((struct kan_rpl_expression_node_t *) expression->children.data)[0u],
                                  &new_expression->while_.condition, KAN_TRUE))
         {
+            // TODO: Validate that condition is boolean.
             resolved = KAN_FALSE;
         }
 
@@ -2818,10 +2836,12 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
 
     case KAN_RPL_EXPRESSION_NODE_TYPE_BREAK:
         new_expression->type = COMPILER_INSTANCE_EXPRESSION_TYPE_BREAK;
+        // TODO: Validate that in loop.
         return KAN_TRUE;
 
     case KAN_RPL_EXPRESSION_NODE_TYPE_CONTINUE:
         new_expression->type = COMPILER_INSTANCE_EXPRESSION_TYPE_CONTINUE;
+        // TODO: Validate that in loop.
         return KAN_TRUE;
 
     case KAN_RPL_EXPRESSION_NODE_TYPE_RETURN:
@@ -2843,6 +2863,7 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
             new_expression->return_expression = NULL;
         }
 
+        // TODO: Validate return against function declaration.
         return resolved;
     }
     }
@@ -2863,8 +2884,24 @@ static kan_bool_t resolve_new_used_function (struct rpl_compiler_context_t *cont
         _Alignof (struct compiler_instance_function_node_t));
     *output_node = function_node;
 
+    kan_bool_t resolved = KAN_TRUE;
     function_node->name = function->name;
-    function_node->return_type = function->return_type_name;
+
+    if (function->return_type_name == interned_void)
+    {
+        function_node->return_type_if_vector = NULL;
+        function_node->return_type_if_matrix = NULL;
+        function_node->return_type_if_struct = NULL;
+    }
+    else if (!(function_node->return_type_if_vector = find_inbuilt_vector_type (function->return_type_name)) &&
+             !(function_node->return_type_if_matrix = find_inbuilt_matrix_type (function->return_type_name)) &&
+             !resolve_use_struct (context, instance, function->return_type_name, &function_node->return_type_if_struct))
+    {
+        KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR, "[%s:%s:%s:%ld] Function return type \"%s\" is unknown.",
+                 context->log_name, intermediate_log_name, function->source_name, (long) function->source_line,
+                 function->return_type_name)
+        resolved = KAN_FALSE;
+    }
 
     function_node->has_stage_specific_access = KAN_FALSE;
     function_node->required_stage = context_stage;
@@ -2875,7 +2912,6 @@ static kan_bool_t resolve_new_used_function (struct rpl_compiler_context_t *cont
     function_node->source_name = function->source_name;
     function_node->source_line = function->source_line;
 
-    kan_bool_t resolved = KAN_TRUE;
     if (!resolve_declarations (context, instance, intermediate_log_name, &function->arguments,
                                &function_node->first_argument, KAN_TRUE))
     {
