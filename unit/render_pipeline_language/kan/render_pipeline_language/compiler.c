@@ -106,11 +106,24 @@ struct flattening_name_generation_buffer_t
     char buffer[KAN_RPL_COMPILER_INSTANCE_MAX_FLAT_NAME_LENGTH];
 };
 
+#define INVALID_LOCATION UINT64_MAX
+#define INVALID_BINDING UINT64_MAX
+
+struct binding_location_assignment_counter_t
+{
+    uint64_t next_attribute_buffer_binding;
+    uint64_t next_arbitrary_buffer_binding;
+    uint64_t next_attribute_location;
+    uint64_t next_vertex_output_location;
+    uint64_t next_fragment_output_location;
+};
+
 struct compiler_instance_buffer_flattened_declaration_t
 {
     struct compiler_instance_buffer_flattened_declaration_t *next;
     struct compiler_instance_declaration_node_t *source_declaration;
     kan_interned_string_t readable_name;
+    uint64_t location;
 };
 
 struct compiler_instance_buffer_flattening_graph_node_t
@@ -129,6 +142,7 @@ struct compiler_instance_buffer_node_t
     kan_bool_t used;
     struct compiler_instance_declaration_node_t *first_field;
 
+    uint64_t binding;
     struct compiler_instance_buffer_flattening_graph_node_t *flattening_graph_base;
     struct compiler_instance_buffer_flattened_declaration_t *first_flattened_declaration;
     struct compiler_instance_buffer_flattened_declaration_t *last_flattened_declaration;
@@ -144,6 +158,8 @@ struct compiler_instance_sampler_node_t
     kan_interned_string_t name;
     enum kan_rpl_sampler_type_t type;
     kan_bool_t used;
+
+    uint64_t binding;
     struct compiler_instance_setting_node_t *first_setting;
 
     kan_interned_string_t module_name;
@@ -1726,7 +1742,73 @@ static kan_bool_t flatten_buffer_process_field (struct rpl_compiler_context_t *c
                                                 struct compiler_instance_buffer_node_t *buffer,
                                                 struct compiler_instance_declaration_node_t *declaration,
                                                 struct compiler_instance_buffer_flattening_graph_node_t *output_node,
-                                                struct flattening_name_generation_buffer_t *name_generation_buffer)
+                                                struct flattening_name_generation_buffer_t *name_generation_buffer,
+                                                struct binding_location_assignment_counter_t *assignment_counter);
+
+static kan_bool_t flatten_buffer_process_field_list (
+    struct rpl_compiler_context_t *context,
+    struct rpl_compiler_instance_t *instance,
+    struct compiler_instance_buffer_node_t *buffer,
+    struct compiler_instance_declaration_node_t *first_declaration,
+    struct compiler_instance_buffer_flattening_graph_node_t *output_node,
+    struct flattening_name_generation_buffer_t *name_generation_buffer,
+    struct binding_location_assignment_counter_t *assignment_counter)
+{
+    kan_bool_t result = KAN_TRUE;
+    struct compiler_instance_buffer_flattening_graph_node_t *last_root = NULL;
+    struct compiler_instance_declaration_node_t *field = first_declaration;
+
+    while (field)
+    {
+        struct compiler_instance_buffer_flattening_graph_node_t *new_root = kan_stack_group_allocator_allocate (
+            &instance->resolve_allocator, sizeof (struct compiler_instance_buffer_flattening_graph_node_t),
+            _Alignof (struct compiler_instance_buffer_flattening_graph_node_t));
+
+        new_root->next_on_level = NULL;
+        new_root->first_child = NULL;
+        new_root->name = field->variable.name;
+        new_root->flattened_result = NULL;
+
+        const uint64_t length = name_generation_buffer->length;
+        flattening_name_generation_buffer_append (name_generation_buffer, field->variable.name);
+
+        if (!flatten_buffer_process_field (context, instance, buffer, field, new_root, name_generation_buffer,
+                                           assignment_counter))
+        {
+            result = KAN_FALSE;
+        }
+
+        flattening_name_generation_buffer_reset (name_generation_buffer, length);
+        if (last_root)
+        {
+            last_root->next_on_level = new_root;
+        }
+        else
+        {
+            if (output_node)
+            {
+                output_node->first_child = new_root;
+            }
+            else
+            {
+                buffer->flattening_graph_base = new_root;
+            }
+        }
+
+        last_root = new_root;
+        field = field->next;
+    }
+
+    return result;
+}
+
+static kan_bool_t flatten_buffer_process_field (struct rpl_compiler_context_t *context,
+                                                struct rpl_compiler_instance_t *instance,
+                                                struct compiler_instance_buffer_node_t *buffer,
+                                                struct compiler_instance_declaration_node_t *declaration,
+                                                struct compiler_instance_buffer_flattening_graph_node_t *output_node,
+                                                struct flattening_name_generation_buffer_t *name_generation_buffer,
+                                                struct binding_location_assignment_counter_t *assignment_counter)
 {
     kan_bool_t result = KAN_TRUE;
     if (declaration->variable.type_if_vector || declaration->variable.type_if_matrix)
@@ -1739,6 +1821,32 @@ static kan_bool_t flatten_buffer_process_field (struct rpl_compiler_context_t *c
         flattened->next = NULL;
         flattened->source_declaration = declaration;
         flattened->readable_name = kan_string_intern (name_generation_buffer->buffer);
+
+        switch (buffer->type)
+        {
+        case KAN_RPL_BUFFER_TYPE_VERTEX_ATTRIBUTE:
+        case KAN_RPL_BUFFER_TYPE_INSTANCED_ATTRIBUTE:
+            flattened->location = assignment_counter->next_attribute_location;
+            ++assignment_counter->next_attribute_location;
+            break;
+
+        case KAN_RPL_BUFFER_TYPE_UNIFORM:
+        case KAN_RPL_BUFFER_TYPE_READ_ONLY_STORAGE:
+        case KAN_RPL_BUFFER_TYPE_INSTANCED_UNIFORM:
+        case KAN_RPL_BUFFER_TYPE_INSTANCED_READ_ONLY_STORAGE:
+            KAN_ASSERT (KAN_FALSE)
+            break;
+
+        case KAN_RPL_BUFFER_TYPE_VERTEX_STAGE_OUTPUT:
+            flattened->location = assignment_counter->next_vertex_output_location;
+            ++assignment_counter->next_vertex_output_location;
+            break;
+
+        case KAN_RPL_BUFFER_TYPE_FRAGMENT_STAGE_OUTPUT:
+            flattened->location = assignment_counter->next_fragment_output_location;
+            ++assignment_counter->next_fragment_output_location;
+            break;
+        }
 
         if (buffer->last_flattened_declaration)
         {
@@ -1754,42 +1862,11 @@ static kan_bool_t flatten_buffer_process_field (struct rpl_compiler_context_t *c
     }
     else if (declaration->variable.type_if_struct)
     {
-        // Process struct node.
-        struct compiler_instance_buffer_flattening_graph_node_t *last_root = NULL;
-        struct compiler_instance_declaration_node_t *field = declaration->variable.type_if_struct->first_field;
-
-        while (field)
+        if (!flatten_buffer_process_field_list (context, instance, buffer,
+                                                declaration->variable.type_if_struct->first_field, output_node,
+                                                name_generation_buffer, assignment_counter))
         {
-            struct compiler_instance_buffer_flattening_graph_node_t *new_root = kan_stack_group_allocator_allocate (
-                &instance->resolve_allocator, sizeof (struct compiler_instance_buffer_flattening_graph_node_t),
-                _Alignof (struct compiler_instance_buffer_flattening_graph_node_t));
-
-            new_root->next_on_level = NULL;
-            new_root->first_child = NULL;
-            new_root->name = field->variable.name;
-            new_root->flattened_result = NULL;
-
-            const uint64_t length = name_generation_buffer->length;
-            flattening_name_generation_buffer_append (name_generation_buffer, field->variable.name);
-
-            if (!flatten_buffer_process_field (context, instance, buffer, field, new_root, name_generation_buffer))
-            {
-                result = KAN_FALSE;
-            }
-
-            flattening_name_generation_buffer_reset (name_generation_buffer, length);
-
-            if (last_root)
-            {
-                last_root->next_on_level = new_root;
-            }
-            else
-            {
-                output_node->first_child = new_root;
-            }
-
-            last_root = new_root;
-            field = field->next;
+            result = KAN_FALSE;
         }
     }
 
@@ -1798,7 +1875,8 @@ static kan_bool_t flatten_buffer_process_field (struct rpl_compiler_context_t *c
 
 static kan_bool_t flatten_buffer (struct rpl_compiler_context_t *context,
                                   struct rpl_compiler_instance_t *instance,
-                                  struct compiler_instance_buffer_node_t *buffer)
+                                  struct compiler_instance_buffer_node_t *buffer,
+                                  struct binding_location_assignment_counter_t *assignment_counter)
 {
     kan_bool_t result = KAN_TRUE;
     struct flattening_name_generation_buffer_t name_generation_buffer;
@@ -1808,40 +1886,10 @@ static kan_bool_t flatten_buffer (struct rpl_compiler_context_t *context,
     flattening_name_generation_buffer_reset (&name_generation_buffer, to_copy);
     memcpy (name_generation_buffer.buffer, buffer->name, to_copy);
 
-    struct compiler_instance_buffer_flattening_graph_node_t *last_root = NULL;
-    struct compiler_instance_declaration_node_t *field = buffer->first_field;
-
-    while (field)
+    if (!flatten_buffer_process_field_list (context, instance, buffer, buffer->first_field, NULL,
+                                            &name_generation_buffer, assignment_counter))
     {
-        struct compiler_instance_buffer_flattening_graph_node_t *new_root = kan_stack_group_allocator_allocate (
-            &instance->resolve_allocator, sizeof (struct compiler_instance_buffer_flattening_graph_node_t),
-            _Alignof (struct compiler_instance_buffer_flattening_graph_node_t));
-
-        new_root->next_on_level = NULL;
-        new_root->first_child = NULL;
-        new_root->name = field->variable.name;
-        new_root->flattened_result = NULL;
-
-        const uint64_t length = name_generation_buffer.length;
-        flattening_name_generation_buffer_append (&name_generation_buffer, field->variable.name);
-
-        if (!flatten_buffer_process_field (context, instance, buffer, field, new_root, &name_generation_buffer))
-        {
-            result = KAN_FALSE;
-        }
-
-        flattening_name_generation_buffer_reset (&name_generation_buffer, length);
-        if (last_root)
-        {
-            last_root->next_on_level = new_root;
-        }
-        else
-        {
-            buffer->flattening_graph_base = new_root;
-        }
-
-        last_root = new_root;
-        field = field->next;
+        result = KAN_FALSE;
     }
 
     return result;
@@ -1905,7 +1953,8 @@ static kan_bool_t resolve_buffers_validate_uniform_internals_alignment (
 
 static kan_bool_t resolve_buffers (struct rpl_compiler_context_t *context,
                                    struct rpl_compiler_instance_t *instance,
-                                   struct kan_rpl_intermediate_t *intermediate)
+                                   struct kan_rpl_intermediate_t *intermediate,
+                                   struct binding_location_assignment_counter_t *assignment_counter)
 {
     kan_bool_t result = KAN_TRUE;
     for (uint64_t buffer_index = 0u; buffer_index < intermediate->buffers.size; ++buffer_index)
@@ -1936,6 +1985,29 @@ static kan_bool_t resolve_buffers (struct rpl_compiler_context_t *context,
                 result = KAN_FALSE;
             }
 
+            switch (target_buffer->type)
+            {
+            case KAN_RPL_BUFFER_TYPE_VERTEX_ATTRIBUTE:
+            case KAN_RPL_BUFFER_TYPE_INSTANCED_ATTRIBUTE:
+                target_buffer->binding = assignment_counter->next_attribute_buffer_binding;
+                ++assignment_counter->next_attribute_buffer_binding;
+                break;
+
+            case KAN_RPL_BUFFER_TYPE_UNIFORM:
+            case KAN_RPL_BUFFER_TYPE_READ_ONLY_STORAGE:
+            case KAN_RPL_BUFFER_TYPE_INSTANCED_UNIFORM:
+            case KAN_RPL_BUFFER_TYPE_INSTANCED_READ_ONLY_STORAGE:
+                target_buffer->binding = assignment_counter->next_arbitrary_buffer_binding;
+                ++assignment_counter->next_arbitrary_buffer_binding;
+                break;
+
+            case KAN_RPL_BUFFER_TYPE_VERTEX_STAGE_OUTPUT:
+            case KAN_RPL_BUFFER_TYPE_FRAGMENT_STAGE_OUTPUT:
+                // Not an external buffers, so no binding.
+                target_buffer->binding = INVALID_BINDING;
+                break;
+            }
+
             target_buffer->flattening_graph_base = NULL;
             target_buffer->first_flattened_declaration = NULL;
             target_buffer->last_flattened_declaration = NULL;
@@ -1947,7 +2019,7 @@ static kan_bool_t resolve_buffers (struct rpl_compiler_context_t *context,
                 case KAN_RPL_BUFFER_TYPE_VERTEX_ATTRIBUTE:
                 case KAN_RPL_BUFFER_TYPE_INSTANCED_ATTRIBUTE:
                 {
-                    flatten_buffer (context, instance, target_buffer);
+                    flatten_buffer (context, instance, target_buffer, assignment_counter);
                     struct compiler_instance_buffer_flattened_declaration_t *declaration =
                         target_buffer->first_flattened_declaration;
 
@@ -1985,12 +2057,12 @@ static kan_bool_t resolve_buffers (struct rpl_compiler_context_t *context,
                     break;
 
                 case KAN_RPL_BUFFER_TYPE_VERTEX_STAGE_OUTPUT:
-                    flatten_buffer (context, instance, target_buffer);
+                    flatten_buffer (context, instance, target_buffer, assignment_counter);
                     break;
 
                 case KAN_RPL_BUFFER_TYPE_FRAGMENT_STAGE_OUTPUT:
                 {
-                    flatten_buffer (context, instance, target_buffer);
+                    flatten_buffer (context, instance, target_buffer, assignment_counter);
                     struct compiler_instance_buffer_flattened_declaration_t *declaration =
                         target_buffer->first_flattened_declaration;
 
@@ -2043,7 +2115,8 @@ static kan_bool_t resolve_buffers (struct rpl_compiler_context_t *context,
 
 static kan_bool_t resolve_samplers (struct rpl_compiler_context_t *context,
                                     struct rpl_compiler_instance_t *instance,
-                                    struct kan_rpl_intermediate_t *intermediate)
+                                    struct kan_rpl_intermediate_t *intermediate,
+                                    struct binding_location_assignment_counter_t *assignment_counter)
 {
     kan_bool_t result = KAN_TRUE;
     for (uint64_t sampler_index = 0u; sampler_index < intermediate->samplers.size; ++sampler_index)
@@ -2066,7 +2139,10 @@ static kan_bool_t resolve_samplers (struct rpl_compiler_context_t *context,
             target_sampler->next = NULL;
             target_sampler->name = source_sampler->name;
             target_sampler->type = source_sampler->type;
+
             target_sampler->used = KAN_FALSE;
+            target_sampler->binding = assignment_counter->next_arbitrary_buffer_binding;
+            ++assignment_counter->next_arbitrary_buffer_binding;
 
             struct compiler_instance_setting_node_t *first_setting = NULL;
             struct compiler_instance_setting_node_t *last_setting = NULL;
@@ -3152,6 +3228,14 @@ kan_rpl_compiler_instance_t kan_rpl_compiler_context_resolve (kan_rpl_compiler_c
     instance->last_function = NULL;
 
     kan_bool_t successfully_resolved = KAN_TRUE;
+    struct binding_location_assignment_counter_t assignment_counter = {
+        .next_attribute_buffer_binding = 0u,
+        .next_arbitrary_buffer_binding = 0u,
+        .next_attribute_location = 0u,
+        .next_vertex_output_location = 0u,
+        .next_fragment_output_location = 0u,
+    };
+
     for (uint64_t intermediate_index = 0u; intermediate_index < context->modules.size; ++intermediate_index)
     {
         struct kan_rpl_intermediate_t *intermediate =
@@ -3165,12 +3249,12 @@ kan_rpl_compiler_instance_t kan_rpl_compiler_context_resolve (kan_rpl_compiler_c
 
         // Buffers and samplers are always added even if they're not used to preserve shader family compatibility.
 
-        if (!resolve_buffers (context, instance, intermediate))
+        if (!resolve_buffers (context, instance, intermediate, &assignment_counter))
         {
             successfully_resolved = KAN_FALSE;
         }
 
-        if (!resolve_samplers (context, instance, intermediate))
+        if (!resolve_samplers (context, instance, intermediate, &assignment_counter))
         {
             successfully_resolved = KAN_FALSE;
         }
