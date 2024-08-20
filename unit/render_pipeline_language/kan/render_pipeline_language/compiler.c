@@ -153,6 +153,12 @@ struct compiler_instance_sampler_node_t
 
 enum compiler_instance_expression_type_t
 {
+    // TODO: Get rid of identifier, binary operation and unary operation.
+    //       Replace with identifiers with direct accesses and access chains.
+    //       Replace with concrete operations instead of nested binary operation enumeration from intermediate.
+    //       Add variable list to scope.
+    //       Resolve functions, samplers and constructors in calls.
+
     COMPILER_INSTANCE_EXPRESSION_TYPE_IDENTIFIER = 0u,
     COMPILER_INSTANCE_EXPRESSION_TYPE_INTEGER_LITERAL,
     COMPILER_INSTANCE_EXPRESSION_TYPE_FLOATING_LITERAL,
@@ -456,6 +462,14 @@ static struct inbuilt_matrix_type_t type_f3x3;
 static struct inbuilt_matrix_type_t type_f4x4;
 static struct inbuilt_matrix_type_t *matrix_types[] = {&type_f3x3, &type_f4x4};
 
+static struct compiler_instance_function_node_t *glsl_450_builtin_functions_first;
+static struct compiler_instance_function_node_t glsl_450_sqrt;
+static struct compiler_instance_declaration_node_t glsl_450_sqrt_arguments[1u];
+
+static struct compiler_instance_function_node_t *shader_standard_builtin_functions_first;
+static struct compiler_instance_function_node_t shader_standard_vertex_stage_output_position;
+static struct compiler_instance_declaration_node_t shader_standard_vertex_stage_output_position_arguments[1u];
+
 static inline void ensure_statics_initialized (void)
 {
     if (!statics_initialized)
@@ -577,6 +591,79 @@ static inline void ensure_statics_initialized (void)
             .columns = 4u,
             .meta_type = KAN_RPL_META_VARIABLE_TYPE_F4X4,
             .spirv_id = SPIRV_FIXED_ID_TYPE_F4X4,
+        };
+
+        glsl_450_builtin_functions_first = &glsl_450_sqrt;
+        const kan_interned_string_t module_glsl_450 = kan_string_intern ("glsl_450_standard");
+        const kan_interned_string_t source_functions = kan_string_intern ("functions");
+
+        glsl_450_sqrt_arguments[0u] = (struct compiler_instance_declaration_node_t) {
+            .next = NULL,
+            .variable =
+                {
+                    .name = kan_string_intern ("number"),
+                    .type_if_vector = &type_f1,
+                    .type_if_matrix = NULL,
+                    .type_if_struct = NULL,
+                    .array_dimensions_count = 0u,
+                    .array_dimensions = NULL,
+                },
+            .meta_count = 0u,
+            .meta = NULL,
+            .module_name = module_glsl_450,
+            .source_name = source_functions,
+            .source_line = 0u,
+        };
+
+        glsl_450_sqrt = (struct compiler_instance_function_node_t) {
+            .next = NULL,
+            .name = kan_string_intern ("sqrt"),
+            .return_type = kan_string_intern ("f1"),
+            .first_argument = glsl_450_sqrt_arguments,
+            .body = NULL,
+            .has_stage_specific_access = KAN_FALSE,
+            .required_stage = KAN_RPL_PIPELINE_STAGE_GRAPHICS_CLASSIC_VERTEX,
+            .first_buffer_access = NULL,
+            .first_sampler_access = NULL,
+            .module_name = module_glsl_450,
+            .source_name = source_functions,
+            .source_line = 0u,
+        };
+
+        shader_standard_builtin_functions_first = &shader_standard_vertex_stage_output_position;
+        const kan_interned_string_t module_shader_standard = kan_string_intern ("shader_standard");
+
+        shader_standard_vertex_stage_output_position_arguments[0u] = (struct compiler_instance_declaration_node_t) {
+            .next = NULL,
+            .variable =
+                {
+                    .name = kan_string_intern ("position"),
+                    .type_if_vector = &type_f4,
+                    .type_if_matrix = NULL,
+                    .type_if_struct = NULL,
+                    .array_dimensions_count = 0u,
+                    .array_dimensions = NULL,
+                },
+            .meta_count = 0u,
+            .meta = NULL,
+            .module_name = module_shader_standard,
+            .source_name = source_functions,
+            .source_line = 0u,
+        };
+
+        shader_standard_vertex_stage_output_position = (struct compiler_instance_function_node_t) {
+            .next = NULL,
+            .name = kan_string_intern ("vertex_stage_output_position"),
+            .return_type = kan_string_intern ("void"),
+            .first_argument = shader_standard_vertex_stage_output_position_arguments,
+            .body = NULL,
+            .has_stage_specific_access = KAN_TRUE,
+            .required_stage = KAN_RPL_PIPELINE_STAGE_GRAPHICS_CLASSIC_VERTEX,
+            .first_buffer_access = NULL,
+            .first_sampler_access = NULL,
+            .module_name = module_shader_standard,
+            .source_name = source_functions,
+            .source_line = 0u,
         };
 
         statics_initialized = KAN_TRUE;
@@ -1783,9 +1870,34 @@ static kan_bool_t resolve_buffers (struct rpl_compiler_context_t *context,
             target_buffer->first_flattened_declaration = NULL;
             target_buffer->last_flattened_declaration = NULL;
 
-            if (result && !flatten_buffer (context, instance, target_buffer))
+            if (result)
             {
-                result = KAN_FALSE;
+                switch (target_buffer->type)
+                {
+                case KAN_RPL_BUFFER_TYPE_VERTEX_ATTRIBUTE:
+                case KAN_RPL_BUFFER_TYPE_INSTANCED_ATTRIBUTE:
+                    flatten_buffer (context, instance, target_buffer);
+                    // TODO: Validate no arrays.
+                    break;
+
+                case KAN_RPL_BUFFER_TYPE_UNIFORM:
+                case KAN_RPL_BUFFER_TYPE_INSTANCED_UNIFORM:
+                    // TODO: Validate for 16-byty alignment compatibility.
+                    break;
+
+                case KAN_RPL_BUFFER_TYPE_READ_ONLY_STORAGE:
+                case KAN_RPL_BUFFER_TYPE_INSTANCED_READ_ONLY_STORAGE:
+                    break;
+
+                case KAN_RPL_BUFFER_TYPE_VERTEX_STAGE_OUTPUT:
+                    flatten_buffer (context, instance, target_buffer);
+                    break;
+
+                case KAN_RPL_BUFFER_TYPE_FRAGMENT_STAGE_OUTPUT:
+                    flatten_buffer (context, instance, target_buffer);
+                    // TODO: Validate only f4's.
+                    break;
+                }
             }
 
             target_buffer->module_name = intermediate->log_name;
@@ -1893,6 +2005,7 @@ static const char *get_stage_name (enum kan_rpl_pipeline_stage_t stage)
 static kan_bool_t check_alias_name_is_not_occupied (struct resolve_expression_scope_t *resolve_scope,
                                                     kan_interned_string_t name)
 {
+    // TODO: Might need rewrite with addition of variables to scopes.
     struct resolve_expression_alias_node_t *alias_node = resolve_scope->first_alias;
     while (alias_node)
     {
@@ -2150,6 +2263,7 @@ static kan_bool_t resolve_function_global_access (struct rpl_compiler_context_t 
                                                   enum kan_rpl_pipeline_stage_t stage,
                                                   kan_interned_string_t identifier)
 {
+    // TODO: Might need rewrite with refactor to explicit accesses and access chains.
     struct compiler_instance_buffer_node_t *buffer = instance->first_buffer;
     while (buffer)
     {
@@ -2229,7 +2343,8 @@ static kan_bool_t resolve_expression_array (struct rpl_compiler_context_t *conte
 static kan_bool_t resolve_function_by_name (struct rpl_compiler_context_t *context,
                                             struct rpl_compiler_instance_t *instance,
                                             kan_interned_string_t function_name,
-                                            enum kan_rpl_pipeline_stage_t context_stage);
+                                            enum kan_rpl_pipeline_stage_t context_stage,
+                                            struct compiler_instance_function_node_t **output_node);
 
 static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
                                       struct rpl_compiler_instance_t *instance,
@@ -2450,8 +2565,9 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
                 if (!resolve_use_sampler (instance, resolve_scope->function, sampler))
                 {
                     resolved = KAN_FALSE;
-                    break;
                 }
+
+                break;
             }
 
             sampler = sampler->next;
@@ -2459,8 +2575,9 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
 
         if (!sampler)
         {
+            struct compiler_instance_function_node_t *temporary_mute;
             if (!resolve_function_by_name (context, instance, expression->function_name,
-                                           resolve_scope->function->required_stage))
+                                           resolve_scope->function->required_stage, &temporary_mute))
             {
                 resolved = KAN_FALSE;
             }
@@ -2632,11 +2749,13 @@ static kan_bool_t resolve_new_used_function (struct rpl_compiler_context_t *cont
                                              struct rpl_compiler_instance_t *instance,
                                              kan_interned_string_t intermediate_log_name,
                                              struct kan_rpl_function_t *function,
-                                             enum kan_rpl_pipeline_stage_t context_stage)
+                                             enum kan_rpl_pipeline_stage_t context_stage,
+                                             struct compiler_instance_function_node_t **output_node)
 {
     struct compiler_instance_function_node_t *function_node = kan_stack_group_allocator_allocate (
         &instance->resolve_allocator, sizeof (struct compiler_instance_function_node_t),
         _Alignof (struct compiler_instance_function_node_t));
+    *output_node = function_node;
 
     function_node->name = function->name;
     function_node->return_type = function->return_type_name;
@@ -2685,55 +2804,105 @@ static kan_bool_t resolve_new_used_function (struct rpl_compiler_context_t *cont
     return resolved;
 }
 
+static inline struct compiler_instance_function_node_t *resolve_inbuilt_function (
+    struct compiler_instance_function_node_t *library_first, kan_interned_string_t name)
+{
+    struct compiler_instance_function_node_t *node = library_first;
+    while (node)
+    {
+        if (node->name == name)
+        {
+            return node;
+        }
+
+        node = node->next;
+    }
+
+    return NULL;
+}
+
+static inline kan_bool_t resolve_function_check_usability (struct rpl_compiler_context_t *context,
+                                                           struct compiler_instance_function_node_t *function_node,
+                                                           enum kan_rpl_pipeline_stage_t context_stage)
+{
+    if (function_node->has_stage_specific_access && function_node->required_stage != context_stage)
+    {
+        KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
+                 "[%s:%s] Function \"%s\" accesses stage specific globals for stage \"%s\", but is also called "
+                 "from stage \"%s\", which results in undefined behavior. Dumping list of accessed "
+                 "stage-specific globals.",
+                 context->log_name, function_node->module_name, function_node->name,
+                 get_stage_name (function_node->required_stage), get_stage_name (context_stage))
+
+        struct compiler_instance_buffer_access_node_t *buffer_access = function_node->first_buffer_access;
+        while (buffer_access)
+        {
+            switch (buffer_access->buffer->type)
+            {
+            case KAN_RPL_BUFFER_TYPE_VERTEX_ATTRIBUTE:
+            case KAN_RPL_BUFFER_TYPE_INSTANCED_ATTRIBUTE:
+            case KAN_RPL_BUFFER_TYPE_INSTANCED_UNIFORM:
+            case KAN_RPL_BUFFER_TYPE_INSTANCED_READ_ONLY_STORAGE:
+            case KAN_RPL_BUFFER_TYPE_VERTEX_STAGE_OUTPUT:
+            case KAN_RPL_BUFFER_TYPE_FRAGMENT_STAGE_OUTPUT:
+                KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
+                         "[%s:%s] Function \"%s\" accesses stage-specific buffer \"%s\" through call of "
+                         "function \"%s\".",
+                         context->log_name, function_node->module_name, function_node->name,
+                         buffer_access->buffer->name, buffer_access->direct_access_function->name)
+                break;
+
+            case KAN_RPL_BUFFER_TYPE_UNIFORM:
+            case KAN_RPL_BUFFER_TYPE_READ_ONLY_STORAGE:
+                break;
+            }
+
+            buffer_access = buffer_access->next;
+        }
+
+        return KAN_FALSE;
+    }
+
+    return KAN_TRUE;
+}
+
 static kan_bool_t resolve_function_by_name (struct rpl_compiler_context_t *context,
                                             struct rpl_compiler_instance_t *instance,
                                             kan_interned_string_t function_name,
-                                            enum kan_rpl_pipeline_stage_t context_stage)
+                                            enum kan_rpl_pipeline_stage_t context_stage,
+                                            struct compiler_instance_function_node_t **output_node)
 {
+    // Check inbuilt functions first.
+    switch (context->pipeline_type)
+    {
+    case KAN_RPL_PIPELINE_TYPE_GRAPHICS_CLASSIC:
+        if ((*output_node = resolve_inbuilt_function (glsl_450_builtin_functions_first, function_name)))
+        {
+            return resolve_function_check_usability (context, *output_node, context_stage);
+        }
+
+        if ((*output_node = resolve_inbuilt_function (shader_standard_builtin_functions_first, function_name)))
+        {
+            return resolve_function_check_usability (context, *output_node, context_stage);
+        }
+
+        break;
+    }
+
+    *output_node = NULL;
     struct compiler_instance_function_node_t *function_node = instance->first_function;
+
     while (function_node)
     {
         if (function_node->name == function_name)
         {
-            if (function_node->has_stage_specific_access && function_node->required_stage != context_stage)
+            if (!resolve_function_check_usability (context, function_node, context_stage))
             {
-                KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
-                         "[%s:%s] Function \"%s\" accesses stage specific globals for stage \"%s\", but is also called "
-                         "from stage \"%s\", which results in undefined behavior. Dumping list of accessed "
-                         "stage-specific globals.",
-                         context->log_name, function_node->module_name, function_name,
-                         get_stage_name (function_node->required_stage), get_stage_name (context_stage))
-
-                struct compiler_instance_buffer_access_node_t *buffer_access = function_node->first_buffer_access;
-                while (buffer_access)
-                {
-                    switch (buffer_access->buffer->type)
-                    {
-                    case KAN_RPL_BUFFER_TYPE_VERTEX_ATTRIBUTE:
-                    case KAN_RPL_BUFFER_TYPE_INSTANCED_ATTRIBUTE:
-                    case KAN_RPL_BUFFER_TYPE_INSTANCED_UNIFORM:
-                    case KAN_RPL_BUFFER_TYPE_INSTANCED_READ_ONLY_STORAGE:
-                    case KAN_RPL_BUFFER_TYPE_VERTEX_STAGE_OUTPUT:
-                    case KAN_RPL_BUFFER_TYPE_FRAGMENT_STAGE_OUTPUT:
-                        KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
-                                 "[%s:%s] Function \"%s\" accesses stage-specific buffer \"%s\" through call of "
-                                 "function \"%s\".",
-                                 context->log_name, function_node->module_name, function_name,
-                                 buffer_access->buffer->name, buffer_access->direct_access_function->name)
-                        break;
-
-                    case KAN_RPL_BUFFER_TYPE_UNIFORM:
-                    case KAN_RPL_BUFFER_TYPE_READ_ONLY_STORAGE:
-                        break;
-                    }
-
-                    buffer_access = buffer_access->next;
-                }
-
                 return KAN_FALSE;
             }
 
             // Already resolved and no stage conflict.
+            *output_node = function_node;
             return KAN_TRUE;
         }
 
@@ -2772,7 +2941,7 @@ static kan_bool_t resolve_function_by_name (struct rpl_compiler_context_t *conte
                     else
                     {
                         if (!resolve_new_used_function (context, instance, intermediate->log_name, function,
-                                                        context_stage))
+                                                        context_stage, &function_node))
                         {
                             result = KAN_FALSE;
                         }
@@ -2789,6 +2958,14 @@ static kan_bool_t resolve_function_by_name (struct rpl_compiler_context_t *conte
         }
     }
 
+    if (!resolved)
+    {
+        KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR, "[%s] Unable to find any active function \"%s\".",
+                 context->log_name, function_name)
+        return KAN_FALSE;
+    }
+
+    *output_node = function_node;
     return result;
 }
 
@@ -2859,8 +3036,9 @@ kan_rpl_compiler_instance_t kan_rpl_compiler_context_resolve (kan_rpl_compiler_c
 
     for (uint64_t entry_point_index = 0u; entry_point_index < entry_point_count; ++entry_point_index)
     {
+        struct compiler_instance_function_node_t *mute;
         if (!resolve_function_by_name (context, instance, entry_points[entry_point_index].function_name,
-                                       entry_points[entry_point_index].stage))
+                                       entry_points[entry_point_index].stage, &mute))
         {
             KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
                      "[%s] Failed to resolve entry point at stage \"%s\" with function \"%s\".", context->log_name,
