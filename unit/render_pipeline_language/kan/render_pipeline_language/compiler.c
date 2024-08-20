@@ -358,6 +358,11 @@ enum inbuilt_type_item_t
     INBUILT_TYPE_ITEM_INTEGER,
 };
 
+static uint32_t inbuilt_type_item_size[] = {
+    4u,
+    4u,
+};
+
 struct inbuilt_vector_type_t
 {
     kan_interned_string_t name;
@@ -1833,6 +1838,62 @@ static kan_bool_t flatten_buffer (struct rpl_compiler_context_t *context,
     return result;
 }
 
+static kan_bool_t resolve_buffers_validate_uniform_internals_alignment (
+    struct rpl_compiler_context_t *context,
+    struct compiler_instance_buffer_node_t *buffer,
+    struct compiler_instance_declaration_node_t *first_declaration)
+{
+    kan_bool_t valid = KAN_TRUE;
+    struct compiler_instance_declaration_node_t *declaration = first_declaration;
+
+    while (declaration)
+    {
+        if (declaration->variable.type_if_vector)
+        {
+            const uint32_t size = declaration->variable.type_if_vector->items_count *
+                                  inbuilt_type_item_size[declaration->variable.type_if_vector->item];
+
+            if (size % 16u != 0u)
+            {
+                KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
+                         "[%s:%s:%s:%ld] Declaration \"%s\" is found inside buffer \"%s\", but its size is not "
+                         "multiple of 16, which is prone to cause errors when used with uniform buffers.",
+                         context->log_name, declaration->module_name, declaration->source_name,
+                         (long) declaration->source_line, declaration->variable.name, buffer->name)
+                valid = KAN_FALSE;
+            }
+        }
+        else if (declaration->variable.type_if_matrix)
+        {
+            const uint32_t size = declaration->variable.type_if_matrix->rows *
+                                  declaration->variable.type_if_matrix->columns *
+                                  inbuilt_type_item_size[declaration->variable.type_if_matrix->item];
+
+            if (size % 16u != 0u)
+            {
+                KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
+                         "[%s:%s:%s:%ld] Declaration \"%s\" is found inside buffer \"%s\", but its size is not "
+                         "multiple of 16, which is prone to cause errors when used with uniform buffers.",
+                         context->log_name, declaration->module_name, declaration->source_name,
+                         (long) declaration->source_line, declaration->variable.name, buffer->name)
+                valid = KAN_FALSE;
+            }
+        }
+        else if (declaration->variable.type_if_struct)
+        {
+            if (!resolve_buffers_validate_uniform_internals_alignment (
+                    context, buffer, declaration->variable.type_if_struct->first_field))
+            {
+                valid = KAN_FALSE;
+            }
+        }
+
+        declaration = declaration->next;
+    }
+
+    return valid;
+}
+
 static kan_bool_t resolve_buffers (struct rpl_compiler_context_t *context,
                                    struct rpl_compiler_instance_t *instance,
                                    struct kan_rpl_intermediate_t *intermediate)
@@ -1876,13 +1937,38 @@ static kan_bool_t resolve_buffers (struct rpl_compiler_context_t *context,
                 {
                 case KAN_RPL_BUFFER_TYPE_VERTEX_ATTRIBUTE:
                 case KAN_RPL_BUFFER_TYPE_INSTANCED_ATTRIBUTE:
+                {
                     flatten_buffer (context, instance, target_buffer);
-                    // TODO: Validate no arrays.
+                    struct compiler_instance_buffer_flattened_declaration_t *declaration =
+                        target_buffer->first_flattened_declaration;
+
+                    while (declaration)
+                    {
+                        if (declaration->source_declaration->variable.array_dimensions_count > 0u)
+                        {
+                            KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
+                                     "[%s:%s:%s:%ld] Attributes should not be arrays, but flattened declaration \"%s\" "
+                                     "with array suffix found.",
+                                     context->log_name, intermediate->log_name,
+                                     declaration->source_declaration->source_name,
+                                     (long) declaration->source_declaration->source_line, declaration->readable_name)
+                            result = KAN_FALSE;
+                        }
+
+                        declaration = declaration->next;
+                    }
+
                     break;
+                }
 
                 case KAN_RPL_BUFFER_TYPE_UNIFORM:
                 case KAN_RPL_BUFFER_TYPE_INSTANCED_UNIFORM:
-                    // TODO: Validate for 16-byty alignment compatibility.
+                    if (!resolve_buffers_validate_uniform_internals_alignment (context, target_buffer,
+                                                                               target_buffer->first_field))
+                    {
+                        result = KAN_FALSE;
+                    }
+
                     break;
 
                 case KAN_RPL_BUFFER_TYPE_READ_ONLY_STORAGE:
@@ -1894,9 +1980,29 @@ static kan_bool_t resolve_buffers (struct rpl_compiler_context_t *context,
                     break;
 
                 case KAN_RPL_BUFFER_TYPE_FRAGMENT_STAGE_OUTPUT:
+                {
                     flatten_buffer (context, instance, target_buffer);
-                    // TODO: Validate only f4's.
+                    struct compiler_instance_buffer_flattened_declaration_t *declaration =
+                        target_buffer->first_flattened_declaration;
+
+                    while (declaration)
+                    {
+                        if (declaration->source_declaration->variable.type_if_vector != &type_f4)
+                        {
+                            KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
+                                     "[%s:%s:%s:%ld] Fragment stage output should only contain \"f4\" declarations, "
+                                     "but flattened declaration \"%s\" with other type found.",
+                                     context->log_name, intermediate->log_name,
+                                     declaration->source_declaration->source_name,
+                                     (long) declaration->source_declaration->source_line, declaration->readable_name)
+                            result = KAN_FALSE;
+                        }
+
+                        declaration = declaration->next;
+                    }
+
                     break;
+                }
                 }
             }
 
