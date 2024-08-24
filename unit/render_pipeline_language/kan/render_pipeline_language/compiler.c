@@ -104,6 +104,8 @@ struct compiler_instance_struct_node_t
     kan_interned_string_t module_name;
     kan_interned_string_t source_name;
     uint32_t source_line;
+
+    uint32_t spirv_id;
 };
 
 struct flattening_name_generation_buffer_t
@@ -130,6 +132,9 @@ struct compiler_instance_buffer_flattened_declaration_t
     struct compiler_instance_declaration_node_t *source_declaration;
     kan_interned_string_t readable_name;
     uint64_t location;
+
+    uint32_t spirv_id_input;
+    uint32_t spirv_id_output;
 };
 
 struct compiler_instance_buffer_flattening_graph_node_t
@@ -155,6 +160,8 @@ struct compiler_instance_buffer_node_t
     struct compiler_instance_buffer_flattening_graph_node_t *flattening_graph_base;
     struct compiler_instance_buffer_flattened_declaration_t *first_flattened_declaration;
     struct compiler_instance_buffer_flattened_declaration_t *last_flattened_declaration;
+
+    uint32_t structured_variable_spirv_id;
 
     kan_interned_string_t module_name;
     kan_interned_string_t source_name;
@@ -483,6 +490,8 @@ struct inbuilt_vector_type_t
     struct compiler_instance_declaration_node_t *constructor_signature;
 
     uint32_t spirv_id;
+    uint32_t spirv_id_input_pointer;
+    uint32_t spirv_id_output_pointer;
 };
 
 struct inbuilt_matrix_type_t
@@ -495,6 +504,8 @@ struct inbuilt_matrix_type_t
     struct compiler_instance_declaration_node_t *constructor_signature;
 
     uint32_t spirv_id;
+    uint32_t spirv_id_input_pointer;
+    uint32_t spirv_id_output_pointer;
 };
 
 enum spirv_fixed_ids_t
@@ -503,23 +514,79 @@ enum spirv_fixed_ids_t
 
     SPIRV_FIXED_ID_TYPE_VOID = 1u,
     SPIRV_FIXED_ID_TYPE_BOOLEAN,
+
     SPIRV_FIXED_ID_TYPE_FLOAT,
+    SPIRV_FIXED_ID_TYPE_FLOAT_INPUT_POINTER,
+    SPIRV_FIXED_ID_TYPE_FLOAT_OUTPUT_POINTER,
+
     SPIRV_FIXED_ID_TYPE_INTEGER,
+    SPIRV_FIXED_ID_TYPE_INTEGER_INPUT_POINTER,
+    SPIRV_FIXED_ID_TYPE_INTEGER_OUTPUT_POINTER,
 
     SPIRV_FIXED_ID_TYPE_F2,
+    SPIRV_FIXED_ID_TYPE_F2_INPUT_POINTER,
+    SPIRV_FIXED_ID_TYPE_F2_OUTPUT_POINTER,
+
     SPIRV_FIXED_ID_TYPE_F3,
+    SPIRV_FIXED_ID_TYPE_F3_INPUT_POINTER,
+    SPIRV_FIXED_ID_TYPE_F3_OUTPUT_POINTER,
+
     SPIRV_FIXED_ID_TYPE_F4,
+    SPIRV_FIXED_ID_TYPE_F4_INPUT_POINTER,
+    SPIRV_FIXED_ID_TYPE_F4_OUTPUT_POINTER,
 
     SPIRV_FIXED_ID_TYPE_I2,
+    SPIRV_FIXED_ID_TYPE_I2_INPUT_POINTER,
+    SPIRV_FIXED_ID_TYPE_I2_OUTPUT_POINTER,
+
     SPIRV_FIXED_ID_TYPE_I3,
+    SPIRV_FIXED_ID_TYPE_I3_INPUT_POINTER,
+    SPIRV_FIXED_ID_TYPE_I3_OUTPUT_POINTER,
+
     SPIRV_FIXED_ID_TYPE_I4,
+    SPIRV_FIXED_ID_TYPE_I4_INPUT_POINTER,
+    SPIRV_FIXED_ID_TYPE_I4_OUTPUT_POINTER,
 
     SPIRV_FIXED_ID_TYPE_F3X3,
+    SPIRV_FIXED_ID_TYPE_F3X3_INPUT_POINTER,
+    SPIRV_FIXED_ID_TYPE_F3X3_OUTPUT_POINTER,
+
     SPIRV_FIXED_ID_TYPE_F4X4,
+    SPIRV_FIXED_ID_TYPE_F4X4_INPUT_POINTER,
+    SPIRV_FIXED_ID_TYPE_F4X4_OUTPUT_POINTER,
 
     SPIRV_FIXED_ID_GLSL_LIBRARY,
 
     SPIRV_FIXED_ID_END,
+};
+
+struct spirv_arbitrary_instruction_item_t
+{
+    struct spirv_arbitrary_instruction_item_t *next;
+    uint32_t code[];
+};
+
+struct spirv_arbitrary_instruction_section_t
+{
+    struct spirv_arbitrary_instruction_item_t *first;
+    struct spirv_arbitrary_instruction_item_t *last;
+};
+
+struct spirv_generation_context_t
+{
+    struct rpl_compiler_instance_t *instance;
+    uint32_t current_bound;
+    uint32_t code_word_count;
+    kan_bool_t emit_result;
+
+    struct spirv_arbitrary_instruction_section_t debug_section;
+    struct spirv_arbitrary_instruction_section_t annotation_section;
+    struct spirv_arbitrary_instruction_section_t base_type_section;
+    struct spirv_arbitrary_instruction_section_t higher_type_section;
+    struct spirv_arbitrary_instruction_section_t global_variable_section;
+    struct spirv_arbitrary_instruction_section_t functions_section;
+
+    struct kan_stack_group_allocator_t temporary_allocator;
 };
 
 static kan_bool_t statics_initialized = KAN_FALSE;
@@ -697,6 +764,8 @@ static inline void ensure_statics_initialized (void)
             .meta_type = KAN_RPL_META_VARIABLE_TYPE_F1,
             .constructor_signature = type_f1_constructor_signatures,
             .spirv_id = SPIRV_FIXED_ID_TYPE_FLOAT,
+            .spirv_id_input_pointer = SPIRV_FIXED_ID_TYPE_FLOAT_INPUT_POINTER,
+            .spirv_id_output_pointer = SPIRV_FIXED_ID_TYPE_FLOAT_OUTPUT_POINTER,
         };
 
         type_f2 = (struct inbuilt_vector_type_t) {
@@ -706,6 +775,8 @@ static inline void ensure_statics_initialized (void)
             .meta_type = KAN_RPL_META_VARIABLE_TYPE_F2,
             .constructor_signature = type_f2_constructor_signatures,
             .spirv_id = SPIRV_FIXED_ID_TYPE_F2,
+            .spirv_id_input_pointer = SPIRV_FIXED_ID_TYPE_F2_INPUT_POINTER,
+            .spirv_id_output_pointer = SPIRV_FIXED_ID_TYPE_F2_OUTPUT_POINTER,
         };
 
         type_f3 = (struct inbuilt_vector_type_t) {
@@ -715,6 +786,8 @@ static inline void ensure_statics_initialized (void)
             .meta_type = KAN_RPL_META_VARIABLE_TYPE_F3,
             .constructor_signature = type_f3_constructor_signatures,
             .spirv_id = SPIRV_FIXED_ID_TYPE_F3,
+            .spirv_id_input_pointer = SPIRV_FIXED_ID_TYPE_F3_INPUT_POINTER,
+            .spirv_id_output_pointer = SPIRV_FIXED_ID_TYPE_F3_OUTPUT_POINTER,
         };
 
         type_f4 = (struct inbuilt_vector_type_t) {
@@ -724,6 +797,8 @@ static inline void ensure_statics_initialized (void)
             .meta_type = KAN_RPL_META_VARIABLE_TYPE_F4,
             .constructor_signature = type_f4_constructor_signatures,
             .spirv_id = SPIRV_FIXED_ID_TYPE_F4,
+            .spirv_id_input_pointer = SPIRV_FIXED_ID_TYPE_F4_INPUT_POINTER,
+            .spirv_id_output_pointer = SPIRV_FIXED_ID_TYPE_F4_OUTPUT_POINTER,
         };
 
         type_i1 = (struct inbuilt_vector_type_t) {
@@ -733,6 +808,8 @@ static inline void ensure_statics_initialized (void)
             .meta_type = KAN_RPL_META_VARIABLE_TYPE_I1,
             .constructor_signature = type_i1_constructor_signatures,
             .spirv_id = SPIRV_FIXED_ID_TYPE_INTEGER,
+            .spirv_id_input_pointer = SPIRV_FIXED_ID_TYPE_INTEGER_INPUT_POINTER,
+            .spirv_id_output_pointer = SPIRV_FIXED_ID_TYPE_INTEGER_OUTPUT_POINTER,
         };
 
         type_i2 = (struct inbuilt_vector_type_t) {
@@ -742,6 +819,8 @@ static inline void ensure_statics_initialized (void)
             .meta_type = KAN_RPL_META_VARIABLE_TYPE_I2,
             .constructor_signature = type_i2_constructor_signatures,
             .spirv_id = SPIRV_FIXED_ID_TYPE_I2,
+            .spirv_id_input_pointer = SPIRV_FIXED_ID_TYPE_I2_INPUT_POINTER,
+            .spirv_id_output_pointer = SPIRV_FIXED_ID_TYPE_I2_OUTPUT_POINTER,
         };
 
         type_i3 = (struct inbuilt_vector_type_t) {
@@ -751,6 +830,8 @@ static inline void ensure_statics_initialized (void)
             .meta_type = KAN_RPL_META_VARIABLE_TYPE_I3,
             .constructor_signature = type_i3_constructor_signatures,
             .spirv_id = SPIRV_FIXED_ID_TYPE_I3,
+            .spirv_id_input_pointer = SPIRV_FIXED_ID_TYPE_I3_INPUT_POINTER,
+            .spirv_id_output_pointer = SPIRV_FIXED_ID_TYPE_I3_OUTPUT_POINTER,
         };
 
         type_i4 = (struct inbuilt_vector_type_t) {
@@ -760,6 +841,8 @@ static inline void ensure_statics_initialized (void)
             .meta_type = KAN_RPL_META_VARIABLE_TYPE_I4,
             .constructor_signature = type_i4_constructor_signatures,
             .spirv_id = SPIRV_FIXED_ID_TYPE_I4,
+            .spirv_id_input_pointer = SPIRV_FIXED_ID_TYPE_I4_INPUT_POINTER,
+            .spirv_id_output_pointer = SPIRV_FIXED_ID_TYPE_I4_OUTPUT_POINTER,
         };
 
         type_f3x3 = (struct inbuilt_matrix_type_t) {
@@ -770,6 +853,8 @@ static inline void ensure_statics_initialized (void)
             .meta_type = KAN_RPL_META_VARIABLE_TYPE_F3X3,
             .constructor_signature = type_f3x3_constructor_signatures,
             .spirv_id = SPIRV_FIXED_ID_TYPE_F3X3,
+            .spirv_id_input_pointer = SPIRV_FIXED_ID_TYPE_F3X3_INPUT_POINTER,
+            .spirv_id_output_pointer = SPIRV_FIXED_ID_TYPE_F3X3_OUTPUT_POINTER,
         };
 
         type_f4x4 = (struct inbuilt_matrix_type_t) {
@@ -780,6 +865,8 @@ static inline void ensure_statics_initialized (void)
             .meta_type = KAN_RPL_META_VARIABLE_TYPE_F4X4,
             .constructor_signature = type_f4x4_constructor_signatures,
             .spirv_id = SPIRV_FIXED_ID_TYPE_F4X4,
+            .spirv_id_input_pointer = SPIRV_FIXED_ID_TYPE_F4X4_INPUT_POINTER,
+            .spirv_id_output_pointer = SPIRV_FIXED_ID_TYPE_F4X4_OUTPUT_POINTER,
         };
 
         build_repeating_vector_constructor_signatures (&type_f1, 1u, type_f1_constructor_signatures);
@@ -1900,7 +1987,7 @@ static inline kan_bool_t resolve_array_dimensions (struct rpl_compiler_context_t
                 break;
 
             case CONDITIONAL_EVALUATION_VALUE_TYPE_INTEGER:
-                if (value.integer_value > 0u)
+                if (value.integer_value > 0u && value.integer_value <= UINT32_MAX)
                 {
                     variable->array_dimensions[dimension] = (uint64_t) value.integer_value;
                 }
@@ -2036,7 +2123,8 @@ static kan_bool_t resolve_declarations (struct rpl_compiler_context_t *context,
 
                 if (target_declaration->size != 0u && target_declaration->alignment != 0u)
                 {
-                    for (uint64_t dimension = 0u; dimension < target_declaration->variable.array_dimensions_count; ++dimension)
+                    for (uint64_t dimension = 0u; dimension < target_declaration->variable.array_dimensions_count;
+                         ++dimension)
                     {
                         target_declaration->size *= target_declaration->variable.array_dimensions[dimension];
                     }
@@ -5734,6 +5822,680 @@ kan_bool_t kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t comp
     }
 
     return valid;
+}
+
+static inline uint32_t *spirv_new_instruction (struct spirv_generation_context_t *context,
+                                               struct spirv_arbitrary_instruction_section_t *section,
+                                               uint32_t word_count)
+{
+    struct spirv_arbitrary_instruction_item_t *item = kan_stack_group_allocator_allocate (
+        &context->temporary_allocator,
+        sizeof (struct spirv_arbitrary_instruction_item_t) + sizeof (uint32_t) * word_count,
+        _Alignof (struct spirv_arbitrary_instruction_item_t));
+
+    item->next = NULL;
+    item->code[0u] = word_count << SpvWordCountShift;
+    ;
+
+    if (section->last)
+    {
+        section->last->next = item;
+        section->last = item;
+    }
+    else
+    {
+        section->first = item;
+        section->last = item;
+    }
+
+    context->code_word_count += word_count;
+    return item->code;
+}
+
+static inline uint32_t spirv_to_word_length (uint32_t length)
+{
+    return (length + 1u) % sizeof (uint32_t) == 0u ? (length + 1u) / sizeof (uint32_t) :
+                                                     1u + (length + 1u) / sizeof (uint32_t);
+}
+
+static inline void spirv_generate_op_name (struct spirv_generation_context_t *context,
+                                           uint32_t for_id,
+                                           const char *name)
+{
+    const uint32_t length = (uint32_t) strlen (name);
+    const uint32_t word_length = spirv_to_word_length (length);
+    uint32_t *code = spirv_new_instruction (context, &context->debug_section, 2u + word_length);
+    code[0u] |= SpvOpCodeMask & SpvOpName;
+    code[1u] = for_id;
+    code[1u + word_length] = 0u;
+    memcpy ((uint8_t *) (code + 2u), name, length);
+}
+
+static inline void spirv_generate_op_member_name (struct spirv_generation_context_t *context,
+                                                  uint32_t struct_id,
+                                                  uint32_t member_index,
+                                                  const char *name)
+{
+    const uint32_t length = (uint32_t) strlen (name);
+    const uint32_t word_length = spirv_to_word_length (length);
+    uint32_t *code = spirv_new_instruction (context, &context->debug_section, 3u + word_length);
+    code[0u] |= SpvOpCodeMask & SpvOpMemberName;
+    code[1u] = struct_id;
+    code[2u] = member_index;
+    code[2u + word_length] = 0u;
+    memcpy ((uint8_t *) (code + 3u), name, length);
+}
+
+static void spirv_generate_standard_types (struct spirv_generation_context_t *context)
+{
+    spirv_generate_op_name (context, SPIRV_FIXED_ID_TYPE_VOID, "void");
+    spirv_generate_op_name (context, SPIRV_FIXED_ID_TYPE_BOOLEAN, "bool");
+    spirv_generate_op_name (context, SPIRV_FIXED_ID_TYPE_FLOAT, "f1");
+    spirv_generate_op_name (context, SPIRV_FIXED_ID_TYPE_INTEGER, "i1");
+    spirv_generate_op_name (context, SPIRV_FIXED_ID_TYPE_F2, "f2");
+    spirv_generate_op_name (context, SPIRV_FIXED_ID_TYPE_F3, "f3");
+    spirv_generate_op_name (context, SPIRV_FIXED_ID_TYPE_F4, "f4");
+    spirv_generate_op_name (context, SPIRV_FIXED_ID_TYPE_I2, "i2");
+    spirv_generate_op_name (context, SPIRV_FIXED_ID_TYPE_I3, "i3");
+    spirv_generate_op_name (context, SPIRV_FIXED_ID_TYPE_I4, "i4");
+    spirv_generate_op_name (context, SPIRV_FIXED_ID_TYPE_F3X3, "f3x3");
+    spirv_generate_op_name (context, SPIRV_FIXED_ID_TYPE_F4X4, "f4x4");
+
+    uint32_t *code = spirv_new_instruction (context, &context->base_type_section, 2u);
+    code[0u] |= SpvOpCodeMask & SpvOpTypeVoid;
+    code[1u] = SPIRV_FIXED_ID_TYPE_VOID;
+
+    code = spirv_new_instruction (context, &context->base_type_section, 2u);
+    code[0u] |= SpvOpCodeMask & SpvOpTypeBool;
+    code[1u] = SPIRV_FIXED_ID_TYPE_BOOLEAN;
+
+    code = spirv_new_instruction (context, &context->base_type_section, 3u);
+    code[0u] |= SpvOpCodeMask & SpvOpTypeFloat;
+    code[1u] = SPIRV_FIXED_ID_TYPE_FLOAT;
+    code[2u] = 32u;
+
+    code = spirv_new_instruction (context, &context->base_type_section, 4u);
+    code[0u] |= SpvOpCodeMask & SpvOpTypePointer;
+    code[1u] = SPIRV_FIXED_ID_TYPE_FLOAT_INPUT_POINTER;
+    code[2u] = SpvStorageClassInput;
+    code[3u] = SPIRV_FIXED_ID_TYPE_FLOAT;
+
+    code = spirv_new_instruction (context, &context->base_type_section, 4u);
+    code[0u] |= SpvOpCodeMask & SpvOpTypePointer;
+    code[1u] = SPIRV_FIXED_ID_TYPE_FLOAT_OUTPUT_POINTER;
+    code[2u] = SpvStorageClassOutput;
+    code[3u] = SPIRV_FIXED_ID_TYPE_FLOAT;
+
+    code = spirv_new_instruction (context, &context->base_type_section, 4u);
+    code[0u] |= SpvOpCodeMask & SpvOpTypeInt;
+    code[1u] = SPIRV_FIXED_ID_TYPE_INTEGER;
+    code[2u] = 32u;
+    code[3u] = 1u; // Signed.
+
+    code = spirv_new_instruction (context, &context->base_type_section, 4u);
+    code[0u] |= SpvOpCodeMask & SpvOpTypePointer;
+    code[1u] = SPIRV_FIXED_ID_TYPE_INTEGER_INPUT_POINTER;
+    code[2u] = SpvStorageClassInput;
+    code[3u] = SPIRV_FIXED_ID_TYPE_INTEGER;
+
+    code = spirv_new_instruction (context, &context->base_type_section, 4u);
+    code[0u] |= SpvOpCodeMask & SpvOpTypePointer;
+    code[1u] = SPIRV_FIXED_ID_TYPE_INTEGER_OUTPUT_POINTER;
+    code[2u] = SpvStorageClassOutput;
+    code[3u] = SPIRV_FIXED_ID_TYPE_INTEGER;
+
+    code = spirv_new_instruction (context, &context->base_type_section, 4u);
+    code[0u] |= SpvOpCodeMask & SpvOpTypeVector;
+    code[1u] = SPIRV_FIXED_ID_TYPE_F2;
+    code[2u] = SPIRV_FIXED_ID_TYPE_FLOAT;
+    code[3u] = 2u;
+
+    code = spirv_new_instruction (context, &context->base_type_section, 4u);
+    code[0u] |= SpvOpCodeMask & SpvOpTypePointer;
+    code[1u] = SPIRV_FIXED_ID_TYPE_F2_INPUT_POINTER;
+    code[2u] = SpvStorageClassInput;
+    code[3u] = SPIRV_FIXED_ID_TYPE_F2;
+
+    code = spirv_new_instruction (context, &context->base_type_section, 4u);
+    code[0u] |= SpvOpCodeMask & SpvOpTypePointer;
+    code[1u] = SPIRV_FIXED_ID_TYPE_F2_OUTPUT_POINTER;
+    code[2u] = SpvStorageClassOutput;
+    code[3u] = SPIRV_FIXED_ID_TYPE_F2;
+
+    code = spirv_new_instruction (context, &context->base_type_section, 4u);
+    code[0u] |= SpvOpCodeMask & SpvOpTypeVector;
+    code[1u] = SPIRV_FIXED_ID_TYPE_F3;
+    code[2u] = SPIRV_FIXED_ID_TYPE_FLOAT;
+    code[3u] = 3u;
+
+    code = spirv_new_instruction (context, &context->base_type_section, 4u);
+    code[0u] |= SpvOpCodeMask & SpvOpTypePointer;
+    code[1u] = SPIRV_FIXED_ID_TYPE_F3_INPUT_POINTER;
+    code[2u] = SpvStorageClassInput;
+    code[3u] = SPIRV_FIXED_ID_TYPE_F3;
+
+    code = spirv_new_instruction (context, &context->base_type_section, 4u);
+    code[0u] |= SpvOpCodeMask & SpvOpTypePointer;
+    code[1u] = SPIRV_FIXED_ID_TYPE_F3_OUTPUT_POINTER;
+    code[2u] = SpvStorageClassOutput;
+    code[3u] = SPIRV_FIXED_ID_TYPE_F3;
+
+    code = spirv_new_instruction (context, &context->base_type_section, 4u);
+    code[0u] |= SpvOpCodeMask & SpvOpTypeVector;
+    code[1u] = SPIRV_FIXED_ID_TYPE_F4;
+    code[2u] = SPIRV_FIXED_ID_TYPE_FLOAT;
+    code[3u] = 4u;
+
+    code = spirv_new_instruction (context, &context->base_type_section, 4u);
+    code[0u] |= SpvOpCodeMask & SpvOpTypePointer;
+    code[1u] = SPIRV_FIXED_ID_TYPE_F4_INPUT_POINTER;
+    code[2u] = SpvStorageClassInput;
+    code[3u] = SPIRV_FIXED_ID_TYPE_F4;
+
+    code = spirv_new_instruction (context, &context->base_type_section, 4u);
+    code[0u] |= SpvOpCodeMask & SpvOpTypePointer;
+    code[1u] = SPIRV_FIXED_ID_TYPE_F4_OUTPUT_POINTER;
+    code[2u] = SpvStorageClassOutput;
+    code[3u] = SPIRV_FIXED_ID_TYPE_F4;
+
+    code = spirv_new_instruction (context, &context->base_type_section, 4u);
+    code[0u] |= SpvOpCodeMask & SpvOpTypeVector;
+    code[1u] = SPIRV_FIXED_ID_TYPE_I2;
+    code[2u] = SPIRV_FIXED_ID_TYPE_INTEGER;
+    code[3u] = 2u;
+
+    code = spirv_new_instruction (context, &context->base_type_section, 4u);
+    code[0u] |= SpvOpCodeMask & SpvOpTypePointer;
+    code[1u] = SPIRV_FIXED_ID_TYPE_I2_INPUT_POINTER;
+    code[2u] = SpvStorageClassInput;
+    code[3u] = SPIRV_FIXED_ID_TYPE_I2;
+
+    code = spirv_new_instruction (context, &context->base_type_section, 4u);
+    code[0u] |= SpvOpCodeMask & SpvOpTypePointer;
+    code[1u] = SPIRV_FIXED_ID_TYPE_I2_OUTPUT_POINTER;
+    code[2u] = SpvStorageClassOutput;
+    code[3u] = SPIRV_FIXED_ID_TYPE_I2;
+
+    code = spirv_new_instruction (context, &context->base_type_section, 4u);
+    code[0u] |= SpvOpCodeMask & SpvOpTypeVector;
+    code[1u] = SPIRV_FIXED_ID_TYPE_I3;
+    code[2u] = SPIRV_FIXED_ID_TYPE_INTEGER;
+    code[3u] = 3u;
+
+    code = spirv_new_instruction (context, &context->base_type_section, 4u);
+    code[0u] |= SpvOpCodeMask & SpvOpTypePointer;
+    code[1u] = SPIRV_FIXED_ID_TYPE_I3_INPUT_POINTER;
+    code[2u] = SpvStorageClassInput;
+    code[3u] = SPIRV_FIXED_ID_TYPE_I3;
+
+    code = spirv_new_instruction (context, &context->base_type_section, 4u);
+    code[0u] |= SpvOpCodeMask & SpvOpTypePointer;
+    code[1u] = SPIRV_FIXED_ID_TYPE_I3_OUTPUT_POINTER;
+    code[2u] = SpvStorageClassOutput;
+    code[3u] = SPIRV_FIXED_ID_TYPE_I3;
+
+    code = spirv_new_instruction (context, &context->base_type_section, 4u);
+    code[0u] |= SpvOpCodeMask & SpvOpTypeVector;
+    code[1u] = SPIRV_FIXED_ID_TYPE_I4;
+    code[2u] = SPIRV_FIXED_ID_TYPE_INTEGER;
+    code[3u] = 4u;
+
+    code = spirv_new_instruction (context, &context->base_type_section, 4u);
+    code[0u] |= SpvOpCodeMask & SpvOpTypePointer;
+    code[1u] = SPIRV_FIXED_ID_TYPE_I4_INPUT_POINTER;
+    code[2u] = SpvStorageClassInput;
+    code[3u] = SPIRV_FIXED_ID_TYPE_I4;
+
+    code = spirv_new_instruction (context, &context->base_type_section, 4u);
+    code[0u] |= SpvOpCodeMask & SpvOpTypePointer;
+    code[1u] = SPIRV_FIXED_ID_TYPE_I4_OUTPUT_POINTER;
+    code[2u] = SpvStorageClassOutput;
+    code[3u] = SPIRV_FIXED_ID_TYPE_I4;
+
+    code = spirv_new_instruction (context, &context->base_type_section, 4u);
+    code[0u] |= SpvOpCodeMask & SpvOpTypeMatrix;
+    code[1u] = SPIRV_FIXED_ID_TYPE_F3X3;
+    code[2u] = SPIRV_FIXED_ID_TYPE_F3;
+    code[3u] = 3u;
+
+    code = spirv_new_instruction (context, &context->base_type_section, 4u);
+    code[0u] |= SpvOpCodeMask & SpvOpTypePointer;
+    code[1u] = SPIRV_FIXED_ID_TYPE_F3X3_INPUT_POINTER;
+    code[2u] = SpvStorageClassInput;
+    code[3u] = SPIRV_FIXED_ID_TYPE_F3X3;
+
+    code = spirv_new_instruction (context, &context->base_type_section, 4u);
+    code[0u] |= SpvOpCodeMask & SpvOpTypePointer;
+    code[1u] = SPIRV_FIXED_ID_TYPE_F3X3_OUTPUT_POINTER;
+    code[2u] = SpvStorageClassOutput;
+    code[3u] = SPIRV_FIXED_ID_TYPE_F3X3;
+
+    code = spirv_new_instruction (context, &context->base_type_section, 4u);
+    code[0u] |= SpvOpCodeMask & SpvOpTypeMatrix;
+    code[1u] = SPIRV_FIXED_ID_TYPE_F4X4;
+    code[2u] = SPIRV_FIXED_ID_TYPE_F4;
+    code[3u] = 4u;
+
+    code = spirv_new_instruction (context, &context->base_type_section, 4u);
+    code[0u] |= SpvOpCodeMask & SpvOpTypePointer;
+    code[1u] = SPIRV_FIXED_ID_TYPE_F4X4_INPUT_POINTER;
+    code[2u] = SpvStorageClassInput;
+    code[3u] = SPIRV_FIXED_ID_TYPE_F4X4;
+
+    code = spirv_new_instruction (context, &context->base_type_section, 4u);
+    code[0u] |= SpvOpCodeMask & SpvOpTypePointer;
+    code[1u] = SPIRV_FIXED_ID_TYPE_F4X4_OUTPUT_POINTER;
+    code[2u] = SpvStorageClassOutput;
+    code[3u] = SPIRV_FIXED_ID_TYPE_F4X4;
+}
+
+static void spirv_init_generation_context (struct spirv_generation_context_t *context,
+                                           struct rpl_compiler_instance_t *instance)
+{
+    context->instance = instance;
+    context->current_bound = (uint32_t) SPIRV_FIXED_ID_END;
+    context->code_word_count = 0u;
+    context->emit_result = KAN_TRUE;
+
+    context->debug_section.first = NULL;
+    context->debug_section.last = NULL;
+    context->annotation_section.first = NULL;
+    context->annotation_section.last = NULL;
+    context->base_type_section.first = NULL;
+    context->base_type_section.last = NULL;
+    context->higher_type_section.first = NULL;
+    context->higher_type_section.last = NULL;
+    context->global_variable_section.first = NULL;
+    context->global_variable_section.last = NULL;
+    context->functions_section.first = NULL;
+    context->functions_section.last = NULL;
+
+    kan_stack_group_allocator_init (&context->temporary_allocator, rpl_compiler_instance_allocation_group,
+                                    KAN_RPL_PARSER_SPIRV_GENERATION_TEMPORARY_SIZE);
+
+    spirv_generate_standard_types (context);
+}
+
+static inline void spirv_copy_instructions (uint32_t **output,
+                                            struct spirv_arbitrary_instruction_item_t *instruction_item)
+{
+    while (instruction_item)
+    {
+        const uint32_t word_count = (*instruction_item->code & ~SpvOpCodeMask) >> SpvWordCountShift;
+        memcpy (*output, instruction_item->code, word_count * sizeof (uint32_t));
+        *output += word_count;
+        instruction_item = instruction_item->next;
+    }
+}
+
+static kan_bool_t spirv_finalize_generation_context (struct spirv_generation_context_t *context,
+                                                     struct kan_dynamic_array_t *code_output)
+{
+    struct spirv_arbitrary_instruction_section_t base_section;
+    base_section.first = NULL;
+    base_section.last = NULL;
+
+    switch (context->instance->pipeline_type)
+    {
+    case KAN_RPL_PIPELINE_TYPE_GRAPHICS_CLASSIC:
+    {
+        uint32_t *op_shader_capability = spirv_new_instruction (context, &base_section, 2u);
+        *op_shader_capability |= SpvOpCodeMask & SpvOpCapability;
+        *(op_shader_capability + 1u) = SpvCapabilityShader;
+        break;
+    }
+    }
+
+    static const char glsl_library_padded[] = "GLSL.std.450\0\0\0";
+    _Static_assert (sizeof (glsl_library_padded) % sizeof (uint32_t) == 0u, "GLSL library name is really padded.");
+    uint32_t *op_glsl_import =
+        spirv_new_instruction (context, &base_section, 2u + sizeof (glsl_library_padded) / sizeof (uint32_t));
+    op_glsl_import[0u] |= SpvOpCodeMask & SpvOpExtInstImport;
+    op_glsl_import[1u] = (uint32_t) SPIRV_FIXED_ID_GLSL_LIBRARY;
+    memcpy (&op_glsl_import[2u], glsl_library_padded, sizeof (glsl_library_padded));
+
+    switch (context->instance->pipeline_type)
+    {
+    case KAN_RPL_PIPELINE_TYPE_GRAPHICS_CLASSIC:
+    {
+        uint32_t *op_memory_model = spirv_new_instruction (context, &base_section, 3u);
+        op_memory_model[0u] |= SpvOpCodeMask & SpvOpMemoryModel;
+        op_memory_model[1u] = SpvAddressingModelLogical;
+        op_memory_model[2u] = SpvMemoryModelGLSL450;
+        break;
+    }
+    }
+
+    // TODO: Generate entry points.
+
+    kan_dynamic_array_set_capacity (code_output, 5u + context->code_word_count);
+    code_output->size = code_output->capacity;
+
+    uint32_t *output = (uint32_t *) code_output->data;
+    output[0u] = SpvMagicNumber;
+    output[1u] = 0x00010300;
+    output[2u] = 0u;
+    output[3u] = context->current_bound;
+    output[4u] = 0u;
+    output += 5u;
+
+    spirv_copy_instructions (&output, base_section.first);
+    spirv_copy_instructions (&output, context->debug_section.first);
+    spirv_copy_instructions (&output, context->annotation_section.first);
+    spirv_copy_instructions (&output, context->base_type_section.first);
+    spirv_copy_instructions (&output, context->higher_type_section.first);
+    spirv_copy_instructions (&output, context->global_variable_section.first);
+    spirv_copy_instructions (&output, context->functions_section.first);
+
+    kan_stack_group_allocator_shutdown (&context->temporary_allocator);
+    return context->emit_result;
+}
+
+static inline void spirv_emit_struct_from_declaration_list (struct spirv_generation_context_t *context,
+                                                            struct compiler_instance_declaration_node_t *first_field,
+                                                            const char *debug_struct_name,
+                                                            uint32_t struct_id)
+{
+    spirv_generate_op_name (context, struct_id, debug_struct_name);
+    uint64_t field_count = 0u;
+    struct compiler_instance_declaration_node_t *field = first_field;
+
+    while (field)
+    {
+        ++field_count;
+        field = field->next;
+    }
+
+    uint32_t *struct_code = spirv_new_instruction (context, &context->higher_type_section, 2u + field_count);
+    struct_code[0u] |= SpvOpCodeMask & SpvOpTypeStruct;
+    struct_code[1u] = struct_id;
+
+    uint64_t field_index = 0u;
+    field = first_field;
+
+    while (field)
+    {
+        uint32_t base_type_id;
+        if (field->variable.type_if_vector)
+        {
+            base_type_id = field->variable.type_if_vector->spirv_id;
+        }
+        else if (field->variable.type_if_matrix)
+        {
+            base_type_id = field->variable.type_if_matrix->spirv_id;
+        }
+        else if (field->variable.type_if_struct)
+        {
+            base_type_id = field->variable.type_if_struct->spirv_id;
+        }
+        else
+        {
+            // Should've been handled by resolve, now it is too late.
+            KAN_ASSERT (KAN_FALSE)
+            base_type_id = UINT32_MAX;
+        }
+
+        uint32_t field_type_id = base_type_id;
+        if (field->variable.array_dimensions_count > 0u)
+        {
+            uint64_t dimension_index = field->variable.array_dimensions_count;
+            do
+            {
+                --dimension_index;
+                uint32_t constant_id = context->current_bound;
+                ++context->current_bound;
+
+                uint32_t *dimension_size_code = spirv_new_instruction (context, &context->base_type_section, 4u);
+                dimension_size_code[0u] |= SpvOpCodeMask & SpvOpConstant;
+                dimension_size_code[1u] = type_i1.spirv_id;
+                dimension_size_code[2u] = constant_id;
+                dimension_size_code[3u] = (uint32_t) field->variable.array_dimensions[dimension_index];
+
+                uint32_t array_type_id = context->current_bound;
+                ++context->current_bound;
+
+                uint32_t *dimension_type_code = spirv_new_instruction (context, &context->base_type_section, 4u);
+                dimension_type_code[0u] |= SpvOpCodeMask & SpvOpTypeArray;
+                dimension_type_code[1u] = array_type_id;
+                dimension_type_code[2u] = field_type_id;
+                dimension_type_code[3u] = constant_id;
+
+                field_type_id = array_type_id;
+            } while (dimension_index > 0u);
+        }
+
+        struct_code[2u + field_index] = field_type_id;
+        spirv_generate_op_member_name (context, struct_id, (uint32_t) field_index, field->variable.name);
+        field = field->next;
+        ++field_index;
+    }
+}
+
+static inline void spirv_emit_location (struct spirv_generation_context_t *context, uint32_t for_id, uint32_t location)
+{
+    uint32_t *location_code = spirv_new_instruction (context, &context->annotation_section, 4u);
+    location_code[0u] |= SpvOpCodeMask & SpvOpDecorate;
+    location_code[1u] = for_id;
+    location_code[2u] = SpvDecorationLocation;
+    location_code[3u] = location;
+}
+
+static inline void spirv_emit_binding (struct spirv_generation_context_t *context, uint32_t for_id, uint32_t binding)
+{
+    uint32_t *binding_code = spirv_new_instruction (context, &context->annotation_section, 4u);
+    binding_code[0u] |= SpvOpCodeMask & SpvOpDecorate;
+    binding_code[1u] = for_id;
+    binding_code[2u] = SpvDecorationBinding;
+    binding_code[3u] = binding;
+}
+
+static inline void spirv_emit_flattened_input_variable (
+    struct spirv_generation_context_t *context, struct compiler_instance_buffer_flattened_declaration_t *declaration)
+{
+    declaration->spirv_id_input = context->current_bound;
+    ++context->current_bound;
+
+    uint32_t *variable_code = spirv_new_instruction (context, &context->global_variable_section, 4u);
+    variable_code[0u] |= SpvOpCodeMask & SpvOpVariable;
+
+    if (declaration->source_declaration->variable.type_if_vector)
+    {
+        variable_code[1u] = declaration->source_declaration->variable.type_if_vector->spirv_id_input_pointer;
+    }
+    else if (declaration->source_declaration->variable.type_if_matrix)
+    {
+        variable_code[1u] = declaration->source_declaration->variable.type_if_matrix->spirv_id_input_pointer;
+    }
+    else
+    {
+        KAN_ASSERT (KAN_FALSE)
+    }
+
+    variable_code[2u] = declaration->spirv_id_input;
+    variable_code[3u] = SpvStorageClassInput;
+
+    spirv_emit_location (context, declaration->spirv_id_input, declaration->location);
+    spirv_generate_op_name (context, declaration->spirv_id_input, declaration->readable_name);
+}
+
+static inline void spirv_emit_flattened_output_variable (
+    struct spirv_generation_context_t *context, struct compiler_instance_buffer_flattened_declaration_t *declaration)
+{
+    declaration->spirv_id_output = context->current_bound;
+    ++context->current_bound;
+
+    uint32_t *variable_code = spirv_new_instruction (context, &context->global_variable_section, 4u);
+    variable_code[0u] |= SpvOpCodeMask & SpvOpVariable;
+
+    if (declaration->source_declaration->variable.type_if_vector)
+    {
+        variable_code[1u] = declaration->source_declaration->variable.type_if_vector->spirv_id_output_pointer;
+    }
+    else if (declaration->source_declaration->variable.type_if_matrix)
+    {
+        variable_code[1u] = declaration->source_declaration->variable.type_if_matrix->spirv_id_output_pointer;
+    }
+    else
+    {
+        KAN_ASSERT (KAN_FALSE)
+    }
+
+    variable_code[2u] = declaration->spirv_id_output;
+    variable_code[3u] = SpvStorageClassOutput;
+
+    spirv_emit_location (context, declaration->spirv_id_output, declaration->location);
+    spirv_generate_op_name (context, declaration->spirv_id_output, declaration->readable_name);
+}
+
+kan_bool_t kan_rpl_compiler_instance_emit_spirv (kan_rpl_compiler_instance_t compiler_instance,
+                                                 struct kan_dynamic_array_t *output,
+                                                 kan_allocation_group_t output_allocation_group)
+{
+    kan_dynamic_array_init (output, 0u, sizeof (uint32_t), _Alignof (uint32_t), output_allocation_group);
+    struct rpl_compiler_instance_t *instance = (struct rpl_compiler_instance_t *) compiler_instance;
+    struct spirv_generation_context_t context;
+    spirv_init_generation_context (&context, instance);
+
+    struct compiler_instance_struct_node_t *struct_node = instance->first_struct;
+    while (struct_node)
+    {
+        struct_node->spirv_id = context.current_bound;
+        ++context.current_bound;
+        spirv_emit_struct_from_declaration_list (&context, struct_node->first_field, struct_node->name,
+                                                 struct_node->spirv_id);
+        struct_node = struct_node->next;
+    }
+
+    struct compiler_instance_buffer_node_t *buffer = instance->first_buffer;
+    while (buffer)
+    {
+        if (!buffer->used)
+        {
+            buffer = buffer->next;
+            continue;
+        }
+
+        if (buffer->first_flattened_declaration)
+        {
+            buffer->structured_variable_spirv_id = UINT32_MAX;
+            struct compiler_instance_buffer_flattened_declaration_t *declaration = buffer->first_flattened_declaration;
+
+            while (declaration)
+            {
+                declaration->spirv_id_input = UINT32_MAX;
+                declaration->spirv_id_output = UINT32_MAX;
+
+                switch (buffer->type)
+                {
+                case KAN_RPL_BUFFER_TYPE_VERTEX_ATTRIBUTE:
+                case KAN_RPL_BUFFER_TYPE_INSTANCED_ATTRIBUTE:
+                    spirv_emit_flattened_input_variable (&context, declaration);
+                    break;
+
+                case KAN_RPL_BUFFER_TYPE_UNIFORM:
+                case KAN_RPL_BUFFER_TYPE_READ_ONLY_STORAGE:
+                case KAN_RPL_BUFFER_TYPE_INSTANCED_UNIFORM:
+                case KAN_RPL_BUFFER_TYPE_INSTANCED_READ_ONLY_STORAGE:
+                    KAN_ASSERT (KAN_FALSE)
+                    break;
+
+                case KAN_RPL_BUFFER_TYPE_VERTEX_STAGE_OUTPUT:
+                    spirv_emit_flattened_input_variable (&context, declaration);
+                    spirv_emit_flattened_output_variable (&context, declaration);
+                    break;
+
+                case KAN_RPL_BUFFER_TYPE_FRAGMENT_STAGE_OUTPUT:
+                    spirv_emit_flattened_output_variable (&context, declaration);
+                    break;
+                }
+
+                declaration = declaration->next;
+            }
+        }
+        else
+        {
+            uint32_t buffer_struct_id = context.current_bound;
+            ++context.current_bound;
+            spirv_emit_struct_from_declaration_list (&context, buffer->first_field, buffer->name, buffer_struct_id);
+
+            if (buffer->type == KAN_RPL_BUFFER_TYPE_INSTANCED_UNIFORM ||
+                buffer->type == KAN_RPL_BUFFER_TYPE_INSTANCED_READ_ONLY_STORAGE)
+            {
+                uint32_t runtime_array_id = context.current_bound;
+                ++context.current_bound;
+
+                uint32_t *runtime_array_code = spirv_new_instruction (&context, &context.higher_type_section, 3u);
+                runtime_array_code[0u] |= SpvOpCodeMask & SpvOpTypeRuntimeArray;
+                runtime_array_code[1u] = runtime_array_id;
+                runtime_array_code[2u] = buffer_struct_id;
+
+                uint32_t real_buffer_struct_id = context.current_bound;
+                ++context.current_bound;
+
+                uint32_t *wrapper_struct_code = spirv_new_instruction (&context, &context.higher_type_section, 3u);
+                wrapper_struct_code[0u] |= SpvOpCodeMask & SpvOpTypeStruct;
+                wrapper_struct_code[1u] = real_buffer_struct_id;
+                wrapper_struct_code[2u] = runtime_array_id;
+
+                uint32_t *wrapper_decorate_code = spirv_new_instruction (&context, &context.annotation_section, 3u);
+                wrapper_decorate_code[0u] |= SpvOpCodeMask & SpvOpDecorate;
+                wrapper_decorate_code[1u] = real_buffer_struct_id;
+                wrapper_decorate_code[2u] = SpvDecorationBlock;
+
+                spirv_generate_op_name (&context, real_buffer_struct_id, buffer->name);
+                spirv_generate_op_member_name (&context, real_buffer_struct_id, 0u, "instanced_data");
+                buffer_struct_id = real_buffer_struct_id;
+            }
+
+            uint32_t storage_type = UINT32_MAX;
+            switch (buffer->type)
+            {
+            case KAN_RPL_BUFFER_TYPE_VERTEX_ATTRIBUTE:
+            case KAN_RPL_BUFFER_TYPE_INSTANCED_ATTRIBUTE:
+            case KAN_RPL_BUFFER_TYPE_VERTEX_STAGE_OUTPUT:
+            case KAN_RPL_BUFFER_TYPE_FRAGMENT_STAGE_OUTPUT:
+                KAN_ASSERT (KAN_FALSE)
+                break;
+
+            case KAN_RPL_BUFFER_TYPE_UNIFORM:
+            case KAN_RPL_BUFFER_TYPE_INSTANCED_UNIFORM:
+                storage_type = SpvStorageClassUniform;
+                break;
+
+            case KAN_RPL_BUFFER_TYPE_READ_ONLY_STORAGE:
+            case KAN_RPL_BUFFER_TYPE_INSTANCED_READ_ONLY_STORAGE:
+                storage_type = SpvStorageClassStorageBuffer;
+                break;
+            }
+
+            uint32_t buffer_struct_pointer_id = context.current_bound;
+            ++context.current_bound;
+
+            uint32_t *pointer_code = spirv_new_instruction (&context, &context.higher_type_section, 4u);
+            pointer_code[0u] |= SpvOpCodeMask & SpvOpTypePointer;
+            pointer_code[1u] = buffer_struct_pointer_id;
+            pointer_code[2u] = storage_type;
+            pointer_code[3u] = buffer_struct_id;
+
+            buffer->structured_variable_spirv_id = context.current_bound;
+            ++context.current_bound;
+
+            uint32_t *variable_code = spirv_new_instruction (&context, &context.global_variable_section, 4u);
+            variable_code[0u] |= SpvOpCodeMask & SpvOpVariable;
+            variable_code[1u] = buffer_struct_pointer_id;
+            variable_code[2u] = buffer->structured_variable_spirv_id;
+            variable_code[3u] = storage_type;
+
+            spirv_emit_binding (&context, buffer->structured_variable_spirv_id, buffer->binding);
+            spirv_generate_op_name (&context, buffer->structured_variable_spirv_id, buffer->name);
+        }
+
+        buffer = buffer->next;
+    }
+
+    // TODO: Implement.
+
+    return spirv_finalize_generation_context (&context, output);
 }
 
 void kan_rpl_compiler_instance_destroy (kan_rpl_compiler_instance_t compiler_instance)

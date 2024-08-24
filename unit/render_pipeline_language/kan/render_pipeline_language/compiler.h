@@ -211,10 +211,13 @@ kan_rpl_compiler_context_resolve (kan_rpl_compiler_context_t compiler_context,
                                   uint64_t entry_point_count,
                                   struct kan_rpl_entry_point_t *entry_points);
 
-RENDER_PIPELINE_LANGUAGE_API kan_bool_t kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t compiler_instance,
-                                                                       struct kan_rpl_meta_t *meta);
+RENDER_PIPELINE_LANGUAGE_API kan_bool_t
+kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t compiler_instance, struct kan_rpl_meta_t *meta);
 
-// TODO: Instance SPIRV code generation.
+RENDER_PIPELINE_LANGUAGE_API kan_bool_t
+kan_rpl_compiler_instance_emit_spirv (kan_rpl_compiler_instance_t compiler_instance,
+                                      struct kan_dynamic_array_t *output,
+                                      kan_allocation_group_t output_allocation_group);
 
 RENDER_PIPELINE_LANGUAGE_API void kan_rpl_compiler_instance_destroy (kan_rpl_compiler_instance_t compiler_instance);
 
