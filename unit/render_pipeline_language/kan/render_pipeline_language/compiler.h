@@ -200,9 +200,8 @@ kan_rpl_compiler_context_create (enum kan_rpl_pipeline_type_t pipeline_type, kan
 RENDER_PIPELINE_LANGUAGE_API kan_bool_t kan_rpl_compiler_context_use_module (
     kan_rpl_compiler_context_t compiler_context, struct kan_rpl_intermediate_t *intermediate_reference);
 
-RENDER_PIPELINE_LANGUAGE_API kan_bool_t kan_rpl_compiler_context_set_option_flag (kan_rpl_compiler_context_t compiler_context,
-                                                                            kan_interned_string_t name,
-                                                                            kan_bool_t value);
+RENDER_PIPELINE_LANGUAGE_API kan_bool_t kan_rpl_compiler_context_set_option_flag (
+    kan_rpl_compiler_context_t compiler_context, kan_interned_string_t name, kan_bool_t value);
 
 RENDER_PIPELINE_LANGUAGE_API kan_bool_t kan_rpl_compiler_context_set_option_count (
     kan_rpl_compiler_context_t compiler_context, kan_interned_string_t name, uint64_t value);
@@ -212,7 +211,8 @@ kan_rpl_compiler_context_resolve (kan_rpl_compiler_context_t compiler_context,
                                   uint64_t entry_point_count,
                                   struct kan_rpl_entry_point_t *entry_points);
 
-// TODO: Instance meta generation.
+RENDER_PIPELINE_LANGUAGE_API kan_bool_t kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t compiler_instance,
+                                                                       struct kan_rpl_meta_t *meta);
 
 // TODO: Instance SPIRV code generation.
 
