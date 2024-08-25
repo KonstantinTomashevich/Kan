@@ -178,6 +178,8 @@ struct compiler_instance_sampler_node_t
     uint64_t binding;
     struct compiler_instance_setting_node_t *first_setting;
 
+    uint32_t variable_spirv_id;
+
     kan_interned_string_t module_name;
     kan_interned_string_t source_name;
     uint32_t source_line;
@@ -554,6 +556,12 @@ enum spirv_fixed_ids_t
     SPIRV_FIXED_ID_TYPE_F4X4,
     SPIRV_FIXED_ID_TYPE_F4X4_INPUT_POINTER,
     SPIRV_FIXED_ID_TYPE_F4X4_OUTPUT_POINTER,
+
+    SPIRV_FIXED_ID_TYPE_COMMON_SAMPLER,
+
+    SPIRV_FIXED_ID_TYPE_SAMPLER_2D_IMAGE,
+    SPIRV_FIXED_ID_TYPE_SAMPLER_2D,
+    SPIRV_FIXED_ID_TYPE_SAMPLER_2D_POINTER,
 
     SPIRV_FIXED_ID_GLSL_LIBRARY,
 
@@ -5334,8 +5342,8 @@ kan_rpl_compiler_instance_t kan_rpl_compiler_context_resolve (kan_rpl_compiler_c
         struct kan_rpl_intermediate_t *intermediate =
             ((struct kan_rpl_intermediate_t **) context->modules.data)[intermediate_index];
 
-        if (!resolve_settings (context, instance, intermediate, &intermediate->settings,
-                               &instance->first_setting, &instance->last_setting))
+        if (!resolve_settings (context, instance, intermediate, &intermediate->settings, &instance->first_setting,
+                               &instance->last_setting))
         {
             successfully_resolved = KAN_FALSE;
         }
@@ -5964,6 +5972,10 @@ static void spirv_generate_standard_types (struct spirv_generation_context_t *co
     spirv_generate_op_name (context, SPIRV_FIXED_ID_TYPE_I4, "i4");
     spirv_generate_op_name (context, SPIRV_FIXED_ID_TYPE_F3X3, "f3x3");
     spirv_generate_op_name (context, SPIRV_FIXED_ID_TYPE_F4X4, "f4x4");
+    spirv_generate_op_name (context, SPIRV_FIXED_ID_TYPE_COMMON_SAMPLER, "common_sampler_type");
+    spirv_generate_op_name (context, SPIRV_FIXED_ID_TYPE_SAMPLER_2D_IMAGE, "sampler_2d_image");
+    spirv_generate_op_name (context, SPIRV_FIXED_ID_TYPE_SAMPLER_2D, "sampler_2d");
+    spirv_generate_op_name (context, SPIRV_FIXED_ID_TYPE_SAMPLER_2D_POINTER, "sampler_2d");
 
     uint32_t *code = spirv_new_instruction (context, &context->base_type_section, 2u);
     code[0u] |= SpvOpCodeMask & SpvOpTypeVoid;
@@ -6151,6 +6163,31 @@ static void spirv_generate_standard_types (struct spirv_generation_context_t *co
     code[1u] = SPIRV_FIXED_ID_TYPE_F4X4_OUTPUT_POINTER;
     code[2u] = SpvStorageClassOutput;
     code[3u] = SPIRV_FIXED_ID_TYPE_F4X4;
+
+    code = spirv_new_instruction (context, &context->base_type_section, 2u);
+    code[0u] |= SpvOpCodeMask & SpvOpTypeSampler;
+    code[1u] = SPIRV_FIXED_ID_TYPE_COMMON_SAMPLER;
+
+    code = spirv_new_instruction (context, &context->base_type_section, 9u);
+    code[0u] |= SpvOpCodeMask & SpvOpTypeImage;
+    code[1u] = SPIRV_FIXED_ID_TYPE_SAMPLER_2D_IMAGE;
+    code[2u] = type_f1.spirv_id;
+    code[3u] = SpvDim2D;
+    code[4u] = 0u;
+    code[5u] = 0u;
+    code[7u] = 1u;
+    code[8u] = SpvImageFormatUnknown;
+
+    code = spirv_new_instruction (context, &context->base_type_section, 3u);
+    code[0u] |= SpvOpCodeMask & SpvOpTypeSampledImage;
+    code[1u] = SPIRV_FIXED_ID_TYPE_SAMPLER_2D;
+    code[2u] = SPIRV_FIXED_ID_TYPE_SAMPLER_2D_IMAGE;
+
+    code = spirv_new_instruction (context, &context->base_type_section, 4u);
+    code[0u] |= SpvOpCodeMask & SpvOpTypePointer;
+    code[1u] = SPIRV_FIXED_ID_TYPE_SAMPLER_2D_POINTER;
+    code[2u] = SpvStorageClassUniformConstant;
+    code[3u] = SPIRV_FIXED_ID_TYPE_SAMPLER_2D;
 }
 
 static void spirv_init_generation_context (struct spirv_generation_context_t *context,
@@ -6523,7 +6560,7 @@ kan_bool_t kan_rpl_compiler_instance_emit_spirv (kan_rpl_compiler_instance_t com
 
             case KAN_RPL_BUFFER_TYPE_UNIFORM:
             case KAN_RPL_BUFFER_TYPE_INSTANCED_UNIFORM:
-                storage_type = SpvStorageClassUniform;
+                storage_type = SpvStorageClassUniformConstant;
                 break;
 
             case KAN_RPL_BUFFER_TYPE_READ_ONLY_STORAGE:
@@ -6557,7 +6594,42 @@ kan_bool_t kan_rpl_compiler_instance_emit_spirv (kan_rpl_compiler_instance_t com
         buffer = buffer->next;
     }
 
-    // TODO: Implement.
+    struct compiler_instance_sampler_node_t *sampler = instance->first_sampler;
+    while (sampler)
+    {
+        if (!sampler->used)
+        {
+            sampler = sampler->next;
+            continue;
+        }
+
+        sampler->variable_spirv_id = context.current_bound;
+        ++context.current_bound;
+
+        uint32_t *sampler_code = spirv_new_instruction (&context, &context.global_variable_section, 4u);
+        sampler_code[0u] |= SpvOpCodeMask & SpvOpVariable;
+
+        switch (sampler->type)
+        {
+        case KAN_RPL_SAMPLER_TYPE_2D:
+            sampler_code[1u] = SPIRV_FIXED_ID_TYPE_SAMPLER_2D_POINTER;
+            break;
+        }
+
+        sampler_code[2u] = sampler->variable_spirv_id;
+        sampler_code[3u] = SpvStorageClassUniformConstant;
+
+        spirv_emit_binding (&context, sampler->variable_spirv_id, sampler->binding);
+        spirv_generate_op_name (&context, sampler->variable_spirv_id, sampler->name);
+        sampler = sampler->next;
+    }
+
+    struct compiler_instance_function_node_t *function_node = instance->first_function;
+    while (function_node)
+    {
+        // TODO: Implement.
+        function_node = function_node->next;
+    }
 
     return spirv_finalize_generation_context (&context, output);
 }

@@ -300,8 +300,6 @@ struct kan_rpl_declaration_t
     uint32_t source_line;
 };
 
-// TODO: What about lining all declarations into common storage like expressions?
-
 struct kan_rpl_struct_t
 {
     kan_interned_string_t name;
