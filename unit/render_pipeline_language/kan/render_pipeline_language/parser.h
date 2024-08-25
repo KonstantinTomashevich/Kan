@@ -71,7 +71,7 @@ enum kan_rpl_unary_operation_t
     KAN_RPL_UNARY_OPERATION_BITWISE_NOT,
 };
 
-enum kan_rpl_expression_node_type_t
+enum kan_rpl_expression_type_t
 {
     KAN_RPL_EXPRESSION_NODE_TYPE_NOPE = 0u,
     KAN_RPL_EXPRESSION_NODE_TYPE_IDENTIFIER,
@@ -93,15 +93,86 @@ enum kan_rpl_expression_node_type_t
     KAN_RPL_EXPRESSION_NODE_TYPE_RETURN,
 };
 
+#define KAN_RPL_EXPRESSION_INDEX_NONE UINT64_MAX
+
 struct kan_rpl_variable_declaration_data_t
 {
     kan_interned_string_t type_name;
     kan_interned_string_t variable_name;
+    uint64_t array_size_expression_list_size;
+    uint64_t array_size_expression_list_index;
 };
 
-struct kan_rpl_expression_node_t
+struct kan_rpl_binary_operation_data_t
 {
-    enum kan_rpl_expression_node_type_t type;
+    enum kan_rpl_binary_operation_t operation;
+    uint64_t left_operand_index;
+    uint64_t right_operand_index;
+};
+
+struct kan_rpl_unary_operation_data_t
+{
+    enum kan_rpl_unary_operation_t operation;
+    uint64_t operand_index;
+};
+
+struct kan_rpl_scope_data_t
+{
+    uint64_t statement_list_size;
+    uint64_t statement_list_index;
+};
+
+struct kan_rpl_function_call_data_t
+{
+    kan_interned_string_t name;
+    uint64_t argument_list_size;
+    uint64_t argument_list_index;
+};
+
+struct kan_rpl_constructor_data_t
+{
+    kan_interned_string_t type_name;
+    uint64_t argument_list_size;
+    uint64_t argument_list_index;
+};
+
+struct kan_rpl_if_data_t
+{
+    uint64_t condition_index;
+    uint64_t true_index;
+    uint64_t false_index;
+};
+
+struct kan_rpl_for_data_t
+{
+    uint64_t init_index;
+    uint64_t condition_index;
+    uint64_t step_index;
+    uint64_t body_index;
+};
+
+struct kan_rpl_while_data_t
+{
+    uint64_t condition_index;
+    uint64_t body_index;
+};
+
+struct kan_rpl_conditional_scope_data_t
+{
+    uint64_t condition_index;
+    uint64_t body_index;
+};
+
+struct kan_rpl_conditional_alias_data_t
+{
+    uint64_t condition_index;
+    kan_interned_string_t name;
+    uint64_t expression_index;
+};
+
+struct kan_rpl_expression_t
+{
+    enum kan_rpl_expression_type_t type;
     union
     {
         /// \meta reflection_visibility_condition_field = "type"
@@ -122,53 +193,52 @@ struct kan_rpl_expression_node_t
 
         /// \meta reflection_visibility_condition_field = "type"
         /// \meta reflection_visibility_condition_values = "(int64_t) KAN_RPL_EXPRESSION_NODE_TYPE_BINARY_OPERATION"
-        enum kan_rpl_binary_operation_t binary_operation;
+        struct kan_rpl_binary_operation_data_t binary_operation;
 
         /// \meta reflection_visibility_condition_field = "type"
         /// \meta reflection_visibility_condition_values = "(int64_t) KAN_RPL_EXPRESSION_NODE_TYPE_UNARY_OPERATION"
-        enum kan_rpl_unary_operation_t unary_operation;
+        struct kan_rpl_unary_operation_data_t unary_operation;
+
+        /// \meta reflection_visibility_condition_field = "type"
+        /// \meta reflection_visibility_condition_values = "(int64_t) KAN_RPL_EXPRESSION_NODE_TYPE_SCOPE"
+        struct kan_rpl_scope_data_t scope;
 
         /// \meta reflection_visibility_condition_field = "type"
         /// \meta reflection_visibility_condition_values = "(int64_t) KAN_RPL_EXPRESSION_NODE_TYPE_FUNCTION_CALL"
-        kan_interned_string_t function_name;
+        struct kan_rpl_function_call_data_t function_call;
 
         /// \meta reflection_visibility_condition_field = "type"
         /// \meta reflection_visibility_condition_values = "(int64_t) KAN_RPL_EXPRESSION_NODE_TYPE_CONSTRUCTOR"
-        kan_interned_string_t constructor_type_name;
+        struct kan_rpl_constructor_data_t constructor;
+
+        /// \meta reflection_visibility_condition_field = "type"
+        /// \meta reflection_visibility_condition_values = "(int64_t) KAN_RPL_EXPRESSION_NODE_TYPE_IF"
+        struct kan_rpl_if_data_t if_;
+
+        /// \meta reflection_visibility_condition_field = "type"
+        /// \meta reflection_visibility_condition_values = "(int64_t) KAN_RPL_EXPRESSION_NODE_TYPE_FOR"
+        struct kan_rpl_for_data_t for_;
+
+        /// \meta reflection_visibility_condition_field = "type"
+        /// \meta reflection_visibility_condition_values = "(int64_t) KAN_RPL_EXPRESSION_NODE_TYPE_WHILE"
+        struct kan_rpl_while_data_t while_;
+
+        /// \meta reflection_visibility_condition_field = "type"
+        /// \meta reflection_visibility_condition_values = "(int64_t) KAN_RPL_EXPRESSION_NODE_TYPE_CONDITIONAL_SCOPE"
+        struct kan_rpl_conditional_scope_data_t conditional_scope;
 
         /// \meta reflection_visibility_condition_field = "type"
         /// \meta reflection_visibility_condition_values = "(int64_t) KAN_RPL_EXPRESSION_NODE_TYPE_CONDITIONAL_ALIAS"
-        kan_interned_string_t alias_name;
-    };
+        struct kan_rpl_conditional_alias_data_t conditional_alias;
 
-    /// \brief Array of children in AST.
-    /// \details Children for types that support them:
-    ///          - KAN_RPL_EXPRESSION_NODE_TYPE_VARIABLE_DECLARATION: If items exist, then variable is array and
-    ///                                                               items are array dimensions sizes.
-    ///          - KAN_RPL_EXPRESSION_NODE_TYPE_BINARY_OPERATION: 0 is left operand and 1 is right operand.
-    ///          - KAN_RPL_EXPRESSION_NODE_TYPE_UNARY_OPERATION: 0 is operand.
-    ///          - KAN_RPL_EXPRESSION_NODE_TYPE_SCOPE: All items are expressions inside scope.
-    ///          - KAN_RPL_EXPRESSION_NODE_TYPE_FUNCTION_CALL: All children are function arguments.
-    ///          - KAN_RPL_EXPRESSION_NODE_TYPE_CONSTRUCTOR: All children are constructor arguments.
-    ///          - KAN_RPL_EXPRESSION_NODE_TYPE_IF: 0 is condition, 1 is body scope and 2 is else body
-    ///                                             scope (if present).
-    ///          - KAN_RPL_EXPRESSION_NODE_TYPE_FOR: 0 is initializer, 1 is condition, 2 is incrementer and
-    ///                                              3 is body scope.
-    ///          - KAN_RPL_EXPRESSION_NODE_TYPE_WHILE: 0 is condition and 1 is body scope.
-    ///          - KAN_RPL_EXPRESSION_NODE_TYPE_CONDITIONAL_SCOPE: 0 is condition and 1 is body scope.
-    ///          - KAN_RPL_EXPRESSION_NODE_TYPE_CONDITIONAL_ALIAS: 0 is condition and 1 is alias replacement.
-    ///          - KAN_RPL_EXPRESSION_NODE_TYPE_RETURN: 0 is return value.
-    ///
-    /// \meta reflection_dynamic_array_type = "struct kan_rpl_expression_node_t"
-    struct kan_dynamic_array_t children;
+        /// \meta reflection_visibility_condition_field = "type"
+        /// \meta reflection_visibility_condition_values = "(int64_t) KAN_RPL_EXPRESSION_NODE_TYPE_RETURN"
+        uint64_t return_index;
+    };
 
     kan_interned_string_t source_name;
     uint32_t source_line;
 };
-
-RENDER_PIPELINE_LANGUAGE_API void kan_rpl_expression_node_init (struct kan_rpl_expression_node_t *instance);
-
-RENDER_PIPELINE_LANGUAGE_API void kan_rpl_expression_node_shutdown (struct kan_rpl_expression_node_t *instance);
 
 enum kan_rpl_setting_type_t
 {
@@ -203,39 +273,34 @@ struct kan_rpl_setting_t
     };
 
     /// \details Conditional expression if it is not KAN_RPL_EXPRESSION_NODE_TYPE_NOPE.
-    struct kan_rpl_expression_node_t conditional;
+    uint64_t conditional_index;
 
     kan_interned_string_t source_name;
     uint32_t source_line;
 };
-
-RENDER_PIPELINE_LANGUAGE_API void kan_rpl_setting_init (struct kan_rpl_setting_t *instance);
-
-RENDER_PIPELINE_LANGUAGE_API void kan_rpl_setting_shutdown (struct kan_rpl_setting_t *instance);
 
 struct kan_rpl_declaration_t
 {
     kan_interned_string_t type_name;
     kan_interned_string_t name;
 
-    /// \details Array size expressions if field is array.
-    /// \meta reflection_dynamic_array_type = "struct kan_rpl_expression_node_t"
-    struct kan_dynamic_array_t array_sizes;
+    /// \details Array size expressions list count if declaring array.
+    uint64_t array_size_expression_list_size;
+
+    /// \details Array size expressions list index if declaring array.
+    uint64_t array_size_expression_list_index;
 
     /// \details Conditional expression if it is not KAN_RPL_EXPRESSION_NODE_TYPE_NOPE.
-    struct kan_rpl_expression_node_t conditional;
+    uint64_t conditional_index;
 
-    /// \details Array of meta-tags on this declaration.
-    /// \meta reflection_dynamic_array_type = "kan_interned_string_t"
-    struct kan_dynamic_array_t meta;
+    uint64_t meta_list_size;
+    uint64_t meta_list_index;
 
     kan_interned_string_t source_name;
     uint32_t source_line;
 };
 
-RENDER_PIPELINE_LANGUAGE_API void kan_rpl_declaration_init (struct kan_rpl_declaration_t *instance);
-
-RENDER_PIPELINE_LANGUAGE_API void kan_rpl_declaration_shutdown (struct kan_rpl_declaration_t *instance);
+// TODO: What about lining all declarations into common storage like expressions?
 
 struct kan_rpl_struct_t
 {
@@ -245,7 +310,7 @@ struct kan_rpl_struct_t
     struct kan_dynamic_array_t fields;
 
     /// \details Conditional expression if it is not KAN_RPL_EXPRESSION_NODE_TYPE_NOPE.
-    struct kan_rpl_expression_node_t conditional;
+    uint64_t conditional_index;
 
     kan_interned_string_t source_name;
     uint32_t source_line;
@@ -280,7 +345,7 @@ struct kan_rpl_buffer_t
     struct kan_dynamic_array_t fields;
 
     /// \details Conditional expression if it is not KAN_RPL_EXPRESSION_NODE_TYPE_NOPE.
-    struct kan_rpl_expression_node_t conditional;
+    uint64_t conditional_index;
 
     kan_interned_string_t source_name;
     uint32_t source_line;
@@ -304,7 +369,7 @@ struct kan_rpl_sampler_t
     struct kan_dynamic_array_t settings;
 
     /// \details Conditional expression if it is not KAN_RPL_EXPRESSION_NODE_TYPE_NOPE.
-    struct kan_rpl_expression_node_t conditional;
+    uint64_t conditional_index;
 
     kan_interned_string_t source_name;
     uint32_t source_line;
@@ -322,10 +387,10 @@ struct kan_rpl_function_t
     /// \meta reflection_dynamic_array_type = "struct kan_rpl_declaration_t"
     struct kan_dynamic_array_t arguments;
 
-    struct kan_rpl_expression_node_t body;
+    uint64_t body_index;
 
     /// \details Conditional expression if it is not KAN_RPL_EXPRESSION_NODE_TYPE_NOPE.
-    struct kan_rpl_expression_node_t conditional;
+    uint64_t conditional_index;
 
     kan_interned_string_t source_name;
     uint32_t source_line;
@@ -361,6 +426,15 @@ struct kan_rpl_intermediate_t
 
     /// \meta reflection_dynamic_array_type = "struct kan_rpl_function_t"
     struct kan_dynamic_array_t functions;
+
+    /// \meta reflection_dynamic_array_type = "struct kan_rpl_expression_t"
+    struct kan_dynamic_array_t expression_storage;
+
+    /// \meta reflection_dynamic_array_type = "uint64_t"
+    struct kan_dynamic_array_t expression_lists_storage;
+
+    /// \meta reflection_dynamic_array_type = "kan_interned_string_t"
+    struct kan_dynamic_array_t meta_lists_storage;
 };
 
 RENDER_PIPELINE_LANGUAGE_API void kan_rpl_intermediate_init (struct kan_rpl_intermediate_t *instance);

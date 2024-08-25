@@ -100,7 +100,7 @@ struct parser_expression_conditional_alias_t
 struct parser_expression_tree_node_t
 {
     struct parser_expression_tree_node_t *parent_expression;
-    enum kan_rpl_expression_node_type_t type;
+    enum kan_rpl_expression_type_t type;
 
     union
     {
@@ -381,7 +381,7 @@ static inline void ensure_statics_initialized (void)
 
 static inline struct parser_expression_tree_node_t *parser_expression_tree_node_new (
     struct rpl_parser_t *parser,
-    enum kan_rpl_expression_node_type_t type,
+    enum kan_rpl_expression_type_t type,
     kan_interned_string_t source_log_name,
     uint64_t source_line)
 {
@@ -3283,84 +3283,19 @@ static kan_bool_t parse_main_function (struct rpl_parser_t *parser,
     return KAN_FALSE;
 }
 
-void kan_rpl_expression_node_init (struct kan_rpl_expression_node_t *instance)
-{
-    instance->type = KAN_RPL_EXPRESSION_NODE_TYPE_NOPE;
-    kan_dynamic_array_init (&instance->children, 0u, sizeof (struct kan_rpl_expression_node_t),
-                            _Alignof (struct kan_rpl_expression_node_t), rpl_intermediate_allocation_group);
-    instance->source_name = NULL;
-    instance->source_line = 0u;
-}
-
-void kan_rpl_expression_node_shutdown (struct kan_rpl_expression_node_t *instance)
-{
-    for (uint64_t index = 0u; index < instance->children.size; ++index)
-    {
-        kan_rpl_expression_node_shutdown (&((struct kan_rpl_expression_node_t *) instance->children.data)[index]);
-    }
-
-    kan_dynamic_array_shutdown (&instance->children);
-}
-
-void kan_rpl_setting_init (struct kan_rpl_setting_t *instance)
-{
-    instance->name = NULL;
-    instance->type = KAN_RPL_SETTING_TYPE_FLAG;
-    instance->flag = KAN_FALSE;
-    kan_rpl_expression_node_init (&instance->conditional);
-    instance->source_name = NULL;
-    instance->source_line = 0u;
-}
-
-void kan_rpl_setting_shutdown (struct kan_rpl_setting_t *instance)
-{
-    kan_rpl_expression_node_shutdown (&instance->conditional);
-}
-
-void kan_rpl_declaration_init (struct kan_rpl_declaration_t *instance)
-{
-    instance->type_name = NULL;
-    instance->name = NULL;
-    kan_dynamic_array_init (&instance->array_sizes, 0u, sizeof (struct kan_rpl_expression_node_t),
-                            _Alignof (struct kan_rpl_expression_node_t), rpl_intermediate_allocation_group);
-    kan_dynamic_array_init (&instance->meta, 0u, sizeof (kan_interned_string_t), _Alignof (kan_interned_string_t),
-                            rpl_intermediate_allocation_group);
-    kan_rpl_expression_node_init (&instance->conditional);
-    instance->source_name = NULL;
-    instance->source_line = 0u;
-}
-
-void kan_rpl_declaration_shutdown (struct kan_rpl_declaration_t *instance)
-{
-    for (uint64_t index = 0u; index < instance->array_sizes.size; ++index)
-    {
-        kan_rpl_expression_node_shutdown (&((struct kan_rpl_expression_node_t *) instance->array_sizes.data)[index]);
-    }
-
-    kan_dynamic_array_shutdown (&instance->array_sizes);
-    kan_dynamic_array_shutdown (&instance->meta);
-    kan_rpl_expression_node_shutdown (&instance->conditional);
-}
-
 void kan_rpl_struct_init (struct kan_rpl_struct_t *instance)
 {
     instance->name = NULL;
     kan_dynamic_array_init (&instance->fields, 0u, sizeof (struct kan_rpl_declaration_t),
                             _Alignof (struct kan_rpl_declaration_t), rpl_intermediate_allocation_group);
-    kan_rpl_expression_node_init (&instance->conditional);
+    instance->conditional_index = KAN_RPL_EXPRESSION_INDEX_NONE;
     instance->source_name = NULL;
     instance->source_line = 0u;
 }
 
 void kan_rpl_struct_shutdown (struct kan_rpl_struct_t *instance)
 {
-    for (uint64_t index = 0u; index < instance->fields.size; ++index)
-    {
-        kan_rpl_declaration_shutdown (&((struct kan_rpl_declaration_t *) instance->fields.data)[index]);
-    }
-
     kan_dynamic_array_shutdown (&instance->fields);
-    kan_rpl_expression_node_shutdown (&instance->conditional);
 }
 
 void kan_rpl_buffer_init (struct kan_rpl_buffer_t *instance)
@@ -3369,20 +3304,14 @@ void kan_rpl_buffer_init (struct kan_rpl_buffer_t *instance)
     instance->type = KAN_RPL_BUFFER_TYPE_VERTEX_ATTRIBUTE;
     kan_dynamic_array_init (&instance->fields, 0u, sizeof (struct kan_rpl_declaration_t),
                             _Alignof (struct kan_rpl_declaration_t), rpl_intermediate_allocation_group);
-    kan_rpl_expression_node_init (&instance->conditional);
+    instance->conditional_index = KAN_RPL_EXPRESSION_INDEX_NONE;
     instance->source_name = NULL;
     instance->source_line = 0u;
 }
 
 void kan_rpl_buffer_shutdown (struct kan_rpl_buffer_t *instance)
 {
-    for (uint64_t index = 0u; index < instance->fields.size; ++index)
-    {
-        kan_rpl_declaration_shutdown (&((struct kan_rpl_declaration_t *) instance->fields.data)[index]);
-    }
-
     kan_dynamic_array_shutdown (&instance->fields);
-    kan_rpl_expression_node_shutdown (&instance->conditional);
 }
 
 void kan_rpl_sampler_init (struct kan_rpl_sampler_t *instance)
@@ -3391,20 +3320,14 @@ void kan_rpl_sampler_init (struct kan_rpl_sampler_t *instance)
     instance->type = KAN_RPL_SAMPLER_TYPE_2D;
     kan_dynamic_array_init (&instance->settings, 0u, sizeof (struct kan_rpl_setting_t),
                             _Alignof (struct kan_rpl_setting_t), rpl_intermediate_allocation_group);
-    kan_rpl_expression_node_init (&instance->conditional);
+    instance->conditional_index = KAN_RPL_EXPRESSION_INDEX_NONE;
     instance->source_name = NULL;
     instance->source_line = 0u;
 }
 
 void kan_rpl_sampler_shutdown (struct kan_rpl_sampler_t *instance)
 {
-    for (uint64_t index = 0u; index < instance->settings.size; ++index)
-    {
-        kan_rpl_setting_shutdown (&((struct kan_rpl_setting_t *) instance->settings.data)[index]);
-    }
-
     kan_dynamic_array_shutdown (&instance->settings);
-    kan_rpl_expression_node_shutdown (&instance->conditional);
 }
 
 void kan_rpl_function_init (struct kan_rpl_function_t *instance)
@@ -3413,22 +3336,15 @@ void kan_rpl_function_init (struct kan_rpl_function_t *instance)
     instance->name = NULL;
     kan_dynamic_array_init (&instance->arguments, 0u, sizeof (struct kan_rpl_declaration_t),
                             _Alignof (struct kan_rpl_declaration_t), rpl_intermediate_allocation_group);
-    kan_rpl_expression_node_init (&instance->body);
-    kan_rpl_expression_node_init (&instance->conditional);
+    instance->body_index = KAN_RPL_EXPRESSION_INDEX_NONE;
+    instance->conditional_index = KAN_RPL_EXPRESSION_INDEX_NONE;
     instance->source_name = NULL;
     instance->source_line = 0u;
 }
 
 void kan_rpl_function_shutdown (struct kan_rpl_function_t *instance)
 {
-    for (uint64_t index = 0u; index < instance->arguments.size; ++index)
-    {
-        kan_rpl_declaration_shutdown (&((struct kan_rpl_declaration_t *) instance->arguments.data)[index]);
-    }
-
     kan_dynamic_array_shutdown (&instance->arguments);
-    kan_rpl_expression_node_shutdown (&instance->body);
-    kan_rpl_expression_node_shutdown (&instance->conditional);
 }
 
 void kan_rpl_intermediate_init (struct kan_rpl_intermediate_t *instance)
@@ -3446,15 +3362,16 @@ void kan_rpl_intermediate_init (struct kan_rpl_intermediate_t *instance)
                             _Alignof (struct kan_rpl_sampler_t), rpl_intermediate_allocation_group);
     kan_dynamic_array_init (&instance->functions, 0u, sizeof (struct kan_rpl_function_t),
                             _Alignof (struct kan_rpl_function_t), rpl_intermediate_allocation_group);
+    kan_dynamic_array_init (&instance->expression_storage, 0u, sizeof (struct kan_rpl_expression_t),
+                            _Alignof (struct kan_rpl_expression_t), rpl_intermediate_allocation_group);
+    kan_dynamic_array_init (&instance->expression_lists_storage, 0u, sizeof (uint64_t), _Alignof (uint64_t),
+                            rpl_intermediate_allocation_group);
+    kan_dynamic_array_init (&instance->meta_lists_storage, 0u, sizeof (kan_interned_string_t),
+                            _Alignof (kan_interned_string_t), rpl_intermediate_allocation_group);
 }
 
 void kan_rpl_intermediate_shutdown (struct kan_rpl_intermediate_t *instance)
 {
-    for (uint64_t index = 0u; index < instance->settings.size; ++index)
-    {
-        kan_rpl_setting_shutdown (&((struct kan_rpl_setting_t *) instance->settings.data)[index]);
-    }
-
     for (uint64_t index = 0u; index < instance->structs.size; ++index)
     {
         kan_rpl_struct_shutdown (&((struct kan_rpl_struct_t *) instance->structs.data)[index]);
@@ -3481,6 +3398,9 @@ void kan_rpl_intermediate_shutdown (struct kan_rpl_intermediate_t *instance)
     kan_dynamic_array_shutdown (&instance->buffers);
     kan_dynamic_array_shutdown (&instance->samplers);
     kan_dynamic_array_shutdown (&instance->functions);
+    kan_dynamic_array_shutdown (&instance->expression_storage);
+    kan_dynamic_array_shutdown (&instance->expression_lists_storage);
+    kan_dynamic_array_shutdown (&instance->meta_lists_storage);
 }
 
 kan_rpl_parser_t kan_rpl_parser_create (kan_interned_string_t log_name)
@@ -3548,19 +3468,27 @@ static kan_bool_t build_intermediate_options (struct rpl_parser_t *instance, str
 }
 
 static kan_bool_t build_intermediate_expression (struct rpl_parser_t *instance,
+                                                 struct kan_rpl_intermediate_t *intermediate,
                                                  struct parser_expression_tree_node_t *expression,
-                                                 struct kan_rpl_expression_node_t *output)
+                                                 uint64_t *index_output)
 {
     kan_bool_t result = KAN_TRUE;
+    *index_output = intermediate->expression_storage.size;
+    struct kan_rpl_expression_t *output = kan_dynamic_array_add_last (&intermediate->expression_storage);
+
+    if (!output)
+    {
+        kan_dynamic_array_set_capacity (&intermediate->expression_storage, intermediate->expression_storage.size * 2u);
+        output = kan_dynamic_array_add_last (&intermediate->expression_storage);
+        KAN_ASSERT (output)
+    }
+
     output->type = expression->type;
     output->source_name = expression->source_log_name;
     output->source_line = (uint32_t) expression->source_line;
 
-#define BUILD_SUB_EXPRESSION(NAME, INDEX, SOURCE)                                                                      \
-    struct kan_rpl_expression_node_t *NAME = &((struct kan_rpl_expression_node_t *) output->children.data)[INDEX];     \
-    kan_rpl_expression_node_init (NAME);                                                                               \
-                                                                                                                       \
-    if (!build_intermediate_expression (instance, SOURCE, NAME))                                                       \
+#define BUILD_SUB_EXPRESSION(OUTPUT, SOURCE)                                                                           \
+    if (!build_intermediate_expression (instance, intermediate, SOURCE, &OUTPUT))                                      \
     {                                                                                                                  \
         result = KAN_FALSE;                                                                                            \
     }
@@ -3575,17 +3503,28 @@ static kan_bool_t build_intermediate_expression (struct rpl_parser_t *instance,
         NAME##_list = NAME##_list->next;                                                                               \
     }
 
-#define BUILD_SUB_LIST(OFFSET, COUNT, LIST)                                                                            \
+#define BUILD_SUB_LIST(COUNT_OUTPUT, INDEX_OUTPUT, COUNT, LIST)                                                        \
+    COUNT_OUTPUT = COUNT;                                                                                              \
+    INDEX_OUTPUT = intermediate->expression_lists_storage.size;                                                        \
     struct parser_expression_list_item_t *sub_list = LIST;                                                             \
-    for (uint64_t index = OFFSET; index < OFFSET + COUNT; ++index, sub_list = sub_list->next)                          \
-    {                                                                                                                  \
-        struct kan_rpl_expression_node_t *node = &((struct kan_rpl_expression_node_t *) output->children.data)[index]; \
-        kan_rpl_expression_node_init (node);                                                                           \
                                                                                                                        \
-        if (!build_intermediate_expression (instance, sub_list->expression, node))                                     \
+    if (intermediate->expression_lists_storage.size + COUNT > intermediate->expression_lists_storage.capacity)         \
+    {                                                                                                                  \
+        kan_dynamic_array_set_capacity (&intermediate->expression_lists_storage,                                       \
+                                        intermediate->expression_lists_storage.size * 2u);                             \
+    }                                                                                                                  \
+                                                                                                                       \
+    while (sub_list)                                                                                                   \
+    {                                                                                                                  \
+        uint64_t *new_index = kan_dynamic_array_add_last (&intermediate->expression_lists_storage);                    \
+        KAN_ASSERT (new_index)                                                                                         \
+                                                                                                                       \
+        if (!build_intermediate_expression (instance, intermediate, sub_list->expression, new_index))                  \
         {                                                                                                              \
             result = KAN_FALSE;                                                                                        \
         }                                                                                                              \
+                                                                                                                       \
+        sub_list = sub_list->next;                                                                                     \
     }
 
     switch (expression->type)
@@ -3611,70 +3550,67 @@ static kan_bool_t build_intermediate_expression (struct rpl_parser_t *instance,
         output->variable_declaration.variable_name = expression->variable_declaration.name;
 
         COLLECT_LIST_SIZE (dimension, expression->variable_declaration.array_size_list)
-        kan_dynamic_array_set_capacity (&output->children, dimension_count);
-        output->children.size = dimension_count;
-        BUILD_SUB_LIST (0u, dimension_count, expression->variable_declaration.array_size_list)
+        BUILD_SUB_LIST (output->variable_declaration.array_size_expression_list_size,
+                        output->variable_declaration.array_size_expression_list_index, dimension_count,
+                        expression->variable_declaration.array_size_list)
         break;
     }
 
     case KAN_RPL_EXPRESSION_NODE_TYPE_BINARY_OPERATION:
     {
-        output->binary_operation = expression->binary_operation.binary_operation;
-        kan_dynamic_array_set_capacity (&output->children, 2u);
-        output->children.size = 2u;
-        BUILD_SUB_EXPRESSION (left_node, 0u, expression->binary_operation.left_operand_expression)
-        BUILD_SUB_EXPRESSION (right_node, 1u, expression->binary_operation.right_operand_expression)
+        output->binary_operation.operation = expression->binary_operation.binary_operation;
+        BUILD_SUB_EXPRESSION (output->binary_operation.left_operand_index,
+                              expression->binary_operation.left_operand_expression)
+        BUILD_SUB_EXPRESSION (output->binary_operation.right_operand_index,
+                              expression->binary_operation.right_operand_expression)
         break;
     }
 
     case KAN_RPL_EXPRESSION_NODE_TYPE_UNARY_OPERATION:
     {
-        output->unary_operation = expression->unary_operation.unary_operation;
-        kan_dynamic_array_set_capacity (&output->children, 1u);
-        output->children.size = 1u;
-        BUILD_SUB_EXPRESSION (node, 0u, expression->unary_operation.operand_expression)
+        output->unary_operation.operation = expression->unary_operation.unary_operation;
+        BUILD_SUB_EXPRESSION (output->unary_operation.operand_index, expression->unary_operation.operand_expression)
         break;
     }
 
     case KAN_RPL_EXPRESSION_NODE_TYPE_SCOPE:
     {
         COLLECT_LIST_SIZE (expression, expression->scope_expressions_list)
-        kan_dynamic_array_set_capacity (&output->children, expression_count);
-        output->children.size = expression_count;
-        BUILD_SUB_LIST (0u, expression_count, expression->scope_expressions_list)
+        BUILD_SUB_LIST (output->scope.statement_list_size, output->scope.statement_list_index, expression_count,
+                        expression->scope_expressions_list)
         break;
     }
 
     case KAN_RPL_EXPRESSION_NODE_TYPE_FUNCTION_CALL:
     {
-        output->function_name = expression->function_call.function_name;
+        output->function_call.name = expression->function_call.function_name;
         COLLECT_LIST_SIZE (argument, expression->function_call.arguments)
-        kan_dynamic_array_set_capacity (&output->children, argument_count);
-        output->children.size = argument_count;
-        BUILD_SUB_LIST (0u, argument_count, expression->function_call.arguments)
+        BUILD_SUB_LIST (output->function_call.argument_list_size, output->function_call.argument_list_index,
+                        argument_count, expression->function_call.arguments)
         break;
     }
 
     case KAN_RPL_EXPRESSION_NODE_TYPE_CONSTRUCTOR:
     {
-        output->constructor_type_name = expression->constructor.constructor_type_name;
+        output->constructor.type_name = expression->constructor.constructor_type_name;
         COLLECT_LIST_SIZE (argument, expression->constructor.arguments)
-        kan_dynamic_array_set_capacity (&output->children, argument_count);
-        output->children.size = argument_count;
-        BUILD_SUB_LIST (0u, argument_count, expression->constructor.arguments)
+        BUILD_SUB_LIST (output->constructor.argument_list_size, output->constructor.argument_list_index, argument_count,
+                        expression->constructor.arguments)
         break;
     }
 
     case KAN_RPL_EXPRESSION_NODE_TYPE_IF:
     {
-        kan_dynamic_array_set_capacity (&output->children, expression->if_.false_expression ? 3u : 2u);
-        output->children.size = expression->if_.false_expression ? 3u : 2u;
-        BUILD_SUB_EXPRESSION (condition_node, 0u, expression->if_.condition_expression)
-        BUILD_SUB_EXPRESSION (true_node, 1u, expression->if_.true_expression)
+        BUILD_SUB_EXPRESSION (output->if_.condition_index, expression->if_.condition_expression)
+        BUILD_SUB_EXPRESSION (output->if_.true_index, expression->if_.true_expression)
 
         if (expression->if_.false_expression)
         {
-            BUILD_SUB_EXPRESSION (false_node, 2u, expression->if_.false_expression)
+            BUILD_SUB_EXPRESSION (output->if_.false_index, expression->if_.false_expression)
+        }
+        else
+        {
+            output->if_.false_index = KAN_RPL_EXPRESSION_INDEX_NONE;
         }
 
         break;
@@ -3682,40 +3618,34 @@ static kan_bool_t build_intermediate_expression (struct rpl_parser_t *instance,
 
     case KAN_RPL_EXPRESSION_NODE_TYPE_FOR:
     {
-        kan_dynamic_array_set_capacity (&output->children, 4u);
-        output->children.size = 4u;
-        BUILD_SUB_EXPRESSION (init_node, 0u, expression->for_.init_expression)
-        BUILD_SUB_EXPRESSION (condition_node, 0u, expression->for_.condition_expression)
-        BUILD_SUB_EXPRESSION (step_node, 0u, expression->for_.step_expression)
-        BUILD_SUB_EXPRESSION (body_node, 0u, expression->for_.body_expression)
+        BUILD_SUB_EXPRESSION (output->for_.init_index, expression->for_.init_expression)
+        BUILD_SUB_EXPRESSION (output->for_.condition_index, expression->for_.condition_expression)
+        BUILD_SUB_EXPRESSION (output->for_.step_index, expression->for_.step_expression)
+        BUILD_SUB_EXPRESSION (output->for_.body_index, expression->for_.body_expression)
         break;
     }
 
     case KAN_RPL_EXPRESSION_NODE_TYPE_WHILE:
     {
-        kan_dynamic_array_set_capacity (&output->children, 2u);
-        output->children.size = 2u;
-        BUILD_SUB_EXPRESSION (condition_node, 0u, expression->while_.condition_expression)
-        BUILD_SUB_EXPRESSION (body_node, 1u, expression->while_.body_expression)
+        BUILD_SUB_EXPRESSION (output->while_.condition_index, expression->while_.condition_expression)
+        BUILD_SUB_EXPRESSION (output->while_.body_index, expression->while_.body_expression)
         break;
     }
 
     case KAN_RPL_EXPRESSION_NODE_TYPE_CONDITIONAL_SCOPE:
     {
-        kan_dynamic_array_set_capacity (&output->children, 2u);
-        output->children.size = 2u;
-        BUILD_SUB_EXPRESSION (condition_node, 0u, expression->conditional_scope.condition_expression)
-        BUILD_SUB_EXPRESSION (body_node, 1u, expression->conditional_scope.body_expression)
+        BUILD_SUB_EXPRESSION (output->conditional_scope.condition_index,
+                              expression->conditional_scope.condition_expression)
+        BUILD_SUB_EXPRESSION (output->conditional_scope.body_index, expression->conditional_scope.body_expression)
         break;
     }
 
     case KAN_RPL_EXPRESSION_NODE_TYPE_CONDITIONAL_ALIAS:
     {
-        output->alias_name = expression->conditional_alias.identifier;
-        kan_dynamic_array_set_capacity (&output->children, 2u);
-        output->children.size = 2u;
-        BUILD_SUB_EXPRESSION (condition_node, 0u, expression->conditional_alias.condition_expression)
-        BUILD_SUB_EXPRESSION (body_node, 1u, expression->conditional_alias.body_expression)
+        output->conditional_alias.name = expression->conditional_alias.identifier;
+        BUILD_SUB_EXPRESSION (output->conditional_alias.condition_index,
+                              expression->conditional_alias.condition_expression)
+        BUILD_SUB_EXPRESSION (output->conditional_alias.expression_index, expression->conditional_alias.body_expression)
         break;
     }
 
@@ -3727,9 +3657,11 @@ static kan_bool_t build_intermediate_expression (struct rpl_parser_t *instance,
     {
         if (expression->return_expression)
         {
-            kan_dynamic_array_set_capacity (&output->children, 1u);
-            output->children.size = 1u;
-            BUILD_SUB_EXPRESSION (node, 0u, expression->return_expression)
+            BUILD_SUB_EXPRESSION (output->return_index, expression->return_expression)
+        }
+        else
+        {
+            output->return_index = KAN_RPL_EXPRESSION_INDEX_NONE;
         }
 
         break;
@@ -3744,11 +3676,13 @@ static kan_bool_t build_intermediate_expression (struct rpl_parser_t *instance,
 }
 
 static kan_bool_t build_intermediate_setting (struct rpl_parser_t *instance,
+                                              struct kan_rpl_intermediate_t *intermediate,
                                               struct parser_setting_data_t *setting,
                                               struct kan_rpl_setting_t *output)
 {
     output->name = setting->name;
     output->type = setting->type;
+    output->conditional_index = KAN_RPL_EXPRESSION_INDEX_NONE;
     output->source_name = setting->source_log_name;
     output->source_line = setting->source_line;
 
@@ -3773,7 +3707,7 @@ static kan_bool_t build_intermediate_setting (struct rpl_parser_t *instance,
 
     if (setting->conditional)
     {
-        if (!build_intermediate_expression (instance, setting->conditional, &output->conditional))
+        if (!build_intermediate_expression (instance, intermediate, setting->conditional, &output->conditional_index))
         {
             return KAN_FALSE;
         }
@@ -3792,9 +3726,8 @@ static kan_bool_t build_intermediate_settings (struct rpl_parser_t *instance, st
     {
         struct kan_rpl_setting_t *target_setting = kan_dynamic_array_add_last (&output->settings);
         KAN_ASSERT (target_setting)
-        kan_rpl_setting_init (target_setting);
 
-        if (!build_intermediate_setting (instance, &source_setting->setting, target_setting))
+        if (!build_intermediate_setting (instance, output, &source_setting->setting, target_setting))
         {
             result = KAN_FALSE;
         }
@@ -3806,6 +3739,7 @@ static kan_bool_t build_intermediate_settings (struct rpl_parser_t *instance, st
 }
 
 static kan_bool_t build_intermediate_declarations (struct rpl_parser_t *instance,
+                                                   struct kan_rpl_intermediate_t *intermediate,
                                                    struct parser_declaration_t *first_declaration,
                                                    struct kan_dynamic_array_t *output)
 {
@@ -3827,9 +3761,9 @@ static kan_bool_t build_intermediate_declarations (struct rpl_parser_t *instance
         struct kan_rpl_declaration_t *new_declaration = kan_dynamic_array_add_last (output);
         KAN_ASSERT (new_declaration)
 
-        kan_rpl_declaration_init (new_declaration);
         new_declaration->name = declaration->declaration.name;
         new_declaration->type_name = declaration->declaration.type;
+        new_declaration->conditional_index = KAN_RPL_EXPRESSION_INDEX_NONE;
         new_declaration->source_name = declaration->source_log_name;
         new_declaration->source_line = declaration->source_line;
 
@@ -3842,17 +3776,23 @@ static kan_bool_t build_intermediate_declarations (struct rpl_parser_t *instance
             array_size = array_size->next;
         }
 
-        kan_dynamic_array_set_capacity (&new_declaration->array_sizes, array_sizes_count);
-        array_size = declaration->declaration.array_size_list;
+        new_declaration->array_size_expression_list_size = array_sizes_count;
+        new_declaration->array_size_expression_list_index = intermediate->expression_lists_storage.size;
 
+        if (intermediate->expression_lists_storage.size + array_sizes_count >
+            intermediate->expression_lists_storage.capacity)
+        {
+            kan_dynamic_array_set_capacity (&intermediate->expression_lists_storage,
+                                            intermediate->expression_lists_storage.size * 2u);
+        }
+
+        array_size = declaration->declaration.array_size_list;
         while (array_size)
         {
-            struct kan_rpl_expression_node_t *new_expression =
-                kan_dynamic_array_add_last (&new_declaration->array_sizes);
-            KAN_ASSERT (new_expression)
-            kan_rpl_expression_node_init (new_expression);
+            uint64_t *new_index = kan_dynamic_array_add_last (&intermediate->expression_lists_storage);
+            KAN_ASSERT (new_index)
 
-            if (!build_intermediate_expression (instance, array_size->expression, new_expression))
+            if (!build_intermediate_expression (instance, intermediate, array_size->expression, new_index))
             {
                 result = KAN_FALSE;
             }
@@ -3869,19 +3809,27 @@ static kan_bool_t build_intermediate_declarations (struct rpl_parser_t *instance
             meta_item = meta_item->next;
         }
 
-        kan_dynamic_array_set_capacity (&new_declaration->meta, meta_count);
-        meta_item = declaration->first_meta;
+        new_declaration->meta_list_size = meta_count;
+        new_declaration->meta_list_index = intermediate->meta_lists_storage.size;
 
+        if (intermediate->meta_lists_storage.size + array_sizes_count > intermediate->meta_lists_storage.capacity)
+        {
+            kan_dynamic_array_set_capacity (&intermediate->meta_lists_storage,
+                                            intermediate->meta_lists_storage.size * 2u);
+        }
+
+        meta_item = declaration->first_meta;
         while (meta_item)
         {
-            kan_interned_string_t *next_meta = kan_dynamic_array_add_last (&new_declaration->meta);
+            kan_interned_string_t *next_meta = kan_dynamic_array_add_last (&intermediate->meta_lists_storage);
             KAN_ASSERT (next_meta)
             *next_meta = meta_item->meta;
             meta_item = meta_item->next;
         }
 
         if (declaration->conditional &&
-            !build_intermediate_expression (instance, declaration->conditional, &new_declaration->conditional))
+            !build_intermediate_expression (instance, intermediate, declaration->conditional,
+                                            &new_declaration->conditional_index))
         {
             result = KAN_FALSE;
         }
@@ -3908,13 +3856,13 @@ static kan_bool_t build_intermediate_structs (struct rpl_parser_t *instance, str
         new_struct->source_name = struct_data->source_log_name;
         new_struct->source_line = struct_data->source_line;
 
-        if (!build_intermediate_declarations (instance, struct_data->first_declaration, &new_struct->fields))
+        if (!build_intermediate_declarations (instance, output, struct_data->first_declaration, &new_struct->fields))
         {
             result = KAN_FALSE;
         }
 
         if (struct_data->conditional &&
-            !build_intermediate_expression (instance, struct_data->conditional, &new_struct->conditional))
+            !build_intermediate_expression (instance, output, struct_data->conditional, &new_struct->conditional_index))
         {
             result = KAN_FALSE;
         }
@@ -3942,13 +3890,14 @@ static kan_bool_t build_intermediate_buffers (struct rpl_parser_t *instance, str
         target_buffer->source_name = source_buffer->source_log_name;
         target_buffer->source_line = source_buffer->source_line;
 
-        if (!build_intermediate_declarations (instance, source_buffer->first_declaration, &target_buffer->fields))
+        if (!build_intermediate_declarations (instance, output, source_buffer->first_declaration,
+                                              &target_buffer->fields))
         {
             result = KAN_FALSE;
         }
 
-        if (source_buffer->conditional &&
-            !build_intermediate_expression (instance, source_buffer->conditional, &target_buffer->conditional))
+        if (source_buffer->conditional && !build_intermediate_expression (instance, output, source_buffer->conditional,
+                                                                          &target_buffer->conditional_index))
         {
             result = KAN_FALSE;
         }
@@ -3992,9 +3941,8 @@ static kan_bool_t build_intermediate_samplers (struct rpl_parser_t *instance, st
         {
             struct kan_rpl_setting_t *new_setting = kan_dynamic_array_add_last (&target_sampler->settings);
             KAN_ASSERT (new_setting)
-            kan_rpl_setting_init (new_setting);
 
-            if (!build_intermediate_setting (instance, &setting->setting, new_setting))
+            if (!build_intermediate_setting (instance, output, &setting->setting, new_setting))
             {
                 result = KAN_FALSE;
             }
@@ -4003,7 +3951,8 @@ static kan_bool_t build_intermediate_samplers (struct rpl_parser_t *instance, st
         }
 
         if (source_sampler->conditional &&
-            !build_intermediate_expression (instance, source_sampler->conditional, &target_sampler->conditional))
+            !build_intermediate_expression (instance, output, source_sampler->conditional,
+                                            &target_sampler->conditional_index))
         {
             result = KAN_FALSE;
         }
@@ -4034,19 +3983,19 @@ static kan_bool_t build_intermediate_functions (struct rpl_parser_t *instance, s
         // Special case -- void function.
         if (function->first_argument->declaration.type != interned_void)
         {
-            if (!build_intermediate_declarations (instance, function->first_argument, &new_function->arguments))
+            if (!build_intermediate_declarations (instance, output, function->first_argument, &new_function->arguments))
             {
                 result = KAN_FALSE;
             }
         }
 
-        if (!build_intermediate_expression (instance, function->body_expression, &new_function->body))
+        if (!build_intermediate_expression (instance, output, function->body_expression, &new_function->body_index))
         {
             result = KAN_FALSE;
         }
 
         if (function->conditional &&
-            !build_intermediate_expression (instance, function->conditional, &new_function->conditional))
+            !build_intermediate_expression (instance, output, function->conditional, &new_function->conditional_index))
         {
             result = KAN_FALSE;
         }
@@ -4061,9 +4010,21 @@ kan_bool_t kan_rpl_parser_build_intermediate (kan_rpl_parser_t parser, struct ka
 {
     struct rpl_parser_t *instance = (struct rpl_parser_t *) parser;
     output->log_name = instance->log_name;
-    return build_intermediate_options (instance, output) && build_intermediate_settings (instance, output) &&
-           build_intermediate_structs (instance, output) && build_intermediate_buffers (instance, output) &&
-           build_intermediate_samplers (instance, output) && build_intermediate_functions (instance, output);
+
+    kan_dynamic_array_set_capacity (&output->expression_storage, KAN_RPL_INTERMEDIATE_EXPRESSION_STORAGE_SIZE);
+    kan_dynamic_array_set_capacity (&output->expression_lists_storage,
+                                    KAN_RPL_INTERMEDIATE_EXPRESSION_LISTS_STORAGE_SIZE);
+    kan_dynamic_array_set_capacity (&output->meta_lists_storage, KAN_RPL_INTERMEDIATE_META_LISTS_STORAGE_SIZE);
+
+    const kan_bool_t result =
+        build_intermediate_options (instance, output) && build_intermediate_settings (instance, output) &&
+        build_intermediate_structs (instance, output) && build_intermediate_buffers (instance, output) &&
+        build_intermediate_samplers (instance, output) && build_intermediate_functions (instance, output);
+
+    kan_dynamic_array_set_capacity (&output->expression_storage, output->expression_storage.size);
+    kan_dynamic_array_set_capacity (&output->expression_lists_storage, output->expression_lists_storage.size);
+    kan_dynamic_array_set_capacity (&output->meta_lists_storage, output->meta_lists_storage.size);
+    return result;
 }
 
 void kan_rpl_parser_destroy (kan_rpl_parser_t parser)

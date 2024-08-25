@@ -58,7 +58,7 @@ struct compiler_instance_setting_node_t
     };
 
     /// \details Conditional expression if it is not KAN_RPL_EXPRESSION_NODE_TYPE_NOPE.
-    struct kan_rpl_expression_node_t conditional;
+    struct kan_rpl_expression_t conditional;
 
     kan_interned_string_t module_name;
     kan_interned_string_t source_name;
@@ -467,7 +467,7 @@ struct resolve_expression_scope_t
 struct resolve_fiend_access_linear_node_t
 {
     struct resolve_fiend_access_linear_node_t *next;
-    struct kan_rpl_expression_node_t *field_source;
+    struct kan_rpl_expression_t *field_source;
 };
 
 enum inbuilt_type_item_t
@@ -1371,8 +1371,8 @@ kan_bool_t kan_rpl_compiler_context_set_option_count (kan_rpl_compiler_context_t
 
 static struct compile_time_evaluation_value_t evaluate_compile_time_expression (
     struct rpl_compiler_context_t *instance,
-    kan_interned_string_t intermediate_log_name,
-    struct kan_rpl_expression_node_t *expression,
+    struct kan_rpl_intermediate_t *intermediate,
+    struct kan_rpl_expression_t *expression,
     kan_bool_t instance_options_allowed)
 {
     struct compile_time_evaluation_value_t result;
@@ -1410,7 +1410,7 @@ static struct compile_time_evaluation_value_t evaluate_compile_time_expression (
                     KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
                              "[%s:%s:%s:%ld] Compile time expression contains non-global option \"%s\" in context that "
                              "only allows global options.",
-                             instance->log_name, intermediate_log_name, expression->source_name,
+                             instance->log_name, intermediate->log_name, expression->source_name,
                              (long) expression->source_line, expression->identifier)
                     result.type = CONDITIONAL_EVALUATION_VALUE_TYPE_ERROR;
                 }
@@ -1429,7 +1429,7 @@ static struct compile_time_evaluation_value_t evaluate_compile_time_expression (
                             KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
                                      "[%s:%s:%s:%ld] Compile time expression uses count option \"%s\" that has value "
                                      "%llu that is greater that supported in conditionals.",
-                                     instance->log_name, intermediate_log_name, expression->source_name,
+                                     instance->log_name, intermediate->log_name, expression->source_name,
                                      (long) expression->source_line, expression->identifier,
                                      (unsigned long long) option->count_value)
                             result.type = CONDITIONAL_EVALUATION_VALUE_TYPE_ERROR;
@@ -1451,8 +1451,8 @@ static struct compile_time_evaluation_value_t evaluate_compile_time_expression (
         {
             KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
                      "[%s:%s:%s%ld] Compile time expression uses option \"%s\" that cannot be found.",
-                     instance->log_name, intermediate_log_name, expression->source_name, (long) expression->source_line,
-                     expression->identifier)
+                     instance->log_name, intermediate->log_name, expression->source_name,
+                     (long) expression->source_line, expression->identifier)
             result.type = CONDITIONAL_EVALUATION_VALUE_TYPE_ERROR;
         }
 
@@ -1472,10 +1472,15 @@ static struct compile_time_evaluation_value_t evaluate_compile_time_expression (
     case KAN_RPL_EXPRESSION_NODE_TYPE_BINARY_OPERATION:
     {
         struct compile_time_evaluation_value_t left_operand = evaluate_compile_time_expression (
-            instance, intermediate_log_name, &((struct kan_rpl_expression_node_t *) expression->children.data)[0u],
+            instance, intermediate,
+            &((struct kan_rpl_expression_t *)
+                  intermediate->expression_storage.data)[expression->binary_operation.left_operand_index],
             instance_options_allowed);
+
         struct compile_time_evaluation_value_t right_operand = evaluate_compile_time_expression (
-            instance, intermediate_log_name, &((struct kan_rpl_expression_node_t *) expression->children.data)[1u],
+            instance, intermediate,
+            &((struct kan_rpl_expression_t *)
+                  intermediate->expression_storage.data)[expression->binary_operation.right_operand_index],
             instance_options_allowed);
 
         if (left_operand.type == CONDITIONAL_EVALUATION_VALUE_TYPE_ERROR ||
@@ -1513,7 +1518,7 @@ static struct compile_time_evaluation_value_t evaluate_compile_time_expression (
     else                                                                                                               \
     {                                                                                                                  \
         KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR, "[%s:%s:%s:%ld] Operator \"%s\" has unsupported operand types.", \
-                 instance->log_name, intermediate_log_name, expression->source_name, (long) expression->source_line,   \
+                 instance->log_name, intermediate->log_name, expression->source_name, (long) expression->source_line,  \
                  #OPERATOR)                                                                                            \
         result.type = CONDITIONAL_EVALUATION_VALUE_TYPE_ERROR;                                                         \
     }
@@ -1543,7 +1548,7 @@ static struct compile_time_evaluation_value_t evaluate_compile_time_expression (
     else                                                                                                               \
     {                                                                                                                  \
         KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR, "[%s:%s:%s:%ld] Operator \"%s\" has unsupported operand types.", \
-                 instance->log_name, intermediate_log_name, expression->source_name, (long) expression->source_line,   \
+                 instance->log_name, intermediate->log_name, expression->source_name, (long) expression->source_line,  \
                  #OPERATOR)                                                                                            \
         result.type = CONDITIONAL_EVALUATION_VALUE_TYPE_ERROR;                                                         \
     }
@@ -1558,24 +1563,24 @@ static struct compile_time_evaluation_value_t evaluate_compile_time_expression (
     else                                                                                                               \
     {                                                                                                                  \
         KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR, "[%s:%s:%s:%ld] Operator \"%s\" has unsupported operand types.", \
-                 instance->log_name, intermediate_log_name, expression->source_name, (long) expression->source_line,   \
+                 instance->log_name, intermediate->log_name, expression->source_name, (long) expression->source_line,  \
                  #OPERATOR)                                                                                            \
         result.type = CONDITIONAL_EVALUATION_VALUE_TYPE_ERROR;                                                         \
     }
 
-        switch (expression->binary_operation)
+        switch (expression->binary_operation.operation)
         {
         case KAN_RPL_BINARY_OPERATION_FIELD_ACCESS:
             KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
                      "[%s:%s:%s:%ld] Operator \".\" is not supported in compile time expressions.", instance->log_name,
-                     intermediate_log_name, expression->source_name, (long) expression->source_line)
+                     intermediate->log_name, expression->source_name, (long) expression->source_line)
             result.type = CONDITIONAL_EVALUATION_VALUE_TYPE_ERROR;
             break;
 
         case KAN_RPL_BINARY_OPERATION_ARRAY_ACCESS:
             KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
                      "[%s:%s:%s:%ld] Operator \"[]\" is not supported in compile time expressions.", instance->log_name,
-                     intermediate_log_name, expression->source_name, (long) expression->source_line)
+                     intermediate->log_name, expression->source_name, (long) expression->source_line)
             result.type = CONDITIONAL_EVALUATION_VALUE_TYPE_ERROR;
             break;
 
@@ -1744,11 +1749,13 @@ static struct compile_time_evaluation_value_t evaluate_compile_time_expression (
     case KAN_RPL_EXPRESSION_NODE_TYPE_UNARY_OPERATION:
     {
         struct compile_time_evaluation_value_t operand = evaluate_compile_time_expression (
-            instance, intermediate_log_name, &((struct kan_rpl_expression_node_t *) expression->children.data)[0u],
+            instance, intermediate,
+            &((struct kan_rpl_expression_t *)
+                  intermediate->expression_storage.data)[expression->unary_operation.operand_index],
             instance_options_allowed);
         result.type = operand.type;
 
-        switch (expression->unary_operation)
+        switch (expression->unary_operation.operation)
         {
         case KAN_RPL_UNARY_OPERATION_NEGATE:
             switch (operand.type)
@@ -1839,23 +1846,31 @@ static struct compile_time_evaluation_value_t evaluate_compile_time_expression (
 }
 
 static enum conditional_evaluation_result_t evaluate_conditional (struct rpl_compiler_context_t *instance,
-                                                                  kan_interned_string_t intermediate_log_name,
-                                                                  struct kan_rpl_expression_node_t *expression,
+                                                                  struct kan_rpl_intermediate_t *intermediate,
+                                                                  uint64_t conditional_index,
                                                                   kan_bool_t instance_options_allowed)
 {
+    if (conditional_index == KAN_RPL_EXPRESSION_INDEX_NONE)
+    {
+        return CONDITIONAL_EVALUATION_RESULT_TRUE;
+    }
+
+    struct kan_rpl_expression_t *expression =
+        &((struct kan_rpl_expression_t *) intermediate->expression_storage.data)[conditional_index];
+
     if (expression->type == KAN_RPL_EXPRESSION_NODE_TYPE_NOPE)
     {
         return CONDITIONAL_EVALUATION_RESULT_TRUE;
     }
 
     struct compile_time_evaluation_value_t result =
-        evaluate_compile_time_expression (instance, intermediate_log_name, expression, instance_options_allowed);
+        evaluate_compile_time_expression (instance, intermediate, expression, instance_options_allowed);
 
     switch (result.type)
     {
     case CONDITIONAL_EVALUATION_VALUE_TYPE_ERROR:
         KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR, "[%s:%s:%s:%ld] Conditional evaluation resulted in failure.",
-                 instance->log_name, intermediate_log_name, expression->source_name, (long) expression->source_line)
+                 instance->log_name, intermediate->log_name, expression->source_name, (long) expression->source_line)
         return CONDITIONAL_EVALUATION_RESULT_FAILED;
 
     case CONDITIONAL_EVALUATION_VALUE_TYPE_BOOLEAN:
@@ -1867,7 +1882,7 @@ static enum conditional_evaluation_result_t evaluate_conditional (struct rpl_com
     case CONDITIONAL_EVALUATION_VALUE_TYPE_FLOATING:
         KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
                  "[%s:%s:%s:%ld] Conditional evaluation resulted in floating value.", instance->log_name,
-                 intermediate_log_name, expression->source_name, (long) expression->source_line)
+                 intermediate->log_name, expression->source_name, (long) expression->source_line)
         return CONDITIONAL_EVALUATION_RESULT_FAILED;
     }
 
@@ -1877,7 +1892,7 @@ static enum conditional_evaluation_result_t evaluate_conditional (struct rpl_com
 
 static kan_bool_t resolve_settings (struct rpl_compiler_context_t *context,
                                     struct rpl_compiler_instance_t *instance,
-                                    kan_interned_string_t intermediate_log_name,
+                                    struct kan_rpl_intermediate_t *intermediate,
                                     struct kan_dynamic_array_t *settings_array,
                                     struct compiler_instance_setting_node_t **first_output,
                                     struct compiler_instance_setting_node_t **last_output)
@@ -1887,7 +1902,7 @@ static kan_bool_t resolve_settings (struct rpl_compiler_context_t *context,
     {
         struct kan_rpl_setting_t *source_setting = &((struct kan_rpl_setting_t *) settings_array->data)[setting_index];
 
-        switch (evaluate_conditional (context, intermediate_log_name, &source_setting->conditional, KAN_TRUE))
+        switch (evaluate_conditional (context, intermediate, source_setting->conditional_index, KAN_TRUE))
         {
         case CONDITIONAL_EVALUATION_RESULT_FAILED:
             result = KAN_FALSE;
@@ -1902,7 +1917,7 @@ static kan_bool_t resolve_settings (struct rpl_compiler_context_t *context,
             target_setting->next = NULL;
             target_setting->name = source_setting->name;
             target_setting->type = source_setting->type;
-            target_setting->module_name = intermediate_log_name;
+            target_setting->module_name = intermediate->log_name;
             target_setting->source_name = source_setting->source_name;
             target_setting->source_line = source_setting->source_line;
 
@@ -1949,13 +1964,14 @@ static kan_bool_t resolve_settings (struct rpl_compiler_context_t *context,
 
 static inline kan_bool_t resolve_array_dimensions (struct rpl_compiler_context_t *context,
                                                    struct rpl_compiler_instance_t *instance,
-                                                   kan_interned_string_t intermediate_log_name,
+                                                   struct kan_rpl_intermediate_t *intermediate,
                                                    struct compiler_instance_variable_t *variable,
-                                                   struct kan_dynamic_array_t *dimensions,
+                                                   uint64_t dimensions_list_size,
+                                                   uint64_t dimensions_list_index,
                                                    kan_bool_t instance_options_allowed)
 {
     kan_bool_t result = KAN_TRUE;
-    variable->array_dimensions_count = dimensions->size;
+    variable->array_dimensions_count = dimensions_list_size;
 
     if (variable->array_dimensions_count > 0u)
     {
@@ -1964,11 +1980,13 @@ static inline kan_bool_t resolve_array_dimensions (struct rpl_compiler_context_t
 
         for (uint64_t dimension = 0u; dimension < variable->array_dimensions_count; ++dimension)
         {
-            struct kan_rpl_expression_node_t *expression =
-                &((struct kan_rpl_expression_node_t *) dimensions->data)[dimension];
+            const uint64_t expression_index =
+                ((uint64_t *) intermediate->expression_lists_storage.data)[dimensions_list_index + dimension];
+            struct kan_rpl_expression_t *expression =
+                &((struct kan_rpl_expression_t *) intermediate->expression_storage.data)[expression_index];
 
             struct compile_time_evaluation_value_t value =
-                evaluate_compile_time_expression (context, intermediate_log_name, expression, instance_options_allowed);
+                evaluate_compile_time_expression (context, intermediate, expression, instance_options_allowed);
 
             switch (value.type)
             {
@@ -1981,7 +1999,7 @@ static inline kan_bool_t resolve_array_dimensions (struct rpl_compiler_context_t
                 KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
                          "[%s:%s:%s:%ld] Declaration \"%s\" array size at dimension %ld calculation resulted "
                          "in non-integer value.",
-                         context->log_name, intermediate_log_name, expression->source_name,
+                         context->log_name, intermediate->log_name, expression->source_name,
                          (long) expression->source_line, variable->name, (long) dimension)
                 result = KAN_FALSE;
                 break;
@@ -1996,7 +2014,7 @@ static inline kan_bool_t resolve_array_dimensions (struct rpl_compiler_context_t
                     KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
                              "[%s:%s:%s:%ld] Declaration \"%s\" array size at dimension %ld calculation resulted "
                              "in invalid value for array size %lld.",
-                             context->log_name, intermediate_log_name, expression->source_name,
+                             context->log_name, intermediate->log_name, expression->source_name,
                              (long) expression->source_line, variable->name, (long) dimension,
                              (long long) value.integer_value)
                     result = KAN_FALSE;
@@ -2045,7 +2063,7 @@ static inline kan_bool_t resolve_variable_type (struct rpl_compiler_context_t *c
 
 static kan_bool_t resolve_declarations (struct rpl_compiler_context_t *context,
                                         struct rpl_compiler_instance_t *instance,
-                                        kan_interned_string_t intermediate_log_name,
+                                        struct kan_rpl_intermediate_t *intermediate,
                                         struct kan_dynamic_array_t *declaration_array,
                                         struct compiler_instance_declaration_node_t **first_output,
                                         kan_bool_t instance_options_allowed)
@@ -2061,7 +2079,7 @@ static kan_bool_t resolve_declarations (struct rpl_compiler_context_t *context,
         struct kan_rpl_declaration_t *source_declaration =
             &((struct kan_rpl_declaration_t *) declaration_array->data)[declaration_index];
 
-        switch (evaluate_conditional (context, intermediate_log_name, &source_declaration->conditional,
+        switch (evaluate_conditional (context, intermediate, source_declaration->conditional_index,
                                       instance_options_allowed))
         {
         case CONDITIONAL_EVALUATION_RESULT_FAILED:
@@ -2080,15 +2098,17 @@ static kan_bool_t resolve_declarations (struct rpl_compiler_context_t *context,
             target_declaration->variable.type_if_matrix = NULL;
             target_declaration->variable.type_if_struct = NULL;
 
-            if (!resolve_variable_type (context, instance, intermediate_log_name, &target_declaration->variable,
+            if (!resolve_variable_type (context, instance, intermediate->log_name, &target_declaration->variable,
                                         source_declaration->type_name, source_declaration->name,
                                         source_declaration->source_name, source_declaration->source_line))
             {
                 result = KAN_FALSE;
             }
 
-            if (!resolve_array_dimensions (context, instance, intermediate_log_name, &target_declaration->variable,
-                                           &source_declaration->array_sizes, instance_options_allowed))
+            if (!resolve_array_dimensions (context, instance, intermediate, &target_declaration->variable,
+                                           source_declaration->array_size_expression_list_size,
+                                           source_declaration->array_size_expression_list_index,
+                                           instance_options_allowed))
             {
                 result = KAN_FALSE;
             }
@@ -2135,13 +2155,15 @@ static kan_bool_t resolve_declarations (struct rpl_compiler_context_t *context,
                 }
             }
 
-            target_declaration->meta_count = source_declaration->meta.size;
+            target_declaration->meta_count = source_declaration->meta_list_size;
             if (target_declaration->meta_count > 0u)
             {
                 target_declaration->meta = kan_stack_group_allocator_allocate (
                     &instance->resolve_allocator, sizeof (kan_interned_string_t) * target_declaration->meta_count,
                     _Alignof (kan_interned_string_t));
-                memcpy (target_declaration->meta, source_declaration->meta.data,
+                memcpy (target_declaration->meta,
+                        &((kan_interned_string_t *)
+                              intermediate->meta_lists_storage.data)[source_declaration->meta_list_index],
                         sizeof (kan_interned_string_t) * target_declaration->meta_count);
             }
             else
@@ -2149,7 +2171,7 @@ static kan_bool_t resolve_declarations (struct rpl_compiler_context_t *context,
                 target_declaration->meta = NULL;
             }
 
-            target_declaration->module_name = intermediate_log_name;
+            target_declaration->module_name = intermediate->log_name;
             target_declaration->source_name = source_declaration->source_name;
             target_declaration->source_line = source_declaration->source_line;
 
@@ -2498,7 +2520,7 @@ static kan_bool_t resolve_buffers (struct rpl_compiler_context_t *context,
         struct kan_rpl_buffer_t *source_buffer =
             &((struct kan_rpl_buffer_t *) intermediate->buffers.data)[buffer_index];
 
-        switch (evaluate_conditional (context, intermediate->log_name, &source_buffer->conditional, KAN_FALSE))
+        switch (evaluate_conditional (context, intermediate, source_buffer->conditional_index, KAN_FALSE))
         {
         case CONDITIONAL_EVALUATION_RESULT_FAILED:
             result = KAN_FALSE;
@@ -2526,7 +2548,7 @@ static kan_bool_t resolve_buffers (struct rpl_compiler_context_t *context,
             target_buffer->type = source_buffer->type;
             target_buffer->used = KAN_FALSE;
 
-            if (!resolve_declarations (context, instance, intermediate->log_name, &source_buffer->fields,
+            if (!resolve_declarations (context, instance, intermediate, &source_buffer->fields,
                                        &target_buffer->first_field, KAN_FALSE))
             {
                 result = KAN_FALSE;
@@ -2674,7 +2696,7 @@ static kan_bool_t resolve_samplers (struct rpl_compiler_context_t *context,
         struct kan_rpl_sampler_t *source_sampler =
             &((struct kan_rpl_sampler_t *) intermediate->samplers.data)[sampler_index];
 
-        switch (evaluate_conditional (context, intermediate->log_name, &source_sampler->conditional, KAN_FALSE))
+        switch (evaluate_conditional (context, intermediate, source_sampler->conditional_index, KAN_FALSE))
         {
         case CONDITIONAL_EVALUATION_RESULT_FAILED:
             result = KAN_FALSE;
@@ -2708,7 +2730,7 @@ static kan_bool_t resolve_samplers (struct rpl_compiler_context_t *context,
             struct compiler_instance_setting_node_t *first_setting = NULL;
             struct compiler_instance_setting_node_t *last_setting = NULL;
 
-            if (!resolve_settings (context, instance, intermediate->log_name, &source_sampler->settings, &first_setting,
+            if (!resolve_settings (context, instance, intermediate, &source_sampler->settings, &first_setting,
                                    &last_setting))
             {
                 result = KAN_FALSE;
@@ -2869,7 +2891,7 @@ static kan_bool_t resolve_use_struct (struct rpl_compiler_context_t *context,
 
     kan_bool_t resolve_successful = KAN_TRUE;
     struct kan_rpl_struct_t *intermediate_struct = NULL;
-    kan_interned_string_t intermediate_log_name = NULL;
+    struct kan_rpl_intermediate_t *selected_intermediate = NULL;
 
     for (uint64_t intermediate_index = 0u; intermediate_index < context->modules.size; ++intermediate_index)
     {
@@ -2883,7 +2905,7 @@ static kan_bool_t resolve_use_struct (struct rpl_compiler_context_t *context,
 
             if (struct_data->name == name)
             {
-                switch (evaluate_conditional (context, intermediate->log_name, &struct_data->conditional, KAN_FALSE))
+                switch (evaluate_conditional (context, intermediate, struct_data->conditional_index, KAN_FALSE))
                 {
                 case CONDITIONAL_EVALUATION_RESULT_FAILED:
                     resolve_successful = KAN_FALSE;
@@ -2900,7 +2922,7 @@ static kan_bool_t resolve_use_struct (struct rpl_compiler_context_t *context,
                     }
 
                     intermediate_struct = struct_data;
-                    intermediate_log_name = intermediate->log_name;
+                    selected_intermediate = intermediate;
                     break;
 
                 case CONDITIONAL_EVALUATION_RESULT_FALSE:
@@ -2927,11 +2949,11 @@ static kan_bool_t resolve_use_struct (struct rpl_compiler_context_t *context,
     *output = struct_node;
 
     struct_node->name = name;
-    struct_node->module_name = intermediate_log_name;
+    struct_node->module_name = selected_intermediate->log_name;
     struct_node->source_name = intermediate_struct->source_name;
     struct_node->source_line = intermediate_struct->source_line;
 
-    if (!resolve_declarations (context, instance, intermediate_log_name, &intermediate_struct->fields,
+    if (!resolve_declarations (context, instance, selected_intermediate, &intermediate_struct->fields,
                                &struct_node->first_field, KAN_FALSE))
     {
         resolve_successful = KAN_FALSE;
@@ -3089,8 +3111,9 @@ static struct compiler_instance_scope_variable_item_t *resolve_find_variable (
 
 static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
                                       struct rpl_compiler_instance_t *instance,
+                                      struct kan_rpl_intermediate_t *intermediate,
                                       struct resolve_expression_scope_t *resolve_scope,
-                                      struct kan_rpl_expression_node_t *expression,
+                                      struct kan_rpl_expression_t *expression,
                                       struct compiler_instance_expression_node_t **output,
                                       struct resolve_expression_output_type_t *output_type);
 
@@ -3207,10 +3230,12 @@ static inline kan_bool_t resolve_match_signature_at_index (struct rpl_compiler_c
 static inline kan_bool_t resolve_expression_array_with_signature (
     struct rpl_compiler_context_t *context,
     struct rpl_compiler_instance_t *instance,
+    struct kan_rpl_intermediate_t *intermediate,
     struct resolve_expression_scope_t *resolve_scope,
     struct compiler_instance_expression_node_t *target_expression,
     struct compiler_instance_expression_list_item_t **first_expression_output,
-    struct kan_rpl_expression_node_t *container_expression,
+    uint64_t expression_list_size,
+    uint64_t expression_list_index,
     struct compiler_instance_declaration_node_t *first_argument)
 {
     kan_bool_t resolved = KAN_TRUE;
@@ -3219,12 +3244,16 @@ static inline kan_bool_t resolve_expression_array_with_signature (
     struct compiler_instance_declaration_node_t *current_argument = first_argument;
     uint64_t current_argument_index = 0u;
 
-    for (uint64_t index = 0u; index < container_expression->children.size; ++index)
+    for (uint64_t index = 0u; index < expression_list_size; ++index)
     {
         struct compiler_instance_expression_node_t *resolved_expression;
-        if (resolve_expression (context, instance, resolve_scope,
-                                &((struct kan_rpl_expression_node_t *) container_expression->children.data)[index],
-                                &resolved_expression, &output_type))
+        const uint64_t expression_index =
+            ((uint64_t *) intermediate->expression_lists_storage.data)[expression_list_index + index];
+
+        if (resolve_expression (
+                context, instance, intermediate, resolve_scope,
+                &((struct kan_rpl_expression_t *) intermediate->expression_storage.data)[expression_index],
+                &resolved_expression, &output_type))
         {
             KAN_ASSERT (resolved_expression)
             struct compiler_instance_expression_list_item_t *list_item = kan_stack_group_allocator_allocate (
@@ -3263,8 +3292,8 @@ static inline kan_bool_t resolve_expression_array_with_signature (
     {
         KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
                  "[%s:%s:%s:%ld] Expression array does not match required \"%s\" call signature: not enough arguments.",
-                 context->log_name, resolve_scope->function->module_name, container_expression->source_name,
-                 (long) container_expression->source_line, get_expression_call_name_for_logging (target_expression))
+                 context->log_name, resolve_scope->function->module_name, target_expression->source_name,
+                 (long) target_expression->source_line, get_expression_call_name_for_logging (target_expression))
         resolved = KAN_FALSE;
     }
 
@@ -3295,24 +3324,26 @@ static kan_bool_t resolve_function_by_name (struct rpl_compiler_context_t *conte
 
 static struct resolve_fiend_access_linear_node_t *resolve_field_access_linearize_access_chain (
     struct rpl_compiler_context_t *context,
-    kan_interned_string_t module_name,
-    struct kan_rpl_expression_node_t *current_expression,
-    struct kan_rpl_expression_node_t **stop_output)
+    struct kan_rpl_intermediate_t *intermediate,
+    struct kan_rpl_expression_t *current_expression,
+    struct kan_rpl_expression_t **stop_output)
 {
     struct resolve_fiend_access_linear_node_t *first_node = NULL;
     while (KAN_TRUE)
     {
-        struct kan_rpl_expression_node_t *input_child =
-            &((struct kan_rpl_expression_node_t *) current_expression->children.data)[0u];
+        struct kan_rpl_expression_t *input_child =
+            &((struct kan_rpl_expression_t *)
+                  intermediate->expression_storage.data)[current_expression->binary_operation.left_operand_index];
 
-        struct kan_rpl_expression_node_t *field_child =
-            &((struct kan_rpl_expression_node_t *) current_expression->children.data)[1u];
+        struct kan_rpl_expression_t *field_child =
+            &((struct kan_rpl_expression_t *)
+                  intermediate->expression_storage.data)[current_expression->binary_operation.right_operand_index];
 
         if (field_child->type != KAN_RPL_EXPRESSION_NODE_TYPE_IDENTIFIER)
         {
             KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
                      "[%s:%s:%s:%ld] Cannot execute \".\" operation: right operand is not a field identifier.",
-                     context->log_name, module_name, current_expression->source_name,
+                     context->log_name, intermediate->log_name, current_expression->source_name,
                      (long) current_expression->source_line)
             return NULL;
         }
@@ -3326,7 +3357,7 @@ static struct resolve_fiend_access_linear_node_t *resolve_field_access_linearize
         new_node->field_source = field_child;
 
         if (input_child->type == KAN_RPL_EXPRESSION_NODE_TYPE_BINARY_OPERATION &&
-            input_child->binary_operation == KAN_RPL_BINARY_OPERATION_FIELD_ACCESS)
+            input_child->binary_operation.operation == KAN_RPL_BINARY_OPERATION_FIELD_ACCESS)
         {
             current_expression = input_child;
         }
@@ -3639,17 +3670,18 @@ static inline kan_bool_t resolve_field_access_structured (struct rpl_compiler_co
 
 static inline kan_bool_t resolve_binary_operation (struct rpl_compiler_context_t *context,
                                                    struct rpl_compiler_instance_t *instance,
+                                                   struct kan_rpl_intermediate_t *intermediate,
                                                    struct resolve_expression_scope_t *resolve_scope,
-                                                   struct kan_rpl_expression_node_t *input_expression,
+                                                   struct kan_rpl_expression_t *input_expression,
                                                    struct compiler_instance_expression_node_t *result_expression,
                                                    struct resolve_expression_output_type_t *output_type)
 {
     // Field access parse into appropriate access operation is complicated and therefore separated from everything else.
-    if (input_expression->binary_operation == KAN_RPL_BINARY_OPERATION_FIELD_ACCESS)
+    if (input_expression->binary_operation.operation == KAN_RPL_BINARY_OPERATION_FIELD_ACCESS)
     {
-        struct kan_rpl_expression_node_t *chain_stop_expression;
+        struct kan_rpl_expression_t *chain_stop_expression;
         struct resolve_fiend_access_linear_node_t *chain_first = resolve_field_access_linearize_access_chain (
-            context, resolve_scope->function->module_name, input_expression, &chain_stop_expression);
+            context, intermediate, input_expression, &chain_stop_expression);
 
         if (!chain_first)
         {
@@ -3732,8 +3764,9 @@ static inline kan_bool_t resolve_binary_operation (struct rpl_compiler_context_t
             }
         }
 
-        if (!chain_input_expression && !resolve_expression (context, instance, resolve_scope, chain_stop_expression,
-                                                            &chain_input_expression, &chain_input_expression_type))
+        if (!chain_input_expression &&
+            !resolve_expression (context, instance, intermediate, resolve_scope, chain_stop_expression,
+                                 &chain_input_expression, &chain_input_expression_type))
         {
             return KAN_FALSE;
         }
@@ -3753,8 +3786,9 @@ static inline kan_bool_t resolve_binary_operation (struct rpl_compiler_context_t
     }
 
     struct resolve_expression_output_type_t left_operand_type;
-    if (!resolve_expression (context, instance, resolve_scope,
-                             &((struct kan_rpl_expression_node_t *) input_expression->children.data)[0u],
+    if (!resolve_expression (context, instance, intermediate, resolve_scope,
+                             &((struct kan_rpl_expression_t *) intermediate->expression_storage
+                                   .data)[input_expression->binary_operation.left_operand_index],
                              &result_expression->binary_operation.left_operand, &left_operand_type))
     {
         return KAN_FALSE;
@@ -3765,8 +3799,9 @@ static inline kan_bool_t resolve_binary_operation (struct rpl_compiler_context_t
     result_expression->binary_operation.left_type_if_struct = left_operand_type.type_if_struct;
 
     struct resolve_expression_output_type_t right_operand_type;
-    if (!resolve_expression (context, instance, resolve_scope,
-                             &((struct kan_rpl_expression_node_t *) input_expression->children.data)[1u],
+    if (!resolve_expression (context, instance, intermediate, resolve_scope,
+                             &((struct kan_rpl_expression_t *) intermediate->expression_storage
+                                   .data)[input_expression->binary_operation.right_operand_index],
                              &result_expression->binary_operation.right_operand, &right_operand_type))
     {
         return KAN_FALSE;
@@ -3776,7 +3811,7 @@ static inline kan_bool_t resolve_binary_operation (struct rpl_compiler_context_t
     result_expression->binary_operation.right_type_if_matrix = right_operand_type.type_if_matrix;
     result_expression->binary_operation.right_type_if_struct = right_operand_type.type_if_struct;
 
-    switch (input_expression->binary_operation)
+    switch (input_expression->binary_operation.operation)
     {
     case KAN_RPL_BINARY_OPERATION_FIELD_ACCESS:
         // Should be processed separately in upper segment.
@@ -4144,14 +4179,16 @@ static inline kan_bool_t resolve_binary_operation (struct rpl_compiler_context_t
 
 static inline kan_bool_t resolve_unary_operation (struct rpl_compiler_context_t *context,
                                                   struct rpl_compiler_instance_t *instance,
+                                                  struct kan_rpl_intermediate_t *intermediate,
                                                   struct resolve_expression_scope_t *resolve_scope,
-                                                  struct kan_rpl_expression_node_t *input_expression,
+                                                  struct kan_rpl_expression_t *input_expression,
                                                   struct compiler_instance_expression_node_t *result_expression,
                                                   struct resolve_expression_output_type_t *output_type)
 {
     struct resolve_expression_output_type_t operand_type;
-    if (!resolve_expression (context, instance, resolve_scope,
-                             &((struct kan_rpl_expression_node_t *) input_expression->children.data)[0u],
+    if (!resolve_expression (context, instance, intermediate, resolve_scope,
+                             &((struct kan_rpl_expression_t *) intermediate->expression_storage
+                                   .data)[input_expression->unary_operation.operand_index],
                              &result_expression->unary_operation.operand, &operand_type))
     {
         return KAN_FALSE;
@@ -4161,7 +4198,7 @@ static inline kan_bool_t resolve_unary_operation (struct rpl_compiler_context_t 
     result_expression->unary_operation.type_if_matrix = operand_type.type_if_matrix;
     result_expression->unary_operation.type_if_struct = operand_type.type_if_struct;
 
-    switch (input_expression->unary_operation)
+    switch (input_expression->unary_operation.operand_index)
     {
     case KAN_RPL_UNARY_OPERATION_NEGATE:
         result_expression->type = COMPILER_INSTANCE_EXPRESSION_TYPE_OPERATION_NEGATE;
@@ -4220,8 +4257,9 @@ static inline kan_bool_t resolve_unary_operation (struct rpl_compiler_context_t 
 
 static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
                                       struct rpl_compiler_instance_t *instance,
+                                      struct kan_rpl_intermediate_t *intermediate,
                                       struct resolve_expression_scope_t *resolve_scope,
-                                      struct kan_rpl_expression_node_t *expression,
+                                      struct kan_rpl_expression_t *expression,
                                       struct compiler_instance_expression_node_t **output,
                                       struct resolve_expression_output_type_t *output_type)
 {
@@ -4242,16 +4280,16 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
     else if (expression->type == KAN_RPL_EXPRESSION_NODE_TYPE_CONDITIONAL_SCOPE)
     {
         struct resolve_expression_output_type_t output_type_mute;
-        switch (evaluate_conditional (context, resolve_scope->function->module_name,
-                                      &((struct kan_rpl_expression_node_t *) expression->children.data)[0u], KAN_TRUE))
+        switch (evaluate_conditional (context, intermediate, expression->conditional_scope.condition_index, KAN_TRUE))
         {
         case CONDITIONAL_EVALUATION_RESULT_FAILED:
             return KAN_FALSE;
 
         case CONDITIONAL_EVALUATION_RESULT_TRUE:
-            return resolve_expression (context, instance, resolve_scope,
-                                       &((struct kan_rpl_expression_node_t *) expression->children.data)[1u], output,
-                                       &output_type_mute);
+            return resolve_expression (context, instance, intermediate, resolve_scope,
+                                       &((struct kan_rpl_expression_t *) intermediate->expression_storage
+                                             .data)[expression->conditional_scope.body_index],
+                                       output, &output_type_mute);
 
         case CONDITIONAL_EVALUATION_RESULT_FALSE:
             return KAN_TRUE;
@@ -4259,21 +4297,21 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
     }
     else if (expression->type == KAN_RPL_EXPRESSION_NODE_TYPE_CONDITIONAL_ALIAS)
     {
-        switch (evaluate_conditional (context, resolve_scope->function->module_name,
-                                      &((struct kan_rpl_expression_node_t *) expression->children.data)[0u], KAN_TRUE))
+        switch (evaluate_conditional (context, intermediate, expression->conditional_alias.condition_index, KAN_TRUE))
         {
         case CONDITIONAL_EVALUATION_RESULT_FAILED:
             return KAN_FALSE;
 
         case CONDITIONAL_EVALUATION_RESULT_TRUE:
         {
-            if (!check_alias_or_variable_name_is_not_occupied (instance, resolve_scope, expression->alias_name))
+            if (!check_alias_or_variable_name_is_not_occupied (instance, resolve_scope,
+                                                               expression->conditional_alias.name))
             {
                 KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
                          "[%s:%s:%s:%ld] Failed to add alias \"%s\" as its name is already occupied by other active "
                          "alias in this scope.",
                          context->log_name, resolve_scope->function->module_name, expression->source_name,
-                         (long) expression->source_line, expression->alias_name)
+                         (long) expression->source_line, expression->conditional_alias.name)
                 return KAN_FALSE;
             }
 
@@ -4281,15 +4319,16 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
                 &context->resolve_allocator, sizeof (struct resolve_expression_alias_node_t),
                 _Alignof (struct resolve_expression_alias_node_t));
 
-            alias_node->name = expression->alias_name;
-            if (!resolve_expression (context, instance, resolve_scope,
-                                     &((struct kan_rpl_expression_node_t *) expression->children.data)[1u],
+            alias_node->name = expression->conditional_alias.name;
+            if (!resolve_expression (context, instance, intermediate, resolve_scope,
+                                     &((struct kan_rpl_expression_t *) intermediate->expression_storage
+                                           .data)[expression->conditional_alias.expression_index],
                                      &alias_node->resolved_expression, &alias_node->resolved_output_type))
             {
                 KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
                          "[%s:%s:%s:%ld] Failed to resolve alias \"%s\" internal expression.", context->log_name,
                          resolve_scope->function->module_name, expression->source_name, (long) expression->source_line,
-                         expression->alias_name)
+                         expression->conditional_alias.name)
                 return KAN_FALSE;
             }
 
@@ -4414,7 +4453,8 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
         }
 
         new_expression->variable_declaration.name = expression->variable_declaration.variable_name;
-        new_expression->variable_declaration.array_dimensions_count = expression->children.size;
+        new_expression->variable_declaration.array_dimensions_count =
+            expression->variable_declaration.array_size_expression_list_size;
 
         if (!resolve_variable_type (context, instance, new_expression->module_name,
                                     &new_expression->variable_declaration, expression->variable_declaration.type_name,
@@ -4424,8 +4464,9 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
             resolved = KAN_FALSE;
         }
 
-        if (!resolve_array_dimensions (context, instance, new_expression->module_name,
-                                       &new_expression->variable_declaration, &expression->children, KAN_TRUE))
+        if (!resolve_array_dimensions (context, instance, intermediate, &new_expression->variable_declaration,
+                                       expression->variable_declaration.array_size_expression_list_size,
+                                       expression->variable_declaration.array_size_expression_list_index, KAN_TRUE))
         {
             resolved = KAN_FALSE;
         }
@@ -4471,10 +4512,12 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
     }
 
     case KAN_RPL_EXPRESSION_NODE_TYPE_BINARY_OPERATION:
-        return resolve_binary_operation (context, instance, resolve_scope, expression, new_expression, output_type);
+        return resolve_binary_operation (context, instance, intermediate, resolve_scope, expression, new_expression,
+                                         output_type);
 
     case KAN_RPL_EXPRESSION_NODE_TYPE_UNARY_OPERATION:
-        return resolve_unary_operation (context, instance, resolve_scope, expression, new_expression, output_type);
+        return resolve_unary_operation (context, instance, intermediate, resolve_scope, expression, new_expression,
+                                        output_type);
 
     case KAN_RPL_EXPRESSION_NODE_TYPE_SCOPE:
     {
@@ -4494,12 +4537,17 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
         struct compiler_instance_expression_list_item_t *last_expression = NULL;
         struct resolve_expression_output_type_t internal_output_type;
 
-        for (uint64_t index = 0u; index < expression->children.size; ++index)
+        for (uint64_t index = 0u; index < expression->scope.statement_list_size; ++index)
         {
+            const uint64_t expression_index =
+                ((uint64_t *)
+                     intermediate->expression_lists_storage.data)[expression->scope.statement_list_index + index];
             struct compiler_instance_expression_node_t *resolved_expression;
-            if (resolve_expression (context, instance, &child_scope,
-                                    &((struct kan_rpl_expression_node_t *) expression->children.data)[index],
-                                    &resolved_expression, &internal_output_type))
+
+            if (resolve_expression (
+                    context, instance, intermediate, &child_scope,
+                    &((struct kan_rpl_expression_t *) intermediate->expression_storage.data)[expression_index],
+                    &resolved_expression, &internal_output_type))
             {
                 // Expression will be null for inactive conditionals and for conditional aliases.
                 if (resolved_expression)
@@ -4537,7 +4585,7 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
         struct compiler_instance_sampler_node_t *sampler = instance->first_sampler;
         while (sampler)
         {
-            if (sampler->name == expression->function_name)
+            if (sampler->name == expression->function_call.name)
             {
                 new_expression->type = COMPILER_INSTANCE_EXPRESSION_TYPE_SAMPLER_CALL;
                 new_expression->sampler_call.sampler = sampler;
@@ -4556,9 +4604,10 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
                     break;
                 }
 
-                if (!resolve_expression_array_with_signature (context, instance, resolve_scope, new_expression,
-                                                              &new_expression->sampler_call.first_argument, expression,
-                                                              signature_first_element))
+                if (!resolve_expression_array_with_signature (
+                        context, instance, intermediate, resolve_scope, new_expression,
+                        &new_expression->sampler_call.first_argument, expression->function_call.argument_list_size,
+                        expression->function_call.argument_list_index, signature_first_element))
                 {
                     resolved = KAN_FALSE;
                 }
@@ -4574,16 +4623,17 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
         kan_bool_t resolved = KAN_TRUE;
         new_expression->function_call.function = NULL;
 
-        if (!resolve_function_by_name (context, instance, expression->function_name,
+        if (!resolve_function_by_name (context, instance, expression->function_call.name,
                                        resolve_scope->function->required_stage,
                                        &new_expression->function_call.function))
         {
             resolved = KAN_FALSE;
         }
 
-        if (!resolve_expression_array_with_signature (context, instance, resolve_scope, new_expression,
-                                                      &new_expression->function_call.first_argument, expression,
-                                                      new_expression->function_call.function->first_argument))
+        if (!resolve_expression_array_with_signature (
+                context, instance, intermediate, resolve_scope, new_expression,
+                &new_expression->function_call.first_argument, expression->function_call.argument_list_size,
+                expression->function_call.argument_list_index, new_expression->function_call.function->first_argument))
         {
             resolved = KAN_FALSE;
         }
@@ -4603,15 +4653,15 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
         new_expression->constructor.type_if_struct = NULL;
 
         if (!(new_expression->constructor.type_if_vector =
-                  find_inbuilt_vector_type (expression->constructor_type_name)) &&
+                  find_inbuilt_vector_type (expression->constructor.type_name)) &&
             !(new_expression->constructor.type_if_matrix =
-                  find_inbuilt_matrix_type (expression->constructor_type_name)) &&
-            !resolve_use_struct (context, instance, expression->constructor_type_name,
+                  find_inbuilt_matrix_type (expression->constructor.type_name)) &&
+            !resolve_use_struct (context, instance, expression->constructor.type_name,
                                  &new_expression->constructor.type_if_struct))
         {
             KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR, "[%s:%s:%s:%ld] Constructor \"%s\" type is unknown.",
                      context->log_name, new_expression->module_name, new_expression->source_name,
-                     (long) new_expression->source_line, expression->constructor_type_name)
+                     (long) new_expression->source_line, expression->constructor.type_name)
             resolved = KAN_FALSE;
         }
 
@@ -4631,9 +4681,10 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
                 signature = new_expression->constructor.type_if_struct->first_field;
             }
 
-            if (!resolve_expression_array_with_signature (context, instance, resolve_scope, new_expression,
-                                                          &new_expression->constructor.first_argument, expression,
-                                                          signature))
+            if (!resolve_expression_array_with_signature (context, instance, intermediate, resolve_scope,
+                                                          new_expression, &new_expression->constructor.first_argument,
+                                                          expression->constructor.argument_list_size,
+                                                          expression->constructor.argument_list_index, signature))
             {
                 resolved = KAN_FALSE;
             }
@@ -4651,8 +4702,9 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
         kan_bool_t resolved = KAN_TRUE;
         struct resolve_expression_output_type_t internal_output_type;
 
-        if (resolve_expression (context, instance, resolve_scope,
-                                &((struct kan_rpl_expression_node_t *) expression->children.data)[0u],
+        if (resolve_expression (context, instance, intermediate, resolve_scope,
+                                &((struct kan_rpl_expression_t *)
+                                      intermediate->expression_storage.data)[expression->if_.condition_index],
                                 &new_expression->if_.condition, &internal_output_type))
         {
             if (!internal_output_type.boolean)
@@ -4668,17 +4720,19 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
             resolved = KAN_FALSE;
         }
 
-        if (!resolve_expression (context, instance, resolve_scope,
-                                 &((struct kan_rpl_expression_node_t *) expression->children.data)[1u],
-                                 &new_expression->if_.when_true, &internal_output_type))
+        if (!resolve_expression (
+                context, instance, intermediate, resolve_scope,
+                &((struct kan_rpl_expression_t *) intermediate->expression_storage.data)[expression->if_.true_index],
+                &new_expression->if_.when_true, &internal_output_type))
         {
             resolved = KAN_FALSE;
         }
 
-        if (expression->children.size == 3u)
+        if (expression->if_.false_index != KAN_RPL_EXPRESSION_INDEX_NONE)
         {
-            if (!resolve_expression (context, instance, resolve_scope,
-                                     &((struct kan_rpl_expression_node_t *) expression->children.data)[2u],
+            if (!resolve_expression (context, instance, intermediate, resolve_scope,
+                                     &((struct kan_rpl_expression_t *)
+                                           intermediate->expression_storage.data)[expression->if_.false_index],
                                      &new_expression->if_.when_false, &internal_output_type))
             {
                 resolved = KAN_FALSE;
@@ -4726,15 +4780,17 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
             .associated_outer_loop_if_any = loop_expression,
         };
 
-        if (!resolve_expression (context, instance, &loop_init_scope,
-                                 &((struct kan_rpl_expression_node_t *) expression->children.data)[0u],
-                                 &loop_expression->for_.init, &internal_output_type))
+        if (!resolve_expression (
+                context, instance, intermediate, &loop_init_scope,
+                &((struct kan_rpl_expression_t *) intermediate->expression_storage.data)[expression->for_.init_index],
+                &loop_expression->for_.init, &internal_output_type))
         {
             resolved = KAN_FALSE;
         }
 
-        if (resolve_expression (context, instance, &loop_init_scope,
-                                &((struct kan_rpl_expression_node_t *) expression->children.data)[1u],
+        if (resolve_expression (context, instance, intermediate, &loop_init_scope,
+                                &((struct kan_rpl_expression_t *)
+                                      intermediate->expression_storage.data)[expression->for_.condition_index],
                                 &loop_expression->for_.condition, &internal_output_type))
         {
             if (!internal_output_type.boolean)
@@ -4751,16 +4807,18 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
             resolved = KAN_FALSE;
         }
 
-        if (!resolve_expression (context, instance, &loop_init_scope,
-                                 &((struct kan_rpl_expression_node_t *) expression->children.data)[2u],
-                                 &loop_expression->for_.step, &internal_output_type))
+        if (!resolve_expression (
+                context, instance, intermediate, &loop_init_scope,
+                &((struct kan_rpl_expression_t *) intermediate->expression_storage.data)[expression->for_.step_index],
+                &loop_expression->for_.step, &internal_output_type))
         {
             resolved = KAN_FALSE;
         }
 
-        if (!resolve_expression (context, instance, &loop_init_scope,
-                                 &((struct kan_rpl_expression_node_t *) expression->children.data)[3u],
-                                 &loop_expression->for_.body, &internal_output_type))
+        if (!resolve_expression (
+                context, instance, intermediate, &loop_init_scope,
+                &((struct kan_rpl_expression_t *) intermediate->expression_storage.data)[expression->for_.body_index],
+                &loop_expression->for_.body, &internal_output_type))
         {
             resolved = KAN_FALSE;
         }
@@ -4782,8 +4840,9 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
             .associated_outer_loop_if_any = new_expression,
         };
 
-        if (resolve_expression (context, instance, &while_loop_scope,
-                                &((struct kan_rpl_expression_node_t *) expression->children.data)[0u],
+        if (resolve_expression (context, instance, intermediate, &while_loop_scope,
+                                &((struct kan_rpl_expression_t *)
+                                      intermediate->expression_storage.data)[expression->while_.condition_index],
                                 &new_expression->while_.condition, &internal_output_type))
         {
             if (!internal_output_type.boolean)
@@ -4799,9 +4858,10 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
             resolved = KAN_FALSE;
         }
 
-        if (!resolve_expression (context, instance, &while_loop_scope,
-                                 &((struct kan_rpl_expression_node_t *) expression->children.data)[1u],
-                                 &new_expression->while_.body, &internal_output_type))
+        if (!resolve_expression (
+                context, instance, intermediate, &while_loop_scope,
+                &((struct kan_rpl_expression_t *) intermediate->expression_storage.data)[expression->while_.body_index],
+                &new_expression->while_.body, &internal_output_type))
         {
             resolved = KAN_FALSE;
         }
@@ -4842,12 +4902,13 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
         new_expression->type = COMPILER_INSTANCE_EXPRESSION_TYPE_RETURN;
         kan_bool_t resolved = KAN_TRUE;
 
-        if (expression->children.size == 1u)
+        if (expression->return_index != KAN_RPL_EXPRESSION_INDEX_NONE)
         {
             struct resolve_expression_output_type_t internal_output_type;
-            if (resolve_expression (context, instance, resolve_scope,
-                                    &((struct kan_rpl_expression_node_t *) expression->children.data)[0u],
-                                    &new_expression->return_expression, &internal_output_type))
+            if (resolve_expression (
+                    context, instance, intermediate, resolve_scope,
+                    &((struct kan_rpl_expression_t *) intermediate->expression_storage.data)[expression->return_index],
+                    &new_expression->return_expression, &internal_output_type))
             {
                 if (!resolve_scope->function->return_type_if_vector &&
                     !resolve_scope->function->return_type_if_matrix && !resolve_scope->function->return_type_if_struct)
@@ -4936,7 +4997,7 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
 
 static kan_bool_t resolve_new_used_function (struct rpl_compiler_context_t *context,
                                              struct rpl_compiler_instance_t *instance,
-                                             kan_interned_string_t intermediate_log_name,
+                                             struct kan_rpl_intermediate_t *intermediate,
                                              struct kan_rpl_function_t *function,
                                              enum kan_rpl_pipeline_stage_t context_stage,
                                              struct compiler_instance_function_node_t **output_node)
@@ -4945,7 +5006,7 @@ static kan_bool_t resolve_new_used_function (struct rpl_compiler_context_t *cont
     {
         KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
                  "[%s:%s:%s:%ld] Cannot resolve function \"%s\" as its global name is already occupied.",
-                 context->log_name, intermediate_log_name, function->source_name, (long) function->source_line,
+                 context->log_name, intermediate->log_name, function->source_name, (long) function->source_line,
                  function->name)
 
         *output_node = NULL;
@@ -4971,7 +5032,7 @@ static kan_bool_t resolve_new_used_function (struct rpl_compiler_context_t *cont
             !resolve_use_struct (context, instance, function->return_type_name, &function_node->return_type_if_struct))
         {
             KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR, "[%s:%s:%s:%ld] Function return type \"%s\" is unknown.",
-                     context->log_name, intermediate_log_name, function->source_name, (long) function->source_line,
+                     context->log_name, intermediate->log_name, function->source_name, (long) function->source_line,
                      function->return_type_name)
             resolved = KAN_FALSE;
         }
@@ -4982,12 +5043,12 @@ static kan_bool_t resolve_new_used_function (struct rpl_compiler_context_t *cont
     function_node->first_buffer_access = NULL;
     function_node->first_sampler_access = NULL;
 
-    function_node->module_name = intermediate_log_name;
+    function_node->module_name = intermediate->log_name;
     function_node->source_name = function->source_name;
     function_node->source_line = function->source_line;
 
-    if (!resolve_declarations (context, instance, intermediate_log_name, &function->arguments,
-                               &function_node->first_argument, KAN_TRUE))
+    if (!resolve_declarations (context, instance, intermediate, &function->arguments, &function_node->first_argument,
+                               KAN_TRUE))
     {
         resolved = KAN_FALSE;
     }
@@ -5027,7 +5088,10 @@ static kan_bool_t resolve_new_used_function (struct rpl_compiler_context_t *cont
     };
 
     struct resolve_expression_output_type_t output_type_mute;
-    if (!resolve_expression (context, instance, &root_scope, &function->body, &function_node->body, &output_type_mute))
+    if (!resolve_expression (
+            context, instance, intermediate, &root_scope,
+            &((struct kan_rpl_expression_t *) intermediate->expression_storage.data)[function->body_index],
+            &function_node->body, &output_type_mute))
     {
         resolved = KAN_FALSE;
     }
@@ -5169,7 +5233,7 @@ static kan_bool_t resolve_function_by_name (struct rpl_compiler_context_t *conte
 
             if (function->name == function_name)
             {
-                switch (evaluate_conditional (context, intermediate->log_name, &function->conditional, KAN_TRUE))
+                switch (evaluate_conditional (context, intermediate, function->conditional_index, KAN_TRUE))
                 {
                 case CONDITIONAL_EVALUATION_RESULT_FAILED:
                     result = KAN_FALSE;
@@ -5185,8 +5249,8 @@ static kan_bool_t resolve_function_by_name (struct rpl_compiler_context_t *conte
                     }
                     else
                     {
-                        if (!resolve_new_used_function (context, instance, intermediate->log_name, function,
-                                                        context_stage, &function_node))
+                        if (!resolve_new_used_function (context, instance, intermediate, function, context_stage,
+                                                        &function_node))
                         {
                             result = KAN_FALSE;
                         }
@@ -5270,7 +5334,7 @@ kan_rpl_compiler_instance_t kan_rpl_compiler_context_resolve (kan_rpl_compiler_c
         struct kan_rpl_intermediate_t *intermediate =
             ((struct kan_rpl_intermediate_t **) context->modules.data)[intermediate_index];
 
-        if (!resolve_settings (context, instance, intermediate->log_name, &intermediate->settings,
+        if (!resolve_settings (context, instance, intermediate, &intermediate->settings,
                                &instance->first_setting, &instance->last_setting))
         {
             successfully_resolved = KAN_FALSE;
