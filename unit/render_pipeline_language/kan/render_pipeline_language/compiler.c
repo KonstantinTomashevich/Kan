@@ -65,15 +65,20 @@ struct compiler_instance_setting_node_t
     uint32_t source_line;
 };
 
-struct compiler_instance_variable_t
+struct compiler_instance_full_type_definition_t
 {
-    kan_interned_string_t name;
-    struct inbuilt_vector_type_t *type_if_vector;
-    struct inbuilt_matrix_type_t *type_if_matrix;
-    struct compiler_instance_struct_node_t *type_if_struct;
+    struct inbuilt_vector_type_t *if_vector;
+    struct inbuilt_matrix_type_t *if_matrix;
+    struct compiler_instance_struct_node_t *if_struct;
 
     uint64_t array_dimensions_count;
     uint64_t *array_dimensions;
+};
+
+struct compiler_instance_variable_t
+{
+    kan_interned_string_t name;
+    struct compiler_instance_full_type_definition_t type;
 };
 
 struct compiler_instance_declaration_node_t
@@ -105,7 +110,8 @@ struct compiler_instance_struct_node_t
     kan_interned_string_t source_name;
     uint32_t source_line;
 
-    uint32_t spirv_id;
+    uint32_t spirv_id_value;
+    uint32_t spirv_id_function_pointer;
 };
 
 struct flattening_name_generation_buffer_t
@@ -190,7 +196,8 @@ enum compiler_instance_expression_type_t
     COMPILER_INSTANCE_EXPRESSION_TYPE_STRUCTURED_BUFFER_REFERENCE,
     COMPILER_INSTANCE_EXPRESSION_TYPE_VARIABLE_REFERENCE,
     COMPILER_INSTANCE_EXPRESSION_TYPE_STRUCTURED_ACCESS,
-    COMPILER_INSTANCE_EXPRESSION_TYPE_FLATTENED_BUFFER_ACCESS,
+    COMPILER_INSTANCE_EXPRESSION_TYPE_FLATTENED_BUFFER_ACCESS_INPUT,
+    COMPILER_INSTANCE_EXPRESSION_TYPE_FLATTENED_BUFFER_ACCESS_OUTPUT,
     COMPILER_INSTANCE_EXPRESSION_TYPE_INTEGER_LITERAL,
     COMPILER_INSTANCE_EXPRESSION_TYPE_FLOATING_LITERAL,
     COMPILER_INSTANCE_EXPRESSION_TYPE_VARIABLE_DECLARATION,
@@ -234,27 +241,28 @@ struct compiler_instance_structured_access_suffix_t
     struct compiler_instance_expression_node_t *input;
     uint64_t access_chain_length;
     uint64_t *access_chain_indices;
+    struct compiler_instance_full_type_definition_t result_type;
+};
+
+struct compiler_instance_variable_declaration_suffix_t
+{
+    struct compiler_instance_variable_t variable;
+    struct compiler_instance_scope_variable_item_t *declared_in_scope;
 };
 
 struct compiler_instance_binary_operation_suffix_t
 {
     struct compiler_instance_expression_node_t *left_operand;
-    struct inbuilt_vector_type_t *left_type_if_vector;
-    struct inbuilt_matrix_type_t *left_type_if_matrix;
-    struct compiler_instance_struct_node_t *left_type_if_struct;
+    struct compiler_instance_full_type_definition_t left_type;
 
     struct compiler_instance_expression_node_t *right_operand;
-    struct inbuilt_vector_type_t *right_type_if_vector;
-    struct inbuilt_matrix_type_t *right_type_if_matrix;
-    struct compiler_instance_struct_node_t *right_type_if_struct;
+    struct compiler_instance_full_type_definition_t right_type;
 };
 
 struct compiler_instance_unary_operation_suffix_t
 {
     struct compiler_instance_expression_node_t *operand;
-    struct inbuilt_vector_type_t *type_if_vector;
-    struct inbuilt_matrix_type_t *type_if_matrix;
-    struct compiler_instance_struct_node_t *type_if_struct;
+    struct compiler_instance_full_type_definition_t type;
 };
 
 struct compiler_instance_expression_list_item_t
@@ -267,6 +275,8 @@ struct compiler_instance_scope_variable_item_t
 {
     struct compiler_instance_scope_variable_item_t *next;
     struct compiler_instance_variable_t *variable;
+    kan_bool_t writable;
+    uint32_t spirv_id;
 };
 
 struct compiler_instance_scope_suffix_t
@@ -327,7 +337,7 @@ struct compiler_instance_expression_node_t
         struct compiler_instance_buffer_flattened_declaration_t *flattened_buffer_access;
         int64_t integer_literal;
         double floating_literal;
-        struct compiler_instance_variable_t variable_declaration;
+        struct compiler_instance_variable_declaration_suffix_t variable_declaration;
         struct compiler_instance_binary_operation_suffix_t binary_operation;
         struct compiler_instance_unary_operation_suffix_t unary_operation;
         struct compiler_instance_scope_suffix_t scope;
@@ -377,6 +387,8 @@ struct compiler_instance_function_node_t
     enum kan_rpl_pipeline_stage_t required_stage;
     struct compiler_instance_buffer_access_node_t *first_buffer_access;
     struct compiler_instance_sampler_access_node_t *first_sampler_access;
+
+    uint32_t spirv_id;
 
     kan_interned_string_t module_name;
     kan_interned_string_t source_name;
@@ -436,11 +448,7 @@ struct compile_time_evaluation_value_t
 
 struct resolve_expression_output_type_t
 {
-    struct inbuilt_vector_type_t *type_if_vector;
-    struct inbuilt_matrix_type_t *type_if_matrix;
-    struct compiler_instance_struct_node_t *type_if_struct;
-    uint64_t array_dimensions_count;
-    uint64_t *array_dimensions;
+    struct compiler_instance_full_type_definition_t type;
     kan_bool_t boolean;
     kan_bool_t writable;
 };
@@ -494,6 +502,7 @@ struct inbuilt_vector_type_t
     uint32_t spirv_id;
     uint32_t spirv_id_input_pointer;
     uint32_t spirv_id_output_pointer;
+    uint32_t spirv_id_function_pointer;
 };
 
 struct inbuilt_matrix_type_t
@@ -508,6 +517,7 @@ struct inbuilt_matrix_type_t
     uint32_t spirv_id;
     uint32_t spirv_id_input_pointer;
     uint32_t spirv_id_output_pointer;
+    uint32_t spirv_id_function_pointer;
 };
 
 enum spirv_fixed_ids_t
@@ -520,42 +530,52 @@ enum spirv_fixed_ids_t
     SPIRV_FIXED_ID_TYPE_FLOAT,
     SPIRV_FIXED_ID_TYPE_FLOAT_INPUT_POINTER,
     SPIRV_FIXED_ID_TYPE_FLOAT_OUTPUT_POINTER,
+    SPIRV_FIXED_ID_TYPE_FLOAT_FUNCTION_POINTER,
 
     SPIRV_FIXED_ID_TYPE_INTEGER,
     SPIRV_FIXED_ID_TYPE_INTEGER_INPUT_POINTER,
     SPIRV_FIXED_ID_TYPE_INTEGER_OUTPUT_POINTER,
+    SPIRV_FIXED_ID_TYPE_INTEGER_FUNCTION_POINTER,
 
     SPIRV_FIXED_ID_TYPE_F2,
     SPIRV_FIXED_ID_TYPE_F2_INPUT_POINTER,
     SPIRV_FIXED_ID_TYPE_F2_OUTPUT_POINTER,
+    SPIRV_FIXED_ID_TYPE_F2_FUNCTION_POINTER,
 
     SPIRV_FIXED_ID_TYPE_F3,
     SPIRV_FIXED_ID_TYPE_F3_INPUT_POINTER,
     SPIRV_FIXED_ID_TYPE_F3_OUTPUT_POINTER,
+    SPIRV_FIXED_ID_TYPE_F3_FUNCTION_POINTER,
 
     SPIRV_FIXED_ID_TYPE_F4,
     SPIRV_FIXED_ID_TYPE_F4_INPUT_POINTER,
     SPIRV_FIXED_ID_TYPE_F4_OUTPUT_POINTER,
+    SPIRV_FIXED_ID_TYPE_F4_FUNCTION_POINTER,
 
     SPIRV_FIXED_ID_TYPE_I2,
     SPIRV_FIXED_ID_TYPE_I2_INPUT_POINTER,
     SPIRV_FIXED_ID_TYPE_I2_OUTPUT_POINTER,
+    SPIRV_FIXED_ID_TYPE_I2_FUNCTION_POINTER,
 
     SPIRV_FIXED_ID_TYPE_I3,
     SPIRV_FIXED_ID_TYPE_I3_INPUT_POINTER,
     SPIRV_FIXED_ID_TYPE_I3_OUTPUT_POINTER,
+    SPIRV_FIXED_ID_TYPE_I3_FUNCTION_POINTER,
 
     SPIRV_FIXED_ID_TYPE_I4,
     SPIRV_FIXED_ID_TYPE_I4_INPUT_POINTER,
     SPIRV_FIXED_ID_TYPE_I4_OUTPUT_POINTER,
+    SPIRV_FIXED_ID_TYPE_I4_FUNCTION_POINTER,
 
     SPIRV_FIXED_ID_TYPE_F3X3,
     SPIRV_FIXED_ID_TYPE_F3X3_INPUT_POINTER,
     SPIRV_FIXED_ID_TYPE_F3X3_OUTPUT_POINTER,
+    SPIRV_FIXED_ID_TYPE_F3X3_FUNCTION_POINTER,
 
     SPIRV_FIXED_ID_TYPE_F4X4,
     SPIRV_FIXED_ID_TYPE_F4X4_INPUT_POINTER,
     SPIRV_FIXED_ID_TYPE_F4X4_OUTPUT_POINTER,
+    SPIRV_FIXED_ID_TYPE_F4X4_FUNCTION_POINTER,
 
     SPIRV_FIXED_ID_TYPE_COMMON_SAMPLER,
 
@@ -580,6 +600,52 @@ struct spirv_arbitrary_instruction_section_t
     struct spirv_arbitrary_instruction_item_t *last;
 };
 
+struct spirv_generation_array_type_t
+{
+    struct spirv_generation_array_type_t *next;
+    uint32_t spirv_id;
+    uint32_t spirv_function_pointer_id;
+    struct inbuilt_vector_type_t *base_type_if_vector;
+    struct inbuilt_matrix_type_t *base_type_if_matrix;
+    struct compiler_instance_struct_node_t *base_type_if_struct;
+    uint64_t dimensions_count;
+    uint64_t *dimensions;
+};
+
+struct spirv_generation_function_type_t
+{
+    struct spirv_generation_function_type_t *next;
+    uint64_t argument_count;
+    uint32_t generated_id;
+    uint32_t return_type_id;
+    uint32_t *argument_types;
+};
+
+struct spirv_generation_block_t
+{
+    struct spirv_generation_block_t *next;
+    uint32_t spirv_id;
+
+    /// \details We need to store variables in the first function block right after the label.
+    ///          Therefore label and variables have separate section.
+    struct spirv_arbitrary_instruction_section_t header_section;
+
+    struct spirv_arbitrary_instruction_section_t code_section;
+};
+
+struct spirv_generation_function_node_t
+{
+    struct spirv_generation_function_node_t *next;
+    struct compiler_instance_function_node_t *source;
+    struct spirv_arbitrary_instruction_section_t header_section;
+
+    struct spirv_generation_block_t *first_block;
+    struct spirv_generation_block_t *last_block;
+
+    /// \details End section is an utility that only contains function end.
+    struct spirv_arbitrary_instruction_section_t end_section;
+};
+
 struct spirv_generation_context_t
 {
     struct rpl_compiler_instance_t *instance;
@@ -592,7 +658,12 @@ struct spirv_generation_context_t
     struct spirv_arbitrary_instruction_section_t base_type_section;
     struct spirv_arbitrary_instruction_section_t higher_type_section;
     struct spirv_arbitrary_instruction_section_t global_variable_section;
-    struct spirv_arbitrary_instruction_section_t functions_section;
+
+    struct spirv_generation_function_node_t *first_function_node;
+    struct spirv_generation_function_node_t *last_function_node;
+
+    struct spirv_generation_array_type_t *first_generated_array_type;
+    struct spirv_generation_function_type_t *first_generated_function_type;
 
     struct kan_stack_group_allocator_t temporary_allocator;
 };
@@ -706,15 +777,15 @@ static void build_repeating_vector_constructor_signatures (
         name[1u] = (char) ('0' + index);
         declaration_array_output[index] = (struct compiler_instance_declaration_node_t) {
             .next = index + 1u == repeats ? NULL : &declaration_array_output[index + 1u],
-            .variable =
-                {
-                    .name = kan_string_intern (name),
-                    .type_if_vector = item,
-                    .type_if_matrix = NULL,
-                    .type_if_struct = NULL,
-                    .array_dimensions_count = 0u,
-                    .array_dimensions = NULL,
-                },
+            .variable = {.name = kan_string_intern (name),
+                         .type =
+                             {
+                                 .if_vector = item,
+                                 .if_matrix = NULL,
+                                 .if_struct = NULL,
+                                 .array_dimensions_count = 0u,
+                                 .array_dimensions = NULL,
+                             }},
             .meta_count = 0u,
             .meta = NULL,
             .module_name = NULL,
@@ -774,6 +845,7 @@ static inline void ensure_statics_initialized (void)
             .spirv_id = SPIRV_FIXED_ID_TYPE_FLOAT,
             .spirv_id_input_pointer = SPIRV_FIXED_ID_TYPE_FLOAT_INPUT_POINTER,
             .spirv_id_output_pointer = SPIRV_FIXED_ID_TYPE_FLOAT_OUTPUT_POINTER,
+            .spirv_id_function_pointer = SPIRV_FIXED_ID_TYPE_FLOAT_FUNCTION_POINTER,
         };
 
         type_f2 = (struct inbuilt_vector_type_t) {
@@ -785,6 +857,7 @@ static inline void ensure_statics_initialized (void)
             .spirv_id = SPIRV_FIXED_ID_TYPE_F2,
             .spirv_id_input_pointer = SPIRV_FIXED_ID_TYPE_F2_INPUT_POINTER,
             .spirv_id_output_pointer = SPIRV_FIXED_ID_TYPE_F2_OUTPUT_POINTER,
+            .spirv_id_function_pointer = SPIRV_FIXED_ID_TYPE_F2_FUNCTION_POINTER,
         };
 
         type_f3 = (struct inbuilt_vector_type_t) {
@@ -796,6 +869,7 @@ static inline void ensure_statics_initialized (void)
             .spirv_id = SPIRV_FIXED_ID_TYPE_F3,
             .spirv_id_input_pointer = SPIRV_FIXED_ID_TYPE_F3_INPUT_POINTER,
             .spirv_id_output_pointer = SPIRV_FIXED_ID_TYPE_F3_OUTPUT_POINTER,
+            .spirv_id_function_pointer = SPIRV_FIXED_ID_TYPE_F3_FUNCTION_POINTER,
         };
 
         type_f4 = (struct inbuilt_vector_type_t) {
@@ -807,6 +881,7 @@ static inline void ensure_statics_initialized (void)
             .spirv_id = SPIRV_FIXED_ID_TYPE_F4,
             .spirv_id_input_pointer = SPIRV_FIXED_ID_TYPE_F4_INPUT_POINTER,
             .spirv_id_output_pointer = SPIRV_FIXED_ID_TYPE_F4_OUTPUT_POINTER,
+            .spirv_id_function_pointer = SPIRV_FIXED_ID_TYPE_F4_FUNCTION_POINTER,
         };
 
         type_i1 = (struct inbuilt_vector_type_t) {
@@ -818,6 +893,7 @@ static inline void ensure_statics_initialized (void)
             .spirv_id = SPIRV_FIXED_ID_TYPE_INTEGER,
             .spirv_id_input_pointer = SPIRV_FIXED_ID_TYPE_INTEGER_INPUT_POINTER,
             .spirv_id_output_pointer = SPIRV_FIXED_ID_TYPE_INTEGER_OUTPUT_POINTER,
+            .spirv_id_function_pointer = SPIRV_FIXED_ID_TYPE_INTEGER_OUTPUT_POINTER,
         };
 
         type_i2 = (struct inbuilt_vector_type_t) {
@@ -829,6 +905,7 @@ static inline void ensure_statics_initialized (void)
             .spirv_id = SPIRV_FIXED_ID_TYPE_I2,
             .spirv_id_input_pointer = SPIRV_FIXED_ID_TYPE_I2_INPUT_POINTER,
             .spirv_id_output_pointer = SPIRV_FIXED_ID_TYPE_I2_OUTPUT_POINTER,
+            .spirv_id_function_pointer = SPIRV_FIXED_ID_TYPE_I2_OUTPUT_POINTER,
         };
 
         type_i3 = (struct inbuilt_vector_type_t) {
@@ -840,6 +917,7 @@ static inline void ensure_statics_initialized (void)
             .spirv_id = SPIRV_FIXED_ID_TYPE_I3,
             .spirv_id_input_pointer = SPIRV_FIXED_ID_TYPE_I3_INPUT_POINTER,
             .spirv_id_output_pointer = SPIRV_FIXED_ID_TYPE_I3_OUTPUT_POINTER,
+            .spirv_id_function_pointer = SPIRV_FIXED_ID_TYPE_I3_OUTPUT_POINTER,
         };
 
         type_i4 = (struct inbuilt_vector_type_t) {
@@ -851,6 +929,7 @@ static inline void ensure_statics_initialized (void)
             .spirv_id = SPIRV_FIXED_ID_TYPE_I4,
             .spirv_id_input_pointer = SPIRV_FIXED_ID_TYPE_I4_INPUT_POINTER,
             .spirv_id_output_pointer = SPIRV_FIXED_ID_TYPE_I4_OUTPUT_POINTER,
+            .spirv_id_function_pointer = SPIRV_FIXED_ID_TYPE_I4_OUTPUT_POINTER,
         };
 
         type_f3x3 = (struct inbuilt_matrix_type_t) {
@@ -863,6 +942,7 @@ static inline void ensure_statics_initialized (void)
             .spirv_id = SPIRV_FIXED_ID_TYPE_F3X3,
             .spirv_id_input_pointer = SPIRV_FIXED_ID_TYPE_F3X3_INPUT_POINTER,
             .spirv_id_output_pointer = SPIRV_FIXED_ID_TYPE_F3X3_OUTPUT_POINTER,
+            .spirv_id_function_pointer = SPIRV_FIXED_ID_TYPE_F3X3_OUTPUT_POINTER,
         };
 
         type_f4x4 = (struct inbuilt_matrix_type_t) {
@@ -875,6 +955,7 @@ static inline void ensure_statics_initialized (void)
             .spirv_id = SPIRV_FIXED_ID_TYPE_F4X4,
             .spirv_id_input_pointer = SPIRV_FIXED_ID_TYPE_F4X4_INPUT_POINTER,
             .spirv_id_output_pointer = SPIRV_FIXED_ID_TYPE_F4X4_OUTPUT_POINTER,
+            .spirv_id_function_pointer = SPIRV_FIXED_ID_TYPE_F4X4_OUTPUT_POINTER,
         };
 
         build_repeating_vector_constructor_signatures (&type_f1, 1u, type_f1_constructor_signatures);
@@ -894,15 +975,15 @@ static inline void ensure_statics_initialized (void)
         sampler_2d_call_signature_first_element = &sampler_2d_call_signature_location;
         sampler_2d_call_signature_location = (struct compiler_instance_declaration_node_t) {
             .next = NULL,
-            .variable =
-                {
-                    .name = kan_string_intern ("location"),
-                    .type_if_vector = &type_f2,
-                    .type_if_matrix = NULL,
-                    .type_if_struct = NULL,
-                    .array_dimensions_count = 0u,
-                    .array_dimensions = NULL,
-                },
+            .variable = {.name = kan_string_intern ("location"),
+                         .type =
+                             {
+                                 .if_vector = &type_f2,
+                                 .if_matrix = NULL,
+                                 .if_struct = NULL,
+                                 .array_dimensions_count = 0u,
+                                 .array_dimensions = NULL,
+                             }},
             .meta_count = 0u,
             .meta = NULL,
             .module_name = interned_sampler,
@@ -916,15 +997,15 @@ static inline void ensure_statics_initialized (void)
 
         glsl_450_sqrt_arguments[0u] = (struct compiler_instance_declaration_node_t) {
             .next = NULL,
-            .variable =
-                {
-                    .name = kan_string_intern ("number"),
-                    .type_if_vector = &type_f1,
-                    .type_if_matrix = NULL,
-                    .type_if_struct = NULL,
-                    .array_dimensions_count = 0u,
-                    .array_dimensions = NULL,
-                },
+            .variable = {.name = kan_string_intern ("number"),
+                         .type =
+                             {
+                                 .if_vector = &type_f1,
+                                 .if_matrix = NULL,
+                                 .if_struct = NULL,
+                                 .array_dimensions_count = 0u,
+                                 .array_dimensions = NULL,
+                             }},
             .meta_count = 0u,
             .meta = NULL,
             .module_name = module_glsl_450,
@@ -954,15 +1035,15 @@ static inline void ensure_statics_initialized (void)
 
         shader_standard_vertex_stage_output_position_arguments[0u] = (struct compiler_instance_declaration_node_t) {
             .next = NULL,
-            .variable =
-                {
-                    .name = kan_string_intern ("position"),
-                    .type_if_vector = &type_f4,
-                    .type_if_matrix = NULL,
-                    .type_if_struct = NULL,
-                    .array_dimensions_count = 0u,
-                    .array_dimensions = NULL,
-                },
+            .variable = {.name = kan_string_intern ("position"),
+                         .type =
+                             {
+                                 .if_vector = &type_f4,
+                                 .if_matrix = NULL,
+                                 .if_struct = NULL,
+                                 .array_dimensions_count = 0u,
+                                 .array_dimensions = NULL,
+                             }},
             .meta_count = 0u,
             .meta = NULL,
             .module_name = module_shader_standard,
@@ -989,15 +1070,15 @@ static inline void ensure_statics_initialized (void)
 
         shader_standard_i1_to_f1_arguments[0u] = (struct compiler_instance_declaration_node_t) {
             .next = NULL,
-            .variable =
-                {
-                    .name = kan_string_intern ("value"),
-                    .type_if_vector = &type_i1,
-                    .type_if_matrix = NULL,
-                    .type_if_struct = NULL,
-                    .array_dimensions_count = 0u,
-                    .array_dimensions = NULL,
-                },
+            .variable = {.name = kan_string_intern ("value"),
+                         .type =
+                             {
+                                 .if_vector = &type_i1,
+                                 .if_matrix = NULL,
+                                 .if_struct = NULL,
+                                 .array_dimensions_count = 0u,
+                                 .array_dimensions = NULL,
+                             }},
             .meta_count = 0u,
             .meta = NULL,
             .module_name = module_shader_standard,
@@ -1024,15 +1105,15 @@ static inline void ensure_statics_initialized (void)
 
         shader_standard_i2_to_f2_arguments[0u] = (struct compiler_instance_declaration_node_t) {
             .next = NULL,
-            .variable =
-                {
-                    .name = kan_string_intern ("value"),
-                    .type_if_vector = &type_i2,
-                    .type_if_matrix = NULL,
-                    .type_if_struct = NULL,
-                    .array_dimensions_count = 0u,
-                    .array_dimensions = NULL,
-                },
+            .variable = {.name = kan_string_intern ("value"),
+                         .type =
+                             {
+                                 .if_vector = &type_i2,
+                                 .if_matrix = NULL,
+                                 .if_struct = NULL,
+                                 .array_dimensions_count = 0u,
+                                 .array_dimensions = NULL,
+                             }},
             .meta_count = 0u,
             .meta = NULL,
             .module_name = module_shader_standard,
@@ -1059,15 +1140,15 @@ static inline void ensure_statics_initialized (void)
 
         shader_standard_i3_to_f3_arguments[0u] = (struct compiler_instance_declaration_node_t) {
             .next = NULL,
-            .variable =
-                {
-                    .name = kan_string_intern ("value"),
-                    .type_if_vector = &type_i3,
-                    .type_if_matrix = NULL,
-                    .type_if_struct = NULL,
-                    .array_dimensions_count = 0u,
-                    .array_dimensions = NULL,
-                },
+            .variable = {.name = kan_string_intern ("value"),
+                         .type =
+                             {
+                                 .if_vector = &type_i3,
+                                 .if_matrix = NULL,
+                                 .if_struct = NULL,
+                                 .array_dimensions_count = 0u,
+                                 .array_dimensions = NULL,
+                             }},
             .meta_count = 0u,
             .meta = NULL,
             .module_name = module_shader_standard,
@@ -1094,15 +1175,15 @@ static inline void ensure_statics_initialized (void)
 
         shader_standard_i4_to_f4_arguments[0u] = (struct compiler_instance_declaration_node_t) {
             .next = NULL,
-            .variable =
-                {
-                    .name = kan_string_intern ("value"),
-                    .type_if_vector = &type_i4,
-                    .type_if_matrix = NULL,
-                    .type_if_struct = NULL,
-                    .array_dimensions_count = 0u,
-                    .array_dimensions = NULL,
-                },
+            .variable = {.name = kan_string_intern ("value"),
+                         .type =
+                             {
+                                 .if_vector = &type_i4,
+                                 .if_matrix = NULL,
+                                 .if_struct = NULL,
+                                 .array_dimensions_count = 0u,
+                                 .array_dimensions = NULL,
+                             }},
             .meta_count = 0u,
             .meta = NULL,
             .module_name = module_shader_standard,
@@ -1979,14 +2060,15 @@ static inline kan_bool_t resolve_array_dimensions (struct rpl_compiler_context_t
                                                    kan_bool_t instance_options_allowed)
 {
     kan_bool_t result = KAN_TRUE;
-    variable->array_dimensions_count = dimensions_list_size;
+    variable->type.array_dimensions_count = dimensions_list_size;
 
-    if (variable->array_dimensions_count > 0u)
+    if (variable->type.array_dimensions_count > 0u)
     {
-        variable->array_dimensions = kan_stack_group_allocator_allocate (
-            &instance->resolve_allocator, sizeof (uint64_t) * variable->array_dimensions_count, _Alignof (uint64_t));
+        variable->type.array_dimensions = kan_stack_group_allocator_allocate (
+            &instance->resolve_allocator, sizeof (uint64_t) * variable->type.array_dimensions_count,
+            _Alignof (uint64_t));
 
-        for (uint64_t dimension = 0u; dimension < variable->array_dimensions_count; ++dimension)
+        for (uint64_t dimension = 0u; dimension < variable->type.array_dimensions_count; ++dimension)
         {
             const uint64_t expression_index =
                 ((uint64_t *) intermediate->expression_lists_storage.data)[dimensions_list_index + dimension];
@@ -2015,7 +2097,7 @@ static inline kan_bool_t resolve_array_dimensions (struct rpl_compiler_context_t
             case CONDITIONAL_EVALUATION_VALUE_TYPE_INTEGER:
                 if (value.integer_value > 0u && value.integer_value <= UINT32_MAX)
                 {
-                    variable->array_dimensions[dimension] = (uint64_t) value.integer_value;
+                    variable->type.array_dimensions[dimension] = (uint64_t) value.integer_value;
                 }
                 else
                 {
@@ -2033,7 +2115,7 @@ static inline kan_bool_t resolve_array_dimensions (struct rpl_compiler_context_t
     }
     else
     {
-        variable->array_dimensions = NULL;
+        variable->type.array_dimensions = NULL;
     }
 
     return result;
@@ -2053,13 +2135,13 @@ static inline kan_bool_t resolve_variable_type (struct rpl_compiler_context_t *c
                                                 kan_interned_string_t source_name,
                                                 uint64_t source_line)
 {
-    variable->type_if_vector = NULL;
-    variable->type_if_matrix = NULL;
-    variable->type_if_struct = NULL;
+    variable->type.if_vector = NULL;
+    variable->type.if_matrix = NULL;
+    variable->type.if_struct = NULL;
 
-    if (!(variable->type_if_vector = find_inbuilt_vector_type (type_name)) &&
-        !(variable->type_if_matrix = find_inbuilt_matrix_type (type_name)) &&
-        !resolve_use_struct (context, instance, type_name, &variable->type_if_struct))
+    if (!(variable->type.if_vector = find_inbuilt_vector_type (type_name)) &&
+        !(variable->type.if_matrix = find_inbuilt_matrix_type (type_name)) &&
+        !resolve_use_struct (context, instance, type_name, &variable->type.if_struct))
     {
         KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR, "[%s:%s:%s:%ld] Declaration \"%s\" type \"%s\" is unknown.",
                  context->log_name, intermediate_log_name, source_name, (long) source_line, declaration_name, type_name)
@@ -2102,9 +2184,9 @@ static kan_bool_t resolve_declarations (struct rpl_compiler_context_t *context,
 
             target_declaration->next = NULL;
             target_declaration->variable.name = source_declaration->name;
-            target_declaration->variable.type_if_vector = NULL;
-            target_declaration->variable.type_if_matrix = NULL;
-            target_declaration->variable.type_if_struct = NULL;
+            target_declaration->variable.type.if_vector = NULL;
+            target_declaration->variable.type.if_matrix = NULL;
+            target_declaration->variable.type.if_struct = NULL;
 
             if (!resolve_variable_type (context, instance, intermediate->log_name, &target_declaration->variable,
                                         source_declaration->type_name, source_declaration->name,
@@ -2126,35 +2208,35 @@ static kan_bool_t resolve_declarations (struct rpl_compiler_context_t *context,
                 target_declaration->size = 0u;
                 target_declaration->alignment = 0u;
 
-                if (target_declaration->variable.type_if_vector)
+                if (target_declaration->variable.type.if_vector)
                 {
                     target_declaration->size =
-                        inbuilt_type_item_size[target_declaration->variable.type_if_vector->item] *
-                        target_declaration->variable.type_if_vector->items_count;
+                        inbuilt_type_item_size[target_declaration->variable.type.if_vector->item] *
+                        target_declaration->variable.type.if_vector->items_count;
                     target_declaration->alignment =
-                        inbuilt_type_item_size[target_declaration->variable.type_if_vector->item];
+                        inbuilt_type_item_size[target_declaration->variable.type.if_vector->item];
                 }
-                else if (target_declaration->variable.type_if_matrix)
+                else if (target_declaration->variable.type.if_matrix)
                 {
                     target_declaration->size =
-                        inbuilt_type_item_size[target_declaration->variable.type_if_matrix->item] *
-                        target_declaration->variable.type_if_matrix->rows *
-                        target_declaration->variable.type_if_matrix->columns;
+                        inbuilt_type_item_size[target_declaration->variable.type.if_matrix->item] *
+                        target_declaration->variable.type.if_matrix->rows *
+                        target_declaration->variable.type.if_matrix->columns;
                     target_declaration->alignment =
-                        inbuilt_type_item_size[target_declaration->variable.type_if_matrix->item];
+                        inbuilt_type_item_size[target_declaration->variable.type.if_matrix->item];
                 }
-                else if (target_declaration->variable.type_if_struct)
+                else if (target_declaration->variable.type.if_struct)
                 {
-                    target_declaration->size = target_declaration->variable.type_if_struct->size;
-                    target_declaration->alignment = target_declaration->variable.type_if_struct->alignment;
+                    target_declaration->size = target_declaration->variable.type.if_struct->size;
+                    target_declaration->alignment = target_declaration->variable.type.if_struct->alignment;
                 }
 
                 if (target_declaration->size != 0u && target_declaration->alignment != 0u)
                 {
-                    for (uint64_t dimension = 0u; dimension < target_declaration->variable.array_dimensions_count;
+                    for (uint64_t dimension = 0u; dimension < target_declaration->variable.type.array_dimensions_count;
                          ++dimension)
                     {
-                        target_declaration->size *= target_declaration->variable.array_dimensions[dimension];
+                        target_declaration->size *= target_declaration->variable.type.array_dimensions[dimension];
                     }
 
                     current_offset = kan_apply_alignment (current_offset, target_declaration->alignment);
@@ -2312,7 +2394,7 @@ static kan_bool_t flatten_buffer_process_field (struct rpl_compiler_context_t *c
                                                 struct binding_location_assignment_counter_t *assignment_counter)
 {
     kan_bool_t result = KAN_TRUE;
-    if (declaration->variable.type_if_vector || declaration->variable.type_if_matrix)
+    if (declaration->variable.type.if_vector || declaration->variable.type.if_matrix)
     {
         // Reached leaf.
         struct compiler_instance_buffer_flattened_declaration_t *flattened = kan_stack_group_allocator_allocate (
@@ -2361,10 +2443,10 @@ static kan_bool_t flatten_buffer_process_field (struct rpl_compiler_context_t *c
         buffer->last_flattened_declaration = flattened;
         output_node->flattened_result = flattened;
     }
-    else if (declaration->variable.type_if_struct)
+    else if (declaration->variable.type.if_struct)
     {
         if (!flatten_buffer_process_field_list (context, instance, buffer,
-                                                declaration->variable.type_if_struct->first_field, output_node,
+                                                declaration->variable.type.if_struct->first_field, output_node,
                                                 name_generation_buffer, assignment_counter))
         {
             result = KAN_FALSE;
@@ -2406,10 +2488,10 @@ static kan_bool_t resolve_buffers_validate_uniform_internals_alignment (
 
     while (declaration)
     {
-        if (declaration->variable.type_if_vector)
+        if (declaration->variable.type.if_vector)
         {
-            const uint32_t size = declaration->variable.type_if_vector->items_count *
-                                  inbuilt_type_item_size[declaration->variable.type_if_vector->item];
+            const uint32_t size = declaration->variable.type.if_vector->items_count *
+                                  inbuilt_type_item_size[declaration->variable.type.if_vector->item];
 
             if (size % 16u != 0u)
             {
@@ -2421,11 +2503,11 @@ static kan_bool_t resolve_buffers_validate_uniform_internals_alignment (
                 valid = KAN_FALSE;
             }
         }
-        else if (declaration->variable.type_if_matrix)
+        else if (declaration->variable.type.if_matrix)
         {
-            const uint32_t size = declaration->variable.type_if_matrix->rows *
-                                  declaration->variable.type_if_matrix->columns *
-                                  inbuilt_type_item_size[declaration->variable.type_if_matrix->item];
+            const uint32_t size = declaration->variable.type.if_matrix->rows *
+                                  declaration->variable.type.if_matrix->columns *
+                                  inbuilt_type_item_size[declaration->variable.type.if_matrix->item];
 
             if (size % 16u != 0u)
             {
@@ -2437,10 +2519,10 @@ static kan_bool_t resolve_buffers_validate_uniform_internals_alignment (
                 valid = KAN_FALSE;
             }
         }
-        else if (declaration->variable.type_if_struct)
+        else if (declaration->variable.type.if_struct)
         {
             if (!resolve_buffers_validate_uniform_internals_alignment (
-                    context, buffer, declaration->variable.type_if_struct->first_field))
+                    context, buffer, declaration->variable.type.if_struct->first_field))
             {
                 valid = KAN_FALSE;
             }
@@ -2602,7 +2684,7 @@ static kan_bool_t resolve_buffers (struct rpl_compiler_context_t *context,
 
                     while (declaration)
                     {
-                        if (declaration->source_declaration->variable.array_dimensions_count > 0u)
+                        if (declaration->source_declaration->variable.type.array_dimensions_count > 0u)
                         {
                             KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
                                      "[%s:%s:%s:%ld] Attributes should not be arrays, but flattened declaration \"%s\" "
@@ -2645,7 +2727,7 @@ static kan_bool_t resolve_buffers (struct rpl_compiler_context_t *context,
 
                     while (declaration)
                     {
-                        if (declaration->source_declaration->variable.type_if_vector != &type_f4)
+                        if (declaration->source_declaration->variable.type.if_vector != &type_f4)
                         {
                             KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
                                      "[%s:%s:%s:%ld] Fragment stage output should only contain \"f4\" declarations, "
@@ -3174,9 +3256,9 @@ static inline kan_bool_t resolve_match_signature_at_index (struct rpl_compiler_c
 {
     if (signature)
     {
-        if ((signature->variable.type_if_vector && signature->variable.type_if_vector != actual_type->type_if_vector) ||
-            (signature->variable.type_if_matrix && signature->variable.type_if_matrix != actual_type->type_if_matrix) ||
-            (signature->variable.type_if_struct && signature->variable.type_if_struct != actual_type->type_if_struct))
+        if ((signature->variable.type.if_vector && signature->variable.type.if_vector != actual_type->type.if_vector) ||
+            (signature->variable.type.if_matrix && signature->variable.type.if_matrix != actual_type->type.if_matrix) ||
+            (signature->variable.type.if_struct && signature->variable.type.if_struct != actual_type->type.if_struct))
         {
             KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
                      "[%s:%s:%s:%ld] Expression array item at index %ld for \"%s\" call has incorrect "
@@ -3184,30 +3266,30 @@ static inline kan_bool_t resolve_match_signature_at_index (struct rpl_compiler_c
                      context->log_name, module_name, owner_expression->source_name,
                      (long) owner_expression->source_line, (long) signature_index,
                      get_expression_call_name_for_logging (owner_expression),
-                     get_type_name_for_logging (actual_type->type_if_vector, actual_type->type_if_matrix,
-                                                actual_type->type_if_struct),
-                     get_type_name_for_logging (signature->variable.type_if_vector, signature->variable.type_if_matrix,
-                                                signature->variable.type_if_struct))
+                     get_type_name_for_logging (actual_type->type.if_vector, actual_type->type.if_matrix,
+                                                actual_type->type.if_struct),
+                     get_type_name_for_logging (signature->variable.type.if_vector, signature->variable.type.if_matrix,
+                                                signature->variable.type.if_struct))
             return KAN_FALSE;
         }
-        else if (signature->variable.array_dimensions_count != actual_type->array_dimensions_count)
+        else if (signature->variable.type.array_dimensions_count != actual_type->type.array_dimensions_count)
         {
             KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
                      "[%s:%s:%s:%ld] Expression array item at index %ld for \"%s\" call has incorrect "
                      "array dimension count: %ld while %ld is expected",
                      context->log_name, module_name, owner_expression->source_name,
                      (long) owner_expression->source_line, (long) signature_index,
-                     get_expression_call_name_for_logging (owner_expression), actual_type->array_dimensions_count,
-                     signature->variable.array_dimensions_count)
+                     get_expression_call_name_for_logging (owner_expression), actual_type->type.array_dimensions_count,
+                     signature->variable.type.array_dimensions_count)
             return KAN_FALSE;
         }
         else
         {
             for (uint64_t array_dimension_index = 0u;
-                 array_dimension_index < signature->variable.array_dimensions_count; ++array_dimension_index)
+                 array_dimension_index < signature->variable.type.array_dimensions_count; ++array_dimension_index)
             {
-                if (signature->variable.array_dimensions[array_dimension_index] !=
-                    actual_type->array_dimensions[array_dimension_index])
+                if (signature->variable.type.array_dimensions[array_dimension_index] !=
+                    actual_type->type.array_dimensions[array_dimension_index])
                 {
                     KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
                              "[%s:%s:%s:%ld] Expression array item at index %ld for \"%s\" call has "
@@ -3215,8 +3297,8 @@ static inline kan_bool_t resolve_match_signature_at_index (struct rpl_compiler_c
                              context->log_name, module_name, owner_expression->source_name,
                              (long) owner_expression->source_line, (long) signature_index,
                              get_expression_call_name_for_logging (owner_expression), array_dimension_index,
-                             actual_type->array_dimensions[array_dimension_index],
-                             signature->variable.array_dimensions[array_dimension_index])
+                             actual_type->type.array_dimensions[array_dimension_index],
+                             signature->variable.type.array_dimensions[array_dimension_index])
                     return KAN_FALSE;
                 }
             }
@@ -3476,7 +3558,7 @@ static inline kan_bool_t resolve_field_access_structured (struct rpl_compiler_co
                                                           struct compiler_instance_expression_node_t *result_expression,
                                                           struct resolve_expression_output_type_t *output_type)
 {
-    if (input_node_type->array_dimensions_count > 0u)
+    if (input_node_type->type.array_dimensions_count > 0u)
     {
         KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
                  "[%s:%s:%s:%ld] Failed to resolve structured access: attempted to use \".\" on array.",
@@ -3501,13 +3583,13 @@ static inline kan_bool_t resolve_field_access_structured (struct rpl_compiler_co
         &instance->resolve_allocator, sizeof (uint64_t) * chain_length, _Alignof (uint64_t));
 
     uint64_t index = 0u;
-    output_type->type_if_vector = input_node_type->type_if_vector;
-    output_type->type_if_matrix = input_node_type->type_if_matrix;
-    output_type->type_if_struct = input_node_type->type_if_struct;
+    output_type->type.if_vector = input_node_type->type.if_vector;
+    output_type->type.if_matrix = input_node_type->type.if_matrix;
+    output_type->type.if_struct = input_node_type->type.if_struct;
     output_type->boolean = KAN_FALSE;
     output_type->writable = input_node_type->writable;
-    output_type->array_dimensions_count = 0u;
-    output_type->array_dimensions = NULL;
+    output_type->type.array_dimensions_count = 0u;
+    output_type->type.array_dimensions = NULL;
 
     if (input_node->type == COMPILER_INSTANCE_EXPRESSION_TYPE_STRUCTURED_BUFFER_REFERENCE)
     {
@@ -3519,7 +3601,7 @@ static inline kan_bool_t resolve_field_access_structured (struct rpl_compiler_co
     while (chain_current)
     {
         kan_bool_t found = KAN_FALSE;
-        if (output_type->array_dimensions_count > 0u)
+        if (output_type->type.array_dimensions_count > 0u)
         {
             KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
                      "[%s:%s:%s:%ld] Failed to resolve structured access: attempted to use \".\" on array.",
@@ -3528,16 +3610,16 @@ static inline kan_bool_t resolve_field_access_structured (struct rpl_compiler_co
             return KAN_FALSE;
         }
 
-        if (output_type->type_if_vector)
+        if (output_type->type.if_vector)
         {
-            if (output_type->type_if_vector->items_count == 1u)
+            if (output_type->type.if_vector->items_count == 1u)
             {
                 KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
                          "[%s:%s:%s:%ld] Failed to resolve structured access: \"%s\" treated as scalar type and "
                          "therefore has no fields.",
                          context->log_name, resolve_scope->function->module_name,
                          chain_first->field_source->source_name, (long) chain_first->field_source->source_line,
-                         output_type->type_if_vector->name)
+                         output_type->type.if_vector->name)
                 return KAN_FALSE;
             }
 
@@ -3558,30 +3640,30 @@ static inline kan_bool_t resolve_field_access_structured (struct rpl_compiler_co
                 chain_current->field_source->identifier[1u] - '0';
 
             if (result_expression->structured_access.access_chain_indices[index] >=
-                output_type->type_if_vector->items_count)
+                output_type->type.if_vector->items_count)
             {
                 KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
                          "[%s:%s:%s:%ld] Failed to resolve structured access: \"%s\" has only %ld items, but item at "
                          "index %ld requested.",
                          context->log_name, resolve_scope->function->module_name,
                          chain_first->field_source->source_name, (long) chain_first->field_source->source_line,
-                         output_type->type_if_vector->name, (long) output_type->type_if_vector->items_count,
+                         output_type->type.if_vector->name, (long) output_type->type.if_vector->items_count,
                          (long) result_expression->structured_access.access_chain_indices[index])
                 return KAN_FALSE;
             }
 
             found = KAN_TRUE;
-            switch (output_type->type_if_vector->item)
+            switch (output_type->type.if_vector->item)
             {
             case INBUILT_TYPE_ITEM_FLOAT:
-                output_type->type_if_vector = &type_f1;
+                output_type->type.if_vector = &type_f1;
                 break;
             case INBUILT_TYPE_ITEM_INTEGER:
-                output_type->type_if_vector = &type_i1;
+                output_type->type.if_vector = &type_i1;
                 break;
             }
         }
-        else if (output_type->type_if_matrix)
+        else if (output_type->type.if_matrix)
         {
             if (chain_current->field_source->identifier[0u] != '_' ||
                 chain_current->field_source->identifier[1u] < '0' ||
@@ -3600,30 +3682,30 @@ static inline kan_bool_t resolve_field_access_structured (struct rpl_compiler_co
                 chain_current->field_source->identifier[1u] - '0';
 
             if (result_expression->structured_access.access_chain_indices[index] >=
-                output_type->type_if_matrix->columns)
+                output_type->type.if_matrix->columns)
             {
                 KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
                          "[%s:%s:%s:%ld] Failed to resolve structured access: \"%s\" has only %ld columns, but column "
                          "at index %ld requested.",
                          context->log_name, resolve_scope->function->module_name,
                          chain_first->field_source->source_name, (long) chain_first->field_source->source_line,
-                         output_type->type_if_matrix->name, (long) output_type->type_if_matrix->columns,
+                         output_type->type.if_matrix->name, (long) output_type->type.if_matrix->columns,
                          (long) result_expression->structured_access.access_chain_indices[index])
                 return KAN_FALSE;
             }
 
             found = KAN_TRUE;
-            switch (output_type->type_if_matrix->item)
+            switch (output_type->type.if_matrix->item)
             {
             case INBUILT_TYPE_ITEM_FLOAT:
-                output_type->type_if_vector = floating_vector_types[output_type->type_if_matrix->rows - 1u];
+                output_type->type.if_vector = floating_vector_types[output_type->type.if_matrix->rows - 1u];
                 break;
             case INBUILT_TYPE_ITEM_INTEGER:
-                output_type->type_if_vector = integer_vector_types[output_type->type_if_matrix->rows - 1u];
+                output_type->type.if_vector = integer_vector_types[output_type->type.if_matrix->rows - 1u];
                 break;
             }
 
-            output_type->type_if_matrix = NULL;
+            output_type->type.if_matrix = NULL;
         }
 
 #define SEARCH_USING_DECLARATION                                                                                       \
@@ -3633,11 +3715,11 @@ static inline kan_bool_t resolve_field_access_structured (struct rpl_compiler_co
         if (declaration->variable.name == chain_current->field_source->identifier)                                     \
         {                                                                                                              \
             found = KAN_TRUE;                                                                                          \
-            output_type->type_if_vector = declaration->variable.type_if_vector;                                        \
-            output_type->type_if_matrix = declaration->variable.type_if_matrix;                                        \
-            output_type->type_if_struct = declaration->variable.type_if_struct;                                        \
-            output_type->array_dimensions_count = declaration->variable.array_dimensions_count;                        \
-            output_type->array_dimensions = declaration->variable.array_dimensions;                                    \
+            output_type->type.if_vector = declaration->variable.type.if_vector;                                        \
+            output_type->type.if_matrix = declaration->variable.type.if_matrix;                                        \
+            output_type->type.if_struct = declaration->variable.type.if_struct;                                        \
+            output_type->type.array_dimensions_count = declaration->variable.type.array_dimensions_count;              \
+            output_type->type.array_dimensions = declaration->variable.type.array_dimensions;                          \
             break;                                                                                                     \
         }                                                                                                              \
                                                                                                                        \
@@ -3645,9 +3727,9 @@ static inline kan_bool_t resolve_field_access_structured (struct rpl_compiler_co
         declaration = declaration->next;                                                                               \
     }
 
-        else if (output_type->type_if_struct)
+        else if (output_type->type.if_struct)
         {
-            struct compiler_instance_declaration_node_t *declaration = output_type->type_if_struct->first_field;
+            struct compiler_instance_declaration_node_t *declaration = output_type->type.if_struct->first_field;
             SEARCH_USING_DECLARATION
         }
         else if (chain_current == chain_first &&
@@ -3723,44 +3805,54 @@ static inline kan_bool_t resolve_binary_operation (struct rpl_compiler_context_t
                                 &instance->resolve_allocator, sizeof (struct compiler_instance_expression_node_t),
                                 _Alignof (struct compiler_instance_expression_node_t));
 
-                            chain_input_expression->type = COMPILER_INSTANCE_EXPRESSION_TYPE_FLATTENED_BUFFER_ACCESS;
+                            const kan_bool_t writable =
+                                is_buffer_writable_for_stage (buffer, resolve_scope->function->required_stage);
+
+                            chain_input_expression->type =
+                                writable ? COMPILER_INSTANCE_EXPRESSION_TYPE_FLATTENED_BUFFER_ACCESS_OUTPUT :
+                                           COMPILER_INSTANCE_EXPRESSION_TYPE_FLATTENED_BUFFER_ACCESS_INPUT;
+
                             chain_input_expression->flattened_buffer_access = flattened_declaration;
                             chain_input_expression->module_name = resolve_scope->function->module_name;
                             chain_input_expression->source_name = chain_stop_expression->source_name;
                             chain_input_expression->source_line = chain_stop_expression->source_line;
 
-                            chain_input_expression_type.type_if_vector =
-                                flattened_declaration->source_declaration->variable.type_if_vector;
-                            chain_input_expression_type.type_if_matrix =
-                                flattened_declaration->source_declaration->variable.type_if_matrix;
-                            chain_input_expression_type.type_if_struct =
-                                flattened_declaration->source_declaration->variable.type_if_struct;
+                            chain_input_expression_type.type.if_vector =
+                                flattened_declaration->source_declaration->variable.type.if_vector;
+                            chain_input_expression_type.type.if_matrix =
+                                flattened_declaration->source_declaration->variable.type.if_matrix;
+                            chain_input_expression_type.type.if_struct =
+                                flattened_declaration->source_declaration->variable.type.if_struct;
                             chain_input_expression_type.boolean = KAN_FALSE;
-                            chain_input_expression_type.writable =
-                                is_buffer_writable_for_stage (buffer, resolve_scope->function->required_stage);
-                            chain_input_expression_type.array_dimensions_count =
-                                flattened_declaration->source_declaration->variable.array_dimensions_count;
-                            chain_input_expression_type.array_dimensions =
-                                flattened_declaration->source_declaration->variable.array_dimensions;
+                            chain_input_expression_type.writable = writable;
+                            chain_input_expression_type.type.array_dimensions_count =
+                                flattened_declaration->source_declaration->variable.type.array_dimensions_count;
+                            chain_input_expression_type.type.array_dimensions =
+                                flattened_declaration->source_declaration->variable.type.array_dimensions;
                         }
                         else
                         {
                             // Full access chain was resolved as flattened access.
-                            result_expression->type = COMPILER_INSTANCE_EXPRESSION_TYPE_FLATTENED_BUFFER_ACCESS;
-                            result_expression->flattened_buffer_access = flattened_declaration;
-                            output_type->type_if_vector =
-                                flattened_declaration->source_declaration->variable.type_if_vector;
-                            output_type->type_if_matrix =
-                                flattened_declaration->source_declaration->variable.type_if_matrix;
-                            output_type->type_if_struct =
-                                flattened_declaration->source_declaration->variable.type_if_struct;
-                            output_type->boolean = KAN_FALSE;
-                            output_type->writable =
+                            const kan_bool_t writable =
                                 is_buffer_writable_for_stage (buffer, resolve_scope->function->required_stage);
-                            output_type->array_dimensions_count =
-                                flattened_declaration->source_declaration->variable.array_dimensions_count;
-                            output_type->array_dimensions =
-                                flattened_declaration->source_declaration->variable.array_dimensions;
+
+                            result_expression->type =
+                                writable ? COMPILER_INSTANCE_EXPRESSION_TYPE_FLATTENED_BUFFER_ACCESS_OUTPUT :
+                                           COMPILER_INSTANCE_EXPRESSION_TYPE_FLATTENED_BUFFER_ACCESS_INPUT;
+
+                            result_expression->flattened_buffer_access = flattened_declaration;
+                            output_type->type.if_vector =
+                                flattened_declaration->source_declaration->variable.type.if_vector;
+                            output_type->type.if_matrix =
+                                flattened_declaration->source_declaration->variable.type.if_matrix;
+                            output_type->type.if_struct =
+                                flattened_declaration->source_declaration->variable.type.if_struct;
+                            output_type->boolean = KAN_FALSE;
+                            output_type->writable = writable;
+                            output_type->type.array_dimensions_count =
+                                flattened_declaration->source_declaration->variable.type.array_dimensions_count;
+                            output_type->type.array_dimensions =
+                                flattened_declaration->source_declaration->variable.type.array_dimensions;
                             return KAN_TRUE;
                         }
                     }
@@ -3802,9 +3894,9 @@ static inline kan_bool_t resolve_binary_operation (struct rpl_compiler_context_t
         return KAN_FALSE;
     }
 
-    result_expression->binary_operation.left_type_if_vector = left_operand_type.type_if_vector;
-    result_expression->binary_operation.left_type_if_matrix = left_operand_type.type_if_matrix;
-    result_expression->binary_operation.left_type_if_struct = left_operand_type.type_if_struct;
+    result_expression->binary_operation.left_type.if_vector = left_operand_type.type.if_vector;
+    result_expression->binary_operation.left_type.if_matrix = left_operand_type.type.if_matrix;
+    result_expression->binary_operation.left_type.if_struct = left_operand_type.type.if_struct;
 
     struct resolve_expression_output_type_t right_operand_type;
     if (!resolve_expression (context, instance, intermediate, resolve_scope,
@@ -3815,9 +3907,9 @@ static inline kan_bool_t resolve_binary_operation (struct rpl_compiler_context_t
         return KAN_FALSE;
     }
 
-    result_expression->binary_operation.right_type_if_vector = right_operand_type.type_if_vector;
-    result_expression->binary_operation.right_type_if_matrix = right_operand_type.type_if_matrix;
-    result_expression->binary_operation.right_type_if_struct = right_operand_type.type_if_struct;
+    result_expression->binary_operation.right_type.if_vector = right_operand_type.type.if_vector;
+    result_expression->binary_operation.right_type.if_matrix = right_operand_type.type.if_matrix;
+    result_expression->binary_operation.right_type.if_struct = right_operand_type.type.if_struct;
 
     switch (input_expression->binary_operation.operation)
     {
@@ -3828,7 +3920,7 @@ static inline kan_bool_t resolve_binary_operation (struct rpl_compiler_context_t
 
     case KAN_RPL_BINARY_OPERATION_ARRAY_ACCESS:
         result_expression->type = COMPILER_INSTANCE_EXPRESSION_TYPE_OPERATION_ARRAY_INDEX;
-        if (left_operand_type.array_dimensions_count == 0u)
+        if (left_operand_type.type.array_dimensions_count == 0u)
         {
             KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
                      "[%s:%s:%s:%ld] Cannot execute array access as left operand in not an array.", context->log_name,
@@ -3837,28 +3929,28 @@ static inline kan_bool_t resolve_binary_operation (struct rpl_compiler_context_t
             return KAN_FALSE;
         }
 
-        if (right_operand_type.type_if_vector != &type_i1)
+        if (right_operand_type.type.if_vector != &type_i1)
         {
             KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
                      "[%s:%s:%s:%ld] Cannot execute array access as right operand is \"%s\" instead of i1.",
                      context->log_name, resolve_scope->function->module_name, input_expression->source_name,
                      (long) input_expression->source_line,
-                     get_type_name_for_logging (right_operand_type.type_if_vector, right_operand_type.type_if_matrix,
-                                                right_operand_type.type_if_struct))
+                     get_type_name_for_logging (right_operand_type.type.if_vector, right_operand_type.type.if_matrix,
+                                                right_operand_type.type.if_struct))
             return KAN_FALSE;
         }
 
-        output_type->type_if_vector = left_operand_type.type_if_vector;
-        output_type->type_if_matrix = left_operand_type.type_if_matrix;
-        output_type->type_if_struct = left_operand_type.type_if_struct;
+        output_type->type.if_vector = left_operand_type.type.if_vector;
+        output_type->type.if_matrix = left_operand_type.type.if_matrix;
+        output_type->type.if_struct = left_operand_type.type.if_struct;
         output_type->boolean = left_operand_type.boolean;
         output_type->writable = left_operand_type.writable;
-        output_type->array_dimensions_count = left_operand_type.array_dimensions_count - 1u;
-        output_type->array_dimensions = left_operand_type.array_dimensions + 1u;
+        output_type->type.array_dimensions_count = left_operand_type.type.array_dimensions_count - 1u;
+        output_type->type.array_dimensions = left_operand_type.type.array_dimensions + 1u;
         return KAN_TRUE;
 
 #define CANNOT_EXECUTE_ON_ARRAYS(OPERATOR_STRING)                                                                      \
-    if (left_operand_type.array_dimensions_count != 0u || right_operand_type.array_dimensions_count != 0u)             \
+    if (left_operand_type.type.array_dimensions_count != 0u || right_operand_type.type.array_dimensions_count != 0u)   \
     {                                                                                                                  \
         KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,                                                                  \
                  "[%s:%s:%s:%ld] Cannot execute \"" OPERATOR_STRING "\" operation on arrays.", context->log_name,      \
@@ -3868,38 +3960,38 @@ static inline kan_bool_t resolve_binary_operation (struct rpl_compiler_context_t
     }
 
 #define CAN_ONLY_EXECUTE_ON_MATCHING_BUILTIN(OPERATOR_STRING)                                                          \
-    if (left_operand_type.type_if_vector != right_operand_type.type_if_vector ||                                       \
-        left_operand_type.type_if_matrix != right_operand_type.type_if_matrix || left_operand_type.type_if_struct ||   \
-        right_operand_type.type_if_struct)                                                                             \
+    if (left_operand_type.type.if_vector != right_operand_type.type.if_vector ||                                       \
+        left_operand_type.type.if_matrix != right_operand_type.type.if_matrix || left_operand_type.type.if_struct ||   \
+        right_operand_type.type.if_struct)                                                                             \
     {                                                                                                                  \
         KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,                                                                  \
                  "[%s:%s:%s:%ld] Cannot execute \"" OPERATOR_STRING "\" on \"%s\" and \"%s\".", context->log_name,     \
                  resolve_scope->function->module_name, input_expression->source_name,                                  \
                  (long) input_expression->source_line,                                                                 \
-                 get_type_name_for_logging (left_operand_type.type_if_vector, left_operand_type.type_if_matrix,        \
-                                            left_operand_type.type_if_struct),                                         \
-                 get_type_name_for_logging (right_operand_type.type_if_vector, right_operand_type.type_if_matrix,      \
-                                            right_operand_type.type_if_struct))                                        \
+                 get_type_name_for_logging (left_operand_type.type.if_vector, left_operand_type.type.if_matrix,        \
+                                            left_operand_type.type.if_struct),                                         \
+                 get_type_name_for_logging (right_operand_type.type.if_vector, right_operand_type.type.if_matrix,      \
+                                            right_operand_type.type.if_struct))                                        \
         return KAN_FALSE;                                                                                              \
     }
 
 #define COPY_TYPE_FROM_LEFT_FOR_ELEMENTAL_OPERATION                                                                    \
-    output_type->type_if_vector = left_operand_type.type_if_vector;                                                    \
-    output_type->type_if_matrix = left_operand_type.type_if_matrix;                                                    \
-    output_type->type_if_struct = left_operand_type.type_if_struct;                                                    \
+    output_type->type.if_vector = left_operand_type.type.if_vector;                                                    \
+    output_type->type.if_matrix = left_operand_type.type.if_matrix;                                                    \
+    output_type->type.if_struct = left_operand_type.type.if_struct;                                                    \
     output_type->boolean = left_operand_type.boolean;                                                                  \
     output_type->writable = KAN_FALSE;                                                                                 \
-    output_type->array_dimensions_count = 0u;                                                                          \
-    output_type->array_dimensions = NULL
+    output_type->type.array_dimensions_count = 0u;                                                                     \
+    output_type->type.array_dimensions = NULL
 
 #define COPY_TYPE_FROM_RIGHT_FOR_ELEMENTAL_OPERATION                                                                   \
-    output_type->type_if_vector = right_operand_type.type_if_vector;                                                   \
-    output_type->type_if_matrix = right_operand_type.type_if_matrix;                                                   \
-    output_type->type_if_struct = right_operand_type.type_if_struct;                                                   \
+    output_type->type.if_vector = right_operand_type.type.if_vector;                                                   \
+    output_type->type.if_matrix = right_operand_type.type.if_matrix;                                                   \
+    output_type->type.if_struct = right_operand_type.type.if_struct;                                                   \
     output_type->boolean = right_operand_type.boolean;                                                                 \
     output_type->writable = KAN_FALSE;                                                                                 \
-    output_type->array_dimensions_count = 0u;                                                                          \
-    output_type->array_dimensions = NULL
+    output_type->type.array_dimensions_count = 0u;                                                                     \
+    output_type->type.array_dimensions = NULL
 
     case KAN_RPL_BINARY_OPERATION_ADD:
         result_expression->type = COMPILER_INSTANCE_EXPRESSION_TYPE_OPERATION_ADD;
@@ -3920,52 +4012,52 @@ static inline kan_bool_t resolve_binary_operation (struct rpl_compiler_context_t
         CANNOT_EXECUTE_ON_ARRAYS ("*")
 
         // Multiply vectors by elements.
-        if (left_operand_type.type_if_vector && left_operand_type.type_if_vector == right_operand_type.type_if_vector)
+        if (left_operand_type.type.if_vector && left_operand_type.type.if_vector == right_operand_type.type.if_vector)
         {
             COPY_TYPE_FROM_LEFT_FOR_ELEMENTAL_OPERATION;
             return KAN_TRUE;
         }
 
         // Multiply vector by scalar of the same type.
-        if (left_operand_type.type_if_vector && right_operand_type.type_if_vector &&
-            left_operand_type.type_if_vector->item == right_operand_type.type_if_vector->item &&
-            right_operand_type.type_if_vector->items_count == 1u)
+        if (left_operand_type.type.if_vector && right_operand_type.type.if_vector &&
+            left_operand_type.type.if_vector->item == right_operand_type.type.if_vector->item &&
+            right_operand_type.type.if_vector->items_count == 1u)
         {
             COPY_TYPE_FROM_LEFT_FOR_ELEMENTAL_OPERATION;
             return KAN_TRUE;
         }
 
         // Multiply matrix by scalar of the same type.
-        if (left_operand_type.type_if_matrix && right_operand_type.type_if_vector &&
-            left_operand_type.type_if_matrix->item == right_operand_type.type_if_vector->item &&
-            right_operand_type.type_if_vector->items_count == 1u)
+        if (left_operand_type.type.if_matrix && right_operand_type.type.if_vector &&
+            left_operand_type.type.if_matrix->item == right_operand_type.type.if_vector->item &&
+            right_operand_type.type.if_vector->items_count == 1u)
         {
             COPY_TYPE_FROM_LEFT_FOR_ELEMENTAL_OPERATION;
             return KAN_TRUE;
         }
 
         // Multiply matrix by vector of the same type.
-        if (left_operand_type.type_if_matrix && right_operand_type.type_if_vector &&
-            left_operand_type.type_if_matrix->item == right_operand_type.type_if_vector->item &&
-            left_operand_type.type_if_matrix->columns == right_operand_type.type_if_vector->items_count)
+        if (left_operand_type.type.if_matrix && right_operand_type.type.if_vector &&
+            left_operand_type.type.if_matrix->item == right_operand_type.type.if_vector->item &&
+            left_operand_type.type.if_matrix->columns == right_operand_type.type.if_vector->items_count)
         {
             COPY_TYPE_FROM_RIGHT_FOR_ELEMENTAL_OPERATION;
             return KAN_TRUE;
         }
 
         // Multiply vector by matrix of the same type.
-        if (left_operand_type.type_if_vector && right_operand_type.type_if_matrix &&
-            left_operand_type.type_if_vector->item == right_operand_type.type_if_matrix->item &&
-            left_operand_type.type_if_vector->items_count == right_operand_type.type_if_matrix->rows)
+        if (left_operand_type.type.if_vector && right_operand_type.type.if_matrix &&
+            left_operand_type.type.if_vector->item == right_operand_type.type.if_matrix->item &&
+            left_operand_type.type.if_vector->items_count == right_operand_type.type.if_matrix->rows)
         {
             COPY_TYPE_FROM_LEFT_FOR_ELEMENTAL_OPERATION;
             return KAN_TRUE;
         }
 
         // Multiply matrix by matrix of the same type.
-        if (left_operand_type.type_if_matrix && right_operand_type.type_if_matrix &&
-            left_operand_type.type_if_matrix->item == right_operand_type.type_if_matrix->item &&
-            left_operand_type.type_if_matrix->columns == right_operand_type.type_if_matrix->rows)
+        if (left_operand_type.type.if_matrix && right_operand_type.type.if_matrix &&
+            left_operand_type.type.if_matrix->item == right_operand_type.type.if_matrix->item &&
+            left_operand_type.type.if_matrix->columns == right_operand_type.type.if_matrix->rows)
         {
             COPY_TYPE_FROM_LEFT_FOR_ELEMENTAL_OPERATION;
             return KAN_TRUE;
@@ -3974,10 +4066,10 @@ static inline kan_bool_t resolve_binary_operation (struct rpl_compiler_context_t
         KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR, "[%s:%s:%s:%ld] Cannot execute \"*\" on \"%s\" and \"%s\".",
                  context->log_name, resolve_scope->function->module_name, input_expression->source_name,
                  (long) input_expression->source_line,
-                 get_type_name_for_logging (left_operand_type.type_if_vector, left_operand_type.type_if_matrix,
-                                            left_operand_type.type_if_struct),
-                 get_type_name_for_logging (right_operand_type.type_if_vector, right_operand_type.type_if_matrix,
-                                            right_operand_type.type_if_struct))
+                 get_type_name_for_logging (left_operand_type.type.if_vector, left_operand_type.type.if_matrix,
+                                            left_operand_type.type.if_struct),
+                 get_type_name_for_logging (right_operand_type.type.if_vector, right_operand_type.type.if_matrix,
+                                            right_operand_type.type.if_struct))
         return KAN_FALSE;
 
     case KAN_RPL_BINARY_OPERATION_DIVIDE:
@@ -3985,16 +4077,16 @@ static inline kan_bool_t resolve_binary_operation (struct rpl_compiler_context_t
         CANNOT_EXECUTE_ON_ARRAYS ("/")
 
         // Divide vectors of the same type.
-        if (left_operand_type.type_if_vector && left_operand_type.type_if_vector == right_operand_type.type_if_vector)
+        if (left_operand_type.type.if_vector && left_operand_type.type.if_vector == right_operand_type.type.if_vector)
         {
             COPY_TYPE_FROM_LEFT_FOR_ELEMENTAL_OPERATION;
             return KAN_TRUE;
         }
 
         // Divide vector by scalar of the same type.
-        if (left_operand_type.type_if_vector && right_operand_type.type_if_vector &&
-            left_operand_type.type_if_vector->item == right_operand_type.type_if_vector->item &&
-            right_operand_type.type_if_vector->items_count == 1u)
+        if (left_operand_type.type.if_vector && right_operand_type.type.if_vector &&
+            left_operand_type.type.if_vector->item == right_operand_type.type.if_vector->item &&
+            right_operand_type.type.if_vector->items_count == 1u)
         {
             COPY_TYPE_FROM_LEFT_FOR_ELEMENTAL_OPERATION;
             return KAN_TRUE;
@@ -4003,28 +4095,28 @@ static inline kan_bool_t resolve_binary_operation (struct rpl_compiler_context_t
         KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR, "[%s:%s:%s:%ld] Cannot execute \"/\" on \"%s\" and \"%s\".",
                  context->log_name, resolve_scope->function->module_name, input_expression->source_name,
                  (long) input_expression->source_line,
-                 get_type_name_for_logging (left_operand_type.type_if_vector, left_operand_type.type_if_matrix,
-                                            left_operand_type.type_if_struct),
-                 get_type_name_for_logging (right_operand_type.type_if_vector, right_operand_type.type_if_matrix,
-                                            right_operand_type.type_if_struct))
+                 get_type_name_for_logging (left_operand_type.type.if_vector, left_operand_type.type.if_matrix,
+                                            left_operand_type.type.if_struct),
+                 get_type_name_for_logging (right_operand_type.type.if_vector, right_operand_type.type.if_matrix,
+                                            right_operand_type.type.if_struct))
         return KAN_FALSE;
 
 #define INTEGER_ONLY_VECTOR_OPERATION(OPERATION_STRING)                                                                \
     CANNOT_EXECUTE_ON_ARRAYS (OPERATION_STRING)                                                                        \
                                                                                                                        \
-    if (!left_operand_type.type_if_vector || !right_operand_type.type_if_vector ||                                     \
-        left_operand_type.type_if_vector->item != INBUILT_TYPE_ITEM_INTEGER ||                                         \
-        right_operand_type.type_if_vector->item != INBUILT_TYPE_ITEM_INTEGER)                                          \
+    if (!left_operand_type.type.if_vector || !right_operand_type.type.if_vector ||                                     \
+        left_operand_type.type.if_vector->item != INBUILT_TYPE_ITEM_INTEGER ||                                         \
+        right_operand_type.type.if_vector->item != INBUILT_TYPE_ITEM_INTEGER)                                          \
     {                                                                                                                  \
         KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,                                                                  \
                  "[%s:%s:%s:%ld] Cannot execute \"" OPERATION_STRING                                                   \
                  "\" on \"%s\" and \"%s\", only integer vectors are supported.",                                       \
                  context->log_name, resolve_scope->function->module_name, input_expression->source_name,               \
                  (long) input_expression->source_line,                                                                 \
-                 get_type_name_for_logging (left_operand_type.type_if_vector, left_operand_type.type_if_matrix,        \
-                                            left_operand_type.type_if_struct),                                         \
-                 get_type_name_for_logging (right_operand_type.type_if_vector, right_operand_type.type_if_matrix,      \
-                                            right_operand_type.type_if_struct))                                        \
+                 get_type_name_for_logging (left_operand_type.type.if_vector, left_operand_type.type.if_matrix,        \
+                                            left_operand_type.type.if_struct),                                         \
+                 get_type_name_for_logging (right_operand_type.type.if_vector, right_operand_type.type.if_matrix,      \
+                                            right_operand_type.type.if_struct))                                        \
     }                                                                                                                  \
                                                                                                                        \
     COPY_TYPE_FROM_LEFT_FOR_ELEMENTAL_OPERATION
@@ -4047,17 +4139,17 @@ static inline kan_bool_t resolve_binary_operation (struct rpl_compiler_context_t
             return KAN_FALSE;
         }
 
-        if (left_operand_type.type_if_vector != right_operand_type.type_if_vector ||
-            left_operand_type.type_if_matrix != right_operand_type.type_if_matrix ||
-            left_operand_type.type_if_struct != right_operand_type.type_if_struct)
+        if (left_operand_type.type.if_vector != right_operand_type.type.if_vector ||
+            left_operand_type.type.if_matrix != right_operand_type.type.if_matrix ||
+            left_operand_type.type.if_struct != right_operand_type.type.if_struct)
         {
             KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR, "[%s:%s:%s:%ld] Cannot execute \"=\" on \"%s\" and \"%s\".",
                      context->log_name, resolve_scope->function->module_name, input_expression->source_name,
                      (long) input_expression->source_line,
-                     get_type_name_for_logging (left_operand_type.type_if_vector, left_operand_type.type_if_matrix,
-                                                left_operand_type.type_if_struct),
-                     get_type_name_for_logging (right_operand_type.type_if_vector, right_operand_type.type_if_matrix,
-                                                right_operand_type.type_if_struct))
+                     get_type_name_for_logging (left_operand_type.type.if_vector, left_operand_type.type.if_matrix,
+                                                left_operand_type.type.if_struct),
+                     get_type_name_for_logging (right_operand_type.type.if_vector, right_operand_type.type.if_matrix,
+                                                right_operand_type.type.if_struct))
             return KAN_FALSE;
         }
 
@@ -4073,20 +4165,20 @@ static inline kan_bool_t resolve_binary_operation (struct rpl_compiler_context_t
                  "\" on \"%s\" and \"%s\", only booleans are supported.",                                              \
                  context->log_name, resolve_scope->function->module_name, input_expression->source_name,               \
                  (long) input_expression->source_line,                                                                 \
-                 get_type_name_for_logging (left_operand_type.type_if_vector, left_operand_type.type_if_matrix,        \
-                                            left_operand_type.type_if_struct),                                         \
-                 get_type_name_for_logging (right_operand_type.type_if_vector, right_operand_type.type_if_matrix,      \
-                                            right_operand_type.type_if_struct))                                        \
+                 get_type_name_for_logging (left_operand_type.type.if_vector, left_operand_type.type.if_matrix,        \
+                                            left_operand_type.type.if_struct),                                         \
+                 get_type_name_for_logging (right_operand_type.type.if_vector, right_operand_type.type.if_matrix,      \
+                                            right_operand_type.type.if_struct))                                        \
         return KAN_FALSE;                                                                                              \
     }                                                                                                                  \
                                                                                                                        \
-    output_type->type_if_vector = NULL;                                                                                \
-    output_type->type_if_matrix = NULL;                                                                                \
-    output_type->type_if_struct = NULL;                                                                                \
+    output_type->type.if_vector = NULL;                                                                                \
+    output_type->type.if_matrix = NULL;                                                                                \
+    output_type->type.if_struct = NULL;                                                                                \
     output_type->boolean = KAN_TRUE;                                                                                   \
     output_type->writable = KAN_FALSE;                                                                                 \
-    output_type->array_dimensions_count = 0u;                                                                          \
-    output_type->array_dimensions = NULL
+    output_type->type.array_dimensions_count = 0u;                                                                     \
+    output_type->type.array_dimensions = NULL
 
     case KAN_RPL_BINARY_OPERATION_AND:
         result_expression->type = COMPILER_INSTANCE_EXPRESSION_TYPE_OPERATION_AND;
@@ -4111,18 +4203,18 @@ static inline kan_bool_t resolve_binary_operation (struct rpl_compiler_context_t
 #define SCALAR_ONLY_OPERATION(OPERATION_STRING)                                                                        \
     CANNOT_EXECUTE_ON_ARRAYS (OPERATION_STRING)                                                                        \
                                                                                                                        \
-    if (!left_operand_type.type_if_vector || !right_operand_type.type_if_vector ||                                     \
-        left_operand_type.type_if_vector->items_count > 1u || right_operand_type.type_if_vector->items_count > 1u)     \
+    if (!left_operand_type.type.if_vector || !right_operand_type.type.if_vector ||                                     \
+        left_operand_type.type.if_vector->items_count > 1u || right_operand_type.type.if_vector->items_count > 1u)     \
     {                                                                                                                  \
         KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,                                                                  \
                  "[%s:%s:%s:%ld] Cannot execute \"" OPERATION_STRING                                                   \
                  "\" on \"%s\" and \"%s\", only one-item vectors are supported.",                                      \
                  context->log_name, resolve_scope->function->module_name, input_expression->source_name,               \
                  (long) input_expression->source_line,                                                                 \
-                 get_type_name_for_logging (left_operand_type.type_if_vector, left_operand_type.type_if_matrix,        \
-                                            left_operand_type.type_if_struct),                                         \
-                 get_type_name_for_logging (right_operand_type.type_if_vector, right_operand_type.type_if_matrix,      \
-                                            right_operand_type.type_if_struct))                                        \
+                 get_type_name_for_logging (left_operand_type.type.if_vector, left_operand_type.type.if_matrix,        \
+                                            left_operand_type.type.if_struct),                                         \
+                 get_type_name_for_logging (right_operand_type.type.if_vector, right_operand_type.type.if_matrix,      \
+                                            right_operand_type.type.if_struct))                                        \
     }                                                                                                                  \
                                                                                                                        \
     COPY_TYPE_FROM_LEFT_FOR_ELEMENTAL_OPERATION
@@ -4202,28 +4294,28 @@ static inline kan_bool_t resolve_unary_operation (struct rpl_compiler_context_t 
         return KAN_FALSE;
     }
 
-    result_expression->unary_operation.type_if_vector = operand_type.type_if_vector;
-    result_expression->unary_operation.type_if_matrix = operand_type.type_if_matrix;
-    result_expression->unary_operation.type_if_struct = operand_type.type_if_struct;
+    result_expression->unary_operation.type.if_vector = operand_type.type.if_vector;
+    result_expression->unary_operation.type.if_matrix = operand_type.type.if_matrix;
+    result_expression->unary_operation.type.if_struct = operand_type.type.if_struct;
 
     switch (input_expression->unary_operation.operand_index)
     {
     case KAN_RPL_UNARY_OPERATION_NEGATE:
         result_expression->type = COMPILER_INSTANCE_EXPRESSION_TYPE_OPERATION_NEGATE;
-        if (!operand_type.type_if_vector && !operand_type.type_if_matrix)
+        if (!operand_type.type.if_vector && !operand_type.type.if_matrix)
         {
             KAN_LOG (
                 rpl_compiler_context, KAN_LOG_ERROR,
                 "[%s:%s:%s:%ld] Cannot apply \"~\" operation to type \"%s\", only vectors and matrices are supported.",
                 context->log_name, resolve_scope->function->module_name, input_expression->source_name,
                 (long) input_expression->source_line,
-                get_type_name_for_logging (operand_type.type_if_vector, operand_type.type_if_matrix,
-                                           operand_type.type_if_struct))
+                get_type_name_for_logging (operand_type.type.if_vector, operand_type.type.if_matrix,
+                                           operand_type.type.if_struct))
             return KAN_FALSE;
         }
 
-        output_type->type_if_vector = operand_type.type_if_vector;
-        output_type->type_if_matrix = operand_type.type_if_matrix;
+        output_type->type.if_vector = operand_type.type.if_vector;
+        output_type->type.if_matrix = operand_type.type.if_matrix;
         return KAN_TRUE;
 
     case KAN_RPL_UNARY_OPERATION_NOT:
@@ -4234,8 +4326,8 @@ static inline kan_bool_t resolve_unary_operation (struct rpl_compiler_context_t 
                      "[%s:%s:%s:%ld] Cannot apply \"!\" operation to non-boolean type \"%s\".", context->log_name,
                      resolve_scope->function->module_name, input_expression->source_name,
                      (long) input_expression->source_line,
-                     get_type_name_for_logging (operand_type.type_if_vector, operand_type.type_if_matrix,
-                                                operand_type.type_if_struct))
+                     get_type_name_for_logging (operand_type.type.if_vector, operand_type.type.if_matrix,
+                                                operand_type.type.if_struct))
             return KAN_FALSE;
         }
 
@@ -4244,18 +4336,18 @@ static inline kan_bool_t resolve_unary_operation (struct rpl_compiler_context_t 
 
     case KAN_RPL_UNARY_OPERATION_BITWISE_NOT:
         result_expression->type = COMPILER_INSTANCE_EXPRESSION_TYPE_OPERATION_BITWISE_NOT;
-        if (operand_type.type_if_vector != &type_i1)
+        if (operand_type.type.if_vector != &type_i1)
         {
             KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
                      "[%s:%s:%s:%ld] Cannot apply \"~\" operation to type \"%s\", only i1 is supported.",
                      context->log_name, resolve_scope->function->module_name, input_expression->source_name,
                      (long) input_expression->source_line,
-                     get_type_name_for_logging (operand_type.type_if_vector, operand_type.type_if_matrix,
-                                                operand_type.type_if_struct))
+                     get_type_name_for_logging (operand_type.type.if_vector, operand_type.type.if_matrix,
+                                                operand_type.type.if_struct))
             return KAN_FALSE;
         }
 
-        output_type->type_if_vector = &type_i1;
+        output_type->type.if_vector = &type_i1;
         return KAN_TRUE;
     }
 
@@ -4272,11 +4364,11 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
                                       struct resolve_expression_output_type_t *output_type)
 {
     *output = NULL;
-    output_type->type_if_vector = NULL;
-    output_type->type_if_matrix = NULL;
-    output_type->type_if_struct = NULL;
-    output_type->array_dimensions_count = 0u;
-    output_type->array_dimensions = NULL;
+    output_type->type.if_vector = NULL;
+    output_type->type.if_matrix = NULL;
+    output_type->type.if_struct = NULL;
+    output_type->type.array_dimensions_count = 0u;
+    output_type->type.array_dimensions = NULL;
     output_type->boolean = KAN_FALSE;
     output_type->writable = KAN_FALSE;
 
@@ -4356,13 +4448,13 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
         if (alias)
         {
             *output = alias->resolved_expression;
-            output_type->type_if_vector = alias->resolved_output_type.type_if_vector;
-            output_type->type_if_matrix = alias->resolved_output_type.type_if_matrix;
-            output_type->type_if_struct = alias->resolved_output_type.type_if_struct;
+            output_type->type.if_vector = alias->resolved_output_type.type.if_vector;
+            output_type->type.if_matrix = alias->resolved_output_type.type.if_matrix;
+            output_type->type.if_struct = alias->resolved_output_type.type.if_struct;
             output_type->boolean = alias->resolved_output_type.boolean;
             output_type->writable = alias->resolved_output_type.writable;
-            output_type->array_dimensions_count = alias->resolved_output_type.array_dimensions_count;
-            output_type->array_dimensions = alias->resolved_output_type.array_dimensions;
+            output_type->type.array_dimensions_count = alias->resolved_output_type.type.array_dimensions_count;
+            output_type->type.array_dimensions = alias->resolved_output_type.type.array_dimensions;
             return KAN_TRUE;
         }
     }
@@ -4420,13 +4512,13 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
             new_expression->type = COMPILER_INSTANCE_EXPRESSION_TYPE_VARIABLE_REFERENCE;
             new_expression->variable_reference = variable;
 
-            output_type->type_if_vector = variable->variable->type_if_vector;
-            output_type->type_if_matrix = variable->variable->type_if_matrix;
-            output_type->type_if_struct = variable->variable->type_if_struct;
-            output_type->array_dimensions_count = variable->variable->array_dimensions_count;
-            output_type->array_dimensions = variable->variable->array_dimensions;
+            output_type->type.if_vector = variable->variable->type.if_vector;
+            output_type->type.if_matrix = variable->variable->type.if_matrix;
+            output_type->type.if_struct = variable->variable->type.if_struct;
+            output_type->type.array_dimensions_count = variable->variable->type.array_dimensions_count;
+            output_type->type.array_dimensions = variable->variable->type.array_dimensions;
             output_type->boolean = KAN_FALSE;
-            output_type->writable = KAN_TRUE;
+            output_type->writable = variable->writable;
             return KAN_TRUE;
         }
 
@@ -4438,15 +4530,24 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
     }
 
     case KAN_RPL_EXPRESSION_NODE_TYPE_INTEGER_LITERAL:
+        if (expression->integer_literal < INT32_MIN || expression->integer_literal > INT32_MAX)
+        {
+            KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
+                     "[%s:%s:%s:%ld] Integer literal %lld is too big for some backends.", context->log_name,
+                     resolve_scope->function->module_name, expression->source_name, (long) expression->source_line,
+                     (long long) expression->integer_literal)
+            return KAN_FALSE;
+        }
+
         new_expression->type = COMPILER_INSTANCE_EXPRESSION_TYPE_INTEGER_LITERAL;
         new_expression->integer_literal = expression->integer_literal;
-        output_type->type_if_vector = &type_i1;
+        output_type->type.if_vector = &type_i1;
         return KAN_TRUE;
 
     case KAN_RPL_EXPRESSION_NODE_TYPE_FLOATING_LITERAL:
         new_expression->type = COMPILER_INSTANCE_EXPRESSION_TYPE_FLOATING_LITERAL;
         new_expression->floating_literal = expression->floating_literal;
-        output_type->type_if_vector = &type_f1;
+        output_type->type.if_vector = &type_f1;
         return KAN_TRUE;
 
     case KAN_RPL_EXPRESSION_NODE_TYPE_VARIABLE_DECLARATION:
@@ -4460,25 +4561,26 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
             resolved = KAN_FALSE;
         }
 
-        new_expression->variable_declaration.name = expression->variable_declaration.variable_name;
-        new_expression->variable_declaration.array_dimensions_count =
+        new_expression->variable_declaration.variable.name = expression->variable_declaration.variable_name;
+        new_expression->variable_declaration.variable.type.array_dimensions_count =
             expression->variable_declaration.array_size_expression_list_size;
 
-        if (!resolve_variable_type (context, instance, new_expression->module_name,
-                                    &new_expression->variable_declaration, expression->variable_declaration.type_name,
-                                    expression->variable_declaration.variable_name, expression->source_name,
-                                    expression->source_line))
+        if (!resolve_variable_type (
+                context, instance, new_expression->module_name, &new_expression->variable_declaration.variable,
+                expression->variable_declaration.type_name, expression->variable_declaration.variable_name,
+                expression->source_name, expression->source_line))
         {
             resolved = KAN_FALSE;
         }
 
-        if (!resolve_array_dimensions (context, instance, intermediate, &new_expression->variable_declaration,
+        if (!resolve_array_dimensions (context, instance, intermediate, &new_expression->variable_declaration.variable,
                                        expression->variable_declaration.array_size_expression_list_size,
                                        expression->variable_declaration.array_size_expression_list_index, KAN_TRUE))
         {
             resolved = KAN_FALSE;
         }
 
+        new_expression->variable_declaration.declared_in_scope = NULL;
         if (resolved)
         {
             struct resolve_expression_scope_t *owner_scope = resolve_scope;
@@ -4493,9 +4595,12 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
                     &instance->resolve_allocator, sizeof (struct compiler_instance_scope_variable_item_t),
                     _Alignof (struct compiler_instance_scope_variable_item_t));
 
-                item->variable = &new_expression->variable_declaration;
+                item->variable = &new_expression->variable_declaration.variable;
                 item->next = owner_scope->associated_resolved_scope_if_any->scope.first_variable;
+                item->writable = KAN_TRUE;
+
                 owner_scope->associated_resolved_scope_if_any->scope.first_variable = item;
+                new_expression->variable_declaration.declared_in_scope = item;
             }
             else
             {
@@ -4507,11 +4612,12 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
                 resolved = KAN_FALSE;
             }
 
-            output_type->type_if_vector = new_expression->variable_declaration.type_if_vector;
-            output_type->type_if_matrix = new_expression->variable_declaration.type_if_matrix;
-            output_type->type_if_struct = new_expression->variable_declaration.type_if_struct;
-            output_type->array_dimensions_count = new_expression->variable_declaration.array_dimensions_count;
-            output_type->array_dimensions = new_expression->variable_declaration.array_dimensions;
+            output_type->type.if_vector = new_expression->variable_declaration.variable.type.if_vector;
+            output_type->type.if_matrix = new_expression->variable_declaration.variable.type.if_matrix;
+            output_type->type.if_struct = new_expression->variable_declaration.variable.type.if_struct;
+            output_type->type.array_dimensions_count =
+                new_expression->variable_declaration.variable.type.array_dimensions_count;
+            output_type->type.array_dimensions = new_expression->variable_declaration.variable.type.array_dimensions;
             output_type->boolean = KAN_FALSE;
             output_type->writable = KAN_TRUE;
         }
@@ -4620,7 +4726,7 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
                     resolved = KAN_FALSE;
                 }
 
-                output_type->type_if_vector = &type_f4;
+                output_type->type.if_vector = &type_f4;
                 return resolved;
             }
 
@@ -4646,9 +4752,9 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
             resolved = KAN_FALSE;
         }
 
-        output_type->type_if_vector = new_expression->function_call.function->return_type_if_vector;
-        output_type->type_if_matrix = new_expression->function_call.function->return_type_if_matrix;
-        output_type->type_if_struct = new_expression->function_call.function->return_type_if_struct;
+        output_type->type.if_vector = new_expression->function_call.function->return_type_if_vector;
+        output_type->type.if_matrix = new_expression->function_call.function->return_type_if_matrix;
+        output_type->type.if_struct = new_expression->function_call.function->return_type_if_struct;
         return resolved;
     }
 
@@ -4698,9 +4804,9 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
             }
         }
 
-        output_type->type_if_vector = new_expression->constructor.type_if_vector;
-        output_type->type_if_matrix = new_expression->constructor.type_if_matrix;
-        output_type->type_if_struct = new_expression->constructor.type_if_struct;
+        output_type->type.if_vector = new_expression->constructor.type_if_vector;
+        output_type->type.if_matrix = new_expression->constructor.type_if_matrix;
+        output_type->type.if_struct = new_expression->constructor.type_if_struct;
         return resolved;
     }
 
@@ -4925,14 +5031,14 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
                              "[%s:%s:%s:%ld] Caught attempt to return \"%s\" from function \"%s\" which returns void.",
                              context->log_name, new_expression->module_name, new_expression->source_name,
                              (long) new_expression->source_line,
-                             get_type_name_for_logging (internal_output_type.type_if_vector,
-                                                        internal_output_type.type_if_matrix,
-                                                        internal_output_type.type_if_struct),
+                             get_type_name_for_logging (internal_output_type.type.if_vector,
+                                                        internal_output_type.type.if_matrix,
+                                                        internal_output_type.type.if_struct),
                              resolve_scope->function->name)
                     resolved = KAN_FALSE;
                 }
 
-                if (internal_output_type.array_dimensions_count > 0u)
+                if (internal_output_type.type.array_dimensions_count > 0u)
                 {
                     KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
                              "[%s:%s:%s:%ld] Caught return of array from function \"%s\" which is not supported.",
@@ -4952,20 +5058,20 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
                 }
 
                 if ((resolve_scope->function->return_type_if_vector &&
-                     internal_output_type.type_if_vector != resolve_scope->function->return_type_if_vector) ||
+                     internal_output_type.type.if_vector != resolve_scope->function->return_type_if_vector) ||
                     (resolve_scope->function->return_type_if_matrix &&
-                     internal_output_type.type_if_matrix != resolve_scope->function->return_type_if_matrix) ||
+                     internal_output_type.type.if_matrix != resolve_scope->function->return_type_if_matrix) ||
                     (resolve_scope->function->return_type_if_struct &&
-                     internal_output_type.type_if_struct != resolve_scope->function->return_type_if_struct))
+                     internal_output_type.type.if_struct != resolve_scope->function->return_type_if_struct))
                 {
                     KAN_LOG (
                         rpl_compiler_context, KAN_LOG_ERROR,
                         "[%s:%s:%s:%ld] Caught attempt to return \"%s\" from function \"%s\" which returns \"%s\".",
                         context->log_name, new_expression->module_name, new_expression->source_name,
                         (long) new_expression->source_line,
-                        get_type_name_for_logging (internal_output_type.type_if_vector,
-                                                   internal_output_type.type_if_matrix,
-                                                   internal_output_type.type_if_struct),
+                        get_type_name_for_logging (internal_output_type.type.if_vector,
+                                                   internal_output_type.type.if_matrix,
+                                                   internal_output_type.type.if_struct),
                         resolve_scope->function->name,
                         get_type_name_for_logging (resolve_scope->function->return_type_if_vector,
                                                    resolve_scope->function->return_type_if_matrix,
@@ -5073,6 +5179,7 @@ static kan_bool_t resolve_new_used_function (struct rpl_compiler_context_t *cont
 
         item->next = NULL;
         item->variable = &argument_declaration->variable;
+        item->writable = KAN_FALSE;
 
         if (last_argument_variable)
         {
@@ -5595,43 +5702,43 @@ static inline kan_bool_t emit_meta_variable_type_to_meta_type (struct compiler_i
                                                                kan_interned_string_t source_name,
                                                                uint64_t source_line)
 {
-    if (variable->type_if_vector == &type_f1)
+    if (variable->type.if_vector == &type_f1)
     {
         *output = KAN_RPL_META_VARIABLE_TYPE_F1;
     }
-    else if (variable->type_if_vector == &type_f2)
+    else if (variable->type.if_vector == &type_f2)
     {
         *output = KAN_RPL_META_VARIABLE_TYPE_F2;
     }
-    else if (variable->type_if_vector == &type_f3)
+    else if (variable->type.if_vector == &type_f3)
     {
         *output = KAN_RPL_META_VARIABLE_TYPE_F3;
     }
-    else if (variable->type_if_vector == &type_f4)
+    else if (variable->type.if_vector == &type_f4)
     {
         *output = KAN_RPL_META_VARIABLE_TYPE_F4;
     }
-    else if (variable->type_if_vector == &type_i1)
+    else if (variable->type.if_vector == &type_i1)
     {
         *output = KAN_RPL_META_VARIABLE_TYPE_I1;
     }
-    else if (variable->type_if_vector == &type_i2)
+    else if (variable->type.if_vector == &type_i2)
     {
         *output = KAN_RPL_META_VARIABLE_TYPE_I2;
     }
-    else if (variable->type_if_vector == &type_i3)
+    else if (variable->type.if_vector == &type_i3)
     {
         *output = KAN_RPL_META_VARIABLE_TYPE_I3;
     }
-    else if (variable->type_if_vector == &type_i4)
+    else if (variable->type.if_vector == &type_i4)
     {
         *output = KAN_RPL_META_VARIABLE_TYPE_I4;
     }
-    else if (variable->type_if_matrix == &type_f3x3)
+    else if (variable->type.if_matrix == &type_f3x3)
     {
         *output = KAN_RPL_META_VARIABLE_TYPE_F3X3;
     }
-    else if (variable->type_if_matrix == &type_f4x4)
+    else if (variable->type.if_matrix == &type_f4x4)
     {
         *output = KAN_RPL_META_VARIABLE_TYPE_F3X3;
     }
@@ -5640,7 +5747,7 @@ static inline kan_bool_t emit_meta_variable_type_to_meta_type (struct compiler_i
         KAN_LOG (
             rpl_compiler_context, KAN_LOG_ERROR, "[%s:%s:%s:%ld] Unable to find meta type for type \"%s\".",
             context_log_name, module_name, source_name, (long) source_line,
-            get_type_name_for_logging (variable->type_if_vector, variable->type_if_matrix, variable->type_if_struct))
+            get_type_name_for_logging (variable->type.if_vector, variable->type.if_matrix, variable->type.if_struct))
         return KAN_FALSE;
     }
 
@@ -5689,7 +5796,7 @@ static kan_bool_t emit_meta_gather_parameters_process_field (
     struct kan_rpl_meta_buffer_t *meta_output,
     struct flattening_name_generation_buffer_t *name_generation_buffer)
 {
-    if (field->variable.type_if_vector || field->variable.type_if_matrix)
+    if (field->variable.type.if_vector || field->variable.type.if_matrix)
     {
         kan_bool_t valid = KAN_TRUE;
         struct kan_rpl_meta_parameter_t *parameter = kan_dynamic_array_add_last (&meta_output->parameters);
@@ -5712,9 +5819,9 @@ static kan_bool_t emit_meta_gather_parameters_process_field (
         }
 
         parameter->total_item_count = 1u;
-        for (uint64_t index = 0u; index < field->variable.array_dimensions_count; ++index)
+        for (uint64_t index = 0u; index < field->variable.type.array_dimensions_count; ++index)
         {
-            parameter->total_item_count *= field->variable.array_dimensions[index];
+            parameter->total_item_count *= field->variable.type.array_dimensions[index];
         }
 
         kan_dynamic_array_set_capacity (&parameter->meta, field->meta_count);
@@ -5727,10 +5834,10 @@ static kan_bool_t emit_meta_gather_parameters_process_field (
 
         return valid;
     }
-    else if (field->variable.type_if_struct)
+    else if (field->variable.type.if_struct)
     {
         return emit_meta_gather_parameters_process_field_list (instance, base_offset + field->offset,
-                                                               field->variable.type_if_struct->first_field, meta_output,
+                                                               field->variable.type.if_struct->first_field, meta_output,
                                                                name_generation_buffer);
     }
 
@@ -5907,7 +6014,6 @@ static inline uint32_t *spirv_new_instruction (struct spirv_generation_context_t
 
     item->next = NULL;
     item->code[0u] = word_count << SpvWordCountShift;
-    ;
 
     if (section->last)
     {
@@ -5960,6 +6066,7 @@ static inline void spirv_generate_op_member_name (struct spirv_generation_contex
 
 static void spirv_generate_standard_types (struct spirv_generation_context_t *context)
 {
+    // We intentionally do not generate special names for pointers.
     spirv_generate_op_name (context, SPIRV_FIXED_ID_TYPE_VOID, "void");
     spirv_generate_op_name (context, SPIRV_FIXED_ID_TYPE_BOOLEAN, "bool");
     spirv_generate_op_name (context, SPIRV_FIXED_ID_TYPE_FLOAT, "f1");
@@ -6003,6 +6110,12 @@ static void spirv_generate_standard_types (struct spirv_generation_context_t *co
     code[3u] = SPIRV_FIXED_ID_TYPE_FLOAT;
 
     code = spirv_new_instruction (context, &context->base_type_section, 4u);
+    code[0u] |= SpvOpCodeMask & SpvOpTypePointer;
+    code[1u] = SPIRV_FIXED_ID_TYPE_FLOAT_FUNCTION_POINTER;
+    code[2u] = SpvStorageClassFunction;
+    code[3u] = SPIRV_FIXED_ID_TYPE_FLOAT;
+
+    code = spirv_new_instruction (context, &context->base_type_section, 4u);
     code[0u] |= SpvOpCodeMask & SpvOpTypeInt;
     code[1u] = SPIRV_FIXED_ID_TYPE_INTEGER;
     code[2u] = 32u;
@@ -6018,6 +6131,12 @@ static void spirv_generate_standard_types (struct spirv_generation_context_t *co
     code[0u] |= SpvOpCodeMask & SpvOpTypePointer;
     code[1u] = SPIRV_FIXED_ID_TYPE_INTEGER_OUTPUT_POINTER;
     code[2u] = SpvStorageClassOutput;
+    code[3u] = SPIRV_FIXED_ID_TYPE_INTEGER;
+
+    code = spirv_new_instruction (context, &context->base_type_section, 4u);
+    code[0u] |= SpvOpCodeMask & SpvOpTypePointer;
+    code[1u] = SPIRV_FIXED_ID_TYPE_INTEGER_FUNCTION_POINTER;
+    code[2u] = SpvStorageClassFunction;
     code[3u] = SPIRV_FIXED_ID_TYPE_INTEGER;
 
     code = spirv_new_instruction (context, &context->base_type_section, 4u);
@@ -6039,6 +6158,12 @@ static void spirv_generate_standard_types (struct spirv_generation_context_t *co
     code[3u] = SPIRV_FIXED_ID_TYPE_F2;
 
     code = spirv_new_instruction (context, &context->base_type_section, 4u);
+    code[0u] |= SpvOpCodeMask & SpvOpTypePointer;
+    code[1u] = SPIRV_FIXED_ID_TYPE_F2_FUNCTION_POINTER;
+    code[2u] = SpvStorageClassFunction;
+    code[3u] = SPIRV_FIXED_ID_TYPE_F2;
+
+    code = spirv_new_instruction (context, &context->base_type_section, 4u);
     code[0u] |= SpvOpCodeMask & SpvOpTypeVector;
     code[1u] = SPIRV_FIXED_ID_TYPE_F3;
     code[2u] = SPIRV_FIXED_ID_TYPE_FLOAT;
@@ -6054,6 +6179,12 @@ static void spirv_generate_standard_types (struct spirv_generation_context_t *co
     code[0u] |= SpvOpCodeMask & SpvOpTypePointer;
     code[1u] = SPIRV_FIXED_ID_TYPE_F3_OUTPUT_POINTER;
     code[2u] = SpvStorageClassOutput;
+    code[3u] = SPIRV_FIXED_ID_TYPE_F3;
+
+    code = spirv_new_instruction (context, &context->base_type_section, 4u);
+    code[0u] |= SpvOpCodeMask & SpvOpTypePointer;
+    code[1u] = SPIRV_FIXED_ID_TYPE_F3_FUNCTION_POINTER;
+    code[2u] = SpvStorageClassFunction;
     code[3u] = SPIRV_FIXED_ID_TYPE_F3;
 
     code = spirv_new_instruction (context, &context->base_type_section, 4u);
@@ -6075,6 +6206,12 @@ static void spirv_generate_standard_types (struct spirv_generation_context_t *co
     code[3u] = SPIRV_FIXED_ID_TYPE_F4;
 
     code = spirv_new_instruction (context, &context->base_type_section, 4u);
+    code[0u] |= SpvOpCodeMask & SpvOpTypePointer;
+    code[1u] = SPIRV_FIXED_ID_TYPE_F4_FUNCTION_POINTER;
+    code[2u] = SpvStorageClassFunction;
+    code[3u] = SPIRV_FIXED_ID_TYPE_F4;
+
+    code = spirv_new_instruction (context, &context->base_type_section, 4u);
     code[0u] |= SpvOpCodeMask & SpvOpTypeVector;
     code[1u] = SPIRV_FIXED_ID_TYPE_I2;
     code[2u] = SPIRV_FIXED_ID_TYPE_INTEGER;
@@ -6090,6 +6227,12 @@ static void spirv_generate_standard_types (struct spirv_generation_context_t *co
     code[0u] |= SpvOpCodeMask & SpvOpTypePointer;
     code[1u] = SPIRV_FIXED_ID_TYPE_I2_OUTPUT_POINTER;
     code[2u] = SpvStorageClassOutput;
+    code[3u] = SPIRV_FIXED_ID_TYPE_I2;
+
+    code = spirv_new_instruction (context, &context->base_type_section, 4u);
+    code[0u] |= SpvOpCodeMask & SpvOpTypePointer;
+    code[1u] = SPIRV_FIXED_ID_TYPE_I2_FUNCTION_POINTER;
+    code[2u] = SpvStorageClassFunction;
     code[3u] = SPIRV_FIXED_ID_TYPE_I2;
 
     code = spirv_new_instruction (context, &context->base_type_section, 4u);
@@ -6111,6 +6254,12 @@ static void spirv_generate_standard_types (struct spirv_generation_context_t *co
     code[3u] = SPIRV_FIXED_ID_TYPE_I3;
 
     code = spirv_new_instruction (context, &context->base_type_section, 4u);
+    code[0u] |= SpvOpCodeMask & SpvOpTypePointer;
+    code[1u] = SPIRV_FIXED_ID_TYPE_I3_FUNCTION_POINTER;
+    code[2u] = SpvStorageClassFunction;
+    code[3u] = SPIRV_FIXED_ID_TYPE_I3;
+
+    code = spirv_new_instruction (context, &context->base_type_section, 4u);
     code[0u] |= SpvOpCodeMask & SpvOpTypeVector;
     code[1u] = SPIRV_FIXED_ID_TYPE_I4;
     code[2u] = SPIRV_FIXED_ID_TYPE_INTEGER;
@@ -6126,6 +6275,12 @@ static void spirv_generate_standard_types (struct spirv_generation_context_t *co
     code[0u] |= SpvOpCodeMask & SpvOpTypePointer;
     code[1u] = SPIRV_FIXED_ID_TYPE_I4_OUTPUT_POINTER;
     code[2u] = SpvStorageClassOutput;
+    code[3u] = SPIRV_FIXED_ID_TYPE_I4;
+
+    code = spirv_new_instruction (context, &context->base_type_section, 4u);
+    code[0u] |= SpvOpCodeMask & SpvOpTypePointer;
+    code[1u] = SPIRV_FIXED_ID_TYPE_I4_FUNCTION_POINTER;
+    code[2u] = SpvStorageClassFunction;
     code[3u] = SPIRV_FIXED_ID_TYPE_I4;
 
     code = spirv_new_instruction (context, &context->base_type_section, 4u);
@@ -6147,6 +6302,12 @@ static void spirv_generate_standard_types (struct spirv_generation_context_t *co
     code[3u] = SPIRV_FIXED_ID_TYPE_F3X3;
 
     code = spirv_new_instruction (context, &context->base_type_section, 4u);
+    code[0u] |= SpvOpCodeMask & SpvOpTypePointer;
+    code[1u] = SPIRV_FIXED_ID_TYPE_F3X3_FUNCTION_POINTER;
+    code[2u] = SpvStorageClassFunction;
+    code[3u] = SPIRV_FIXED_ID_TYPE_F3X3;
+
+    code = spirv_new_instruction (context, &context->base_type_section, 4u);
     code[0u] |= SpvOpCodeMask & SpvOpTypeMatrix;
     code[1u] = SPIRV_FIXED_ID_TYPE_F4X4;
     code[2u] = SPIRV_FIXED_ID_TYPE_F4;
@@ -6162,6 +6323,12 @@ static void spirv_generate_standard_types (struct spirv_generation_context_t *co
     code[0u] |= SpvOpCodeMask & SpvOpTypePointer;
     code[1u] = SPIRV_FIXED_ID_TYPE_F4X4_OUTPUT_POINTER;
     code[2u] = SpvStorageClassOutput;
+    code[3u] = SPIRV_FIXED_ID_TYPE_F4X4;
+
+    code = spirv_new_instruction (context, &context->base_type_section, 4u);
+    code[0u] |= SpvOpCodeMask & SpvOpTypePointer;
+    code[1u] = SPIRV_FIXED_ID_TYPE_F4X4_FUNCTION_POINTER;
+    code[2u] = SpvStorageClassFunction;
     code[3u] = SPIRV_FIXED_ID_TYPE_F4X4;
 
     code = spirv_new_instruction (context, &context->base_type_section, 2u);
@@ -6208,8 +6375,11 @@ static void spirv_init_generation_context (struct spirv_generation_context_t *co
     context->higher_type_section.last = NULL;
     context->global_variable_section.first = NULL;
     context->global_variable_section.last = NULL;
-    context->functions_section.first = NULL;
-    context->functions_section.last = NULL;
+    context->first_function_node = NULL;
+    context->last_function_node = NULL;
+
+    context->first_generated_array_type = NULL;
+    context->first_generated_function_type = NULL;
 
     kan_stack_group_allocator_init (&context->temporary_allocator, rpl_compiler_instance_allocation_group,
                                     KAN_RPL_PARSER_SPIRV_GENERATION_TEMPORARY_SIZE);
@@ -6286,10 +6456,111 @@ static kan_bool_t spirv_finalize_generation_context (struct spirv_generation_con
     spirv_copy_instructions (&output, context->base_type_section.first);
     spirv_copy_instructions (&output, context->higher_type_section.first);
     spirv_copy_instructions (&output, context->global_variable_section.first);
-    spirv_copy_instructions (&output, context->functions_section.first);
+
+    struct spirv_generation_function_node_t *function_node = context->first_function_node;
+    while (function_node)
+    {
+        spirv_copy_instructions (&output, function_node->header_section.first);
+        struct spirv_generation_block_t *block = function_node->first_block;
+
+        while (block)
+        {
+            spirv_copy_instructions (&output, block->header_section.first);
+            spirv_copy_instructions (&output, block->code_section.first);
+            block = block->next;
+        }
+
+        spirv_copy_instructions (&output, function_node->end_section.first);
+        function_node = function_node->next;
+    }
 
     kan_stack_group_allocator_shutdown (&context->temporary_allocator);
     return context->emit_result;
+}
+
+static uint32_t spirv_find_or_generate_variable_type (struct spirv_generation_context_t *context,
+                                                      struct compiler_instance_full_type_definition_t *type,
+                                                      uint64_t start_dimension_index,
+                                                      kan_bool_t need_function_pointer_type)
+{
+    if (start_dimension_index == type->array_dimensions_count)
+    {
+        if (type->if_vector)
+        {
+            return need_function_pointer_type ? type->if_vector->spirv_id_function_pointer : type->if_vector->spirv_id;
+        }
+        else if (type->if_matrix)
+        {
+            return need_function_pointer_type ? type->if_matrix->spirv_id_function_pointer : type->if_matrix->spirv_id;
+        }
+        else if (type->if_struct)
+        {
+            return need_function_pointer_type ? type->if_struct->spirv_id_function_pointer :
+                                                type->if_struct->spirv_id_value;
+        }
+
+        KAN_ASSERT (KAN_FALSE)
+    }
+
+    struct spirv_generation_array_type_t *array_type = context->first_generated_array_type;
+    while (array_type)
+    {
+        if (array_type->base_type_if_vector == type->if_vector && array_type->base_type_if_matrix == type->if_matrix &&
+            array_type->base_type_if_struct == type->if_struct &&
+            array_type->dimensions_count == type->array_dimensions_count - start_dimension_index &&
+            memcmp (array_type->dimensions, &type->array_dimensions[start_dimension_index],
+                    array_type->dimensions_count * sizeof (uint64_t)) == 0)
+        {
+            return array_type->spirv_id;
+        }
+
+        array_type = array_type->next;
+    }
+
+    const uint32_t base_type_id =
+        spirv_find_or_generate_variable_type (context, type, start_dimension_index + 1u, KAN_FALSE);
+    uint32_t constant_id = context->current_bound;
+    ++context->current_bound;
+
+    uint32_t *dimension_size_code = spirv_new_instruction (context, &context->base_type_section, 4u);
+    dimension_size_code[0u] |= SpvOpCodeMask & SpvOpConstant;
+    dimension_size_code[1u] = type_i1.spirv_id;
+    dimension_size_code[2u] = constant_id;
+    dimension_size_code[3u] = (uint32_t) type->array_dimensions[start_dimension_index];
+
+    uint32_t array_type_id = context->current_bound;
+    ++context->current_bound;
+
+    uint32_t *dimension_type_code = spirv_new_instruction (context, &context->base_type_section, 4u);
+    dimension_type_code[0u] |= SpvOpCodeMask & SpvOpTypeArray;
+    dimension_type_code[1u] = array_type_id;
+    dimension_type_code[2u] = base_type_id;
+    dimension_type_code[3u] = constant_id;
+
+    uint32_t array_type_function_pointer_id = context->current_bound;
+    ++context->current_bound;
+
+    uint32_t *function_pointer_code = spirv_new_instruction (context, &context->base_type_section, 4u);
+    function_pointer_code[0u] |= SpvOpCodeMask & SpvOpTypePointer;
+    function_pointer_code[1u] = array_type_function_pointer_id;
+    function_pointer_code[2u] = SpvStorageClassFunction;
+    function_pointer_code[3u] = array_type_id;
+
+    struct spirv_generation_array_type_t *new_array_type = kan_stack_group_allocator_allocate (
+        &context->temporary_allocator, sizeof (struct spirv_generation_array_type_t),
+        _Alignof (struct spirv_generation_array_type_t));
+
+    new_array_type->next = context->first_generated_array_type;
+    context->first_generated_array_type = new_array_type;
+    new_array_type->spirv_id = array_type_id;
+    new_array_type->spirv_function_pointer_id = array_type_function_pointer_id;
+    new_array_type->base_type_if_vector = type->if_vector;
+    new_array_type->base_type_if_matrix = type->if_matrix;
+    new_array_type->base_type_if_struct = type->if_struct;
+    new_array_type->dimensions_count = type->array_dimensions_count - start_dimension_index;
+    new_array_type->dimensions = &type->array_dimensions[start_dimension_index];
+
+    return need_function_pointer_type ? new_array_type->spirv_function_pointer_id : new_array_type->spirv_id;
 }
 
 static inline void spirv_emit_struct_from_declaration_list (struct spirv_generation_context_t *context,
@@ -6316,55 +6587,7 @@ static inline void spirv_emit_struct_from_declaration_list (struct spirv_generat
 
     while (field)
     {
-        uint32_t base_type_id;
-        if (field->variable.type_if_vector)
-        {
-            base_type_id = field->variable.type_if_vector->spirv_id;
-        }
-        else if (field->variable.type_if_matrix)
-        {
-            base_type_id = field->variable.type_if_matrix->spirv_id;
-        }
-        else if (field->variable.type_if_struct)
-        {
-            base_type_id = field->variable.type_if_struct->spirv_id;
-        }
-        else
-        {
-            // Should've been handled by resolve, now it is too late.
-            KAN_ASSERT (KAN_FALSE)
-            base_type_id = UINT32_MAX;
-        }
-
-        uint32_t field_type_id = base_type_id;
-        if (field->variable.array_dimensions_count > 0u)
-        {
-            uint64_t dimension_index = field->variable.array_dimensions_count;
-            do
-            {
-                --dimension_index;
-                uint32_t constant_id = context->current_bound;
-                ++context->current_bound;
-
-                uint32_t *dimension_size_code = spirv_new_instruction (context, &context->base_type_section, 4u);
-                dimension_size_code[0u] |= SpvOpCodeMask & SpvOpConstant;
-                dimension_size_code[1u] = type_i1.spirv_id;
-                dimension_size_code[2u] = constant_id;
-                dimension_size_code[3u] = (uint32_t) field->variable.array_dimensions[dimension_index];
-
-                uint32_t array_type_id = context->current_bound;
-                ++context->current_bound;
-
-                uint32_t *dimension_type_code = spirv_new_instruction (context, &context->base_type_section, 4u);
-                dimension_type_code[0u] |= SpvOpCodeMask & SpvOpTypeArray;
-                dimension_type_code[1u] = array_type_id;
-                dimension_type_code[2u] = field_type_id;
-                dimension_type_code[3u] = constant_id;
-
-                field_type_id = array_type_id;
-            } while (dimension_index > 0u);
-        }
-
+        uint32_t field_type_id = spirv_find_or_generate_variable_type (context, &field->variable.type, 0u, KAN_FALSE);
         struct_code[2u + field_index] = field_type_id;
         spirv_generate_op_member_name (context, struct_id, (uint32_t) field_index, field->variable.name);
         field = field->next;
@@ -6399,13 +6622,13 @@ static inline void spirv_emit_flattened_input_variable (
     uint32_t *variable_code = spirv_new_instruction (context, &context->global_variable_section, 4u);
     variable_code[0u] |= SpvOpCodeMask & SpvOpVariable;
 
-    if (declaration->source_declaration->variable.type_if_vector)
+    if (declaration->source_declaration->variable.type.if_vector)
     {
-        variable_code[1u] = declaration->source_declaration->variable.type_if_vector->spirv_id_input_pointer;
+        variable_code[1u] = declaration->source_declaration->variable.type.if_vector->spirv_id_input_pointer;
     }
-    else if (declaration->source_declaration->variable.type_if_matrix)
+    else if (declaration->source_declaration->variable.type.if_matrix)
     {
-        variable_code[1u] = declaration->source_declaration->variable.type_if_matrix->spirv_id_input_pointer;
+        variable_code[1u] = declaration->source_declaration->variable.type.if_matrix->spirv_id_input_pointer;
     }
     else
     {
@@ -6428,13 +6651,13 @@ static inline void spirv_emit_flattened_output_variable (
     uint32_t *variable_code = spirv_new_instruction (context, &context->global_variable_section, 4u);
     variable_code[0u] |= SpvOpCodeMask & SpvOpVariable;
 
-    if (declaration->source_declaration->variable.type_if_vector)
+    if (declaration->source_declaration->variable.type.if_vector)
     {
-        variable_code[1u] = declaration->source_declaration->variable.type_if_vector->spirv_id_output_pointer;
+        variable_code[1u] = declaration->source_declaration->variable.type.if_vector->spirv_id_output_pointer;
     }
-    else if (declaration->source_declaration->variable.type_if_matrix)
+    else if (declaration->source_declaration->variable.type.if_matrix)
     {
-        variable_code[1u] = declaration->source_declaration->variable.type_if_matrix->spirv_id_output_pointer;
+        variable_code[1u] = declaration->source_declaration->variable.type.if_matrix->spirv_id_output_pointer;
     }
     else
     {
@@ -6446,6 +6669,764 @@ static inline void spirv_emit_flattened_output_variable (
 
     spirv_emit_location (context, declaration->spirv_id_output, declaration->location);
     spirv_generate_op_name (context, declaration->spirv_id_output, declaration->readable_name);
+}
+
+static struct spirv_generation_function_type_t *spirv_find_or_generate_function_type (
+    struct spirv_generation_context_t *context, struct compiler_instance_function_node_t *function)
+{
+    uint32_t return_type;
+    if (function->return_type_if_vector)
+    {
+        return_type = function->return_type_if_vector->spirv_id;
+    }
+    else if (function->return_type_if_matrix)
+    {
+        return_type = function->return_type_if_matrix->spirv_id;
+    }
+    else if (function->return_type_if_struct)
+    {
+        return_type = function->return_type_if_struct->spirv_id_value;
+    }
+    else
+    {
+        return_type = SPIRV_FIXED_ID_TYPE_VOID;
+    }
+
+    uint64_t argument_count = 0u;
+    struct compiler_instance_declaration_node_t *argument = function->first_argument;
+
+    while (argument)
+    {
+        ++argument_count;
+        argument = argument->next;
+    }
+
+    uint32_t *argument_types = NULL;
+    if (argument_count > 0u)
+    {
+        argument_types = kan_stack_group_allocator_allocate (&context->temporary_allocator,
+                                                             sizeof (uint32_t) * argument_count, _Alignof (uint32_t));
+        uint64_t argument_index = 0u;
+        argument = function->first_argument;
+
+        while (argument)
+        {
+            argument_types[argument_index] =
+                spirv_find_or_generate_variable_type (context, &argument->variable.type, 0u, KAN_TRUE);
+            ++argument_index;
+            argument = argument->next;
+        }
+    }
+
+    struct spirv_generation_function_type_t *function_type = context->first_generated_function_type;
+    while (function_type)
+    {
+        if (function_type->return_type_id == return_type && function_type->argument_count == argument_count &&
+            (argument_count == 0u ||
+             memcmp (function_type->argument_types, argument_types, argument_count * sizeof (uint32_t)) == 0))
+        {
+            return function_type;
+        }
+
+        function_type = function_type->next;
+    }
+
+    uint32_t function_type_id = context->current_bound;
+    ++context->current_bound;
+
+    uint32_t *type_code = spirv_new_instruction (context, &context->higher_type_section, 3u + argument_count);
+    type_code[0u] |= SpvOpCodeMask & SpvOpTypeFunction;
+    type_code[1u] = function_type_id;
+    type_code[2u] = return_type;
+
+    if (argument_count > 0u)
+    {
+        memcpy (type_code + 3u, argument_types, argument_count * sizeof (uint32_t));
+    }
+
+    struct spirv_generation_function_type_t *new_function_type = kan_stack_group_allocator_allocate (
+        &context->temporary_allocator, sizeof (struct spirv_generation_function_type_t),
+        _Alignof (struct spirv_generation_function_type_t));
+
+    new_function_type->next = context->first_generated_function_type;
+    context->first_generated_function_type = new_function_type;
+
+    new_function_type->generated_id = function_type_id;
+    new_function_type->return_type_id = return_type;
+    new_function_type->argument_count = argument_count;
+    new_function_type->argument_types = argument_types;
+    return new_function_type;
+}
+
+static inline struct spirv_generation_block_t *spirv_function_new_block (struct spirv_generation_context_t *context,
+                                                                         struct spirv_generation_function_node_t *node)
+{
+    struct spirv_generation_block_t *block =
+        kan_stack_group_allocator_allocate (&context->temporary_allocator, sizeof (struct spirv_generation_block_t),
+                                            _Alignof (struct spirv_generation_block_t));
+
+    block->next = NULL;
+    block->spirv_id = context->current_bound;
+    ++context->current_bound;
+    block->header_section.first = NULL;
+    block->header_section.last = NULL;
+    block->code_section.first = NULL;
+    block->code_section.last = NULL;
+
+    uint32_t *label_code = spirv_new_instruction (context, &block->header_section, 2u);
+    label_code[0u] |= SpvOpCodeMask & SpvOpLabel;
+    label_code[1u] = block->spirv_id;
+
+    if (node->last_block)
+    {
+        node->last_block->next = block;
+    }
+    else
+    {
+        node->first_block = block;
+    }
+
+    node->last_block = block;
+    return block;
+}
+
+// We should never try to load something other than single vectors or matrices.
+// If we do it, then something is wrong with resolve or AST.
+#define SPIRV_ASSERT_VARIABLE_CAN_BE_LOADED(VARIABLE)                                                                  \
+    KAN_ASSERT ((VARIABLE)->type.array_dimensions_count == 0u &&                                                       \
+                ((VARIABLE)->type.if_vector || (VARIABLE)->type.if_matrix))
+
+#define SPIRV_LOADED_VARIABLE_TYPE(VARIABLE)                                                                           \
+    ((VARIABLE)->type.if_vector ? (VARIABLE)->type.if_vector->spirv_id : (VARIABLE)->type.if_matrix->spirv_id)
+
+static inline uint32_t spirv_emit_load (struct spirv_generation_context_t *context,
+                                        struct spirv_arbitrary_instruction_section_t *section,
+                                        uint32_t type_id,
+                                        uint32_t variable_id)
+{
+    uint32_t loaded_id = context->current_bound;
+    ++context->current_bound;
+
+    uint32_t *load_code = spirv_new_instruction (context, section, 4u);
+    load_code[0u] |= SpvOpCodeMask & SpvOpLoad;
+    load_code[1u] = type_id;
+    load_code[2u] = loaded_id;
+    load_code[3u] = variable_id;
+    return loaded_id;
+}
+
+static inline uint32_t spirv_emit_i1_constant (struct spirv_generation_context_t *context,
+                                               struct spirv_arbitrary_instruction_section_t *section,
+                                               int32_t value)
+{
+    uint32_t constant_id = context->current_bound;
+    ++context->current_bound;
+
+    uint32_t *constant_code = spirv_new_instruction (context, section, 4u);
+    constant_code[0u] |= SpvOpCodeMask & SpvOpConstant;
+    constant_code[1u] = type_i1.spirv_id;
+    constant_code[2u] = constant_id;
+    *(int32_t *) &constant_code[3u] = (int32_t) value;
+    return constant_id;
+}
+
+static inline uint32_t spirv_emit_f1_constant (struct spirv_generation_context_t *context,
+                                               struct spirv_arbitrary_instruction_section_t *section,
+                                               float value)
+{
+    uint32_t constant_id = context->current_bound;
+    ++context->current_bound;
+
+    uint32_t *constant_code = spirv_new_instruction (context, section, 4u);
+    constant_code[0u] |= SpvOpCodeMask & SpvOpConstant;
+    constant_code[1u] = type_f1.spirv_id;
+    constant_code[2u] = constant_id;
+    *(float *) &constant_code[3u] = value;
+    return constant_id;
+}
+
+#define SPIRV_EMIT_VECTOR_ARITHMETIC(SUFFIX, FLOAT_OP, INTEGER_OP)                                                     \
+    static inline uint32_t spirv_emit_vector_##SUFFIX (                                                                \
+        struct spirv_generation_context_t *context, struct spirv_arbitrary_instruction_section_t *section,             \
+        struct inbuilt_vector_type_t *type, uint32_t left, uint32_t right)                                             \
+    {                                                                                                                  \
+        uint32_t result_id = context->current_bound;                                                                   \
+        ++context->current_bound;                                                                                      \
+                                                                                                                       \
+        switch (type->item)                                                                                            \
+        {                                                                                                              \
+        case INBUILT_TYPE_ITEM_FLOAT:                                                                                  \
+        {                                                                                                              \
+            uint32_t *code = spirv_new_instruction (context, section, 5u);                                             \
+            code[0u] |= SpvOpCodeMask & FLOAT_OP;                                                                      \
+            code[1u] = type->spirv_id;                                                                                 \
+            code[2u] = result_id;                                                                                      \
+            code[3u] = left;                                                                                           \
+            code[4u] = right;                                                                                          \
+            break;                                                                                                     \
+        }                                                                                                              \
+                                                                                                                       \
+        case INBUILT_TYPE_ITEM_INTEGER:                                                                                \
+        {                                                                                                              \
+            uint32_t *code = spirv_new_instruction (context, section, 5u);                                             \
+            code[0u] |= SpvOpCodeMask & INTEGER_OP;                                                                    \
+            code[1u] = type->spirv_id;                                                                                 \
+            code[2u] = result_id;                                                                                      \
+            code[3u] = left;                                                                                           \
+            code[4u] = right;                                                                                          \
+            break;                                                                                                     \
+        }                                                                                                              \
+        }                                                                                                              \
+                                                                                                                       \
+        return result_id;                                                                                              \
+    }
+
+SPIRV_EMIT_VECTOR_ARITHMETIC (add, SpvOpFAdd, SpvOpIAdd)
+SPIRV_EMIT_VECTOR_ARITHMETIC (sub, SpvOpFSub, SpvOpISub)
+SPIRV_EMIT_VECTOR_ARITHMETIC (mul, SpvOpFMul, SpvOpIMul)
+SPIRV_EMIT_VECTOR_ARITHMETIC (div, SpvOpFDiv, SpvOpSDiv)
+#undef SPIRV_EMIT_VECTOR_ARITHMETIC
+
+#define SPIRV_EMIT_MATRIX_ARITHMETIC(SUFFIX)                                                                           \
+    static inline uint32_t spirv_emit_matrix_##SUFFIX (                                                                \
+        struct spirv_generation_context_t *context, struct spirv_arbitrary_instruction_section_t *section,             \
+        struct inbuilt_matrix_type_t *type, uint32_t left, uint32_t right)                                             \
+    {                                                                                                                  \
+        uint32_t column_result_ids[4u];                                                                                \
+        KAN_ASSERT (type->columns <= 4u)                                                                               \
+        struct inbuilt_vector_type_t *column_type;                                                                     \
+                                                                                                                       \
+        switch (type->item)                                                                                            \
+        {                                                                                                              \
+        case INBUILT_TYPE_ITEM_FLOAT:                                                                                  \
+            column_type = floating_vector_types[type->rows - 1u];                                                      \
+            break;                                                                                                     \
+                                                                                                                       \
+        case INBUILT_TYPE_ITEM_INTEGER:                                                                                \
+            column_type = integer_vector_types[type->rows - 1u];                                                       \
+            break;                                                                                                     \
+        }                                                                                                              \
+                                                                                                                       \
+        for (uint64_t column_index = 0u; column_index < type->columns; ++column_index)                                 \
+        {                                                                                                              \
+            uint32_t left_extract_result = context->current_bound;                                                     \
+            ++context->current_bound;                                                                                  \
+                                                                                                                       \
+            uint32_t *left_extract = spirv_new_instruction (context, section, 5u);                                     \
+            left_extract[0u] |= SpvOpCodeMask & SpvOpCompositeExtract;                                                 \
+            left_extract[1u] = column_type->spirv_id;                                                                  \
+            left_extract[2u] = left_extract_result;                                                                    \
+            left_extract[3u] = left;                                                                                   \
+            left_extract[4u] = (uint32_t) column_index;                                                                \
+                                                                                                                       \
+            uint32_t right_extract_result = context->current_bound;                                                    \
+            ++context->current_bound;                                                                                  \
+                                                                                                                       \
+            uint32_t *right_extract = spirv_new_instruction (context, section, 5u);                                    \
+            right_extract[0u] |= SpvOpCodeMask & SpvOpCompositeExtract;                                                \
+            right_extract[1u] = column_type->spirv_id;                                                                 \
+            right_extract[2u] = right_extract_result;                                                                  \
+            right_extract[3u] = right;                                                                                 \
+            right_extract[4u] = (uint32_t) column_index;                                                               \
+                                                                                                                       \
+            column_result_ids[column_index] =                                                                          \
+                spirv_emit_vector_##SUFFIX (context, section, column_type, left_extract_result, right_extract_result); \
+        }                                                                                                              \
+                                                                                                                       \
+        uint32_t result_id = context->current_bound;                                                                   \
+        ++context->current_bound;                                                                                      \
+                                                                                                                       \
+        uint32_t *construct = spirv_new_instruction (context, section, 3u + type->columns);                            \
+        construct[0u] |= SpvOpCodeMask & SpvOpCompositeConstruct;                                                      \
+        construct[1u] |= type->spirv_id;                                                                               \
+        construct[2u] |= result_id;                                                                                    \
+        memcpy (construct + 3u, column_result_ids, type->columns * sizeof (uint32_t));                                 \
+        return result_id;                                                                                              \
+    }
+
+SPIRV_EMIT_MATRIX_ARITHMETIC (add)
+SPIRV_EMIT_MATRIX_ARITHMETIC (sub)
+SPIRV_EMIT_MATRIX_ARITHMETIC (mul)
+SPIRV_EMIT_MATRIX_ARITHMETIC (div)
+#undef SPIRV_EMIT_MATRIX_ARITHMETIC
+
+static uint32_t spirv_emit_expression (struct spirv_generation_context_t *context,
+                                       struct spirv_generation_function_node_t *function,
+                                       struct spirv_generation_block_t *current_block,
+                                       struct compiler_instance_expression_node_t *expression,
+                                       kan_bool_t result_should_be_pointer)
+{
+    switch (expression->type)
+    {
+    case COMPILER_INSTANCE_EXPRESSION_TYPE_STRUCTURED_BUFFER_REFERENCE:
+        // If buffer reference result is requested as not pointer, then something is off with resolve or AST.
+        KAN_ASSERT (result_should_be_pointer)
+        return expression->structured_buffer_reference->structured_variable_spirv_id;
+
+    case COMPILER_INSTANCE_EXPRESSION_TYPE_VARIABLE_REFERENCE:
+        if (result_should_be_pointer)
+        {
+            return expression->variable_reference->spirv_id;
+        }
+
+        SPIRV_ASSERT_VARIABLE_CAN_BE_LOADED (expression->variable_reference->variable)
+        return spirv_emit_load (context, &current_block->code_section,
+                                SPIRV_LOADED_VARIABLE_TYPE (expression->variable_reference->variable),
+                                expression->variable_reference->spirv_id);
+
+    case COMPILER_INSTANCE_EXPRESSION_TYPE_STRUCTURED_ACCESS:
+    {
+        // TODO: Implement. Combine with array indexing?
+        break;
+    }
+
+    case COMPILER_INSTANCE_EXPRESSION_TYPE_FLATTENED_BUFFER_ACCESS_INPUT:
+        if (result_should_be_pointer)
+        {
+            return expression->flattened_buffer_access->spirv_id_input;
+        }
+
+        SPIRV_ASSERT_VARIABLE_CAN_BE_LOADED (&expression->flattened_buffer_access->source_declaration->variable)
+        return spirv_emit_load (
+            context, &current_block->code_section,
+            SPIRV_LOADED_VARIABLE_TYPE (&expression->flattened_buffer_access->source_declaration->variable),
+            expression->flattened_buffer_access->spirv_id_input);
+
+    case COMPILER_INSTANCE_EXPRESSION_TYPE_FLATTENED_BUFFER_ACCESS_OUTPUT:
+        if (result_should_be_pointer)
+        {
+            return expression->flattened_buffer_access->spirv_id_output;
+        }
+
+        SPIRV_ASSERT_VARIABLE_CAN_BE_LOADED (&expression->flattened_buffer_access->source_declaration->variable)
+        return spirv_emit_load (
+            context, &current_block->code_section,
+            SPIRV_LOADED_VARIABLE_TYPE (&expression->flattened_buffer_access->source_declaration->variable),
+            expression->flattened_buffer_access->spirv_id_output);
+
+    case COMPILER_INSTANCE_EXPRESSION_TYPE_INTEGER_LITERAL:
+        return spirv_emit_i1_constant (context, &current_block->code_section, (int32_t) expression->integer_literal);
+
+    case COMPILER_INSTANCE_EXPRESSION_TYPE_FLOATING_LITERAL:
+        return spirv_emit_f1_constant (context, &current_block->code_section, (float) expression->floating_literal);
+
+    case COMPILER_INSTANCE_EXPRESSION_TYPE_VARIABLE_DECLARATION:
+        // If variable declaration result is requested as not pointer, then something is off with resolve or AST.
+        KAN_ASSERT (result_should_be_pointer)
+        return expression->variable_declaration.declared_in_scope->spirv_id;
+
+    case COMPILER_INSTANCE_EXPRESSION_TYPE_OPERATION_ARRAY_INDEX:
+    {
+        // TODO: Implement. Combine multiple array index operations into one access chain?
+        break;
+    }
+
+#define BINARY_OPERATION_PREPARE                                                                                       \
+    const uint32_t left_operand_id = spirv_emit_expression (context, function, current_block,                          \
+                                                            expression->binary_operation.left_operand, KAN_FALSE);     \
+    const uint32_t right_operand_id =                                                                                  \
+        spirv_emit_expression (context, function, current_block, expression->binary_operation.left_operand, KAN_FALSE)
+
+    case COMPILER_INSTANCE_EXPRESSION_TYPE_OPERATION_ADD:
+    {
+        // TODO: If result should be pointer -- wrap it into variable.
+        BINARY_OPERATION_PREPARE;
+        if (expression->binary_operation.left_type.if_vector)
+        {
+            return spirv_emit_vector_add (context, &current_block->code_section,
+                                          expression->binary_operation.left_type.if_vector, left_operand_id,
+                                          right_operand_id);
+        }
+        else if (expression->binary_operation.left_type.if_matrix)
+        {
+            return spirv_emit_matrix_add (context, &current_block->code_section,
+                                          expression->binary_operation.left_type.if_matrix, left_operand_id,
+                                          right_operand_id);
+        }
+        else
+        {
+            KAN_ASSERT (KAN_FALSE)
+            return (uint32_t) SPIRV_FIXED_ID_INVALID;
+        }
+    }
+
+    case COMPILER_INSTANCE_EXPRESSION_TYPE_OPERATION_SUBTRACT:
+    {
+        // TODO: If result should be pointer -- wrap it into variable.
+        BINARY_OPERATION_PREPARE;
+        if (expression->binary_operation.left_type.if_vector)
+        {
+            return spirv_emit_vector_sub (context, &current_block->code_section,
+                                          expression->binary_operation.left_type.if_vector, left_operand_id,
+                                          right_operand_id);
+        }
+        else if (expression->binary_operation.left_type.if_matrix)
+        {
+            return spirv_emit_matrix_sub (context, &current_block->code_section,
+                                          expression->binary_operation.left_type.if_matrix, left_operand_id,
+                                          right_operand_id);
+        }
+        else
+        {
+            KAN_ASSERT (KAN_FALSE)
+            return (uint32_t) SPIRV_FIXED_ID_INVALID;
+        }
+    }
+
+
+    case COMPILER_INSTANCE_EXPRESSION_TYPE_OPERATION_MULTIPLY:
+        // TODO: Implement.
+        break;
+
+    case COMPILER_INSTANCE_EXPRESSION_TYPE_OPERATION_DIVIDE:
+        // TODO: Implement.
+        break;
+
+    case COMPILER_INSTANCE_EXPRESSION_TYPE_OPERATION_MODULUS:
+        // TODO: Implement.
+        break;
+
+    case COMPILER_INSTANCE_EXPRESSION_TYPE_OPERATION_ASSIGN:
+        // TODO: Implement.
+        break;
+
+    case COMPILER_INSTANCE_EXPRESSION_TYPE_OPERATION_AND:
+        // TODO: Implement.
+        break;
+
+    case COMPILER_INSTANCE_EXPRESSION_TYPE_OPERATION_OR:
+        // TODO: Implement.
+        break;
+
+    case COMPILER_INSTANCE_EXPRESSION_TYPE_OPERATION_EQUAL:
+        // TODO: Implement.
+        break;
+
+    case COMPILER_INSTANCE_EXPRESSION_TYPE_OPERATION_NOT_EQUAL:
+        // TODO: Implement.
+        break;
+
+    case COMPILER_INSTANCE_EXPRESSION_TYPE_OPERATION_LESS:
+        // TODO: Implement.
+        break;
+
+    case COMPILER_INSTANCE_EXPRESSION_TYPE_OPERATION_GREATER:
+        // TODO: Implement.
+        break;
+
+    case COMPILER_INSTANCE_EXPRESSION_TYPE_OPERATION_LESS_OR_EQUAL:
+        // TODO: Implement.
+        break;
+
+    case COMPILER_INSTANCE_EXPRESSION_TYPE_OPERATION_GREATER_OR_EQUAL:
+        // TODO: Implement.
+        break;
+
+    case COMPILER_INSTANCE_EXPRESSION_TYPE_OPERATION_BITWISE_AND:
+        // TODO: Implement.
+        break;
+
+    case COMPILER_INSTANCE_EXPRESSION_TYPE_OPERATION_BITWISE_OR:
+        // TODO: Implement.
+        break;
+
+    case COMPILER_INSTANCE_EXPRESSION_TYPE_OPERATION_BITWISE_XOR:
+        // TODO: Implement.
+        break;
+
+    case COMPILER_INSTANCE_EXPRESSION_TYPE_OPERATION_BITWISE_LEFT_SHIFT:
+        // TODO: Implement.
+        break;
+
+    case COMPILER_INSTANCE_EXPRESSION_TYPE_OPERATION_BITWISE_RIGHT_SHIFT:
+        // TODO: Implement.
+        break;
+
+    case COMPILER_INSTANCE_EXPRESSION_TYPE_OPERATION_NEGATE:
+        // TODO: Implement.
+        break;
+
+    case COMPILER_INSTANCE_EXPRESSION_TYPE_OPERATION_NOT:
+        // TODO: Implement.
+        break;
+
+    case COMPILER_INSTANCE_EXPRESSION_TYPE_OPERATION_BITWISE_NOT:
+        // TODO: Implement.
+        break;
+
+    case COMPILER_INSTANCE_EXPRESSION_TYPE_FUNCTION_CALL:
+        // TODO: Implement.
+        // TODO: Remember about standard inbuilt functions and glsl 450 functions.
+        break;
+
+    case COMPILER_INSTANCE_EXPRESSION_TYPE_SAMPLER_CALL:
+        // TODO: Implement.
+        break;
+
+    case COMPILER_INSTANCE_EXPRESSION_TYPE_CONSTRUCTOR:
+        // TODO: Implement.
+        break;
+
+    case COMPILER_INSTANCE_EXPRESSION_TYPE_SCOPE:
+    case COMPILER_INSTANCE_EXPRESSION_TYPE_IF:
+    case COMPILER_INSTANCE_EXPRESSION_TYPE_FOR:
+    case COMPILER_INSTANCE_EXPRESSION_TYPE_WHILE:
+    case COMPILER_INSTANCE_EXPRESSION_TYPE_BREAK:
+    case COMPILER_INSTANCE_EXPRESSION_TYPE_CONTINUE:
+    case COMPILER_INSTANCE_EXPRESSION_TYPE_RETURN:
+        // Should be processes along statements.
+        KAN_ASSERT (KAN_FALSE)
+        return (uint32_t) SPIRV_FIXED_ID_INVALID;
+    }
+
+#undef BINARY_OPERATION_PREPARE
+
+    KAN_ASSERT (KAN_FALSE)
+    return (uint32_t) SPIRV_FIXED_ID_INVALID;
+}
+
+static void spirv_emit_scope (struct spirv_generation_context_t *context,
+                              struct spirv_generation_function_node_t *function,
+                              struct spirv_generation_block_t *current_block,
+                              struct spirv_generation_block_t *next_block,
+                              struct compiler_instance_expression_node_t *scope_expression)
+{
+    KAN_ASSERT (scope_expression->type == COMPILER_INSTANCE_EXPRESSION_TYPE_SCOPE)
+    struct compiler_instance_scope_variable_item_t *variable = scope_expression->scope.first_variable;
+
+    while (variable)
+    {
+        variable->spirv_id = context->current_bound;
+        ++context->current_bound;
+
+        uint32_t *variable_code = spirv_new_instruction (context, &function->first_block->header_section, 4u);
+        variable_code[0u] |= SpvOpCodeMask & SpvOpVariable;
+        variable_code[1u] = spirv_find_or_generate_variable_type (context, &variable->variable->type, 0u, KAN_TRUE);
+        variable_code[2u] = variable->spirv_id;
+        variable_code[3u] = SpvStorageClassFunction;
+
+        spirv_generate_op_name (context, variable->spirv_id, variable->variable->name);
+        variable = variable->next;
+    }
+
+    struct compiler_instance_expression_list_item_t *statement = scope_expression->scope.first_expression;
+    struct compiler_instance_expression_list_item_t *previous_statement = NULL;
+
+    while (statement)
+    {
+        if (previous_statement && previous_statement->expression->type == COMPILER_INSTANCE_EXPRESSION_TYPE_RETURN)
+        {
+            KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
+                     "[%s:%s:%s:%ld] Found expressions after function return, generated SPIRV will be invalid.",
+                     context->instance->context_log_name, statement->expression->module_name,
+                     statement->expression->source_name, (long) statement->expression->source_line)
+            context->emit_result = KAN_FALSE;
+            break;
+        }
+
+        switch (statement->expression->type)
+        {
+        case COMPILER_INSTANCE_EXPRESSION_TYPE_STRUCTURED_BUFFER_REFERENCE:
+        case COMPILER_INSTANCE_EXPRESSION_TYPE_VARIABLE_REFERENCE:
+        case COMPILER_INSTANCE_EXPRESSION_TYPE_STRUCTURED_ACCESS:
+        case COMPILER_INSTANCE_EXPRESSION_TYPE_FLATTENED_BUFFER_ACCESS_INPUT:
+        case COMPILER_INSTANCE_EXPRESSION_TYPE_FLATTENED_BUFFER_ACCESS_OUTPUT:
+        case COMPILER_INSTANCE_EXPRESSION_TYPE_INTEGER_LITERAL:
+        case COMPILER_INSTANCE_EXPRESSION_TYPE_FLOATING_LITERAL:
+        case COMPILER_INSTANCE_EXPRESSION_TYPE_VARIABLE_DECLARATION:
+        case COMPILER_INSTANCE_EXPRESSION_TYPE_OPERATION_ARRAY_INDEX:
+        case COMPILER_INSTANCE_EXPRESSION_TYPE_OPERATION_ADD:
+        case COMPILER_INSTANCE_EXPRESSION_TYPE_OPERATION_SUBTRACT:
+        case COMPILER_INSTANCE_EXPRESSION_TYPE_OPERATION_MULTIPLY:
+        case COMPILER_INSTANCE_EXPRESSION_TYPE_OPERATION_DIVIDE:
+        case COMPILER_INSTANCE_EXPRESSION_TYPE_OPERATION_MODULUS:
+        case COMPILER_INSTANCE_EXPRESSION_TYPE_OPERATION_ASSIGN:
+        case COMPILER_INSTANCE_EXPRESSION_TYPE_OPERATION_AND:
+        case COMPILER_INSTANCE_EXPRESSION_TYPE_OPERATION_OR:
+        case COMPILER_INSTANCE_EXPRESSION_TYPE_OPERATION_EQUAL:
+        case COMPILER_INSTANCE_EXPRESSION_TYPE_OPERATION_NOT_EQUAL:
+        case COMPILER_INSTANCE_EXPRESSION_TYPE_OPERATION_LESS:
+        case COMPILER_INSTANCE_EXPRESSION_TYPE_OPERATION_GREATER:
+        case COMPILER_INSTANCE_EXPRESSION_TYPE_OPERATION_LESS_OR_EQUAL:
+        case COMPILER_INSTANCE_EXPRESSION_TYPE_OPERATION_GREATER_OR_EQUAL:
+        case COMPILER_INSTANCE_EXPRESSION_TYPE_OPERATION_BITWISE_AND:
+        case COMPILER_INSTANCE_EXPRESSION_TYPE_OPERATION_BITWISE_OR:
+        case COMPILER_INSTANCE_EXPRESSION_TYPE_OPERATION_BITWISE_XOR:
+        case COMPILER_INSTANCE_EXPRESSION_TYPE_OPERATION_BITWISE_LEFT_SHIFT:
+        case COMPILER_INSTANCE_EXPRESSION_TYPE_OPERATION_BITWISE_RIGHT_SHIFT:
+        case COMPILER_INSTANCE_EXPRESSION_TYPE_OPERATION_NEGATE:
+        case COMPILER_INSTANCE_EXPRESSION_TYPE_OPERATION_NOT:
+        case COMPILER_INSTANCE_EXPRESSION_TYPE_OPERATION_BITWISE_NOT:
+        case COMPILER_INSTANCE_EXPRESSION_TYPE_FUNCTION_CALL:
+        case COMPILER_INSTANCE_EXPRESSION_TYPE_SAMPLER_CALL:
+        case COMPILER_INSTANCE_EXPRESSION_TYPE_CONSTRUCTOR:
+            spirv_emit_expression (context, function, current_block, statement->expression, KAN_TRUE);
+            break;
+
+        case COMPILER_INSTANCE_EXPRESSION_TYPE_SCOPE:
+            // TODO: Implement.
+            break;
+
+        case COMPILER_INSTANCE_EXPRESSION_TYPE_IF:
+            // TODO: Implement.
+            break;
+
+        case COMPILER_INSTANCE_EXPRESSION_TYPE_FOR:
+            // TODO: Implement.
+            break;
+
+        case COMPILER_INSTANCE_EXPRESSION_TYPE_WHILE:
+            // TODO: Implement.
+            break;
+
+        case COMPILER_INSTANCE_EXPRESSION_TYPE_BREAK:
+            // TODO: Implement.
+            break;
+
+        case COMPILER_INSTANCE_EXPRESSION_TYPE_CONTINUE:
+            // TODO: Implement.
+            break;
+
+        case COMPILER_INSTANCE_EXPRESSION_TYPE_RETURN:
+            // TODO: Implement.
+            break;
+        }
+
+        previous_statement = statement;
+        statement = statement->next;
+    }
+
+    const kan_bool_t emitted_return =
+        previous_statement && previous_statement->expression->type == COMPILER_INSTANCE_EXPRESSION_TYPE_RETURN;
+
+    if (next_block && !emitted_return)
+    {
+        uint32_t *branch_code = spirv_new_instruction (context, &current_block->code_section, 1u);
+        branch_code[0u] |= SpvOpCodeMask & SpvOpBranch;
+        branch_code[1u] = next_block->spirv_id;
+    }
+    else if (!emitted_return)
+    {
+        if (function->source->return_type_if_vector || function->source->return_type_if_matrix ||
+            function->source->return_type_if_struct)
+        {
+            KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
+                     "[%s:%s:%s:%ld] Reached last statement of non-void function \"%s\" execution loop and it is not a "
+                     "return.",
+                     context->instance->context_log_name,
+                     previous_statement ? previous_statement->expression->module_name : "<node>",
+                     previous_statement ? previous_statement->expression->source_name : "<node>",
+                     (long) (previous_statement ? previous_statement->expression->source_line : 0u),
+                     function->source->name)
+            context->emit_result = KAN_FALSE;
+        }
+        else
+        {
+            // Emit missing return.
+            uint32_t *return_code = spirv_new_instruction (context, &current_block->code_section, 1u);
+            return_code[0u] |= SpvOpCodeMask & SpvOpReturn;
+        }
+    }
+}
+
+static inline void spirv_emit_function (struct spirv_generation_context_t *context,
+                                        struct compiler_instance_function_node_t *function)
+{
+    struct spirv_generation_function_node_t *generated_function = kan_stack_group_allocator_allocate (
+        &context->temporary_allocator, sizeof (struct spirv_generation_function_node_t),
+        _Alignof (struct spirv_generation_function_node_t));
+
+    generated_function->source = function;
+    generated_function->header_section.first = NULL;
+    generated_function->header_section.last = NULL;
+    generated_function->first_block = NULL;
+    generated_function->last_block = NULL;
+    generated_function->end_section.first = NULL;
+    generated_function->end_section.last = NULL;
+
+    generated_function->next = NULL;
+    if (context->last_function_node)
+    {
+        context->last_function_node->next = generated_function;
+    }
+    else
+    {
+        context->first_function_node = generated_function;
+    }
+
+    context->last_function_node = generated_function;
+    spirv_generate_op_name (context, function->spirv_id, function->name);
+    const struct spirv_generation_function_type_t *function_type =
+        spirv_find_or_generate_function_type (context, function);
+
+    uint32_t *definition_code = spirv_new_instruction (context, &generated_function->header_section, 5u);
+    definition_code[0u] |= SpvOpCodeMask & SpvOpFunction;
+    definition_code[1u] = function_type->return_type_id;
+    definition_code[2u] = function->spirv_id;
+    definition_code[4u] = function_type->generated_id;
+
+    kan_bool_t writes_globals = KAN_FALSE;
+    kan_bool_t reads_globals = function->first_buffer_access || function->first_sampler_access;
+
+    struct compiler_instance_buffer_access_node_t *buffer_access = function->first_buffer_access;
+    while (buffer_access)
+    {
+        switch (buffer_access->buffer->type)
+        {
+        case KAN_RPL_BUFFER_TYPE_VERTEX_ATTRIBUTE:
+        case KAN_RPL_BUFFER_TYPE_UNIFORM:
+        case KAN_RPL_BUFFER_TYPE_READ_ONLY_STORAGE:
+        case KAN_RPL_BUFFER_TYPE_INSTANCED_ATTRIBUTE:
+        case KAN_RPL_BUFFER_TYPE_INSTANCED_UNIFORM:
+        case KAN_RPL_BUFFER_TYPE_INSTANCED_READ_ONLY_STORAGE:
+            break;
+
+        case KAN_RPL_BUFFER_TYPE_VERTEX_STAGE_OUTPUT:
+            writes_globals |= function->required_stage == KAN_RPL_PIPELINE_STAGE_GRAPHICS_CLASSIC_VERTEX;
+            break;
+
+        case KAN_RPL_BUFFER_TYPE_FRAGMENT_STAGE_OUTPUT:
+            writes_globals |= function->required_stage == KAN_RPL_PIPELINE_STAGE_GRAPHICS_CLASSIC_FRAGMENT;
+            break;
+        }
+
+        buffer_access = buffer_access->next;
+    }
+
+    if (!writes_globals && !reads_globals)
+    {
+        definition_code[3u] = SpvFunctionControlConstMask;
+    }
+    else if (!reads_globals)
+    {
+        definition_code[3u] = SpvFunctionControlPureMask;
+    }
+    else
+    {
+        definition_code[3u] = SpvFunctionControlMaskNone;
+    }
+
+    struct compiler_instance_scope_variable_item_t *argument_variable = function->first_argument_variable;
+    while (argument_variable)
+    {
+        argument_variable->spirv_id = context->current_bound;
+        ++context->current_bound;
+
+        uint32_t *argument_code = spirv_new_instruction (context, &generated_function->header_section, 3u);
+        argument_code[0u] |= SpvOpCodeMask & SpvOpFunctionParameter;
+        argument_code[1u] =
+            spirv_find_or_generate_variable_type (context, &argument_variable->variable->type, 0u, KAN_TRUE);
+        argument_code[2u] = argument_variable->spirv_id;
+
+        spirv_generate_op_name (context, argument_variable->spirv_id, argument_variable->variable->name);
+        argument_variable = argument_variable->next;
+    }
+
+    uint32_t *end_code = spirv_new_instruction (context, &generated_function->end_section, 1u);
+    end_code[0u] |= SpvOpCodeMask & SpvOpFunctionEnd;
+
+    struct spirv_generation_block_t *first_block = spirv_function_new_block (context, generated_function);
+    spirv_emit_scope (context, generated_function, first_block, NULL, function->body);
 }
 
 kan_bool_t kan_rpl_compiler_instance_emit_spirv (kan_rpl_compiler_instance_t compiler_instance,
@@ -6460,10 +7441,21 @@ kan_bool_t kan_rpl_compiler_instance_emit_spirv (kan_rpl_compiler_instance_t com
     struct compiler_instance_struct_node_t *struct_node = instance->first_struct;
     while (struct_node)
     {
-        struct_node->spirv_id = context.current_bound;
+        struct_node->spirv_id_value = context.current_bound;
         ++context.current_bound;
         spirv_emit_struct_from_declaration_list (&context, struct_node->first_field, struct_node->name,
-                                                 struct_node->spirv_id);
+                                                 struct_node->spirv_id_value);
+
+        struct_node->spirv_id_function_pointer = context.current_bound;
+        ++context.current_bound;
+
+        uint32_t *pointer_code = spirv_new_instruction (&context, &context.higher_type_section, 4u);
+        pointer_code[0u] |= SpvOpCodeMask & SpvOpTypePointer;
+        pointer_code[1u] = struct_node->spirv_id_function_pointer;
+        pointer_code[2u] = SpvStorageClassFunction;
+        pointer_code[3u] = struct_node->spirv_id_value;
+
+        spirv_generate_op_name (&context, struct_node->spirv_id_function_pointer, struct_node->name);
         struct_node = struct_node->next;
     }
 
@@ -6624,10 +7616,22 @@ kan_bool_t kan_rpl_compiler_instance_emit_spirv (kan_rpl_compiler_instance_t com
         sampler = sampler->next;
     }
 
+    // Function first pass: just generate ids (needed in case of recursion).
     struct compiler_instance_function_node_t *function_node = instance->first_function;
+
     while (function_node)
     {
-        // TODO: Implement.
+        function_node->spirv_id = context.current_bound;
+        ++context.current_bound;
+        function_node = function_node->next;
+    }
+
+    // Function second pass: now we can truly generate functions.
+    function_node = instance->first_function;
+
+    while (function_node)
+    {
+        spirv_emit_function (&context, function_node);
         function_node = function_node->next;
     }
 
