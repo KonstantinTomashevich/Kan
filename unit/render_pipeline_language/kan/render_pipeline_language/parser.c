@@ -3514,16 +3514,18 @@ static kan_bool_t build_intermediate_expression (struct rpl_parser_t *instance,
                                         intermediate->expression_lists_storage.size * 2u);                             \
     }                                                                                                                  \
                                                                                                                        \
+    uint64_t *index_output =                                                                                           \
+        &((uint64_t *) intermediate->expression_lists_storage.data)[intermediate->expression_lists_storage.size];      \
+    intermediate->expression_lists_storage.size += COUNT;                                                              \
+                                                                                                                       \
     while (sub_list)                                                                                                   \
     {                                                                                                                  \
-        uint64_t *new_index = kan_dynamic_array_add_last (&intermediate->expression_lists_storage);                    \
-        KAN_ASSERT (new_index)                                                                                         \
-                                                                                                                       \
-        if (!build_intermediate_expression (instance, intermediate, sub_list->expression, new_index))                  \
+        if (!build_intermediate_expression (instance, intermediate, sub_list->expression, index_output))               \
         {                                                                                                              \
             result = KAN_FALSE;                                                                                        \
         }                                                                                                              \
                                                                                                                        \
+        ++index_output;                                                                                                \
         sub_list = sub_list->next;                                                                                     \
     }
 
