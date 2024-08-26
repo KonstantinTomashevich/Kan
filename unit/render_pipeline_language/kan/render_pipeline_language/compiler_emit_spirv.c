@@ -1224,12 +1224,12 @@ static uint32_t spirv_emit_expression (struct spirv_generation_context_t *contex
                                        struct compiler_instance_expression_node_t *expression,
                                        kan_bool_t result_should_be_pointer);
 
-static uint32_t spirv_emit_extension_instruction (struct spirv_generation_context_t *context,
-                                                  struct spirv_generation_function_node_t *function,
-                                                  struct spirv_generation_block_t *current_block,
-                                                  struct compiler_instance_expression_node_t *expression,
-                                                  uint32_t library,
-                                                  uint32_t extension)
+static inline uint32_t spirv_emit_extension_instruction (struct spirv_generation_context_t *context,
+                                                         struct spirv_generation_function_node_t *function,
+                                                         struct spirv_generation_block_t *current_block,
+                                                         struct compiler_instance_expression_node_t *expression,
+                                                         uint32_t library,
+                                                         uint32_t extension)
 {
     uint64_t argument_count = 0u;
     struct compiler_instance_expression_list_item_t *argument = expression->function_call.first_argument;
@@ -1363,17 +1363,18 @@ static uint32_t spirv_request_builtin (struct spirv_generation_context_t *contex
     return variable_id;
 }
 
-static inline uint32_t spirv_emit_inbuilt_function_call (struct spirv_generation_context_t *context,
-                                                         struct spirv_generation_function_node_t *function,
-                                                         struct spirv_generation_block_t *current_block,
-                                                         struct compiler_instance_expression_node_t *expression)
+static uint32_t spirv_emit_inbuilt_function_call (struct spirv_generation_context_t *context,
+                                                  struct spirv_generation_function_node_t *function,
+                                                  struct spirv_generation_block_t *current_block,
+                                                  struct compiler_instance_expression_node_t *expression)
 {
-    if (expression->function_call.function == &STATICS.glsl_450_sqrt)
+    if (expression->function_call.function->spirv_external_library_id != (uint32_t) SPIRV_FIXED_ID_INVALID)
     {
         return spirv_emit_extension_instruction (context, function, current_block, expression,
-                                                 (uint32_t) SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Sqrt);
+                                                 expression->function_call.function->spirv_external_library_id,
+                                                 expression->function_call.function->spirv_external_instruction_id);
     }
-    else if (expression->function_call.function == &STATICS.shader_standard_vertex_stage_output_position)
+    else if (expression->function_call.function == &STATICS.builtin_vertex_stage_output_position)
     {
         uint32_t operand_id = spirv_emit_expression (context, function, current_block,
                                                      expression->function_call.first_argument->expression, KAN_FALSE);
@@ -1385,10 +1386,10 @@ static inline uint32_t spirv_emit_inbuilt_function_call (struct spirv_generation
         // Just a store operation, has no return.
         return (uint32_t) SPIRV_FIXED_ID_INVALID;
     }
-    else if (expression->function_call.function == &STATICS.shader_standard_i1_to_f1 ||
-             expression->function_call.function == &STATICS.shader_standard_i2_to_f2 ||
-             expression->function_call.function == &STATICS.shader_standard_i3_to_f3 ||
-             expression->function_call.function == &STATICS.shader_standard_i4_to_f4)
+    else if (expression->function_call.function == &STATICS.builtin_i1_to_f1 ||
+             expression->function_call.function == &STATICS.builtin_i2_to_f2 ||
+             expression->function_call.function == &STATICS.builtin_i3_to_f3 ||
+             expression->function_call.function == &STATICS.builtin_i4_to_f4)
     {
         uint32_t operand_id = spirv_emit_expression (context, function, current_block,
                                                      expression->function_call.first_argument->expression, KAN_FALSE);
@@ -1401,6 +1402,67 @@ static inline uint32_t spirv_emit_inbuilt_function_call (struct spirv_generation
         code[1u] = expression->function_call.function->return_type_if_vector->spirv_id;
         code[2u] = result_id;
         code[3u] = operand_id;
+
+        return result_id;
+    }
+    else if (expression->function_call.function == &STATICS.builtin_f1_to_i1 ||
+             expression->function_call.function == &STATICS.builtin_f2_to_i2 ||
+             expression->function_call.function == &STATICS.builtin_f3_to_i3 ||
+             expression->function_call.function == &STATICS.builtin_f4_to_i4)
+    {
+        uint32_t operand_id = spirv_emit_expression (context, function, current_block,
+                                                     expression->function_call.first_argument->expression, KAN_FALSE);
+
+        uint32_t result_id = context->current_bound;
+        ++context->current_bound;
+
+        uint32_t *code = spirv_new_instruction (context, &current_block->code_section, 4u);
+        code[0u] = SpvOpCodeMask & SpvOpConvertFToS;
+        code[1u] = expression->function_call.function->return_type_if_vector->spirv_id;
+        code[2u] = result_id;
+        code[3u] = operand_id;
+
+        return result_id;
+    }
+    else if (expression->function_call.function == &STATICS.builtin_transpose_matrix_f3x3 ||
+             expression->function_call.function == &STATICS.builtin_transpose_matrix_f4x4)
+    {
+        uint32_t operand_id = spirv_emit_expression (context, function, current_block,
+                                                     expression->function_call.first_argument->expression, KAN_FALSE);
+
+        uint32_t result_id = context->current_bound;
+        ++context->current_bound;
+
+        uint32_t *code = spirv_new_instruction (context, &current_block->code_section, 4u);
+        code[0u] = SpvOpCodeMask & SpvOpTranspose;
+        code[1u] = expression->function_call.function->return_type_if_matrix->spirv_id;
+        code[2u] = result_id;
+        code[3u] = operand_id;
+
+        return result_id;
+    }
+    else if (expression->function_call.function == &STATICS.builtin_dot_f1 ||
+             expression->function_call.function == &STATICS.builtin_dot_f2 ||
+             expression->function_call.function == &STATICS.builtin_dot_f3 ||
+             expression->function_call.function == &STATICS.builtin_dot_f4)
+    {
+        struct compiler_instance_expression_list_item_t *left_argument = expression->function_call.first_argument;
+        struct compiler_instance_expression_list_item_t *right_argument = left_argument->next;
+
+        uint32_t left_operand_id = spirv_emit_expression (context, function, current_block,
+                                                     left_argument->expression, KAN_FALSE);
+        uint32_t right_operand_id = spirv_emit_expression (context, function, current_block,
+                                                          right_argument->expression, KAN_FALSE);
+
+        uint32_t result_id = context->current_bound;
+        ++context->current_bound;
+
+        uint32_t *code = spirv_new_instruction (context, &current_block->code_section, 5u);
+        code[0u] = SpvOpCodeMask & SpvOpDot;
+        code[1u] = expression->function_call.function->return_type_if_vector->spirv_id;
+        code[2u] = result_id;
+        code[3u] = left_operand_id;
+        code[4u] = right_operand_id;
 
         return result_id;
     }

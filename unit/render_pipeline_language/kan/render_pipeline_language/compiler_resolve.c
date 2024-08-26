@@ -3764,23 +3764,6 @@ static kan_bool_t resolve_new_used_function (struct rpl_compiler_context_t *cont
     return resolved;
 }
 
-static inline struct compiler_instance_function_node_t *resolve_inbuilt_function (
-    struct compiler_instance_function_node_t *library_first, kan_interned_string_t name)
-{
-    struct compiler_instance_function_node_t *node = library_first;
-    while (node)
-    {
-        if (node->name == name)
-        {
-            return node;
-        }
-
-        node = node->next;
-    }
-
-    return NULL;
-}
-
 static inline kan_bool_t resolve_function_check_usability (struct rpl_compiler_context_t *context,
                                                            struct compiler_instance_function_node_t *function_node,
                                                            enum kan_rpl_pipeline_stage_t context_stage)
@@ -3836,12 +3819,7 @@ static kan_bool_t resolve_function_by_name (struct rpl_compiler_context_t *conte
     switch (context->pipeline_type)
     {
     case KAN_RPL_PIPELINE_TYPE_GRAPHICS_CLASSIC:
-        if ((*output_node = resolve_inbuilt_function (STATICS.glsl_450_builtin_functions_first, function_name)))
-        {
-            return resolve_function_check_usability (context, *output_node, context_stage);
-        }
-
-        if ((*output_node = resolve_inbuilt_function (STATICS.shader_standard_builtin_functions_first, function_name)))
+        if ((*output_node = find_builtin_function (function_name)))
         {
             return resolve_function_check_usability (context, *output_node, context_stage);
         }

@@ -11,6 +11,7 @@
 
 #include <kan/api_common/alignment.h>
 #include <kan/api_common/min_max.h>
+#include <kan/container/hash_storage.h>
 #include <kan/container/stack_group_allocator.h>
 #include <kan/error/critical.h>
 #include <kan/log/logging.h>
@@ -394,6 +395,8 @@ struct compiler_instance_function_node_t
     struct compiler_instance_sampler_access_node_t *first_sampler_access;
 
     uint32_t spirv_id;
+    uint32_t spirv_external_library_id;
+    uint32_t spirv_external_instruction_id;
     const struct spirv_generation_function_type_t *spirv_function_type;
 
     kan_interned_string_t module_name;
@@ -535,11 +538,18 @@ enum spirv_fixed_ids_t
     SPIRV_FIXED_ID_END,
 };
 
+struct kan_rpl_compiler_builtin_node_t
+{
+    struct kan_hash_storage_node_t node;
+    struct compiler_instance_function_node_t *builtin;
+};
+
 struct kan_rpl_compiler_statics_t
 {
     kan_allocation_group_t rpl_allocation_group;
     kan_allocation_group_t rpl_meta_allocation_group;
     kan_allocation_group_t rpl_compiler_allocation_group;
+    kan_allocation_group_t rpl_compiler_builtin_hash_allocation_group;
     kan_allocation_group_t rpl_compiler_context_allocation_group;
     kan_allocation_group_t rpl_compiler_instance_allocation_group;
 
@@ -609,31 +619,583 @@ struct kan_rpl_compiler_statics_t
     struct compiler_instance_declaration_node_t *sampler_2d_call_signature_first_element;
     struct compiler_instance_declaration_node_t sampler_2d_call_signature_location;
 
-    // TODO: Don't call these "glsl_450_builtin", as SPIRV is not only future target.
-    //       Find a way to wrap everything into our own shader standard library that we will support.
-    //       Of course, this library should wrap most of GLSL standard functions.
-    //       Also, we need to store all standard functions in a hash storage as there is potentially lots of them.
-    //       Also, in extension-based functions specify extension library and code directly.
+    struct kan_hash_storage_t builtin_hash_storage;
 
-    struct compiler_instance_function_node_t *glsl_450_builtin_functions_first;
-    struct compiler_instance_function_node_t glsl_450_sqrt;
-    struct compiler_instance_declaration_node_t glsl_450_sqrt_arguments[1u];
+    struct compiler_instance_function_node_t builtin_vertex_stage_output_position;
+    struct compiler_instance_declaration_node_t builtin_vertex_stage_output_position_arguments[1u];
 
-    struct compiler_instance_function_node_t *shader_standard_builtin_functions_first;
-    struct compiler_instance_function_node_t shader_standard_vertex_stage_output_position;
-    struct compiler_instance_declaration_node_t shader_standard_vertex_stage_output_position_arguments[1u];
+    struct compiler_instance_function_node_t builtin_i1_to_f1;
+    struct compiler_instance_declaration_node_t builtin_i1_to_f1_arguments[1u];
 
-    struct compiler_instance_function_node_t shader_standard_i1_to_f1;
-    struct compiler_instance_declaration_node_t shader_standard_i1_to_f1_arguments[1u];
+    struct compiler_instance_function_node_t builtin_i2_to_f2;
+    struct compiler_instance_declaration_node_t builtin_i2_to_f2_arguments[1u];
 
-    struct compiler_instance_function_node_t shader_standard_i2_to_f2;
-    struct compiler_instance_declaration_node_t shader_standard_i2_to_f2_arguments[1u];
+    struct compiler_instance_function_node_t builtin_i3_to_f3;
+    struct compiler_instance_declaration_node_t builtin_i3_to_f3_arguments[1u];
 
-    struct compiler_instance_function_node_t shader_standard_i3_to_f3;
-    struct compiler_instance_declaration_node_t shader_standard_i3_to_f3_arguments[1u];
+    struct compiler_instance_function_node_t builtin_i4_to_f4;
+    struct compiler_instance_declaration_node_t builtin_i4_to_f4_arguments[1u];
 
-    struct compiler_instance_function_node_t shader_standard_i4_to_f4;
-    struct compiler_instance_declaration_node_t shader_standard_i4_to_f4_arguments[1u];
+    struct compiler_instance_function_node_t builtin_f1_to_i1;
+    struct compiler_instance_declaration_node_t builtin_f1_to_i1_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_f2_to_i2;
+    struct compiler_instance_declaration_node_t builtin_f2_to_i2_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_f3_to_i3;
+    struct compiler_instance_declaration_node_t builtin_f3_to_i3_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_f4_to_i4;
+    struct compiler_instance_declaration_node_t builtin_f4_to_i4_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_round_f1;
+    struct compiler_instance_declaration_node_t builtin_round_f1_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_round_f2;
+    struct compiler_instance_declaration_node_t builtin_round_f2_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_round_f3;
+    struct compiler_instance_declaration_node_t builtin_round_f3_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_round_f4;
+    struct compiler_instance_declaration_node_t builtin_round_f4_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_round_even_f1;
+    struct compiler_instance_declaration_node_t builtin_round_even_f1_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_round_even_f2;
+    struct compiler_instance_declaration_node_t builtin_round_even_f2_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_round_even_f3;
+    struct compiler_instance_declaration_node_t builtin_round_even_f3_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_round_even_f4;
+    struct compiler_instance_declaration_node_t builtin_round_even_f4_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_trunc_f1;
+    struct compiler_instance_declaration_node_t builtin_trunc_f1_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_trunc_f2;
+    struct compiler_instance_declaration_node_t builtin_trunc_f2_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_trunc_f3;
+    struct compiler_instance_declaration_node_t builtin_trunc_f3_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_trunc_f4;
+    struct compiler_instance_declaration_node_t builtin_trunc_f4_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_abs_f1;
+    struct compiler_instance_declaration_node_t builtin_abs_f1_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_abs_f2;
+    struct compiler_instance_declaration_node_t builtin_abs_f2_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_abs_f3;
+    struct compiler_instance_declaration_node_t builtin_abs_f3_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_abs_f4;
+    struct compiler_instance_declaration_node_t builtin_abs_f4_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_abs_i1;
+    struct compiler_instance_declaration_node_t builtin_abs_i1_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_abs_i2;
+    struct compiler_instance_declaration_node_t builtin_abs_i2_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_abs_i3;
+    struct compiler_instance_declaration_node_t builtin_abs_i3_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_abs_i4;
+    struct compiler_instance_declaration_node_t builtin_abs_i4_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_sign_f1;
+    struct compiler_instance_declaration_node_t builtin_sign_f1_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_sign_f2;
+    struct compiler_instance_declaration_node_t builtin_sign_f2_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_sign_f3;
+    struct compiler_instance_declaration_node_t builtin_sign_f3_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_sign_f4;
+    struct compiler_instance_declaration_node_t builtin_sign_f4_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_sign_i1;
+    struct compiler_instance_declaration_node_t builtin_sign_i1_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_sign_i2;
+    struct compiler_instance_declaration_node_t builtin_sign_i2_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_sign_i3;
+    struct compiler_instance_declaration_node_t builtin_sign_i3_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_sign_i4;
+    struct compiler_instance_declaration_node_t builtin_sign_i4_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_floor_f1;
+    struct compiler_instance_declaration_node_t builtin_floor_f1_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_floor_f2;
+    struct compiler_instance_declaration_node_t builtin_floor_f2_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_floor_f3;
+    struct compiler_instance_declaration_node_t builtin_floor_f3_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_floor_f4;
+    struct compiler_instance_declaration_node_t builtin_floor_f4_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_ceil_f1;
+    struct compiler_instance_declaration_node_t builtin_ceil_f1_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_ceil_f2;
+    struct compiler_instance_declaration_node_t builtin_ceil_f2_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_ceil_f3;
+    struct compiler_instance_declaration_node_t builtin_ceil_f3_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_ceil_f4;
+    struct compiler_instance_declaration_node_t builtin_ceil_f4_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_fract_f1;
+    struct compiler_instance_declaration_node_t builtin_fract_f1_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_fract_f2;
+    struct compiler_instance_declaration_node_t builtin_fract_f2_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_fract_f3;
+    struct compiler_instance_declaration_node_t builtin_fract_f3_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_fract_f4;
+    struct compiler_instance_declaration_node_t builtin_fract_f4_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_sin_f1;
+    struct compiler_instance_declaration_node_t builtin_sin_f1_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_sin_f2;
+    struct compiler_instance_declaration_node_t builtin_sin_f2_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_sin_f3;
+    struct compiler_instance_declaration_node_t builtin_sin_f3_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_sin_f4;
+    struct compiler_instance_declaration_node_t builtin_sin_f4_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_cos_f1;
+    struct compiler_instance_declaration_node_t builtin_cos_f1_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_cos_f2;
+    struct compiler_instance_declaration_node_t builtin_cos_f2_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_cos_f3;
+    struct compiler_instance_declaration_node_t builtin_cos_f3_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_cos_f4;
+    struct compiler_instance_declaration_node_t builtin_cos_f4_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_tan_f1;
+    struct compiler_instance_declaration_node_t builtin_tan_f1_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_tan_f2;
+    struct compiler_instance_declaration_node_t builtin_tan_f2_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_tan_f3;
+    struct compiler_instance_declaration_node_t builtin_tan_f3_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_tan_f4;
+    struct compiler_instance_declaration_node_t builtin_tan_f4_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_asin_f1;
+    struct compiler_instance_declaration_node_t builtin_asin_f1_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_asin_f2;
+    struct compiler_instance_declaration_node_t builtin_asin_f2_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_asin_f3;
+    struct compiler_instance_declaration_node_t builtin_asin_f3_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_asin_f4;
+    struct compiler_instance_declaration_node_t builtin_asin_f4_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_acos_f1;
+    struct compiler_instance_declaration_node_t builtin_acos_f1_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_acos_f2;
+    struct compiler_instance_declaration_node_t builtin_acos_f2_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_acos_f3;
+    struct compiler_instance_declaration_node_t builtin_acos_f3_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_acos_f4;
+    struct compiler_instance_declaration_node_t builtin_acos_f4_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_atan_f1;
+    struct compiler_instance_declaration_node_t builtin_atan_f1_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_atan_f2;
+    struct compiler_instance_declaration_node_t builtin_atan_f2_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_atan_f3;
+    struct compiler_instance_declaration_node_t builtin_atan_f3_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_atan_f4;
+    struct compiler_instance_declaration_node_t builtin_atan_f4_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_sinh_f1;
+    struct compiler_instance_declaration_node_t builtin_sinh_f1_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_sinh_f2;
+    struct compiler_instance_declaration_node_t builtin_sinh_f2_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_sinh_f3;
+    struct compiler_instance_declaration_node_t builtin_sinh_f3_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_sinh_f4;
+    struct compiler_instance_declaration_node_t builtin_sinh_f4_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_cosh_f1;
+    struct compiler_instance_declaration_node_t builtin_cosh_f1_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_cosh_f2;
+    struct compiler_instance_declaration_node_t builtin_cosh_f2_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_cosh_f3;
+    struct compiler_instance_declaration_node_t builtin_cosh_f3_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_cosh_f4;
+    struct compiler_instance_declaration_node_t builtin_cosh_f4_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_tanh_f1;
+    struct compiler_instance_declaration_node_t builtin_tanh_f1_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_tanh_f2;
+    struct compiler_instance_declaration_node_t builtin_tanh_f2_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_tanh_f3;
+    struct compiler_instance_declaration_node_t builtin_tanh_f3_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_tanh_f4;
+    struct compiler_instance_declaration_node_t builtin_tanh_f4_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_asinh_f1;
+    struct compiler_instance_declaration_node_t builtin_asinh_f1_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_asinh_f2;
+    struct compiler_instance_declaration_node_t builtin_asinh_f2_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_asinh_f3;
+    struct compiler_instance_declaration_node_t builtin_asinh_f3_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_asinh_f4;
+    struct compiler_instance_declaration_node_t builtin_asinh_f4_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_acosh_f1;
+    struct compiler_instance_declaration_node_t builtin_acosh_f1_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_acosh_f2;
+    struct compiler_instance_declaration_node_t builtin_acosh_f2_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_acosh_f3;
+    struct compiler_instance_declaration_node_t builtin_acosh_f3_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_acosh_f4;
+    struct compiler_instance_declaration_node_t builtin_acosh_f4_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_atanh_f1;
+    struct compiler_instance_declaration_node_t builtin_atanh_f1_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_atanh_f2;
+    struct compiler_instance_declaration_node_t builtin_atanh_f2_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_atanh_f3;
+    struct compiler_instance_declaration_node_t builtin_atanh_f3_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_atanh_f4;
+    struct compiler_instance_declaration_node_t builtin_atanh_f4_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_atan2_f1;
+    struct compiler_instance_declaration_node_t builtin_atan2_f1_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_atan2_f2;
+    struct compiler_instance_declaration_node_t builtin_atan2_f2_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_atan2_f3;
+    struct compiler_instance_declaration_node_t builtin_atan2_f3_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_atan2_f4;
+    struct compiler_instance_declaration_node_t builtin_atan2_f4_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_pow_f1;
+    struct compiler_instance_declaration_node_t builtin_pow_f1_arguments[2u];
+
+    struct compiler_instance_function_node_t builtin_pow_f2;
+    struct compiler_instance_declaration_node_t builtin_pow_f2_arguments[2u];
+
+    struct compiler_instance_function_node_t builtin_pow_f3;
+    struct compiler_instance_declaration_node_t builtin_pow_f3_arguments[2u];
+
+    struct compiler_instance_function_node_t builtin_pow_f4;
+    struct compiler_instance_declaration_node_t builtin_pow_f4_arguments[2u];
+
+    struct compiler_instance_function_node_t builtin_exp_f1;
+    struct compiler_instance_declaration_node_t builtin_exp_f1_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_exp_f2;
+    struct compiler_instance_declaration_node_t builtin_exp_f2_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_exp_f3;
+    struct compiler_instance_declaration_node_t builtin_exp_f3_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_exp_f4;
+    struct compiler_instance_declaration_node_t builtin_exp_f4_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_log_f1;
+    struct compiler_instance_declaration_node_t builtin_log_f1_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_log_f2;
+    struct compiler_instance_declaration_node_t builtin_log_f2_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_log_f3;
+    struct compiler_instance_declaration_node_t builtin_log_f3_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_log_f4;
+    struct compiler_instance_declaration_node_t builtin_log_f4_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_exp2_f1;
+    struct compiler_instance_declaration_node_t builtin_exp2_f1_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_exp2_f2;
+    struct compiler_instance_declaration_node_t builtin_exp2_f2_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_exp2_f3;
+    struct compiler_instance_declaration_node_t builtin_exp2_f3_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_exp2_f4;
+    struct compiler_instance_declaration_node_t builtin_exp2_f4_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_log2_f1;
+    struct compiler_instance_declaration_node_t builtin_log2_f1_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_log2_f2;
+    struct compiler_instance_declaration_node_t builtin_log2_f2_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_log2_f3;
+    struct compiler_instance_declaration_node_t builtin_log2_f3_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_log2_f4;
+    struct compiler_instance_declaration_node_t builtin_log2_f4_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_sqrt_f1;
+    struct compiler_instance_declaration_node_t builtin_sqrt_f1_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_sqrt_f2;
+    struct compiler_instance_declaration_node_t builtin_sqrt_f2_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_sqrt_f3;
+    struct compiler_instance_declaration_node_t builtin_sqrt_f3_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_sqrt_f4;
+    struct compiler_instance_declaration_node_t builtin_sqrt_f4_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_inverse_sqrt_f1;
+    struct compiler_instance_declaration_node_t builtin_inverse_sqrt_f1_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_inverse_sqrt_f2;
+    struct compiler_instance_declaration_node_t builtin_inverse_sqrt_f2_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_inverse_sqrt_f3;
+    struct compiler_instance_declaration_node_t builtin_inverse_sqrt_f3_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_inverse_sqrt_f4;
+    struct compiler_instance_declaration_node_t builtin_inverse_sqrt_f4_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_determinant_f3x3;
+    struct compiler_instance_declaration_node_t builtin_determinant_f3x3_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_determinant_f4x4;
+    struct compiler_instance_declaration_node_t builtin_determinant_f4x4_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_inverse_matrix_f3x3;
+    struct compiler_instance_declaration_node_t builtin_inverse_matrix_f3x3_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_inverse_matrix_f4x4;
+    struct compiler_instance_declaration_node_t builtin_inverse_matrix_f4x4_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_transpose_matrix_f3x3;
+    struct compiler_instance_declaration_node_t builtin_transpose_matrix_f3x3_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_transpose_matrix_f4x4;
+    struct compiler_instance_declaration_node_t builtin_transpose_matrix_f4x4_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_min_f1;
+    struct compiler_instance_declaration_node_t builtin_min_f1_arguments[2u];
+
+    struct compiler_instance_function_node_t builtin_min_f2;
+    struct compiler_instance_declaration_node_t builtin_min_f2_arguments[2u];
+
+    struct compiler_instance_function_node_t builtin_min_f3;
+    struct compiler_instance_declaration_node_t builtin_min_f3_arguments[2u];
+
+    struct compiler_instance_function_node_t builtin_min_f4;
+    struct compiler_instance_declaration_node_t builtin_min_f4_arguments[2u];
+
+    struct compiler_instance_function_node_t builtin_min_i1;
+    struct compiler_instance_declaration_node_t builtin_min_i1_arguments[2u];
+
+    struct compiler_instance_function_node_t builtin_min_i2;
+    struct compiler_instance_declaration_node_t builtin_min_i2_arguments[2u];
+
+    struct compiler_instance_function_node_t builtin_min_i3;
+    struct compiler_instance_declaration_node_t builtin_min_i3_arguments[2u];
+
+    struct compiler_instance_function_node_t builtin_min_i4;
+    struct compiler_instance_declaration_node_t builtin_min_i4_arguments[2u];
+
+    struct compiler_instance_function_node_t builtin_max_f1;
+    struct compiler_instance_declaration_node_t builtin_max_f1_arguments[2u];
+
+    struct compiler_instance_function_node_t builtin_max_f2;
+    struct compiler_instance_declaration_node_t builtin_max_f2_arguments[2u];
+
+    struct compiler_instance_function_node_t builtin_max_f3;
+    struct compiler_instance_declaration_node_t builtin_max_f3_arguments[2u];
+
+    struct compiler_instance_function_node_t builtin_max_f4;
+    struct compiler_instance_declaration_node_t builtin_max_f4_arguments[2u];
+
+    struct compiler_instance_function_node_t builtin_max_i1;
+    struct compiler_instance_declaration_node_t builtin_max_i1_arguments[2u];
+
+    struct compiler_instance_function_node_t builtin_max_i2;
+    struct compiler_instance_declaration_node_t builtin_max_i2_arguments[2u];
+
+    struct compiler_instance_function_node_t builtin_max_i3;
+    struct compiler_instance_declaration_node_t builtin_max_i3_arguments[2u];
+
+    struct compiler_instance_function_node_t builtin_max_i4;
+    struct compiler_instance_declaration_node_t builtin_max_i4_arguments[2u];
+
+    struct compiler_instance_function_node_t builtin_clamp_f1;
+    struct compiler_instance_declaration_node_t builtin_clamp_f1_arguments[3u];
+
+    struct compiler_instance_function_node_t builtin_clamp_f2;
+    struct compiler_instance_declaration_node_t builtin_clamp_f2_arguments[3u];
+
+    struct compiler_instance_function_node_t builtin_clamp_f3;
+    struct compiler_instance_declaration_node_t builtin_clamp_f3_arguments[3u];
+
+    struct compiler_instance_function_node_t builtin_clamp_f4;
+    struct compiler_instance_declaration_node_t builtin_clamp_f4_arguments[3u];
+
+    struct compiler_instance_function_node_t builtin_clamp_i1;
+    struct compiler_instance_declaration_node_t builtin_clamp_i1_arguments[3u];
+
+    struct compiler_instance_function_node_t builtin_clamp_i2;
+    struct compiler_instance_declaration_node_t builtin_clamp_i2_arguments[3u];
+
+    struct compiler_instance_function_node_t builtin_clamp_i3;
+    struct compiler_instance_declaration_node_t builtin_clamp_i3_arguments[3u];
+
+    struct compiler_instance_function_node_t builtin_clamp_i4;
+    struct compiler_instance_declaration_node_t builtin_clamp_i4_arguments[3u];
+
+    struct compiler_instance_function_node_t builtin_mix_f1;
+    struct compiler_instance_declaration_node_t builtin_mix_f1_arguments[3u];
+
+    struct compiler_instance_function_node_t builtin_mix_f2;
+    struct compiler_instance_declaration_node_t builtin_mix_f2_arguments[3u];
+
+    struct compiler_instance_function_node_t builtin_mix_f3;
+    struct compiler_instance_declaration_node_t builtin_mix_f3_arguments[3u];
+
+    struct compiler_instance_function_node_t builtin_mix_f4;
+    struct compiler_instance_declaration_node_t builtin_mix_f4_arguments[3u];
+
+    struct compiler_instance_function_node_t builtin_fma_f1;
+    struct compiler_instance_declaration_node_t builtin_fma_f1_arguments[3u];
+
+    struct compiler_instance_function_node_t builtin_fma_f2;
+    struct compiler_instance_declaration_node_t builtin_fma_f2_arguments[3u];
+
+    struct compiler_instance_function_node_t builtin_fma_f3;
+    struct compiler_instance_declaration_node_t builtin_fma_f3_arguments[3u];
+
+    struct compiler_instance_function_node_t builtin_fma_f4;
+    struct compiler_instance_declaration_node_t builtin_fma_f4_arguments[3u];
+
+    struct compiler_instance_function_node_t builtin_length_f1;
+    struct compiler_instance_declaration_node_t builtin_length_f1_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_length_f2;
+    struct compiler_instance_declaration_node_t builtin_length_f2_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_length_f3;
+    struct compiler_instance_declaration_node_t builtin_length_f3_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_length_f4;
+    struct compiler_instance_declaration_node_t builtin_length_f4_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_distance_f1;
+    struct compiler_instance_declaration_node_t builtin_distance_f1_arguments[2u];
+
+    struct compiler_instance_function_node_t builtin_distance_f2;
+    struct compiler_instance_declaration_node_t builtin_distance_f2_arguments[2u];
+
+    struct compiler_instance_function_node_t builtin_distance_f3;
+    struct compiler_instance_declaration_node_t builtin_distance_f3_arguments[2u];
+
+    struct compiler_instance_function_node_t builtin_distance_f4;
+    struct compiler_instance_declaration_node_t builtin_distance_f4_arguments[2u];
+
+    struct compiler_instance_function_node_t builtin_cross_f3;
+    struct compiler_instance_declaration_node_t builtin_cross_f3_arguments[2u];
+
+    struct compiler_instance_function_node_t builtin_dot_f1;
+    struct compiler_instance_declaration_node_t builtin_dot_f1_arguments[2u];
+
+    struct compiler_instance_function_node_t builtin_dot_f2;
+    struct compiler_instance_declaration_node_t builtin_dot_f2_arguments[2u];
+
+    struct compiler_instance_function_node_t builtin_dot_f3;
+    struct compiler_instance_declaration_node_t builtin_dot_f3_arguments[2u];
+
+    struct compiler_instance_function_node_t builtin_dot_f4;
+    struct compiler_instance_declaration_node_t builtin_dot_f4_arguments[2u];
+
+    struct compiler_instance_function_node_t builtin_normalize_f1;
+    struct compiler_instance_declaration_node_t builtin_normalize_f1_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_normalize_f2;
+    struct compiler_instance_declaration_node_t builtin_normalize_f2_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_normalize_f3;
+    struct compiler_instance_declaration_node_t builtin_normalize_f3_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_normalize_f4;
+    struct compiler_instance_declaration_node_t builtin_normalize_f4_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_reflect_f1;
+    struct compiler_instance_declaration_node_t builtin_reflect_f1_arguments[2u];
+
+    struct compiler_instance_function_node_t builtin_reflect_f2;
+    struct compiler_instance_declaration_node_t builtin_reflect_f2_arguments[2u];
+
+    struct compiler_instance_function_node_t builtin_reflect_f3;
+    struct compiler_instance_declaration_node_t builtin_reflect_f3_arguments[2u];
+
+    struct compiler_instance_function_node_t builtin_reflect_f4;
+    struct compiler_instance_declaration_node_t builtin_reflect_f4_arguments[2u];
+
+    struct compiler_instance_function_node_t builtin_refract_f1;
+    struct compiler_instance_declaration_node_t builtin_refract_f1_arguments[3u];
+
+    struct compiler_instance_function_node_t builtin_refract_f2;
+    struct compiler_instance_declaration_node_t builtin_refract_f2_arguments[3u];
+
+    struct compiler_instance_function_node_t builtin_refract_f3;
+    struct compiler_instance_declaration_node_t builtin_refract_f3_arguments[3u];
+
+    struct compiler_instance_function_node_t builtin_refract_f4;
+    struct compiler_instance_declaration_node_t builtin_refract_f4_arguments[3u];
 };
 
 extern struct kan_rpl_compiler_statics_t kan_rpl_compiler_statics;
@@ -668,6 +1230,27 @@ static inline struct inbuilt_matrix_type_t *find_inbuilt_matrix_type (kan_intern
         {
             return kan_rpl_compiler_statics.matrix_types[index];
         }
+    }
+
+    return NULL;
+}
+
+static inline struct compiler_instance_function_node_t *find_builtin_function (kan_interned_string_t name)
+{
+    const struct kan_hash_storage_bucket_t *bucket =
+        kan_hash_storage_query (&STATICS.builtin_hash_storage, (uint64_t) name);
+    struct kan_rpl_compiler_builtin_node_t *node = (struct kan_rpl_compiler_builtin_node_t *) bucket->first;
+    const struct kan_rpl_compiler_builtin_node_t *node_end =
+        (struct kan_rpl_compiler_builtin_node_t *) (bucket->last ? bucket->last->next : NULL);
+
+    while (node != node_end)
+    {
+        if (node->node.hash == (uint64_t) name)
+        {
+            return node->builtin;
+        }
+
+        node = (struct kan_rpl_compiler_builtin_node_t *) node->node.list_node.next;
     }
 
     return NULL;
