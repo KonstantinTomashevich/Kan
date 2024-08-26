@@ -13,13 +13,19 @@ add_custom_command (
 concrete_highlight_direct ("${GENERATION_SOURCE}")
 concrete_sources_direct (
         "${GENERATION_OUTPUT}"
-        "${CMAKE_CURRENT_SOURCE_DIR}/kan/render_pipeline_language/compiler.c")
+        "${CMAKE_CURRENT_SOURCE_DIR}/kan/render_pipeline_language/compiler_api_base.c"
+        "${CMAKE_CURRENT_SOURCE_DIR}/kan/render_pipeline_language/compiler_emit_meta.c"
+        "${CMAKE_CURRENT_SOURCE_DIR}/kan/render_pipeline_language/compiler_emit_spirv.c"
+        "${CMAKE_CURRENT_SOURCE_DIR}/kan/render_pipeline_language/compiler_resolve.c"
+        "${CMAKE_CURRENT_SOURCE_DIR}/kan/render_pipeline_language/compiler_statics.c")
 
 concrete_require (SCOPE PUBLIC CONCRETE_INTERFACE container)
 concrete_require (SCOPE PRIVATE ABSTRACT error log reflection THIRD_PARTY SPIRV-Headers::SPIRV-Headers)
 
 c_interface_scanner_setup (GLOB "*.h")
-reflection_generator_setup (GLOB "*.h")
+reflection_generator_setup (DIRECT
+        "${CMAKE_CURRENT_SOURCE_DIR}/kan/render_pipeline_language/compiler.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/kan/render_pipeline_language/parser.h")
 register_unit_reflection ()
 
 reflection_generator_get_output_file_path (REFLECTION_GENERATOR_OUTPUT_FILE_PATH)
