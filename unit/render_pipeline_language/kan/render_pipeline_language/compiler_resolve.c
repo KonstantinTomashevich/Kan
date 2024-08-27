@@ -1632,6 +1632,34 @@ static kan_bool_t resolve_use_struct (struct rpl_compiler_context_t *context,
     return resolve_successful;
 }
 
+static inline kan_bool_t resolve_bind_function_to_stage (struct rpl_compiler_context_t *context,
+                                                         struct compiler_instance_function_node_t *function,
+                                                         enum kan_rpl_pipeline_stage_t stage,
+                                                         uint64_t usage_line,
+                                                         kan_interned_string_t global_name)
+{
+    if (function->has_stage_specific_access)
+    {
+        if (function->required_stage != stage)
+        {
+            KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
+                     "[%s:%s:%s:%ld] Function \"%s\" is already bound to stage \"%s\" and cannot be accessed from "
+                     "other stages due to its buffer accesses, but it also tries to access global (buffer or sampler) "
+                     "\"%s\" that wants to bind function to stage \"%s\".",
+                     context->log_name, function->module_name, function->source_name, (long) usage_line, function->name,
+                     get_stage_name (function->required_stage), global_name, get_stage_name (stage))
+            return KAN_FALSE;
+        }
+    }
+    else
+    {
+        function->has_stage_specific_access = KAN_TRUE;
+        function->required_stage = stage;
+    }
+
+    return KAN_TRUE;
+}
+
 static kan_bool_t resolve_use_buffer (struct rpl_compiler_context_t *context,
                                       struct rpl_compiler_instance_t *instance,
                                       struct compiler_instance_function_node_t *function,
@@ -1673,24 +1701,9 @@ static kan_bool_t resolve_use_buffer (struct rpl_compiler_context_t *context,
 
     if (needs_binding)
     {
-        if (function->has_stage_specific_access)
+        if (!resolve_bind_function_to_stage (context, function, stage, usage_line, buffer->name))
         {
-            if (function->required_stage != stage)
-            {
-                KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
-                         "[%s:%s:%s:%ld] Function \"%s\" is already bound to stage \"%s\" and cannot be accessed from "
-                         "other stages due to its buffer accesses, but it also tries to access buffer \"%s\" that "
-                         "wants to bind function to stage \"%s\".",
-                         context->log_name, function->module_name, function->source_name, (long) usage_line,
-                         function->name, get_stage_name (function->required_stage), buffer->name,
-                         get_stage_name (stage))
-                return KAN_FALSE;
-            }
-        }
-        else
-        {
-            function->has_stage_specific_access = KAN_TRUE;
-            function->required_stage = stage;
+            return KAN_FALSE;
         }
     }
 
@@ -1698,9 +1711,11 @@ static kan_bool_t resolve_use_buffer (struct rpl_compiler_context_t *context,
     return KAN_TRUE;
 }
 
-static kan_bool_t resolve_use_sampler (struct rpl_compiler_instance_t *instance,
+static kan_bool_t resolve_use_sampler (struct rpl_compiler_context_t *context,
+                                       struct rpl_compiler_instance_t *instance,
                                        struct compiler_instance_function_node_t *function,
-                                       struct compiler_instance_sampler_node_t *sampler)
+                                       struct compiler_instance_sampler_node_t *sampler,
+                                       uint64_t usage_line)
 {
     struct compiler_instance_sampler_access_node_t *access_node = function->first_sampler_access;
     while (access_node)
@@ -1722,6 +1737,19 @@ static kan_bool_t resolve_use_sampler (struct rpl_compiler_instance_t *instance,
     function->first_sampler_access = access_node;
     access_node->sampler = sampler;
     access_node->direct_access_function = function;
+
+    enum kan_rpl_pipeline_stage_t sampling_stage;
+    switch (context->pipeline_type)
+    {
+    case KAN_RPL_PIPELINE_TYPE_GRAPHICS_CLASSIC:
+        sampling_stage = KAN_RPL_PIPELINE_STAGE_GRAPHICS_CLASSIC_FRAGMENT;
+        break;
+    }
+
+    if (!resolve_bind_function_to_stage (context, function, sampling_stage, usage_line, sampler->name))
+    {
+        return KAN_FALSE;
+    }
 
     sampler->used = KAN_TRUE;
     return KAN_TRUE;
@@ -3244,7 +3272,7 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
                 new_expression->sampler_call.sampler = sampler;
                 kan_bool_t resolved = KAN_TRUE;
 
-                if (!resolve_use_sampler (instance, resolve_scope->function, sampler))
+                if (!resolve_use_sampler (context, instance, resolve_scope->function, sampler, expression->source_line))
                 {
                     resolved = KAN_FALSE;
                 }
