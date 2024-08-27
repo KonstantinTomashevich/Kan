@@ -799,40 +799,11 @@ static kan_bool_t resolve_declarations (struct rpl_compiler_context_t *context,
 
             if (result)
             {
-                target_declaration->size = 0u;
-                target_declaration->alignment = 0u;
-
-                if (target_declaration->variable.type.if_vector)
-                {
-                    target_declaration->size =
-                        inbuilt_type_item_size[target_declaration->variable.type.if_vector->item] *
-                        target_declaration->variable.type.if_vector->items_count;
-                    target_declaration->alignment =
-                        inbuilt_type_item_size[target_declaration->variable.type.if_vector->item];
-                }
-                else if (target_declaration->variable.type.if_matrix)
-                {
-                    target_declaration->size =
-                        inbuilt_type_item_size[target_declaration->variable.type.if_matrix->item] *
-                        target_declaration->variable.type.if_matrix->rows *
-                        target_declaration->variable.type.if_matrix->columns;
-                    target_declaration->alignment =
-                        inbuilt_type_item_size[target_declaration->variable.type.if_matrix->item];
-                }
-                else if (target_declaration->variable.type.if_struct)
-                {
-                    target_declaration->size = target_declaration->variable.type.if_struct->size;
-                    target_declaration->alignment = target_declaration->variable.type.if_struct->alignment;
-                }
+                calculate_full_type_definition_size_and_alignment (
+                    &target_declaration->variable.type, 0u, &target_declaration->size, &target_declaration->alignment);
 
                 if (target_declaration->size != 0u && target_declaration->alignment != 0u)
                 {
-                    for (uint64_t dimension = 0u; dimension < target_declaration->variable.type.array_dimensions_count;
-                         ++dimension)
-                    {
-                        target_declaration->size *= target_declaration->variable.type.array_dimensions[dimension];
-                    }
-
                     current_offset = kan_apply_alignment (current_offset, target_declaration->alignment);
                     target_declaration->offset = current_offset;
                     current_offset += target_declaration->size;
@@ -1495,9 +1466,12 @@ static struct resolve_expression_alias_node_t *resolve_find_alias (struct resolv
 
 static kan_bool_t is_buffer_can_be_accessed_from_stage (struct compiler_instance_buffer_node_t *buffer,
                                                         enum kan_rpl_pipeline_stage_t stage,
-                                                        kan_bool_t *output_unique_stage_binding)
+                                                        kan_bool_t *output_unique_stage_binding,
+                                                        kan_bool_t *used_as_output)
 {
     *output_unique_stage_binding = KAN_FALSE;
+    *used_as_output = KAN_FALSE;
+
     switch (buffer->type)
     {
     case KAN_RPL_BUFFER_TYPE_VERTEX_ATTRIBUTE:
@@ -1513,11 +1487,13 @@ static kan_bool_t is_buffer_can_be_accessed_from_stage (struct compiler_instance
 
     case KAN_RPL_BUFFER_TYPE_VERTEX_STAGE_OUTPUT:
         *output_unique_stage_binding = KAN_TRUE;
+        *used_as_output = stage == KAN_RPL_PIPELINE_STAGE_GRAPHICS_CLASSIC_VERTEX;
         return stage == KAN_RPL_PIPELINE_STAGE_GRAPHICS_CLASSIC_VERTEX ||
                stage == KAN_RPL_PIPELINE_STAGE_GRAPHICS_CLASSIC_FRAGMENT;
 
     case KAN_RPL_BUFFER_TYPE_FRAGMENT_STAGE_OUTPUT:
         *output_unique_stage_binding = KAN_TRUE;
+        *used_as_output = stage == KAN_RPL_PIPELINE_STAGE_GRAPHICS_CLASSIC_FRAGMENT;
         return stage == KAN_RPL_PIPELINE_STAGE_GRAPHICS_CLASSIC_FRAGMENT;
     }
 
@@ -1689,7 +1665,7 @@ static kan_bool_t resolve_use_buffer (struct rpl_compiler_context_t *context,
     access_node->direct_access_function = function;
 
     kan_bool_t needs_binding;
-    if (!is_buffer_can_be_accessed_from_stage (buffer, stage, &needs_binding))
+    if (!is_buffer_can_be_accessed_from_stage (buffer, stage, &needs_binding, &access_node->used_as_output))
     {
         KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
                  "[%s:%s:%s:%ld] Function \"%s\" is called in stage \"%s\" and tries to access buffer \"%s\" which is "
@@ -2764,17 +2740,37 @@ static inline kan_bool_t resolve_binary_operation (struct rpl_compiler_context_t
         LOGIC_OPERATION ("||");
         return KAN_TRUE;
 
+#define EQUALITY_OPERATION(OPERATION_STRING)                                                                           \
+    CANNOT_EXECUTE_ON_ARRAYS (OPERATION_STRING)                                                                        \
+                                                                                                                       \
+    if (!left->output.type.if_vector || !right->output.type.if_vector ||                                               \
+        left->output.type.if_vector->item != INBUILT_TYPE_ITEM_INTEGER ||                                              \
+        right->output.type.if_vector->item != INBUILT_TYPE_ITEM_INTEGER)                                               \
+    {                                                                                                                  \
+        KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,                                                                  \
+                 "[%s:%s:%s:%ld] Cannot execute \"" OPERATION_STRING                                                   \
+                 "\" on \"%s\" and \"%s\", only integer vectors are supported.",                                       \
+                 context->log_name, resolve_scope->function->module_name, input_expression->source_name,               \
+                 (long) input_expression->source_line,                                                                 \
+                 get_type_name_for_logging (left->output.type.if_vector, left->output.type.if_matrix,                  \
+                                            left->output.type.if_struct),                                              \
+                 get_type_name_for_logging (right->output.type.if_vector, right->output.type.if_matrix,                \
+                                            right->output.type.if_struct))                                             \
+    }                                                                                                                  \
+                                                                                                                       \
+    result_expression->output.boolean = KAN_TRUE
+
     case KAN_RPL_BINARY_OPERATION_EQUAL:
         result_expression->type = COMPILER_INSTANCE_EXPRESSION_TYPE_OPERATION_EQUAL;
-        INTEGER_ONLY_VECTOR_OPERATION ("==");
+        EQUALITY_OPERATION ("==");
         return KAN_TRUE;
 
     case KAN_RPL_BINARY_OPERATION_NOT_EQUAL:
         result_expression->type = COMPILER_INSTANCE_EXPRESSION_TYPE_OPERATION_NOT_EQUAL;
-        INTEGER_ONLY_VECTOR_OPERATION ("!=");
+        EQUALITY_OPERATION ("!=");
         return KAN_TRUE;
 
-#define SCALAR_ONLY_OPERATION(OPERATION_STRING)                                                                        \
+#define LOGICAL_SCALAR_ONLY_OPERATION(OPERATION_STRING)                                                                \
     CANNOT_EXECUTE_ON_ARRAYS (OPERATION_STRING)                                                                        \
                                                                                                                        \
     if (!left->output.type.if_vector || !right->output.type.if_vector ||                                               \
@@ -2792,26 +2788,26 @@ static inline kan_bool_t resolve_binary_operation (struct rpl_compiler_context_t
                                             right->output.type.if_struct))                                             \
     }                                                                                                                  \
                                                                                                                        \
-    COPY_TYPE_FROM_LEFT_FOR_ELEMENTAL_OPERATION
+    result_expression->output.boolean = KAN_TRUE
 
     case KAN_RPL_BINARY_OPERATION_LESS:
         result_expression->type = COMPILER_INSTANCE_EXPRESSION_TYPE_OPERATION_LESS;
-        SCALAR_ONLY_OPERATION ("<");
+        LOGICAL_SCALAR_ONLY_OPERATION ("<");
         return KAN_TRUE;
 
     case KAN_RPL_BINARY_OPERATION_GREATER:
         result_expression->type = COMPILER_INSTANCE_EXPRESSION_TYPE_OPERATION_GREATER;
-        SCALAR_ONLY_OPERATION (">");
+        LOGICAL_SCALAR_ONLY_OPERATION (">");
         return KAN_TRUE;
 
     case KAN_RPL_BINARY_OPERATION_LESS_OR_EQUAL:
         result_expression->type = COMPILER_INSTANCE_EXPRESSION_TYPE_OPERATION_LESS_OR_EQUAL;
-        SCALAR_ONLY_OPERATION ("<=");
+        LOGICAL_SCALAR_ONLY_OPERATION ("<=");
         return KAN_TRUE;
 
     case KAN_RPL_BINARY_OPERATION_GREATER_OR_EQUAL:
         result_expression->type = COMPILER_INSTANCE_EXPRESSION_TYPE_OPERATION_GREATER_OR_EQUAL;
-        SCALAR_ONLY_OPERATION (">=");
+        LOGICAL_SCALAR_ONLY_OPERATION (">=");
         return KAN_TRUE;
 
     case KAN_RPL_BINARY_OPERATION_BITWISE_AND:
@@ -2844,8 +2840,9 @@ static inline kan_bool_t resolve_binary_operation (struct rpl_compiler_context_t
 #undef COPY_TYPE_FROM_LEFT_FOR_ELEMENTAL_OPERATION
 #undef COPY_TYPE_FROM_RIGHT_FOR_ELEMENTAL_OPERATION
 #undef INTEGER_ONLY_VECTOR_OPERATION
+#undef EQUALITY_OPERATION
 #undef LOGIC_OPERATION
-#undef SCALAR_ONLY_OPERATION
+#undef LOGICAL_SCALAR_ONLY_OPERATION
     }
 
     KAN_ASSERT (KAN_FALSE)
@@ -3471,7 +3468,7 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
                                       intermediate->expression_storage.data)[expression->for_.condition_index],
                                 &loop_expression->for_.condition))
         {
-            if (!new_expression->for_.condition->output.boolean)
+            if (!loop_expression->for_.condition->output.boolean)
             {
                 KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
                          "[%s:%s:%s:%ld] Condition of for cannot be resolved as boolean.", context->log_name,
@@ -4027,6 +4024,7 @@ kan_rpl_compiler_instance_t kan_rpl_compiler_context_resolve (kan_rpl_compiler_c
     kan_stack_group_allocator_reset (&context->resolve_allocator);
     if (successfully_resolved)
     {
+        // Here we would like to apply optimizations on compiled AST in future.
         return (kan_rpl_compiler_instance_t) instance;
     }
 

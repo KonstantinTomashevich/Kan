@@ -316,12 +316,18 @@ struct compiler_instance_for_suffix_t
     struct compiler_instance_expression_node_t *condition;
     struct compiler_instance_expression_node_t *step;
     struct compiler_instance_expression_node_t *body;
+
+    uint32_t spirv_label_break;
+    uint32_t spirv_label_continue;
 };
 
 struct compiler_instance_while_suffix_t
 {
     struct compiler_instance_expression_node_t *condition;
     struct compiler_instance_expression_node_t *body;
+
+    uint32_t spirv_label_break;
+    uint32_t spirv_label_continue;
 };
 
 struct compiler_instance_expression_output_type_t
@@ -368,6 +374,7 @@ struct compiler_instance_buffer_access_node_t
     struct compiler_instance_buffer_access_node_t *next;
     struct compiler_instance_buffer_node_t *buffer;
     struct compiler_instance_function_node_t *direct_access_function;
+    kan_bool_t used_as_output;
 };
 
 struct compiler_instance_sampler_access_node_t
@@ -1302,4 +1309,36 @@ static inline const char *get_type_name_for_logging (struct inbuilt_vector_type_
     }
 
     return "<not_a_variable_type>";
+}
+
+static inline void calculate_full_type_definition_size_and_alignment (
+    struct compiler_instance_full_type_definition_t *definition,
+    uint64_t dimension_offset,
+    uint64_t *size,
+    uint64_t *alignment)
+{
+    *size = 0u;
+    *alignment = 0u;
+
+    if (definition->if_vector)
+    {
+        *size = inbuilt_type_item_size[definition->if_vector->item] * definition->if_vector->items_count;
+        *alignment = inbuilt_type_item_size[definition->if_vector->item];
+    }
+    else if (definition->if_matrix)
+    {
+        *size = inbuilt_type_item_size[definition->if_matrix->item] * definition->if_matrix->rows *
+                definition->if_matrix->columns;
+        *alignment = inbuilt_type_item_size[definition->if_matrix->item];
+    }
+    else if (definition->if_struct)
+    {
+        *size = definition->if_struct->size;
+        *alignment = definition->if_struct->alignment;
+    }
+
+    for (uint64_t dimension = dimension_offset; dimension < definition->array_dimensions_count; ++dimension)
+    {
+        *size *= definition->array_dimensions[dimension];
+    }
 }
