@@ -1,3 +1,5 @@
+// Ported code glsl code from naga benchmark to rpl in order to use for benchmarking.
+
 vertex_attribute_buffer vertex
 {
     f3 position;
