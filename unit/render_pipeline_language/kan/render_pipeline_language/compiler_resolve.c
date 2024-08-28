@@ -1071,7 +1071,9 @@ static kan_bool_t resolve_buffers_validate_uniform_internals_alignment (
     return valid;
 }
 
-static kan_bool_t is_global_name_occupied (struct rpl_compiler_instance_t *instance, kan_interned_string_t name)
+static kan_bool_t is_global_name_occupied (struct rpl_compiler_context_t *context,
+                                           struct rpl_compiler_instance_t *instance,
+                                           kan_interned_string_t name)
 {
     struct compiler_instance_struct_node_t *struct_data = instance->first_struct;
     while (struct_data)
@@ -1117,6 +1119,17 @@ static kan_bool_t is_global_name_occupied (struct rpl_compiler_instance_t *insta
         function = function->next;
     }
 
+    for (uint64_t option_value_index = 0u; option_value_index < context->option_values.size; ++option_value_index)
+    {
+        struct rpl_compiler_context_option_value_t *value =
+            &((struct rpl_compiler_context_option_value_t *) context->option_values.data)[option_value_index];
+
+        if (value->name == name)
+        {
+            return KAN_TRUE;
+        }
+    }
+
     return KAN_FALSE;
 }
 
@@ -1155,7 +1168,7 @@ static kan_bool_t resolve_buffers (struct rpl_compiler_context_t *context,
 
         case CONDITIONAL_EVALUATION_RESULT_TRUE:
         {
-            if (is_global_name_occupied (instance, source_buffer->name))
+            if (is_global_name_occupied (context, instance, source_buffer->name))
             {
                 KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
                          "[%s:%s:%s:%ld] Cannot resolve buffer \"%s\" as its global name is already occupied.",
@@ -1331,7 +1344,7 @@ static kan_bool_t resolve_samplers (struct rpl_compiler_context_t *context,
 
         case CONDITIONAL_EVALUATION_RESULT_TRUE:
         {
-            if (is_global_name_occupied (instance, source_sampler->name))
+            if (is_global_name_occupied (context, instance, source_sampler->name))
             {
                 KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
                          "[%s:%s:%s:%ld] Cannot resolve sampler \"%s\" as its global name is already occupied.",
@@ -1403,7 +1416,8 @@ static const char *get_stage_name (enum kan_rpl_pipeline_stage_t stage)
     return "unknown_pipeline_stage";
 }
 
-static kan_bool_t check_alias_or_variable_name_is_not_occupied (struct rpl_compiler_instance_t *instance,
+static kan_bool_t check_alias_or_variable_name_is_not_occupied (struct rpl_compiler_context_t *context,
+                                                                struct rpl_compiler_instance_t *instance,
                                                                 struct resolve_expression_scope_t *resolve_scope,
                                                                 kan_interned_string_t name)
 {
@@ -1436,10 +1450,10 @@ static kan_bool_t check_alias_or_variable_name_is_not_occupied (struct rpl_compi
 
     if (resolve_scope->parent)
     {
-        return check_alias_or_variable_name_is_not_occupied (instance, resolve_scope->parent, name);
+        return check_alias_or_variable_name_is_not_occupied (context, instance, resolve_scope->parent, name);
     }
 
-    return !is_global_name_occupied (instance, name);
+    return !is_global_name_occupied (context, instance, name);
 }
 
 static struct resolve_expression_alias_node_t *resolve_find_alias (struct resolve_expression_scope_t *resolve_scope,
@@ -2873,7 +2887,7 @@ static inline kan_bool_t resolve_unary_operation (struct rpl_compiler_context_t 
         return KAN_FALSE;
     }
 
-    switch (input_expression->unary_operation.operand_index)
+    switch (input_expression->unary_operation.operation)
     {
     case KAN_RPL_UNARY_OPERATION_NEGATE:
         result_expression->type = COMPILER_INSTANCE_EXPRESSION_TYPE_OPERATION_NEGATE;
@@ -2969,7 +2983,7 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
 
         case CONDITIONAL_EVALUATION_RESULT_TRUE:
         {
-            if (!check_alias_or_variable_name_is_not_occupied (instance, resolve_scope,
+            if (!check_alias_or_variable_name_is_not_occupied (context, instance, resolve_scope,
                                                                expression->conditional_alias.name))
             {
                 KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
@@ -3088,6 +3102,33 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
             return KAN_TRUE;
         }
 
+        // Search for option value that can be used here.
+        for (uint64_t option_value_index = 0u; option_value_index < context->option_values.size; ++option_value_index)
+        {
+            struct rpl_compiler_context_option_value_t *value =
+                &((struct rpl_compiler_context_option_value_t *) context->option_values.data)[option_value_index];
+
+            if (value->name == expression->identifier)
+            {
+                switch (value->type)
+                {
+                case KAN_RPL_OPTION_TYPE_FLAG:
+                    KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
+                             "[%s:%s:%s:%ld] Detected attempt to access flag option \"%s\" value outside of constant "
+                             "expressions. It is forbidden as it can cause performance issues.",
+                             context->log_name, resolve_scope->function->module_name, expression->source_name,
+                             (long) expression->source_line, expression->identifier)
+                    return KAN_FALSE;
+
+                case KAN_RPL_OPTION_TYPE_COUNT:
+                    new_expression->type = COMPILER_INSTANCE_EXPRESSION_TYPE_INTEGER_LITERAL;
+                    new_expression->integer_literal = (int64_t) value->count_value;
+                    new_expression->output.type.if_vector = &STATICS.type_i1;
+                    return KAN_TRUE;
+                }
+            }
+        }
+
         KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
                  "[%s:%s:%s:%ld] Cannot resolve identifier \"%s\" to either variable or structured buffer access.",
                  context->log_name, resolve_scope->function->module_name, expression->source_name,
@@ -3121,7 +3162,7 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
         new_expression->type = COMPILER_INSTANCE_EXPRESSION_TYPE_VARIABLE_DECLARATION;
         kan_bool_t resolved = KAN_TRUE;
 
-        if (!check_alias_or_variable_name_is_not_occupied (instance, resolve_scope,
+        if (!check_alias_or_variable_name_is_not_occupied (context, instance, resolve_scope,
                                                            expression->variable_declaration.variable_name))
         {
             resolved = KAN_FALSE;
@@ -3203,6 +3244,8 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
         new_expression->type = COMPILER_INSTANCE_EXPRESSION_TYPE_SCOPE;
         new_expression->scope.first_variable = NULL;
         new_expression->scope.first_expression = NULL;
+        new_expression->scope.leads_to_return = KAN_FALSE;
+        new_expression->scope.leads_to_jump = KAN_FALSE;
 
         struct resolve_expression_scope_t child_scope = {
             .parent = resolve_scope,
@@ -3220,16 +3263,54 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
             const uint64_t expression_index =
                 ((uint64_t *)
                      intermediate->expression_lists_storage.data)[expression->scope.statement_list_index + index];
+
+            struct kan_rpl_expression_t *parser_expression =
+                &((struct kan_rpl_expression_t *) intermediate->expression_storage.data)[expression_index];
+
+            if (new_expression->scope.leads_to_return || new_expression->scope.leads_to_jump)
+            {
+                KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR, "[%s:%s:%s:%ld] Found code after return/break/continue.",
+                         context->log_name, resolve_scope->function->module_name, parser_expression->source_name,
+                         (long) parser_expression->source_line)
+                resolved = KAN_FALSE;
+                break;
+            }
+
             struct compiler_instance_expression_node_t *resolved_expression;
 
-            if (resolve_expression (
-                    context, instance, intermediate, &child_scope,
-                    &((struct kan_rpl_expression_t *) intermediate->expression_storage.data)[expression_index],
-                    &resolved_expression))
+            if (resolve_expression (context, instance, intermediate, &child_scope, parser_expression,
+                                    &resolved_expression))
             {
                 // Expression will be null for inactive conditionals and for conditional aliases.
                 if (resolved_expression)
                 {
+                    if (resolved_expression->type == COMPILER_INSTANCE_EXPRESSION_TYPE_RETURN)
+                    {
+                        new_expression->scope.leads_to_return = KAN_TRUE;
+                    }
+                    else if (resolved_expression->type == COMPILER_INSTANCE_EXPRESSION_TYPE_BREAK ||
+                             resolved_expression->type == COMPILER_INSTANCE_EXPRESSION_TYPE_CONTINUE)
+                    {
+                        new_expression->scope.leads_to_jump = KAN_TRUE;
+                    }
+                    else if (resolved_expression->type == COMPILER_INSTANCE_EXPRESSION_TYPE_SCOPE)
+                    {
+                        new_expression->scope.leads_to_return = resolved_expression->scope.leads_to_return;
+                        new_expression->scope.leads_to_jump = resolved_expression->scope.leads_to_jump;
+                    }
+                    else if (resolved_expression->type == COMPILER_INSTANCE_EXPRESSION_TYPE_IF)
+                    {
+                        if (resolved_expression->if_.when_false)
+                        {
+                            new_expression->scope.leads_to_return =
+                                resolved_expression->if_.when_true->scope.leads_to_return &&
+                                resolved_expression->if_.when_false->scope.leads_to_return;
+                            new_expression->scope.leads_to_jump =
+                                resolved_expression->if_.when_true->scope.leads_to_jump &&
+                                resolved_expression->if_.when_false->scope.leads_to_jump;
+                        }
+                    }
+
                     struct compiler_instance_expression_list_item_t *list_item = kan_stack_group_allocator_allocate (
                         &instance->resolve_allocator, sizeof (struct compiler_instance_expression_list_item_t),
                         _Alignof (struct compiler_instance_expression_list_item_t));
@@ -3307,18 +3388,21 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
         {
             resolved = KAN_FALSE;
         }
-
-        if (!resolve_expression_array_with_signature (
-                context, instance, intermediate, resolve_scope, new_expression,
-                &new_expression->function_call.first_argument, expression->function_call.argument_list_size,
-                expression->function_call.argument_list_index, new_expression->function_call.function->first_argument))
+        else if (!resolve_expression_array_with_signature (
+                     context, instance, intermediate, resolve_scope, new_expression,
+                     &new_expression->function_call.first_argument, expression->function_call.argument_list_size,
+                     expression->function_call.argument_list_index,
+                     new_expression->function_call.function->first_argument))
         {
             resolved = KAN_FALSE;
         }
+        else
+        {
+            new_expression->output.type.if_vector = new_expression->function_call.function->return_type_if_vector;
+            new_expression->output.type.if_matrix = new_expression->function_call.function->return_type_if_matrix;
+            new_expression->output.type.if_struct = new_expression->function_call.function->return_type_if_struct;
+        }
 
-        new_expression->output.type.if_vector = new_expression->function_call.function->return_type_if_vector;
-        new_expression->output.type.if_matrix = new_expression->function_call.function->return_type_if_matrix;
-        new_expression->output.type.if_struct = new_expression->function_call.function->return_type_if_struct;
         return resolved;
     }
 
@@ -3428,6 +3512,8 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
         // Loop must be inside scope to avoid leaking out init variable.
         new_expression->type = COMPILER_INSTANCE_EXPRESSION_TYPE_SCOPE;
         new_expression->scope.first_variable = NULL;
+        new_expression->scope.leads_to_return = KAN_FALSE;
+        new_expression->scope.leads_to_jump = KAN_FALSE;
 
         struct compiler_instance_expression_node_t *loop_expression = kan_stack_group_allocator_allocate (
             &instance->resolve_allocator, sizeof (struct compiler_instance_expression_node_t),
@@ -3678,7 +3764,7 @@ static kan_bool_t resolve_new_used_function (struct rpl_compiler_context_t *cont
                                              enum kan_rpl_pipeline_stage_t context_stage,
                                              struct compiler_instance_function_node_t **output_node)
 {
-    if (is_global_name_occupied (instance, function->name))
+    if (is_global_name_occupied (context, instance, function->name))
     {
         KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
                  "[%s:%s:%s:%ld] Cannot resolve function \"%s\" as its global name is already occupied.",
@@ -3770,6 +3856,18 @@ static kan_bool_t resolve_new_used_function (struct rpl_compiler_context_t *cont
             &function_node->body))
     {
         resolved = KAN_FALSE;
+    }
+
+    if (function_node->return_type_if_vector || function_node->return_type_if_matrix ||
+        function_node->return_type_if_struct)
+    {
+        if (!function_node->body->scope.leads_to_return)
+        {
+            KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
+                     "[%s:%s:%s:%ld] Not all paths from function \"%s\" return value.", context->log_name,
+                     intermediate->log_name, function->source_name, (long) function->source_line, function->name)
+            resolved = KAN_FALSE;
+        }
     }
 
     // Parser should not produce conditionals as function bodies anyway, so this should be impossible.
