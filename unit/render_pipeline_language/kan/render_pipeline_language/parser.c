@@ -2835,12 +2835,26 @@ static struct parser_expression_tree_node_t *parse_if_after_keyword (struct rpl_
         /*!re2c
          "else" separator+ "if" separator* "("
          {
-             if_expression->if_.false_expression = parse_if_after_keyword (parser, state);
-             if (!if_expression->if_.false_expression)
+             struct parser_expression_tree_node_t *next_if = parse_if_after_keyword (parser, state);
+             if (!next_if)
              {
                  return NULL;
              }
 
+             // Even in case of else-if false not should technically be a scope.
+             struct parser_expression_tree_node_t *scope_expression = parser_expression_tree_node_new (
+                     parser, KAN_RPL_EXPRESSION_NODE_TYPE_SCOPE, state->source_log_name, state->saved_line);
+
+             struct parser_expression_list_item_t *new_item =
+                     kan_stack_group_allocator_allocate (&parser->allocator,
+                             sizeof (struct parser_expression_list_item_t),
+                             _Alignof (struct parser_expression_list_item_t));
+
+             new_item->next = NULL;
+             new_item->expression = next_if;
+             scope_expression->scope_expressions_list = new_item;
+
+             if_expression->if_.false_expression = scope_expression;
              return if_expression;
          }
 
