@@ -1801,13 +1801,13 @@ static struct parser_expression_tree_node_t *parse_expression (struct rpl_parser
              CHECKED (parse_expression_array_access (parser, state, &expression_parse_state))
          }
 
-         @name_begin identifier @name_end separator* "{"
+         @name_begin identifier @name_end separator* "{" separator*
          {
              CHECKED (parse_expression_operand_constructor (parser, state, &expression_parse_state,
                                                             name_begin, name_end))
          }
 
-         @name_begin identifier @name_end separator* "("
+         @name_begin identifier @name_end separator* "(" separator*
          {
              CHECKED (parse_expression_operand_function_call (parser, state, &expression_parse_state,
                                                               name_begin, name_end))
@@ -2017,6 +2017,22 @@ static kan_bool_t parse_call_arguments (struct rpl_parser_t *parser,
 {
     KAN_ASSERT (output->type == KAN_RPL_EXPRESSION_NODE_TYPE_CONSTRUCTOR ||
                 output->type == KAN_RPL_EXPRESSION_NODE_TYPE_FUNCTION_CALL)
+
+    // Special case for calls without arguments.
+    if (*state->cursor == ')' || *state->cursor == '}')
+    {
+        if (output->type == KAN_RPL_EXPRESSION_NODE_TYPE_CONSTRUCTOR)
+        {
+            output->constructor.arguments = NULL;
+        }
+        else if (output->type == KAN_RPL_EXPRESSION_NODE_TYPE_FUNCTION_CALL)
+        {
+            output->function_call.arguments = NULL;
+        }
+
+        return KAN_TRUE;
+    }
+
     struct parser_expression_list_item_t *previous_item = NULL;
 
     while (KAN_TRUE)
@@ -2312,6 +2328,7 @@ static struct parser_declaration_t *parse_declarations (struct rpl_parser_t *par
                          return NULL;
                      }
 
+                     ++state->cursor;
                      break;
                  }
              }
