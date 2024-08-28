@@ -1,0 +1,72 @@
+// Improvised simple pipeline to check that single if's and chains if if's can be properly processed.
+
+vertex_attribute_buffer vertex
+{
+    f3 position;
+    f2 uv;
+};
+
+uniform_buffer uniforms
+{
+    f4x4 model_view_projection;
+};
+
+vertex_stage_output vertex_output
+{
+    f2 uv;
+};
+
+void vertex_main (void)
+{
+    vertex_output.uv = vertex.uv;
+    f4 position4 = f4 {vertex.position._0, vertex.position._1, vertex.position._2, 1.0};
+    vertex_stage_output_position (uniforms.model_view_projection * position4);
+}
+
+sampler_2d diffuse_color
+{
+    setting mag_filter "nearest";
+    setting min_filter "nearest";
+    setting mip_map_mode "nearest";
+    setting address_mode_u "repeat";
+    setting address_mode_v "repeat";
+    setting address_mode_w "repeat";
+};
+
+fragment_stage_output fragment_output
+{
+    f4 color;
+};
+
+f4 calculate_modifier (void)
+{
+    f2 fract_uv = fract_f2 (vertex_output.uv);
+    if (fract_uv._0 < 0.1 || fract_uv._0 > 0.9 ||
+        fract_uv._1 < 0.1 || fract_uv._1 > 0.9)
+    {
+        return f4 {0.2, 0.2, 0.2, 1.0};
+    }
+
+    if (fract_uv._0 < 0.5 && fract_uv._1 < 0.5)
+    {
+        return f4 {1.0, 0.0, 0.0, 1.0};
+    }
+    else if (fract_uv._0 < 0.5 && fract_uv._1 > 0.5)
+    {
+        return f4 {0.0, 1.0, 0.0, 1.0};
+    }
+    else if (fract_uv._0 > 0.5 && fract_uv._1 < 0.5)
+    {
+        return f4 {0.0, 0.0, 1.0, 1.0};
+    }
+    else
+    {
+        return f4 {1.0, 1.0, 1.0, 1.0};
+    }
+}
+
+void fragment_main (void)
+{
+    f4 base_color = diffuse_color (vertex_output.uv);
+    fragment_output.color = base_color * calculate_modifier ();
+}
