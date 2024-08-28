@@ -281,6 +281,8 @@ struct compiler_instance_scope_suffix_t
 {
     struct compiler_instance_scope_variable_item_t *first_variable;
     struct compiler_instance_expression_list_item_t *first_expression;
+    kan_bool_t leads_to_return;
+    kan_bool_t leads_to_jump;
 };
 
 struct compiler_instance_function_call_suffix_t
@@ -630,6 +632,8 @@ struct kan_rpl_compiler_statics_t
 
     struct compiler_instance_function_node_t builtin_vertex_stage_output_position;
     struct compiler_instance_declaration_node_t builtin_vertex_stage_output_position_arguments[1u];
+
+    struct compiler_instance_function_node_t builtin_pi;
 
     struct compiler_instance_function_node_t builtin_i1_to_f1;
     struct compiler_instance_declaration_node_t builtin_i1_to_f1_arguments[1u];
@@ -1203,6 +1207,15 @@ struct kan_rpl_compiler_statics_t
 
     struct compiler_instance_function_node_t builtin_refract_f4;
     struct compiler_instance_declaration_node_t builtin_refract_f4_arguments[3u];
+
+    struct compiler_instance_function_node_t builtin_expand_f3_to_f4;
+    struct compiler_instance_declaration_node_t builtin_expand_f3_to_f4_arguments[2u];
+
+    struct compiler_instance_function_node_t builtin_crop_f4_to_f3;
+    struct compiler_instance_declaration_node_t builtin_crop_f4_to_f3_arguments[2u];
+
+    struct compiler_instance_function_node_t builtin_crop_f4x4_to_f3x3;
+    struct compiler_instance_declaration_node_t builtin_crop_f4x4_to_f3x3_arguments[2u];
 };
 
 extern struct kan_rpl_compiler_statics_t kan_rpl_compiler_statics;

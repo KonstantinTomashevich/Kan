@@ -266,14 +266,14 @@ void kan_rpl_compiler_ensure_statics_initialized (void)
 #define ANY_STAGE KAN_RPL_PIPELINE_STAGE_GRAPHICS_CLASSIC_VERTEX
 
 #define BUILTIN_COMMON(NAME, RETURN_IF_VECTOR, RETURN_IF_MATRIX, IS_STAGE_SPECIFIC, REQUIRED_STAGE,                    \
-                       SPIRV_EXTERNAL_LIBRARY, SPIRV_EXTERNAL_INSTRUCTION)                                             \
+                       SPIRV_EXTERNAL_LIBRARY, SPIRV_EXTERNAL_INSTRUCTION, ARGUMENTS)                                  \
     STATICS.builtin_##NAME = (struct compiler_instance_function_node_t) {                                              \
         .next = NULL,                                                                                                  \
         .name = kan_string_intern (#NAME),                                                                             \
         .return_type_if_vector = RETURN_IF_VECTOR,                                                                     \
         .return_type_if_matrix = RETURN_IF_MATRIX,                                                                     \
         .return_type_if_struct = NULL,                                                                                 \
-        .first_argument = STATICS.builtin_##NAME##_arguments,                                                          \
+        .first_argument = ARGUMENTS,                                                                                   \
         .body = NULL,                                                                                                  \
         .has_stage_specific_access = IS_STAGE_SPECIFIC,                                                                \
         .required_stage = REQUIRED_STAGE,                                                                              \
@@ -311,11 +311,16 @@ void kan_rpl_compiler_ensure_statics_initialized (void)
         .source_line = 0u,                                                                                             \
     }
 
+#define BUILTIN_0(NAME, RETURN_IF_VECTOR, RETURN_IF_MATRIX, IS_STAGE_SPECIFIC, REQUIRED_STAGE, SPIRV_EXTERNAL_LIBRARY, \
+                  SPIRV_EXTERNAL_INSTRUCTION)                                                                          \
+    BUILTIN_COMMON (NAME, RETURN_IF_VECTOR, RETURN_IF_MATRIX, IS_STAGE_SPECIFIC, REQUIRED_STAGE,                       \
+                    SPIRV_EXTERNAL_LIBRARY, SPIRV_EXTERNAL_INSTRUCTION, NULL)
+
 #define BUILTIN_1(NAME, RETURN_IF_VECTOR, RETURN_IF_MATRIX, IS_STAGE_SPECIFIC, REQUIRED_STAGE, SPIRV_EXTERNAL_LIBRARY, \
                   SPIRV_EXTERNAL_INSTRUCTION, ARGUMENT_1_NAME, ARGUMENT_1_IF_VECTOR, ARGUMENT_1_IF_MATRIX)             \
     BUILTIN_ARGUMENT (NAME, 0u, NULL, ARGUMENT_1_NAME, ARGUMENT_1_IF_VECTOR, ARGUMENT_1_IF_MATRIX);                    \
     BUILTIN_COMMON (NAME, RETURN_IF_VECTOR, RETURN_IF_MATRIX, IS_STAGE_SPECIFIC, REQUIRED_STAGE,                       \
-                    SPIRV_EXTERNAL_LIBRARY, SPIRV_EXTERNAL_INSTRUCTION)
+                    SPIRV_EXTERNAL_LIBRARY, SPIRV_EXTERNAL_INSTRUCTION, STATICS.builtin_##NAME##_arguments)
 
 #define BUILTIN_2(NAME, RETURN_IF_VECTOR, RETURN_IF_MATRIX, IS_STAGE_SPECIFIC, REQUIRED_STAGE, SPIRV_EXTERNAL_LIBRARY, \
                   SPIRV_EXTERNAL_INSTRUCTION, ARGUMENT_1_NAME, ARGUMENT_1_IF_VECTOR, ARGUMENT_1_IF_MATRIX,             \
@@ -324,7 +329,7 @@ void kan_rpl_compiler_ensure_statics_initialized (void)
                       ARGUMENT_1_IF_MATRIX);                                                                           \
     BUILTIN_ARGUMENT (NAME, 1u, NULL, ARGUMENT_2_NAME, ARGUMENT_2_IF_VECTOR, ARGUMENT_2_IF_MATRIX);                    \
     BUILTIN_COMMON (NAME, RETURN_IF_VECTOR, RETURN_IF_MATRIX, IS_STAGE_SPECIFIC, REQUIRED_STAGE,                       \
-                    SPIRV_EXTERNAL_LIBRARY, SPIRV_EXTERNAL_INSTRUCTION)
+                    SPIRV_EXTERNAL_LIBRARY, SPIRV_EXTERNAL_INSTRUCTION, STATICS.builtin_##NAME##_arguments)
 
 #define BUILTIN_3(NAME, RETURN_IF_VECTOR, RETURN_IF_MATRIX, IS_STAGE_SPECIFIC, REQUIRED_STAGE, SPIRV_EXTERNAL_LIBRARY, \
                   SPIRV_EXTERNAL_INSTRUCTION, ARGUMENT_1_NAME, ARGUMENT_1_IF_VECTOR, ARGUMENT_1_IF_MATRIX,             \
@@ -336,10 +341,12 @@ void kan_rpl_compiler_ensure_statics_initialized (void)
                       ARGUMENT_2_IF_MATRIX);                                                                           \
     BUILTIN_ARGUMENT (NAME, 2u, NULL, ARGUMENT_3_NAME, ARGUMENT_3_IF_VECTOR, ARGUMENT_3_IF_MATRIX);                    \
     BUILTIN_COMMON (NAME, RETURN_IF_VECTOR, RETURN_IF_MATRIX, IS_STAGE_SPECIFIC, REQUIRED_STAGE,                       \
-                    SPIRV_EXTERNAL_LIBRARY, SPIRV_EXTERNAL_INSTRUCTION)
+                    SPIRV_EXTERNAL_LIBRARY, SPIRV_EXTERNAL_INSTRUCTION, STATICS.builtin_##NAME##_arguments)
 
         BUILTIN_1 (vertex_stage_output_position, NULL, NULL, KAN_TRUE, KAN_RPL_PIPELINE_STAGE_GRAPHICS_CLASSIC_VERTEX,
                    SPIRV_INTERNAL, SPIRV_INTERNAL, "position", &STATICS.type_f4, NULL);
+
+        BUILTIN_0 (pi, &STATICS.type_f1, NULL, KAN_FALSE, ANY_STAGE, SPIRV_INTERNAL, SPIRV_INTERNAL);
 
         BUILTIN_1 (i1_to_f1, &STATICS.type_f1, NULL, KAN_FALSE, ANY_STAGE, SPIRV_INTERNAL, SPIRV_INTERNAL, "value",
                    &STATICS.type_i1, NULL);
@@ -784,6 +791,15 @@ void kan_rpl_compiler_ensure_statics_initialized (void)
         BUILTIN_3 (refract_f4, &STATICS.type_f4, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY,
                    GLSLstd450Refract, "incident", &STATICS.type_f4, NULL, "normal", &STATICS.type_f4, NULL,
                    "refraction", &STATICS.type_f1, NULL);
+
+        BUILTIN_2 (expand_f3_to_f4, &STATICS.type_f4, NULL, KAN_FALSE, ANY_STAGE, SPIRV_INTERNAL, SPIRV_INTERNAL, "v3",
+                   &STATICS.type_f3, NULL, "last_element", &STATICS.type_f1, NULL);
+
+        BUILTIN_1 (crop_f4_to_f3, &STATICS.type_f3, NULL, KAN_FALSE, ANY_STAGE, SPIRV_INTERNAL, SPIRV_INTERNAL, "v4",
+                   &STATICS.type_f4, NULL);
+
+        BUILTIN_1 (crop_f4x4_to_f3x3, NULL, &STATICS.type_f3x3, KAN_FALSE, ANY_STAGE, SPIRV_INTERNAL, SPIRV_INTERNAL,
+                   "v4", NULL, &STATICS.type_f4x4);
 
 #undef BUILTIN_COMMON
 #undef BUILTIN_ARGUMENT
