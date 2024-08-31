@@ -229,7 +229,8 @@ void kan_rpl_compiler_instance_destroy (kan_rpl_compiler_instance_t compiler_ins
 {
     struct rpl_compiler_instance_t *instance = (struct rpl_compiler_instance_t *) compiler_instance;
     kan_stack_group_allocator_shutdown (&instance->resolve_allocator);
-    kan_free_general (STATICS.rpl_compiler_instance_allocation_group, instance, sizeof (struct rpl_compiler_instance_t));
+    kan_free_general (STATICS.rpl_compiler_instance_allocation_group, instance,
+                      sizeof (struct rpl_compiler_instance_t));
 }
 
 void kan_rpl_compiler_context_destroy (kan_rpl_compiler_context_t compiler_context)

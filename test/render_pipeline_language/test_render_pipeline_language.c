@@ -88,7 +88,7 @@ KAN_TEST_CASE (generic)
         kan_rpl_compiler_context_create (KAN_RPL_PIPELINE_TYPE_GRAPHICS_CLASSIC, kan_string_intern ("variant_test"));
 
     kan_rpl_compiler_context_use_module (compiler_context, &intermediate);
-    kan_rpl_compiler_context_set_option_count(compiler_context, kan_string_intern ("max_joints"), 1024u);
+    kan_rpl_compiler_context_set_option_count (compiler_context, kan_string_intern ("max_joints"), 1024u);
     kan_rpl_compiler_context_set_option_flag (compiler_context, kan_string_intern ("wireframe"), KAN_TRUE);
 
     kan_rpl_compiler_instance_t meta_instance = kan_rpl_compiler_context_resolve (compiler_context, 0u, NULL);
