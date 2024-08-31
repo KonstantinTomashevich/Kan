@@ -23,8 +23,9 @@ shared_library_copy_linked_artefacts ()
 # We need higher timeout for benchmark test.
 set (TEST_TIMEOUT 10)
 
-if (KAN_ENABLE_ADDRESS_SANITIZER)
+if (KAN_ENABLE_ADDRESS_SANITIZER OR WIN32)
     # And with address sanitizer benchmark test is very long.
+    # For some reason, on Windows in debug mode allocations are also super expensive, therefore we need bigger timeout.
     set (TEST_TIMEOUT 60)
 endif ()
 
