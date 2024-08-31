@@ -7,20 +7,26 @@
 #include <kan/container/dynamic_array.h>
 #include <kan/container/interned_string.h>
 
+/// \file
+/// \brief Contains declarations for parse step of render pipeline language and intermediate format declaration.
+
 KAN_C_HEADER_BEGIN
 
+/// \brief Supported option scopes.
 enum kan_rpl_option_scope_t
 {
     KAN_RPL_OPTION_SCOPE_GLOBAL = 0u,
     KAN_RPL_OPTION_SCOPE_INSTANCE,
 };
 
+/// \brief Supported option types.
 enum kan_rpl_option_type_t
 {
     KAN_RPL_OPTION_TYPE_FLAG = 0u,
     KAN_RPL_OPTION_TYPE_COUNT,
 };
 
+/// \brief Defines intermediate format to store parsed option.
 struct kan_rpl_option_t
 {
     kan_interned_string_t name;
@@ -39,6 +45,7 @@ struct kan_rpl_option_t
     };
 };
 
+/// \brief Enumerates supported binary operations.
 enum kan_rpl_binary_operation_t
 {
     KAN_RPL_BINARY_OPERATION_FIELD_ACCESS = 0u,
@@ -64,6 +71,7 @@ enum kan_rpl_binary_operation_t
     KAN_RPL_BINARY_OPERATION_BITWISE_RSHIFT,
 };
 
+/// \brief Enumerates supported unary operations.
 enum kan_rpl_unary_operation_t
 {
     KAN_RPL_UNARY_OPERATION_NEGATE = 0u,
@@ -71,6 +79,7 @@ enum kan_rpl_unary_operation_t
     KAN_RPL_UNARY_OPERATION_BITWISE_NOT,
 };
 
+/// \brief Enumerates supported expression types.
 enum kan_rpl_expression_type_t
 {
     KAN_RPL_EXPRESSION_NODE_TYPE_NOPE = 0u,
@@ -93,8 +102,10 @@ enum kan_rpl_expression_type_t
     KAN_RPL_EXPRESSION_NODE_TYPE_RETURN,
 };
 
+/// \brief Expression index used to specify absence of expression.
 #define KAN_RPL_EXPRESSION_INDEX_NONE UINT64_MAX
 
+/// \brief Additional expression data for variable declarations.
 struct kan_rpl_variable_declaration_data_t
 {
     kan_interned_string_t type_name;
@@ -103,6 +114,7 @@ struct kan_rpl_variable_declaration_data_t
     uint64_t array_size_expression_list_index;
 };
 
+/// \brief Additional expression data for binary operations.
 struct kan_rpl_binary_operation_data_t
 {
     enum kan_rpl_binary_operation_t operation;
@@ -110,18 +122,21 @@ struct kan_rpl_binary_operation_data_t
     uint64_t right_operand_index;
 };
 
+/// \brief Additional expression data for unary operations.
 struct kan_rpl_unary_operation_data_t
 {
     enum kan_rpl_unary_operation_t operation;
     uint64_t operand_index;
 };
 
+/// \brief Additional expression data for scopes.
 struct kan_rpl_scope_data_t
 {
     uint64_t statement_list_size;
     uint64_t statement_list_index;
 };
 
+/// \brief Additional expression data for function call.
 struct kan_rpl_function_call_data_t
 {
     kan_interned_string_t name;
@@ -129,6 +144,7 @@ struct kan_rpl_function_call_data_t
     uint64_t argument_list_index;
 };
 
+/// \brief Additional expression data for constructor call.
 struct kan_rpl_constructor_data_t
 {
     kan_interned_string_t type_name;
@@ -136,6 +152,7 @@ struct kan_rpl_constructor_data_t
     uint64_t argument_list_index;
 };
 
+/// \brief Additional expression data for if construction.
 struct kan_rpl_if_data_t
 {
     uint64_t condition_index;
@@ -143,6 +160,7 @@ struct kan_rpl_if_data_t
     uint64_t false_index;
 };
 
+/// \brief Additional expression data for for construction.
 struct kan_rpl_for_data_t
 {
     uint64_t init_index;
@@ -151,18 +169,21 @@ struct kan_rpl_for_data_t
     uint64_t body_index;
 };
 
+/// \brief Additional expression data for while construction.
 struct kan_rpl_while_data_t
 {
     uint64_t condition_index;
     uint64_t body_index;
 };
 
+/// \brief Additional expression data for conditional scope.
 struct kan_rpl_conditional_scope_data_t
 {
     uint64_t condition_index;
     uint64_t body_index;
 };
 
+/// \brief Additional expression data for conditional alias.
 struct kan_rpl_conditional_alias_data_t
 {
     uint64_t condition_index;
@@ -170,6 +191,7 @@ struct kan_rpl_conditional_alias_data_t
     uint64_t expression_index;
 };
 
+/// \brief Defines structure that holds one expression data.
 struct kan_rpl_expression_t
 {
     enum kan_rpl_expression_type_t type;
@@ -240,6 +262,7 @@ struct kan_rpl_expression_t
     uint32_t source_line;
 };
 
+/// \brief Enumerates supported setting types.
 enum kan_rpl_setting_type_t
 {
     KAN_RPL_SETTING_TYPE_FLAG = 0u,
@@ -248,6 +271,7 @@ enum kan_rpl_setting_type_t
     KAN_RPL_SETTING_TYPE_STRING,
 };
 
+/// \brief Defines structure that holds one setting data.
 struct kan_rpl_setting_t
 {
     kan_interned_string_t name;
@@ -279,6 +303,7 @@ struct kan_rpl_setting_t
     uint32_t source_line;
 };
 
+/// \brief Defines structure that holds one declaration data: either field or function argument.
 struct kan_rpl_declaration_t
 {
     kan_interned_string_t type_name;
@@ -300,6 +325,7 @@ struct kan_rpl_declaration_t
     uint32_t source_line;
 };
 
+/// \brief Defines structure that holds structure data.
 struct kan_rpl_struct_t
 {
     kan_interned_string_t name;
@@ -318,6 +344,7 @@ RENDER_PIPELINE_LANGUAGE_API void kan_rpl_struct_init (struct kan_rpl_struct_t *
 
 RENDER_PIPELINE_LANGUAGE_API void kan_rpl_struct_shutdown (struct kan_rpl_struct_t *instance);
 
+/// \brief Enumerates supported buffer types.
 enum kan_rpl_buffer_type_t
 {
     KAN_RPL_BUFFER_TYPE_VERTEX_ATTRIBUTE = 0u,
@@ -334,6 +361,7 @@ enum kan_rpl_buffer_type_t
     KAN_RPL_BUFFER_TYPE_FRAGMENT_STAGE_OUTPUT,
 };
 
+/// \brief Defines structure that holds buffer data.
 struct kan_rpl_buffer_t
 {
     kan_interned_string_t name;
@@ -353,11 +381,13 @@ RENDER_PIPELINE_LANGUAGE_API void kan_rpl_buffer_init (struct kan_rpl_buffer_t *
 
 RENDER_PIPELINE_LANGUAGE_API void kan_rpl_buffer_shutdown (struct kan_rpl_buffer_t *instance);
 
+/// \brief Enumerates supported sampler types.
 enum kan_rpl_sampler_type_t
 {
     KAN_RPL_SAMPLER_TYPE_2D = 0u,
 };
 
+/// \brief Defines structure that holds sampler data.
 struct kan_rpl_sampler_t
 {
     kan_interned_string_t name;
@@ -377,6 +407,7 @@ RENDER_PIPELINE_LANGUAGE_API void kan_rpl_sampler_init (struct kan_rpl_sampler_t
 
 RENDER_PIPELINE_LANGUAGE_API void kan_rpl_sampler_shutdown (struct kan_rpl_sampler_t *instance);
 
+/// \brief Defines structure that holds function data.
 struct kan_rpl_function_t
 {
     kan_interned_string_t return_type_name;
@@ -398,39 +429,55 @@ RENDER_PIPELINE_LANGUAGE_API void kan_rpl_function_init (struct kan_rpl_function
 
 RENDER_PIPELINE_LANGUAGE_API void kan_rpl_function_shutdown (struct kan_rpl_function_t *instance);
 
+/// \brief Enumerates supported pipeline types.
 enum kan_rpl_pipeline_type_t
 {
     KAN_RPL_PIPELINE_TYPE_GRAPHICS_CLASSIC = 0u,
 };
 
+/// \brief Defines format for storing parsed render pipeline language data.
 struct kan_rpl_intermediate_t
 {
+    /// \brief Name for logging, so user can understand from what this data was generated.
     kan_interned_string_t log_name;
 
+    /// \brief Array of parsed options.
     /// \meta reflection_dynamic_array_type = "struct kan_rpl_option_t"
     struct kan_dynamic_array_t options;
 
+    /// \brief Array of parsed settings.
     /// \meta reflection_dynamic_array_type = "struct kan_rpl_setting_t"
     struct kan_dynamic_array_t settings;
 
+    /// \brief Array of parsed structs.
     /// \meta reflection_dynamic_array_type = "struct kan_rpl_struct_t"
     struct kan_dynamic_array_t structs;
 
+    /// \brief Array of parsed buffers.
     /// \meta reflection_dynamic_array_type = "struct kan_rpl_buffer_t"
     struct kan_dynamic_array_t buffers;
 
+    /// \brief Array of parsed samplers.
     /// \meta reflection_dynamic_array_type = "struct kan_rpl_sampler_t"
     struct kan_dynamic_array_t samplers;
 
+    /// \brief Array of parsed functions.
     /// \meta reflection_dynamic_array_type = "struct kan_rpl_function_t"
     struct kan_dynamic_array_t functions;
 
+    /// \brief Array of parsed expressions.
+    /// \details Expression are stored in special array for better performance
+    ///          through better utilization of memory caching techniques.
     /// \meta reflection_dynamic_array_type = "struct kan_rpl_expression_t"
     struct kan_dynamic_array_t expression_storage;
 
+    /// \brief Array that is used to store expression indices for expression lists.
+    /// \details For the same reason as expressions, lists of expression indices are stored in one continuous array.
     /// \meta reflection_dynamic_array_type = "uint64_t"
     struct kan_dynamic_array_t expression_lists_storage;
 
+    /// \brief Array that is used to store all meta tags for declarations.
+    /// \details For the same reason as expressions, lists of meta tags are stored in one continuous array.
     /// \meta reflection_dynamic_array_type = "kan_interned_string_t"
     struct kan_dynamic_array_t meta_lists_storage;
 };
@@ -447,15 +494,19 @@ enum kan_rpl_pipeline_stage_t
 
 typedef uint64_t kan_rpl_parser_t;
 
+/// \brief Creates new instance of render pipeline language parser.
 RENDER_PIPELINE_LANGUAGE_API kan_rpl_parser_t kan_rpl_parser_create (kan_interned_string_t log_name);
 
+/// \brief Parses given string as source and appends it to previous parsed data if any.
 RENDER_PIPELINE_LANGUAGE_API kan_bool_t kan_rpl_parser_add_source (kan_rpl_parser_t parser,
                                                                    const char *source,
                                                                    kan_interned_string_t log_name);
 
+/// \brief Builds intermediate structure from parsed data.
 RENDER_PIPELINE_LANGUAGE_API kan_bool_t kan_rpl_parser_build_intermediate (kan_rpl_parser_t parser,
                                                                            struct kan_rpl_intermediate_t *output);
 
+/// \brief Destroys given render pipeline language parser.
 RENDER_PIPELINE_LANGUAGE_API void kan_rpl_parser_destroy (kan_rpl_parser_t parser);
 
 KAN_C_HEADER_END
