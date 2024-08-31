@@ -20,7 +20,14 @@ shared_library_include (
 shared_library_verify ()
 shared_library_copy_linked_artefacts ()
 
-# We need higher timeout for benchmark test because it takes very long time when address sanitizer is enabled.
+# We need higher timeout for benchmark test.
+set (TEST_TIMEOUT 10)
+
+if (KAN_ENABLE_ADDRESS_SANITIZER)
+    # And with address sanitizer benchmark test is very long.
+    set (TEST_TIMEOUT 60)
+endif ()
+
 kan_setup_tests (
         TEST_UNIT test_render_pipeline_language TEST_SHARED_LIBRARY test_render_pipeline_language_library
-        PROPERTIES TIMEOUT 20)
+        PROPERTIES TIMEOUT ${TEST_TIMEOUT})
