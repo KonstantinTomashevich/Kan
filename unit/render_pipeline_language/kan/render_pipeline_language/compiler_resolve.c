@@ -3355,7 +3355,7 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
                     resolved = KAN_FALSE;
                 }
 
-                struct compiler_instance_declaration_node_t *signature_first_element;
+                struct compiler_instance_declaration_node_t *signature_first_element = NULL;
                 switch (sampler->type)
                 {
                 case KAN_RPL_SAMPLER_TYPE_2D:

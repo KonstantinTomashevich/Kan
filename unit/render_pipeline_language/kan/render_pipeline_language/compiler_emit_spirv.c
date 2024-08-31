@@ -1668,7 +1668,7 @@ static inline uint32_t spirv_emit_access_chain (struct spirv_generation_context_
     ++context->current_bound;
 
     uint32_t result_value_type = spirv_find_or_generate_variable_type (context, &top_expression->output.type, 0u);
-    uint32_t result_pointer_type;
+    uint32_t result_pointer_type = (uint32_t) SPIRV_FIXED_ID_INVALID;
 
     switch (root_expression->type)
     {
@@ -1799,7 +1799,7 @@ SPIRV_EMIT_VECTOR_ARITHMETIC (div, SpvOpFDiv, SpvOpSDiv)
     {                                                                                                                  \
         uint32_t column_result_ids[4u];                                                                                \
         KAN_ASSERT (type->columns <= 4u)                                                                               \
-        struct inbuilt_vector_type_t *column_type;                                                                     \
+        struct inbuilt_vector_type_t *column_type = NULL;                                                              \
                                                                                                                        \
         switch (type->item)                                                                                            \
         {                                                                                                              \
@@ -2573,7 +2573,7 @@ static uint32_t spirv_emit_expression (struct spirv_generation_context_t *contex
         uint32_t result_id = context->current_bound;                                                                   \
         ++context->current_bound;                                                                                      \
                                                                                                                        \
-        uint32_t operation;                                                                                            \
+        uint32_t operation = SpvOpCodeMask;                                                                            \
         switch (expression->binary_operation.left_operand->output.type.if_vector->item)                                \
         {                                                                                                              \
         case INBUILT_TYPE_ITEM_FLOAT:                                                                                  \
@@ -2650,7 +2650,7 @@ static uint32_t spirv_emit_expression (struct spirv_generation_context_t *contex
 
         if (expression->output.type.if_vector)
         {
-            uint32_t operation;
+            uint32_t operation = SpvOpCodeMask;
             switch (expression->output.type.if_vector->item)
             {
             case INBUILT_TYPE_ITEM_FLOAT:
@@ -2670,7 +2670,7 @@ static uint32_t spirv_emit_expression (struct spirv_generation_context_t *contex
         }
         else if (expression->output.type.if_matrix)
         {
-            uint32_t constant_id;
+            uint32_t constant_id = (uint32_t) SPIRV_FIXED_ID_INVALID;
             switch (expression->output.type.if_matrix->item)
             {
             case INBUILT_TYPE_ITEM_FLOAT:
