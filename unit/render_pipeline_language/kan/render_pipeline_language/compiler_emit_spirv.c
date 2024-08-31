@@ -152,7 +152,7 @@ struct spirv_generation_context_t
 
 static inline uint32_t *spirv_new_instruction (struct spirv_generation_context_t *context,
                                                struct spirv_arbitrary_instruction_section_t *section,
-                                               uint32_t word_count)
+                                               uint64_t word_count)
 {
     struct spirv_arbitrary_instruction_item_t *item = kan_stack_group_allocator_allocate (
         &context->temporary_allocator,
@@ -160,7 +160,7 @@ static inline uint32_t *spirv_new_instruction (struct spirv_generation_context_t
         _Alignof (struct spirv_arbitrary_instruction_item_t));
 
     item->next = NULL;
-    item->code[0u] = word_count << SpvWordCountShift;
+    item->code[0u] = ((uint32_t) word_count) << SpvWordCountShift;
 
     if (section->last)
     {
@@ -173,7 +173,7 @@ static inline uint32_t *spirv_new_instruction (struct spirv_generation_context_t
         section->last = item;
     }
 
-    context->code_word_count += word_count;
+    context->code_word_count += (uint32_t) word_count;
     return item->code;
 }
 
