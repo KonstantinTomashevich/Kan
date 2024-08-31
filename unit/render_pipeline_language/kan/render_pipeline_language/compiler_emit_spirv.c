@@ -1,3 +1,5 @@
+// It seems like we need this define for M_PI for MSVC.
+#define _USE_MATH_DEFINES
 #include <math.h>
 
 #include <spirv/unified1/spirv.h>
@@ -987,7 +989,7 @@ static uint32_t spirv_find_or_generate_variable_type (struct spirv_generation_co
     array_stride_code[0u] |= SpvOpCodeMask & SpvOpDecorate;
     array_stride_code[1u] = array_type_id;
     array_stride_code[2u] = SpvDecorationArrayStride;
-    array_stride_code[3u] = base_size;
+    array_stride_code[3u] = (uint32_t) base_size;
 
     struct spirv_generation_array_type_t *new_array_type = kan_stack_group_allocator_allocate (
         &context->temporary_allocator, sizeof (struct spirv_generation_array_type_t),
@@ -1073,22 +1075,22 @@ static inline void spirv_emit_struct_from_declaration_list (struct spirv_generat
     }
 }
 
-static inline void spirv_emit_location (struct spirv_generation_context_t *context, uint32_t for_id, uint32_t location)
+static inline void spirv_emit_location (struct spirv_generation_context_t *context, uint32_t for_id, uint64_t location)
 {
     uint32_t *location_code = spirv_new_instruction (context, &context->decoration_section, 4u);
     location_code[0u] |= SpvOpCodeMask & SpvOpDecorate;
     location_code[1u] = for_id;
     location_code[2u] = SpvDecorationLocation;
-    location_code[3u] = location;
+    location_code[3u] = (uint32_t) location;
 }
 
-static inline void spirv_emit_binding (struct spirv_generation_context_t *context, uint32_t for_id, uint32_t binding)
+static inline void spirv_emit_binding (struct spirv_generation_context_t *context, uint32_t for_id, uint64_t binding)
 {
     uint32_t *binding_code = spirv_new_instruction (context, &context->decoration_section, 4u);
     binding_code[0u] |= SpvOpCodeMask & SpvOpDecorate;
     binding_code[1u] = for_id;
     binding_code[2u] = SpvDecorationBinding;
-    binding_code[3u] = binding;
+    binding_code[3u] = (uint32_t) binding;
 }
 
 static inline void spirv_emit_descriptor_set (struct spirv_generation_context_t *context,
@@ -1250,7 +1252,7 @@ static struct spirv_generation_function_type_t *spirv_find_or_generate_function_
 
 static inline struct spirv_generation_block_t *spirv_function_new_block (struct spirv_generation_context_t *context,
                                                                          struct spirv_generation_function_node_t *node,
-                                                                         uint64_t block_id)
+                                                                         uint32_t block_id)
 {
     struct spirv_generation_block_t *block =
         kan_stack_group_allocator_allocate (&context->temporary_allocator, sizeof (struct spirv_generation_block_t),
@@ -3449,7 +3451,7 @@ kan_bool_t kan_rpl_compiler_instance_emit_spirv (kan_rpl_compiler_instance_t com
                 array_stride_code[0u] |= SpvOpCodeMask & SpvOpDecorate;
                 array_stride_code[1u] = runtime_array_id;
                 array_stride_code[2u] = SpvDecorationArrayStride;
-                array_stride_code[3u] = buffer->size;
+                array_stride_code[3u] = (uint32_t) buffer->size;
 
                 spirv_generate_op_name (&context, real_buffer_struct_id, buffer->name);
                 spirv_generate_op_member_name (&context, real_buffer_struct_id, 0u, "instanced_data");
