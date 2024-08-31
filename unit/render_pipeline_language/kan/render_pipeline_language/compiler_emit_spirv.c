@@ -1495,7 +1495,6 @@ static uint32_t *spirv_fill_access_chain_elements (struct spirv_generation_conte
 
         for (uint64_t index = 0u; index < top_expression->structured_access.access_chain_length; ++index)
         {
-            KAN_ASSERT (top_expression->structured_access.access_chain_indices[index] >= 0u)
             KAN_ASSERT (top_expression->structured_access.access_chain_indices[index] < INT32_MAX)
             uint32_t constant_id = spirv_request_i1_constant (
                 context, (int32_t) top_expression->structured_access.access_chain_indices[index]);

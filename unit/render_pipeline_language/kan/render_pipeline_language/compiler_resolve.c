@@ -458,7 +458,7 @@ static struct compile_time_evaluation_value_t evaluate_compile_time_expression (
                 break;
 
             case CONDITIONAL_EVALUATION_VALUE_TYPE_FLOATING:
-                result.floating_value = -result.floating_value;
+                result.floating_value = -operand.floating_value;
                 break;
             }
 
