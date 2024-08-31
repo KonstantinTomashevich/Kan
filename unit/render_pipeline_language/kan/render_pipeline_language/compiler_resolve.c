@@ -1846,7 +1846,8 @@ static inline kan_bool_t resolve_match_signature_at_index (struct rpl_compiler_c
                      context->log_name, module_name, owner_expression->source_name,
                      (long) owner_expression->source_line, (long) signature_index,
                      get_expression_call_name_for_logging (owner_expression),
-                     expression->output.type.array_dimensions_count, signature->variable.type.array_dimensions_count)
+                     (long) expression->output.type.array_dimensions_count,
+                     (long) signature->variable.type.array_dimensions_count)
             return KAN_FALSE;
         }
         else
@@ -1863,8 +1864,8 @@ static inline kan_bool_t resolve_match_signature_at_index (struct rpl_compiler_c
                              context->log_name, module_name, owner_expression->source_name,
                              (long) owner_expression->source_line, (long) signature_index,
                              get_expression_call_name_for_logging (owner_expression), array_dimension_index,
-                             expression->output.type.array_dimensions[array_dimension_index],
-                             signature->variable.type.array_dimensions[array_dimension_index])
+                             (long) expression->output.type.array_dimensions[array_dimension_index],
+                             (long) signature->variable.type.array_dimensions[array_dimension_index])
                     return KAN_FALSE;
                 }
             }

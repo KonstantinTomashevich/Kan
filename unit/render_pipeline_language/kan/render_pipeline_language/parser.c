@@ -3545,18 +3545,18 @@ static kan_bool_t build_intermediate_expression (struct rpl_parser_t *instance,
                                         intermediate->expression_lists_storage.size * 2u);                             \
     }                                                                                                                  \
                                                                                                                        \
-    uint64_t *index_output =                                                                                           \
+    uint64_t *sub_list_index_output =                                                                                  \
         &((uint64_t *) intermediate->expression_lists_storage.data)[intermediate->expression_lists_storage.size];      \
     intermediate->expression_lists_storage.size += COUNT;                                                              \
                                                                                                                        \
     while (sub_list)                                                                                                   \
     {                                                                                                                  \
-        if (!build_intermediate_expression (instance, intermediate, sub_list->expression, index_output))               \
+        if (!build_intermediate_expression (instance, intermediate, sub_list->expression, sub_list_index_output))      \
         {                                                                                                              \
             result = KAN_FALSE;                                                                                        \
         }                                                                                                              \
                                                                                                                        \
-        ++index_output;                                                                                                \
+        ++sub_list_index_output;                                                                                       \
         sub_list = sub_list->next;                                                                                     \
     }
 
@@ -3717,7 +3717,7 @@ static kan_bool_t build_intermediate_setting (struct rpl_parser_t *instance,
     output->type = setting->type;
     output->conditional_index = KAN_RPL_EXPRESSION_INDEX_NONE;
     output->source_name = setting->source_log_name;
-    output->source_line = setting->source_line;
+    output->source_line = (uint32_t) setting->source_line;
 
     switch (setting->type)
     {
@@ -3798,7 +3798,7 @@ static kan_bool_t build_intermediate_declarations (struct rpl_parser_t *instance
         new_declaration->type_name = declaration->declaration.type;
         new_declaration->conditional_index = KAN_RPL_EXPRESSION_INDEX_NONE;
         new_declaration->source_name = declaration->source_log_name;
-        new_declaration->source_line = declaration->source_line;
+        new_declaration->source_line = (uint32_t) declaration->source_line;
 
         uint64_t array_sizes_count = 0u;
         struct parser_expression_list_item_t *array_size = declaration->declaration.array_size_list;
@@ -3887,7 +3887,7 @@ static kan_bool_t build_intermediate_structs (struct rpl_parser_t *instance, str
         kan_rpl_struct_init (new_struct);
         new_struct->name = struct_data->name;
         new_struct->source_name = struct_data->source_log_name;
-        new_struct->source_line = struct_data->source_line;
+        new_struct->source_line = (uint32_t) struct_data->source_line;
 
         if (!build_intermediate_declarations (instance, output, struct_data->first_declaration, &new_struct->fields))
         {
@@ -3921,7 +3921,7 @@ static kan_bool_t build_intermediate_buffers (struct rpl_parser_t *instance, str
         target_buffer->name = source_buffer->name;
         target_buffer->type = source_buffer->type;
         target_buffer->source_name = source_buffer->source_log_name;
-        target_buffer->source_line = source_buffer->source_line;
+        target_buffer->source_line = (uint32_t) source_buffer->source_line;
 
         if (!build_intermediate_declarations (instance, output, source_buffer->first_declaration,
                                               &target_buffer->fields))
@@ -3956,7 +3956,7 @@ static kan_bool_t build_intermediate_samplers (struct rpl_parser_t *instance, st
         target_sampler->name = source_sampler->name;
         target_sampler->type = source_sampler->type;
         target_sampler->source_name = source_sampler->source_log_name;
-        target_sampler->source_line = source_sampler->source_line;
+        target_sampler->source_line = (uint32_t) source_sampler->source_line;
 
         uint64_t settings_count = 0u;
         struct parser_setting_list_item_t *setting = source_sampler->first_setting;
@@ -4011,7 +4011,7 @@ static kan_bool_t build_intermediate_functions (struct rpl_parser_t *instance, s
         new_function->return_type_name = function->return_type_name;
         new_function->name = function->name;
         new_function->source_name = function->source_log_name;
-        new_function->source_line = function->source_line;
+        new_function->source_line = (uint32_t) function->source_line;
 
         // Special case -- void function.
         if (function->first_argument->declaration.type != interned_void)
