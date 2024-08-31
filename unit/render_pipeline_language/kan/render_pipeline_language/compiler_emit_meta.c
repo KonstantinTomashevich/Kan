@@ -258,7 +258,7 @@ static inline kan_bool_t emit_meta_variable_type_to_meta_type (struct compiler_i
     }
     else if (variable->type.if_matrix == &STATICS.type_f4x4)
     {
-        *output = KAN_RPL_META_VARIABLE_TYPE_F3X3;
+        *output = KAN_RPL_META_VARIABLE_TYPE_F4X4;
     }
     else
     {

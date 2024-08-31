@@ -1,6 +1,7 @@
 #include <stdio.h>
-#include <time.h>
 #include <stdlib.h>
+#include <string.h>
+#include <time.h>
 
 #include <kan/file_system/stream.h>
 #include <kan/render_pipeline_language/compiler.h>
@@ -63,9 +64,6 @@ static void save_code (const char *path, struct kan_dynamic_array_t *output)
 
 KAN_TEST_CASE (generic)
 {
-    // TODO: Test different options.
-    // TODO: Test meta.
-
     struct kan_dynamic_array_t library_source;
     load_pipeline_source (PIPELINE_BASE_PATH "generic_library.rpl", &library_source);
 
@@ -90,6 +88,9 @@ KAN_TEST_CASE (generic)
         kan_rpl_compiler_context_create (KAN_RPL_PIPELINE_TYPE_GRAPHICS_CLASSIC, kan_string_intern ("variant_test"));
 
     kan_rpl_compiler_context_use_module (compiler_context, &intermediate);
+    kan_rpl_compiler_context_set_option_count(compiler_context, kan_string_intern ("max_joints"), 1024u);
+    kan_rpl_compiler_context_set_option_flag (compiler_context, kan_string_intern ("wireframe"), KAN_TRUE);
+
     kan_rpl_compiler_instance_t meta_instance = kan_rpl_compiler_context_resolve (compiler_context, 0u, NULL);
     KAN_TEST_ASSERT (meta_instance != KAN_INVALID_RPL_COMPILER_INSTANCE)
 
@@ -98,77 +99,102 @@ KAN_TEST_CASE (generic)
     KAN_TEST_ASSERT (kan_rpl_compiler_instance_emit_meta (meta_instance, &meta))
     kan_rpl_compiler_instance_destroy (meta_instance);
 
-    // TODO: Temporary print until real test.
-    printf ("Meta:\n");
-    printf ("    pipeline_type: %lu\n", (unsigned long) meta.pipeline_type);
+    KAN_TEST_CHECK (meta.pipeline_type == KAN_RPL_PIPELINE_TYPE_GRAPHICS_CLASSIC)
+    KAN_TEST_CHECK (meta.graphics_classic_settings.polygon_mode == KAN_RPL_POLYGON_MODE_WIREFRAME)
+    KAN_TEST_CHECK (meta.graphics_classic_settings.cull_mode == KAN_RPL_CULL_MODE_BACK)
+    KAN_TEST_CHECK (meta.graphics_classic_settings.depth_test == KAN_TRUE)
+    KAN_TEST_CHECK (meta.graphics_classic_settings.depth_write == KAN_TRUE)
 
-    switch (meta.pipeline_type)
-    {
-    case KAN_RPL_PIPELINE_TYPE_GRAPHICS_CLASSIC:
-        printf ("    graphics_classic_settings:\n");
-        printf ("        polygon_mode: %lu\n", (unsigned long) meta.graphics_classic_settings.polygon_mode);
-        printf ("        cull_mode: %lu\n", (unsigned long) meta.graphics_classic_settings.cull_mode);
-        printf ("        depth_test: %lu\n", (unsigned long) meta.graphics_classic_settings.depth_test);
-        printf ("        depth_write: %lu\n", (unsigned long) meta.graphics_classic_settings.depth_write);
-        printf ("        fragment_output_count: %lu\n",
-                (unsigned long) meta.graphics_classic_settings.fragment_output_count);
-        break;
-    }
+    KAN_TEST_ASSERT (meta.buffers.size == 3u)
+    struct kan_rpl_meta_buffer_t *buffer_meta = &((struct kan_rpl_meta_buffer_t *) meta.buffers.data)[0u];
+    KAN_TEST_CHECK (strcmp (buffer_meta->name, "vertex") == 0)
+    KAN_TEST_CHECK (buffer_meta->binding == 0u)
+    KAN_TEST_CHECK (buffer_meta->type == KAN_RPL_BUFFER_TYPE_VERTEX_ATTRIBUTE)
+    KAN_TEST_CHECK (buffer_meta->size == 48u)
 
-    printf ("    buffers:\n");
-    for (uint64_t buffer_index = 0u; buffer_index < meta.buffers.size; ++buffer_index)
-    {
-        struct kan_rpl_meta_buffer_t *buffer = &((struct kan_rpl_meta_buffer_t *) meta.buffers.data)[buffer_index];
-        printf ("        %s:\n", buffer->name);
-        printf ("            binding: %lu\n", (unsigned long) buffer->binding);
-        printf ("            type: %lu\n", (unsigned long) buffer->type);
-        printf ("            size: %lu\n", (unsigned long) buffer->size);
-        printf ("            attributes:\n");
+    KAN_TEST_ASSERT (buffer_meta->attributes.size == 5u)
+    struct kan_rpl_meta_attribute_t *attribute_meta =
+        &((struct kan_rpl_meta_attribute_t *) buffer_meta->attributes.data)[0u];
+    KAN_TEST_CHECK (attribute_meta->location == 0u)
+    KAN_TEST_CHECK (attribute_meta->type == KAN_RPL_META_VARIABLE_TYPE_F3)
+    KAN_TEST_CHECK (attribute_meta->offset == 0u)
 
-        for (uint64_t attribute_index = 0u; attribute_index < buffer->attributes.size; ++attribute_index)
-        {
-            struct kan_rpl_meta_attribute_t *attribute =
-                &((struct kan_rpl_meta_attribute_t *) buffer->attributes.data)[attribute_index];
+    attribute_meta = &((struct kan_rpl_meta_attribute_t *) buffer_meta->attributes.data)[1u];
+    KAN_TEST_CHECK (attribute_meta->location == 1u)
+    KAN_TEST_CHECK (attribute_meta->type == KAN_RPL_META_VARIABLE_TYPE_F3)
+    KAN_TEST_CHECK (attribute_meta->offset == 12u)
 
-            printf ("                %lu:\n", (unsigned long) attribute_index);
-            printf ("                    location: %lu\n", (unsigned long) attribute->location);
-            printf ("                    type: %lu\n", (unsigned long) attribute->type);
-            printf ("                    offset: %lu\n", (unsigned long) attribute->offset);
-        }
+    attribute_meta = &((struct kan_rpl_meta_attribute_t *) buffer_meta->attributes.data)[2u];
+    KAN_TEST_CHECK (attribute_meta->location == 2u)
+    KAN_TEST_CHECK (attribute_meta->type == KAN_RPL_META_VARIABLE_TYPE_F2)
+    KAN_TEST_CHECK (attribute_meta->offset == 24u)
 
-        printf ("            parameters:\n");
-        for (uint64_t parameter_index = 0u; parameter_index < buffer->parameters.size; ++parameter_index)
-        {
-            struct kan_rpl_meta_parameter_t *parameter =
-                &((struct kan_rpl_meta_parameter_t *) buffer->parameters.data)[parameter_index];
+    attribute_meta = &((struct kan_rpl_meta_attribute_t *) buffer_meta->attributes.data)[3u];
+    KAN_TEST_CHECK (attribute_meta->location == 3u)
+    KAN_TEST_CHECK (attribute_meta->type == KAN_RPL_META_VARIABLE_TYPE_I2)
+    KAN_TEST_CHECK (attribute_meta->offset == 32u)
 
-            printf ("                %s:\n", parameter->name);
-            printf ("                    type: %lu\n", (unsigned long) parameter->type);
-            printf ("                    offset: %lu\n", (unsigned long) parameter->offset);
-            printf ("                    total_item_count: %lu\n", (unsigned long) parameter->total_item_count);
-            printf ("                    meta:\n");
+    attribute_meta = &((struct kan_rpl_meta_attribute_t *) buffer_meta->attributes.data)[4u];
+    KAN_TEST_CHECK (attribute_meta->location == 4u)
+    KAN_TEST_CHECK (attribute_meta->type == KAN_RPL_META_VARIABLE_TYPE_F2)
+    KAN_TEST_CHECK (attribute_meta->offset == 40u)
 
-            for (uint64_t meta_index = 0u; meta_index < parameter->meta.size; ++meta_index)
-            {
-                printf ("                        %s\n", ((kan_interned_string_t *) parameter->meta.data)[meta_index]);
-            }
-        }
-    }
+    KAN_TEST_ASSERT (buffer_meta->parameters.size == 0u)
 
-    printf ("    samplers:\n");
-    for (uint64_t sampler_index = 0u; sampler_index < meta.samplers.size; ++sampler_index)
-    {
-        struct kan_rpl_meta_sampler_t *sampler = &((struct kan_rpl_meta_sampler_t *) meta.samplers.data)[sampler_index];
-        printf ("        %s:\n", sampler->name);
-        printf ("            binding: %lu\n", (unsigned long) sampler->binding);
-        printf ("            type: %lu\n", (unsigned long) sampler->type);
-        printf ("            mag_filter: %lu\n", (unsigned long) sampler->settings.mag_filter);
-        printf ("            min_filter: %lu\n", (unsigned long) sampler->settings.min_filter);
-        printf ("            mip_map_mode: %lu\n", (unsigned long) sampler->settings.mip_map_mode);
-        printf ("            address_mode_u: %lu\n", (unsigned long) sampler->settings.address_mode_u);
-        printf ("            address_mode_v: %lu\n", (unsigned long) sampler->settings.address_mode_v);
-        printf ("            address_mode_w: %lu\n", (unsigned long) sampler->settings.address_mode_w);
-    }
+    buffer_meta = &((struct kan_rpl_meta_buffer_t *) meta.buffers.data)[1u];
+    KAN_TEST_CHECK (strcmp (buffer_meta->name, "instance_storage") == 0)
+    KAN_TEST_CHECK (buffer_meta->binding == 0u)
+    KAN_TEST_CHECK (buffer_meta->type == KAN_RPL_BUFFER_TYPE_INSTANCED_READ_ONLY_STORAGE)
+    KAN_TEST_CHECK (buffer_meta->size == 65552u)
+
+    KAN_TEST_ASSERT (buffer_meta->attributes.size == 0u)
+
+    KAN_TEST_ASSERT (buffer_meta->parameters.size == 2u)
+    struct kan_rpl_meta_parameter_t *parameter_meta =
+        &((struct kan_rpl_meta_parameter_t *) buffer_meta->parameters.data)[0u];
+    KAN_TEST_CHECK (strcmp (parameter_meta->name, "color_multiplier") == 0)
+    KAN_TEST_CHECK (parameter_meta->type == KAN_RPL_META_VARIABLE_TYPE_F4)
+    KAN_TEST_CHECK (parameter_meta->offset == 0u)
+    KAN_TEST_CHECK (parameter_meta->total_item_count == 1u)
+    KAN_TEST_ASSERT (parameter_meta->meta.size == 0u)
+
+    parameter_meta = &((struct kan_rpl_meta_parameter_t *) buffer_meta->parameters.data)[1u];
+    KAN_TEST_CHECK (strcmp (parameter_meta->name, "joint_data.model_joints") == 0)
+    KAN_TEST_CHECK (parameter_meta->type == KAN_RPL_META_VARIABLE_TYPE_F4X4)
+    KAN_TEST_CHECK (parameter_meta->offset == 16u)
+    KAN_TEST_CHECK (parameter_meta->total_item_count == 1024u)
+    KAN_TEST_ASSERT (parameter_meta->meta.size == 2u)
+    KAN_TEST_CHECK (strcmp (((kan_interned_string_t *) parameter_meta->meta.data)[0u], "model_joint_matrices") == 0)
+    KAN_TEST_CHECK (strcmp (((kan_interned_string_t *) parameter_meta->meta.data)[1u], "hidden") == 0)
+
+    buffer_meta = &((struct kan_rpl_meta_buffer_t *) meta.buffers.data)[2u];
+    KAN_TEST_CHECK (strcmp (buffer_meta->name, "uniforms") == 0)
+    KAN_TEST_CHECK (buffer_meta->binding == 1u)
+    KAN_TEST_CHECK (buffer_meta->type == KAN_RPL_BUFFER_TYPE_UNIFORM)
+    KAN_TEST_CHECK (buffer_meta->size == 64u)
+
+    KAN_TEST_ASSERT (buffer_meta->attributes.size == 0u)
+
+    KAN_TEST_ASSERT (buffer_meta->parameters.size == 1u)
+    parameter_meta = &((struct kan_rpl_meta_parameter_t *) buffer_meta->parameters.data)[0u];
+    KAN_TEST_CHECK (strcmp (parameter_meta->name, "projection_mul_view") == 0)
+    KAN_TEST_CHECK (parameter_meta->type == KAN_RPL_META_VARIABLE_TYPE_F4X4)
+    KAN_TEST_CHECK (parameter_meta->offset == 0u)
+    KAN_TEST_CHECK (parameter_meta->total_item_count == 1u)
+    KAN_TEST_ASSERT (parameter_meta->meta.size == 2u)
+    KAN_TEST_CHECK (strcmp (((kan_interned_string_t *) parameter_meta->meta.data)[0u], "projection_view_matrix") == 0)
+    KAN_TEST_CHECK (strcmp (((kan_interned_string_t *) parameter_meta->meta.data)[1u], "hidden") == 0)
+
+    KAN_TEST_ASSERT (meta.samplers.size == 1u)
+    struct kan_rpl_meta_sampler_t *sampler_meta = &((struct kan_rpl_meta_sampler_t *) meta.samplers.data)[0u];
+    KAN_TEST_CHECK (sampler_meta->binding == 2u)
+    KAN_TEST_CHECK (sampler_meta->type == KAN_RPL_SAMPLER_TYPE_2D)
+    KAN_TEST_CHECK (sampler_meta->settings.mag_filter == KAN_RPL_META_SAMPLER_FILTER_NEAREST)
+    KAN_TEST_CHECK (sampler_meta->settings.min_filter == KAN_RPL_META_SAMPLER_FILTER_NEAREST)
+    KAN_TEST_CHECK (sampler_meta->settings.mip_map_mode == KAN_RPL_META_SAMPLER_MIP_MAP_MODE_NEAREST)
+    KAN_TEST_CHECK (sampler_meta->settings.address_mode_u == KAN_RPL_META_SAMPLER_ADDRESS_MODE_REPEAT)
+    KAN_TEST_CHECK (sampler_meta->settings.address_mode_v == KAN_RPL_META_SAMPLER_ADDRESS_MODE_REPEAT)
+    KAN_TEST_CHECK (sampler_meta->settings.address_mode_w == KAN_RPL_META_SAMPLER_ADDRESS_MODE_REPEAT)
 
     kan_rpl_meta_shutdown (&meta);
     struct kan_dynamic_array_t code;
