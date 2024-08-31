@@ -3386,6 +3386,7 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
         new_expression->type = COMPILER_INSTANCE_EXPRESSION_TYPE_FUNCTION_CALL;
         kan_bool_t resolved = KAN_TRUE;
         new_expression->function_call.function = NULL;
+        new_expression->function_call.first_argument = NULL;
 
         if (!resolve_function_by_name (context, instance, expression->function_call.name,
                                        resolve_scope->function->required_stage,
