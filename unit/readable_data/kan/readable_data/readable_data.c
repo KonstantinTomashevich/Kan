@@ -436,7 +436,7 @@ static enum kan_readable_data_parser_response_t re2c_verify_blocks_on_input_end 
         KAN_LOG (readable_data, KAN_LOG_ERROR,
                  "Error. [%ld:%ld]: Encountered end of input, but not all opened blocks are closed. Parser: %s. "
                  "Symbol code: 0x%x.\n",
-                 (long) parser->cursor_line, (long) parser->cursor_symbol, __func__, (int) *parser->cursor);
+                 (long) parser->cursor_line, (long) parser->cursor_symbol, __func__, (int) *parser->cursor)
         return KAN_READABLE_DATA_PARSER_RESPONSE_FAILED;
     }
 

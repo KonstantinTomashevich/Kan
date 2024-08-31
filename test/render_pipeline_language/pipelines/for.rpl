@@ -1,0 +1,57 @@
+// Improvised simple pipeline to check that for loop can be properly processed.
+
+vertex_attribute_buffer vertex
+{
+    f3 position;
+    f2 uv;
+};
+
+uniform_buffer uniforms
+{
+    f4x4 model_view_projection;
+};
+
+vertex_stage_output vertex_output
+{
+    f2 uv;
+};
+
+void vertex_main (void)
+{
+    vertex_output.uv = vertex.uv;
+    f4 position4 = f4 {vertex.position._0, vertex.position._1, vertex.position._2, 1.0};
+    vertex_stage_output_position (uniforms.model_view_projection * position4);
+}
+
+sampler_2d diffuse_color
+{
+    setting mag_filter "nearest";
+    setting min_filter "nearest";
+    setting mip_map_mode "nearest";
+    setting address_mode_u "repeat";
+    setting address_mode_v "repeat";
+    setting address_mode_w "repeat";
+};
+
+fragment_stage_output fragment_output
+{
+    f4 color;
+};
+
+void fragment_main (void)
+{
+    f4 base_color = diffuse_color (vertex_output.uv);
+    f4 modifier = f4 {0.0, 0.0, 0.0, 1.0};
+
+    for (i1 i = 0; i < 5 || i < 7 || i < 10; i = i + 1)
+    {
+        modifier = modifier + f4 {0.1, 0.1, 0.1, 0.0};
+        if (i == 3)
+        {
+            modifier._0 = 1.0;
+            break;
+        }
+    }
+
+    fragment_output.color = base_color * modifier;
+}

@@ -1,0 +1,352 @@
+// Ported code glsl code from naga benchmark to rpl in order to use for benchmarking.
+
+vertex_attribute_buffer vertex
+{
+    f3 position;
+    f3 normal;
+    f2 uv;
+    f4 tangent;
+};
+
+vertex_stage_output vertex_output
+{
+    f3 world_position;
+    f3 world_normal;
+    f2 uv;
+    f4 world_tangent;
+};
+
+uniform_buffer volatile_uniforms
+{
+    f4x4 view_projection;
+    f4x4 model;
+    f4 camera_position;
+};
+
+void vertex_main (void)
+{
+    f4 position_4 = expand_f3_to_f4 (vertex.position, 1.0);
+    f4 world_position_4 = volatile_uniforms.model * position_4;
+    vertex_output.world_position = crop_f4_to_f3 (world_position_4);
+
+    f3x3 model_cropped = crop_f4x4_to_f3x3(volatile_uniforms.model);
+    vertex_output.world_normal = model_cropped  * vertex.normal;
+    vertex_output.uv = vertex.uv;
+    vertex_output.world_tangent = expand_f3_to_f4 (model_cropped * crop_f4_to_f3 (vertex.tangent), vertex.tangent._3);
+    vertex_stage_output_position (world_position_4);
+}
+
+global count max_point_lights 10;
+global count max_directional_lights 1;
+
+struct point_light_t
+{
+    f4 position;
+    f4 color;
+    f4 light_parameters;
+};
+
+struct directional_light_t
+{
+    f4 direction;
+    f4 color;
+};
+
+uniform_buffer lights
+{
+    f4 ambient_color;
+    i4 counts;
+    point_light_t[max_point_lights] point;
+    directional_light_t[max_point_lights] directional;
+};
+
+uniform_buffer material
+{
+    f4 base_color;
+    f4 proughness_metallic_reflectance;
+    f4 emissive;
+};
+
+sampler_2d texture_base_color
+{
+    setting mag_filter "nearest";
+    setting min_filter "nearest";
+    setting mip_map_mode "nearest";
+    setting address_mode_u "repeat";
+    setting address_mode_v "repeat";
+    setting address_mode_w "repeat";
+};
+
+sampler_2d texture_metallic_roughness
+{
+    setting mag_filter "nearest";
+    setting min_filter "nearest";
+    setting mip_map_mode "nearest";
+    setting address_mode_u "repeat";
+    setting address_mode_v "repeat";
+    setting address_mode_w "repeat";
+};
+
+sampler_2d texture_normal
+{
+    setting mag_filter "nearest";
+    setting min_filter "nearest";
+    setting mip_map_mode "nearest";
+    setting address_mode_u "repeat";
+    setting address_mode_v "repeat";
+    setting address_mode_w "repeat";
+};
+
+sampler_2d texture_occlusion
+{
+    setting mag_filter "nearest";
+    setting min_filter "nearest";
+    setting mip_map_mode "nearest";
+    setting address_mode_u "repeat";
+    setting address_mode_v "repeat";
+    setting address_mode_w "repeat";
+};
+
+sampler_2d texture_emissive
+{
+    setting mag_filter "nearest";
+    setting min_filter "nearest";
+    setting mip_map_mode "nearest";
+    setting address_mode_u "repeat";
+    setting address_mode_v "repeat";
+    setting address_mode_w "repeat";
+};
+
+fragment_stage_output fragment_output
+{
+    f4 color;
+};
+
+f1 pow5 (f1 x)
+{
+    f1 x2 = x * x;
+    return x2 * x2 * x;
+}
+
+f1 get_distance_attenuation (f1 distance_square, f1 inverse_range_squared)
+{
+    f1 factor = distance_square * inverse_range_squared;
+    f1 smooth_factor = clamp_f1 (1.0 - factor * factor, 0.0, 1.0);
+    f1 attenuation = smooth_factor * smooth_factor;
+    return attenuation / max_f1 (distance_square, 0.001);
+}
+
+f1 d_ggx (f1 roughness, f1 n_o_h, f3 h)
+{
+    f1 one_minus_n_o_h_squared = 1.0 - n_o_h * n_o_h;
+    f1 a = n_o_h * roughness;
+    f1 k = roughness / (one_minus_n_o_h_squared + a * a);
+    f1 d = k * k * (1.0 / pi ());
+    return d;
+}
+
+f1 v_smith_ggx_correlated (f1 roughness, f1 n_o_v, f1 n_o_l)
+{
+    f1 a2 = roughness * roughness;
+    f1 lambda_v = n_o_l * sqrt_f1 ((n_o_v - a2 * n_o_v) * n_o_v + a2);
+    f1 lambda_l = n_o_v * sqrt_f1 ((n_o_l - a2 * n_o_l) * n_o_l + a2);
+    f1 v = 0.5 / (lambda_v + lambda_l);
+    return v;
+}
+
+f3 f_schlick_f3 (f3 f0, f1 f90, f1 v_o_h)
+{
+    return f0 + (f3 {f90, f90, f90} - f0) * pow5 (1.0 - v_o_h);
+}
+
+f1 f_schlick_f1 (f1 f0, f1 f90, f1 v_o_h)
+{
+    return f0 + (f90 - f0) * pow5 (1.0 - v_o_h);
+}
+
+f3 fresnel (f3 f0, f1 l_o_h)
+{
+    f1 f90 = clamp_f1 (dot_f3 (f0, f3 {50.0 * 0.33, 50.0 * 0.33, 50.0 * 0.33}), 0.0, 1.0);
+    return f_schlick_f3 (f0, f90, l_o_h);
+}
+
+f3 specular (f3 f0, f1 roughness, f3 h, f1 n_o_v, f1 n_o_l, f1 n_o_h, f1 l_o_h, f1 specular_intensity)
+{
+    f1 d = d_ggx (roughness, n_o_h, h);
+    f1 v = v_smith_ggx_correlated (roughness, n_o_v, n_o_l);
+    f3 f = fresnel (f0, l_o_h);
+    return f * specular_intensity * d * v;
+}
+
+f1 fd_burley (f1 roughness, f1 n_o_v, f1 n_o_l, f1 l_o_h)
+{
+    f1 f90 = 0.5 + 2.0 * roughness * l_o_h * l_o_h;
+    f1 light_scatter = f_schlick_f1 (1.0, f90, n_o_l);
+    f1 view_scatter = f_schlick_f1 (1.0, f90, n_o_v);
+    return light_scatter * view_scatter * (1.0 / pi ());
+}
+
+f3 env_brdf_approx (f3 f0, f1 p_roughness, f1 n_o_v)
+{
+    f4 c0 = f4 {-1.0, -0.0275, -0.572, 0.022};
+    f4 c1 = f4 {1.0, 0.0425, 1.04, -0.04};
+    f4 r = f4{p_roughness, p_roughness, p_roughness, p_roughness} * c0 * c1;
+    f1 a004 = min_f1 (r._0 * r._0, exp2_f1 (-9.28 * n_o_v)) * r._0 * r._0;
+    f2 ab = f2 {-1.04, 1.04} * f2 {a004, a004} + f2 {r._2, r._3};
+    return f0 * f3 {ab._0, ab._0, ab._0} + f3 {ab._1, ab._1, ab._1};
+}
+
+f1 perceptual_roughness_to_roughness (f1 p_roughness)
+{
+    f1 clamped = clamp_f1 (p_roughness, 0.089, 1.0);
+    return clamped * clamped;
+}
+
+f3 reinhard (f3 color)
+{
+    return color / (f3 {1.0, 1.0, 1.0} + color);
+}
+
+f3 reinhard_extended (f3 color, f1 max_white)
+{
+    f3 numerator = color * (f3 {1.0, 1.0, 1.0} +
+            (color / f3 {max_white * max_white, max_white * max_white, max_white * max_white}));
+    return numerator / (f3 {1.0, 1.0, 1.0} + color);
+}
+
+f1 luminance (f3 v)
+{
+    return dot_f3 (v, f3 {0.2126, 0.7152, 0.0722});
+}
+
+f3 change_luminance (f3 v_in, f1 l_out)
+{
+    f1 l_in = luminance (v_in);
+    return v_in * (l_out / l_in);
+}
+
+f3 reinhard_luminance (f3 color)
+{
+    f1 l_old = luminance (color);
+    f1 l_new = l_old / (1.0 + l_old);
+    return change_luminance (color, l_new);
+}
+
+f3 reinhard_extended_luminance (f3 color, f1 max_white_l)
+{
+    f1 l_old = luminance (color);
+    f1 numerator = l_old * (1.0 + (l_old / (max_white_l * max_white_l)));
+    f1 l_new = numerator / (1.0 + l_old);
+    return change_luminance (color, l_new);
+}
+
+f3 point_light (point_light_t light, f1 roughness, f1 n_dot_v, f3 _n, f3 _v, f3 _r, f3 f0, f3 diffuse_color)
+{
+    f3 light_to_frag = crop_f4_to_f3 (light.position) - vertex_output.world_position;
+    f1 distance_square = dot_f3 (light_to_frag, light_to_frag);
+    f1 range_attenuation = get_distance_attenuation (distance_square, light.light_parameters._0);
+
+    f1 a = roughness;
+    f1 radius = light.light_parameters._1;
+    f3 center_to_ray = _r * dot_f3 (light_to_frag, _r) - light_to_frag;
+    f3 closest_point = light_to_frag +
+        center_to_ray * clamp_f1 (radius * inverse_sqrt_f1 (dot_f3 (center_to_ray, center_to_ray)), 0.0, 1.0);
+    f1 lspec_length_inverse = inverse_sqrt_f1 (dot_f3 (closest_point, closest_point));
+    f1 normalization_factor = a / clamp_f1 (a + (radius * 0.5 * lspec_length_inverse), 0.0, 1.0);
+    f1 specular_intensity = normalization_factor * normalization_factor;
+
+    f3 _l = closest_point * lspec_length_inverse;
+    f3 _h = normalize_f3 (_l + _v);
+    f1 n_o_l = clamp_f1 (dot_f3 (_n, _l), 0.0, 1.0);
+    f1 n_o_h = clamp_f1 (dot_f3 (_n, _h), 0.0, 1.0);
+    f1 l_o_h = clamp_f1 (dot_f3 (_l, _h), 0.0, 1.0);
+
+    f3 spec = specular (f0, roughness, _h, n_dot_v, n_o_l, n_o_h, l_o_h, specular_intensity);
+
+    _l = normalize_f3 (light_to_frag);
+    _h = normalize_f3 (_l + _v);
+    n_o_l = clamp_f1 (dot_f3 (_n, _l), 0.0, 1.0);
+    n_o_h = clamp_f1 (dot_f3 (_n, _h), 0.0, 1.0);
+    l_o_h = clamp_f1 (dot_f3 (_l, _h), 0.0, 1.0);
+
+    f3 diffuse = diffuse_color * fd_burley (roughness, n_dot_v, n_o_l, l_o_h);
+
+    return ((diffuse + spec) * crop_f4_to_f3 (light.color)) * range_attenuation * n_o_l;
+}
+
+f3 directional_light (directional_light_t light, f1 roughness, f1 n_dot_v, f3 normal, f3 view, f3 _r, f3 f0,
+                      f3 diffuse_color)
+{
+    f3 incident_light = crop_f4_to_f3 (light.direction);
+
+    f3 half_vector = normalize_f3 (incident_light + view);
+    f1 n_o_l = clamp_f1 (dot_f3 (normal, incident_light), 0.0, 1.0);
+    f1 n_o_h = clamp_f1 (dot_f3 (normal, half_vector), 0.0, 1.0);
+    f1 l_o_h = clamp_f1 (dot_f3 (incident_light, half_vector), 0.0, 1.0);
+
+    f3 diffuse = diffuse_color * fd_burley (roughness, n_dot_v, n_o_l, l_o_h);
+    f1 specular_intensity = 1.0;
+    f3 spec = specular (f0, roughness, half_vector, n_dot_v, n_o_l, n_o_h, l_o_h, specular_intensity);
+
+    return (spec + diffuse) * crop_f4_to_f3 (light.color) * n_o_l;
+}
+
+void fragment_main (void)
+{
+    f4 output_color = material.base_color;
+    output_color = output_color * texture_base_color (vertex_output.uv);
+
+    f4 metallic_roughness = texture_metallic_roughness (vertex_output.uv);
+    f1 metallic = material.proughness_metallic_reflectance._1 * metallic_roughness._2;
+    f1 p_roughness = material.proughness_metallic_reflectance._0 * metallic_roughness._1;
+    f1 roughness = perceptual_roughness_to_roughness (p_roughness);
+
+    f3 _n = normalize_f3 (vertex_output.world_normal);
+    f3 _t = normalize_f3 (crop_f4_to_f3 (vertex_output.world_tangent));
+    f3 _b = cross_f3 (_n, _t) * vertex_output.world_tangent._3;
+
+    // TODO: Not working with gl_FrontFacing for now as I'm not sure it is always need, because we cull back faces?
+
+    f3x3 _tbn = f3x3 {_t, _b, _n};
+    _n = _tbn * normalize_f3 (crop_f4_to_f3 (texture_normal (vertex_output.uv)) * 2.0 - f3 {1.0, 1.0, 1.0});
+
+    f1 occlusion = texture_occlusion (vertex_output.uv)._0;
+
+    f4 emissive = material.emissive;
+    f4 sampled_emissive = texture_emissive (vertex_output.uv);
+    emissive._0 = emissive._0 * sampled_emissive._0;
+    emissive._1 = emissive._1 * sampled_emissive._1;
+    emissive._2 = emissive._2 * sampled_emissive._2;
+
+    f3 _v = normalize_f3 (crop_f4_to_f3 (volatile_uniforms.camera_position) - vertex_output.world_position);
+    f1 n_dot_v = max_f1 (dot_f3 (_n, _v), 0.001);
+
+    f1 reflectance = material.proughness_metallic_reflectance._2;
+    f1 f0_temp = 0.16 * reflectance * reflectance * (1.0 - metallic);
+    f3 f0 = f3 {f0_temp, f0_temp, f0_temp} + crop_f4_to_f3 (output_color) * f3 {metallic, metallic, metallic};
+
+    f3 diffuse_color = crop_f4_to_f3 (output_color) * f3 {1.0 - metallic, 1.0 - metallic, 1.0 - metallic};
+    f3 _r = reflect_f3 (-_v, _n);
+
+    f3 light_accum = f3 {0.0, 0.0, 0.0};
+    for (i1 i = 0; i < lights.counts._0 && i < max_point_lights; i = i + 1)
+    {
+        light_accum = light_accum + point_light (lights.point[i], roughness, n_dot_v, _n, _v, _r, f0, diffuse_color);
+    }
+
+    for (i1 i = 0; i < lights.counts._1 && i < max_directional_lights; i = i + 1)
+    {
+        light_accum = light_accum + directional_light (
+            lights.directional[i], roughness, n_dot_v, _n, _v, _r, f0, diffuse_color);
+    }
+
+    f3 diffuse_ambient = env_brdf_approx (diffuse_color, 1.0, n_dot_v);
+    f3 specular_ambient = env_brdf_approx (f0, p_roughness, n_dot_v);
+
+    f3 output_3 = light_accum +
+        (diffuse_ambient + specular_ambient) * crop_f4_to_f3 (lights.ambient_color) * occlusion +
+        crop_f4_to_f3 (emissive) * output_color._3;
+
+    output_3 = reinhard_luminance (output_3);
+    fragment_output.color = expand_f3_to_f4 (output_3, output_color._3);
+}

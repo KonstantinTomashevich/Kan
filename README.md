@@ -33,4 +33,5 @@ This project uses several third-party open source libraries, listened in alphabe
 - [qsort](https://github.com/svpv/qsort/) -- quick sort implementation using only macros.
 - [re2c](https://github.com/skvadrik/re2c/) -- lexer generator.
 - [SDL](https://github.com/libsdl-org/SDL/) -- cross-platform direct media layer.
+- [SPIRV-Headers](https://github.com/KhronosGroup/SPIRV-Headers) -- header files for reading and writing SPIRV binary.
 - [tracy](https://github.com/wolfpld/tracy/) -- real time profiler for game development.

@@ -19,3 +19,6 @@
 [submodule "third_party/cglm"]
 	path = third_party/cglm
 	url = https://github.com/recp/cglm
+[submodule "third_party/SPIRV-Headers"]
+	path = third_party/SPIRV-Headers
+	url = https://github.com/KhronosGroup/SPIRV-Headers.git
