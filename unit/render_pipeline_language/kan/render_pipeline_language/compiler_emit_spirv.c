@@ -2791,7 +2791,7 @@ static uint32_t spirv_emit_expression (struct spirv_generation_context_t *contex
         uint32_t coordinate_operand = spirv_emit_expression (
             context, function, current_block, expression->sampler_call.first_argument->expression, KAN_FALSE);
 
-        uint32_t sampler_type_id;
+        uint32_t sampler_type_id = (uint32_t) SPIRV_FIXED_ID_INVALID;
         switch (expression->sampler_call.sampler->type)
         {
         case KAN_RPL_SAMPLER_TYPE_2D:

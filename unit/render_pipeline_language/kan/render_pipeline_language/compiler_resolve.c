@@ -58,7 +58,11 @@ static struct compile_time_evaluation_value_t evaluate_compile_time_expression (
     struct kan_rpl_expression_t *expression,
     kan_bool_t instance_options_allowed)
 {
-    struct compile_time_evaluation_value_t result;
+    struct compile_time_evaluation_value_t result = {
+        .type = CONDITIONAL_EVALUATION_VALUE_TYPE_ERROR,
+        .integer_value = 0,
+    };
+
     switch (expression->type)
     {
     case KAN_RPL_EXPRESSION_NODE_TYPE_NOPE:
@@ -1728,7 +1732,7 @@ static kan_bool_t resolve_use_sampler (struct rpl_compiler_context_t *context,
     access_node->sampler = sampler;
     access_node->direct_access_function = function;
 
-    enum kan_rpl_pipeline_stage_t sampling_stage;
+    enum kan_rpl_pipeline_stage_t sampling_stage = KAN_RPL_PIPELINE_STAGE_GRAPHICS_CLASSIC_FRAGMENT;
     switch (context->pipeline_type)
     {
     case KAN_RPL_PIPELINE_TYPE_GRAPHICS_CLASSIC:
