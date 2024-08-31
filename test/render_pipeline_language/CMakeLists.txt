@@ -19,4 +19,8 @@ shared_library_include (
 
 shared_library_verify ()
 shared_library_copy_linked_artefacts ()
-kan_setup_tests (TEST_UNIT test_render_pipeline_language TEST_SHARED_LIBRARY test_render_pipeline_language_library)
+
+# We need higher timeout for benchmark test.
+kan_setup_tests (
+        TEST_UNIT test_render_pipeline_language TEST_SHARED_LIBRARY test_render_pipeline_language_library
+        PROPERTIES TIMEOUT 10)
