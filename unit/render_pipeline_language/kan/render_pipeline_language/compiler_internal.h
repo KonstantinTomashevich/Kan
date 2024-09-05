@@ -50,6 +50,7 @@ struct compiler_instance_setting_node_t
 {
     struct compiler_instance_setting_node_t *next;
     kan_interned_string_t name;
+    uint64_t block;
     enum kan_rpl_setting_type_t type;
 
     union
@@ -571,11 +572,24 @@ struct kan_rpl_compiler_statics_t
     kan_interned_string_t interned_fill;
     kan_interned_string_t interned_wireframe;
     kan_interned_string_t interned_back;
+    
+    kan_interned_string_t interned_never;
+    kan_interned_string_t interned_always;
+    kan_interned_string_t interned_equal;
+    kan_interned_string_t interned_not_equal;
+    kan_interned_string_t interned_less;
+    kan_interned_string_t interned_less_or_equal;
+    kan_interned_string_t interned_greater;
+    kan_interned_string_t interned_greater_or_equal;
 
     kan_interned_string_t interned_polygon_mode;
     kan_interned_string_t interned_cull_mode;
     kan_interned_string_t interned_depth_test;
     kan_interned_string_t interned_depth_write;
+    kan_interned_string_t interned_depth_bounds_test;
+    kan_interned_string_t interned_depth_compare_operation;
+    kan_interned_string_t interned_depth_min;
+    kan_interned_string_t interned_depth_max;
 
     kan_interned_string_t interned_nearest;
     kan_interned_string_t interned_linear;
@@ -592,6 +606,45 @@ struct kan_rpl_compiler_statics_t
     kan_interned_string_t interned_address_mode_u;
     kan_interned_string_t interned_address_mode_v;
     kan_interned_string_t interned_address_mode_w;
+    
+    kan_interned_string_t interned_zero;
+    kan_interned_string_t interned_one;
+    kan_interned_string_t interned_source_color;
+    kan_interned_string_t interned_one_minus_source_color;
+    kan_interned_string_t interned_destination_color;
+    kan_interned_string_t interned_one_minus_destination_color;
+    kan_interned_string_t interned_source_alpha;
+    kan_interned_string_t interned_one_minus_source_alpha;
+    kan_interned_string_t interned_destination_alpha;
+    kan_interned_string_t interned_one_minus_destination_alpha;
+    kan_interned_string_t interned_constant_color;
+    kan_interned_string_t interned_one_minus_constant_color;
+    kan_interned_string_t interned_constant_alpha;
+    kan_interned_string_t interned_one_minus_constant_alpha;
+    kan_interned_string_t interned_source_alpha_saturate;
+
+    kan_interned_string_t interned_add;
+    kan_interned_string_t interned_subtract;
+    kan_interned_string_t interned_reverse_subtract;
+    kan_interned_string_t interned_min;
+    kan_interned_string_t interned_max;
+
+    kan_interned_string_t interned_color_output_use_blend;
+    kan_interned_string_t interned_color_output_write_r;
+    kan_interned_string_t interned_color_output_write_g;
+    kan_interned_string_t interned_color_output_write_b;
+    kan_interned_string_t interned_color_output_write_a;
+    kan_interned_string_t interned_color_output_source_color_blend_factor;
+    kan_interned_string_t interned_color_output_destination_color_blend_factor;
+    kan_interned_string_t interned_color_output_color_blend_operation;
+    kan_interned_string_t interned_color_output_source_alpha_blend_factor;
+    kan_interned_string_t interned_color_output_destination_alpha_blend_factor;
+    kan_interned_string_t interned_color_output_alpha_blend_operation;
+
+    kan_interned_string_t interned_color_blend_constant_r;
+    kan_interned_string_t interned_color_blend_constant_g;
+    kan_interned_string_t interned_color_blend_constant_b;
+    kan_interned_string_t interned_color_blend_constant_a;
 
     kan_interned_string_t interned_void;
 

@@ -13,6 +13,10 @@ conditional (wireframe) setting polygon_mode "wireframe";
 setting cull_mode "back";
 setting depth_test on;
 setting depth_write on;
+setting depth_min -1.0;
+setting depth_max 1.0;
+
+setting color_output_use_blend on block 0;
 
 conditional (enable_skinning) struct joint_data_t
 {

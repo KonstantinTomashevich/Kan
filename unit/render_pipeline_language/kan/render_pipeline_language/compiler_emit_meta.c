@@ -1,6 +1,26 @@
 #define KAN_RPL_COMPILER_IMPLEMENTATION
 #include <kan/render_pipeline_language/compiler_internal.h>
 
+#define SETTING_REQUIRE_IN_BLOCK                                                                                       \
+    if (setting->block == KAN_RPL_SETTING_BLOCK_NONE)                                                                  \
+    {                                                                                                                  \
+        KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR, "[%s:%s:%s:%ld] Setting \"%s\" should have block index.",        \
+                 instance->context_log_name, setting->module_name, setting->source_name, (long) setting->source_line,  \
+                 setting->name)                                                                                        \
+        valid = KAN_FALSE;                                                                                             \
+    }                                                                                                                  \
+    else
+
+#define SETTING_REQUIRE_NOT_IN_BLOCK                                                                                   \
+    if (setting->block != KAN_RPL_SETTING_BLOCK_NONE)                                                                  \
+    {                                                                                                                  \
+        KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR, "[%s:%s:%s:%ld] Setting \"%s\" should not have block index.",    \
+                 instance->context_log_name, setting->module_name, setting->source_name, (long) setting->source_line,  \
+                 setting->name)                                                                                        \
+        valid = KAN_FALSE;                                                                                             \
+    }                                                                                                                  \
+    else
+
 #define SETTING_REQUIRE_TYPE(TYPE, TYPE_NAME)                                                                          \
     if (setting->type != TYPE)                                                                                         \
     {                                                                                                                  \
@@ -26,8 +46,329 @@
         valid = KAN_FALSE;                                                                                             \
     }
 
-static kan_bool_t emit_meta_graphics_classic_settings (struct rpl_compiler_instance_t *instance,
-                                                       struct kan_rpl_meta_t *meta)
+static inline kan_bool_t emit_meta_check_common_setting (struct rpl_compiler_instance_t *instance,
+                                                         struct kan_rpl_meta_t *meta,
+                                                         struct compiler_instance_setting_node_t *setting)
+{
+    kan_bool_t valid = KAN_TRUE;
+    if (setting->name == STATICS.interned_color_blend_constant_r)
+    {
+        SETTING_REQUIRE_TYPE (KAN_RPL_SETTING_TYPE_FLOATING, "floating")
+        SETTING_REQUIRE_NOT_IN_BLOCK
+        {
+            meta->color_blend_constant_r = setting->floating;
+        }
+    }
+    else if (setting->name == STATICS.interned_color_blend_constant_g)
+    {
+        SETTING_REQUIRE_TYPE (KAN_RPL_SETTING_TYPE_FLOATING, "floating")
+        SETTING_REQUIRE_NOT_IN_BLOCK
+        {
+            meta->color_blend_constant_g = setting->floating;
+        }
+    }
+    else if (setting->name == STATICS.interned_color_blend_constant_b)
+    {
+        SETTING_REQUIRE_TYPE (KAN_RPL_SETTING_TYPE_FLOATING, "floating")
+        SETTING_REQUIRE_NOT_IN_BLOCK
+        {
+            meta->color_blend_constant_b = setting->floating;
+        }
+    }
+    else if (setting->name == STATICS.interned_color_blend_constant_a)
+    {
+        SETTING_REQUIRE_TYPE (KAN_RPL_SETTING_TYPE_FLOATING, "floating")
+        SETTING_REQUIRE_NOT_IN_BLOCK
+        {
+            meta->color_blend_constant_a = setting->floating;
+        }
+    }
+    else
+    {
+        valid = KAN_FALSE;
+    }
+
+    return valid;
+}
+
+static inline kan_bool_t emit_meta_check_graphics_classic_setting (struct rpl_compiler_instance_t *instance,
+                                                                   struct kan_rpl_meta_t *meta,
+                                                                   struct compiler_instance_setting_node_t *setting)
+{
+    kan_bool_t valid = KAN_TRUE;
+    if (setting->name == STATICS.interned_polygon_mode)
+    {
+        SETTING_REQUIRE_TYPE (KAN_RPL_SETTING_TYPE_STRING, "string")
+        SETTING_REQUIRE_NOT_IN_BLOCK
+        {
+            SETTING_STRING_VALUE (STATICS.interned_fill, KAN_RPL_POLYGON_MODE_FILL,
+                                  meta->graphics_classic_settings.polygon_mode)
+            SETTING_STRING_VALUE (STATICS.interned_wireframe, KAN_RPL_POLYGON_MODE_WIREFRAME,
+                                  meta->graphics_classic_settings.polygon_mode)
+            SETTING_STRING_NO_MORE_VALUES
+        }
+    }
+    else if (setting->name == STATICS.interned_cull_mode)
+    {
+        SETTING_REQUIRE_TYPE (KAN_RPL_SETTING_TYPE_STRING, "string")
+        SETTING_REQUIRE_NOT_IN_BLOCK
+        {
+            SETTING_STRING_VALUE (STATICS.interned_back, KAN_RPL_CULL_MODE_BACK,
+                                  meta->graphics_classic_settings.cull_mode)
+            SETTING_STRING_NO_MORE_VALUES
+        }
+    }
+    else if (setting->name == STATICS.interned_depth_test)
+    {
+        SETTING_REQUIRE_TYPE (KAN_RPL_SETTING_TYPE_FLAG, "flag")
+        SETTING_REQUIRE_NOT_IN_BLOCK
+        {
+            meta->graphics_classic_settings.depth_test = setting->flag;
+        }
+    }
+    else if (setting->name == STATICS.interned_depth_write)
+    {
+        SETTING_REQUIRE_TYPE (KAN_RPL_SETTING_TYPE_FLAG, "flag")
+        SETTING_REQUIRE_NOT_IN_BLOCK
+        {
+            meta->graphics_classic_settings.depth_write = setting->flag;
+        }
+    }
+    else if (setting->name == STATICS.interned_depth_bounds_test)
+    {
+        SETTING_REQUIRE_TYPE (KAN_RPL_SETTING_TYPE_FLAG, "flag")
+        SETTING_REQUIRE_NOT_IN_BLOCK
+        {
+            meta->graphics_classic_settings.depth_bounds_test = setting->flag;
+        }
+    }
+    else if (setting->name == STATICS.interned_depth_compare_operation)
+    {
+        SETTING_REQUIRE_TYPE (KAN_RPL_SETTING_TYPE_STRING, "string")
+        SETTING_REQUIRE_NOT_IN_BLOCK
+        {
+            SETTING_STRING_VALUE (STATICS.interned_always, KAN_RPL_DEPTH_COMPARE_OPERATION_ALWAYS,
+                                  meta->graphics_classic_settings.depth_compare_operation)
+            SETTING_STRING_VALUE (STATICS.interned_never, KAN_RPL_DEPTH_COMPARE_OPERATION_NEVER,
+                                  meta->graphics_classic_settings.depth_compare_operation)
+            SETTING_STRING_VALUE (STATICS.interned_equal, KAN_RPL_DEPTH_COMPARE_OPERATION_EQUAL,
+                                  meta->graphics_classic_settings.depth_compare_operation)
+            SETTING_STRING_VALUE (STATICS.interned_not_equal, KAN_RPL_DEPTH_COMPARE_OPERATION_NOT_EQUAL,
+                                  meta->graphics_classic_settings.depth_compare_operation)
+            SETTING_STRING_VALUE (STATICS.interned_less, KAN_RPL_DEPTH_COMPARE_OPERATION_LESS,
+                                  meta->graphics_classic_settings.depth_compare_operation)
+            SETTING_STRING_VALUE (STATICS.interned_less_or_equal, KAN_RPL_DEPTH_COMPARE_OPERATION_LESS_OR_EQUAL,
+                                  meta->graphics_classic_settings.depth_compare_operation)
+            SETTING_STRING_VALUE (STATICS.interned_greater, KAN_RPL_DEPTH_COMPARE_OPERATION_GREATER,
+                                  meta->graphics_classic_settings.depth_compare_operation)
+            SETTING_STRING_VALUE (STATICS.interned_greater_or_equal, KAN_RPL_DEPTH_COMPARE_OPERATION_GREATER_OR_EQUAL,
+                                  meta->graphics_classic_settings.depth_compare_operation)
+            SETTING_STRING_NO_MORE_VALUES
+        }
+    }
+    else if (setting->name == STATICS.interned_depth_min)
+    {
+        SETTING_REQUIRE_TYPE (KAN_RPL_SETTING_TYPE_FLOATING, "floating")
+        SETTING_REQUIRE_NOT_IN_BLOCK
+        {
+            meta->graphics_classic_settings.depth_min = setting->floating;
+        }
+    }
+    else if (setting->name == STATICS.interned_depth_max)
+    {
+        SETTING_REQUIRE_TYPE (KAN_RPL_SETTING_TYPE_FLOATING, "floating")
+        SETTING_REQUIRE_NOT_IN_BLOCK
+        {
+            meta->graphics_classic_settings.depth_max = setting->floating;
+        }
+    }
+    else
+    {
+        valid = KAN_FALSE;
+    }
+
+    return valid;
+}
+
+static inline kan_bool_t emit_meta_check_color_output_setting (struct rpl_compiler_instance_t *instance,
+                                                               struct kan_rpl_meta_t *meta,
+                                                               struct compiler_instance_setting_node_t *setting)
+{
+    kan_bool_t valid = KAN_TRUE;
+#define SETTING_REQUIRE_VALID_COLOR_OUTPUT_BLOCK                                                                       \
+    if (setting->block >= meta->color_outputs.size)                                                                    \
+    {                                                                                                                  \
+        KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,                                                                  \
+                 "[%s:%s:%s:%ld] Setting \"%s\" has block index %lu while there is only %lu color outputs.",           \
+                 instance->context_log_name, setting->module_name, setting->source_name, (long) setting->source_line,  \
+                 setting->name, (unsigned long) setting->block, (unsigned long) meta->color_outputs.size)              \
+        valid = KAN_FALSE;                                                                                             \
+    }                                                                                                                  \
+    else
+
+#define COLOR_OUTPUT_BLOCK (((struct kan_rpl_meta_color_output_t *) meta->color_outputs.data)[setting->block])
+
+#define BLEND_FACTOR_VALUES(FIELD)                                                                                     \
+    SETTING_STRING_VALUE (STATICS.interned_zero, KAN_RPL_BLEND_FACTOR_ZERO, COLOR_OUTPUT_BLOCK.FIELD)                  \
+    SETTING_STRING_VALUE (STATICS.interned_one, KAN_RPL_BLEND_FACTOR_ONE, COLOR_OUTPUT_BLOCK.FIELD)                    \
+    SETTING_STRING_VALUE (STATICS.interned_source_color, KAN_RPL_BLEND_FACTOR_SOURCE_COLOR, COLOR_OUTPUT_BLOCK.FIELD)  \
+    SETTING_STRING_VALUE (STATICS.interned_one_minus_source_color, KAN_RPL_BLEND_FACTOR_ONE_MINUS_SOURCE_COLOR,        \
+                          COLOR_OUTPUT_BLOCK.FIELD)                                                                    \
+    SETTING_STRING_VALUE (STATICS.interned_destination_color, KAN_RPL_BLEND_FACTOR_DESTINATION_COLOR,                  \
+                          COLOR_OUTPUT_BLOCK.FIELD)                                                                    \
+    SETTING_STRING_VALUE (STATICS.interned_one_minus_destination_color,                                                \
+                          KAN_RPL_BLEND_FACTOR_ONE_MINUS_DESTINATION_COLOR, COLOR_OUTPUT_BLOCK.FIELD)                  \
+    SETTING_STRING_VALUE (STATICS.interned_source_alpha, KAN_RPL_BLEND_FACTOR_SOURCE_ALPHA, COLOR_OUTPUT_BLOCK.FIELD)  \
+    SETTING_STRING_VALUE (STATICS.interned_one_minus_source_alpha, KAN_RPL_BLEND_FACTOR_ONE_MINUS_SOURCE_ALPHA,        \
+                          COLOR_OUTPUT_BLOCK.FIELD)                                                                    \
+    SETTING_STRING_VALUE (STATICS.interned_destination_alpha, KAN_RPL_BLEND_FACTOR_DESTINATION_ALPHA,                  \
+                          COLOR_OUTPUT_BLOCK.FIELD)                                                                    \
+    SETTING_STRING_VALUE (STATICS.interned_one_minus_destination_alpha,                                                \
+                          KAN_RPL_BLEND_FACTOR_ONE_MINUS_DESTINATION_ALPHA, COLOR_OUTPUT_BLOCK.FIELD)                  \
+    SETTING_STRING_VALUE (STATICS.interned_constant_color, KAN_RPL_BLEND_FACTOR_CONSTANT_COLOR,                        \
+                          COLOR_OUTPUT_BLOCK.FIELD)                                                                    \
+    SETTING_STRING_VALUE (STATICS.interned_one_minus_constant_color, KAN_RPL_BLEND_FACTOR_ONE_MINUS_CONSTANT_COLOR,    \
+                          COLOR_OUTPUT_BLOCK.FIELD)                                                                    \
+    SETTING_STRING_VALUE (STATICS.interned_constant_alpha, KAN_RPL_BLEND_FACTOR_CONSTANT_ALPHA,                        \
+                          COLOR_OUTPUT_BLOCK.FIELD)                                                                    \
+    SETTING_STRING_VALUE (STATICS.interned_one_minus_constant_alpha, KAN_RPL_BLEND_FACTOR_ONE_MINUS_CONSTANT_ALPHA,    \
+                          COLOR_OUTPUT_BLOCK.FIELD)                                                                    \
+    SETTING_STRING_VALUE (STATICS.interned_source_alpha_saturate, KAN_RPL_BLEND_FACTOR_SOURCE_ALPHA_SATURATE,          \
+                          COLOR_OUTPUT_BLOCK.FIELD)                                                                    \
+    SETTING_STRING_NO_MORE_VALUES
+
+    if (setting->name == STATICS.interned_color_output_use_blend)
+    {
+        SETTING_REQUIRE_TYPE (KAN_RPL_SETTING_TYPE_FLAG, "flag")
+        SETTING_REQUIRE_IN_BLOCK
+        SETTING_REQUIRE_VALID_COLOR_OUTPUT_BLOCK
+        {
+            COLOR_OUTPUT_BLOCK.use_blend = setting->flag;
+        }
+    }
+    else if (setting->name == STATICS.interned_color_output_write_r)
+    {
+        SETTING_REQUIRE_TYPE (KAN_RPL_SETTING_TYPE_FLAG, "flag")
+        SETTING_REQUIRE_IN_BLOCK
+        SETTING_REQUIRE_VALID_COLOR_OUTPUT_BLOCK
+        {
+            COLOR_OUTPUT_BLOCK.write_r = setting->flag;
+        }
+    }
+    else if (setting->name == STATICS.interned_color_output_write_g)
+    {
+        SETTING_REQUIRE_TYPE (KAN_RPL_SETTING_TYPE_FLAG, "flag")
+        SETTING_REQUIRE_IN_BLOCK
+        SETTING_REQUIRE_VALID_COLOR_OUTPUT_BLOCK
+        {
+            COLOR_OUTPUT_BLOCK.write_g = setting->flag;
+        }
+    }
+    else if (setting->name == STATICS.interned_color_output_write_b)
+    {
+        SETTING_REQUIRE_TYPE (KAN_RPL_SETTING_TYPE_FLAG, "flag")
+        SETTING_REQUIRE_IN_BLOCK
+        SETTING_REQUIRE_VALID_COLOR_OUTPUT_BLOCK
+        {
+            COLOR_OUTPUT_BLOCK.write_b = setting->flag;
+        }
+    }
+    else if (setting->name == STATICS.interned_color_output_write_a)
+    {
+        SETTING_REQUIRE_TYPE (KAN_RPL_SETTING_TYPE_FLAG, "flag")
+        SETTING_REQUIRE_IN_BLOCK
+        SETTING_REQUIRE_VALID_COLOR_OUTPUT_BLOCK
+        {
+            COLOR_OUTPUT_BLOCK.write_a = setting->flag;
+        }
+    }
+    else if (setting->name == STATICS.interned_color_output_source_color_blend_factor)
+    {
+        SETTING_REQUIRE_TYPE (KAN_RPL_SETTING_TYPE_STRING, "string")
+        SETTING_REQUIRE_IN_BLOCK
+        SETTING_REQUIRE_VALID_COLOR_OUTPUT_BLOCK
+        {
+            BLEND_FACTOR_VALUES (source_color_blend_factor)
+        }
+    }
+    else if (setting->name == STATICS.interned_color_output_destination_color_blend_factor)
+    {
+        SETTING_REQUIRE_TYPE (KAN_RPL_SETTING_TYPE_STRING, "string")
+        SETTING_REQUIRE_IN_BLOCK
+        SETTING_REQUIRE_VALID_COLOR_OUTPUT_BLOCK
+        {
+            BLEND_FACTOR_VALUES (destination_color_blend_factor)
+        }
+    }
+    else if (setting->name == STATICS.interned_color_output_color_blend_operation)
+    {
+        SETTING_REQUIRE_TYPE (KAN_RPL_SETTING_TYPE_STRING, "string")
+        SETTING_REQUIRE_IN_BLOCK
+        SETTING_REQUIRE_VALID_COLOR_OUTPUT_BLOCK
+        {
+            SETTING_STRING_VALUE (STATICS.interned_add, KAN_RPL_BLEND_OPERATION_ADD,
+                                  COLOR_OUTPUT_BLOCK.color_blend_operation)
+            SETTING_STRING_VALUE (STATICS.interned_subtract, KAN_RPL_BLEND_OPERATION_SUBTRACT,
+                                  COLOR_OUTPUT_BLOCK.color_blend_operation)
+            SETTING_STRING_VALUE (STATICS.interned_reverse_subtract, KAN_RPL_BLEND_OPERATION_REVERSE_SUBTRACT,
+                                  COLOR_OUTPUT_BLOCK.color_blend_operation)
+            SETTING_STRING_VALUE (STATICS.interned_min, KAN_RPL_BLEND_OPERATION_MIN,
+                                  COLOR_OUTPUT_BLOCK.color_blend_operation)
+            SETTING_STRING_VALUE (STATICS.interned_max, KAN_RPL_BLEND_OPERATION_MAX,
+                                  COLOR_OUTPUT_BLOCK.color_blend_operation)
+            SETTING_STRING_NO_MORE_VALUES
+        }
+    }
+    else if (setting->name == STATICS.interned_color_output_source_alpha_blend_factor)
+    {
+        SETTING_REQUIRE_TYPE (KAN_RPL_SETTING_TYPE_STRING, "string")
+        SETTING_REQUIRE_IN_BLOCK
+        SETTING_REQUIRE_VALID_COLOR_OUTPUT_BLOCK
+        {
+            BLEND_FACTOR_VALUES (source_alpha_blend_factor)
+        }
+    }
+    else if (setting->name == STATICS.interned_color_output_destination_alpha_blend_factor)
+    {
+        SETTING_REQUIRE_TYPE (KAN_RPL_SETTING_TYPE_STRING, "string")
+        SETTING_REQUIRE_IN_BLOCK
+        SETTING_REQUIRE_VALID_COLOR_OUTPUT_BLOCK
+        {
+            BLEND_FACTOR_VALUES (destination_alpha_blend_factor)
+        }
+    }
+    else if (setting->name == STATICS.interned_color_output_alpha_blend_operation)
+    {
+        SETTING_REQUIRE_TYPE (KAN_RPL_SETTING_TYPE_STRING, "string")
+        SETTING_REQUIRE_IN_BLOCK
+        SETTING_REQUIRE_VALID_COLOR_OUTPUT_BLOCK
+        {
+            SETTING_STRING_VALUE (STATICS.interned_add, KAN_RPL_BLEND_OPERATION_ADD,
+                                  COLOR_OUTPUT_BLOCK.alpha_blend_operation)
+            SETTING_STRING_VALUE (STATICS.interned_subtract, KAN_RPL_BLEND_OPERATION_SUBTRACT,
+                                  COLOR_OUTPUT_BLOCK.alpha_blend_operation)
+            SETTING_STRING_VALUE (STATICS.interned_reverse_subtract, KAN_RPL_BLEND_OPERATION_REVERSE_SUBTRACT,
+                                  COLOR_OUTPUT_BLOCK.alpha_blend_operation)
+            SETTING_STRING_VALUE (STATICS.interned_min, KAN_RPL_BLEND_OPERATION_MIN,
+                                  COLOR_OUTPUT_BLOCK.alpha_blend_operation)
+            SETTING_STRING_VALUE (STATICS.interned_max, KAN_RPL_BLEND_OPERATION_MAX,
+                                  COLOR_OUTPUT_BLOCK.alpha_blend_operation)
+            SETTING_STRING_NO_MORE_VALUES
+        }
+    }
+    else
+    {
+        valid = KAN_FALSE;
+    }
+
+#undef SETTING_REQUIRE_VALID_COLOR_OUTPUT_BLOCK
+#undef COLOR_OUTPUT_BLOCK
+#undef BLEND_FACTOR_VALUES
+
+    return valid;
+}
+
+static kan_bool_t emit_meta_settings (struct rpl_compiler_instance_t *instance, struct kan_rpl_meta_t *meta)
 {
     kan_bool_t valid = KAN_TRUE;
     meta->graphics_classic_settings = kan_rpl_graphics_classic_pipeline_settings_default ();
@@ -35,41 +376,24 @@ static kan_bool_t emit_meta_graphics_classic_settings (struct rpl_compiler_insta
 
     while (setting)
     {
-        if (setting->name == STATICS.interned_polygon_mode)
+        kan_bool_t setting_accepted = emit_meta_check_common_setting (instance, meta, setting);
+
+        if (!setting_accepted)
         {
-            SETTING_REQUIRE_TYPE (KAN_RPL_SETTING_TYPE_STRING, "string")
+            switch (instance->pipeline_type)
             {
-                SETTING_STRING_VALUE (STATICS.interned_fill, KAN_RPL_POLYGON_MODE_FILL,
-                                      meta->graphics_classic_settings.polygon_mode)
-                SETTING_STRING_VALUE (STATICS.interned_wireframe, KAN_RPL_POLYGON_MODE_WIREFRAME,
-                                      meta->graphics_classic_settings.polygon_mode)
-                SETTING_STRING_NO_MORE_VALUES
+            case KAN_RPL_PIPELINE_TYPE_GRAPHICS_CLASSIC:
+                setting_accepted = emit_meta_check_graphics_classic_setting (instance, meta, setting);
+                break;
             }
         }
-        else if (setting->name == STATICS.interned_cull_mode)
+
+        if (!setting_accepted)
         {
-            SETTING_REQUIRE_TYPE (KAN_RPL_SETTING_TYPE_STRING, "string")
-            {
-                SETTING_STRING_VALUE (STATICS.interned_back, KAN_RPL_CULL_MODE_BACK,
-                                      meta->graphics_classic_settings.cull_mode)
-                SETTING_STRING_NO_MORE_VALUES
-            }
+            setting_accepted = emit_meta_check_color_output_setting (instance, meta, setting);
         }
-        else if (setting->name == STATICS.interned_depth_test)
-        {
-            SETTING_REQUIRE_TYPE (KAN_RPL_SETTING_TYPE_FLAG, "flag")
-            {
-                meta->graphics_classic_settings.depth_test = setting->flag;
-            }
-        }
-        else if (setting->name == STATICS.interned_depth_write)
-        {
-            SETTING_REQUIRE_TYPE (KAN_RPL_SETTING_TYPE_FLAG, "flag")
-            {
-                meta->graphics_classic_settings.depth_write = setting->flag;
-            }
-        }
-        else
+
+        if (!setting_accepted)
         {
             KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR, "[%s:%s:%s:%ld] Unknown global settings \"%s\".",
                      instance->context_log_name, setting->module_name, setting->source_name,
@@ -369,17 +693,6 @@ kan_bool_t kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t comp
     meta->pipeline_type = instance->pipeline_type;
     kan_bool_t valid = KAN_TRUE;
 
-    switch (instance->pipeline_type)
-    {
-    case KAN_RPL_PIPELINE_TYPE_GRAPHICS_CLASSIC:
-        if (!emit_meta_graphics_classic_settings (instance, meta))
-        {
-            valid = KAN_FALSE;
-        }
-
-        break;
-    }
-
     uint64_t buffer_count = 0u;
     struct compiler_instance_buffer_node_t *buffer = instance->first_buffer;
 
@@ -391,6 +704,7 @@ kan_bool_t kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t comp
 
     kan_dynamic_array_set_capacity (&meta->buffers, buffer_count);
     buffer = instance->first_buffer;
+    uint64_t color_outputs = 0u;
 
     while (buffer)
     {
@@ -411,7 +725,7 @@ kan_bool_t kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t comp
 
                 while (declaration)
                 {
-                    ++meta->graphics_classic_settings.fragment_output_count;
+                    ++color_outputs;
                     declaration = declaration->next;
                 }
             }
@@ -515,6 +829,18 @@ kan_bool_t kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t comp
         }
 
         sampler = sampler->next;
+    }
+
+    kan_dynamic_array_set_capacity (&meta->color_outputs, color_outputs);
+    for (uint64_t output_index = 0u; output_index < color_outputs; ++output_index)
+    {
+        *(struct kan_rpl_meta_color_output_t *) kan_dynamic_array_add_last (&meta->color_outputs) =
+            kan_rpl_meta_color_output_default ();
+    }
+
+    if (!emit_meta_settings (instance, meta))
+    {
+        valid = KAN_FALSE;
     }
 
     return valid;

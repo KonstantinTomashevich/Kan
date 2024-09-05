@@ -101,9 +101,11 @@ Settings are used to provide information for pipeline configuration. Accepted se
 pipeline type (for example, classic graphics or compute) which is only known to CPU during compilation.
 
 Settings are declared in global scope and follow the pattern: 
-`conditional_prefix? setting <setting_name> flag_value|integer_value|floating_value|string_value` with 
-`conditonal_prefix` being allowed to use instance options, `flag_value` being `on|off`, `integer_value` being signed 
-integer literal, `floating_value` being signed floating literal and string value be C-style `"`-guarded string literal. 
+`conditional_prefix? <setting_name> flag_value|integer_value|floating_value|string_value 
+(block unsigned_integer_value)?` with `conditonal_prefix` being allowed to use instance options, `flag_value` being 
+`on|off`, `integer_value` being signed integer literal, `floating_value` being signed floating literal and string value 
+be C-style `"`-guarded string literal, and optional block suffix for specifying blocks for settings that require block 
+context (for example there can be several color outputs, therefore we must specify color output index as block index). 
 Below are the examples of setting declarations in global scope:
 
 ```
@@ -112,6 +114,8 @@ conditional (wireframe) setting polygon_mode "wireframe";
 setting cull_mode "back";
 setting depth_test on;
 setting depth_write on;
+setting color_output_use_blend on block 0;
+setting color_output_source_color_blend_factor "source_color" block 1;
 ```
 
 ## Meta prefixes

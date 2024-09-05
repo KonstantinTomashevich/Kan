@@ -39,6 +39,19 @@ enum kan_rpl_cull_mode_t
     KAN_RPL_CULL_MODE_BACK = 0u,
 };
 
+/// \brief Enumerates supported depth compare operations.
+enum kan_rpl_depth_compare_operation_t
+{
+    KAN_RPL_DEPTH_COMPARE_OPERATION_NEVER = 0u,
+    KAN_RPL_DEPTH_COMPARE_OPERATION_ALWAYS,
+    KAN_RPL_DEPTH_COMPARE_OPERATION_EQUAL,
+    KAN_RPL_DEPTH_COMPARE_OPERATION_NOT_EQUAL,
+    KAN_RPL_DEPTH_COMPARE_OPERATION_LESS,
+    KAN_RPL_DEPTH_COMPARE_OPERATION_LESS_OR_EQUAL,
+    KAN_RPL_DEPTH_COMPARE_OPERATION_GREATER,
+    KAN_RPL_DEPTH_COMPARE_OPERATION_GREATER_OR_EQUAL,
+};
+
 /// \brief Contains resolved settings for classic graphics pipeline.
 struct kan_rpl_graphics_classic_pipeline_settings_t
 {
@@ -47,8 +60,10 @@ struct kan_rpl_graphics_classic_pipeline_settings_t
 
     kan_bool_t depth_test;
     kan_bool_t depth_write;
-
-    uint64_t fragment_output_count;
+    kan_bool_t depth_bounds_test;
+    enum kan_rpl_depth_compare_operation_t depth_compare_operation;
+    double depth_min;
+    double depth_max;
 };
 
 static inline struct kan_rpl_graphics_classic_pipeline_settings_t kan_rpl_graphics_classic_pipeline_settings_default (
@@ -59,7 +74,10 @@ static inline struct kan_rpl_graphics_classic_pipeline_settings_t kan_rpl_graphi
         .cull_mode = KAN_RPL_CULL_MODE_BACK,
         .depth_test = KAN_TRUE,
         .depth_write = KAN_TRUE,
-        .fragment_output_count = 0u,
+        .depth_bounds_test = KAN_FALSE,
+        .depth_compare_operation = KAN_RPL_DEPTH_COMPARE_OPERATION_LESS,
+        .depth_min = 0.0,
+        .depth_max = 1.0,
     };
 }
 
@@ -204,6 +222,69 @@ struct kan_rpl_meta_sampler_t
     struct kan_rpl_meta_sampler_settings_t settings;
 };
 
+/// \brief Enumerates supported blend factor values.
+enum kan_rpl_blend_factor_t
+{
+    KAN_RPL_BLEND_FACTOR_ZERO = 0u,
+    KAN_RPL_BLEND_FACTOR_ONE,
+    KAN_RPL_BLEND_FACTOR_SOURCE_COLOR,
+    KAN_RPL_BLEND_FACTOR_ONE_MINUS_SOURCE_COLOR,
+    KAN_RPL_BLEND_FACTOR_DESTINATION_COLOR,
+    KAN_RPL_BLEND_FACTOR_ONE_MINUS_DESTINATION_COLOR,
+    KAN_RPL_BLEND_FACTOR_SOURCE_ALPHA,
+    KAN_RPL_BLEND_FACTOR_ONE_MINUS_SOURCE_ALPHA,
+    KAN_RPL_BLEND_FACTOR_DESTINATION_ALPHA,
+    KAN_RPL_BLEND_FACTOR_ONE_MINUS_DESTINATION_ALPHA,
+    KAN_RPL_BLEND_FACTOR_CONSTANT_COLOR,
+    KAN_RPL_BLEND_FACTOR_ONE_MINUS_CONSTANT_COLOR,
+    KAN_RPL_BLEND_FACTOR_CONSTANT_ALPHA,
+    KAN_RPL_BLEND_FACTOR_ONE_MINUS_CONSTANT_ALPHA,
+    KAN_RPL_BLEND_FACTOR_SOURCE_ALPHA_SATURATE,
+};
+
+/// \brief Enumerates supported blend operations.
+enum kan_rpl_blend_operation_t
+{
+    KAN_RPL_BLEND_OPERATION_ADD = 0u,
+    KAN_RPL_BLEND_OPERATION_SUBTRACT,
+    KAN_RPL_BLEND_OPERATION_REVERSE_SUBTRACT,
+    KAN_RPL_BLEND_OPERATION_MIN,
+    KAN_RPL_BLEND_OPERATION_MAX,
+};
+
+/// \brief Contains configuration for single color output of the pipeline.
+struct kan_rpl_meta_color_output_t
+{
+    kan_bool_t use_blend;
+    kan_bool_t write_r;
+    kan_bool_t write_g;
+    kan_bool_t write_b;
+    kan_bool_t write_a;
+    enum kan_rpl_blend_factor_t source_color_blend_factor;
+    enum kan_rpl_blend_factor_t destination_color_blend_factor;
+    enum kan_rpl_blend_operation_t color_blend_operation;
+    enum kan_rpl_blend_factor_t source_alpha_blend_factor;
+    enum kan_rpl_blend_factor_t destination_alpha_blend_factor;
+    enum kan_rpl_blend_operation_t alpha_blend_operation;
+};
+
+static inline struct kan_rpl_meta_color_output_t kan_rpl_meta_color_output_default (void)
+{
+    return (struct kan_rpl_meta_color_output_t) {
+        .use_blend = KAN_FALSE,
+        .write_r = KAN_TRUE,
+        .write_g = KAN_TRUE,
+        .write_b = KAN_TRUE,
+        .write_a = KAN_TRUE,
+        .source_color_blend_factor = KAN_RPL_BLEND_FACTOR_ONE,
+        .destination_color_blend_factor = KAN_RPL_BLEND_FACTOR_ZERO,
+        .color_blend_operation = KAN_RPL_BLEND_OPERATION_ADD,
+        .source_alpha_blend_factor = KAN_RPL_BLEND_FACTOR_ONE,
+        .destination_alpha_blend_factor = KAN_RPL_BLEND_FACTOR_ZERO,
+        .alpha_blend_operation = KAN_RPL_BLEND_OPERATION_ADD,
+    };
+}
+
 /// \brief Provides full metadata about resolved pipeline.
 struct kan_rpl_meta_t
 {
@@ -221,6 +302,15 @@ struct kan_rpl_meta_t
 
     /// \meta reflection_dynamic_array_type = "struct kan_rpl_meta_sampler_t"
     struct kan_dynamic_array_t samplers;
+
+    /// \brief Contains information about pipeline color outputs if any.
+    /// \meta reflection_dynamic_array_type = "struct kan_rpl_meta_color_output_t"
+    struct kan_dynamic_array_t color_outputs;
+
+    double color_blend_constant_r;
+    double color_blend_constant_g;
+    double color_blend_constant_b;
+    double color_blend_constant_a;
 };
 
 RENDER_PIPELINE_LANGUAGE_API void kan_rpl_meta_init (struct kan_rpl_meta_t *instance);

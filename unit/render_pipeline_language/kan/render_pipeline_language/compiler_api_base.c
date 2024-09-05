@@ -49,17 +49,19 @@ void kan_rpl_meta_init (struct kan_rpl_meta_t *instance)
 {
     kan_rpl_compiler_ensure_statics_initialized ();
     instance->pipeline_type = KAN_RPL_PIPELINE_TYPE_GRAPHICS_CLASSIC;
-    instance->graphics_classic_settings = (struct kan_rpl_graphics_classic_pipeline_settings_t) {
-        .polygon_mode = KAN_RPL_POLYGON_MODE_FILL,
-        .cull_mode = KAN_RPL_CULL_MODE_BACK,
-        .depth_test = KAN_TRUE,
-        .depth_write = KAN_TRUE,
-    };
+    instance->graphics_classic_settings = kan_rpl_graphics_classic_pipeline_settings_default ();
 
     kan_dynamic_array_init (&instance->buffers, 0u, sizeof (struct kan_rpl_meta_buffer_t),
                             _Alignof (struct kan_rpl_meta_buffer_t), STATICS.rpl_meta_allocation_group);
     kan_dynamic_array_init (&instance->samplers, 0u, sizeof (struct kan_rpl_meta_sampler_t),
                             _Alignof (struct kan_rpl_meta_sampler_t), STATICS.rpl_meta_allocation_group);
+    kan_dynamic_array_init (&instance->color_outputs, 0u, sizeof (struct kan_rpl_meta_color_output_t),
+                            _Alignof (struct kan_rpl_meta_color_output_t), STATICS.rpl_meta_allocation_group);
+
+    instance->color_blend_constant_r = 0.0f;
+    instance->color_blend_constant_g = 0.0f;
+    instance->color_blend_constant_b = 0.0f;
+    instance->color_blend_constant_a = 0.0f;
 }
 
 void kan_rpl_meta_shutdown (struct kan_rpl_meta_t *instance)
@@ -71,6 +73,7 @@ void kan_rpl_meta_shutdown (struct kan_rpl_meta_t *instance)
 
     kan_dynamic_array_shutdown (&instance->buffers);
     kan_dynamic_array_shutdown (&instance->samplers);
+    kan_dynamic_array_shutdown (&instance->color_outputs);
 }
 
 kan_rpl_compiler_context_t kan_rpl_compiler_context_create (enum kan_rpl_pipeline_type_t pipeline_type,

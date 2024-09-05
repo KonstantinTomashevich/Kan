@@ -55,10 +55,23 @@ void kan_rpl_compiler_ensure_statics_initialized (void)
         STATICS.interned_wireframe = kan_string_intern ("wireframe");
         STATICS.interned_back = kan_string_intern ("back");
 
+        STATICS.interned_never = kan_string_intern ("never");
+        STATICS.interned_always = kan_string_intern ("always");
+        STATICS.interned_equal = kan_string_intern ("equal");
+        STATICS.interned_not_equal = kan_string_intern ("not_equal");
+        STATICS.interned_less = kan_string_intern ("less");
+        STATICS.interned_less_or_equal = kan_string_intern ("less_or_equal");
+        STATICS.interned_greater = kan_string_intern ("greater");
+        STATICS.interned_greater_or_equal = kan_string_intern ("greater_or_equal");
+
         STATICS.interned_polygon_mode = kan_string_intern ("polygon_mode");
         STATICS.interned_cull_mode = kan_string_intern ("cull_mode");
         STATICS.interned_depth_test = kan_string_intern ("depth_test");
         STATICS.interned_depth_write = kan_string_intern ("depth_write");
+        STATICS.interned_depth_bounds_test = kan_string_intern ("depth_bounds_test");
+        STATICS.interned_depth_compare_operation = kan_string_intern ("depth_compare_operation");
+        STATICS.interned_depth_min = kan_string_intern ("depth_min");
+        STATICS.interned_depth_max = kan_string_intern ("depth_max");
 
         STATICS.interned_nearest = kan_string_intern ("nearest");
         STATICS.interned_linear = kan_string_intern ("linear");
@@ -75,6 +88,49 @@ void kan_rpl_compiler_ensure_statics_initialized (void)
         STATICS.interned_address_mode_u = kan_string_intern ("address_mode_u");
         STATICS.interned_address_mode_v = kan_string_intern ("address_mode_v");
         STATICS.interned_address_mode_w = kan_string_intern ("address_mode_w");
+
+        STATICS.interned_zero = kan_string_intern ("zero");
+        STATICS.interned_one = kan_string_intern ("one");
+        STATICS.interned_source_color = kan_string_intern ("source_color");
+        STATICS.interned_one_minus_source_color = kan_string_intern ("one_minus_source_color");
+        STATICS.interned_destination_color = kan_string_intern ("destination_color");
+        STATICS.interned_one_minus_destination_color = kan_string_intern ("one_minus_destination_color");
+        STATICS.interned_source_alpha = kan_string_intern ("source_alpha");
+        STATICS.interned_one_minus_source_alpha = kan_string_intern ("one_minus_source_alpha");
+        STATICS.interned_destination_alpha = kan_string_intern ("destination_alpha");
+        STATICS.interned_one_minus_destination_alpha = kan_string_intern ("one_minus_destination_alpha");
+        STATICS.interned_constant_color = kan_string_intern ("constant_color");
+        STATICS.interned_one_minus_constant_color = kan_string_intern ("one_minus_constant_color");
+        STATICS.interned_constant_alpha = kan_string_intern ("constant_alpha");
+        STATICS.interned_one_minus_constant_alpha = kan_string_intern ("one_minus_constant_alpha");
+        STATICS.interned_source_alpha_saturate = kan_string_intern ("source_alpha_saturate");
+
+        STATICS.interned_add = kan_string_intern ("add");
+        STATICS.interned_subtract = kan_string_intern ("subtract");
+        STATICS.interned_reverse_subtract = kan_string_intern ("reverse_subtract");
+        STATICS.interned_min = kan_string_intern ("min");
+        STATICS.interned_max = kan_string_intern ("max");
+
+        STATICS.interned_color_output_use_blend = kan_string_intern ("color_output_use_blend");
+        STATICS.interned_color_output_write_r = kan_string_intern ("color_output_write_r");
+        STATICS.interned_color_output_write_g = kan_string_intern ("color_output_write_g");
+        STATICS.interned_color_output_write_b = kan_string_intern ("color_output_write_b");
+        STATICS.interned_color_output_write_a = kan_string_intern ("color_output_write_a");
+        STATICS.interned_color_output_source_color_blend_factor =
+            kan_string_intern ("color_output_source_color_blend_factor");
+        STATICS.interned_color_output_destination_color_blend_factor =
+            kan_string_intern ("color_output_destination_color_blend_factor");
+        STATICS.interned_color_output_color_blend_operation = kan_string_intern ("color_output_color_blend_operation");
+        STATICS.interned_color_output_source_alpha_blend_factor =
+            kan_string_intern ("color_output_source_alpha_blend_factor");
+        STATICS.interned_color_output_destination_alpha_blend_factor =
+            kan_string_intern ("color_output_destination_alpha_blend_factor");
+        STATICS.interned_color_output_alpha_blend_operation = kan_string_intern ("color_output_alpha_blend_operation");
+
+        STATICS.interned_color_blend_constant_r = kan_string_intern ("color_blend_constant_r");
+        STATICS.interned_color_blend_constant_g = kan_string_intern ("color_blend_constant_g");
+        STATICS.interned_color_blend_constant_b = kan_string_intern ("color_blend_constant_b");
+        STATICS.interned_color_blend_constant_a = kan_string_intern ("color_blend_constant_a");
 
         STATICS.interned_void = kan_string_intern ("void");
 

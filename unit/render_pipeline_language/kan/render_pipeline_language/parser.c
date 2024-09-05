@@ -142,6 +142,7 @@ struct parser_expression_tree_node_t
 struct parser_setting_data_t
 {
     kan_interned_string_t name;
+    uint64_t block;
     enum kan_rpl_setting_type_t type;
 
     union
@@ -661,6 +662,23 @@ static inline void re2c_restore_saved_cursor (struct dynamic_parser_state_t *par
  separator = [\x20\x0c\x0a\x0d\x09\x0b];
  identifier = [A-Za-z_][A-Za-z0-9_]*;
  comment = "//" .* "\n";
+
+ setting_block_suffix = "block" separator+ @block_begin [0-9]+ @block_end;
+ setting_declaration = "setting" separator+ @name_begin (identifier | ".")+ @name_end;
+ setting_flag_on = setting_declaration separator+ "on" (separator+ setting_block_suffix)? separator* ";";
+ setting_flag_off = setting_declaration separator+ "off" (separator+ setting_block_suffix)? separator* ";";
+
+ setting_integer_literal = @literal_begin "-"? [0-9]+ @literal_end;
+ setting_integer =
+     setting_declaration separator+ setting_integer_literal (separator+ setting_block_suffix)? separator* ";";
+
+ setting_floating_literal = @literal_begin "-"? [0-9]+ "." [0-9]+ @literal_end;
+ setting_floating =
+     setting_declaration separator+ setting_floating_literal (separator+ setting_block_suffix)? separator* ";";
+
+ setting_string_literal = "\"" @literal_begin ((. \ [\x22]) | "\\\"")* @literal_end "\"";
+ setting_string =
+     setting_declaration separator+ setting_string_literal (separator+ setting_block_suffix)? separator* ";";
  */
 
 static inline struct parser_option_t *rpl_parser_find_option (struct rpl_parser_t *parser, kan_interned_string_t name)
@@ -872,7 +890,9 @@ static inline kan_bool_t parse_main_setting_flag (struct rpl_parser_t *parser,
                                                   struct dynamic_parser_state_t *state,
                                                   const char *name_begin,
                                                   const char *name_end,
-                                                  kan_bool_t value)
+                                                  kan_bool_t value,
+                                                  const char *block_begin,
+                                                  const char *block_end)
 {
     struct parser_setting_t *node = kan_stack_group_allocator_allocate (
         &parser->allocator, sizeof (struct parser_setting_t), _Alignof (struct parser_setting_t));
@@ -891,6 +911,8 @@ static inline kan_bool_t parse_main_setting_flag (struct rpl_parser_t *parser,
     ++parser->processing_data.setting_count;
 
     node->setting.name = kan_char_sequence_intern (name_begin, name_end);
+    node->setting.block =
+        block_begin ? parse_unsigned_integer_value (parser, state, block_begin, block_end) : KAN_RPL_SETTING_BLOCK_NONE;
     node->setting.type = KAN_RPL_SETTING_TYPE_FLAG;
     node->setting.flag = value;
 
@@ -907,7 +929,9 @@ static inline kan_bool_t parse_main_setting_integer (struct rpl_parser_t *parser
                                                      const char *name_begin,
                                                      const char *name_end,
                                                      const char *literal_begin,
-                                                     const char *literal_end)
+                                                     const char *literal_end,
+                                                     const char *block_begin,
+                                                     const char *block_end)
 {
     struct parser_setting_t *node = kan_stack_group_allocator_allocate (
         &parser->allocator, sizeof (struct parser_setting_t), _Alignof (struct parser_setting_t));
@@ -926,6 +950,8 @@ static inline kan_bool_t parse_main_setting_integer (struct rpl_parser_t *parser
     ++parser->processing_data.setting_count;
 
     node->setting.name = kan_char_sequence_intern (name_begin, name_end);
+    node->setting.block =
+        block_begin ? parse_unsigned_integer_value (parser, state, block_begin, block_end) : KAN_RPL_SETTING_BLOCK_NONE;
     node->setting.type = KAN_RPL_SETTING_TYPE_INTEGER;
 
     const kan_bool_t negative = *literal_begin == '-';
@@ -962,7 +988,9 @@ static inline kan_bool_t parse_main_setting_floating (struct rpl_parser_t *parse
                                                       const char *name_begin,
                                                       const char *name_end,
                                                       const char *literal_begin,
-                                                      const char *literal_end)
+                                                      const char *literal_end,
+                                                      const char *block_begin,
+                                                      const char *block_end)
 {
     struct parser_setting_t *node = kan_stack_group_allocator_allocate (
         &parser->allocator, sizeof (struct parser_setting_t), _Alignof (struct parser_setting_t));
@@ -981,6 +1009,8 @@ static inline kan_bool_t parse_main_setting_floating (struct rpl_parser_t *parse
     ++parser->processing_data.setting_count;
 
     node->setting.name = kan_char_sequence_intern (name_begin, name_end);
+    node->setting.block =
+        block_begin ? parse_unsigned_integer_value (parser, state, block_begin, block_end) : KAN_RPL_SETTING_BLOCK_NONE;
     node->setting.type = KAN_RPL_SETTING_TYPE_FLOATING;
 
     const kan_bool_t negative = *literal_begin == '-';
@@ -1010,7 +1040,9 @@ static inline kan_bool_t parse_main_setting_string (struct rpl_parser_t *parser,
                                                     const char *name_begin,
                                                     const char *name_end,
                                                     const char *literal_begin,
-                                                    const char *literal_end)
+                                                    const char *literal_end,
+                                                    const char *block_begin,
+                                                    const char *block_end)
 {
     struct parser_setting_t *node = kan_stack_group_allocator_allocate (
         &parser->allocator, sizeof (struct parser_setting_t), _Alignof (struct parser_setting_t));
@@ -1029,6 +1061,8 @@ static inline kan_bool_t parse_main_setting_string (struct rpl_parser_t *parser,
     ++parser->processing_data.setting_count;
 
     node->setting.name = kan_char_sequence_intern (name_begin, name_end);
+    node->setting.block =
+        block_begin ? parse_unsigned_integer_value (parser, state, block_begin, block_end) : KAN_RPL_SETTING_BLOCK_NONE;
     node->setting.type = KAN_RPL_SETTING_TYPE_STRING;
     node->setting.string = kan_char_sequence_intern (literal_begin, literal_end);
 
@@ -1134,6 +1168,8 @@ static kan_bool_t parse_main (struct rpl_parser_t *parser, struct dynamic_parser
         const char *literal_end;
         const char *type_name_begin;
         const char *type_name_end;
+        const char *block_begin;
+        const char *block_end;
 
 #define CHECKED(...)                                                                                                   \
     if (!(__VA_ARGS__))                                                                                                \
@@ -1191,23 +1227,29 @@ static kan_bool_t parse_main (struct rpl_parser_t *parser, struct dynamic_parser
              continue;
          }
 
-         "setting" separator+ @name_begin (identifier | ".")+ @name_end separator+ "on" separator* ";"
-         { CHECKED (parse_main_setting_flag (parser, state, name_begin, name_end, KAN_TRUE)) }
+         setting_flag_on
+         { CHECKED (parse_main_setting_flag (parser, state, name_begin, name_end, KAN_TRUE, block_begin, block_end)) }
 
-         "setting" separator+ @name_begin (identifier | ".")+ @name_end separator+ "off" separator* ";"
-         { CHECKED (parse_main_setting_flag (parser, state, name_begin, name_end, KAN_FALSE)) }
+         setting_flag_off
+         { CHECKED (parse_main_setting_flag (parser, state, name_begin, name_end, KAN_FALSE, block_begin, block_end)) }
 
-         "setting" separator+ @name_begin (identifier | ".")+ @name_end separator+
-         @literal_begin "-"? [0-9]+ @literal_end separator* ";"
-         { CHECKED (parse_main_setting_integer (parser, state, name_begin, name_end, literal_begin, literal_end)) }
+         setting_integer
+         {
+             CHECKED (parse_main_setting_integer (parser, state, name_begin, name_end, literal_begin, literal_end,
+                                                  block_begin, block_end))
+         }
 
-         "setting" separator+ @name_begin (identifier | ".")+ @name_end separator+
-         @literal_begin "-"? [0-9]+ "." [0-9]+ @literal_end separator* ";"
-         { CHECKED (parse_main_setting_floating (parser, state, name_begin, name_end, literal_begin, literal_end)) }
+         setting_floating
+         {
+             CHECKED (parse_main_setting_floating (parser, state, name_begin, name_end, literal_begin, literal_end,
+                                                  block_begin, block_end))
+         }
 
-         "setting" separator+ @name_begin (identifier | ".")+ @name_end separator+
-         "\"" @literal_begin ((. \ [\x22]) | "\\\"")* @literal_end "\"" separator* ";"
-         { CHECKED (parse_main_setting_string (parser, state, name_begin, name_end, literal_begin, literal_end)) }
+         setting_string
+         {
+             CHECKED (parse_main_setting_string (parser, state, name_begin, name_end, literal_begin, literal_end,
+                                                  block_begin, block_end))
+         }
 
          "struct" separator+ @name_begin identifier @name_end separator* "{"
          { CHECKED (parse_main_struct (parser, state, name_begin, name_end)) }
@@ -2410,13 +2452,17 @@ static inline kan_bool_t parse_sampler_setting_flag (struct rpl_parser_t *parser
                                                      struct parser_sampler_t *sampler,
                                                      const char *name_begin,
                                                      const char *name_end,
-                                                     kan_bool_t value)
+                                                     kan_bool_t value,
+                                                     const char *block_begin,
+                                                     const char *block_end)
 {
     kan_interned_string_t name = kan_char_sequence_intern (name_begin, name_end);
     struct parser_setting_list_item_t *item = kan_stack_group_allocator_allocate (
         &parser->allocator, sizeof (struct parser_setting_list_item_t), _Alignof (struct parser_setting_list_item_t));
 
     item->setting.name = name;
+    item->setting.block =
+        block_begin ? parse_unsigned_integer_value (parser, state, block_begin, block_end) : KAN_RPL_SETTING_BLOCK_NONE;
     item->setting.type = KAN_RPL_SETTING_TYPE_FLAG;
     item->setting.flag = value;
 
@@ -2446,13 +2492,17 @@ static inline kan_bool_t parse_sampler_setting_integer (struct rpl_parser_t *par
                                                         const char *name_begin,
                                                         const char *name_end,
                                                         const char *literal_begin,
-                                                        const char *literal_end)
+                                                        const char *literal_end,
+                                                        const char *block_begin,
+                                                        const char *block_end)
 {
     kan_interned_string_t name = kan_char_sequence_intern (name_begin, name_end);
     struct parser_setting_list_item_t *item = kan_stack_group_allocator_allocate (
         &parser->allocator, sizeof (struct parser_setting_list_item_t), _Alignof (struct parser_setting_list_item_t));
 
     item->setting.name = name;
+    item->setting.block =
+        block_begin ? parse_unsigned_integer_value (parser, state, block_begin, block_end) : KAN_RPL_SETTING_BLOCK_NONE;
     item->setting.type = KAN_RPL_SETTING_TYPE_INTEGER;
 
     const kan_bool_t negative = *literal_begin == '-';
@@ -2501,13 +2551,17 @@ static inline kan_bool_t parse_sampler_setting_floating (struct rpl_parser_t *pa
                                                          const char *name_begin,
                                                          const char *name_end,
                                                          const char *literal_begin,
-                                                         const char *literal_end)
+                                                         const char *literal_end,
+                                                         const char *block_begin,
+                                                         const char *block_end)
 {
     kan_interned_string_t name = kan_char_sequence_intern (name_begin, name_end);
     struct parser_setting_list_item_t *item = kan_stack_group_allocator_allocate (
         &parser->allocator, sizeof (struct parser_setting_list_item_t), _Alignof (struct parser_setting_list_item_t));
 
     item->setting.name = name;
+    item->setting.block =
+        block_begin ? parse_unsigned_integer_value (parser, state, block_begin, block_end) : KAN_RPL_SETTING_BLOCK_NONE;
     item->setting.type = KAN_RPL_SETTING_TYPE_FLOATING;
 
     const kan_bool_t negative = *literal_begin == '-';
@@ -2550,13 +2604,17 @@ static inline kan_bool_t parse_sampler_setting_string (struct rpl_parser_t *pars
                                                        const char *name_begin,
                                                        const char *name_end,
                                                        const char *literal_begin,
-                                                       const char *literal_end)
+                                                       const char *literal_end,
+                                                       const char *block_begin,
+                                                       const char *block_end)
 {
     kan_interned_string_t name = kan_char_sequence_intern (name_begin, name_end);
     struct parser_setting_list_item_t *item = kan_stack_group_allocator_allocate (
         &parser->allocator, sizeof (struct parser_setting_list_item_t), _Alignof (struct parser_setting_list_item_t));
 
     item->setting.name = name;
+    item->setting.block =
+        block_begin ? parse_unsigned_integer_value (parser, state, block_begin, block_end) : KAN_RPL_SETTING_BLOCK_NONE;
     item->setting.type = KAN_RPL_SETTING_TYPE_STRING;
     item->setting.string = kan_char_sequence_intern (literal_begin, literal_end);
 
@@ -2591,6 +2649,8 @@ static inline kan_bool_t parse_sampler_settings (struct rpl_parser_t *parser,
         const char *name_end;
         const char *literal_begin;
         const char *literal_end;
+        const char *block_begin;
+        const char *block_end;
 
 #define CHECKED(...)                                                                                                   \
     if (!(__VA_ARGS__))                                                                                                \
@@ -2611,31 +2671,34 @@ static inline kan_bool_t parse_sampler_settings (struct rpl_parser_t *parser,
              continue;
          }
 
-         "setting" separator+ @name_begin (identifier | ".")+ @name_end separator+ "on" separator* ";"
-         { CHECKED (parse_sampler_setting_flag (parser, state, sampler, name_begin, name_end, KAN_TRUE)) }
-
-         "setting" separator+ @name_begin (identifier | ".")+ @name_end separator+ "off" separator* ";"
-         { CHECKED (parse_sampler_setting_flag (parser, state, sampler, name_begin, name_end, KAN_FALSE)) }
-
-         "setting" separator+ @name_begin (identifier | ".")+ @name_end separator+
-         @literal_begin "-"? [0-9]+ @literal_end separator* ";"
+         setting_flag_on
          {
-             CHECKED (parse_sampler_setting_integer (
-                     parser, state, sampler, name_begin, name_end, literal_begin, literal_end))
+             CHECKED (parse_sampler_setting_flag (parser, state, sampler, name_begin, name_end, KAN_TRUE,
+                                                  block_begin, block_end))
          }
 
-         "setting" separator+ @name_begin (identifier | ".")+ @name_end separator+
-         @literal_begin "-"? [0-9]+ "." [0-9]+ @literal_end separator* ";"
+         setting_flag_off
          {
-             CHECKED (parse_sampler_setting_floating (
-                     parser, state, sampler, name_begin, name_end, literal_begin, literal_end))
+             CHECKED (parse_sampler_setting_flag (parser, state, sampler, name_begin, name_end, KAN_FALSE,
+                                                  block_begin, block_end))
          }
 
-         "setting" separator+ @name_begin (identifier | ".")+ @name_end separator+
-         "\"" @literal_begin ((. \ [\x22]) | "\\\"")* @literal_end "\"" separator* ";"
+         setting_integer
          {
-             CHECKED (parse_sampler_setting_string (
-                     parser, state, sampler, name_begin, name_end, literal_begin, literal_end))
+             CHECKED (parse_sampler_setting_integer (parser, state, sampler, name_begin, name_end,
+                                                     literal_begin, literal_end, block_begin, block_end))
+         }
+
+         setting_floating
+         {
+             CHECKED (parse_sampler_setting_floating (parser, state, sampler, name_begin, name_end,
+                                                      literal_begin, literal_end, block_begin, block_end))
+         }
+
+         setting_string
+         {
+             CHECKED (parse_sampler_setting_string (parser, state, sampler, name_begin, name_end,
+                                                    literal_begin, literal_end, block_begin, block_end))
          }
 
          "}" separator* ";" { return KAN_TRUE; }
@@ -3714,6 +3777,7 @@ static kan_bool_t build_intermediate_setting (struct rpl_parser_t *instance,
                                               struct kan_rpl_setting_t *output)
 {
     output->name = setting->name;
+    output->block = setting->block;
     output->type = setting->type;
     output->conditional_index = KAN_RPL_EXPRESSION_INDEX_NONE;
     output->source_name = setting->source_log_name;

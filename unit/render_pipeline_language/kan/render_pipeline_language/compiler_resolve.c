@@ -603,6 +603,7 @@ static kan_bool_t resolve_settings (struct rpl_compiler_context_t *context,
 
             target_setting->next = NULL;
             target_setting->name = source_setting->name;
+            target_setting->block = source_setting->block;
             target_setting->type = source_setting->type;
             target_setting->module_name = intermediate->log_name;
             target_setting->source_name = source_setting->source_name;

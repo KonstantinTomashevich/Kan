@@ -271,10 +271,13 @@ enum kan_rpl_setting_type_t
     KAN_RPL_SETTING_TYPE_STRING,
 };
 
+#define KAN_RPL_SETTING_BLOCK_NONE UINT64_MAX
+
 /// \brief Defines structure that holds one setting data.
 struct kan_rpl_setting_t
 {
     kan_interned_string_t name;
+    uint64_t block;
     enum kan_rpl_setting_type_t type;
 
     union
