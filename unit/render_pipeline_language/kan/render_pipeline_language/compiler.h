@@ -109,9 +109,20 @@ struct kan_rpl_meta_buffer_t
 {
     kan_interned_string_t name;
 
+    /// \brief Descriptor set in which buffer binding should be passed.
+    /// \details Currently we are only using sets to separate stable and unstable bindings.
+    uint64_t set;
+
     /// \brief Binding point index for buffer.
     /// \details Vertex buffer binding for vertex attribute buffers or buffer binding point for other buffers.
     uint64_t binding;
+
+    /// \brief If true, binding changes very rarely and therefore can be cached.
+    ///        Otherwise, binding is prone to be changed every frame.
+    /// \details Currently there is no language feature to specify stable and unstable bindings.
+    ///          But we assume that instancing buffers are unstable and all other buffers are stable.
+    ///          Nevertheless, it can change in the future, therefore this property was introduced to avoid hardcode.
+    kan_bool_t stable_binding;
 
     /// \brief Buffer type.
     /// \details Stage outputs are not listed in meta buffers.
@@ -187,6 +198,7 @@ static inline struct kan_rpl_meta_sampler_settings_t kan_rpl_meta_sampler_settin
 struct kan_rpl_meta_sampler_t
 {
     kan_interned_string_t name;
+    uint64_t set;
     uint64_t binding;
     enum kan_rpl_sampler_type_t type;
     struct kan_rpl_meta_sampler_settings_t settings;

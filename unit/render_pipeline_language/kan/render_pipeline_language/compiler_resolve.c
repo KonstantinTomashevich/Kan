@@ -951,7 +951,22 @@ static kan_bool_t flatten_buffer_process_field (struct rpl_compiler_context_t *c
         case KAN_RPL_BUFFER_TYPE_VERTEX_ATTRIBUTE:
         case KAN_RPL_BUFFER_TYPE_INSTANCED_ATTRIBUTE:
             flattened->location = assignment_counter->next_attribute_location;
-            ++assignment_counter->next_attribute_location;
+            if (flattened->source_declaration->variable.type.if_vector)
+            {
+                ++assignment_counter->next_attribute_location;
+            }
+            else if (flattened->source_declaration->variable.type.if_matrix)
+            {
+                // Unfortunately, most graphic APIs cannot push matrix as one attribute,
+                // therefore we need to process one matrix attribute as several column attributes.
+                assignment_counter->next_attribute_location +=
+                    flattened->source_declaration->variable.type.if_matrix->columns;
+            }
+            else
+            {
+                KAN_ASSERT (KAN_FALSE)
+            }
+
             break;
 
         case KAN_RPL_BUFFER_TYPE_UNIFORM:
@@ -1202,22 +1217,34 @@ static kan_bool_t resolve_buffers (struct rpl_compiler_context_t *context,
             {
             case KAN_RPL_BUFFER_TYPE_VERTEX_ATTRIBUTE:
             case KAN_RPL_BUFFER_TYPE_INSTANCED_ATTRIBUTE:
+                target_buffer->set = 0u;
                 target_buffer->binding = assignment_counter->next_attribute_buffer_binding;
                 ++assignment_counter->next_attribute_buffer_binding;
+                target_buffer->stable_binding = KAN_TRUE;
                 break;
 
             case KAN_RPL_BUFFER_TYPE_UNIFORM:
             case KAN_RPL_BUFFER_TYPE_READ_ONLY_STORAGE:
+                target_buffer->set = 0u;
+                target_buffer->binding = assignment_counter->next_arbitrary_stable_buffer_binding;
+                ++assignment_counter->next_arbitrary_stable_buffer_binding;
+                target_buffer->stable_binding = KAN_TRUE;
+                break;
+
             case KAN_RPL_BUFFER_TYPE_INSTANCED_UNIFORM:
             case KAN_RPL_BUFFER_TYPE_INSTANCED_READ_ONLY_STORAGE:
-                target_buffer->binding = assignment_counter->next_arbitrary_buffer_binding;
-                ++assignment_counter->next_arbitrary_buffer_binding;
+                target_buffer->set = 1u;
+                target_buffer->binding = assignment_counter->next_arbitrary_unstable_buffer_binding;
+                ++assignment_counter->next_arbitrary_unstable_buffer_binding;
+                target_buffer->stable_binding = KAN_FALSE;
                 break;
 
             case KAN_RPL_BUFFER_TYPE_VERTEX_STAGE_OUTPUT:
             case KAN_RPL_BUFFER_TYPE_FRAGMENT_STAGE_OUTPUT:
                 // Not an external buffers, so no binding.
+                target_buffer->set = INVALID_SET;
                 target_buffer->binding = INVALID_BINDING;
+                target_buffer->stable_binding = KAN_FALSE;
                 break;
             }
 
@@ -1368,8 +1395,9 @@ static kan_bool_t resolve_samplers (struct rpl_compiler_context_t *context,
             target_sampler->type = source_sampler->type;
 
             target_sampler->used = KAN_FALSE;
-            target_sampler->binding = assignment_counter->next_arbitrary_buffer_binding;
-            ++assignment_counter->next_arbitrary_buffer_binding;
+            target_sampler->set = 0u;
+            target_sampler->binding = assignment_counter->next_arbitrary_stable_buffer_binding;
+            ++assignment_counter->next_arbitrary_stable_buffer_binding;
 
             struct compiler_instance_setting_node_t *first_setting = NULL;
             struct compiler_instance_setting_node_t *last_setting = NULL;
@@ -4081,7 +4109,8 @@ kan_rpl_compiler_instance_t kan_rpl_compiler_context_resolve (kan_rpl_compiler_c
     kan_bool_t successfully_resolved = KAN_TRUE;
     struct binding_location_assignment_counter_t assignment_counter = {
         .next_attribute_buffer_binding = 0u,
-        .next_arbitrary_buffer_binding = 0u,
+        .next_arbitrary_stable_buffer_binding = 0u,
+        .next_arbitrary_unstable_buffer_binding = 0u,
         .next_attribute_location = 0u,
         .next_vertex_output_location = 0u,
         .next_fragment_output_location = 0u,

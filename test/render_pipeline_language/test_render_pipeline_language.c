@@ -108,6 +108,7 @@ KAN_TEST_CASE (generic)
     KAN_TEST_ASSERT (meta.buffers.size == 3u)
     struct kan_rpl_meta_buffer_t *buffer_meta = &((struct kan_rpl_meta_buffer_t *) meta.buffers.data)[0u];
     KAN_TEST_CHECK (strcmp (buffer_meta->name, "vertex") == 0)
+    KAN_TEST_CHECK (buffer_meta->set == 0u)
     KAN_TEST_CHECK (buffer_meta->binding == 0u)
     KAN_TEST_CHECK (buffer_meta->type == KAN_RPL_BUFFER_TYPE_VERTEX_ATTRIBUTE)
     KAN_TEST_CHECK (buffer_meta->size == 48u)
@@ -143,7 +144,9 @@ KAN_TEST_CASE (generic)
 
     buffer_meta = &((struct kan_rpl_meta_buffer_t *) meta.buffers.data)[1u];
     KAN_TEST_CHECK (strcmp (buffer_meta->name, "instance_storage") == 0)
+    KAN_TEST_CHECK (buffer_meta->set == 1u)
     KAN_TEST_CHECK (buffer_meta->binding == 0u)
+    KAN_TEST_CHECK (!buffer_meta->stable_binding)
     KAN_TEST_CHECK (buffer_meta->type == KAN_RPL_BUFFER_TYPE_INSTANCED_READ_ONLY_STORAGE)
     KAN_TEST_CHECK (buffer_meta->size == 65552u)
 
@@ -169,7 +172,9 @@ KAN_TEST_CASE (generic)
 
     buffer_meta = &((struct kan_rpl_meta_buffer_t *) meta.buffers.data)[2u];
     KAN_TEST_CHECK (strcmp (buffer_meta->name, "uniforms") == 0)
-    KAN_TEST_CHECK (buffer_meta->binding == 1u)
+    KAN_TEST_CHECK (buffer_meta->set == 0u)
+    KAN_TEST_CHECK (buffer_meta->binding == 0u)
+    KAN_TEST_CHECK (buffer_meta->stable_binding)
     KAN_TEST_CHECK (buffer_meta->type == KAN_RPL_BUFFER_TYPE_UNIFORM)
     KAN_TEST_CHECK (buffer_meta->size == 64u)
 
@@ -187,7 +192,8 @@ KAN_TEST_CASE (generic)
 
     KAN_TEST_ASSERT (meta.samplers.size == 1u)
     struct kan_rpl_meta_sampler_t *sampler_meta = &((struct kan_rpl_meta_sampler_t *) meta.samplers.data)[0u];
-    KAN_TEST_CHECK (sampler_meta->binding == 2u)
+    KAN_TEST_CHECK (sampler_meta->set == 0u)
+    KAN_TEST_CHECK (sampler_meta->binding == 1u)
     KAN_TEST_CHECK (sampler_meta->type == KAN_RPL_SAMPLER_TYPE_2D)
     KAN_TEST_CHECK (sampler_meta->settings.mag_filter == KAN_RPL_META_SAMPLER_FILTER_NEAREST)
     KAN_TEST_CHECK (sampler_meta->settings.min_filter == KAN_RPL_META_SAMPLER_FILTER_NEAREST)

@@ -22,7 +22,9 @@ void kan_rpl_meta_parameter_shutdown (struct kan_rpl_meta_parameter_t *instance)
 void kan_rpl_meta_buffer_init (struct kan_rpl_meta_buffer_t *instance)
 {
     instance->name = NULL;
+    instance->set = 0u;
     instance->binding = 0u;
+    instance->stable_binding = KAN_TRUE;
     instance->type = KAN_RPL_BUFFER_TYPE_VERTEX_ATTRIBUTE;
     instance->size = 0u;
     kan_dynamic_array_init (&instance->attributes, 0u, sizeof (struct kan_rpl_meta_attribute_t),

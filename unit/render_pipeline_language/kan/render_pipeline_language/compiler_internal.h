@@ -124,12 +124,14 @@ struct flattening_name_generation_buffer_t
 };
 
 #define INVALID_LOCATION UINT64_MAX
+#define INVALID_SET UINT64_MAX
 #define INVALID_BINDING UINT64_MAX
 
 struct binding_location_assignment_counter_t
 {
     uint64_t next_attribute_buffer_binding;
-    uint64_t next_arbitrary_buffer_binding;
+    uint64_t next_arbitrary_stable_buffer_binding;
+    uint64_t next_arbitrary_unstable_buffer_binding;
     uint64_t next_attribute_location;
     uint64_t next_vertex_output_location;
     uint64_t next_fragment_output_location;
@@ -165,7 +167,10 @@ struct compiler_instance_buffer_node_t
     uint64_t alignment;
     struct compiler_instance_declaration_node_t *first_field;
 
+    uint64_t set;
     uint64_t binding;
+    kan_bool_t stable_binding;
+
     struct compiler_instance_buffer_flattening_graph_node_t *flattening_graph_base;
     struct compiler_instance_buffer_flattened_declaration_t *first_flattened_declaration;
     struct compiler_instance_buffer_flattened_declaration_t *last_flattened_declaration;
@@ -184,6 +189,7 @@ struct compiler_instance_sampler_node_t
     enum kan_rpl_sampler_type_t type;
     kan_bool_t used;
 
+    uint64_t set;
     uint64_t binding;
     struct compiler_instance_setting_node_t *first_setting;
 

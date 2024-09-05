@@ -425,7 +425,9 @@ kan_bool_t kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t comp
         kan_rpl_meta_buffer_init (meta_buffer);
 
         meta_buffer->name = buffer->name;
+        meta_buffer->set = buffer->set;
         meta_buffer->binding = buffer->binding;
+        meta_buffer->stable_binding = buffer->stable_binding;
         meta_buffer->type = buffer->type;
         meta_buffer->size = buffer->size;
 
@@ -503,6 +505,7 @@ kan_bool_t kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t comp
         KAN_ASSERT (meta_sampler)
 
         meta_sampler->name = sampler->name;
+        meta_sampler->set = sampler->set;
         meta_sampler->binding = sampler->binding;
         meta_sampler->type = sampler->type;
 

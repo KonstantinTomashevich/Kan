@@ -1095,13 +1095,13 @@ static inline void spirv_emit_binding (struct spirv_generation_context_t *contex
 
 static inline void spirv_emit_descriptor_set (struct spirv_generation_context_t *context,
                                               uint32_t for_id,
-                                              uint32_t descriptor_set)
+                                              uint64_t descriptor_set)
 {
     uint32_t *binding_code = spirv_new_instruction (context, &context->decoration_section, 4u);
     binding_code[0u] |= SpvOpCodeMask & SpvOpDecorate;
     binding_code[1u] = for_id;
     binding_code[2u] = SpvDecorationDescriptorSet;
-    binding_code[3u] = 0u;
+    binding_code[3u] = (uint32_t) descriptor_set;
 }
 
 static inline void spirv_emit_flattened_input_variable (
@@ -3479,7 +3479,7 @@ kan_bool_t kan_rpl_compiler_instance_emit_spirv (kan_rpl_compiler_instance_t com
             variable_code[2u] = buffer->structured_variable_spirv_id;
             variable_code[3u] = storage_type;
 
-            spirv_emit_descriptor_set (&context, buffer->structured_variable_spirv_id, 0u);
+            spirv_emit_descriptor_set (&context, buffer->structured_variable_spirv_id, buffer->set);
             spirv_emit_binding (&context, buffer->structured_variable_spirv_id, buffer->binding);
             spirv_generate_op_name (&context, buffer->structured_variable_spirv_id, buffer->name);
         }
