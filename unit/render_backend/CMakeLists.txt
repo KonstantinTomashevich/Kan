@@ -1,0 +1,5 @@
+register_abstract (render_backend)
+abstract_include ("${CMAKE_CURRENT_SOURCE_DIR}")
+abstract_require (CONCRETE_INTERFACE container INTERFACE api_common platform)
+abstract_register_implementation (NAME vulkan PARTS render_backend_vulkan)
+c_interface_scanner_setup (GLOB "*.h")
