@@ -35,3 +35,6 @@ This project uses several third-party open source libraries, listened in alphabe
 - [SDL](https://github.com/libsdl-org/SDL/) -- cross-platform direct media layer.
 - [SPIRV-Headers](https://github.com/KhronosGroup/SPIRV-Headers) -- header files for reading and writing SPIRV binary.
 - [tracy](https://github.com/wolfpld/tracy/) -- real time profiler for game development.
+- [volk](https://github.com/zeux/volk.git) -- meta loader for Vulkan graphics API.
+- [VulkanMemoryAllocator](https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator) -- library for allocating
+  GPU memory for Vulkan graphics API.

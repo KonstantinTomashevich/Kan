@@ -21,6 +21,16 @@ add_subdirectory (SPIRV-Headers)
 set (TRACY_ON_DEMAND ON)
 add_subdirectory (tracy)
 
+# volk
+if (KAN_USE_VULKAN_API)
+    add_subdirectory (volk)
+endif ()
+
+# VulkanMemoryAllocator
+if (KAN_USE_VULKAN_API)
+    add_subdirectory (VulkanMemoryAllocator)
+endif ()
+
 # re2c
 # Hack to fix re2c build on Linux: it needs stdc++, but it is not linked to it by default.
 # Due to this issue, re2c is registered last.

@@ -10,9 +10,13 @@
 // clang-format off
 #    define KAN_MUTE_THIRD_PARTY_WARNINGS_BEGIN                                                                        \
         _Pragma ("GCC diagnostic push")                                                                                \
+        _Pragma ("GCC diagnostic ignored \"-Wmissing-field-initializers\"")                                            \
+        _Pragma ("GCC diagnostic ignored \"-Wnullability-completeness\"")                                              \
         _Pragma ("GCC diagnostic ignored \"-Wpedantic\"")                                                              \
         _Pragma ("GCC diagnostic ignored \"-Wignored-attributes\"")                                                    \
-        _Pragma ("GCC diagnostic ignored \"-Wunused-function\"")
+        _Pragma ("GCC diagnostic ignored \"-Wunused-function\"")                                                       \
+        _Pragma ("GCC diagnostic ignored \"-Wunused-private-field\"")                                                  \
+        _Pragma ("GCC diagnostic ignored \"-Wunused-variable\"")
 // clang-format on
 
 #    define KAN_MUTE_THIRD_PARTY_WARNINGS_END _Pragma ("GCC diagnostic pop")
