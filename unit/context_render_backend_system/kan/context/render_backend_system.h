@@ -1,15 +1,18 @@
 #pragma once
 
-#include <render_backend_api.h>
+#include <context_render_backend_system_api.h>
 
 #include <kan/api_common/bool.h>
 #include <kan/api_common/c_header.h>
 #include <kan/container/interned_string.h>
-#include <kan/platform/application.h>
+#include <kan/context/application_system.h>
+#include <kan/context/context.h>
 
 KAN_C_HEADER_BEGIN
 
 typedef uint64_t kan_render_context_t;
+
+#define KAN_INVALID_RENDER_CONTEXT 0u
 
 typedef uint64_t kan_render_device_id_t;
 
@@ -49,17 +52,18 @@ typedef uint64_t kan_render_image_t;
 
 #define KAN_INVALID_RENDER_IMAGE 0u
 
-struct kan_render_context_description_t
+/// \brief System name for requirements and queries.
+#define KAN_CONTEXT_RENDER_BACKEND_SYSTEM_NAME "render_backend_system_t"
+
+/// \brief Contains render backend system configuration data.
+struct kan_render_backend_system_config_t
 {
-    const char *application_info_name;
+    kan_bool_t disable_render;
+    kan_interned_string_t application_info_name;
     uint64_t version_major;
     uint64_t version_minor;
     uint64_t version_patch;
-    kan_interned_string_t tracking_name;
 };
-
-RENDER_BACKEND_API kan_render_context_t
-kan_render_context_create (struct kan_render_context_description_t *description);
 
 enum kan_render_device_type_t
 {
@@ -91,29 +95,32 @@ struct kan_render_supported_devices_t
     struct kan_render_supported_device_info_t devices[];
 };
 
-RENDER_BACKEND_API struct kan_render_supported_devices_t *kan_render_context_query_devices (
-    kan_render_context_t context);
+CONTEXT_RENDER_BACKEND_SYSTEM_API struct kan_render_supported_devices_t *kan_render_backend_system_get_devices (
+    kan_context_system_handle_t render_backend_system);
 
-RENDER_BACKEND_API void kan_render_context_free_device_query_result (
-    kan_render_context_t context, struct kan_render_supported_devices_t *query_result);
+CONTEXT_RENDER_BACKEND_SYSTEM_API kan_bool_t kan_render_backend_system_select_device (
+    kan_context_system_handle_t render_backend_system, kan_render_device_id_t device);
 
-RENDER_BACKEND_API kan_bool_t kan_render_context_select_device (kan_render_context_t context,
-                                                                kan_render_device_id_t device);
+CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_context_t
+kan_render_backend_system_get_render_context (kan_context_system_handle_t render_backend_system);
 
 /// \details Submits recorded commands and presentation from previous frame, prepares data for the new frame.
 /// \return True if next frame submit should be started, false otherwise. For example, we might not be able to submit
 ///         new frame while using frames in flights when GPU is not fast enough to process all the frames.
-RENDER_BACKEND_API kan_bool_t kan_render_context_next_frame (kan_render_context_t context);
+CONTEXT_RENDER_BACKEND_SYSTEM_API kan_bool_t
+kan_render_backend_system_next_frame (kan_context_system_handle_t render_backend_system);
 
-RENDER_BACKEND_API void kan_render_context_destroy (kan_render_context_t context);
+// TODO: Add API for making screenshots. Possibly something for recording screen (useful for crashes and bug reports)?
 
-RENDER_BACKEND_API enum kan_platform_window_flag_t kan_render_get_required_window_flags (void);
+CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_surface_t
+kan_render_backend_system_create_surface (kan_context_system_handle_t render_backend_system,
+                                          kan_application_system_window_handle_t window,
+                                          kan_interned_string_t tracking_name);
 
-RENDER_BACKEND_API kan_render_surface_t kan_render_surface_create (kan_render_context_t context,
-                                                                   kan_platform_window_id_t window,
-                                                                   kan_interned_string_t tracking_name);
+CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_backend_system_destroy_surface (
+    kan_context_system_handle_t render_backend_system, kan_render_surface_t surface);
 
-RENDER_BACKEND_API void kan_render_surface_destroy (kan_render_surface_t surface);
+CONTEXT_RENDER_BACKEND_SYSTEM_API enum kan_platform_window_flag_t kan_render_get_required_window_flags (void);
 
 enum kan_render_pass_output_attachment_type_t
 {
@@ -139,10 +146,10 @@ struct kan_render_frame_buffer_description_t
     kan_interned_string_t tracking_name;
 };
 
-RENDER_BACKEND_API kan_render_frame_buffer_t kan_render_frame_buffer_create (
+CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_frame_buffer_t kan_render_frame_buffer_create (
     kan_render_context_t context, struct kan_render_frame_buffer_description_t *description);
 
-RENDER_BACKEND_API void kan_render_frame_buffer_destroy (kan_render_frame_buffer_t buffer);
+CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_frame_buffer_destroy (kan_render_frame_buffer_t buffer);
 
 // TODO: Overview of planned things.
 //       Render graph is separated into 2 parts: definition and instances.
@@ -212,43 +219,44 @@ struct kan_render_scissor_t
     uint64_t height;
 };
 
-RENDER_BACKEND_API kan_render_pass_t kan_render_pass_create (kan_render_context_t context,
-                                                             struct kan_render_pass_description_t *description);
+CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_pass_t
+kan_render_pass_create (kan_render_context_t context, struct kan_render_pass_description_t *description);
 
-RENDER_BACKEND_API kan_bool_t kan_render_pass_add_static_dependency (kan_render_pass_t pass,
-                                                                     kan_render_pass_t dependency);
+CONTEXT_RENDER_BACKEND_SYSTEM_API kan_bool_t kan_render_pass_add_static_dependency (kan_render_pass_t pass,
+                                                                                    kan_render_pass_t dependency);
 
-RENDER_BACKEND_API kan_render_pass_instance_t
+CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_pass_instance_t
 kan_render_pass_instantiate (kan_render_pass_t pass,
                              kan_render_frame_buffer_t frame_buffer,
                              struct kan_render_viewport_bounds_t *viewport_bounds,
                              struct kan_render_scissor_t *scissor);
 
-RENDER_BACKEND_API void kan_render_pass_instance_add_dynamic_dependency (kan_render_pass_instance_t pass_instance,
-                                                                         kan_render_pass_instance_t dependency);
+CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_instance_add_dynamic_dependency (
+    kan_render_pass_instance_t pass_instance, kan_render_pass_instance_t dependency);
 
-RENDER_BACKEND_API void kan_render_pass_instance_classic_graphics_pipeline (
+CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_instance_classic_graphics_pipeline (
     kan_render_pass_instance_t pass_instance, kan_render_classic_graphics_pipeline_instance_t pipeline_instance);
 
-RENDER_BACKEND_API void kan_render_pass_instance_attributes (kan_render_pass_instance_t pass_instance,
-                                                             uint64_t start_at_binding,
-                                                             uint64_t buffers_count,
-                                                             kan_render_buffer_t *buffers);
+CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_instance_attributes (kan_render_pass_instance_t pass_instance,
+                                                                            uint64_t start_at_binding,
+                                                                            uint64_t buffers_count,
+                                                                            kan_render_buffer_t *buffers);
 
-RENDER_BACKEND_API void kan_render_pass_instance_indices (kan_render_pass_instance_t pass_instance,
-                                                          kan_render_buffer_t buffer);
+CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_instance_indices (kan_render_pass_instance_t pass_instance,
+                                                                         kan_render_buffer_t buffer);
 
-RENDER_BACKEND_API void kan_render_pass_instance_draw (kan_render_pass_instance_t pass_instance,
-                                                       uint64_t vertex_offset,
-                                                       uint64_t vertex_count);
+CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_instance_draw (kan_render_pass_instance_t pass_instance,
+                                                                      uint64_t vertex_offset,
+                                                                      uint64_t vertex_count);
 
-RENDER_BACKEND_API void kan_render_pass_instance_instanced_draw (kan_render_pass_instance_t pass_instance,
-                                                                 uint64_t vertex_offset,
-                                                                 uint64_t vertex_count,
-                                                                 uint64_t instance_offset,
-                                                                 uint64_t instance_count);
+CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_instance_instanced_draw (
+    kan_render_pass_instance_t pass_instance,
+    uint64_t vertex_offset,
+    uint64_t vertex_count,
+    uint64_t instance_offset,
+    uint64_t instance_count);
 
-RENDER_BACKEND_API void kan_render_pass_destroy (kan_render_pass_t pass);
+CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_destroy (kan_render_pass_t pass);
 
 enum kan_render_stage_t
 {
@@ -330,10 +338,11 @@ struct kan_render_classic_graphics_pipeline_family_definition_t
     kan_interned_string_t tracking_name;
 };
 
-RENDER_BACKEND_API kan_render_classic_graphics_pipeline_family_t kan_render_classic_graphics_pipeline_family_create (
+CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_classic_graphics_pipeline_family_t
+kan_render_classic_graphics_pipeline_family_create (
     kan_render_context_t context, struct kan_render_classic_graphics_pipeline_family_definition_t *definition);
 
-RENDER_BACKEND_API void kan_render_classic_graphics_pipeline_family_destroy (
+CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_classic_graphics_pipeline_family_destroy (
     kan_render_classic_graphics_pipeline_family_t family);
 
 enum kan_render_polygon_mode_t
@@ -487,10 +496,11 @@ struct kan_render_classic_graphics_pipeline_definition_t
     kan_interned_string_t tracking_name;
 };
 
-RENDER_BACKEND_API kan_render_classic_graphics_pipeline_t kan_render_classic_graphics_pipeline_create (
+CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_classic_graphics_pipeline_t kan_render_classic_graphics_pipeline_create (
     kan_render_context_t context, struct kan_render_classic_graphics_pipeline_definition_t *definition);
 
-RENDER_BACKEND_API void kan_render_classic_graphics_pipeline_destroy (kan_render_classic_graphics_pipeline_t pipeline);
+CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_classic_graphics_pipeline_destroy (
+    kan_render_classic_graphics_pipeline_t pipeline);
 
 struct kan_render_layout_update_description_t
 {
@@ -504,19 +514,19 @@ struct kan_render_layout_update_description_t
     kan_render_image_t bind_image;
 };
 
-RENDER_BACKEND_API kan_render_classic_graphics_pipeline_instance_t
+CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_classic_graphics_pipeline_instance_t
 kan_render_classic_graphics_pipeline_instance_create (kan_render_context_t context,
                                                       kan_render_classic_graphics_pipeline_t pipeline,
                                                       uint64_t initial_bindings_count,
                                                       struct kan_render_layout_update_description_t *initial_bindings,
                                                       kan_interned_string_t tracking_name);
 
-RENDER_BACKEND_API void kan_render_classic_graphics_pipeline_instance_update_layout (
+CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_classic_graphics_pipeline_instance_update_layout (
     kan_render_classic_graphics_pipeline_instance_t instance,
     uint64_t bindings_count,
     struct kan_render_layout_update_description_t *bindings);
 
-RENDER_BACKEND_API void kan_render_classic_graphics_pipeline_instance_destroy (
+CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_classic_graphics_pipeline_instance_destroy (
     kan_render_classic_graphics_pipeline_instance_t instance);
 
 enum kan_render_buffer_type_t
@@ -535,17 +545,17 @@ enum kan_render_buffer_type_t
 /// \details Optional initial data allows to directly upload initial data to buffer without transfer operation on
 ///          devices with unified memory. In other cases direct upload with this devices might not be possible
 ///          due to frames in flights feature.
-RENDER_BACKEND_API kan_render_buffer_t kan_render_buffer_create (kan_render_context_t context,
-                                                                 enum kan_render_buffer_type_t type,
-                                                                 uint64_t full_size,
-                                                                 void *optional_initial_data,
-                                                                 kan_interned_string_t tracking_name);
+CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_buffer_t kan_render_buffer_create (kan_render_context_t context,
+                                                                                enum kan_render_buffer_type_t type,
+                                                                                uint64_t full_size,
+                                                                                void *optional_initial_data,
+                                                                                kan_interned_string_t tracking_name);
 
-RENDER_BACKEND_API void *kan_render_buffer_patch (kan_render_buffer_t buffer,
-                                                  uint64_t slice_offset,
-                                                  uint64_t slice_size);
+CONTEXT_RENDER_BACKEND_SYSTEM_API void *kan_render_buffer_patch (kan_render_buffer_t buffer,
+                                                                 uint64_t slice_offset,
+                                                                 uint64_t slice_size);
 
-RENDER_BACKEND_API void kan_render_buffer_destroy (kan_render_buffer_t buffer);
+CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_buffer_destroy (kan_render_buffer_t buffer);
 
 struct kan_render_allocated_slice_t
 {
@@ -555,16 +565,18 @@ struct kan_render_allocated_slice_t
 
 typedef uint64_t kan_render_frame_lifetime_buffer_allocator_t;
 
-RENDER_BACKEND_API kan_render_frame_lifetime_buffer_allocator_t
+CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_frame_lifetime_buffer_allocator_t
 kan_render_frame_lifetime_buffer_allocator_create (kan_render_context_t context,
                                                    enum kan_render_buffer_type_t buffer_type,
                                                    uint64_t page_size,
                                                    kan_interned_string_t tracking_name);
 
-RENDER_BACKEND_API struct kan_uniform_allocated_slice_t kan_render_frame_lifetime_buffer_allocator_allocate (
-    kan_render_frame_lifetime_buffer_allocator_t allocator, uint64_t size, uint64_t alignment);
+CONTEXT_RENDER_BACKEND_SYSTEM_API struct kan_uniform_allocated_slice_t
+kan_render_frame_lifetime_buffer_allocator_allocate (kan_render_frame_lifetime_buffer_allocator_t allocator,
+                                                     uint64_t size,
+                                                     uint64_t alignment);
 
-RENDER_BACKEND_API void kan_render_frame_lifetime_buffer_allocator_destroy (
+CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_frame_lifetime_buffer_allocator_destroy (
     kan_render_frame_lifetime_buffer_allocator_t allocator);
 
 // TODO: For future iterations: cube maps and layered images (aka image arrays).
@@ -596,18 +608,20 @@ struct kan_render_image_description_t
     kan_interned_string_t tracking_name;
 };
 
-RENDER_BACKEND_API kan_render_image_t kan_render_image_create (kan_render_context_t context,
-                                                               struct kan_render_image_description_t *description);
+CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_image_t
+kan_render_image_create (kan_render_context_t context, struct kan_render_image_description_t *description);
 
-RENDER_BACKEND_API enum kan_render_image_type_t kan_render_image_get_type (kan_render_image_t image);
+CONTEXT_RENDER_BACKEND_SYSTEM_API enum kan_render_image_type_t kan_render_image_get_type (kan_render_image_t image);
 
-RENDER_BACKEND_API void kan_render_image_upload_data (kan_render_image_t image, uint64_t mip, void *data);
+CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_image_upload_data (kan_render_image_t image,
+                                                                     uint64_t mip,
+                                                                     void *data);
 
-RENDER_BACKEND_API void kan_render_image_request_mip_generation (kan_render_image_t image,
-                                                                 uint64_t base,
-                                                                 uint64_t start,
-                                                                 uint64_t end);
+CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_image_request_mip_generation (kan_render_image_t image,
+                                                                                uint64_t base,
+                                                                                uint64_t start,
+                                                                                uint64_t end);
 
-RENDER_BACKEND_API void kan_render_image_destroy (kan_render_image_t image);
+CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_image_destroy (kan_render_image_t image);
 
 KAN_C_HEADER_END
