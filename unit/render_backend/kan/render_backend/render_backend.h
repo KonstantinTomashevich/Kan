@@ -49,15 +49,32 @@ typedef uint64_t kan_render_image_t;
 
 #define KAN_INVALID_RENDER_IMAGE 0u
 
-RENDER_BACKEND_API kan_render_context_t kan_render_context_create (void);
+struct kan_render_context_description_t
+{
+    const char *application_info_name;
+    uint64_t version_major;
+    uint64_t version_minor;
+    uint64_t version_patch;
+    kan_interned_string_t tracking_name;
+};
+
+RENDER_BACKEND_API kan_render_context_t
+kan_render_context_create (struct kan_render_context_description_t *description);
 
 enum kan_render_device_type_t
 {
-    KAN_RENDER_DEVICE_TYPE_DESCRITE_GPU = 0u,
+    KAN_RENDER_DEVICE_TYPE_DISCRETE_GPU = 0u,
     KAN_RENDER_DEVICE_TYPE_INTEGRATED_GPU,
     KAN_RENDER_DEVICE_TYPE_VIRTUAL_GPU,
     KAN_RENDER_DEVICE_TYPE_CPU,
     KAN_RENDER_DEVICE_TYPE_UNKNOWN,
+};
+
+enum kan_render_device_memory_type_t
+{
+    KAN_RENDER_DEVICE_MEMORY_TYPE_SEPARATE = 0u,
+    KAN_RENDER_DEVICE_MEMORY_TYPE_UNIFIED,
+    KAN_RENDER_DEVICE_MEMORY_TYPE_UNIFIED_COHERENT,
 };
 
 struct kan_render_supported_device_info_t
@@ -65,7 +82,7 @@ struct kan_render_supported_device_info_t
     kan_render_device_id_t id;
     const char *name;
     enum kan_render_device_type_t device_type;
-    kan_bool_t has_unified_memory;
+    enum kan_render_device_memory_type_t memory_type;
 };
 
 struct kan_render_supported_devices_t
@@ -77,20 +94,24 @@ struct kan_render_supported_devices_t
 RENDER_BACKEND_API struct kan_render_supported_devices_t *kan_render_context_query_devices (
     kan_render_context_t context);
 
-RENDER_BACKEND_API struct kan_render_supported_devices_t *kan_render_context_free_device_query_result (
+RENDER_BACKEND_API void kan_render_context_free_device_query_result (
     kan_render_context_t context, struct kan_render_supported_devices_t *query_result);
 
-RENDER_BACKEND_API void kan_render_context_select_device (kan_render_context_t context, kan_render_device_id_t device);
+RENDER_BACKEND_API kan_bool_t kan_render_context_select_device (kan_render_context_t context,
+                                                                kan_render_device_id_t device);
 
 /// \details Submits recorded commands and presentation from previous frame, prepares data for the new frame.
-RENDER_BACKEND_API void kan_render_context_next_frame (kan_render_context_t context);
+/// \return True if next frame submit should be started, false otherwise. For example, we might not be able to submit
+///         new frame while using frames in flights when GPU is not fast enough to process all the frames.
+RENDER_BACKEND_API kan_bool_t kan_render_context_next_frame (kan_render_context_t context);
 
 RENDER_BACKEND_API void kan_render_context_destroy (kan_render_context_t context);
 
 RENDER_BACKEND_API enum kan_platform_window_flag_t kan_render_get_required_window_flags (void);
 
 RENDER_BACKEND_API kan_render_surface_t kan_render_surface_create (kan_render_context_t context,
-                                                                   kan_platform_window_id_t window);
+                                                                   kan_platform_window_id_t window,
+                                                                   kan_interned_string_t tracking_name);
 
 RENDER_BACKEND_API void kan_render_surface_destroy (kan_render_surface_t surface);
 
@@ -115,6 +136,7 @@ struct kan_render_frame_buffer_description_t
     kan_render_pass_t associated_pass;
     uint64_t attachment_count;
     struct kan_render_frame_buffer_attachment_description_t *attachments;
+    kan_interned_string_t tracking_name;
 };
 
 RENDER_BACKEND_API kan_render_frame_buffer_t kan_render_frame_buffer_create (
@@ -169,6 +191,7 @@ struct kan_render_pass_description_t
     enum kan_render_pass_type_t type;
     uint64_t attachments_count;
     struct kan_render_pass_attachment_t *attachments;
+    kan_interned_string_t tracking_name;
 };
 
 struct kan_render_viewport_bounds_t
@@ -303,6 +326,8 @@ struct kan_render_classic_graphics_pipeline_family_definition_t
 
     uint64_t layouts_count;
     struct kan_render_layout_description_t *layouts;
+
+    kan_interned_string_t tracking_name;
 };
 
 RENDER_BACKEND_API kan_render_classic_graphics_pipeline_family_t kan_render_classic_graphics_pipeline_family_create (
@@ -458,6 +483,8 @@ struct kan_render_classic_graphics_pipeline_definition_t
 
     uint64_t samplers_count;
     struct kan_render_sampler_definition_t *samplers;
+
+    kan_interned_string_t tracking_name;
 };
 
 RENDER_BACKEND_API kan_render_classic_graphics_pipeline_t kan_render_classic_graphics_pipeline_create (
@@ -481,7 +508,8 @@ RENDER_BACKEND_API kan_render_classic_graphics_pipeline_instance_t
 kan_render_classic_graphics_pipeline_instance_create (kan_render_context_t context,
                                                       kan_render_classic_graphics_pipeline_t pipeline,
                                                       uint64_t initial_bindings_count,
-                                                      struct kan_render_layout_update_description_t *initial_bindings);
+                                                      struct kan_render_layout_update_description_t *initial_bindings,
+                                                      kan_interned_string_t tracking_name);
 
 RENDER_BACKEND_API void kan_render_classic_graphics_pipeline_instance_update_layout (
     kan_render_classic_graphics_pipeline_instance_t instance,
@@ -510,7 +538,8 @@ enum kan_render_buffer_type_t
 RENDER_BACKEND_API kan_render_buffer_t kan_render_buffer_create (kan_render_context_t context,
                                                                  enum kan_render_buffer_type_t type,
                                                                  uint64_t full_size,
-                                                                 void *optional_initial_data);
+                                                                 void *optional_initial_data,
+                                                                 kan_interned_string_t tracking_name);
 
 RENDER_BACKEND_API void *kan_render_buffer_patch (kan_render_buffer_t buffer,
                                                   uint64_t slice_offset,
@@ -526,8 +555,11 @@ struct kan_render_allocated_slice_t
 
 typedef uint64_t kan_render_frame_lifetime_buffer_allocator_t;
 
-RENDER_BACKEND_API kan_render_frame_lifetime_buffer_allocator_t kan_render_frame_lifetime_buffer_allocator_create (
-    kan_render_context_t context, enum kan_render_buffer_type_t buffer_type, uint64_t page_size);
+RENDER_BACKEND_API kan_render_frame_lifetime_buffer_allocator_t
+kan_render_frame_lifetime_buffer_allocator_create (kan_render_context_t context,
+                                                   enum kan_render_buffer_type_t buffer_type,
+                                                   uint64_t page_size,
+                                                   kan_interned_string_t tracking_name);
 
 RENDER_BACKEND_API struct kan_uniform_allocated_slice_t kan_render_frame_lifetime_buffer_allocator_allocate (
     kan_render_frame_lifetime_buffer_allocator_t allocator, uint64_t size, uint64_t alignment);
@@ -560,6 +592,8 @@ struct kan_render_image_description_t
     uint64_t mips;
 
     kan_bool_t render_target;
+
+    kan_interned_string_t tracking_name;
 };
 
 RENDER_BACKEND_API kan_render_image_t kan_render_image_create (kan_render_context_t context,

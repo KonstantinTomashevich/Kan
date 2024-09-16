@@ -442,4 +442,21 @@ PLATFORM_API char *kan_platform_application_extract_text_from_clipboard (void);
 /// \brief Puts given text into platform clipboard.
 PLATFORM_API void kan_platform_application_put_text_into_clipboard (const char *text);
 
+/// \brief Adds request for the Vulkan library to be loaded. Returns true if library is loaded and ready to be used.
+PLATFORM_API kan_bool_t kan_platform_application_register_vulkan_library_usage (void);
+
+/// \brief Attempts to find and return address for `vkGetInstanceProcAddr` function.
+/// \invariant Vulkan library should be in loaded state.
+PLATFORM_API void *kan_platform_application_request_vulkan_resolve_function (void);
+
+/// \brief Attempts to request count of supported instance extensions for Vulkan library.
+/// \details All `char *` strings added to output array will be allocated in given allocation group.
+/// \invariant Output array must not be initialized.
+/// \invariant Vulkan library should be in loaded state.
+PLATFORM_API void kan_platform_application_request_vulkan_extensions (struct kan_dynamic_array_t *output,
+                                                                      kan_allocation_group_t allocation_group);
+
+/// \brief Removes request for the Vulkan library loading. Call it when Vulkan is no longer required.
+PLATFORM_API void kan_platform_application_unregister_vulkan_library_usage (void);
+
 KAN_C_HEADER_END
