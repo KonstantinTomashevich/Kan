@@ -346,6 +346,11 @@ PLATFORM_API kan_bool_t kan_platform_application_window_get_size (kan_platform_w
                                                                   uint32_t *output_width,
                                                                   uint32_t *output_height);
 
+/// \brief Queries window size for rendering: result size is always in pixels and not in window coordinates.
+PLATFORM_API kan_bool_t kan_platform_application_window_get_size_for_render (kan_platform_window_id_t window_id,
+                                                                             uint32_t *output_width,
+                                                                             uint32_t *output_height);
+
 /// \brief Updates window minimum size.
 PLATFORM_API kan_bool_t kan_platform_application_window_set_minimum_size (kan_platform_window_id_t window_id,
                                                                           uint32_t width,
@@ -413,6 +418,17 @@ PLATFORM_API float kan_platform_application_window_get_opacity (kan_platform_win
 /// \brief Sets whether given window is focusable.
 PLATFORM_API void kan_platform_application_window_set_focusable (kan_platform_window_id_t window_id,
                                                                  kan_bool_t focusable);
+
+/// \brief Attempts to create Vulkan surface on given window using given Vulkan instance.
+PLATFORM_API uint64_t kan_platform_application_window_create_vulkan_surface (kan_platform_window_id_t window_id,
+                                                                             uint64_t vulkan_instance,
+                                                                             void *vulkan_allocation_callbacks);
+
+/// \brief Destroys Vulkan surface that was created for given window using given Vulkan instance.
+PLATFORM_API void kan_platform_application_window_destroy_vulkan_surface (kan_platform_window_id_t window_id,
+                                                                          uint64_t vulkan_instance,
+                                                                          uint64_t vulkan_surface,
+                                                                          void *vulkan_allocation_callbacks);
 
 /// \brief Destroys given window.
 PLATFORM_API void kan_platform_application_window_destroy (kan_platform_window_id_t window_id);
