@@ -21,11 +21,20 @@ struct display_info_holder_t
     struct kan_application_system_display_info_t info;
 };
 
+struct window_resource_t
+{
+    struct window_resource_t *previous;
+    struct window_resource_t *next;
+    kan_application_system_window_resource_id_t id;
+    struct kan_application_system_window_resource_binding_t binding;
+};
+
 struct window_info_holder_t
 {
     struct window_info_holder_t *previous;
     struct window_info_holder_t *next;
     struct kan_application_system_window_info_t info;
+    struct window_resource_t *first_resource;
 };
 
 enum operation_type_t
@@ -51,6 +60,8 @@ enum operation_type_t
     OPERATION_TYPE_WINDOW_SET_KEYBOARD_GRAB,
     OPERATION_TYPE_WINDOW_SET_OPACITY,
     OPERATION_TYPE_WINDOW_SET_FOCUSABLE,
+    OPERATION_TYPE_WINDOW_ADD_RESOURCE,
+    OPERATION_TYPE_WINDOW_REMOVE_RESOURCE,
     OPERATION_TYPE_WINDOW_DESTROY,
     OPERATION_TYPE_WARP_MOUSE_GLOBAL,
     OPERATION_TYPE_WARP_MOUSE_TO_WINDOW,
@@ -118,6 +129,19 @@ struct window_set_floating_point_parameter_suffix_t
     float value;
 };
 
+struct window_add_resource_suffix_t
+{
+    kan_application_system_window_handle_t window_handle;
+    kan_application_system_window_resource_id_t resource_id;
+    struct kan_application_system_window_resource_binding_t resource_binding;
+};
+
+struct window_remove_resource_suffix_t
+{
+    kan_application_system_window_handle_t window_handle;
+    kan_application_system_window_resource_id_t resource_id;
+};
+
 struct warp_mouse_global_suffix_t
 {
     float global_x;
@@ -157,6 +181,8 @@ struct operation_t
         struct window_set_size_limit_suffix_t window_set_size_limit_suffix;
         struct window_set_boolean_parameter_suffix_t window_set_boolean_parameter_suffix;
         struct window_set_floating_point_parameter_suffix_t window_set_floating_point_parameter_suffix;
+        struct window_add_resource_suffix_t window_add_resource_suffix;
+        struct window_remove_resource_suffix_t window_remove_resource_suffix;
         struct warp_mouse_global_suffix_t warp_mouse_global_suffix;
         struct warp_mouse_to_window_suffix_t warp_mouse_to_window_suffix;
         struct set_cursor_visible_suffix_t set_cursor_visible_suffix;
@@ -189,6 +215,7 @@ struct application_system_t
     struct kan_application_system_mouse_state_t mouse_state;
     char *clipboard_content;
     kan_bool_t initial_clipboard_update_done;
+    struct kan_atomic_int_t resource_id_counter;
 };
 
 static inline struct event_node_t *allocate_event_node (kan_allocation_group_t events_group)
@@ -240,6 +267,7 @@ kan_context_system_handle_t application_system_create (kan_allocation_group_t gr
 
     system->clipboard_content = NULL;
     system->initial_clipboard_update_done = KAN_FALSE;
+    system->resource_id_counter = kan_atomic_int_init (0);
     return (kan_context_system_handle_t) system;
 }
 
@@ -324,6 +352,20 @@ CONTEXT_APPLICATION_SYSTEM_API struct kan_context_system_api_t KAN_CONTEXT_SYSTE
     .destroy = application_system_destroy,
 };
 
+static inline void destroy_window_resources (struct application_system_t *system, struct window_info_holder_t *holder)
+{
+    struct window_resource_t *resource = holder->first_resource;
+    while (resource)
+    {
+        struct window_resource_t *next = resource->next;
+        resource->binding.shutdown (resource->binding.user_data, &holder->info);
+        kan_free_batched (system->window_infos_group, resource);
+        resource = next;
+    }
+
+    holder->first_resource = NULL;
+}
+
 static inline void flush_operations (struct application_system_t *system)
 {
     struct operation_t *operation = system->first_operation;
@@ -340,6 +382,9 @@ static inline void flush_operations (struct application_system_t *system)
             holder->info.id = kan_platform_application_window_create (
                 operation->window_create_suffix.title, operation->window_create_suffix.width,
                 operation->window_create_suffix.height, operation->window_create_suffix.flags);
+
+            // Technically, there is no way for resources to be attached before window creation.
+            KAN_ASSERT (!holder->first_resource)
             break;
         }
 
@@ -547,11 +592,69 @@ static inline void flush_operations (struct application_system_t *system)
             break;
         }
 
+        case OPERATION_TYPE_WINDOW_ADD_RESOURCE:
+        {
+            struct window_info_holder_t *holder =
+                (struct window_info_holder_t *) operation->window_add_resource_suffix.window_handle;
+
+            struct window_resource_t *resource =
+                kan_allocate_batched (system->window_infos_group, sizeof (struct window_resource_t));
+            resource->id = operation->window_add_resource_suffix.resource_id;
+            resource->binding = operation->window_add_resource_suffix.resource_binding;
+
+            resource->next = holder->first_resource;
+            resource->previous = NULL;
+
+            if (holder->first_resource)
+            {
+                holder->first_resource->previous = resource;
+            }
+
+            holder->first_resource = resource;
+            KAN_ASSERT (holder->info.id != KAN_INVALID_PLATFORM_WINDOW_ID)
+            resource->binding.init (resource->binding.user_data, &holder->info);
+            break;
+        }
+
+        case OPERATION_TYPE_WINDOW_REMOVE_RESOURCE:
+        {
+            struct window_info_holder_t *holder =
+                (struct window_info_holder_t *) operation->window_remove_resource_suffix.window_handle;
+            struct window_resource_t *resource = holder->first_resource;
+
+            while (resource && resource->id != operation->window_remove_resource_suffix.resource_id)
+            {
+                resource = resource->next;
+            }
+
+            KAN_ASSERT (resource)
+            resource->binding.shutdown (resource->binding.user_data, &holder->info);
+
+            if (resource->next)
+            {
+                resource->next->previous = resource->previous;
+            }
+
+            if (resource->previous)
+            {
+                resource->previous->next = resource->next;
+            }
+            else
+            {
+                KAN_ASSERT (resource == holder->first_resource)
+                holder->first_resource = resource->next;
+            }
+
+            kan_free_batched (system->window_infos_group, resource);
+            break;
+        }
+
         case OPERATION_TYPE_WINDOW_DESTROY:
         {
             struct window_info_holder_t *holder =
                 (struct window_info_holder_t *) operation->window_parameterless_suffix.window_handle;
 
+            destroy_window_resources (system, holder);
             kan_platform_application_window_destroy (holder->info.id);
 
             if (holder->next)
@@ -737,6 +840,13 @@ static inline void sync_info_and_clipboard (struct application_system_t *system,
                 window->info.bounds.max_y = position_y + (int32_t) size_y;
             }
 
+            if (!kan_platform_application_window_get_size_for_render (window->info.id, &window->info.width_for_render,
+                                                                      &window->info.height_for_render))
+            {
+                window->info.width_for_render = 0u;
+                window->info.height_for_render = 0u;
+            }
+
             if (!kan_platform_application_window_get_minimum_size (window->info.id, &window->info.minimum_width,
                                                                    &window->info.minimum_height))
             {
@@ -801,8 +911,10 @@ void kan_application_system_prepare_for_destroy_in_main_thread (kan_context_syst
     {
         if (holder->info.id != KAN_INVALID_PLATFORM_WINDOW_ID)
         {
+            destroy_window_resources (system, holder);
             kan_platform_application_window_destroy (holder->info.id);
             holder->info.id = KAN_INVALID_PLATFORM_WINDOW_ID;
+            holder->first_resource = NULL;
         }
 
         holder = holder->next;
@@ -922,6 +1034,7 @@ kan_application_system_window_handle_t kan_application_system_window_create (kan
 
     window_info_holder->info.handle = (kan_application_system_window_handle_t) window_info_holder;
     window_info_holder->info.id = KAN_INVALID_PLATFORM_WINDOW_ID;
+    window_info_holder->first_resource = NULL;
     window_info_holder->previous = NULL;
     window_info_holder->next = system->first_window_info;
     system->first_window_info = window_info_holder;
@@ -1281,6 +1394,47 @@ void kan_application_window_set_focusable (kan_context_system_handle_t system_ha
     operation->type = OPERATION_TYPE_WINDOW_SET_FOCUSABLE;
     operation->window_set_boolean_parameter_suffix.window_handle = window_handle;
     operation->window_set_boolean_parameter_suffix.value = focusable;
+
+    insert_operation (system, operation);
+    kan_atomic_int_unlock (&system->operation_submission_lock);
+}
+
+kan_application_system_window_resource_id_t kan_application_system_window_add_resource (
+    kan_context_system_handle_t system_handle,
+    kan_application_system_window_handle_t window_handle,
+    struct kan_application_system_window_resource_binding_t binding)
+{
+    struct application_system_t *system = (struct application_system_t *) system_handle;
+    kan_application_system_window_resource_id_t resource_id =
+        (uint64_t) kan_atomic_int_add (&system->resource_id_counter, 1);
+
+    kan_atomic_int_lock (&system->operation_submission_lock);
+    struct operation_t *operation = kan_stack_group_allocator_allocate (
+        &system->operation_temporary_allocator, sizeof (struct operation_t), _Alignof (struct operation_t));
+
+    operation->type = OPERATION_TYPE_WINDOW_ADD_RESOURCE;
+    operation->window_add_resource_suffix.window_handle = window_handle;
+    operation->window_add_resource_suffix.resource_id = resource_id;
+    operation->window_add_resource_suffix.resource_binding = binding;
+
+    insert_operation (system, operation);
+    kan_atomic_int_unlock (&system->operation_submission_lock);
+    return resource_id;
+}
+
+CONTEXT_APPLICATION_SYSTEM_API void kan_application_system_window_remove_resource (
+    kan_context_system_handle_t system_handle,
+    kan_application_system_window_handle_t window_handle,
+    kan_application_system_window_resource_id_t resource_id)
+{
+    struct application_system_t *system = (struct application_system_t *) system_handle;
+    kan_atomic_int_lock (&system->operation_submission_lock);
+    struct operation_t *operation = kan_stack_group_allocator_allocate (
+        &system->operation_temporary_allocator, sizeof (struct operation_t), _Alignof (struct operation_t));
+
+    operation->type = OPERATION_TYPE_WINDOW_REMOVE_RESOURCE;
+    operation->window_remove_resource_suffix.window_handle = window_handle;
+    operation->window_remove_resource_suffix.resource_id = resource_id;
 
     insert_operation (system, operation);
     kan_atomic_int_unlock (&system->operation_submission_lock);

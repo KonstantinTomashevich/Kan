@@ -36,6 +36,19 @@
 /// for application system and make it possible to refer to any window before it is created. Window handles are
 /// invalidated on window destruction.
 /// \endparblock
+///
+/// \par Window resources
+/// \parblock
+/// In some cases, usually for render implementation, it is required to create and manage custom resources that are
+/// strictly attached to window lifecycle and therefore should be managed from the same thread as window without async
+/// calls. Common example is surfaces and swap chains for render backends.
+///
+/// In order to support this, concept of window resources was introduced. Any resource can be bound to window using
+/// `kan_application_system_window_resource_binding_t` with `init` and `shutdown` callbacks. `init` will be called on
+/// the main thread as soon as window is ready and able to work with resources. `shutdown` will be called before window
+/// destruction or inside command execution routine if resource was manually detached without window destruction.
+/// Therefore, through these 2 callbacks it is possible to attach and manage arbitrary window resources.
+/// \endparblock
 
 KAN_C_HEADER_BEGIN
 
@@ -80,6 +93,12 @@ struct kan_application_system_window_info_t
     enum kan_platform_window_flag_t flags;
     struct kan_platform_integer_bounds_t bounds;
 
+    /// \details Always in pixels, not in window coordinates, therefore more suitable for rendering.
+    uint32_t width_for_render;
+
+    /// \details Always in pixels, not in window coordinates, therefore more suitable for rendering.
+    uint32_t height_for_render;
+
     uint32_t minimum_width;
     uint32_t minimum_height;
 
@@ -88,6 +107,17 @@ struct kan_application_system_window_info_t
 };
 
 typedef uint64_t kan_application_system_window_info_iterator_t;
+
+/// \brief Describes window resource binding with its user data and callbacks.
+struct kan_application_system_window_resource_binding_t
+{
+    void *user_data;
+    void (*init) (void *user_data, const struct kan_application_system_window_info_t *window_info);
+    void (*shutdown) (void *user_data, const struct kan_application_system_window_info_t *window_info);
+};
+
+/// \brief Resource binding id that can be used to manually remove resource without destroying window.
+typedef uint64_t kan_application_system_window_resource_id_t;
 
 /// \brief Contains buffered information about mouse state.
 struct kan_application_system_mouse_state_t
@@ -275,6 +305,18 @@ CONTEXT_APPLICATION_SYSTEM_API void kan_application_window_set_focusable (
     kan_context_system_handle_t system_handle,
     kan_application_system_window_handle_t window_handle,
     kan_bool_t focusable);
+
+/// \brief Attaches new resource to given window and returns this resource id.
+CONTEXT_APPLICATION_SYSTEM_API kan_application_system_window_resource_id_t
+kan_application_system_window_add_resource (kan_context_system_handle_t system_handle,
+                                            kan_application_system_window_handle_t window_handle,
+                                            struct kan_application_system_window_resource_binding_t binding);
+
+/// \brief Removes resource from window using this resource id without destroying the window.
+CONTEXT_APPLICATION_SYSTEM_API void kan_application_system_window_remove_resource (
+    kan_context_system_handle_t system_handle,
+    kan_application_system_window_handle_t window_handle,
+    kan_application_system_window_resource_id_t resource_id);
 
 /// \brief Adapts `kan_platform_application_window_destroy`.
 CONTEXT_APPLICATION_SYSTEM_API void kan_application_system_window_destroy (
