@@ -59,6 +59,8 @@ typedef uint64_t kan_render_image_t;
 struct kan_render_backend_system_config_t
 {
     kan_bool_t disable_render;
+    kan_bool_t prefer_vsync;
+
     kan_interned_string_t application_info_name;
     uint64_t version_major;
     uint64_t version_minor;
@@ -496,22 +498,55 @@ struct kan_render_classic_graphics_pipeline_definition_t
     kan_interned_string_t tracking_name;
 };
 
-CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_classic_graphics_pipeline_t kan_render_classic_graphics_pipeline_create (
-    kan_render_context_t context, struct kan_render_classic_graphics_pipeline_definition_t *definition);
+/// \details Some backends need to compile pipelines for optimization. It might take considerable time (10+ms),
+///          therefore it should be done in non-blocking manner on separate thread. Priority manages which pipelines
+///          are compiled first. Pipeline is allowed to be used in any method calls even when it is not compiled, but
+///          objects that are using non-compiled pipeline will not be rendered until pipeline is compiled.
+enum kan_render_pipeline_compilation_priority_t
+{
+    /// \brief Priority for pipelines that should be ready right away even if it causes hitches in gameplay.
+    /// \details If critical pipeline is not ready by the time it is submitted, it will be compiled during submit,
+    ///          which can result in noticeable frame time hitch.
+    KAN_RENDER_PIPELINE_COMPILATION_PRIORITY_CRITICAL = 0u,
+
+    /// \brief Priority for pipelines that should be compiled as soon as possible because they are used in game world.
+    KAN_RENDER_PIPELINE_COMPILATION_PRIORITY_ACTIVE,
+
+    /// \brief Priority for pipelines that are compiled ahead of time and are not yet used by anything in the game.
+    KAN_RENDER_PIPELINE_COMPILATION_PRIORITY_CACHE,
+};
+
+CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_classic_graphics_pipeline_t
+kan_render_classic_graphics_pipeline_create (kan_render_context_t context,
+                                             struct kan_render_classic_graphics_pipeline_definition_t *definition,
+                                             enum kan_render_pipeline_compilation_priority_t compilation_priority);
+
+CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_classic_graphics_pipeline_change_compilation_priority (
+    kan_render_classic_graphics_pipeline_t pipeline,
+    enum kan_render_pipeline_compilation_priority_t compilation_priority);
 
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_classic_graphics_pipeline_destroy (
     kan_render_classic_graphics_pipeline_t pipeline);
+
+struct kan_render_layout_update_description_buffer_t
+{
+    kan_render_frame_buffer_t buffer;
+    uint64_t offset;
+    uint64_t range;
+};
+
+struct kan_render_layout_update_description_image_t
+{
+    kan_render_image_t image;
+};
 
 struct kan_render_layout_update_description_t
 {
     uint64_t set;
     uint64_t binding;
 
-    kan_render_frame_buffer_t bind_buffer;
-    uint64_t buffer_offset;
-    uint64_t buffer_range;
-
-    kan_render_image_t bind_image;
+    struct kan_render_layout_update_description_buffer_t buffer_binding;
+    struct kan_render_layout_update_description_image_t image_binding;
 };
 
 CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_classic_graphics_pipeline_instance_t
@@ -621,6 +656,16 @@ CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_image_request_mip_generation (
                                                                                 uint64_t base,
                                                                                 uint64_t start,
                                                                                 uint64_t end);
+
+/// \brief Requests render target to be resized.
+/// \details In most cases this call results in creation of the new image under the hood.
+///          In this case, all frame buffers are updated automatically.
+///          Therefore, main goal of this function is to provide user-friendly way for recreating render targets with
+///          another size and updating attached frame buffers automatically under the hood.
+CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_image_resize_render_target (kan_render_image_t image,
+                                                                              uint64_t new_width,
+                                                                              uint64_t new_height,
+                                                                              uint64_t new_depth);
 
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_image_destroy (kan_render_image_t image);
 
