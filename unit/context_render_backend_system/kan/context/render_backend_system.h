@@ -606,7 +606,7 @@ kan_render_frame_lifetime_buffer_allocator_create (kan_render_context_t context,
                                                    uint64_t page_size,
                                                    kan_interned_string_t tracking_name);
 
-CONTEXT_RENDER_BACKEND_SYSTEM_API struct kan_uniform_allocated_slice_t
+CONTEXT_RENDER_BACKEND_SYSTEM_API struct kan_render_allocated_slice_t
 kan_render_frame_lifetime_buffer_allocator_allocate (kan_render_frame_lifetime_buffer_allocator_t allocator,
                                                      uint64_t size,
                                                      uint64_t alignment);
@@ -645,8 +645,6 @@ struct kan_render_image_description_t
 
 CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_image_t
 kan_render_image_create (kan_render_context_t context, struct kan_render_image_description_t *description);
-
-CONTEXT_RENDER_BACKEND_SYSTEM_API enum kan_render_image_type_t kan_render_image_get_type (kan_render_image_t image);
 
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_image_upload_data (kan_render_image_t image,
                                                                      uint64_t mip,
