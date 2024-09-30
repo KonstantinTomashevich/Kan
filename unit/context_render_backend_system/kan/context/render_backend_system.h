@@ -639,6 +639,7 @@ struct kan_render_image_description_t
     uint64_t mips;
 
     kan_bool_t render_target;
+    kan_bool_t supports_sampling;
 
     kan_interned_string_t tracking_name;
 };
@@ -650,10 +651,11 @@ CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_image_upload_data (kan_render_
                                                                      uint64_t mip,
                                                                      void *data);
 
+/// \brief Requests image mip generation to be executed from the first mip to the last (including it).
+/// \invariant First mip is already filled with image data using `kan_render_image_upload_data`.
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_image_request_mip_generation (kan_render_image_t image,
-                                                                                uint64_t base,
-                                                                                uint64_t start,
-                                                                                uint64_t end);
+                                                                                uint64_t first,
+                                                                                uint64_t last);
 
 /// \brief Requests render target to be resized.
 /// \details In most cases this call results in creation of the new image under the hood.

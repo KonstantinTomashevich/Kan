@@ -94,6 +94,23 @@ struct scheduled_buffer_unmap_flush_t
     uint64_t size;
 };
 
+struct scheduled_image_upload_t
+{
+    struct scheduled_image_upload_t *next;
+    struct render_backend_image_t *image;
+    uint64_t mip;
+    struct render_backend_buffer_t *staging_buffer;
+    uint64_t staging_buffer_offset;
+};
+
+struct scheduled_image_mip_generation_t
+{
+    struct scheduled_image_mip_generation_t *next;
+    struct render_backend_image_t *image;
+    uint64_t first;
+    uint64_t last;
+};
+
 struct scheduled_buffer_destroy_t
 {
     struct scheduled_buffer_destroy_t *next;
@@ -106,6 +123,12 @@ struct scheduled_frame_lifetime_allocator_destroy_t
     struct render_backend_frame_lifetime_allocator_t *frame_lifetime_allocator;
 };
 
+struct scheduled_image_destroy_t
+{
+    struct scheduled_image_destroy_t *next;
+    struct render_backend_image_t *image;
+};
+
 struct render_backend_schedule_state_t
 {
     struct kan_stack_group_allocator_t item_allocator;
@@ -115,8 +138,12 @@ struct render_backend_schedule_state_t
 
     struct scheduled_buffer_unmap_flush_transfer_t *first_scheduled_buffer_unmap_flush_transfer;
     struct scheduled_buffer_unmap_flush_t *first_scheduled_buffer_unmap_flush;
+    struct scheduled_image_upload_t *first_scheduled_image_upload;
+    struct scheduled_image_mip_generation_t *first_scheduled_image_mip_generation;
+
     struct scheduled_buffer_destroy_t *first_scheduled_buffer_destroy;
     struct scheduled_frame_lifetime_allocator_destroy_t *first_scheduled_frame_lifetime_allocator_destroy;
+    struct scheduled_image_destroy_t *first_scheduled_image_destroy;
 };
 
 enum render_backend_buffer_family_t
@@ -192,6 +219,26 @@ struct render_backend_frame_lifetime_allocator_allocation_t
 
 #define STAGING_BUFFER_ALLOCATION_ALIGNMENT _Alignof (float)
 
+struct render_backend_image_t
+{
+    struct render_backend_image_t *next;
+    struct render_backend_image_t *previous;
+    struct render_backend_system_t *system;
+
+    VkImage image;
+    VmaAllocation allocation;
+
+    struct kan_render_image_description_t description;
+
+    // TODO: Attached frame buffers (for render target resize).
+
+    // TODO: Attached pipeline instances (for render target resize).
+
+#if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_PROFILE_MEMORY)
+    kan_allocation_group_t device_allocation_group;
+#endif
+};
+
 struct render_backend_system_t
 {
     kan_context_handle_t context;
@@ -231,7 +278,8 @@ struct render_backend_system_t
     struct render_backend_surface_t *first_surface;
     struct render_backend_buffer_t *first_buffer;
     struct render_backend_frame_lifetime_allocator_t *first_frame_lifetime_allocator;
-    
+    struct render_backend_image_t *first_image;
+
     /// \details Still listed in frame lifetime allocator list above, but referenced here too for usability.
     struct render_backend_frame_lifetime_allocator_t *staging_frame_lifetime_allocator;
 
@@ -247,6 +295,7 @@ struct render_backend_system_t
     kan_allocation_group_t schedule_allocation_group;
     kan_allocation_group_t buffer_wrapper_allocation_group;
     kan_allocation_group_t frame_lifetime_wrapper_allocation_group;
+    kan_allocation_group_t image_wrapper_allocation_group;
 
     struct kan_render_supported_devices_t *supported_devices;
 
@@ -313,10 +362,13 @@ static void *profiled_reallocate (
     struct memory_profiling_t *profiling = (struct memory_profiling_t *) user_data;
     void *original_user_accessible_data = original;
     void *original_allocated_data = walk_from_accessible_to_allocated (original_user_accessible_data);
-    const uint64_t original_size = *(uint64_t *) original_allocated_data;
+
+    const uint64_t original_real_size = *(uint64_t *) original_allocated_data;
+    const uint64_t original_data_size =
+        original_real_size - (((uint8_t *) original_user_accessible_data) - ((uint8_t *) original_allocated_data));
 
     void *new_data = profiled_allocate (user_data, size, alignment, scope);
-    memcpy (new_data, original, KAN_MIN ((size_t) original_size, size));
+    memcpy (new_data, original, KAN_MIN ((size_t) original_data_size, size));
     profiled_free_internal (profiling, original_allocated_data, original_user_accessible_data);
     return new_data;
 }
@@ -1075,6 +1127,301 @@ static void render_backend_system_destroy_frame_lifetime_allocator (
     kan_free_batched (system->frame_lifetime_wrapper_allocation_group, frame_lifetime_allocator);
 }
 
+static inline kan_bool_t create_vulkan_image_and_view (struct render_backend_system_t *system,
+                                                       struct kan_render_image_description_t *description,
+                                                       VkImage *output_image,
+                                                       VmaAllocation *output_allocation)
+{
+    VkImageType image_type = VK_IMAGE_TYPE_2D;
+    VkFormat image_format = VK_FORMAT_R8G8B8A8_SRGB;
+    VkImageUsageFlags image_usage = 0u;
+
+    VkSharingMode sharing_mode;
+    uint32_t sharing_index_count;
+    uint32_t shared_indices[2u] = {system->device_graphics_queue_family_index,
+                                   system->device_transfer_queue_family_index};
+
+    switch (description->type)
+    {
+    case KAN_RENDER_IMAGE_TYPE_COLOR_2D:
+        KAN_ASSERT (description->depth == 1u)
+        image_type = VK_IMAGE_TYPE_2D;
+        image_usage |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+        break;
+
+    case KAN_RENDER_IMAGE_TYPE_COLOR_3D:
+        image_type = VK_IMAGE_TYPE_3D;
+        image_usage |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+        break;
+
+    case KAN_RENDER_IMAGE_TYPE_DEPTH_STENCIL:
+        KAN_ASSERT (description->render_target)
+        image_type = VK_IMAGE_TYPE_2D;
+        image_format = system->device_depth_image_format;
+        image_usage |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+        break;
+    }
+
+    if (description->type == KAN_RENDER_IMAGE_TYPE_COLOR_2D || description->type == KAN_RENDER_IMAGE_TYPE_COLOR_3D)
+    {
+        switch (description->color_format)
+        {
+        case KAN_RENDER_IMAGE_COLOR_FORMAT_RGBA32_SRGB:
+            image_format = VK_FORMAT_R8G8B8A8_SRGB;
+            break;
+        }
+    }
+
+    if (description->render_target)
+    {
+        KAN_ASSERT (description->mips == 1u)
+        switch (description->type)
+        {
+        case KAN_RENDER_IMAGE_TYPE_COLOR_2D:
+        case KAN_RENDER_IMAGE_TYPE_COLOR_3D:
+            image_usage |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+            break;
+
+        case KAN_RENDER_IMAGE_TYPE_DEPTH_STENCIL:
+            image_usage |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+            break;
+        }
+    }
+    else
+    {
+        // We need source transfer in order to generate mip maps, unless they are expected to be loaded from textures.
+        image_usage |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+    }
+
+    if (description->supports_sampling)
+    {
+        image_usage |= VK_IMAGE_USAGE_SAMPLED_BIT;
+    }
+
+    if (description->render_target &&
+        system->device_graphics_queue_family_index != system->device_transfer_queue_family_index)
+    {
+        sharing_mode = VK_SHARING_MODE_CONCURRENT;
+        sharing_index_count = 2u;
+    }
+    else
+    {
+        sharing_mode = VK_SHARING_MODE_EXCLUSIVE;
+        sharing_index_count = 1u;
+    }
+
+    VkImageCreateInfo image_create_info = {
+        .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+        .pNext = NULL,
+        .imageType = image_type,
+        .format = image_format,
+        .extent =
+            {
+                .width = (uint32_t) description->width,
+                .height = (uint32_t) description->height,
+                .depth = (uint32_t) description->depth,
+            },
+        .mipLevels = (uint32_t) description->mips,
+        .arrayLayers = 1u,
+        .samples = VK_SAMPLE_COUNT_1_BIT,
+        .tiling = VK_IMAGE_TILING_OPTIMAL,
+        .usage = image_usage,
+        .sharingMode = sharing_mode,
+        .queueFamilyIndexCount = sharing_index_count,
+        .pQueueFamilyIndices = shared_indices,
+        .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+    };
+
+    VmaAllocationCreateInfo allocation_create_info = {
+        .flags = 0u,
+        .usage = VMA_MEMORY_USAGE_AUTO,
+        .requiredFlags = 0u,
+        .preferredFlags = 0u,
+        .memoryTypeBits = UINT32_MAX,
+        .pool = NULL,
+        .pUserData = NULL,
+        .priority = 0.0f,
+    };
+
+    VmaAllocationInfo allocation_info;
+    if (vmaCreateImage (system->gpu_memory_allocator, &image_create_info, &allocation_create_info, output_image,
+                        output_allocation, &allocation_info) != VK_SUCCESS)
+    {
+        KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR, "Failed to create image \"%s\".",
+                 description->tracking_name)
+        return KAN_FALSE;
+    }
+
+    return KAN_TRUE;
+}
+
+static inline VkImageAspectFlags kan_render_image_description_calculate_aspects (
+    struct render_backend_system_t *system, struct kan_render_image_description_t *description)
+{
+    VkImageAspectFlags aspects = 0u;
+    switch (description->type)
+    {
+    case KAN_RENDER_IMAGE_TYPE_COLOR_2D:
+    case KAN_RENDER_IMAGE_TYPE_COLOR_3D:
+        aspects |= VK_IMAGE_ASPECT_COLOR_BIT;
+        break;
+
+    case KAN_RENDER_IMAGE_TYPE_DEPTH_STENCIL:
+        aspects |= VK_IMAGE_ASPECT_DEPTH_BIT;
+        if (system->device_depth_image_has_stencil)
+        {
+            aspects |= VK_IMAGE_ASPECT_STENCIL_BIT;
+        }
+
+        break;
+    }
+
+    return aspects;
+}
+
+static inline void kan_render_image_description_calculate_size_at_mip (
+    struct kan_render_image_description_t *description,
+    uint64_t mip,
+    uint64_t *output_width,
+    uint64_t *output_height,
+    uint64_t *output_depth)
+{
+    KAN_ASSERT (mip < description->mips)
+    *output_width = KAN_MAX (1u, description->width >> mip);
+    *output_height = KAN_MAX (1u, description->height >> mip);
+    *output_depth = KAN_MAX (1u, description->depth >> mip);
+}
+
+static inline uint64_t kan_render_image_description_calculate_texel_size (
+    struct render_backend_system_t *system, struct kan_render_image_description_t *description)
+{
+    uint64_t texel_size = 0u;
+    switch (description->type)
+    {
+    case KAN_RENDER_IMAGE_TYPE_COLOR_2D:
+    case KAN_RENDER_IMAGE_TYPE_COLOR_3D:
+        switch (description->color_format)
+        {
+        case KAN_RENDER_IMAGE_COLOR_FORMAT_RGBA32_SRGB:
+            texel_size = 4u;
+            break;
+        }
+
+        break;
+
+    case KAN_RENDER_IMAGE_TYPE_DEPTH_STENCIL:
+        switch (system->device_depth_image_format)
+        {
+        case VK_FORMAT_D32_SFLOAT:
+        case VK_FORMAT_D24_UNORM_S8_UINT:
+            texel_size = 4u;
+            break;
+
+        case VK_FORMAT_D32_SFLOAT_S8_UINT:
+            texel_size = 5u;
+            break;
+
+        default:
+            KAN_ASSERT (KAN_FALSE)
+            texel_size = 0u;
+            break;
+        }
+
+        break;
+    }
+
+    return texel_size;
+}
+
+#if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_PROFILE_MEMORY)
+static uint64_t render_backend_image_calculate_gpu_size (struct render_backend_system_t *system,
+                                                         struct render_backend_image_t *image)
+{
+    uint64_t texel_size = kan_render_image_description_calculate_texel_size (system, &image->description);
+    uint64_t size = 0u;
+
+    for (uint64_t mip = 0u; mip < image->description.mips; ++mip)
+    {
+        uint64_t width;
+        uint64_t height;
+        uint64_t depth;
+        kan_render_image_description_calculate_size_at_mip (&image->description, mip, &width, &height, &depth);
+        size += texel_size * width * height * depth;
+    }
+
+    return size;
+}
+#endif
+
+static struct render_backend_image_t *render_backend_system_create_image (
+    struct render_backend_system_t *system, struct kan_render_image_description_t *description)
+{
+    VkImage vulkan_image;
+    VmaAllocation vulkan_allocation;
+
+    if (!create_vulkan_image_and_view (system, description, &vulkan_image, &vulkan_allocation))
+    {
+        return NULL;
+    }
+
+    struct render_backend_image_t *image =
+        kan_allocate_batched (system->image_wrapper_allocation_group, sizeof (struct render_backend_image_t));
+    image->next = system->first_image;
+    image->previous = NULL;
+
+    if (system->first_image)
+    {
+        system->first_image->previous = image;
+    }
+
+    system->first_image = image;
+    image->system = system;
+
+    image->image = vulkan_image;
+    image->allocation = vulkan_allocation;
+    image->description = *description;
+
+#if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_PROFILE_MEMORY)
+    image->device_allocation_group =
+        kan_allocation_group_get_child (system->memory_profiling.gpu_image_group, description->tracking_name);
+    transfer_memory_between_groups (render_backend_image_calculate_gpu_size (system, image),
+                                    system->memory_profiling.gpu_unmarked_group, image->device_allocation_group);
+#endif
+
+    return image;
+}
+
+static void render_backend_system_destroy_image (struct render_backend_system_t *system,
+                                                 struct render_backend_image_t *image,
+                                                 kan_bool_t remove_from_list)
+{
+    if (remove_from_list)
+    {
+        if (image->next)
+        {
+            image->next->previous = image->previous;
+        }
+
+        if (image->previous)
+        {
+            image->previous->next = image->next;
+        }
+        else
+        {
+            KAN_ASSERT (system->first_image == image)
+            system->first_image = image->next;
+        }
+    }
+
+#if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_PROFILE_MEMORY)
+    transfer_memory_between_groups (render_backend_image_calculate_gpu_size (system, image),
+                                    image->device_allocation_group, system->memory_profiling.gpu_unmarked_group);
+#endif
+
+    vmaDestroyImage (system->gpu_memory_allocator, image->image, image->allocation);
+    kan_free_batched (system->image_wrapper_allocation_group, image);
+}
+
 kan_context_system_handle_t render_backend_system_create (kan_allocation_group_t group, void *user_config)
 {
     struct render_backend_system_t *system = kan_allocate_general (group, sizeof (struct render_backend_system_t),
@@ -1100,6 +1447,7 @@ kan_context_system_handle_t render_backend_system_create (kan_allocation_group_t
     system->first_surface = NULL;
     system->first_buffer = NULL;
     system->first_frame_lifetime_allocator = NULL;
+    system->first_image = NULL;
     system->staging_frame_lifetime_allocator = NULL;
     system->supported_devices = NULL;
 
@@ -1521,6 +1869,14 @@ void render_backend_system_shutdown (kan_context_system_handle_t handle)
         struct render_backend_frame_lifetime_allocator_t *next = frame_lifetime_allocator->next;
         render_backend_system_destroy_frame_lifetime_allocator (system, frame_lifetime_allocator, KAN_FALSE, KAN_FALSE);
         frame_lifetime_allocator = next;
+    }
+
+    struct render_backend_image_t *image = system->first_image;
+    while (image)
+    {
+        struct render_backend_image_t *next = image->next;
+        render_backend_system_destroy_image (system, image, KAN_FALSE);
+        image = next;
     }
 
     if (system->device != VK_NULL_HANDLE)
@@ -1955,8 +2311,12 @@ kan_bool_t kan_render_backend_system_select_device (kan_context_system_handle_t 
 
         state->first_scheduled_buffer_unmap_flush_transfer = NULL;
         state->first_scheduled_buffer_unmap_flush = NULL;
+        state->first_scheduled_image_upload = NULL;
+        state->first_scheduled_image_mip_generation = NULL;
+
         state->first_scheduled_buffer_destroy = NULL;
         state->first_scheduled_frame_lifetime_allocator_destroy = NULL;
+        state->first_scheduled_image_destroy = NULL;
     }
 
     system->staging_frame_lifetime_allocator = render_backend_system_create_frame_lifetime_allocator (
@@ -2031,9 +2391,98 @@ static void render_backend_system_submit_transfer (struct render_backend_system_
     }
 
     schedule->first_scheduled_buffer_unmap_flush = NULL;
+    struct scheduled_image_upload_t *image_upload = schedule->first_scheduled_image_upload;
 
-    // TODO: Fill buffer with accumulated transfer commands.
+    while (image_upload)
+    {
+        VkImageAspectFlags image_aspect =
+            kan_render_image_description_calculate_aspects (system, &image_upload->image->description);
 
+        uint64_t width;
+        uint64_t height;
+        uint64_t depth;
+        kan_render_image_description_calculate_size_at_mip (&image_upload->image->description, image_upload->mip,
+                                                            &width, &height, &depth);
+
+        VkImageMemoryBarrier prepare_transfer_barrier = {
+            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+            .pNext = NULL,
+            .srcAccessMask = 0u,
+            .dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
+            .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+            .newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .image = image_upload->image->image,
+            .subresourceRange =
+                {
+                    .aspectMask = image_aspect,
+                    .baseMipLevel = (uint32_t) image_upload->mip,
+                    .levelCount = 1u,
+                    .baseArrayLayer = 0u,
+                    .layerCount = 1u,
+                },
+        };
+
+        vkCmdPipelineBarrier (state->primary_transfer_command_buffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                              VK_PIPELINE_STAGE_TRANSFER_BIT, 0u, 0u, NULL, 0u, NULL, 1u, &prepare_transfer_barrier);
+
+        VkBufferImageCopy copy_region = {
+            .bufferOffset = (uint32_t) image_upload->staging_buffer_offset,
+            .bufferRowLength = 0u,
+            .bufferImageHeight = 0u,
+            .imageSubresource =
+                {
+                    .aspectMask = image_aspect,
+                    .mipLevel = (uint32_t) image_upload->mip,
+                    .baseArrayLayer = 0u,
+                    .layerCount = 1u,
+                },
+            .imageOffset =
+                {
+                    .x = 0u,
+                    .y = 0u,
+                    .z = 0u,
+                },
+            .imageExtent =
+                {
+                    .width = (uint32_t) width,
+                    .height = (uint32_t) height,
+                    .depth = (uint32_t) depth,
+                },
+        };
+
+        vkCmdCopyBufferToImage (state->primary_transfer_command_buffer, image_upload->staging_buffer->buffer,
+                                image_upload->image->image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1u, &copy_region);
+
+        VkImageMemoryBarrier finish_transfer_barrier = {
+            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+            .pNext = NULL,
+            .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
+            .dstAccessMask = 0u,
+            .oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+            .newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .image = image_upload->image->image,
+            .subresourceRange =
+                {
+                    .aspectMask = image_aspect,
+                    .baseMipLevel = (uint32_t) image_upload->mip,
+                    .levelCount = 1u,
+                    .baseArrayLayer = 0u,
+                    .layerCount = 1u,
+                },
+        };
+
+        vkCmdPipelineBarrier (state->primary_transfer_command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                              VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0u, 0u, NULL, 0u, NULL, 1u,
+                              &finish_transfer_barrier);
+
+        image_upload = image_upload->next;
+    }
+
+    schedule->first_scheduled_image_upload = NULL;
     if (vkEndCommandBuffer (state->primary_transfer_command_buffer) != VK_SUCCESS)
     {
         kan_critical_error ("Failed to end recording primary transfer buffer.", __FILE__, __LINE__);
@@ -2136,6 +2585,181 @@ static void render_backend_system_submit_graphics (struct render_backend_system_
         surface->received_any_output = KAN_FALSE;
         surface = surface->next;
     }
+
+    struct render_backend_schedule_state_t *schedule = &system->schedule_states[system->current_frame_in_flight_index];
+    // Mip generation must be done in graphics queue.
+    struct scheduled_image_mip_generation_t *image_mip_generation = schedule->first_scheduled_image_mip_generation;
+
+    while (image_mip_generation)
+    {
+        VkImageAspectFlags image_aspect =
+            kan_render_image_description_calculate_aspects (system, &image_mip_generation->image->description);
+
+        for (uint64_t output_mip = image_mip_generation->first + 1u; output_mip <= image_mip_generation->last;
+             ++output_mip)
+        {
+            const uint64_t input_mip = output_mip - 1u;
+            uint64_t input_width;
+            uint64_t input_height;
+            uint64_t input_depth;
+            kan_render_image_description_calculate_size_at_mip (&image_mip_generation->image->description, input_mip,
+                                                                &input_width, &input_height, &input_depth);
+
+            uint64_t output_width;
+            uint64_t output_height;
+            uint64_t output_depth;
+            kan_render_image_description_calculate_size_at_mip (&image_mip_generation->image->description, output_mip,
+                                                                &output_width, &output_height, &output_depth);
+
+            VkImageMemoryBarrier input_to_transfer_source_barrier = {
+                .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+                .pNext = NULL,
+                .srcAccessMask = input_mip == image_mip_generation->first ? 0u : VK_ACCESS_TRANSFER_WRITE_BIT,
+                .dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
+                .oldLayout = input_mip == image_mip_generation->first ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL :
+                                                                        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                .newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                .image = image_mip_generation->image->image,
+                .subresourceRange =
+                    {
+                        .aspectMask = image_aspect,
+                        .baseMipLevel = (uint32_t) input_mip,
+                        .levelCount = 1u,
+                        .baseArrayLayer = 0u,
+                        .layerCount = 1u,
+                    },
+            };
+
+            vkCmdPipelineBarrier (state->primary_graphics_command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                                  VK_PIPELINE_STAGE_TRANSFER_BIT, 0u, 0u, NULL, 0u, NULL, 1u,
+                                  &input_to_transfer_source_barrier);
+
+            VkImageMemoryBarrier output_to_transfer_destination_barrier = {
+                .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+                .pNext = NULL,
+                .srcAccessMask = 0u,
+                .dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
+                .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+                .newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                .image = image_mip_generation->image->image,
+                .subresourceRange =
+                    {
+                        .aspectMask = image_aspect,
+                        .baseMipLevel = (uint32_t) output_mip,
+                        .levelCount = 1u,
+                        .baseArrayLayer = 0u,
+                        .layerCount = 1u,
+                    },
+            };
+
+            vkCmdPipelineBarrier (state->primary_graphics_command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                                  VK_PIPELINE_STAGE_TRANSFER_BIT, 0u, 0u, NULL, 0u, NULL, 1u,
+                                  &output_to_transfer_destination_barrier);
+
+            VkImageBlit image_blit = {
+                .srcSubresource =
+                    {
+                        .aspectMask = image_aspect,
+                        .mipLevel = (uint32_t) input_mip,
+                        .baseArrayLayer = 0u,
+                        .layerCount = 1u,
+                    },
+                .srcOffsets =
+                    {
+                        {
+                            .x = 0,
+                            .y = 0,
+                            .z = 0,
+                        },
+                        {
+                            .x = (int32_t) input_width,
+                            .y = (int32_t) input_height,
+                            .z = (int32_t) input_depth,
+                        },
+                    },
+                .dstSubresource =
+                    {
+                        .aspectMask = image_aspect,
+                        .mipLevel = (uint32_t) output_mip,
+                        .baseArrayLayer = 0u,
+                        .layerCount = 1u,
+                    },
+                .dstOffsets =
+                    {
+                        {
+                            .x = 0,
+                            .y = 0,
+                            .z = 0,
+                        },
+                        {
+                            .x = (int32_t) output_width,
+                            .y = (int32_t) output_height,
+                            .z = (int32_t) output_depth,
+                        },
+                    },
+            };
+
+            vkCmdBlitImage (state->primary_graphics_command_buffer, image_mip_generation->image->image,
+                            VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, image_mip_generation->image->image,
+                            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1u, &image_blit, VK_FILTER_LINEAR);
+
+            VkImageMemoryBarrier input_to_read_only_barrier = {
+                .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+                .pNext = NULL,
+                .srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
+                .dstAccessMask = 0u,
+                .oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                .newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                .image = image_mip_generation->image->image,
+                .subresourceRange =
+                    {
+                        .aspectMask = image_aspect,
+                        .baseMipLevel = (uint32_t) input_mip,
+                        .levelCount = 1u,
+                        .baseArrayLayer = 0u,
+                        .layerCount = 1u,
+                    },
+            };
+
+            vkCmdPipelineBarrier (state->primary_graphics_command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                                  VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0u, 0u, NULL, 0u, NULL, 1u,
+                                  &input_to_read_only_barrier);
+        }
+
+        VkImageMemoryBarrier last_to_read_only_barrier = {
+            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+            .pNext = NULL,
+            .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
+            .dstAccessMask = 0u,
+            .oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+            .newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .image = image_mip_generation->image->image,
+            .subresourceRange =
+                {
+                    .aspectMask = image_aspect,
+                    .baseMipLevel = (uint32_t) image_mip_generation->last,
+                    .levelCount = 1u,
+                    .baseArrayLayer = 0u,
+                    .layerCount = 1u,
+                },
+        };
+
+        vkCmdPipelineBarrier (state->primary_graphics_command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                              VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0u, 0u, NULL, 0u, NULL, 1u,
+                              &last_to_read_only_barrier);
+
+        image_mip_generation = image_mip_generation->next;
+    }
+
+    schedule->first_scheduled_image_mip_generation = NULL;
 
     // TODO: Fill buffer with accumulated graphics commands.
 
@@ -2284,7 +2908,9 @@ static void render_backend_system_clean_current_schedule_if_safe (struct render_
     kan_stack_group_allocator_shrink (&schedule->item_allocator);
 
     if (!schedule->first_scheduled_buffer_unmap_flush_transfer && !schedule->first_scheduled_buffer_unmap_flush &&
-        !schedule->first_scheduled_buffer_destroy && !schedule->first_scheduled_frame_lifetime_allocator_destroy)
+        !schedule->first_scheduled_image_upload && !schedule->first_scheduled_image_mip_generation &&
+        !schedule->first_scheduled_buffer_destroy && !schedule->first_scheduled_frame_lifetime_allocator_destroy &&
+        !schedule->first_scheduled_image_destroy)
     {
         // No active scheduled operations, safe to reset allocator completely.
         kan_stack_group_allocator_reset (&schedule->item_allocator);
@@ -2862,6 +3488,15 @@ kan_bool_t kan_render_backend_system_next_frame (kan_context_system_handle_t ren
     }
 
     schedule->first_scheduled_frame_lifetime_allocator_destroy = NULL;
+    struct scheduled_image_destroy_t *image_destroy = schedule->first_scheduled_image_destroy;
+
+    while (image_destroy)
+    {
+        render_backend_system_destroy_image (system, image_destroy->image, KAN_TRUE);
+        image_destroy = image_destroy->next;
+    }
+
+    schedule->first_scheduled_image_destroy = NULL;
 
     // TODO: Execute destroy schedule here.
 
@@ -3340,18 +3975,76 @@ void kan_render_frame_lifetime_buffer_allocator_destroy (kan_render_frame_lifeti
 kan_render_image_t kan_render_image_create (kan_render_context_t context,
                                             struct kan_render_image_description_t *description)
 {
-    // TODO: Implement.
-    return KAN_INVALID_RENDER_IMAGE;
+    struct render_backend_system_t *system = (struct render_backend_system_t *) context;
+    kan_atomic_int_lock (&system->resource_management_lock);
+    struct render_backend_image_t *image = render_backend_system_create_image (system, description);
+    kan_atomic_int_unlock (&system->resource_management_lock);
+    return image ? (kan_render_image_t) image : KAN_INVALID_RENDER_IMAGE;
 }
 
 void kan_render_image_upload_data (kan_render_image_t image, uint64_t mip, void *data)
 {
-    // TODO: Implement.
+    struct render_backend_image_t *image_data = (struct render_backend_image_t *) image;
+    KAN_ASSERT (!image_data->description.render_target)
+    KAN_ASSERT (mip < image_data->description.mips)
+
+    uint64_t texel_size =
+        kan_render_image_description_calculate_texel_size (image_data->system, &image_data->description);
+
+    uint64_t width;
+    uint64_t height;
+    uint64_t depth;
+    kan_render_image_description_calculate_size_at_mip (&image_data->description, mip, &width, &height, &depth);
+
+    const uint64_t allocation_size = texel_size * width * height * depth;
+    struct render_backend_frame_lifetime_allocator_allocation_t staging_allocation =
+        render_backend_system_allocate_for_staging (image_data->system, allocation_size);
+
+    if (!staging_allocation.buffer)
+    {
+        KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR,
+                 "Failed to upload image \"%s\" mip %lu: out of staging memory.", image_data->description.tracking_name,
+                 (unsigned long) mip)
+        return;
+    }
+
+    struct render_backend_schedule_state_t *schedule =
+        render_backend_system_get_schedule_for_memory (image_data->system);
+    kan_atomic_int_lock (&schedule->schedule_lock);
+
+    struct scheduled_image_upload_t *item =
+        kan_stack_group_allocator_allocate (&schedule->item_allocator, sizeof (struct scheduled_image_upload_t),
+                                            _Alignof (struct scheduled_image_upload_t));
+
+    // We do not need to preserve order as images cannot depend one on another.
+    item->next = schedule->first_scheduled_image_upload;
+    schedule->first_scheduled_image_upload = item;
+    item->image = image_data;
+    item->mip = mip;
+    item->staging_buffer = staging_allocation.buffer;
+    item->staging_buffer_offset = staging_allocation.offset;
+    kan_atomic_int_unlock (&schedule->schedule_lock);
 }
 
-void kan_render_image_request_mip_generation (kan_render_image_t image, uint64_t base, uint64_t start, uint64_t end)
+void kan_render_image_request_mip_generation (kan_render_image_t image, uint64_t first, uint64_t last)
 {
-    // TODO: Implement.
+    struct render_backend_image_t *data = (struct render_backend_image_t *) image;
+    KAN_ASSERT (!data->description.render_target)
+
+    struct render_backend_schedule_state_t *schedule = render_backend_system_get_schedule_for_memory (data->system);
+    kan_atomic_int_lock (&schedule->schedule_lock);
+
+    struct scheduled_image_mip_generation_t *item =
+        kan_stack_group_allocator_allocate (&schedule->item_allocator, sizeof (struct scheduled_image_mip_generation_t),
+                                            _Alignof (struct scheduled_image_mip_generation_t));
+
+    // We do not need to preserve order as images cannot depend one on another.
+    item->next = schedule->first_scheduled_image_mip_generation;
+    schedule->first_scheduled_image_mip_generation = item;
+    item->image = data;
+    item->first = first;
+    item->last = last;
+    kan_atomic_int_unlock (&schedule->schedule_lock);
 }
 
 void kan_render_image_resize_render_target (kan_render_image_t image,
@@ -3359,10 +4052,25 @@ void kan_render_image_resize_render_target (kan_render_image_t image,
                                             uint64_t new_height,
                                             uint64_t new_depth)
 {
+    struct render_backend_image_t *data = (struct render_backend_image_t *) image;
+    KAN_ASSERT (data->description.render_target)
+
     // TODO: Implement.
 }
 
 void kan_render_image_destroy (kan_render_image_t image)
 {
-    // TODO: Implement.
+    struct render_backend_image_t *data = (struct render_backend_image_t *) image;
+    struct render_backend_schedule_state_t *schedule = render_backend_system_get_schedule_for_destroy (data->system);
+    kan_atomic_int_lock (&schedule->schedule_lock);
+
+    struct scheduled_image_destroy_t *item =
+        kan_stack_group_allocator_allocate (&schedule->item_allocator, sizeof (struct scheduled_image_destroy_t),
+                                            _Alignof (struct scheduled_image_destroy_t));
+
+    // We do not need to preserve order as images cannot depend one on another.
+    item->next = schedule->first_scheduled_image_destroy;
+    schedule->first_scheduled_image_destroy = item;
+    item->image = data;
+    kan_atomic_int_unlock (&schedule->schedule_lock);
 }

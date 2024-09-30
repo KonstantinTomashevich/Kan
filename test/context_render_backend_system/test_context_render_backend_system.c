@@ -76,6 +76,29 @@ KAN_TEST_CASE (temp)
     uint8_t stub_buffer_changed_again_data[1024u * sizeof (stub_buffers) / sizeof (stub_buffers[0u])];
     memset (stub_buffer_changed_again_data, 123, sizeof (stub_buffer_initial_data));
 
+#define TEST_IMAGE_WIDTH 1024u
+#define TEST_IMAGE_HEIGHT 1024u
+#define TEST_IMAGE_DEPTH 1u
+#define TEST_IMAGE_MIPS 8u
+    uint8_t test_image_first_mip_data[4u * TEST_IMAGE_WIDTH * TEST_IMAGE_HEIGHT & TEST_IMAGE_DEPTH];
+    memset (test_image_first_mip_data, 255, sizeof (test_image_first_mip_data));
+
+    struct kan_render_image_description_t test_image_description = {
+        .type = KAN_RENDER_IMAGE_TYPE_COLOR_2D,
+        .color_format = KAN_RENDER_IMAGE_COLOR_FORMAT_RGBA32_SRGB,
+        .width = TEST_IMAGE_WIDTH,
+        .height = TEST_IMAGE_HEIGHT,
+        .depth = TEST_IMAGE_DEPTH,
+        .mips = TEST_IMAGE_MIPS,
+        .render_target = KAN_FALSE,
+        .supports_sampling = KAN_TRUE,
+        .tracking_name = kan_string_intern ("test_image"),
+    };
+
+    kan_render_image_t test_image = kan_render_image_create (render_context, &test_image_description);
+    kan_render_image_upload_data (test_image, 0u, test_image_first_mip_data);
+    kan_render_image_request_mip_generation (test_image, 0u, TEST_IMAGE_MIPS - 1u);
+
     for (uint64_t frame = 0u; frame < TEST_FRAMES; ++frame)
     {
         switch (frame % 4u)
