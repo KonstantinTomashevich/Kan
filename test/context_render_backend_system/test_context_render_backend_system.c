@@ -85,7 +85,7 @@ KAN_TEST_CASE (temp)
 
     struct kan_render_image_description_t test_image_description = {
         .type = KAN_RENDER_IMAGE_TYPE_COLOR_2D,
-        .color_format = KAN_RENDER_IMAGE_COLOR_FORMAT_RGBA32_SRGB,
+        .color_format = KAN_RENDER_COLOR_FORMAT_RGBA32_SRGB,
         .width = TEST_IMAGE_WIDTH,
         .height = TEST_IMAGE_HEIGHT,
         .depth = TEST_IMAGE_DEPTH,
@@ -98,6 +98,33 @@ KAN_TEST_CASE (temp)
     kan_render_image_t test_image = kan_render_image_create (render_context, &test_image_description);
     kan_render_image_upload_data (test_image, 0u, test_image_first_mip_data);
     kan_render_image_request_mip_generation (test_image, 0u, TEST_IMAGE_MIPS - 1u);
+
+    struct kan_render_pass_attachment_t test_pass_attachments[] = {
+        {
+            .type = KAN_RENDER_PASS_ATTACHMENT_COLOR,
+            .color_format = KAN_RENDER_COLOR_FORMAT_SURFACE,
+            .samples = 1u,
+            .load_operation = KAN_RENDER_LOAD_OPERATION_CLEAR,
+            .store_operation = KAN_RENDER_STORE_OPERATION_STORE,
+        },
+        {
+            .type = KAN_RENDER_PASS_ATTACHMENT_DEPTH_STENCIL,
+            .color_format = 0u,
+            .samples = 1u,
+            .load_operation = KAN_RENDER_LOAD_OPERATION_CLEAR,
+            .store_operation = KAN_RENDER_STORE_OPERATION_ANY,
+        },
+    };
+
+    struct kan_render_pass_description_t test_pass_description = {
+        .type = KAN_RENDER_PASS_GRAPHICS,
+        .attachments_count = sizeof (test_pass_attachments) / sizeof (test_pass_attachments[0u]),
+        .attachments = test_pass_attachments,
+        .tracking_name = kan_string_intern ("test_pass"),
+    };
+
+    kan_render_pass_t test_pass = kan_render_pass_create (render_context, &test_pass_description);
+    KAN_TEST_ASSERT (test_pass != KAN_INVALID_RENDER_PASS)
 
     for (uint64_t frame = 0u; frame < TEST_FRAMES; ++frame)
     {

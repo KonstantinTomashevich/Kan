@@ -124,7 +124,7 @@ CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_backend_system_destroy_surface
 
 CONTEXT_RENDER_BACKEND_SYSTEM_API enum kan_platform_window_flag_t kan_render_get_required_window_flags (void);
 
-enum kan_render_pass_output_attachment_type_t
+enum kan_render_frame_buffer_attachment_type_t
 {
     KAN_FRAME_BUFFER_ATTACHMENT_IMAGE = 0u,
     KAN_FRAME_BUFFER_ATTACHMENT_SURFACE,
@@ -132,7 +132,7 @@ enum kan_render_pass_output_attachment_type_t
 
 struct kan_render_frame_buffer_attachment_description_t
 {
-    enum kan_render_pass_output_attachment_type_t type;
+    enum kan_render_frame_buffer_attachment_type_t type;
     union
     {
         kan_render_image_t image;
@@ -173,6 +173,21 @@ enum kan_render_pass_type_t
     KAN_RENDER_PASS_GRAPHICS = 0u,
 };
 
+enum kan_render_pass_attachment_type_t
+{
+    KAN_RENDER_PASS_ATTACHMENT_COLOR = 0u,
+    KAN_RENDER_PASS_ATTACHMENT_DEPTH_STENCIL,
+};
+
+enum kan_render_color_format_t
+{
+    KAN_RENDER_COLOR_FORMAT_RGBA32_SRGB = 0u,
+    KAN_RENDER_COLOR_FORMAT_RGBA128_SFLOAT,
+
+    /// \brief Special value that indicates that color format which is currently used for surfaces should be used here.
+    KAN_RENDER_COLOR_FORMAT_SURFACE,
+};
+
 enum kan_render_load_operation_t
 {
     KAN_RENDER_LOAD_OPERATION_ANY = 0u,
@@ -189,7 +204,8 @@ enum kan_render_store_operation_t
 
 struct kan_render_pass_attachment_t
 {
-    enum kan_render_pass_output_attachment_type_t type;
+    enum kan_render_pass_attachment_type_t type;
+    enum kan_render_color_format_t color_format;
     uint64_t samples;
     enum kan_render_load_operation_t load_operation;
     enum kan_render_store_operation_t store_operation;
@@ -623,15 +639,10 @@ enum kan_render_image_type_t
     KAN_RENDER_IMAGE_TYPE_DEPTH_STENCIL,
 };
 
-enum kan_render_image_color_format_t
-{
-    KAN_RENDER_IMAGE_COLOR_FORMAT_RGBA32_SRGB = 0u,
-};
-
 struct kan_render_image_description_t
 {
     enum kan_render_image_type_t type;
-    enum kan_render_image_color_format_t color_format;
+    enum kan_render_color_format_t color_format;
 
     uint64_t width;
     uint64_t height;

@@ -11,6 +11,9 @@
 
 KAN_LOG_DEFINE_CATEGORY (render_backend_system_vulkan);
 
+#define SURFACE_COLOR_FORMAT VK_FORMAT_B8G8R8A8_SRGB
+#define SURFACE_COLOR_SPACE VK_COLOR_SPACE_SRGB_NONLINEAR_KHR
+
 #if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_PROFILE_MEMORY)
 struct memory_profiling_t
 {
@@ -111,6 +114,12 @@ struct scheduled_image_mip_generation_t
     uint64_t last;
 };
 
+struct scheduled_pass_destroy_t
+{
+    struct scheduled_pass_destroy_t *next;
+    struct render_backend_pass_t *pass;
+};
+
 struct scheduled_buffer_destroy_t
 {
     struct scheduled_buffer_destroy_t *next;
@@ -141,9 +150,18 @@ struct render_backend_schedule_state_t
     struct scheduled_image_upload_t *first_scheduled_image_upload;
     struct scheduled_image_mip_generation_t *first_scheduled_image_mip_generation;
 
+    struct scheduled_pass_destroy_t *first_scheduled_pass_destroy;
     struct scheduled_buffer_destroy_t *first_scheduled_buffer_destroy;
     struct scheduled_frame_lifetime_allocator_destroy_t *first_scheduled_frame_lifetime_allocator_destroy;
     struct scheduled_image_destroy_t *first_scheduled_image_destroy;
+};
+
+struct render_backend_pass_t
+{
+    struct render_backend_pass_t *next;
+    struct render_backend_pass_t *previous;
+    struct render_backend_system_t *system;
+    VkRenderPass pass;
 };
 
 enum render_backend_buffer_family_t
@@ -276,6 +294,7 @@ struct render_backend_system_t
     struct kan_atomic_int_t resource_management_lock;
 
     struct render_backend_surface_t *first_surface;
+    struct render_backend_pass_t *first_pass;
     struct render_backend_buffer_t *first_buffer;
     struct render_backend_frame_lifetime_allocator_t *first_frame_lifetime_allocator;
     struct render_backend_image_t *first_image;
@@ -293,6 +312,7 @@ struct render_backend_system_t
     kan_allocation_group_t utility_allocation_group;
     kan_allocation_group_t surface_wrapper_allocation_group;
     kan_allocation_group_t schedule_allocation_group;
+    kan_allocation_group_t pass_wrapper_allocation_group;
     kan_allocation_group_t buffer_wrapper_allocation_group;
     kan_allocation_group_t frame_lifetime_wrapper_allocation_group;
     kan_allocation_group_t image_wrapper_allocation_group;
@@ -492,6 +512,247 @@ static inline struct render_backend_schedule_state_t *render_backend_system_get_
     return &system->schedule_states[schedule_index];
 }
 
+static inline struct render_backend_pass_t *render_backend_system_create_pass (
+    struct render_backend_system_t *system, struct kan_render_pass_description_t *description)
+{
+    VkAttachmentDescription *attachment_descriptions = kan_allocate_general (
+        system->utility_allocation_group, sizeof (VkAttachmentDescription) * description->attachments_count,
+        _Alignof (VkAttachmentDescription));
+
+    VkAttachmentReference *color_attachments = kan_allocate_general (
+        system->utility_allocation_group, sizeof (VkAttachmentReference) * description->attachments_count,
+        _Alignof (VkAttachmentReference));
+
+    VkAttachmentReference *next_color_attachment = color_attachments;
+    uint64_t color_attachments_count = 0u;
+    kan_bool_t has_depth_attachment = KAN_FALSE;
+    VkAttachmentReference depth_attachment;
+
+    for (uint64_t index = 0u; index < description->attachments_count; ++index)
+    {
+        struct kan_render_pass_attachment_t *attachment = &description->attachments[index];
+        struct VkAttachmentDescription *vulkan_attachment = &attachment_descriptions[index];
+        vulkan_attachment->flags = 0u;
+
+        switch (attachment->type)
+        {
+        case KAN_RENDER_PASS_ATTACHMENT_COLOR:
+            ++color_attachments_count;
+
+            switch (attachment->color_format)
+            {
+            case KAN_RENDER_COLOR_FORMAT_RGBA32_SRGB:
+                vulkan_attachment->format = VK_FORMAT_R8G8B8A8_SRGB;
+                break;
+
+            case KAN_RENDER_COLOR_FORMAT_RGBA128_SFLOAT:
+                vulkan_attachment->format = VK_FORMAT_R32G32B32A32_SFLOAT;
+                break;
+
+            case KAN_RENDER_COLOR_FORMAT_SURFACE:
+                vulkan_attachment->format = SURFACE_COLOR_FORMAT;
+                break;
+            }
+
+            switch (attachment->samples)
+            {
+            case 1u:
+                vulkan_attachment->samples = VK_SAMPLE_COUNT_1_BIT;
+                break;
+
+            case 2u:
+                vulkan_attachment->samples = VK_SAMPLE_COUNT_2_BIT;
+                break;
+
+            case 4u:
+                vulkan_attachment->samples = VK_SAMPLE_COUNT_4_BIT;
+                break;
+
+            case 8u:
+                vulkan_attachment->samples = VK_SAMPLE_COUNT_8_BIT;
+                break;
+
+            case 16u:
+                vulkan_attachment->samples = VK_SAMPLE_COUNT_16_BIT;
+                break;
+
+            case 32u:
+                vulkan_attachment->samples = VK_SAMPLE_COUNT_32_BIT;
+                break;
+
+            case 64u:
+                vulkan_attachment->samples = VK_SAMPLE_COUNT_64_BIT;
+                break;
+
+            default:
+                // Count of samples is not power of two.
+                KAN_ASSERT (KAN_FALSE)
+                break;
+            }
+
+            vulkan_attachment->finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+            next_color_attachment->attachment = (uint32_t) index;
+            next_color_attachment->layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+            ++next_color_attachment;
+            break;
+
+        case KAN_RENDER_PASS_ATTACHMENT_DEPTH_STENCIL:
+            // There should be not more than 1 depth attachment per pass.
+            KAN_ASSERT (!has_depth_attachment)
+
+            has_depth_attachment = KAN_TRUE;
+            vulkan_attachment->format = system->device_depth_image_format;
+            KAN_ASSERT (attachment->samples == 1u)
+            vulkan_attachment->samples = VK_SAMPLE_COUNT_1_BIT;
+            vulkan_attachment->finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+            depth_attachment.attachment = (uint32_t) index;
+            depth_attachment.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+            break;
+        }
+
+        switch (attachment->load_operation)
+        {
+        case KAN_RENDER_LOAD_OPERATION_ANY:
+            vulkan_attachment->loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+            break;
+
+        case KAN_RENDER_LOAD_OPERATION_LOAD:
+            vulkan_attachment->loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+            break;
+
+        case KAN_RENDER_LOAD_OPERATION_CLEAR:
+            vulkan_attachment->loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+            break;
+        }
+
+        switch (attachment->store_operation)
+        {
+        case KAN_RENDER_STORE_OPERATION_ANY:
+            vulkan_attachment->storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+            break;
+
+        case KAN_RENDER_STORE_OPERATION_STORE:
+            vulkan_attachment->storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+            break;
+
+        case KAN_RENDER_STORE_OPERATION_NONE:
+            vulkan_attachment->storeOp = VK_ATTACHMENT_STORE_OP_NONE;
+            break;
+        }
+
+        vulkan_attachment->stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        vulkan_attachment->stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        vulkan_attachment->initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    }
+
+    VkSubpassDescription sub_pass_description = {
+        .flags = 0u,
+        .pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
+        .inputAttachmentCount = 0u,
+        .pInputAttachments = NULL,
+        .colorAttachmentCount = (uint32_t) color_attachments_count,
+        .pColorAttachments = color_attachments,
+        .pResolveAttachments = NULL,
+        .pDepthStencilAttachment = has_depth_attachment ? &depth_attachment : NULL,
+        .preserveAttachmentCount = 0u,
+        .pPreserveAttachments = NULL,
+    };
+
+    uint32_t destination_access_mask = 0u;
+    if (color_attachments_count > 0u)
+    {
+        destination_access_mask |= VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    }
+
+    if (has_depth_attachment)
+    {
+        destination_access_mask |= VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+    }
+
+    VkSubpassDependency sub_pass_dependencies[] = {
+        {
+            .srcSubpass = VK_SUBPASS_EXTERNAL,
+            .dstSubpass = 0u,
+            .srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
+            .dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
+            .srcAccessMask = 0u,
+            .dstAccessMask = destination_access_mask,
+            .dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT,
+        },
+    };
+
+    VkRenderPassCreateInfo render_pass_description = {
+        .sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
+        .pNext = NULL,
+        .flags = 0u,
+        .attachmentCount = (uint32_t) description->attachments_count,
+        .pAttachments = attachment_descriptions,
+        .subpassCount = 1u,
+        .pSubpasses = &sub_pass_description,
+        .dependencyCount = 1u,
+        .pDependencies = sub_pass_dependencies,
+    };
+
+    VkRenderPass render_pass;
+    VkResult result = vkCreateRenderPass (system->device, &render_pass_description,
+                                          VULKAN_ALLOCATION_CALLBACKS (system), &render_pass);
+
+    kan_free_general (system->utility_allocation_group, attachment_descriptions,
+                      sizeof (VkAttachmentDescription) * description->attachments_count);
+    kan_free_general (system->utility_allocation_group, color_attachments,
+                      sizeof (VkAttachmentReference) * description->attachments_count);
+
+    if (result != VK_SUCCESS)
+    {
+        KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR, "Failed to create render pass \"%s\".",
+                 description->tracking_name)
+        return NULL;
+    }
+
+    struct render_backend_pass_t *pass =
+        kan_allocate_batched (system->pass_wrapper_allocation_group, sizeof (struct render_backend_pass_t));
+
+    pass->next = system->first_pass;
+    pass->previous = NULL;
+    pass->system = system;
+
+    if (system->first_pass)
+    {
+        system->first_pass->previous = pass;
+    }
+
+    system->first_pass = pass;
+    pass->pass = render_pass;
+    return pass;
+}
+
+static inline void render_backend_system_destroy_pass (struct render_backend_system_t *system,
+                                                       struct render_backend_pass_t *pass,
+                                                       kan_bool_t remove_from_list)
+{
+    if (remove_from_list)
+    {
+        if (pass->next)
+        {
+            pass->next->previous = pass->previous;
+        }
+
+        if (pass->previous)
+        {
+            pass->previous->next = pass->next;
+        }
+        else
+        {
+            KAN_ASSERT (system->first_pass = pass)
+            system->first_pass = pass->next;
+        }
+    }
+
+    vkDestroyRenderPass (system->device, pass->pass, VULKAN_ALLOCATION_CALLBACKS (system));
+    kan_free_batched (system->pass_wrapper_allocation_group, pass);
+}
+
 static inline struct render_backend_buffer_t *render_backend_system_create_buffer (
     struct render_backend_system_t *system,
     enum render_backend_buffer_family_t family,
@@ -668,9 +929,9 @@ static inline struct render_backend_buffer_t *render_backend_system_create_buffe
     return buffer;
 }
 
-static void render_backend_system_destroy_buffer (struct render_backend_system_t *system,
-                                                  struct render_backend_buffer_t *buffer,
-                                                  kan_bool_t remove_from_list)
+static inline void render_backend_system_destroy_buffer (struct render_backend_system_t *system,
+                                                         struct render_backend_buffer_t *buffer,
+                                                         kan_bool_t remove_from_list)
 {
     if (remove_from_list)
     {
@@ -1166,8 +1427,16 @@ static inline kan_bool_t create_vulkan_image_and_view (struct render_backend_sys
     {
         switch (description->color_format)
         {
-        case KAN_RENDER_IMAGE_COLOR_FORMAT_RGBA32_SRGB:
+        case KAN_RENDER_COLOR_FORMAT_RGBA32_SRGB:
             image_format = VK_FORMAT_R8G8B8A8_SRGB;
+            break;
+
+        case KAN_RENDER_COLOR_FORMAT_RGBA128_SFLOAT:
+            image_format = VK_FORMAT_R32G32B32A32_SFLOAT;
+            break;
+
+        case KAN_RENDER_COLOR_FORMAT_SURFACE:
+            image_format = SURFACE_COLOR_FORMAT;
             break;
         }
     }
@@ -1302,8 +1571,13 @@ static inline uint64_t kan_render_image_description_calculate_texel_size (
     case KAN_RENDER_IMAGE_TYPE_COLOR_3D:
         switch (description->color_format)
         {
-        case KAN_RENDER_IMAGE_COLOR_FORMAT_RGBA32_SRGB:
+        case KAN_RENDER_COLOR_FORMAT_RGBA32_SRGB:
+        case KAN_RENDER_COLOR_FORMAT_SURFACE:
             texel_size = 4u;
+            break;
+
+        case KAN_RENDER_COLOR_FORMAT_RGBA128_SFLOAT:
+            texel_size = 16u;
             break;
         }
 
@@ -1435,6 +1709,7 @@ kan_context_system_handle_t render_backend_system_create (kan_allocation_group_t
     system->utility_allocation_group = kan_allocation_group_get_child (group, "utility");
     system->surface_wrapper_allocation_group = kan_allocation_group_get_child (group, "surface_wrapper");
     system->schedule_allocation_group = kan_allocation_group_get_child (group, "schedule");
+    system->pass_wrapper_allocation_group = kan_allocation_group_get_child (group, "pass_wrapper");
     system->buffer_wrapper_allocation_group = kan_allocation_group_get_child (group, "buffer_wrapper");
     system->frame_lifetime_wrapper_allocation_group =
         kan_allocation_group_get_child (group, "frame_lifetime_allocator_wrapper");
@@ -1445,6 +1720,7 @@ kan_context_system_handle_t render_backend_system_create (kan_allocation_group_t
     system->resource_management_lock = kan_atomic_int_init (0);
 
     system->first_surface = NULL;
+    system->first_pass = NULL;
     system->first_buffer = NULL;
     system->first_frame_lifetime_allocator = NULL;
     system->first_image = NULL;
@@ -1854,8 +2130,16 @@ void render_backend_system_shutdown (kan_context_system_handle_t handle)
     vkDeviceWaitIdle (system->device);
     // All surfaces should've been automatically destroyed during application system shutdown.
     KAN_ASSERT (!system->first_surface)
-    struct render_backend_buffer_t *buffer = system->first_buffer;
 
+    struct render_backend_pass_t *pass = system->first_pass;
+    while (pass)
+    {
+        struct render_backend_pass_t *next = pass->next;
+        render_backend_system_destroy_pass (system, pass, KAN_FALSE);
+        pass = next;
+    }
+
+    struct render_backend_buffer_t *buffer = system->first_buffer;
     while (buffer)
     {
         struct render_backend_buffer_t *next = buffer->next;
@@ -2314,6 +2598,7 @@ kan_bool_t kan_render_backend_system_select_device (kan_context_system_handle_t 
         state->first_scheduled_image_upload = NULL;
         state->first_scheduled_image_mip_generation = NULL;
 
+        state->first_scheduled_pass_destroy = NULL;
         state->first_scheduled_buffer_destroy = NULL;
         state->first_scheduled_frame_lifetime_allocator_destroy = NULL;
         state->first_scheduled_image_destroy = NULL;
@@ -2766,33 +3051,32 @@ static void render_backend_system_submit_graphics (struct render_backend_system_
     surface = system->first_surface;
     while (surface)
     {
-        if (!surface->received_any_output)
-        {
-            // Special catch for cases when there is no render commands: we still need to transition surface images.
-            VkImageMemoryBarrier barrier_info = {
-                .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-                .pNext = NULL,
-                .srcAccessMask = 0u,
-                .dstAccessMask = 0u,
-                .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-                .newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
-                .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                .image = surface->images[surface->acquired_image_index],
-                .subresourceRange =
-                    {
-                        .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-                        .baseMipLevel = 0u,
-                        .levelCount = 1u,
-                        .baseArrayLayer = 0u,
-                        .layerCount = 1u,
-                    },
-            };
+        // We need to transition swap chain images into present layout.
+        // If surface image didn't receive any output, we don't care about old layout.
+        // Otherwise, it must be properly transitioned.
+        VkImageMemoryBarrier barrier_info = {
+            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+            .pNext = NULL,
+            .srcAccessMask = 0u,
+            .dstAccessMask = 0u,
+            .oldLayout =
+                surface->received_any_output ? VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL : VK_IMAGE_LAYOUT_UNDEFINED,
+            .newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .image = surface->images[surface->acquired_image_index],
+            .subresourceRange =
+                {
+                    .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                    .baseMipLevel = 0u,
+                    .levelCount = 1u,
+                    .baseArrayLayer = 0u,
+                    .layerCount = 1u,
+                },
+        };
 
-            vkCmdPipelineBarrier (state->primary_graphics_command_buffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                                  VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT, 0u, 0u, NULL, 0u, NULL, 1u, &barrier_info);
-        }
-
+        vkCmdPipelineBarrier (state->primary_graphics_command_buffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                              VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT, 0u, 0u, NULL, 0u, NULL, 1u, &barrier_info);
         surface = surface->next;
     }
 
@@ -2909,8 +3193,8 @@ static void render_backend_system_clean_current_schedule_if_safe (struct render_
 
     if (!schedule->first_scheduled_buffer_unmap_flush_transfer && !schedule->first_scheduled_buffer_unmap_flush &&
         !schedule->first_scheduled_image_upload && !schedule->first_scheduled_image_mip_generation &&
-        !schedule->first_scheduled_buffer_destroy && !schedule->first_scheduled_frame_lifetime_allocator_destroy &&
-        !schedule->first_scheduled_image_destroy)
+        !schedule->first_scheduled_pass_destroy && !schedule->first_scheduled_buffer_destroy &&
+        !schedule->first_scheduled_frame_lifetime_allocator_destroy && !schedule->first_scheduled_image_destroy)
     {
         // No active scheduled operations, safe to reset allocator completely.
         kan_stack_group_allocator_reset (&schedule->item_allocator);
@@ -3154,8 +3438,7 @@ static void render_backend_surface_create_swap_chain (struct render_backend_surf
 
     for (uint32_t index = 0u; index < formats_count; ++index)
     {
-        if (formats[index].format == VK_FORMAT_B8G8R8A8_SRGB &&
-            formats[index].colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
+        if (formats[index].format == SURFACE_COLOR_FORMAT && formats[index].colorSpace == SURFACE_COLOR_SPACE)
         {
             format_found = KAN_TRUE;
             surface_format = formats[index];
@@ -3468,6 +3751,15 @@ kan_bool_t kan_render_backend_system_next_frame (kan_context_system_handle_t ren
     }
 
     struct render_backend_schedule_state_t *schedule = &system->schedule_states[system->current_frame_in_flight_index];
+    struct scheduled_pass_destroy_t *pass_destroy = schedule->first_scheduled_pass_destroy;
+
+    while (pass_destroy)
+    {
+        render_backend_system_destroy_pass (system, pass_destroy->pass, KAN_TRUE);
+        pass_destroy = pass_destroy->next;
+    }
+
+    schedule->first_scheduled_pass_destroy = NULL;
     struct scheduled_buffer_destroy_t *buffer_destroy = schedule->first_scheduled_buffer_destroy;
 
     while (buffer_destroy)
@@ -3630,8 +3922,11 @@ void kan_render_frame_buffer_destroy (kan_render_frame_buffer_t buffer)
 kan_render_pass_t kan_render_pass_create (kan_render_context_t context,
                                           struct kan_render_pass_description_t *description)
 {
-    // TODO: Implement.
-    return KAN_INVALID_RENDER_PASS;
+    struct render_backend_system_t *system = (struct render_backend_system_t *) context;
+    kan_atomic_int_lock (&system->resource_management_lock);
+    struct render_backend_pass_t *pass = render_backend_system_create_pass (system, description);
+    kan_atomic_int_unlock (&system->resource_management_lock);
+    return pass ? (kan_render_pass_t) pass : KAN_INVALID_RENDER_IMAGE;
 }
 
 kan_bool_t kan_render_pass_add_static_dependency (kan_render_pass_t pass, kan_render_pass_t dependency)
@@ -3692,7 +3987,19 @@ void kan_render_pass_instance_instanced_draw (kan_render_pass_instance_t pass_in
 
 void kan_render_pass_destroy (kan_render_pass_t pass)
 {
-    // TODO: Implement.
+    struct render_backend_pass_t *data = (struct render_backend_pass_t *) pass;
+    struct render_backend_schedule_state_t *schedule = render_backend_system_get_schedule_for_destroy (data->system);
+    kan_atomic_int_lock (&schedule->schedule_lock);
+
+    struct scheduled_pass_destroy_t *item =
+        kan_stack_group_allocator_allocate (&schedule->item_allocator, sizeof (struct scheduled_pass_destroy_t),
+                                            _Alignof (struct scheduled_pass_destroy_t));
+
+    // We do not need to preserve order as passes cannot depend one on another.
+    item->next = schedule->first_scheduled_pass_destroy;
+    schedule->first_scheduled_pass_destroy = item;
+    item->pass = data;
+    kan_atomic_int_unlock (&schedule->schedule_lock);
 }
 
 kan_render_classic_graphics_pipeline_family_t kan_render_classic_graphics_pipeline_family_create (
