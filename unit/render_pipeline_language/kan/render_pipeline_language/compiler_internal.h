@@ -572,7 +572,7 @@ struct kan_rpl_compiler_statics_t
     kan_interned_string_t interned_fill;
     kan_interned_string_t interned_wireframe;
     kan_interned_string_t interned_back;
-    
+
     kan_interned_string_t interned_never;
     kan_interned_string_t interned_always;
     kan_interned_string_t interned_equal;
@@ -606,7 +606,7 @@ struct kan_rpl_compiler_statics_t
     kan_interned_string_t interned_address_mode_u;
     kan_interned_string_t interned_address_mode_v;
     kan_interned_string_t interned_address_mode_w;
-    
+
     kan_interned_string_t interned_zero;
     kan_interned_string_t interned_one;
     kan_interned_string_t interned_source_color;

@@ -228,8 +228,7 @@ static inline void spirv_register_and_generate_known_pointer_type (
     code[3u] = base_type_id;
 
     struct spirv_known_pointer_type_t *new_type =
-        kan_stack_group_allocator_allocate (&context->temporary_allocator, sizeof (struct spirv_known_pointer_type_t),
-                                            _Alignof (struct spirv_known_pointer_type_t));
+        KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&context->temporary_allocator, struct spirv_known_pointer_type_t);
 
     new_type->pointer_type_id = expected_pointer_id;
     new_type->source_type_id = base_type_id;
@@ -887,9 +886,8 @@ static uint32_t spirv_request_i1_constant (struct spirv_generation_context_t *co
     constant_code[2u] = constant_id;
     *(int32_t *) &constant_code[3u] = (int32_t) value;
 
-    struct spirv_generation_integer_constant_t *new_constant = kan_stack_group_allocator_allocate (
-        &context->temporary_allocator, sizeof (struct spirv_generation_integer_constant_t),
-        _Alignof (struct spirv_generation_integer_constant_t));
+    struct spirv_generation_integer_constant_t *new_constant = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (
+        &context->temporary_allocator, struct spirv_generation_integer_constant_t);
 
     new_constant->next = context->first_integer_constant;
     context->first_integer_constant = new_constant;
@@ -920,9 +918,8 @@ static uint32_t spirv_request_f1_constant (struct spirv_generation_context_t *co
     constant_code[2u] = constant_id;
     *(float *) &constant_code[3u] = value;
 
-    struct spirv_generation_floating_constant_t *new_constant = kan_stack_group_allocator_allocate (
-        &context->temporary_allocator, sizeof (struct spirv_generation_floating_constant_t),
-        _Alignof (struct spirv_generation_floating_constant_t));
+    struct spirv_generation_floating_constant_t *new_constant = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (
+        &context->temporary_allocator, struct spirv_generation_floating_constant_t);
 
     new_constant->next = context->first_floating_constant;
     context->first_floating_constant = new_constant;
@@ -991,9 +988,8 @@ static uint32_t spirv_find_or_generate_variable_type (struct spirv_generation_co
     array_stride_code[2u] = SpvDecorationArrayStride;
     array_stride_code[3u] = (uint32_t) base_size;
 
-    struct spirv_generation_array_type_t *new_array_type = kan_stack_group_allocator_allocate (
-        &context->temporary_allocator, sizeof (struct spirv_generation_array_type_t),
-        _Alignof (struct spirv_generation_array_type_t));
+    struct spirv_generation_array_type_t *new_array_type =
+        KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&context->temporary_allocator, struct spirv_generation_array_type_t);
 
     new_array_type->next = context->first_generated_array_type;
     context->first_generated_array_type = new_array_type;
@@ -1236,9 +1232,8 @@ static struct spirv_generation_function_type_t *spirv_find_or_generate_function_
         memcpy (type_code + 3u, argument_types, argument_count * sizeof (uint32_t));
     }
 
-    struct spirv_generation_function_type_t *new_function_type = kan_stack_group_allocator_allocate (
-        &context->temporary_allocator, sizeof (struct spirv_generation_function_type_t),
-        _Alignof (struct spirv_generation_function_type_t));
+    struct spirv_generation_function_type_t *new_function_type = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (
+        &context->temporary_allocator, struct spirv_generation_function_type_t);
 
     new_function_type->next = context->first_generated_function_type;
     context->first_generated_function_type = new_function_type;
@@ -1255,8 +1250,7 @@ static inline struct spirv_generation_block_t *spirv_function_new_block (struct 
                                                                          uint32_t block_id)
 {
     struct spirv_generation_block_t *block =
-        kan_stack_group_allocator_allocate (&context->temporary_allocator, sizeof (struct spirv_generation_block_t),
-                                            _Alignof (struct spirv_generation_block_t));
+        KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&context->temporary_allocator, struct spirv_generation_block_t);
 
     block->next = NULL;
     block->spirv_id = block_id;
@@ -1288,9 +1282,8 @@ static inline void spirv_add_persistent_load (struct spirv_generation_context_t 
                                               uint32_t variable_id,
                                               uint32_t token_id)
 {
-    struct spirv_block_persistent_load_t *persistent_load = kan_stack_group_allocator_allocate (
-        &context->temporary_allocator, sizeof (struct spirv_block_persistent_load_t),
-        _Alignof (struct spirv_block_persistent_load_t));
+    struct spirv_block_persistent_load_t *persistent_load =
+        KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&context->temporary_allocator, struct spirv_block_persistent_load_t);
 
     persistent_load->next = block->first_persistent_load;
     block->first_persistent_load = persistent_load;
@@ -1381,9 +1374,8 @@ static inline void spirv_register_builtin_usage (struct spirv_generation_context
         stage_usage = stage_usage->next;
     }
 
-    stage_usage = kan_stack_group_allocator_allocate (&context->temporary_allocator,
-                                                      sizeof (struct spirv_generation_builtin_used_by_stage_t),
-                                                      _Alignof (struct spirv_generation_builtin_used_by_stage_t));
+    stage_usage = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&context->temporary_allocator,
+                                                            struct spirv_generation_builtin_used_by_stage_t);
     stage_usage->next = builtin->first_stage;
     builtin->first_stage = stage_usage;
     stage_usage->stage = function->source->required_stage;
@@ -1411,8 +1403,7 @@ static uint32_t spirv_request_builtin (struct spirv_generation_context_t *contex
     ++context->current_bound;
 
     struct spirv_generation_builtin_t *new_builtin =
-        kan_stack_group_allocator_allocate (&context->temporary_allocator, sizeof (struct spirv_generation_builtin_t),
-                                            _Alignof (struct spirv_generation_builtin_t));
+        KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&context->temporary_allocator, struct spirv_generation_builtin_t);
     new_builtin->next = context->first_builtin;
     context->first_builtin = new_builtin;
     new_builtin->spirv_id = variable_id;
@@ -1628,9 +1619,8 @@ static uint32_t spirv_use_temporary_variable (struct spirv_generation_context_t 
         free_variable = free_variable->next;
     }
 
-    struct spirv_generation_temporary_variable_t *new_variable = kan_stack_group_allocator_allocate (
-        &context->temporary_allocator, sizeof (struct spirv_generation_temporary_variable_t),
-        _Alignof (struct spirv_generation_temporary_variable_t));
+    struct spirv_generation_temporary_variable_t *new_variable = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (
+        &context->temporary_allocator, struct spirv_generation_temporary_variable_t);
 
     new_variable->next = function->first_used_temporary_variable;
     function->first_used_temporary_variable = new_variable;
@@ -3213,9 +3203,8 @@ static struct spirv_generation_block_t *spirv_emit_scope (struct spirv_generatio
 static inline void spirv_emit_function (struct spirv_generation_context_t *context,
                                         struct compiler_instance_function_node_t *function)
 {
-    struct spirv_generation_function_node_t *generated_function = kan_stack_group_allocator_allocate (
-        &context->temporary_allocator, sizeof (struct spirv_generation_function_node_t),
-        _Alignof (struct spirv_generation_function_node_t));
+    struct spirv_generation_function_node_t *generated_function = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (
+        &context->temporary_allocator, struct spirv_generation_function_node_t);
 
     generated_function->source = function;
     generated_function->header_section.first = NULL;

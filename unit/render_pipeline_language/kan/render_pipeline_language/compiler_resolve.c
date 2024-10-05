@@ -597,9 +597,8 @@ static kan_bool_t resolve_settings (struct rpl_compiler_context_t *context,
 
         case CONDITIONAL_EVALUATION_RESULT_TRUE:
         {
-            struct compiler_instance_setting_node_t *target_setting = kan_stack_group_allocator_allocate (
-                &instance->resolve_allocator, sizeof (struct compiler_instance_setting_node_t),
-                _Alignof (struct compiler_instance_setting_node_t));
+            struct compiler_instance_setting_node_t *target_setting = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (
+                &instance->resolve_allocator, struct compiler_instance_setting_node_t);
 
             target_setting->next = NULL;
             target_setting->name = source_setting->name;
@@ -777,9 +776,8 @@ static kan_bool_t resolve_declarations (struct rpl_compiler_context_t *context,
 
         case CONDITIONAL_EVALUATION_RESULT_TRUE:
         {
-            struct compiler_instance_declaration_node_t *target_declaration = kan_stack_group_allocator_allocate (
-                &instance->resolve_allocator, sizeof (struct compiler_instance_declaration_node_t),
-                _Alignof (struct compiler_instance_declaration_node_t));
+            struct compiler_instance_declaration_node_t *target_declaration = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (
+                &instance->resolve_allocator, struct compiler_instance_declaration_node_t);
 
             target_declaration->next = NULL;
             target_declaration->variable.name = source_declaration->name;
@@ -885,9 +883,8 @@ static kan_bool_t flatten_buffer_process_field_list (
 
     while (field)
     {
-        struct compiler_instance_buffer_flattening_graph_node_t *new_root = kan_stack_group_allocator_allocate (
-            &instance->resolve_allocator, sizeof (struct compiler_instance_buffer_flattening_graph_node_t),
-            _Alignof (struct compiler_instance_buffer_flattening_graph_node_t));
+        struct compiler_instance_buffer_flattening_graph_node_t *new_root = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (
+            &instance->resolve_allocator, struct compiler_instance_buffer_flattening_graph_node_t);
 
         new_root->next_on_level = NULL;
         new_root->first_child = NULL;
@@ -939,9 +936,8 @@ static kan_bool_t flatten_buffer_process_field (struct rpl_compiler_context_t *c
     if (declaration->variable.type.if_vector || declaration->variable.type.if_matrix)
     {
         // Reached leaf.
-        struct compiler_instance_buffer_flattened_declaration_t *flattened = kan_stack_group_allocator_allocate (
-            &instance->resolve_allocator, sizeof (struct compiler_instance_buffer_flattened_declaration_t),
-            _Alignof (struct compiler_instance_buffer_flattened_declaration_t));
+        struct compiler_instance_buffer_flattened_declaration_t *flattened = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (
+            &instance->resolve_allocator, struct compiler_instance_buffer_flattened_declaration_t);
 
         flattened->next = NULL;
         flattened->source_declaration = declaration;
@@ -1199,9 +1195,8 @@ static kan_bool_t resolve_buffers (struct rpl_compiler_context_t *context,
                 break;
             }
 
-            struct compiler_instance_buffer_node_t *target_buffer = kan_stack_group_allocator_allocate (
-                &instance->resolve_allocator, sizeof (struct compiler_instance_buffer_node_t),
-                _Alignof (struct compiler_instance_buffer_node_t));
+            struct compiler_instance_buffer_node_t *target_buffer = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (
+                &instance->resolve_allocator, struct compiler_instance_buffer_node_t);
 
             target_buffer->next = NULL;
             target_buffer->name = source_buffer->name;
@@ -1387,9 +1382,8 @@ static kan_bool_t resolve_samplers (struct rpl_compiler_context_t *context,
                 break;
             }
 
-            struct compiler_instance_sampler_node_t *target_sampler = kan_stack_group_allocator_allocate (
-                &instance->resolve_allocator, sizeof (struct compiler_instance_sampler_node_t),
-                _Alignof (struct compiler_instance_sampler_node_t));
+            struct compiler_instance_sampler_node_t *target_sampler = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (
+                &instance->resolve_allocator, struct compiler_instance_sampler_node_t);
 
             target_sampler->next = NULL;
             target_sampler->name = source_sampler->name;
@@ -1622,9 +1616,8 @@ static kan_bool_t resolve_use_struct (struct rpl_compiler_context_t *context,
         return KAN_FALSE;
     }
 
-    struct_node = kan_stack_group_allocator_allocate (&instance->resolve_allocator,
-                                                      sizeof (struct compiler_instance_struct_node_t),
-                                                      _Alignof (struct compiler_instance_struct_node_t));
+    struct_node =
+        KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&instance->resolve_allocator, struct compiler_instance_struct_node_t);
     *output = struct_node;
 
     struct_node->name = name;
@@ -1702,9 +1695,8 @@ static kan_bool_t resolve_use_buffer (struct rpl_compiler_context_t *context,
         access_node = access_node->next;
     }
 
-    access_node = kan_stack_group_allocator_allocate (&instance->resolve_allocator,
-                                                      sizeof (struct compiler_instance_buffer_access_node_t),
-                                                      _Alignof (struct compiler_instance_buffer_access_node_t));
+    access_node = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&instance->resolve_allocator,
+                                                            struct compiler_instance_buffer_access_node_t);
 
     access_node->next = function->first_buffer_access;
     function->first_buffer_access = access_node;
@@ -1752,9 +1744,8 @@ static kan_bool_t resolve_use_sampler (struct rpl_compiler_context_t *context,
         access_node = access_node->next;
     }
 
-    access_node = kan_stack_group_allocator_allocate (&instance->resolve_allocator,
-                                                      sizeof (struct compiler_instance_sampler_access_node_t),
-                                                      _Alignof (struct compiler_instance_sampler_access_node_t));
+    access_node = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&instance->resolve_allocator,
+                                                            struct compiler_instance_sampler_access_node_t);
 
     access_node->next = function->first_sampler_access;
     function->first_sampler_access = access_node;
@@ -1945,9 +1936,8 @@ static inline kan_bool_t resolve_expression_array_with_signature (
                 &resolved_expression))
         {
             KAN_ASSERT (resolved_expression)
-            struct compiler_instance_expression_list_item_t *list_item = kan_stack_group_allocator_allocate (
-                &instance->resolve_allocator, sizeof (struct compiler_instance_expression_list_item_t),
-                _Alignof (struct compiler_instance_expression_list_item_t));
+            struct compiler_instance_expression_list_item_t *list_item = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (
+                &instance->resolve_allocator, struct compiler_instance_expression_list_item_t);
 
             list_item->next = NULL;
             list_item->expression = resolved_expression;
@@ -2037,9 +2027,8 @@ static struct resolve_fiend_access_linear_node_t *resolve_field_access_linearize
             return NULL;
         }
 
-        struct resolve_fiend_access_linear_node_t *new_node = kan_stack_group_allocator_allocate (
-            &context->resolve_allocator, sizeof (struct resolve_fiend_access_linear_node_t),
-            _Alignof (struct resolve_fiend_access_linear_node_t));
+        struct resolve_fiend_access_linear_node_t *new_node = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (
+            &context->resolve_allocator, struct resolve_fiend_access_linear_node_t);
 
         new_node->next = first_node;
         first_node = new_node;
@@ -2401,9 +2390,8 @@ static inline kan_bool_t resolve_binary_operation (struct rpl_compiler_context_t
 
                         if (chain_first)
                         {
-                            chain_input_expression = kan_stack_group_allocator_allocate (
-                                &instance->resolve_allocator, sizeof (struct compiler_instance_expression_node_t),
-                                _Alignof (struct compiler_instance_expression_node_t));
+                            chain_input_expression = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (
+                                &instance->resolve_allocator, struct compiler_instance_expression_node_t);
 
                             const kan_bool_t writable =
                                 is_buffer_writable_for_stage (buffer, resolve_scope->function->required_stage);
@@ -3028,9 +3016,8 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
                 return KAN_FALSE;
             }
 
-            struct resolve_expression_alias_node_t *alias_node = kan_stack_group_allocator_allocate (
-                &context->resolve_allocator, sizeof (struct resolve_expression_alias_node_t),
-                _Alignof (struct resolve_expression_alias_node_t));
+            struct resolve_expression_alias_node_t *alias_node = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (
+                &context->resolve_allocator, struct resolve_expression_alias_node_t);
 
             alias_node->name = expression->conditional_alias.name;
             if (!resolve_expression (context, instance, intermediate, resolve_scope,
@@ -3065,9 +3052,8 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
         }
     }
 
-    struct compiler_instance_expression_node_t *new_expression = kan_stack_group_allocator_allocate (
-        &instance->resolve_allocator, sizeof (struct compiler_instance_expression_node_t),
-        _Alignof (struct compiler_instance_expression_node_t));
+    struct compiler_instance_expression_node_t *new_expression = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (
+        &instance->resolve_allocator, struct compiler_instance_expression_node_t);
 
     new_expression->output.type.if_vector = NULL;
     new_expression->output.type.if_matrix = NULL;
@@ -3232,9 +3218,8 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
 
             if (owner_scope)
             {
-                struct compiler_instance_scope_variable_item_t *item = kan_stack_group_allocator_allocate (
-                    &instance->resolve_allocator, sizeof (struct compiler_instance_scope_variable_item_t),
-                    _Alignof (struct compiler_instance_scope_variable_item_t));
+                struct compiler_instance_scope_variable_item_t *item = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (
+                    &instance->resolve_allocator, struct compiler_instance_scope_variable_item_t);
 
                 item->variable = &new_expression->variable_declaration.variable;
                 item->next = owner_scope->associated_resolved_scope_if_any->scope.first_variable;
@@ -3345,9 +3330,9 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
                         }
                     }
 
-                    struct compiler_instance_expression_list_item_t *list_item = kan_stack_group_allocator_allocate (
-                        &instance->resolve_allocator, sizeof (struct compiler_instance_expression_list_item_t),
-                        _Alignof (struct compiler_instance_expression_list_item_t));
+                    struct compiler_instance_expression_list_item_t *list_item =
+                        KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&instance->resolve_allocator,
+                                                                  struct compiler_instance_expression_list_item_t);
 
                     list_item->next = NULL;
                     list_item->expression = resolved_expression;
@@ -3550,18 +3535,16 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
         new_expression->scope.leads_to_return = KAN_FALSE;
         new_expression->scope.leads_to_jump = KAN_FALSE;
 
-        struct compiler_instance_expression_node_t *loop_expression = kan_stack_group_allocator_allocate (
-            &instance->resolve_allocator, sizeof (struct compiler_instance_expression_node_t),
-            _Alignof (struct compiler_instance_expression_node_t));
+        struct compiler_instance_expression_node_t *loop_expression = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (
+            &instance->resolve_allocator, struct compiler_instance_expression_node_t);
 
         loop_expression->type = COMPILER_INSTANCE_EXPRESSION_TYPE_FOR;
         loop_expression->module_name = resolve_scope->function->module_name;
         loop_expression->source_name = expression->source_name;
         loop_expression->source_line = expression->source_line;
 
-        struct compiler_instance_expression_list_item_t *list_item = kan_stack_group_allocator_allocate (
-            &instance->resolve_allocator, sizeof (struct compiler_instance_expression_list_item_t),
-            _Alignof (struct compiler_instance_expression_list_item_t));
+        struct compiler_instance_expression_list_item_t *list_item = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (
+            &instance->resolve_allocator, struct compiler_instance_expression_list_item_t);
 
         list_item->next = NULL;
         list_item->expression = loop_expression;
@@ -3810,9 +3793,8 @@ static kan_bool_t resolve_new_used_function (struct rpl_compiler_context_t *cont
         return KAN_FALSE;
     }
 
-    struct compiler_instance_function_node_t *function_node = kan_stack_group_allocator_allocate (
-        &instance->resolve_allocator, sizeof (struct compiler_instance_function_node_t),
-        _Alignof (struct compiler_instance_function_node_t));
+    struct compiler_instance_function_node_t *function_node = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (
+        &instance->resolve_allocator, struct compiler_instance_function_node_t);
     *output_node = function_node;
 
     kan_bool_t resolved = KAN_TRUE;
@@ -3856,9 +3838,8 @@ static kan_bool_t resolve_new_used_function (struct rpl_compiler_context_t *cont
 
     while (argument_declaration)
     {
-        struct compiler_instance_scope_variable_item_t *item = kan_stack_group_allocator_allocate (
-            &instance->resolve_allocator, sizeof (struct compiler_instance_scope_variable_item_t),
-            _Alignof (struct compiler_instance_scope_variable_item_t));
+        struct compiler_instance_scope_variable_item_t *item = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (
+            &instance->resolve_allocator, struct compiler_instance_scope_variable_item_t);
 
         item->next = NULL;
         item->variable = &argument_declaration->variable;

@@ -387,8 +387,7 @@ static inline struct parser_expression_tree_node_t *parser_expression_tree_node_
     uint64_t source_line)
 {
     struct parser_expression_tree_node_t *node =
-        kan_stack_group_allocator_allocate (&parser->allocator, sizeof (struct parser_expression_tree_node_t),
-                                            _Alignof (struct parser_expression_tree_node_t));
+        KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&parser->allocator, struct parser_expression_tree_node_t);
 
     node->parent_expression = NULL;
     node->type = type;
@@ -486,8 +485,8 @@ static inline struct parser_declaration_t *parser_declaration_new (struct rpl_pa
                                                                    kan_interned_string_t source_log_name,
                                                                    uint64_t source_line)
 {
-    struct parser_declaration_t *declaration = kan_stack_group_allocator_allocate (
-        &parser->allocator, sizeof (struct parser_declaration_t), _Alignof (struct parser_declaration_t));
+    struct parser_declaration_t *declaration =
+        KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&parser->allocator, struct parser_declaration_t);
     declaration->next = NULL;
     declaration->declaration.name = NULL;
     declaration->declaration.type = NULL;
@@ -504,8 +503,8 @@ static inline struct parser_struct_t *parser_struct_new (struct rpl_parser_t *pa
                                                          kan_interned_string_t source_log_name,
                                                          uint64_t source_line)
 {
-    struct parser_struct_t *instance = kan_stack_group_allocator_allocate (
-        &parser->allocator, sizeof (struct parser_struct_t), _Alignof (struct parser_struct_t));
+    struct parser_struct_t *instance =
+        KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&parser->allocator, struct parser_struct_t);
     instance->next = NULL;
     instance->name = name;
     instance->first_declaration = NULL;
@@ -520,8 +519,8 @@ static inline struct parser_buffer_t *parser_buffer_new (struct rpl_parser_t *pa
                                                          kan_interned_string_t source_log_name,
                                                          uint64_t source_line)
 {
-    struct parser_buffer_t *instance = kan_stack_group_allocator_allocate (
-        &parser->allocator, sizeof (struct parser_buffer_t), _Alignof (struct parser_buffer_t));
+    struct parser_buffer_t *instance =
+        KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&parser->allocator, struct parser_buffer_t);
     instance->next = NULL;
     instance->name = name;
     instance->first_declaration = NULL;
@@ -537,8 +536,8 @@ static inline struct parser_sampler_t *parser_sampler_new (struct rpl_parser_t *
                                                            kan_interned_string_t source_log_name,
                                                            uint64_t source_line)
 {
-    struct parser_sampler_t *instance = kan_stack_group_allocator_allocate (
-        &parser->allocator, sizeof (struct parser_sampler_t), _Alignof (struct parser_sampler_t));
+    struct parser_sampler_t *instance =
+        KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&parser->allocator, struct parser_sampler_t);
     instance->next = NULL;
     instance->name = name;
     instance->type = type;
@@ -556,8 +555,8 @@ static inline struct parser_function_t *parser_function_new (struct rpl_parser_t
                                                              kan_interned_string_t source_log_name,
                                                              uint64_t source_line)
 {
-    struct parser_function_t *instance = kan_stack_group_allocator_allocate (
-        &parser->allocator, sizeof (struct parser_function_t), _Alignof (struct parser_function_t));
+    struct parser_function_t *instance =
+        KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&parser->allocator, struct parser_function_t);
     instance->next = NULL;
     instance->name = name;
     instance->return_type_name = return_type_name;
@@ -732,8 +731,8 @@ static inline kan_bool_t parse_main_option_flag (struct rpl_parser_t *parser,
         return KAN_FALSE;
     }
 
-    struct parser_option_t *node = kan_stack_group_allocator_allocate (
-        &parser->allocator, sizeof (struct parser_option_t), _Alignof (struct parser_option_t));
+    struct parser_option_t *node =
+        KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&parser->allocator, struct parser_option_t);
 
     node->next = NULL;
     if (parser->processing_data.last_option)
@@ -828,8 +827,8 @@ static inline kan_bool_t parse_main_option_count (struct rpl_parser_t *parser,
         return KAN_FALSE;
     }
 
-    struct parser_option_t *node = kan_stack_group_allocator_allocate (
-        &parser->allocator, sizeof (struct parser_option_t), _Alignof (struct parser_option_t));
+    struct parser_option_t *node =
+        KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&parser->allocator, struct parser_option_t);
 
     node->next = NULL;
     if (parser->processing_data.last_option)
@@ -894,8 +893,8 @@ static inline kan_bool_t parse_main_setting_flag (struct rpl_parser_t *parser,
                                                   const char *block_begin,
                                                   const char *block_end)
 {
-    struct parser_setting_t *node = kan_stack_group_allocator_allocate (
-        &parser->allocator, sizeof (struct parser_setting_t), _Alignof (struct parser_setting_t));
+    struct parser_setting_t *node =
+        KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&parser->allocator, struct parser_setting_t);
 
     node->next = NULL;
     if (parser->processing_data.last_setting)
@@ -933,8 +932,8 @@ static inline kan_bool_t parse_main_setting_integer (struct rpl_parser_t *parser
                                                      const char *block_begin,
                                                      const char *block_end)
 {
-    struct parser_setting_t *node = kan_stack_group_allocator_allocate (
-        &parser->allocator, sizeof (struct parser_setting_t), _Alignof (struct parser_setting_t));
+    struct parser_setting_t *node =
+        KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&parser->allocator, struct parser_setting_t);
 
     node->next = NULL;
     if (parser->processing_data.last_setting)
@@ -992,8 +991,8 @@ static inline kan_bool_t parse_main_setting_floating (struct rpl_parser_t *parse
                                                       const char *block_begin,
                                                       const char *block_end)
 {
-    struct parser_setting_t *node = kan_stack_group_allocator_allocate (
-        &parser->allocator, sizeof (struct parser_setting_t), _Alignof (struct parser_setting_t));
+    struct parser_setting_t *node =
+        KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&parser->allocator, struct parser_setting_t);
 
     node->next = NULL;
     if (parser->processing_data.last_setting)
@@ -1044,8 +1043,8 @@ static inline kan_bool_t parse_main_setting_string (struct rpl_parser_t *parser,
                                                     const char *block_begin,
                                                     const char *block_end)
 {
-    struct parser_setting_t *node = kan_stack_group_allocator_allocate (
-        &parser->allocator, sizeof (struct parser_setting_t), _Alignof (struct parser_setting_t));
+    struct parser_setting_t *node =
+        KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&parser->allocator, struct parser_setting_t);
 
     node->next = NULL;
     if (parser->processing_data.last_setting)
@@ -2086,8 +2085,7 @@ static kan_bool_t parse_call_arguments (struct rpl_parser_t *parser,
         }
 
         struct parser_expression_list_item_t *item =
-            kan_stack_group_allocator_allocate (&parser->allocator, sizeof (struct parser_expression_list_item_t),
-                                                _Alignof (struct parser_expression_list_item_t));
+            KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&parser->allocator, struct parser_expression_list_item_t);
 
         item->next = NULL;
         item->expression = expression;
@@ -2137,9 +2135,8 @@ static kan_bool_t parse_declarations_finish_item (struct rpl_parser_t *parser,
                  return KAN_FALSE;
              }
 
-             struct parser_expression_list_item_t *new_item = kan_stack_group_allocator_allocate (
-                     &parser->allocator, sizeof (struct parser_expression_list_item_t),
-                     _Alignof (struct parser_expression_list_item_t));
+             struct parser_expression_list_item_t *new_item = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (
+                     &parser->allocator, struct parser_expression_list_item_t);
 
              new_item->next = NULL;
              new_item->expression = array_size_expression;
@@ -2207,9 +2204,8 @@ static struct parser_declaration_meta_item_t *parse_declarations_meta (struct rp
         /*!re2c
          @name_begin identifier @name_end separator* ("," | ")")
          {
-             struct parser_declaration_meta_item_t *new_item = kan_stack_group_allocator_allocate (
-                     &parser->allocator, sizeof (struct parser_declaration_meta_item_t),
-                     _Alignof (struct parser_declaration_meta_item_t));
+             struct parser_declaration_meta_item_t *new_item = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (
+                     &parser->allocator, struct parser_declaration_meta_item_t);
 
              new_item->meta = kan_char_sequence_intern (name_begin, name_end);
              new_item->next = meta_item;
@@ -2457,8 +2453,8 @@ static inline kan_bool_t parse_sampler_setting_flag (struct rpl_parser_t *parser
                                                      const char *block_end)
 {
     kan_interned_string_t name = kan_char_sequence_intern (name_begin, name_end);
-    struct parser_setting_list_item_t *item = kan_stack_group_allocator_allocate (
-        &parser->allocator, sizeof (struct parser_setting_list_item_t), _Alignof (struct parser_setting_list_item_t));
+    struct parser_setting_list_item_t *item =
+        KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&parser->allocator, struct parser_setting_list_item_t);
 
     item->setting.name = name;
     item->setting.block =
@@ -2497,8 +2493,8 @@ static inline kan_bool_t parse_sampler_setting_integer (struct rpl_parser_t *par
                                                         const char *block_end)
 {
     kan_interned_string_t name = kan_char_sequence_intern (name_begin, name_end);
-    struct parser_setting_list_item_t *item = kan_stack_group_allocator_allocate (
-        &parser->allocator, sizeof (struct parser_setting_list_item_t), _Alignof (struct parser_setting_list_item_t));
+    struct parser_setting_list_item_t *item =
+        KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&parser->allocator, struct parser_setting_list_item_t);
 
     item->setting.name = name;
     item->setting.block =
@@ -2556,8 +2552,8 @@ static inline kan_bool_t parse_sampler_setting_floating (struct rpl_parser_t *pa
                                                          const char *block_end)
 {
     kan_interned_string_t name = kan_char_sequence_intern (name_begin, name_end);
-    struct parser_setting_list_item_t *item = kan_stack_group_allocator_allocate (
-        &parser->allocator, sizeof (struct parser_setting_list_item_t), _Alignof (struct parser_setting_list_item_t));
+    struct parser_setting_list_item_t *item =
+        KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&parser->allocator, struct parser_setting_list_item_t);
 
     item->setting.name = name;
     item->setting.block =
@@ -2609,8 +2605,8 @@ static inline kan_bool_t parse_sampler_setting_string (struct rpl_parser_t *pars
                                                        const char *block_end)
 {
     kan_interned_string_t name = kan_char_sequence_intern (name_begin, name_end);
-    struct parser_setting_list_item_t *item = kan_stack_group_allocator_allocate (
-        &parser->allocator, sizeof (struct parser_setting_list_item_t), _Alignof (struct parser_setting_list_item_t));
+    struct parser_setting_list_item_t *item =
+        KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&parser->allocator, struct parser_setting_list_item_t);
 
     item->setting.name = name;
     item->setting.block =
@@ -2925,10 +2921,8 @@ static struct parser_expression_tree_node_t *parse_if_after_keyword (struct rpl_
              struct parser_expression_tree_node_t *scope_expression = parser_expression_tree_node_new (
                      parser, KAN_RPL_EXPRESSION_NODE_TYPE_SCOPE, state->source_log_name, state->saved_line);
 
-             struct parser_expression_list_item_t *new_item =
-                     kan_stack_group_allocator_allocate (&parser->allocator,
-                             sizeof (struct parser_expression_list_item_t),
-                             _Alignof (struct parser_expression_list_item_t));
+             struct parser_expression_list_item_t *new_item = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (
+                     &parser->allocator, struct parser_expression_list_item_t);
 
              new_item->next = NULL;
              new_item->expression = next_if;
@@ -3036,8 +3030,7 @@ static struct parser_expression_tree_node_t *parse_scope (struct rpl_parser_t *p
 
 #define ADD_EXPRESSION(EXPRESSION)                                                                                     \
     struct parser_expression_list_item_t *new_item =                                                                   \
-        kan_stack_group_allocator_allocate (&parser->allocator, sizeof (struct parser_expression_list_item_t),         \
-                                            _Alignof (struct parser_expression_list_item_t));                          \
+        KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&parser->allocator, struct parser_expression_list_item_t);           \
     new_item->next = NULL;                                                                                             \
     new_item->expression = EXPRESSION;                                                                                 \
                                                                                                                        \
