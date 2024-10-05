@@ -1212,8 +1212,11 @@ kan_bool_t kan_platform_application_window_get_size_for_render (kan_platform_win
     int width;
     int height;
 
-    if (!SDL_GetWindowSizeInPixels (window, &width, &height))
+    if (SDL_GetWindowSizeInPixels (window, &width, &height) != 0)
     {
+        KAN_LOG (platform_application, KAN_LOG_ERROR,
+                 "Unable to get window with id %llu size for render, backend error: %s", (unsigned long long) window_id,
+                 SDL_GetError ())
         return KAN_FALSE;
     }
 
