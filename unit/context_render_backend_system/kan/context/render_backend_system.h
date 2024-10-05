@@ -106,11 +106,21 @@ CONTEXT_RENDER_BACKEND_SYSTEM_API kan_bool_t kan_render_backend_system_select_de
 CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_context_t
 kan_render_backend_system_get_render_context (kan_context_system_handle_t render_backend_system);
 
+// TODO: Integrate with cpu profiler sections, especially kan_render_backend_system_next_frame.
+
 /// \details Submits recorded commands and presentation from previous frame, prepares data for the new frame.
 /// \return True if next frame submit should be started, false otherwise. For example, we might not be able to submit
 ///         new frame while using frames in flights when GPU is not fast enough to process all the frames.
 CONTEXT_RENDER_BACKEND_SYSTEM_API kan_bool_t
 kan_render_backend_system_next_frame (kan_context_system_handle_t render_backend_system);
+
+struct kan_render_integer_region_t
+{
+    int64_t x;
+    int64_t y;
+    uint64_t width;
+    uint64_t height;
+};
 
 // TODO: Add API for making screenshots. Possibly something for recording screen (useful for crashes and bug reports)?
 
@@ -118,6 +128,12 @@ CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_surface_t
 kan_render_backend_system_create_surface (kan_context_system_handle_t render_backend_system,
                                           kan_application_system_window_handle_t window,
                                           kan_interned_string_t tracking_name);
+
+CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_backend_system_present_image_on_surface (
+    kan_render_surface_t surface,
+    kan_render_image_t image,
+    struct kan_render_integer_region_t image_region,
+    struct kan_render_integer_region_t surface_region);
 
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_backend_system_destroy_surface (
     kan_context_system_handle_t render_backend_system, kan_render_surface_t surface);
@@ -229,14 +245,6 @@ struct kan_render_viewport_bounds_t
     float depth_max;
 };
 
-struct kan_render_scissor_t
-{
-    int64_t offset_x;
-    int64_t offset_y;
-    uint64_t width;
-    uint64_t height;
-};
-
 CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_pass_t
 kan_render_pass_create (kan_render_context_t context, struct kan_render_pass_description_t *description);
 
@@ -247,7 +255,7 @@ CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_pass_instance_t
 kan_render_pass_instantiate (kan_render_pass_t pass,
                              kan_render_frame_buffer_t frame_buffer,
                              struct kan_render_viewport_bounds_t *viewport_bounds,
-                             struct kan_render_scissor_t *scissor);
+                             struct kan_render_integer_region_t *scissor);
 
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_instance_add_dynamic_dependency (
     kan_render_pass_instance_t pass_instance, kan_render_pass_instance_t dependency);

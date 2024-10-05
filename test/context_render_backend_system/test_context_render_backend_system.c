@@ -57,7 +57,9 @@ KAN_TEST_CASE (temp)
     kan_application_system_window_handle_t window_handle = kan_application_system_window_create (
         application_system, "Kan context_render_backend test window", 800u, 600u,
         kan_render_get_required_window_flags () | KAN_PLATFORM_WINDOW_FLAG_RESIZABLE);
-    kan_render_backend_system_create_surface (render_backend_system, window_handle, kan_string_intern ("test_surface"));
+
+    kan_render_surface_t test_surface = kan_render_backend_system_create_surface (render_backend_system, window_handle,
+                                                                                  kan_string_intern ("test_surface"));
 
     kan_render_frame_lifetime_buffer_allocator_t frame_lifetime_buffer_allocator =
         kan_render_frame_lifetime_buffer_allocator_create (render_context, KAN_RENDER_BUFFER_TYPE_STORAGE,
@@ -99,6 +101,22 @@ KAN_TEST_CASE (temp)
     kan_render_image_upload_data (test_image, 0u, test_image_first_mip_data);
     kan_render_image_request_mip_generation (test_image, 0u, TEST_IMAGE_MIPS - 1u);
 
+    struct kan_render_image_description_t depth_stencil_image_description = {
+        .type = KAN_RENDER_IMAGE_TYPE_DEPTH_STENCIL,
+        .color_format = KAN_RENDER_COLOR_FORMAT_SURFACE,
+        .width = 800u,
+        .height = 600u,
+        .depth = 1u,
+        .mips = 1u,
+        .render_target = KAN_TRUE,
+        .supports_sampling = KAN_FALSE,
+        .tracking_name = kan_string_intern ("depth_stencil_image"),
+    };
+
+    kan_render_image_t depth_stencil_image = kan_render_image_create (render_context, &depth_stencil_image_description);
+    uint32_t depth_stencil_width = 800u;
+    uint32_t depth_stencil_height = 600u;
+
     struct kan_render_pass_attachment_t test_pass_attachments[] = {
         {
             .type = KAN_RENDER_PASS_ATTACHMENT_COLOR,
@@ -126,8 +144,44 @@ KAN_TEST_CASE (temp)
     kan_render_pass_t test_pass = kan_render_pass_create (render_context, &test_pass_description);
     KAN_TEST_ASSERT (test_pass != KAN_INVALID_RENDER_PASS)
 
+    struct kan_render_frame_buffer_attachment_description_t test_frame_buffer_attachments[] = {
+        {
+            .type = KAN_FRAME_BUFFER_ATTACHMENT_SURFACE,
+            .surface = test_surface,
+        },
+        {
+            .type = KAN_FRAME_BUFFER_ATTACHMENT_IMAGE,
+            .image = depth_stencil_image,
+        },
+    };
+
+    struct kan_render_frame_buffer_description_t test_frame_buffer_description = {
+        .associated_pass = test_pass,
+        .attachment_count = sizeof (test_frame_buffer_attachments) / sizeof (test_frame_buffer_attachments[0u]),
+        .attachments = test_frame_buffer_attachments,
+        .tracking_name = kan_string_intern ("test_frame_buffer"),
+    };
+
+    kan_render_frame_buffer_create (render_context, &test_frame_buffer_description);
+
     for (uint64_t frame = 0u; frame < TEST_FRAMES; ++frame)
     {
+        const struct kan_application_system_window_info_t *window_info =
+            kan_application_system_get_window_info_from_handle (application_system, window_handle);
+
+        if (window_info->width_for_render != depth_stencil_width ||
+            window_info->height_for_render != depth_stencil_height)
+        {
+            depth_stencil_width = window_info->width_for_render;
+            depth_stencil_height = window_info->height_for_render;
+
+            if (depth_stencil_width != 0u && depth_stencil_height != 0u)
+            {
+                kan_render_image_resize_render_target (depth_stencil_image, depth_stencil_width, depth_stencil_height,
+                                                       1u);
+            }
+        }
+
         switch (frame % 4u)
         {
         case 0u:
