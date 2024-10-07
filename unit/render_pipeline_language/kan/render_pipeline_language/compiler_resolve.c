@@ -3423,6 +3423,84 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
             new_expression->output.type.if_struct = new_expression->function_call.function->return_type_if_struct;
         }
 
+        // We need to pass callee accesses to the caller function.
+        if (resolved)
+        {
+            struct compiler_instance_buffer_access_node_t *buffer_access_node =
+                new_expression->function_call.function->first_buffer_access;
+
+            while (buffer_access_node)
+            {
+                struct compiler_instance_buffer_access_node_t *existent_access_node =
+                    resolve_scope->function->first_buffer_access;
+
+                while (existent_access_node)
+                {
+                    if (existent_access_node->buffer == buffer_access_node->buffer)
+                    {
+                        // Already used, no need for further verification.
+                        break;
+                    }
+
+                    existent_access_node = existent_access_node->next;
+                }
+
+                if (!existent_access_node)
+                {
+                    struct compiler_instance_buffer_access_node_t *new_access_node =
+                        KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&instance->resolve_allocator,
+                                                                  struct compiler_instance_buffer_access_node_t);
+
+                    new_access_node->next = resolve_scope->function->first_buffer_access;
+                    resolve_scope->function->first_buffer_access = new_access_node;
+                    new_access_node->buffer = buffer_access_node->buffer;
+                    new_access_node->direct_access_function = buffer_access_node->direct_access_function;
+                }
+
+                buffer_access_node = buffer_access_node->next;
+            }
+
+            struct compiler_instance_sampler_access_node_t *sampler_access_node =
+                new_expression->function_call.function->first_sampler_access;
+
+            while (sampler_access_node)
+            {
+                struct compiler_instance_sampler_access_node_t *existent_access_node =
+                    resolve_scope->function->first_sampler_access;
+
+                while (existent_access_node)
+                {
+                    if (existent_access_node->sampler == sampler_access_node->sampler)
+                    {
+                        // Already used, no need fop further verification.
+                        return KAN_TRUE;
+                    }
+
+                    existent_access_node = existent_access_node->next;
+                }
+
+                if (!existent_access_node)
+                {
+                    struct compiler_instance_sampler_access_node_t *new_access_node =
+                        KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&instance->resolve_allocator,
+                                                                  struct compiler_instance_sampler_access_node_t);
+
+                    new_access_node->next = resolve_scope->function->first_sampler_access;
+                    resolve_scope->function->first_sampler_access = new_access_node;
+                    new_access_node->sampler = sampler_access_node->sampler;
+                    new_access_node->direct_access_function = sampler_access_node->direct_access_function;
+                }
+
+                sampler_access_node = sampler_access_node->next;
+            }
+
+            if (!resolve_scope->function->has_stage_specific_access &&
+                new_expression->function_call.function->has_stage_specific_access)
+            {
+                resolve_scope->function->has_stage_specific_access = KAN_TRUE;
+            }
+        }
+
         return resolved;
     }
 

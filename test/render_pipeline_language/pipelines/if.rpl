@@ -65,8 +65,13 @@ f4 calculate_modifier (void)
     }
 }
 
+// We separate this into special function to make sure that buffer usage is correctly translated to caller.
+f4 calculate_fragment_base_color (void)
+{
+    return diffuse_color (vertex_output.uv);
+}
+
 void fragment_main (void)
 {
-    f4 base_color = diffuse_color (vertex_output.uv);
-    fragment_output.color = base_color * calculate_modifier ();
+    fragment_output.color = calculate_fragment_base_color () * calculate_modifier ();
 }
