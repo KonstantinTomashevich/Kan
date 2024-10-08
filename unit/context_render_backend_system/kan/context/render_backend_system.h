@@ -323,7 +323,7 @@ struct kan_render_attribute_description_t
 
 enum kan_render_layout_binding_type_t
 {
-    KAN_RENDER_LAYOUT_BINDING_TYPE_UNIFORM_BUFFER,
+    KAN_RENDER_LAYOUT_BINDING_TYPE_UNIFORM_BUFFER = 0u,
     KAN_RENDER_LAYOUT_BINDING_TYPE_STORAGE_BUFFER,
     KAN_RENDER_LAYOUT_BINDING_TYPE_COMBINED_IMAGE_SAMPLER,
 };
@@ -348,7 +348,7 @@ enum kan_render_classic_graphics_topology_t
     KAN_RENDER_CLASSIC_GRAPHICS_TOPOLOGY_TRIANGLE_LIST = 0u,
 };
 
-struct kan_render_classic_graphics_pipeline_family_definition_t
+struct kan_render_classic_graphics_pipeline_family_description_t
 {
     enum kan_render_classic_graphics_topology_t topology;
 
@@ -366,7 +366,7 @@ struct kan_render_classic_graphics_pipeline_family_definition_t
 
 CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_classic_graphics_pipeline_family_t
 kan_render_classic_graphics_pipeline_family_create (
-    kan_render_context_t context, struct kan_render_classic_graphics_pipeline_family_definition_t *definition);
+    kan_render_context_t context, struct kan_render_classic_graphics_pipeline_family_description_t *description);
 
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_classic_graphics_pipeline_family_destroy (
     kan_render_classic_graphics_pipeline_family_t family);
@@ -474,7 +474,7 @@ enum kan_render_address_mode_t
     KAN_RENDER_ADDRESS_MODE_MIRRORED_CLAMP_TO_BORDER,
 };
 
-struct kan_render_sampler_definition_t
+struct kan_render_sampler_description_t
 {
     uint64_t layout_set;
     uint64_t layout_binding;
@@ -490,7 +490,7 @@ struct kan_render_sampler_definition_t
     float border_a;
 };
 
-struct kan_render_classic_graphics_pipeline_definition_t
+struct kan_render_classic_graphics_pipeline_description_t
 {
     kan_render_pass_t pass;
     kan_render_classic_graphics_pipeline_family_t family;
@@ -517,7 +517,7 @@ struct kan_render_classic_graphics_pipeline_definition_t
     struct kan_render_pipeline_code_module_t *code_modules;
 
     uint64_t samplers_count;
-    struct kan_render_sampler_definition_t *samplers;
+    struct kan_render_sampler_description_t *samplers;
 
     kan_interned_string_t tracking_name;
 };
@@ -542,7 +542,7 @@ enum kan_render_pipeline_compilation_priority_t
 
 CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_classic_graphics_pipeline_t
 kan_render_classic_graphics_pipeline_create (kan_render_context_t context,
-                                             struct kan_render_classic_graphics_pipeline_definition_t *definition,
+                                             struct kan_render_classic_graphics_pipeline_description_t *description,
                                              enum kan_render_pipeline_compilation_priority_t compilation_priority);
 
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_classic_graphics_pipeline_change_compilation_priority (
@@ -569,8 +569,11 @@ struct kan_render_layout_update_description_t
     uint64_t set;
     uint64_t binding;
 
-    struct kan_render_layout_update_description_buffer_t buffer_binding;
-    struct kan_render_layout_update_description_image_t image_binding;
+    union
+    {
+        struct kan_render_layout_update_description_buffer_t buffer_binding;
+        struct kan_render_layout_update_description_image_t image_binding;
+    };
 };
 
 CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_classic_graphics_pipeline_instance_t
