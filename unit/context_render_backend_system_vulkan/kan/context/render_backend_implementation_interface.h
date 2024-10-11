@@ -7,7 +7,13 @@
 #include <kan/context/vulkan_memory_allocator.h>
 #include <kan/memory/allocation.h>
 #include <kan/platform/application.h>
+#include <kan/platform/precise_time.h>
 #include <kan/threading/atomic.h>
+#include <kan/threading/conditional_variable.h>
+#include <kan/threading/mutex.h>
+#include <kan/threading/thread.h>
+
+// TODO: Maybe use bi-directional lists from container everywhere to avoid excessive duplication?
 
 KAN_C_HEADER_BEGIN
 
@@ -160,6 +166,12 @@ struct scheduled_pass_destroy_t
     struct render_backend_pass_t *pass;
 };
 
+struct scheduled_classic_graphics_pipeline_destroy_t
+{
+    struct scheduled_classic_graphics_pipeline_destroy_t *next;
+    struct render_backend_classic_graphics_pipeline_t *pipeline;
+};
+
 struct scheduled_classic_graphics_pipeline_family_destroy_t
 {
     struct scheduled_classic_graphics_pipeline_family_destroy_t *next;
@@ -218,6 +230,7 @@ struct render_backend_schedule_state_t
     struct scheduled_frame_buffer_destroy_t *first_scheduled_frame_buffer_destroy;
     struct scheduled_detached_frame_buffer_destroy_t *first_scheduled_detached_frame_buffer_destroy;
     struct scheduled_pass_destroy_t *first_scheduled_pass_destroy;
+    struct scheduled_classic_graphics_pipeline_destroy_t *first_scheduled_classic_graphics_pipeline_destroy;
     struct scheduled_classic_graphics_pipeline_family_destroy_t
         *first_scheduled_classic_graphics_pipeline_family_destroy;
     struct scheduled_buffer_destroy_t *first_scheduled_buffer_destroy;
@@ -316,11 +329,11 @@ struct render_backend_classic_graphics_pipeline_family_t
     enum kan_render_classic_graphics_topology_t topology;
     kan_interned_string_t tracking_name;
 
-    uint64_t attribute_sources_count;
-    struct kan_render_attribute_source_description_t *attribute_sources;
+    uint64_t input_bindings_count;
+    VkVertexInputBindingDescription *input_bindings;
 
     uint64_t attributes_count;
-    struct kan_render_attribute_description_t *attributes;
+    VkVertexInputAttributeDescription *attributes;
 };
 
 struct render_backend_classic_graphics_pipeline_family_t *
@@ -332,6 +345,46 @@ void render_backend_system_destroy_classic_graphics_pipeline_family (
     struct render_backend_system_t *system,
     struct render_backend_classic_graphics_pipeline_family_t *family,
     kan_bool_t remove_from_list);
+
+enum pipeline_compilation_state_t
+{
+    PIPELINE_COMPILATION_STATE_PENDING = 0u,
+    PIPELINE_COMPILATION_STATE_EXECUTION,
+    PIPELINE_COMPILATION_STATE_SUCCESS,
+    PIPELINE_COMPILATION_STATE_FAILURE,
+};
+
+struct render_backend_classic_graphics_pipeline_t
+{
+    struct render_backend_classic_graphics_pipeline_t *next;
+    struct render_backend_classic_graphics_pipeline_t *previous;
+    struct render_backend_system_t *system;
+
+    VkPipeline pipeline;
+    struct render_backend_pass_t *pass;
+    struct render_backend_classic_graphics_pipeline_family_t *family;
+
+    float min_depth;
+    float max_depth;
+
+    uint64_t shader_modules_count;
+    VkShaderModule *shader_modules;
+
+    enum kan_render_pipeline_compilation_priority_t compilation_priority;
+    enum pipeline_compilation_state_t compilation_state;
+    struct classic_graphics_pipeline_compilation_request_t *compilation_request;
+
+    kan_interned_string_t tracking_name;
+};
+
+struct render_backend_classic_graphics_pipeline_t *render_backend_system_create_classic_graphics_pipeline (
+    struct render_backend_system_t *system,
+    struct kan_render_classic_graphics_pipeline_description_t *description,
+    enum kan_render_pipeline_compilation_priority_t compilation_priority);
+
+void render_backend_system_destroy_classic_graphics_pipeline (struct render_backend_system_t *system,
+                                                              struct render_backend_classic_graphics_pipeline_t *family,
+                                                              kan_bool_t remove_from_list);
 
 enum render_backend_buffer_family_t
 {
@@ -477,12 +530,63 @@ struct render_backend_image_t
 #endif
 };
 
-struct render_backend_image_t *render_backend_system_create_image (
-    struct render_backend_system_t *system, struct kan_render_image_description_t *description);
+struct render_backend_image_t *render_backend_system_create_image (struct render_backend_system_t *system,
+                                                                   struct kan_render_image_description_t *description);
 
 void render_backend_system_destroy_image (struct render_backend_system_t *system,
                                           struct render_backend_image_t *image,
                                           kan_bool_t remove_from_list);
+
+struct classic_graphics_pipeline_compilation_request_t
+{
+    struct classic_graphics_pipeline_compilation_request_t *next;
+    struct classic_graphics_pipeline_compilation_request_t *previous;
+    struct render_backend_classic_graphics_pipeline_t *pipeline;
+
+    uint64_t shader_stages_count;
+    VkPipelineShaderStageCreateInfo *shader_stages;
+
+    VkPipelineRasterizationStateCreateInfo rasterization;
+    VkPipelineMultisampleStateCreateInfo multisampling;
+    VkPipelineDepthStencilStateCreateInfo depth_stencil;
+    VkPipelineColorBlendStateCreateInfo color_blending;
+
+    uint64_t color_blending_attachments_count;
+    VkPipelineColorBlendAttachmentState *color_blending_attachments;
+};
+
+/// \details We use one separate thread for compiling pipelines instead of several threads, because some drivers are
+///          observed to have bugs while compiling several pipelines at once (despite the fact that it must be ok
+///          by Vulkan specifications). For example:
+///          https://community.amd.com/t5/opengl-vulkan/parallel-vkcreategraphicspipelines-calls-lead-to-corrupted/td-p/571884
+///          If this changes, we might rethink our approach.
+struct render_backend_pipeline_compiler_state_t
+{
+    kan_thread_handle_t thread;
+    kan_mutex_handle_t state_transition_mutex;
+    kan_conditional_variable_handle_t has_more_work;
+    struct kan_atomic_int_t should_terminate;
+
+    struct classic_graphics_pipeline_compilation_request_t *first_classic_graphics_critical;
+    struct classic_graphics_pipeline_compilation_request_t *last_classic_graphics_critical;
+
+    struct classic_graphics_pipeline_compilation_request_t *first_classic_graphics_active;
+    struct classic_graphics_pipeline_compilation_request_t *last_classic_graphics_active;
+
+    struct classic_graphics_pipeline_compilation_request_t *first_classic_graphics_cache;
+    struct classic_graphics_pipeline_compilation_request_t *last_classic_graphics_cache;
+};
+
+kan_thread_result_t render_backend_pipeline_compiler_state_worker_function (kan_thread_user_data_t user_data);
+
+void render_backend_compiler_state_request_classic_graphics (
+    struct render_backend_pipeline_compiler_state_t *state,
+    struct render_backend_classic_graphics_pipeline_t *pipeline,
+    struct kan_render_classic_graphics_pipeline_description_t *description);
+
+/// \invariant Request must be already detached from queue.
+void render_backend_compiler_state_destroy_classic_graphics_request (
+    struct classic_graphics_pipeline_compilation_request_t *request);
 
 struct render_backend_system_t
 {
@@ -524,12 +628,15 @@ struct render_backend_system_t
     struct render_backend_frame_buffer_t *first_frame_buffer;
     struct render_backend_pass_t *first_pass;
     struct render_backend_classic_graphics_pipeline_family_t *first_classic_graphics_pipeline_family;
+    struct render_backend_classic_graphics_pipeline_t *first_classic_graphics_pipeline;
     struct render_backend_buffer_t *first_buffer;
     struct render_backend_frame_lifetime_allocator_t *first_frame_lifetime_allocator;
     struct render_backend_image_t *first_image;
 
     /// \details Still listed in frame lifetime allocator list above, but referenced here too for usability.
     struct render_backend_frame_lifetime_allocator_t *staging_frame_lifetime_allocator;
+
+    struct render_backend_pipeline_compiler_state_t compiler_state;
 
 #if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_VALIDATION_ENABLED)
     kan_bool_t has_validation_layer;
@@ -544,6 +651,7 @@ struct render_backend_system_t
     kan_allocation_group_t frame_buffer_wrapper_allocation_group;
     kan_allocation_group_t pass_wrapper_allocation_group;
     kan_allocation_group_t pipeline_family_wrapper_allocation_group;
+    kan_allocation_group_t pipeline_wrapper_allocation_group;
     kan_allocation_group_t buffer_wrapper_allocation_group;
     kan_allocation_group_t frame_lifetime_wrapper_allocation_group;
     kan_allocation_group_t image_wrapper_allocation_group;
@@ -603,6 +711,49 @@ static inline struct render_backend_schedule_state_t *render_backend_system_get_
     }
 
     return &system->schedule_states[schedule_index];
+}
+
+static inline void render_backend_pipeline_compiler_state_remove_classic_graphics_request_unsafe (
+    struct render_backend_pipeline_compiler_state_t *state,
+    struct classic_graphics_pipeline_compilation_request_t *request)
+{
+#define DO_FOR_PRIORITY(PRIORITY)                                                                                      \
+    if (request->next)                                                                                                 \
+    {                                                                                                                  \
+        request->next->previous = request->previous;                                                                   \
+    }                                                                                                                  \
+    else                                                                                                               \
+    {                                                                                                                  \
+        state->last_classic_graphics_##PRIORITY = request->previous;                                                   \
+    }                                                                                                                  \
+                                                                                                                       \
+    if (request->previous)                                                                                             \
+    {                                                                                                                  \
+        request->previous->next = request->next;                                                                       \
+    }                                                                                                                  \
+    else                                                                                                               \
+    {                                                                                                                  \
+        state->first_classic_graphics_##PRIORITY = request->next;                                                      \
+    }
+
+    switch (request->pipeline->compilation_priority)
+    {
+    case KAN_RENDER_PIPELINE_COMPILATION_PRIORITY_CRITICAL:
+        DO_FOR_PRIORITY (critical)
+        break;
+
+    case KAN_RENDER_PIPELINE_COMPILATION_PRIORITY_ACTIVE:
+        DO_FOR_PRIORITY (active)
+        break;
+
+    case KAN_RENDER_PIPELINE_COMPILATION_PRIORITY_CACHE:
+        DO_FOR_PRIORITY (cache)
+        break;
+    }
+
+    request->next = NULL;
+    request->previous = NULL;
+#undef DO_FOR_PRIORITY
 }
 
 static inline VkFormat kan_render_image_description_calculate_format (

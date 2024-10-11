@@ -499,7 +499,7 @@ struct kan_render_classic_graphics_pipeline_description_t
     enum kan_render_cull_mode_t cull_mode;
     kan_bool_t use_depth_clamp;
 
-    uint64_t *output_setups_count;
+    uint64_t output_setups_count;
     struct kan_render_color_output_setup_description_t *output_setups;
     float blend_constant_r;
     float blend_constant_g;

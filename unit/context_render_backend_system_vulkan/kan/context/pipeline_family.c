@@ -257,22 +257,115 @@ render_backend_system_create_classic_graphics_pipeline_family (
     family->topology = description->topology;
     family->tracking_name = description->tracking_name;
 
-#define COPY_POD_ARRAY(TO, FROM, NAME, TYPE)                                                                           \
-    (TO).NAME##_count = (FROM).NAME##_count;                                                                           \
-    if ((TO).NAME##_count > 0u)                                                                                        \
-    {                                                                                                                  \
-        (TO).NAME = kan_allocate_general (system->pipeline_family_wrapper_allocation_group,                            \
-                                          sizeof (TYPE) * (TO).NAME##_count, _Alignof (TYPE));                         \
-        memcpy ((TO).NAME, (FROM).NAME, sizeof (TYPE) * (TO).NAME##_count);                                            \
-    }                                                                                                                  \
-    else                                                                                                               \
-    {                                                                                                                  \
-        (TO).NAME = NULL;                                                                                              \
+    family->input_bindings_count = description->attribute_sources_count;
+    family->input_bindings =
+        kan_allocate_general (system->pipeline_family_wrapper_allocation_group,
+                              sizeof (VkVertexInputBindingDescription) * family->input_bindings_count,
+                              _Alignof (VkVertexInputBindingDescription));
+
+    for (uint64_t index = 0u; index < description->attribute_sources_count; ++index)
+    {
+        struct kan_render_attribute_source_description_t *input = &description->attribute_sources[index];
+        VkVertexInputBindingDescription *output = &family->input_bindings[index];
+
+        output->binding = (uint32_t) input->binding;
+        output->stride = (uint32_t) input->stride;
+
+        switch (input->rate)
+        {
+        case KAN_RENDER_ATTRIBUTE_RATE_PER_VERTEX:
+            output->inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+            break;
+
+        case KAN_RENDER_ATTRIBUTE_RATE_PER_INSTANCE:
+            output->inputRate = VK_VERTEX_INPUT_RATE_INSTANCE;
+            break;
+        }
     }
 
-    COPY_POD_ARRAY (*family, *description, attribute_sources, struct kan_render_attribute_source_description_t)
-    COPY_POD_ARRAY (*family, *description, attributes, struct kan_render_attribute_description_t)
-#undef COPY_POD_ARRAY
+    family->attributes_count = 0u;
+    for (uint64_t index = 0u; index < description->attributes_count; ++index)
+    {
+        struct kan_render_attribute_description_t *input = &description->attributes[index];
+        switch (input->format)
+        {
+        case KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_FLOAT_1:
+        case KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_FLOAT_2:
+        case KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_FLOAT_3:
+        case KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_FLOAT_4:
+            ++family->attributes_count;
+            break;
+
+        case KAN_RENDER_ATTRIBUTE_FORMAT_MATRIX_FLOAT_3_3:
+            family->attributes_count += 3u;
+            break;
+
+        case KAN_RENDER_ATTRIBUTE_FORMAT_MATRIX_FLOAT_4_4:
+            family->attributes_count += 4u;
+            break;
+        }
+    }
+
+    family->attributes = kan_allocate_general (system->utility_allocation_group,
+                                               sizeof (VkVertexInputAttributeDescription) * family->attributes_count,
+                                               _Alignof (VkVertexInputAttributeDescription));
+    VkVertexInputAttributeDescription *attribute_output = family->attributes;
+
+    for (uint64_t index = 0u; index < description->attributes_count; ++index)
+    {
+        struct kan_render_attribute_description_t *input = &description->attributes[index];
+        VkFormat input_format;
+        uint32_t attribute_count;
+        uint32_t item_offset;
+
+        switch (input->format)
+        {
+        case KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_FLOAT_1:
+            input_format = VK_FORMAT_R32_SFLOAT;
+            attribute_count = 1u;
+            item_offset = sizeof (float);
+            break;
+
+        case KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_FLOAT_2:
+            input_format = VK_FORMAT_R32G32_SFLOAT;
+            attribute_count = 1u;
+            item_offset = sizeof (float) * 2u;
+            break;
+
+        case KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_FLOAT_3:
+            input_format = VK_FORMAT_R32G32B32_SFLOAT;
+            attribute_count = 1u;
+            item_offset = sizeof (float) * 3u;
+            break;
+
+        case KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_FLOAT_4:
+            input_format = VK_FORMAT_R32G32B32A32_SFLOAT;
+            attribute_count = 1u;
+            item_offset = sizeof (float) * 4u;
+            break;
+
+        case KAN_RENDER_ATTRIBUTE_FORMAT_MATRIX_FLOAT_3_3:
+            input_format = VK_FORMAT_R32G32B32_SFLOAT;
+            attribute_count = 3u;
+            item_offset = sizeof (float) * 3u;
+            break;
+
+        case KAN_RENDER_ATTRIBUTE_FORMAT_MATRIX_FLOAT_4_4:
+            input_format = VK_FORMAT_R32G32B32A32_SFLOAT;
+            attribute_count = 4u;
+            item_offset = sizeof (float) * 4u;
+            break;
+        }
+
+        for (uint32_t attribute_index = 0u; attribute_index < attribute_count; ++attribute_index)
+        {
+            attribute_output->binding = (uint32_t) input->binding;
+            attribute_output->location = (uint32_t) input->location;
+            attribute_output->offset = (uint32_t) input->offset + item_offset * attribute_index;
+            attribute_output->format = input_format;
+            ++attribute_output;
+        }
+    }
 
     return family;
 }
@@ -303,10 +396,10 @@ void render_backend_system_destroy_classic_graphics_pipeline_family (
     vkDestroyPipelineLayout (system->device, family->layout, VULKAN_ALLOCATION_CALLBACKS (system));
     free_descriptor_set_layouts (system, family->descriptor_set_layouts_count, family->descriptor_set_layouts);
 
-    kan_free_general (system->pipeline_family_wrapper_allocation_group, family->attribute_sources,
-                      sizeof (struct kan_render_attribute_source_description_t) * family->attribute_sources_count);
+    kan_free_general (system->pipeline_family_wrapper_allocation_group, family->input_bindings,
+                      sizeof (VkVertexInputBindingDescription) * family->input_bindings_count);
     kan_free_general (system->pipeline_family_wrapper_allocation_group, family->attributes,
-                      sizeof (struct kan_render_attribute_description_t) * family->attributes_count);
+                      sizeof (VkVertexInputAttributeDescription) * family->attributes_count);
 }
 
 kan_render_classic_graphics_pipeline_family_t kan_render_classic_graphics_pipeline_family_create (

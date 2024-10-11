@@ -19,6 +19,7 @@ kan_context_system_handle_t render_backend_system_create (kan_allocation_group_t
     system->pass_wrapper_allocation_group = kan_allocation_group_get_child (group, "pass_wrapper");
     system->pipeline_family_wrapper_allocation_group =
         kan_allocation_group_get_child (group, "pipeline_family_wrapper");
+    system->pipeline_wrapper_allocation_group = kan_allocation_group_get_child (group, "pipeline_wrapper");
     system->buffer_wrapper_allocation_group = kan_allocation_group_get_child (group, "buffer_wrapper");
     system->frame_lifetime_wrapper_allocation_group =
         kan_allocation_group_get_child (group, "frame_lifetime_allocator_wrapper");
@@ -32,11 +33,29 @@ kan_context_system_handle_t render_backend_system_create (kan_allocation_group_t
     system->first_frame_buffer = NULL;
     system->first_pass = NULL;
     system->first_classic_graphics_pipeline_family = NULL;
+    system->first_classic_graphics_pipeline = NULL;
     system->first_buffer = NULL;
     system->first_frame_lifetime_allocator = NULL;
     system->first_image = NULL;
     system->staging_frame_lifetime_allocator = NULL;
     system->supported_devices = NULL;
+
+    system->compiler_state.state_transition_mutex = kan_mutex_create ();
+    system->compiler_state.has_more_work = kan_conditional_variable_create ();
+    system->compiler_state.should_terminate = kan_atomic_int_init (0);
+
+    system->compiler_state.first_classic_graphics_critical = NULL;
+    system->compiler_state.last_classic_graphics_critical = NULL;
+
+    system->compiler_state.first_classic_graphics_active = NULL;
+    system->compiler_state.last_classic_graphics_active = NULL;
+
+    system->compiler_state.first_classic_graphics_cache = NULL;
+    system->compiler_state.last_classic_graphics_cache = NULL;
+
+    system->compiler_state.thread = kan_thread_create ("context_render_backend_system_vulkan_pipeline_compiler",
+                                                       render_backend_pipeline_compiler_state_worker_function,
+                                                       (kan_thread_user_data_t) &system->compiler_state);
 
     if (user_config)
     {
@@ -442,6 +461,34 @@ void render_backend_system_shutdown (kan_context_system_handle_t handle)
     // All surfaces should've been automatically destroyed during application system shutdown.
     KAN_ASSERT (!system->first_surface)
 
+    // Shutdown pipeline compiler thread.
+    system->compiler_state.should_terminate = kan_atomic_int_init (1);
+    kan_conditional_variable_signal_one (system->compiler_state.has_more_work);
+    kan_thread_wait (system->compiler_state.thread);
+
+    kan_mutex_destroy (system->compiler_state.state_transition_mutex);
+    kan_conditional_variable_destroy (system->compiler_state.has_more_work);
+
+#define DESTROY_CLASSIC_GRAPHICS_PIPELINE_REQUESTS                                                                     \
+    while (pipeline_request)                                                                                           \
+    {                                                                                                                  \
+        struct classic_graphics_pipeline_compilation_request_t *next = pipeline_request->next;                         \
+        pipeline_request->pipeline->compilation_request = NULL;                                                        \
+        render_backend_compiler_state_destroy_classic_graphics_request (pipeline_request);                             \
+        pipeline_request = next;                                                                                       \
+    }
+
+    struct classic_graphics_pipeline_compilation_request_t *pipeline_request =
+        system->compiler_state.first_classic_graphics_critical;
+    DESTROY_CLASSIC_GRAPHICS_PIPELINE_REQUESTS
+
+    pipeline_request = system->compiler_state.first_classic_graphics_active;
+    DESTROY_CLASSIC_GRAPHICS_PIPELINE_REQUESTS
+
+    pipeline_request = system->compiler_state.first_classic_graphics_cache;
+    DESTROY_CLASSIC_GRAPHICS_PIPELINE_REQUESTS
+#undef DESTROY_CLASSIC_GRAPHICS_PIPELINE_REQUESTS
+
     struct render_backend_frame_buffer_t *frame_buffer = system->first_frame_buffer;
     while (frame_buffer)
     {
@@ -492,17 +539,15 @@ void render_backend_system_shutdown (kan_context_system_handle_t handle)
         }
     }
 
-    struct render_backend_pass_t *pass = system->first_pass;
-    while (pass)
-    {
-        struct render_backend_pass_t *next = pass->next;
-        render_backend_system_destroy_pass (system, pass, KAN_FALSE);
-        pass = next;
-    }
-
     // TODO: Destroy pipeline instances here.
 
-    // TODO: Destroy pipelines here.
+    struct render_backend_classic_graphics_pipeline_t *pipeline = system->first_classic_graphics_pipeline;
+    while (pipeline)
+    {
+        struct render_backend_classic_graphics_pipeline_t *next = pipeline->next;
+        render_backend_system_destroy_classic_graphics_pipeline (system, pipeline, KAN_FALSE);
+        pipeline = next;
+    }
 
     struct render_backend_classic_graphics_pipeline_family_t *family = system->first_classic_graphics_pipeline_family;
     while (family)
@@ -510,6 +555,14 @@ void render_backend_system_shutdown (kan_context_system_handle_t handle)
         struct render_backend_classic_graphics_pipeline_family_t *next = family->next;
         render_backend_system_destroy_classic_graphics_pipeline_family (system, family, KAN_FALSE);
         family = next;
+    }
+
+    struct render_backend_pass_t *pass = system->first_pass;
+    while (pass)
+    {
+        struct render_backend_pass_t *next = pass->next;
+        render_backend_system_destroy_pass (system, pass, KAN_FALSE);
+        pass = next;
     }
 
     struct render_backend_buffer_t *buffer = system->first_buffer;
@@ -975,6 +1028,7 @@ kan_bool_t kan_render_backend_system_select_device (kan_context_system_handle_t 
         state->first_scheduled_frame_buffer_destroy = NULL;
         state->first_scheduled_detached_frame_buffer_destroy = NULL;
         state->first_scheduled_pass_destroy = NULL;
+        state->first_scheduled_classic_graphics_pipeline_destroy = NULL;
         state->first_scheduled_classic_graphics_pipeline_family_destroy = NULL;
         state->first_scheduled_buffer_destroy = NULL;
         state->first_scheduled_frame_lifetime_allocator_destroy = NULL;
@@ -2013,6 +2067,7 @@ static void render_backend_system_clean_current_schedule_if_safe (struct render_
         !schedule->first_scheduled_image_upload && !schedule->first_scheduled_frame_buffer_create &&
         !schedule->first_scheduled_image_mip_generation && !schedule->first_scheduled_frame_buffer_destroy &&
         !schedule->first_scheduled_detached_frame_buffer_destroy && !schedule->first_scheduled_pass_destroy &&
+        !schedule->first_scheduled_classic_graphics_pipeline_destroy &&
         !schedule->first_scheduled_classic_graphics_pipeline_family_destroy &&
         !schedule->first_scheduled_buffer_destroy && !schedule->first_scheduled_frame_lifetime_allocator_destroy &&
         !schedule->first_scheduled_detached_image_view_destroy && !schedule->first_scheduled_image_destroy &&
@@ -2626,6 +2681,53 @@ kan_bool_t kan_render_backend_system_next_frame (kan_context_system_handle_t ren
     }
 
     schedule->first_scheduled_pass_destroy = NULL;
+    struct scheduled_classic_graphics_pipeline_destroy_t *classic_graphics_pipeline_destroy =
+        schedule->first_scheduled_classic_graphics_pipeline_destroy;
+
+    while (classic_graphics_pipeline_destroy)
+    {
+        // If we still have lingering compilation request, we must deal with it.
+        while (classic_graphics_pipeline_destroy->pipeline->compilation_request)
+        {
+            kan_mutex_lock (system->compiler_state.state_transition_mutex);
+            switch (classic_graphics_pipeline_destroy->pipeline->compilation_state)
+            {
+            case PIPELINE_COMPILATION_STATE_PENDING:
+                // Request is pending, therefore it is possible to safely remove it.
+                render_backend_pipeline_compiler_state_remove_classic_graphics_request_unsafe (
+                    &system->compiler_state, classic_graphics_pipeline_destroy->pipeline->compilation_request);
+                kan_mutex_unlock (system->compiler_state.state_transition_mutex);
+
+                render_backend_compiler_state_destroy_classic_graphics_request (
+                    classic_graphics_pipeline_destroy->pipeline->compilation_request);
+
+                classic_graphics_pipeline_destroy->pipeline->compilation_state = PIPELINE_COMPILATION_STATE_FAILURE;
+                classic_graphics_pipeline_destroy->pipeline->compilation_request = NULL;
+                break;
+
+            case PIPELINE_COMPILATION_STATE_EXECUTION:
+                // Bad case, it is already executing and we cannot stop it.
+                // The best solution is to delay destruction, but to do that we also need to delay family destruction.
+                // It is a rare case, therefore we're using simplistic wait here instead of real delay.
+                kan_mutex_unlock (system->compiler_state.state_transition_mutex);
+                kan_platform_sleep (KAN_CONTEXT_RENDER_BACKEND_COMPILATION_WAIT_STEP_NS);
+                break;
+
+            case PIPELINE_COMPILATION_STATE_SUCCESS:
+            case PIPELINE_COMPILATION_STATE_FAILURE:
+                // Already got completed when lock is acquired, we can exit.
+                KAN_ASSERT (!classic_graphics_pipeline_destroy->pipeline->compilation_request)
+                kan_mutex_unlock (system->compiler_state.state_transition_mutex);
+                break;
+            }
+        }
+
+        render_backend_system_destroy_classic_graphics_pipeline (system, classic_graphics_pipeline_destroy->pipeline,
+                                                                 KAN_TRUE);
+        classic_graphics_pipeline_destroy = classic_graphics_pipeline_destroy->next;
+    }
+
+    schedule->first_scheduled_classic_graphics_pipeline_destroy = NULL;
     struct scheduled_classic_graphics_pipeline_family_destroy_t *classic_graphics_pipeline_family_destroy =
         schedule->first_scheduled_classic_graphics_pipeline_family_destroy;
 
