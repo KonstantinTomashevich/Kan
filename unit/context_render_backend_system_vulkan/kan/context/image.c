@@ -129,15 +129,8 @@ struct render_backend_image_t *render_backend_system_create_image (struct render
 
     struct render_backend_image_t *image =
         kan_allocate_batched (system->image_wrapper_allocation_group, sizeof (struct render_backend_image_t));
-    image->next = system->first_image;
-    image->previous = NULL;
 
-    if (system->first_image)
-    {
-        system->first_image->previous = image;
-    }
-
-    system->first_image = image;
+    kan_bd_list_add (&system->images, NULL, &image->list_node);
     image->system = system;
 
     image->image = vulkan_image;
@@ -156,28 +149,8 @@ struct render_backend_image_t *render_backend_system_create_image (struct render
     return image;
 }
 
-void render_backend_system_destroy_image (struct render_backend_system_t *system,
-                                          struct render_backend_image_t *image,
-                                          kan_bool_t remove_from_list)
+void render_backend_system_destroy_image (struct render_backend_system_t *system, struct render_backend_image_t *image)
 {
-    if (remove_from_list)
-    {
-        if (image->next)
-        {
-            image->next->previous = image->previous;
-        }
-
-        if (image->previous)
-        {
-            image->previous->next = image->next;
-        }
-        else
-        {
-            KAN_ASSERT (system->first_image == image)
-            system->first_image = image->next;
-        }
-    }
-
     struct image_frame_buffer_attachment_t *attachment = image->first_frame_buffer_attachment;
     while (attachment)
     {

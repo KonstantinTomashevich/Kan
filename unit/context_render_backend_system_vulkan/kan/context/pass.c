@@ -200,43 +200,14 @@ struct render_backend_pass_t *render_backend_system_create_pass (struct render_b
 
     struct render_backend_pass_t *pass =
         kan_allocate_batched (system->pass_wrapper_allocation_group, sizeof (struct render_backend_pass_t));
-
-    pass->next = system->first_pass;
-    pass->previous = NULL;
-    pass->system = system;
-
-    if (system->first_pass)
-    {
-        system->first_pass->previous = pass;
-    }
-
-    system->first_pass = pass;
+    kan_bd_list_add (&system->passes, NULL, &pass->list_node);
     pass->pass = render_pass;
     return pass;
 }
 
 void render_backend_system_destroy_pass (struct render_backend_system_t *system,
-                                         struct render_backend_pass_t *pass,
-                                         kan_bool_t remove_from_list)
+                                         struct render_backend_pass_t *pass)
 {
-    if (remove_from_list)
-    {
-        if (pass->next)
-        {
-            pass->next->previous = pass->previous;
-        }
-
-        if (pass->previous)
-        {
-            pass->previous->next = pass->next;
-        }
-        else
-        {
-            KAN_ASSERT (system->first_pass = pass)
-            system->first_pass = pass->next;
-        }
-    }
-
     vkDestroyRenderPass (system->device, pass->pass, VULKAN_ALLOCATION_CALLBACKS (system));
     kan_free_batched (system->pass_wrapper_allocation_group, pass);
 }

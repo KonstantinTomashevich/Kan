@@ -6,16 +6,8 @@ struct render_backend_frame_buffer_t *render_backend_system_create_frame_buffer 
     struct render_backend_frame_buffer_t *buffer = kan_allocate_batched (system->frame_buffer_wrapper_allocation_group,
                                                                          sizeof (struct render_backend_frame_buffer_t));
 
-    buffer->next = system->first_frame_buffer;
-    buffer->previous = NULL;
+    kan_bd_list_add (&system->frame_buffers, NULL, &buffer->list_node);
     buffer->system = system;
-
-    if (system->first_frame_buffer)
-    {
-        system->first_frame_buffer->previous = buffer;
-    }
-
-    system->first_frame_buffer = buffer;
     buffer->instance = VK_NULL_HANDLE;
     buffer->instance_array_size = 0u;
     buffer->instance_array = NULL;
@@ -173,27 +165,8 @@ void render_backend_frame_buffer_schedule_resource_destroy (struct render_backen
 }
 
 void render_backend_system_destroy_frame_buffer (struct render_backend_system_t *system,
-                                                 struct render_backend_frame_buffer_t *frame_buffer,
-                                                 kan_bool_t remove_from_list)
+                                                 struct render_backend_frame_buffer_t *frame_buffer)
 {
-    if (remove_from_list)
-    {
-        if (frame_buffer->next)
-        {
-            frame_buffer->next->previous = frame_buffer->previous;
-        }
-
-        if (frame_buffer->previous)
-        {
-            frame_buffer->previous->next = frame_buffer->next;
-        }
-        else
-        {
-            KAN_ASSERT (system->first_frame_buffer = frame_buffer)
-            system->first_frame_buffer = frame_buffer->next;
-        }
-    }
-
     // Detach from surface and images if attachment is created.
     for (uint64_t index = 0u; index < frame_buffer->attachments_count; ++index)
     {

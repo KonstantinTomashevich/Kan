@@ -128,15 +128,7 @@ struct render_backend_buffer_t *render_backend_system_create_buffer (struct rend
     struct render_backend_buffer_t *buffer =
         kan_allocate_batched (system->buffer_wrapper_allocation_group, sizeof (struct render_backend_buffer_t));
 
-    buffer->next = system->first_buffer;
-    buffer->previous = NULL;
-
-    if (system->first_buffer)
-    {
-        system->first_buffer->previous = buffer;
-    }
-
-    system->first_buffer = buffer;
+    kan_bd_list_add (&system->buffers, NULL, &buffer->list_node);
     buffer->system = system;
     buffer->buffer = buffer_handle;
     buffer->allocation = allocation_handle;
@@ -176,27 +168,8 @@ struct render_backend_buffer_t *render_backend_system_create_buffer (struct rend
 }
 
 void render_backend_system_destroy_buffer (struct render_backend_system_t *system,
-                                           struct render_backend_buffer_t *buffer,
-                                           kan_bool_t remove_from_list)
+                                           struct render_backend_buffer_t *buffer)
 {
-    if (remove_from_list)
-    {
-        if (buffer->next)
-        {
-            buffer->next->previous = buffer->previous;
-        }
-
-        if (buffer->previous)
-        {
-            buffer->previous->next = buffer->next;
-        }
-        else
-        {
-            KAN_ASSERT (system->first_buffer = buffer)
-            system->first_buffer = buffer->next;
-        }
-    }
-
 #if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_PROFILE_MEMORY)
     transfer_memory_between_groups (buffer->full_size, buffer->device_allocation_group,
                                     system->memory_profiling.gpu_unmarked_group);

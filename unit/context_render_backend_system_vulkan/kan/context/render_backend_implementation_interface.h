@@ -2,6 +2,7 @@
 
 #include <kan/api_common/alignment.h>
 #include <kan/api_common/min_max.h>
+#include <kan/container/list.h>
 #include <kan/container/stack_group_allocator.h>
 #include <kan/context/render_backend_system.h>
 #include <kan/context/vulkan_memory_allocator.h>
@@ -64,8 +65,7 @@ struct surface_frame_buffer_attachment_t
 
 struct render_backend_surface_t
 {
-    struct render_backend_surface_t *previous;
-    struct render_backend_surface_t *next;
+    struct kan_bd_list_node_t list_node;
     struct render_backend_system_t *system;
 
     kan_interned_string_t tracking_name;
@@ -252,8 +252,7 @@ struct render_backend_frame_buffer_attachment_t
 
 struct render_backend_frame_buffer_t
 {
-    struct render_backend_frame_buffer_t *next;
-    struct render_backend_frame_buffer_t *previous;
+    struct kan_bd_list_node_t list_node;
     struct render_backend_system_t *system;
 
     VkFramebuffer instance;
@@ -283,13 +282,11 @@ void render_backend_frame_buffer_schedule_resource_destroy (struct render_backen
                                                             struct render_backend_schedule_state_t *schedule);
 
 void render_backend_system_destroy_frame_buffer (struct render_backend_system_t *system,
-                                                 struct render_backend_frame_buffer_t *frame_buffer,
-                                                 kan_bool_t remove_from_list);
+                                                 struct render_backend_frame_buffer_t *frame_buffer);
 
 struct render_backend_pass_t
 {
-    struct render_backend_pass_t *next;
-    struct render_backend_pass_t *previous;
+    struct kan_bd_list_node_t list_node;
     struct render_backend_system_t *system;
     VkRenderPass pass;
 };
@@ -297,9 +294,7 @@ struct render_backend_pass_t
 struct render_backend_pass_t *render_backend_system_create_pass (struct render_backend_system_t *system,
                                                                  struct kan_render_pass_description_t *description);
 
-void render_backend_system_destroy_pass (struct render_backend_system_t *system,
-                                         struct render_backend_pass_t *pass,
-                                         kan_bool_t remove_from_list);
+void render_backend_system_destroy_pass (struct render_backend_system_t *system, struct render_backend_pass_t *pass);
 
 struct render_backend_layout_binding_t
 {
@@ -317,8 +312,7 @@ struct render_backend_descriptor_set_layout_t
 
 struct render_backend_classic_graphics_pipeline_family_t
 {
-    struct render_backend_classic_graphics_pipeline_family_t *next;
-    struct render_backend_classic_graphics_pipeline_family_t *previous;
+    struct kan_bd_list_node_t list_node;
     struct render_backend_system_t *system;
 
     VkPipelineLayout layout;
@@ -342,9 +336,7 @@ render_backend_system_create_classic_graphics_pipeline_family (
     struct kan_render_classic_graphics_pipeline_family_description_t *description);
 
 void render_backend_system_destroy_classic_graphics_pipeline_family (
-    struct render_backend_system_t *system,
-    struct render_backend_classic_graphics_pipeline_family_t *family,
-    kan_bool_t remove_from_list);
+    struct render_backend_system_t *system, struct render_backend_classic_graphics_pipeline_family_t *family);
 
 enum pipeline_compilation_state_t
 {
@@ -356,8 +348,7 @@ enum pipeline_compilation_state_t
 
 struct render_backend_classic_graphics_pipeline_t
 {
-    struct render_backend_classic_graphics_pipeline_t *next;
-    struct render_backend_classic_graphics_pipeline_t *previous;
+    struct kan_bd_list_node_t list_node;
     struct render_backend_system_t *system;
 
     VkPipeline pipeline;
@@ -382,9 +373,8 @@ struct render_backend_classic_graphics_pipeline_t *render_backend_system_create_
     struct kan_render_classic_graphics_pipeline_description_t *description,
     enum kan_render_pipeline_compilation_priority_t compilation_priority);
 
-void render_backend_system_destroy_classic_graphics_pipeline (struct render_backend_system_t *system,
-                                                              struct render_backend_classic_graphics_pipeline_t *family,
-                                                              kan_bool_t remove_from_list);
+void render_backend_system_destroy_classic_graphics_pipeline (
+    struct render_backend_system_t *system, struct render_backend_classic_graphics_pipeline_t *family);
 
 enum render_backend_buffer_family_t
 {
@@ -395,8 +385,7 @@ enum render_backend_buffer_family_t
 
 struct render_backend_buffer_t
 {
-    struct render_backend_buffer_t *next;
-    struct render_backend_buffer_t *previous;
+    struct kan_bd_list_node_t list_node;
     struct render_backend_system_t *system;
 
     VkBuffer buffer;
@@ -418,8 +407,7 @@ struct render_backend_buffer_t *render_backend_system_create_buffer (struct rend
                                                                      kan_interned_string_t tracking_name);
 
 void render_backend_system_destroy_buffer (struct render_backend_system_t *system,
-                                           struct render_backend_buffer_t *buffer,
-                                           kan_bool_t remove_from_list);
+                                           struct render_backend_buffer_t *buffer);
 
 #define CHUNK_FREE_MARKER UINT64_MAX
 
@@ -445,8 +433,7 @@ struct render_backend_frame_lifetime_allocator_page_t
 
 struct render_backend_frame_lifetime_allocator_t
 {
-    struct render_backend_frame_lifetime_allocator_t *next;
-    struct render_backend_frame_lifetime_allocator_t *previous;
+    struct kan_bd_list_node_t list_node;
     struct render_backend_system_t *system;
 
     struct render_backend_frame_lifetime_allocator_page_t *first_page;
@@ -497,8 +484,7 @@ void render_backend_frame_lifetime_allocator_clean_empty_pages (
 void render_backend_system_destroy_frame_lifetime_allocator (
     struct render_backend_system_t *system,
     struct render_backend_frame_lifetime_allocator_t *frame_lifetime_allocator,
-    kan_bool_t destroy_buffers,
-    kan_bool_t remove_from_list);
+    kan_bool_t destroy_buffers);
 
 struct image_frame_buffer_attachment_t
 {
@@ -508,8 +494,7 @@ struct image_frame_buffer_attachment_t
 
 struct render_backend_image_t
 {
-    struct render_backend_image_t *next;
-    struct render_backend_image_t *previous;
+    struct kan_bd_list_node_t list_node;
     struct render_backend_system_t *system;
 
     VkImage image;
@@ -533,14 +518,11 @@ struct render_backend_image_t
 struct render_backend_image_t *render_backend_system_create_image (struct render_backend_system_t *system,
                                                                    struct kan_render_image_description_t *description);
 
-void render_backend_system_destroy_image (struct render_backend_system_t *system,
-                                          struct render_backend_image_t *image,
-                                          kan_bool_t remove_from_list);
+void render_backend_system_destroy_image (struct render_backend_system_t *system, struct render_backend_image_t *image);
 
 struct classic_graphics_pipeline_compilation_request_t
 {
-    struct classic_graphics_pipeline_compilation_request_t *next;
-    struct classic_graphics_pipeline_compilation_request_t *previous;
+    struct kan_bd_list_node_t list_node;
     struct render_backend_classic_graphics_pipeline_t *pipeline;
 
     uint64_t shader_stages_count;
@@ -567,14 +549,9 @@ struct render_backend_pipeline_compiler_state_t
     kan_conditional_variable_handle_t has_more_work;
     struct kan_atomic_int_t should_terminate;
 
-    struct classic_graphics_pipeline_compilation_request_t *first_classic_graphics_critical;
-    struct classic_graphics_pipeline_compilation_request_t *last_classic_graphics_critical;
-
-    struct classic_graphics_pipeline_compilation_request_t *first_classic_graphics_active;
-    struct classic_graphics_pipeline_compilation_request_t *last_classic_graphics_active;
-
-    struct classic_graphics_pipeline_compilation_request_t *first_classic_graphics_cache;
-    struct classic_graphics_pipeline_compilation_request_t *last_classic_graphics_cache;
+    struct kan_bd_list_t classic_graphics_critical;
+    struct kan_bd_list_t classic_graphics_active;
+    struct kan_bd_list_t classic_graphics_cache;
 };
 
 kan_thread_result_t render_backend_pipeline_compiler_state_worker_function (kan_thread_user_data_t user_data);
@@ -624,14 +601,14 @@ struct render_backend_system_t
     ///          strict frame ordering must prevent any calls that are simultaneous with next frame call.
     struct kan_atomic_int_t resource_management_lock;
 
-    struct render_backend_surface_t *first_surface;
-    struct render_backend_frame_buffer_t *first_frame_buffer;
-    struct render_backend_pass_t *first_pass;
-    struct render_backend_classic_graphics_pipeline_family_t *first_classic_graphics_pipeline_family;
-    struct render_backend_classic_graphics_pipeline_t *first_classic_graphics_pipeline;
-    struct render_backend_buffer_t *first_buffer;
-    struct render_backend_frame_lifetime_allocator_t *first_frame_lifetime_allocator;
-    struct render_backend_image_t *first_image;
+    struct kan_bd_list_t surfaces;
+    struct kan_bd_list_t frame_buffers;
+    struct kan_bd_list_t passes;
+    struct kan_bd_list_t classic_graphics_pipeline_families;
+    struct kan_bd_list_t classic_graphics_pipelines;
+    struct kan_bd_list_t buffers;
+    struct kan_bd_list_t frame_lifetime_allocators;
+    struct kan_bd_list_t images;
 
     /// \details Still listed in frame lifetime allocator list above, but referenced here too for usability.
     struct render_backend_frame_lifetime_allocator_t *staging_frame_lifetime_allocator;
@@ -717,43 +694,23 @@ static inline void render_backend_pipeline_compiler_state_remove_classic_graphic
     struct render_backend_pipeline_compiler_state_t *state,
     struct classic_graphics_pipeline_compilation_request_t *request)
 {
-#define DO_FOR_PRIORITY(PRIORITY)                                                                                      \
-    if (request->next)                                                                                                 \
-    {                                                                                                                  \
-        request->next->previous = request->previous;                                                                   \
-    }                                                                                                                  \
-    else                                                                                                               \
-    {                                                                                                                  \
-        state->last_classic_graphics_##PRIORITY = request->previous;                                                   \
-    }                                                                                                                  \
-                                                                                                                       \
-    if (request->previous)                                                                                             \
-    {                                                                                                                  \
-        request->previous->next = request->next;                                                                       \
-    }                                                                                                                  \
-    else                                                                                                               \
-    {                                                                                                                  \
-        state->first_classic_graphics_##PRIORITY = request->next;                                                      \
-    }
-
     switch (request->pipeline->compilation_priority)
     {
     case KAN_RENDER_PIPELINE_COMPILATION_PRIORITY_CRITICAL:
-        DO_FOR_PRIORITY (critical)
+        kan_bd_list_remove (&state->classic_graphics_critical, &request->list_node);
         break;
 
     case KAN_RENDER_PIPELINE_COMPILATION_PRIORITY_ACTIVE:
-        DO_FOR_PRIORITY (active)
+        kan_bd_list_remove (&state->classic_graphics_active, &request->list_node);
         break;
 
     case KAN_RENDER_PIPELINE_COMPILATION_PRIORITY_CACHE:
-        DO_FOR_PRIORITY (cache)
+        kan_bd_list_remove (&state->classic_graphics_cache, &request->list_node);
         break;
     }
 
-    request->next = NULL;
-    request->previous = NULL;
-#undef DO_FOR_PRIORITY
+    request->list_node.next = NULL;
+    request->list_node.previous = NULL;
 }
 
 static inline VkFormat kan_render_image_description_calculate_format (

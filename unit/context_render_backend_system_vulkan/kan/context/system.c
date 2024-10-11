@@ -29,14 +29,15 @@ kan_context_system_handle_t render_backend_system_create (kan_allocation_group_t
 
     system->resource_management_lock = kan_atomic_int_init (0);
 
-    system->first_surface = NULL;
-    system->first_frame_buffer = NULL;
-    system->first_pass = NULL;
-    system->first_classic_graphics_pipeline_family = NULL;
-    system->first_classic_graphics_pipeline = NULL;
-    system->first_buffer = NULL;
-    system->first_frame_lifetime_allocator = NULL;
-    system->first_image = NULL;
+    kan_bd_list_init (&system->surfaces);
+    kan_bd_list_init (&system->frame_buffers);
+    kan_bd_list_init (&system->passes);
+    kan_bd_list_init (&system->classic_graphics_pipeline_families);
+    kan_bd_list_init (&system->classic_graphics_pipelines);
+    kan_bd_list_init (&system->buffers);
+    kan_bd_list_init (&system->frame_lifetime_allocators);
+    kan_bd_list_init (&system->images);
+
     system->staging_frame_lifetime_allocator = NULL;
     system->supported_devices = NULL;
 
@@ -44,14 +45,9 @@ kan_context_system_handle_t render_backend_system_create (kan_allocation_group_t
     system->compiler_state.has_more_work = kan_conditional_variable_create ();
     system->compiler_state.should_terminate = kan_atomic_int_init (0);
 
-    system->compiler_state.first_classic_graphics_critical = NULL;
-    system->compiler_state.last_classic_graphics_critical = NULL;
-
-    system->compiler_state.first_classic_graphics_active = NULL;
-    system->compiler_state.last_classic_graphics_active = NULL;
-
-    system->compiler_state.first_classic_graphics_cache = NULL;
-    system->compiler_state.last_classic_graphics_cache = NULL;
+    kan_bd_list_init (&system->compiler_state.classic_graphics_critical);
+    kan_bd_list_init (&system->compiler_state.classic_graphics_active);
+    kan_bd_list_init (&system->compiler_state.classic_graphics_cache);
 
     system->compiler_state.thread = kan_thread_create ("context_render_backend_system_vulkan_pipeline_compiler",
                                                        render_backend_pipeline_compiler_state_worker_function,
@@ -459,7 +455,7 @@ void render_backend_system_shutdown (kan_context_system_handle_t handle)
 
     vkDeviceWaitIdle (system->device);
     // All surfaces should've been automatically destroyed during application system shutdown.
-    KAN_ASSERT (!system->first_surface)
+    KAN_ASSERT (!system->surfaces.first)
 
     // Shutdown pipeline compiler thread.
     system->compiler_state.should_terminate = kan_atomic_int_init (1);
@@ -472,28 +468,35 @@ void render_backend_system_shutdown (kan_context_system_handle_t handle)
 #define DESTROY_CLASSIC_GRAPHICS_PIPELINE_REQUESTS                                                                     \
     while (pipeline_request)                                                                                           \
     {                                                                                                                  \
-        struct classic_graphics_pipeline_compilation_request_t *next = pipeline_request->next;                         \
+        struct classic_graphics_pipeline_compilation_request_t *next =                                                 \
+            (struct classic_graphics_pipeline_compilation_request_t *) pipeline_request->list_node.next;               \
         pipeline_request->pipeline->compilation_request = NULL;                                                        \
         render_backend_compiler_state_destroy_classic_graphics_request (pipeline_request);                             \
         pipeline_request = next;                                                                                       \
     }
 
     struct classic_graphics_pipeline_compilation_request_t *pipeline_request =
-        system->compiler_state.first_classic_graphics_critical;
+        (struct classic_graphics_pipeline_compilation_request_t *)
+            system->compiler_state.classic_graphics_critical.first;
     DESTROY_CLASSIC_GRAPHICS_PIPELINE_REQUESTS
 
-    pipeline_request = system->compiler_state.first_classic_graphics_active;
+    pipeline_request =
+        (struct classic_graphics_pipeline_compilation_request_t *) system->compiler_state.classic_graphics_active.first;
     DESTROY_CLASSIC_GRAPHICS_PIPELINE_REQUESTS
 
-    pipeline_request = system->compiler_state.first_classic_graphics_cache;
+    pipeline_request =
+        (struct classic_graphics_pipeline_compilation_request_t *) system->compiler_state.classic_graphics_cache.first;
     DESTROY_CLASSIC_GRAPHICS_PIPELINE_REQUESTS
 #undef DESTROY_CLASSIC_GRAPHICS_PIPELINE_REQUESTS
 
-    struct render_backend_frame_buffer_t *frame_buffer = system->first_frame_buffer;
+    struct render_backend_frame_buffer_t *frame_buffer =
+        (struct render_backend_frame_buffer_t *) system->frame_buffers.first;
+
     while (frame_buffer)
     {
-        struct render_backend_frame_buffer_t *next = frame_buffer->next;
-        render_backend_system_destroy_frame_buffer (system, frame_buffer, KAN_FALSE);
+        struct render_backend_frame_buffer_t *next =
+            (struct render_backend_frame_buffer_t *) frame_buffer->list_node.next;
+        render_backend_system_destroy_frame_buffer (system, frame_buffer);
         frame_buffer = next;
     }
 
@@ -541,51 +544,60 @@ void render_backend_system_shutdown (kan_context_system_handle_t handle)
 
     // TODO: Destroy pipeline instances here.
 
-    struct render_backend_classic_graphics_pipeline_t *pipeline = system->first_classic_graphics_pipeline;
+    struct render_backend_classic_graphics_pipeline_t *pipeline =
+        (struct render_backend_classic_graphics_pipeline_t *) system->classic_graphics_pipelines.first;
+
     while (pipeline)
     {
-        struct render_backend_classic_graphics_pipeline_t *next = pipeline->next;
-        render_backend_system_destroy_classic_graphics_pipeline (system, pipeline, KAN_FALSE);
+        struct render_backend_classic_graphics_pipeline_t *next =
+            (struct render_backend_classic_graphics_pipeline_t *) pipeline->list_node.next;
+        render_backend_system_destroy_classic_graphics_pipeline (system, pipeline);
         pipeline = next;
     }
 
-    struct render_backend_classic_graphics_pipeline_family_t *family = system->first_classic_graphics_pipeline_family;
+    struct render_backend_classic_graphics_pipeline_family_t *family =
+        (struct render_backend_classic_graphics_pipeline_family_t *) system->classic_graphics_pipeline_families.first;
+
     while (family)
     {
-        struct render_backend_classic_graphics_pipeline_family_t *next = family->next;
-        render_backend_system_destroy_classic_graphics_pipeline_family (system, family, KAN_FALSE);
+        struct render_backend_classic_graphics_pipeline_family_t *next =
+            (struct render_backend_classic_graphics_pipeline_family_t *) family->list_node.next;
+        render_backend_system_destroy_classic_graphics_pipeline_family (system, family);
         family = next;
     }
 
-    struct render_backend_pass_t *pass = system->first_pass;
+    struct render_backend_pass_t *pass = (struct render_backend_pass_t *) system->passes.first;
     while (pass)
     {
-        struct render_backend_pass_t *next = pass->next;
-        render_backend_system_destroy_pass (system, pass, KAN_FALSE);
+        struct render_backend_pass_t *next = (struct render_backend_pass_t *) pass->list_node.next;
+        render_backend_system_destroy_pass (system, pass);
         pass = next;
     }
 
-    struct render_backend_buffer_t *buffer = system->first_buffer;
+    struct render_backend_buffer_t *buffer = (struct render_backend_buffer_t *) system->buffers.first;
     while (buffer)
     {
-        struct render_backend_buffer_t *next = buffer->next;
-        render_backend_system_destroy_buffer (system, buffer, KAN_FALSE);
+        struct render_backend_buffer_t *next = (struct render_backend_buffer_t *) buffer->list_node.next;
+        render_backend_system_destroy_buffer (system, buffer);
         buffer = next;
     }
 
-    struct render_backend_frame_lifetime_allocator_t *frame_lifetime_allocator = system->first_frame_lifetime_allocator;
+    struct render_backend_frame_lifetime_allocator_t *frame_lifetime_allocator =
+        (struct render_backend_frame_lifetime_allocator_t *) system->frame_lifetime_allocators.first;
+
     while (frame_lifetime_allocator)
     {
-        struct render_backend_frame_lifetime_allocator_t *next = frame_lifetime_allocator->next;
-        render_backend_system_destroy_frame_lifetime_allocator (system, frame_lifetime_allocator, KAN_FALSE, KAN_FALSE);
+        struct render_backend_frame_lifetime_allocator_t *next =
+            (struct render_backend_frame_lifetime_allocator_t *) frame_lifetime_allocator->list_node.next;
+        render_backend_system_destroy_frame_lifetime_allocator (system, frame_lifetime_allocator, KAN_FALSE);
         frame_lifetime_allocator = next;
     }
 
-    struct render_backend_image_t *image = system->first_image;
+    struct render_backend_image_t *image = (struct render_backend_image_t *) system->images.first;
     while (image)
     {
-        struct render_backend_image_t *next = image->next;
-        render_backend_system_destroy_image (system, image, KAN_FALSE);
+        struct render_backend_image_t *next = (struct render_backend_image_t *) image->list_node.next;
+        render_backend_system_destroy_image (system, image);
         image = next;
     }
 
@@ -1212,7 +1224,7 @@ static void render_backend_system_submit_transfer (struct render_backend_system_
 
     VkSemaphore *wait_semaphores = static_wait_semaphores;
     VkPipelineStageFlags *semaphore_stages = static_semaphore_stages;
-    struct render_backend_surface_t *surface = system->first_surface;
+    struct render_backend_surface_t *surface = (struct render_backend_surface_t *) system->surfaces.first;
 
     while (surface)
     {
@@ -1228,7 +1240,7 @@ static void render_backend_system_submit_transfer (struct render_backend_system_
             ++semaphores_to_wait;
         }
 
-        surface = surface->next;
+        surface = (struct render_backend_surface_t *) surface->list_node.next;
     }
 
     if (semaphores_to_wait > KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_INLINE_HANDLES)
@@ -1239,9 +1251,9 @@ static void render_backend_system_submit_transfer (struct render_backend_system_
         semaphore_stages =
             kan_allocate_general (system->utility_allocation_group, sizeof (VkPipelineStageFlags) * semaphores_to_wait,
                                   _Alignof (VkPipelineStageFlags));
-        semaphores_to_wait = 0u;
 
-        surface = system->first_surface;
+        semaphores_to_wait = 0u;
+        surface = (struct render_backend_surface_t *) system->surfaces.first;
 
         while (surface)
         {
@@ -1253,7 +1265,7 @@ static void render_backend_system_submit_transfer (struct render_backend_system_
                 ++semaphores_to_wait;
             }
 
-            surface = surface->next;
+            surface = (struct render_backend_surface_t *) surface->list_node.next;
         }
     }
 
@@ -1705,7 +1717,7 @@ static inline void process_frame_buffer_create_requests (struct render_backend_s
 static inline void process_surface_blit_requests (struct render_backend_system_t *system,
                                                   struct render_backend_command_state_t *state)
 {
-    struct render_backend_surface_t *surface = system->first_surface;
+    struct render_backend_surface_t *surface = (struct render_backend_surface_t *) system->surfaces.first;
     while (surface)
     {
         struct surface_blit_request_t *request = surface->first_blit_request;
@@ -1780,10 +1792,10 @@ static inline void process_surface_blit_requests (struct render_backend_system_t
             request = request->next;
         }
 
-        surface = surface->next;
+        surface = (struct render_backend_surface_t *) surface->list_node.next;
     }
 
-    surface = system->first_surface;
+    surface = (struct render_backend_surface_t *) system->surfaces.first;
     while (surface)
     {
         struct surface_blit_request_t *request = surface->first_blit_request;
@@ -1838,10 +1850,10 @@ static inline void process_surface_blit_requests (struct render_backend_system_t
             request = request->next;
         }
 
-        surface = surface->next;
+        surface = (struct render_backend_surface_t *) surface->list_node.next;
     }
 
-    surface = system->first_surface;
+    surface = (struct render_backend_surface_t *) system->surfaces.first;
     while (surface)
     {
         struct surface_blit_request_t *request = surface->first_blit_request;
@@ -1886,7 +1898,7 @@ static inline void process_surface_blit_requests (struct render_backend_system_t
         }
 
         surface->first_blit_request = NULL;
-        surface = surface->next;
+        surface = (struct render_backend_surface_t *) surface->list_node.next;
     }
 }
 
@@ -1905,11 +1917,11 @@ static void render_backend_system_submit_graphics (struct render_backend_system_
         kan_critical_error ("Failed to start recording primary graphics buffer.", __FILE__, __LINE__);
     }
 
-    struct render_backend_surface_t *surface = system->first_surface;
+    struct render_backend_surface_t *surface = (struct render_backend_surface_t *) system->surfaces.first;
     while (surface)
     {
         surface->render_state = SURFACE_RENDER_STATE_RECEIVED_NO_OUTPUT;
-        surface = surface->next;
+        surface = (struct render_backend_surface_t *) surface->list_node.next;
     }
 
     struct render_backend_schedule_state_t *schedule = &system->schedule_states[system->current_frame_in_flight_index];
@@ -1920,7 +1932,7 @@ static void render_backend_system_submit_graphics (struct render_backend_system_
     // TODO: Fill buffer with accumulated graphics commands.
 
     process_surface_blit_requests (system, state);
-    surface = system->first_surface;
+    surface = (struct render_backend_surface_t *) system->surfaces.first;
 
     while (surface)
     {
@@ -1949,7 +1961,7 @@ static void render_backend_system_submit_graphics (struct render_backend_system_
 
         vkCmdPipelineBarrier (state->primary_graphics_command_buffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
                               VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0u, 0u, NULL, 0u, NULL, 1u, &barrier_info);
-        surface = surface->next;
+        surface = (struct render_backend_surface_t *) surface->list_node.next;
     }
 
     if (vkEndCommandBuffer (state->primary_graphics_command_buffer) != VK_SUCCESS)
@@ -1987,7 +1999,7 @@ static void render_backend_system_submit_present (struct render_backend_system_t
     uint32_t swap_chains_count = 0u;
     VkSwapchainKHR *swap_chains = static_swap_chains;
     uint32_t *image_indices = static_image_indices;
-    struct render_backend_surface_t *surface = system->first_surface;
+    struct render_backend_surface_t *surface = (struct render_backend_surface_t *) system->surfaces.first;
 
     while (surface)
     {
@@ -2002,7 +2014,7 @@ static void render_backend_system_submit_present (struct render_backend_system_t
             ++swap_chains_count;
         }
 
-        surface = surface->next;
+        surface = (struct render_backend_surface_t *) surface->list_node.next;
     }
 
     if (swap_chains_count > KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_INLINE_HANDLES)
@@ -2013,7 +2025,7 @@ static void render_backend_system_submit_present (struct render_backend_system_t
         image_indices = kan_allocate_general (system->utility_allocation_group, sizeof (uint32_t) * swap_chains_count,
                                               _Alignof (uint32_t));
         swap_chains_count = 0u;
-        surface = system->first_surface;
+        surface = (struct render_backend_surface_t *) system->surfaces.first;
 
         while (surface)
         {
@@ -2024,7 +2036,7 @@ static void render_backend_system_submit_present (struct render_backend_system_t
                 ++swap_chains_count;
             }
 
-            surface = surface->next;
+            surface = (struct render_backend_surface_t *) surface->list_node.next;
         }
     }
 
@@ -2539,7 +2551,7 @@ static kan_bool_t render_backend_system_acquire_images (struct render_backend_sy
 
     kan_bool_t acquired_all_images = KAN_TRUE;
     kan_bool_t any_swap_chain_outdated = KAN_FALSE;
-    struct render_backend_surface_t *surface = system->first_surface;
+    struct render_backend_surface_t *surface = (struct render_backend_surface_t *) system->surfaces.first;
 
     while (surface)
     {
@@ -2584,13 +2596,13 @@ static kan_bool_t render_backend_system_acquire_images (struct render_backend_sy
             }
         }
 
-        surface = surface->next;
+        surface = (struct render_backend_surface_t *) surface->list_node.next;
     }
 
     if (any_swap_chain_outdated)
     {
         vkDeviceWaitIdle (system->device);
-        surface = system->first_surface;
+        surface = (struct render_backend_surface_t *) system->surfaces.first;
 
         while (surface)
         {
@@ -2601,7 +2613,7 @@ static kan_bool_t render_backend_system_acquire_images (struct render_backend_sy
                                                                        application_system, surface->window_handle));
             }
 
-            surface = surface->next;
+            surface = (struct render_backend_surface_t *) surface->list_node.next;
         }
     }
 
@@ -2656,7 +2668,8 @@ kan_bool_t kan_render_backend_system_next_frame (kan_context_system_handle_t ren
 
     while (frame_buffer_destroy)
     {
-        render_backend_system_destroy_frame_buffer (system, frame_buffer_destroy->frame_buffer, KAN_TRUE);
+        kan_bd_list_remove (&system->frame_buffers, &frame_buffer_destroy->frame_buffer->list_node);
+        render_backend_system_destroy_frame_buffer (system, frame_buffer_destroy->frame_buffer);
         frame_buffer_destroy = frame_buffer_destroy->next;
     }
 
@@ -2676,7 +2689,8 @@ kan_bool_t kan_render_backend_system_next_frame (kan_context_system_handle_t ren
 
     while (pass_destroy)
     {
-        render_backend_system_destroy_pass (system, pass_destroy->pass, KAN_TRUE);
+        kan_bd_list_remove (&system->passes, &pass_destroy->pass->list_node);
+        render_backend_system_destroy_pass (system, pass_destroy->pass);
         pass_destroy = pass_destroy->next;
     }
 
@@ -2722,8 +2736,9 @@ kan_bool_t kan_render_backend_system_next_frame (kan_context_system_handle_t ren
             }
         }
 
-        render_backend_system_destroy_classic_graphics_pipeline (system, classic_graphics_pipeline_destroy->pipeline,
-                                                                 KAN_TRUE);
+        kan_bd_list_remove (&system->classic_graphics_pipelines,
+                            &classic_graphics_pipeline_destroy->pipeline->list_node);
+        render_backend_system_destroy_classic_graphics_pipeline (system, classic_graphics_pipeline_destroy->pipeline);
         classic_graphics_pipeline_destroy = classic_graphics_pipeline_destroy->next;
     }
 
@@ -2733,8 +2748,10 @@ kan_bool_t kan_render_backend_system_next_frame (kan_context_system_handle_t ren
 
     while (classic_graphics_pipeline_family_destroy)
     {
+        kan_bd_list_remove (&system->classic_graphics_pipeline_families,
+                            &classic_graphics_pipeline_family_destroy->family->list_node);
         render_backend_system_destroy_classic_graphics_pipeline_family (
-            system, classic_graphics_pipeline_family_destroy->family, KAN_TRUE);
+            system, classic_graphics_pipeline_family_destroy->family);
         classic_graphics_pipeline_family_destroy = classic_graphics_pipeline_family_destroy->next;
     }
 
@@ -2743,7 +2760,8 @@ kan_bool_t kan_render_backend_system_next_frame (kan_context_system_handle_t ren
 
     while (buffer_destroy)
     {
-        render_backend_system_destroy_buffer (system, buffer_destroy->buffer, KAN_TRUE);
+        kan_bd_list_remove (&system->buffers, &buffer_destroy->buffer->list_node);
+        render_backend_system_destroy_buffer (system, buffer_destroy->buffer);
         buffer_destroy = buffer_destroy->next;
     }
 
@@ -2753,8 +2771,10 @@ kan_bool_t kan_render_backend_system_next_frame (kan_context_system_handle_t ren
 
     while (frame_lifetime_allocator_destroy)
     {
+        kan_bd_list_remove (&system->frame_lifetime_allocators,
+                            &frame_lifetime_allocator_destroy->frame_lifetime_allocator->list_node);
         render_backend_system_destroy_frame_lifetime_allocator (
-            system, frame_lifetime_allocator_destroy->frame_lifetime_allocator, KAN_TRUE, KAN_TRUE);
+            system, frame_lifetime_allocator_destroy->frame_lifetime_allocator, KAN_TRUE);
         frame_lifetime_allocator_destroy = frame_lifetime_allocator_destroy->next;
     }
 
@@ -2774,7 +2794,8 @@ kan_bool_t kan_render_backend_system_next_frame (kan_context_system_handle_t ren
 
     while (image_destroy)
     {
-        render_backend_system_destroy_image (system, image_destroy->image, KAN_TRUE);
+        kan_bd_list_remove (&system->images, &image_destroy->image->list_node);
+        render_backend_system_destroy_image (system, image_destroy->image);
         image_destroy = image_destroy->next;
     }
 
@@ -2847,21 +2868,7 @@ static void render_backend_surface_shutdown_with_window (void *user_data,
         attachment = next;
     }
 
-    if (surface->next)
-    {
-        surface->next->previous = surface->previous;
-    }
-
-    if (surface->previous)
-    {
-        surface->previous->next = surface->next;
-    }
-    else
-    {
-        KAN_ASSERT (surface->system->first_surface == surface)
-        surface->system->first_surface = surface->next;
-    }
-
+    kan_bd_list_remove (&surface->system->surfaces, &surface->list_node);
     kan_free_batched (surface->system->surface_wrapper_allocation_group, surface);
 }
 
@@ -2895,15 +2902,7 @@ kan_render_surface_t kan_render_backend_system_create_surface (kan_context_syste
     new_surface->first_blit_request = NULL;
     new_surface->first_frame_buffer_attachment = NULL;
 
-    new_surface->previous = NULL;
-    new_surface->next = system->first_surface;
-
-    if (system->first_surface)
-    {
-        system->first_surface->previous = new_surface;
-    }
-
-    system->first_surface = new_surface;
+    kan_bd_list_add (&system->surfaces, NULL, &new_surface->list_node);
     kan_atomic_int_unlock (&system->resource_management_lock);
 
     new_surface->resource_id =

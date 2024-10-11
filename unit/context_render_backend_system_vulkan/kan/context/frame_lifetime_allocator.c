@@ -10,17 +10,8 @@ struct render_backend_frame_lifetime_allocator_t *render_backend_system_create_f
     struct render_backend_frame_lifetime_allocator_t *allocator = kan_allocate_batched (
         system->frame_lifetime_wrapper_allocation_group, sizeof (struct render_backend_frame_lifetime_allocator_t));
 
-    allocator->next = system->first_frame_lifetime_allocator;
-    allocator->previous = NULL;
-
-    if (system->first_frame_lifetime_allocator)
-    {
-        system->first_frame_lifetime_allocator->previous = allocator;
-    }
-
-    system->first_frame_lifetime_allocator = allocator;
+    kan_bd_list_add (&system->frame_lifetime_allocators, NULL, &allocator->list_node);
     allocator->system = system;
-
     allocator->first_page = NULL;
     allocator->last_page = NULL;
     allocator->allocation_lock = kan_atomic_int_init (0);
@@ -336,7 +327,8 @@ static inline void render_backend_frame_lifetime_allocator_destroy_page (
 {
     if (destroy_buffers)
     {
-        render_backend_system_destroy_buffer (system, page->buffer, KAN_TRUE);
+        kan_bd_list_remove (&system->buffers, &page->buffer->list_node);
+        render_backend_system_destroy_buffer (system, page->buffer);
     }
 
     struct render_backend_frame_lifetime_allocator_chunk_t *chunk = page->first_chunk;
@@ -395,27 +387,8 @@ void render_backend_frame_lifetime_allocator_clean_empty_pages (
 void render_backend_system_destroy_frame_lifetime_allocator (
     struct render_backend_system_t *system,
     struct render_backend_frame_lifetime_allocator_t *frame_lifetime_allocator,
-    kan_bool_t destroy_buffers,
-    kan_bool_t remove_from_list)
+    kan_bool_t destroy_buffers)
 {
-    if (remove_from_list)
-    {
-        if (frame_lifetime_allocator->next)
-        {
-            frame_lifetime_allocator->next->previous = frame_lifetime_allocator->previous;
-        }
-
-        if (frame_lifetime_allocator->previous)
-        {
-            frame_lifetime_allocator->previous->next = frame_lifetime_allocator->next;
-        }
-        else
-        {
-            KAN_ASSERT (system->first_frame_lifetime_allocator = frame_lifetime_allocator)
-            system->first_frame_lifetime_allocator = frame_lifetime_allocator->next;
-        }
-    }
-
     struct render_backend_frame_lifetime_allocator_page_t *page = frame_lifetime_allocator->first_page;
     while (page)
     {

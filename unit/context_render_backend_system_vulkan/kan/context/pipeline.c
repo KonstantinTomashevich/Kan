@@ -82,36 +82,21 @@ static inline kan_bool_t add_classic_graphics_request_unsafe (
     struct render_backend_pipeline_compiler_state_t *state,
     struct classic_graphics_pipeline_compilation_request_t *request)
 {
-#define DO_FOR_PRIORITY(PRIORITY)                                                                                      \
-    request->next = NULL;                                                                                              \
-    request->previous = state->last_classic_graphics_##PRIORITY;                                                       \
-                                                                                                                       \
-    if (state->last_classic_graphics_##PRIORITY)                                                                       \
-    {                                                                                                                  \
-        state->last_classic_graphics_##PRIORITY->next = request;                                                       \
-        state->last_classic_graphics_##PRIORITY = request;                                                             \
-        return KAN_FALSE;                                                                                              \
-    }                                                                                                                  \
-    else                                                                                                               \
-    {                                                                                                                  \
-        state->first_classic_graphics_##PRIORITY = request;                                                            \
-        state->last_classic_graphics_##PRIORITY = request;                                                             \
-        return KAN_TRUE;                                                                                               \
-    }
-
     switch (request->pipeline->compilation_priority)
     {
     case KAN_RENDER_PIPELINE_COMPILATION_PRIORITY_CRITICAL:
-        DO_FOR_PRIORITY (critical)
+        kan_bd_list_add (&state->classic_graphics_critical, NULL, &request->list_node);
+        return state->classic_graphics_critical.size == 1u;
 
     case KAN_RENDER_PIPELINE_COMPILATION_PRIORITY_ACTIVE:
-        DO_FOR_PRIORITY (active)
+        kan_bd_list_add (&state->classic_graphics_active, NULL, &request->list_node);
+        return state->classic_graphics_active.size == 1u;
 
     case KAN_RENDER_PIPELINE_COMPILATION_PRIORITY_CACHE:
-        DO_FOR_PRIORITY (cache)
+        kan_bd_list_add (&state->classic_graphics_cache, NULL, &request->list_node);
+        return state->classic_graphics_cache.size == 1u;
     }
 
-#undef DO_FOR_PRIORITY
     KAN_ASSERT (KAN_FALSE)
     return KAN_FALSE;
 }
@@ -139,45 +124,30 @@ kan_thread_result_t render_backend_pipeline_compiler_state_worker_function (kan_
                 return 0;
             }
 
-            if (!state->first_classic_graphics_critical && !state->first_classic_graphics_active &&
-                !state->first_classic_graphics_cache)
+            if (!state->classic_graphics_critical.first && !state->classic_graphics_active.first &&
+                !state->classic_graphics_cache.first)
             {
                 kan_conditional_variable_wait (state->has_more_work, state->state_transition_mutex);
                 continue;
             }
 
-            KAN_ASSERT (state->first_classic_graphics_critical || state->first_classic_graphics_active ||
-                        state->first_classic_graphics_cache)
-
-            if (state->first_classic_graphics_critical)
+            if (state->classic_graphics_critical.first)
             {
-                request = state->first_classic_graphics_critical;
-                state->first_classic_graphics_critical = request->next;
-
-                if (request == state->last_classic_graphics_critical)
-                {
-                    state->last_classic_graphics_critical = NULL;
-                }
+                request =
+                    (struct classic_graphics_pipeline_compilation_request_t *) state->classic_graphics_critical.first;
+                kan_bd_list_remove (&state->classic_graphics_critical, &request->list_node);
             }
-            else if (state->first_classic_graphics_active)
+            else if (state->classic_graphics_active.first)
             {
-                request = state->first_classic_graphics_active;
-                state->first_classic_graphics_active = request->next;
-
-                if (request == state->last_classic_graphics_active)
-                {
-                    state->last_classic_graphics_active = NULL;
-                }
+                request =
+                    (struct classic_graphics_pipeline_compilation_request_t *) state->classic_graphics_active.first;
+                kan_bd_list_remove (&state->classic_graphics_active, &request->list_node);
             }
-            else if (state->first_classic_graphics_cache)
+            else if (state->classic_graphics_cache.first)
             {
-                request = state->first_classic_graphics_cache;
-                state->first_classic_graphics_cache = request->next;
-
-                if (request == state->last_classic_graphics_cache)
-                {
-                    state->last_classic_graphics_cache = NULL;
-                }
+                request =
+                    (struct classic_graphics_pipeline_compilation_request_t *) state->classic_graphics_cache.first;
+                kan_bd_list_remove (&state->classic_graphics_cache, &request->list_node);
             }
             else
             {
@@ -610,16 +580,9 @@ struct render_backend_classic_graphics_pipeline_t *render_backend_system_create_
     struct render_backend_classic_graphics_pipeline_t *pipeline = kan_allocate_batched (
         system->pipeline_wrapper_allocation_group, sizeof (struct render_backend_classic_graphics_pipeline_t));
 
-    pipeline->next = system->first_classic_graphics_pipeline;
-    pipeline->previous = NULL;
+    kan_bd_list_add (&system->classic_graphics_pipelines, NULL, &pipeline->list_node);
     pipeline->system = system;
 
-    if (system->first_classic_graphics_pipeline)
-    {
-        system->first_classic_graphics_pipeline->previous = pipeline;
-    }
-
-    system->first_classic_graphics_pipeline = pipeline;
     pipeline->pipeline = VK_NULL_HANDLE;
     pipeline->pass = (struct render_backend_pass_t *) description->pass;
     pipeline->family = (struct render_backend_classic_graphics_pipeline_family_t *) description->family;
@@ -641,29 +604,9 @@ struct render_backend_classic_graphics_pipeline_t *render_backend_system_create_
 }
 
 void render_backend_system_destroy_classic_graphics_pipeline (
-    struct render_backend_system_t *system,
-    struct render_backend_classic_graphics_pipeline_t *pipeline,
-    kan_bool_t remove_from_list)
+    struct render_backend_system_t *system, struct render_backend_classic_graphics_pipeline_t *pipeline)
 {
-    if (remove_from_list)
-    {
-        if (pipeline->next)
-        {
-            pipeline->next->previous = pipeline->previous;
-        }
-
-        if (pipeline->previous)
-        {
-            pipeline->previous->next = pipeline->next;
-        }
-        else
-        {
-            KAN_ASSERT (system->first_classic_graphics_pipeline = pipeline)
-            system->first_classic_graphics_pipeline = pipeline->next;
-        }
-    }
-
-    // Compilation request should be dealt with previously.
+    // Compilation request should be dealt with properly before destroying pipeline.
     KAN_ASSERT (!pipeline->compilation_request)
 
     if (pipeline->pipeline != VK_NULL_HANDLE)

@@ -239,16 +239,9 @@ render_backend_system_create_classic_graphics_pipeline_family (
         kan_allocate_batched (system->pipeline_family_wrapper_allocation_group,
                               sizeof (struct render_backend_classic_graphics_pipeline_family_t));
 
-    family->next = system->first_classic_graphics_pipeline_family;
-    family->previous = NULL;
+    kan_bd_list_add (&system->classic_graphics_pipeline_families, NULL, &family->list_node);
     family->system = system;
 
-    if (system->first_classic_graphics_pipeline_family)
-    {
-        system->first_classic_graphics_pipeline_family->previous = family;
-    }
-
-    system->first_classic_graphics_pipeline_family = family;
     family->layout = pipeline_layout;
     family->descriptor_set_layouts_count = sets_count;
     family->descriptor_set_layouts = descriptor_set_layouts;
@@ -372,27 +365,8 @@ render_backend_system_create_classic_graphics_pipeline_family (
 
 void render_backend_system_destroy_classic_graphics_pipeline_family (
     struct render_backend_system_t *system,
-    struct render_backend_classic_graphics_pipeline_family_t *family,
-    kan_bool_t remove_from_list)
+    struct render_backend_classic_graphics_pipeline_family_t *family)
 {
-    if (remove_from_list)
-    {
-        if (family->next)
-        {
-            family->next->previous = family->previous;
-        }
-
-        if (family->previous)
-        {
-            family->previous->next = family->next;
-        }
-        else
-        {
-            KAN_ASSERT (system->first_classic_graphics_pipeline_family = family)
-            system->first_classic_graphics_pipeline_family = family->next;
-        }
-    }
-
     vkDestroyPipelineLayout (system->device, family->layout, VULKAN_ALLOCATION_CALLBACKS (system));
     free_descriptor_set_layouts (system, family->descriptor_set_layouts_count, family->descriptor_set_layouts);
 
