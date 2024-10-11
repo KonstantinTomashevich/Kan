@@ -14,8 +14,6 @@
 #include <kan/threading/mutex.h>
 #include <kan/threading/thread.h>
 
-// TODO: Maybe use bi-directional lists from container everywhere to avoid excessive duplication?
-
 KAN_C_HEADER_BEGIN
 
 #define SURFACE_COLOR_FORMAT VK_FORMAT_B8G8R8A8_SRGB
