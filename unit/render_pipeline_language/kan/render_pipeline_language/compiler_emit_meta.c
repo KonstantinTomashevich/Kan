@@ -467,9 +467,6 @@ static kan_bool_t emit_meta_sampler_settings (struct rpl_compiler_instance_t *in
                 SETTING_STRING_VALUE (STATICS.interned_mirror_clamp_to_edge,
                                       KAN_RPL_META_SAMPLER_ADDRESS_MODE_MIRROR_CLAMP_TO_EDGE,
                                       settings_output->address_mode_u)
-                SETTING_STRING_VALUE (STATICS.interned_mirror_clamp_to_border,
-                                      KAN_RPL_META_SAMPLER_ADDRESS_MODE_MIRROR_CLAMP_TO_BORDER,
-                                      settings_output->address_mode_u)
                 SETTING_STRING_NO_MORE_VALUES
             }
         }
@@ -490,9 +487,6 @@ static kan_bool_t emit_meta_sampler_settings (struct rpl_compiler_instance_t *in
                 SETTING_STRING_VALUE (STATICS.interned_mirror_clamp_to_edge,
                                       KAN_RPL_META_SAMPLER_ADDRESS_MODE_MIRROR_CLAMP_TO_EDGE,
                                       settings_output->address_mode_v)
-                SETTING_STRING_VALUE (STATICS.interned_mirror_clamp_to_border,
-                                      KAN_RPL_META_SAMPLER_ADDRESS_MODE_MIRROR_CLAMP_TO_BORDER,
-                                      settings_output->address_mode_v)
                 SETTING_STRING_NO_MORE_VALUES
             }
         }
@@ -512,9 +506,6 @@ static kan_bool_t emit_meta_sampler_settings (struct rpl_compiler_instance_t *in
                                       settings_output->address_mode_w)
                 SETTING_STRING_VALUE (STATICS.interned_mirror_clamp_to_edge,
                                       KAN_RPL_META_SAMPLER_ADDRESS_MODE_MIRROR_CLAMP_TO_EDGE,
-                                      settings_output->address_mode_w)
-                SETTING_STRING_VALUE (STATICS.interned_mirror_clamp_to_border,
-                                      KAN_RPL_META_SAMPLER_ADDRESS_MODE_MIRROR_CLAMP_TO_BORDER,
                                       settings_output->address_mode_w)
                 SETTING_STRING_NO_MORE_VALUES
             }
