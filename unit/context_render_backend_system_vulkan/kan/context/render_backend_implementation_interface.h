@@ -105,6 +105,12 @@ struct render_backend_command_state_t
     VkCommandBuffer primary_transfer_command_buffer;
 };
 
+struct render_backend_descriptor_set_allocation_t
+{
+    VkDescriptorSet descriptor_set;
+    struct render_backend_descriptor_set_pool_t *source_pool;
+};
+
 struct scheduled_buffer_unmap_flush_transfer_t
 {
     struct scheduled_buffer_unmap_flush_transfer_t *next;
@@ -164,16 +170,28 @@ struct scheduled_pass_destroy_t
     struct render_backend_pass_t *pass;
 };
 
-struct scheduled_classic_graphics_pipeline_destroy_t
+struct scheduled_graphics_pipeline_destroy_t
 {
-    struct scheduled_classic_graphics_pipeline_destroy_t *next;
-    struct render_backend_classic_graphics_pipeline_t *pipeline;
+    struct scheduled_graphics_pipeline_destroy_t *next;
+    struct render_backend_graphics_pipeline_t *pipeline;
 };
 
-struct scheduled_classic_graphics_pipeline_family_destroy_t
+struct scheduled_graphics_pipeline_family_destroy_t
 {
-    struct scheduled_classic_graphics_pipeline_family_destroy_t *next;
-    struct render_backend_classic_graphics_pipeline_family_t *family;
+    struct scheduled_graphics_pipeline_family_destroy_t *next;
+    struct render_backend_graphics_pipeline_family_t *family;
+};
+
+struct scheduled_pipeline_parameter_set_destroy_t
+{
+    struct scheduled_pipeline_parameter_set_destroy_t *next;
+    struct render_backend_pipeline_parameter_set_t *set;
+};
+
+struct scheduled_detached_descriptor_set_destroy_t
+{
+    struct scheduled_detached_descriptor_set_destroy_t *next;
+    struct render_backend_descriptor_set_allocation_t allocation;
 };
 
 struct scheduled_buffer_destroy_t
@@ -228,9 +246,10 @@ struct render_backend_schedule_state_t
     struct scheduled_frame_buffer_destroy_t *first_scheduled_frame_buffer_destroy;
     struct scheduled_detached_frame_buffer_destroy_t *first_scheduled_detached_frame_buffer_destroy;
     struct scheduled_pass_destroy_t *first_scheduled_pass_destroy;
-    struct scheduled_classic_graphics_pipeline_destroy_t *first_scheduled_classic_graphics_pipeline_destroy;
-    struct scheduled_classic_graphics_pipeline_family_destroy_t
-        *first_scheduled_classic_graphics_pipeline_family_destroy;
+    struct scheduled_pipeline_parameter_set_destroy_t *first_scheduled_pipeline_parameter_set_destroy;
+    struct scheduled_detached_descriptor_set_destroy_t *first_scheduled_detached_descriptor_set_destroy;
+    struct scheduled_graphics_pipeline_destroy_t *first_scheduled_graphics_pipeline_destroy;
+    struct scheduled_graphics_pipeline_family_destroy_t *first_scheduled_graphics_pipeline_family_destroy;
     struct scheduled_buffer_destroy_t *first_scheduled_buffer_destroy;
     struct scheduled_frame_lifetime_allocator_destroy_t *first_scheduled_frame_lifetime_allocator_destroy;
     struct scheduled_detached_image_view_destroy_t *first_scheduled_detached_image_view_destroy;
@@ -302,13 +321,19 @@ struct render_backend_layout_binding_t
 
 struct render_backend_descriptor_set_layout_t
 {
+    /// \details In future, we can try to hash the layouts and share them between families whenever it is possible.
+    ///          But it is only needed if there is lots of families with similar layouts.
     VkDescriptorSetLayout layout;
+
     kan_bool_t stable_binding;
+    uint8_t uniform_buffers_count;
+    uint8_t storage_buffers_count;
+    uint8_t combined_image_samplers_count;
     uint64_t bindings_count;
     struct render_backend_layout_binding_t bindings[];
 };
 
-struct render_backend_classic_graphics_pipeline_family_t
+struct render_backend_graphics_pipeline_family_t
 {
     struct kan_bd_list_node_t list_node;
     struct render_backend_system_t *system;
@@ -318,7 +343,7 @@ struct render_backend_classic_graphics_pipeline_family_t
     struct render_backend_descriptor_set_layout_t **descriptor_set_layouts;
     kan_bool_t descriptor_sets_are_zero_sequential;
 
-    enum kan_render_classic_graphics_topology_t topology;
+    enum kan_render_graphics_topology_t topology;
     kan_interned_string_t tracking_name;
 
     uint64_t input_bindings_count;
@@ -328,13 +353,11 @@ struct render_backend_classic_graphics_pipeline_family_t
     VkVertexInputAttributeDescription *attributes;
 };
 
-struct render_backend_classic_graphics_pipeline_family_t *
-render_backend_system_create_classic_graphics_pipeline_family (
-    struct render_backend_system_t *system,
-    struct kan_render_classic_graphics_pipeline_family_description_t *description);
+struct render_backend_graphics_pipeline_family_t *render_backend_system_create_graphics_pipeline_family (
+    struct render_backend_system_t *system, struct kan_render_graphics_pipeline_family_description_t *description);
 
-void render_backend_system_destroy_classic_graphics_pipeline_family (
-    struct render_backend_system_t *system, struct render_backend_classic_graphics_pipeline_family_t *family);
+void render_backend_system_destroy_graphics_pipeline_family (struct render_backend_system_t *system,
+                                                             struct render_backend_graphics_pipeline_family_t *family);
 
 enum pipeline_compilation_state_t
 {
@@ -344,14 +367,21 @@ enum pipeline_compilation_state_t
     PIPELINE_COMPILATION_STATE_FAILURE,
 };
 
-struct render_backend_classic_graphics_pipeline_t
+struct render_backend_pipeline_sampler_t
+{
+    uint32_t set;
+    uint32_t binding;
+    VkSampler sampler;
+};
+
+struct render_backend_graphics_pipeline_t
 {
     struct kan_bd_list_node_t list_node;
     struct render_backend_system_t *system;
 
     VkPipeline pipeline;
     struct render_backend_pass_t *pass;
-    struct render_backend_classic_graphics_pipeline_family_t *family;
+    struct render_backend_graphics_pipeline_family_t *family;
 
     float min_depth;
     float max_depth;
@@ -359,20 +389,23 @@ struct render_backend_classic_graphics_pipeline_t
     uint64_t shader_modules_count;
     VkShaderModule *shader_modules;
 
+    uint64_t samplers_count;
+    struct render_backend_pipeline_sampler_t *samplers;
+
     enum kan_render_pipeline_compilation_priority_t compilation_priority;
     enum pipeline_compilation_state_t compilation_state;
-    struct classic_graphics_pipeline_compilation_request_t *compilation_request;
+    struct graphics_pipeline_compilation_request_t *compilation_request;
 
     kan_interned_string_t tracking_name;
 };
 
-struct render_backend_classic_graphics_pipeline_t *render_backend_system_create_classic_graphics_pipeline (
+struct render_backend_graphics_pipeline_t *render_backend_system_create_graphics_pipeline (
     struct render_backend_system_t *system,
-    struct kan_render_classic_graphics_pipeline_description_t *description,
+    struct kan_render_graphics_pipeline_description_t *description,
     enum kan_render_pipeline_compilation_priority_t compilation_priority);
 
-void render_backend_system_destroy_classic_graphics_pipeline (
-    struct render_backend_system_t *system, struct render_backend_classic_graphics_pipeline_t *family);
+void render_backend_system_destroy_graphics_pipeline (struct render_backend_system_t *system,
+                                                      struct render_backend_graphics_pipeline_t *family);
 
 enum render_backend_buffer_family_t
 {
@@ -380,6 +413,62 @@ enum render_backend_buffer_family_t
     RENDER_BACKEND_BUFFER_FAMILY_STAGING,
     RENDER_BACKEND_BUFFER_FAMILY_FRAME_LIFETIME_ALLOCATOR,
 };
+
+struct render_backend_stable_parameter_set_data_t
+{
+    struct render_backend_descriptor_set_allocation_t allocation;
+
+    /// \details Stable parameter sets are expected to be close-to-immutable, but still can be rarely updated. When it
+    ///          happens, we need to know whether set was ever submitted to command buffers. It is needed to avoid
+    ///          excessive allocations when update was called twice during the same frame on one parameter set before
+    ///          even submitting it.
+    kan_bool_t has_been_submitted;
+};
+
+struct render_backend_unstable_parameter_set_data_t
+{
+    struct render_backend_descriptor_set_allocation_t *allocations;
+
+    /// \details When last accessed index is not equal to current frame index, it means that allocations wasn't yet
+    ///          accessed in current frame context and set data must be copied from last accessed allocations index.
+    ///          It can be detected both when updating parameter set and when submitting it to command buffer.
+    uint64_t last_accessed_allocation_index;
+};
+
+struct render_backend_parameter_set_render_target_attachment_t
+{
+    struct render_backend_parameter_set_render_target_attachment_t *next;
+    uint64_t binding;
+    struct render_backend_image_t *image;
+};
+
+struct render_backend_pipeline_parameter_set_t
+{
+    struct kan_bd_list_node_t list_node;
+    struct render_backend_system_t *system;
+
+    struct render_backend_descriptor_set_layout_t *layout;
+    union
+    {
+        struct render_backend_stable_parameter_set_data_t stable;
+        struct render_backend_unstable_parameter_set_data_t unstable;
+    };
+
+    uint64_t set_index;
+    VkImageView *bound_image_views;
+
+    uint64_t pipeline_samplers_count;
+    struct render_backend_pipeline_sampler_t *pipeline_samplers;
+
+    struct render_backend_parameter_set_render_target_attachment_t *first_render_target_attachment;
+    kan_interned_string_t tracking_name;
+};
+
+struct render_backend_pipeline_parameter_set_t *render_backend_system_create_pipeline_parameter_set (
+    struct render_backend_system_t *system, struct kan_render_pipeline_parameter_set_description_t *description);
+
+void render_backend_system_destroy_pipeline_parameter_set (struct render_backend_system_t *system,
+                                                           struct render_backend_pipeline_parameter_set_t *set);
 
 struct render_backend_buffer_t
 {
@@ -490,6 +579,13 @@ struct image_frame_buffer_attachment_t
     struct render_backend_frame_buffer_t *frame_buffer;
 };
 
+struct image_parameter_set_attachment_t
+{
+    struct image_parameter_set_attachment_t *next;
+    struct render_backend_pipeline_parameter_set_t *set;
+    uint64_t binding;
+};
+
 struct render_backend_image_t
 {
     struct kan_bd_list_node_t list_node;
@@ -500,13 +596,15 @@ struct render_backend_image_t
 
     struct kan_render_image_description_t description;
 
+    // TODO: Use last command layout field? Might simplify things. Especially when we render to some image only once
+    //       and then use it as parameter for all frames without re-rendering.
+
     /// \brief Flag used by blit-to-present routine in order to avoid
     ///        incorrectly changing layout of the same image twice.
     kan_bool_t switched_to_transfer_source;
 
     struct image_frame_buffer_attachment_t *first_frame_buffer_attachment;
-
-    // TODO: Attached pipeline instances (for render target resize).
+    struct image_parameter_set_attachment_t *first_parameter_set_attachment;
 
 #if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_PROFILE_MEMORY)
     kan_allocation_group_t device_allocation_group;
@@ -518,10 +616,10 @@ struct render_backend_image_t *render_backend_system_create_image (struct render
 
 void render_backend_system_destroy_image (struct render_backend_system_t *system, struct render_backend_image_t *image);
 
-struct classic_graphics_pipeline_compilation_request_t
+struct graphics_pipeline_compilation_request_t
 {
     struct kan_bd_list_node_t list_node;
-    struct render_backend_classic_graphics_pipeline_t *pipeline;
+    struct render_backend_graphics_pipeline_t *pipeline;
 
     uint64_t shader_stages_count;
     VkPipelineShaderStageCreateInfo *shader_stages;
@@ -547,21 +645,60 @@ struct render_backend_pipeline_compiler_state_t
     kan_conditional_variable_handle_t has_more_work;
     struct kan_atomic_int_t should_terminate;
 
-    struct kan_bd_list_t classic_graphics_critical;
-    struct kan_bd_list_t classic_graphics_active;
-    struct kan_bd_list_t classic_graphics_cache;
+    struct kan_bd_list_t graphics_critical;
+    struct kan_bd_list_t graphics_active;
+    struct kan_bd_list_t graphics_cache;
 };
 
 kan_thread_result_t render_backend_pipeline_compiler_state_worker_function (kan_thread_user_data_t user_data);
 
-void render_backend_compiler_state_request_classic_graphics (
-    struct render_backend_pipeline_compiler_state_t *state,
-    struct render_backend_classic_graphics_pipeline_t *pipeline,
-    struct kan_render_classic_graphics_pipeline_description_t *description);
+void render_backend_compiler_state_request_graphics (struct render_backend_pipeline_compiler_state_t *state,
+                                                     struct render_backend_graphics_pipeline_t *pipeline,
+                                                     struct kan_render_graphics_pipeline_description_t *description);
 
 /// \invariant Request must be already detached from queue.
-void render_backend_compiler_state_destroy_classic_graphics_request (
-    struct classic_graphics_pipeline_compilation_request_t *request);
+void render_backend_compiler_state_destroy_graphics_request (struct graphics_pipeline_compilation_request_t *request);
+
+struct render_backend_descriptor_set_pool_t
+{
+    struct kan_bd_list_node_t list_node;
+    VkDescriptorPool pool;
+    uint64_t active_allocations;
+};
+
+struct render_backend_descriptor_set_allocator_t
+{
+    struct kan_bd_list_t pools;
+
+    uint64_t total_set_allocations;
+    uint64_t uniform_buffer_binding_allocations;
+    uint64_t storage_buffer_binding_allocations;
+    uint64_t combined_image_binding_sampler_allocations;
+};
+
+void render_backend_descriptor_set_allocator_init (struct render_backend_descriptor_set_allocator_t *allocator);
+
+struct render_backend_descriptor_set_allocation_t render_backend_descriptor_set_allocator_allocate (
+    struct render_backend_system_t *system,
+    struct render_backend_descriptor_set_allocator_t *allocator,
+    struct render_backend_descriptor_set_layout_t *layout);
+
+void render_backend_descriptor_set_allocator_free (struct render_backend_system_t *system,
+                                                   struct render_backend_descriptor_set_allocator_t *allocator,
+                                                   struct render_backend_descriptor_set_allocation_t *allocation);
+
+void render_backend_descriptor_set_allocator_shutdown (struct render_backend_system_t *system,
+                                                       struct render_backend_descriptor_set_allocator_t *allocator);
+
+/// \details Mutation is a term for transfer-and-or-update operation for descriptors. There are multiple places in code
+///          where we need to either transfer data from one set to another, update set or do both at the same time.
+///          If we need to both transfer and update, it is much more efficient to merge this operation into one.
+///          Therefore, it is merge into one mutation operation.
+void render_backend_apply_descriptor_set_mutation (struct render_backend_pipeline_parameter_set_t *set_context,
+                                                   VkDescriptorSet source_set,
+                                                   VkDescriptorSet target_set,
+                                                   uint64_t bindings_count,
+                                                   struct kan_render_parameter_update_description_t *bindings);
 
 struct render_backend_system_t
 {
@@ -602,8 +739,9 @@ struct render_backend_system_t
     struct kan_bd_list_t surfaces;
     struct kan_bd_list_t frame_buffers;
     struct kan_bd_list_t passes;
-    struct kan_bd_list_t classic_graphics_pipeline_families;
-    struct kan_bd_list_t classic_graphics_pipelines;
+    struct kan_bd_list_t graphics_pipeline_families;
+    struct kan_bd_list_t graphics_pipelines;
+    struct kan_bd_list_t pipeline_parameter_sets;
     struct kan_bd_list_t buffers;
     struct kan_bd_list_t frame_lifetime_allocators;
     struct kan_bd_list_t images;
@@ -612,6 +750,7 @@ struct render_backend_system_t
     struct render_backend_frame_lifetime_allocator_t *staging_frame_lifetime_allocator;
 
     struct render_backend_pipeline_compiler_state_t compiler_state;
+    struct render_backend_descriptor_set_allocator_t descriptor_set_allocator;
 
 #if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_VALIDATION_ENABLED)
     kan_bool_t has_validation_layer;
@@ -627,9 +766,11 @@ struct render_backend_system_t
     kan_allocation_group_t pass_wrapper_allocation_group;
     kan_allocation_group_t pipeline_family_wrapper_allocation_group;
     kan_allocation_group_t pipeline_wrapper_allocation_group;
+    kan_allocation_group_t pipeline_parameter_set_wrapper_allocation_group;
     kan_allocation_group_t buffer_wrapper_allocation_group;
     kan_allocation_group_t frame_lifetime_wrapper_allocation_group;
     kan_allocation_group_t image_wrapper_allocation_group;
+    kan_allocation_group_t descriptor_set_wrapper_allocation_group;
 
     struct kan_render_supported_devices_t *supported_devices;
 
@@ -688,27 +829,44 @@ static inline struct render_backend_schedule_state_t *render_backend_system_get_
     return &system->schedule_states[schedule_index];
 }
 
-static inline void render_backend_pipeline_compiler_state_remove_classic_graphics_request_unsafe (
-    struct render_backend_pipeline_compiler_state_t *state,
-    struct classic_graphics_pipeline_compilation_request_t *request)
+static inline void render_backend_pipeline_compiler_state_remove_graphics_request_unsafe (
+    struct render_backend_pipeline_compiler_state_t *state, struct graphics_pipeline_compilation_request_t *request)
 {
     switch (request->pipeline->compilation_priority)
     {
     case KAN_RENDER_PIPELINE_COMPILATION_PRIORITY_CRITICAL:
-        kan_bd_list_remove (&state->classic_graphics_critical, &request->list_node);
+        kan_bd_list_remove (&state->graphics_critical, &request->list_node);
         break;
 
     case KAN_RENDER_PIPELINE_COMPILATION_PRIORITY_ACTIVE:
-        kan_bd_list_remove (&state->classic_graphics_active, &request->list_node);
+        kan_bd_list_remove (&state->graphics_active, &request->list_node);
         break;
 
     case KAN_RENDER_PIPELINE_COMPILATION_PRIORITY_CACHE:
-        kan_bd_list_remove (&state->classic_graphics_cache, &request->list_node);
+        kan_bd_list_remove (&state->graphics_cache, &request->list_node);
         break;
     }
 
     request->list_node.next = NULL;
     request->list_node.previous = NULL;
+}
+static inline VkImageViewType kan_render_image_description_calculate_view_type (
+    struct kan_render_image_description_t *description)
+{
+    switch (description->type)
+    {
+    case KAN_RENDER_IMAGE_TYPE_COLOR_2D:
+        return VK_IMAGE_VIEW_TYPE_2D;
+
+    case KAN_RENDER_IMAGE_TYPE_COLOR_3D:
+        return VK_IMAGE_VIEW_TYPE_3D;
+
+    case KAN_RENDER_IMAGE_TYPE_DEPTH_STENCIL:
+        return VK_IMAGE_VIEW_TYPE_2D;
+    }
+
+    KAN_ASSERT (KAN_FALSE)
+    return VK_IMAGE_VIEW_TYPE_2D;
 }
 
 static inline VkFormat kan_render_image_description_calculate_format (

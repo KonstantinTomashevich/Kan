@@ -138,6 +138,7 @@ struct render_backend_image_t *render_backend_system_create_image (struct render
     image->description = *description;
     image->switched_to_transfer_source = KAN_FALSE;
     image->first_frame_buffer_attachment = NULL;
+    image->first_parameter_set_attachment = NULL;
 
 #if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_PROFILE_MEMORY)
     image->device_allocation_group =
@@ -151,12 +152,20 @@ struct render_backend_image_t *render_backend_system_create_image (struct render
 
 void render_backend_system_destroy_image (struct render_backend_system_t *system, struct render_backend_image_t *image)
 {
-    struct image_frame_buffer_attachment_t *attachment = image->first_frame_buffer_attachment;
-    while (attachment)
+    struct image_frame_buffer_attachment_t *frame_buffer_attachment = image->first_frame_buffer_attachment;
+    while (frame_buffer_attachment)
     {
-        struct image_frame_buffer_attachment_t *next = attachment->next;
-        kan_free_batched (system->image_wrapper_allocation_group, attachment);
-        attachment = next;
+        struct image_frame_buffer_attachment_t *next = frame_buffer_attachment->next;
+        kan_free_batched (system->image_wrapper_allocation_group, frame_buffer_attachment);
+        frame_buffer_attachment = next;
+    }
+
+    struct image_parameter_set_attachment_t *parameter_set_attachment = image->first_parameter_set_attachment;
+    while (parameter_set_attachment)
+    {
+        struct image_parameter_set_attachment_t *next = parameter_set_attachment->next;
+        kan_free_batched (system->image_wrapper_allocation_group, parameter_set_attachment);
+        parameter_set_attachment = next;
     }
 
 #if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_PROFILE_MEMORY)
@@ -256,11 +265,12 @@ void kan_render_image_resize_render_target (kan_render_image_t image,
             render_backend_system_get_schedule_for_destroy (data->system);
         kan_atomic_int_lock (&schedule->schedule_lock);
 
-        struct image_frame_buffer_attachment_t *attachment = data->first_frame_buffer_attachment;
-        while (attachment)
+        struct image_frame_buffer_attachment_t *frame_buffer_attachment = data->first_frame_buffer_attachment;
+        while (frame_buffer_attachment)
         {
-            render_backend_frame_buffer_schedule_resource_destroy (data->system, attachment->frame_buffer, schedule);
-            attachment = attachment->next;
+            render_backend_frame_buffer_schedule_resource_destroy (data->system, frame_buffer_attachment->frame_buffer,
+                                                                   schedule);
+            frame_buffer_attachment = frame_buffer_attachment->next;
         }
 
         struct scheduled_detached_image_destroy_t *image_destroy = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (
@@ -293,9 +303,9 @@ void kan_render_image_resize_render_target (kan_render_image_t image,
 
     struct render_backend_schedule_state_t *schedule = render_backend_system_get_schedule_for_memory (data->system);
     kan_atomic_int_lock (&schedule->schedule_lock);
-    struct image_frame_buffer_attachment_t *attachment = data->first_frame_buffer_attachment;
+    struct image_frame_buffer_attachment_t *frame_buffer_attachment = data->first_frame_buffer_attachment;
 
-    while (attachment)
+    while (frame_buffer_attachment)
     {
         struct scheduled_frame_buffer_create_t *item = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (
             &schedule->item_allocator, struct scheduled_frame_buffer_create_t);
@@ -303,8 +313,24 @@ void kan_render_image_resize_render_target (kan_render_image_t image,
         // We do not need to preserve order as frame buffers cannot depend one on another.
         item->next = schedule->first_scheduled_frame_buffer_create;
         schedule->first_scheduled_frame_buffer_create = item;
-        item->frame_buffer = attachment->frame_buffer;
-        attachment = attachment->next;
+        item->frame_buffer = frame_buffer_attachment->frame_buffer;
+        frame_buffer_attachment = frame_buffer_attachment->next;
+    }
+
+    struct image_parameter_set_attachment_t *parameter_set_attachment = data->first_parameter_set_attachment;
+    while (parameter_set_attachment)
+    {
+        struct kan_render_parameter_update_description_t update = {
+            .binding = parameter_set_attachment->binding,
+            .image_binding =
+                {
+                    .image = image,
+                },
+        };
+
+        kan_render_pipeline_parameter_set_update ((kan_render_pipeline_parameter_set_t) parameter_set_attachment->set,
+                                                  1u, &update);
+        parameter_set_attachment = parameter_set_attachment->next;
     }
 
     kan_atomic_int_unlock (&schedule->schedule_lock);

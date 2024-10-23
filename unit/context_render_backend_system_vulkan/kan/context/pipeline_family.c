@@ -25,17 +25,15 @@ static inline void free_descriptor_set_layouts (struct render_backend_system_t *
                       sizeof (struct render_backend_descriptor_set_layout_t *) * descriptor_set_layouts_count);
 }
 
-struct render_backend_classic_graphics_pipeline_family_t *
-render_backend_system_create_classic_graphics_pipeline_family (
-    struct render_backend_system_t *system,
-    struct kan_render_classic_graphics_pipeline_family_description_t *description)
+struct render_backend_graphics_pipeline_family_t *render_backend_system_create_graphics_pipeline_family (
+    struct render_backend_system_t *system, struct kan_render_graphics_pipeline_family_description_t *description)
 {
     kan_bool_t descriptor_sets_are_zero_sequential = KAN_TRUE;
     uint64_t sets_count = 0u;
 
-    for (uint64_t index = 0u; index < description->layouts_count; ++index)
+    for (uint64_t index = 0u; index < description->parameter_sets_count; ++index)
     {
-        if (description->layouts[index].set != index)
+        if (description->parameter_sets[index].set != index)
         {
             KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR,
                      "Pipeline family \"%s\" layout set indices do not form zero-based sequence with step equal to "
@@ -45,7 +43,7 @@ render_backend_system_create_classic_graphics_pipeline_family (
             break;
         }
 
-        sets_count = KAN_MAX (sets_count, description->layouts[index].set + 1u);
+        sets_count = KAN_MAX (sets_count, description->parameter_sets[index].set + 1u);
     }
 
     if (sets_count >= KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_SET_INDEX)
@@ -73,12 +71,12 @@ render_backend_system_create_classic_graphics_pipeline_family (
     VkDescriptorSetLayoutBinding *bindings = NULL;
 
     VkDescriptorSetLayout *descriptor_set_layouts_for_pipeline = kan_allocate_general (
-        system->utility_allocation_group, sizeof (VkDescriptorSetLayout) * description->layouts_count,
+        system->utility_allocation_group, sizeof (VkDescriptorSetLayout) * description->parameter_sets_count,
         _Alignof (VkDescriptorSetLayout));
 
-    for (uint64_t layout_index = 0u; layout_index < description->layouts_count; ++layout_index)
+    for (uint64_t layout_index = 0u; layout_index < description->parameter_sets_count; ++layout_index)
     {
-        struct kan_render_layout_description_t *layout_description = &description->layouts[layout_index];
+        struct kan_render_parameter_set_description_t *layout_description = &description->parameter_sets[layout_index];
         if (descriptor_set_layouts[layout_description->set])
         {
             KAN_LOG (
@@ -130,12 +128,12 @@ render_backend_system_create_classic_graphics_pipeline_family (
                 break;
             }
 
-            if (binding_description->used_stage_mask & (1u << KAN_RENDER_STAGE_CLASSIC_GRAPHICS_VERTEX))
+            if (binding_description->used_stage_mask & (1u << KAN_RENDER_STAGE_GRAPHICS_VERTEX))
             {
                 vulkan_binding->stageFlags |= VK_SHADER_STAGE_VERTEX_BIT;
             }
 
-            if (binding_description->used_stage_mask & (1u << KAN_RENDER_STAGE_CLASSIC_GRAPHICS_FRAGMENT))
+            if (binding_description->used_stage_mask & (1u << KAN_RENDER_STAGE_GRAPHICS_FRAGMENT))
             {
                 vulkan_binding->stageFlags |= VK_SHADER_STAGE_FRAGMENT_BIT;
             }
@@ -181,6 +179,9 @@ render_backend_system_create_classic_graphics_pipeline_family (
         layout->layout = descriptor_set_layouts_for_pipeline[layout_index];
         layout->stable_binding = layout_description->stable_binding;
         layout->bindings_count = bindings_count;
+        layout->uniform_buffers_count = 0u;
+        layout->storage_buffers_count = 0u;
+        layout->combined_image_samplers_count = 0u;
 
         for (uint64_t binding = 0u; binding < bindings_count; ++binding)
         {
@@ -193,8 +194,27 @@ render_backend_system_create_classic_graphics_pipeline_family (
         {
             struct kan_render_layout_binding_description_t *binding_description =
                 &layout_description->bindings[binding_index];
+
             layout->bindings[binding_description->binding].type = binding_description->type;
             layout->bindings[binding_description->binding].used_stage_mask = binding_description->used_stage_mask;
+
+            switch (binding_description->type)
+            {
+            case KAN_RENDER_LAYOUT_BINDING_TYPE_UNIFORM_BUFFER:
+                KAN_ASSERT (layout->uniform_buffers_count < UINT8_MAX)
+                ++layout->uniform_buffers_count;
+                break;
+
+            case KAN_RENDER_LAYOUT_BINDING_TYPE_STORAGE_BUFFER:
+                KAN_ASSERT (layout->storage_buffers_count < UINT8_MAX)
+                ++layout->storage_buffers_count;
+                break;
+
+            case KAN_RENDER_LAYOUT_BINDING_TYPE_COMBINED_IMAGE_SAMPLER:
+                KAN_ASSERT (layout->combined_image_samplers_count < UINT8_MAX)
+                ++layout->combined_image_samplers_count;
+                break;
+            }
         }
     }
 
@@ -208,7 +228,7 @@ render_backend_system_create_classic_graphics_pipeline_family (
     {
         free_descriptor_set_layouts (system, sets_count, descriptor_set_layouts);
         kan_free_general (system->utility_allocation_group, descriptor_set_layouts_for_pipeline,
-                          sizeof (VkDescriptorSetLayout) * description->layouts_count);
+                          sizeof (VkDescriptorSetLayout) * description->parameter_sets_count);
         return NULL;
     }
 
@@ -216,7 +236,7 @@ render_backend_system_create_classic_graphics_pipeline_family (
         .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
         .pNext = NULL,
         .flags = 0u,
-        .setLayoutCount = (uint32_t) description->layouts_count,
+        .setLayoutCount = (uint32_t) description->parameter_sets_count,
         .pSetLayouts = descriptor_set_layouts_for_pipeline,
         .pushConstantRangeCount = 0u,
         .pPushConstantRanges = NULL,
@@ -225,7 +245,7 @@ render_backend_system_create_classic_graphics_pipeline_family (
     VkResult result = vkCreatePipelineLayout (system->device, &pipeline_layout_info,
                                               VULKAN_ALLOCATION_CALLBACKS (system), &pipeline_layout);
     kan_free_general (system->utility_allocation_group, descriptor_set_layouts_for_pipeline,
-                      sizeof (VkDescriptorSetLayout) * description->layouts_count);
+                      sizeof (VkDescriptorSetLayout) * description->parameter_sets_count);
 
     if (result != VK_SUCCESS)
     {
@@ -235,11 +255,10 @@ render_backend_system_create_classic_graphics_pipeline_family (
         return NULL;
     }
 
-    struct render_backend_classic_graphics_pipeline_family_t *family =
-        kan_allocate_batched (system->pipeline_family_wrapper_allocation_group,
-                              sizeof (struct render_backend_classic_graphics_pipeline_family_t));
+    struct render_backend_graphics_pipeline_family_t *family = kan_allocate_batched (
+        system->pipeline_family_wrapper_allocation_group, sizeof (struct render_backend_graphics_pipeline_family_t));
 
-    kan_bd_list_add (&system->classic_graphics_pipeline_families, NULL, &family->list_node);
+    kan_bd_list_add (&system->graphics_pipeline_families, NULL, &family->list_node);
     family->system = system;
 
     family->layout = pipeline_layout;
@@ -363,9 +382,8 @@ render_backend_system_create_classic_graphics_pipeline_family (
     return family;
 }
 
-void render_backend_system_destroy_classic_graphics_pipeline_family (
-    struct render_backend_system_t *system,
-    struct render_backend_classic_graphics_pipeline_family_t *family)
+void render_backend_system_destroy_graphics_pipeline_family (struct render_backend_system_t *system,
+                                                             struct render_backend_graphics_pipeline_family_t *family)
 {
     vkDestroyPipelineLayout (system->device, family->layout, VULKAN_ALLOCATION_CALLBACKS (system));
     free_descriptor_set_layouts (system, family->descriptor_set_layouts_count, family->descriptor_set_layouts);
@@ -376,30 +394,29 @@ void render_backend_system_destroy_classic_graphics_pipeline_family (
                       sizeof (VkVertexInputAttributeDescription) * family->attributes_count);
 }
 
-kan_render_classic_graphics_pipeline_family_t kan_render_classic_graphics_pipeline_family_create (
-    kan_render_context_t context, struct kan_render_classic_graphics_pipeline_family_description_t *description)
+kan_render_graphics_pipeline_family_t kan_render_graphics_pipeline_family_create (
+    kan_render_context_t context, struct kan_render_graphics_pipeline_family_description_t *description)
 {
     struct render_backend_system_t *system = (struct render_backend_system_t *) context;
     kan_atomic_int_lock (&system->resource_management_lock);
-    struct render_backend_classic_graphics_pipeline_family_t *family =
-        render_backend_system_create_classic_graphics_pipeline_family (system, description);
+    struct render_backend_graphics_pipeline_family_t *family =
+        render_backend_system_create_graphics_pipeline_family (system, description);
     kan_atomic_int_unlock (&system->resource_management_lock);
-    return family ? (kan_render_classic_graphics_pipeline_family_t) family :
-                    KAN_INVALID_RENDER_CLASSIC_GRAPHICS_PIPELINE_FAMILY;
+    return family ? (kan_render_graphics_pipeline_family_t) family : KAN_INVALID_RENDER_GRAPHICS_PIPELINE_FAMILY;
 }
 
-void kan_render_classic_graphics_pipeline_family_destroy (kan_render_classic_graphics_pipeline_family_t family)
+void kan_render_graphics_pipeline_family_destroy (kan_render_graphics_pipeline_family_t family)
 {
-    struct render_backend_classic_graphics_pipeline_family_t *data =
-        (struct render_backend_classic_graphics_pipeline_family_t *) family;
+    struct render_backend_graphics_pipeline_family_t *data =
+        (struct render_backend_graphics_pipeline_family_t *) family;
     struct render_backend_schedule_state_t *schedule = render_backend_system_get_schedule_for_destroy (data->system);
     kan_atomic_int_lock (&schedule->schedule_lock);
 
-    struct scheduled_classic_graphics_pipeline_family_destroy_t *item = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (
-        &schedule->item_allocator, struct scheduled_classic_graphics_pipeline_family_destroy_t);
+    struct scheduled_graphics_pipeline_family_destroy_t *item = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (
+        &schedule->item_allocator, struct scheduled_graphics_pipeline_family_destroy_t);
 
-    item->next = schedule->first_scheduled_classic_graphics_pipeline_family_destroy;
-    schedule->first_scheduled_classic_graphics_pipeline_family_destroy = item;
+    item->next = schedule->first_scheduled_graphics_pipeline_family_destroy;
+    schedule->first_scheduled_graphics_pipeline_family_destroy = item;
     item->family = data;
     kan_atomic_int_unlock (&schedule->schedule_lock);
 }

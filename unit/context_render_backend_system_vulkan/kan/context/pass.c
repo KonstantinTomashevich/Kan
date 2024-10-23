@@ -205,8 +205,7 @@ struct render_backend_pass_t *render_backend_system_create_pass (struct render_b
     return pass;
 }
 
-void render_backend_system_destroy_pass (struct render_backend_system_t *system,
-                                         struct render_backend_pass_t *pass)
+void render_backend_system_destroy_pass (struct render_backend_system_t *system, struct render_backend_pass_t *pass)
 {
     vkDestroyRenderPass (system->device, pass->pass, VULKAN_ALLOCATION_CALLBACKS (system));
     kan_free_batched (system->pass_wrapper_allocation_group, pass);
@@ -243,8 +242,8 @@ void kan_render_pass_instance_add_dynamic_dependency (kan_render_pass_instance_t
     // TODO: Implement.
 }
 
-void kan_render_pass_instance_classic_graphics_pipeline (
-    kan_render_pass_instance_t pass_instance, kan_render_classic_graphics_pipeline_instance_t pipeline_instance)
+void kan_render_pass_instance_graphics_pipeline (kan_render_pass_instance_t pass_instance,
+                                                 kan_render_pipeline_parameter_set_t *parameter_sets)
 {
     // TODO: Implement.
 }

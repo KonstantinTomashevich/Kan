@@ -33,6 +33,8 @@ struct render_backend_frame_buffer_t *render_backend_system_create_frame_buffer 
         case KAN_FRAME_BUFFER_ATTACHMENT_IMAGE:
         {
             target->image = (struct render_backend_image_t *) source->image;
+            KAN_ASSERT (target->image->description.render_target)
+
             struct image_frame_buffer_attachment_t *attachment = kan_allocate_batched (
                 system->image_wrapper_allocation_group, sizeof (struct image_frame_buffer_attachment_t));
 

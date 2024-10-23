@@ -32,17 +32,17 @@ typedef uint64_t kan_render_pass_instance_t;
 
 #define KAN_INVALID_RENDER_PASS_INSTANCE 0u
 
-typedef uint64_t kan_render_classic_graphics_pipeline_family_t;
+typedef uint64_t kan_render_graphics_pipeline_family_t;
 
-#define KAN_INVALID_RENDER_CLASSIC_GRAPHICS_PIPELINE_FAMILY 0u
+#define KAN_INVALID_RENDER_GRAPHICS_PIPELINE_FAMILY 0u
 
-typedef uint64_t kan_render_classic_graphics_pipeline_t;
+typedef uint64_t kan_render_graphics_pipeline_t;
 
-#define KAN_INVALID_RENDER_CLASSIC_GRAPHICS_PIPELINE 0u
+#define KAN_INVALID_RENDER_GRAPHICS_PIPELINE 0u
 
-typedef uint64_t kan_render_classic_graphics_pipeline_instance_t;
+typedef uint64_t kan_render_pipeline_parameter_set_t;
 
-#define KAN_INVALID_RENDER_CLASSIC_GRAPHICS_PIPELINE_INSTANCE 0u
+#define KAN_INVALID_RENDER_PIPELINE_PARAMETER_SET 0u
 
 typedef uint64_t kan_render_buffer_t;
 
@@ -200,6 +200,8 @@ enum kan_render_color_format_t
     KAN_RENDER_COLOR_FORMAT_RGBA32_SRGB = 0u,
     KAN_RENDER_COLOR_FORMAT_RGBA128_SFLOAT,
 
+    // TODO: 1-2-3 component formats, needed for things like deferred rendering.
+
     /// \brief Special value that indicates that color format which is currently used for surfaces should be used here.
     KAN_RENDER_COLOR_FORMAT_SURFACE,
 };
@@ -260,8 +262,8 @@ kan_render_pass_instantiate (kan_render_pass_t pass,
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_instance_add_dynamic_dependency (
     kan_render_pass_instance_t pass_instance, kan_render_pass_instance_t dependency);
 
-CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_instance_classic_graphics_pipeline (
-    kan_render_pass_instance_t pass_instance, kan_render_classic_graphics_pipeline_instance_t pipeline_instance);
+CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_instance_graphics_pipeline (
+    kan_render_pass_instance_t pass_instance, kan_render_pipeline_parameter_set_t *parameter_sets);
 
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_instance_attributes (kan_render_pass_instance_t pass_instance,
                                                                             uint64_t start_at_binding,
@@ -284,10 +286,15 @@ CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_instance_instanced_draw (
 
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_destroy (kan_render_pass_t pass);
 
+enum kan_render_pipeline_type_t
+{
+    KAN_RENDER_PIPELINE_TYPE_GRAPHICS,
+};
+
 enum kan_render_stage_t
 {
-    KAN_RENDER_STAGE_CLASSIC_GRAPHICS_VERTEX = 0u,
-    KAN_RENDER_STAGE_CLASSIC_GRAPHICS_FRAGMENT,
+    KAN_RENDER_STAGE_GRAPHICS_VERTEX = 0u,
+    KAN_RENDER_STAGE_GRAPHICS_FRAGMENT,
 };
 
 enum kan_render_attribute_rate_t
@@ -335,7 +342,7 @@ struct kan_render_layout_binding_description_t
     uint64_t used_stage_mask;
 };
 
-struct kan_render_layout_description_t
+struct kan_render_parameter_set_description_t
 {
     uint64_t set;
     uint64_t bindings_count;
@@ -343,14 +350,14 @@ struct kan_render_layout_description_t
     kan_bool_t stable_binding;
 };
 
-enum kan_render_classic_graphics_topology_t
+enum kan_render_graphics_topology_t
 {
-    KAN_RENDER_CLASSIC_GRAPHICS_TOPOLOGY_TRIANGLE_LIST = 0u,
+    KAN_RENDER_GRAPHICS_TOPOLOGY_TRIANGLE_LIST = 0u,
 };
 
-struct kan_render_classic_graphics_pipeline_family_description_t
+struct kan_render_graphics_pipeline_family_description_t
 {
-    enum kan_render_classic_graphics_topology_t topology;
+    enum kan_render_graphics_topology_t topology;
 
     uint64_t attribute_sources_count;
     struct kan_render_attribute_source_description_t *attribute_sources;
@@ -358,18 +365,17 @@ struct kan_render_classic_graphics_pipeline_family_description_t
     uint64_t attributes_count;
     struct kan_render_attribute_description_t *attributes;
 
-    uint64_t layouts_count;
-    struct kan_render_layout_description_t *layouts;
+    uint64_t parameter_sets_count;
+    struct kan_render_parameter_set_description_t *parameter_sets;
 
     kan_interned_string_t tracking_name;
 };
 
-CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_classic_graphics_pipeline_family_t
-kan_render_classic_graphics_pipeline_family_create (
-    kan_render_context_t context, struct kan_render_classic_graphics_pipeline_family_description_t *description);
+CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_graphics_pipeline_family_t kan_render_graphics_pipeline_family_create (
+    kan_render_context_t context, struct kan_render_graphics_pipeline_family_description_t *description);
 
-CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_classic_graphics_pipeline_family_destroy (
-    kan_render_classic_graphics_pipeline_family_t family);
+CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_graphics_pipeline_family_destroy (
+    kan_render_graphics_pipeline_family_t family);
 
 enum kan_render_polygon_mode_t
 {
@@ -471,7 +477,6 @@ enum kan_render_address_mode_t
     KAN_RENDER_ADDRESS_MODE_CLAMP_TO_EDGE,
     KAN_RENDER_ADDRESS_MODE_MIRRORED_CLAMP_TO_EDGE,
     KAN_RENDER_ADDRESS_MODE_CLAMP_TO_BORDER,
-    KAN_RENDER_ADDRESS_MODE_MIRRORED_CLAMP_TO_BORDER,
 };
 
 struct kan_render_sampler_description_t
@@ -484,16 +489,12 @@ struct kan_render_sampler_description_t
     enum kan_render_address_mode_t address_mode_u;
     enum kan_render_address_mode_t address_mode_v;
     enum kan_render_address_mode_t address_mode_w;
-    float border_r;
-    float border_g;
-    float border_b;
-    float border_a;
 };
 
-struct kan_render_classic_graphics_pipeline_description_t
+struct kan_render_graphics_pipeline_description_t
 {
     kan_render_pass_t pass;
-    kan_render_classic_graphics_pipeline_family_t family;
+    kan_render_graphics_pipeline_family_t family;
 
     enum kan_render_polygon_mode_t polygon_mode;
     enum kan_render_cull_mode_t cull_mode;
@@ -512,6 +513,8 @@ struct kan_render_classic_graphics_pipeline_description_t
     enum kan_render_depth_compare_operation_t depth_compare_operation;
     float min_depth;
     float max_depth;
+
+    // TODO: Stencil test, it is useful.
 
     uint64_t code_modules_count;
     struct kan_render_pipeline_code_module_t *code_modules;
@@ -540,56 +543,63 @@ enum kan_render_pipeline_compilation_priority_t
     KAN_RENDER_PIPELINE_COMPILATION_PRIORITY_CACHE,
 };
 
-CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_classic_graphics_pipeline_t
-kan_render_classic_graphics_pipeline_create (kan_render_context_t context,
-                                             struct kan_render_classic_graphics_pipeline_description_t *description,
-                                             enum kan_render_pipeline_compilation_priority_t compilation_priority);
+CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_graphics_pipeline_t
+kan_render_graphics_pipeline_create (kan_render_context_t context,
+                                     struct kan_render_graphics_pipeline_description_t *description,
+                                     enum kan_render_pipeline_compilation_priority_t compilation_priority);
 
-CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_classic_graphics_pipeline_change_compilation_priority (
-    kan_render_classic_graphics_pipeline_t pipeline,
-    enum kan_render_pipeline_compilation_priority_t compilation_priority);
+CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_graphics_pipeline_change_compilation_priority (
+    kan_render_graphics_pipeline_t pipeline, enum kan_render_pipeline_compilation_priority_t compilation_priority);
 
-CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_classic_graphics_pipeline_destroy (
-    kan_render_classic_graphics_pipeline_t pipeline);
+CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_graphics_pipeline_destroy (kan_render_graphics_pipeline_t pipeline);
 
-struct kan_render_layout_update_description_buffer_t
+struct kan_render_pipeline_parameter_set_description_t
+{
+    enum kan_render_pipeline_type_t pipeline_type;
+    union
+    {
+        kan_render_graphics_pipeline_family_t graphics_pipeline;
+    };
+
+    uint64_t set;
+    kan_interned_string_t tracking_name;
+
+    uint64_t initial_bindings_count;
+    struct kan_render_parameter_update_description_t *initial_bindings;
+};
+
+struct kan_render_parameter_update_description_buffer_t
 {
     kan_render_frame_buffer_t buffer;
     uint64_t offset;
     uint64_t range;
 };
 
-struct kan_render_layout_update_description_image_t
+struct kan_render_parameter_update_description_image_t
 {
     kan_render_image_t image;
 };
 
-struct kan_render_layout_update_description_t
+struct kan_render_parameter_update_description_t
 {
-    uint64_t set;
     uint64_t binding;
-
     union
     {
-        struct kan_render_layout_update_description_buffer_t buffer_binding;
-        struct kan_render_layout_update_description_image_t image_binding;
+        struct kan_render_parameter_update_description_buffer_t buffer_binding;
+        struct kan_render_parameter_update_description_image_t image_binding;
     };
 };
 
-CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_classic_graphics_pipeline_instance_t
-kan_render_classic_graphics_pipeline_instance_create (kan_render_context_t context,
-                                                      kan_render_classic_graphics_pipeline_t pipeline,
-                                                      uint64_t initial_bindings_count,
-                                                      struct kan_render_layout_update_description_t *initial_bindings,
-                                                      kan_interned_string_t tracking_name);
+CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_pipeline_parameter_set_t kan_render_pipeline_parameter_set_create (
+    kan_render_context_t context, struct kan_render_pipeline_parameter_set_description_t *description);
 
-CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_classic_graphics_pipeline_instance_update_layout (
-    kan_render_classic_graphics_pipeline_instance_t instance,
+CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pipeline_parameter_set_update (
+    kan_render_pipeline_parameter_set_t set,
     uint64_t bindings_count,
-    struct kan_render_layout_update_description_t *bindings);
+    struct kan_render_parameter_update_description_t *bindings);
 
-CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_classic_graphics_pipeline_instance_destroy (
-    kan_render_classic_graphics_pipeline_instance_t instance);
+CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pipeline_parameter_set_destroy (
+    kan_render_pipeline_parameter_set_t set);
 
 enum kan_render_buffer_type_t
 {
@@ -647,6 +657,8 @@ enum kan_render_image_type_t
 {
     KAN_RENDER_IMAGE_TYPE_COLOR_2D,
     KAN_RENDER_IMAGE_TYPE_COLOR_3D,
+    // TODO: Separate depth-only format.
+    // TODO: Separate stencil-only format.
     KAN_RENDER_IMAGE_TYPE_DEPTH_STENCIL,
 };
 
