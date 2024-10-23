@@ -122,6 +122,18 @@ RENDER_PIPELINE_LANGUAGE_API void kan_rpl_meta_parameter_init (struct kan_rpl_me
 
 RENDER_PIPELINE_LANGUAGE_API void kan_rpl_meta_parameter_shutdown (struct kan_rpl_meta_parameter_t *instance);
 
+// TODO: We really need the ability to specify buffers sets on language level as well as whether binding is stable or
+//       no. The main reason is descriptor set allocation optimization. One of the proposed solutions is to add ability
+//       to specify settings in buffers. We might as well use named buffer groups instead of direct set indices in
+//       settings. As there are 5 predicted buffer groups (material-global parameters that can be very rarely overridden
+//       by objects, pass-global parameters that are unique for every pass but cannot be overridden by objects,
+//       object-scope parameters that are always unique for every object like model space, object-group-scope parameters
+//       that are shared between multiple objects like skeleton joints can be shared between several meshes, instanced
+//       parameters that are always pushed from CPU to GPU through instancing buffers). Theoretically, we can even
+//       remove stable binding flag from buffer as all groups except instanced parameters should be stable in almost
+//       every case.
+// TODO: 5 is too much, only 4 is guaranteed to be supported on every hardware. Think about another grouping?
+
 /// \brief Stores information about buffer exposed in metadata.
 struct kan_rpl_meta_buffer_t
 {
@@ -186,7 +198,6 @@ enum kan_rpl_meta_sampler_address_mode_t
     KAN_RPL_META_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
     KAN_RPL_META_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER,
     KAN_RPL_META_SAMPLER_ADDRESS_MODE_MIRROR_CLAMP_TO_EDGE,
-    KAN_RPL_META_SAMPLER_ADDRESS_MODE_MIRROR_CLAMP_TO_BORDER,
 };
 
 /// \brief Stores information about sampler settings.
@@ -255,6 +266,8 @@ enum kan_rpl_blend_operation_t
 /// \brief Contains configuration for single color output of the pipeline.
 struct kan_rpl_meta_color_output_t
 {
+    // TODO: We need support for 1-2-3 color outputs for things like deferred renderer.
+
     kan_bool_t use_blend;
     kan_bool_t write_r;
     kan_bool_t write_g;
@@ -266,6 +279,8 @@ struct kan_rpl_meta_color_output_t
     enum kan_rpl_blend_factor_t source_alpha_blend_factor;
     enum kan_rpl_blend_factor_t destination_alpha_blend_factor;
     enum kan_rpl_blend_operation_t alpha_blend_operation;
+
+    // TODO: Stencil settings?
 };
 
 static inline struct kan_rpl_meta_color_output_t kan_rpl_meta_color_output_default (void)
