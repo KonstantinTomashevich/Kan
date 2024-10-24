@@ -685,17 +685,45 @@ kan_bool_t kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t comp
     kan_bool_t valid = KAN_TRUE;
 
     uint64_t buffer_count = 0u;
+    uint64_t color_outputs = 0u;
     struct compiler_instance_buffer_node_t *buffer = instance->first_buffer;
 
     while (buffer)
     {
+        if (buffer->type == KAN_RPL_BUFFER_TYPE_FRAGMENT_STAGE_OUTPUT)
+        {
+            // Not exposed, only affects pipeline settings.
+            if (instance->pipeline_type == KAN_RPL_PIPELINE_TYPE_GRAPHICS_CLASSIC)
+            {
+                struct compiler_instance_buffer_flattened_declaration_t *declaration =
+                    buffer->first_flattened_declaration;
+
+                while (declaration)
+                {
+                    ++color_outputs;
+                    declaration = declaration->next;
+                }
+            }
+
+            buffer = buffer->next;
+            continue;
+        }
+
         ++buffer_count;
         buffer = buffer->next;
     }
 
     kan_dynamic_array_set_capacity (&meta->buffers, buffer_count);
+    kan_dynamic_array_set_capacity (&meta->color_outputs, color_outputs);
+
+    for (uint64_t output_index = 0u; output_index < color_outputs; ++output_index)
+    {
+        *(struct kan_rpl_meta_color_output_t *) kan_dynamic_array_add_last (&meta->color_outputs) =
+            kan_rpl_meta_color_output_default ();
+    }
+
+    uint64_t color_output_index = 0u;
     buffer = instance->first_buffer;
-    uint64_t color_outputs = 0u;
 
     while (buffer)
     {
@@ -716,7 +744,12 @@ kan_bool_t kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t comp
 
                 while (declaration)
                 {
-                    ++color_outputs;
+                    KAN_ASSERT (declaration->source_declaration->variable.type.if_vector)
+                    ((struct kan_rpl_meta_color_output_t *) meta->color_outputs.data)[color_output_index]
+                        .components_count =
+                        (uint8_t) declaration->source_declaration->variable.type.if_vector->items_count;
+
+                    ++color_output_index;
                     declaration = declaration->next;
                 }
             }
@@ -820,13 +853,6 @@ kan_bool_t kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t comp
         }
 
         sampler = sampler->next;
-    }
-
-    kan_dynamic_array_set_capacity (&meta->color_outputs, color_outputs);
-    for (uint64_t output_index = 0u; output_index < color_outputs; ++output_index)
-    {
-        *(struct kan_rpl_meta_color_output_t *) kan_dynamic_array_add_last (&meta->color_outputs) =
-            kan_rpl_meta_color_output_default ();
     }
 
     if (!emit_meta_settings (instance, meta))

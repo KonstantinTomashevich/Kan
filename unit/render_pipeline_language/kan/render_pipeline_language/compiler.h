@@ -266,8 +266,7 @@ enum kan_rpl_blend_operation_t
 /// \brief Contains configuration for single color output of the pipeline.
 struct kan_rpl_meta_color_output_t
 {
-    // TODO: We need support for 1-2-3 color outputs for things like deferred renderer.
-
+    uint8_t components_count;
     kan_bool_t use_blend;
     kan_bool_t write_r;
     kan_bool_t write_g;
@@ -286,6 +285,7 @@ struct kan_rpl_meta_color_output_t
 static inline struct kan_rpl_meta_color_output_t kan_rpl_meta_color_output_default (void)
 {
     return (struct kan_rpl_meta_color_output_t) {
+        .components_count = 4u,
         .use_blend = KAN_FALSE,
         .write_r = KAN_TRUE,
         .write_g = KAN_TRUE,

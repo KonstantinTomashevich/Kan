@@ -212,6 +212,7 @@ KAN_TEST_CASE (generic)
     KAN_TEST_ASSERT (meta.color_outputs.size == 1u)
     struct kan_rpl_meta_color_output_t *color_output =
         &((struct kan_rpl_meta_color_output_t *) meta.color_outputs.data)[0u];
+    KAN_TEST_CHECK (color_output->components_count == 4u)
     KAN_TEST_CHECK (color_output->use_blend)
     KAN_TEST_CHECK (color_output->write_r)
     KAN_TEST_CHECK (color_output->write_g)

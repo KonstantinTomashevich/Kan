@@ -1304,10 +1304,10 @@ static kan_bool_t resolve_buffers (struct rpl_compiler_context_t *context,
 
                     while (declaration)
                     {
-                        if (declaration->source_declaration->variable.type.if_vector != &STATICS.type_f4)
+                        if (!declaration->source_declaration->variable.type.if_vector)
                         {
                             KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
-                                     "[%s:%s:%s:%ld] Fragment stage output should only contain \"f4\" declarations, "
+                                     "[%s:%s:%s:%ld] Fragment stage output should only contain vector declarations, "
                                      "but flattened declaration \"%s\" with other type found.",
                                      context->log_name, intermediate->log_name,
                                      declaration->source_declaration->source_name,
