@@ -39,17 +39,30 @@ enum kan_rpl_cull_mode_t
     KAN_RPL_CULL_MODE_BACK = 0u,
 };
 
-/// \brief Enumerates supported depth compare operations.
-enum kan_rpl_depth_compare_operation_t
+/// \brief Enumerates supported compare operations for depth and stencil tests.
+enum kan_rpl_compare_operation_t
 {
-    KAN_RPL_DEPTH_COMPARE_OPERATION_NEVER = 0u,
-    KAN_RPL_DEPTH_COMPARE_OPERATION_ALWAYS,
-    KAN_RPL_DEPTH_COMPARE_OPERATION_EQUAL,
-    KAN_RPL_DEPTH_COMPARE_OPERATION_NOT_EQUAL,
-    KAN_RPL_DEPTH_COMPARE_OPERATION_LESS,
-    KAN_RPL_DEPTH_COMPARE_OPERATION_LESS_OR_EQUAL,
-    KAN_RPL_DEPTH_COMPARE_OPERATION_GREATER,
-    KAN_RPL_DEPTH_COMPARE_OPERATION_GREATER_OR_EQUAL,
+    KAN_RPL_COMPARE_OPERATION_NEVER = 0u,
+    KAN_RPL_COMPARE_OPERATION_ALWAYS,
+    KAN_RPL_COMPARE_OPERATION_EQUAL,
+    KAN_RPL_COMPARE_OPERATION_NOT_EQUAL,
+    KAN_RPL_COMPARE_OPERATION_LESS,
+    KAN_RPL_COMPARE_OPERATION_LESS_OR_EQUAL,
+    KAN_RPL_COMPARE_OPERATION_GREATER,
+    KAN_RPL_COMPARE_OPERATION_GREATER_OR_EQUAL,
+};
+
+/// \brief Enumerates supported stencil result operations.
+enum kan_rpl_stencil_operation_t
+{
+    KAN_RPL_STENCIL_OPERATION_KEEP = 0u,
+    KAN_RPL_STENCIL_OPERATION_ZERO,
+    KAN_RPL_STENCIL_OPERATION_REPLACE,
+    KAN_RPL_STENCIL_OPERATION_INCREMENT_AND_CLAMP,
+    KAN_RPL_STENCIL_OPERATION_DECREMENT_AND_CLAMP,
+    KAN_RPL_STENCIL_OPERATION_INVERT,
+    KAN_RPL_STENCIL_OPERATION_INCREMENT_AND_WRAP,
+    KAN_RPL_STENCIL_OPERATION_DECREMENT_AND_WRAP,
 };
 
 /// \brief Contains resolved settings for classic graphics pipeline.
@@ -61,9 +74,26 @@ struct kan_rpl_graphics_classic_pipeline_settings_t
     kan_bool_t depth_test;
     kan_bool_t depth_write;
     kan_bool_t depth_bounds_test;
-    enum kan_rpl_depth_compare_operation_t depth_compare_operation;
+    enum kan_rpl_compare_operation_t depth_compare_operation;
     double depth_min;
     double depth_max;
+
+    kan_bool_t stencil_test;
+    enum kan_rpl_stencil_operation_t stencil_front_on_fail;
+    enum kan_rpl_stencil_operation_t stencil_front_on_depth_fail;
+    enum kan_rpl_stencil_operation_t stencil_front_on_pass;
+    enum kan_rpl_compare_operation_t stencil_front_compare;
+    uint32_t stencil_front_compare_mask;
+    uint32_t stencil_front_write_mask;
+    uint32_t stencil_front_reference;
+    
+    enum kan_rpl_stencil_operation_t stencil_back_on_fail;
+    enum kan_rpl_stencil_operation_t stencil_back_on_depth_fail;
+    enum kan_rpl_stencil_operation_t stencil_back_on_pass;
+    enum kan_rpl_compare_operation_t stencil_back_compare;
+    uint32_t stencil_back_compare_mask;
+    uint32_t stencil_back_write_mask;
+    uint32_t stencil_back_reference;
 };
 
 static inline struct kan_rpl_graphics_classic_pipeline_settings_t kan_rpl_graphics_classic_pipeline_settings_default (
@@ -75,9 +105,24 @@ static inline struct kan_rpl_graphics_classic_pipeline_settings_t kan_rpl_graphi
         .depth_test = KAN_TRUE,
         .depth_write = KAN_TRUE,
         .depth_bounds_test = KAN_FALSE,
-        .depth_compare_operation = KAN_RPL_DEPTH_COMPARE_OPERATION_LESS,
+        .depth_compare_operation = KAN_RPL_COMPARE_OPERATION_LESS,
         .depth_min = 0.0,
         .depth_max = 1.0,
+        .stencil_test = KAN_FALSE,
+        .stencil_front_on_fail = KAN_RPL_STENCIL_OPERATION_KEEP,
+        .stencil_front_on_depth_fail = KAN_RPL_STENCIL_OPERATION_KEEP,
+        .stencil_front_on_pass = KAN_RPL_STENCIL_OPERATION_KEEP,
+        .stencil_front_compare = KAN_RPL_COMPARE_OPERATION_NEVER,
+        .stencil_front_compare_mask = 0u,
+        .stencil_front_write_mask = 0u,
+        .stencil_front_reference = 0u,
+        .stencil_back_on_fail = KAN_RPL_STENCIL_OPERATION_KEEP,
+        .stencil_back_on_depth_fail = KAN_RPL_STENCIL_OPERATION_KEEP,
+        .stencil_back_on_pass = KAN_RPL_STENCIL_OPERATION_KEEP,
+        .stencil_back_compare = KAN_RPL_COMPARE_OPERATION_NEVER,
+        .stencil_back_compare_mask = 0u,
+        .stencil_back_write_mask = 0u,
+        .stencil_back_reference = 0u,
     };
 }
 
@@ -278,8 +323,6 @@ struct kan_rpl_meta_color_output_t
     enum kan_rpl_blend_factor_t source_alpha_blend_factor;
     enum kan_rpl_blend_factor_t destination_alpha_blend_factor;
     enum kan_rpl_blend_operation_t alpha_blend_operation;
-
-    // TODO: Stencil settings?
 };
 
 static inline struct kan_rpl_meta_color_output_t kan_rpl_meta_color_output_default (void)

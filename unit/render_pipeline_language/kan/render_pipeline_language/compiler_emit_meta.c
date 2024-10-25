@@ -31,6 +31,17 @@
     }                                                                                                                  \
     else
 
+#define SETTING_REQUIRE_POSITIVE_INTEGER                                                                               \
+    SETTING_REQUIRE_TYPE (KAN_RPL_SETTING_TYPE_INTEGER, "integer")                                                     \
+    if (setting->integer < 0)                                                                                          \
+    {                                                                                                                  \
+        KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR, "[%s:%s:%s:%ld] Setting \"%s\" should be positive integer.",     \
+                 instance->context_log_name, setting->module_name, setting->source_name, (long) setting->source_line,  \
+                 setting->name)                                                                                        \
+        valid = KAN_FALSE;                                                                                             \
+    }                                                                                                                  \
+    else
+
 #define SETTING_STRING_VALUE(INTERNED_VALUE, REAL_VALUE, OUTPUT)                                                       \
     if (setting->string == INTERNED_VALUE)                                                                             \
     {                                                                                                                  \
@@ -95,6 +106,40 @@ static inline kan_bool_t emit_meta_check_graphics_classic_setting (struct rpl_co
                                                                    struct kan_rpl_meta_t *meta,
                                                                    struct compiler_instance_setting_node_t *setting)
 {
+#define SETTING_COMPARE_OPERATION(OUTPUT)                                                                              \
+    SETTING_REQUIRE_TYPE (KAN_RPL_SETTING_TYPE_STRING, "string")                                                       \
+    SETTING_REQUIRE_NOT_IN_BLOCK                                                                                       \
+    {                                                                                                                  \
+        SETTING_STRING_VALUE (STATICS.interned_always, KAN_RPL_COMPARE_OPERATION_ALWAYS, OUTPUT)                       \
+        SETTING_STRING_VALUE (STATICS.interned_never, KAN_RPL_COMPARE_OPERATION_NEVER, OUTPUT)                         \
+        SETTING_STRING_VALUE (STATICS.interned_equal, KAN_RPL_COMPARE_OPERATION_EQUAL, OUTPUT)                         \
+        SETTING_STRING_VALUE (STATICS.interned_not_equal, KAN_RPL_COMPARE_OPERATION_NOT_EQUAL, OUTPUT)                 \
+        SETTING_STRING_VALUE (STATICS.interned_less, KAN_RPL_COMPARE_OPERATION_LESS, OUTPUT)                           \
+        SETTING_STRING_VALUE (STATICS.interned_less_or_equal, KAN_RPL_COMPARE_OPERATION_LESS_OR_EQUAL, OUTPUT)         \
+        SETTING_STRING_VALUE (STATICS.interned_greater, KAN_RPL_COMPARE_OPERATION_GREATER, OUTPUT)                     \
+        SETTING_STRING_VALUE (STATICS.interned_greater_or_equal, KAN_RPL_COMPARE_OPERATION_GREATER_OR_EQUAL, OUTPUT)   \
+        SETTING_STRING_NO_MORE_VALUES;                                                                                 \
+    }
+
+#define SETTING_STENCIL_OPERATION(OUTPUT)                                                                              \
+    SETTING_REQUIRE_TYPE (KAN_RPL_SETTING_TYPE_STRING, "string")                                                       \
+    SETTING_REQUIRE_NOT_IN_BLOCK                                                                                       \
+    {                                                                                                                  \
+        SETTING_STRING_VALUE (STATICS.interned_keep, KAN_RPL_STENCIL_OPERATION_KEEP, OUTPUT)                           \
+        SETTING_STRING_VALUE (STATICS.interned_zero, KAN_RPL_STENCIL_OPERATION_ZERO, OUTPUT)                           \
+        SETTING_STRING_VALUE (STATICS.interned_replace, KAN_RPL_STENCIL_OPERATION_REPLACE, OUTPUT)                     \
+        SETTING_STRING_VALUE (STATICS.interned_increment_and_clamp, KAN_RPL_STENCIL_OPERATION_INCREMENT_AND_CLAMP,     \
+                              OUTPUT)                                                                                  \
+        SETTING_STRING_VALUE (STATICS.interned_decrement_and_clamp, KAN_RPL_STENCIL_OPERATION_DECREMENT_AND_CLAMP,     \
+                              OUTPUT)                                                                                  \
+        SETTING_STRING_VALUE (STATICS.interned_invert, KAN_RPL_STENCIL_OPERATION_INVERT, OUTPUT)                       \
+        SETTING_STRING_VALUE (STATICS.interned_increment_and_wrap, KAN_RPL_STENCIL_OPERATION_INCREMENT_AND_WRAP,       \
+                              OUTPUT)                                                                                  \
+        SETTING_STRING_VALUE (STATICS.interned_decrement_and_wrap, KAN_RPL_STENCIL_OPERATION_DECREMENT_AND_WRAP,       \
+                              OUTPUT)                                                                                  \
+        SETTING_STRING_NO_MORE_VALUES;                                                                                 \
+    }
+
     kan_bool_t valid = KAN_TRUE;
     if (setting->name == STATICS.interned_polygon_mode)
     {
@@ -144,27 +189,7 @@ static inline kan_bool_t emit_meta_check_graphics_classic_setting (struct rpl_co
     }
     else if (setting->name == STATICS.interned_depth_compare_operation)
     {
-        SETTING_REQUIRE_TYPE (KAN_RPL_SETTING_TYPE_STRING, "string")
-        SETTING_REQUIRE_NOT_IN_BLOCK
-        {
-            SETTING_STRING_VALUE (STATICS.interned_always, KAN_RPL_DEPTH_COMPARE_OPERATION_ALWAYS,
-                                  meta->graphics_classic_settings.depth_compare_operation)
-            SETTING_STRING_VALUE (STATICS.interned_never, KAN_RPL_DEPTH_COMPARE_OPERATION_NEVER,
-                                  meta->graphics_classic_settings.depth_compare_operation)
-            SETTING_STRING_VALUE (STATICS.interned_equal, KAN_RPL_DEPTH_COMPARE_OPERATION_EQUAL,
-                                  meta->graphics_classic_settings.depth_compare_operation)
-            SETTING_STRING_VALUE (STATICS.interned_not_equal, KAN_RPL_DEPTH_COMPARE_OPERATION_NOT_EQUAL,
-                                  meta->graphics_classic_settings.depth_compare_operation)
-            SETTING_STRING_VALUE (STATICS.interned_less, KAN_RPL_DEPTH_COMPARE_OPERATION_LESS,
-                                  meta->graphics_classic_settings.depth_compare_operation)
-            SETTING_STRING_VALUE (STATICS.interned_less_or_equal, KAN_RPL_DEPTH_COMPARE_OPERATION_LESS_OR_EQUAL,
-                                  meta->graphics_classic_settings.depth_compare_operation)
-            SETTING_STRING_VALUE (STATICS.interned_greater, KAN_RPL_DEPTH_COMPARE_OPERATION_GREATER,
-                                  meta->graphics_classic_settings.depth_compare_operation)
-            SETTING_STRING_VALUE (STATICS.interned_greater_or_equal, KAN_RPL_DEPTH_COMPARE_OPERATION_GREATER_OR_EQUAL,
-                                  meta->graphics_classic_settings.depth_compare_operation)
-            SETTING_STRING_NO_MORE_VALUES
-        }
+        SETTING_COMPARE_OPERATION (meta->graphics_classic_settings.depth_compare_operation)
     }
     else if (setting->name == STATICS.interned_depth_min)
     {
@@ -182,10 +207,101 @@ static inline kan_bool_t emit_meta_check_graphics_classic_setting (struct rpl_co
             meta->graphics_classic_settings.depth_max = setting->floating;
         }
     }
+    else if (setting->name == STATICS.interned_stencil_test)
+    {
+        SETTING_REQUIRE_TYPE (KAN_RPL_SETTING_TYPE_FLAG, "flag")
+        SETTING_REQUIRE_NOT_IN_BLOCK
+        {
+            meta->graphics_classic_settings.stencil_test = setting->flag;
+        }
+    }
+    else if (setting->name == STATICS.interned_stencil_front_on_fail)
+    {
+        SETTING_STENCIL_OPERATION (meta->graphics_classic_settings.stencil_front_on_fail)
+    }
+    else if (setting->name == STATICS.interned_stencil_front_on_depth_fail)
+    {
+        SETTING_STENCIL_OPERATION (meta->graphics_classic_settings.stencil_front_on_depth_fail)
+    }
+    else if (setting->name == STATICS.interned_stencil_front_on_pass)
+    {
+        SETTING_STENCIL_OPERATION (meta->graphics_classic_settings.stencil_front_on_pass)
+    }
+    else if (setting->name == STATICS.interned_stencil_front_compare)
+    {
+        SETTING_COMPARE_OPERATION (meta->graphics_classic_settings.stencil_front_compare)
+    }
+    else if (setting->name == STATICS.interned_stencil_front_compare_mask)
+    {
+        SETTING_REQUIRE_POSITIVE_INTEGER
+        SETTING_REQUIRE_NOT_IN_BLOCK
+        {
+            meta->graphics_classic_settings.stencil_front_compare_mask = (uint32_t) setting->integer;
+        }
+    }
+    else if (setting->name == STATICS.interned_stencil_front_write_mask)
+    {
+        SETTING_REQUIRE_POSITIVE_INTEGER
+        SETTING_REQUIRE_NOT_IN_BLOCK
+        {
+            meta->graphics_classic_settings.stencil_front_write_mask = (uint32_t) setting->integer;
+        }
+    }
+    else if (setting->name == STATICS.interned_stencil_front_reference)
+    {
+        SETTING_REQUIRE_POSITIVE_INTEGER
+        SETTING_REQUIRE_NOT_IN_BLOCK
+        {
+            meta->graphics_classic_settings.stencil_front_reference = (uint32_t) setting->integer;
+        }
+    }
+    else if (setting->name == STATICS.interned_stencil_back_on_fail)
+    {
+        SETTING_STENCIL_OPERATION (meta->graphics_classic_settings.stencil_back_on_fail)
+    }
+    else if (setting->name == STATICS.interned_stencil_back_on_depth_fail)
+    {
+        SETTING_STENCIL_OPERATION (meta->graphics_classic_settings.stencil_back_on_depth_fail)
+    }
+    else if (setting->name == STATICS.interned_stencil_back_on_pass)
+    {
+        SETTING_STENCIL_OPERATION (meta->graphics_classic_settings.stencil_back_on_pass)
+    }
+    else if (setting->name == STATICS.interned_stencil_back_compare)
+    {
+        SETTING_COMPARE_OPERATION (meta->graphics_classic_settings.stencil_back_compare)
+    }
+    else if (setting->name == STATICS.interned_stencil_back_compare_mask)
+    {
+        SETTING_REQUIRE_POSITIVE_INTEGER
+        SETTING_REQUIRE_NOT_IN_BLOCK
+        {
+            meta->graphics_classic_settings.stencil_back_compare_mask = (uint32_t) setting->integer;
+        }
+    }
+    else if (setting->name == STATICS.interned_stencil_back_write_mask)
+    {
+        SETTING_REQUIRE_POSITIVE_INTEGER
+        SETTING_REQUIRE_NOT_IN_BLOCK
+        {
+            meta->graphics_classic_settings.stencil_back_write_mask = (uint32_t) setting->integer;
+        }
+    }
+    else if (setting->name == STATICS.interned_stencil_back_reference)
+    {
+        SETTING_REQUIRE_POSITIVE_INTEGER
+        SETTING_REQUIRE_NOT_IN_BLOCK
+        {
+            meta->graphics_classic_settings.stencil_back_reference = (uint32_t) setting->integer;
+        }
+    }
     else
     {
         valid = KAN_FALSE;
     }
+
+#undef SETTING_COMPARE_OPERATION
+#undef SETTING_STENCIL_OPERATION
 
     return valid;
 }

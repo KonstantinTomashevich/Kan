@@ -26,6 +26,8 @@ static kan_bool_t create_vulkan_image (struct render_backend_system_t *system,
         image_usage |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
         break;
 
+    case KAN_RENDER_IMAGE_TYPE_DEPTH:
+    case KAN_RENDER_IMAGE_TYPE_STENCIL:
     case KAN_RENDER_IMAGE_TYPE_DEPTH_STENCIL:
         KAN_ASSERT (description->render_target)
         image_type = VK_IMAGE_TYPE_2D;
@@ -43,6 +45,8 @@ static kan_bool_t create_vulkan_image (struct render_backend_system_t *system,
             image_usage |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
             break;
 
+        case KAN_RENDER_IMAGE_TYPE_DEPTH:
+        case KAN_RENDER_IMAGE_TYPE_STENCIL:
         case KAN_RENDER_IMAGE_TYPE_DEPTH_STENCIL:
             image_usage |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
             break;

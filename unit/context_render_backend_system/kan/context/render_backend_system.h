@@ -192,15 +192,22 @@ enum kan_render_pass_type_t
 enum kan_render_pass_attachment_type_t
 {
     KAN_RENDER_PASS_ATTACHMENT_COLOR = 0u,
+    KAN_RENDER_PASS_ATTACHMENT_DEPTH,
+    KAN_RENDER_PASS_ATTACHMENT_STENCIL,
     KAN_RENDER_PASS_ATTACHMENT_DEPTH_STENCIL,
 };
 
 enum kan_render_color_format_t
 {
-    KAN_RENDER_COLOR_FORMAT_RGBA32_SRGB = 0u,
-    KAN_RENDER_COLOR_FORMAT_RGBA128_SFLOAT,
+    KAN_RENDER_COLOR_FORMAT_R8_SRGB = 0u,
+    KAN_RENDER_COLOR_FORMAT_RG16_SRGB,
+    KAN_RENDER_COLOR_FORMAT_RGB24_SRGB,
+    KAN_RENDER_COLOR_FORMAT_RGBA32_SRGB,
 
-    // TODO: 1-2-3 component formats, needed for things like deferred rendering.
+    KAN_RENDER_COLOR_FORMAT_R32_SFLOAT,
+    KAN_RENDER_COLOR_FORMAT_RG64_SFLOAT,
+    KAN_RENDER_COLOR_FORMAT_RGB96_SFLOAT,
+    KAN_RENDER_COLOR_FORMAT_RGBA128_SFLOAT,
 
     /// \brief Special value that indicates that color format which is currently used for surfaces should be used here.
     KAN_RENDER_COLOR_FORMAT_SURFACE,
@@ -431,16 +438,39 @@ struct kan_render_color_output_setup_description_t
     enum kan_render_blend_operation_t alpha_blend_operation;
 };
 
-enum kan_render_depth_compare_operation_t
+enum kan_render_compare_operation_t
 {
-    KAN_RENDER_DEPTH_COMPARE_OPERATION_NEVER = 0u,
-    KAN_RENDER_DEPTH_COMPARE_OPERATION_ALWAYS,
-    KAN_RENDER_DEPTH_COMPARE_OPERATION_EQUAL,
-    KAN_RENDER_DEPTH_COMPARE_OPERATION_NOT_EQUAL,
-    KAN_RENDER_DEPTH_COMPARE_OPERATION_LESS,
-    KAN_RENDER_DEPTH_COMPARE_OPERATION_LESS_OR_EQUAL,
-    KAN_RENDER_DEPTH_COMPARE_OPERATION_GREATER,
-    KAN_RENDER_DEPTH_COMPARE_OPERATION_GREATER_OR_EQUAL,
+    KAN_RENDER_COMPARE_OPERATION_NEVER = 0u,
+    KAN_RENDER_COMPARE_OPERATION_ALWAYS,
+    KAN_RENDER_COMPARE_OPERATION_EQUAL,
+    KAN_RENDER_COMPARE_OPERATION_NOT_EQUAL,
+    KAN_RENDER_COMPARE_OPERATION_LESS,
+    KAN_RENDER_COMPARE_OPERATION_LESS_OR_EQUAL,
+    KAN_RENDER_COMPARE_OPERATION_GREATER,
+    KAN_RENDER_COMPARE_OPERATION_GREATER_OR_EQUAL,
+};
+
+enum kan_render_stencil_operation_t
+{
+    KAN_RENDER_STENCIL_OPERATION_KEEP = 0u,
+    KAN_RENDER_STENCIL_OPERATION_ZERO,
+    KAN_RENDER_STENCIL_OPERATION_REPLACE,
+    KAN_RENDER_STENCIL_OPERATION_INCREMENT_AND_CLAMP,
+    KAN_RENDER_STENCIL_OPERATION_DECREMENT_AND_CLAMP,
+    KAN_RENDER_STENCIL_OPERATION_INVERT,
+    KAN_RENDER_STENCIL_OPERATION_INCREMENT_AND_WRAP,
+    KAN_RENDER_STENCIL_OPERATION_DECREMENT_AND_WRAP,
+};
+
+struct kan_render_stencil_test_t
+{
+    enum kan_render_stencil_operation_t on_fail;
+    enum kan_render_stencil_operation_t on_depth_fail;
+    enum kan_render_stencil_operation_t on_pass;
+    enum kan_render_compare_operation_t compare;
+    uint32_t compare_mask;
+    uint32_t write_mask;
+    uint32_t reference;
 };
 
 struct kan_render_pipeline_code_entry_point_t
@@ -510,11 +540,13 @@ struct kan_render_graphics_pipeline_description_t
     kan_bool_t depth_test_enabled;
     kan_bool_t depth_write_enabled;
     kan_bool_t depth_bounds_test_enabled;
-    enum kan_render_depth_compare_operation_t depth_compare_operation;
+    enum kan_render_compare_operation_t depth_compare_operation;
     float min_depth;
     float max_depth;
 
-    // TODO: Stencil test, it is useful.
+    kan_bool_t stencil_test_enabled;
+    struct kan_render_stencil_test_t stencil_front;
+    struct kan_render_stencil_test_t stencil_back;
 
     uint64_t code_modules_count;
     struct kan_render_pipeline_code_module_t *code_modules;
@@ -657,8 +689,8 @@ enum kan_render_image_type_t
 {
     KAN_RENDER_IMAGE_TYPE_COLOR_2D,
     KAN_RENDER_IMAGE_TYPE_COLOR_3D,
-    // TODO: Separate depth-only format.
-    // TODO: Separate stencil-only format.
+    KAN_RENDER_IMAGE_TYPE_DEPTH,
+    KAN_RENDER_IMAGE_TYPE_STENCIL,
     KAN_RENDER_IMAGE_TYPE_DEPTH_STENCIL,
 };
 

@@ -63,6 +63,14 @@ void kan_rpl_compiler_ensure_statics_initialized (void)
         STATICS.interned_less_or_equal = kan_string_intern ("less_or_equal");
         STATICS.interned_greater = kan_string_intern ("greater");
         STATICS.interned_greater_or_equal = kan_string_intern ("greater_or_equal");
+        
+        STATICS.interned_keep = kan_string_intern ("keep");
+        STATICS.interned_replace = kan_string_intern ("replace");
+        STATICS.interned_increment_and_clamp = kan_string_intern ("increment_and_clamp");
+        STATICS.interned_decrement_and_clamp = kan_string_intern ("decrement_and_clamp");
+        STATICS.interned_invert = kan_string_intern ("invert");
+        STATICS.interned_increment_and_wrap = kan_string_intern ("increment_and_wrap");
+        STATICS.interned_decrement_and_wrap = kan_string_intern ("decrement_and_wrap");
 
         STATICS.interned_polygon_mode = kan_string_intern ("polygon_mode");
         STATICS.interned_cull_mode = kan_string_intern ("cull_mode");
@@ -72,6 +80,21 @@ void kan_rpl_compiler_ensure_statics_initialized (void)
         STATICS.interned_depth_compare_operation = kan_string_intern ("depth_compare_operation");
         STATICS.interned_depth_min = kan_string_intern ("depth_min");
         STATICS.interned_depth_max = kan_string_intern ("depth_max");
+        STATICS.interned_stencil_test = kan_string_intern ("stencil_test");
+        STATICS.interned_stencil_front_on_fail = kan_string_intern ("stencil_front_on_fail");
+        STATICS.interned_stencil_front_on_depth_fail = kan_string_intern ("stencil_front_on_depth_fail");
+        STATICS.interned_stencil_front_on_pass = kan_string_intern ("stencil_front_on_pass");
+        STATICS.interned_stencil_front_compare = kan_string_intern ("stencil_front_compare");
+        STATICS.interned_stencil_front_compare_mask = kan_string_intern ("stencil_front_compare_mask");
+        STATICS.interned_stencil_front_write_mask = kan_string_intern ("stencil_front_write_mask");
+        STATICS.interned_stencil_front_reference = kan_string_intern ("stencil_front_reference");
+        STATICS.interned_stencil_back_on_fail = kan_string_intern ("stencil_back_on_fail");
+        STATICS.interned_stencil_back_on_depth_fail = kan_string_intern ("stencil_back_on_depth_fail");
+        STATICS.interned_stencil_back_on_pass = kan_string_intern ("stencil_back_on_pass");
+        STATICS.interned_stencil_back_compare = kan_string_intern ("stencil_back_compare");
+        STATICS.interned_stencil_back_compare_mask = kan_string_intern ("stencil_back_compare_mask");
+        STATICS.interned_stencil_back_write_mask = kan_string_intern ("stencil_back_write_mask");
+        STATICS.interned_stencil_back_reference = kan_string_intern ("stencil_back_reference");
 
         STATICS.interned_nearest = kan_string_intern ("nearest");
         STATICS.interned_linear = kan_string_intern ("linear");

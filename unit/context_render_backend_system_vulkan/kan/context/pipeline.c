@@ -78,6 +78,73 @@ static inline VkBlendOp to_vulkan_blend_operation (enum kan_render_blend_operati
     return VK_BLEND_OP_MAX_ENUM;
 }
 
+static inline VkCompareOp to_vulkan_compare_operation (enum kan_render_compare_operation_t operation)
+{
+    switch (operation)
+    {
+    case KAN_RENDER_COMPARE_OPERATION_NEVER:
+        return VK_COMPARE_OP_NEVER;
+        break;
+
+    case KAN_RENDER_COMPARE_OPERATION_ALWAYS:
+        return VK_COMPARE_OP_ALWAYS;
+
+    case KAN_RENDER_COMPARE_OPERATION_EQUAL:
+        return VK_COMPARE_OP_EQUAL;
+
+    case KAN_RENDER_COMPARE_OPERATION_NOT_EQUAL:
+        return VK_COMPARE_OP_NOT_EQUAL;
+
+    case KAN_RENDER_COMPARE_OPERATION_LESS:
+        return VK_COMPARE_OP_LESS;
+
+    case KAN_RENDER_COMPARE_OPERATION_LESS_OR_EQUAL:
+        return VK_COMPARE_OP_LESS_OR_EQUAL;
+
+    case KAN_RENDER_COMPARE_OPERATION_GREATER:
+        return VK_COMPARE_OP_GREATER;
+
+    case KAN_RENDER_COMPARE_OPERATION_GREATER_OR_EQUAL:
+        return VK_COMPARE_OP_GREATER_OR_EQUAL;
+    }
+
+    KAN_ASSERT (KAN_FALSE)
+    return VK_COMPARE_OP_NEVER;
+}
+
+static VkStencilOp to_vulkan_stencil_operation (enum kan_render_stencil_operation_t operation)
+{
+    switch (operation)
+    {
+    case KAN_RENDER_STENCIL_OPERATION_KEEP:
+        return VK_STENCIL_OP_KEEP;
+
+    case KAN_RENDER_STENCIL_OPERATION_ZERO:
+        return VK_STENCIL_OP_ZERO;
+
+    case KAN_RENDER_STENCIL_OPERATION_REPLACE:
+        return VK_STENCIL_OP_REPLACE;
+
+    case KAN_RENDER_STENCIL_OPERATION_INCREMENT_AND_CLAMP:
+        return VK_STENCIL_OP_INCREMENT_AND_CLAMP;
+
+    case KAN_RENDER_STENCIL_OPERATION_DECREMENT_AND_CLAMP:
+        return VK_STENCIL_OP_DECREMENT_AND_CLAMP;
+
+    case KAN_RENDER_STENCIL_OPERATION_INVERT:
+        return VK_STENCIL_OP_INVERT;
+
+    case KAN_RENDER_STENCIL_OPERATION_INCREMENT_AND_WRAP:
+        return VK_STENCIL_OP_INCREMENT_AND_WRAP;
+
+    case KAN_RENDER_STENCIL_OPERATION_DECREMENT_AND_WRAP:
+        return VK_STENCIL_OP_DECREMENT_AND_WRAP;
+    }
+
+    KAN_ASSERT (KAN_FALSE)
+    return VK_STENCIL_OP_KEEP;
+}
+
 static inline kan_bool_t add_graphics_request_unsafe (struct render_backend_pipeline_compiler_state_t *state,
                                                       struct graphics_pipeline_compilation_request_t *request)
 {
@@ -366,71 +433,35 @@ void render_backend_compiler_state_request_graphics (struct render_backend_pipel
         .alphaToOneEnable = VK_FALSE,
     };
 
-    VkCompareOp depth_compare;
-    switch (description->depth_compare_operation)
-    {
-    case KAN_RENDER_DEPTH_COMPARE_OPERATION_NEVER:
-        depth_compare = VK_COMPARE_OP_NEVER;
-        break;
-
-    case KAN_RENDER_DEPTH_COMPARE_OPERATION_ALWAYS:
-        depth_compare = VK_COMPARE_OP_ALWAYS;
-        break;
-
-    case KAN_RENDER_DEPTH_COMPARE_OPERATION_EQUAL:
-        depth_compare = VK_COMPARE_OP_EQUAL;
-        break;
-
-    case KAN_RENDER_DEPTH_COMPARE_OPERATION_NOT_EQUAL:
-        depth_compare = VK_COMPARE_OP_NOT_EQUAL;
-        break;
-
-    case KAN_RENDER_DEPTH_COMPARE_OPERATION_LESS:
-        depth_compare = VK_COMPARE_OP_LESS;
-        break;
-
-    case KAN_RENDER_DEPTH_COMPARE_OPERATION_LESS_OR_EQUAL:
-        depth_compare = VK_COMPARE_OP_LESS_OR_EQUAL;
-        break;
-
-    case KAN_RENDER_DEPTH_COMPARE_OPERATION_GREATER:
-        depth_compare = VK_COMPARE_OP_GREATER;
-        break;
-
-    case KAN_RENDER_DEPTH_COMPARE_OPERATION_GREATER_OR_EQUAL:
-        depth_compare = VK_COMPARE_OP_GREATER_OR_EQUAL;
-        break;
-    }
-
     request->depth_stencil = (VkPipelineDepthStencilStateCreateInfo) {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
         .pNext = NULL,
         .flags = 0u,
         .depthTestEnable = description->depth_test_enabled,
         .depthWriteEnable = description->depth_write_enabled,
-        .depthCompareOp = depth_compare,
+        .depthCompareOp = to_vulkan_compare_operation (description->depth_compare_operation),
         .depthBoundsTestEnable = description->depth_bounds_test_enabled,
-        .stencilTestEnable = VK_FALSE,
+        .stencilTestEnable = description->stencil_test_enabled,
         // Stencil test disabled, therefore we don't care about front and back at all.
         .front =
             {
-                .failOp = VK_STENCIL_OP_MAX_ENUM,
-                .passOp = VK_STENCIL_OP_MAX_ENUM,
-                .depthFailOp = VK_STENCIL_OP_MAX_ENUM,
-                .compareOp = VK_COMPARE_OP_MAX_ENUM,
-                .compareMask = 0u,
-                .writeMask = 0u,
-                .reference = 0u,
+                .failOp = to_vulkan_stencil_operation (description->stencil_front.on_fail),
+                .passOp = to_vulkan_stencil_operation (description->stencil_front.on_pass),
+                .depthFailOp = to_vulkan_stencil_operation (description->stencil_front.on_depth_fail),
+                .compareOp = to_vulkan_compare_operation (description->stencil_front.compare),
+                .compareMask = description->stencil_front.compare_mask,
+                .writeMask = description->stencil_front.write_mask,
+                .reference = description->stencil_front.reference,
             },
         .back =
             {
-                .failOp = VK_STENCIL_OP_MAX_ENUM,
-                .passOp = VK_STENCIL_OP_MAX_ENUM,
-                .depthFailOp = VK_STENCIL_OP_MAX_ENUM,
-                .compareOp = VK_COMPARE_OP_MAX_ENUM,
-                .compareMask = 0u,
-                .writeMask = 0u,
-                .reference = 0u,
+                .failOp = to_vulkan_stencil_operation (description->stencil_back.on_fail),
+                .passOp = to_vulkan_stencil_operation (description->stencil_back.on_pass),
+                .depthFailOp = to_vulkan_stencil_operation (description->stencil_back.on_depth_fail),
+                .compareOp = to_vulkan_compare_operation (description->stencil_back.compare),
+                .compareMask = description->stencil_back.compare_mask,
+                .writeMask = description->stencil_back.write_mask,
+                .reference = description->stencil_back.reference,
             },
         .minDepthBounds = description->min_depth,
         .maxDepthBounds = description->max_depth,

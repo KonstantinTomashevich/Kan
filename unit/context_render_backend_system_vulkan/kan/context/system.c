@@ -760,29 +760,29 @@ kan_bool_t kan_render_backend_system_select_device (kan_context_system_handle_t 
         return KAN_FALSE;
     }
 
-    // TODO: We do not need to iterate through formats. We need to check that D32, D32_S8 and S8 are supported.
-    static VkFormat depth_formats[] = {VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT};
-    system->device_depth_image_format = VK_FORMAT_UNDEFINED;
+    VkFormatProperties format_properties;
+    vkGetPhysicalDeviceFormatProperties (physical_device, DEPTH_FORMAT, &format_properties);
 
-    for (uint64_t index = 0u; index < sizeof (depth_formats) / sizeof (depth_formats[0u]); ++index)
-    {
-        VkFormatProperties format_properties;
-        vkGetPhysicalDeviceFormatProperties (physical_device, depth_formats[index], &format_properties);
-
-        if (format_properties.optimalTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT)
-        {
-            system->device_depth_image_format = depth_formats[index];
-            break;
-        }
-    }
-
-    system->device_depth_image_has_stencil = system->device_depth_image_format == VK_FORMAT_D32_SFLOAT_S8_UINT ||
-                                             system->device_depth_image_format == VK_FORMAT_D24_UNORM_S8_UINT;
-
-    if (system->device_depth_image_format == VK_FORMAT_UNDEFINED)
+    if ((format_properties.optimalTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT) == 0u)
     {
         KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR,
-                 "Unable to select device: unable to select depth format for device.")
+                 "Unable to select device: preferred depth format is not optimal.")
+        return KAN_FALSE;
+    }
+
+    vkGetPhysicalDeviceFormatProperties (physical_device, STENCIL_FORMAT, &format_properties);
+    if ((format_properties.optimalTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT) == 0u)
+    {
+        KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR,
+                 "Unable to select device: preferred stencil format is not optimal.")
+        return KAN_FALSE;
+    }
+
+    vkGetPhysicalDeviceFormatProperties (physical_device, DEPTH_STENCIL_FORMAT, &format_properties);
+    if ((format_properties.optimalTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT) == 0u)
+    {
+        KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR,
+                 "Unable to select device: preferred depth stencil format is not optimal.")
         return KAN_FALSE;
     }
 

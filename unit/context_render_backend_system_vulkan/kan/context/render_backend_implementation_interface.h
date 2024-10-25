@@ -19,6 +19,10 @@ KAN_C_HEADER_BEGIN
 #define SURFACE_COLOR_FORMAT VK_FORMAT_B8G8R8A8_SRGB
 #define SURFACE_COLOR_SPACE VK_COLOR_SPACE_SRGB_NONLINEAR_KHR
 
+#define DEPTH_FORMAT VK_FORMAT_D32_SFLOAT
+#define STENCIL_FORMAT VK_FORMAT_S8_UINT
+#define DEPTH_STENCIL_FORMAT VK_FORMAT_D32_SFLOAT_S8_UINT
+
 #if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_PROFILE_MEMORY)
 struct memory_profiling_t
 {
@@ -727,9 +731,6 @@ struct render_backend_system_t
     struct render_backend_command_state_t command_states[KAN_CONTEXT_RENDER_BACKEND_VULKAN_FRAMES_IN_FLIGHT];
     struct render_backend_schedule_state_t schedule_states[KAN_CONTEXT_RENDER_BACKEND_VULKAN_FRAMES_IN_FLIGHT];
 
-    VkFormat device_depth_image_format;
-    kan_bool_t device_depth_image_has_stencil;
-
     /// \brief Lock for safe resource management (resource creation, memory management) in multithreaded environment.
     /// \details Surfaces are the exemption from this rule as they're always managed from application system thread.
     ///          Everything that is done from kan_render_backend_system_next_frame is an exemption from this rule as
@@ -861,6 +862,8 @@ static inline VkImageViewType kan_render_image_description_calculate_view_type (
     case KAN_RENDER_IMAGE_TYPE_COLOR_3D:
         return VK_IMAGE_VIEW_TYPE_3D;
 
+    case KAN_RENDER_IMAGE_TYPE_DEPTH:
+    case KAN_RENDER_IMAGE_TYPE_STENCIL:
     case KAN_RENDER_IMAGE_TYPE_DEPTH_STENCIL:
         return VK_IMAGE_VIEW_TYPE_2D;
     }
@@ -879,8 +882,32 @@ static inline VkFormat kan_render_image_description_calculate_format (
     case KAN_RENDER_IMAGE_TYPE_COLOR_3D:
         switch (description->color_format)
         {
+        case KAN_RENDER_COLOR_FORMAT_R8_SRGB:
+            image_format = VK_FORMAT_R8_SRGB;
+            break;
+
+        case KAN_RENDER_COLOR_FORMAT_RG16_SRGB:
+            image_format = VK_FORMAT_R8G8_SRGB;
+            break;
+
+        case KAN_RENDER_COLOR_FORMAT_RGB24_SRGB:
+            image_format = VK_FORMAT_R8G8B8_SRGB;
+            break;
+
         case KAN_RENDER_COLOR_FORMAT_RGBA32_SRGB:
             image_format = VK_FORMAT_R8G8B8A8_SRGB;
+            break;
+
+        case KAN_RENDER_COLOR_FORMAT_R32_SFLOAT:
+            image_format = VK_FORMAT_R32_SFLOAT;
+            break;
+
+        case KAN_RENDER_COLOR_FORMAT_RG64_SFLOAT:
+            image_format = VK_FORMAT_R32G32_SFLOAT;
+            break;
+
+        case KAN_RENDER_COLOR_FORMAT_RGB96_SFLOAT:
+            image_format = VK_FORMAT_R32G32B32_SFLOAT;
             break;
 
         case KAN_RENDER_COLOR_FORMAT_RGBA128_SFLOAT:
@@ -894,8 +921,16 @@ static inline VkFormat kan_render_image_description_calculate_format (
 
         break;
 
+    case KAN_RENDER_IMAGE_TYPE_DEPTH:
+        image_format = DEPTH_FORMAT;
+        break;
+
+    case KAN_RENDER_IMAGE_TYPE_STENCIL:
+        image_format = STENCIL_FORMAT;
+        break;
+
     case KAN_RENDER_IMAGE_TYPE_DEPTH_STENCIL:
-        image_format = system->device_depth_image_format;
+        image_format = DEPTH_STENCIL_FORMAT;
         break;
     }
 
@@ -913,13 +948,16 @@ static inline VkImageAspectFlags kan_render_image_description_calculate_aspects 
         aspects |= VK_IMAGE_ASPECT_COLOR_BIT;
         break;
 
-    case KAN_RENDER_IMAGE_TYPE_DEPTH_STENCIL:
+    case KAN_RENDER_IMAGE_TYPE_DEPTH:
         aspects |= VK_IMAGE_ASPECT_DEPTH_BIT;
-        if (system->device_depth_image_has_stencil)
-        {
-            aspects |= VK_IMAGE_ASPECT_STENCIL_BIT;
-        }
+        break;
 
+    case KAN_RENDER_IMAGE_TYPE_STENCIL:
+        aspects |= VK_IMAGE_ASPECT_STENCIL_BIT;
+        break;
+
+    case KAN_RENDER_IMAGE_TYPE_DEPTH_STENCIL:
+        aspects |= VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
         break;
     }
 
@@ -949,9 +987,33 @@ static inline uint64_t kan_render_image_description_calculate_texel_size (
     case KAN_RENDER_IMAGE_TYPE_COLOR_3D:
         switch (description->color_format)
         {
+        case KAN_RENDER_COLOR_FORMAT_R8_SRGB:
+            texel_size = 1u;
+            break;
+
+        case KAN_RENDER_COLOR_FORMAT_RG16_SRGB:
+            texel_size = 2u;
+            break;
+
+        case KAN_RENDER_COLOR_FORMAT_RGB24_SRGB:
+            texel_size = 3u;
+            break;
+
         case KAN_RENDER_COLOR_FORMAT_RGBA32_SRGB:
         case KAN_RENDER_COLOR_FORMAT_SURFACE:
             texel_size = 4u;
+            break;
+
+        case KAN_RENDER_COLOR_FORMAT_R32_SFLOAT:
+            texel_size = 4u;
+            break;
+
+        case KAN_RENDER_COLOR_FORMAT_RG64_SFLOAT:
+            texel_size = 8u;
+            break;
+
+        case KAN_RENDER_COLOR_FORMAT_RGB96_SFLOAT:
+            texel_size = 12u;
             break;
 
         case KAN_RENDER_COLOR_FORMAT_RGBA128_SFLOAT:
@@ -961,24 +1023,16 @@ static inline uint64_t kan_render_image_description_calculate_texel_size (
 
         break;
 
+    case KAN_RENDER_IMAGE_TYPE_DEPTH:
+        texel_size = 4u;
+        break;
+
+    case KAN_RENDER_IMAGE_TYPE_STENCIL:
+        texel_size = 1u;
+        break;
+
     case KAN_RENDER_IMAGE_TYPE_DEPTH_STENCIL:
-        switch (system->device_depth_image_format)
-        {
-        case VK_FORMAT_D32_SFLOAT:
-        case VK_FORMAT_D24_UNORM_S8_UINT:
-            texel_size = 4u;
-            break;
-
-        case VK_FORMAT_D32_SFLOAT_S8_UINT:
-            texel_size = 5u;
-            break;
-
-        default:
-            KAN_ASSERT (KAN_FALSE)
-            texel_size = 0u;
-            break;
-        }
-
+        texel_size = 5u;
         break;
     }
 

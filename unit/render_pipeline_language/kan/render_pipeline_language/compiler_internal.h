@@ -582,6 +582,14 @@ struct kan_rpl_compiler_statics_t
     kan_interned_string_t interned_greater;
     kan_interned_string_t interned_greater_or_equal;
 
+    kan_interned_string_t interned_keep;
+    kan_interned_string_t interned_replace;
+    kan_interned_string_t interned_increment_and_clamp;
+    kan_interned_string_t interned_decrement_and_clamp;
+    kan_interned_string_t interned_invert;
+    kan_interned_string_t interned_increment_and_wrap;
+    kan_interned_string_t interned_decrement_and_wrap;
+
     kan_interned_string_t interned_polygon_mode;
     kan_interned_string_t interned_cull_mode;
     kan_interned_string_t interned_depth_test;
@@ -590,6 +598,21 @@ struct kan_rpl_compiler_statics_t
     kan_interned_string_t interned_depth_compare_operation;
     kan_interned_string_t interned_depth_min;
     kan_interned_string_t interned_depth_max;
+    kan_interned_string_t interned_stencil_test;
+    kan_interned_string_t interned_stencil_front_on_fail;
+    kan_interned_string_t interned_stencil_front_on_depth_fail;
+    kan_interned_string_t interned_stencil_front_on_pass;
+    kan_interned_string_t interned_stencil_front_compare;
+    kan_interned_string_t interned_stencil_front_compare_mask;
+    kan_interned_string_t interned_stencil_front_write_mask;
+    kan_interned_string_t interned_stencil_front_reference;
+    kan_interned_string_t interned_stencil_back_on_fail;
+    kan_interned_string_t interned_stencil_back_on_depth_fail;
+    kan_interned_string_t interned_stencil_back_on_pass;
+    kan_interned_string_t interned_stencil_back_compare;
+    kan_interned_string_t interned_stencil_back_compare_mask;
+    kan_interned_string_t interned_stencil_back_write_mask;
+    kan_interned_string_t interned_stencil_back_reference;
 
     kan_interned_string_t interned_nearest;
     kan_interned_string_t interned_linear;
