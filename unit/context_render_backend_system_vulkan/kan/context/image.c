@@ -140,7 +140,7 @@ struct render_backend_image_t *render_backend_system_create_image (struct render
     image->image = vulkan_image;
     image->allocation = vulkan_allocation;
     image->description = *description;
-    image->switched_to_transfer_source = KAN_FALSE;
+    image->last_command_layout = VK_IMAGE_LAYOUT_UNDEFINED;
     image->first_frame_buffer_attachment = NULL;
     image->first_parameter_set_attachment = NULL;
 

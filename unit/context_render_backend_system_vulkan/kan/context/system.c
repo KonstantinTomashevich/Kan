@@ -1157,7 +1157,7 @@ static void render_backend_system_submit_transfer (struct render_backend_system_
             .pNext = NULL,
             .srcAccessMask = 0u,
             .dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
-            .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+            .oldLayout = image_upload->image->last_command_layout,
             .newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
             .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
             .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
@@ -1174,6 +1174,7 @@ static void render_backend_system_submit_transfer (struct render_backend_system_
 
         vkCmdPipelineBarrier (state->primary_transfer_command_buffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
                               VK_PIPELINE_STAGE_TRANSFER_BIT, 0u, 0u, NULL, 0u, NULL, 1u, &prepare_transfer_barrier);
+        image_upload->image->last_command_layout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
 
         VkBufferImageCopy copy_region = {
             .bufferOffset = (uint32_t) image_upload->staging_buffer_offset,
@@ -1208,7 +1209,7 @@ static void render_backend_system_submit_transfer (struct render_backend_system_
             .pNext = NULL,
             .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
             .dstAccessMask = 0u,
-            .oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+            .oldLayout = image_upload->image->last_command_layout,
             .newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
             .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
             .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
@@ -1227,6 +1228,7 @@ static void render_backend_system_submit_transfer (struct render_backend_system_
                               VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0u, 0u, NULL, 0u, NULL, 1u,
                               &finish_transfer_barrier);
 
+        image_upload->image->last_command_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         image_upload = image_upload->next;
     }
 
@@ -1335,7 +1337,6 @@ static inline void submit_mip_generation (struct render_backend_system_t *system
                                           struct render_backend_command_state_t *state)
 {
     struct scheduled_image_mip_generation_t *image_mip_generation = schedule->first_scheduled_image_mip_generation;
-
     while (image_mip_generation)
     {
         VkImageAspectFlags image_aspect =
@@ -1502,6 +1503,7 @@ static inline void submit_mip_generation (struct render_backend_system_t *system
                               VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0u, 0u, NULL, 0u, NULL, 1u,
                               &last_to_read_only_barrier);
 
+        image_mip_generation->image->last_command_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         image_mip_generation = image_mip_generation->next;
     }
 
@@ -1724,7 +1726,7 @@ static inline void process_surface_blit_requests (struct render_backend_system_t
         struct surface_blit_request_t *request = surface->first_blit_request;
         while (request)
         {
-            if (!request->image->switched_to_transfer_source)
+            if (request->image->last_command_layout != VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL)
             {
                 if (request->image->description.type != KAN_RENDER_IMAGE_TYPE_COLOR_2D)
                 {
@@ -1738,9 +1740,7 @@ static inline void process_surface_blit_requests (struct render_backend_system_t
                         .pNext = NULL,
                         .srcAccessMask = 0u,
                         .dstAccessMask = 0u,
-                        .oldLayout = request->image->description.render_target ?
-                                         VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL :
-                                         VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                        .oldLayout = request->image->last_command_layout,
                         .newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
                         .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
                         .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
@@ -1758,7 +1758,7 @@ static inline void process_surface_blit_requests (struct render_backend_system_t
                     vkCmdPipelineBarrier (state->primary_graphics_command_buffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
                                           VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0u, 0u, NULL, 0u, NULL, 1u,
                                           &barrier_info);
-                    request->image->switched_to_transfer_source = KAN_TRUE;
+                    request->image->last_command_layout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
                 }
             }
 
@@ -1861,17 +1861,17 @@ static inline void process_surface_blit_requests (struct render_backend_system_t
         while (request)
         {
             struct surface_blit_request_t *next = request->next;
-            if (request->image->switched_to_transfer_source)
+            if (request->image->last_command_layout == VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL)
             {
-                // Render targets do not care as they'll be overwritten next frame anyway.
-                if (!request->image->description.render_target)
+                // If image supports sampling, return it back to normal layout.
+                if (request->image->description.supports_sampling)
                 {
                     VkImageMemoryBarrier barrier_info = {
                         .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
                         .pNext = NULL,
                         .srcAccessMask = 0u,
                         .dstAccessMask = 0u,
-                        .oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                        .oldLayout = request->image->last_command_layout,
                         .newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                         .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
                         .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
@@ -1889,9 +1889,8 @@ static inline void process_surface_blit_requests (struct render_backend_system_t
                     vkCmdPipelineBarrier (state->primary_graphics_command_buffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
                                           VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0u, 0u, NULL, 0u, NULL, 1u,
                                           &barrier_info);
+                    request->image->last_command_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
                 }
-
-                request->image->switched_to_transfer_source = KAN_FALSE;
             }
 
             kan_free_batched (system->surface_wrapper_allocation_group, request);

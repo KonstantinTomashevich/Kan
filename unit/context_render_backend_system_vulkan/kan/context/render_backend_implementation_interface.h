@@ -599,13 +599,7 @@ struct render_backend_image_t
     VmaAllocation allocation;
 
     struct kan_render_image_description_t description;
-
-    // TODO: Use last command layout field? Might simplify things. Especially when we render to some image only once
-    //       and then use it as parameter for all frames without re-rendering.
-
-    /// \brief Flag used by blit-to-present routine in order to avoid
-    ///        incorrectly changing layout of the same image twice.
-    kan_bool_t switched_to_transfer_source;
+    VkImageLayout last_command_layout;
 
     struct image_frame_buffer_attachment_t *first_frame_buffer_attachment;
     struct image_parameter_set_attachment_t *first_parameter_set_attachment;
