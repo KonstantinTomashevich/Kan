@@ -579,8 +579,7 @@ void render_backend_apply_descriptor_set_mutation (struct render_backend_pipelin
                             },
                         .subresourceRange =
                             {
-                                .aspectMask = kan_render_image_description_calculate_aspects (set_context->system,
-                                                                                              &image->description),
+                                .aspectMask = kan_render_image_description_calculate_aspects (&image->description),
                                 .baseMipLevel = 0u,
                                 .levelCount = (uint32_t) image->description.mips,
                                 .baseArrayLayer = 0u,

@@ -28,21 +28,9 @@ static inline void free_descriptor_set_layouts (struct render_backend_system_t *
 struct render_backend_graphics_pipeline_family_t *render_backend_system_create_graphics_pipeline_family (
     struct render_backend_system_t *system, struct kan_render_graphics_pipeline_family_description_t *description)
 {
-    kan_bool_t descriptor_sets_are_zero_sequential = KAN_TRUE;
     uint64_t sets_count = 0u;
-
     for (uint64_t index = 0u; index < description->parameter_sets_count; ++index)
     {
-        if (description->parameter_sets[index].set != index)
-        {
-            KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR,
-                     "Pipeline family \"%s\" layout set indices do not form zero-based sequence with step equal to "
-                     "one. It makes bind less efficient.",
-                     description->tracking_name)
-            descriptor_sets_are_zero_sequential = KAN_FALSE;
-            break;
-        }
-
         sets_count = KAN_MAX (sets_count, description->parameter_sets[index].set + 1u);
     }
 
@@ -264,7 +252,6 @@ struct render_backend_graphics_pipeline_family_t *render_backend_system_create_g
     family->layout = pipeline_layout;
     family->descriptor_set_layouts_count = sets_count;
     family->descriptor_set_layouts = descriptor_set_layouts;
-    family->descriptor_sets_are_zero_sequential = descriptor_sets_are_zero_sequential;
 
     family->topology = description->topology;
     family->tracking_name = description->tracking_name;

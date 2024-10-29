@@ -169,20 +169,56 @@ CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_frame_buffer_t kan_render_frame_buf
 
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_frame_buffer_destroy (kan_render_frame_buffer_t buffer);
 
-// TODO: Overview of planned things.
-//       Render graph is separated into 2 parts: definition and instances.
-//       Graph definition creates render passes and stores their properties.
-//       Graph instance is created once for every unique render path.
-//       One path with multiple viewports that could point to multiple surfaces is still one render path.
-//       Multiple pass instances can be created depending on what is being rendered.
-//       For example, I think that every shadow map should be rendered in its pass instance.
-//       Every viewport should also be rendered into its own pass instance.
-//       That means that dependencies are being set up between pass instances rather that passes.
-//       We can even receive the case when two pass instances from the same pass depend one on another.
-//       For example, monitor inside 3d scene.
-//       Also, it is worth mentioning that there are 2 types of viewports -- surface viewports and transient viewports.
-//       Transient viewports (like monitors in game) should only be rendered if they're visible from viewport visibility
-//       chain that goes from any surface viewport.
+// TODO: Overview of how render foundation with render graph should be working.
+//       1. Render setup resource. Contains name of render graph and setup flags. Root resource for resource builder.
+//          Usually, we need only two instances: game one and editor one. Editor one can be placed in editor resources
+//          and therefore be invisible to resource builder while packaging game.
+//       2. Render graph resource. Contains descriptions of all passes and their static dependencies. Passes might
+//          require setup flags to be enabled. Reason: it would be convenient to have one render graph per project,
+//          but in this case we need to disable excessive editor-only passes in game (to avoid compiling useless
+//          pipelines that would never be needed in game). Therefore, render graph describes everything it can do and
+//          flags from render setup are used to select what is actually needed. We may even strip unneeded passes during
+//          resource building.
+//       3. Render foundation resource system always loads one render setup with its render graph and utilizes it.
+//          We do not plan to support multiple render graphs at once as it is non trivial for the architecture and
+//          use cases are not obvious.
+//       4. Materials should be able to load a create appropriate pipelines after render graph is ready.
+//       5. Render graph and materials should support hot reload of each other, including hot reload of all materials
+//          when render graph is changed. It is not easy, but should be quite straightforward.
+//       6. In every leaf world during render (do not confuse passes here with render passes):
+//          - Viewport pass. There are primary and secondary viewports. Primary viewports used to describe things that
+//            are always visible (player view, dynamic popup viewports, other player views when using split screen).
+//            Secondary viewports are only enabled when they are visible from any primary viewport (including recursive
+//            visibility from secondary which is visible from primary), therefore every secondary viewport has defined
+//            world shape for visibility test. Primary use case for secondary viewports are portals (what is inside?)
+//            and cameras (like security camera that sends its data to some monitor).
+//          - Planning pass. Here render logic decided which pass instances will be created and also allocates render
+//            target textures for them (we need texture pool for that in order to avoid excessive memory operations).
+//            All pass instances should be created during this pass, but no operations on them are permitted,
+//            neither dependency registration nor command submission.
+//          - Recording pass. Here render logic performs actual recording of command buffers for passes. Dependency
+//            registration is also permitted, but dependency through render target image usage should be handled through
+//            other way which will be discussed below.
+//       7. Render target reference is a special structure that allows materials and render logic to create a stable
+//          reference to render target which image could be replaced without breaking the reference. But it has another
+//          important usage: it allows to register producer pass instance (as field during planning pass) and
+//          consumer pass instances (as attached structures during recording pass). Then, before submitting the frame,
+//          dependency from consumer instances to producer instance will be created. In some cases, it is okay to have
+//          no producer instance or no render target image -- it should not cause crash, but could cause a visual
+//          glitch.
+//       8. Render and user code. Both planning and recording passes should be done by user mutators (render 3d unit
+//          mutators, game special mutators, etc.). It would make render more flexible and will give users more control
+//          on what is happening under the hood.
+//       9. Render target references could be a powerful tool for portals or similar techniques that would allow full
+//          world separation. For example, we may have hierarchy (root world) -> (game root world) ->
+//          [(game main world), (portal world underworld), (portal world heaven), (portal world another continent)].
+//          In this case, (game root world) scheduler would always run (game main world) first. During its update,
+//          (game main world) would register visible portals and create render target images for them (for example,
+//          take them from pools). During this registration, render target references will be created with consumers,
+//          but no producer. Then, (game root world) scheduler will use information about portals to run updates for
+//          only visible portal worlds and they would attach producer instances to appropriate target references.
+//          This sounds quite complex, but it should still be much easier than fitting all the portal worlds inside
+//          the main world and trying to manage ambient and separation of this worlds manually.
 
 enum kan_render_pass_type_t
 {
@@ -254,42 +290,76 @@ struct kan_render_viewport_bounds_t
     float depth_max;
 };
 
+struct kan_render_clear_color_t
+{
+    float r;
+    float g;
+    float b;
+    float a;
+};
+
+struct kan_render_clear_depth_stencil_t
+{
+    float depth;
+    uint32_t stencil;
+};
+
+struct kan_render_clear_value_t
+{
+    union
+    {
+        struct kan_render_clear_color_t color;
+        struct kan_render_clear_depth_stencil_t depth_stencil;
+    };
+};
+
 CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_pass_t
 kan_render_pass_create (kan_render_context_t context, struct kan_render_pass_description_t *description);
 
-CONTEXT_RENDER_BACKEND_SYSTEM_API kan_bool_t kan_render_pass_add_static_dependency (kan_render_pass_t pass,
-                                                                                    kan_render_pass_t dependency);
+/// \details Static dependency creation binds passes together and requires both passes to be destroyed during the
+///          same frame. It shouldn't be an issue for the architecture, because passes are part of render graph and
+///          graph should only be destroyed as a whole, not partially.
+CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_add_static_dependency (kan_render_pass_t pass,
+                                                                              kan_render_pass_t dependency);
 
 CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_pass_instance_t
 kan_render_pass_instantiate (kan_render_pass_t pass,
                              kan_render_frame_buffer_t frame_buffer,
                              struct kan_render_viewport_bounds_t *viewport_bounds,
-                             struct kan_render_integer_region_t *scissor);
+                             struct kan_render_integer_region_t *scissor,
+                             struct kan_render_clear_value_t *attachment_clear_values);
 
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_instance_add_dynamic_dependency (
     kan_render_pass_instance_t pass_instance, kan_render_pass_instance_t dependency);
 
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_instance_graphics_pipeline (
-    kan_render_pass_instance_t pass_instance, kan_render_pipeline_parameter_set_t *parameter_sets);
+    kan_render_pass_instance_t pass_instance, kan_render_graphics_pipeline_t graphics_pipeline);
+
+CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_instance_pipeline_parameter_sets (
+    kan_render_pass_instance_t pass_instance,
+    uint32_t parameter_sets_count,
+    kan_render_pipeline_parameter_set_t *parameter_sets);
 
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_instance_attributes (kan_render_pass_instance_t pass_instance,
-                                                                            uint64_t start_at_binding,
-                                                                            uint64_t buffers_count,
+                                                                            uint32_t start_at_binding,
+                                                                            uint32_t buffers_count,
                                                                             kan_render_buffer_t *buffers);
 
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_instance_indices (kan_render_pass_instance_t pass_instance,
                                                                          kan_render_buffer_t buffer);
 
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_instance_draw (kan_render_pass_instance_t pass_instance,
-                                                                      uint64_t vertex_offset,
-                                                                      uint64_t vertex_count);
+                                                                      uint32_t index_offset,
+                                                                      uint32_t index_count,
+                                                                      uint32_t vertex_offset);
 
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_instance_instanced_draw (
     kan_render_pass_instance_t pass_instance,
-    uint64_t vertex_offset,
-    uint64_t vertex_count,
-    uint64_t instance_offset,
-    uint64_t instance_count);
+    uint32_t index_offset,
+    uint32_t index_count,
+    uint32_t vertex_offset,
+    uint32_t instance_offset,
+    uint32_t instance_count);
 
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_destroy (kan_render_pass_t pass);
 

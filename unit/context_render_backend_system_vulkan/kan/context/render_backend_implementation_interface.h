@@ -103,7 +103,14 @@ struct render_backend_command_state_t
     VkCommandPool graphics_command_pool;
     VkCommandBuffer primary_graphics_command_buffer;
 
-    // TODO: Secondary graphic buffers.
+    /// \details Currently, all graphics command buffers use the same pool,
+    ///          therefore we need global lock for command submission.
+    struct kan_atomic_int_t graphics_command_operation_lock;
+
+    /// \meta reflection_dynamic_array_type = "struct mutator_t"
+    struct kan_dynamic_array_t graphics_command_buffers;
+
+    uint64_t graphics_command_buffers_used;
 
     VkCommandPool transfer_command_pool;
     VkCommandBuffer primary_transfer_command_buffer;
@@ -305,17 +312,52 @@ void render_backend_frame_buffer_schedule_resource_destroy (struct render_backen
 void render_backend_system_destroy_frame_buffer (struct render_backend_system_t *system,
                                                  struct render_backend_frame_buffer_t *frame_buffer);
 
+struct render_backend_pass_dependency_t
+{
+    struct render_backend_pass_dependency_t *next;
+    struct render_backend_pass_t *dependant_pass;
+};
+
 struct render_backend_pass_t
 {
     struct kan_bd_list_node_t list_node;
     struct render_backend_system_t *system;
+
     VkRenderPass pass;
+    struct render_backend_pass_dependency_t *first_dependant_pass;
+    struct render_backend_pass_instance_t *first_instance;
+
+    kan_interned_string_t tracking_name;
 };
 
 struct render_backend_pass_t *render_backend_system_create_pass (struct render_backend_system_t *system,
                                                                  struct kan_render_pass_description_t *description);
 
 void render_backend_system_destroy_pass (struct render_backend_system_t *system, struct render_backend_pass_t *pass);
+
+struct render_backend_pass_instance_dependency_t
+{
+    struct render_backend_pass_instance_dependency_t *next;
+    struct render_backend_pass_instance_t *dependant_pass_instance;
+};
+
+struct render_backend_pass_instance_t
+{
+    struct render_backend_system_t *system;
+    VkCommandBuffer command_buffer;
+    struct render_backend_frame_buffer_t *frame_buffer;
+    VkPipelineLayout current_pipeline_layout;
+
+    uint64_t dependencies_left;
+    struct render_backend_pass_instance_dependency_t *first_dependant;
+
+    struct render_backend_pass_instance_t *next_in_pass;
+    struct kan_bd_list_node_t node_in_available;
+    struct kan_bd_list_node_t node_in_all;
+};
+
+void render_backend_pass_instance_add_dependency_internal (struct render_backend_pass_instance_t *dependant,
+                                                           struct render_backend_pass_instance_t *dependency);
 
 struct render_backend_layout_binding_t
 {
@@ -345,7 +387,6 @@ struct render_backend_graphics_pipeline_family_t
     VkPipelineLayout layout;
     uint64_t descriptor_set_layouts_count;
     struct render_backend_descriptor_set_layout_t **descriptor_set_layouts;
-    kan_bool_t descriptor_sets_are_zero_sequential;
 
     enum kan_render_graphics_topology_t topology;
     kan_interned_string_t tracking_name;
@@ -731,9 +772,16 @@ struct render_backend_system_t
     ///          strict frame ordering must prevent any calls that are simultaneous with next frame call.
     struct kan_atomic_int_t resource_management_lock;
 
+    struct kan_atomic_int_t pass_static_dependency_lock;
+
+    /// \details Lock used for operations than change pass instance state by moving it in different lists.
+    struct kan_atomic_int_t pass_instance_state_management_lock;
+
     struct kan_bd_list_t surfaces;
     struct kan_bd_list_t frame_buffers;
     struct kan_bd_list_t passes;
+    struct kan_bd_list_t pass_instances;
+    struct kan_bd_list_t pass_instances_available;
     struct kan_bd_list_t graphics_pipeline_families;
     struct kan_bd_list_t graphics_pipelines;
     struct kan_bd_list_t pipeline_parameter_sets;
@@ -747,6 +795,8 @@ struct render_backend_system_t
     struct render_backend_pipeline_compiler_state_t compiler_state;
     struct render_backend_descriptor_set_allocator_t descriptor_set_allocator;
 
+    struct kan_stack_group_allocator_t pass_instance_allocator;
+
 #if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_VALIDATION_ENABLED)
     kan_bool_t has_validation_layer;
     VkDebugUtilsMessengerEXT debug_messenger;
@@ -759,6 +809,7 @@ struct render_backend_system_t
     kan_allocation_group_t schedule_allocation_group;
     kan_allocation_group_t frame_buffer_wrapper_allocation_group;
     kan_allocation_group_t pass_wrapper_allocation_group;
+    kan_allocation_group_t pass_instance_allocation_group;
     kan_allocation_group_t pipeline_family_wrapper_allocation_group;
     kan_allocation_group_t pipeline_wrapper_allocation_group;
     kan_allocation_group_t pipeline_parameter_set_wrapper_allocation_group;
@@ -932,7 +983,7 @@ static inline VkFormat kan_render_image_description_calculate_format (
 }
 
 static inline VkImageAspectFlags kan_render_image_description_calculate_aspects (
-    struct render_backend_system_t *system, struct kan_render_image_description_t *description)
+    struct kan_render_image_description_t *description)
 {
     VkImageAspectFlags aspects = 0u;
     switch (description->type)

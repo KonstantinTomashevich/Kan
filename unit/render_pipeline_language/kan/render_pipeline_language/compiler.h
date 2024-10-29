@@ -178,6 +178,7 @@ RENDER_PIPELINE_LANGUAGE_API void kan_rpl_meta_parameter_shutdown (struct kan_rp
 //       remove stable binding flag from buffer as all groups except instanced parameters should be stable in almost
 //       every case.
 // TODO: 5 is too much, only 4 is guaranteed to be supported on every hardware. Think about another grouping?
+// TODO: Samplers need sets too, for example lights: their shadow maps technically belong to object binding set.
 
 /// \brief Stores information about buffer exposed in metadata.
 struct kan_rpl_meta_buffer_t

@@ -17,6 +17,7 @@ kan_context_system_handle_t render_backend_system_create (kan_allocation_group_t
     system->schedule_allocation_group = kan_allocation_group_get_child (group, "schedule");
     system->frame_buffer_wrapper_allocation_group = kan_allocation_group_get_child (group, "frame_buffer_wrapper");
     system->pass_wrapper_allocation_group = kan_allocation_group_get_child (group, "pass_wrapper");
+    system->pass_instance_allocation_group = kan_allocation_group_get_child (group, "pass_instance");
     system->pipeline_family_wrapper_allocation_group =
         kan_allocation_group_get_child (group, "pipeline_family_wrapper");
     system->pipeline_wrapper_allocation_group = kan_allocation_group_get_child (group, "pipeline_wrapper");
@@ -31,10 +32,14 @@ kan_context_system_handle_t render_backend_system_create (kan_allocation_group_t
     system->current_frame_in_flight_index = 0u;
 
     system->resource_management_lock = kan_atomic_int_init (0);
+    system->pass_static_dependency_lock = kan_atomic_int_init (0);
+    system->pass_instance_state_management_lock = kan_atomic_int_init (0);
 
     kan_bd_list_init (&system->surfaces);
     kan_bd_list_init (&system->frame_buffers);
     kan_bd_list_init (&system->passes);
+    kan_bd_list_init (&system->pass_instances);
+    kan_bd_list_init (&system->pass_instances_available);
     kan_bd_list_init (&system->graphics_pipeline_families);
     kan_bd_list_init (&system->graphics_pipelines);
     kan_bd_list_init (&system->pipeline_parameter_sets);
@@ -57,6 +62,8 @@ kan_context_system_handle_t render_backend_system_create (kan_allocation_group_t
                                                        render_backend_pipeline_compiler_state_worker_function,
                                                        (kan_thread_user_data_t) &system->compiler_state);
     render_backend_descriptor_set_allocator_init (&system->descriptor_set_allocator);
+    kan_stack_group_allocator_init (&system->pass_instance_allocator, system->pass_instance_allocation_group,
+                                    KAN_CONTEXT_RENDER_BACKEND_VULKAN_PASS_STACK_SIZE);
 
     if (user_config)
     {
@@ -417,9 +424,18 @@ static void render_backend_system_destroy_command_states (struct render_backend_
 
         if (state->graphics_command_pool != VK_NULL_HANDLE)
         {
+            vkResetCommandPool (system->device, state->graphics_command_pool, 0u);
+            if (state->graphics_command_buffers.size > 0u)
+            {
+                vkFreeCommandBuffers (system->device, state->graphics_command_pool,
+                                      (uint32_t) state->graphics_command_buffers.size,
+                                      (VkCommandBuffer *) state->graphics_command_buffers.data);
+            }
+
             vkDestroyCommandPool (system->device, state->graphics_command_pool, VULKAN_ALLOCATION_CALLBACKS (system));
         }
 
+        kan_dynamic_array_shutdown (&state->graphics_command_buffers);
         if (state->transfer_command_pool != VK_NULL_HANDLE)
         {
             vkDestroyCommandPool (system->device, state->transfer_command_pool, VULKAN_ALLOCATION_CALLBACKS (system));
@@ -581,6 +597,9 @@ void render_backend_system_shutdown (kan_context_system_handle_t handle)
         family = next;
     }
 
+    // Pass instances should always be allocated on special stack allocator,
+    // therefore we do not care about them at all here.
+
     struct render_backend_pass_t *pass = (struct render_backend_pass_t *) system->passes.first;
     while (pass)
     {
@@ -642,6 +661,7 @@ void render_backend_system_shutdown (kan_context_system_handle_t handle)
 #endif
 
     vkDestroyInstance (system->instance, VULKAN_ALLOCATION_CALLBACKS (system));
+    kan_stack_group_allocator_shutdown (&system->pass_instance_allocator);
     kan_platform_application_unregister_vulkan_library_usage ();
 }
 
@@ -996,6 +1016,12 @@ kan_bool_t kan_render_backend_system_select_device (kan_context_system_handle_t 
             break;
         }
 
+        system->command_states[index].graphics_command_operation_lock = kan_atomic_int_init (0);
+        kan_dynamic_array_init (&system->command_states[index].graphics_command_buffers,
+                                KAN_CONTEXT_RENDER_BACKEND_VULKAN_GCB_ARRAY_SIZE, sizeof (VkCommandBuffer),
+                                _Alignof (VkCommandBuffer), system->pass_instance_allocation_group);
+        system->command_states[index].graphics_command_buffers_used = 0u;
+
         VkCommandPoolCreateInfo transfer_command_pool_info = {
             .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
             .pNext = NULL,
@@ -1144,7 +1170,7 @@ static void render_backend_system_submit_transfer (struct render_backend_system_
     while (image_upload)
     {
         VkImageAspectFlags image_aspect =
-            kan_render_image_description_calculate_aspects (system, &image_upload->image->description);
+            kan_render_image_description_calculate_aspects (&image_upload->image->description);
 
         uint64_t width;
         uint64_t height;
@@ -1340,7 +1366,7 @@ static inline void submit_mip_generation (struct render_backend_system_t *system
     while (image_mip_generation)
     {
         VkImageAspectFlags image_aspect =
-            kan_render_image_description_calculate_aspects (system, &image_mip_generation->image->description);
+            kan_render_image_description_calculate_aspects (&image_mip_generation->image->description);
 
         for (uint64_t output_mip = image_mip_generation->first + 1u; output_mip <= image_mip_generation->last;
              ++output_mip)
@@ -1635,7 +1661,7 @@ static inline void process_frame_buffer_create_requests (struct render_backend_s
                         },
                     .subresourceRange =
                         {
-                            .aspectMask = kan_render_image_description_calculate_aspects (system, &image->description),
+                            .aspectMask = kan_render_image_description_calculate_aspects (&image->description),
                             .baseMipLevel = 0u,
                             .levelCount = 1u,
                             .baseArrayLayer = 0u,
@@ -1902,6 +1928,234 @@ static inline void process_surface_blit_requests (struct render_backend_system_t
     }
 }
 
+static void render_backend_system_submit_pass_instance (struct render_backend_system_t *system,
+                                                        struct render_backend_command_state_t *state,
+                                                        struct render_backend_pass_instance_t *pass_instance)
+{
+    vkCmdEndRenderPass (pass_instance->command_buffer);
+
+    // We put lots of barrier here in order to be sure that everything works properly.
+    // It might not be the best from performance point of view, might need investigation later.
+
+    VkImageMemoryBarrier image_barriers_static[KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_INLINE_BARRIERS];
+    VkImageMemoryBarrier *image_barriers = image_barriers_static;
+    uint32_t added_barriers = 0u;
+
+    if (pass_instance->frame_buffer->attachments_count > KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_INLINE_BARRIERS)
+    {
+        image_barriers =
+            kan_allocate_general (system->utility_allocation_group,
+                                  sizeof (VkImageMemoryBarrier) * pass_instance->frame_buffer->attachments_count,
+                                  _Alignof (VkImageMemoryBarrier));
+    }
+
+    for (uint64_t attachment_index = 0u; attachment_index < pass_instance->frame_buffer->attachments_count;
+         ++attachment_index)
+    {
+        struct render_backend_frame_buffer_attachment_t *attachment =
+            &pass_instance->frame_buffer->attachments[attachment_index];
+
+        switch (attachment->type)
+        {
+        case KAN_FRAME_BUFFER_ATTACHMENT_IMAGE:
+        {
+            VkImageLayout target_layout;
+            // Currently we include everything possible into possible access flags, which is not optimal.
+            VkAccessFlags possible_access_flags = 0u;
+            VkAccessFlags target_access_flags = 0u;
+
+            switch (attachment->image->description.type)
+            {
+            case KAN_RENDER_IMAGE_TYPE_COLOR_2D:
+            case KAN_RENDER_IMAGE_TYPE_COLOR_3D:
+                target_layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+                possible_access_flags |= VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+                target_access_flags |= VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+                break;
+
+            case KAN_RENDER_IMAGE_TYPE_DEPTH:
+            case KAN_RENDER_IMAGE_TYPE_STENCIL:
+            case KAN_RENDER_IMAGE_TYPE_DEPTH_STENCIL:
+                target_layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+                possible_access_flags |=
+                    VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+                target_access_flags |=
+                    VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+                break;
+            }
+
+            if (attachment->image->last_command_layout != target_layout ||
+                // There is always at least one attachment (the current one) and if there are several attachments,
+                // then we're trying to be safe and add barrier to be sure that previous attachment has finished its
+                // work. Previous attachment might not exist in this frame, but it is better to be safe than sorry
+                // right now.
+                attachment->image->first_frame_buffer_attachment->next)
+            {
+                if (attachment->image->description.supports_sampling)
+                {
+                    possible_access_flags |= VK_ACCESS_SHADER_READ_BIT;
+                }
+
+                image_barriers[added_barriers] = (VkImageMemoryBarrier) {
+                    .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+                    .pNext = NULL,
+                    .srcAccessMask = possible_access_flags,
+                    .dstAccessMask = target_access_flags,
+                    .oldLayout = attachment->image->last_command_layout,
+                    .newLayout = target_layout,
+                    .srcQueueFamilyIndex = system->device_graphics_queue_family_index,
+                    .dstQueueFamilyIndex = system->device_graphics_queue_family_index,
+                    .image = attachment->image->image,
+                    .subresourceRange =
+                        {
+                            .aspectMask =
+                                kan_render_image_description_calculate_aspects (&attachment->image->description),
+                            .baseMipLevel = 0u,
+                            .levelCount = 1u,
+                            .baseArrayLayer = 0u,
+                            .layerCount = 1u,
+                        },
+                };
+
+                attachment->image->last_command_layout = target_layout;
+                ++added_barriers;
+            }
+
+            break;
+        }
+
+        case KAN_FRAME_BUFFER_ATTACHMENT_SURFACE:
+            switch (attachment->surface->render_state)
+            {
+            case SURFACE_RENDER_STATE_RECEIVED_NO_OUTPUT:
+                image_barriers[added_barriers] = (VkImageMemoryBarrier) {
+                    .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+                    .pNext = NULL,
+                    .srcAccessMask = 0u,
+                    .dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+                    .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+                    .newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                    .srcQueueFamilyIndex = system->device_graphics_queue_family_index,
+                    .dstQueueFamilyIndex = system->device_graphics_queue_family_index,
+                    .image = attachment->surface->images[attachment->surface->acquired_image_index],
+                    .subresourceRange =
+                        {
+                            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                            .baseMipLevel = 0u,
+                            .levelCount = 1u,
+                            .baseArrayLayer = 0u,
+                            .layerCount = 1u,
+                        },
+                };
+
+                attachment->surface->render_state = SURFACE_RENDER_STATE_RECEIVED_DATA_FROM_FRAME_BUFFER;
+                ++added_barriers;
+                break;
+
+            case SURFACE_RENDER_STATE_RECEIVED_DATA_FROM_FRAME_BUFFER:
+                // Already transitioned to attachment state.
+                break;
+
+            case SURFACE_RENDER_STATE_RECEIVED_DATA_FROM_BLIT:
+                // Blits should only be done after passes, how did we end up here?
+                KAN_ASSERT (KAN_FALSE)
+                break;
+            }
+
+            break;
+        }
+    }
+
+    vkCmdPipelineBarrier (state->primary_graphics_command_buffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                          VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0u, 0u, NULL, 0u, NULL, added_barriers, image_barriers);
+    vkCmdExecuteCommands (state->primary_graphics_command_buffer, 1u, &pass_instance->command_buffer);
+
+    // Transition readable render targets so they can be used in shaders for sampling.
+    added_barriers = 0u;
+
+    for (uint64_t attachment_index = 0u; attachment_index < pass_instance->frame_buffer->attachments_count;
+         ++attachment_index)
+    {
+        struct render_backend_frame_buffer_attachment_t *attachment =
+            &pass_instance->frame_buffer->attachments[attachment_index];
+
+        if (attachment->type == KAN_FRAME_BUFFER_ATTACHMENT_IMAGE && attachment->image->description.supports_sampling)
+        {
+            VkAccessFlags possible_access_flags = 0u;
+            switch (attachment->image->description.type)
+            {
+            case KAN_RENDER_IMAGE_TYPE_COLOR_2D:
+            case KAN_RENDER_IMAGE_TYPE_COLOR_3D:
+                possible_access_flags |= VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+                break;
+
+            case KAN_RENDER_IMAGE_TYPE_DEPTH:
+            case KAN_RENDER_IMAGE_TYPE_STENCIL:
+            case KAN_RENDER_IMAGE_TYPE_DEPTH_STENCIL:
+                possible_access_flags |=
+                    VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+                break;
+            }
+
+            image_barriers[added_barriers] = (VkImageMemoryBarrier) {
+                .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+                .pNext = NULL,
+                .srcAccessMask = possible_access_flags,
+                .dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
+                .oldLayout = attachment->image->last_command_layout,
+                .newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                .srcQueueFamilyIndex = system->device_graphics_queue_family_index,
+                .dstQueueFamilyIndex = system->device_graphics_queue_family_index,
+                .image = attachment->image->image,
+                .subresourceRange =
+                    {
+                        .aspectMask = kan_render_image_description_calculate_aspects (&attachment->image->description),
+                        .baseMipLevel = 0u,
+                        .levelCount = 1u,
+                        .baseArrayLayer = 0u,
+                        .layerCount = 1u,
+                    },
+            };
+
+            attachment->image->last_command_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            ++added_barriers;
+        }
+    }
+
+    if (added_barriers > 0u)
+    {
+        vkCmdPipelineBarrier (state->primary_graphics_command_buffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                              VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0u, 0u, NULL, 0u, NULL, added_barriers,
+                              image_barriers);
+    }
+
+    if (image_barriers != image_barriers_static)
+    {
+        kan_free_general (system->utility_allocation_group, image_barriers,
+                          sizeof (VkImageMemoryBarrier) * pass_instance->frame_buffer->attachments_count);
+    }
+
+    struct render_backend_pass_instance_dependency_t *dependant = pass_instance->first_dependant;
+    while (dependant)
+    {
+        // Dependencies left can be already zero if we were trying to get out of dead lock situation.
+        if (dependant->dependant_pass_instance->dependencies_left != 0u)
+        {
+            --dependant->dependant_pass_instance->dependencies_left;
+            if (dependant->dependant_pass_instance->dependencies_left == 0u)
+            {
+                kan_bd_list_add (&system->pass_instances_available, NULL,
+                                 &dependant->dependant_pass_instance->node_in_available);
+            }
+        }
+
+        dependant = dependant->next;
+    }
+
+    kan_bd_list_remove (&system->pass_instances, &pass_instance->node_in_available);
+    kan_bd_list_remove (&system->pass_instances_available, &pass_instance->node_in_available);
+}
+
 static void render_backend_system_submit_graphics (struct render_backend_system_t *system)
 {
     VkCommandBufferBeginInfo buffer_begin_info = {
@@ -1929,7 +2183,79 @@ static void render_backend_system_submit_graphics (struct render_backend_system_
     submit_mip_generation (system, schedule, state);
     process_frame_buffer_create_requests (system, schedule, state);
 
-    // TODO: Fill buffer with accumulated graphics commands.
+    struct render_backend_pass_t *pass = (struct render_backend_pass_t *) system->passes.first;
+    while (pass)
+    {
+        struct render_backend_pass_dependency_t *dependant_pass = pass->first_dependant_pass;
+        while (dependant_pass)
+        {
+            struct render_backend_pass_instance_t *dependant_instance = dependant_pass->dependant_pass->first_instance;
+            while (dependant_instance)
+            {
+                struct render_backend_pass_instance_t *dependency_instance = pass->first_instance;
+                while (dependency_instance)
+                {
+                    render_backend_pass_instance_add_dependency_internal (dependant_instance, dependency_instance);
+                    dependency_instance = dependency_instance->next_in_pass;
+                }
+
+                dependant_instance = dependant_instance->next_in_pass;
+            }
+
+            dependant_pass = dependant_pass->next;
+        }
+
+        pass = (struct render_backend_pass_t *) pass->list_node.next;
+    }
+
+    while (system->pass_instances.size > 0u)
+    {
+        while (system->pass_instances_available.size > 0u)
+        {
+            render_backend_system_submit_pass_instance (
+                system, state, (struct render_backend_pass_instance_t *) system->pass_instances_available.first);
+        }
+
+        if (system->pass_instances.size > 0u)
+        {
+            KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR,
+                     "Failed to topologically sort pass instances. Submitting pass instance with lowest amount of "
+                     "dependencies to try to work around the issue.")
+
+            struct render_backend_pass_instance_t *make_available_anyway = NULL;
+            struct render_backend_pass_instance_t *pass_instance =
+                (struct render_backend_pass_instance_t *) system->pass_instances.first;
+
+            while (pass_instance)
+            {
+                if (make_available_anyway == NULL ||
+                    make_available_anyway->dependencies_left > pass_instance->dependencies_left ||
+                    // We prefer instances that do not write to surfaces to instance that do write.
+                    // If instance frame buffer has several instances under the hood, then it definitely
+                    // writes to the surface.
+                    (make_available_anyway->frame_buffer->instance_array_size > 0u &&
+                     pass_instance->frame_buffer->instance_array_size == 0u))
+                {
+                    make_available_anyway = pass_instance;
+                }
+
+                pass_instance = (struct render_backend_pass_instance_t *) pass_instance->node_in_all.next;
+            }
+
+            make_available_anyway->dependencies_left = 0u;
+            kan_bd_list_add (&system->pass_instances_available, NULL, &make_available_anyway->node_in_available);
+        }
+    }
+
+    pass = (struct render_backend_pass_t *) system->passes.first;
+    while (pass)
+    {
+        pass->first_instance = NULL;
+        pass = (struct render_backend_pass_t *) pass->list_node.next;
+    }
+
+    kan_stack_group_allocator_shrink (&system->pass_instance_allocator);
+    kan_stack_group_allocator_reset (&system->pass_instance_allocator);
 
     process_surface_blit_requests (system, state);
     surface = (struct render_backend_surface_t *) system->surfaces.first;
@@ -2103,9 +2429,33 @@ static void render_backend_system_submit_previous_frame (struct render_backend_s
     render_backend_system_submit_graphics (system);
     render_backend_system_submit_present (system);
 
-    // TODO: Destroy unused resources (secondary command buffers, etc).
     render_backend_frame_lifetime_allocator_clean_empty_pages (system->staging_frame_lifetime_allocator);
     render_backend_system_clean_current_schedule_if_safe (system);
+
+    struct render_backend_command_state_t *command_state =
+        &system->command_states[system->current_frame_in_flight_index];
+
+    KAN_ASSERT (command_state->graphics_command_buffers_used <= command_state->graphics_command_buffers.size)
+    const uint64_t excess_command_buffers =
+        command_state->graphics_command_buffers.size - command_state->graphics_command_buffers_used;
+
+    if (excess_command_buffers > 0u)
+    {
+        VkCommandBuffer *first_excess_buffer =
+            &((VkCommandBuffer *)
+                  command_state->graphics_command_buffers.data)[command_state->graphics_command_buffers_used];
+
+        vkFreeCommandBuffers (system->device, command_state->graphics_command_pool, (uint32_t) excess_command_buffers,
+                              first_excess_buffer);
+
+        command_state->graphics_command_buffers.size = command_state->graphics_command_buffers_used;
+        if (command_state->graphics_command_buffers.size * 2u < command_state->graphics_command_buffers.capacity &&
+            command_state->graphics_command_buffers.size > KAN_CONTEXT_RENDER_BACKEND_VULKAN_GCB_ARRAY_SIZE)
+        {
+            kan_dynamic_array_set_capacity (&command_state->graphics_command_buffers,
+                                            command_state->graphics_command_buffers.capacity / 2u);
+        }
+    }
 
     system->current_frame_in_flight_index =
         (system->current_frame_in_flight_index + 1u) % KAN_CONTEXT_RENDER_BACKEND_VULKAN_FRAMES_IN_FLIGHT;
@@ -2454,7 +2804,8 @@ static void render_backend_surface_create_swap_chain (struct render_backend_surf
         .imageColorSpace = surface_format.colorSpace,
         .imageExtent = surface_extent,
         .imageArrayLayers = 1u,
-        .imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+        .imageUsage =
+            VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
         .imageSharingMode = VK_SHARING_MODE_EXCLUSIVE,
         .queueFamilyIndexCount = 0u,
         .pQueueFamilyIndices = NULL,
@@ -2836,10 +3187,6 @@ kan_bool_t kan_render_backend_system_next_frame (kan_context_system_handle_t ren
                          detached_image_destroy->detached_allocation);
         detached_image_destroy = detached_image_destroy->next;
     }
-
-    // TODO: Execute destroy schedule here.
-
-    // TODO: Clear leftovers from previous frame that executed on this index.
 
     render_backend_system_clean_current_schedule_if_safe (system);
     render_backend_frame_lifetime_allocator_retire_old_allocations (system->staging_frame_lifetime_allocator);
