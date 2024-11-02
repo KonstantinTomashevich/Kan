@@ -210,6 +210,22 @@ struct render_backend_pipeline_parameter_set_t *render_backend_system_create_pip
                      description->tracking_name)
             return NULL;
         }
+
+#if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED)
+        char debug_name[KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME];
+        snprintf (debug_name, KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME, "%s_stable_set",
+                  description->tracking_name);
+
+        struct VkDebugUtilsObjectNameInfoEXT object_name = {
+            .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
+            .pNext = NULL,
+            .objectType = VK_OBJECT_TYPE_DESCRIPTOR_SET,
+            .objectHandle = (uint64_t) stable_allocation.descriptor_set,
+            .pObjectName = debug_name,
+        };
+
+        vkSetDebugUtilsObjectNameEXT (system->device, &object_name);
+#endif
     }
     else
     {
@@ -238,6 +254,22 @@ struct render_backend_pipeline_parameter_set_t *render_backend_system_create_pip
                 allocated_successfully = KAN_FALSE;
                 break;
             }
+
+#if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED)
+            char debug_name[KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME];
+            snprintf (debug_name, KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME, "%s_unstable_set_%lu",
+                      description->tracking_name, (unsigned long) index);
+
+            struct VkDebugUtilsObjectNameInfoEXT object_name = {
+                .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
+                .pNext = NULL,
+                .objectType = VK_OBJECT_TYPE_DESCRIPTOR_SET,
+                .objectHandle = (uint64_t) unstable_allocations[index].descriptor_set,
+                .pObjectName = debug_name,
+            };
+
+            vkSetDebugUtilsObjectNameEXT (system->device, &object_name);
+#endif
         }
 
         if (!allocated_successfully)
@@ -596,6 +628,25 @@ void render_backend_apply_descriptor_set_mutation (struct render_backend_pipelin
                                  (unsigned long) update_bindings[index].binding, set_context->tracking_name)
                         this_image_info->imageView = VK_NULL_HANDLE;
                     }
+
+#if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED)
+                    if (this_image_info->imageView != VK_NULL_HANDLE)
+                    {
+                        char debug_name[KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME];
+                        snprintf (debug_name, KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME, "%s_image_view_%lu",
+                                  set_context->tracking_name, (unsigned long) update_bindings[index].binding);
+
+                        struct VkDebugUtilsObjectNameInfoEXT object_name = {
+                            .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
+                            .pNext = NULL,
+                            .objectType = VK_OBJECT_TYPE_IMAGE_VIEW,
+                            .objectHandle = (uint64_t) this_image_info->imageView,
+                            .pObjectName = debug_name,
+                        };
+
+                        vkSetDebugUtilsObjectNameEXT (set_context->system->device, &object_name);
+                    }
+#endif
 
                     set_context->bound_image_views[update_bindings[index].binding] = this_image_info->imageView;
                 }

@@ -99,7 +99,7 @@ void render_backend_system_connect (kan_context_system_handle_t handle, kan_cont
     kan_context_query (system->context, KAN_CONTEXT_APPLICATION_SYSTEM_NAME);
 }
 
-#if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_VALIDATION_ENABLED)
+#if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED)
 static VKAPI_ATTR VkBool32 VKAPI_CALL
 vulkan_message_callback (VkDebugUtilsMessageSeverityFlagBitsEXT severity,
                          VkDebugUtilsMessageTypeFlagsEXT type,
@@ -273,7 +273,7 @@ void render_backend_system_init (kan_context_system_handle_t handle)
     struct kan_dynamic_array_t extensions;
     kan_platform_application_request_vulkan_extensions (&extensions, system->utility_allocation_group);
 
-#if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_VALIDATION_ENABLED)
+#if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED)
     {
         kan_dynamic_array_set_capacity (&extensions, extensions.size + 1u);
         char **output = kan_dynamic_array_add_last (&extensions);
@@ -289,7 +289,7 @@ void render_backend_system_init (kan_context_system_handle_t handle)
         KAN_LOG (render_backend_system_vulkan, KAN_LOG_INFO, "    - %s", ((char **) extensions.data)[index])
     }
 
-#if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_VALIDATION_ENABLED)
+#if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED)
     system->debug_messenger = VK_NULL_HANDLE;
 #endif
 
@@ -316,7 +316,7 @@ void render_backend_system_init (kan_context_system_handle_t handle)
         .ppEnabledLayerNames = NULL,
     };
 
-#if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_VALIDATION_ENABLED)
+#if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED)
     VkDebugUtilsMessengerCreateInfoEXT debug_messenger_create_info = {
         .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
         .messageSeverity =
@@ -378,7 +378,7 @@ void render_backend_system_init (kan_context_system_handle_t handle)
 
     kan_dynamic_array_shutdown (&extensions);
 
-#if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_VALIDATION_ENABLED)
+#if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED)
     if (system->has_validation_layer)
     {
         debug_messenger_create_info = (VkDebugUtilsMessengerCreateInfoEXT) {
@@ -674,7 +674,7 @@ void render_backend_system_shutdown (kan_context_system_handle_t handle)
                 sizeof (struct kan_render_supported_device_info_t) * system->supported_devices->supported_device_count);
     }
 
-#if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_VALIDATION_ENABLED)
+#if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED)
     if (system->debug_messenger != VK_NULL_HANDLE)
     {
         vkDestroyDebugUtilsMessengerEXT (system->instance, system->debug_messenger,
@@ -865,7 +865,7 @@ kan_bool_t kan_render_backend_system_select_device (kan_context_system_handle_t 
         .pEnabledFeatures = &device_features,
     };
 
-#if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_VALIDATION_ENABLED)
+#if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED)
     const char *enabled_layers[] = {"VK_LAYER_KHRONOS_validation"};
     if (system->has_validation_layer)
     {
@@ -970,6 +970,24 @@ kan_bool_t kan_render_backend_system_select_device (kan_context_system_handle_t 
             break;
         }
 
+#if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED)
+        {
+            char debug_name[KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME];
+            snprintf (debug_name, KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME, "transfer_finished_semaphore_%lu",
+                      (unsigned long) index);
+
+            struct VkDebugUtilsObjectNameInfoEXT object_name = {
+                .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
+                .pNext = NULL,
+                .objectType = VK_OBJECT_TYPE_SEMAPHORE,
+                .objectHandle = (uint64_t) system->transfer_finished_semaphores[index],
+                .pObjectName = debug_name,
+            };
+
+            vkSetDebugUtilsObjectNameEXT (system->device, &object_name);
+        }
+#endif
+
         if (vkCreateSemaphore (system->device, &semaphore_creation_info, VULKAN_ALLOCATION_CALLBACKS (system),
                                &system->render_finished_semaphores[index]) != VK_SUCCESS)
         {
@@ -978,6 +996,24 @@ kan_bool_t kan_render_backend_system_select_device (kan_context_system_handle_t 
             break;
         }
 
+#if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED)
+        {
+            char debug_name[KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME];
+            snprintf (debug_name, KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME, "render_finished_semaphore_%lu",
+                      (unsigned long) index);
+
+            struct VkDebugUtilsObjectNameInfoEXT object_name = {
+                .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
+                .pNext = NULL,
+                .objectType = VK_OBJECT_TYPE_SEMAPHORE,
+                .objectHandle = (uint64_t) system->render_finished_semaphores[index],
+                .pObjectName = debug_name,
+            };
+
+            vkSetDebugUtilsObjectNameEXT (system->device, &object_name);
+        }
+#endif
+
         if (vkCreateFence (system->device, &fence_creation_info, VULKAN_ALLOCATION_CALLBACKS (system),
                            &system->in_flight_fences[index]) != VK_SUCCESS)
         {
@@ -985,6 +1021,24 @@ kan_bool_t kan_render_backend_system_select_device (kan_context_system_handle_t 
             synchronization_objects_created = KAN_FALSE;
             break;
         }
+
+#if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED)
+        {
+            char debug_name[KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME];
+            snprintf (debug_name, KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME, "in_flight_%lu",
+                      (unsigned long) index);
+
+            struct VkDebugUtilsObjectNameInfoEXT object_name = {
+                .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
+                .pNext = NULL,
+                .objectType = VK_OBJECT_TYPE_FENCE,
+                .objectHandle = (uint64_t) system->in_flight_fences[index],
+                .pObjectName = debug_name,
+            };
+
+            vkSetDebugUtilsObjectNameEXT (system->device, &object_name);
+        }
+#endif
     }
 
     if (!synchronization_objects_created)
@@ -1023,6 +1077,24 @@ kan_bool_t kan_render_backend_system_select_device (kan_context_system_handle_t 
             break;
         }
 
+#if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED)
+        {
+            char debug_name[KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME];
+            snprintf (debug_name, KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME, "graphics_command_pool_%lu",
+                      (unsigned long) index);
+
+            struct VkDebugUtilsObjectNameInfoEXT object_name = {
+                .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
+                .pNext = NULL,
+                .objectType = VK_OBJECT_TYPE_COMMAND_POOL,
+                .objectHandle = (uint64_t) system->command_states[index].graphics_command_pool,
+                .pObjectName = debug_name,
+            };
+
+            vkSetDebugUtilsObjectNameEXT (system->device, &object_name);
+        }
+#endif
+
         VkCommandBufferAllocateInfo graphics_primary_buffer_info = {
             .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
             .pNext = NULL,
@@ -1058,6 +1130,24 @@ kan_bool_t kan_render_backend_system_select_device (kan_context_system_handle_t 
             command_states_created = KAN_FALSE;
             break;
         }
+
+#if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED)
+        {
+            char debug_name[KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME];
+            snprintf (debug_name, KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME, "transfer_command_pool_%lu",
+                      (unsigned long) index);
+
+            struct VkDebugUtilsObjectNameInfoEXT object_name = {
+                .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
+                .pNext = NULL,
+                .objectType = VK_OBJECT_TYPE_COMMAND_POOL,
+                .objectHandle = (uint64_t) system->command_states[index].transfer_command_pool,
+                .pObjectName = debug_name,
+            };
+
+            vkSetDebugUtilsObjectNameEXT (system->device, &object_name);
+        }
+#endif
 
         VkCommandBufferAllocateInfo transfer_primary_buffer_info = {
             .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
@@ -1144,6 +1234,7 @@ static void render_backend_system_submit_transfer (struct render_backend_system_
         kan_critical_error ("Failed to start recording primary transfer buffer.", __FILE__, __LINE__);
     }
 
+    DEBUG_LABEL_SCOPE_BEGIN (state->primary_transfer_command_buffer, "buffer_transfer", DEBUG_LABEL_COLOR_PASS)
     struct render_backend_schedule_state_t *schedule = &system->schedule_states[system->current_frame_in_flight_index];
     struct scheduled_buffer_unmap_flush_transfer_t *buffer_unmap_flush_transfer =
         schedule->first_scheduled_buffer_unmap_flush_transfer;
@@ -1171,6 +1262,9 @@ static void render_backend_system_submit_transfer (struct render_backend_system_
         buffer_unmap_flush_transfer = buffer_unmap_flush_transfer->next;
     }
 
+    DEBUG_LABEL_SCOPE_END (state->primary_transfer_command_buffer)
+    DEBUG_LABEL_SCOPE_BEGIN (state->primary_transfer_command_buffer, "buffer_flush", DEBUG_LABEL_COLOR_PASS)
+
     struct scheduled_buffer_unmap_flush_t *buffer_unmap_flush = schedule->first_scheduled_buffer_unmap_flush;
     schedule->first_scheduled_buffer_unmap_flush = NULL;
 
@@ -1186,6 +1280,9 @@ static void render_backend_system_submit_transfer (struct render_backend_system_
 
         buffer_unmap_flush = buffer_unmap_flush->next;
     }
+
+    DEBUG_LABEL_SCOPE_END (state->primary_transfer_command_buffer)
+    DEBUG_LABEL_SCOPE_BEGIN (state->primary_transfer_command_buffer, "image_upload", DEBUG_LABEL_COLOR_PASS)
 
     struct scheduled_image_upload_t *image_upload = schedule->first_scheduled_image_upload;
     schedule->first_scheduled_image_upload = NULL;
@@ -1280,6 +1377,7 @@ static void render_backend_system_submit_transfer (struct render_backend_system_
         image_upload = image_upload->next;
     }
 
+    DEBUG_LABEL_SCOPE_END (state->primary_transfer_command_buffer)
     if (vkEndCommandBuffer (state->primary_transfer_command_buffer) != VK_SUCCESS)
     {
         kan_critical_error ("Failed to end recording primary transfer buffer.", __FILE__, __LINE__);
@@ -1336,6 +1434,17 @@ static void render_backend_system_submit_transfer (struct render_backend_system_
         }
     }
 
+#if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED)
+    struct VkDebugUtilsLabelEXT queue_label = {
+        .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT,
+        .pNext = NULL,
+        .pLabelName = "Transfer Queue",
+        .color = {0.082f, 0.639f, 0.114f, 1.0f},
+    };
+
+    vkQueueBeginDebugUtilsLabelEXT (system->transfer_queue, &queue_label);
+#endif
+
     VkSubmitInfo submit_info = {
         .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
         .pNext = NULL,
@@ -1352,6 +1461,10 @@ static void render_backend_system_submit_transfer (struct render_backend_system_
     {
         kan_critical_error ("Failed to submit work to transfer queue.", __FILE__, __LINE__);
     }
+
+#if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED)
+    vkQueueEndDebugUtilsLabelEXT (system->transfer_queue);
+#endif
 
     if (wait_semaphores != static_wait_semaphores)
     {
@@ -1690,6 +1803,25 @@ static inline void process_frame_buffer_create_requests (struct render_backend_s
                              frame_buffer->tracking_name, (unsigned long) attachment_index)
                 }
 
+#if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED)
+                if (frame_buffer->image_views[attachment_index] != VK_NULL_HANDLE)
+                {
+                    char debug_name[KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME];
+                    snprintf (debug_name, KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME, "%s_image_view_%lu",
+                              frame_buffer->tracking_name, (unsigned long) attachment_index);
+
+                    struct VkDebugUtilsObjectNameInfoEXT object_name = {
+                        .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
+                        .pNext = NULL,
+                        .objectType = VK_OBJECT_TYPE_IMAGE_VIEW,
+                        .objectHandle = (uint64_t) frame_buffer->image_views[attachment_index],
+                        .pObjectName = debug_name,
+                    };
+
+                    vkSetDebugUtilsObjectNameEXT (system->device, &object_name);
+                }
+#endif
+
                 break;
             }
 
@@ -1740,6 +1872,21 @@ static inline void process_frame_buffer_create_requests (struct render_backend_s
                          "Unable to create frame buffer \"%s\" due to failure when creating instance %lu.",
                          frame_buffer->tracking_name, (unsigned long) instance_index)
             }
+
+#if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED)
+            if (*output != VK_NULL_HANDLE)
+            {
+                struct VkDebugUtilsObjectNameInfoEXT object_name = {
+                    .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
+                    .pNext = NULL,
+                    .objectType = VK_OBJECT_TYPE_FRAMEBUFFER,
+                    .objectHandle = (uint64_t) *output,
+                    .pObjectName = frame_buffer->tracking_name,
+                };
+
+                vkSetDebugUtilsObjectNameEXT (system->device, &object_name);
+            }
+#endif
         }
 
         if (surface_index != UINT64_MAX)
@@ -2102,6 +2249,9 @@ static void render_backend_system_submit_pass_instance (struct render_backend_sy
         }
     }
 
+    DEBUG_LABEL_SCOPE_BEGIN (state->primary_graphics_command_buffer, pass_instance->pass->tracking_name,
+                             DEBUG_LABEL_COLOR_PASS)
+
     vkCmdPipelineBarrier (state->primary_graphics_command_buffer,
                           VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT |
                               VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
@@ -2174,6 +2324,7 @@ static void render_backend_system_submit_pass_instance (struct render_backend_sy
                               image_barriers);
     }
 
+    DEBUG_LABEL_SCOPE_END (state->primary_graphics_command_buffer)
     if (image_barriers != image_barriers_static)
     {
         kan_free_general (system->utility_allocation_group, image_barriers,
@@ -2368,6 +2519,17 @@ static void render_backend_system_submit_graphics (struct render_backend_system_
     VkSemaphore wait_semaphores[] = {system->transfer_finished_semaphores[system->current_frame_in_flight_index]};
     VkPipelineStageFlags wait_stages[] = {VK_PIPELINE_STAGE_TRANSFER_BIT};
 
+#if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED)
+    struct VkDebugUtilsLabelEXT queue_label = {
+        .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT,
+        .pNext = NULL,
+        .pLabelName = "Graphics Queue",
+        .color = {0.0f, 0.035f, 0.89f, 1.0f},
+    };
+
+    vkQueueBeginDebugUtilsLabelEXT (system->graphics_queue, &queue_label);
+#endif
+
     VkSubmitInfo submit_info = {
         .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
         .pNext = NULL,
@@ -2385,6 +2547,10 @@ static void render_backend_system_submit_graphics (struct render_backend_system_
     {
         kan_critical_error ("Failed to submit work to graphics queue.", __FILE__, __LINE__);
     }
+
+#if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED)
+    vkQueueEndDebugUtilsLabelEXT (system->graphics_queue);
+#endif
 }
 
 static void render_backend_system_submit_present (struct render_backend_system_t *system)
@@ -2627,6 +2793,22 @@ static kan_bool_t render_backend_surface_create_swap_chain_image_views (struct r
             views_created_successfully = KAN_FALSE;
             break;
         }
+
+#if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED)
+        char debug_name[KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME];
+        snprintf (debug_name, KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME, "%s_image_view_%lu",
+                  surface->tracking_name, (unsigned long) index);
+
+        struct VkDebugUtilsObjectNameInfoEXT object_name = {
+            .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
+            .pNext = NULL,
+            .objectType = VK_OBJECT_TYPE_IMAGE_VIEW,
+            .objectHandle = (uint64_t) surface->image_views[view_index],
+            .pObjectName = debug_name,
+        };
+
+        vkSetDebugUtilsObjectNameEXT (surface->system->device, &object_name);
+#endif
     }
 
     if (!views_created_successfully)
@@ -2678,6 +2860,22 @@ static kan_bool_t render_backend_surface_create_semaphores (struct render_backen
             created_successfully = KAN_FALSE;
             break;
         }
+
+#if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED)
+        char debug_name[KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME];
+        snprintf (debug_name, KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME, "%s_image_available_%lu",
+                  surface->tracking_name, (unsigned long) index);
+
+        struct VkDebugUtilsObjectNameInfoEXT object_name = {
+            .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
+            .pNext = NULL,
+            .objectType = VK_OBJECT_TYPE_SEMAPHORE,
+            .objectHandle = (uint64_t) surface->image_available_semaphores[index],
+            .pObjectName = debug_name,
+        };
+
+        vkSetDebugUtilsObjectNameEXT (surface->system->device, &object_name);
+#endif
     }
 
     if (!created_successfully)
@@ -2896,6 +3094,18 @@ static void render_backend_surface_create_swap_chain (struct render_backend_surf
         surface->swap_chain = VK_NULL_HANDLE;
         return;
     }
+
+#if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED)
+    struct VkDebugUtilsObjectNameInfoEXT object_name = {
+        .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
+        .pNext = NULL,
+        .objectType = VK_OBJECT_TYPE_SWAPCHAIN_KHR,
+        .objectHandle = (uint64_t) surface->swap_chain,
+        .pObjectName = surface->tracking_name,
+    };
+
+    vkSetDebugUtilsObjectNameEXT (surface->system->device, &object_name);
+#endif
 
     surface->swap_chain_creation_window_width = (uint32_t) surface_extent.width;
     surface->swap_chain_creation_window_height = (uint32_t) surface_extent.height;

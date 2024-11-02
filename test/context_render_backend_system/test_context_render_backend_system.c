@@ -1050,12 +1050,12 @@ KAN_TEST_CASE (temp)
                 memcpy (cube_instanced_memory, &cube_instanced_data, sizeof (cube_instanced_data));
 
                 kan_render_pass_instance_graphics_pipeline (cube_instance, cube_pipeline);
+                kan_render_pass_instance_pipeline_parameter_sets (cube_instance, 1u, &cube_set);
                 kan_render_pass_instance_attributes (cube_instance, (uint32_t) cube_attribute_vertex_binding, 1u,
                                                      &cube_vertex_buffer);
                 kan_render_pass_instance_attributes (cube_instance, (uint32_t) cube_attribute_instanced_binding, 1u,
                                                      &cube_instanced_buffer);
                 kan_render_pass_instance_indices (cube_instance, cube_index_buffer);
-                kan_render_pass_instance_pipeline_parameter_sets (cube_instance, 1u, &cube_set);
                 kan_render_pass_instance_instanced_draw (cube_instance, 0u,
                                                          (uint32_t) (sizeof (cube_indices) / sizeof (cube_indices[0u])),
                                                          0u, 0u, MAX_INSTANCED_CUBES);
@@ -1092,11 +1092,11 @@ KAN_TEST_CASE (temp)
                 if (render_image_instance != KAN_INVALID_RENDER_PASS_INSTANCE)
                 {
                     kan_render_pass_instance_graphics_pipeline (render_image_instance, render_image_pipeline);
+                    kan_render_pass_instance_pipeline_parameter_sets (render_image_instance, 1u, &render_image_set);
                     kan_render_pass_instance_attributes (render_image_instance,
                                                          (uint32_t) render_image_attribute_binding, 1u,
                                                          &render_image_quad_vertex_buffer);
                     kan_render_pass_instance_indices (render_image_instance, render_image_quad_index_buffer);
-                    kan_render_pass_instance_pipeline_parameter_sets (render_image_instance, 1u, &render_image_set);
                     kan_render_pass_instance_draw (
                         render_image_instance, 0u,
                         (uint32_t) (sizeof (render_image_quad_indices) / sizeof (render_image_quad_indices[0u])), 0u);

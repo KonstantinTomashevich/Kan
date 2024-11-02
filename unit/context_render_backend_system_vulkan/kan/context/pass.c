@@ -239,6 +239,18 @@ struct render_backend_pass_t *render_backend_system_create_pass (struct render_b
         return NULL;
     }
 
+#if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED)
+    struct VkDebugUtilsObjectNameInfoEXT object_name = {
+        .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
+        .pNext = NULL,
+        .objectType = VK_OBJECT_TYPE_RENDER_PASS,
+        .objectHandle = (uint64_t) render_pass,
+        .pObjectName = description->tracking_name,
+    };
+
+    vkSetDebugUtilsObjectNameEXT (system->device, &object_name);
+#endif
+
     struct render_backend_pass_t *pass =
         kan_allocate_batched (system->pass_wrapper_allocation_group, sizeof (struct render_backend_pass_t));
     kan_bd_list_add (&system->passes, NULL, &pass->list_node);
@@ -411,7 +423,7 @@ kan_render_pass_instance_t kan_render_pass_instantiate (kan_render_pass_t pass,
         struct VkCommandBufferBeginInfo begin_info = {
             .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
             .pNext = NULL,
-            .flags = VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT,
+            .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT | VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT,
             .pInheritanceInfo = &inheritance_info,
         };
 
@@ -438,6 +450,8 @@ kan_render_pass_instance_t kan_render_pass_instantiate (kan_render_pass_t pass,
         _Alignof (struct render_backend_pass_instance_t));
 
     instance->system = pass_data->system;
+    instance->pass = pass_data;
+
     instance->command_buffer = command_buffer;
     instance->frame_buffer = (struct render_backend_frame_buffer_t *) frame_buffer;
     instance->current_pipeline_layout = VK_NULL_HANDLE;
@@ -545,6 +559,7 @@ void kan_render_pass_instance_graphics_pipeline (kan_render_pass_instance_t pass
         &instance->system->command_states[instance->system->current_frame_in_flight_index];
 
     kan_atomic_int_lock (&command_state->graphics_command_operation_lock);
+    DEBUG_LABEL_INSERT (instance->command_buffer, pipeline->tracking_name, 0.063f, 0.569f, 0.0f, 1.0f)
     vkCmdBindPipeline (instance->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->pipeline);
     kan_atomic_int_unlock (&command_state->graphics_command_operation_lock);
     instance->current_pipeline_layout = pipeline->family->layout;
@@ -594,6 +609,7 @@ void kan_render_pass_instance_pipeline_parameter_sets (kan_render_pass_instance_
             descriptor_set = set->unstable.allocations[set->system->current_frame_in_flight_index].descriptor_set;
         }
 
+        DEBUG_LABEL_INSERT (instance->command_buffer, set->tracking_name, 0.918f, 0.98f, 0.0f, 1.0f)
         vkCmdBindDescriptorSets (instance->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
                                  instance->current_pipeline_layout, (uint32_t) set->set_index, 1u, &descriptor_set, 0u,
                                  NULL);

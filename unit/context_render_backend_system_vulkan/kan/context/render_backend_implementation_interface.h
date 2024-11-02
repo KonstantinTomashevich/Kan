@@ -348,6 +348,8 @@ struct render_backend_pass_instance_dependency_t
 struct render_backend_pass_instance_t
 {
     struct render_backend_system_t *system;
+    struct render_backend_pass_t *pass;
+
     VkCommandBuffer command_buffer;
     struct render_backend_frame_buffer_t *frame_buffer;
     VkPipelineLayout current_pipeline_layout;
@@ -804,7 +806,7 @@ struct render_backend_system_t
 
     struct kan_stack_group_allocator_t pass_instance_allocator;
 
-#if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_VALIDATION_ENABLED)
+#if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED)
     kan_bool_t has_validation_layer;
     VkDebugUtilsMessengerEXT debug_messenger;
 #endif
@@ -1109,6 +1111,40 @@ static inline uint32_t render_backend_image_calculate_gpu_size (struct render_ba
 
     return size;
 }
+#endif
+
+#define DEBUG_LABEL_COLOR_PASS 1.0f, 0.796f, 0.0f, 1.0f
+
+#if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED)
+#    define DEBUG_LABEL_SCOPE_BEGIN(BUFFER, LABEL, ...)                                                                \
+        {                                                                                                              \
+            struct VkDebugUtilsLabelEXT label = {                                                                      \
+                .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT,                                                      \
+                .pNext = NULL,                                                                                         \
+                .pLabelName = LABEL,                                                                                   \
+                .color = {__VA_ARGS__},                                                                                \
+            };                                                                                                         \
+                                                                                                                       \
+            vkCmdBeginDebugUtilsLabelEXT (BUFFER, &label);                                                             \
+        }
+
+#    define DEBUG_LABEL_SCOPE_END(BUFFER) vkCmdEndDebugUtilsLabelEXT (BUFFER);
+
+#    define DEBUG_LABEL_INSERT(BUFFER, LABEL, ...)                                                                     \
+        {                                                                                                              \
+            struct VkDebugUtilsLabelEXT label = {                                                                      \
+                .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT,                                                      \
+                .pNext = NULL,                                                                                         \
+                .pLabelName = LABEL,                                                                                   \
+                .color = {__VA_ARGS__},                                                                                \
+            };                                                                                                         \
+                                                                                                                       \
+            vkCmdInsertDebugUtilsLabelEXT (BUFFER, &label);                                                            \
+        }
+#else
+#    define DEBUG_LABEL_SCOPE_BEGIN(BUFFER, LABEL, ...) /* Disabled. */
+#    define DEBUG_LABEL_SCOPE_END(BUFFER)               /* Disabled. */
+#    define DEBUG_LABEL_INSERT(BUFFER, LABEL, ...)      /* Disabled. */
 #endif
 
 KAN_C_HEADER_END

@@ -125,6 +125,18 @@ struct render_backend_buffer_t *render_backend_system_create_buffer (struct rend
         return NULL;
     }
 
+#if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED)
+    struct VkDebugUtilsObjectNameInfoEXT object_name = {
+        .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
+        .pNext = NULL,
+        .objectType = VK_OBJECT_TYPE_BUFFER,
+        .objectHandle = (uint64_t) buffer_handle,
+        .pObjectName = tracking_name,
+    };
+
+    vkSetDebugUtilsObjectNameEXT (system->device, &object_name);
+#endif
+
     struct render_backend_buffer_t *buffer =
         kan_allocate_batched (system->buffer_wrapper_allocation_group, sizeof (struct render_backend_buffer_t));
 

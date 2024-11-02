@@ -117,6 +117,18 @@ static kan_bool_t create_vulkan_image (struct render_backend_system_t *system,
         return KAN_FALSE;
     }
 
+#if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED)
+    struct VkDebugUtilsObjectNameInfoEXT object_name = {
+        .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
+        .pNext = NULL,
+        .objectType = VK_OBJECT_TYPE_IMAGE,
+        .objectHandle = (uint64_t) *output_image,
+        .pObjectName = description->tracking_name,
+    };
+
+    vkSetDebugUtilsObjectNameEXT (system->device, &object_name);
+#endif
+
     return KAN_TRUE;
 }
 

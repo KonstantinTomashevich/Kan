@@ -318,6 +318,21 @@ kan_thread_result_t render_backend_pipeline_compiler_state_worker_function (kan_
                      request->pipeline->family->tracking_name)
         }
 
+#if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED)
+        if (pipeline != VK_NULL_HANDLE)
+        {
+            struct VkDebugUtilsObjectNameInfoEXT object_name = {
+                .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
+                .pNext = NULL,
+                .objectType = VK_OBJECT_TYPE_PIPELINE,
+                .objectHandle = (uint64_t) pipeline,
+                .pObjectName = request->pipeline->tracking_name,
+            };
+
+            vkSetDebugUtilsObjectNameEXT (request->pipeline->system->device, &object_name);
+        }
+#endif
+
         kan_mutex_lock (state->state_transition_mutex);
         request->pipeline->pipeline = pipeline;
         request->pipeline->compilation_state =
@@ -638,6 +653,24 @@ struct render_backend_graphics_pipeline_t *render_backend_system_create_graphics
             shader_modules_created = KAN_FALSE;
             break;
         }
+
+        // TODO: SHADER MODULES NEED TO BE CREATED SEPARATELY TO SAVE MEMORY ON THE SAME SHADERS IN DIFFERENT PIPELINES.
+
+#if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED)
+        char debug_name[KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME];
+        snprintf (debug_name, KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME, "%s_shader_module_%lu",
+                  description->tracking_name, (unsigned long) module_index);
+
+        struct VkDebugUtilsObjectNameInfoEXT object_name = {
+            .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
+            .pNext = NULL,
+            .objectType = VK_OBJECT_TYPE_SHADER_MODULE,
+            .objectHandle = (uint64_t) shader_modules[module_index],
+            .pObjectName = debug_name,
+        };
+
+        vkSetDebugUtilsObjectNameEXT (system->device, &object_name);
+#endif
     }
 
     kan_bool_t samplers_created = KAN_TRUE;
@@ -730,6 +763,22 @@ struct render_backend_graphics_pipeline_t *render_backend_system_create_graphics
                 samplers_created = KAN_FALSE;
                 break;
             }
+
+#if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED)
+            char debug_name[KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME];
+            snprintf (debug_name, KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME, "%s_sampler_%lu",
+                      description->tracking_name, (unsigned long) sampler_index);
+
+            struct VkDebugUtilsObjectNameInfoEXT object_name = {
+                .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
+                .pNext = NULL,
+                .objectType = VK_OBJECT_TYPE_SAMPLER,
+                .objectHandle = (uint64_t) output->sampler,
+                .pObjectName = debug_name,
+            };
+
+            vkSetDebugUtilsObjectNameEXT (system->device, &object_name);
+#endif
         }
     }
 

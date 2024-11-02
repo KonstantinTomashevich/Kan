@@ -158,6 +158,22 @@ struct render_backend_graphics_pipeline_family_t *render_backend_system_create_g
             break;
         }
 
+#if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED)
+        char debug_name[KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME];
+        snprintf (debug_name, KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME, "%s_set_%lu",
+                  description->tracking_name, (unsigned long) layout_description->set);
+
+        struct VkDebugUtilsObjectNameInfoEXT object_name = {
+            .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
+            .pNext = NULL,
+            .objectType = VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT,
+            .objectHandle = (uint64_t) descriptor_set_layouts_for_pipeline[layout_index],
+            .pObjectName = debug_name,
+        };
+
+        vkSetDebugUtilsObjectNameEXT (system->device, &object_name);
+#endif
+
         struct render_backend_descriptor_set_layout_t *layout =
             kan_allocate_general (system->pipeline_family_wrapper_allocation_group,
                                   sizeof (struct render_backend_descriptor_set_layout_t) +
@@ -243,6 +259,18 @@ struct render_backend_graphics_pipeline_family_t *render_backend_system_create_g
         free_descriptor_set_layouts (system, sets_count, descriptor_set_layouts);
         return NULL;
     }
+
+#if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED)
+        struct VkDebugUtilsObjectNameInfoEXT object_name = {
+            .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
+            .pNext = NULL,
+            .objectType = VK_OBJECT_TYPE_PIPELINE_LAYOUT,
+            .objectHandle = (uint64_t) pipeline_layout,
+            .pObjectName = description->tracking_name,
+        };
+
+        vkSetDebugUtilsObjectNameEXT (system->device, &object_name);
+#endif
 
     struct render_backend_graphics_pipeline_family_t *family = kan_allocate_batched (
         system->pipeline_family_wrapper_allocation_group, sizeof (struct render_backend_graphics_pipeline_family_t));
