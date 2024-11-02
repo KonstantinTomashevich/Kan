@@ -4,7 +4,7 @@ struct render_backend_frame_lifetime_allocator_t *render_backend_system_create_f
     struct render_backend_system_t *system,
     enum render_backend_buffer_family_t buffer_family,
     enum kan_render_buffer_type_t buffer_type,
-    uint64_t page_size,
+    uint32_t page_size,
     kan_interned_string_t tracking_name)
 {
     struct render_backend_frame_lifetime_allocator_t *allocator = kan_allocate_batched (
@@ -28,8 +28,8 @@ struct render_backend_frame_lifetime_allocator_t *render_backend_system_create_f
 struct render_backend_frame_lifetime_allocator_allocation_t render_backend_frame_lifetime_allocator_allocate_on_page (
     struct render_backend_frame_lifetime_allocator_t *allocator,
     struct render_backend_frame_lifetime_allocator_page_t *page,
-    uint64_t size,
-    uint64_t alignment)
+    uint32_t size,
+    uint32_t alignment)
 {
     struct render_backend_frame_lifetime_allocator_allocation_t result = {
         .buffer = NULL,
@@ -42,9 +42,9 @@ struct render_backend_frame_lifetime_allocator_allocation_t render_backend_frame
     while (chunk)
     {
         KAN_ASSERT (chunk->occupied_by_frame == CHUNK_FREE_MARKER)
-        const uint64_t memory_offset = chunk->offset;
-        const uint64_t allocation_offset = kan_apply_alignment (memory_offset, alignment);
-        const uint64_t allocation_size = size + allocation_offset - memory_offset;
+        const uint32_t memory_offset = chunk->offset;
+        const uint32_t allocation_offset = kan_apply_alignment (memory_offset, alignment);
+        const uint32_t allocation_size = size + allocation_offset - memory_offset;
 
         if (chunk->size >= allocation_size)
         {
@@ -139,7 +139,7 @@ struct render_backend_frame_lifetime_allocator_allocation_t render_backend_frame
 }
 
 struct render_backend_frame_lifetime_allocator_allocation_t render_backend_frame_lifetime_allocator_allocate (
-    struct render_backend_frame_lifetime_allocator_t *allocator, uint64_t size, uint64_t alignment)
+    struct render_backend_frame_lifetime_allocator_t *allocator, uint32_t size, uint32_t alignment)
 {
     struct render_backend_frame_lifetime_allocator_allocation_t result = {
         .buffer = NULL,
@@ -220,7 +220,7 @@ struct render_backend_frame_lifetime_allocator_allocation_t render_backend_frame
 }
 
 struct render_backend_frame_lifetime_allocator_allocation_t render_backend_system_allocate_for_staging (
-    struct render_backend_system_t *system, uint64_t size)
+    struct render_backend_system_t *system, uint32_t size)
 {
     if (size <= system->staging_frame_lifetime_allocator->page_size)
     {
@@ -403,7 +403,7 @@ void render_backend_system_destroy_frame_lifetime_allocator (
 kan_render_frame_lifetime_buffer_allocator_t kan_render_frame_lifetime_buffer_allocator_create (
     kan_render_context_t context,
     enum kan_render_buffer_type_t buffer_type,
-    uint64_t page_size,
+    uint32_t page_size,
     kan_interned_string_t tracking_name)
 {
     struct render_backend_system_t *system = (struct render_backend_system_t *) context;
@@ -416,7 +416,7 @@ kan_render_frame_lifetime_buffer_allocator_t kan_render_frame_lifetime_buffer_al
 }
 
 struct kan_render_allocated_slice_t kan_render_frame_lifetime_buffer_allocator_allocate (
-    kan_render_frame_lifetime_buffer_allocator_t allocator, uint64_t size, uint64_t alignment)
+    kan_render_frame_lifetime_buffer_allocator_t allocator, uint32_t size, uint32_t alignment)
 {
     struct render_backend_frame_lifetime_allocator_t *data =
         (struct render_backend_frame_lifetime_allocator_t *) allocator;

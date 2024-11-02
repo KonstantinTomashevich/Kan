@@ -1202,10 +1202,10 @@ struct kan_rpl_compiler_statics_t
 
     struct compiler_instance_function_node_t builtin_mix_f4;
     struct compiler_instance_declaration_node_t builtin_mix_f4_arguments[3u];
-    
+
     struct compiler_instance_function_node_t builtin_step_f1;
     struct compiler_instance_declaration_node_t builtin_step_f1_arguments[2u];
-    
+
     struct compiler_instance_function_node_t builtin_step_f2;
     struct compiler_instance_declaration_node_t builtin_step_f2_arguments[2u];
 

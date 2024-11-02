@@ -127,26 +127,26 @@ struct scheduled_buffer_unmap_flush_transfer_t
     struct scheduled_buffer_unmap_flush_transfer_t *next;
     struct render_backend_buffer_t *source_buffer;
     struct render_backend_buffer_t *target_buffer;
-    uint64_t source_offset;
-    uint64_t target_offset;
-    uint64_t size;
+    uint32_t source_offset;
+    uint32_t target_offset;
+    uint32_t size;
 };
 
 struct scheduled_buffer_unmap_flush_t
 {
     struct scheduled_buffer_unmap_flush_t *next;
     struct render_backend_buffer_t *buffer;
-    uint64_t offset;
-    uint64_t size;
+    uint32_t offset;
+    uint32_t size;
 };
 
 struct scheduled_image_upload_t
 {
     struct scheduled_image_upload_t *next;
     struct render_backend_image_t *image;
-    uint64_t mip;
+    uint32_t mip;
     struct render_backend_buffer_t *staging_buffer;
-    uint64_t staging_buffer_offset;
+    uint32_t staging_buffer_offset;
 };
 
 struct scheduled_frame_buffer_create_t
@@ -159,8 +159,8 @@ struct scheduled_image_mip_generation_t
 {
     struct scheduled_image_mip_generation_t *next;
     struct render_backend_image_t *image;
-    uint64_t first;
-    uint64_t last;
+    uint8_t first;
+    uint8_t last;
 };
 
 struct scheduled_frame_buffer_destroy_t
@@ -236,7 +236,7 @@ struct scheduled_detached_image_destroy_t
     VmaAllocation detached_allocation;
 
 #if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_PROFILE_MEMORY)
-    uint64_t gpu_size;
+    uint32_t gpu_size;
     kan_allocation_group_t gpu_allocation_group;
 #endif
 };
@@ -369,7 +369,7 @@ void render_backend_pass_instance_add_dependency_internal (struct render_backend
 struct render_backend_layout_binding_t
 {
     enum kan_render_parameter_binding_type_t type;
-    uint64_t used_stage_mask;
+    uint32_t used_stage_mask;
 };
 
 struct render_backend_descriptor_set_layout_t
@@ -484,13 +484,13 @@ struct render_backend_unstable_parameter_set_data_t
     /// \details When last accessed index is not equal to current frame index, it means that allocations wasn't yet
     ///          accessed in current frame context and set data must be copied from last accessed allocations index.
     ///          It can be detected both when updating parameter set and when submitting it to command buffer.
-    uint64_t last_accessed_allocation_index;
+    uint32_t last_accessed_allocation_index;
 };
 
 struct render_backend_parameter_set_render_target_attachment_t
 {
     struct render_backend_parameter_set_render_target_attachment_t *next;
-    uint64_t binding;
+    uint32_t binding;
     struct render_backend_image_t *image;
 };
 
@@ -506,7 +506,7 @@ struct render_backend_pipeline_parameter_set_t
         struct render_backend_unstable_parameter_set_data_t unstable;
     };
 
-    uint64_t set_index;
+    uint32_t set_index;
     VkImageView *bound_image_views;
 
     uint64_t pipeline_samplers_count;
@@ -531,7 +531,7 @@ struct render_backend_buffer_t
     VmaAllocation allocation;
     enum render_backend_buffer_family_t family;
     enum kan_render_buffer_type_t type;
-    uint64_t full_size;
+    uint32_t full_size;
     kan_interned_string_t tracking_name;
 
 #if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_PROFILE_MEMORY)
@@ -542,13 +542,13 @@ struct render_backend_buffer_t
 struct render_backend_buffer_t *render_backend_system_create_buffer (struct render_backend_system_t *system,
                                                                      enum render_backend_buffer_family_t family,
                                                                      enum kan_render_buffer_type_t buffer_type,
-                                                                     uint64_t full_size,
+                                                                     uint32_t full_size,
                                                                      kan_interned_string_t tracking_name);
 
 void render_backend_system_destroy_buffer (struct render_backend_system_t *system,
                                            struct render_backend_buffer_t *buffer);
 
-#define CHUNK_FREE_MARKER UINT64_MAX
+#define CHUNK_FREE_MARKER UINT32_MAX
 
 struct render_backend_frame_lifetime_allocator_chunk_t
 {
@@ -556,9 +556,9 @@ struct render_backend_frame_lifetime_allocator_chunk_t
     struct render_backend_frame_lifetime_allocator_chunk_t *previous;
     struct render_backend_frame_lifetime_allocator_chunk_t *next_free;
 
-    uint64_t offset;
-    uint64_t size;
-    uint64_t occupied_by_frame;
+    uint32_t offset;
+    uint32_t size;
+    uint32_t occupied_by_frame;
 };
 
 struct render_backend_frame_lifetime_allocator_page_t
@@ -583,14 +583,14 @@ struct render_backend_frame_lifetime_allocator_t
 
     enum render_backend_buffer_family_t buffer_family;
     enum kan_render_buffer_type_t buffer_type;
-    uint64_t page_size;
+    uint32_t page_size;
     kan_interned_string_t tracking_name;
 };
 
 struct render_backend_frame_lifetime_allocator_allocation_t
 {
     struct render_backend_buffer_t *buffer;
-    uint64_t offset;
+    uint32_t offset;
 };
 
 #define STAGING_BUFFER_ALLOCATION_ALIGNMENT _Alignof (float)
@@ -599,20 +599,20 @@ struct render_backend_frame_lifetime_allocator_t *render_backend_system_create_f
     struct render_backend_system_t *system,
     enum render_backend_buffer_family_t buffer_family,
     enum kan_render_buffer_type_t buffer_type,
-    uint64_t page_size,
+    uint32_t page_size,
     kan_interned_string_t tracking_name);
 
 struct render_backend_frame_lifetime_allocator_allocation_t render_backend_frame_lifetime_allocator_allocate_on_page (
     struct render_backend_frame_lifetime_allocator_t *allocator,
     struct render_backend_frame_lifetime_allocator_page_t *page,
-    uint64_t size,
-    uint64_t alignment);
+    uint32_t size,
+    uint32_t alignment);
 
 struct render_backend_frame_lifetime_allocator_allocation_t render_backend_frame_lifetime_allocator_allocate (
-    struct render_backend_frame_lifetime_allocator_t *allocator, uint64_t size, uint64_t alignment);
+    struct render_backend_frame_lifetime_allocator_t *allocator, uint32_t size, uint32_t alignment);
 
 struct render_backend_frame_lifetime_allocator_allocation_t render_backend_system_allocate_for_staging (
-    struct render_backend_system_t *system, uint64_t size);
+    struct render_backend_system_t *system, uint32_t size);
 
 void render_backend_frame_lifetime_allocator_retire_old_allocations (
     struct render_backend_frame_lifetime_allocator_t *allocator);
@@ -635,7 +635,7 @@ struct image_parameter_set_attachment_t
 {
     struct image_parameter_set_attachment_t *next;
     struct render_backend_pipeline_parameter_set_t *set;
-    uint64_t binding;
+    uint32_t binding;
 };
 
 struct render_backend_image_t
@@ -709,7 +709,7 @@ struct render_backend_descriptor_set_pool_t
 {
     struct kan_bd_list_node_t list_node;
     VkDescriptorPool pool;
-    uint64_t active_allocations;
+    uint32_t active_allocations;
 };
 
 struct render_backend_descriptor_set_allocator_t
@@ -835,9 +835,9 @@ struct render_backend_system_t
     kan_bool_t prefer_vsync;
 
     kan_interned_string_t application_info_name;
-    uint64_t version_major;
-    uint64_t version_minor;
-    uint64_t version_patch;
+    uint32_t version_major;
+    uint32_t version_minor;
+    uint32_t version_patch;
 
     kan_interned_string_t interned_temporary_staging_buffer;
 };
@@ -847,7 +847,7 @@ struct render_backend_system_t
 
 void render_backend_memory_profiling_init (struct render_backend_system_t *system);
 
-static inline void transfer_memory_between_groups (uint64_t amount,
+static inline void transfer_memory_between_groups (uint32_t amount,
                                                    kan_allocation_group_t from,
                                                    kan_allocation_group_t to)
 {
@@ -868,7 +868,7 @@ static inline struct render_backend_schedule_state_t *render_backend_system_get_
 static inline struct render_backend_schedule_state_t *render_backend_system_get_schedule_for_destroy (
     struct render_backend_system_t *system)
 {
-    uint64_t schedule_index = system->current_frame_in_flight_index;
+    uint32_t schedule_index = system->current_frame_in_flight_index;
     if (!system->frame_started)
     {
         // If frame is not started, then we can't schedule destroy for current frame as destroy is done when frame
@@ -1018,10 +1018,10 @@ static inline VkImageAspectFlags kan_render_image_description_calculate_aspects 
 
 static inline void kan_render_image_description_calculate_size_at_mip (
     struct kan_render_image_description_t *description,
-    uint64_t mip,
-    uint64_t *output_width,
-    uint64_t *output_height,
-    uint64_t *output_depth)
+    uint8_t mip,
+    uint32_t *output_width,
+    uint32_t *output_height,
+    uint32_t *output_depth)
 {
     KAN_ASSERT (mip < description->mips)
     *output_width = KAN_MAX (1u, description->width >> mip);
@@ -1029,10 +1029,10 @@ static inline void kan_render_image_description_calculate_size_at_mip (
     *output_depth = KAN_MAX (1u, description->depth >> mip);
 }
 
-static inline uint64_t kan_render_image_description_calculate_texel_size (
+static inline uint32_t kan_render_image_description_calculate_texel_size (
     struct render_backend_system_t *system, struct kan_render_image_description_t *description)
 {
-    uint64_t texel_size = 0u;
+    uint32_t texel_size = 0u;
     switch (description->type)
     {
     case KAN_RENDER_IMAGE_TYPE_COLOR_2D:
@@ -1092,17 +1092,17 @@ static inline uint64_t kan_render_image_description_calculate_texel_size (
 }
 
 #if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_PROFILE_MEMORY)
-static inline uint64_t render_backend_image_calculate_gpu_size (struct render_backend_system_t *system,
+static inline uint32_t render_backend_image_calculate_gpu_size (struct render_backend_system_t *system,
                                                                 struct render_backend_image_t *image)
 {
-    uint64_t texel_size = kan_render_image_description_calculate_texel_size (system, &image->description);
-    uint64_t size = 0u;
+    uint32_t texel_size = kan_render_image_description_calculate_texel_size (system, &image->description);
+    uint32_t size = 0u;
 
     for (uint64_t mip = 0u; mip < image->description.mips; ++mip)
     {
-        uint64_t width;
-        uint64_t height;
-        uint64_t depth;
+        uint32_t width;
+        uint32_t height;
+        uint32_t depth;
         kan_render_image_description_calculate_size_at_mip (&image->description, mip, &width, &height, &depth);
         size += texel_size * width * height * depth;
     }

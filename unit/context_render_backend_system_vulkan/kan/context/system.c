@@ -1195,9 +1195,9 @@ static void render_backend_system_submit_transfer (struct render_backend_system_
         VkImageAspectFlags image_aspect =
             kan_render_image_description_calculate_aspects (&image_upload->image->description);
 
-        uint64_t width;
-        uint64_t height;
-        uint64_t depth;
+        uint32_t width;
+        uint32_t height;
+        uint32_t depth;
         kan_render_image_description_calculate_size_at_mip (&image_upload->image->description, image_upload->mip,
                                                             &width, &height, &depth);
 
@@ -1371,19 +1371,19 @@ static inline void submit_mip_generation (struct render_backend_system_t *system
         VkImageAspectFlags image_aspect =
             kan_render_image_description_calculate_aspects (&image_mip_generation->image->description);
 
-        for (uint64_t output_mip = image_mip_generation->first + 1u; output_mip <= image_mip_generation->last;
+        for (uint8_t output_mip = image_mip_generation->first + 1u; output_mip <= image_mip_generation->last;
              ++output_mip)
         {
-            const uint64_t input_mip = output_mip - 1u;
-            uint64_t input_width;
-            uint64_t input_height;
-            uint64_t input_depth;
+            const uint8_t input_mip = output_mip - 1u;
+            uint32_t input_width;
+            uint32_t input_height;
+            uint32_t input_depth;
             kan_render_image_description_calculate_size_at_mip (&image_mip_generation->image->description, input_mip,
                                                                 &input_width, &input_height, &input_depth);
 
-            uint64_t output_width;
-            uint64_t output_height;
-            uint64_t output_depth;
+            uint32_t output_width;
+            uint32_t output_height;
+            uint32_t output_depth;
             kan_render_image_description_calculate_size_at_mip (&image_mip_generation->image->description, output_mip,
                                                                 &output_width, &output_height, &output_depth);
 

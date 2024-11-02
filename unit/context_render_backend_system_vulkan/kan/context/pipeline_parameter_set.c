@@ -274,8 +274,8 @@ struct render_backend_pipeline_parameter_set_t *render_backend_system_create_pip
     else
     {
         set->unstable.allocations = unstable_allocations;
-        // Never accessed, therefore index is UINT64_MAX.
-        set->unstable.last_accessed_allocation_index = UINT64_MAX;
+        // Never accessed, therefore index is UINT32_MAX.
+        set->unstable.last_accessed_allocation_index = UINT32_MAX;
     }
 
     set->set_index = description->set;
@@ -403,7 +403,7 @@ void render_backend_apply_descriptor_set_mutation (struct render_backend_pipelin
                                          sizeof (VkCopyDescriptorSet) * set_context->layout->bindings_count,
                                          _Alignof (VkCopyDescriptorSet));
 
-        for (uint64_t binding = 0u; binding < set_context->layout->bindings_count; ++binding)
+        for (uint32_t binding = 0u; binding < set_context->layout->bindings_count; ++binding)
         {
             kan_bool_t should_transfer = KAN_TRUE;
             if (update_needed)
@@ -756,7 +756,7 @@ void kan_render_pipeline_parameter_set_update (kan_render_pipeline_parameter_set
     else
     {
         VkDescriptorSet source_set =
-            data->unstable.last_accessed_allocation_index == UINT64_MAX ?
+            data->unstable.last_accessed_allocation_index == UINT32_MAX ?
                 data->unstable.allocations[data->system->current_frame_in_flight_index].descriptor_set :
                 data->unstable.allocations[data->unstable.last_accessed_allocation_index].descriptor_set;
 

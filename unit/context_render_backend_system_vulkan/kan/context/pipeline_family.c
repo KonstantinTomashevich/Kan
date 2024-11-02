@@ -28,7 +28,7 @@ static inline void free_descriptor_set_layouts (struct render_backend_system_t *
 struct render_backend_graphics_pipeline_family_t *render_backend_system_create_graphics_pipeline_family (
     struct render_backend_system_t *system, struct kan_render_graphics_pipeline_family_description_t *description)
 {
-    uint64_t sets_count = 0u;
+    uint32_t sets_count = 0u;
     for (uint64_t index = 0u; index < description->parameter_sets_count; ++index)
     {
         sets_count = KAN_MAX (sets_count, description->parameter_sets[index].set + 1u);
@@ -89,7 +89,7 @@ struct render_backend_graphics_pipeline_family_t *render_backend_system_create_g
                                              _Alignof (VkDescriptorSetLayoutBinding));
         }
 
-        uint64_t bindings_count = 0u;
+        uint32_t bindings_count = 0u;
         for (uint64_t binding_index = 0u; binding_index < layout_description->bindings_count; ++binding_index)
         {
             struct kan_render_parameter_binding_description_t *binding_description =
@@ -172,7 +172,7 @@ struct render_backend_graphics_pipeline_family_t *render_backend_system_create_g
         layout->storage_buffers_count = 0u;
         layout->combined_image_samplers_count = 0u;
 
-        for (uint64_t binding = 0u; binding < bindings_count; ++binding)
+        for (uint32_t binding = 0u; binding < bindings_count; ++binding)
         {
             layout->bindings[binding].type = KAN_RENDER_PARAMETER_BINDING_TYPE_UNIFORM_BUFFER;
             // Bindings with zero used stage mask are treated as non-existent.

@@ -191,21 +191,21 @@ kan_render_image_t kan_render_image_create (kan_render_context_t context,
     return image ? (kan_render_image_t) image : KAN_INVALID_RENDER_IMAGE;
 }
 
-void kan_render_image_upload_data (kan_render_image_t image, uint64_t mip, void *data)
+void kan_render_image_upload_data (kan_render_image_t image, uint8_t mip, void *data)
 {
     struct render_backend_image_t *image_data = (struct render_backend_image_t *) image;
     KAN_ASSERT (!image_data->description.render_target)
     KAN_ASSERT (mip < image_data->description.mips)
 
-    uint64_t texel_size =
+    uint32_t texel_size =
         kan_render_image_description_calculate_texel_size (image_data->system, &image_data->description);
 
-    uint64_t width;
-    uint64_t height;
-    uint64_t depth;
+    uint32_t width;
+    uint32_t height;
+    uint32_t depth;
     kan_render_image_description_calculate_size_at_mip (&image_data->description, mip, &width, &height, &depth);
 
-    const uint64_t allocation_size = texel_size * width * height * depth;
+    const uint32_t allocation_size = texel_size * width * height * depth;
     struct render_backend_frame_lifetime_allocator_allocation_t staging_allocation =
         render_backend_system_allocate_for_staging (image_data->system, allocation_size);
 
@@ -234,7 +234,7 @@ void kan_render_image_upload_data (kan_render_image_t image, uint64_t mip, void 
     kan_atomic_int_unlock (&schedule->schedule_lock);
 }
 
-void kan_render_image_request_mip_generation (kan_render_image_t image, uint64_t first, uint64_t last)
+void kan_render_image_request_mip_generation (kan_render_image_t image, uint8_t first, uint8_t last)
 {
     struct render_backend_image_t *data = (struct render_backend_image_t *) image;
     KAN_ASSERT (!data->description.render_target)
@@ -255,9 +255,9 @@ void kan_render_image_request_mip_generation (kan_render_image_t image, uint64_t
 }
 
 void kan_render_image_resize_render_target (kan_render_image_t image,
-                                            uint64_t new_width,
-                                            uint64_t new_height,
-                                            uint64_t new_depth)
+                                            uint32_t new_width,
+                                            uint32_t new_height,
+                                            uint32_t new_depth)
 {
     struct render_backend_image_t *data = (struct render_backend_image_t *) image;
     KAN_ASSERT (data->description.render_target)

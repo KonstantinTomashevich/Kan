@@ -48,6 +48,8 @@ typedef uint64_t kan_render_buffer_t;
 
 #define KAN_INVALID_RENDER_BUFFER 0u
 
+typedef uint64_t kan_render_frame_lifetime_buffer_allocator_t;
+
 typedef uint64_t kan_render_image_t;
 
 #define KAN_INVALID_RENDER_IMAGE 0u
@@ -62,9 +64,9 @@ struct kan_render_backend_system_config_t
     kan_bool_t prefer_vsync;
 
     kan_interned_string_t application_info_name;
-    uint64_t version_major;
-    uint64_t version_minor;
-    uint64_t version_patch;
+    uint32_t version_major;
+    uint32_t version_minor;
+    uint32_t version_patch;
 };
 
 enum kan_render_device_type_t
@@ -118,10 +120,10 @@ kan_render_backend_system_next_frame (kan_context_system_handle_t render_backend
 
 struct kan_render_integer_region_t
 {
-    int64_t x;
-    int64_t y;
-    uint64_t width;
-    uint64_t height;
+    int32_t x;
+    int32_t y;
+    uint32_t width;
+    uint32_t height;
 };
 
 // TODO: Add API for making screenshots. Possibly something for recording screen (useful for crashes and bug reports)?
@@ -269,7 +271,7 @@ struct kan_render_pass_attachment_t
 {
     enum kan_render_pass_attachment_type_t type;
     enum kan_render_color_format_t color_format;
-    uint64_t samples;
+    uint32_t samples;
     enum kan_render_load_operation_t load_operation;
     enum kan_render_store_operation_t store_operation;
 };
@@ -384,8 +386,8 @@ enum kan_render_attribute_rate_t
 
 struct kan_render_attribute_source_description_t
 {
-    uint64_t binding;
-    uint64_t stride;
+    uint32_t binding;
+    uint32_t stride;
     enum kan_render_attribute_rate_t rate;
 };
 
@@ -401,9 +403,9 @@ enum kan_render_attribute_format_t
 
 struct kan_render_attribute_description_t
 {
-    uint64_t binding;
-    uint64_t location;
-    uint64_t offset;
+    uint32_t binding;
+    uint32_t location;
+    uint32_t offset;
     enum kan_render_attribute_format_t format;
 };
 
@@ -416,14 +418,14 @@ enum kan_render_parameter_binding_type_t
 
 struct kan_render_parameter_binding_description_t
 {
-    uint64_t binding;
+    uint32_t binding;
     enum kan_render_parameter_binding_type_t type;
-    uint64_t used_stage_mask;
+    uint32_t used_stage_mask;
 };
 
 struct kan_render_parameter_set_description_t
 {
-    uint64_t set;
+    uint32_t set;
     uint64_t bindings_count;
     struct kan_render_parameter_binding_description_t *bindings;
     kan_bool_t stable_binding;
@@ -553,7 +555,7 @@ struct kan_render_pipeline_code_entry_point_t
 
 struct kan_render_pipeline_code_module_t
 {
-    uint64_t code_length;
+    uint32_t code_length;
     void *code;
 
     uint64_t entry_points_count;
@@ -583,8 +585,8 @@ enum kan_render_address_mode_t
 
 struct kan_render_sampler_description_t
 {
-    uint64_t parameter_set;
-    uint64_t parameter_binding;
+    uint32_t parameter_set;
+    uint32_t parameter_binding;
     enum kan_render_filter_mode_t mag_filter;
     enum kan_render_filter_mode_t min_filter;
     enum kan_render_mip_map_mode_t mip_map_mode;
@@ -665,7 +667,7 @@ struct kan_render_pipeline_parameter_set_description_t
         kan_render_graphics_pipeline_family_t graphics_pipeline;
     };
 
-    uint64_t set;
+    uint32_t set;
     kan_interned_string_t tracking_name;
 
     uint64_t initial_bindings_count;
@@ -675,8 +677,8 @@ struct kan_render_pipeline_parameter_set_description_t
 struct kan_render_parameter_update_description_buffer_t
 {
     kan_render_frame_buffer_t buffer;
-    uint64_t offset;
-    uint64_t range;
+    uint32_t offset;
+    uint32_t range;
 };
 
 struct kan_render_parameter_update_description_image_t
@@ -686,7 +688,7 @@ struct kan_render_parameter_update_description_image_t
 
 struct kan_render_parameter_update_description_t
 {
-    uint64_t binding;
+    uint32_t binding;
     union
     {
         struct kan_render_parameter_update_description_buffer_t buffer_binding;
@@ -723,34 +725,32 @@ enum kan_render_buffer_type_t
 ///          due to frames in flights feature.
 CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_buffer_t kan_render_buffer_create (kan_render_context_t context,
                                                                                 enum kan_render_buffer_type_t type,
-                                                                                uint64_t full_size,
+                                                                                uint32_t full_size,
                                                                                 void *optional_initial_data,
                                                                                 kan_interned_string_t tracking_name);
 
 CONTEXT_RENDER_BACKEND_SYSTEM_API void *kan_render_buffer_patch (kan_render_buffer_t buffer,
-                                                                 uint64_t slice_offset,
-                                                                 uint64_t slice_size);
+                                                                 uint32_t slice_offset,
+                                                                 uint32_t slice_size);
 
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_buffer_destroy (kan_render_buffer_t buffer);
 
 struct kan_render_allocated_slice_t
 {
     kan_render_buffer_t buffer;
-    uint64_t slice_offset;
+    uint32_t slice_offset;
 };
-
-typedef uint64_t kan_render_frame_lifetime_buffer_allocator_t;
 
 CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_frame_lifetime_buffer_allocator_t
 kan_render_frame_lifetime_buffer_allocator_create (kan_render_context_t context,
                                                    enum kan_render_buffer_type_t buffer_type,
-                                                   uint64_t page_size,
+                                                   uint32_t page_size,
                                                    kan_interned_string_t tracking_name);
 
 CONTEXT_RENDER_BACKEND_SYSTEM_API struct kan_render_allocated_slice_t
 kan_render_frame_lifetime_buffer_allocator_allocate (kan_render_frame_lifetime_buffer_allocator_t allocator,
-                                                     uint64_t size,
-                                                     uint64_t alignment);
+                                                     uint32_t size,
+                                                     uint32_t alignment);
 
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_frame_lifetime_buffer_allocator_destroy (
     kan_render_frame_lifetime_buffer_allocator_t allocator);
@@ -766,17 +766,15 @@ enum kan_render_image_type_t
     KAN_RENDER_IMAGE_TYPE_DEPTH_STENCIL,
 };
 
-// TODO: In a lot of places 64 bit integers are unneeded. Make them 32 bit?
-
 struct kan_render_image_description_t
 {
     enum kan_render_image_type_t type;
     enum kan_render_color_format_t color_format;
 
-    uint64_t width;
-    uint64_t height;
-    uint64_t depth;
-    uint64_t mips;
+    uint32_t width;
+    uint32_t height;
+    uint32_t depth;
+    uint8_t mips;
 
     kan_bool_t render_target;
     kan_bool_t supports_sampling;
@@ -787,15 +785,13 @@ struct kan_render_image_description_t
 CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_image_t
 kan_render_image_create (kan_render_context_t context, struct kan_render_image_description_t *description);
 
-CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_image_upload_data (kan_render_image_t image,
-                                                                     uint64_t mip,
-                                                                     void *data);
+CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_image_upload_data (kan_render_image_t image, uint8_t mip, void *data);
 
 /// \brief Requests image mip generation to be executed from the first mip to the last (including it).
 /// \invariant First mip is already filled with image data using `kan_render_image_upload_data`.
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_image_request_mip_generation (kan_render_image_t image,
-                                                                                uint64_t first,
-                                                                                uint64_t last);
+                                                                                uint8_t first,
+                                                                                uint8_t last);
 
 /// \brief Requests render target to be resized.
 /// \details In most cases this call results in creation of the new image under the hood.
@@ -803,9 +799,9 @@ CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_image_request_mip_generation (
 ///          Therefore, main goal of this function is to provide user-friendly way for recreating render targets with
 ///          another size and updating attached frame buffers automatically under the hood.
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_image_resize_render_target (kan_render_image_t image,
-                                                                              uint64_t new_width,
-                                                                              uint64_t new_height,
-                                                                              uint64_t new_depth);
+                                                                              uint32_t new_width,
+                                                                              uint32_t new_height,
+                                                                              uint32_t new_depth);
 
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_image_destroy (kan_render_image_t image);
 

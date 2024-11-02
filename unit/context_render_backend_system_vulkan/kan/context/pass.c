@@ -565,7 +565,7 @@ void kan_render_pass_instance_pipeline_parameter_sets (kan_render_pass_instance_
         struct render_backend_pipeline_parameter_set_t *set =
             (struct render_backend_pipeline_parameter_set_t *) parameter_sets[index];
 
-        if (!set->layout->stable_binding && set->unstable.last_accessed_allocation_index != UINT64_MAX &&
+        if (!set->layout->stable_binding && set->unstable.last_accessed_allocation_index != UINT32_MAX &&
             set->unstable.last_accessed_allocation_index != set->system->current_frame_in_flight_index)
         {
             VkDescriptorSet source_set =

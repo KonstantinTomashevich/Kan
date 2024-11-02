@@ -6,13 +6,13 @@
 static void *profiled_allocate (void *user_data, size_t size, size_t alignment, VkSystemAllocationScope scope)
 {
     struct memory_profiling_t *profiling = (struct memory_profiling_t *) user_data;
-    uint64_t real_alignment = KAN_MAX (alignment, _Alignof (uint64_t));
-    uint64_t real_size = kan_apply_alignment (real_alignment + size, real_alignment);
+    uint32_t real_alignment = KAN_MAX (alignment, _Alignof (uint32_t));
+    uint32_t real_size = kan_apply_alignment (real_alignment + size, real_alignment);
 
     void *allocated_data = kan_allocate_general (profiling->driver_cpu_generic_group, real_size, real_alignment);
 
     void *accessible_data = ((uint8_t *) allocated_data) + real_alignment;
-    uint64_t *meta_output = allocated_data;
+    uint32_t *meta_output = allocated_data;
     *meta_output = real_size;
     ++meta_output;
 
@@ -27,7 +27,7 @@ static void *profiled_allocate (void *user_data, size_t size, size_t alignment, 
 
 static inline void *walk_from_accessible_to_allocated (void *accessible)
 {
-    uint64_t *meta = accessible;
+    uint32_t *meta = accessible;
     do
     {
         meta--;
@@ -38,7 +38,7 @@ static inline void *walk_from_accessible_to_allocated (void *accessible)
 
 static inline void profiled_free_internal (struct memory_profiling_t *profiling, void *allocated, void *accessible)
 {
-    uint64_t size_to_free = (*(uint64_t *) allocated) + (((uint8_t *) accessible) - ((uint8_t *) allocated));
+    uint32_t size_to_free = (*(uint32_t *) allocated) + (((uint8_t *) accessible) - ((uint8_t *) allocated));
     kan_free_general (profiling->driver_cpu_generic_group, allocated, size_to_free);
 }
 
@@ -49,8 +49,8 @@ static void *profiled_reallocate (
     void *original_user_accessible_data = original;
     void *original_allocated_data = walk_from_accessible_to_allocated (original_user_accessible_data);
 
-    const uint64_t original_real_size = *(uint64_t *) original_allocated_data;
-    const uint64_t original_data_size =
+    const uint32_t original_real_size = *(uint32_t *) original_allocated_data;
+    const uint32_t original_data_size =
         original_real_size - (((uint8_t *) original_user_accessible_data) - ((uint8_t *) original_allocated_data));
 
     void *new_data = profiled_allocate (user_data, size, alignment, scope);

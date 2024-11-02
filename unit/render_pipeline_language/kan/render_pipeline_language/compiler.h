@@ -86,7 +86,7 @@ struct kan_rpl_graphics_classic_pipeline_settings_t
     uint32_t stencil_front_compare_mask;
     uint32_t stencil_front_write_mask;
     uint32_t stencil_front_reference;
-    
+
     enum kan_rpl_stencil_operation_t stencil_back_on_fail;
     enum kan_rpl_stencil_operation_t stencil_back_on_depth_fail;
     enum kan_rpl_stencil_operation_t stencil_back_on_pass;
