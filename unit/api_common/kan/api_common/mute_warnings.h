@@ -10,6 +10,7 @@
 // clang-format off
 #    define KAN_MUTE_THIRD_PARTY_WARNINGS_BEGIN                                                                        \
         _Pragma ("GCC diagnostic push")                                                                                \
+        _Pragma ("GCC diagnostic ignored \"-Wpragmas\"")                                                               \
         _Pragma ("GCC diagnostic ignored \"-Wmissing-field-initializers\"")                                            \
         _Pragma ("GCC diagnostic ignored \"-Wnullability-completeness\"")                                              \
         _Pragma ("GCC diagnostic ignored \"-Wpedantic\"")                                                              \
