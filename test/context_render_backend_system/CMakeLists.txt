@@ -1,7 +1,10 @@
 register_concrete (test_context_render_backend_system)
 concrete_include (PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 concrete_sources ("*.c")
-concrete_require (SCOPE PUBLIC ABSTRACT context_render_backend_system CONCRETE_INTERFACE testing)
+concrete_require (
+        SCOPE PUBLIC
+        ABSTRACT context_render_backend_system render_backend_tools
+        CONCRETE_INTERFACE inline_math testing)
 
 abstract_get_implementations (
         ABSTRACT context_render_backend_system OUTPUT CONTEXT_RENDER_BACKEND_SYSTEM_IMPLEMENTATIONS)
@@ -14,8 +17,11 @@ foreach (IMPLEMENTATION ${CONTEXT_RENDER_BACKEND_SYSTEM_IMPLEMENTATIONS})
             SCOPE PUBLIC
             ABSTRACT
             context_render_backend_system=${IMPLEMENTATION} cpu_dispatch=kan cpu_profiler=none error=sdl hash=djb2
-            log=kan memory=kan memory_profiler=none platform=sdl reflection=kan threading=sdl
-            CONCRETE container context context_application_system testing test_context_render_backend_system)
+            log=kan memory=kan memory_profiler=none platform=sdl reflection=kan render_backend_tools=${IMPLEMENTATION}
+            threading=sdl
+            CONCRETE
+            container context context_application_system inline_math render_pipeline_language testing
+            test_context_render_backend_system)
 
     generate_artefact_context_data ()
     shared_library_verify ()
