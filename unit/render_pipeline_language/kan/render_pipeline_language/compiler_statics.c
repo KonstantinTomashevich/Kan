@@ -63,7 +63,7 @@ void kan_rpl_compiler_ensure_statics_initialized (void)
         STATICS.interned_less_or_equal = kan_string_intern ("less_or_equal");
         STATICS.interned_greater = kan_string_intern ("greater");
         STATICS.interned_greater_or_equal = kan_string_intern ("greater_or_equal");
-        
+
         STATICS.interned_keep = kan_string_intern ("keep");
         STATICS.interned_replace = kan_string_intern ("replace");
         STATICS.interned_increment_and_clamp = kan_string_intern ("increment_and_clamp");
@@ -800,6 +800,15 @@ void kan_rpl_compiler_ensure_statics_initialized (void)
                    "left", &STATICS.type_f3, NULL, "right", &STATICS.type_f3, NULL, "alpha", &STATICS.type_f3, NULL);
         BUILTIN_3 (mix_f4, &STATICS.type_f4, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450FMix,
                    "left", &STATICS.type_f4, NULL, "right", &STATICS.type_f4, NULL, "alpha", &STATICS.type_f4, NULL);
+
+        BUILTIN_2 (step_f1, &STATICS.type_f1, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Step,
+                   "edge", &STATICS.type_f1, NULL, "value", &STATICS.type_f1, NULL);
+        BUILTIN_2 (step_f2, &STATICS.type_f2, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Step,
+                   "edge", &STATICS.type_f2, NULL, "value", &STATICS.type_f2, NULL);
+        BUILTIN_2 (step_f3, &STATICS.type_f3, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Step,
+                   "edge", &STATICS.type_f3, NULL, "value", &STATICS.type_f3, NULL);
+        BUILTIN_2 (step_f4, &STATICS.type_f4, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Step,
+                   "edge", &STATICS.type_f4, NULL, "value", &STATICS.type_f4, NULL);
 
         BUILTIN_3 (fma_f1, &STATICS.type_f1, NULL, KAN_FALSE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Fma,
                    "left", &STATICS.type_f1, NULL, "right", &STATICS.type_f1, NULL, "addition", &STATICS.type_f1, NULL);
