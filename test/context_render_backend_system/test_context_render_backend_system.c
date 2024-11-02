@@ -220,6 +220,9 @@ static kan_render_graphics_pipeline_t create_render_image_pipeline (kan_render_c
         kan_render_graphics_pipeline_family_create (render_context, &pipeline_family_description);
     KAN_TEST_ASSERT (family != KAN_INVALID_RENDER_GRAPHICS_PIPELINE_FAMILY)
 
+    kan_render_code_module_t code_module = kan_render_code_module_create (
+        render_context, code.size * code.item_size, code.data, kan_string_intern ("render_image_code"));
+
     struct kan_render_color_output_setup_description_t output_setups[1u] = {
         {
             .use_blend = KAN_FALSE,
@@ -247,10 +250,9 @@ static kan_render_graphics_pipeline_t create_render_image_pipeline (kan_render_c
         },
     };
 
-    struct kan_render_pipeline_code_module_t code_modules[1u] = {
+    struct kan_render_pipeline_code_module_usage_t code_modules[1u] = {
         {
-            .code_length = code.size * code.item_size,
-            .code = code.data,
+            .code_module = code_module,
             .entry_points_count = sizeof (code_entry_points) / sizeof (code_entry_points[0u]),
             .entry_points = code_entry_points,
         },
@@ -562,6 +564,9 @@ static kan_render_graphics_pipeline_t create_cube_pipeline (kan_render_context_t
         kan_render_graphics_pipeline_family_create (render_context, &pipeline_family_description);
     KAN_TEST_ASSERT (family != KAN_INVALID_RENDER_GRAPHICS_PIPELINE_FAMILY)
 
+    kan_render_code_module_t code_module = kan_render_code_module_create (render_context, code.size * code.item_size,
+                                                                          code.data, kan_string_intern ("cube_code"));
+
     struct kan_render_color_output_setup_description_t output_setups[1u] = {
         {
             .use_blend = KAN_FALSE,
@@ -589,10 +594,9 @@ static kan_render_graphics_pipeline_t create_cube_pipeline (kan_render_context_t
         },
     };
 
-    struct kan_render_pipeline_code_module_t code_modules[1u] = {
+    struct kan_render_pipeline_code_module_usage_t code_modules[1u] = {
         {
-            .code_length = code.size * code.item_size,
-            .code = code.data,
+            .code_module = code_module,
             .entry_points_count = sizeof (code_entry_points) / sizeof (code_entry_points[0u]),
             .entry_points = code_entry_points,
         },

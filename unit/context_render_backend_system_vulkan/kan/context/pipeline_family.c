@@ -261,15 +261,15 @@ struct render_backend_graphics_pipeline_family_t *render_backend_system_create_g
     }
 
 #if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED)
-        struct VkDebugUtilsObjectNameInfoEXT object_name = {
-            .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
-            .pNext = NULL,
-            .objectType = VK_OBJECT_TYPE_PIPELINE_LAYOUT,
-            .objectHandle = (uint64_t) pipeline_layout,
-            .pObjectName = description->tracking_name,
-        };
+    struct VkDebugUtilsObjectNameInfoEXT object_name = {
+        .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
+        .pNext = NULL,
+        .objectType = VK_OBJECT_TYPE_PIPELINE_LAYOUT,
+        .objectHandle = (uint64_t) pipeline_layout,
+        .pObjectName = description->tracking_name,
+    };
 
-        vkSetDebugUtilsObjectNameEXT (system->device, &object_name);
+    vkSetDebugUtilsObjectNameEXT (system->device, &object_name);
 #endif
 
     struct render_backend_graphics_pipeline_family_t *family = kan_allocate_batched (
@@ -408,6 +408,7 @@ void render_backend_system_destroy_graphics_pipeline_family (struct render_backe
                       sizeof (VkVertexInputBindingDescription) * family->input_bindings_count);
     kan_free_general (system->pipeline_family_wrapper_allocation_group, family->attributes,
                       sizeof (VkVertexInputAttributeDescription) * family->attributes_count);
+    kan_free_batched (system->pipeline_family_wrapper_allocation_group, family);
 }
 
 kan_render_graphics_pipeline_family_t kan_render_graphics_pipeline_family_create (

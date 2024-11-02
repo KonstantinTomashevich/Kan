@@ -36,6 +36,10 @@ typedef uint64_t kan_render_graphics_pipeline_family_t;
 
 #define KAN_INVALID_RENDER_GRAPHICS_PIPELINE_FAMILY 0u
 
+typedef uint64_t kan_render_code_module_t;
+
+#define KAN_INVALID_RENDER_CODE_MODULE 0u
+
 typedef uint64_t kan_render_graphics_pipeline_t;
 
 #define KAN_INVALID_RENDER_GRAPHICS_PIPELINE 0u
@@ -109,8 +113,6 @@ CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_context_t
 kan_render_backend_system_get_render_context (kan_context_system_handle_t render_backend_system);
 
 // TODO: Integrate with cpu profiler sections, especially kan_render_backend_system_next_frame.
-
-// TODO: Attach debug utils for RenderDoc if enabled.
 
 /// \details Submits recorded commands and presentation from previous frame, prepares data for the new frame.
 /// \return True if next frame submit should be started, false otherwise. For example, we might not be able to submit
@@ -458,6 +460,13 @@ CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_graphics_pipeline_family_t kan_rend
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_graphics_pipeline_family_destroy (
     kan_render_graphics_pipeline_family_t family);
 
+CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_code_module_t kan_render_code_module_create (kan_render_context_t context,
+                                                                                          uint32_t code_length,
+                                                                                          void *code,
+                                                                                          kan_interned_string_t tracking_name);
+
+CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_code_module_destroy (kan_render_code_module_t code_module);
+
 enum kan_render_polygon_mode_t
 {
     KAN_RENDER_POLYGON_MODE_FILL,
@@ -553,11 +562,9 @@ struct kan_render_pipeline_code_entry_point_t
     kan_interned_string_t function_name;
 };
 
-struct kan_render_pipeline_code_module_t
+struct kan_render_pipeline_code_module_usage_t
 {
-    uint32_t code_length;
-    void *code;
-
+    kan_render_code_module_t code_module;
     uint64_t entry_points_count;
     struct kan_render_pipeline_code_entry_point_t *entry_points;
 };
@@ -623,7 +630,7 @@ struct kan_render_graphics_pipeline_description_t
     struct kan_render_stencil_test_t stencil_back;
 
     uint64_t code_modules_count;
-    struct kan_render_pipeline_code_module_t *code_modules;
+    struct kan_render_pipeline_code_module_usage_t *code_modules;
 
     uint64_t samplers_count;
     struct kan_render_sampler_description_t *samplers;

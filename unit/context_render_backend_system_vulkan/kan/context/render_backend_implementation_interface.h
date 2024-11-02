@@ -181,6 +181,18 @@ struct scheduled_pass_destroy_t
     struct render_backend_pass_t *pass;
 };
 
+struct scheduled_pipeline_parameter_set_destroy_t
+{
+    struct scheduled_pipeline_parameter_set_destroy_t *next;
+    struct render_backend_pipeline_parameter_set_t *set;
+};
+
+struct scheduled_code_module_destroy_t
+{
+    struct scheduled_code_module_destroy_t *next;
+    struct render_backend_code_module_t *module;
+};
+
 struct scheduled_graphics_pipeline_destroy_t
 {
     struct scheduled_graphics_pipeline_destroy_t *next;
@@ -191,12 +203,6 @@ struct scheduled_graphics_pipeline_family_destroy_t
 {
     struct scheduled_graphics_pipeline_family_destroy_t *next;
     struct render_backend_graphics_pipeline_family_t *family;
-};
-
-struct scheduled_pipeline_parameter_set_destroy_t
-{
-    struct scheduled_pipeline_parameter_set_destroy_t *next;
-    struct render_backend_pipeline_parameter_set_t *set;
 };
 
 struct scheduled_detached_descriptor_set_destroy_t
@@ -259,6 +265,7 @@ struct render_backend_schedule_state_t
     struct scheduled_pass_destroy_t *first_scheduled_pass_destroy;
     struct scheduled_pipeline_parameter_set_destroy_t *first_scheduled_pipeline_parameter_set_destroy;
     struct scheduled_detached_descriptor_set_destroy_t *first_scheduled_detached_descriptor_set_destroy;
+    struct scheduled_code_module_destroy_t *first_scheduled_code_module_destroy;
     struct scheduled_graphics_pipeline_destroy_t *first_scheduled_graphics_pipeline_destroy;
     struct scheduled_graphics_pipeline_family_destroy_t *first_scheduled_graphics_pipeline_family_destroy;
     struct scheduled_buffer_destroy_t *first_scheduled_buffer_destroy;
@@ -413,6 +420,22 @@ struct render_backend_graphics_pipeline_family_t *render_backend_system_create_g
 void render_backend_system_destroy_graphics_pipeline_family (struct render_backend_system_t *system,
                                                              struct render_backend_graphics_pipeline_family_t *family);
 
+struct render_backend_code_module_t
+{
+    struct kan_bd_list_node_t list_node;
+    struct render_backend_system_t *system;
+    VkShaderModule module;
+    kan_interned_string_t tracking_name;
+};
+
+struct render_backend_code_module_t *render_backend_system_create_code_module (struct render_backend_system_t *system,
+                                                                               uint32_t code_length,
+                                                                               void *code,
+                                                                               kan_interned_string_t tracking_name);
+
+void render_backend_system_destroy_code_module (struct render_backend_system_t *system,
+                                                struct render_backend_code_module_t *code_module);
+
 enum pipeline_compilation_state_t
 {
     PIPELINE_COMPILATION_STATE_PENDING = 0u,
@@ -439,9 +462,6 @@ struct render_backend_graphics_pipeline_t
 
     float min_depth;
     float max_depth;
-
-    uint64_t shader_modules_count;
-    VkShaderModule *shader_modules;
 
     uint64_t samplers_count;
     struct render_backend_pipeline_sampler_t *samplers;
@@ -779,6 +799,8 @@ struct render_backend_system_t
     /// \details Surfaces are the exemption from this rule as they're always managed from application system thread.
     ///          Everything that is done from kan_render_backend_system_next_frame is an exemption from this rule as
     ///          strict frame ordering must prevent any calls that are simultaneous with next frame call.
+    // TODO: This lock is used in a lot of cases where it is not really needed de facto, for example lots of vkCreate*
+    //       do not need external synchronization but are caught under this lock. Research and improve it?
     struct kan_atomic_int_t resource_management_lock;
 
     struct kan_atomic_int_t pass_static_dependency_lock;
@@ -792,6 +814,7 @@ struct render_backend_system_t
     struct kan_bd_list_t pass_instances;
     struct kan_bd_list_t pass_instances_available;
     struct kan_bd_list_t graphics_pipeline_families;
+    struct kan_bd_list_t code_modules;
     struct kan_bd_list_t graphics_pipelines;
     struct kan_bd_list_t pipeline_parameter_sets;
     struct kan_bd_list_t buffers;
@@ -820,6 +843,7 @@ struct render_backend_system_t
     kan_allocation_group_t pass_wrapper_allocation_group;
     kan_allocation_group_t pass_instance_allocation_group;
     kan_allocation_group_t pipeline_family_wrapper_allocation_group;
+    kan_allocation_group_t code_module_wrapper_allocation_group;
     kan_allocation_group_t pipeline_wrapper_allocation_group;
     kan_allocation_group_t pipeline_parameter_set_wrapper_allocation_group;
     kan_allocation_group_t buffer_wrapper_allocation_group;

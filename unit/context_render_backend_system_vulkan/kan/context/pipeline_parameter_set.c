@@ -410,6 +410,8 @@ void render_backend_system_destroy_pipeline_parameter_set (struct render_backend
         kan_free_general (system->pipeline_parameter_set_wrapper_allocation_group, set->bound_image_views,
                           sizeof (VkImageView) * set->layout->bindings_count);
     }
+
+    kan_free_batched (system->pipeline_parameter_set_wrapper_allocation_group, set);
 }
 
 void render_backend_apply_descriptor_set_mutation (struct render_backend_pipeline_parameter_set_t *set_context,

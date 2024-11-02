@@ -367,11 +367,11 @@ void render_backend_compiler_state_request_graphics (struct render_backend_pipel
                               _Alignof (VkPipelineShaderStageCreateInfo));
 
     VkPipelineShaderStageCreateInfo *output_stage = request->shader_stages;
-    KAN_ASSERT (pipeline->shader_modules_count == description->code_modules_count)
-
     for (uint64_t module_index = 0u; module_index < description->code_modules_count; ++module_index)
     {
-        VkShaderModule module = pipeline->shader_modules[module_index];
+        VkShaderModule module =
+            ((struct render_backend_code_module_t *) description->code_modules[module_index].code_module)->module;
+
         for (uint64_t entry_point_index = 0u;
              entry_point_index < description->code_modules[module_index].entry_points_count; ++entry_point_index)
         {
@@ -624,55 +624,6 @@ struct render_backend_graphics_pipeline_t *render_backend_system_create_graphics
     struct render_backend_graphics_pipeline_family_t *family =
         (struct render_backend_graphics_pipeline_family_t *) description->family;
 
-    kan_bool_t shader_modules_created = KAN_TRUE;
-    VkShaderModule *shader_modules =
-        kan_allocate_general (system->pipeline_wrapper_allocation_group,
-                              sizeof (VkShaderModule) * description->code_modules_count, _Alignof (VkShaderModule));
-
-    for (uint64_t module_index = 0u; module_index < description->code_modules_count; ++module_index)
-    {
-        shader_modules[module_index] = VK_NULL_HANDLE;
-    }
-
-    for (uint64_t module_index = 0u; module_index < description->code_modules_count; ++module_index)
-    {
-        VkShaderModuleCreateInfo module_create_info = {
-            .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
-            .pNext = NULL,
-            .flags = 0u,
-            .codeSize = description->code_modules[module_index].code_length,
-            .pCode = (const uint32_t *) description->code_modules[module_index].code,
-        };
-
-        if (vkCreateShaderModule (system->device, &module_create_info, VULKAN_ALLOCATION_CALLBACKS (system),
-                                  &shader_modules[module_index]))
-        {
-            KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR,
-                     "Failed to compile shader module %lu of pipeline \"%s\" from family \"%s\".",
-                     (unsigned long) module_index, description->tracking_name, family->tracking_name)
-            shader_modules_created = KAN_FALSE;
-            break;
-        }
-
-        // TODO: SHADER MODULES NEED TO BE CREATED SEPARATELY TO SAVE MEMORY ON THE SAME SHADERS IN DIFFERENT PIPELINES.
-
-#if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED)
-        char debug_name[KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME];
-        snprintf (debug_name, KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME, "%s_shader_module_%lu",
-                  description->tracking_name, (unsigned long) module_index);
-
-        struct VkDebugUtilsObjectNameInfoEXT object_name = {
-            .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
-            .pNext = NULL,
-            .objectType = VK_OBJECT_TYPE_SHADER_MODULE,
-            .objectHandle = (uint64_t) shader_modules[module_index],
-            .pObjectName = debug_name,
-        };
-
-        vkSetDebugUtilsObjectNameEXT (system->device, &object_name);
-#endif
-    }
-
     kan_bool_t samplers_created = KAN_TRUE;
     struct render_backend_pipeline_sampler_t *samplers = NULL;
 
@@ -782,17 +733,8 @@ struct render_backend_graphics_pipeline_t *render_backend_system_create_graphics
         }
     }
 
-    if (!shader_modules_created || !samplers_created)
+    if (!samplers_created)
     {
-        for (uint64_t module_index = 0u; module_index < description->code_modules_count; ++module_index)
-        {
-            if (shader_modules[module_index] != VK_NULL_HANDLE)
-            {
-                vkDestroyShaderModule (system->device, shader_modules[module_index],
-                                       VULKAN_ALLOCATION_CALLBACKS (system));
-            }
-        }
-
         for (uint64_t sampler_index = 0u; sampler_index < description->samplers_count; ++sampler_index)
         {
             if (samplers[sampler_index].sampler != VK_NULL_HANDLE)
@@ -801,9 +743,6 @@ struct render_backend_graphics_pipeline_t *render_backend_system_create_graphics
                                   VULKAN_ALLOCATION_CALLBACKS (system));
             }
         }
-
-        kan_free_general (system->pipeline_wrapper_allocation_group, shader_modules,
-                          sizeof (VkShaderModule) * description->code_modules_count);
 
         if (samplers)
         {
@@ -826,9 +765,6 @@ struct render_backend_graphics_pipeline_t *render_backend_system_create_graphics
 
     pipeline->min_depth = description->min_depth;
     pipeline->max_depth = description->max_depth;
-
-    pipeline->shader_modules_count = description->code_modules_count;
-    pipeline->shader_modules = shader_modules;
 
     pipeline->samplers_count = description->samplers_count;
     pipeline->samplers = samplers;
@@ -854,26 +790,19 @@ void render_backend_system_destroy_graphics_pipeline (struct render_backend_syst
         vkDestroyPipeline (system->device, pipeline->pipeline, VULKAN_ALLOCATION_CALLBACKS (system));
     }
 
-    for (uint64_t module_index = 0u; module_index < pipeline->shader_modules_count; ++module_index)
-    {
-        vkDestroyShaderModule (system->device, pipeline->shader_modules[module_index],
-                               VULKAN_ALLOCATION_CALLBACKS (system));
-    }
-
     for (uint64_t sampler_index = 0u; sampler_index < pipeline->samplers_count; ++sampler_index)
     {
         vkDestroySampler (system->device, pipeline->samplers[sampler_index].sampler,
                           VULKAN_ALLOCATION_CALLBACKS (system));
     }
 
-    kan_free_general (system->pipeline_wrapper_allocation_group, pipeline->shader_modules,
-                      sizeof (VkShaderModule) * pipeline->shader_modules_count);
-
     if (pipeline->samplers)
     {
         kan_free_general (system->pipeline_wrapper_allocation_group, pipeline->samplers,
                           sizeof (struct render_backend_pipeline_sampler_t) * pipeline->samplers_count);
     }
+
+    kan_free_batched (system->pipeline_wrapper_allocation_group, pipeline);
 }
 
 kan_render_graphics_pipeline_t kan_render_graphics_pipeline_create (

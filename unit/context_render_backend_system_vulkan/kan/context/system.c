@@ -20,6 +20,7 @@ kan_context_system_handle_t render_backend_system_create (kan_allocation_group_t
     system->pass_instance_allocation_group = kan_allocation_group_get_child (group, "pass_instance");
     system->pipeline_family_wrapper_allocation_group =
         kan_allocation_group_get_child (group, "pipeline_family_wrapper");
+    system->code_module_wrapper_allocation_group = kan_allocation_group_get_child (group, "code_module_wrapper");
     system->pipeline_wrapper_allocation_group = kan_allocation_group_get_child (group, "pipeline_wrapper");
     system->pipeline_parameter_set_wrapper_allocation_group =
         kan_allocation_group_get_child (group, "pipeline_parameter_set_wrapper");
@@ -41,6 +42,7 @@ kan_context_system_handle_t render_backend_system_create (kan_allocation_group_t
     kan_bd_list_init (&system->pass_instances);
     kan_bd_list_init (&system->pass_instances_available);
     kan_bd_list_init (&system->graphics_pipeline_families);
+    kan_bd_list_init (&system->code_modules);
     kan_bd_list_init (&system->graphics_pipelines);
     kan_bd_list_init (&system->pipeline_parameter_sets);
     kan_bd_list_init (&system->buffers);
@@ -606,6 +608,16 @@ void render_backend_system_shutdown (kan_context_system_handle_t handle)
             (struct render_backend_graphics_pipeline_t *) pipeline->list_node.next;
         render_backend_system_destroy_graphics_pipeline (system, pipeline);
         pipeline = next;
+    }
+
+    struct render_backend_code_module_t *code_module =
+        (struct render_backend_code_module_t *) system->code_modules.first;
+
+    while (code_module)
+    {
+        struct render_backend_code_module_t *next = (struct render_backend_code_module_t *) code_module->list_node.next;
+        render_backend_system_destroy_code_module (system, code_module);
+        code_module = next;
     }
 
     struct render_backend_graphics_pipeline_family_t *family =
@@ -1196,6 +1208,7 @@ kan_bool_t kan_render_backend_system_select_device (kan_context_system_handle_t 
         state->first_scheduled_pass_destroy = NULL;
         state->first_scheduled_pipeline_parameter_set_destroy = NULL;
         state->first_scheduled_detached_descriptor_set_destroy = NULL;
+        state->first_scheduled_code_module_destroy = NULL;
         state->first_scheduled_graphics_pipeline_destroy = NULL;
         state->first_scheduled_graphics_pipeline_family_destroy = NULL;
         state->first_scheduled_buffer_destroy = NULL;
@@ -2644,7 +2657,7 @@ static void render_backend_system_clean_current_schedule_if_safe (struct render_
         !schedule->first_scheduled_image_mip_generation && !schedule->first_scheduled_frame_buffer_destroy &&
         !schedule->first_scheduled_detached_frame_buffer_destroy && !schedule->first_scheduled_pass_destroy &&
         !schedule->first_scheduled_pipeline_parameter_set_destroy &&
-        !schedule->first_scheduled_detached_descriptor_set_destroy &&
+        !schedule->first_scheduled_detached_descriptor_set_destroy && !schedule->first_scheduled_code_module_destroy &&
         !schedule->first_scheduled_graphics_pipeline_destroy &&
         !schedule->first_scheduled_graphics_pipeline_family_destroy && !schedule->first_scheduled_buffer_destroy &&
         !schedule->first_scheduled_frame_lifetime_allocator_destroy &&
@@ -2795,6 +2808,7 @@ static kan_bool_t render_backend_surface_create_swap_chain_image_views (struct r
         }
 
 #if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED)
+        // TODO: Add type prefixes to all names everywhere -- things like RenderDoc show names without types.
         char debug_name[KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME];
         snprintf (debug_name, KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME, "%s_image_view_%lu",
                   surface->tracking_name, (unsigned long) index);
@@ -3326,6 +3340,16 @@ kan_bool_t kan_render_backend_system_next_frame (kan_context_system_handle_t ren
         render_backend_descriptor_set_allocator_free (system, &system->descriptor_set_allocator,
                                                       &detached_descriptor_set_destroy->allocation);
         detached_descriptor_set_destroy = detached_descriptor_set_destroy->next;
+    }
+
+    struct scheduled_code_module_destroy_t *code_module_destroy = schedule->first_scheduled_code_module_destroy;
+    schedule->first_scheduled_code_module_destroy = NULL;
+
+    while (code_module_destroy)
+    {
+        kan_bd_list_remove (&system->code_modules, &code_module_destroy->module->list_node);
+        render_backend_system_destroy_code_module (system, code_module_destroy->module);
+        code_module_destroy = code_module_destroy->next;
     }
 
     struct scheduled_graphics_pipeline_destroy_t *graphics_pipeline_destroy =
