@@ -659,41 +659,41 @@ struct render_backend_graphics_pipeline_t *render_backend_system_create_graphics
         {
             struct kan_render_sampler_description_t *input = &description->samplers[sampler_index];
             struct render_backend_pipeline_sampler_t *output = &samplers[sampler_index];
-            output->set = (uint32_t) input->layout_set;
-            output->binding = (uint32_t) input->layout_binding;
+            output->set = (uint32_t) input->parameter_set;
+            output->binding = (uint32_t) input->parameter_binding;
 
-            if (input->layout_set >= family->descriptor_set_layouts_count)
+            if (input->parameter_set >= family->descriptor_set_layouts_count)
             {
                 KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR,
                          "Unable to create pipeline \"%s\" from family \"%s\": found attempt to bind sampler to set "
                          "%lu while there is only %lu sets.",
-                         description->tracking_name, family->tracking_name, (unsigned long) input->layout_set,
+                         description->tracking_name, family->tracking_name, (unsigned long) input->parameter_set,
                          (unsigned long) family->descriptor_set_layouts_count)
                 samplers_created = KAN_FALSE;
                 break;
             }
 
-            if (input->layout_binding >= family->descriptor_set_layouts[input->layout_set]->bindings_count)
+            if (input->parameter_binding >= family->descriptor_set_layouts[input->parameter_set]->bindings_count)
             {
                 KAN_LOG (
                     render_backend_system_vulkan, KAN_LOG_ERROR,
                     "Unable to create pipeline \"%s\" from family \"%s\": found attempt to bind sampler to binding "
                     "%lu while there is only %lu bindings (set %lu).",
-                    description->tracking_name, family->tracking_name, (unsigned long) input->layout_binding,
-                    (unsigned long) family->descriptor_set_layouts[input->layout_set]->bindings_count,
-                    (unsigned long) input->layout_set)
+                    description->tracking_name, family->tracking_name, (unsigned long) input->parameter_binding,
+                    (unsigned long) family->descriptor_set_layouts[input->parameter_set]->bindings_count,
+                    (unsigned long) input->parameter_set)
                 samplers_created = KAN_FALSE;
                 break;
             }
 
-            if (family->descriptor_set_layouts[input->layout_set]->bindings[input->layout_binding].type !=
-                KAN_RENDER_LAYOUT_BINDING_TYPE_COMBINED_IMAGE_SAMPLER)
+            if (family->descriptor_set_layouts[input->parameter_set]->bindings[input->parameter_binding].type !=
+                KAN_RENDER_PARAMETER_BINDING_TYPE_COMBINED_IMAGE_SAMPLER)
             {
                 KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR,
                          "Unable to create pipeline \"%s\" from family \"%s\": found attempt to bind sampler to set "
                          "%lu binding %lu, but it is not an image slot.",
-                         description->tracking_name, family->tracking_name, (unsigned long) input->layout_set,
-                         (unsigned long) input->layout_binding)
+                         description->tracking_name, family->tracking_name, (unsigned long) input->parameter_set,
+                         (unsigned long) input->parameter_binding)
                 samplers_created = KAN_FALSE;
                 break;
             }

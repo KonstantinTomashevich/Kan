@@ -293,6 +293,7 @@ void kan_render_image_resize_render_target (kan_render_image_t image,
         kan_atomic_int_unlock (&schedule->schedule_lock);
     }
 
+    data->last_command_layout = VK_IMAGE_LAYOUT_UNDEFINED;
     data->description.width = new_width;
     data->description.height = new_height;
     data->description.depth = new_depth;

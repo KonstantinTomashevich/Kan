@@ -99,6 +99,7 @@ void render_backend_system_connect (kan_context_system_handle_t handle, kan_cont
     kan_context_query (system->context, KAN_CONTEXT_APPLICATION_SYSTEM_NAME);
 }
 
+#if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_VALIDATION_ENABLED)
 static VKAPI_ATTR VkBool32 VKAPI_CALL
 vulkan_message_callback (VkDebugUtilsMessageSeverityFlagBitsEXT severity,
                          VkDebugUtilsMessageTypeFlagsEXT type,
@@ -130,6 +131,7 @@ vulkan_message_callback (VkDebugUtilsMessageSeverityFlagBitsEXT severity,
     KAN_LOG (render_backend_system_vulkan, verbosity, "Received message from Vulkan: %s", callback_data->pMessage)
     return VK_FALSE;
 }
+#endif
 
 static enum kan_render_device_memory_type_t query_device_memory_type (VkPhysicalDevice device)
 {
@@ -560,6 +562,26 @@ void render_backend_system_shutdown (kan_context_system_handle_t handle)
             vmaDestroyImage (system->gpu_memory_allocator, detached_image_destroy->detached_image,
                              detached_image_destroy->detached_allocation);
             detached_image_destroy = detached_image_destroy->next;
+        }
+
+        // We need to unmap scheduled uploads.
+        struct scheduled_buffer_unmap_flush_transfer_t *buffer_unmap_flush_transfer =
+            schedule->first_scheduled_buffer_unmap_flush_transfer;
+        schedule->first_scheduled_buffer_unmap_flush_transfer = NULL;
+
+        while (buffer_unmap_flush_transfer)
+        {
+            vmaUnmapMemory (system->gpu_memory_allocator, buffer_unmap_flush_transfer->source_buffer->allocation);
+            buffer_unmap_flush_transfer = buffer_unmap_flush_transfer->next;
+        }
+
+        struct scheduled_buffer_unmap_flush_t *buffer_unmap_flush = schedule->first_scheduled_buffer_unmap_flush;
+        schedule->first_scheduled_buffer_unmap_flush = NULL;
+
+        while (buffer_unmap_flush)
+        {
+            vmaUnmapMemory (system->gpu_memory_allocator, buffer_unmap_flush->buffer->allocation);
+            buffer_unmap_flush = buffer_unmap_flush->next;
         }
     }
 
@@ -1125,6 +1147,7 @@ static void render_backend_system_submit_transfer (struct render_backend_system_
     struct render_backend_schedule_state_t *schedule = &system->schedule_states[system->current_frame_in_flight_index];
     struct scheduled_buffer_unmap_flush_transfer_t *buffer_unmap_flush_transfer =
         schedule->first_scheduled_buffer_unmap_flush_transfer;
+    schedule->first_scheduled_buffer_unmap_flush_transfer = NULL;
 
     while (buffer_unmap_flush_transfer)
     {
@@ -1148,8 +1171,8 @@ static void render_backend_system_submit_transfer (struct render_backend_system_
         buffer_unmap_flush_transfer = buffer_unmap_flush_transfer->next;
     }
 
-    schedule->first_scheduled_buffer_unmap_flush_transfer = NULL;
     struct scheduled_buffer_unmap_flush_t *buffer_unmap_flush = schedule->first_scheduled_buffer_unmap_flush;
+    schedule->first_scheduled_buffer_unmap_flush = NULL;
 
     while (buffer_unmap_flush)
     {
@@ -1164,8 +1187,8 @@ static void render_backend_system_submit_transfer (struct render_backend_system_
         buffer_unmap_flush = buffer_unmap_flush->next;
     }
 
-    schedule->first_scheduled_buffer_unmap_flush = NULL;
     struct scheduled_image_upload_t *image_upload = schedule->first_scheduled_image_upload;
+    schedule->first_scheduled_image_upload = NULL;
 
     while (image_upload)
     {
@@ -1185,8 +1208,8 @@ static void render_backend_system_submit_transfer (struct render_backend_system_
             .dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
             .oldLayout = image_upload->image->last_command_layout,
             .newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .srcQueueFamilyIndex = system->device_transfer_queue_family_index,
+            .dstQueueFamilyIndex = system->device_transfer_queue_family_index,
             .image = image_upload->image->image,
             .subresourceRange =
                 {
@@ -1198,7 +1221,7 @@ static void render_backend_system_submit_transfer (struct render_backend_system_
                 },
         };
 
-        vkCmdPipelineBarrier (state->primary_transfer_command_buffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+        vkCmdPipelineBarrier (state->primary_transfer_command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT,
                               VK_PIPELINE_STAGE_TRANSFER_BIT, 0u, 0u, NULL, 0u, NULL, 1u, &prepare_transfer_barrier);
         image_upload->image->last_command_layout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
 
@@ -1237,8 +1260,8 @@ static void render_backend_system_submit_transfer (struct render_backend_system_
             .dstAccessMask = 0u,
             .oldLayout = image_upload->image->last_command_layout,
             .newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .srcQueueFamilyIndex = system->device_transfer_queue_family_index,
+            .dstQueueFamilyIndex = system->device_transfer_queue_family_index,
             .image = image_upload->image->image,
             .subresourceRange =
                 {
@@ -1251,14 +1274,12 @@ static void render_backend_system_submit_transfer (struct render_backend_system_
         };
 
         vkCmdPipelineBarrier (state->primary_transfer_command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT,
-                              VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0u, 0u, NULL, 0u, NULL, 1u,
-                              &finish_transfer_barrier);
+                              VK_PIPELINE_STAGE_TRANSFER_BIT, 0u, 0u, NULL, 0u, NULL, 1u, &finish_transfer_barrier);
 
         image_upload->image->last_command_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         image_upload = image_upload->next;
     }
 
-    schedule->first_scheduled_image_upload = NULL;
     if (vkEndCommandBuffer (state->primary_transfer_command_buffer) != VK_SUCCESS)
     {
         kan_critical_error ("Failed to end recording primary transfer buffer.", __FILE__, __LINE__);
@@ -1340,24 +1361,6 @@ static void render_backend_system_submit_transfer (struct render_backend_system_
     }
 }
 
-static VkImageLayout get_surface_layout_from_render_state (enum surface_render_state_t state)
-{
-    switch (state)
-    {
-    case SURFACE_RENDER_STATE_RECEIVED_NO_OUTPUT:
-        return VK_IMAGE_LAYOUT_UNDEFINED;
-
-    case SURFACE_RENDER_STATE_RECEIVED_DATA_FROM_FRAME_BUFFER:
-        return VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-    case SURFACE_RENDER_STATE_RECEIVED_DATA_FROM_BLIT:
-        return VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-    }
-
-    KAN_ASSERT (KAN_FALSE)
-    return VK_IMAGE_LAYOUT_UNDEFINED;
-}
-
 static inline void submit_mip_generation (struct render_backend_system_t *system,
                                           struct render_backend_schedule_state_t *schedule,
                                           struct render_backend_command_state_t *state)
@@ -1392,8 +1395,8 @@ static inline void submit_mip_generation (struct render_backend_system_t *system
                 .oldLayout = input_mip == image_mip_generation->first ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL :
                                                                         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                 .newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                .srcQueueFamilyIndex = system->device_graphics_queue_family_index,
+                .dstQueueFamilyIndex = system->device_graphics_queue_family_index,
                 .image = image_mip_generation->image->image,
                 .subresourceRange =
                     {
@@ -1405,7 +1408,8 @@ static inline void submit_mip_generation (struct render_backend_system_t *system
                     },
             };
 
-            vkCmdPipelineBarrier (state->primary_graphics_command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT,
+            vkCmdPipelineBarrier (state->primary_graphics_command_buffer,
+                                  VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT,
                                   VK_PIPELINE_STAGE_TRANSFER_BIT, 0u, 0u, NULL, 0u, NULL, 1u,
                                   &input_to_transfer_source_barrier);
 
@@ -1416,8 +1420,8 @@ static inline void submit_mip_generation (struct render_backend_system_t *system
                 .dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
                 .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
                 .newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                .srcQueueFamilyIndex = system->device_graphics_queue_family_index,
+                .dstQueueFamilyIndex = system->device_graphics_queue_family_index,
                 .image = image_mip_generation->image->image,
                 .subresourceRange =
                     {
@@ -1487,8 +1491,8 @@ static inline void submit_mip_generation (struct render_backend_system_t *system
                 .dstAccessMask = 0u,
                 .oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
                 .newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                .srcQueueFamilyIndex = system->device_graphics_queue_family_index,
+                .dstQueueFamilyIndex = system->device_graphics_queue_family_index,
                 .image = image_mip_generation->image->image,
                 .subresourceRange =
                     {
@@ -1501,7 +1505,7 @@ static inline void submit_mip_generation (struct render_backend_system_t *system
             };
 
             vkCmdPipelineBarrier (state->primary_graphics_command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT,
-                                  VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0u, 0u, NULL, 0u, NULL, 1u,
+                                  VK_PIPELINE_STAGE_TRANSFER_BIT, 0u, 0u, NULL, 0u, NULL, 1u,
                                   &input_to_read_only_barrier);
         }
 
@@ -1512,8 +1516,8 @@ static inline void submit_mip_generation (struct render_backend_system_t *system
             .dstAccessMask = 0u,
             .oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
             .newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .srcQueueFamilyIndex = system->device_graphics_queue_family_index,
+            .dstQueueFamilyIndex = system->device_graphics_queue_family_index,
             .image = image_mip_generation->image->image,
             .subresourceRange =
                 {
@@ -1526,8 +1530,7 @@ static inline void submit_mip_generation (struct render_backend_system_t *system
         };
 
         vkCmdPipelineBarrier (state->primary_graphics_command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT,
-                              VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0u, 0u, NULL, 0u, NULL, 1u,
-                              &last_to_read_only_barrier);
+                              VK_PIPELINE_STAGE_TRANSFER_BIT, 0u, 0u, NULL, 0u, NULL, 1u, &last_to_read_only_barrier);
 
         image_mip_generation->image->last_command_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         image_mip_generation = image_mip_generation->next;
@@ -1563,6 +1566,14 @@ static inline void process_frame_buffer_create_requests (struct render_backend_s
         {
             if (frame_buffer->attachments[attachment_index].type == KAN_FRAME_BUFFER_ATTACHMENT_SURFACE)
             {
+                if (!frame_buffer->attachments[attachment_index].surface)
+                {
+                    can_be_created = KAN_FALSE;
+                    KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR,
+                             "Unable to create frame buffer \"%s\" as its surface is already gone.",
+                             frame_buffer->tracking_name)
+                }
+
                 if (surface_index == UINT64_MAX)
                 {
                     instance_count = frame_buffer->attachments[attachment_index].surface->images_count;
@@ -1731,7 +1742,11 @@ static inline void process_frame_buffer_create_requests (struct render_backend_s
             }
         }
 
-        frame_buffer->image_views[surface_index] = VK_NULL_HANDLE;
+        if (surface_index != UINT64_MAX)
+        {
+            frame_buffer->image_views[surface_index] = VK_NULL_HANDLE;
+        }
+
         if (!created)
         {
             render_backend_frame_buffer_destroy_resources (system, frame_buffer);
@@ -1764,12 +1779,12 @@ static inline void process_surface_blit_requests (struct render_backend_system_t
                     VkImageMemoryBarrier barrier_info = {
                         .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
                         .pNext = NULL,
-                        .srcAccessMask = 0u,
-                        .dstAccessMask = 0u,
+                        .srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+                        .dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
                         .oldLayout = request->image->last_command_layout,
                         .newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                        .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                        .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                        .srcQueueFamilyIndex = system->device_graphics_queue_family_index,
+                        .dstQueueFamilyIndex = system->device_graphics_queue_family_index,
                         .image = request->image->image,
                         .subresourceRange =
                             {
@@ -1781,9 +1796,9 @@ static inline void process_surface_blit_requests (struct render_backend_system_t
                             },
                     };
 
-                    vkCmdPipelineBarrier (state->primary_graphics_command_buffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                                          VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0u, 0u, NULL, 0u, NULL, 1u,
-                                          &barrier_info);
+                    vkCmdPipelineBarrier (state->primary_graphics_command_buffer,
+                                          VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                                          0u, 0u, NULL, 0u, NULL, 1u, &barrier_info);
                     request->image->last_command_layout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
                 }
             }
@@ -1791,15 +1806,37 @@ static inline void process_surface_blit_requests (struct render_backend_system_t
             // Prepare destination surface image.
             if (surface->render_state != SURFACE_RENDER_STATE_RECEIVED_DATA_FROM_BLIT)
             {
+                VkImageLayout old_layout = VK_IMAGE_LAYOUT_UNDEFINED;
+                VkAccessFlags source_access_mask = 0u;
+                VkPipelineStageFlags source_stage = 0u;
+
+                switch (surface->render_state)
+                {
+                case SURFACE_RENDER_STATE_RECEIVED_NO_OUTPUT:
+                    old_layout = VK_IMAGE_LAYOUT_UNDEFINED;
+                    source_stage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+                    break;
+
+                case SURFACE_RENDER_STATE_RECEIVED_DATA_FROM_FRAME_BUFFER:
+                    old_layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+                    source_access_mask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+                    source_stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+                    break;
+
+                case SURFACE_RENDER_STATE_RECEIVED_DATA_FROM_BLIT:
+                    KAN_ASSERT (KAN_FALSE)
+                    break;
+                }
+
                 VkImageMemoryBarrier barrier_info = {
                     .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
                     .pNext = NULL,
-                    .srcAccessMask = 0u,
-                    .dstAccessMask = 0u,
-                    .oldLayout = get_surface_layout_from_render_state (surface->render_state),
+                    .srcAccessMask = source_access_mask,
+                    .dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
+                    .oldLayout = old_layout,
                     .newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                    .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                    .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                    .srcQueueFamilyIndex = system->device_graphics_queue_family_index,
+                    .dstQueueFamilyIndex = system->device_graphics_queue_family_index,
                     .image = surface->images[surface->acquired_image_index],
                     .subresourceRange =
                         {
@@ -1811,8 +1848,8 @@ static inline void process_surface_blit_requests (struct render_backend_system_t
                         },
                 };
 
-                vkCmdPipelineBarrier (state->primary_graphics_command_buffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                                      VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0u, 0u, NULL, 0u, NULL, 1u, &barrier_info);
+                vkCmdPipelineBarrier (state->primary_graphics_command_buffer, source_stage,
+                                      VK_PIPELINE_STAGE_TRANSFER_BIT, 0u, 0u, NULL, 0u, NULL, 1u, &barrier_info);
                 surface->render_state = SURFACE_RENDER_STATE_RECEIVED_DATA_FROM_BLIT;
             }
 
@@ -1895,12 +1932,12 @@ static inline void process_surface_blit_requests (struct render_backend_system_t
                     VkImageMemoryBarrier barrier_info = {
                         .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
                         .pNext = NULL,
-                        .srcAccessMask = 0u,
+                        .srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
                         .dstAccessMask = 0u,
                         .oldLayout = request->image->last_command_layout,
                         .newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                        .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                        .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                        .srcQueueFamilyIndex = system->device_graphics_queue_family_index,
+                        .dstQueueFamilyIndex = system->device_graphics_queue_family_index,
                         .image = request->image->image,
                         .subresourceRange =
                             {
@@ -1912,9 +1949,8 @@ static inline void process_surface_blit_requests (struct render_backend_system_t
                             },
                     };
 
-                    vkCmdPipelineBarrier (state->primary_graphics_command_buffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                                          VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0u, 0u, NULL, 0u, NULL, 1u,
-                                          &barrier_info);
+                    vkCmdPipelineBarrier (state->primary_graphics_command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                                          VK_PIPELINE_STAGE_TRANSFER_BIT, 0u, 0u, NULL, 0u, NULL, 1u, &barrier_info);
                     request->image->last_command_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
                 }
             }
@@ -1932,7 +1968,7 @@ static void render_backend_system_submit_pass_instance (struct render_backend_sy
                                                         struct render_backend_command_state_t *state,
                                                         struct render_backend_pass_instance_t *pass_instance)
 {
-    vkCmdEndRenderPass (pass_instance->command_buffer);
+    vkEndCommandBuffer (pass_instance->command_buffer);
 
     // We put lots of barrier here in order to be sure that everything works properly.
     // It might not be the best from performance point of view, might need investigation later.
@@ -2066,9 +2102,16 @@ static void render_backend_system_submit_pass_instance (struct render_backend_sy
         }
     }
 
-    vkCmdPipelineBarrier (state->primary_graphics_command_buffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                          VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0u, 0u, NULL, 0u, NULL, added_barriers, image_barriers);
+    vkCmdPipelineBarrier (state->primary_graphics_command_buffer,
+                          VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT |
+                              VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                          VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                          0u, 0u, NULL, 0u, NULL, added_barriers, image_barriers);
+
+    vkCmdBeginRenderPass (state->primary_graphics_command_buffer, &pass_instance->render_pass_begin_info,
+                          VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
     vkCmdExecuteCommands (state->primary_graphics_command_buffer, 1u, &pass_instance->command_buffer);
+    vkCmdEndRenderPass (state->primary_graphics_command_buffer);
 
     // Transition readable render targets so they can be used in shaders for sampling.
     added_barriers = 0u;
@@ -2124,8 +2167,10 @@ static void render_backend_system_submit_pass_instance (struct render_backend_sy
 
     if (added_barriers > 0u)
     {
-        vkCmdPipelineBarrier (state->primary_graphics_command_buffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                              VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0u, 0u, NULL, 0u, NULL, added_barriers,
+        vkCmdPipelineBarrier (state->primary_graphics_command_buffer,
+                              VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT |
+                                  VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                              VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0u, 0u, NULL, 0u, NULL, added_barriers,
                               image_barriers);
     }
 
@@ -2152,7 +2197,7 @@ static void render_backend_system_submit_pass_instance (struct render_backend_sy
         dependant = dependant->next;
     }
 
-    kan_bd_list_remove (&system->pass_instances, &pass_instance->node_in_available);
+    kan_bd_list_remove (&system->pass_instances, &pass_instance->node_in_all);
     kan_bd_list_remove (&system->pass_instances_available, &pass_instance->node_in_available);
 }
 
@@ -2213,7 +2258,10 @@ static void render_backend_system_submit_graphics (struct render_backend_system_
         while (system->pass_instances_available.size > 0u)
         {
             render_backend_system_submit_pass_instance (
-                system, state, (struct render_backend_pass_instance_t *) system->pass_instances_available.first);
+                system, state,
+                (struct render_backend_pass_instance_t *) (((uint8_t *) system->pass_instances_available.first) -
+                                                           offsetof (struct render_backend_pass_instance_t,
+                                                                     node_in_available)));
         }
 
         if (system->pass_instances.size > 0u)
@@ -2224,7 +2272,9 @@ static void render_backend_system_submit_graphics (struct render_backend_system_
 
             struct render_backend_pass_instance_t *make_available_anyway = NULL;
             struct render_backend_pass_instance_t *pass_instance =
-                (struct render_backend_pass_instance_t *) system->pass_instances.first;
+                (struct render_backend_pass_instance_t *) (((uint8_t *) system->pass_instances.first) -
+                                                           offsetof (struct render_backend_pass_instance_t,
+                                                                     node_in_all));
 
             while (pass_instance)
             {
@@ -2239,7 +2289,10 @@ static void render_backend_system_submit_graphics (struct render_backend_system_
                     make_available_anyway = pass_instance;
                 }
 
-                pass_instance = (struct render_backend_pass_instance_t *) pass_instance->node_in_all.next;
+                pass_instance =
+                    (struct render_backend_pass_instance_t *) (((uint8_t *) pass_instance->node_in_all.next) -
+                                                               offsetof (struct render_backend_pass_instance_t,
+                                                                         node_in_all));
             }
 
             make_available_anyway->dependencies_left = 0u;
@@ -2265,15 +2318,32 @@ static void render_backend_system_submit_graphics (struct render_backend_system_
         // We need to transition swap chain images into present layout.
         // If surface image didn't receive any output, we don't care about old layout.
         // Otherwise, it must be properly transitioned.
+
+        VkImageLayout old_layout;
+        switch (surface->render_state)
+        {
+        case SURFACE_RENDER_STATE_RECEIVED_NO_OUTPUT:
+            old_layout = VK_IMAGE_LAYOUT_UNDEFINED;
+            break;
+
+        case SURFACE_RENDER_STATE_RECEIVED_DATA_FROM_FRAME_BUFFER:
+            old_layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+            break;
+
+        case SURFACE_RENDER_STATE_RECEIVED_DATA_FROM_BLIT:
+            old_layout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+            break;
+        }
+
         VkImageMemoryBarrier barrier_info = {
             .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
             .pNext = NULL,
             .srcAccessMask = 0u,
             .dstAccessMask = 0u,
-            .oldLayout = get_surface_layout_from_render_state (surface->render_state),
+            .oldLayout = old_layout,
             .newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
-            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .srcQueueFamilyIndex = system->device_graphics_queue_family_index,
+            .dstQueueFamilyIndex = system->device_graphics_queue_family_index,
             .image = surface->images[surface->acquired_image_index],
             .subresourceRange =
                 {
@@ -2285,7 +2355,7 @@ static void render_backend_system_submit_graphics (struct render_backend_system_
                 },
         };
 
-        vkCmdPipelineBarrier (state->primary_graphics_command_buffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+        vkCmdPipelineBarrier (state->primary_graphics_command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
                               VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0u, 0u, NULL, 0u, NULL, 1u, &barrier_info);
         surface = (struct render_backend_surface_t *) surface->list_node.next;
     }
@@ -2378,7 +2448,9 @@ static void render_backend_system_submit_present (struct render_backend_system_t
         .pResults = NULL,
     };
 
-    if (vkQueuePresentKHR (system->graphics_queue, &present_info) != VK_SUCCESS)
+    const VkResult present_result = vkQueuePresentKHR (system->graphics_queue, &present_info);
+    if (present_result != VK_SUCCESS && present_result != VK_SUBOPTIMAL_KHR &&
+        present_result != VK_ERROR_OUT_OF_DATE_KHR)
     {
         kan_critical_error ("Failed to request present operations.", __FILE__, __LINE__);
     }
@@ -2947,6 +3019,13 @@ static kan_bool_t render_backend_system_acquire_images (struct render_backend_sy
                     any_swap_chain_outdated = KAN_TRUE;
                 }
             }
+
+            struct surface_frame_buffer_attachment_t *attachment = surface->first_frame_buffer_attachment;
+            while (attachment)
+            {
+                attachment->frame_buffer->instance_index = surface->acquired_image_index;
+                attachment = attachment->next;
+            }
         }
 
         surface = (struct render_backend_surface_t *) surface->list_node.next;
@@ -3220,6 +3299,8 @@ static void render_backend_surface_shutdown_with_window (void *user_data,
     }
 
     struct surface_blit_request_t *request = surface->first_blit_request;
+    surface->first_blit_request = NULL;
+
     while (request)
     {
         struct surface_blit_request_t *next = request->next;
@@ -3228,9 +3309,22 @@ static void render_backend_surface_shutdown_with_window (void *user_data,
     }
 
     struct surface_frame_buffer_attachment_t *attachment = surface->first_frame_buffer_attachment;
+    surface->first_frame_buffer_attachment = NULL;
+
     while (attachment)
     {
         struct surface_frame_buffer_attachment_t *next = attachment->next;
+        for (uint64_t attachment_index = 0u; attachment_index < attachment->frame_buffer->attachments_count;
+             ++attachment_index)
+        {
+            if (attachment->frame_buffer->attachments[attachment_index].type == KAN_FRAME_BUFFER_ATTACHMENT_SURFACE &&
+                attachment->frame_buffer->attachments[attachment_index].surface == surface)
+            {
+                // Forcibly detach buffer from surface to avoid memory corruption.
+                attachment->frame_buffer->attachments[attachment_index].surface = NULL;
+            }
+        }
+
         kan_free_batched (surface->system->surface_wrapper_allocation_group, attachment);
         attachment = next;
     }

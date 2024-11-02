@@ -290,6 +290,10 @@ struct render_backend_frame_buffer_t
     ///          Therefore, in that case frame_buffer_array is used instead of frame_buffer field.
     VkFramebuffer *instance_array;
 
+    /// \brief If this frame buffer is attached to surface,
+    ///        this variable contains index if frame buffer instance to use.
+    uint32_t instance_index;
+
     /// \brief Image views for attached images. VK_NULL_HANDLE is inserted in place of surface attachment if any.
     VkImageView *image_views;
 
@@ -354,6 +358,9 @@ struct render_backend_pass_instance_t
     struct render_backend_pass_instance_t *next_in_pass;
     struct kan_bd_list_node_t node_in_available;
     struct kan_bd_list_node_t node_in_all;
+
+    VkRenderPassBeginInfo render_pass_begin_info;
+    VkClearValue clear_values[];
 };
 
 void render_backend_pass_instance_add_dependency_internal (struct render_backend_pass_instance_t *dependant,
@@ -361,7 +368,7 @@ void render_backend_pass_instance_add_dependency_internal (struct render_backend
 
 struct render_backend_layout_binding_t
 {
-    enum kan_render_layout_binding_type_t type;
+    enum kan_render_parameter_binding_type_t type;
     uint64_t used_stage_mask;
 };
 

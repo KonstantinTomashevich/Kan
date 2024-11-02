@@ -108,6 +108,8 @@ kan_render_backend_system_get_render_context (kan_context_system_handle_t render
 
 // TODO: Integrate with cpu profiler sections, especially kan_render_backend_system_next_frame.
 
+// TODO: Attach debug utils for RenderDoc if enabled.
+
 /// \details Submits recorded commands and presentation from previous frame, prepares data for the new frame.
 /// \return True if next frame submit should be started, false otherwise. For example, we might not be able to submit
 ///         new frame while using frames in flights when GPU is not fast enough to process all the frames.
@@ -405,17 +407,17 @@ struct kan_render_attribute_description_t
     enum kan_render_attribute_format_t format;
 };
 
-enum kan_render_layout_binding_type_t
+enum kan_render_parameter_binding_type_t
 {
-    KAN_RENDER_LAYOUT_BINDING_TYPE_UNIFORM_BUFFER = 0u,
-    KAN_RENDER_LAYOUT_BINDING_TYPE_STORAGE_BUFFER,
-    KAN_RENDER_LAYOUT_BINDING_TYPE_COMBINED_IMAGE_SAMPLER,
+    KAN_RENDER_PARAMETER_BINDING_TYPE_UNIFORM_BUFFER = 0u,
+    KAN_RENDER_PARAMETER_BINDING_TYPE_STORAGE_BUFFER,
+    KAN_RENDER_PARAMETER_BINDING_TYPE_COMBINED_IMAGE_SAMPLER,
 };
 
-struct kan_render_layout_binding_description_t
+struct kan_render_parameter_binding_description_t
 {
     uint64_t binding;
-    enum kan_render_layout_binding_type_t type;
+    enum kan_render_parameter_binding_type_t type;
     uint64_t used_stage_mask;
 };
 
@@ -423,7 +425,7 @@ struct kan_render_parameter_set_description_t
 {
     uint64_t set;
     uint64_t bindings_count;
-    struct kan_render_layout_binding_description_t *bindings;
+    struct kan_render_parameter_binding_description_t *bindings;
     kan_bool_t stable_binding;
 };
 
@@ -581,8 +583,8 @@ enum kan_render_address_mode_t
 
 struct kan_render_sampler_description_t
 {
-    uint64_t layout_set;
-    uint64_t layout_binding;
+    uint64_t parameter_set;
+    uint64_t parameter_binding;
     enum kan_render_filter_mode_t mag_filter;
     enum kan_render_filter_mode_t min_filter;
     enum kan_render_mip_map_mode_t mip_map_mode;
@@ -763,6 +765,8 @@ enum kan_render_image_type_t
     KAN_RENDER_IMAGE_TYPE_STENCIL,
     KAN_RENDER_IMAGE_TYPE_DEPTH_STENCIL,
 };
+
+// TODO: In a lot of places 64 bit integers are unneeded. Make them 32 bit?
 
 struct kan_render_image_description_t
 {

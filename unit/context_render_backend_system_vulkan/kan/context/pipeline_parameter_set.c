@@ -452,12 +452,12 @@ void render_backend_apply_descriptor_set_mutation (struct render_backend_pipelin
         {
             switch (set_context->layout->bindings[update_bindings[index].binding].type)
             {
-            case KAN_RENDER_LAYOUT_BINDING_TYPE_UNIFORM_BUFFER:
-            case KAN_RENDER_LAYOUT_BINDING_TYPE_STORAGE_BUFFER:
+            case KAN_RENDER_PARAMETER_BINDING_TYPE_UNIFORM_BUFFER:
+            case KAN_RENDER_PARAMETER_BINDING_TYPE_STORAGE_BUFFER:
                 ++buffer_info_count;
                 break;
 
-            case KAN_RENDER_LAYOUT_BINDING_TYPE_COMBINED_IMAGE_SAMPLER:
+            case KAN_RENDER_PARAMETER_BINDING_TYPE_COMBINED_IMAGE_SAMPLER:
                 ++image_info_count;
                 break;
             }
@@ -492,23 +492,23 @@ void render_backend_apply_descriptor_set_mutation (struct render_backend_pipelin
 
             switch (set_context->layout->bindings[update_bindings[index].binding].type)
             {
-            case KAN_RENDER_LAYOUT_BINDING_TYPE_UNIFORM_BUFFER:
+            case KAN_RENDER_PARAMETER_BINDING_TYPE_UNIFORM_BUFFER:
                 descriptor_type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
                 break;
 
-            case KAN_RENDER_LAYOUT_BINDING_TYPE_STORAGE_BUFFER:
+            case KAN_RENDER_PARAMETER_BINDING_TYPE_STORAGE_BUFFER:
                 descriptor_type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
                 break;
 
-            case KAN_RENDER_LAYOUT_BINDING_TYPE_COMBINED_IMAGE_SAMPLER:
+            case KAN_RENDER_PARAMETER_BINDING_TYPE_COMBINED_IMAGE_SAMPLER:
                 descriptor_type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
                 break;
             }
 
             switch (set_context->layout->bindings[update_bindings[index].binding].type)
             {
-            case KAN_RENDER_LAYOUT_BINDING_TYPE_UNIFORM_BUFFER:
-            case KAN_RENDER_LAYOUT_BINDING_TYPE_STORAGE_BUFFER:
+            case KAN_RENDER_PARAMETER_BINDING_TYPE_UNIFORM_BUFFER:
+            case KAN_RENDER_PARAMETER_BINDING_TYPE_STORAGE_BUFFER:
                 this_buffer_info = next_buffer_info;
                 ++next_buffer_info;
 
@@ -520,7 +520,7 @@ void render_backend_apply_descriptor_set_mutation (struct render_backend_pipelin
 
                 break;
 
-            case KAN_RENDER_LAYOUT_BINDING_TYPE_COMBINED_IMAGE_SAMPLER:
+            case KAN_RENDER_PARAMETER_BINDING_TYPE_COMBINED_IMAGE_SAMPLER:
             {
                 this_image_info = next_image_info;
                 ++next_image_info;
@@ -596,6 +596,8 @@ void render_backend_apply_descriptor_set_mutation (struct render_backend_pipelin
                                  (unsigned long) update_bindings[index].binding, set_context->tracking_name)
                         this_image_info->imageView = VK_NULL_HANDLE;
                     }
+
+                    set_context->bound_image_views[update_bindings[index].binding] = this_image_info->imageView;
                 }
 
                 break;
@@ -685,7 +687,8 @@ void kan_render_pipeline_parameter_set_update (kan_render_pipeline_parameter_set
         for (uint64_t binding_index = 0u; binding_index < bindings_count; ++binding_index)
         {
             struct kan_render_parameter_update_description_t *update = &bindings[binding_index];
-            if (data->layout->bindings[update->binding].type == KAN_RENDER_LAYOUT_BINDING_TYPE_COMBINED_IMAGE_SAMPLER &&
+            if (data->layout->bindings[update->binding].type ==
+                    KAN_RENDER_PARAMETER_BINDING_TYPE_COMBINED_IMAGE_SAMPLER &&
                 update->image_binding.image != (kan_render_image_t) render_target_attachment->image)
             {
                 // Render target attachment changed, destroy it.
@@ -767,7 +770,7 @@ void kan_render_pipeline_parameter_set_update (kan_render_pipeline_parameter_set
     for (uint64_t binding_index = 0u; binding_index < bindings_count; ++binding_index)
     {
         struct kan_render_parameter_update_description_t *update = &bindings[binding_index];
-        if (data->layout->bindings[update->binding].type == KAN_RENDER_LAYOUT_BINDING_TYPE_COMBINED_IMAGE_SAMPLER)
+        if (data->layout->bindings[update->binding].type == KAN_RENDER_PARAMETER_BINDING_TYPE_COMBINED_IMAGE_SAMPLER)
         {
             struct render_backend_image_t *image = (struct render_backend_image_t *) update->image_binding.image;
             if (image && image->description.render_target)

@@ -11,6 +11,7 @@ struct render_backend_frame_buffer_t *render_backend_system_create_frame_buffer 
     buffer->instance = VK_NULL_HANDLE;
     buffer->instance_array_size = 0u;
     buffer->instance_array = NULL;
+    buffer->instance_index = UINT32_MAX;
     buffer->image_views = NULL;
 
     buffer->pass = (struct render_backend_pass_t *) description->associated_pass;
@@ -207,29 +208,32 @@ void render_backend_system_destroy_frame_buffer (struct render_backend_system_t 
 
         case KAN_FRAME_BUFFER_ATTACHMENT_SURFACE:
         {
-            struct surface_frame_buffer_attachment_t *previous = NULL;
-            struct surface_frame_buffer_attachment_t *current = attachment->surface->first_frame_buffer_attachment;
-
-            while (current)
+            if (attachment->surface)
             {
-                if (current->frame_buffer == frame_buffer)
+                struct surface_frame_buffer_attachment_t *previous = NULL;
+                struct surface_frame_buffer_attachment_t *current = attachment->surface->first_frame_buffer_attachment;
+
+                while (current)
                 {
-                    if (previous)
+                    if (current->frame_buffer == frame_buffer)
                     {
-                        previous->next = current->next;
-                    }
-                    else
-                    {
-                        KAN_ASSERT (attachment->surface->first_frame_buffer_attachment == current)
-                        attachment->surface->first_frame_buffer_attachment = current->next;
+                        if (previous)
+                        {
+                            previous->next = current->next;
+                        }
+                        else
+                        {
+                            KAN_ASSERT (attachment->surface->first_frame_buffer_attachment == current)
+                            attachment->surface->first_frame_buffer_attachment = current->next;
+                        }
+
+                        kan_free_batched (system->surface_wrapper_allocation_group, current);
+                        break;
                     }
 
-                    kan_free_batched (system->surface_wrapper_allocation_group, current);
-                    break;
+                    previous = current;
+                    current = current->next;
                 }
-
-                previous = current;
-                current = current->next;
             }
 
             break;

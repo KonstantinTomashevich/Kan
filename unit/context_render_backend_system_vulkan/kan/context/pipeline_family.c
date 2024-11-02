@@ -92,7 +92,7 @@ struct render_backend_graphics_pipeline_family_t *render_backend_system_create_g
         uint64_t bindings_count = 0u;
         for (uint64_t binding_index = 0u; binding_index < layout_description->bindings_count; ++binding_index)
         {
-            struct kan_render_layout_binding_description_t *binding_description =
+            struct kan_render_parameter_binding_description_t *binding_description =
                 &layout_description->bindings[binding_index];
             VkDescriptorSetLayoutBinding *vulkan_binding = &bindings[binding_index];
 
@@ -103,15 +103,15 @@ struct render_backend_graphics_pipeline_family_t *render_backend_system_create_g
 
             switch (binding_description->type)
             {
-            case KAN_RENDER_LAYOUT_BINDING_TYPE_UNIFORM_BUFFER:
+            case KAN_RENDER_PARAMETER_BINDING_TYPE_UNIFORM_BUFFER:
                 vulkan_binding->descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
                 break;
 
-            case KAN_RENDER_LAYOUT_BINDING_TYPE_STORAGE_BUFFER:
+            case KAN_RENDER_PARAMETER_BINDING_TYPE_STORAGE_BUFFER:
                 vulkan_binding->descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
                 break;
 
-            case KAN_RENDER_LAYOUT_BINDING_TYPE_COMBINED_IMAGE_SAMPLER:
+            case KAN_RENDER_PARAMETER_BINDING_TYPE_COMBINED_IMAGE_SAMPLER:
                 vulkan_binding->descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
                 break;
             }
@@ -163,6 +163,7 @@ struct render_backend_graphics_pipeline_family_t *render_backend_system_create_g
                                   sizeof (struct render_backend_descriptor_set_layout_t) +
                                       sizeof (struct render_backend_layout_binding_t) * bindings_count,
                                   _Alignof (struct render_backend_descriptor_set_layout_t));
+        descriptor_set_layouts[layout_description->set] = layout;
 
         layout->layout = descriptor_set_layouts_for_pipeline[layout_index];
         layout->stable_binding = layout_description->stable_binding;
@@ -173,14 +174,14 @@ struct render_backend_graphics_pipeline_family_t *render_backend_system_create_g
 
         for (uint64_t binding = 0u; binding < bindings_count; ++binding)
         {
-            layout->bindings[binding].type = KAN_RENDER_LAYOUT_BINDING_TYPE_UNIFORM_BUFFER;
+            layout->bindings[binding].type = KAN_RENDER_PARAMETER_BINDING_TYPE_UNIFORM_BUFFER;
             // Bindings with zero used stage mask are treated as non-existent.
             layout->bindings[binding].used_stage_mask = 0u;
         }
 
         for (uint64_t binding_index = 0u; binding_index < layout_description->bindings_count; ++binding_index)
         {
-            struct kan_render_layout_binding_description_t *binding_description =
+            struct kan_render_parameter_binding_description_t *binding_description =
                 &layout_description->bindings[binding_index];
 
             layout->bindings[binding_description->binding].type = binding_description->type;
@@ -188,17 +189,17 @@ struct render_backend_graphics_pipeline_family_t *render_backend_system_create_g
 
             switch (binding_description->type)
             {
-            case KAN_RENDER_LAYOUT_BINDING_TYPE_UNIFORM_BUFFER:
+            case KAN_RENDER_PARAMETER_BINDING_TYPE_UNIFORM_BUFFER:
                 KAN_ASSERT (layout->uniform_buffers_count < UINT8_MAX)
                 ++layout->uniform_buffers_count;
                 break;
 
-            case KAN_RENDER_LAYOUT_BINDING_TYPE_STORAGE_BUFFER:
+            case KAN_RENDER_PARAMETER_BINDING_TYPE_STORAGE_BUFFER:
                 KAN_ASSERT (layout->storage_buffers_count < UINT8_MAX)
                 ++layout->storage_buffers_count;
                 break;
 
-            case KAN_RENDER_LAYOUT_BINDING_TYPE_COMBINED_IMAGE_SAMPLER:
+            case KAN_RENDER_PARAMETER_BINDING_TYPE_COMBINED_IMAGE_SAMPLER:
                 KAN_ASSERT (layout->combined_image_samplers_count < UINT8_MAX)
                 ++layout->combined_image_samplers_count;
                 break;
@@ -359,7 +360,7 @@ struct render_backend_graphics_pipeline_family_t *render_backend_system_create_g
         for (uint32_t attribute_index = 0u; attribute_index < attribute_count; ++attribute_index)
         {
             attribute_output->binding = (uint32_t) input->binding;
-            attribute_output->location = (uint32_t) input->location;
+            attribute_output->location = (uint32_t) input->location + attribute_index;
             attribute_output->offset = (uint32_t) input->offset + item_offset * attribute_index;
             attribute_output->format = input_format;
             ++attribute_output;

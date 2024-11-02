@@ -244,6 +244,7 @@ struct render_backend_pass_t *render_backend_system_create_pass (struct render_b
     kan_bd_list_add (&system->passes, NULL, &pass->list_node);
 
     pass->pass = render_pass;
+    pass->system = system;
     pass->first_dependant_pass = NULL;
     pass->first_instance = NULL;
     pass->tracking_name = description->tracking_name;
@@ -345,7 +346,11 @@ kan_render_pass_instance_t kan_render_pass_instantiate (kan_render_pass_t pass,
     struct render_backend_pass_t *pass_data = (struct render_backend_pass_t *) pass;
     struct render_backend_frame_buffer_t *frame_buffer_data = (struct render_backend_frame_buffer_t *) frame_buffer;
 
-    if (!pass_data->system->frame_started || frame_buffer_data->instance != VK_NULL_HANDLE)
+    VkFramebuffer selected_frame_buffer = frame_buffer_data->instance_array ?
+                                              frame_buffer_data->instance_array[frame_buffer_data->instance_index] :
+                                              frame_buffer_data->instance;
+
+    if (!pass_data->system->frame_started || selected_frame_buffer == VK_NULL_HANDLE)
     {
         return KAN_INVALID_RENDER_PASS_INSTANCE;
     }
@@ -390,6 +395,34 @@ kan_render_pass_instance_t kan_render_pass_instantiate (kan_render_pass_t pass,
         command_buffer = ((VkCommandBuffer *) command_state->graphics_command_buffers.data)[command_buffer_index];
     }
 
+    if (command_buffer != VK_NULL_HANDLE)
+    {
+        struct VkCommandBufferInheritanceInfo inheritance_info = {
+            .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO,
+            .pNext = NULL,
+            .renderPass = pass_data->pass,
+            .subpass = 0u,
+            .framebuffer = selected_frame_buffer,
+            .occlusionQueryEnable = VK_FALSE,
+            .queryFlags = 0u,
+            .pipelineStatistics = 0u,
+        };
+
+        struct VkCommandBufferBeginInfo begin_info = {
+            .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+            .pNext = NULL,
+            .flags = VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT,
+            .pInheritanceInfo = &inheritance_info,
+        };
+
+        if (vkBeginCommandBuffer (command_buffer, &begin_info) != VK_SUCCESS)
+        {
+            KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR,
+                     "Failed to begin command buffer for new pass \"%s\" instance.", pass_data->tracking_name)
+            command_buffer = VK_NULL_HANDLE;
+        }
+    }
+
     kan_atomic_int_unlock (&command_state->graphics_command_operation_lock);
     if (command_buffer == VK_NULL_HANDLE)
     {
@@ -399,8 +432,10 @@ kan_render_pass_instance_t kan_render_pass_instantiate (kan_render_pass_t pass,
     }
 
     kan_atomic_int_lock (&pass_data->system->pass_instance_state_management_lock);
-    struct render_backend_pass_instance_t *instance = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (
-        &pass_data->system->pass_instance_allocator, struct render_backend_pass_instance_t);
+    struct render_backend_pass_instance_t *instance = kan_stack_group_allocator_allocate (
+        &pass_data->system->pass_instance_allocator,
+        sizeof (struct render_backend_pass_instance_t) + sizeof (VkClearValue) * frame_buffer_data->attachments_count,
+        _Alignof (struct render_backend_pass_instance_t));
 
     instance->system = pass_data->system;
     instance->command_buffer = command_buffer;
@@ -412,44 +447,36 @@ kan_render_pass_instance_t kan_render_pass_instantiate (kan_render_pass_t pass,
     instance->next_in_pass = pass_data->first_instance;
     pass_data->first_instance = instance;
     kan_bd_list_add (&pass_data->system->pass_instances, NULL, &instance->node_in_all);
-    kan_bd_list_add (&pass_data->system->pass_instances, NULL, &instance->node_in_all);
     kan_bd_list_add (&pass_data->system->pass_instances_available, NULL, &instance->node_in_available);
     kan_atomic_int_unlock (&pass_data->system->pass_instance_state_management_lock);
 
-    // Initial commands. Bind render pass, viewport and scissor.
-    VkClearValue clear_values_static[KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_INLINE_CLEARS];
-    VkClearValue *clear_values = clear_values_static;
-
-    if (frame_buffer_data->attachments_count > KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_INLINE_CLEARS)
-    {
-        clear_values = kan_allocate_general (pass_data->system->utility_allocation_group,
-                                             sizeof (VkClearValue) * frame_buffer_data->attachments_count,
-                                             _Alignof (VkClearValue));
-    }
+    // Initial commands:
+    // - Prepare render pass info for primary buffer. Render pass cannot be started in secondary buffers.
+    // - Bind viewport and scissor.
 
     for (uint64_t index = 0u; index < frame_buffer_data->attachments_count; ++index)
     {
         switch (frame_buffer_data->attachments[index].type)
         {
         case KAN_FRAME_BUFFER_ATTACHMENT_IMAGE:
-            clear_values[index].color.float32[0u] = attachment_clear_values[index].color.r;
-            clear_values[index].color.float32[1u] = attachment_clear_values[index].color.g;
-            clear_values[index].color.float32[2u] = attachment_clear_values[index].color.b;
-            clear_values[index].color.float32[3u] = attachment_clear_values[index].color.a;
+            instance->clear_values[index].color.float32[0u] = attachment_clear_values[index].color.r;
+            instance->clear_values[index].color.float32[1u] = attachment_clear_values[index].color.g;
+            instance->clear_values[index].color.float32[2u] = attachment_clear_values[index].color.b;
+            instance->clear_values[index].color.float32[3u] = attachment_clear_values[index].color.a;
             break;
 
         case KAN_FRAME_BUFFER_ATTACHMENT_SURFACE:
-            clear_values[index].depthStencil.depth = attachment_clear_values[index].depth_stencil.depth;
-            clear_values[index].depthStencil.stencil = attachment_clear_values[index].depth_stencil.stencil;
+            instance->clear_values[index].depthStencil.depth = attachment_clear_values[index].depth_stencil.depth;
+            instance->clear_values[index].depthStencil.stencil = attachment_clear_values[index].depth_stencil.stencil;
             break;
         }
     }
 
-    VkRenderPassBeginInfo render_pass_begin_info = {
+    instance->render_pass_begin_info = (VkRenderPassBeginInfo) {
         .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
         .pNext = NULL,
         .renderPass = pass_data->pass,
-        .framebuffer = instance->frame_buffer->instance,
+        .framebuffer = selected_frame_buffer,
         .renderArea =
             {
                 .offset =
@@ -464,14 +491,14 @@ kan_render_pass_instance_t kan_render_pass_instantiate (kan_render_pass_t pass,
                     },
             },
         .clearValueCount = (uint32_t) frame_buffer_data->attachments_count,
-        .pClearValues = clear_values,
+        .pClearValues = instance->clear_values,
     };
 
     VkViewport pass_viewport = {
         .x = viewport_bounds->x,
         .y = viewport_bounds->y + viewport_bounds->height,
         .width = viewport_bounds->width,
-        .height = viewport_bounds->height,
+        .height = -viewport_bounds->height,
         .minDepth = viewport_bounds->depth_min,
         .maxDepth = viewport_bounds->depth_max,
     };
@@ -490,17 +517,9 @@ kan_render_pass_instance_t kan_render_pass_instantiate (kan_render_pass_t pass,
     };
 
     kan_atomic_int_lock (&command_state->graphics_command_operation_lock);
-    vkCmdBeginRenderPass (instance->command_buffer, &render_pass_begin_info, VK_SUBPASS_CONTENTS_INLINE);
     vkCmdSetViewport (instance->command_buffer, 0u, 1u, &pass_viewport);
     vkCmdSetScissor (instance->command_buffer, 0u, 1u, &pass_scissor);
     kan_atomic_int_unlock (&command_state->graphics_command_operation_lock);
-
-    if (clear_values != clear_values_static)
-    {
-        kan_free_general (pass_data->system->utility_allocation_group, clear_values,
-                          sizeof (VkClearValue) * frame_buffer_data->attachments_count);
-    }
-
     return (kan_render_pass_instance_t) instance;
 }
 
@@ -536,6 +555,7 @@ void kan_render_pass_instance_pipeline_parameter_sets (kan_render_pass_instance_
                                                        kan_render_pipeline_parameter_set_t *parameter_sets)
 {
     struct render_backend_pass_instance_t *instance = (struct render_backend_pass_instance_t *) pass_instance;
+    KAN_ASSERT (instance->current_pipeline_layout)
     struct render_backend_command_state_t *command_state =
         &instance->system->command_states[instance->system->current_frame_in_flight_index];
 
