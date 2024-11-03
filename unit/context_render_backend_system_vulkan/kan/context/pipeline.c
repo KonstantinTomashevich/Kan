@@ -321,12 +321,16 @@ kan_thread_result_t render_backend_pipeline_compiler_state_worker_function (kan_
 #if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED)
         if (pipeline != VK_NULL_HANDLE)
         {
+            char debug_name[KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME];
+            snprintf (debug_name, KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME, "Pipeline::%s",
+                      request->pipeline->tracking_name);
+
             struct VkDebugUtilsObjectNameInfoEXT object_name = {
                 .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
                 .pNext = NULL,
                 .objectType = VK_OBJECT_TYPE_PIPELINE,
                 .objectHandle = (uint64_t) pipeline,
-                .pObjectName = request->pipeline->tracking_name,
+                .pObjectName = debug_name,
             };
 
             vkSetDebugUtilsObjectNameEXT (request->pipeline->system->device, &object_name);
@@ -717,8 +721,9 @@ struct render_backend_graphics_pipeline_t *render_backend_system_create_graphics
 
 #if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED)
             char debug_name[KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME];
-            snprintf (debug_name, KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME, "%s_sampler_%lu",
-                      description->tracking_name, (unsigned long) sampler_index);
+            snprintf (debug_name, KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME,
+                      "Sampler::ForPipeline::%s::attachment%lu", description->tracking_name,
+                      (unsigned long) sampler_index);
 
             struct VkDebugUtilsObjectNameInfoEXT object_name = {
                 .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,

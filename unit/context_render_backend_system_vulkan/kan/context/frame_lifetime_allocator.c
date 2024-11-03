@@ -23,6 +23,11 @@ struct render_backend_frame_lifetime_allocator_t *render_backend_system_create_f
     allocator->buffer_type = buffer_type;
     allocator->page_size = page_size;
     allocator->tracking_name = tracking_name;
+
+    char debug_name[KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME];
+    snprintf (debug_name, KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME, "ForFLA::%s",
+              allocator->tracking_name);
+    allocator->buffer_tracking_name = kan_string_intern (debug_name);
     return allocator;
 }
 
@@ -174,7 +179,7 @@ struct render_backend_frame_lifetime_allocator_allocation_t render_backend_frame
     // No space on existing pages, need to create new one.
     struct render_backend_buffer_t *new_page_buffer =
         render_backend_system_create_buffer (allocator->system, allocator->buffer_family, allocator->buffer_type,
-                                             allocator->page_size, allocator->tracking_name);
+                                             allocator->page_size, allocator->buffer_tracking_name);
 
     if (!new_page_buffer)
     {

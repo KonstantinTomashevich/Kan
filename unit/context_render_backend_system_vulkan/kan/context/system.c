@@ -859,11 +859,50 @@ kan_bool_t kan_render_backend_system_select_device (kan_context_system_handle_t 
         return KAN_FALSE;
     }
 
+#if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED)
+    {
+        struct VkDebugUtilsObjectNameInfoEXT object_name = {
+            .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
+            .pNext = NULL,
+            .objectType = VK_OBJECT_TYPE_INSTANCE,
+            .objectHandle = (uint64_t) system->instance,
+            .pObjectName = "RenderContextInstance",
+        };
+
+        vkSetDebugUtilsObjectNameEXT (system->device, &object_name);
+    }
+    {
+        struct VkDebugUtilsObjectNameInfoEXT object_name = {
+            .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
+            .pNext = NULL,
+            .objectType = VK_OBJECT_TYPE_DEVICE,
+            .objectHandle = (uint64_t) system->device,
+            .pObjectName = "LogicalDevice",
+        };
+
+        vkSetDebugUtilsObjectNameEXT (system->device, &object_name);
+    }
+#endif
+
     system->device_memory_type = query_device_memory_type (physical_device);
     system->physical_device = physical_device;
 
     volkLoadDevice (system->device);
     vkGetDeviceQueue (system->device, system->device_queue_family_index, 0u, &system->device_queue);
+
+#if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED)
+    {
+        struct VkDebugUtilsObjectNameInfoEXT object_name = {
+            .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
+            .pNext = NULL,
+            .objectType = VK_OBJECT_TYPE_QUEUE,
+            .objectHandle = (uint64_t) system->device_queue,
+            .pObjectName = "Queue::merged_queue",
+        };
+
+        vkSetDebugUtilsObjectNameEXT (system->device, &object_name);
+    }
+#endif
 
     system->gpu_memory_allocator_functions = (VmaVulkanFunctions) {
         .vkGetInstanceProcAddr = vkGetInstanceProcAddr,
@@ -948,8 +987,8 @@ kan_bool_t kan_render_backend_system_select_device (kan_context_system_handle_t 
 #if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED)
         {
             char debug_name[KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME];
-            snprintf (debug_name, KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME, "render_finished_semaphore_%lu",
-                      (unsigned long) index);
+            snprintf (debug_name, KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME,
+                      "Semaphore::render_finished::frame%lu", (unsigned long) index);
 
             struct VkDebugUtilsObjectNameInfoEXT object_name = {
                 .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
@@ -974,7 +1013,7 @@ kan_bool_t kan_render_backend_system_select_device (kan_context_system_handle_t 
 #if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED)
         {
             char debug_name[KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME];
-            snprintf (debug_name, KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME, "in_flight_%lu",
+            snprintf (debug_name, KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME, "Fence::in_flight::frame%lu",
                       (unsigned long) index);
 
             struct VkDebugUtilsObjectNameInfoEXT object_name = {
@@ -1028,7 +1067,7 @@ kan_bool_t kan_render_backend_system_select_device (kan_context_system_handle_t 
 #if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED)
         {
             char debug_name[KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME];
-            snprintf (debug_name, KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME, "graphics_command_pool_%lu",
+            snprintf (debug_name, KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME, "CommandPool::primary::frame%lu",
                       (unsigned long) index);
 
             struct VkDebugUtilsObjectNameInfoEXT object_name = {
@@ -1661,8 +1700,9 @@ static inline void process_frame_buffer_create_requests (struct render_backend_s
                 if (frame_buffer->image_views[attachment_index] != VK_NULL_HANDLE)
                 {
                     char debug_name[KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME];
-                    snprintf (debug_name, KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME, "%s_image_view_%lu",
-                              frame_buffer->tracking_name, (unsigned long) attachment_index);
+                    snprintf (debug_name, KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME,
+                              "ImageView::ForFrameBuffer::%s::attachment%lu", frame_buffer->tracking_name,
+                              (unsigned long) attachment_index);
 
                     struct VkDebugUtilsObjectNameInfoEXT object_name = {
                         .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
@@ -1730,12 +1770,16 @@ static inline void process_frame_buffer_create_requests (struct render_backend_s
 #if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED)
             if (*output != VK_NULL_HANDLE)
             {
+                char debug_name[KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME];
+                snprintf (debug_name, KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME, "FrameBuffer::%s::instance%lu",
+                          frame_buffer->tracking_name, (unsigned long) instance_index);
+
                 struct VkDebugUtilsObjectNameInfoEXT object_name = {
                     .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
                     .pNext = NULL,
                     .objectType = VK_OBJECT_TYPE_FRAMEBUFFER,
                     .objectHandle = (uint64_t) *output,
-                    .pObjectName = frame_buffer->tracking_name,
+                    .pObjectName = debug_name,
                 };
 
                 vkSetDebugUtilsObjectNameEXT (system->device, &object_name);
@@ -2667,6 +2711,24 @@ static kan_bool_t render_backend_surface_create_swap_chain_image_views (struct r
     kan_bool_t views_created_successfully = KAN_TRUE;
     for (uint32_t view_index = 0u; view_index < surface->images_count; ++view_index)
     {
+#if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED)
+        {
+            char debug_name[KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME];
+            snprintf (debug_name, KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME,
+                      "Image::ForSurface::%s::instance%lu", surface->tracking_name, (unsigned long) index);
+
+            struct VkDebugUtilsObjectNameInfoEXT object_name = {
+                .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
+                .pNext = NULL,
+                .objectType = VK_OBJECT_TYPE_IMAGE,
+                .objectHandle = (uint64_t) surface->images[view_index],
+                .pObjectName = debug_name,
+            };
+
+            vkSetDebugUtilsObjectNameEXT (surface->system->device, &object_name);
+        }
+#endif
+
         VkImageViewCreateInfo create_info = {
             .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
             .pNext = NULL,
@@ -2704,10 +2766,9 @@ static kan_bool_t render_backend_surface_create_swap_chain_image_views (struct r
         }
 
 #if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED)
-        // TODO: Add type prefixes to all names everywhere -- things like RenderDoc show names without types.
         char debug_name[KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME];
-        snprintf (debug_name, KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME, "%s_image_view_%lu",
-                  surface->tracking_name, (unsigned long) index);
+        snprintf (debug_name, KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME, "ImageVew::ForSurface:::%s::image%lu",
+                  surface->tracking_name, (unsigned long) view_index);
 
         struct VkDebugUtilsObjectNameInfoEXT object_name = {
             .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
@@ -2773,8 +2834,8 @@ static kan_bool_t render_backend_surface_create_semaphores (struct render_backen
 
 #if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED)
         char debug_name[KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME];
-        snprintf (debug_name, KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME, "%s_image_available_%lu",
-                  surface->tracking_name, (unsigned long) index);
+        snprintf (debug_name, KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME,
+                  "Semaphore::ForSurface::%s::image_available%lu", surface->tracking_name, (unsigned long) index);
 
         struct VkDebugUtilsObjectNameInfoEXT object_name = {
             .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
@@ -3006,12 +3067,15 @@ static void render_backend_surface_create_swap_chain (struct render_backend_surf
     }
 
 #if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED)
+    char debug_name[KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME];
+    snprintf (debug_name, KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME, "Surface::%s", surface->tracking_name);
+
     struct VkDebugUtilsObjectNameInfoEXT object_name = {
         .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
         .pNext = NULL,
         .objectType = VK_OBJECT_TYPE_SWAPCHAIN_KHR,
         .objectHandle = (uint64_t) surface->swap_chain,
-        .pObjectName = surface->tracking_name,
+        .pObjectName = debug_name,
     };
 
     vkSetDebugUtilsObjectNameEXT (surface->system->device, &object_name);

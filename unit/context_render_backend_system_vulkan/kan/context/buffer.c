@@ -96,12 +96,39 @@ struct render_backend_buffer_t *render_backend_system_create_buffer (struct rend
     }
 
 #if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED)
+    const char *buffer_type_name = "UnknownBuffer";
+    switch (buffer_type)
+    {
+    case KAN_RENDER_BUFFER_TYPE_ATTRIBUTE:
+        buffer_type_name = "AttributeBuffer";
+        break;
+
+    case KAN_RENDER_BUFFER_TYPE_INDEX_16:
+        buffer_type_name = "Index16Buffer";
+        break;
+
+    case KAN_RENDER_BUFFER_TYPE_INDEX_32:
+        buffer_type_name = "Index32Buffer";
+        break;
+
+    case KAN_RENDER_BUFFER_TYPE_UNIFORM:
+        buffer_type_name = "UniformBuffer";
+        break;
+
+    case KAN_RENDER_BUFFER_TYPE_STORAGE:
+        buffer_type_name = "StorageBuffer";
+        break;
+    }
+
+    char debug_name[KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME];
+    snprintf (debug_name, KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME, "%s::%s", buffer_type_name, tracking_name);
+
     struct VkDebugUtilsObjectNameInfoEXT object_name = {
         .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
         .pNext = NULL,
         .objectType = VK_OBJECT_TYPE_BUFFER,
         .objectHandle = (uint64_t) buffer_handle,
-        .pObjectName = tracking_name,
+        .pObjectName = debug_name,
     };
 
     vkSetDebugUtilsObjectNameEXT (system->device, &object_name);

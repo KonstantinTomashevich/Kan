@@ -22,12 +22,15 @@ struct render_backend_code_module_t *render_backend_system_create_code_module (s
     }
 
 #if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED)
+    char debug_name[KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME];
+    snprintf (debug_name, KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME, "CodeModule::%s", tracking_name);
+
     struct VkDebugUtilsObjectNameInfoEXT object_name = {
         .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
         .pNext = NULL,
         .objectType = VK_OBJECT_TYPE_SHADER_MODULE,
         .objectHandle = (uint64_t) shader_module,
-        .pObjectName = tracking_name,
+        .pObjectName = debug_name,
     };
 
     vkSetDebugUtilsObjectNameEXT (system->device, &object_name);

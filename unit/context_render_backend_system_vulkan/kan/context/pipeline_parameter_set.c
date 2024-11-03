@@ -103,6 +103,22 @@ struct render_backend_descriptor_set_allocation_t render_backend_descriptor_set_
         return allocation;
     }
 
+#if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED)
+    char debug_name[KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME];
+    snprintf (debug_name, KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME, "DescriptorPool::global_page_%llu",
+              (unsigned long long) new_pool);
+
+    struct VkDebugUtilsObjectNameInfoEXT object_name = {
+        .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
+        .pNext = NULL,
+        .objectType = VK_OBJECT_TYPE_DESCRIPTOR_POOL,
+        .objectHandle = (uint64_t) new_pool,
+        .pObjectName = debug_name,
+    };
+
+    vkSetDebugUtilsObjectNameEXT (system->device, &object_name);
+#endif
+
     struct render_backend_descriptor_set_pool_t *new_pool_node = kan_allocate_batched (
         system->descriptor_set_wrapper_allocation_group, sizeof (struct render_backend_descriptor_set_pool_t));
 
@@ -213,7 +229,7 @@ struct render_backend_pipeline_parameter_set_t *render_backend_system_create_pip
 
 #if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED)
         char debug_name[KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME];
-        snprintf (debug_name, KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME, "%s_stable_set",
+        snprintf (debug_name, KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME, "PipelineParameterSet::%s::stable",
                   description->tracking_name);
 
         struct VkDebugUtilsObjectNameInfoEXT object_name = {
@@ -257,8 +273,8 @@ struct render_backend_pipeline_parameter_set_t *render_backend_system_create_pip
 
 #if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED)
             char debug_name[KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME];
-            snprintf (debug_name, KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME, "%s_unstable_set_%lu",
-                      description->tracking_name, (unsigned long) index);
+            snprintf (debug_name, KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME,
+                      "PipelineParameterSet::%s::unstable%lu", description->tracking_name, (unsigned long) index);
 
             struct VkDebugUtilsObjectNameInfoEXT object_name = {
                 .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
@@ -635,8 +651,9 @@ void render_backend_apply_descriptor_set_mutation (struct render_backend_pipelin
                     if (this_image_info->imageView != VK_NULL_HANDLE)
                     {
                         char debug_name[KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME];
-                        snprintf (debug_name, KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME, "%s_image_view_%lu",
-                                  set_context->tracking_name, (unsigned long) update_bindings[index].binding);
+                        snprintf (debug_name, KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME,
+                                  "ImageView::ForPipelineParameterSet::%s::binding%lu", set_context->tracking_name,
+                                  (unsigned long) update_bindings[index].binding);
 
                         struct VkDebugUtilsObjectNameInfoEXT object_name = {
                             .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,

@@ -605,6 +605,7 @@ struct render_backend_frame_lifetime_allocator_t
     enum kan_render_buffer_type_t buffer_type;
     uint32_t page_size;
     kan_interned_string_t tracking_name;
+    kan_interned_string_t buffer_tracking_name;
 };
 
 struct render_backend_frame_lifetime_allocator_allocation_t
