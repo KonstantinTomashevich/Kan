@@ -24,6 +24,7 @@ struct render_backend_buffer_t *render_backend_system_create_buffer (struct rend
     switch (family)
     {
     case RENDER_BACKEND_BUFFER_FAMILY_RESOURCE:
+    case RENDER_BACKEND_BUFFER_FAMILY_DEVICE_FRAME_LIFETIME_ALLOCATOR:
         usage_flags |= VK_BUFFER_USAGE_TRANSFER_DST_BIT;
         break;
 
@@ -32,7 +33,7 @@ struct render_backend_buffer_t *render_backend_system_create_buffer (struct rend
         allocation_flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
         break;
 
-    case RENDER_BACKEND_BUFFER_FAMILY_FRAME_LIFETIME_ALLOCATOR:
+    case RENDER_BACKEND_BUFFER_FAMILY_HOST_FRAME_LIFETIME_ALLOCATOR:
         allocation_flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
         break;
     }
@@ -60,46 +61,15 @@ struct render_backend_buffer_t *render_backend_system_create_buffer (struct rend
         }
     }
 
-    uint32_t used_queues_count;
-    uint32_t used_queues_indices[2u];
-
-    switch (family)
-    {
-    case RENDER_BACKEND_BUFFER_FAMILY_RESOURCE:
-        if (system->device_graphics_queue_family_index == system->device_transfer_queue_family_index)
-        {
-            used_queues_count = 1u;
-            used_queues_indices[0u] = system->device_graphics_queue_family_index;
-        }
-        else
-        {
-            used_queues_count = 2u;
-            used_queues_indices[0u] = system->device_graphics_queue_family_index;
-            used_queues_indices[0u] = system->device_transfer_queue_family_index;
-        }
-
-        break;
-
-    case RENDER_BACKEND_BUFFER_FAMILY_STAGING:
-        used_queues_count = 1u;
-        used_queues_indices[0u] = system->device_transfer_queue_family_index;
-        break;
-
-    case RENDER_BACKEND_BUFFER_FAMILY_FRAME_LIFETIME_ALLOCATOR:
-        used_queues_count = 1u;
-        used_queues_indices[0u] = system->device_graphics_queue_family_index;
-        break;
-    }
-
     VkBufferCreateInfo buffer_create_info = {
         .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
         .pNext = NULL,
         .flags = 0u,
         .size = full_size,
         .usage = usage_flags,
-        .sharingMode = used_queues_count <= 1u ? VK_SHARING_MODE_EXCLUSIVE : VK_SHARING_MODE_CONCURRENT,
-        .queueFamilyIndexCount = used_queues_count,
-        .pQueueFamilyIndices = used_queues_indices,
+        .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+        .queueFamilyIndexCount = 1u,
+        .pQueueFamilyIndices = &system->device_queue_family_index,
     };
 
     VmaAllocationCreateInfo allocation_create_info = {
@@ -258,6 +228,7 @@ void *kan_render_buffer_patch (kan_render_buffer_t buffer, uint32_t slice_offset
     switch (data->family)
     {
     case RENDER_BACKEND_BUFFER_FAMILY_RESOURCE:
+    case RENDER_BACKEND_BUFFER_FAMILY_DEVICE_FRAME_LIFETIME_ALLOCATOR:
     {
         struct render_backend_frame_lifetime_allocator_allocation_t staging_allocation =
             render_backend_system_allocate_for_staging (data->system, slice_size);
@@ -303,7 +274,7 @@ void *kan_render_buffer_patch (kan_render_buffer_t buffer, uint32_t slice_offset
         KAN_ASSERT (KAN_FALSE)
         break;
 
-    case RENDER_BACKEND_BUFFER_FAMILY_FRAME_LIFETIME_ALLOCATOR:
+    case RENDER_BACKEND_BUFFER_FAMILY_HOST_FRAME_LIFETIME_ALLOCATOR:
     {
         // Frame lifetime allocations are always host visible, there is no need to stage them due to their lifetime.
         void *memory;

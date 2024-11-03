@@ -59,8 +59,13 @@ struct render_backend_graphics_pipeline_family_t *render_backend_system_create_g
     VkDescriptorSetLayoutBinding *bindings = NULL;
 
     VkDescriptorSetLayout *descriptor_set_layouts_for_pipeline = kan_allocate_general (
-        system->utility_allocation_group, sizeof (VkDescriptorSetLayout) * description->parameter_sets_count,
+        system->utility_allocation_group, sizeof (VkDescriptorSetLayout) * sets_count,
         _Alignof (VkDescriptorSetLayout));
+
+    for (uint64_t layout_index = 0u; layout_index < sets_count; ++layout_index)
+    {
+        descriptor_set_layouts_for_pipeline[layout_index] = VK_NULL_HANDLE;
+    }
 
     for (uint64_t layout_index = 0u; layout_index < description->parameter_sets_count; ++layout_index)
     {
@@ -149,7 +154,7 @@ struct render_backend_graphics_pipeline_family_t *render_backend_system_create_g
         };
 
         if (vkCreateDescriptorSetLayout (system->device, &layout_info, VULKAN_ALLOCATION_CALLBACKS (system),
-                                         &descriptor_set_layouts_for_pipeline[layout_index]) != VK_SUCCESS)
+                                         &descriptor_set_layouts_for_pipeline[layout_description->set]) != VK_SUCCESS)
         {
             KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR,
                      "Failed to create descriptor set for layout %lu for pipeline family \"%s\".",
@@ -167,7 +172,7 @@ struct render_backend_graphics_pipeline_family_t *render_backend_system_create_g
             .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
             .pNext = NULL,
             .objectType = VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT,
-            .objectHandle = (uint64_t) descriptor_set_layouts_for_pipeline[layout_index],
+            .objectHandle = (uint64_t) descriptor_set_layouts_for_pipeline[layout_description->set],
             .pObjectName = debug_name,
         };
 
@@ -181,7 +186,7 @@ struct render_backend_graphics_pipeline_family_t *render_backend_system_create_g
                                   _Alignof (struct render_backend_descriptor_set_layout_t));
         descriptor_set_layouts[layout_description->set] = layout;
 
-        layout->layout = descriptor_set_layouts_for_pipeline[layout_index];
+        layout->layout = descriptor_set_layouts_for_pipeline[layout_description->set];
         layout->stable_binding = layout_description->stable_binding;
         layout->bindings_count = bindings_count;
         layout->uniform_buffers_count = 0u;
@@ -233,7 +238,7 @@ struct render_backend_graphics_pipeline_family_t *render_backend_system_create_g
     {
         free_descriptor_set_layouts (system, sets_count, descriptor_set_layouts);
         kan_free_general (system->utility_allocation_group, descriptor_set_layouts_for_pipeline,
-                          sizeof (VkDescriptorSetLayout) * description->parameter_sets_count);
+                          sizeof (VkDescriptorSetLayout) * sets_count);
         return NULL;
     }
 
@@ -241,7 +246,7 @@ struct render_backend_graphics_pipeline_family_t *render_backend_system_create_g
         .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
         .pNext = NULL,
         .flags = 0u,
-        .setLayoutCount = (uint32_t) description->parameter_sets_count,
+        .setLayoutCount = (uint32_t) sets_count,
         .pSetLayouts = descriptor_set_layouts_for_pipeline,
         .pushConstantRangeCount = 0u,
         .pPushConstantRanges = NULL,
@@ -250,7 +255,7 @@ struct render_backend_graphics_pipeline_family_t *render_backend_system_create_g
     VkResult result = vkCreatePipelineLayout (system->device, &pipeline_layout_info,
                                               VULKAN_ALLOCATION_CALLBACKS (system), &pipeline_layout);
     kan_free_general (system->utility_allocation_group, descriptor_set_layouts_for_pipeline,
-                      sizeof (VkDescriptorSetLayout) * description->parameter_sets_count);
+                      sizeof (VkDescriptorSetLayout) * sets_count);
 
     if (result != VK_SUCCESS)
     {
@@ -334,7 +339,7 @@ struct render_backend_graphics_pipeline_family_t *render_backend_system_create_g
         }
     }
 
-    family->attributes = kan_allocate_general (system->utility_allocation_group,
+    family->attributes = kan_allocate_general (system->pipeline_family_wrapper_allocation_group,
                                                sizeof (VkVertexInputAttributeDescription) * family->attributes_count,
                                                _Alignof (VkVertexInputAttributeDescription));
     VkVertexInputAttributeDescription *attribute_output = family->attributes;

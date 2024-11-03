@@ -17,7 +17,8 @@ struct render_backend_frame_lifetime_allocator_t *render_backend_system_create_f
     allocator->allocation_lock = kan_atomic_int_init (0);
 
     KAN_ASSERT (buffer_family == RENDER_BACKEND_BUFFER_FAMILY_STAGING ||
-                buffer_family == RENDER_BACKEND_BUFFER_FAMILY_FRAME_LIFETIME_ALLOCATOR)
+                buffer_family == RENDER_BACKEND_BUFFER_FAMILY_HOST_FRAME_LIFETIME_ALLOCATOR ||
+                buffer_family == RENDER_BACKEND_BUFFER_FAMILY_DEVICE_FRAME_LIFETIME_ALLOCATOR)
     allocator->buffer_family = buffer_family;
     allocator->buffer_type = buffer_type;
     allocator->page_size = page_size;
@@ -404,13 +405,17 @@ kan_render_frame_lifetime_buffer_allocator_t kan_render_frame_lifetime_buffer_al
     kan_render_context_t context,
     enum kan_render_buffer_type_t buffer_type,
     uint32_t page_size,
+    kan_bool_t on_device,
     kan_interned_string_t tracking_name)
 {
     struct render_backend_system_t *system = (struct render_backend_system_t *) context;
     kan_atomic_int_lock (&system->resource_management_lock);
     struct render_backend_frame_lifetime_allocator_t *allocator =
         render_backend_system_create_frame_lifetime_allocator (
-            system, RENDER_BACKEND_BUFFER_FAMILY_FRAME_LIFETIME_ALLOCATOR, buffer_type, page_size, tracking_name);
+            system,
+            on_device ? RENDER_BACKEND_BUFFER_FAMILY_DEVICE_FRAME_LIFETIME_ALLOCATOR :
+                        RENDER_BACKEND_BUFFER_FAMILY_HOST_FRAME_LIFETIME_ALLOCATOR,
+            buffer_type, page_size, tracking_name);
     kan_atomic_int_unlock (&system->resource_management_lock);
     return (kan_render_frame_lifetime_buffer_allocator_t) allocator;
 }
@@ -435,7 +440,8 @@ void kan_render_frame_lifetime_buffer_allocator_destroy (kan_render_frame_lifeti
     struct render_backend_frame_lifetime_allocator_t *data =
         (struct render_backend_frame_lifetime_allocator_t *) allocator;
     // Only resource family buffers can be destroyed externally through scheduling.
-    KAN_ASSERT (data->buffer_family == RENDER_BACKEND_BUFFER_FAMILY_FRAME_LIFETIME_ALLOCATOR)
+    KAN_ASSERT (data->buffer_family == RENDER_BACKEND_BUFFER_FAMILY_HOST_FRAME_LIFETIME_ALLOCATOR ||
+                data->buffer_family == RENDER_BACKEND_BUFFER_FAMILY_DEVICE_FRAME_LIFETIME_ALLOCATOR)
 
     struct render_backend_schedule_state_t *schedule = render_backend_system_get_schedule_for_destroy (data->system);
     kan_atomic_int_lock (&schedule->schedule_lock);

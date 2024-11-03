@@ -27,6 +27,7 @@ kan_context_system_handle_t render_backend_system_create (kan_allocation_group_t
     system->buffer_wrapper_allocation_group = kan_allocation_group_get_child (group, "buffer_wrapper");
     system->frame_lifetime_wrapper_allocation_group =
         kan_allocation_group_get_child (group, "frame_lifetime_allocator_wrapper");
+    system->image_wrapper_allocation_group = kan_allocation_group_get_child (group, "descriptor_set_wrapper");
     system->descriptor_set_wrapper_allocation_group = kan_allocation_group_get_child (group, "descriptor_set_wrapper");
 
     system->frame_started = KAN_FALSE;
@@ -423,27 +424,21 @@ static void render_backend_system_destroy_command_states (struct render_backend_
         struct render_backend_command_state_t *state = &system->command_states[index];
 
         // There is no need to free command buffers as we're destroying pools already.
-        state->primary_graphics_command_buffer = VK_NULL_HANDLE;
-        state->primary_transfer_command_buffer = VK_NULL_HANDLE;
-
-        if (state->graphics_command_pool != VK_NULL_HANDLE)
+        state->primary_command_buffer = VK_NULL_HANDLE;
+        if (state->command_pool != VK_NULL_HANDLE)
         {
-            vkResetCommandPool (system->device, state->graphics_command_pool, 0u);
-            if (state->graphics_command_buffers.size > 0u)
+            vkResetCommandPool (system->device, state->command_pool, 0u);
+            if (state->secondary_command_buffers.size > 0u)
             {
-                vkFreeCommandBuffers (system->device, state->graphics_command_pool,
-                                      (uint32_t) state->graphics_command_buffers.size,
-                                      (VkCommandBuffer *) state->graphics_command_buffers.data);
+                vkFreeCommandBuffers (system->device, state->command_pool,
+                                      (uint32_t) state->secondary_command_buffers.size,
+                                      (VkCommandBuffer *) state->secondary_command_buffers.data);
             }
 
-            vkDestroyCommandPool (system->device, state->graphics_command_pool, VULKAN_ALLOCATION_CALLBACKS (system));
+            vkDestroyCommandPool (system->device, state->command_pool, VULKAN_ALLOCATION_CALLBACKS (system));
         }
 
-        kan_dynamic_array_shutdown (&state->graphics_command_buffers);
-        if (state->transfer_command_pool != VK_NULL_HANDLE)
-        {
-            vkDestroyCommandPool (system->device, state->transfer_command_pool, VULKAN_ALLOCATION_CALLBACKS (system));
-        }
+        kan_dynamic_array_shutdown (&state->secondary_command_buffers);
     }
 }
 
@@ -451,12 +446,6 @@ static void render_backend_system_destroy_synchronization_objects (struct render
 {
     for (uint64_t index = 0u; index < KAN_CONTEXT_RENDER_BACKEND_VULKAN_FRAMES_IN_FLIGHT; ++index)
     {
-        if (system->transfer_finished_semaphores[index] != VK_NULL_HANDLE)
-        {
-            vkDestroySemaphore (system->device, system->transfer_finished_semaphores[index],
-                                VULKAN_ALLOCATION_CALLBACKS (system));
-        }
-
         if (system->render_finished_semaphores[index] != VK_NULL_HANDLE)
         {
             vkDestroySemaphore (system->device, system->render_finished_semaphores[index],
@@ -781,36 +770,22 @@ kan_bool_t kan_render_backend_system_select_device (kan_context_system_handle_t 
                               _Alignof (VkQueueFamilyProperties));
     vkGetPhysicalDeviceQueueFamilyProperties (physical_device, &queues_count, queues);
 
-    system->device_graphics_queue_family_index = UINT32_MAX;
-    system->device_transfer_queue_family_index = UINT32_MAX;
-
+    system->device_queue_family_index = UINT32_MAX;
     for (uint32_t index = 0u; index < queues_count; ++index)
     {
-        if (system->device_graphics_queue_family_index == UINT32_MAX &&
-            (queues[index].queueFlags & VK_QUEUE_GRAPHICS_BIT))
+        const uint32_t mask = VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_TRANSFER_BIT;
+        if (mask == (queues[index].queueFlags & mask))
         {
-            system->device_graphics_queue_family_index = index;
-        }
-
-        if (system->device_transfer_queue_family_index == UINT32_MAX &&
-            (queues[index].queueFlags & VK_QUEUE_TRANSFER_BIT))
-        {
-            system->device_transfer_queue_family_index = index;
+            system->device_queue_family_index = index;
+            break;
         }
     }
 
     kan_free_general (system->utility_allocation_group, queues, sizeof (VkQueueFamilyProperties) * queues_count);
-    if (system->device_graphics_queue_family_index == UINT32_MAX)
+    if (system->device_queue_family_index == UINT32_MAX)
     {
         KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR,
-                 "Unable to select device: requested device has no graphics family.")
-        return KAN_FALSE;
-    }
-
-    if (system->device_transfer_queue_family_index == UINT32_MAX)
-    {
-        KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR,
-                 "Unable to select device: requested device has no transfer family.")
+                 "Unable to select device: requested device has no combined graphics and transfer queue family.")
         return KAN_FALSE;
     }
 
@@ -845,21 +820,11 @@ kan_bool_t kan_render_backend_system_select_device (kan_context_system_handle_t 
         {
             .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
             .pNext = NULL,
-            .queueFamilyIndex = system->device_graphics_queue_family_index,
-            .queueCount = 1u,
-            .pQueuePriorities = &queues_priorities,
-        },
-        {
-            .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
-            .pNext = NULL,
-            .queueFamilyIndex = system->device_transfer_queue_family_index,
+            .queueFamilyIndex = system->device_queue_family_index,
             .queueCount = 1u,
             .pQueuePriorities = &queues_priorities,
         },
     };
-
-    uint32_t queues_to_create_count =
-        system->device_graphics_queue_family_index == system->device_transfer_queue_family_index ? 1u : 2u;
 
     VkPhysicalDeviceFeatures device_features;
     vkGetPhysicalDeviceFeatures (physical_device, &device_features);
@@ -868,7 +833,7 @@ kan_bool_t kan_render_backend_system_select_device (kan_context_system_handle_t 
     VkDeviceCreateInfo device_create_info = {
         .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
         .pNext = NULL,
-        .queueCreateInfoCount = queues_to_create_count,
+        .queueCreateInfoCount = 1u,
         .pQueueCreateInfos = queues_create_info,
         .enabledLayerCount = 0u,
         .ppEnabledLayerNames = NULL,
@@ -898,8 +863,7 @@ kan_bool_t kan_render_backend_system_select_device (kan_context_system_handle_t 
     system->physical_device = physical_device;
 
     volkLoadDevice (system->device);
-    vkGetDeviceQueue (system->device, system->device_graphics_queue_family_index, 0u, &system->graphics_queue);
-    vkGetDeviceQueue (system->device, system->device_transfer_queue_family_index, 0u, &system->transfer_queue);
+    vkGetDeviceQueue (system->device, system->device_queue_family_index, 0u, &system->device_queue);
 
     system->gpu_memory_allocator_functions = (VmaVulkanFunctions) {
         .vkGetInstanceProcAddr = vkGetInstanceProcAddr,
@@ -966,7 +930,6 @@ kan_bool_t kan_render_backend_system_select_device (kan_context_system_handle_t 
 
     for (uint64_t index = 0u; index < KAN_CONTEXT_RENDER_BACKEND_VULKAN_FRAMES_IN_FLIGHT; ++index)
     {
-        system->transfer_finished_semaphores[index] = VK_NULL_HANDLE;
         system->render_finished_semaphores[index] = VK_NULL_HANDLE;
         system->in_flight_fences[index] = VK_NULL_HANDLE;
     }
@@ -974,32 +937,6 @@ kan_bool_t kan_render_backend_system_select_device (kan_context_system_handle_t 
     kan_bool_t synchronization_objects_created = KAN_TRUE;
     for (uint64_t index = 0u; index < KAN_CONTEXT_RENDER_BACKEND_VULKAN_FRAMES_IN_FLIGHT; ++index)
     {
-        if (vkCreateSemaphore (system->device, &semaphore_creation_info, VULKAN_ALLOCATION_CALLBACKS (system),
-                               &system->transfer_finished_semaphores[index]) != VK_SUCCESS)
-        {
-            system->transfer_finished_semaphores[index] = VK_NULL_HANDLE;
-            synchronization_objects_created = KAN_FALSE;
-            break;
-        }
-
-#if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED)
-        {
-            char debug_name[KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME];
-            snprintf (debug_name, KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME, "transfer_finished_semaphore_%lu",
-                      (unsigned long) index);
-
-            struct VkDebugUtilsObjectNameInfoEXT object_name = {
-                .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
-                .pNext = NULL,
-                .objectType = VK_OBJECT_TYPE_SEMAPHORE,
-                .objectHandle = (uint64_t) system->transfer_finished_semaphores[index],
-                .pObjectName = debug_name,
-            };
-
-            vkSetDebugUtilsObjectNameEXT (system->device, &object_name);
-        }
-#endif
-
         if (vkCreateSemaphore (system->device, &semaphore_creation_info, VULKAN_ALLOCATION_CALLBACKS (system),
                                &system->render_finished_semaphores[index]) != VK_SUCCESS)
         {
@@ -1067,8 +1004,7 @@ kan_bool_t kan_render_backend_system_select_device (kan_context_system_handle_t 
 
     for (uint64_t index = 0u; index < KAN_CONTEXT_RENDER_BACKEND_VULKAN_FRAMES_IN_FLIGHT; ++index)
     {
-        system->command_states[index].graphics_command_pool = VK_NULL_HANDLE;
-        system->command_states[index].transfer_command_pool = VK_NULL_HANDLE;
+        system->command_states[index].command_pool = VK_NULL_HANDLE;
     }
 
     kan_bool_t command_states_created = KAN_TRUE;
@@ -1078,13 +1014,13 @@ kan_bool_t kan_render_backend_system_select_device (kan_context_system_handle_t 
             .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
             .pNext = NULL,
             .flags = 0u,
-            .queueFamilyIndex = system->device_graphics_queue_family_index,
+            .queueFamilyIndex = system->device_queue_family_index,
         };
 
         if (vkCreateCommandPool (system->device, &graphics_command_pool_info, VULKAN_ALLOCATION_CALLBACKS (system),
-                                 &system->command_states[index].graphics_command_pool))
+                                 &system->command_states[index].command_pool))
         {
-            system->command_states[index].graphics_command_pool = VK_NULL_HANDLE;
+            system->command_states[index].command_pool = VK_NULL_HANDLE;
             command_states_created = KAN_FALSE;
             break;
         }
@@ -1099,7 +1035,7 @@ kan_bool_t kan_render_backend_system_select_device (kan_context_system_handle_t 
                 .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
                 .pNext = NULL,
                 .objectType = VK_OBJECT_TYPE_COMMAND_POOL,
-                .objectHandle = (uint64_t) system->command_states[index].graphics_command_pool,
+                .objectHandle = (uint64_t) system->command_states[index].command_pool,
                 .pObjectName = debug_name,
             };
 
@@ -1110,71 +1046,23 @@ kan_bool_t kan_render_backend_system_select_device (kan_context_system_handle_t 
         VkCommandBufferAllocateInfo graphics_primary_buffer_info = {
             .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
             .pNext = NULL,
-            .commandPool = system->command_states[index].graphics_command_pool,
+            .commandPool = system->command_states[index].command_pool,
             .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
             .commandBufferCount = 1u,
         };
 
         if (vkAllocateCommandBuffers (system->device, &graphics_primary_buffer_info,
-                                      &system->command_states[index].primary_graphics_command_buffer))
+                                      &system->command_states[index].primary_command_buffer))
         {
             command_states_created = KAN_FALSE;
             break;
         }
 
-        system->command_states[index].graphics_command_operation_lock = kan_atomic_int_init (0);
-        kan_dynamic_array_init (&system->command_states[index].graphics_command_buffers,
+        system->command_states[index].command_operation_lock = kan_atomic_int_init (0);
+        kan_dynamic_array_init (&system->command_states[index].secondary_command_buffers,
                                 KAN_CONTEXT_RENDER_BACKEND_VULKAN_GCB_ARRAY_SIZE, sizeof (VkCommandBuffer),
                                 _Alignof (VkCommandBuffer), system->pass_instance_allocation_group);
-        system->command_states[index].graphics_command_buffers_used = 0u;
-
-        VkCommandPoolCreateInfo transfer_command_pool_info = {
-            .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
-            .pNext = NULL,
-            .flags = 0u,
-            .queueFamilyIndex = system->device_transfer_queue_family_index,
-        };
-
-        if (vkCreateCommandPool (system->device, &transfer_command_pool_info, VULKAN_ALLOCATION_CALLBACKS (system),
-                                 &system->command_states[index].transfer_command_pool))
-        {
-            system->command_states[index].transfer_command_pool = VK_NULL_HANDLE;
-            command_states_created = KAN_FALSE;
-            break;
-        }
-
-#if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED)
-        {
-            char debug_name[KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME];
-            snprintf (debug_name, KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME, "transfer_command_pool_%lu",
-                      (unsigned long) index);
-
-            struct VkDebugUtilsObjectNameInfoEXT object_name = {
-                .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
-                .pNext = NULL,
-                .objectType = VK_OBJECT_TYPE_COMMAND_POOL,
-                .objectHandle = (uint64_t) system->command_states[index].transfer_command_pool,
-                .pObjectName = debug_name,
-            };
-
-            vkSetDebugUtilsObjectNameEXT (system->device, &object_name);
-        }
-#endif
-
-        VkCommandBufferAllocateInfo transfer_primary_buffer_info = {
-            .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-            .pNext = NULL,
-            .commandPool = system->command_states[index].transfer_command_pool,
-            .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-            .commandBufferCount = 1u,
-        };
-
-        if (vkAllocateCommandBuffers (system->device, &transfer_primary_buffer_info,
-                                      &system->command_states[index].primary_transfer_command_buffer))
-        {
-            command_states_created = KAN_FALSE;
-            break;
-        }
+        system->command_states[index].secondary_command_buffers_used = 0u;
     }
 
     if (!command_states_created)
@@ -1232,7 +1120,7 @@ kan_render_context_t kan_render_backend_system_get_render_context (kan_context_s
     return system->render_enabled ? (kan_render_context_t) system : KAN_INVALID_RENDER_CONTEXT;
 }
 
-static void render_backend_system_submit_transfer (struct render_backend_system_t *system)
+static void render_backend_system_begin_command_submission (struct render_backend_system_t *system)
 {
     VkCommandBufferBeginInfo buffer_begin_info = {
         .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
@@ -1241,13 +1129,18 @@ static void render_backend_system_submit_transfer (struct render_backend_system_
         .pInheritanceInfo = NULL,
     };
 
-    struct render_backend_command_state_t *state = &system->command_states[system->current_frame_in_flight_index];
-    if (vkBeginCommandBuffer (state->primary_transfer_command_buffer, &buffer_begin_info) != VK_SUCCESS)
+    if (vkBeginCommandBuffer (system->command_states[system->current_frame_in_flight_index].primary_command_buffer,
+                              &buffer_begin_info) != VK_SUCCESS)
     {
-        kan_critical_error ("Failed to start recording primary transfer buffer.", __FILE__, __LINE__);
+        kan_critical_error ("Failed to start recording primary buffer.", __FILE__, __LINE__);
     }
+}
 
-    DEBUG_LABEL_SCOPE_BEGIN (state->primary_transfer_command_buffer, "buffer_transfer", DEBUG_LABEL_COLOR_PASS)
+static void render_backend_system_submit_transfer (struct render_backend_system_t *system)
+{
+    struct render_backend_command_state_t *state = &system->command_states[system->current_frame_in_flight_index];
+    DEBUG_LABEL_SCOPE_BEGIN (state->primary_command_buffer, "buffer_transfer", DEBUG_LABEL_COLOR_PASS)
+
     struct render_backend_schedule_state_t *schedule = &system->schedule_states[system->current_frame_in_flight_index];
     struct scheduled_buffer_unmap_flush_transfer_t *buffer_unmap_flush_transfer =
         schedule->first_scheduled_buffer_unmap_flush_transfer;
@@ -1270,13 +1163,55 @@ static void render_backend_system_submit_transfer (struct render_backend_system_
             .size = buffer_unmap_flush_transfer->size,
         };
 
-        vkCmdCopyBuffer (state->primary_transfer_command_buffer, buffer_unmap_flush_transfer->source_buffer->buffer,
+        vkCmdCopyBuffer (state->primary_command_buffer, buffer_unmap_flush_transfer->source_buffer->buffer,
                          buffer_unmap_flush_transfer->target_buffer->buffer, 1u, &region);
+
+        VkAccessFlags destination_access_flags = 0u;
+        VkPipelineStageFlags destination_stage;
+
+        switch (buffer_unmap_flush_transfer->target_buffer->type)
+        {
+        case KAN_RENDER_BUFFER_TYPE_ATTRIBUTE:
+            destination_access_flags |= VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;
+            destination_stage = VK_PIPELINE_STAGE_VERTEX_INPUT_BIT;
+            break;
+
+        case KAN_RENDER_BUFFER_TYPE_INDEX_16:
+        case KAN_RENDER_BUFFER_TYPE_INDEX_32:
+            destination_access_flags |= VK_ACCESS_INDEX_READ_BIT;
+            destination_stage = VK_PIPELINE_STAGE_VERTEX_INPUT_BIT;
+            break;
+
+        case KAN_RENDER_BUFFER_TYPE_UNIFORM:
+            destination_access_flags |= VK_ACCESS_UNIFORM_READ_BIT;
+            destination_stage = VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+            break;
+
+        case KAN_RENDER_BUFFER_TYPE_STORAGE:
+            destination_access_flags |= VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
+            destination_stage = VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+            break;
+        }
+
+        VkBufferMemoryBarrier memory_barrier = {
+            .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
+            .pNext = NULL,
+            .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
+            .dstAccessMask = destination_access_flags,
+            .srcQueueFamilyIndex = system->device_queue_family_index,
+            .dstQueueFamilyIndex = system->device_queue_family_index,
+            .buffer = buffer_unmap_flush_transfer->target_buffer->buffer,
+            .offset = region.dstOffset,
+            .size = region.size,
+        };
+
+        vkCmdPipelineBarrier (state->primary_command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT, destination_stage, 0u, 0u,
+                              NULL, 1u, &memory_barrier, 0u, NULL);
         buffer_unmap_flush_transfer = buffer_unmap_flush_transfer->next;
     }
 
-    DEBUG_LABEL_SCOPE_END (state->primary_transfer_command_buffer)
-    DEBUG_LABEL_SCOPE_BEGIN (state->primary_transfer_command_buffer, "buffer_flush", DEBUG_LABEL_COLOR_PASS)
+    DEBUG_LABEL_SCOPE_END (state->primary_command_buffer)
+    DEBUG_LABEL_SCOPE_BEGIN (state->primary_command_buffer, "buffer_flush", DEBUG_LABEL_COLOR_PASS)
 
     struct scheduled_buffer_unmap_flush_t *buffer_unmap_flush = schedule->first_scheduled_buffer_unmap_flush;
     schedule->first_scheduled_buffer_unmap_flush = NULL;
@@ -1294,8 +1229,8 @@ static void render_backend_system_submit_transfer (struct render_backend_system_
         buffer_unmap_flush = buffer_unmap_flush->next;
     }
 
-    DEBUG_LABEL_SCOPE_END (state->primary_transfer_command_buffer)
-    DEBUG_LABEL_SCOPE_BEGIN (state->primary_transfer_command_buffer, "image_upload", DEBUG_LABEL_COLOR_PASS)
+    DEBUG_LABEL_SCOPE_END (state->primary_command_buffer)
+    DEBUG_LABEL_SCOPE_BEGIN (state->primary_command_buffer, "image_upload", DEBUG_LABEL_COLOR_PASS)
 
     struct scheduled_image_upload_t *image_upload = schedule->first_scheduled_image_upload;
     schedule->first_scheduled_image_upload = NULL;
@@ -1318,8 +1253,8 @@ static void render_backend_system_submit_transfer (struct render_backend_system_
             .dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
             .oldLayout = image_upload->image->last_command_layout,
             .newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-            .srcQueueFamilyIndex = system->device_transfer_queue_family_index,
-            .dstQueueFamilyIndex = system->device_transfer_queue_family_index,
+            .srcQueueFamilyIndex = system->device_queue_family_index,
+            .dstQueueFamilyIndex = system->device_queue_family_index,
             .image = image_upload->image->image,
             .subresourceRange =
                 {
@@ -1331,7 +1266,7 @@ static void render_backend_system_submit_transfer (struct render_backend_system_
                 },
         };
 
-        vkCmdPipelineBarrier (state->primary_transfer_command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT,
+        vkCmdPipelineBarrier (state->primary_command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT,
                               VK_PIPELINE_STAGE_TRANSFER_BIT, 0u, 0u, NULL, 0u, NULL, 1u, &prepare_transfer_barrier);
         image_upload->image->last_command_layout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
 
@@ -1360,18 +1295,18 @@ static void render_backend_system_submit_transfer (struct render_backend_system_
                 },
         };
 
-        vkCmdCopyBufferToImage (state->primary_transfer_command_buffer, image_upload->staging_buffer->buffer,
+        vkCmdCopyBufferToImage (state->primary_command_buffer, image_upload->staging_buffer->buffer,
                                 image_upload->image->image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1u, &copy_region);
 
         VkImageMemoryBarrier finish_transfer_barrier = {
             .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
             .pNext = NULL,
             .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
-            .dstAccessMask = 0u,
+            .dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_TRANSFER_READ_BIT,
             .oldLayout = image_upload->image->last_command_layout,
             .newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-            .srcQueueFamilyIndex = system->device_transfer_queue_family_index,
-            .dstQueueFamilyIndex = system->device_transfer_queue_family_index,
+            .srcQueueFamilyIndex = system->device_queue_family_index,
+            .dstQueueFamilyIndex = system->device_queue_family_index,
             .image = image_upload->image->image,
             .subresourceRange =
                 {
@@ -1383,108 +1318,15 @@ static void render_backend_system_submit_transfer (struct render_backend_system_
                 },
         };
 
-        vkCmdPipelineBarrier (state->primary_transfer_command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT,
-                              VK_PIPELINE_STAGE_TRANSFER_BIT, 0u, 0u, NULL, 0u, NULL, 1u, &finish_transfer_barrier);
+        vkCmdPipelineBarrier (state->primary_command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                              VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT, 0u, 0u, NULL, 0u,
+                              NULL, 1u, &finish_transfer_barrier);
 
         image_upload->image->last_command_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         image_upload = image_upload->next;
     }
 
-    DEBUG_LABEL_SCOPE_END (state->primary_transfer_command_buffer)
-    if (vkEndCommandBuffer (state->primary_transfer_command_buffer) != VK_SUCCESS)
-    {
-        kan_critical_error ("Failed to end recording primary transfer buffer.", __FILE__, __LINE__);
-    }
-
-    uint32_t semaphores_to_wait = 0u;
-    static VkSemaphore static_wait_semaphores[KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_INLINE_HANDLES];
-    static VkPipelineStageFlags static_semaphore_stages[KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_INLINE_HANDLES];
-
-    VkSemaphore *wait_semaphores = static_wait_semaphores;
-    VkPipelineStageFlags *semaphore_stages = static_semaphore_stages;
-    struct render_backend_surface_t *surface = (struct render_backend_surface_t *) system->surfaces.first;
-
-    while (surface)
-    {
-        if (surface->surface != VK_NULL_HANDLE)
-        {
-            if (semaphores_to_wait < KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_INLINE_HANDLES)
-            {
-                wait_semaphores[semaphores_to_wait] =
-                    surface->image_available_semaphores[system->current_frame_in_flight_index];
-                semaphore_stages[semaphores_to_wait] = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-            }
-
-            ++semaphores_to_wait;
-        }
-
-        surface = (struct render_backend_surface_t *) surface->list_node.next;
-    }
-
-    if (semaphores_to_wait > KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_INLINE_HANDLES)
-    {
-        // Too many semaphores to capture everything to static array, allocate new one.
-        wait_semaphores = kan_allocate_general (system->utility_allocation_group,
-                                                sizeof (VkSemaphore) * semaphores_to_wait, _Alignof (VkSemaphore));
-        semaphore_stages =
-            kan_allocate_general (system->utility_allocation_group, sizeof (VkPipelineStageFlags) * semaphores_to_wait,
-                                  _Alignof (VkPipelineStageFlags));
-
-        semaphores_to_wait = 0u;
-        surface = (struct render_backend_surface_t *) system->surfaces.first;
-
-        while (surface)
-        {
-            if (surface->surface != VK_NULL_HANDLE)
-            {
-                wait_semaphores[semaphores_to_wait] =
-                    surface->image_available_semaphores[system->current_frame_in_flight_index];
-                semaphore_stages[semaphores_to_wait] = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-                ++semaphores_to_wait;
-            }
-
-            surface = (struct render_backend_surface_t *) surface->list_node.next;
-        }
-    }
-
-#if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED)
-    struct VkDebugUtilsLabelEXT queue_label = {
-        .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT,
-        .pNext = NULL,
-        .pLabelName = "Transfer Queue",
-        .color = {0.082f, 0.639f, 0.114f, 1.0f},
-    };
-
-    vkQueueBeginDebugUtilsLabelEXT (system->transfer_queue, &queue_label);
-#endif
-
-    VkSubmitInfo submit_info = {
-        .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-        .pNext = NULL,
-        .waitSemaphoreCount = semaphores_to_wait,
-        .pWaitSemaphores = wait_semaphores,
-        .pWaitDstStageMask = semaphore_stages,
-        .commandBufferCount = 1u,
-        .pCommandBuffers = &state->primary_transfer_command_buffer,
-        .signalSemaphoreCount = 1u,
-        .pSignalSemaphores = &system->transfer_finished_semaphores[system->current_frame_in_flight_index],
-    };
-
-    if (vkQueueSubmit (system->transfer_queue, 1u, &submit_info, VK_NULL_HANDLE) != VK_SUCCESS)
-    {
-        kan_critical_error ("Failed to submit work to transfer queue.", __FILE__, __LINE__);
-    }
-
-#if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED)
-    vkQueueEndDebugUtilsLabelEXT (system->transfer_queue);
-#endif
-
-    if (wait_semaphores != static_wait_semaphores)
-    {
-        kan_free_general (system->utility_allocation_group, wait_semaphores, sizeof (VkSemaphore) * semaphores_to_wait);
-        kan_free_general (system->utility_allocation_group, semaphore_stages,
-                          sizeof (VkPipelineStageFlags) * semaphores_to_wait);
-    }
+    DEBUG_LABEL_SCOPE_END (state->primary_command_buffer)
 }
 
 static inline void submit_mip_generation (struct render_backend_system_t *system,
@@ -1521,8 +1363,8 @@ static inline void submit_mip_generation (struct render_backend_system_t *system
                 .oldLayout = input_mip == image_mip_generation->first ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL :
                                                                         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                 .newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                .srcQueueFamilyIndex = system->device_graphics_queue_family_index,
-                .dstQueueFamilyIndex = system->device_graphics_queue_family_index,
+                .srcQueueFamilyIndex = system->device_queue_family_index,
+                .dstQueueFamilyIndex = system->device_queue_family_index,
                 .image = image_mip_generation->image->image,
                 .subresourceRange =
                     {
@@ -1534,10 +1376,9 @@ static inline void submit_mip_generation (struct render_backend_system_t *system
                     },
             };
 
-            vkCmdPipelineBarrier (state->primary_graphics_command_buffer,
-                                  VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT,
-                                  VK_PIPELINE_STAGE_TRANSFER_BIT, 0u, 0u, NULL, 0u, NULL, 1u,
-                                  &input_to_transfer_source_barrier);
+            vkCmdPipelineBarrier (
+                state->primary_command_buffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT,
+                VK_PIPELINE_STAGE_TRANSFER_BIT, 0u, 0u, NULL, 0u, NULL, 1u, &input_to_transfer_source_barrier);
 
             VkImageMemoryBarrier output_to_transfer_destination_barrier = {
                 .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
@@ -1546,8 +1387,8 @@ static inline void submit_mip_generation (struct render_backend_system_t *system
                 .dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
                 .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
                 .newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                .srcQueueFamilyIndex = system->device_graphics_queue_family_index,
-                .dstQueueFamilyIndex = system->device_graphics_queue_family_index,
+                .srcQueueFamilyIndex = system->device_queue_family_index,
+                .dstQueueFamilyIndex = system->device_queue_family_index,
                 .image = image_mip_generation->image->image,
                 .subresourceRange =
                     {
@@ -1559,7 +1400,7 @@ static inline void submit_mip_generation (struct render_backend_system_t *system
                     },
             };
 
-            vkCmdPipelineBarrier (state->primary_graphics_command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT,
+            vkCmdPipelineBarrier (state->primary_command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT,
                                   VK_PIPELINE_STAGE_TRANSFER_BIT, 0u, 0u, NULL, 0u, NULL, 1u,
                                   &output_to_transfer_destination_barrier);
 
@@ -1606,7 +1447,7 @@ static inline void submit_mip_generation (struct render_backend_system_t *system
                     },
             };
 
-            vkCmdBlitImage (state->primary_graphics_command_buffer, image_mip_generation->image->image,
+            vkCmdBlitImage (state->primary_command_buffer, image_mip_generation->image->image,
                             VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, image_mip_generation->image->image,
                             VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1u, &image_blit, VK_FILTER_LINEAR);
 
@@ -1617,8 +1458,8 @@ static inline void submit_mip_generation (struct render_backend_system_t *system
                 .dstAccessMask = 0u,
                 .oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
                 .newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                .srcQueueFamilyIndex = system->device_graphics_queue_family_index,
-                .dstQueueFamilyIndex = system->device_graphics_queue_family_index,
+                .srcQueueFamilyIndex = system->device_queue_family_index,
+                .dstQueueFamilyIndex = system->device_queue_family_index,
                 .image = image_mip_generation->image->image,
                 .subresourceRange =
                     {
@@ -1630,7 +1471,7 @@ static inline void submit_mip_generation (struct render_backend_system_t *system
                     },
             };
 
-            vkCmdPipelineBarrier (state->primary_graphics_command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT,
+            vkCmdPipelineBarrier (state->primary_command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT,
                                   VK_PIPELINE_STAGE_TRANSFER_BIT, 0u, 0u, NULL, 0u, NULL, 1u,
                                   &input_to_read_only_barrier);
         }
@@ -1642,8 +1483,8 @@ static inline void submit_mip_generation (struct render_backend_system_t *system
             .dstAccessMask = 0u,
             .oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
             .newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-            .srcQueueFamilyIndex = system->device_graphics_queue_family_index,
-            .dstQueueFamilyIndex = system->device_graphics_queue_family_index,
+            .srcQueueFamilyIndex = system->device_queue_family_index,
+            .dstQueueFamilyIndex = system->device_queue_family_index,
             .image = image_mip_generation->image->image,
             .subresourceRange =
                 {
@@ -1655,7 +1496,7 @@ static inline void submit_mip_generation (struct render_backend_system_t *system
                 },
         };
 
-        vkCmdPipelineBarrier (state->primary_graphics_command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT,
+        vkCmdPipelineBarrier (state->primary_command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT,
                               VK_PIPELINE_STAGE_TRANSFER_BIT, 0u, 0u, NULL, 0u, NULL, 1u, &last_to_read_only_barrier);
 
         image_mip_generation->image->last_command_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
@@ -1943,8 +1784,8 @@ static inline void process_surface_blit_requests (struct render_backend_system_t
                         .dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
                         .oldLayout = request->image->last_command_layout,
                         .newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                        .srcQueueFamilyIndex = system->device_graphics_queue_family_index,
-                        .dstQueueFamilyIndex = system->device_graphics_queue_family_index,
+                        .srcQueueFamilyIndex = system->device_queue_family_index,
+                        .dstQueueFamilyIndex = system->device_queue_family_index,
                         .image = request->image->image,
                         .subresourceRange =
                             {
@@ -1956,9 +1797,8 @@ static inline void process_surface_blit_requests (struct render_backend_system_t
                             },
                     };
 
-                    vkCmdPipelineBarrier (state->primary_graphics_command_buffer,
-                                          VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
-                                          0u, 0u, NULL, 0u, NULL, 1u, &barrier_info);
+                    vkCmdPipelineBarrier (state->primary_command_buffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                                          VK_PIPELINE_STAGE_TRANSFER_BIT, 0u, 0u, NULL, 0u, NULL, 1u, &barrier_info);
                     request->image->last_command_layout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
                 }
             }
@@ -1995,8 +1835,8 @@ static inline void process_surface_blit_requests (struct render_backend_system_t
                     .dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
                     .oldLayout = old_layout,
                     .newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                    .srcQueueFamilyIndex = system->device_graphics_queue_family_index,
-                    .dstQueueFamilyIndex = system->device_graphics_queue_family_index,
+                    .srcQueueFamilyIndex = system->device_queue_family_index,
+                    .dstQueueFamilyIndex = system->device_queue_family_index,
                     .image = surface->images[surface->acquired_image_index],
                     .subresourceRange =
                         {
@@ -2008,8 +1848,8 @@ static inline void process_surface_blit_requests (struct render_backend_system_t
                         },
                 };
 
-                vkCmdPipelineBarrier (state->primary_graphics_command_buffer, source_stage,
-                                      VK_PIPELINE_STAGE_TRANSFER_BIT, 0u, 0u, NULL, 0u, NULL, 1u, &barrier_info);
+                vkCmdPipelineBarrier (state->primary_command_buffer, source_stage, VK_PIPELINE_STAGE_TRANSFER_BIT, 0u,
+                                      0u, NULL, 0u, NULL, 1u, &barrier_info);
                 surface->render_state = SURFACE_RENDER_STATE_RECEIVED_DATA_FROM_BLIT;
             }
 
@@ -2068,9 +1908,9 @@ static inline void process_surface_blit_requests (struct render_backend_system_t
                     },
             };
 
-            vkCmdBlitImage (state->primary_graphics_command_buffer, request->image->image,
-                            VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, surface->images[surface->acquired_image_index],
-                            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1u, &image_blit, VK_FILTER_LINEAR);
+            vkCmdBlitImage (state->primary_command_buffer, request->image->image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                            surface->images[surface->acquired_image_index], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1u,
+                            &image_blit, VK_FILTER_LINEAR);
             request = request->next;
         }
 
@@ -2096,8 +1936,8 @@ static inline void process_surface_blit_requests (struct render_backend_system_t
                         .dstAccessMask = 0u,
                         .oldLayout = request->image->last_command_layout,
                         .newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                        .srcQueueFamilyIndex = system->device_graphics_queue_family_index,
-                        .dstQueueFamilyIndex = system->device_graphics_queue_family_index,
+                        .srcQueueFamilyIndex = system->device_queue_family_index,
+                        .dstQueueFamilyIndex = system->device_queue_family_index,
                         .image = request->image->image,
                         .subresourceRange =
                             {
@@ -2109,7 +1949,7 @@ static inline void process_surface_blit_requests (struct render_backend_system_t
                             },
                     };
 
-                    vkCmdPipelineBarrier (state->primary_graphics_command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                    vkCmdPipelineBarrier (state->primary_command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT,
                                           VK_PIPELINE_STAGE_TRANSFER_BIT, 0u, 0u, NULL, 0u, NULL, 1u, &barrier_info);
                     request->image->last_command_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
                 }
@@ -2199,8 +2039,8 @@ static void render_backend_system_submit_pass_instance (struct render_backend_sy
                     .dstAccessMask = target_access_flags,
                     .oldLayout = attachment->image->last_command_layout,
                     .newLayout = target_layout,
-                    .srcQueueFamilyIndex = system->device_graphics_queue_family_index,
-                    .dstQueueFamilyIndex = system->device_graphics_queue_family_index,
+                    .srcQueueFamilyIndex = system->device_queue_family_index,
+                    .dstQueueFamilyIndex = system->device_queue_family_index,
                     .image = attachment->image->image,
                     .subresourceRange =
                         {
@@ -2231,8 +2071,8 @@ static void render_backend_system_submit_pass_instance (struct render_backend_sy
                     .dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
                     .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
                     .newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-                    .srcQueueFamilyIndex = system->device_graphics_queue_family_index,
-                    .dstQueueFamilyIndex = system->device_graphics_queue_family_index,
+                    .srcQueueFamilyIndex = system->device_queue_family_index,
+                    .dstQueueFamilyIndex = system->device_queue_family_index,
                     .image = attachment->surface->images[attachment->surface->acquired_image_index],
                     .subresourceRange =
                         {
@@ -2262,19 +2102,18 @@ static void render_backend_system_submit_pass_instance (struct render_backend_sy
         }
     }
 
-    DEBUG_LABEL_SCOPE_BEGIN (state->primary_graphics_command_buffer, pass_instance->pass->tracking_name,
-                             DEBUG_LABEL_COLOR_PASS)
+    DEBUG_LABEL_SCOPE_BEGIN (state->primary_command_buffer, pass_instance->pass->tracking_name, DEBUG_LABEL_COLOR_PASS)
 
-    vkCmdPipelineBarrier (state->primary_graphics_command_buffer,
+    vkCmdPipelineBarrier (state->primary_command_buffer,
                           VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT |
                               VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
                           VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
                           0u, 0u, NULL, 0u, NULL, added_barriers, image_barriers);
 
-    vkCmdBeginRenderPass (state->primary_graphics_command_buffer, &pass_instance->render_pass_begin_info,
+    vkCmdBeginRenderPass (state->primary_command_buffer, &pass_instance->render_pass_begin_info,
                           VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
-    vkCmdExecuteCommands (state->primary_graphics_command_buffer, 1u, &pass_instance->command_buffer);
-    vkCmdEndRenderPass (state->primary_graphics_command_buffer);
+    vkCmdExecuteCommands (state->primary_command_buffer, 1u, &pass_instance->command_buffer);
+    vkCmdEndRenderPass (state->primary_command_buffer);
 
     // Transition readable render targets so they can be used in shaders for sampling.
     added_barriers = 0u;
@@ -2310,8 +2149,8 @@ static void render_backend_system_submit_pass_instance (struct render_backend_sy
                 .dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
                 .oldLayout = attachment->image->last_command_layout,
                 .newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                .srcQueueFamilyIndex = system->device_graphics_queue_family_index,
-                .dstQueueFamilyIndex = system->device_graphics_queue_family_index,
+                .srcQueueFamilyIndex = system->device_queue_family_index,
+                .dstQueueFamilyIndex = system->device_queue_family_index,
                 .image = attachment->image->image,
                 .subresourceRange =
                     {
@@ -2330,14 +2169,14 @@ static void render_backend_system_submit_pass_instance (struct render_backend_sy
 
     if (added_barriers > 0u)
     {
-        vkCmdPipelineBarrier (state->primary_graphics_command_buffer,
+        vkCmdPipelineBarrier (state->primary_command_buffer,
                               VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT |
                                   VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
                               VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0u, 0u, NULL, 0u, NULL, added_barriers,
                               image_barriers);
     }
 
-    DEBUG_LABEL_SCOPE_END (state->primary_graphics_command_buffer)
+    DEBUG_LABEL_SCOPE_END (state->primary_command_buffer)
     if (image_barriers != image_barriers_static)
     {
         kan_free_general (system->utility_allocation_group, image_barriers,
@@ -2367,20 +2206,9 @@ static void render_backend_system_submit_pass_instance (struct render_backend_sy
 
 static void render_backend_system_submit_graphics (struct render_backend_system_t *system)
 {
-    VkCommandBufferBeginInfo buffer_begin_info = {
-        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-        .pNext = NULL,
-        .flags = 0u,
-        .pInheritanceInfo = NULL,
-    };
-
     struct render_backend_command_state_t *state = &system->command_states[system->current_frame_in_flight_index];
-    if (vkBeginCommandBuffer (state->primary_graphics_command_buffer, &buffer_begin_info) != VK_SUCCESS)
-    {
-        kan_critical_error ("Failed to start recording primary graphics buffer.", __FILE__, __LINE__);
-    }
-
     struct render_backend_surface_t *surface = (struct render_backend_surface_t *) system->surfaces.first;
+
     while (surface)
     {
         surface->render_state = SURFACE_RENDER_STATE_RECEIVED_NO_OUTPUT;
@@ -2388,7 +2216,6 @@ static void render_backend_system_submit_graphics (struct render_backend_system_
     }
 
     struct render_backend_schedule_state_t *schedule = &system->schedule_states[system->current_frame_in_flight_index];
-    // Mip generation must be done in graphics queue.
     submit_mip_generation (system, schedule, state);
     process_frame_buffer_create_requests (system, schedule, state);
 
@@ -2506,8 +2333,8 @@ static void render_backend_system_submit_graphics (struct render_backend_system_
             .dstAccessMask = 0u,
             .oldLayout = old_layout,
             .newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
-            .srcQueueFamilyIndex = system->device_graphics_queue_family_index,
-            .dstQueueFamilyIndex = system->device_graphics_queue_family_index,
+            .srcQueueFamilyIndex = system->device_queue_family_index,
+            .dstQueueFamilyIndex = system->device_queue_family_index,
             .image = surface->images[surface->acquired_image_index],
             .subresourceRange =
                 {
@@ -2519,51 +2346,110 @@ static void render_backend_system_submit_graphics (struct render_backend_system_
                 },
         };
 
-        vkCmdPipelineBarrier (state->primary_graphics_command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+        vkCmdPipelineBarrier (state->primary_command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
                               VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0u, 0u, NULL, 0u, NULL, 1u, &barrier_info);
         surface = (struct render_backend_surface_t *) surface->list_node.next;
     }
+}
 
-    if (vkEndCommandBuffer (state->primary_graphics_command_buffer) != VK_SUCCESS)
+static void render_backend_system_finish_command_submission (struct render_backend_system_t *system)
+{
+    struct render_backend_command_state_t *state = &system->command_states[system->current_frame_in_flight_index];
+    if (vkEndCommandBuffer (state->primary_command_buffer) != VK_SUCCESS)
     {
-        kan_critical_error ("Failed to end recording primary graphics buffer.", __FILE__, __LINE__);
+        kan_critical_error ("Failed to end recording primary buffer.", __FILE__, __LINE__);
     }
 
-    VkSemaphore wait_semaphores[] = {system->transfer_finished_semaphores[system->current_frame_in_flight_index]};
-    VkPipelineStageFlags wait_stages[] = {VK_PIPELINE_STAGE_TRANSFER_BIT};
+    uint32_t semaphores_to_wait = 0u;
+    static VkSemaphore static_wait_semaphores[KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_INLINE_HANDLES];
+    static VkPipelineStageFlags static_semaphore_stages[KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_INLINE_HANDLES];
+
+    VkSemaphore *wait_semaphores = static_wait_semaphores;
+    VkPipelineStageFlags *semaphore_stages = static_semaphore_stages;
+    struct render_backend_surface_t *surface = (struct render_backend_surface_t *) system->surfaces.first;
+
+    while (surface)
+    {
+        if (surface->surface != VK_NULL_HANDLE)
+        {
+            if (semaphores_to_wait < KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_INLINE_HANDLES)
+            {
+                wait_semaphores[semaphores_to_wait] =
+                    surface->image_available_semaphores[system->current_frame_in_flight_index];
+                semaphore_stages[semaphores_to_wait] = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+            }
+
+            ++semaphores_to_wait;
+        }
+
+        surface = (struct render_backend_surface_t *) surface->list_node.next;
+    }
+
+    if (semaphores_to_wait > KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_INLINE_HANDLES)
+    {
+        // Too many semaphores to capture everything to static array, allocate new one.
+        wait_semaphores = kan_allocate_general (system->utility_allocation_group,
+                                                sizeof (VkSemaphore) * semaphores_to_wait, _Alignof (VkSemaphore));
+        semaphore_stages =
+            kan_allocate_general (system->utility_allocation_group, sizeof (VkPipelineStageFlags) * semaphores_to_wait,
+                                  _Alignof (VkPipelineStageFlags));
+
+        semaphores_to_wait = 0u;
+        surface = (struct render_backend_surface_t *) system->surfaces.first;
+
+        while (surface)
+        {
+            if (surface->surface != VK_NULL_HANDLE)
+            {
+                wait_semaphores[semaphores_to_wait] =
+                    surface->image_available_semaphores[system->current_frame_in_flight_index];
+                semaphore_stages[semaphores_to_wait] = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+                ++semaphores_to_wait;
+            }
+
+            surface = (struct render_backend_surface_t *) surface->list_node.next;
+        }
+    }
 
 #if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED)
     struct VkDebugUtilsLabelEXT queue_label = {
         .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT,
         .pNext = NULL,
-        .pLabelName = "Graphics Queue",
-        .color = {0.0f, 0.035f, 0.89f, 1.0f},
+        .pLabelName = "Merged Queue",
+        .color = {0.082f, 0.639f, 0.114f, 1.0f},
     };
 
-    vkQueueBeginDebugUtilsLabelEXT (system->graphics_queue, &queue_label);
+    vkQueueBeginDebugUtilsLabelEXT (system->device_queue, &queue_label);
 #endif
 
     VkSubmitInfo submit_info = {
         .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
         .pNext = NULL,
-        .waitSemaphoreCount = sizeof (wait_semaphores) / sizeof (wait_semaphores[0u]),
+        .waitSemaphoreCount = semaphores_to_wait,
         .pWaitSemaphores = wait_semaphores,
-        .pWaitDstStageMask = wait_stages,
+        .pWaitDstStageMask = semaphore_stages,
         .commandBufferCount = 1u,
-        .pCommandBuffers = &state->primary_graphics_command_buffer,
+        .pCommandBuffers = &state->primary_command_buffer,
         .signalSemaphoreCount = 1u,
         .pSignalSemaphores = &system->render_finished_semaphores[system->current_frame_in_flight_index],
     };
 
-    if (vkQueueSubmit (system->graphics_queue, 1u, &submit_info,
+    if (vkQueueSubmit (system->device_queue, 1u, &submit_info,
                        system->in_flight_fences[system->current_frame_in_flight_index]) != VK_SUCCESS)
     {
-        kan_critical_error ("Failed to submit work to graphics queue.", __FILE__, __LINE__);
+        kan_critical_error ("Failed to submit work to merged queue.", __FILE__, __LINE__);
     }
 
 #if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED)
-    vkQueueEndDebugUtilsLabelEXT (system->graphics_queue);
+    vkQueueEndDebugUtilsLabelEXT (system->device_queue);
 #endif
+
+    if (wait_semaphores != static_wait_semaphores)
+    {
+        kan_free_general (system->utility_allocation_group, wait_semaphores, sizeof (VkSemaphore) * semaphores_to_wait);
+        kan_free_general (system->utility_allocation_group, semaphore_stages,
+                          sizeof (VkPipelineStageFlags) * semaphores_to_wait);
+    }
 }
 
 static void render_backend_system_submit_present (struct render_backend_system_t *system)
@@ -2627,7 +2513,7 @@ static void render_backend_system_submit_present (struct render_backend_system_t
         .pResults = NULL,
     };
 
-    const VkResult present_result = vkQueuePresentKHR (system->graphics_queue, &present_info);
+    const VkResult present_result = vkQueuePresentKHR (system->device_queue, &present_info);
     if (present_result != VK_SUCCESS && present_result != VK_SUBOPTIMAL_KHR &&
         present_result != VK_ERROR_OUT_OF_DATE_KHR)
     {
@@ -2676,35 +2562,45 @@ static void render_backend_system_submit_previous_frame (struct render_backend_s
         return;
     }
 
+    render_backend_system_begin_command_submission (system);
     render_backend_system_submit_transfer (system);
     render_backend_system_submit_graphics (system);
+    render_backend_system_finish_command_submission (system);
     render_backend_system_submit_present (system);
 
-    render_backend_frame_lifetime_allocator_clean_empty_pages (system->staging_frame_lifetime_allocator);
-    render_backend_system_clean_current_schedule_if_safe (system);
+    struct render_backend_frame_lifetime_allocator_t *frame_lifetime_allocator =
+        (struct render_backend_frame_lifetime_allocator_t *) system->frame_lifetime_allocators.first;
 
+    while (frame_lifetime_allocator)
+    {
+        render_backend_frame_lifetime_allocator_clean_empty_pages (frame_lifetime_allocator);
+        frame_lifetime_allocator =
+            (struct render_backend_frame_lifetime_allocator_t *) frame_lifetime_allocator->list_node.next;
+    }
+
+    render_backend_system_clean_current_schedule_if_safe (system);
     struct render_backend_command_state_t *command_state =
         &system->command_states[system->current_frame_in_flight_index];
 
-    KAN_ASSERT (command_state->graphics_command_buffers_used <= command_state->graphics_command_buffers.size)
+    KAN_ASSERT (command_state->secondary_command_buffers_used <= command_state->secondary_command_buffers.size)
     const uint64_t excess_command_buffers =
-        command_state->graphics_command_buffers.size - command_state->graphics_command_buffers_used;
+        command_state->secondary_command_buffers.size - command_state->secondary_command_buffers_used;
 
     if (excess_command_buffers > 0u)
     {
         VkCommandBuffer *first_excess_buffer =
             &((VkCommandBuffer *)
-                  command_state->graphics_command_buffers.data)[command_state->graphics_command_buffers_used];
+                  command_state->secondary_command_buffers.data)[command_state->secondary_command_buffers_used];
 
-        vkFreeCommandBuffers (system->device, command_state->graphics_command_pool, (uint32_t) excess_command_buffers,
+        vkFreeCommandBuffers (system->device, command_state->command_pool, (uint32_t) excess_command_buffers,
                               first_excess_buffer);
 
-        command_state->graphics_command_buffers.size = command_state->graphics_command_buffers_used;
-        if (command_state->graphics_command_buffers.size * 2u < command_state->graphics_command_buffers.capacity &&
-            command_state->graphics_command_buffers.size > KAN_CONTEXT_RENDER_BACKEND_VULKAN_GCB_ARRAY_SIZE)
+        command_state->secondary_command_buffers.size = command_state->secondary_command_buffers_used;
+        if (command_state->secondary_command_buffers.size * 2u < command_state->secondary_command_buffers.capacity &&
+            command_state->secondary_command_buffers.size > KAN_CONTEXT_RENDER_BACKEND_VULKAN_GCB_ARRAY_SIZE)
         {
-            kan_dynamic_array_set_capacity (&command_state->graphics_command_buffers,
-                                            command_state->graphics_command_buffers.capacity / 2u);
+            kan_dynamic_array_set_capacity (&command_state->secondary_command_buffers,
+                                            command_state->secondary_command_buffers.capacity / 2u);
         }
     }
 
@@ -2905,7 +2801,7 @@ static void render_backend_surface_create_swap_chain (struct render_backend_surf
 {
     VkBool32 present_supported;
     if (vkGetPhysicalDeviceSurfaceSupportKHR (surface->system->physical_device,
-                                              surface->system->device_graphics_queue_family_index, surface->surface,
+                                              surface->system->device_queue_family_index, surface->surface,
                                               &present_supported) != VK_SUCCESS)
     {
         KAN_LOG (
@@ -3029,7 +2925,7 @@ static void render_backend_surface_create_swap_chain (struct render_backend_surf
     }
 
     kan_free_general (surface->system->utility_allocation_group, present_modes,
-                      sizeof (VkSurfaceFormatKHR) * present_modes_count);
+                      sizeof (VkPresentModeKHR) * present_modes_count);
 
     if (!present_mode_found)
     {
@@ -3305,18 +3201,10 @@ kan_bool_t kan_render_backend_system_next_frame (kan_context_system_handle_t ren
     vkResetFences (system->device, 1u, &system->in_flight_fences[system->current_frame_in_flight_index]);
     system->frame_started = KAN_TRUE;
 
-    if (vkResetCommandPool (system->device,
-                            system->command_states[system->current_frame_in_flight_index].graphics_command_pool,
+    if (vkResetCommandPool (system->device, system->command_states[system->current_frame_in_flight_index].command_pool,
                             0u) != VK_SUCCESS)
     {
         kan_critical_error ("Unexpected failure when resetting graphics command pool.", __FILE__, __LINE__);
-    }
-
-    if (vkResetCommandPool (system->device,
-                            system->command_states[system->current_frame_in_flight_index].transfer_command_pool,
-                            0u) != VK_SUCCESS)
-    {
-        kan_critical_error ("Unexpected failure when resetting transfer command pool.", __FILE__, __LINE__);
     }
 
     struct render_backend_schedule_state_t *schedule = &system->schedule_states[system->current_frame_in_flight_index];
@@ -3502,7 +3390,16 @@ kan_bool_t kan_render_backend_system_next_frame (kan_context_system_handle_t ren
     }
 
     render_backend_system_clean_current_schedule_if_safe (system);
-    render_backend_frame_lifetime_allocator_retire_old_allocations (system->staging_frame_lifetime_allocator);
+    struct render_backend_frame_lifetime_allocator_t *frame_lifetime_allocator =
+        (struct render_backend_frame_lifetime_allocator_t *) system->frame_lifetime_allocators.first;
+
+    while (frame_lifetime_allocator)
+    {
+        render_backend_frame_lifetime_allocator_retire_old_allocations (frame_lifetime_allocator);
+        frame_lifetime_allocator =
+            (struct render_backend_frame_lifetime_allocator_t *) frame_lifetime_allocator->list_node.next;
+    }
+
     return KAN_TRUE;
 }
 

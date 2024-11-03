@@ -371,25 +371,25 @@ kan_render_pass_instance_t kan_render_pass_instantiate (kan_render_pass_t pass,
         &pass_data->system->command_states[pass_data->system->current_frame_in_flight_index];
     VkCommandBuffer command_buffer = VK_NULL_HANDLE;
 
-    kan_atomic_int_lock (&command_state->graphics_command_operation_lock);
-    const uint64_t command_buffer_index = command_state->graphics_command_buffers_used;
-    ++command_state->graphics_command_buffers_used;
+    kan_atomic_int_lock (&command_state->command_operation_lock);
+    const uint64_t command_buffer_index = command_state->secondary_command_buffers_used;
+    ++command_state->secondary_command_buffers_used;
 
-    if (command_buffer_index >= command_state->graphics_command_buffers.size)
+    if (command_buffer_index >= command_state->secondary_command_buffers.size)
     {
-        VkCommandBuffer *slot = kan_dynamic_array_add_last (&command_state->graphics_command_buffers);
+        VkCommandBuffer *slot = kan_dynamic_array_add_last (&command_state->secondary_command_buffers);
         if (!slot)
         {
-            kan_dynamic_array_set_capacity (&command_state->graphics_command_buffers,
-                                            command_state->graphics_command_buffers.capacity * 2u);
-            slot = kan_dynamic_array_add_last (&command_state->graphics_command_buffers);
+            kan_dynamic_array_set_capacity (&command_state->secondary_command_buffers,
+                                            command_state->secondary_command_buffers.capacity * 2u);
+            slot = kan_dynamic_array_add_last (&command_state->secondary_command_buffers);
             KAN_ASSERT (slot)
         }
 
         VkCommandBufferAllocateInfo allocate_info = {
             .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
             .pNext = NULL,
-            .commandPool = command_state->graphics_command_pool,
+            .commandPool = command_state->command_pool,
             .level = VK_COMMAND_BUFFER_LEVEL_SECONDARY,
             .commandBufferCount = 1u,
         };
@@ -397,14 +397,14 @@ kan_render_pass_instance_t kan_render_pass_instantiate (kan_render_pass_t pass,
         if (vkAllocateCommandBuffers (pass_data->system->device, &allocate_info, slot) != VK_SUCCESS)
         {
             *slot = VK_NULL_HANDLE;
-            --command_state->graphics_command_buffers_used;
+            --command_state->secondary_command_buffers_used;
         }
 
         command_buffer = *slot;
     }
     else
     {
-        command_buffer = ((VkCommandBuffer *) command_state->graphics_command_buffers.data)[command_buffer_index];
+        command_buffer = ((VkCommandBuffer *) command_state->secondary_command_buffers.data)[command_buffer_index];
     }
 
     if (command_buffer != VK_NULL_HANDLE)
@@ -435,7 +435,7 @@ kan_render_pass_instance_t kan_render_pass_instantiate (kan_render_pass_t pass,
         }
     }
 
-    kan_atomic_int_unlock (&command_state->graphics_command_operation_lock);
+    kan_atomic_int_unlock (&command_state->command_operation_lock);
     if (command_buffer == VK_NULL_HANDLE)
     {
         KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR,
@@ -530,10 +530,10 @@ kan_render_pass_instance_t kan_render_pass_instantiate (kan_render_pass_t pass,
             },
     };
 
-    kan_atomic_int_lock (&command_state->graphics_command_operation_lock);
+    kan_atomic_int_lock (&command_state->command_operation_lock);
     vkCmdSetViewport (instance->command_buffer, 0u, 1u, &pass_viewport);
     vkCmdSetScissor (instance->command_buffer, 0u, 1u, &pass_scissor);
-    kan_atomic_int_unlock (&command_state->graphics_command_operation_lock);
+    kan_atomic_int_unlock (&command_state->command_operation_lock);
     return (kan_render_pass_instance_t) instance;
 }
 
@@ -558,10 +558,10 @@ void kan_render_pass_instance_graphics_pipeline (kan_render_pass_instance_t pass
     struct render_backend_command_state_t *command_state =
         &instance->system->command_states[instance->system->current_frame_in_flight_index];
 
-    kan_atomic_int_lock (&command_state->graphics_command_operation_lock);
+    kan_atomic_int_lock (&command_state->command_operation_lock);
     DEBUG_LABEL_INSERT (instance->command_buffer, pipeline->tracking_name, 0.063f, 0.569f, 0.0f, 1.0f)
     vkCmdBindPipeline (instance->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->pipeline);
-    kan_atomic_int_unlock (&command_state->graphics_command_operation_lock);
+    kan_atomic_int_unlock (&command_state->command_operation_lock);
     instance->current_pipeline_layout = pipeline->family->layout;
 }
 
@@ -591,7 +591,7 @@ void kan_render_pass_instance_pipeline_parameter_sets (kan_render_pass_instance_
         }
     }
 
-    kan_atomic_int_lock (&command_state->graphics_command_operation_lock);
+    kan_atomic_int_lock (&command_state->command_operation_lock);
     for (uint64_t index = 0u; index < parameter_sets_count; ++index)
     {
         // We don't implement sequential set optimization as it looks like it is not worth it in most cases for us.
@@ -615,7 +615,7 @@ void kan_render_pass_instance_pipeline_parameter_sets (kan_render_pass_instance_
                                  NULL);
     }
 
-    kan_atomic_int_unlock (&command_state->graphics_command_operation_lock);
+    kan_atomic_int_unlock (&command_state->command_operation_lock);
 }
 
 void kan_render_pass_instance_attributes (kan_render_pass_instance_t pass_instance,
@@ -648,10 +648,10 @@ void kan_render_pass_instance_attributes (kan_render_pass_instance_t pass_instan
         buffer_offsets[index] = 0u;
     }
 
-    kan_atomic_int_lock (&command_state->graphics_command_operation_lock);
+    kan_atomic_int_lock (&command_state->command_operation_lock);
     vkCmdBindVertexBuffers (instance->command_buffer, (uint32_t) start_at_binding, (uint32_t) buffers_count,
                             buffer_handles, buffer_offsets);
-    kan_atomic_int_unlock (&command_state->graphics_command_operation_lock);
+    kan_atomic_int_unlock (&command_state->command_operation_lock);
 
     if (buffer_handles != buffer_handles_static)
     {
@@ -675,9 +675,9 @@ void kan_render_pass_instance_indices (kan_render_pass_instance_t pass_instance,
     struct render_backend_command_state_t *command_state =
         &instance->system->command_states[instance->system->current_frame_in_flight_index];
 
-    kan_atomic_int_lock (&command_state->graphics_command_operation_lock);
+    kan_atomic_int_lock (&command_state->command_operation_lock);
     vkCmdBindIndexBuffer (instance->command_buffer, index_buffer->buffer, 0u, index_type);
-    kan_atomic_int_unlock (&command_state->graphics_command_operation_lock);
+    kan_atomic_int_unlock (&command_state->command_operation_lock);
 }
 
 void kan_render_pass_instance_draw (kan_render_pass_instance_t pass_instance,
@@ -689,9 +689,9 @@ void kan_render_pass_instance_draw (kan_render_pass_instance_t pass_instance,
     struct render_backend_command_state_t *command_state =
         &instance->system->command_states[instance->system->current_frame_in_flight_index];
 
-    kan_atomic_int_lock (&command_state->graphics_command_operation_lock);
+    kan_atomic_int_lock (&command_state->command_operation_lock);
     vkCmdDrawIndexed (instance->command_buffer, index_count, 1u, index_offset, (int32_t) vertex_offset, 0u);
-    kan_atomic_int_unlock (&command_state->graphics_command_operation_lock);
+    kan_atomic_int_unlock (&command_state->command_operation_lock);
 }
 
 void kan_render_pass_instance_instanced_draw (kan_render_pass_instance_t pass_instance,
@@ -705,10 +705,10 @@ void kan_render_pass_instance_instanced_draw (kan_render_pass_instance_t pass_in
     struct render_backend_command_state_t *command_state =
         &instance->system->command_states[instance->system->current_frame_in_flight_index];
 
-    kan_atomic_int_lock (&command_state->graphics_command_operation_lock);
+    kan_atomic_int_lock (&command_state->command_operation_lock);
     vkCmdDrawIndexed (instance->command_buffer, index_count, instance_count, index_offset, (int32_t) vertex_offset,
                       instance_offset);
-    kan_atomic_int_unlock (&command_state->graphics_command_operation_lock);
+    kan_atomic_int_unlock (&command_state->command_operation_lock);
 }
 
 void kan_render_pass_destroy (kan_render_pass_t pass)

@@ -460,10 +460,8 @@ CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_graphics_pipeline_family_t kan_rend
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_graphics_pipeline_family_destroy (
     kan_render_graphics_pipeline_family_t family);
 
-CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_code_module_t kan_render_code_module_create (kan_render_context_t context,
-                                                                                          uint32_t code_length,
-                                                                                          void *code,
-                                                                                          kan_interned_string_t tracking_name);
+CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_code_module_t kan_render_code_module_create (
+    kan_render_context_t context, uint32_t code_length, void *code, kan_interned_string_t tracking_name);
 
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_code_module_destroy (kan_render_code_module_t code_module);
 
@@ -748,10 +746,17 @@ struct kan_render_allocated_slice_t
     uint32_t slice_offset;
 };
 
+/// \details Usually, there is no need for frame lifetime allocation on device, as either way memory is transferred from
+///          host to GPU. However, in some cases transferring data to GPU every frame is still faster than letting
+///          GPU access host memory directly, although it is usually not noticeable, as GPU might access the same data
+///          several times. Therefore, we've made it possible to use frame lifetime allocators with device memory.
+///          However, using such frame allocators essentially doubles the memory usage as they need to use staging
+///          buffer to execute transfer to device memory.
 CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_frame_lifetime_buffer_allocator_t
 kan_render_frame_lifetime_buffer_allocator_create (kan_render_context_t context,
                                                    enum kan_render_buffer_type_t buffer_type,
                                                    uint32_t page_size,
+                                                   kan_bool_t on_device,
                                                    kan_interned_string_t tracking_name);
 
 CONTEXT_RENDER_BACKEND_SYSTEM_API struct kan_render_allocated_slice_t

@@ -100,20 +100,17 @@ struct render_backend_surface_t
 ///          point of view and is advised on docs.vulkan.org.
 struct render_backend_command_state_t
 {
-    VkCommandPool graphics_command_pool;
-    VkCommandBuffer primary_graphics_command_buffer;
+    VkCommandPool command_pool;
+    VkCommandBuffer primary_command_buffer;
 
-    /// \details Currently, all graphics command buffers use the same pool,
+    /// \details Currently, all secondary command buffers use the same pool,
     ///          therefore we need global lock for command submission.
-    struct kan_atomic_int_t graphics_command_operation_lock;
+    struct kan_atomic_int_t command_operation_lock;
 
     /// \meta reflection_dynamic_array_type = "struct mutator_t"
-    struct kan_dynamic_array_t graphics_command_buffers;
+    struct kan_dynamic_array_t secondary_command_buffers;
 
-    uint64_t graphics_command_buffers_used;
-
-    VkCommandPool transfer_command_pool;
-    VkCommandBuffer primary_transfer_command_buffer;
+    uint64_t secondary_command_buffers_used;
 };
 
 struct render_backend_descriptor_set_allocation_t
@@ -485,7 +482,8 @@ enum render_backend_buffer_family_t
 {
     RENDER_BACKEND_BUFFER_FAMILY_RESOURCE = 0u,
     RENDER_BACKEND_BUFFER_FAMILY_STAGING,
-    RENDER_BACKEND_BUFFER_FAMILY_FRAME_LIFETIME_ALLOCATOR,
+    RENDER_BACKEND_BUFFER_FAMILY_HOST_FRAME_LIFETIME_ALLOCATOR,
+    RENDER_BACKEND_BUFFER_FAMILY_DEVICE_FRAME_LIFETIME_ALLOCATOR,
 };
 
 struct render_backend_stable_parameter_set_data_t
@@ -777,18 +775,13 @@ struct render_backend_system_t
     enum kan_render_device_memory_type_t device_memory_type;
     VkPhysicalDevice physical_device;
 
-    VkQueue graphics_queue;
-    VkQueue transfer_queue;
-
     VmaAllocator gpu_memory_allocator;
-
-    uint32_t device_graphics_queue_family_index;
-    uint32_t device_transfer_queue_family_index;
+    uint32_t device_queue_family_index;
+    VkQueue device_queue;
 
     kan_bool_t frame_started;
     uint32_t current_frame_in_flight_index;
 
-    VkSemaphore transfer_finished_semaphores[KAN_CONTEXT_RENDER_BACKEND_VULKAN_FRAMES_IN_FLIGHT];
     VkSemaphore render_finished_semaphores[KAN_CONTEXT_RENDER_BACKEND_VULKAN_FRAMES_IN_FLIGHT];
     VkFence in_flight_fences[KAN_CONTEXT_RENDER_BACKEND_VULKAN_FRAMES_IN_FLIGHT];
 

@@ -8,11 +8,6 @@ static kan_bool_t create_vulkan_image (struct render_backend_system_t *system,
     VkImageType image_type = VK_IMAGE_TYPE_2D;
     VkImageUsageFlags image_usage = 0u;
 
-    VkSharingMode sharing_mode;
-    uint32_t sharing_index_count;
-    uint32_t shared_indices[2u] = {system->device_graphics_queue_family_index,
-                                   system->device_transfer_queue_family_index};
-
     switch (description->type)
     {
     case KAN_RENDER_IMAGE_TYPE_COLOR_2D:
@@ -63,18 +58,6 @@ static kan_bool_t create_vulkan_image (struct render_backend_system_t *system,
         image_usage |= VK_IMAGE_USAGE_SAMPLED_BIT;
     }
 
-    if (description->render_target &&
-        system->device_graphics_queue_family_index != system->device_transfer_queue_family_index)
-    {
-        sharing_mode = VK_SHARING_MODE_CONCURRENT;
-        sharing_index_count = 2u;
-    }
-    else
-    {
-        sharing_mode = VK_SHARING_MODE_EXCLUSIVE;
-        sharing_index_count = 1u;
-    }
-
     VkImageCreateInfo image_create_info = {
         .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
         .pNext = NULL,
@@ -91,9 +74,9 @@ static kan_bool_t create_vulkan_image (struct render_backend_system_t *system,
         .samples = VK_SAMPLE_COUNT_1_BIT,
         .tiling = VK_IMAGE_TILING_OPTIMAL,
         .usage = image_usage,
-        .sharingMode = sharing_mode,
-        .queueFamilyIndexCount = sharing_index_count,
-        .pQueueFamilyIndices = shared_indices,
+        .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+        .queueFamilyIndexCount = 1u,
+        .pQueueFamilyIndices = &system->device_queue_family_index,
         .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
     };
 
@@ -317,6 +300,11 @@ void kan_render_image_resize_render_target (kan_render_image_t image,
                  "Failed to resize image \"%s\": new image creation failed.", data->description.tracking_name)
         return;
     }
+
+#if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_PROFILE_MEMORY)
+    transfer_memory_between_groups (render_backend_image_calculate_gpu_size (data->system, data),
+                                    data->system->memory_profiling.gpu_unmarked_group, data->device_allocation_group);
+#endif
 
     struct render_backend_schedule_state_t *schedule = render_backend_system_get_schedule_for_memory (data->system);
     kan_atomic_int_lock (&schedule->schedule_lock);

@@ -36,12 +36,6 @@ static inline void *walk_from_accessible_to_allocated (void *accessible)
     return meta;
 }
 
-static inline void profiled_free_internal (struct memory_profiling_t *profiling, void *allocated, void *accessible)
-{
-    uint32_t size_to_free = (*(uint32_t *) allocated) + (((uint8_t *) accessible) - ((uint8_t *) allocated));
-    kan_free_general (profiling->driver_cpu_generic_group, allocated, size_to_free);
-}
-
 static void *profiled_reallocate (
     void *user_data, void *original, size_t size, size_t alignment, VkSystemAllocationScope scope)
 {
@@ -55,7 +49,8 @@ static void *profiled_reallocate (
 
     void *new_data = profiled_allocate (user_data, size, alignment, scope);
     memcpy (new_data, original, KAN_MIN ((size_t) original_data_size, size));
-    profiled_free_internal (profiling, original_allocated_data, original_user_accessible_data);
+    kan_free_general (profiling->driver_cpu_generic_group, original_allocated_data,
+                      *(uint32_t *) original_allocated_data);
     return new_data;
 }
 
@@ -66,7 +61,7 @@ static void profiled_free (void *user_data, void *pointer)
         struct memory_profiling_t *profiling = (struct memory_profiling_t *) user_data;
         void *accessible = pointer;
         void *allocated = walk_from_accessible_to_allocated (accessible);
-        profiled_free_internal (profiling, allocated, accessible);
+        kan_free_general (profiling->driver_cpu_generic_group, allocated, *(uint32_t *) allocated);
     }
 }
 
