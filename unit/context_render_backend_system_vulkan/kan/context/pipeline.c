@@ -761,7 +761,9 @@ struct render_backend_graphics_pipeline_t *render_backend_system_create_graphics
     struct render_backend_graphics_pipeline_t *pipeline = kan_allocate_batched (
         system->pipeline_wrapper_allocation_group, sizeof (struct render_backend_graphics_pipeline_t));
 
+    kan_atomic_int_lock (&system->resource_registration_lock);
     kan_bd_list_add (&system->graphics_pipelines, NULL, &pipeline->list_node);
+    kan_atomic_int_unlock (&system->resource_registration_lock);
     pipeline->system = system;
 
     pipeline->pipeline = VK_NULL_HANDLE;
@@ -816,10 +818,8 @@ kan_render_graphics_pipeline_t kan_render_graphics_pipeline_create (
     enum kan_render_pipeline_compilation_priority_t compilation_priority)
 {
     struct render_backend_system_t *system = (struct render_backend_system_t *) context;
-    kan_atomic_int_lock (&system->resource_management_lock);
     struct render_backend_graphics_pipeline_t *pipeline =
         render_backend_system_create_graphics_pipeline (system, description, compilation_priority);
-    kan_atomic_int_unlock (&system->resource_management_lock);
 
     render_backend_compiler_state_request_graphics (&system->compiler_state, pipeline, description);
     return pipeline ? (kan_render_graphics_pipeline_t) pipeline : KAN_INVALID_RENDER_GRAPHICS_PIPELINE;

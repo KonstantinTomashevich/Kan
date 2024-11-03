@@ -257,7 +257,10 @@ struct render_backend_pass_t *render_backend_system_create_pass (struct render_b
 
     struct render_backend_pass_t *pass =
         kan_allocate_batched (system->pass_wrapper_allocation_group, sizeof (struct render_backend_pass_t));
+
+    kan_atomic_int_lock (&system->resource_registration_lock);
     kan_bd_list_add (&system->passes, NULL, &pass->list_node);
+    kan_atomic_int_unlock (&system->resource_registration_lock);
 
     pass->pass = render_pass;
     pass->system = system;
@@ -315,9 +318,7 @@ kan_render_pass_t kan_render_pass_create (kan_render_context_t context,
                                           struct kan_render_pass_description_t *description)
 {
     struct render_backend_system_t *system = (struct render_backend_system_t *) context;
-    kan_atomic_int_lock (&system->resource_management_lock);
     struct render_backend_pass_t *pass = render_backend_system_create_pass (system, description);
-    kan_atomic_int_unlock (&system->resource_management_lock);
     return pass ? (kan_render_pass_t) pass : KAN_INVALID_RENDER_PASS;
 }
 

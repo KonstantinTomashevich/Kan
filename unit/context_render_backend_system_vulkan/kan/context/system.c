@@ -33,7 +33,7 @@ kan_context_system_handle_t render_backend_system_create (kan_allocation_group_t
     system->frame_started = KAN_FALSE;
     system->current_frame_in_flight_index = 0u;
 
-    system->resource_management_lock = kan_atomic_int_init (0);
+    system->resource_registration_lock = kan_atomic_int_init (0);
     system->pass_static_dependency_lock = kan_atomic_int_init (0);
     system->pass_instance_state_management_lock = kan_atomic_int_init (0);
 
@@ -927,7 +927,7 @@ kan_bool_t kan_render_backend_system_select_device (kan_context_system_handle_t 
     };
 
     VmaAllocatorCreateInfo allocator_create_info = {
-        .flags = VMA_ALLOCATOR_CREATE_EXTERNALLY_SYNCHRONIZED_BIT,
+        .flags = 0u,
         .physicalDevice = physical_device,
         .device = system->device,
         .preferredLargeHeapBlockSize = 0u, // Use default.
@@ -3543,7 +3543,6 @@ kan_render_surface_t kan_render_backend_system_create_surface (kan_context_syste
         return KAN_INVALID_RENDER_SURFACE;
     }
 
-    kan_atomic_int_lock (&system->resource_management_lock);
     struct render_backend_surface_t *new_surface =
         kan_allocate_batched (system->surface_wrapper_allocation_group, sizeof (struct render_backend_surface_t));
 
@@ -3558,8 +3557,9 @@ kan_render_surface_t kan_render_backend_system_create_surface (kan_context_syste
     new_surface->first_blit_request = NULL;
     new_surface->first_frame_buffer_attachment = NULL;
 
+    kan_atomic_int_lock (&system->resource_registration_lock);
     kan_bd_list_add (&system->surfaces, NULL, &new_surface->list_node);
-    kan_atomic_int_unlock (&system->resource_management_lock);
+    kan_atomic_int_unlock (&system->resource_registration_lock);
 
     new_surface->resource_id =
         kan_application_system_window_add_resource (application_system, window,

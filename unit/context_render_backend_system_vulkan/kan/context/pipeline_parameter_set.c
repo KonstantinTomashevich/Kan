@@ -3,6 +3,7 @@
 void render_backend_descriptor_set_allocator_init (struct render_backend_descriptor_set_allocator_t *allocator)
 {
     kan_bd_list_init (&allocator->pools);
+    allocator->multithreaded_access_lock = kan_atomic_int_init (0);
     allocator->total_set_allocations = 0u;
     allocator->uniform_buffer_binding_allocations = 0u;
     allocator->storage_buffer_binding_allocations = 0u;
@@ -19,6 +20,7 @@ struct render_backend_descriptor_set_allocation_t render_backend_descriptor_set_
         .source_pool = NULL,
     };
 
+    kan_atomic_int_lock (&allocator->multithreaded_access_lock);
     ++allocator->total_set_allocations;
     allocator->uniform_buffer_binding_allocations += layout->uniform_buffers_count;
     allocator->storage_buffer_binding_allocations += layout->storage_buffers_count;
@@ -41,6 +43,7 @@ struct render_backend_descriptor_set_allocation_t render_backend_descriptor_set_
         {
             allocation.source_pool = pool;
             ++pool->active_allocations;
+            kan_atomic_int_unlock (&allocator->multithreaded_access_lock);
             return allocation;
         }
 
@@ -145,6 +148,7 @@ struct render_backend_descriptor_set_allocation_t render_backend_descriptor_set_
         allocation.descriptor_set = VK_NULL_HANDLE;
     }
 
+    kan_atomic_int_unlock (&allocator->multithreaded_access_lock);
     return allocation;
 }
 
@@ -152,6 +156,7 @@ void render_backend_descriptor_set_allocator_free (struct render_backend_system_
                                                    struct render_backend_descriptor_set_allocator_t *allocator,
                                                    struct render_backend_descriptor_set_allocation_t *allocation)
 {
+    kan_atomic_int_lock (&allocator->multithreaded_access_lock);
     vkFreeDescriptorSets (system->device, allocation->source_pool->pool, 1u, &allocation->descriptor_set);
     --allocation->source_pool->active_allocations;
 
@@ -162,6 +167,8 @@ void render_backend_descriptor_set_allocator_free (struct render_backend_system_
         kan_bd_list_remove (&allocator->pools, &allocation->source_pool->list_node);
         kan_free_batched (system->descriptor_set_wrapper_allocation_group, allocation->source_pool);
     }
+
+    kan_atomic_int_unlock (&allocator->multithreaded_access_lock);
 }
 
 void render_backend_descriptor_set_allocator_shutdown (struct render_backend_system_t *system,
@@ -310,7 +317,10 @@ struct render_backend_pipeline_parameter_set_t *render_backend_system_create_pip
         kan_allocate_batched (system->pipeline_parameter_set_wrapper_allocation_group,
                               sizeof (struct render_backend_pipeline_parameter_set_t));
 
+    kan_atomic_int_lock (&system->resource_registration_lock);
     kan_bd_list_add (&system->pipeline_parameter_sets, NULL, &set->list_node);
+    kan_atomic_int_unlock (&system->resource_registration_lock);
+
     set->system = system;
     set->layout = layout;
 
@@ -723,10 +733,8 @@ kan_render_pipeline_parameter_set_t kan_render_pipeline_parameter_set_create (
     kan_render_context_t context, struct kan_render_pipeline_parameter_set_description_t *description)
 {
     struct render_backend_system_t *system = (struct render_backend_system_t *) context;
-    kan_atomic_int_lock (&system->resource_management_lock);
     struct render_backend_pipeline_parameter_set_t *set =
         render_backend_system_create_pipeline_parameter_set (system, description);
-    kan_atomic_int_unlock (&system->resource_management_lock);
 
     if (!set)
     {

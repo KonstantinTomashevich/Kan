@@ -6,7 +6,10 @@ struct render_backend_frame_buffer_t *render_backend_system_create_frame_buffer 
     struct render_backend_frame_buffer_t *buffer = kan_allocate_batched (system->frame_buffer_wrapper_allocation_group,
                                                                          sizeof (struct render_backend_frame_buffer_t));
 
+    kan_atomic_int_lock (&system->resource_registration_lock);
     kan_bd_list_add (&system->frame_buffers, NULL, &buffer->list_node);
+    kan_atomic_int_unlock (&system->resource_registration_lock);
+
     buffer->system = system;
     buffer->instance = VK_NULL_HANDLE;
     buffer->instance_array_size = 0u;
@@ -251,10 +254,8 @@ kan_render_frame_buffer_t kan_render_frame_buffer_create (kan_render_context_t c
                                                           struct kan_render_frame_buffer_description_t *description)
 {
     struct render_backend_system_t *system = (struct render_backend_system_t *) context;
-    kan_atomic_int_lock (&system->resource_management_lock);
     struct render_backend_frame_buffer_t *frame_buffer =
         render_backend_system_create_frame_buffer (system, description);
-    kan_atomic_int_unlock (&system->resource_management_lock);
     return frame_buffer ? (kan_render_frame_buffer_t) frame_buffer : KAN_INVALID_FRAME_BUFFER;
 }
 

@@ -39,7 +39,10 @@ struct render_backend_code_module_t *render_backend_system_create_code_module (s
     struct render_backend_code_module_t *module = kan_allocate_batched (system->code_module_wrapper_allocation_group,
                                                                         sizeof (struct render_backend_code_module_t));
 
+    kan_atomic_int_lock (&system->resource_registration_lock);
     kan_bd_list_add (&system->code_modules, NULL, &module->list_node);
+    kan_atomic_int_unlock (&system->resource_registration_lock);
+
     module->system = system;
     module->module = shader_module;
     module->tracking_name = tracking_name;
@@ -59,10 +62,8 @@ kan_render_code_module_t kan_render_code_module_create (kan_render_context_t con
                                                         kan_interned_string_t tracking_name)
 {
     struct render_backend_system_t *system = (struct render_backend_system_t *) context;
-    kan_atomic_int_lock (&system->resource_management_lock);
     struct render_backend_code_module_t *module =
         render_backend_system_create_code_module (system, code_length, code, tracking_name);
-    kan_atomic_int_unlock (&system->resource_management_lock);
     return module ? (kan_render_code_module_t) module : KAN_INVALID_RENDER_CODE_MODULE;
 }
 

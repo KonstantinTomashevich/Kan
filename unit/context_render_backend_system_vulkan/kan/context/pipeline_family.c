@@ -285,7 +285,9 @@ struct render_backend_graphics_pipeline_family_t *render_backend_system_create_g
     struct render_backend_graphics_pipeline_family_t *family = kan_allocate_batched (
         system->pipeline_family_wrapper_allocation_group, sizeof (struct render_backend_graphics_pipeline_family_t));
 
+    kan_atomic_int_lock (&system->resource_registration_lock);
     kan_bd_list_add (&system->graphics_pipeline_families, NULL, &family->list_node);
+    kan_atomic_int_unlock (&system->resource_registration_lock);
     family->system = system;
 
     family->layout = pipeline_layout;
@@ -425,10 +427,8 @@ kan_render_graphics_pipeline_family_t kan_render_graphics_pipeline_family_create
     kan_render_context_t context, struct kan_render_graphics_pipeline_family_description_t *description)
 {
     struct render_backend_system_t *system = (struct render_backend_system_t *) context;
-    kan_atomic_int_lock (&system->resource_management_lock);
     struct render_backend_graphics_pipeline_family_t *family =
         render_backend_system_create_graphics_pipeline_family (system, description);
-    kan_atomic_int_unlock (&system->resource_management_lock);
     return family ? (kan_render_graphics_pipeline_family_t) family : KAN_INVALID_RENDER_GRAPHICS_PIPELINE_FAMILY;
 }
 

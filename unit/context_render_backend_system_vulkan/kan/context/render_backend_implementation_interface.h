@@ -736,6 +736,7 @@ struct render_backend_descriptor_set_pool_t
 struct render_backend_descriptor_set_allocator_t
 {
     struct kan_bd_list_t pools;
+    struct kan_atomic_int_t multithreaded_access_lock;
 
     uint64_t total_set_allocations;
     uint64_t uniform_buffer_binding_allocations;
@@ -789,14 +790,10 @@ struct render_backend_system_t
     struct render_backend_command_state_t command_states[KAN_CONTEXT_RENDER_BACKEND_VULKAN_FRAMES_IN_FLIGHT];
     struct render_backend_schedule_state_t schedule_states[KAN_CONTEXT_RENDER_BACKEND_VULKAN_FRAMES_IN_FLIGHT];
 
-    /// \brief Lock for safe resource management (resource creation, memory management) in multithreaded environment.
-    /// \details Surfaces are the exemption from this rule as they're always managed from application system thread.
-    ///          Everything that is done from kan_render_backend_system_next_frame is an exemption from this rule as
-    ///          strict frame ordering must prevent any calls that are simultaneous with next frame call.
-    // TODO: This lock is used in a lot of cases where it is not really needed de facto, for example lots of vkCreate*
-    //       do not need external synchronization but are caught under this lock. Research and improve it?
-    struct kan_atomic_int_t resource_management_lock;
+    /// \brief Lock for safe resource creation registration in multithreaded environment.
+    struct kan_atomic_int_t resource_registration_lock;
 
+    /// \brief Lock used for registering static dependencies between passes.
     struct kan_atomic_int_t pass_static_dependency_lock;
 
     /// \details Lock used for operations than change pass instance state by moving it in different lists.

@@ -137,7 +137,10 @@ struct render_backend_buffer_t *render_backend_system_create_buffer (struct rend
     struct render_backend_buffer_t *buffer =
         kan_allocate_batched (system->buffer_wrapper_allocation_group, sizeof (struct render_backend_buffer_t));
 
+    kan_atomic_int_lock (&system->resource_registration_lock);
     kan_bd_list_add (&system->buffers, NULL, &buffer->list_node);
+    kan_atomic_int_unlock (&system->resource_registration_lock);
+
     buffer->system = system;
     buffer->buffer = buffer_handle;
     buffer->allocation = allocation_handle;
@@ -195,10 +198,8 @@ kan_render_buffer_t kan_render_buffer_create (kan_render_context_t context,
                                               kan_interned_string_t tracking_name)
 {
     struct render_backend_system_t *system = (struct render_backend_system_t *) context;
-    kan_atomic_int_lock (&system->resource_management_lock);
     struct render_backend_buffer_t *buffer = render_backend_system_create_buffer (
         system, RENDER_BACKEND_BUFFER_FAMILY_RESOURCE, type, full_size, tracking_name);
-    kan_atomic_int_unlock (&system->resource_management_lock);
 
     if (!buffer)
     {
@@ -212,7 +213,6 @@ kan_render_buffer_t kan_render_buffer_create (kan_render_context_t context,
         {
             // Due to unified memory, we should be able to directly initialize buffer.
             void *memory;
-            kan_atomic_int_lock (&system->resource_management_lock);
 
             if (vmaMapMemory (system->gpu_memory_allocator, buffer->allocation, &memory) != VK_SUCCESS)
             {
@@ -220,9 +220,7 @@ kan_render_buffer_t kan_render_buffer_create (kan_render_context_t context,
                                     __FILE__, __LINE__);
             }
 
-            kan_atomic_int_unlock (&system->resource_management_lock);
             memcpy (memory, optional_initial_data, full_size);
-            kan_atomic_int_lock (&system->resource_management_lock);
             vmaUnmapMemory (system->gpu_memory_allocator, buffer->allocation);
 
             if (vmaFlushAllocation (system->gpu_memory_allocator, buffer->allocation, 0u, full_size) != VK_SUCCESS)
@@ -231,8 +229,6 @@ kan_render_buffer_t kan_render_buffer_create (kan_render_context_t context,
                     "Unexpected failure while flushing buffer initial data, unable to continue properly.", __FILE__,
                     __LINE__);
             }
-
-            kan_atomic_int_unlock (&system->resource_management_lock);
         }
         else
         {
@@ -267,9 +263,7 @@ void *kan_render_buffer_patch (kan_render_buffer_t buffer, uint32_t slice_offset
             return NULL;
         }
 
-        kan_atomic_int_lock (&data->system->resource_management_lock);
         void *memory;
-
         if (vmaMapMemory (data->system->gpu_memory_allocator, staging_allocation.buffer->allocation, &memory) !=
             VK_SUCCESS)
         {
@@ -277,9 +271,7 @@ void *kan_render_buffer_patch (kan_render_buffer_t buffer, uint32_t slice_offset
                                 __FILE__, __LINE__);
         }
 
-        kan_atomic_int_unlock (&data->system->resource_management_lock);
         kan_atomic_int_lock (&schedule->schedule_lock);
-
         struct scheduled_buffer_unmap_flush_transfer_t *item = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (
             &schedule->item_allocator, struct scheduled_buffer_unmap_flush_transfer_t);
 
@@ -305,7 +297,6 @@ void *kan_render_buffer_patch (kan_render_buffer_t buffer, uint32_t slice_offset
     {
         // Frame lifetime allocations are always host visible, there is no need to stage them due to their lifetime.
         void *memory;
-        kan_atomic_int_lock (&data->system->resource_management_lock);
 
         if (vmaMapMemory (data->system->gpu_memory_allocator, data->allocation, &memory) != VK_SUCCESS)
         {
@@ -313,9 +304,7 @@ void *kan_render_buffer_patch (kan_render_buffer_t buffer, uint32_t slice_offset
                                 __FILE__, __LINE__);
         }
 
-        kan_atomic_int_unlock (&data->system->resource_management_lock);
         kan_atomic_int_lock (&schedule->schedule_lock);
-
         struct scheduled_buffer_unmap_flush_t *item =
             KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&schedule->item_allocator, struct scheduled_buffer_unmap_flush_t);
 

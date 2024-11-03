@@ -132,7 +132,9 @@ struct render_backend_image_t *render_backend_system_create_image (struct render
     struct render_backend_image_t *image =
         kan_allocate_batched (system->image_wrapper_allocation_group, sizeof (struct render_backend_image_t));
 
+    kan_atomic_int_lock (&system->resource_registration_lock);
     kan_bd_list_add (&system->images, NULL, &image->list_node);
+    kan_atomic_int_unlock (&system->resource_registration_lock);
     image->system = system;
 
     image->image = vulkan_image;
@@ -183,9 +185,7 @@ kan_render_image_t kan_render_image_create (kan_render_context_t context,
                                             struct kan_render_image_description_t *description)
 {
     struct render_backend_system_t *system = (struct render_backend_system_t *) context;
-    kan_atomic_int_lock (&system->resource_management_lock);
     struct render_backend_image_t *image = render_backend_system_create_image (system, description);
-    kan_atomic_int_unlock (&system->resource_management_lock);
     return image ? (kan_render_image_t) image : KAN_INVALID_RENDER_IMAGE;
 }
 

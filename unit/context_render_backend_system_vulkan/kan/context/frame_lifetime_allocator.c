@@ -10,7 +10,10 @@ struct render_backend_frame_lifetime_allocator_t *render_backend_system_create_f
     struct render_backend_frame_lifetime_allocator_t *allocator = kan_allocate_batched (
         system->frame_lifetime_wrapper_allocation_group, sizeof (struct render_backend_frame_lifetime_allocator_t));
 
+    kan_atomic_int_lock (&system->resource_registration_lock);
     kan_bd_list_add (&system->frame_lifetime_allocators, NULL, &allocator->list_node);
+    kan_atomic_int_unlock (&system->resource_registration_lock);
+
     allocator->system = system;
     allocator->first_page = NULL;
     allocator->last_page = NULL;
@@ -236,11 +239,9 @@ struct render_backend_frame_lifetime_allocator_allocation_t render_backend_syste
     }
 
     // Size is super big, we need separate buffer.
-    kan_atomic_int_lock (&system->resource_management_lock);
     struct render_backend_buffer_t *buffer = render_backend_system_create_buffer (
         system, RENDER_BACKEND_BUFFER_FAMILY_STAGING, KAN_RENDER_BUFFER_TYPE_STORAGE, size,
         system->interned_temporary_staging_buffer);
-    kan_atomic_int_unlock (&system->resource_management_lock);
 
     if (!buffer)
     {
@@ -414,14 +415,12 @@ kan_render_frame_lifetime_buffer_allocator_t kan_render_frame_lifetime_buffer_al
     kan_interned_string_t tracking_name)
 {
     struct render_backend_system_t *system = (struct render_backend_system_t *) context;
-    kan_atomic_int_lock (&system->resource_management_lock);
     struct render_backend_frame_lifetime_allocator_t *allocator =
         render_backend_system_create_frame_lifetime_allocator (
             system,
             on_device ? RENDER_BACKEND_BUFFER_FAMILY_DEVICE_FRAME_LIFETIME_ALLOCATOR :
                         RENDER_BACKEND_BUFFER_FAMILY_HOST_FRAME_LIFETIME_ALLOCATOR,
             buffer_type, page_size, tracking_name);
-    kan_atomic_int_unlock (&system->resource_management_lock);
     return (kan_render_frame_lifetime_buffer_allocator_t) allocator;
 }
 
