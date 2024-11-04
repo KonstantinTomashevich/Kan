@@ -3464,6 +3464,7 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
                     resolve_scope->function->first_buffer_access = new_access_node;
                     new_access_node->buffer = buffer_access_node->buffer;
                     new_access_node->direct_access_function = buffer_access_node->direct_access_function;
+                    new_access_node->used_as_output = buffer_access_node->used_as_output;
                 }
 
                 buffer_access_node = buffer_access_node->next;
