@@ -821,6 +821,8 @@ struct render_backend_system_t
 
     struct kan_stack_group_allocator_t pass_instance_allocator;
 
+    VkDescriptorSetLayout empty_descriptor_set_layout;
+
 #if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED)
     kan_bool_t has_validation_layer;
     VkDebugUtilsMessengerEXT debug_messenger;

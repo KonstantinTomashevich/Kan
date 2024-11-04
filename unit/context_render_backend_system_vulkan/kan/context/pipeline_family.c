@@ -69,7 +69,7 @@ struct render_backend_graphics_pipeline_family_t *render_backend_system_create_g
 
     for (uint64_t layout_index = 0u; layout_index < sets_count; ++layout_index)
     {
-        descriptor_set_layouts_for_pipeline[layout_index] = VK_NULL_HANDLE;
+        descriptor_set_layouts_for_pipeline[layout_index] = system->empty_descriptor_set_layout;
     }
 
     for (uint64_t layout_index = 0u; layout_index < description->parameter_sets_count; ++layout_index)
@@ -77,10 +77,10 @@ struct render_backend_graphics_pipeline_family_t *render_backend_system_create_g
         struct kan_render_parameter_set_description_t *layout_description = &description->parameter_sets[layout_index];
         if (descriptor_set_layouts[layout_description->set])
         {
-            KAN_LOG (
-                render_backend_system_vulkan, KAN_LOG_ERROR,
-                "Failed to create descriptor set for layout %lu for pipeline family \"%s\" as set %lu is already used.",
-                (unsigned long) layout_index, description->tracking_name, (unsigned long) layout_description->set)
+            KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR,
+                     "Failed to create descriptor set for parameter set %lu for pipeline family \"%s\" as hardware set "
+                     "%lu is already used.",
+                     (unsigned long) layout_index, description->tracking_name, (unsigned long) layout_description->set)
             descriptor_set_layouts_created = KAN_FALSE;
             break;
         }

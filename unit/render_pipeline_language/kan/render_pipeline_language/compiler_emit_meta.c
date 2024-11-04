@@ -800,14 +800,52 @@ kan_bool_t kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t comp
     meta->pipeline_type = instance->pipeline_type;
     kan_bool_t valid = KAN_TRUE;
 
-    uint64_t buffer_count = 0u;
+    uint64_t attribute_buffer_count = 0u;
+    uint64_t pass_buffer_count = 0u;
+    uint64_t material_buffer_count = 0u;
+    uint64_t object_buffer_count = 0u;
+    uint64_t instanced_buffer_count = 0u;
     uint64_t color_outputs = 0u;
     struct compiler_instance_buffer_node_t *buffer = instance->first_buffer;
 
     while (buffer)
     {
-        if (buffer->type == KAN_RPL_BUFFER_TYPE_FRAGMENT_STAGE_OUTPUT)
+        switch (buffer->type)
         {
+        case KAN_RPL_BUFFER_TYPE_VERTEX_ATTRIBUTE:
+        case KAN_RPL_BUFFER_TYPE_INSTANCED_ATTRIBUTE:
+            ++attribute_buffer_count;
+            break;
+
+        case KAN_RPL_BUFFER_TYPE_UNIFORM:
+        case KAN_RPL_BUFFER_TYPE_READ_ONLY_STORAGE:
+        case KAN_RPL_BUFFER_TYPE_INSTANCED_UNIFORM:
+        case KAN_RPL_BUFFER_TYPE_INSTANCED_READ_ONLY_STORAGE:
+            switch (buffer->set)
+            {
+            case KAN_RPL_SET_PASS:
+                ++pass_buffer_count;
+                break;
+
+            case KAN_RPL_SET_MATERIAL:
+                ++material_buffer_count;
+                break;
+
+            case KAN_RPL_SET_OBJECT:
+                ++object_buffer_count;
+                break;
+
+            case KAN_RPL_SET_INSTANCED:
+                ++instanced_buffer_count;
+                break;
+            }
+
+            break;
+
+        case KAN_RPL_BUFFER_TYPE_VERTEX_STAGE_OUTPUT:
+            break;
+
+        case KAN_RPL_BUFFER_TYPE_FRAGMENT_STAGE_OUTPUT:
             // Not exposed, only affects pipeline settings.
             if (instance->pipeline_type == KAN_RPL_PIPELINE_TYPE_GRAPHICS_CLASSIC)
             {
@@ -821,15 +859,17 @@ kan_bool_t kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t comp
                 }
             }
 
-            buffer = buffer->next;
-            continue;
+            break;
         }
 
-        ++buffer_count;
         buffer = buffer->next;
     }
 
-    kan_dynamic_array_set_capacity (&meta->buffers, buffer_count);
+    kan_dynamic_array_set_capacity (&meta->attribute_buffers, attribute_buffer_count);
+    kan_dynamic_array_set_capacity (&meta->set_pass.buffers, pass_buffer_count);
+    kan_dynamic_array_set_capacity (&meta->set_material.buffers, material_buffer_count);
+    kan_dynamic_array_set_capacity (&meta->set_object.buffers, object_buffer_count);
+    kan_dynamic_array_set_capacity (&meta->set_instanced.buffers, instanced_buffer_count);
     kan_dynamic_array_set_capacity (&meta->color_outputs, color_outputs);
 
     for (uint64_t output_index = 0u; output_index < color_outputs; ++output_index)
@@ -843,15 +883,43 @@ kan_bool_t kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t comp
 
     while (buffer)
     {
-        if (buffer->type == KAN_RPL_BUFFER_TYPE_VERTEX_STAGE_OUTPUT)
+        struct kan_dynamic_array_t *buffer_array = NULL;
+        switch (buffer->type)
         {
-            // Not exposed.
-            buffer = buffer->next;
-            continue;
-        }
+        case KAN_RPL_BUFFER_TYPE_VERTEX_ATTRIBUTE:
+        case KAN_RPL_BUFFER_TYPE_INSTANCED_ATTRIBUTE:
+            buffer_array = &meta->attribute_buffers;
+            break;
 
-        if (buffer->type == KAN_RPL_BUFFER_TYPE_FRAGMENT_STAGE_OUTPUT)
-        {
+        case KAN_RPL_BUFFER_TYPE_UNIFORM:
+        case KAN_RPL_BUFFER_TYPE_READ_ONLY_STORAGE:
+        case KAN_RPL_BUFFER_TYPE_INSTANCED_UNIFORM:
+        case KAN_RPL_BUFFER_TYPE_INSTANCED_READ_ONLY_STORAGE:
+            switch (buffer->set)
+            {
+            case KAN_RPL_SET_PASS:
+                buffer_array = &meta->set_pass.buffers;
+                break;
+
+            case KAN_RPL_SET_MATERIAL:
+                buffer_array = &meta->set_material.buffers;
+                break;
+
+            case KAN_RPL_SET_OBJECT:
+                buffer_array = &meta->set_object.buffers;
+                break;
+
+            case KAN_RPL_SET_INSTANCED:
+                buffer_array = &meta->set_instanced.buffers;
+                break;
+            }
+
+            break;
+
+        case KAN_RPL_BUFFER_TYPE_VERTEX_STAGE_OUTPUT:
+            break;
+
+        case KAN_RPL_BUFFER_TYPE_FRAGMENT_STAGE_OUTPUT:
             // Not exposed, only affects pipeline settings.
             if (instance->pipeline_type == KAN_RPL_PIPELINE_TYPE_GRAPHICS_CLASSIC)
             {
@@ -870,18 +938,21 @@ kan_bool_t kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t comp
                 }
             }
 
+            break;
+        }
+
+        if (!buffer_array)
+        {
             buffer = buffer->next;
             continue;
         }
 
-        struct kan_rpl_meta_buffer_t *meta_buffer = kan_dynamic_array_add_last (&meta->buffers);
+        struct kan_rpl_meta_buffer_t *meta_buffer = kan_dynamic_array_add_last (buffer_array);
         KAN_ASSERT (meta_buffer)
         kan_rpl_meta_buffer_init (meta_buffer);
 
         meta_buffer->name = buffer->name;
-        meta_buffer->set = buffer->set;
         meta_buffer->binding = buffer->binding;
-        meta_buffer->stable_binding = buffer->stable_binding;
         meta_buffer->type = buffer->type;
         meta_buffer->size = buffer->size;
 
@@ -941,25 +1012,68 @@ kan_bool_t kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t comp
         buffer = buffer->next;
     }
 
-    uint64_t sampler_count = 0u;
+    uint64_t pass_sampler_count = 0u;
+    uint64_t material_sampler_count = 0u;
+    uint64_t object_sampler_count = 0u;
+    uint64_t instanced_sampler_count = 0u;
     struct compiler_instance_sampler_node_t *sampler = instance->first_sampler;
 
     while (sampler)
     {
-        ++sampler_count;
+        switch (sampler->set)
+        {
+        case KAN_RPL_SET_PASS:
+            ++pass_sampler_count;
+            break;
+
+        case KAN_RPL_SET_MATERIAL:
+            ++material_sampler_count;
+            break;
+
+        case KAN_RPL_SET_OBJECT:
+            ++object_sampler_count;
+            break;
+
+        case KAN_RPL_SET_INSTANCED:
+            ++instanced_sampler_count;
+            break;
+        }
+
         sampler = sampler->next;
     }
 
-    kan_dynamic_array_set_capacity (&meta->samplers, sampler_count);
+    kan_dynamic_array_set_capacity (&meta->set_pass.samplers, pass_sampler_count);
+    kan_dynamic_array_set_capacity (&meta->set_material.samplers, material_sampler_count);
+    kan_dynamic_array_set_capacity (&meta->set_object.samplers, object_sampler_count);
+    kan_dynamic_array_set_capacity (&meta->set_instanced.samplers, instanced_sampler_count);
     sampler = instance->first_sampler;
 
     while (sampler)
     {
-        struct kan_rpl_meta_sampler_t *meta_sampler = kan_dynamic_array_add_last (&meta->samplers);
+        struct kan_dynamic_array_t *sampler_array = NULL;
+        switch (sampler->set)
+        {
+        case KAN_RPL_SET_PASS:
+            sampler_array = &meta->set_pass.samplers;
+            break;
+
+        case KAN_RPL_SET_MATERIAL:
+            sampler_array = &meta->set_material.samplers;
+            break;
+
+        case KAN_RPL_SET_OBJECT:
+            sampler_array = &meta->set_object.samplers;
+            break;
+
+        case KAN_RPL_SET_INSTANCED:
+            sampler_array = &meta->set_instanced.samplers;
+            break;
+        }
+
+        struct kan_rpl_meta_sampler_t *meta_sampler = kan_dynamic_array_add_last (sampler_array);
         KAN_ASSERT (meta_sampler)
 
         meta_sampler->name = sampler->name;
-        meta_sampler->set = sampler->set;
         meta_sampler->binding = sampler->binding;
         meta_sampler->type = sampler->type;
 

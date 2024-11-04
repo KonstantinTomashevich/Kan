@@ -167,38 +167,14 @@ RENDER_PIPELINE_LANGUAGE_API void kan_rpl_meta_parameter_init (struct kan_rpl_me
 
 RENDER_PIPELINE_LANGUAGE_API void kan_rpl_meta_parameter_shutdown (struct kan_rpl_meta_parameter_t *instance);
 
-// TODO: We really need the ability to specify buffers sets on language level as well as whether binding is stable or
-//       no. The main reason is descriptor set allocation optimization. One of the proposed solutions is to add ability
-//       to specify settings in buffers. We might as well use named buffer groups instead of direct set indices in
-//       settings. As there are 5 predicted buffer groups (material-global parameters that can be very rarely overridden
-//       by objects, pass-global parameters that are unique for every pass but cannot be overridden by objects,
-//       object-scope parameters that are always unique for every object like model space, object-group-scope parameters
-//       that are shared between multiple objects like skeleton joints can be shared between several meshes, instanced
-//       parameters that are always pushed from CPU to GPU through instancing buffers). Theoretically, we can even
-//       remove stable binding flag from buffer as all groups except instanced parameters should be stable in almost
-//       every case.
-// TODO: 5 is too much, only 4 is guaranteed to be supported on every hardware. Think about another grouping?
-// TODO: Samplers need sets too, for example lights: their shadow maps technically belong to object binding set.
-
 /// \brief Stores information about buffer exposed in metadata.
 struct kan_rpl_meta_buffer_t
 {
     kan_interned_string_t name;
 
-    /// \brief Descriptor set in which buffer binding should be passed.
-    /// \details Currently we are only using sets to separate stable and unstable bindings.
-    uint64_t set;
-
     /// \brief Binding point index for buffer.
     /// \details Vertex buffer binding for vertex attribute buffers or buffer binding point for other buffers.
     uint64_t binding;
-
-    /// \brief If true, binding changes very rarely and therefore can be cached.
-    ///        Otherwise, binding is prone to be changed every frame.
-    /// \details Currently there is no language feature to specify stable and unstable bindings.
-    ///          But we assume that instancing buffers are unstable and all other buffers are stable.
-    ///          Nevertheless, it can change in the future, therefore this property was introduced to avoid hardcode.
-    kan_bool_t stable_binding;
 
     /// \brief Buffer type.
     /// \details Stage outputs are not listed in meta buffers.
@@ -273,11 +249,24 @@ static inline struct kan_rpl_meta_sampler_settings_t kan_rpl_meta_sampler_settin
 struct kan_rpl_meta_sampler_t
 {
     kan_interned_string_t name;
-    uint64_t set;
     uint64_t binding;
     enum kan_rpl_sampler_type_t type;
     struct kan_rpl_meta_sampler_settings_t settings;
 };
+
+/// \brief Stores information about buffer and sampler bindings for concrete descriptor set.
+struct kan_rpl_meta_set_bindings_t
+{
+    /// \meta reflection_dynamic_array_type = "struct kan_rpl_meta_buffer_t"
+    struct kan_dynamic_array_t buffers;
+
+    /// \meta reflection_dynamic_array_type = "struct kan_rpl_meta_sampler_t"
+    struct kan_dynamic_array_t samplers;
+};
+
+RENDER_PIPELINE_LANGUAGE_API void kan_rpl_meta_set_bindings_init (struct kan_rpl_meta_set_bindings_t *instance);
+
+RENDER_PIPELINE_LANGUAGE_API void kan_rpl_meta_set_bindings_shutdown (struct kan_rpl_meta_set_bindings_t *instance);
 
 /// \brief Enumerates supported blend factor values.
 enum kan_rpl_blend_factor_t
@@ -357,10 +346,12 @@ struct kan_rpl_meta_t
     };
 
     /// \meta reflection_dynamic_array_type = "struct kan_rpl_meta_buffer_t"
-    struct kan_dynamic_array_t buffers;
+    struct kan_dynamic_array_t attribute_buffers;
 
-    /// \meta reflection_dynamic_array_type = "struct kan_rpl_meta_sampler_t"
-    struct kan_dynamic_array_t samplers;
+    struct kan_rpl_meta_set_bindings_t set_pass;
+    struct kan_rpl_meta_set_bindings_t set_material;
+    struct kan_rpl_meta_set_bindings_t set_object;
+    struct kan_rpl_meta_set_bindings_t set_instanced;
 
     /// \brief Contains information about pipeline color outputs if any.
     /// \meta reflection_dynamic_array_type = "struct kan_rpl_meta_color_output_t"

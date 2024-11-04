@@ -3468,7 +3468,7 @@ kan_bool_t kan_rpl_compiler_instance_emit_spirv (kan_rpl_compiler_instance_t com
             variable_code[2u] = buffer->structured_variable_spirv_id;
             variable_code[3u] = storage_type;
 
-            spirv_emit_descriptor_set (&context, buffer->structured_variable_spirv_id, buffer->set);
+            spirv_emit_descriptor_set (&context, buffer->structured_variable_spirv_id, (uint32_t) buffer->set);
             spirv_emit_binding (&context, buffer->structured_variable_spirv_id, buffer->binding);
             spirv_generate_op_name (&context, buffer->structured_variable_spirv_id, buffer->name);
         }
@@ -3501,7 +3501,7 @@ kan_bool_t kan_rpl_compiler_instance_emit_spirv (kan_rpl_compiler_instance_t com
         sampler_code[2u] = sampler->variable_spirv_id;
         sampler_code[3u] = SpvStorageClassUniformConstant;
 
-        spirv_emit_descriptor_set (&context, sampler->variable_spirv_id, 0u);
+        spirv_emit_descriptor_set (&context, sampler->variable_spirv_id, (uint32_t) sampler->set);
         spirv_emit_binding (&context, sampler->variable_spirv_id, sampler->binding);
         spirv_generate_op_name (&context, sampler->variable_spirv_id, sampler->name);
         sampler = sampler->next;

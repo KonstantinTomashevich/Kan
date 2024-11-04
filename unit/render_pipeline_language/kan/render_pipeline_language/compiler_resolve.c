@@ -1200,8 +1200,21 @@ static kan_bool_t resolve_buffers (struct rpl_compiler_context_t *context,
 
             target_buffer->next = NULL;
             target_buffer->name = source_buffer->name;
+            target_buffer->set = source_buffer->set;
             target_buffer->type = source_buffer->type;
             target_buffer->used = KAN_FALSE;
+
+            KAN_ASSERT ((target_buffer->set == KAN_RPL_SET_INSTANCED) ==
+                        (target_buffer->type == KAN_RPL_BUFFER_TYPE_INSTANCED_UNIFORM ||
+                         target_buffer->type == KAN_RPL_BUFFER_TYPE_INSTANCED_READ_ONLY_STORAGE))
+
+#if defined(KAN_WITH_ASSERT)
+            if (target_buffer->type == KAN_RPL_BUFFER_TYPE_VERTEX_ATTRIBUTE ||
+                target_buffer->type == KAN_RPL_BUFFER_TYPE_INSTANCED_ATTRIBUTE)
+            {
+                KAN_ASSERT (target_buffer->set == KAN_RPL_SET_PASS)
+            }
+#endif
 
             if (!resolve_declarations (context, instance, intermediate, &source_buffer->fields,
                                        &target_buffer->first_field, KAN_FALSE))
@@ -1213,7 +1226,6 @@ static kan_bool_t resolve_buffers (struct rpl_compiler_context_t *context,
             {
             case KAN_RPL_BUFFER_TYPE_VERTEX_ATTRIBUTE:
             case KAN_RPL_BUFFER_TYPE_INSTANCED_ATTRIBUTE:
-                target_buffer->set = 0u;
                 target_buffer->binding = assignment_counter->next_attribute_buffer_binding;
                 ++assignment_counter->next_attribute_buffer_binding;
                 target_buffer->stable_binding = KAN_TRUE;
@@ -1221,7 +1233,6 @@ static kan_bool_t resolve_buffers (struct rpl_compiler_context_t *context,
 
             case KAN_RPL_BUFFER_TYPE_UNIFORM:
             case KAN_RPL_BUFFER_TYPE_READ_ONLY_STORAGE:
-                target_buffer->set = 0u;
                 target_buffer->binding = assignment_counter->next_arbitrary_stable_buffer_binding;
                 ++assignment_counter->next_arbitrary_stable_buffer_binding;
                 target_buffer->stable_binding = KAN_TRUE;
@@ -1229,7 +1240,6 @@ static kan_bool_t resolve_buffers (struct rpl_compiler_context_t *context,
 
             case KAN_RPL_BUFFER_TYPE_INSTANCED_UNIFORM:
             case KAN_RPL_BUFFER_TYPE_INSTANCED_READ_ONLY_STORAGE:
-                target_buffer->set = 1u;
                 target_buffer->binding = assignment_counter->next_arbitrary_unstable_buffer_binding;
                 ++assignment_counter->next_arbitrary_unstable_buffer_binding;
                 target_buffer->stable_binding = KAN_FALSE;
@@ -1238,7 +1248,6 @@ static kan_bool_t resolve_buffers (struct rpl_compiler_context_t *context,
             case KAN_RPL_BUFFER_TYPE_VERTEX_STAGE_OUTPUT:
             case KAN_RPL_BUFFER_TYPE_FRAGMENT_STAGE_OUTPUT:
                 // Not an external buffers, so no binding.
-                target_buffer->set = INVALID_SET;
                 target_buffer->binding = INVALID_BINDING;
                 target_buffer->stable_binding = KAN_FALSE;
                 break;
@@ -1390,7 +1399,7 @@ static kan_bool_t resolve_samplers (struct rpl_compiler_context_t *context,
             target_sampler->type = source_sampler->type;
 
             target_sampler->used = KAN_FALSE;
-            target_sampler->set = 0u;
+            target_sampler->set = source_sampler->set;
             target_sampler->binding = assignment_counter->next_arbitrary_stable_buffer_binding;
             ++assignment_counter->next_arbitrary_stable_buffer_binding;
 

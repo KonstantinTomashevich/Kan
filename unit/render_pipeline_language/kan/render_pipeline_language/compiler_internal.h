@@ -161,6 +161,7 @@ struct compiler_instance_buffer_node_t
 {
     struct compiler_instance_buffer_node_t *next;
     kan_interned_string_t name;
+    enum kan_rpl_set_t set;
     enum kan_rpl_buffer_type_t type;
     kan_bool_t used;
 
@@ -168,7 +169,6 @@ struct compiler_instance_buffer_node_t
     uint64_t alignment;
     struct compiler_instance_declaration_node_t *first_field;
 
-    uint64_t set;
     uint64_t binding;
     kan_bool_t stable_binding;
 
@@ -187,10 +187,10 @@ struct compiler_instance_sampler_node_t
 {
     struct compiler_instance_sampler_node_t *next;
     kan_interned_string_t name;
+    enum kan_rpl_set_t set;
     enum kan_rpl_sampler_type_t type;
     kan_bool_t used;
 
-    uint64_t set;
     uint64_t binding;
     struct compiler_instance_setting_node_t *first_setting;
 

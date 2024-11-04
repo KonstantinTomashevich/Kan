@@ -698,6 +698,9 @@ void render_backend_system_shutdown (kan_context_system_handle_t handle)
         family = next;
     }
 
+    vkDestroyDescriptorSetLayout (system->device, system->empty_descriptor_set_layout,
+                                  VULKAN_ALLOCATION_CALLBACKS (system));
+
     // Pass instances should always be allocated on special stack allocator,
     // therefore we do not care about them at all here.
 
@@ -1194,6 +1197,40 @@ kan_bool_t kan_render_backend_system_select_device (kan_context_system_handle_t 
         system->device = VK_NULL_HANDLE;
         return KAN_FALSE;
     }
+
+    VkDescriptorSetLayoutCreateInfo layout_info = {
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+        .pNext = NULL,
+        .flags = 0u,
+        .bindingCount = 0u,
+        .pBindings = NULL,
+    };
+
+    if (vkCreateDescriptorSetLayout (system->device, &layout_info, VULKAN_ALLOCATION_CALLBACKS (system),
+                                     &system->empty_descriptor_set_layout) != VK_SUCCESS)
+    {
+        KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR,
+                 "Unable to select device: failed to create empty descriptor set layout.")
+
+        render_backend_system_destroy_command_states (system);
+        render_backend_system_destroy_synchronization_objects (system);
+        vmaDestroyAllocator (system->gpu_memory_allocator);
+        vkDestroyDevice (system->device, VULKAN_ALLOCATION_CALLBACKS (system));
+        system->device = VK_NULL_HANDLE;
+        return KAN_FALSE;
+    }
+
+#if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED)
+    struct VkDebugUtilsObjectNameInfoEXT object_name = {
+        .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
+        .pNext = NULL,
+        .objectType = VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT,
+        .objectHandle = (uint64_t) system->empty_descriptor_set_layout,
+        .pObjectName = "DescriptorSetLayout::empty",
+    };
+
+    vkSetDebugUtilsObjectNameEXT (system->device, &object_name);
+#endif
 
     for (uint64_t index = 0u; index < KAN_CONTEXT_RENDER_BACKEND_VULKAN_FRAMES_IN_FLIGHT; ++index)
     {

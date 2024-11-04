@@ -347,6 +347,26 @@ RENDER_PIPELINE_LANGUAGE_API void kan_rpl_struct_init (struct kan_rpl_struct_t *
 
 RENDER_PIPELINE_LANGUAGE_API void kan_rpl_struct_shutdown (struct kan_rpl_struct_t *instance);
 
+/// \brief Defines set types in which buffer and sampler bindings are contained.
+/// \details Set index in generated code is equal to the value of this enumeration.
+///          There can be no more that 4 sets as of autumn 2024 as it is minimum guaranteed count on modern GPUs.
+///          Having more would make some old hardware unusable for us.
+enum kan_rpl_set_t
+{
+    /// \brief Set for data that is bound once during pass and
+    ///        shared across everything that is rendered inside the pass.
+    KAN_RPL_SET_PASS = 0u,
+
+    /// \brief Set for data that is bound on per-material basis.
+    KAN_RPL_SET_MATERIAL = 1u,
+
+    /// \brief Set for data that is bound on per-object basis.
+    KAN_RPL_SET_OBJECT = 2u,
+
+    /// \brief Set for data that is used for binding instanced buffers and therefore is changed every frame.
+    KAN_RPL_SET_INSTANCED = 3u,
+};
+
 /// \brief Enumerates supported buffer types.
 enum kan_rpl_buffer_type_t
 {
@@ -368,6 +388,7 @@ enum kan_rpl_buffer_type_t
 struct kan_rpl_buffer_t
 {
     kan_interned_string_t name;
+    enum kan_rpl_set_t set;
     enum kan_rpl_buffer_type_t type;
 
     /// \meta reflection_dynamic_array_type = "struct kan_rpl_declaration_t"
@@ -394,6 +415,7 @@ enum kan_rpl_sampler_type_t
 struct kan_rpl_sampler_t
 {
     kan_interned_string_t name;
+    enum kan_rpl_set_t set;
     enum kan_rpl_sampler_type_t type;
 
     /// \meta reflection_dynamic_array_type = "struct kan_rpl_setting_t"

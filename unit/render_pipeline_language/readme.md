@@ -8,7 +8,7 @@ Currently, it is in early prototype stage.
 
 ## Goals
 
-- To provide enough information for constructing pipeline stage objects right away with requiring any additional 
+- To provide enough information for constructing pipeline stage objects right away with requiring any additional
   context. Having all the information in pipeline file is one of the solutions to PSO hiccup issue.
 
 - To provide enough usable information to build outer high-level objects like materials. For example, pipeline should
@@ -31,7 +31,7 @@ Currently, it is in early prototype stage.
 
 - Pipeline settings are declared in global scope to express information needed to configure pipeline creation.
 
-- All input and output data is declared through named and typed buffers that can also be visible through pipeline 
+- All input and output data is declared through named and typed buffers that can also be visible through pipeline
   metadata.
 
 - All structure and buffer fields might contain attached meta tags that can be used by outer logic to bind its data
@@ -41,7 +41,7 @@ Currently, it is in early prototype stage.
 
 - Samplers and images are coupled and all sampler settings are declared in sampler using the same setting syntax.
 
-- All settings, buffers and samplers can be exported to separate structure during compilation than can be serialized 
+- All settings, buffers and samplers can be exported to separate structure during compilation than can be serialized
   and later used for high-level object construction.
 
 - Compilation is split in 3 steps: parse step, resolve step and emit step. Parse step produces intermediate data that
@@ -62,7 +62,7 @@ Currently, there are 2 types of option data:
 Also, there are 2 classes of options:
 
 - `global` options are allowed to be used everywhere and can be used in any conditional.
-- `instance` options can only be used in places where they do not affect which buffers are generated and which data 
+- `instance` options can only be used in places where they do not affect which buffers are generated and which data
   they hold.
 
 Goal of these classes is to make it easier for material system to follow proper configuration routine. Every pass
@@ -70,8 +70,8 @@ supported by material should accept the same data format, therefore buffers shou
 ensured by specifying `global` options for the whole material and allowing passes to only specify `instance` options
 by themselves.
 
-Options are declared in global scope and follow the pattern: `global|instance flag|count <option_name> <option_value>` 
-with `on|off` for `flag` option values and unsigned decimal literals for `count` option value. Below are the examples 
+Options are declared in global scope and follow the pattern: `global|instance flag|count <option_name> <option_value>`
+with `on|off` for `flag` option values and unsigned decimal literals for `count` option value. Below are the examples
 of option declarations in global scope:
 
 ```
@@ -100,12 +100,12 @@ conditional (enable_skinning && skinning_2_weights)
 Settings are used to provide information for pipeline configuration. Accepted settings and their types depend on
 pipeline type (for example, classic graphics or compute) which is only known to CPU during compilation.
 
-Settings are declared in global scope and follow the pattern: 
-`conditional_prefix? <setting_name> flag_value|integer_value|floating_value|string_value 
-(block unsigned_integer_value)?` with `conditonal_prefix` being allowed to use instance options, `flag_value` being 
-`on|off`, `integer_value` being signed integer literal, `floating_value` being signed floating literal and string value 
-be C-style `"`-guarded string literal, and optional block suffix for specifying blocks for settings that require block 
-context (for example there can be several color outputs, therefore we must specify color output index as block index). 
+Settings are declared in global scope and follow the pattern:
+`conditional_prefix? <setting_name> flag_value|integer_value|floating_value|string_value
+(block unsigned_integer_value)?` with `conditonal_prefix` being allowed to use instance options, `flag_value` being
+`on|off`, `integer_value` being signed integer literal, `floating_value` being signed floating literal and string value
+be C-style `"`-guarded string literal, and optional block suffix for specifying blocks for settings that require block
+context (for example there can be several color outputs, therefore we must specify color output index as block index).
 Below are the examples of setting declarations in global scope:
 
 ```
@@ -121,7 +121,7 @@ setting color_output_source_color_blend_factor "source_color" block 1;
 ## Meta prefixes
 
 Meta prefixes are used to add textual meta tags to struct and buffer fields, that can be later used on higher level to
-identify required parameters. Meta prefixes follow the pattern: `meta \( tag (, tag)* \)` with `tag` as any C-style 
+identify required parameters. Meta prefixes follow the pattern: `meta \( tag (, tag)* \)` with `tag` as any C-style
 identifier. Below are the examples of meta prefixes:
 
 ```
@@ -177,6 +177,24 @@ conditional (enable_skinning) struct joint_data_t
 };
 ```
 
+## Descriptor sets
+
+There are several inbuilt descriptor sets that correspond to the common usage pattern:
+
+- `set_pass` is advised for data that stays bound during the whole render pass like projection view matrix.
+- `set_material` is advised for data that is shared between lots of objects and corresponds to
+  high level concept of materials.
+- `set_object` is advised for data unique for scene object, but when binding is rarely changed. For example, object may
+  store its data in its own uniform buffer and update this buffer without changing descriptor set.
+- `set_instanced` is advised for data that is unique for every scene object and which binding changing every frame.
+  For example, instanced parameter buffers might technically change every frame.
+
+Any set keyword inside declaration syntax is called `set_prefix` below.
+
+Hardcoded set names are used to make writing shaders more explicit and easy to understand as render pipeline language
+is designed to provide as much information as possible to the high level material system instead of just arbitrary set 
+numbers. Also, we have only 4 descriptor sets as it is the minimum guaranteed number of supported sets on modern GPUs.
+
 ## Buffers
 
 Buffer is a group variables that serve the same purpose and usually stored in one physical buffer object.
@@ -186,12 +204,13 @@ There are several types of buffers:
   vertex.
 - `instanced_attribute_buffer` represents buffer of per-instance attributes. Fields of this buffer are the attributes
   of one instanced geometry.
-- `uniform_buffer` represents a classic uniform buffer object with `std140` memory layout.
-- `read_only_storage_buffer` represents a classic storage buffer which is read-only and has `std430` memory layout.
-- `instanced_uniform_buffer` represents a uniform buffer which is used to store per-instance data. Instancing is
+- `uniform_buffer` represents a classic uniform buffer object with `std140` memory layout. Requires `set_prefix`.
+  When used with `set_instanced`, automatically transformed into instanced uniform buffer. In this case, instancing is
   automatically applied, therefore there is no need for explicit runtime arrays and instance indices.
-- `instanced_read_only_storage_buffer` represents a read only storage buffer which is used to store per-instance data. 
-  Instancing is automatically applied, therefore there is no need for explicit runtime arrays and instance indices.
+- `read_only_storage_buffer` represents a classic storage buffer which is read-only and has `std430` memory layout.
+  Requires `set_prefix`. When used with `set_instanced`, automatically transformed into instanced uniform buffer.
+  In this case, instancing is automatically applied, therefore there is no need for explicit runtime arrays and
+  instance indices.
 - `vertex_stage_output` is an abstract buffer which is technically not a buffer and used for sharing vertex stage
   data with other pipeline stages.
 - `fragment_stage_output` is an abstract buffer which is technically not a buffer and used for fragment stage output.
@@ -199,7 +218,7 @@ There are several types of buffers:
 Buffer declaration syntax is close to struct declaration syntax:
 
 ```
-conditional_prefix? buffer_type <buffer_name>
+conditional_prefix? set_prefix_if_supported_by_type buffer_type <buffer_name>
 {
     (conditional_prefix? meta_prefix? type <field_name>;)+
 };
@@ -250,7 +269,7 @@ Currently, there is only one supported sampler type: `sampler2d`. More types wil
 Samples declaration syntax is:
 
 ```
-conditional_prefix? sampler_type <sampler_name>
+conditional_prefix? set_prefix sampler_type <sampler_name>
 {
     (sampler_setting ;)+
 };
@@ -280,7 +299,7 @@ To sample data from sampler, sampler should be called like a function. Below are
 
 Function declaration syntax is close to C with a few exceptions:
 
-- Function can only return non-array types. 
+- Function can only return non-array types.
 - If function doesn't return anything, `void` should be used instead of return type.
 - Functions without arguments must be declared as `<return_type> <function_name> (void)`.
 - Every function argument is allowed to have conditional prefix.

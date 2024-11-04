@@ -201,6 +201,7 @@ struct parser_buffer_t
 {
     struct parser_buffer_t *next;
     kan_interned_string_t name;
+    enum kan_rpl_set_t set;
     enum kan_rpl_buffer_type_t type;
     struct parser_declaration_t *first_declaration;
 
@@ -219,6 +220,7 @@ struct parser_sampler_t
 {
     struct parser_sampler_t *next;
     kan_interned_string_t name;
+    enum kan_rpl_set_t set;
     enum kan_rpl_sampler_type_t type;
     struct parser_setting_list_item_t *first_setting;
     struct parser_setting_list_item_t *last_setting;
@@ -516,6 +518,7 @@ static inline struct parser_struct_t *parser_struct_new (struct rpl_parser_t *pa
 
 static inline struct parser_buffer_t *parser_buffer_new (struct rpl_parser_t *parser,
                                                          kan_interned_string_t name,
+                                                         enum kan_rpl_set_t set,
                                                          kan_interned_string_t source_log_name,
                                                          uint64_t source_line)
 {
@@ -523,6 +526,7 @@ static inline struct parser_buffer_t *parser_buffer_new (struct rpl_parser_t *pa
         KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&parser->allocator, struct parser_buffer_t);
     instance->next = NULL;
     instance->name = name;
+    instance->set = set;
     instance->first_declaration = NULL;
     instance->conditional = NULL;
     instance->source_log_name = source_log_name;
@@ -532,6 +536,7 @@ static inline struct parser_buffer_t *parser_buffer_new (struct rpl_parser_t *pa
 
 static inline struct parser_sampler_t *parser_sampler_new (struct rpl_parser_t *parser,
                                                            kan_interned_string_t name,
+                                                           enum kan_rpl_set_t set,
                                                            enum kan_rpl_sampler_type_t type,
                                                            kan_interned_string_t source_log_name,
                                                            uint64_t source_line)
@@ -540,6 +545,7 @@ static inline struct parser_sampler_t *parser_sampler_new (struct rpl_parser_t *
         KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&parser->allocator, struct parser_sampler_t);
     instance->next = NULL;
     instance->name = name;
+    instance->set = set;
     instance->type = type;
     instance->first_setting = NULL;
     instance->last_setting = NULL;
@@ -1111,12 +1117,13 @@ static inline kan_bool_t parse_main_struct (struct rpl_parser_t *parser,
 
 static inline kan_bool_t parse_main_buffer (struct rpl_parser_t *parser,
                                             struct dynamic_parser_state_t *state,
+                                            enum kan_rpl_set_t set,
                                             enum kan_rpl_buffer_type_t type,
                                             const char *name_begin,
                                             const char *name_end)
 {
     struct parser_buffer_t *new_buffer = parser_buffer_new (parser, kan_char_sequence_intern (name_begin, name_end),
-                                                            state->source_log_name, state->cursor_line);
+                                                            set, state->source_log_name, state->cursor_line);
     new_buffer->type = type;
     new_buffer->conditional = state->detached_conditional;
     state->detached_conditional = NULL;
@@ -1144,6 +1151,7 @@ static inline kan_bool_t parse_main_buffer (struct rpl_parser_t *parser,
 
 static kan_bool_t parse_main_sampler (struct rpl_parser_t *parser,
                                       struct dynamic_parser_state_t *state,
+                                      enum kan_rpl_set_t set,
                                       enum kan_rpl_sampler_type_t type,
                                       const char *name_begin,
                                       const char *name_end);
@@ -1170,6 +1178,57 @@ static kan_bool_t parse_main (struct rpl_parser_t *parser, struct dynamic_parser
         const char *block_begin;
         const char *block_end;
 
+        const char *marker_set_pass;
+        const char *marker_set_material;
+        const char *marker_set_object;
+        const char *marker_set_instanced;
+
+        const char *marker_buffer_uniform;
+        const char *marker_buffer_read_only_storage;
+
+        enum kan_rpl_set_t detected_set;
+#define DETECT_SET                                                                                                     \
+    if (marker_set_pass)                                                                                               \
+    {                                                                                                                  \
+        detected_set = KAN_RPL_SET_PASS;                                                                               \
+    }                                                                                                                  \
+    else if (marker_set_material)                                                                                      \
+    {                                                                                                                  \
+        detected_set = KAN_RPL_SET_MATERIAL;                                                                           \
+    }                                                                                                                  \
+    else if (marker_set_object)                                                                                        \
+    {                                                                                                                  \
+        detected_set = KAN_RPL_SET_OBJECT;                                                                             \
+    }                                                                                                                  \
+    else if (marker_set_instanced)                                                                                     \
+    {                                                                                                                  \
+        detected_set = KAN_RPL_SET_INSTANCED;                                                                          \
+    }                                                                                                                  \
+    else                                                                                                               \
+    {                                                                                                                  \
+        detected_set = KAN_RPL_SET_PASS;                                                                               \
+        KAN_ASSERT (KAN_FALSE)                                                                                         \
+    }
+
+        enum kan_rpl_buffer_type_t detected_buffer_type;
+#define DETECT_BUFFER_TYPE                                                                                             \
+    if (marker_buffer_uniform)                                                                                         \
+    {                                                                                                                  \
+        detected_buffer_type = detected_set == KAN_RPL_SET_INSTANCED ? KAN_RPL_BUFFER_TYPE_INSTANCED_UNIFORM :         \
+                                                                       KAN_RPL_BUFFER_TYPE_UNIFORM;                    \
+    }                                                                                                                  \
+    else if (marker_buffer_read_only_storage)                                                                          \
+    {                                                                                                                  \
+        detected_buffer_type = detected_set == KAN_RPL_SET_INSTANCED ?                                                 \
+                                   KAN_RPL_BUFFER_TYPE_INSTANCED_READ_ONLY_STORAGE :                                   \
+                                   KAN_RPL_BUFFER_TYPE_READ_ONLY_STORAGE;                                              \
+    }                                                                                                                  \
+    else                                                                                                               \
+    {                                                                                                                  \
+        detected_buffer_type = KAN_RPL_BUFFER_TYPE_VERTEX_ATTRIBUTE;                                                   \
+        KAN_ASSERT (KAN_FALSE)                                                                                         \
+    }
+
 #define CHECKED(...)                                                                                                   \
     if (!(__VA_ARGS__))                                                                                                \
     {                                                                                                                  \
@@ -1178,6 +1237,14 @@ static kan_bool_t parse_main (struct rpl_parser_t *parser, struct dynamic_parser
     continue;
 
         /*!re2c
+         set_prefix = ("set_pass" @marker_set_pass) |
+                      ("set_material" @marker_set_material) |
+                      ("set_object" @marker_set_object) |
+                      ("set_instanced" @marker_set_instanced);
+
+         external_buffer_type_prefix = ("uniform_buffer" @marker_buffer_uniform) |
+                                       ("read_only_storage_buffer" @marker_buffer_read_only_storage);
+
          "global" separator+ "flag" separator+ @name_begin identifier @name_end separator+ "on" separator* ";"
          {
              CHECKED (parse_main_option_flag (parser, state, name_begin, name_end, KAN_RPL_OPTION_SCOPE_GLOBAL,
@@ -1254,37 +1321,41 @@ static kan_bool_t parse_main (struct rpl_parser_t *parser, struct dynamic_parser
          { CHECKED (parse_main_struct (parser, state, name_begin, name_end)) }
 
          "vertex_attribute_buffer" separator+ @name_begin identifier @name_end separator* "{"
-         { CHECKED (parse_main_buffer (parser, state, KAN_RPL_BUFFER_TYPE_VERTEX_ATTRIBUTE, name_begin, name_end)) }
-
-         "uniform_buffer" separator+ @name_begin identifier @name_end separator* "{"
-         { CHECKED (parse_main_buffer (parser, state, KAN_RPL_BUFFER_TYPE_UNIFORM, name_begin, name_end)) }
-
-         "read_only_storage_buffer" separator+ @name_begin identifier @name_end separator* "{"
-         { CHECKED (parse_main_buffer (parser, state, KAN_RPL_BUFFER_TYPE_READ_ONLY_STORAGE, name_begin, name_end)) }
-
-         "instanced_attribute_buffer" separator+ @name_begin identifier @name_end separator* "{"
-         { CHECKED (parse_main_buffer (parser, state, KAN_RPL_BUFFER_TYPE_INSTANCED_ATTRIBUTE, name_begin, name_end)) }
-
-         "instanced_uniform_buffer" separator+ @name_begin identifier @name_end separator* "{"
-         { CHECKED (parse_main_buffer (parser, state, KAN_RPL_BUFFER_TYPE_INSTANCED_UNIFORM, name_begin, name_end)) }
-
-         "instanced_read_only_storage_buffer" separator+ @name_begin identifier @name_end separator* "{"
          {
              CHECKED (parse_main_buffer (
-                     parser, state, KAN_RPL_BUFFER_TYPE_INSTANCED_READ_ONLY_STORAGE, name_begin, name_end))
+                     parser, state, KAN_RPL_SET_PASS, KAN_RPL_BUFFER_TYPE_VERTEX_ATTRIBUTE, name_begin, name_end))
+         }
+
+         "instanced_attribute_buffer" separator+ @name_begin identifier @name_end separator* "{"
+         {
+             CHECKED (parse_main_buffer (
+                     parser, state, KAN_RPL_SET_PASS, KAN_RPL_BUFFER_TYPE_INSTANCED_ATTRIBUTE, name_begin, name_end))
+         }
+
+         set_prefix separator+ external_buffer_type_prefix separator+ @name_begin identifier @name_end separator* "{"
+         {
+             DETECT_SET
+             DETECT_BUFFER_TYPE
+             CHECKED (parse_main_buffer (parser, state, detected_set, detected_buffer_type, name_begin, name_end))
          }
 
          "vertex_stage_output" separator+ @name_begin identifier @name_end separator* "{"
-         { CHECKED (parse_main_buffer (parser, state, KAN_RPL_BUFFER_TYPE_VERTEX_STAGE_OUTPUT, name_begin, name_end)) }
+         {
+             CHECKED (parse_main_buffer (
+                     parser, state, KAN_RPL_SET_PASS, KAN_RPL_BUFFER_TYPE_VERTEX_STAGE_OUTPUT, name_begin, name_end))
+         }
 
          "fragment_stage_output" separator+ @name_begin identifier @name_end separator* "{"
          {
              CHECKED (parse_main_buffer (
-                     parser, state, KAN_RPL_BUFFER_TYPE_FRAGMENT_STAGE_OUTPUT, name_begin, name_end))
+                     parser, state, KAN_RPL_SET_PASS, KAN_RPL_BUFFER_TYPE_FRAGMENT_STAGE_OUTPUT, name_begin, name_end))
          }
 
-         "sampler_2d" separator+ @name_begin identifier @name_end separator* "{"
-         { CHECKED (parse_main_sampler (parser, state, KAN_RPL_SAMPLER_TYPE_2D, name_begin, name_end)) }
+         set_prefix separator+ "sampler_2d" separator+ @name_begin identifier @name_end separator* "{"
+         {
+             DETECT_SET
+             CHECKED (parse_main_sampler (parser, state, detected_set, KAN_RPL_SAMPLER_TYPE_2D, name_begin, name_end))
+         }
 
          @type_name_begin identifier @type_name_end separator+ @name_begin identifier @name_end separator* "("
          { CHECKED (parse_main_function (parser, state, name_begin, name_end, type_name_begin, type_name_end)) }
@@ -2724,11 +2795,12 @@ static inline kan_bool_t parse_sampler_settings (struct rpl_parser_t *parser,
 
 static kan_bool_t parse_main_sampler (struct rpl_parser_t *parser,
                                       struct dynamic_parser_state_t *state,
+                                      enum kan_rpl_set_t set,
                                       enum kan_rpl_sampler_type_t type,
                                       const char *name_begin,
                                       const char *name_end)
 {
-    struct parser_sampler_t *sampler = parser_sampler_new (parser, kan_char_sequence_intern (name_begin, name_end),
+    struct parser_sampler_t *sampler = parser_sampler_new (parser, kan_char_sequence_intern (name_begin, name_end), set,
                                                            type, state->source_log_name, state->cursor_line);
     sampler->conditional = state->detached_conditional;
     state->detached_conditional = NULL;
@@ -3976,6 +4048,7 @@ static kan_bool_t build_intermediate_buffers (struct rpl_parser_t *instance, str
 
         kan_rpl_buffer_init (target_buffer);
         target_buffer->name = source_buffer->name;
+        target_buffer->set = source_buffer->set;
         target_buffer->type = source_buffer->type;
         target_buffer->source_name = source_buffer->source_log_name;
         target_buffer->source_line = (uint32_t) source_buffer->source_line;
@@ -4011,6 +4084,7 @@ static kan_bool_t build_intermediate_samplers (struct rpl_parser_t *instance, st
 
         kan_rpl_sampler_init (target_sampler);
         target_sampler->name = source_sampler->name;
+        target_sampler->set = source_sampler->set;
         target_sampler->type = source_sampler->type;
         target_sampler->source_name = source_sampler->source_log_name;
         target_sampler->source_line = (uint32_t) source_sampler->source_line;

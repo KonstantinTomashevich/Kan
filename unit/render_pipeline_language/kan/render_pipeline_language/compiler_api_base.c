@@ -22,9 +22,7 @@ void kan_rpl_meta_parameter_shutdown (struct kan_rpl_meta_parameter_t *instance)
 void kan_rpl_meta_buffer_init (struct kan_rpl_meta_buffer_t *instance)
 {
     instance->name = NULL;
-    instance->set = 0u;
     instance->binding = 0u;
-    instance->stable_binding = KAN_TRUE;
     instance->type = KAN_RPL_BUFFER_TYPE_VERTEX_ATTRIBUTE;
     instance->size = 0u;
     kan_dynamic_array_init (&instance->attributes, 0u, sizeof (struct kan_rpl_meta_attribute_t),
@@ -45,16 +43,38 @@ void kan_rpl_meta_buffer_shutdown (struct kan_rpl_meta_buffer_t *instance)
     kan_dynamic_array_shutdown (&instance->parameters);
 }
 
+void kan_rpl_meta_set_bindings_init (struct kan_rpl_meta_set_bindings_t *instance)
+{
+    kan_dynamic_array_init (&instance->buffers, 0u, sizeof (struct kan_rpl_meta_buffer_t),
+                            _Alignof (struct kan_rpl_meta_buffer_t), STATICS.rpl_meta_allocation_group);
+    kan_dynamic_array_init (&instance->samplers, 0u, sizeof (struct kan_rpl_meta_sampler_t),
+                            _Alignof (struct kan_rpl_meta_sampler_t), STATICS.rpl_meta_allocation_group);
+}
+
+void kan_rpl_meta_set_bindings_shutdown (struct kan_rpl_meta_set_bindings_t *instance)
+{
+    for (uint64_t index = 0u; index < instance->buffers.size; ++index)
+    {
+        kan_rpl_meta_buffer_shutdown (&((struct kan_rpl_meta_buffer_t *) instance->buffers.data)[index]);
+    }
+
+    kan_dynamic_array_shutdown (&instance->buffers);
+    kan_dynamic_array_shutdown (&instance->samplers);
+}
+
 void kan_rpl_meta_init (struct kan_rpl_meta_t *instance)
 {
     kan_rpl_compiler_ensure_statics_initialized ();
     instance->pipeline_type = KAN_RPL_PIPELINE_TYPE_GRAPHICS_CLASSIC;
     instance->graphics_classic_settings = kan_rpl_graphics_classic_pipeline_settings_default ();
 
-    kan_dynamic_array_init (&instance->buffers, 0u, sizeof (struct kan_rpl_meta_buffer_t),
+    kan_dynamic_array_init (&instance->attribute_buffers, 0u, sizeof (struct kan_rpl_meta_buffer_t),
                             _Alignof (struct kan_rpl_meta_buffer_t), STATICS.rpl_meta_allocation_group);
-    kan_dynamic_array_init (&instance->samplers, 0u, sizeof (struct kan_rpl_meta_sampler_t),
-                            _Alignof (struct kan_rpl_meta_sampler_t), STATICS.rpl_meta_allocation_group);
+    kan_rpl_meta_set_bindings_init (&instance->set_pass);
+    kan_rpl_meta_set_bindings_init (&instance->set_material);
+    kan_rpl_meta_set_bindings_init (&instance->set_object);
+    kan_rpl_meta_set_bindings_init (&instance->set_instanced);
+
     kan_dynamic_array_init (&instance->color_outputs, 0u, sizeof (struct kan_rpl_meta_color_output_t),
                             _Alignof (struct kan_rpl_meta_color_output_t), STATICS.rpl_meta_allocation_group);
 
@@ -66,13 +86,16 @@ void kan_rpl_meta_init (struct kan_rpl_meta_t *instance)
 
 void kan_rpl_meta_shutdown (struct kan_rpl_meta_t *instance)
 {
-    for (uint64_t index = 0u; index < instance->buffers.size; ++index)
+    for (uint64_t index = 0u; index < instance->attribute_buffers.size; ++index)
     {
-        kan_rpl_meta_buffer_shutdown (&((struct kan_rpl_meta_buffer_t *) instance->buffers.data)[index]);
+        kan_rpl_meta_buffer_shutdown (&((struct kan_rpl_meta_buffer_t *) instance->attribute_buffers.data)[index]);
     }
 
-    kan_dynamic_array_shutdown (&instance->buffers);
-    kan_dynamic_array_shutdown (&instance->samplers);
+    kan_dynamic_array_shutdown (&instance->attribute_buffers);
+    kan_rpl_meta_set_bindings_shutdown (&instance->set_pass);
+    kan_rpl_meta_set_bindings_shutdown (&instance->set_material);
+    kan_rpl_meta_set_bindings_shutdown (&instance->set_object);
+    kan_rpl_meta_set_bindings_shutdown (&instance->set_instanced);
     kan_dynamic_array_shutdown (&instance->color_outputs);
 }
 
