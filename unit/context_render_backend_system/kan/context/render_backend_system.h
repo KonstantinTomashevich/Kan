@@ -112,8 +112,6 @@ CONTEXT_RENDER_BACKEND_SYSTEM_API kan_bool_t kan_render_backend_system_select_de
 CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_context_t
 kan_render_backend_system_get_render_context (kan_context_system_handle_t render_backend_system);
 
-// TODO: Integrate with cpu profiler sections, especially kan_render_backend_system_next_frame.
-
 /// \details Submits recorded commands and presentation from previous frame, prepares data for the new frame.
 /// \return True if next frame submit should be started, false otherwise. For example, we might not be able to submit
 ///         new frame while using frames in flights when GPU is not fast enough to process all the frames.

@@ -3,7 +3,7 @@ concrete_include (PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 concrete_sources ("*.c")
 concrete_require (
         SCOPE PUBLIC
-        ABSTRACT context_render_backend_system render_backend_tools
+        ABSTRACT context_render_backend_system cpu_profiler render_backend_tools
         CONCRETE_INTERFACE inline_math testing)
 
 abstract_get_implementations (

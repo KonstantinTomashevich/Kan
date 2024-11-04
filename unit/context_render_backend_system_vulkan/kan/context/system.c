@@ -30,6 +30,84 @@ kan_context_system_handle_t render_backend_system_create (kan_allocation_group_t
     system->image_wrapper_allocation_group = kan_allocation_group_get_child (group, "descriptor_set_wrapper");
     system->descriptor_set_wrapper_allocation_group = kan_allocation_group_get_child (group, "descriptor_set_wrapper");
 
+    system->section_create_surface = kan_cpu_section_get ("render_backend_create_surface");
+    system->section_create_frame_buffer = kan_cpu_section_get ("render_backend_create_frame_buffer");
+    system->section_create_frame_buffer_internal = kan_cpu_section_get ("render_backend_create_frame_buffer_internal");
+    system->section_create_pass = kan_cpu_section_get ("render_backend_create_pass");
+    system->section_create_pass_internal = kan_cpu_section_get ("render_backend_create_pass_internal");
+    system->section_create_pass_instance = kan_cpu_section_get ("render_backend_create_pass_instance");
+    system->section_create_graphics_pipeline_family =
+        kan_cpu_section_get ("render_backend_create_graphics_pipeline_family");
+    system->section_create_graphics_pipeline_family_internal =
+        kan_cpu_section_get ("render_backend_create_graphics_pipeline_family_internal");
+    system->section_create_code_module = kan_cpu_section_get ("render_backend_create_code_module");
+    system->section_create_code_module_internal = kan_cpu_section_get ("render_backend_create_code_module_internal");
+    system->section_create_graphics_pipeline = kan_cpu_section_get ("render_backend_create_graphics_pipeline");
+    system->section_create_graphics_pipeline_internal =
+        kan_cpu_section_get ("render_backend_create_graphics_pipeline_internal");
+    system->section_create_pipeline_parameter_set =
+        kan_cpu_section_get ("render_backend_create_pipeline_parameter_set");
+    system->section_create_pipeline_parameter_set_internal =
+        kan_cpu_section_get ("render_backend_create_pipeline_parameter_set_internal");
+    system->section_create_buffer = kan_cpu_section_get ("render_backend_create_buffer");
+    system->section_create_buffer_internal = kan_cpu_section_get ("render_backend_create_buffer_internal");
+    system->section_create_frame_lifetime_allocator =
+        kan_cpu_section_get ("render_backend_create_frame_lifetime_allocator");
+    system->section_create_frame_lifetime_allocator_internal =
+        kan_cpu_section_get ("render_backend_create_frame_lifetime_allocator_internal");
+    system->section_create_image = kan_cpu_section_get ("render_backend_create_image");
+    system->section_create_image_internal = kan_cpu_section_get ("render_backend_create_image_internal");
+
+    system->section_surface_init_with_window = kan_cpu_section_get ("render_backend_surface_init_with_window");
+    system->section_surface_shutdown_with_window = kan_cpu_section_get ("render_backend_surface_shutdown_with_window");
+    system->section_surface_create_swap_chain = kan_cpu_section_get ("render_backend_surface_create_swap_chain");
+    system->section_surface_destroy_swap_chain = kan_cpu_section_get ("render_backend_surface_destroy_swap_chain");
+
+    system->section_pipeline_compiler_request = kan_cpu_section_get ("render_backend_pipeline_compiler_request");
+
+    system->section_pipeline_compilation = kan_cpu_section_get ("render_backend_pipeline_compilation");
+
+    system->section_descriptor_set_allocator_allocate =
+        kan_cpu_section_get ("render_backend_descriptor_set_allocator_allocate");
+    system->section_descriptor_set_allocator_free =
+        kan_cpu_section_get ("render_backend_descriptor_set_allocator_free");
+
+    system->section_apply_descriptor_set_mutation =
+        kan_cpu_section_get ("render_backend_apply_descriptor_set_mutation");
+    system->section_pipeline_parameter_set_update =
+        kan_cpu_section_get ("render_backend_pipeline_parameter_set_update");
+
+    system->section_frame_lifetime_allocator_allocate =
+        kan_cpu_section_get ("render_backend_frame_lifetime_allocator_allocate");
+    system->section_frame_lifetime_allocator_retire_old_allocations =
+        kan_cpu_section_get ("render_backend_frame_lifetime_allocator_retire_old_allocations");
+    system->section_frame_lifetime_allocator_clean_empty_pages =
+        kan_cpu_section_get ("render_backend_frame_lifetime_allocator_clean_empty_pages");
+    system->section_allocate_for_staging = kan_cpu_section_get ("render_backend_allocate_for_staging");
+
+    system->section_image_create_on_device = kan_cpu_section_get ("render_backend_image_create_on_device");
+    system->section_image_upload = kan_cpu_section_get ("render_backend_image_upload");
+    system->section_image_resize_render_target = kan_cpu_section_get ("render_backend_image_resize_render_target");
+
+    system->section_next_frame = kan_cpu_section_get ("render_backend_next_frame");
+    system->section_next_frame_synchronization = kan_cpu_section_get ("render_backend_next_frame_synchronization");
+    system->section_next_frame_acquire_images = kan_cpu_section_get ("render_backend_next_frame_acquire_images");
+    system->section_next_frame_destruction_schedule =
+        kan_cpu_section_get ("render_backend_next_frame_destruction_schedule");
+    system->section_next_frame_destruction_schedule_waiting_pipeline_compilation =
+        kan_cpu_section_get ("render_backend_next_frame_destruction_schedule_waiting_pipeline_compilation");
+
+    system->section_submit_previous_frame = kan_cpu_section_get ("render_backend_submit_previous_frame");
+    system->section_submit_transfer = kan_cpu_section_get ("render_backend_submit_transfer");
+    system->section_submit_graphics = kan_cpu_section_get ("render_backend_submit_graphics");
+    system->section_submit_mip_generation = kan_cpu_section_get ("render_backend_submit_mip_generation");
+    system->section_execute_frame_buffer_creation =
+        kan_cpu_section_get ("render_backend_execute_frame_buffer_creation");
+    system->section_submit_blit_requests = kan_cpu_section_get ("render_backend_submit_blit_requests");
+    system->section_submit_pass_instance = kan_cpu_section_get ("render_backend_submit_pass_instance");
+    system->section_pass_instance_sort_and_submission =
+        kan_cpu_section_get ("render_backend_pass_instance_sort_and_submission");
+
     system->frame_started = KAN_FALSE;
     system->current_frame_in_flight_index = 0u;
 
@@ -1177,6 +1255,9 @@ static void render_backend_system_begin_command_submission (struct render_backen
 
 static void render_backend_system_submit_transfer (struct render_backend_system_t *system)
 {
+    struct kan_cpu_section_execution_t execution;
+    kan_cpu_section_execution_init (&execution, system->section_submit_transfer);
+
     struct render_backend_command_state_t *state = &system->command_states[system->current_frame_in_flight_index];
     DEBUG_LABEL_SCOPE_BEGIN (state->primary_command_buffer, "buffer_transfer", DEBUG_LABEL_COLOR_PASS)
 
@@ -1366,13 +1447,17 @@ static void render_backend_system_submit_transfer (struct render_backend_system_
     }
 
     DEBUG_LABEL_SCOPE_END (state->primary_command_buffer)
+    kan_cpu_section_execution_shutdown (&execution);
 }
 
 static inline void submit_mip_generation (struct render_backend_system_t *system,
                                           struct render_backend_schedule_state_t *schedule,
                                           struct render_backend_command_state_t *state)
 {
+    struct kan_cpu_section_execution_t execution;
+    kan_cpu_section_execution_init (&execution, system->section_submit_mip_generation);
     struct scheduled_image_mip_generation_t *image_mip_generation = schedule->first_scheduled_image_mip_generation;
+
     while (image_mip_generation)
     {
         VkImageAspectFlags image_aspect =
@@ -1543,13 +1628,16 @@ static inline void submit_mip_generation (struct render_backend_system_t *system
     }
 
     schedule->first_scheduled_image_mip_generation = NULL;
+    kan_cpu_section_execution_shutdown (&execution);
 }
 
 static inline void process_frame_buffer_create_requests (struct render_backend_system_t *system,
-                                                         struct render_backend_schedule_state_t *schedule,
-                                                         struct render_backend_command_state_t *state)
+                                                         struct render_backend_schedule_state_t *schedule)
 {
+    struct kan_cpu_section_execution_t execution;
+    kan_cpu_section_execution_init (&execution, system->section_execute_frame_buffer_creation);
     struct scheduled_frame_buffer_create_t *frame_buffer_create = schedule->first_scheduled_frame_buffer_create;
+
     while (frame_buffer_create)
     {
         struct render_backend_frame_buffer_t *frame_buffer = frame_buffer_create->frame_buffer;
@@ -1801,12 +1889,16 @@ static inline void process_frame_buffer_create_requests (struct render_backend_s
     }
 
     schedule->first_scheduled_frame_buffer_create = NULL;
+    kan_cpu_section_execution_shutdown (&execution);
 }
 
 static inline void process_surface_blit_requests (struct render_backend_system_t *system,
                                                   struct render_backend_command_state_t *state)
 {
+    struct kan_cpu_section_execution_t execution;
+    kan_cpu_section_execution_init (&execution, system->section_submit_blit_requests);
     struct render_backend_surface_t *surface = (struct render_backend_surface_t *) system->surfaces.first;
+
     while (surface)
     {
         struct surface_blit_request_t *request = surface->first_blit_request;
@@ -2006,12 +2098,16 @@ static inline void process_surface_blit_requests (struct render_backend_system_t
         surface->first_blit_request = NULL;
         surface = (struct render_backend_surface_t *) surface->list_node.next;
     }
+
+    kan_cpu_section_execution_shutdown (&execution);
 }
 
 static void render_backend_system_submit_pass_instance (struct render_backend_system_t *system,
                                                         struct render_backend_command_state_t *state,
                                                         struct render_backend_pass_instance_t *pass_instance)
 {
+    struct kan_cpu_section_execution_t execution;
+    kan_cpu_section_execution_init (&execution, system->section_submit_pass_instance);
     vkEndCommandBuffer (pass_instance->command_buffer);
 
     // We put lots of barrier here in order to be sure that everything works properly.
@@ -2246,10 +2342,14 @@ static void render_backend_system_submit_pass_instance (struct render_backend_sy
 
     kan_bd_list_remove (&system->pass_instances, &pass_instance->node_in_all);
     kan_bd_list_remove (&system->pass_instances_available, &pass_instance->node_in_available);
+    kan_cpu_section_execution_shutdown (&execution);
 }
 
 static void render_backend_system_submit_graphics (struct render_backend_system_t *system)
 {
+    struct kan_cpu_section_execution_t execution;
+    kan_cpu_section_execution_init (&execution, system->section_submit_graphics);
+
     struct render_backend_command_state_t *state = &system->command_states[system->current_frame_in_flight_index];
     struct render_backend_surface_t *surface = (struct render_backend_surface_t *) system->surfaces.first;
 
@@ -2261,7 +2361,7 @@ static void render_backend_system_submit_graphics (struct render_backend_system_
 
     struct render_backend_schedule_state_t *schedule = &system->schedule_states[system->current_frame_in_flight_index];
     submit_mip_generation (system, schedule, state);
-    process_frame_buffer_create_requests (system, schedule, state);
+    process_frame_buffer_create_requests (system, schedule);
 
     struct render_backend_pass_t *pass = (struct render_backend_pass_t *) system->passes.first;
     while (pass)
@@ -2287,6 +2387,9 @@ static void render_backend_system_submit_graphics (struct render_backend_system_
 
         pass = (struct render_backend_pass_t *) pass->list_node.next;
     }
+
+    struct kan_cpu_section_execution_t pass_instance_execution;
+    kan_cpu_section_execution_init (&pass_instance_execution, system->section_pass_instance_sort_and_submission);
 
     while (system->pass_instances.size > 0u)
     {
@@ -2335,7 +2438,9 @@ static void render_backend_system_submit_graphics (struct render_backend_system_
         }
     }
 
+    kan_cpu_section_execution_shutdown (&pass_instance_execution);
     pass = (struct render_backend_pass_t *) system->passes.first;
+
     while (pass)
     {
         pass->first_instance = NULL;
@@ -2394,6 +2499,8 @@ static void render_backend_system_submit_graphics (struct render_backend_system_
                               VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0u, 0u, NULL, 0u, NULL, 1u, &barrier_info);
         surface = (struct render_backend_surface_t *) surface->list_node.next;
     }
+
+    kan_cpu_section_execution_shutdown (&execution);
 }
 
 static void render_backend_system_finish_command_submission (struct render_backend_system_t *system)
@@ -2606,6 +2713,9 @@ static void render_backend_system_submit_previous_frame (struct render_backend_s
         return;
     }
 
+    struct kan_cpu_section_execution_t execution;
+    kan_cpu_section_execution_init (&execution, system->section_submit_previous_frame);
+
     render_backend_system_begin_command_submission (system);
     render_backend_system_submit_transfer (system);
     render_backend_system_submit_graphics (system);
@@ -2651,6 +2761,7 @@ static void render_backend_system_submit_previous_frame (struct render_backend_s
     system->current_frame_in_flight_index =
         (system->current_frame_in_flight_index + 1u) % KAN_CONTEXT_RENDER_BACKEND_VULKAN_FRAMES_IN_FLIGHT;
     system->frame_started = KAN_FALSE;
+    kan_cpu_section_execution_shutdown (&execution);
 }
 
 static void render_backend_surface_destroy_swap_chain_image_views (struct render_backend_surface_t *surface)
@@ -2860,6 +2971,9 @@ static kan_bool_t render_backend_surface_create_semaphores (struct render_backen
 static void render_backend_surface_create_swap_chain (struct render_backend_surface_t *surface,
                                                       const struct kan_application_system_window_info_t *window_info)
 {
+    struct kan_cpu_section_execution_t execution;
+    kan_cpu_section_execution_init (&execution, surface->system->section_surface_create_swap_chain);
+
     VkBool32 present_supported;
     if (vkGetPhysicalDeviceSurfaceSupportKHR (surface->system->physical_device,
                                               surface->system->device_queue_family_index, surface->surface,
@@ -2869,6 +2983,8 @@ static void render_backend_surface_create_swap_chain (struct render_backend_surf
             render_backend_system_vulkan, KAN_LOG_ERROR,
             "Unable to create swap chain for surface \"%s\": failed to query whether present to surface is supported.",
             surface->tracking_name)
+
+        kan_cpu_section_execution_shutdown (&execution);
         return;
     }
 
@@ -2878,6 +2994,8 @@ static void render_backend_surface_create_swap_chain (struct render_backend_surf
             render_backend_system_vulkan, KAN_LOG_ERROR,
             "Unable to create swap chain for surface \"%s\": picked device is unable to present to created surface.",
             surface->tracking_name)
+
+        kan_cpu_section_execution_shutdown (&execution);
         return;
     }
 
@@ -2888,6 +3006,8 @@ static void render_backend_surface_create_swap_chain (struct render_backend_surf
         KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR,
                  "Unable to create swap chain for surface \"%s\": failed to query surface formats.",
                  surface->tracking_name)
+
+        kan_cpu_section_execution_shutdown (&execution);
         return;
     }
 
@@ -2896,6 +3016,8 @@ static void render_backend_surface_create_swap_chain (struct render_backend_surf
         KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR,
                  "Unable to create swap chain for surface \"%s\": there is no supported surface formats.",
                  surface->tracking_name)
+
+        kan_cpu_section_execution_shutdown (&execution);
         return;
     }
 
@@ -2912,6 +3034,7 @@ static void render_backend_surface_create_swap_chain (struct render_backend_surf
 
         kan_free_general (surface->system->utility_allocation_group, formats,
                           sizeof (VkSurfaceFormatKHR) * formats_count);
+        kan_cpu_section_execution_shutdown (&execution);
         return;
     }
 
@@ -2934,6 +3057,7 @@ static void render_backend_surface_create_swap_chain (struct render_backend_surf
         KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR,
                  "Unable to create swap chain for surface \"%s\": failed to found supported surface format.",
                  surface->tracking_name)
+        kan_cpu_section_execution_shutdown (&execution);
         return;
     }
 
@@ -2944,6 +3068,7 @@ static void render_backend_surface_create_swap_chain (struct render_backend_surf
         KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR,
                  "Unable to create swap chain for surface \"%s\": failed to query surface present modes.",
                  surface->tracking_name)
+        kan_cpu_section_execution_shutdown (&execution);
         return;
     }
 
@@ -2952,6 +3077,7 @@ static void render_backend_surface_create_swap_chain (struct render_backend_surf
         KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR,
                  "Unable to create swap chain for surface \"%s\": there is no supported surface present modes.",
                  surface->tracking_name)
+        kan_cpu_section_execution_shutdown (&execution);
         return;
     }
 
@@ -2968,6 +3094,7 @@ static void render_backend_surface_create_swap_chain (struct render_backend_surf
 
         kan_free_general (surface->system->utility_allocation_group, present_modes,
                           sizeof (VkPresentModeKHR) * present_modes_count);
+        kan_cpu_section_execution_shutdown (&execution);
         return;
     }
 
@@ -2993,6 +3120,7 @@ static void render_backend_surface_create_swap_chain (struct render_backend_surf
         KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR,
                  "Unable to create swap chain for surface \"%s\": failed to found supported surface present mode.",
                  surface->tracking_name)
+        kan_cpu_section_execution_shutdown (&execution);
         return;
     }
 
@@ -3003,6 +3131,7 @@ static void render_backend_surface_create_swap_chain (struct render_backend_surf
         KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR,
                  "Unable to create swap chain for surface \"%s\": failed to query surface capabilities.",
                  surface->tracking_name)
+        kan_cpu_section_execution_shutdown (&execution);
         return;
     }
 
@@ -3063,6 +3192,7 @@ static void render_backend_surface_create_swap_chain (struct render_backend_surf
         KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR,
                  "Unable to create swap chain for surface \"%s\": construction failed.", surface->tracking_name)
         surface->swap_chain = VK_NULL_HANDLE;
+        kan_cpu_section_execution_shutdown (&execution);
         return;
     }
 
@@ -3093,6 +3223,7 @@ static void render_backend_surface_create_swap_chain (struct render_backend_surf
         vkDestroySwapchainKHR (surface->system->device, surface->swap_chain,
                                VULKAN_ALLOCATION_CALLBACKS (surface->system));
         surface->swap_chain = VK_NULL_HANDLE;
+        kan_cpu_section_execution_shutdown (&execution);
         return;
     }
 
@@ -3106,6 +3237,7 @@ static void render_backend_surface_create_swap_chain (struct render_backend_surf
         vkDestroySwapchainKHR (surface->system->device, surface->swap_chain,
                                VULKAN_ALLOCATION_CALLBACKS (surface->system));
         surface->swap_chain = VK_NULL_HANDLE;
+        kan_cpu_section_execution_shutdown (&execution);
         return;
     }
 
@@ -3130,12 +3262,18 @@ static void render_backend_surface_create_swap_chain (struct render_backend_surf
 
         attachment = attachment->next;
     }
+
+    kan_cpu_section_execution_shutdown (&execution);
 }
 
 static void render_backend_surface_destroy_swap_chain (struct render_backend_surface_t *surface)
 {
+    struct kan_cpu_section_execution_t execution;
+    kan_cpu_section_execution_init (&execution, surface->system->section_surface_destroy_swap_chain);
+
     if (surface->swap_chain == VK_NULL_HANDLE)
     {
+        kan_cpu_section_execution_shutdown (&execution);
         return;
     }
 
@@ -3151,10 +3289,14 @@ static void render_backend_surface_destroy_swap_chain (struct render_backend_sur
     render_backend_surface_destroy_semaphores (surface);
     render_backend_surface_destroy_swap_chain_image_views (surface);
     vkDestroySwapchainKHR (surface->system->device, surface->swap_chain, VULKAN_ALLOCATION_CALLBACKS (surface->system));
+    kan_cpu_section_execution_shutdown (&execution);
 }
 
 static kan_bool_t render_backend_system_acquire_images (struct render_backend_system_t *system)
 {
+    struct kan_cpu_section_execution_t execution;
+    kan_cpu_section_execution_init (&execution, system->section_next_frame_acquire_images);
+
     kan_context_system_handle_t application_system =
         kan_context_query (system->context, KAN_CONTEXT_APPLICATION_SYSTEM_NAME);
 
@@ -3233,13 +3375,20 @@ static kan_bool_t render_backend_system_acquire_images (struct render_backend_sy
         }
     }
 
+    kan_cpu_section_execution_shutdown (&execution);
     return acquired_all_images && !any_swap_chain_outdated;
 }
 
 kan_bool_t kan_render_backend_system_next_frame (kan_context_system_handle_t render_backend_system)
 {
     struct render_backend_system_t *system = (struct render_backend_system_t *) render_backend_system;
+    struct kan_cpu_section_execution_t next_frame_execution;
+    kan_cpu_section_execution_init (&next_frame_execution, system->section_next_frame);
+
     render_backend_system_submit_previous_frame (system);
+
+    struct kan_cpu_section_execution_t synchronization_execution;
+    kan_cpu_section_execution_init (&synchronization_execution, system->section_next_frame_synchronization);
 
     VkResult fence_wait_result =
         vkWaitForFences (system->device, 1u, &system->in_flight_fences[system->current_frame_in_flight_index], VK_TRUE,
@@ -3248,17 +3397,23 @@ kan_bool_t kan_render_backend_system_next_frame (kan_context_system_handle_t ren
     if (fence_wait_result == VK_TIMEOUT)
     {
         KAN_LOG (render_backend_system_vulkan, KAN_LOG_INFO, "Skipping frame due to in flight fence wait timeout.")
+        kan_cpu_section_execution_shutdown (&synchronization_execution);
+        kan_cpu_section_execution_shutdown (&next_frame_execution);
         return KAN_FALSE;
     }
     else if (fence_wait_result != VK_SUCCESS)
     {
         KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR, "Failed waiting for in flight fence.")
+        kan_cpu_section_execution_shutdown (&synchronization_execution);
+        kan_cpu_section_execution_shutdown (&next_frame_execution);
         return KAN_FALSE;
     }
 
     if (!render_backend_system_acquire_images (system))
     {
         KAN_LOG (render_backend_system_vulkan, KAN_LOG_INFO, "Skipping frame as swap chain images are not ready.")
+        kan_cpu_section_execution_shutdown (&synchronization_execution);
+        kan_cpu_section_execution_shutdown (&next_frame_execution);
         return KAN_FALSE;
     }
 
@@ -3270,6 +3425,10 @@ kan_bool_t kan_render_backend_system_next_frame (kan_context_system_handle_t ren
     {
         kan_critical_error ("Unexpected failure when resetting graphics command pool.", __FILE__, __LINE__);
     }
+
+    kan_cpu_section_execution_shutdown (&synchronization_execution);
+    struct kan_cpu_section_execution_t destruction_schedule_execution;
+    kan_cpu_section_execution_init (&destruction_schedule_execution, system->section_next_frame_destruction_schedule);
 
     struct render_backend_schedule_state_t *schedule = &system->schedule_states[system->current_frame_in_flight_index];
     struct scheduled_pipeline_parameter_set_destroy_t *pipeline_parameter_set_destroy =
@@ -3313,6 +3472,11 @@ kan_bool_t kan_render_backend_system_next_frame (kan_context_system_handle_t ren
         // If we still have lingering compilation request, we must deal with it.
         while (graphics_pipeline_destroy->pipeline->compilation_request)
         {
+            struct kan_cpu_section_execution_t waiting_compilation_execution;
+            kan_cpu_section_execution_init (
+                &waiting_compilation_execution,
+                system->section_next_frame_destruction_schedule_waiting_pipeline_compilation);
+
             kan_mutex_lock (system->compiler_state.state_transition_mutex);
             switch (graphics_pipeline_destroy->pipeline->compilation_state)
             {
@@ -3344,6 +3508,8 @@ kan_bool_t kan_render_backend_system_next_frame (kan_context_system_handle_t ren
                 kan_mutex_unlock (system->compiler_state.state_transition_mutex);
                 break;
             }
+
+            kan_cpu_section_execution_shutdown (&waiting_compilation_execution);
         }
 
         kan_bd_list_remove (&system->graphics_pipelines, &graphics_pipeline_destroy->pipeline->list_node);
@@ -3453,6 +3619,7 @@ kan_bool_t kan_render_backend_system_next_frame (kan_context_system_handle_t ren
         detached_image_destroy = detached_image_destroy->next;
     }
 
+    kan_cpu_section_execution_shutdown (&destruction_schedule_execution);
     render_backend_system_clean_current_schedule_if_safe (system);
     struct render_backend_frame_lifetime_allocator_t *frame_lifetime_allocator =
         (struct render_backend_frame_lifetime_allocator_t *) system->frame_lifetime_allocators.first;
@@ -3464,6 +3631,7 @@ kan_bool_t kan_render_backend_system_next_frame (kan_context_system_handle_t ren
             (struct render_backend_frame_lifetime_allocator_t *) frame_lifetime_allocator->list_node.next;
     }
 
+    kan_cpu_section_execution_shutdown (&next_frame_execution);
     return KAN_TRUE;
 }
 
@@ -3473,15 +3641,22 @@ static void render_backend_surface_init_with_window (void *user_data,
     struct render_backend_surface_t *surface = user_data;
     KAN_ASSERT (surface->surface == VK_NULL_HANDLE)
 
+    struct kan_cpu_section_execution_t execution;
+    kan_cpu_section_execution_init (&execution, surface->system->section_surface_init_with_window);
+
     surface->surface = (VkSurfaceKHR) kan_platform_application_window_create_vulkan_surface (
         window_info->id, (uint64_t) surface->system->instance, VULKAN_ALLOCATION_CALLBACKS (surface->system));
     render_backend_surface_create_swap_chain (surface, window_info);
+    kan_cpu_section_execution_shutdown (&execution);
 }
 
 static void render_backend_surface_shutdown_with_window (void *user_data,
                                                          const struct kan_application_system_window_info_t *window_info)
 {
     struct render_backend_surface_t *surface = user_data;
+    struct kan_cpu_section_execution_t execution;
+    kan_cpu_section_execution_init (&execution, surface->system->section_surface_shutdown_with_window);
+
     vkDeviceWaitIdle (surface->system->device);
 
     if (surface->surface != VK_NULL_HANDLE)
@@ -3526,6 +3701,7 @@ static void render_backend_surface_shutdown_with_window (void *user_data,
 
     kan_bd_list_remove (&surface->system->surfaces, &surface->list_node);
     kan_free_batched (surface->system->surface_wrapper_allocation_group, surface);
+    kan_cpu_section_execution_shutdown (&execution);
 }
 
 kan_render_surface_t kan_render_backend_system_create_surface (kan_context_system_handle_t render_backend_system,
@@ -3533,6 +3709,9 @@ kan_render_surface_t kan_render_backend_system_create_surface (kan_context_syste
                                                                kan_interned_string_t tracking_name)
 {
     struct render_backend_system_t *system = (struct render_backend_system_t *) render_backend_system;
+    struct kan_cpu_section_execution_t execution;
+    kan_cpu_section_execution_init (&execution, system->section_create_surface);
+
     kan_context_system_handle_t application_system =
         kan_context_query (system->context, KAN_CONTEXT_APPLICATION_SYSTEM_NAME);
 
@@ -3540,6 +3719,7 @@ kan_render_surface_t kan_render_backend_system_create_surface (kan_context_syste
     {
         KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR,
                  "Unable to create surfaces due to absence of application system in context.")
+        kan_cpu_section_execution_shutdown (&execution);
         return KAN_INVALID_RENDER_SURFACE;
     }
 
@@ -3569,6 +3749,7 @@ kan_render_surface_t kan_render_backend_system_create_surface (kan_context_syste
                                                         .shutdown = render_backend_surface_shutdown_with_window,
                                                     });
 
+    kan_cpu_section_execution_shutdown (&execution);
     return (kan_render_surface_t) new_surface;
 }
 

@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include <kan/context/render_backend_system.h>
+#include <kan/cpu_profiler/markup.h>
 #include <kan/inline_math/inline_math.h>
 #include <kan/memory_profiler/capture.h>
 #include <kan/platform/application.h>
@@ -721,8 +722,8 @@ KAN_TEST_CASE (temp)
     kan_application_system_event_iterator_t event_iterator =
         kan_application_system_event_iterator_create (application_system);
 
-    kan_render_surface_t test_surface = kan_render_backend_system_create_surface (render_backend_system, window_handle,
-                                                                                  kan_string_intern ("test"));
+    kan_render_surface_t test_surface =
+        kan_render_backend_system_create_surface (render_backend_system, window_handle, kan_string_intern ("test"));
 
     kan_render_pass_t render_image_pass = create_render_image_pass (render_context);
     KAN_TEST_ASSERT (render_image_pass != KAN_INVALID_RENDER_PASS)
@@ -885,8 +886,8 @@ KAN_TEST_CASE (temp)
     struct cube_instanced_t *cube_instanced_data = malloc (sizeof (struct cube_instanced_t) * MAX_INSTANCED_CUBES);
 
     struct pass_t pass_data;
-    kan_render_buffer_t pass_buffer = kan_render_buffer_create (render_context, KAN_RENDER_BUFFER_TYPE_UNIFORM,
-                                                                sizeof (pass_data), NULL, kan_string_intern ("cube_pass"));
+    kan_render_buffer_t pass_buffer = kan_render_buffer_create (
+        render_context, KAN_RENDER_BUFFER_TYPE_UNIFORM, sizeof (pass_data), NULL, kan_string_intern ("cube_pass"));
 
     struct kan_render_parameter_update_description_t render_image_parameters[] = {{
         .binding = render_image_config_binding,
@@ -1153,6 +1154,8 @@ KAN_TEST_CASE (temp)
             // Sleep to avoid exiting too fast.
             kan_platform_sleep (4000000u - duration);
         }
+
+        kan_cpu_stage_separator ();
     }
 
     free (cube_instanced_data);

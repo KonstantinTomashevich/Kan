@@ -6,6 +6,9 @@ struct render_backend_buffer_t *render_backend_system_create_buffer (struct rend
                                                                      uint32_t full_size,
                                                                      kan_interned_string_t tracking_name)
 {
+    struct kan_cpu_section_execution_t execution;
+    kan_cpu_section_execution_init (&execution, system->section_create_buffer_internal);
+
     VkBufferUsageFlags usage_flags = 0u;
     VmaAllocationCreateFlagBits allocation_flags = 0u;
 
@@ -92,6 +95,7 @@ struct render_backend_buffer_t *render_backend_system_create_buffer (struct rend
     {
         KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR, "Failed to create buffer \"%s\" of size %llu.",
                  tracking_name, (unsigned long long) full_size)
+        kan_cpu_section_execution_shutdown (&execution);
         return NULL;
     }
 
@@ -176,6 +180,7 @@ struct render_backend_buffer_t *render_backend_system_create_buffer (struct rend
                                     buffer->device_allocation_group);
 #endif
 
+    kan_cpu_section_execution_shutdown (&execution);
     return buffer;
 }
 
@@ -198,11 +203,15 @@ kan_render_buffer_t kan_render_buffer_create (kan_render_context_t context,
                                               kan_interned_string_t tracking_name)
 {
     struct render_backend_system_t *system = (struct render_backend_system_t *) context;
+    struct kan_cpu_section_execution_t execution;
+    kan_cpu_section_execution_init (&execution, system->section_create_buffer);
+
     struct render_backend_buffer_t *buffer = render_backend_system_create_buffer (
         system, RENDER_BACKEND_BUFFER_FAMILY_RESOURCE, type, full_size, tracking_name);
 
     if (!buffer)
     {
+        kan_cpu_section_execution_shutdown (&execution);
         return KAN_INVALID_RENDER_BUFFER;
     }
 
@@ -240,6 +249,7 @@ kan_render_buffer_t kan_render_buffer_create (kan_render_context_t context,
         }
     }
 
+    kan_cpu_section_execution_shutdown (&execution);
     return (kan_render_buffer_t) buffer;
 }
 

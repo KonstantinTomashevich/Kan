@@ -28,6 +28,9 @@ static inline void free_descriptor_set_layouts (struct render_backend_system_t *
 struct render_backend_graphics_pipeline_family_t *render_backend_system_create_graphics_pipeline_family (
     struct render_backend_system_t *system, struct kan_render_graphics_pipeline_family_description_t *description)
 {
+    struct kan_cpu_section_execution_t execution;
+    kan_cpu_section_execution_init (&execution, system->section_create_graphics_pipeline_family_internal);
+
     uint32_t sets_count = 0u;
     for (uint64_t index = 0u; index < description->parameter_sets_count; ++index)
     {
@@ -40,6 +43,8 @@ struct render_backend_graphics_pipeline_family_t *render_backend_system_create_g
                  "Pipeline family \"%s\" last layout set index %lu is higher than maximum allowed %lu.",
                  description->tracking_name, (unsigned long) (sets_count - 1u),
                  (unsigned long) KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_SET_INDEX)
+
+        kan_cpu_section_execution_shutdown (&execution);
         return NULL;
     }
 
@@ -240,6 +245,8 @@ struct render_backend_graphics_pipeline_family_t *render_backend_system_create_g
         free_descriptor_set_layouts (system, sets_count, descriptor_set_layouts);
         kan_free_general (system->utility_allocation_group, descriptor_set_layouts_for_pipeline,
                           sizeof (VkDescriptorSetLayout) * sets_count);
+
+        kan_cpu_section_execution_shutdown (&execution);
         return NULL;
     }
 
@@ -263,6 +270,7 @@ struct render_backend_graphics_pipeline_family_t *render_backend_system_create_g
         KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR, "Failed to pipeline layout for pipeline family \"%s\".",
                  description->tracking_name)
         free_descriptor_set_layouts (system, sets_count, descriptor_set_layouts);
+        kan_cpu_section_execution_shutdown (&execution);
         return NULL;
     }
 
@@ -407,6 +415,7 @@ struct render_backend_graphics_pipeline_family_t *render_backend_system_create_g
         }
     }
 
+    kan_cpu_section_execution_shutdown (&execution);
     return family;
 }
 
@@ -427,8 +436,11 @@ kan_render_graphics_pipeline_family_t kan_render_graphics_pipeline_family_create
     kan_render_context_t context, struct kan_render_graphics_pipeline_family_description_t *description)
 {
     struct render_backend_system_t *system = (struct render_backend_system_t *) context;
+    struct kan_cpu_section_execution_t execution;
+    kan_cpu_section_execution_init (&execution, system->section_create_graphics_pipeline_family);
     struct render_backend_graphics_pipeline_family_t *family =
         render_backend_system_create_graphics_pipeline_family (system, description);
+    kan_cpu_section_execution_shutdown (&execution);
     return family ? (kan_render_graphics_pipeline_family_t) family : KAN_INVALID_RENDER_GRAPHICS_PIPELINE_FAMILY;
 }
 

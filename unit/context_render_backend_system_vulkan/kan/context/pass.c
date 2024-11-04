@@ -3,6 +3,9 @@
 struct render_backend_pass_t *render_backend_system_create_pass (struct render_backend_system_t *system,
                                                                  struct kan_render_pass_description_t *description)
 {
+    struct kan_cpu_section_execution_t execution;
+    kan_cpu_section_execution_init (&execution, system->section_create_pass_internal);
+
     VkAttachmentDescription *attachment_descriptions = kan_allocate_general (
         system->utility_allocation_group, sizeof (VkAttachmentDescription) * description->attachments_count,
         _Alignof (VkAttachmentDescription));
@@ -236,6 +239,7 @@ struct render_backend_pass_t *render_backend_system_create_pass (struct render_b
     {
         KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR, "Failed to create render pass \"%s\".",
                  description->tracking_name)
+        kan_cpu_section_execution_shutdown (&execution);
         return NULL;
     }
 
@@ -267,6 +271,8 @@ struct render_backend_pass_t *render_backend_system_create_pass (struct render_b
     pass->first_dependant_pass = NULL;
     pass->first_instance = NULL;
     pass->tracking_name = description->tracking_name;
+
+    kan_cpu_section_execution_shutdown (&execution);
     return pass;
 }
 
@@ -318,7 +324,10 @@ kan_render_pass_t kan_render_pass_create (kan_render_context_t context,
                                           struct kan_render_pass_description_t *description)
 {
     struct render_backend_system_t *system = (struct render_backend_system_t *) context;
+    struct kan_cpu_section_execution_t execution;
+    kan_cpu_section_execution_init (&execution, system->section_create_pass);
     struct render_backend_pass_t *pass = render_backend_system_create_pass (system, description);
+    kan_cpu_section_execution_shutdown (&execution);
     return pass ? (kan_render_pass_t) pass : KAN_INVALID_RENDER_PASS;
 }
 
@@ -363,12 +372,16 @@ kan_render_pass_instance_t kan_render_pass_instantiate (kan_render_pass_t pass,
     struct render_backend_pass_t *pass_data = (struct render_backend_pass_t *) pass;
     struct render_backend_frame_buffer_t *frame_buffer_data = (struct render_backend_frame_buffer_t *) frame_buffer;
 
+    struct kan_cpu_section_execution_t execution;
+    kan_cpu_section_execution_init (&execution, pass_data->system->section_create_pass_instance);
+
     VkFramebuffer selected_frame_buffer = frame_buffer_data->instance_array ?
                                               frame_buffer_data->instance_array[frame_buffer_data->instance_index] :
                                               frame_buffer_data->instance;
 
     if (!pass_data->system->frame_started || selected_frame_buffer == VK_NULL_HANDLE)
     {
+        kan_cpu_section_execution_shutdown (&execution);
         return KAN_INVALID_RENDER_PASS_INSTANCE;
     }
 
@@ -445,6 +458,7 @@ kan_render_pass_instance_t kan_render_pass_instantiate (kan_render_pass_t pass,
     {
         KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR,
                  "Failed to retrieve command buffer for new pass \"%s\" instance.", pass_data->tracking_name)
+        kan_cpu_section_execution_shutdown (&execution);
         return KAN_INVALID_RENDER_PASS_INSTANCE;
     }
 
@@ -539,6 +553,8 @@ kan_render_pass_instance_t kan_render_pass_instantiate (kan_render_pass_t pass,
     vkCmdSetViewport (instance->command_buffer, 0u, 1u, &pass_viewport);
     vkCmdSetScissor (instance->command_buffer, 0u, 1u, &pass_scissor);
     kan_atomic_int_unlock (&command_state->command_operation_lock);
+
+    kan_cpu_section_execution_shutdown (&execution);
     return (kan_render_pass_instance_t) instance;
 }
 

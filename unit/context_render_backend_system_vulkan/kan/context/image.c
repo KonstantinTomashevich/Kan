@@ -5,6 +5,9 @@ static kan_bool_t create_vulkan_image (struct render_backend_system_t *system,
                                        VkImage *output_image,
                                        VmaAllocation *output_allocation)
 {
+    struct kan_cpu_section_execution_t execution;
+    kan_cpu_section_execution_init (&execution, system->section_image_create_on_device);
+
     VkImageType image_type = VK_IMAGE_TYPE_2D;
     VkImageUsageFlags image_usage = 0u;
 
@@ -97,6 +100,7 @@ static kan_bool_t create_vulkan_image (struct render_backend_system_t *system,
     {
         KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR, "Failed to create image \"%s\".",
                  description->tracking_name)
+        kan_cpu_section_execution_shutdown (&execution);
         return KAN_FALSE;
     }
 
@@ -115,17 +119,22 @@ static kan_bool_t create_vulkan_image (struct render_backend_system_t *system,
     vkSetDebugUtilsObjectNameEXT (system->device, &object_name);
 #endif
 
+    kan_cpu_section_execution_shutdown (&execution);
     return KAN_TRUE;
 }
 
 struct render_backend_image_t *render_backend_system_create_image (struct render_backend_system_t *system,
                                                                    struct kan_render_image_description_t *description)
 {
+    struct kan_cpu_section_execution_t execution;
+    kan_cpu_section_execution_init (&execution, system->section_create_image_internal);
+
     VkImage vulkan_image;
     VmaAllocation vulkan_allocation;
 
     if (!create_vulkan_image (system, description, &vulkan_image, &vulkan_allocation))
     {
+        kan_cpu_section_execution_shutdown (&execution);
         return NULL;
     }
 
@@ -151,6 +160,7 @@ struct render_backend_image_t *render_backend_system_create_image (struct render
                                     system->memory_profiling.gpu_unmarked_group, image->device_allocation_group);
 #endif
 
+    kan_cpu_section_execution_shutdown (&execution);
     return image;
 }
 
@@ -185,13 +195,19 @@ kan_render_image_t kan_render_image_create (kan_render_context_t context,
                                             struct kan_render_image_description_t *description)
 {
     struct render_backend_system_t *system = (struct render_backend_system_t *) context;
+    struct kan_cpu_section_execution_t execution;
+    kan_cpu_section_execution_init (&execution, system->section_create_image);
     struct render_backend_image_t *image = render_backend_system_create_image (system, description);
+    kan_cpu_section_execution_shutdown (&execution);
     return image ? (kan_render_image_t) image : KAN_INVALID_RENDER_IMAGE;
 }
 
 void kan_render_image_upload_data (kan_render_image_t image, uint8_t mip, void *data)
 {
     struct render_backend_image_t *image_data = (struct render_backend_image_t *) image;
+    struct kan_cpu_section_execution_t execution;
+    kan_cpu_section_execution_init (&execution, image_data->system->section_image_upload);
+
     KAN_ASSERT (!image_data->description.render_target)
     KAN_ASSERT (mip < image_data->description.mips)
 
@@ -212,9 +228,23 @@ void kan_render_image_upload_data (kan_render_image_t image, uint8_t mip, void *
         KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR,
                  "Failed to upload image \"%s\" mip %lu: out of staging memory.", image_data->description.tracking_name,
                  (unsigned long) mip)
+        kan_cpu_section_execution_shutdown (&execution);
         return;
     }
 
+    void *output = kan_render_buffer_patch ((kan_render_buffer_t) staging_allocation.buffer, staging_allocation.offset,
+                                            allocation_size);
+
+    if (!output)
+    {
+        KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR,
+                 "Failed to upload image \"%s\" mip %lu: unable to patch acquired staging memory.",
+                 image_data->description.tracking_name, (unsigned long) mip)
+        kan_cpu_section_execution_shutdown (&execution);
+        return;
+    }
+
+    memcpy (output, data, allocation_size);
     struct render_backend_schedule_state_t *schedule =
         render_backend_system_get_schedule_for_memory (image_data->system);
     kan_atomic_int_lock (&schedule->schedule_lock);
@@ -230,6 +260,8 @@ void kan_render_image_upload_data (kan_render_image_t image, uint8_t mip, void *
     item->staging_buffer = staging_allocation.buffer;
     item->staging_buffer_offset = staging_allocation.offset;
     kan_atomic_int_unlock (&schedule->schedule_lock);
+
+    kan_cpu_section_execution_shutdown (&execution);
 }
 
 void kan_render_image_request_mip_generation (kan_render_image_t image, uint8_t first, uint8_t last)
@@ -258,6 +290,8 @@ void kan_render_image_resize_render_target (kan_render_image_t image,
                                             uint32_t new_depth)
 {
     struct render_backend_image_t *data = (struct render_backend_image_t *) image;
+    struct kan_cpu_section_execution_t execution;
+    kan_cpu_section_execution_init (&execution, data->system->section_image_resize_render_target);
     KAN_ASSERT (data->description.render_target)
 
     // If it is null handle, then we've tried to resize earlier and failed. No need for additional cleanup.
@@ -301,6 +335,8 @@ void kan_render_image_resize_render_target (kan_render_image_t image,
         data->image = VK_NULL_HANDLE;
         KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR,
                  "Failed to resize image \"%s\": new image creation failed.", data->description.tracking_name)
+
+        kan_cpu_section_execution_shutdown (&execution);
         return;
     }
 
@@ -342,6 +378,7 @@ void kan_render_image_resize_render_target (kan_render_image_t image,
     }
 
     kan_atomic_int_unlock (&schedule->schedule_lock);
+    kan_cpu_section_execution_shutdown (&execution);
 }
 
 void kan_render_image_destroy (kan_render_image_t image)

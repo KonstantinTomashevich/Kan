@@ -5,6 +5,9 @@ struct render_backend_code_module_t *render_backend_system_create_code_module (s
                                                                                void *code,
                                                                                kan_interned_string_t tracking_name)
 {
+    struct kan_cpu_section_execution_t execution;
+    kan_cpu_section_execution_init (&execution, system->section_create_code_module_internal);
+
     VkShaderModuleCreateInfo module_create_info = {
         .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
         .pNext = NULL,
@@ -18,6 +21,7 @@ struct render_backend_code_module_t *render_backend_system_create_code_module (s
                               &shader_module) != VK_SUCCESS)
     {
         KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR, "Failed to create shader module \"%s\".", tracking_name)
+        kan_cpu_section_execution_shutdown (&execution);
         return NULL;
     }
 
@@ -46,6 +50,8 @@ struct render_backend_code_module_t *render_backend_system_create_code_module (s
     module->system = system;
     module->module = shader_module;
     module->tracking_name = tracking_name;
+
+    kan_cpu_section_execution_shutdown (&execution);
     return module;
 }
 
@@ -62,8 +68,11 @@ kan_render_code_module_t kan_render_code_module_create (kan_render_context_t con
                                                         kan_interned_string_t tracking_name)
 {
     struct render_backend_system_t *system = (struct render_backend_system_t *) context;
+    struct kan_cpu_section_execution_t execution;
+    kan_cpu_section_execution_init (&execution, system->section_create_code_module);
     struct render_backend_code_module_t *module =
         render_backend_system_create_code_module (system, code_length, code, tracking_name);
+    kan_cpu_section_execution_shutdown (&execution);
     return module ? (kan_render_code_module_t) module : KAN_INVALID_RENDER_CODE_MODULE;
 }
 
