@@ -2863,7 +2863,7 @@ static kan_bool_t render_backend_surface_create_swap_chain_image_views (struct r
         {
             char debug_name[KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME];
             snprintf (debug_name, KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME,
-                      "Image::ForSurface::%s::instance%lu", surface->tracking_name, (unsigned long) index);
+                      "Image::ForSurface::%s::instance%lu", surface->tracking_name, (unsigned long) view_index);
 
             struct VkDebugUtilsObjectNameInfoEXT object_name = {
                 .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
