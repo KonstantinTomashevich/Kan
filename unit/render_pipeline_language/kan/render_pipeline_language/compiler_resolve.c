@@ -1204,11 +1204,8 @@ static kan_bool_t resolve_buffers (struct rpl_compiler_context_t *context,
             target_buffer->type = source_buffer->type;
             target_buffer->used = KAN_FALSE;
 
-            KAN_ASSERT ((target_buffer->set == KAN_RPL_SET_INSTANCED) ==
-                        (target_buffer->type == KAN_RPL_BUFFER_TYPE_INSTANCED_UNIFORM ||
-                         target_buffer->type == KAN_RPL_BUFFER_TYPE_INSTANCED_READ_ONLY_STORAGE))
-
 #if defined(KAN_WITH_ASSERT)
+            // Check that parser is not trying to assign sets to attribute buffers.
             if (target_buffer->type == KAN_RPL_BUFFER_TYPE_VERTEX_ATTRIBUTE ||
                 target_buffer->type == KAN_RPL_BUFFER_TYPE_INSTANCED_ATTRIBUTE)
             {

@@ -186,7 +186,7 @@ There are several inbuilt descriptor sets that correspond to the common usage pa
   high level concept of materials.
 - `set_object` is advised for data unique for scene object, but when binding is rarely changed. For example, object may
   store its data in its own uniform buffer and update this buffer without changing descriptor set.
-- `set_instanced` is advised for data that is unique for every scene object and which binding changing every frame.
+- `set_unstable` is advised for data that is unique for every scene object and which binding changing every frame.
   For example, instanced parameter buffers might technically change every frame.
 
 Any set keyword inside declaration syntax is called `set_prefix` below.
@@ -205,11 +205,13 @@ There are several types of buffers:
 - `instanced_attribute_buffer` represents buffer of per-instance attributes. Fields of this buffer are the attributes
   of one instanced geometry.
 - `uniform_buffer` represents a classic uniform buffer object with `std140` memory layout. Requires `set_prefix`.
-  When used with `set_instanced`, automatically transformed into instanced uniform buffer. In this case, instancing is
-  automatically applied, therefore there is no need for explicit runtime arrays and instance indices.
 - `read_only_storage_buffer` represents a classic storage buffer which is read-only and has `std430` memory layout.
-  Requires `set_prefix`. When used with `set_instanced`, automatically transformed into instanced uniform buffer.
-  In this case, instancing is automatically applied, therefore there is no need for explicit runtime arrays and
+  Requires `set_prefix`.
+- `instanced_uniform_buffer` represents a uniform buffer which is used to store per-instance data. 
+  Requires `set_prefix`. Instancing is automatically applied, therefore there is no need for explicit runtime arrays 
+  and instance indices.
+- `instanced_read_only_storage_buffer` represents a read only storage buffer which is used to store per-instance data.
+  Requires `set_prefix`. Instancing is automatically applied, therefore there is no need for explicit runtime arrays and 
   instance indices.
 - `vertex_stage_output` is an abstract buffer which is technically not a buffer and used for sharing vertex stage
   data with other pipeline stages.

@@ -351,7 +351,7 @@ struct kan_rpl_meta_t
     struct kan_rpl_meta_set_bindings_t set_pass;
     struct kan_rpl_meta_set_bindings_t set_material;
     struct kan_rpl_meta_set_bindings_t set_object;
-    struct kan_rpl_meta_set_bindings_t set_instanced;
+    struct kan_rpl_meta_set_bindings_t set_unstable;
 
     /// \brief Contains information about pipeline color outputs if any.
     /// \meta reflection_dynamic_array_type = "struct kan_rpl_meta_color_output_t"

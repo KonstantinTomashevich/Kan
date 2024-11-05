@@ -363,8 +363,8 @@ enum kan_rpl_set_t
     /// \brief Set for data that is bound on per-object basis.
     KAN_RPL_SET_OBJECT = 2u,
 
-    /// \brief Set for data that is used for binding instanced buffers and therefore is changed every frame.
-    KAN_RPL_SET_INSTANCED = 3u,
+    /// \brief Set for data that which bindings keep changing every frame.
+    KAN_RPL_SET_UNSTABLE = 3u,
 };
 
 /// \brief Enumerates supported buffer types.

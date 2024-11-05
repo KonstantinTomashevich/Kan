@@ -804,7 +804,7 @@ kan_bool_t kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t comp
     uint64_t pass_buffer_count = 0u;
     uint64_t material_buffer_count = 0u;
     uint64_t object_buffer_count = 0u;
-    uint64_t instanced_buffer_count = 0u;
+    uint64_t unstable_buffer_count = 0u;
     uint64_t color_outputs = 0u;
     struct compiler_instance_buffer_node_t *buffer = instance->first_buffer;
 
@@ -835,8 +835,8 @@ kan_bool_t kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t comp
                 ++object_buffer_count;
                 break;
 
-            case KAN_RPL_SET_INSTANCED:
-                ++instanced_buffer_count;
+            case KAN_RPL_SET_UNSTABLE:
+                ++unstable_buffer_count;
                 break;
             }
 
@@ -869,7 +869,7 @@ kan_bool_t kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t comp
     kan_dynamic_array_set_capacity (&meta->set_pass.buffers, pass_buffer_count);
     kan_dynamic_array_set_capacity (&meta->set_material.buffers, material_buffer_count);
     kan_dynamic_array_set_capacity (&meta->set_object.buffers, object_buffer_count);
-    kan_dynamic_array_set_capacity (&meta->set_instanced.buffers, instanced_buffer_count);
+    kan_dynamic_array_set_capacity (&meta->set_unstable.buffers, unstable_buffer_count);
     kan_dynamic_array_set_capacity (&meta->color_outputs, color_outputs);
 
     for (uint64_t output_index = 0u; output_index < color_outputs; ++output_index)
@@ -909,8 +909,8 @@ kan_bool_t kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t comp
                 buffer_array = &meta->set_object.buffers;
                 break;
 
-            case KAN_RPL_SET_INSTANCED:
-                buffer_array = &meta->set_instanced.buffers;
+            case KAN_RPL_SET_UNSTABLE:
+                buffer_array = &meta->set_unstable.buffers;
                 break;
             }
 
@@ -1015,7 +1015,7 @@ kan_bool_t kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t comp
     uint64_t pass_sampler_count = 0u;
     uint64_t material_sampler_count = 0u;
     uint64_t object_sampler_count = 0u;
-    uint64_t instanced_sampler_count = 0u;
+    uint64_t unstable_sampler_count = 0u;
     struct compiler_instance_sampler_node_t *sampler = instance->first_sampler;
 
     while (sampler)
@@ -1034,8 +1034,8 @@ kan_bool_t kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t comp
             ++object_sampler_count;
             break;
 
-        case KAN_RPL_SET_INSTANCED:
-            ++instanced_sampler_count;
+        case KAN_RPL_SET_UNSTABLE:
+            ++unstable_sampler_count;
             break;
         }
 
@@ -1045,7 +1045,7 @@ kan_bool_t kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t comp
     kan_dynamic_array_set_capacity (&meta->set_pass.samplers, pass_sampler_count);
     kan_dynamic_array_set_capacity (&meta->set_material.samplers, material_sampler_count);
     kan_dynamic_array_set_capacity (&meta->set_object.samplers, object_sampler_count);
-    kan_dynamic_array_set_capacity (&meta->set_instanced.samplers, instanced_sampler_count);
+    kan_dynamic_array_set_capacity (&meta->set_unstable.samplers, unstable_sampler_count);
     sampler = instance->first_sampler;
 
     while (sampler)
@@ -1065,8 +1065,8 @@ kan_bool_t kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t comp
             sampler_array = &meta->set_object.samplers;
             break;
 
-        case KAN_RPL_SET_INSTANCED:
-            sampler_array = &meta->set_instanced.samplers;
+        case KAN_RPL_SET_UNSTABLE:
+            sampler_array = &meta->set_unstable.samplers;
             break;
         }
 

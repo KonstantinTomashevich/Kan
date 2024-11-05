@@ -1181,10 +1181,12 @@ static kan_bool_t parse_main (struct rpl_parser_t *parser, struct dynamic_parser
         const char *marker_set_pass;
         const char *marker_set_material;
         const char *marker_set_object;
-        const char *marker_set_instanced;
+        const char *marker_set_unstable;
 
         const char *marker_buffer_uniform;
         const char *marker_buffer_read_only_storage;
+        const char *marker_buffer_instanced_uniform;
+        const char *marker_buffer_instanced_read_only_storage;
 
         enum kan_rpl_set_t detected_set;
 #define DETECT_SET                                                                                                     \
@@ -1200,9 +1202,9 @@ static kan_bool_t parse_main (struct rpl_parser_t *parser, struct dynamic_parser
     {                                                                                                                  \
         detected_set = KAN_RPL_SET_OBJECT;                                                                             \
     }                                                                                                                  \
-    else if (marker_set_instanced)                                                                                     \
+    else if (marker_set_unstable)                                                                                      \
     {                                                                                                                  \
-        detected_set = KAN_RPL_SET_INSTANCED;                                                                          \
+        detected_set = KAN_RPL_SET_UNSTABLE;                                                                           \
     }                                                                                                                  \
     else                                                                                                               \
     {                                                                                                                  \
@@ -1214,14 +1216,19 @@ static kan_bool_t parse_main (struct rpl_parser_t *parser, struct dynamic_parser
 #define DETECT_BUFFER_TYPE                                                                                             \
     if (marker_buffer_uniform)                                                                                         \
     {                                                                                                                  \
-        detected_buffer_type = detected_set == KAN_RPL_SET_INSTANCED ? KAN_RPL_BUFFER_TYPE_INSTANCED_UNIFORM :         \
-                                                                       KAN_RPL_BUFFER_TYPE_UNIFORM;                    \
+        detected_buffer_type = KAN_RPL_BUFFER_TYPE_UNIFORM;                                                            \
     }                                                                                                                  \
     else if (marker_buffer_read_only_storage)                                                                          \
     {                                                                                                                  \
-        detected_buffer_type = detected_set == KAN_RPL_SET_INSTANCED ?                                                 \
-                                   KAN_RPL_BUFFER_TYPE_INSTANCED_READ_ONLY_STORAGE :                                   \
-                                   KAN_RPL_BUFFER_TYPE_READ_ONLY_STORAGE;                                              \
+        detected_buffer_type = KAN_RPL_BUFFER_TYPE_READ_ONLY_STORAGE;                                                  \
+    }                                                                                                                  \
+    else if (marker_buffer_instanced_uniform)                                                                          \
+    {                                                                                                                  \
+        detected_buffer_type = KAN_RPL_BUFFER_TYPE_INSTANCED_UNIFORM;                                                  \
+    }                                                                                                                  \
+    else if (marker_buffer_instanced_read_only_storage)                                                                \
+    {                                                                                                                  \
+        detected_buffer_type = KAN_RPL_BUFFER_TYPE_INSTANCED_READ_ONLY_STORAGE;                                        \
     }                                                                                                                  \
     else                                                                                                               \
     {                                                                                                                  \
@@ -1240,10 +1247,13 @@ static kan_bool_t parse_main (struct rpl_parser_t *parser, struct dynamic_parser
          set_prefix = ("set_pass" @marker_set_pass) |
                       ("set_material" @marker_set_material) |
                       ("set_object" @marker_set_object) |
-                      ("set_instanced" @marker_set_instanced);
+                      ("set_unstable" @marker_set_unstable);
 
-         external_buffer_type_prefix = ("uniform_buffer" @marker_buffer_uniform) |
-                                       ("read_only_storage_buffer" @marker_buffer_read_only_storage);
+         external_buffer_type_prefix =
+             ("uniform_buffer" @marker_buffer_uniform) |
+             ("read_only_storage_buffer" @marker_buffer_read_only_storage) |
+             ("instanced_uniform_buffer" @marker_buffer_instanced_uniform) |
+             ("instanced_read_only_storage_buffer" @marker_buffer_instanced_read_only_storage);
 
          "global" separator+ "flag" separator+ @name_begin identifier @name_end separator+ "on" separator* ";"
          {

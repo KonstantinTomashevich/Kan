@@ -326,7 +326,7 @@ static const char *cube_shader =
     "    f2 uv;\n"
     "};\n"
     "\n"
-    "set_instanced read_only_storage_buffer instanced\n"
+    "set_unstable instanced_read_only_storage_buffer instanced\n"
     "{\n"
     "    f4x4 model;\n"
     "};\n"
@@ -500,9 +500,9 @@ static kan_render_graphics_pipeline_t create_cube_pipeline (kan_render_context_t
     material_parameter_set_bindings[0u].used_stage_mask =
         (1u << KAN_RENDER_STAGE_GRAPHICS_VERTEX) | (1u << KAN_RENDER_STAGE_GRAPHICS_FRAGMENT);
 
-    KAN_TEST_ASSERT (meta.set_instanced.buffers.size == 1u)
-    buffer = &((struct kan_rpl_meta_buffer_t *) meta.set_instanced.buffers.data)[0u];
-    parameter_sets[2u].set = (uint32_t) KAN_RPL_SET_INSTANCED;
+    KAN_TEST_ASSERT (meta.set_unstable.buffers.size == 1u)
+    buffer = &((struct kan_rpl_meta_buffer_t *) meta.set_unstable.buffers.data)[0u];
+    parameter_sets[2u].set = (uint32_t) KAN_RPL_SET_UNSTABLE;
     parameter_sets[2u].bindings_count =
         sizeof (instanced_parameter_set_bindings) / sizeof (instanced_parameter_set_bindings[0u]);
     parameter_sets[2u].bindings = instanced_parameter_set_bindings;
@@ -926,7 +926,7 @@ KAN_TEST_CASE (temp)
     struct kan_render_pipeline_parameter_set_description_t cube_instanced_set_description = {
         .pipeline_type = KAN_RENDER_PIPELINE_TYPE_GRAPHICS,
         .graphics_pipeline = cube_pipeline,
-        .set = (uint32_t) KAN_RPL_SET_INSTANCED,
+        .set = (uint32_t) KAN_RPL_SET_UNSTABLE,
         .tracking_name = kan_string_intern ("cube_instanced"),
         .initial_bindings_count = 0u,
         .initial_bindings = NULL,

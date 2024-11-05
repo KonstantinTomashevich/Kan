@@ -171,9 +171,9 @@ KAN_TEST_CASE (generic)
 
     KAN_TEST_ASSERT (meta.set_material.buffers.size == 0u)
     KAN_TEST_ASSERT (meta.set_object.buffers.size == 0u)
-    KAN_TEST_ASSERT (meta.set_instanced.buffers.size == 1u)
+    KAN_TEST_ASSERT (meta.set_unstable.buffers.size == 1u)
 
-    buffer_meta = &((struct kan_rpl_meta_buffer_t *) meta.set_instanced.buffers.data)[0u];
+    buffer_meta = &((struct kan_rpl_meta_buffer_t *) meta.set_unstable.buffers.data)[0u];
     KAN_TEST_CHECK (strcmp (buffer_meta->name, "instance_storage") == 0)
     KAN_TEST_CHECK (buffer_meta->binding == 0u)
     KAN_TEST_CHECK (buffer_meta->type == KAN_RPL_BUFFER_TYPE_INSTANCED_READ_ONLY_STORAGE)
@@ -201,7 +201,7 @@ KAN_TEST_CASE (generic)
     KAN_TEST_ASSERT (meta.set_pass.samplers.size == 0u)
     KAN_TEST_ASSERT (meta.set_material.samplers.size == 1u)
     KAN_TEST_ASSERT (meta.set_object.samplers.size == 0u)
-    KAN_TEST_ASSERT (meta.set_instanced.samplers.size == 0u)
+    KAN_TEST_ASSERT (meta.set_unstable.samplers.size == 0u)
 
     struct kan_rpl_meta_sampler_t *sampler_meta =
         &((struct kan_rpl_meta_sampler_t *) meta.set_material.samplers.data)[0u];
