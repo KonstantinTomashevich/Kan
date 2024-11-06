@@ -2545,6 +2545,7 @@ static void render_backend_system_submit_read_back (struct render_backend_system
     kan_cpu_section_execution_init (&execution, system->section_submit_read_back);
 
     struct render_backend_command_state_t *state = &system->command_states[system->current_frame_in_flight_index];
+    DEBUG_LABEL_SCOPE_BEGIN (state->primary_command_buffer, "read_back", DEBUG_LABEL_COLOR_PASS)
     struct render_backend_schedule_state_t *schedule = &system->schedule_states[system->current_frame_in_flight_index];
 
     struct scheduled_surface_read_back_t *first_surface_read_back = schedule->first_scheduled_surface_read_back;
@@ -2951,6 +2952,7 @@ static void render_backend_system_submit_read_back (struct render_backend_system
                           sizeof (VkImageMemoryBarrier) * buffer_barriers_needed);
     }
 
+    DEBUG_LABEL_SCOPE_END (state->primary_command_buffer)
     kan_cpu_section_execution_shutdown (&execution);
 }
 

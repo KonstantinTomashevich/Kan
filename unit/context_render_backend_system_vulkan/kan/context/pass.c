@@ -492,15 +492,31 @@ kan_render_pass_instance_t kan_render_pass_instantiate (kan_render_pass_t pass,
         switch (frame_buffer_data->attachments[index].type)
         {
         case KAN_FRAME_BUFFER_ATTACHMENT_IMAGE:
+            switch (frame_buffer_data->attachments[index].image->description.type)
+            {
+            case KAN_RENDER_IMAGE_TYPE_COLOR_2D:
+            case KAN_RENDER_IMAGE_TYPE_COLOR_3D:
+                instance->clear_values[index].color.float32[0u] = attachment_clear_values[index].color.r;
+                instance->clear_values[index].color.float32[1u] = attachment_clear_values[index].color.g;
+                instance->clear_values[index].color.float32[2u] = attachment_clear_values[index].color.b;
+                instance->clear_values[index].color.float32[3u] = attachment_clear_values[index].color.a;
+                break;
+
+            case KAN_RENDER_IMAGE_TYPE_DEPTH:
+            case KAN_RENDER_IMAGE_TYPE_STENCIL:
+            case KAN_RENDER_IMAGE_TYPE_DEPTH_STENCIL:
+                instance->clear_values[index].depthStencil.depth = attachment_clear_values[index].depth_stencil.depth;
+                instance->clear_values[index].depthStencil.stencil = attachment_clear_values[index].depth_stencil.stencil;
+                break;
+            }
+
+            break;
+
+        case KAN_FRAME_BUFFER_ATTACHMENT_SURFACE:
             instance->clear_values[index].color.float32[0u] = attachment_clear_values[index].color.r;
             instance->clear_values[index].color.float32[1u] = attachment_clear_values[index].color.g;
             instance->clear_values[index].color.float32[2u] = attachment_clear_values[index].color.b;
             instance->clear_values[index].color.float32[3u] = attachment_clear_values[index].color.a;
-            break;
-
-        case KAN_FRAME_BUFFER_ATTACHMENT_SURFACE:
-            instance->clear_values[index].depthStencil.depth = attachment_clear_values[index].depth_stencil.depth;
-            instance->clear_values[index].depthStencil.stencil = attachment_clear_values[index].depth_stencil.stencil;
             break;
         }
     }
