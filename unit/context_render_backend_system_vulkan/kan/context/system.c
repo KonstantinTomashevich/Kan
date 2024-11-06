@@ -29,6 +29,7 @@ kan_context_system_handle_t render_backend_system_create (kan_allocation_group_t
         kan_allocation_group_get_child (group, "frame_lifetime_allocator_wrapper");
     system->image_wrapper_allocation_group = kan_allocation_group_get_child (group, "descriptor_set_wrapper");
     system->descriptor_set_wrapper_allocation_group = kan_allocation_group_get_child (group, "descriptor_set_wrapper");
+    system->read_back_status_allocation_group = kan_allocation_group_get_child (group, "read_back_status");
 
     system->section_create_surface = kan_cpu_section_get ("render_backend_create_surface");
     system->section_create_frame_buffer = kan_cpu_section_get ("render_backend_create_frame_buffer");
@@ -92,6 +93,8 @@ kan_context_system_handle_t render_backend_system_create (kan_allocation_group_t
     system->section_next_frame = kan_cpu_section_get ("render_backend_next_frame");
     system->section_next_frame_synchronization = kan_cpu_section_get ("render_backend_next_frame_synchronization");
     system->section_next_frame_acquire_images = kan_cpu_section_get ("render_backend_next_frame_acquire_images");
+    system->section_next_frame_command_pool_reset =
+        kan_cpu_section_get ("render_backend_next_frame_command_pool_reset");
     system->section_next_frame_destruction_schedule =
         kan_cpu_section_get ("render_backend_next_frame_destruction_schedule");
     system->section_next_frame_destruction_schedule_waiting_pipeline_compilation =
@@ -107,6 +110,8 @@ kan_context_system_handle_t render_backend_system_create (kan_allocation_group_t
     system->section_submit_pass_instance = kan_cpu_section_get ("render_backend_submit_pass_instance");
     system->section_pass_instance_sort_and_submission =
         kan_cpu_section_get ("render_backend_pass_instance_sort_and_submission");
+    system->section_submit_read_back = kan_cpu_section_get ("render_backend_submit_read_back");
+    system->section_present = kan_cpu_section_get ("render_backend_present");
 
     system->frame_started = KAN_FALSE;
     system->current_frame_in_flight_index = 0u;
@@ -652,6 +657,14 @@ void render_backend_system_shutdown (kan_context_system_handle_t handle)
             vmaUnmapMemory (system->gpu_memory_allocator, buffer_unmap_flush->buffer->allocation);
             buffer_unmap_flush = buffer_unmap_flush->next;
         }
+
+        struct render_backend_read_back_status_t *status = schedule->first_read_back_status;
+        while (status)
+        {
+            struct render_backend_read_back_status_t *next = status->next;
+            kan_free_batched (system->read_back_status_allocation_group, status);
+            status = next;
+        }
     }
 
     struct render_backend_pipeline_parameter_set_t *parameter_set =
@@ -896,7 +909,7 @@ kan_bool_t kan_render_backend_system_select_device (kan_context_system_handle_t 
         return KAN_FALSE;
     }
 
-    float queues_priorities = 0u;
+    float queues_priorities = 0.0f;
     VkDeviceQueueCreateInfo queues_create_info[] = {
         {
             .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
@@ -1244,6 +1257,9 @@ kan_bool_t kan_render_backend_system_select_device (kan_context_system_handle_t 
         state->first_scheduled_image_upload = NULL;
         state->first_scheduled_frame_buffer_create = NULL;
         state->first_scheduled_image_mip_generation = NULL;
+        state->first_scheduled_surface_read_back = NULL;
+        state->first_scheduled_buffer_read_back = NULL;
+        state->first_scheduled_image_read_back = NULL;
 
         state->first_scheduled_frame_buffer_destroy = NULL;
         state->first_scheduled_detached_frame_buffer_destroy = NULL;
@@ -1258,6 +1274,8 @@ kan_bool_t kan_render_backend_system_select_device (kan_context_system_handle_t 
         state->first_scheduled_detached_image_view_destroy = NULL;
         state->first_scheduled_image_destroy = NULL;
         state->first_scheduled_detached_image_destroy = NULL;
+
+        state->first_read_back_status = NULL;
     }
 
     system->staging_frame_lifetime_allocator = render_backend_system_create_frame_lifetime_allocator (
@@ -1347,6 +1365,13 @@ static void render_backend_system_submit_transfer (struct render_backend_system_
         case KAN_RENDER_BUFFER_TYPE_STORAGE:
             destination_access_flags |= VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
             destination_stage = VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+            break;
+
+        case KAN_RENDER_BUFFER_TYPE_READ_BACK_STORAGE:
+            // Read back buffer cannot be target of transfer to the GPU.
+            KAN_ASSERT (KAN_FALSE)
+            destination_access_flags = 0u;
+            destination_stage = 0u;
             break;
         }
 
@@ -1997,6 +2022,7 @@ static inline void process_surface_blit_requests (struct render_backend_system_t
                     break;
 
                 case SURFACE_RENDER_STATE_RECEIVED_DATA_FROM_BLIT:
+                case SURFACE_RENDER_STATE_SENT_DATA_TO_READ_BACK:
                     KAN_ASSERT (KAN_FALSE)
                     break;
                 }
@@ -2270,6 +2296,7 @@ static void render_backend_system_submit_pass_instance (struct render_backend_sy
                 break;
 
             case SURFACE_RENDER_STATE_RECEIVED_DATA_FROM_BLIT:
+            case SURFACE_RENDER_STATE_SENT_DATA_TO_READ_BACK:
                 // Blits should only be done after passes, how did we end up here?
                 KAN_ASSERT (KAN_FALSE)
                 break;
@@ -2488,7 +2515,449 @@ static void render_backend_system_submit_graphics (struct render_backend_system_
     kan_stack_group_allocator_reset (&system->pass_instance_allocator);
 
     process_surface_blit_requests (system, state);
-    surface = (struct render_backend_surface_t *) system->surfaces.first;
+    kan_cpu_section_execution_shutdown (&execution);
+}
+
+static inline VkImageLayout get_surface_image_layout_from_render_state (enum surface_render_state_t state)
+{
+    switch (state)
+    {
+    case SURFACE_RENDER_STATE_RECEIVED_NO_OUTPUT:
+        return VK_IMAGE_LAYOUT_UNDEFINED;
+
+    case SURFACE_RENDER_STATE_RECEIVED_DATA_FROM_FRAME_BUFFER:
+        return VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+    case SURFACE_RENDER_STATE_RECEIVED_DATA_FROM_BLIT:
+        return VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+
+    case SURFACE_RENDER_STATE_SENT_DATA_TO_READ_BACK:
+        return VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+    }
+
+    KAN_ASSERT (KAN_FALSE)
+    return VK_IMAGE_LAYOUT_UNDEFINED;
+}
+
+static void render_backend_system_submit_read_back (struct render_backend_system_t *system)
+{
+    struct kan_cpu_section_execution_t execution;
+    kan_cpu_section_execution_init (&execution, system->section_submit_read_back);
+
+    struct render_backend_command_state_t *state = &system->command_states[system->current_frame_in_flight_index];
+    struct render_backend_schedule_state_t *schedule = &system->schedule_states[system->current_frame_in_flight_index];
+
+    struct scheduled_surface_read_back_t *first_surface_read_back = schedule->first_scheduled_surface_read_back;
+    struct scheduled_buffer_read_back_t *first_buffer_read_back = schedule->first_scheduled_buffer_read_back;
+    struct scheduled_image_read_back_t *first_image_read_back = schedule->first_scheduled_image_read_back;
+
+    schedule->first_scheduled_surface_read_back = NULL;
+    schedule->first_scheduled_buffer_read_back = NULL;
+    schedule->first_scheduled_image_read_back = NULL;
+
+    uint64_t image_barriers_needed = 0u;
+    uint64_t buffer_barriers_needed = 0u;
+
+    struct scheduled_surface_read_back_t *surface_read_back = first_surface_read_back;
+    while (surface_read_back)
+    {
+        const uint32_t space_left =
+            surface_read_back->read_back_offset < surface_read_back->read_back_buffer->full_size ?
+                surface_read_back->read_back_buffer->full_size - surface_read_back->read_back_offset :
+                0u;
+
+        const uint32_t space_needed = surface_read_back->surface->swap_chain_creation_window_width *
+                                      surface_read_back->surface->swap_chain_creation_window_height *
+                                      SURFACE_COLOR_FORMAT_TEXEL_SIZE;
+
+        if (surface_read_back->surface->images && space_needed <= space_left)
+        {
+            surface_read_back->status->state = KAN_RENDER_READ_BACK_STATE_SCHEDULED;
+            ++image_barriers_needed;
+        }
+        else
+        {
+            surface_read_back->status->state = KAN_RENDER_READ_BACK_STATE_FAILED;
+        }
+
+        surface_read_back = surface_read_back->next;
+    }
+
+    struct scheduled_buffer_read_back_t *buffer_read_back = first_buffer_read_back;
+    while (buffer_read_back)
+    {
+        const uint32_t space_left =
+            buffer_read_back->read_back_offset < buffer_read_back->read_back_buffer->full_size ?
+                buffer_read_back->read_back_buffer->full_size - buffer_read_back->read_back_offset :
+                0u;
+
+        const uint32_t space_needed = buffer_read_back->slice;
+        if (buffer_read_back->buffer->buffer != VK_NULL_HANDLE && space_needed <= space_left)
+        {
+            buffer_read_back->status->state = KAN_RENDER_READ_BACK_STATE_SCHEDULED;
+            ++buffer_barriers_needed;
+        }
+        else
+        {
+            buffer_read_back->status->state = KAN_RENDER_READ_BACK_STATE_FAILED;
+        }
+
+        buffer_read_back = buffer_read_back->next;
+    }
+
+    struct scheduled_image_read_back_t *image_read_back = first_image_read_back;
+    while (image_read_back)
+    {
+        const uint32_t space_left =
+            image_read_back->read_back_offset < image_read_back->read_back_buffer->full_size ?
+                image_read_back->read_back_buffer->full_size - image_read_back->read_back_offset :
+                0u;
+
+        uint32_t width;
+        uint32_t height;
+        uint32_t depth;
+        kan_render_image_description_calculate_size_at_mip (&image_read_back->image->description, image_read_back->mip,
+                                                            &width, &height, &depth);
+
+        const uint32_t space_needed =
+            width * height * depth *
+            kan_render_image_description_calculate_texel_size (system, &image_read_back->image->description);
+
+        if (image_read_back->image->image != VK_NULL_HANDLE &&
+            image_read_back->mip < image_read_back->image->description.mips && space_needed <= space_left)
+        {
+            image_read_back->status->state = KAN_RENDER_READ_BACK_STATE_SCHEDULED;
+            ++image_barriers_needed;
+        }
+        else
+        {
+            image_read_back->status->state = KAN_RENDER_READ_BACK_STATE_FAILED;
+        }
+
+        image_read_back = image_read_back->next;
+    }
+
+    // Cleanup statuses that weren't scheduled.
+    struct render_backend_read_back_status_t *previous = NULL;
+    struct render_backend_read_back_status_t *status = schedule->first_read_back_status;
+
+    while (status)
+    {
+        struct render_backend_read_back_status_t *next = status->next;
+        if (status->state != KAN_RENDER_READ_BACK_STATE_SCHEDULED)
+        {
+            status->state = KAN_RENDER_READ_BACK_STATE_FAILED;
+            status->referenced_in_schedule = KAN_FALSE;
+
+            if (previous)
+            {
+                previous->next = previous;
+            }
+            else
+            {
+                KAN_ASSERT (status == schedule->first_read_back_status)
+                schedule->first_read_back_status = next;
+            }
+
+            if (!status->referenced_outside)
+            {
+                kan_free_batched (system->read_back_status_allocation_group, status);
+            }
+        }
+        else
+        {
+            previous = status;
+        }
+
+        status = next;
+    }
+
+    // Collect barriers before read back.
+
+    static VkBufferMemoryBarrier static_buffer_barriers[KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_INLINE_BARRIERS];
+    static VkImageMemoryBarrier static_image_barriers[KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_INLINE_BARRIERS];
+
+    VkBufferMemoryBarrier *buffer_barriers = static_buffer_barriers;
+    if (buffer_barriers_needed > KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_INLINE_BARRIERS)
+    {
+        buffer_barriers = kan_allocate_general (system->utility_allocation_group,
+                                                sizeof (VkBufferMemoryBarrier) * buffer_barriers_needed,
+                                                _Alignof (VkBufferMemoryBarrier));
+    }
+
+    VkImageMemoryBarrier *image_barriers = static_image_barriers;
+    if (image_barriers_needed > KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_INLINE_BARRIERS)
+    {
+        image_barriers = kan_allocate_general (system->utility_allocation_group,
+                                               sizeof (VkImageMemoryBarrier) * buffer_barriers_needed,
+                                               _Alignof (VkImageMemoryBarrier));
+    }
+
+    struct VkBufferMemoryBarrier *buffer_barrier_output = buffer_barriers;
+    struct VkImageMemoryBarrier *image_barrier_output = image_barriers;
+
+    surface_read_back = first_surface_read_back;
+    while (surface_read_back)
+    {
+        if (surface_read_back->status->state == KAN_RENDER_READ_BACK_STATE_SCHEDULED &&
+            surface_read_back->surface->render_state != SURFACE_RENDER_STATE_SENT_DATA_TO_READ_BACK)
+        {
+            *image_barrier_output = (VkImageMemoryBarrier) {
+                .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+                .pNext = NULL,
+                .srcAccessMask = 0u,
+                .dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
+                .oldLayout = get_surface_image_layout_from_render_state (surface_read_back->surface->render_state),
+                .newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                .srcQueueFamilyIndex = system->device_queue_family_index,
+                .dstQueueFamilyIndex = system->device_queue_family_index,
+                .image = surface_read_back->surface->images[surface_read_back->surface->acquired_image_index],
+                .subresourceRange =
+                    {
+                        .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                        .baseMipLevel = 0u,
+                        .levelCount = 1u,
+                        .baseArrayLayer = 0u,
+                        .layerCount = 1u,
+                    },
+            };
+
+            surface_read_back->surface->render_state = SURFACE_RENDER_STATE_SENT_DATA_TO_READ_BACK;
+            ++image_barrier_output;
+        }
+
+        surface_read_back = surface_read_back->next;
+    }
+
+    buffer_read_back = first_buffer_read_back;
+    while (buffer_read_back)
+    {
+        if (buffer_read_back->status->state == KAN_RENDER_READ_BACK_STATE_SCHEDULED)
+        {
+            *buffer_barrier_output = (VkBufferMemoryBarrier) {
+                .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+                .pNext = NULL,
+                .srcAccessMask = 0u,
+                .dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
+                .srcQueueFamilyIndex = system->device_queue_family_index,
+                .dstQueueFamilyIndex = system->device_queue_family_index,
+                .buffer = buffer_read_back->buffer->buffer,
+                .offset = buffer_read_back->offset,
+                .size = buffer_read_back->slice,
+            };
+
+            ++buffer_barrier_output;
+        }
+
+        buffer_read_back = buffer_read_back->next;
+    }
+
+    image_read_back = first_image_read_back;
+    while (image_read_back)
+    {
+        if (image_read_back->status->state == KAN_RENDER_READ_BACK_STATE_SCHEDULED &&
+            image_read_back->image->last_command_layout != VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL)
+        {
+            *image_barrier_output = (VkImageMemoryBarrier) {
+                .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+                .pNext = NULL,
+                .srcAccessMask = 0u,
+                .dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
+                .oldLayout = image_read_back->image->last_command_layout,
+                .newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                .srcQueueFamilyIndex = system->device_queue_family_index,
+                .dstQueueFamilyIndex = system->device_queue_family_index,
+                .image = image_read_back->image->image,
+                .subresourceRange =
+                    {
+                        .aspectMask =
+                            kan_render_image_description_calculate_aspects (&image_read_back->image->description),
+                        .baseMipLevel = image_read_back->mip,
+                        .levelCount = 1u,
+                        .baseArrayLayer = 0u,
+                        .layerCount = 1u,
+                    },
+            };
+
+            image_read_back->image->last_command_layout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+            ++image_barrier_output;
+        }
+
+        image_read_back = image_read_back->next;
+    }
+
+    vkCmdPipelineBarrier (state->primary_command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+                          VK_PIPELINE_STAGE_TRANSFER_BIT, 0u, 0u, NULL, buffer_barrier_output - buffer_barriers,
+                          buffer_barriers, image_barrier_output - image_barriers, image_barriers);
+
+    // Execute read back.
+
+    surface_read_back = first_surface_read_back;
+    while (surface_read_back)
+    {
+        if (surface_read_back->status->state == KAN_RENDER_READ_BACK_STATE_SCHEDULED)
+        {
+            VkBufferImageCopy region = {
+                .bufferOffset = surface_read_back->read_back_offset,
+                .bufferRowLength = 0u,
+                .bufferImageHeight = 0u,
+                .imageSubresource =
+                    {
+                        .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                        .mipLevel = 0u,
+                        .baseArrayLayer = 0u,
+                        .layerCount = 1u,
+                    },
+                .imageOffset =
+                    {
+                        .x = 0u,
+                        .y = 0u,
+                        .z = 0u,
+                    },
+                .imageExtent =
+                    {
+                        .width = surface_read_back->surface->swap_chain_creation_window_width,
+                        .height = surface_read_back->surface->swap_chain_creation_window_height,
+                        .depth = 1u,
+                    },
+            };
+
+            vkCmdCopyImageToBuffer (
+                state->primary_command_buffer,
+                surface_read_back->surface->images[surface_read_back->surface->acquired_image_index],
+                VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, surface_read_back->read_back_buffer->buffer, 1u, &region);
+        }
+
+        surface_read_back = surface_read_back->next;
+    }
+
+    buffer_read_back = first_buffer_read_back;
+    while (buffer_read_back)
+    {
+        if (buffer_read_back->status->state == KAN_RENDER_READ_BACK_STATE_SCHEDULED)
+        {
+            struct VkBufferCopy region = {
+                .srcOffset = buffer_read_back->offset,
+                .dstOffset = buffer_read_back->read_back_offset,
+                .size = buffer_read_back->slice,
+            };
+
+            vkCmdCopyBuffer (state->primary_command_buffer, buffer_read_back->buffer->buffer,
+                             buffer_read_back->read_back_buffer->buffer, 1u, &region);
+        }
+
+        buffer_read_back = buffer_read_back->next;
+    }
+
+    image_read_back = first_image_read_back;
+    while (image_read_back)
+    {
+        if (image_read_back->status->state == KAN_RENDER_READ_BACK_STATE_SCHEDULED)
+        {
+            uint32_t width;
+            uint32_t height;
+            uint32_t depth;
+            kan_render_image_description_calculate_size_at_mip (&image_read_back->image->description,
+                                                                image_read_back->mip, &width, &height, &depth);
+
+            VkBufferImageCopy region = {
+                .bufferOffset = image_read_back->read_back_offset,
+                .bufferRowLength = 0u,
+                .bufferImageHeight = 0u,
+                .imageSubresource =
+                    {
+                        .aspectMask =
+                            kan_render_image_description_calculate_aspects (&image_read_back->image->description),
+                        .mipLevel = image_read_back->mip,
+                        .baseArrayLayer = 0u,
+                        .layerCount = 1u,
+                    },
+                .imageOffset =
+                    {
+                        .x = 0u,
+                        .y = 0u,
+                        .z = 0u,
+                    },
+                .imageExtent =
+                    {
+                        .width = width,
+                        .height = height,
+                        .depth = depth,
+                    },
+            };
+
+            vkCmdCopyImageToBuffer (state->primary_command_buffer, image_read_back->image->image,
+                                    VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, image_read_back->read_back_buffer->buffer, 1u,
+                                    &region);
+        }
+
+        image_read_back = image_read_back->next;
+    }
+
+    // Change back layout of images that support sampling.
+
+    image_barrier_output = image_barriers;
+    image_read_back = first_image_read_back;
+
+    while (image_read_back)
+    {
+        if (image_read_back->status->state == KAN_RENDER_READ_BACK_STATE_SCHEDULED &&
+            image_read_back->image->description.supports_sampling)
+        {
+            *image_barrier_output = (VkImageMemoryBarrier) {
+                .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+                .pNext = NULL,
+                .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
+                .dstAccessMask = 0u,
+                .oldLayout = image_read_back->image->last_command_layout,
+                .newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                .srcQueueFamilyIndex = system->device_queue_family_index,
+                .dstQueueFamilyIndex = system->device_queue_family_index,
+                .image = image_read_back->image->image,
+                .subresourceRange =
+                    {
+                        .aspectMask =
+                            kan_render_image_description_calculate_aspects (&image_read_back->image->description),
+                        .baseMipLevel = image_read_back->mip,
+                        .levelCount = 1u,
+                        .baseArrayLayer = 0u,
+                        .layerCount = 1u,
+                    },
+            };
+
+            image_read_back->image->last_command_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            ++image_barrier_output;
+        }
+
+        image_read_back = image_read_back->next;
+    }
+
+    if (image_barrier_output != image_barriers)
+    {
+        vkCmdPipelineBarrier (state->primary_command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                              VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0u, 0u, NULL, 0u, NULL,
+                              image_barrier_output - image_barriers, image_barriers);
+    }
+
+    if (buffer_barriers != static_buffer_barriers)
+    {
+        kan_free_general (system->utility_allocation_group, buffer_barriers,
+                          sizeof (VkBufferMemoryBarrier) * buffer_barriers_needed);
+    }
+
+    if (image_barriers != static_image_barriers)
+    {
+        kan_free_general (system->utility_allocation_group, image_barriers,
+                          sizeof (VkImageMemoryBarrier) * buffer_barriers_needed);
+    }
+
+    kan_cpu_section_execution_shutdown (&execution);
+}
+
+static void render_backend_system_finish_command_submission (struct render_backend_system_t *system)
+{
+    struct render_backend_command_state_t *state = &system->command_states[system->current_frame_in_flight_index];
+    struct render_backend_surface_t *surface = (struct render_backend_surface_t *) system->surfaces.first;
 
     while (surface)
     {
@@ -2496,28 +2965,12 @@ static void render_backend_system_submit_graphics (struct render_backend_system_
         // If surface image didn't receive any output, we don't care about old layout.
         // Otherwise, it must be properly transitioned.
 
-        VkImageLayout old_layout;
-        switch (surface->render_state)
-        {
-        case SURFACE_RENDER_STATE_RECEIVED_NO_OUTPUT:
-            old_layout = VK_IMAGE_LAYOUT_UNDEFINED;
-            break;
-
-        case SURFACE_RENDER_STATE_RECEIVED_DATA_FROM_FRAME_BUFFER:
-            old_layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-            break;
-
-        case SURFACE_RENDER_STATE_RECEIVED_DATA_FROM_BLIT:
-            old_layout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-            break;
-        }
-
         VkImageMemoryBarrier barrier_info = {
             .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
             .pNext = NULL,
             .srcAccessMask = 0u,
             .dstAccessMask = 0u,
-            .oldLayout = old_layout,
+            .oldLayout = get_surface_image_layout_from_render_state (surface->render_state),
             .newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
             .srcQueueFamilyIndex = system->device_queue_family_index,
             .dstQueueFamilyIndex = system->device_queue_family_index,
@@ -2537,12 +2990,6 @@ static void render_backend_system_submit_graphics (struct render_backend_system_
         surface = (struct render_backend_surface_t *) surface->list_node.next;
     }
 
-    kan_cpu_section_execution_shutdown (&execution);
-}
-
-static void render_backend_system_finish_command_submission (struct render_backend_system_t *system)
-{
-    struct render_backend_command_state_t *state = &system->command_states[system->current_frame_in_flight_index];
     if (vkEndCommandBuffer (state->primary_command_buffer) != VK_SUCCESS)
     {
         kan_critical_error ("Failed to end recording primary buffer.", __FILE__, __LINE__);
@@ -2554,7 +3001,7 @@ static void render_backend_system_finish_command_submission (struct render_backe
 
     VkSemaphore *wait_semaphores = static_wait_semaphores;
     VkPipelineStageFlags *semaphore_stages = static_semaphore_stages;
-    struct render_backend_surface_t *surface = (struct render_backend_surface_t *) system->surfaces.first;
+    surface = (struct render_backend_surface_t *) system->surfaces.first;
 
     while (surface)
     {
@@ -2701,7 +3148,11 @@ static void render_backend_system_submit_present (struct render_backend_system_t
         .pResults = NULL,
     };
 
+    struct kan_cpu_section_execution_t execution;
+    kan_cpu_section_execution_init (&execution, system->section_present);
     const VkResult present_result = vkQueuePresentKHR (system->device_queue, &present_info);
+    kan_cpu_section_execution_shutdown (&execution);
+
     if (present_result != VK_SUCCESS && present_result != VK_SUBOPTIMAL_KHR &&
         present_result != VK_ERROR_OUT_OF_DATE_KHR)
     {
@@ -2728,9 +3179,10 @@ static void render_backend_system_clean_current_schedule_if_safe (struct render_
 
     if (!schedule->first_scheduled_buffer_unmap_flush_transfer && !schedule->first_scheduled_buffer_unmap_flush &&
         !schedule->first_scheduled_image_upload && !schedule->first_scheduled_frame_buffer_create &&
-        !schedule->first_scheduled_image_mip_generation && !schedule->first_scheduled_frame_buffer_destroy &&
-        !schedule->first_scheduled_detached_frame_buffer_destroy && !schedule->first_scheduled_pass_destroy &&
-        !schedule->first_scheduled_pipeline_parameter_set_destroy &&
+        !schedule->first_scheduled_image_mip_generation && !schedule->first_scheduled_surface_read_back &&
+        !schedule->first_scheduled_buffer_read_back && !schedule->first_scheduled_image_read_back &&
+        !schedule->first_scheduled_frame_buffer_destroy && !schedule->first_scheduled_detached_frame_buffer_destroy &&
+        !schedule->first_scheduled_pass_destroy && !schedule->first_scheduled_pipeline_parameter_set_destroy &&
         !schedule->first_scheduled_detached_descriptor_set_destroy && !schedule->first_scheduled_code_module_destroy &&
         !schedule->first_scheduled_graphics_pipeline_destroy &&
         !schedule->first_scheduled_graphics_pipeline_family_destroy && !schedule->first_scheduled_buffer_destroy &&
@@ -2756,6 +3208,7 @@ static void render_backend_system_submit_previous_frame (struct render_backend_s
     render_backend_system_begin_command_submission (system);
     render_backend_system_submit_transfer (system);
     render_backend_system_submit_graphics (system);
+    render_backend_system_submit_read_back (system);
     render_backend_system_finish_command_submission (system);
     render_backend_system_submit_present (system);
 
@@ -3214,8 +3667,8 @@ static void render_backend_surface_create_swap_chain (struct render_backend_surf
         .imageUsage =
             VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
         .imageSharingMode = VK_SHARING_MODE_EXCLUSIVE,
-        .queueFamilyIndexCount = 0u,
-        .pQueueFamilyIndices = NULL,
+        .queueFamilyIndexCount = 1u,
+        .pQueueFamilyIndices = &surface->system->device_queue_family_index,
         .preTransform = surface_capabilities.currentTransform,
         .compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
         .presentMode = surface_present_mode,
@@ -3456,6 +3909,10 @@ kan_bool_t kan_render_backend_system_next_frame (kan_context_system_handle_t ren
 
     vkResetFences (system->device, 1u, &system->in_flight_fences[system->current_frame_in_flight_index]);
     system->frame_started = KAN_TRUE;
+    kan_cpu_section_execution_shutdown (&synchronization_execution);
+
+    struct kan_cpu_section_execution_t command_pool_reset_execution;
+    kan_cpu_section_execution_init (&command_pool_reset_execution, system->section_next_frame_command_pool_reset);
 
     if (vkResetCommandPool (system->device, system->command_states[system->current_frame_in_flight_index].command_pool,
                             0u) != VK_SUCCESS)
@@ -3463,7 +3920,7 @@ kan_bool_t kan_render_backend_system_next_frame (kan_context_system_handle_t ren
         kan_critical_error ("Unexpected failure when resetting graphics command pool.", __FILE__, __LINE__);
     }
 
-    kan_cpu_section_execution_shutdown (&synchronization_execution);
+    kan_cpu_section_execution_shutdown (&command_pool_reset_execution);
     struct kan_cpu_section_execution_t destruction_schedule_execution;
     kan_cpu_section_execution_init (&destruction_schedule_execution, system->section_next_frame_destruction_schedule);
 
@@ -3658,6 +4115,25 @@ kan_bool_t kan_render_backend_system_next_frame (kan_context_system_handle_t ren
 
     kan_cpu_section_execution_shutdown (&destruction_schedule_execution);
     render_backend_system_clean_current_schedule_if_safe (system);
+
+    struct render_backend_read_back_status_t *status = schedule->first_read_back_status;
+    schedule->first_read_back_status = NULL;
+
+    while (status)
+    {
+        struct render_backend_read_back_status_t *next = status->next;
+        KAN_ASSERT (status->state == KAN_RENDER_READ_BACK_STATE_SCHEDULED)
+        status->state = KAN_RENDER_READ_BACK_STATE_FINISHED;
+        status->referenced_in_schedule = KAN_FALSE;
+
+        if (!status->referenced_outside)
+        {
+            kan_free_batched (system->read_back_status_allocation_group, status);
+        }
+
+        status = next;
+    }
+
     struct render_backend_frame_lifetime_allocator_t *frame_lifetime_allocator =
         (struct render_backend_frame_lifetime_allocator_t *) system->frame_lifetime_allocators.first;
 

@@ -58,6 +58,10 @@ typedef uint64_t kan_render_image_t;
 
 #define KAN_INVALID_RENDER_IMAGE 0u
 
+typedef uint64_t kan_render_read_back_status_t;
+
+#define KAN_INVALID_RENDER_READ_BACK_STATUS 0u
+
 /// \brief System name for requirements and queries.
 #define KAN_CONTEXT_RENDER_BACKEND_SYSTEM_NAME "render_backend_system_t"
 
@@ -717,6 +721,7 @@ enum kan_render_buffer_type_t
     KAN_RENDER_BUFFER_TYPE_INDEX_32,
     KAN_RENDER_BUFFER_TYPE_UNIFORM,
     KAN_RENDER_BUFFER_TYPE_STORAGE,
+    KAN_RENDER_BUFFER_TYPE_READ_BACK_STORAGE,
 };
 
 #define KAN_UNIFORM_BUFFER_MAXIMUM_GUARANTEED_SIZE (16u * 1024u)
@@ -735,6 +740,10 @@ CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_buffer_t kan_render_buffer_create (
 CONTEXT_RENDER_BACKEND_SYSTEM_API void *kan_render_buffer_patch (kan_render_buffer_t buffer,
                                                                  uint32_t slice_offset,
                                                                  uint32_t slice_size);
+
+CONTEXT_RENDER_BACKEND_SYSTEM_API void *kan_render_buffer_begin_access (kan_render_buffer_t buffer);
+
+CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_buffer_end_access (kan_render_buffer_t buffer);
 
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_buffer_destroy (kan_render_buffer_t buffer);
 
@@ -814,5 +823,29 @@ CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_image_resize_render_target (ka
                                                                               uint32_t new_depth);
 
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_image_destroy (kan_render_image_t image);
+
+enum kan_render_read_back_state_t
+{
+    KAN_RENDER_READ_BACK_STATE_REQUESTED = 0,
+    KAN_RENDER_READ_BACK_STATE_SCHEDULED,
+    KAN_RENDER_READ_BACK_STATE_FINISHED,
+    KAN_RENDER_READ_BACK_STATE_FAILED,
+};
+
+CONTEXT_RENDER_BACKEND_SYSTEM_API uint64_t kan_render_get_read_back_max_delay_in_frames (void);
+
+CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_read_back_status_t
+kan_render_read_back_request_from_surface (kan_render_surface_t surface, kan_render_buffer_t read_back_buffer, uint32_t read_back_offset);
+
+CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_read_back_status_t kan_render_read_back_request_from_buffer (
+    kan_render_buffer_t buffer, uint32_t offset, uint32_t slice, kan_render_buffer_t read_back_buffer, uint32_t read_back_offset);
+
+CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_read_back_status_t
+kan_render_read_back_request_from_image (kan_render_image_t image, uint8_t mip, kan_render_buffer_t read_back_buffer, uint32_t read_back_offset);
+
+CONTEXT_RENDER_BACKEND_SYSTEM_API enum kan_render_read_back_state_t kan_read_read_back_status_get (
+    kan_render_read_back_status_t status);
+
+CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_read_back_status_destroy (kan_render_read_back_status_t status);
 
 KAN_C_HEADER_END

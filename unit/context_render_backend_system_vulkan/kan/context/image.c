@@ -9,7 +9,8 @@ static kan_bool_t create_vulkan_image (struct render_backend_system_t *system,
     kan_cpu_section_execution_init (&execution, system->section_image_create_on_device);
 
     VkImageType image_type = VK_IMAGE_TYPE_2D;
-    VkImageUsageFlags image_usage = 0u;
+    // Always support at least transfer source as read back might be requested.
+    VkImageUsageFlags image_usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
 
     switch (description->type)
     {
@@ -52,8 +53,7 @@ static kan_bool_t create_vulkan_image (struct render_backend_system_t *system,
     }
     else
     {
-        // We need source transfer in order to generate mip maps, unless they are expected to be loaded from textures.
-        image_usage |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+        image_usage |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
     }
 
     if (description->supports_sampling)

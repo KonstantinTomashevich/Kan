@@ -18,6 +18,7 @@
 KAN_C_HEADER_BEGIN
 
 #define SURFACE_COLOR_FORMAT VK_FORMAT_B8G8R8A8_SRGB
+#define SURFACE_COLOR_FORMAT_TEXEL_SIZE 4u
 #define SURFACE_COLOR_SPACE VK_COLOR_SPACE_SRGB_NONLINEAR_KHR
 
 #define DEPTH_FORMAT VK_FORMAT_D32_SFLOAT
@@ -38,6 +39,7 @@ struct memory_profiling_t
     kan_allocation_group_t gpu_buffer_index_group;
     kan_allocation_group_t gpu_buffer_uniform_group;
     kan_allocation_group_t gpu_buffer_storage_group;
+    kan_allocation_group_t gpu_buffer_read_back_storage_group;
     kan_allocation_group_t gpu_image_group;
 
     VkAllocationCallbacks vulkan_allocation_callbacks;
@@ -50,6 +52,7 @@ enum surface_render_state_t
     SURFACE_RENDER_STATE_RECEIVED_NO_OUTPUT = 0u,
     SURFACE_RENDER_STATE_RECEIVED_DATA_FROM_FRAME_BUFFER,
     SURFACE_RENDER_STATE_RECEIVED_DATA_FROM_BLIT,
+    SURFACE_RENDER_STATE_SENT_DATA_TO_READ_BACK,
 };
 
 struct surface_blit_request_t
@@ -161,6 +164,40 @@ struct scheduled_image_mip_generation_t
     uint8_t last;
 };
 
+struct scheduled_surface_read_back_t
+{
+    struct scheduled_surface_read_back_t *next;
+    struct render_backend_surface_t *surface;
+    struct render_backend_buffer_t *read_back_buffer;
+    uint32_t read_back_offset;
+    struct render_backend_read_back_status_t *status;
+};
+
+struct scheduled_buffer_read_back_t
+{
+    struct scheduled_buffer_read_back_t *next;
+    struct render_backend_buffer_t *buffer;
+    uint32_t offset;
+    uint32_t slice;
+
+    struct render_backend_buffer_t *read_back_buffer;
+    uint32_t read_back_offset;
+
+    struct render_backend_read_back_status_t *status;
+};
+
+struct scheduled_image_read_back_t
+{
+    struct scheduled_image_read_back_t *next;
+    struct render_backend_image_t *image;
+    uint8_t mip;
+
+    struct render_backend_buffer_t *read_back_buffer;
+    uint32_t read_back_offset;
+
+    struct render_backend_read_back_status_t *status;
+};
+
 struct scheduled_frame_buffer_destroy_t
 {
     struct scheduled_frame_buffer_destroy_t *next;
@@ -245,6 +282,15 @@ struct scheduled_detached_image_destroy_t
 #endif
 };
 
+struct render_backend_read_back_status_t
+{
+    struct render_backend_read_back_status_t *next;
+    struct render_backend_system_t *system;
+    enum kan_render_read_back_state_t state;
+    kan_bool_t referenced_in_schedule;
+    kan_bool_t referenced_outside;
+};
+
 struct render_backend_schedule_state_t
 {
     struct kan_stack_group_allocator_t item_allocator;
@@ -257,6 +303,9 @@ struct render_backend_schedule_state_t
     struct scheduled_image_upload_t *first_scheduled_image_upload;
     struct scheduled_frame_buffer_create_t *first_scheduled_frame_buffer_create;
     struct scheduled_image_mip_generation_t *first_scheduled_image_mip_generation;
+    struct scheduled_surface_read_back_t *first_scheduled_surface_read_back;
+    struct scheduled_buffer_read_back_t *first_scheduled_buffer_read_back;
+    struct scheduled_image_read_back_t *first_scheduled_image_read_back;
 
     struct scheduled_frame_buffer_destroy_t *first_scheduled_frame_buffer_destroy;
     struct scheduled_detached_frame_buffer_destroy_t *first_scheduled_detached_frame_buffer_destroy;
@@ -271,6 +320,10 @@ struct render_backend_schedule_state_t
     struct scheduled_detached_image_view_destroy_t *first_scheduled_detached_image_view_destroy;
     struct scheduled_image_destroy_t *first_scheduled_image_destroy;
     struct scheduled_detached_image_destroy_t *first_scheduled_detached_image_destroy;
+
+    /// \details Read back statuses are allocated through batched allocator instead of stack group allocator,
+    ///          because they can clog item allocator during continuous read back by preventing item allocator reset.
+    struct render_backend_read_back_status_t *first_read_back_status;
 };
 
 struct render_backend_frame_buffer_attachment_t
@@ -844,6 +897,7 @@ struct render_backend_system_t
     kan_allocation_group_t frame_lifetime_wrapper_allocation_group;
     kan_allocation_group_t image_wrapper_allocation_group;
     kan_allocation_group_t descriptor_set_wrapper_allocation_group;
+    kan_allocation_group_t read_back_status_allocation_group;
 
     kan_cpu_section_t section_create_surface;
     kan_cpu_section_t section_create_frame_buffer;
@@ -893,6 +947,7 @@ struct render_backend_system_t
     kan_cpu_section_t section_next_frame;
     kan_cpu_section_t section_next_frame_synchronization;
     kan_cpu_section_t section_next_frame_acquire_images;
+    kan_cpu_section_t section_next_frame_command_pool_reset;
     kan_cpu_section_t section_next_frame_destruction_schedule;
     kan_cpu_section_t section_next_frame_destruction_schedule_waiting_pipeline_compilation;
 
@@ -904,6 +959,8 @@ struct render_backend_system_t
     kan_cpu_section_t section_submit_blit_requests;
     kan_cpu_section_t section_submit_pass_instance;
     kan_cpu_section_t section_pass_instance_sort_and_submission;
+    kan_cpu_section_t section_submit_read_back;
+    kan_cpu_section_t section_present;
 
     struct kan_render_supported_devices_t *supported_devices;
 

@@ -444,6 +444,9 @@ kan_render_frame_lifetime_buffer_allocator_t kan_render_frame_lifetime_buffer_al
     kan_bool_t on_device,
     kan_interned_string_t tracking_name)
 {
+    // Frame-lifetime read back just doesn't make sense as it would be destroyed right after collecting data.
+    KAN_ASSERT (buffer_type != KAN_RENDER_BUFFER_TYPE_READ_BACK_STORAGE)
+
     struct render_backend_system_t *system = (struct render_backend_system_t *) context;
     struct kan_cpu_section_execution_t execution;
     kan_cpu_section_execution_init (&execution, system->section_create_frame_lifetime_allocator);

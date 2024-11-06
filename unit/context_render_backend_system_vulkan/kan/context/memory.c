@@ -119,6 +119,8 @@ void render_backend_memory_profiling_init (struct render_backend_system_t *syste
         kan_allocation_group_get_child (system->memory_profiling.gpu_buffer_group, "uniform");
     system->memory_profiling.gpu_buffer_storage_group =
         kan_allocation_group_get_child (system->memory_profiling.gpu_buffer_group, "storage");
+    system->memory_profiling.gpu_buffer_read_back_storage_group =
+        kan_allocation_group_get_child (system->memory_profiling.gpu_buffer_group, "read_back_storage");
     system->memory_profiling.gpu_image_group =
         kan_allocation_group_get_child (system->memory_profiling.gpu_group, "image");
 

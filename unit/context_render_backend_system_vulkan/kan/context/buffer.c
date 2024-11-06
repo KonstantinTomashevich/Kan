@@ -28,7 +28,8 @@ struct render_backend_buffer_t *render_backend_system_create_buffer (struct rend
     {
     case RENDER_BACKEND_BUFFER_FAMILY_RESOURCE:
     case RENDER_BACKEND_BUFFER_FAMILY_DEVICE_FRAME_LIFETIME_ALLOCATOR:
-        usage_flags |= VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+        // Transfer source might be used if read back is requested.
+        usage_flags |= VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
         break;
 
     case RENDER_BACKEND_BUFFER_FAMILY_STAGING:
@@ -60,6 +61,12 @@ struct render_backend_buffer_t *render_backend_system_create_buffer (struct rend
 
         case KAN_RENDER_BUFFER_TYPE_STORAGE:
             usage_flags |= VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+            break;
+
+        case KAN_RENDER_BUFFER_TYPE_READ_BACK_STORAGE:
+            KAN_ASSERT (family == RENDER_BACKEND_BUFFER_FAMILY_RESOURCE)
+            usage_flags |= VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+            allocation_flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT;
             break;
         }
     }
@@ -122,6 +129,10 @@ struct render_backend_buffer_t *render_backend_system_create_buffer (struct rend
     case KAN_RENDER_BUFFER_TYPE_STORAGE:
         buffer_type_name = "StorageBuffer";
         break;
+
+    case KAN_RENDER_BUFFER_TYPE_READ_BACK_STORAGE:
+        buffer_type_name = "ReadBackStorageBuffer";
+        break;
     }
 
     char debug_name[KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME];
@@ -172,6 +183,10 @@ struct render_backend_buffer_t *render_backend_system_create_buffer (struct rend
 
     case KAN_RENDER_BUFFER_TYPE_STORAGE:
         type_allocation_group = system->memory_profiling.gpu_buffer_storage_group;
+        break;
+
+    case KAN_RENDER_BUFFER_TYPE_READ_BACK_STORAGE:
+        type_allocation_group = system->memory_profiling.gpu_buffer_read_back_storage_group;
         break;
     }
 
@@ -256,6 +271,8 @@ kan_render_buffer_t kan_render_buffer_create (kan_render_context_t context,
 void *kan_render_buffer_patch (kan_render_buffer_t buffer, uint32_t slice_offset, uint32_t slice_size)
 {
     struct render_backend_buffer_t *data = (struct render_backend_buffer_t *) buffer;
+    // Read back buffers should be accessed through kan_render_buffer_begin_access/kan_render_buffer_end_access.
+    KAN_ASSERT (data->type != KAN_RENDER_BUFFER_TYPE_READ_BACK_STORAGE)
     struct render_backend_schedule_state_t *schedule = render_backend_system_get_schedule_for_memory (data->system);
 
     switch (data->family)
@@ -331,6 +348,28 @@ void *kan_render_buffer_patch (kan_render_buffer_t buffer, uint32_t slice_offset
 
     KAN_ASSERT (KAN_FALSE)
     return NULL;
+}
+
+void *kan_render_buffer_begin_access (kan_render_buffer_t buffer)
+{
+    struct render_backend_buffer_t *data = (struct render_backend_buffer_t *) buffer;
+    KAN_ASSERT (data->type == KAN_RENDER_BUFFER_TYPE_READ_BACK_STORAGE)
+    void *memory;
+
+    if (vmaMapMemory (data->system->gpu_memory_allocator, data->allocation, &memory) != VK_SUCCESS)
+    {
+        kan_critical_error ("Unexpected failure while mapping buffer memory, unable to continue properly.", __FILE__,
+                            __LINE__);
+    }
+
+    return memory;
+}
+
+void kan_render_buffer_end_access (kan_render_buffer_t buffer)
+{
+    struct render_backend_buffer_t *data = (struct render_backend_buffer_t *) buffer;
+    KAN_ASSERT (data->type == KAN_RENDER_BUFFER_TYPE_READ_BACK_STORAGE)
+    vmaUnmapMemory (data->system->gpu_memory_allocator, data->allocation);
 }
 
 void kan_render_buffer_destroy (kan_render_buffer_t buffer)
