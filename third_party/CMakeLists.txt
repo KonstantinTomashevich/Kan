@@ -5,6 +5,10 @@ add_subdirectory (cglm)
 add_library (debug_break INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/debugbreak/debugbreak.h")
 target_include_directories (debug_break INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/debugbreak")
 
+# stb
+add_library (stb INTERFACE)
+target_include_directories (stb INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/stb")
+
 # qsort
 add_library (qsort INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/qsort/qsort.h")
 target_include_directories (qsort INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/qsort")
