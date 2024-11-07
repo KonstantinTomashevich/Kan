@@ -17,14 +17,6 @@
 
 KAN_C_HEADER_BEGIN
 
-#define SURFACE_COLOR_FORMAT VK_FORMAT_B8G8R8A8_SRGB
-#define SURFACE_COLOR_FORMAT_TEXEL_SIZE 4u
-#define SURFACE_COLOR_SPACE VK_COLOR_SPACE_SRGB_NONLINEAR_KHR
-
-#define DEPTH_FORMAT VK_FORMAT_D32_SFLOAT
-#define STENCIL_FORMAT VK_FORMAT_S8_UINT
-#define DEPTH_STENCIL_FORMAT VK_FORMAT_D32_SFLOAT_S8_UINT
-
 #if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_PROFILE_MEMORY)
 struct memory_profiling_t
 {
@@ -277,7 +269,6 @@ struct scheduled_detached_image_destroy_t
     VmaAllocation detached_allocation;
 
 #if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_PROFILE_MEMORY)
-    uint32_t gpu_size;
     kan_allocation_group_t gpu_allocation_group;
 #endif
 };
@@ -995,6 +986,308 @@ static inline void transfer_memory_between_groups (uint32_t amount,
 #    define VULKAN_ALLOCATION_CALLBACKS(SYSTEM) NULL
 #endif
 
+static inline VkFormat image_format_to_vulkan (enum kan_render_image_format_t format)
+{
+    switch (format)
+    {
+    case KAN_RENDER_IMAGE_FORMAT_R8_SRGB:
+        return VK_FORMAT_R8_SRGB;
+
+    case KAN_RENDER_IMAGE_FORMAT_RG16_SRGB:
+        return VK_FORMAT_R8G8_SRGB;
+
+    case KAN_RENDER_IMAGE_FORMAT_RGB24_SRGB:
+        return VK_FORMAT_R8G8B8_SRGB;
+
+    case KAN_RENDER_IMAGE_FORMAT_RGBA32_SRGB:
+        return VK_FORMAT_R8G8B8A8_SRGB;
+
+    case KAN_RENDER_IMAGE_FORMAT_BGRA32_SRGB:
+        return VK_FORMAT_B8G8R8A8_SRGB;
+
+    case KAN_RENDER_IMAGE_FORMAT_R32_SFLOAT:
+        return VK_FORMAT_R32_SFLOAT;
+
+    case KAN_RENDER_IMAGE_FORMAT_RG64_SFLOAT:
+        return VK_FORMAT_R32G32_SFLOAT;
+
+    case KAN_RENDER_IMAGE_FORMAT_RGB96_SFLOAT:
+        return VK_FORMAT_R32G32B32_SFLOAT;
+
+    case KAN_RENDER_IMAGE_FORMAT_RGBA128_SFLOAT:
+        return VK_FORMAT_R32G32B32A32_SFLOAT;
+
+    case KAN_RENDER_IMAGE_FORMAT_D16_UNORM:
+        return VK_FORMAT_D16_UNORM;
+
+    case KAN_RENDER_IMAGE_FORMAT_D32_SFLOAT:
+        return VK_FORMAT_D32_SFLOAT;
+
+    case KAN_RENDER_IMAGE_FORMAT_S8_UINT:
+        return VK_FORMAT_S8_UINT;
+
+    case KAN_RENDER_IMAGE_FORMAT_D16_UNORM_S8_UINT:
+        return VK_FORMAT_D16_UNORM_S8_UINT;
+
+    case KAN_RENDER_IMAGE_FORMAT_D24_UNORM_S8_UINT:
+        return VK_FORMAT_D24_UNORM_S8_UINT;
+
+    case KAN_RENDER_IMAGE_FORMAT_D32_SFLOAT_S8_UINT:
+        return VK_FORMAT_D32_SFLOAT_S8_UINT;
+
+    case KAN_RENDER_IMAGE_FORMAT_BC1_RGB_UNORM_BLOCK:
+        return VK_FORMAT_BC1_RGB_UNORM_BLOCK;
+
+    case KAN_RENDER_IMAGE_FORMAT_BC1_RGB_SRGB_BLOCK:
+        return VK_FORMAT_BC1_RGB_SRGB_BLOCK;
+
+    case KAN_RENDER_IMAGE_FORMAT_BC1_RGBA_UNORM_BLOCK:
+        return VK_FORMAT_BC1_RGBA_UNORM_BLOCK;
+
+    case KAN_RENDER_IMAGE_FORMAT_BC1_RGBA_SRGB_BLOCK:
+        return VK_FORMAT_BC1_RGBA_SRGB_BLOCK;
+
+    case KAN_RENDER_IMAGE_FORMAT_BC2_UNORM_BLOCK:
+        return VK_FORMAT_BC2_UNORM_BLOCK;
+
+    case KAN_RENDER_IMAGE_FORMAT_BC2_SRGB_BLOCK:
+        return VK_FORMAT_BC2_SRGB_BLOCK;
+
+    case KAN_RENDER_IMAGE_FORMAT_BC3_UNORM_BLOCK:
+        return VK_FORMAT_BC3_UNORM_BLOCK;
+
+    case KAN_RENDER_IMAGE_FORMAT_BC3_SRGB_BLOCK:
+        return VK_FORMAT_BC3_SRGB_BLOCK;
+
+    case KAN_RENDER_IMAGE_FORMAT_BC4_UNORM_BLOCK:
+        return VK_FORMAT_BC4_UNORM_BLOCK;
+
+    case KAN_RENDER_IMAGE_FORMAT_BC4_SNORM_BLOCK:
+        return VK_FORMAT_BC4_SNORM_BLOCK;
+
+    case KAN_RENDER_IMAGE_FORMAT_BC5_UNORM_BLOCK:
+        return VK_FORMAT_BC5_UNORM_BLOCK;
+
+    case KAN_RENDER_IMAGE_FORMAT_BC5_SNORM_BLOCK:
+        return VK_FORMAT_BC5_SNORM_BLOCK;
+
+    case KAN_RENDER_IMAGE_FORMAT_BC6H_UFLOAT_BLOCK:
+        return VK_FORMAT_BC6H_UFLOAT_BLOCK;
+
+    case KAN_RENDER_IMAGE_FORMAT_BC6H_SFLOAT_BLOCK:
+        return VK_FORMAT_BC6H_SFLOAT_BLOCK;
+
+    case KAN_RENDER_IMAGE_FORMAT_BC7_UNORM_BLOCK:
+        return VK_FORMAT_BC7_UNORM_BLOCK;
+
+    case KAN_RENDER_IMAGE_FORMAT_BC7_SRGB_BLOCK:
+        return VK_FORMAT_BC7_SRGB_BLOCK;
+
+    case KAN_RENDER_IMAGE_FORMAT_ETC2_RGB24_UNORM_BLOCK:
+        return VK_FORMAT_ETC2_R8G8B8_UNORM_BLOCK;
+
+    case KAN_RENDER_IMAGE_FORMAT_ETC2_RGB24_SRGB_BLOCK:
+        return VK_FORMAT_ETC2_R8G8B8_SRGB_BLOCK;
+
+    case KAN_RENDER_IMAGE_FORMAT_ETC2_RGBA25_UNORM_BLOCK:
+        return VK_FORMAT_ETC2_R8G8B8A1_UNORM_BLOCK;
+
+    case KAN_RENDER_IMAGE_FORMAT_ETC2_RGBA25_SRGB_BLOCK:
+        return VK_FORMAT_ETC2_R8G8B8A1_SRGB_BLOCK;
+
+    case KAN_RENDER_IMAGE_FORMAT_ETC2_RGBA32_UNORM_BLOCK:
+        return VK_FORMAT_ETC2_R8G8B8A8_UNORM_BLOCK;
+
+    case KAN_RENDER_IMAGE_FORMAT_ETC2_RGBA32_SRGB_BLOCK:
+        return VK_FORMAT_ETC2_R8G8B8A8_SRGB_BLOCK;
+
+    case KAN_RENDER_IMAGE_FORMAT_ASTC_4x4_UNORM_BLOCK:
+        return VK_FORMAT_ASTC_4x4_UNORM_BLOCK;
+
+    case KAN_RENDER_IMAGE_FORMAT_ASTC_4x4_SRGB_BLOCK:
+        return VK_FORMAT_ASTC_4x4_SRGB_BLOCK;
+
+    case KAN_RENDER_IMAGE_FORMAT_ASTC_5x4_UNORM_BLOCK:
+        return VK_FORMAT_ASTC_5x4_UNORM_BLOCK;
+
+    case KAN_RENDER_IMAGE_FORMAT_ASTC_5x4_SRGB_BLOCK:
+        return VK_FORMAT_ASTC_5x4_SRGB_BLOCK;
+
+    case KAN_RENDER_IMAGE_FORMAT_ASTC_5x5_UNORM_BLOCK:
+        return VK_FORMAT_ASTC_5x5_UNORM_BLOCK;
+
+    case KAN_RENDER_IMAGE_FORMAT_ASTC_5x5_SRGB_BLOCK:
+        return VK_FORMAT_ASTC_5x5_SRGB_BLOCK;
+
+    case KAN_RENDER_IMAGE_FORMAT_ASTC_6x5_UNORM_BLOCK:
+        return VK_FORMAT_ASTC_6x5_UNORM_BLOCK;
+
+    case KAN_RENDER_IMAGE_FORMAT_ASTC_6x5_SRGB_BLOCK:
+        return VK_FORMAT_ASTC_6x5_SRGB_BLOCK;
+
+    case KAN_RENDER_IMAGE_FORMAT_ASTC_6x6_UNORM_BLOCK:
+        return VK_FORMAT_ASTC_6x6_UNORM_BLOCK;
+
+    case KAN_RENDER_IMAGE_FORMAT_ASTC_6x6_SRGB_BLOCK:
+        return VK_FORMAT_ASTC_6x6_SRGB_BLOCK;
+
+    case KAN_RENDER_IMAGE_FORMAT_ASTC_8x5_UNORM_BLOCK:
+        return VK_FORMAT_ASTC_8x5_UNORM_BLOCK;
+
+    case KAN_RENDER_IMAGE_FORMAT_ASTC_8x5_SRGB_BLOCK:
+        return VK_FORMAT_ASTC_8x5_SRGB_BLOCK;
+
+    case KAN_RENDER_IMAGE_FORMAT_ASTC_8x6_UNORM_BLOCK:
+        return VK_FORMAT_ASTC_8x6_UNORM_BLOCK;
+
+    case KAN_RENDER_IMAGE_FORMAT_ASTC_8x6_SRGB_BLOCK:
+        return VK_FORMAT_ASTC_8x6_SRGB_BLOCK;
+
+    case KAN_RENDER_IMAGE_FORMAT_ASTC_8x8_UNORM_BLOCK:
+        return VK_FORMAT_ASTC_8x8_UNORM_BLOCK;
+
+    case KAN_RENDER_IMAGE_FORMAT_ASTC_8x8_SRGB_BLOCK:
+        return VK_FORMAT_ASTC_8x8_SRGB_BLOCK;
+
+    case KAN_RENDER_IMAGE_FORMAT_ASTC_10x5_UNORM_BLOCK:
+        return VK_FORMAT_ASTC_10x5_UNORM_BLOCK;
+
+    case KAN_RENDER_IMAGE_FORMAT_ASTC_10x5_SRGB_BLOCK:
+        return VK_FORMAT_ASTC_10x5_SRGB_BLOCK;
+
+    case KAN_RENDER_IMAGE_FORMAT_ASTC_10x6_UNORM_BLOCK:
+        return VK_FORMAT_ASTC_10x6_UNORM_BLOCK;
+
+    case KAN_RENDER_IMAGE_FORMAT_ASTC_10x6_SRGB_BLOCK:
+        return VK_FORMAT_ASTC_10x6_SRGB_BLOCK;
+
+    case KAN_RENDER_IMAGE_FORMAT_ASTC_10x8_UNORM_BLOCK:
+        return VK_FORMAT_ASTC_10x8_UNORM_BLOCK;
+
+    case KAN_RENDER_IMAGE_FORMAT_ASTC_10x8_SRGB_BLOCK:
+        return VK_FORMAT_ASTC_10x8_SRGB_BLOCK;
+
+    case KAN_RENDER_IMAGE_FORMAT_ASTC_10x10_UNORM_BLOCK:
+        return VK_FORMAT_ASTC_10x10_UNORM_BLOCK;
+
+    case KAN_RENDER_IMAGE_FORMAT_ASTC_10x10_SRGB_BLOCK:
+        return VK_FORMAT_ASTC_10x10_SRGB_BLOCK;
+
+    case KAN_RENDER_IMAGE_FORMAT_ASTC_12x10_UNORM_BLOCK:
+        return VK_FORMAT_ASTC_12x10_UNORM_BLOCK;
+
+    case KAN_RENDER_IMAGE_FORMAT_ASTC_12x10_SRGB_BLOCK:
+        return VK_FORMAT_ASTC_12x10_SRGB_BLOCK;
+
+    case KAN_RENDER_IMAGE_FORMAT_ASTC_12x12_UNORM_BLOCK:
+        return VK_FORMAT_ASTC_12x12_UNORM_BLOCK;
+
+    case KAN_RENDER_IMAGE_FORMAT_ASTC_12x12_SRGB_BLOCK:
+        return VK_FORMAT_ASTC_12x12_SRGB_BLOCK;
+
+    case KAN_RENDER_IMAGE_FORMAT_COUNT:
+        KAN_ASSERT (KAN_FALSE)
+        return KAN_FALSE;
+    }
+
+    KAN_ASSERT (KAN_FALSE)
+    return KAN_FALSE;
+}
+
+enum image_format_class_t
+{
+    IMAGE_FORMAT_CLASS_COLOR = 0u,
+    IMAGE_FORMAT_CLASS_DEPTH,
+    IMAGE_FORMAT_CLASS_STENCIL,
+    IMAGE_FORMAT_CLASS_DEPTH_STENCIL,
+};
+
+static inline enum image_format_class_t get_image_format_class (enum kan_render_image_format_t format)
+{
+    switch (format)
+    {
+    case KAN_RENDER_IMAGE_FORMAT_R8_SRGB:
+    case KAN_RENDER_IMAGE_FORMAT_RG16_SRGB:
+    case KAN_RENDER_IMAGE_FORMAT_RGB24_SRGB:
+    case KAN_RENDER_IMAGE_FORMAT_RGBA32_SRGB:
+    case KAN_RENDER_IMAGE_FORMAT_BGRA32_SRGB:
+    case KAN_RENDER_IMAGE_FORMAT_R32_SFLOAT:
+    case KAN_RENDER_IMAGE_FORMAT_RG64_SFLOAT:
+    case KAN_RENDER_IMAGE_FORMAT_RGB96_SFLOAT:
+    case KAN_RENDER_IMAGE_FORMAT_RGBA128_SFLOAT:
+    case KAN_RENDER_IMAGE_FORMAT_BC1_RGB_UNORM_BLOCK:
+    case KAN_RENDER_IMAGE_FORMAT_BC1_RGB_SRGB_BLOCK:
+    case KAN_RENDER_IMAGE_FORMAT_BC1_RGBA_UNORM_BLOCK:
+    case KAN_RENDER_IMAGE_FORMAT_BC1_RGBA_SRGB_BLOCK:
+    case KAN_RENDER_IMAGE_FORMAT_BC2_UNORM_BLOCK:
+    case KAN_RENDER_IMAGE_FORMAT_BC2_SRGB_BLOCK:
+    case KAN_RENDER_IMAGE_FORMAT_BC3_UNORM_BLOCK:
+    case KAN_RENDER_IMAGE_FORMAT_BC3_SRGB_BLOCK:
+    case KAN_RENDER_IMAGE_FORMAT_BC4_UNORM_BLOCK:
+    case KAN_RENDER_IMAGE_FORMAT_BC4_SNORM_BLOCK:
+    case KAN_RENDER_IMAGE_FORMAT_BC5_UNORM_BLOCK:
+    case KAN_RENDER_IMAGE_FORMAT_BC5_SNORM_BLOCK:
+    case KAN_RENDER_IMAGE_FORMAT_BC6H_UFLOAT_BLOCK:
+    case KAN_RENDER_IMAGE_FORMAT_BC6H_SFLOAT_BLOCK:
+    case KAN_RENDER_IMAGE_FORMAT_BC7_UNORM_BLOCK:
+    case KAN_RENDER_IMAGE_FORMAT_BC7_SRGB_BLOCK:
+    case KAN_RENDER_IMAGE_FORMAT_ETC2_RGB24_UNORM_BLOCK:
+    case KAN_RENDER_IMAGE_FORMAT_ETC2_RGB24_SRGB_BLOCK:
+    case KAN_RENDER_IMAGE_FORMAT_ETC2_RGBA25_UNORM_BLOCK:
+    case KAN_RENDER_IMAGE_FORMAT_ETC2_RGBA25_SRGB_BLOCK:
+    case KAN_RENDER_IMAGE_FORMAT_ETC2_RGBA32_UNORM_BLOCK:
+    case KAN_RENDER_IMAGE_FORMAT_ETC2_RGBA32_SRGB_BLOCK:
+    case KAN_RENDER_IMAGE_FORMAT_ASTC_4x4_UNORM_BLOCK:
+    case KAN_RENDER_IMAGE_FORMAT_ASTC_4x4_SRGB_BLOCK:
+    case KAN_RENDER_IMAGE_FORMAT_ASTC_5x4_UNORM_BLOCK:
+    case KAN_RENDER_IMAGE_FORMAT_ASTC_5x4_SRGB_BLOCK:
+    case KAN_RENDER_IMAGE_FORMAT_ASTC_5x5_UNORM_BLOCK:
+    case KAN_RENDER_IMAGE_FORMAT_ASTC_5x5_SRGB_BLOCK:
+    case KAN_RENDER_IMAGE_FORMAT_ASTC_6x5_UNORM_BLOCK:
+    case KAN_RENDER_IMAGE_FORMAT_ASTC_6x5_SRGB_BLOCK:
+    case KAN_RENDER_IMAGE_FORMAT_ASTC_6x6_UNORM_BLOCK:
+    case KAN_RENDER_IMAGE_FORMAT_ASTC_6x6_SRGB_BLOCK:
+    case KAN_RENDER_IMAGE_FORMAT_ASTC_8x5_UNORM_BLOCK:
+    case KAN_RENDER_IMAGE_FORMAT_ASTC_8x5_SRGB_BLOCK:
+    case KAN_RENDER_IMAGE_FORMAT_ASTC_8x6_UNORM_BLOCK:
+    case KAN_RENDER_IMAGE_FORMAT_ASTC_8x6_SRGB_BLOCK:
+    case KAN_RENDER_IMAGE_FORMAT_ASTC_8x8_UNORM_BLOCK:
+    case KAN_RENDER_IMAGE_FORMAT_ASTC_8x8_SRGB_BLOCK:
+    case KAN_RENDER_IMAGE_FORMAT_ASTC_10x5_UNORM_BLOCK:
+    case KAN_RENDER_IMAGE_FORMAT_ASTC_10x5_SRGB_BLOCK:
+    case KAN_RENDER_IMAGE_FORMAT_ASTC_10x6_UNORM_BLOCK:
+    case KAN_RENDER_IMAGE_FORMAT_ASTC_10x6_SRGB_BLOCK:
+    case KAN_RENDER_IMAGE_FORMAT_ASTC_10x8_UNORM_BLOCK:
+    case KAN_RENDER_IMAGE_FORMAT_ASTC_10x8_SRGB_BLOCK:
+    case KAN_RENDER_IMAGE_FORMAT_ASTC_10x10_UNORM_BLOCK:
+    case KAN_RENDER_IMAGE_FORMAT_ASTC_10x10_SRGB_BLOCK:
+    case KAN_RENDER_IMAGE_FORMAT_ASTC_12x10_UNORM_BLOCK:
+    case KAN_RENDER_IMAGE_FORMAT_ASTC_12x10_SRGB_BLOCK:
+    case KAN_RENDER_IMAGE_FORMAT_ASTC_12x12_UNORM_BLOCK:
+    case KAN_RENDER_IMAGE_FORMAT_ASTC_12x12_SRGB_BLOCK:
+        return IMAGE_FORMAT_CLASS_COLOR;
+
+    case KAN_RENDER_IMAGE_FORMAT_D16_UNORM:
+    case KAN_RENDER_IMAGE_FORMAT_D32_SFLOAT:
+        return IMAGE_FORMAT_CLASS_DEPTH;
+
+    case KAN_RENDER_IMAGE_FORMAT_S8_UINT:
+        return IMAGE_FORMAT_CLASS_STENCIL;
+
+    case KAN_RENDER_IMAGE_FORMAT_D16_UNORM_S8_UINT:
+    case KAN_RENDER_IMAGE_FORMAT_D24_UNORM_S8_UINT:
+    case KAN_RENDER_IMAGE_FORMAT_D32_SFLOAT_S8_UINT:
+        return IMAGE_FORMAT_CLASS_DEPTH_STENCIL;
+
+    case KAN_RENDER_IMAGE_FORMAT_COUNT:
+        KAN_ASSERT (KAN_FALSE)
+        return KAN_FALSE;
+    }
+
+    KAN_ASSERT (KAN_FALSE)
+    return KAN_FALSE;
+}
+
 static inline struct render_backend_schedule_state_t *render_backend_system_get_schedule_for_memory (
     struct render_backend_system_t *system)
 {
@@ -1040,112 +1333,38 @@ static inline void render_backend_pipeline_compiler_state_remove_graphics_reques
     request->list_node.next = NULL;
     request->list_node.previous = NULL;
 }
-static inline VkImageViewType kan_render_image_description_calculate_view_type (
+static inline VkImageViewType get_image_view_type (
     struct kan_render_image_description_t *description)
 {
-    switch (description->type)
+    if (description->depth > 1u)
     {
-    case KAN_RENDER_IMAGE_TYPE_COLOR_2D:
-        return VK_IMAGE_VIEW_TYPE_2D;
-
-    case KAN_RENDER_IMAGE_TYPE_COLOR_3D:
         return VK_IMAGE_VIEW_TYPE_3D;
-
-    case KAN_RENDER_IMAGE_TYPE_DEPTH:
-    case KAN_RENDER_IMAGE_TYPE_STENCIL:
-    case KAN_RENDER_IMAGE_TYPE_DEPTH_STENCIL:
+    }
+    else
+    {
         return VK_IMAGE_VIEW_TYPE_2D;
     }
-
-    KAN_ASSERT (KAN_FALSE)
-    return VK_IMAGE_VIEW_TYPE_2D;
 }
 
-static inline VkFormat kan_render_image_description_calculate_format (
-    struct render_backend_system_t *system, struct kan_render_image_description_t *description)
-{
-    VkFormat image_format = VK_FORMAT_R8G8B8A8_SRGB;
-    switch (description->type)
-    {
-    case KAN_RENDER_IMAGE_TYPE_COLOR_2D:
-    case KAN_RENDER_IMAGE_TYPE_COLOR_3D:
-        switch (description->color_format)
-        {
-        case KAN_RENDER_COLOR_FORMAT_R8_SRGB:
-            image_format = VK_FORMAT_R8_SRGB;
-            break;
-
-        case KAN_RENDER_COLOR_FORMAT_RG16_SRGB:
-            image_format = VK_FORMAT_R8G8_SRGB;
-            break;
-
-        case KAN_RENDER_COLOR_FORMAT_RGB24_SRGB:
-            image_format = VK_FORMAT_R8G8B8_SRGB;
-            break;
-
-        case KAN_RENDER_COLOR_FORMAT_RGBA32_SRGB:
-            image_format = VK_FORMAT_R8G8B8A8_SRGB;
-            break;
-
-        case KAN_RENDER_COLOR_FORMAT_R32_SFLOAT:
-            image_format = VK_FORMAT_R32_SFLOAT;
-            break;
-
-        case KAN_RENDER_COLOR_FORMAT_RG64_SFLOAT:
-            image_format = VK_FORMAT_R32G32_SFLOAT;
-            break;
-
-        case KAN_RENDER_COLOR_FORMAT_RGB96_SFLOAT:
-            image_format = VK_FORMAT_R32G32B32_SFLOAT;
-            break;
-
-        case KAN_RENDER_COLOR_FORMAT_RGBA128_SFLOAT:
-            image_format = VK_FORMAT_R32G32B32A32_SFLOAT;
-            break;
-
-        case KAN_RENDER_COLOR_FORMAT_SURFACE:
-            image_format = SURFACE_COLOR_FORMAT;
-            break;
-        }
-
-        break;
-
-    case KAN_RENDER_IMAGE_TYPE_DEPTH:
-        image_format = DEPTH_FORMAT;
-        break;
-
-    case KAN_RENDER_IMAGE_TYPE_STENCIL:
-        image_format = STENCIL_FORMAT;
-        break;
-
-    case KAN_RENDER_IMAGE_TYPE_DEPTH_STENCIL:
-        image_format = DEPTH_STENCIL_FORMAT;
-        break;
-    }
-
-    return image_format;
-}
-
-static inline VkImageAspectFlags kan_render_image_description_calculate_aspects (
+static inline VkImageAspectFlags get_image_aspects (
     struct kan_render_image_description_t *description)
 {
     VkImageAspectFlags aspects = 0u;
-    switch (description->type)
+    switch (get_image_format_class (description->format))
     {
-    case KAN_RENDER_IMAGE_TYPE_COLOR_2D:
-    case KAN_RENDER_IMAGE_TYPE_COLOR_3D:
+    case IMAGE_FORMAT_CLASS_COLOR:
         aspects |= VK_IMAGE_ASPECT_COLOR_BIT;
         break;
 
-    case KAN_RENDER_IMAGE_TYPE_DEPTH:
+    case IMAGE_FORMAT_CLASS_DEPTH:
         aspects |= VK_IMAGE_ASPECT_DEPTH_BIT;
         break;
 
-    case KAN_RENDER_IMAGE_TYPE_STENCIL:
+    case IMAGE_FORMAT_CLASS_STENCIL:
         aspects |= VK_IMAGE_ASPECT_STENCIL_BIT;
         break;
 
-    case KAN_RENDER_IMAGE_TYPE_DEPTH_STENCIL:
+    case IMAGE_FORMAT_CLASS_DEPTH_STENCIL:
         aspects |= VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
         break;
     }
@@ -1165,88 +1384,6 @@ static inline void kan_render_image_description_calculate_size_at_mip (
     *output_height = KAN_MAX (1u, description->height >> mip);
     *output_depth = KAN_MAX (1u, description->depth >> mip);
 }
-
-static inline uint32_t kan_render_image_description_calculate_texel_size (
-    struct render_backend_system_t *system, struct kan_render_image_description_t *description)
-{
-    uint32_t texel_size = 0u;
-    switch (description->type)
-    {
-    case KAN_RENDER_IMAGE_TYPE_COLOR_2D:
-    case KAN_RENDER_IMAGE_TYPE_COLOR_3D:
-        switch (description->color_format)
-        {
-        case KAN_RENDER_COLOR_FORMAT_R8_SRGB:
-            texel_size = 1u;
-            break;
-
-        case KAN_RENDER_COLOR_FORMAT_RG16_SRGB:
-            texel_size = 2u;
-            break;
-
-        case KAN_RENDER_COLOR_FORMAT_RGB24_SRGB:
-            texel_size = 3u;
-            break;
-
-        case KAN_RENDER_COLOR_FORMAT_RGBA32_SRGB:
-        case KAN_RENDER_COLOR_FORMAT_SURFACE:
-            texel_size = 4u;
-            break;
-
-        case KAN_RENDER_COLOR_FORMAT_R32_SFLOAT:
-            texel_size = 4u;
-            break;
-
-        case KAN_RENDER_COLOR_FORMAT_RG64_SFLOAT:
-            texel_size = 8u;
-            break;
-
-        case KAN_RENDER_COLOR_FORMAT_RGB96_SFLOAT:
-            texel_size = 12u;
-            break;
-
-        case KAN_RENDER_COLOR_FORMAT_RGBA128_SFLOAT:
-            texel_size = 16u;
-            break;
-        }
-
-        break;
-
-    case KAN_RENDER_IMAGE_TYPE_DEPTH:
-        texel_size = 4u;
-        break;
-
-    case KAN_RENDER_IMAGE_TYPE_STENCIL:
-        texel_size = 1u;
-        break;
-
-    case KAN_RENDER_IMAGE_TYPE_DEPTH_STENCIL:
-        texel_size = 5u;
-        break;
-    }
-
-    return texel_size;
-}
-
-#if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_PROFILE_MEMORY)
-static inline uint32_t render_backend_image_calculate_gpu_size (struct render_backend_system_t *system,
-                                                                struct render_backend_image_t *image)
-{
-    uint32_t texel_size = kan_render_image_description_calculate_texel_size (system, &image->description);
-    uint32_t size = 0u;
-
-    for (uint64_t mip = 0u; mip < image->description.mips; ++mip)
-    {
-        uint32_t width;
-        uint32_t height;
-        uint32_t depth;
-        kan_render_image_description_calculate_size_at_mip (&image->description, mip, &width, &height, &depth);
-        size += texel_size * width * height * depth;
-    }
-
-    return size;
-}
-#endif
 
 #define DEBUG_LABEL_COLOR_PASS 1.0f, 0.796f, 0.0f, 1.0f
 

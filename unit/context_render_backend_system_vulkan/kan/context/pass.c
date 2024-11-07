@@ -24,50 +24,12 @@ struct render_backend_pass_t *render_backend_system_create_pass (struct render_b
         struct kan_render_pass_attachment_t *attachment = &description->attachments[index];
         struct VkAttachmentDescription *vulkan_attachment = &attachment_descriptions[index];
         vulkan_attachment->flags = 0u;
+        vulkan_attachment->format = image_format_to_vulkan (attachment->format);
 
         switch (attachment->type)
         {
         case KAN_RENDER_PASS_ATTACHMENT_COLOR:
             ++color_attachments_count;
-
-            switch (attachment->color_format)
-            {
-            case KAN_RENDER_COLOR_FORMAT_R8_SRGB:
-                vulkan_attachment->format = VK_FORMAT_R8_SRGB;
-                break;
-
-            case KAN_RENDER_COLOR_FORMAT_RG16_SRGB:
-                vulkan_attachment->format = VK_FORMAT_R8G8_SRGB;
-                break;
-
-            case KAN_RENDER_COLOR_FORMAT_RGB24_SRGB:
-                vulkan_attachment->format = VK_FORMAT_R8G8B8_SRGB;
-                break;
-
-            case KAN_RENDER_COLOR_FORMAT_RGBA32_SRGB:
-                vulkan_attachment->format = VK_FORMAT_R8G8B8A8_SRGB;
-                break;
-
-            case KAN_RENDER_COLOR_FORMAT_R32_SFLOAT:
-                vulkan_attachment->format = VK_FORMAT_R32_SFLOAT;
-                break;
-
-            case KAN_RENDER_COLOR_FORMAT_RG64_SFLOAT:
-                vulkan_attachment->format = VK_FORMAT_R32G32_SFLOAT;
-                break;
-
-            case KAN_RENDER_COLOR_FORMAT_RGB96_SFLOAT:
-                vulkan_attachment->format = VK_FORMAT_R32G32B32_SFLOAT;
-                break;
-
-            case KAN_RENDER_COLOR_FORMAT_RGBA128_SFLOAT:
-                vulkan_attachment->format = VK_FORMAT_R32G32B32A32_SFLOAT;
-                break;
-
-            case KAN_RENDER_COLOR_FORMAT_SURFACE:
-                vulkan_attachment->format = SURFACE_COLOR_FORMAT;
-                break;
-            }
 
             switch (attachment->samples)
             {
@@ -117,19 +79,6 @@ struct render_backend_pass_t *render_backend_system_create_pass (struct render_b
             // There should be not more than 1 depth attachment per pass.
             KAN_ASSERT (!has_depth_attachment)
             has_depth_attachment = KAN_TRUE;
-
-            if (attachment->type == KAN_RENDER_PASS_ATTACHMENT_DEPTH)
-            {
-                vulkan_attachment->format = DEPTH_FORMAT;
-            }
-            else if (attachment->type == KAN_RENDER_PASS_ATTACHMENT_STENCIL)
-            {
-                vulkan_attachment->format = STENCIL_FORMAT;
-            }
-            else if (attachment->type == KAN_RENDER_PASS_ATTACHMENT_DEPTH_STENCIL)
-            {
-                vulkan_attachment->format = DEPTH_STENCIL_FORMAT;
-            }
 
             KAN_ASSERT (attachment->samples == 1u)
             vulkan_attachment->samples = VK_SAMPLE_COUNT_1_BIT;
@@ -492,21 +441,21 @@ kan_render_pass_instance_t kan_render_pass_instantiate (kan_render_pass_t pass,
         switch (frame_buffer_data->attachments[index].type)
         {
         case KAN_FRAME_BUFFER_ATTACHMENT_IMAGE:
-            switch (frame_buffer_data->attachments[index].image->description.type)
+            switch (get_image_format_class (frame_buffer_data->attachments[index].image->description.format))
             {
-            case KAN_RENDER_IMAGE_TYPE_COLOR_2D:
-            case KAN_RENDER_IMAGE_TYPE_COLOR_3D:
+            case IMAGE_FORMAT_CLASS_COLOR:
                 instance->clear_values[index].color.float32[0u] = attachment_clear_values[index].color.r;
                 instance->clear_values[index].color.float32[1u] = attachment_clear_values[index].color.g;
                 instance->clear_values[index].color.float32[2u] = attachment_clear_values[index].color.b;
                 instance->clear_values[index].color.float32[3u] = attachment_clear_values[index].color.a;
                 break;
 
-            case KAN_RENDER_IMAGE_TYPE_DEPTH:
-            case KAN_RENDER_IMAGE_TYPE_STENCIL:
-            case KAN_RENDER_IMAGE_TYPE_DEPTH_STENCIL:
+            case IMAGE_FORMAT_CLASS_DEPTH:
+            case IMAGE_FORMAT_CLASS_STENCIL:
+            case IMAGE_FORMAT_CLASS_DEPTH_STENCIL:
                 instance->clear_values[index].depthStencil.depth = attachment_clear_values[index].depth_stencil.depth;
-                instance->clear_values[index].depthStencil.stencil = attachment_clear_values[index].depth_stencil.stencil;
+                instance->clear_values[index].depthStencil.stencil =
+                    attachment_clear_values[index].depth_stencil.stencil;
                 break;
             }
 

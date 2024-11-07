@@ -8,45 +8,21 @@ static kan_bool_t create_vulkan_image (struct render_backend_system_t *system,
     struct kan_cpu_section_execution_t execution;
     kan_cpu_section_execution_init (&execution, system->section_image_create_on_device);
 
-    VkImageType image_type = VK_IMAGE_TYPE_2D;
+    VkImageType image_type = description->depth > 1u ? VK_IMAGE_TYPE_3D : VK_IMAGE_TYPE_2D;
     // Always support at least transfer source as read back might be requested.
     VkImageUsageFlags image_usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
 
-    switch (description->type)
-    {
-    case KAN_RENDER_IMAGE_TYPE_COLOR_2D:
-        KAN_ASSERT (description->depth == 1u)
-        image_type = VK_IMAGE_TYPE_2D;
-        image_usage |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-        break;
-
-    case KAN_RENDER_IMAGE_TYPE_COLOR_3D:
-        image_type = VK_IMAGE_TYPE_3D;
-        image_usage |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-        break;
-
-    case KAN_RENDER_IMAGE_TYPE_DEPTH:
-    case KAN_RENDER_IMAGE_TYPE_STENCIL:
-    case KAN_RENDER_IMAGE_TYPE_DEPTH_STENCIL:
-        KAN_ASSERT (description->render_target)
-        image_type = VK_IMAGE_TYPE_2D;
-        image_usage |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-        break;
-    }
-
     if (description->render_target)
     {
-        KAN_ASSERT (description->mips == 1u)
-        switch (description->type)
+        switch (get_image_format_class (description->format))
         {
-        case KAN_RENDER_IMAGE_TYPE_COLOR_2D:
-        case KAN_RENDER_IMAGE_TYPE_COLOR_3D:
+        case IMAGE_FORMAT_CLASS_COLOR:
             image_usage |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
             break;
 
-        case KAN_RENDER_IMAGE_TYPE_DEPTH:
-        case KAN_RENDER_IMAGE_TYPE_STENCIL:
-        case KAN_RENDER_IMAGE_TYPE_DEPTH_STENCIL:
+        case IMAGE_FORMAT_CLASS_DEPTH:
+        case IMAGE_FORMAT_CLASS_STENCIL:
+        case IMAGE_FORMAT_CLASS_DEPTH_STENCIL:
             image_usage |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
             break;
         }
@@ -65,7 +41,7 @@ static kan_bool_t create_vulkan_image (struct render_backend_system_t *system,
         .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
         .pNext = NULL,
         .imageType = image_type,
-        .format = kan_render_image_description_calculate_format (system, description),
+        .format = image_format_to_vulkan (description->format),
         .extent =
             {
                 .width = (uint32_t) description->width,
@@ -156,8 +132,12 @@ struct render_backend_image_t *render_backend_system_create_image (struct render
 #if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_PROFILE_MEMORY)
     image->device_allocation_group =
         kan_allocation_group_get_child (system->memory_profiling.gpu_image_group, description->tracking_name);
-    transfer_memory_between_groups (render_backend_image_calculate_gpu_size (system, image),
-                                    system->memory_profiling.gpu_unmarked_group, image->device_allocation_group);
+
+    VkMemoryRequirements requirements;
+    vkGetImageMemoryRequirements (system->device, image->image, &requirements);
+
+    transfer_memory_between_groups (requirements.size, system->memory_profiling.gpu_unmarked_group,
+                                    image->device_allocation_group);
 #endif
 
     kan_cpu_section_execution_shutdown (&execution);
@@ -183,7 +163,10 @@ void render_backend_system_destroy_image (struct render_backend_system_t *system
     }
 
 #if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_PROFILE_MEMORY)
-    transfer_memory_between_groups (render_backend_image_calculate_gpu_size (system, image),
+    VkMemoryRequirements requirements;
+    vkGetImageMemoryRequirements (system->device, image->image, &requirements);
+
+    transfer_memory_between_groups (requirements.size,
                                     image->device_allocation_group, system->memory_profiling.gpu_unmarked_group);
 #endif
 
@@ -202,7 +185,7 @@ kan_render_image_t kan_render_image_create (kan_render_context_t context,
     return image ? (kan_render_image_t) image : KAN_INVALID_RENDER_IMAGE;
 }
 
-void kan_render_image_upload_data (kan_render_image_t image, uint8_t mip, void *data)
+void kan_render_image_upload_data (kan_render_image_t image, uint8_t mip, uint32_t data_size, void *data)
 {
     struct render_backend_image_t *image_data = (struct render_backend_image_t *) image;
     struct kan_cpu_section_execution_t execution;
@@ -211,15 +194,7 @@ void kan_render_image_upload_data (kan_render_image_t image, uint8_t mip, void *
     KAN_ASSERT (!image_data->description.render_target)
     KAN_ASSERT (mip < image_data->description.mips)
 
-    uint32_t texel_size =
-        kan_render_image_description_calculate_texel_size (image_data->system, &image_data->description);
-
-    uint32_t width;
-    uint32_t height;
-    uint32_t depth;
-    kan_render_image_description_calculate_size_at_mip (&image_data->description, mip, &width, &height, &depth);
-
-    const uint32_t allocation_size = texel_size * width * height * depth;
+    const uint32_t allocation_size = data_size;
     struct render_backend_frame_lifetime_allocator_allocation_t staging_allocation =
         render_backend_system_allocate_for_staging (image_data->system, allocation_size);
 
@@ -318,7 +293,6 @@ void kan_render_image_resize_render_target (kan_render_image_t image,
         image_destroy->detached_allocation = data->allocation;
 
 #if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_PROFILE_MEMORY)
-        image_destroy->gpu_size = render_backend_image_calculate_gpu_size (data->system, data);
         image_destroy->gpu_allocation_group = data->device_allocation_group;
 #endif
 
@@ -341,7 +315,10 @@ void kan_render_image_resize_render_target (kan_render_image_t image,
     }
 
 #if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_PROFILE_MEMORY)
-    transfer_memory_between_groups (render_backend_image_calculate_gpu_size (data->system, data),
+    VkMemoryRequirements requirements;
+    vkGetImageMemoryRequirements (data->system->device, data->image, &requirements);
+
+    transfer_memory_between_groups (requirements.size,
                                     data->system->memory_profiling.gpu_unmarked_group, data->device_allocation_group);
 #endif
 

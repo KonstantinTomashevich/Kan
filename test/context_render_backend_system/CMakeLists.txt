@@ -3,8 +3,14 @@ concrete_include (PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 concrete_sources ("*.c")
 concrete_require (
         SCOPE PUBLIC
-        ABSTRACT context_render_backend_system cpu_profiler render_backend_tools
+        ABSTRACT context_render_backend_system cpu_profiler file_system image render_backend_tools
         CONCRETE_INTERFACE inline_math testing)
+
+add_custom_target (test_context_render_backend_system_copy_expectation
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${CMAKE_CURRENT_SOURCE_DIR}/expectation" "${CMAKE_CURRENT_BINARY_DIR}/expectation"
+        COMMENT "Copying context render backend screenshot expectation...")
+add_dependencies (test_context_render_backend_system test_context_render_backend_system_copy_expectation)
 
 abstract_get_implementations (
         ABSTRACT context_render_backend_system OUTPUT CONTEXT_RENDER_BACKEND_SYSTEM_IMPLEMENTATIONS)
@@ -16,9 +22,9 @@ foreach (IMPLEMENTATION ${CONTEXT_RENDER_BACKEND_SYSTEM_IMPLEMENTATIONS})
     shared_library_include (
             SCOPE PUBLIC
             ABSTRACT
-            context_render_backend_system=${IMPLEMENTATION} cpu_dispatch=kan cpu_profiler=none error=sdl hash=djb2
-            log=kan memory=kan memory_profiler=none platform=sdl reflection=kan render_backend_tools=${IMPLEMENTATION}
-            threading=sdl
+            context_render_backend_system=${IMPLEMENTATION} cpu_dispatch=kan cpu_profiler=tracy error=sdl
+            file_system=platform_default hash=djb2 image=stb log=kan memory=kan memory_profiler=none platform=sdl
+            reflection=kan render_backend_tools=${IMPLEMENTATION} stream=kan threading=sdl
             CONCRETE
             container context context_application_system inline_math render_pipeline_language testing
             test_context_render_backend_system)
@@ -26,5 +32,8 @@ foreach (IMPLEMENTATION ${CONTEXT_RENDER_BACKEND_SYSTEM_IMPLEMENTATIONS})
     generate_artefact_context_data ()
     shared_library_verify ()
     shared_library_copy_linked_artefacts ()
-    kan_setup_tests (TEST_UNIT test_context_render_backend_system TEST_SHARED_LIBRARY "${SHARED_NAME}")
+
+    kan_setup_tests (TEST_UNIT test_context_render_backend_system TEST_SHARED_LIBRARY "${SHARED_NAME}"
+            # We need more timeout due to initialization/shutdown times.
+            PROPERTIES TIMEOUT 5)
 endforeach ()

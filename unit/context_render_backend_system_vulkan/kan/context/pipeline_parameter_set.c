@@ -652,9 +652,8 @@ void render_backend_apply_descriptor_set_mutation (struct render_backend_pipelin
                         .pNext = NULL,
                         .flags = 0u,
                         .image = image->image,
-                        .viewType = kan_render_image_description_calculate_view_type (&image->description),
-                        .format =
-                            kan_render_image_description_calculate_format (set_context->system, &image->description),
+                        .viewType = get_image_view_type (&image->description),
+                        .format = image_format_to_vulkan (image->description.format),
                         .components =
                             {
                                 .r = VK_COMPONENT_SWIZZLE_IDENTITY,
@@ -664,7 +663,7 @@ void render_backend_apply_descriptor_set_mutation (struct render_backend_pipelin
                             },
                         .subresourceRange =
                             {
-                                .aspectMask = kan_render_image_description_calculate_aspects (&image->description),
+                                .aspectMask = get_image_aspects (&image->description),
                                 .baseMipLevel = 0u,
                                 .levelCount = (uint32_t) image->description.mips,
                                 .baseArrayLayer = 0u,

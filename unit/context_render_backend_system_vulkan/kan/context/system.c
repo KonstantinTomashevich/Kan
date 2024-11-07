@@ -335,6 +335,41 @@ static void render_backend_system_query_devices (struct render_backend_system_t 
         }
 
         device_info->memory_type = query_device_memory_type (physical_devices[device_index]);
+        for (uint64_t format = 0u; format < KAN_RENDER_IMAGE_FORMAT_COUNT; ++format)
+        {
+            device_info->image_format_support[format] = 0u;
+            VkFormatProperties format_properties;
+            vkGetPhysicalDeviceFormatProperties (physical_devices[device_index], image_format_to_vulkan (format),
+                                                 &format_properties);
+
+            const uint32_t transfer_mask = VK_FORMAT_FEATURE_TRANSFER_SRC_BIT | VK_FORMAT_FEATURE_TRANSFER_DST_BIT;
+            if ((format_properties.optimalTilingFeatures & transfer_mask) == transfer_mask)
+            {
+                device_info->image_format_support[format] |= KAN_RENDER_IMAGE_FORMAT_SUPPORT_FLAG_TRANSFER;
+            }
+
+            const uint32_t sampled_mask = VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT | VK_FORMAT_FEATURE_TRANSFER_DST_BIT;
+            if ((format_properties.optimalTilingFeatures & sampled_mask) == sampled_mask)
+            {
+                device_info->image_format_support[format] |= KAN_RENDER_IMAGE_FORMAT_SUPPORT_FLAG_SAMPLED;
+            }
+
+            const uint32_t color_render_mask = VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT |
+                                               VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BLEND_BIT |
+                                               VK_FORMAT_FEATURE_BLIT_SRC_BIT | VK_FORMAT_FEATURE_BLIT_DST_BIT;
+
+            if ((format_properties.optimalTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT) ||
+                (format_properties.optimalTilingFeatures & color_render_mask) == color_render_mask)
+            {
+                device_info->image_format_support[format] |= KAN_RENDER_IMAGE_FORMAT_SUPPORT_FLAG_RENDER;
+            }
+
+            // If it fails, we've found the device that doesn't support BGRA and we have a problem.
+            KAN_ASSERT (format != KAN_RENDER_IMAGE_FORMAT_SURFACE ||
+                        device_info->image_format_support[format] == (KAN_RENDER_IMAGE_FORMAT_SUPPORT_FLAG_TRANSFER |
+                                                                      KAN_RENDER_IMAGE_FORMAT_SUPPORT_FLAG_SAMPLED |
+                                                                      KAN_RENDER_IMAGE_FORMAT_SUPPORT_FLAG_RENDER))
+        }
     }
 
     kan_free_general (system->utility_allocation_group, physical_devices,
@@ -628,8 +663,10 @@ void render_backend_system_shutdown (kan_context_system_handle_t handle)
         while (detached_image_destroy)
         {
 #if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_PROFILE_MEMORY)
-            transfer_memory_between_groups (detached_image_destroy->gpu_size,
-                                            detached_image_destroy->gpu_allocation_group,
+            VkMemoryRequirements requirements;
+            vkGetImageMemoryRequirements (system->device, detached_image_destroy->detached_image, &requirements);
+
+            transfer_memory_between_groups (requirements.size, detached_image_destroy->gpu_allocation_group,
                                             system->memory_profiling.gpu_unmarked_group);
 #endif
 
@@ -880,32 +917,6 @@ kan_bool_t kan_render_backend_system_select_device (kan_context_system_handle_t 
     {
         KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR,
                  "Unable to select device: requested device has no combined graphics and transfer queue family.")
-        return KAN_FALSE;
-    }
-
-    VkFormatProperties format_properties;
-    vkGetPhysicalDeviceFormatProperties (physical_device, DEPTH_FORMAT, &format_properties);
-
-    if ((format_properties.optimalTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT) == 0u)
-    {
-        KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR,
-                 "Unable to select device: preferred depth format is not optimal.")
-        return KAN_FALSE;
-    }
-
-    vkGetPhysicalDeviceFormatProperties (physical_device, STENCIL_FORMAT, &format_properties);
-    if ((format_properties.optimalTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT) == 0u)
-    {
-        KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR,
-                 "Unable to select device: preferred stencil format is not optimal.")
-        return KAN_FALSE;
-    }
-
-    vkGetPhysicalDeviceFormatProperties (physical_device, DEPTH_STENCIL_FORMAT, &format_properties);
-    if ((format_properties.optimalTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT) == 0u)
-    {
-        KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR,
-                 "Unable to select device: preferred depth stencil format is not optimal.")
         return KAN_FALSE;
     }
 
@@ -1419,8 +1430,7 @@ static void render_backend_system_submit_transfer (struct render_backend_system_
 
     while (image_upload)
     {
-        VkImageAspectFlags image_aspect =
-            kan_render_image_description_calculate_aspects (&image_upload->image->description);
+        VkImageAspectFlags image_aspect = get_image_aspects (&image_upload->image->description);
 
         uint32_t width;
         uint32_t height;
@@ -1522,8 +1532,7 @@ static inline void submit_mip_generation (struct render_backend_system_t *system
 
     while (image_mip_generation)
     {
-        VkImageAspectFlags image_aspect =
-            kan_render_image_description_calculate_aspects (&image_mip_generation->image->description);
+        VkImageAspectFlags image_aspect = get_image_aspects (&image_mip_generation->image->description);
 
         for (uint8_t output_mip = image_mip_generation->first + 1u; output_mip <= image_mip_generation->last;
              ++output_mip)
@@ -1817,8 +1826,8 @@ static inline void process_frame_buffer_create_requests (struct render_backend_s
                     .pNext = NULL,
                     .flags = 0u,
                     .image = frame_buffer->attachments[attachment_index].image->image,
-                    .viewType = kan_render_image_description_calculate_view_type (&image->description),
-                    .format = kan_render_image_description_calculate_format (system, &image->description),
+                    .viewType = get_image_view_type (&image->description),
+                    .format = image_format_to_vulkan (image->description.format),
                     .components =
                         {
                             .r = VK_COMPONENT_SWIZZLE_IDENTITY,
@@ -1828,7 +1837,7 @@ static inline void process_frame_buffer_create_requests (struct render_backend_s
                         },
                     .subresourceRange =
                         {
-                            .aspectMask = kan_render_image_description_calculate_aspects (&image->description),
+                            .aspectMask = get_image_aspects (&image->description),
                             .baseMipLevel = 0u,
                             .levelCount = 1u,
                             .baseArrayLayer = 0u,
@@ -1968,37 +1977,29 @@ static inline void process_surface_blit_requests (struct render_backend_system_t
         {
             if (request->image->last_command_layout != VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL)
             {
-                if (request->image->description.type != KAN_RENDER_IMAGE_TYPE_COLOR_2D)
-                {
-                    KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR,
-                             "Caught attempt to blit image to present surface where image is not color 2d image!")
-                }
-                else
-                {
-                    VkImageMemoryBarrier barrier_info = {
-                        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-                        .pNext = NULL,
-                        .srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-                        .dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
-                        .oldLayout = request->image->last_command_layout,
-                        .newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                        .srcQueueFamilyIndex = system->device_queue_family_index,
-                        .dstQueueFamilyIndex = system->device_queue_family_index,
-                        .image = request->image->image,
-                        .subresourceRange =
-                            {
-                                .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-                                .baseMipLevel = 0u,
-                                .levelCount = 1u,
-                                .baseArrayLayer = 0u,
-                                .layerCount = 1u,
-                            },
-                    };
+                VkImageMemoryBarrier barrier_info = {
+                    .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+                    .pNext = NULL,
+                    .srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+                    .dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
+                    .oldLayout = request->image->last_command_layout,
+                    .newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                    .srcQueueFamilyIndex = system->device_queue_family_index,
+                    .dstQueueFamilyIndex = system->device_queue_family_index,
+                    .image = request->image->image,
+                    .subresourceRange =
+                        {
+                            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                            .baseMipLevel = 0u,
+                            .levelCount = 1u,
+                            .baseArrayLayer = 0u,
+                            .layerCount = 1u,
+                        },
+                };
 
-                    vkCmdPipelineBarrier (state->primary_command_buffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                                          VK_PIPELINE_STAGE_TRANSFER_BIT, 0u, 0u, NULL, 0u, NULL, 1u, &barrier_info);
-                    request->image->last_command_layout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-                }
+                vkCmdPipelineBarrier (state->primary_command_buffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                                      VK_PIPELINE_STAGE_TRANSFER_BIT, 0u, 0u, NULL, 0u, NULL, 1u, &barrier_info);
+                request->image->last_command_layout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
             }
 
             // Prepare destination surface image.
@@ -2203,18 +2204,17 @@ static void render_backend_system_submit_pass_instance (struct render_backend_sy
             VkAccessFlags possible_access_flags = 0u;
             VkAccessFlags target_access_flags = 0u;
 
-            switch (attachment->image->description.type)
+            switch (get_image_format_class (attachment->image->description.format))
             {
-            case KAN_RENDER_IMAGE_TYPE_COLOR_2D:
-            case KAN_RENDER_IMAGE_TYPE_COLOR_3D:
+            case IMAGE_FORMAT_CLASS_COLOR:
                 target_layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
                 possible_access_flags |= VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
                 target_access_flags |= VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
                 break;
 
-            case KAN_RENDER_IMAGE_TYPE_DEPTH:
-            case KAN_RENDER_IMAGE_TYPE_STENCIL:
-            case KAN_RENDER_IMAGE_TYPE_DEPTH_STENCIL:
+            case IMAGE_FORMAT_CLASS_DEPTH:
+            case IMAGE_FORMAT_CLASS_STENCIL:
+            case IMAGE_FORMAT_CLASS_DEPTH_STENCIL:
                 target_layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
                 possible_access_flags |=
                     VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
@@ -2247,8 +2247,7 @@ static void render_backend_system_submit_pass_instance (struct render_backend_sy
                     .image = attachment->image->image,
                     .subresourceRange =
                         {
-                            .aspectMask =
-                                kan_render_image_description_calculate_aspects (&attachment->image->description),
+                            .aspectMask = get_image_aspects (&attachment->image->description),
                             .baseMipLevel = 0u,
                             .levelCount = 1u,
                             .baseArrayLayer = 0u,
@@ -2331,16 +2330,15 @@ static void render_backend_system_submit_pass_instance (struct render_backend_sy
         if (attachment->type == KAN_FRAME_BUFFER_ATTACHMENT_IMAGE && attachment->image->description.supports_sampling)
         {
             VkAccessFlags possible_access_flags = 0u;
-            switch (attachment->image->description.type)
+            switch (get_image_format_class (attachment->image->description.format))
             {
-            case KAN_RENDER_IMAGE_TYPE_COLOR_2D:
-            case KAN_RENDER_IMAGE_TYPE_COLOR_3D:
+            case IMAGE_FORMAT_CLASS_COLOR:
                 possible_access_flags |= VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
                 break;
 
-            case KAN_RENDER_IMAGE_TYPE_DEPTH:
-            case KAN_RENDER_IMAGE_TYPE_STENCIL:
-            case KAN_RENDER_IMAGE_TYPE_DEPTH_STENCIL:
+            case IMAGE_FORMAT_CLASS_DEPTH:
+            case IMAGE_FORMAT_CLASS_STENCIL:
+            case IMAGE_FORMAT_CLASS_DEPTH_STENCIL:
                 possible_access_flags |=
                     VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
                 break;
@@ -2358,7 +2356,7 @@ static void render_backend_system_submit_pass_instance (struct render_backend_sy
                 .image = attachment->image->image,
                 .subresourceRange =
                     {
-                        .aspectMask = kan_render_image_description_calculate_aspects (&attachment->image->description),
+                        .aspectMask = get_image_aspects (&attachment->image->description),
                         .baseMipLevel = 0u,
                         .levelCount = 1u,
                         .baseArrayLayer = 0u,
@@ -2562,16 +2560,7 @@ static void render_backend_system_submit_read_back (struct render_backend_system
     struct scheduled_surface_read_back_t *surface_read_back = first_surface_read_back;
     while (surface_read_back)
     {
-        const uint32_t space_left =
-            surface_read_back->read_back_offset < surface_read_back->read_back_buffer->full_size ?
-                surface_read_back->read_back_buffer->full_size - surface_read_back->read_back_offset :
-                0u;
-
-        const uint32_t space_needed = surface_read_back->surface->swap_chain_creation_window_width *
-                                      surface_read_back->surface->swap_chain_creation_window_height *
-                                      SURFACE_COLOR_FORMAT_TEXEL_SIZE;
-
-        if (surface_read_back->surface->images && space_needed <= space_left)
+        if (surface_read_back->surface->images)
         {
             surface_read_back->status->state = KAN_RENDER_READ_BACK_STATE_SCHEDULED;
             ++image_barriers_needed;
@@ -2587,13 +2576,7 @@ static void render_backend_system_submit_read_back (struct render_backend_system
     struct scheduled_buffer_read_back_t *buffer_read_back = first_buffer_read_back;
     while (buffer_read_back)
     {
-        const uint32_t space_left =
-            buffer_read_back->read_back_offset < buffer_read_back->read_back_buffer->full_size ?
-                buffer_read_back->read_back_buffer->full_size - buffer_read_back->read_back_offset :
-                0u;
-
-        const uint32_t space_needed = buffer_read_back->slice;
-        if (buffer_read_back->buffer->buffer != VK_NULL_HANDLE && space_needed <= space_left)
+        if (buffer_read_back->buffer->buffer != VK_NULL_HANDLE)
         {
             buffer_read_back->status->state = KAN_RENDER_READ_BACK_STATE_SCHEDULED;
             ++buffer_barriers_needed;
@@ -2609,23 +2592,8 @@ static void render_backend_system_submit_read_back (struct render_backend_system
     struct scheduled_image_read_back_t *image_read_back = first_image_read_back;
     while (image_read_back)
     {
-        const uint32_t space_left =
-            image_read_back->read_back_offset < image_read_back->read_back_buffer->full_size ?
-                image_read_back->read_back_buffer->full_size - image_read_back->read_back_offset :
-                0u;
-
-        uint32_t width;
-        uint32_t height;
-        uint32_t depth;
-        kan_render_image_description_calculate_size_at_mip (&image_read_back->image->description, image_read_back->mip,
-                                                            &width, &height, &depth);
-
-        const uint32_t space_needed =
-            width * height * depth *
-            kan_render_image_description_calculate_texel_size (system, &image_read_back->image->description);
-
         if (image_read_back->image->image != VK_NULL_HANDLE &&
-            image_read_back->mip < image_read_back->image->description.mips && space_needed <= space_left)
+            image_read_back->mip < image_read_back->image->description.mips)
         {
             image_read_back->status->state = KAN_RENDER_READ_BACK_STATE_SCHEDULED;
             ++image_barriers_needed;
@@ -2771,8 +2739,7 @@ static void render_backend_system_submit_read_back (struct render_backend_system
                 .image = image_read_back->image->image,
                 .subresourceRange =
                     {
-                        .aspectMask =
-                            kan_render_image_description_calculate_aspects (&image_read_back->image->description),
+                        .aspectMask = get_image_aspects (&image_read_back->image->description),
                         .baseMipLevel = image_read_back->mip,
                         .levelCount = 1u,
                         .baseArrayLayer = 0u,
@@ -2867,8 +2834,7 @@ static void render_backend_system_submit_read_back (struct render_backend_system
                 .bufferImageHeight = 0u,
                 .imageSubresource =
                     {
-                        .aspectMask =
-                            kan_render_image_description_calculate_aspects (&image_read_back->image->description),
+                        .aspectMask = get_image_aspects (&image_read_back->image->description),
                         .mipLevel = image_read_back->mip,
                         .baseArrayLayer = 0u,
                         .layerCount = 1u,
@@ -2917,8 +2883,7 @@ static void render_backend_system_submit_read_back (struct render_backend_system
                 .image = image_read_back->image->image,
                 .subresourceRange =
                     {
-                        .aspectMask =
-                            kan_render_image_description_calculate_aspects (&image_read_back->image->description),
+                        .aspectMask = get_image_aspects (&image_read_back->image->description),
                         .baseMipLevel = image_read_back->mip,
                         .levelCount = 1u,
                         .baseArrayLayer = 0u,
@@ -3531,14 +3496,16 @@ static void render_backend_surface_create_swap_chain (struct render_backend_surf
     }
 
     kan_bool_t format_found = KAN_FALSE;
-    VkSurfaceFormatKHR surface_format;
+    VkSurfaceFormatKHR surface_format = {
+        .format = image_format_to_vulkan (KAN_RENDER_IMAGE_FORMAT_SURFACE),
+        .colorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR,
+    };
 
     for (uint32_t index = 0u; index < formats_count; ++index)
     {
-        if (formats[index].format == SURFACE_COLOR_FORMAT && formats[index].colorSpace == SURFACE_COLOR_SPACE)
+        if (formats[index].format == surface_format.format && formats[index].colorSpace == surface_format.colorSpace)
         {
             format_found = KAN_TRUE;
-            surface_format = formats[index];
             break;
         }
     }
@@ -4106,7 +4073,10 @@ kan_bool_t kan_render_backend_system_next_frame (kan_context_system_handle_t ren
     while (detached_image_destroy)
     {
 #if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_PROFILE_MEMORY)
-        transfer_memory_between_groups (detached_image_destroy->gpu_size, detached_image_destroy->gpu_allocation_group,
+        VkMemoryRequirements requirements;
+        vkGetImageMemoryRequirements (system->device, detached_image_destroy->detached_image, &requirements);
+
+        transfer_memory_between_groups (requirements.size, detached_image_destroy->gpu_allocation_group,
                                         system->memory_profiling.gpu_unmarked_group);
 #endif
 

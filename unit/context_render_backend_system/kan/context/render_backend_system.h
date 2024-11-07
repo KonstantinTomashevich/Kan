@@ -93,12 +93,96 @@ enum kan_render_device_memory_type_t
     KAN_RENDER_DEVICE_MEMORY_TYPE_UNIFIED_COHERENT,
 };
 
+enum kan_render_image_format_t
+{
+    KAN_RENDER_IMAGE_FORMAT_R8_SRGB = 0u,
+    KAN_RENDER_IMAGE_FORMAT_RG16_SRGB,
+    KAN_RENDER_IMAGE_FORMAT_RGB24_SRGB,
+    KAN_RENDER_IMAGE_FORMAT_RGBA32_SRGB,
+    KAN_RENDER_IMAGE_FORMAT_BGRA32_SRGB,
+
+    KAN_RENDER_IMAGE_FORMAT_R32_SFLOAT,
+    KAN_RENDER_IMAGE_FORMAT_RG64_SFLOAT,
+    KAN_RENDER_IMAGE_FORMAT_RGB96_SFLOAT,
+    KAN_RENDER_IMAGE_FORMAT_RGBA128_SFLOAT,
+
+    KAN_RENDER_IMAGE_FORMAT_D16_UNORM,
+    KAN_RENDER_IMAGE_FORMAT_D32_SFLOAT,
+
+    KAN_RENDER_IMAGE_FORMAT_S8_UINT,
+
+    KAN_RENDER_IMAGE_FORMAT_D16_UNORM_S8_UINT,
+    KAN_RENDER_IMAGE_FORMAT_D24_UNORM_S8_UINT,
+    KAN_RENDER_IMAGE_FORMAT_D32_SFLOAT_S8_UINT,
+
+    KAN_RENDER_IMAGE_FORMAT_BC1_RGB_UNORM_BLOCK,
+    KAN_RENDER_IMAGE_FORMAT_BC1_RGB_SRGB_BLOCK,
+    KAN_RENDER_IMAGE_FORMAT_BC1_RGBA_UNORM_BLOCK,
+    KAN_RENDER_IMAGE_FORMAT_BC1_RGBA_SRGB_BLOCK,
+    KAN_RENDER_IMAGE_FORMAT_BC2_UNORM_BLOCK,
+    KAN_RENDER_IMAGE_FORMAT_BC2_SRGB_BLOCK,
+    KAN_RENDER_IMAGE_FORMAT_BC3_UNORM_BLOCK,
+    KAN_RENDER_IMAGE_FORMAT_BC3_SRGB_BLOCK,
+    KAN_RENDER_IMAGE_FORMAT_BC4_UNORM_BLOCK,
+    KAN_RENDER_IMAGE_FORMAT_BC4_SNORM_BLOCK,
+    KAN_RENDER_IMAGE_FORMAT_BC5_UNORM_BLOCK,
+    KAN_RENDER_IMAGE_FORMAT_BC5_SNORM_BLOCK,
+    KAN_RENDER_IMAGE_FORMAT_BC6H_UFLOAT_BLOCK,
+    KAN_RENDER_IMAGE_FORMAT_BC6H_SFLOAT_BLOCK,
+    KAN_RENDER_IMAGE_FORMAT_BC7_UNORM_BLOCK,
+    KAN_RENDER_IMAGE_FORMAT_BC7_SRGB_BLOCK,
+    KAN_RENDER_IMAGE_FORMAT_ETC2_RGB24_UNORM_BLOCK,
+    KAN_RENDER_IMAGE_FORMAT_ETC2_RGB24_SRGB_BLOCK,
+    KAN_RENDER_IMAGE_FORMAT_ETC2_RGBA25_UNORM_BLOCK,
+    KAN_RENDER_IMAGE_FORMAT_ETC2_RGBA25_SRGB_BLOCK,
+    KAN_RENDER_IMAGE_FORMAT_ETC2_RGBA32_UNORM_BLOCK,
+    KAN_RENDER_IMAGE_FORMAT_ETC2_RGBA32_SRGB_BLOCK,
+    KAN_RENDER_IMAGE_FORMAT_ASTC_4x4_UNORM_BLOCK,
+    KAN_RENDER_IMAGE_FORMAT_ASTC_4x4_SRGB_BLOCK,
+    KAN_RENDER_IMAGE_FORMAT_ASTC_5x4_UNORM_BLOCK,
+    KAN_RENDER_IMAGE_FORMAT_ASTC_5x4_SRGB_BLOCK,
+    KAN_RENDER_IMAGE_FORMAT_ASTC_5x5_UNORM_BLOCK,
+    KAN_RENDER_IMAGE_FORMAT_ASTC_5x5_SRGB_BLOCK,
+    KAN_RENDER_IMAGE_FORMAT_ASTC_6x5_UNORM_BLOCK,
+    KAN_RENDER_IMAGE_FORMAT_ASTC_6x5_SRGB_BLOCK,
+    KAN_RENDER_IMAGE_FORMAT_ASTC_6x6_UNORM_BLOCK,
+    KAN_RENDER_IMAGE_FORMAT_ASTC_6x6_SRGB_BLOCK,
+    KAN_RENDER_IMAGE_FORMAT_ASTC_8x5_UNORM_BLOCK,
+    KAN_RENDER_IMAGE_FORMAT_ASTC_8x5_SRGB_BLOCK,
+    KAN_RENDER_IMAGE_FORMAT_ASTC_8x6_UNORM_BLOCK,
+    KAN_RENDER_IMAGE_FORMAT_ASTC_8x6_SRGB_BLOCK,
+    KAN_RENDER_IMAGE_FORMAT_ASTC_8x8_UNORM_BLOCK,
+    KAN_RENDER_IMAGE_FORMAT_ASTC_8x8_SRGB_BLOCK,
+    KAN_RENDER_IMAGE_FORMAT_ASTC_10x5_UNORM_BLOCK,
+    KAN_RENDER_IMAGE_FORMAT_ASTC_10x5_SRGB_BLOCK,
+    KAN_RENDER_IMAGE_FORMAT_ASTC_10x6_UNORM_BLOCK,
+    KAN_RENDER_IMAGE_FORMAT_ASTC_10x6_SRGB_BLOCK,
+    KAN_RENDER_IMAGE_FORMAT_ASTC_10x8_UNORM_BLOCK,
+    KAN_RENDER_IMAGE_FORMAT_ASTC_10x8_SRGB_BLOCK,
+    KAN_RENDER_IMAGE_FORMAT_ASTC_10x10_UNORM_BLOCK,
+    KAN_RENDER_IMAGE_FORMAT_ASTC_10x10_SRGB_BLOCK,
+    KAN_RENDER_IMAGE_FORMAT_ASTC_12x10_UNORM_BLOCK,
+    KAN_RENDER_IMAGE_FORMAT_ASTC_12x10_SRGB_BLOCK,
+    KAN_RENDER_IMAGE_FORMAT_ASTC_12x12_UNORM_BLOCK,
+    KAN_RENDER_IMAGE_FORMAT_ASTC_12x12_SRGB_BLOCK,
+
+    KAN_RENDER_IMAGE_FORMAT_COUNT,
+
+    /// \brief As of now, we always use BGRA for surfaces.
+    KAN_RENDER_IMAGE_FORMAT_SURFACE = KAN_RENDER_IMAGE_FORMAT_BGRA32_SRGB,
+};
+
+#define KAN_RENDER_IMAGE_FORMAT_SUPPORT_FLAG_TRANSFER (1u << 0u)
+#define KAN_RENDER_IMAGE_FORMAT_SUPPORT_FLAG_SAMPLED (1u << 1u)
+#define KAN_RENDER_IMAGE_FORMAT_SUPPORT_FLAG_RENDER (1u << 2u)
+
 struct kan_render_supported_device_info_t
 {
     kan_render_device_id_t id;
     const char *name;
     enum kan_render_device_type_t device_type;
     enum kan_render_device_memory_type_t memory_type;
+    uint8_t image_format_support[KAN_RENDER_IMAGE_FORMAT_COUNT];
 };
 
 struct kan_render_supported_devices_t
@@ -129,8 +213,6 @@ struct kan_render_integer_region_t
     uint32_t width;
     uint32_t height;
 };
-
-// TODO: Add API for making screenshots. Possibly something for recording screen (useful for crashes and bug reports)?
 
 CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_surface_t
 kan_render_backend_system_create_surface (kan_context_system_handle_t render_backend_system,
@@ -241,22 +323,6 @@ enum kan_render_pass_attachment_type_t
     KAN_RENDER_PASS_ATTACHMENT_DEPTH_STENCIL,
 };
 
-enum kan_render_color_format_t
-{
-    KAN_RENDER_COLOR_FORMAT_R8_SRGB = 0u,
-    KAN_RENDER_COLOR_FORMAT_RG16_SRGB,
-    KAN_RENDER_COLOR_FORMAT_RGB24_SRGB,
-    KAN_RENDER_COLOR_FORMAT_RGBA32_SRGB,
-
-    KAN_RENDER_COLOR_FORMAT_R32_SFLOAT,
-    KAN_RENDER_COLOR_FORMAT_RG64_SFLOAT,
-    KAN_RENDER_COLOR_FORMAT_RGB96_SFLOAT,
-    KAN_RENDER_COLOR_FORMAT_RGBA128_SFLOAT,
-
-    /// \brief Special value that indicates that color format which is currently used for surfaces should be used here.
-    KAN_RENDER_COLOR_FORMAT_SURFACE,
-};
-
 enum kan_render_load_operation_t
 {
     KAN_RENDER_LOAD_OPERATION_ANY = 0u,
@@ -274,7 +340,7 @@ enum kan_render_store_operation_t
 struct kan_render_pass_attachment_t
 {
     enum kan_render_pass_attachment_type_t type;
-    enum kan_render_color_format_t color_format;
+    enum kan_render_image_format_t format;
     uint32_t samples;
     enum kan_render_load_operation_t load_operation;
     enum kan_render_store_operation_t store_operation;
@@ -776,20 +842,9 @@ CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_frame_lifetime_buffer_allocato
 
 // TODO: For future iterations: cube maps and layered images (aka image arrays).
 
-enum kan_render_image_type_t
-{
-    KAN_RENDER_IMAGE_TYPE_COLOR_2D,
-    KAN_RENDER_IMAGE_TYPE_COLOR_3D,
-    KAN_RENDER_IMAGE_TYPE_DEPTH,
-    KAN_RENDER_IMAGE_TYPE_STENCIL,
-    KAN_RENDER_IMAGE_TYPE_DEPTH_STENCIL,
-};
-
 struct kan_render_image_description_t
 {
-    enum kan_render_image_type_t type;
-    enum kan_render_color_format_t color_format;
-
+    enum kan_render_image_format_t format;
     uint32_t width;
     uint32_t height;
     uint32_t depth;
@@ -804,7 +859,7 @@ struct kan_render_image_description_t
 CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_image_t
 kan_render_image_create (kan_render_context_t context, struct kan_render_image_description_t *description);
 
-CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_image_upload_data (kan_render_image_t image, uint8_t mip, void *data);
+CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_image_upload_data (kan_render_image_t image, uint8_t mip, uint32_t data_size, void *data);
 
 /// \brief Requests image mip generation to be executed from the first mip to the last (including it).
 /// \invariant First mip is already filled with image data using `kan_render_image_upload_data`.
@@ -834,14 +889,18 @@ enum kan_render_read_back_state_t
 
 CONTEXT_RENDER_BACKEND_SYSTEM_API uint64_t kan_render_get_read_back_max_delay_in_frames (void);
 
-CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_read_back_status_t
-kan_render_read_back_request_from_surface (kan_render_surface_t surface, kan_render_buffer_t read_back_buffer, uint32_t read_back_offset);
-
-CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_read_back_status_t kan_render_read_back_request_from_buffer (
-    kan_render_buffer_t buffer, uint32_t offset, uint32_t slice, kan_render_buffer_t read_back_buffer, uint32_t read_back_offset);
+CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_read_back_status_t kan_render_read_back_request_from_surface (
+    kan_render_surface_t surface, kan_render_buffer_t read_back_buffer, uint32_t read_back_offset);
 
 CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_read_back_status_t
-kan_render_read_back_request_from_image (kan_render_image_t image, uint8_t mip, kan_render_buffer_t read_back_buffer, uint32_t read_back_offset);
+kan_render_read_back_request_from_buffer (kan_render_buffer_t buffer,
+                                          uint32_t offset,
+                                          uint32_t slice,
+                                          kan_render_buffer_t read_back_buffer,
+                                          uint32_t read_back_offset);
+
+CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_read_back_status_t kan_render_read_back_request_from_image (
+    kan_render_image_t image, uint8_t mip, kan_render_buffer_t read_back_buffer, uint32_t read_back_offset);
 
 CONTEXT_RENDER_BACKEND_SYSTEM_API enum kan_render_read_back_state_t kan_read_read_back_status_get (
     kan_render_read_back_status_t status);

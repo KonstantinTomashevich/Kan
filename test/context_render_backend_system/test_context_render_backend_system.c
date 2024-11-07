@@ -4,8 +4,10 @@
 
 #include <kan/context/render_backend_system.h>
 #include <kan/cpu_profiler/markup.h>
+#include <kan/file_system/stream.h>
+#include <kan/image/image.h>
 #include <kan/inline_math/inline_math.h>
-#include <kan/memory_profiler/capture.h>
+#include <kan/memory/allocation.h>
 #include <kan/platform/application.h>
 #include <kan/platform/precise_time.h>
 #include <kan/render_backend_tools/render_backend_tools.h>
@@ -100,7 +102,7 @@ static kan_render_pass_t create_render_image_pass (kan_render_context_t render_c
     struct kan_render_pass_attachment_t attachments[] = {
         {
             .type = KAN_RENDER_PASS_ATTACHMENT_COLOR,
-            .color_format = KAN_RENDER_COLOR_FORMAT_RGBA32_SRGB,
+            .format = KAN_RENDER_IMAGE_FORMAT_RGBA32_SRGB,
             .samples = 1u,
             .load_operation = KAN_RENDER_LOAD_OPERATION_CLEAR,
             .store_operation = KAN_RENDER_STORE_OPERATION_STORE,
@@ -373,13 +375,14 @@ static kan_render_pass_t create_cube_pass (kan_render_context_t render_context)
     struct kan_render_pass_attachment_t attachments[] = {
         {
             .type = KAN_RENDER_PASS_ATTACHMENT_COLOR,
-            .color_format = KAN_RENDER_COLOR_FORMAT_SURFACE,
+            .format = KAN_RENDER_IMAGE_FORMAT_SURFACE,
             .samples = 1u,
             .load_operation = KAN_RENDER_LOAD_OPERATION_CLEAR,
             .store_operation = KAN_RENDER_STORE_OPERATION_STORE,
         },
         {
             .type = KAN_RENDER_PASS_ATTACHMENT_DEPTH,
+            .format = KAN_RENDER_IMAGE_FORMAT_D32_SFLOAT,
             .samples = 1u,
             .load_operation = KAN_RENDER_LOAD_OPERATION_CLEAR,
             .store_operation = KAN_RENDER_STORE_OPERATION_ANY,
@@ -636,7 +639,39 @@ static kan_render_graphics_pipeline_t create_cube_pipeline (kan_render_context_t
     return pipeline;
 }
 
-KAN_TEST_CASE (temp)
+static void bgra_to_rgba (uint32_t *input_bgra, uint32_t *output_rgba, uint32_t count)
+{
+    while (count--)
+    {
+        *output_rgba =
+            ((*input_bgra & 0x00FF0000) >> 16u) | ((*input_bgra & 0x000000FF) << 16u) | (*input_bgra & 0xFF00FF00);
+
+        ++input_bgra;
+        ++output_rgba;
+    }
+}
+
+static void check_rgba_equal_enough (uint32_t *first, uint32_t *second, uint32_t count)
+{
+    uint32_t error_count = 0u;
+    // Not more than 1% of errors.
+    uint32_t max_error_count = count / 100u;
+
+    while (count--)
+    {
+        if (*first != *second)
+        {
+            ++error_count;
+        }
+
+        ++first;
+        ++second;
+    }
+
+    KAN_TEST_CHECK (error_count < max_error_count)
+}
+
+KAN_TEST_CASE (render_and_capture)
 {
     kan_platform_application_init ();
     kan_context_handle_t context =
@@ -680,17 +715,25 @@ KAN_TEST_CASE (temp)
         }
     }
 
+    KAN_TEST_ASSERT (devices->devices[picked_device_index].image_format_support[KAN_RENDER_IMAGE_FORMAT_RGBA32_SRGB] &
+                     KAN_RENDER_IMAGE_FORMAT_SUPPORT_FLAG_TRANSFER)
+    KAN_TEST_ASSERT (devices->devices[picked_device_index].image_format_support[KAN_RENDER_IMAGE_FORMAT_RGBA32_SRGB] &
+                     KAN_RENDER_IMAGE_FORMAT_SUPPORT_FLAG_SAMPLED)
+    KAN_TEST_ASSERT (devices->devices[picked_device_index].image_format_support[KAN_RENDER_IMAGE_FORMAT_RGBA32_SRGB] &
+                     KAN_RENDER_IMAGE_FORMAT_SUPPORT_FLAG_RENDER)
+    KAN_TEST_ASSERT (devices->devices[picked_device_index].image_format_support[KAN_RENDER_IMAGE_FORMAT_D32_SFLOAT] &
+                     KAN_RENDER_IMAGE_FORMAT_SUPPORT_FLAG_RENDER)
+
     kan_render_backend_system_select_device (render_backend_system, picked_device);
-    const uint64_t base_window_size = 512u;
+    const uint64_t fixed_window_size = 1024u;
     kan_application_system_window_handle_t window_handle = kan_application_system_window_create (
-        application_system, "Kan context_render_backend test window", base_window_size, base_window_size,
-        kan_render_get_required_window_flags () | KAN_PLATFORM_WINDOW_FLAG_RESIZABLE);
+        application_system, "Kan context_render_backend test window", fixed_window_size, fixed_window_size,
+        // Not having KAN_PLATFORM_WINDOW_FLAG_RESIZABLE results in severe FPS drop on some NVIDIA drivers.
+        // It is okay for automatic test, but beware in real applications.
+        kan_render_get_required_window_flags ());
 
     const struct kan_application_system_window_info_t *window_info =
         kan_application_system_get_window_info_from_handle (application_system, window_handle);
-
-    kan_application_system_event_iterator_t event_iterator =
-        kan_application_system_event_iterator_create (application_system);
 
     kan_render_surface_t test_surface =
         kan_render_backend_system_create_surface (render_backend_system, window_handle, kan_string_intern ("test"));
@@ -719,8 +762,7 @@ KAN_TEST_CASE (temp)
 
     const uint64_t render_target_image_size = 256u;
     struct kan_render_image_description_t render_target_image_description = {
-        .type = KAN_RENDER_IMAGE_TYPE_COLOR_2D,
-        .color_format = KAN_RENDER_COLOR_FORMAT_RGBA32_SRGB,
+        .format = KAN_RENDER_IMAGE_FORMAT_RGBA32_SRGB,
         .width = render_target_image_size,
         .height = render_target_image_size,
         .depth = 1u,
@@ -733,9 +775,9 @@ KAN_TEST_CASE (temp)
     kan_render_image_t render_target_image = kan_render_image_create (render_context, &render_target_image_description);
 
     struct kan_render_image_description_t depth_image_description = {
-        .type = KAN_RENDER_IMAGE_TYPE_DEPTH,
-        .width = base_window_size,
-        .height = base_window_size,
+        .format = KAN_RENDER_IMAGE_FORMAT_D32_SFLOAT,
+        .width = fixed_window_size,
+        .height = fixed_window_size,
         .depth = 1u,
         .mips = 1u,
         .render_target = KAN_TRUE,
@@ -849,7 +891,9 @@ KAN_TEST_CASE (temp)
 #define INSTANCED_CUBES_Y 16u
 #define INSTANCED_CUBES_Z 16u
 #define MAX_INSTANCED_CUBES (INSTANCED_CUBES_X * INSTANCED_CUBES_Y * INSTANCED_CUBES_Z)
-    struct cube_instanced_t *cube_instanced_data = malloc (sizeof (struct cube_instanced_t) * MAX_INSTANCED_CUBES);
+    struct cube_instanced_t *cube_instanced_data =
+        kan_allocate_general (KAN_ALLOCATION_GROUP_IGNORE, sizeof (struct cube_instanced_t) * MAX_INSTANCED_CUBES,
+                              _Alignof (struct cube_instanced_t));
 
     struct pass_t pass_data;
     kan_render_buffer_t pass_buffer = kan_render_buffer_create (
@@ -941,38 +985,28 @@ KAN_TEST_CASE (temp)
             (MAX_INSTANCED_CUBES + 2u) * sizeof (struct cube_instanced_t), KAN_FALSE,
             kan_string_intern ("cube_instanced"));
 
-    uint64_t width = base_window_size;
-    uint64_t height = base_window_size;
+    uint64_t frame = 0u;
     uint64_t last_render_image_frame = UINT64_MAX;
-    kan_bool_t exit_requested = KAN_FALSE;
 
-    // #define TEST_FRAMES 600u
-    for (uint64_t frame = 0u; !exit_requested /*frame < TEST_FRAMES*/; ++frame)
+    kan_render_read_back_status_t first_frame_read_back = KAN_INVALID_RENDER_READ_BACK_STATUS;
+    kan_render_read_back_status_t second_frame_read_back = KAN_INVALID_RENDER_READ_BACK_STATUS;
+
+    kan_render_buffer_t first_read_back_buffer = kan_render_buffer_create (
+        render_context, KAN_RENDER_BUFFER_TYPE_READ_BACK_STORAGE, fixed_window_size * fixed_window_size * 4u, NULL,
+        kan_string_intern ("read_back_first"));
+
+    kan_render_buffer_t second_read_back_buffer = kan_render_buffer_create (
+        render_context, KAN_RENDER_BUFFER_TYPE_READ_BACK_STORAGE, fixed_window_size * fixed_window_size * 4u, NULL,
+        kan_string_intern ("read_back_second"));
+
+    while (first_frame_read_back == KAN_INVALID_RENDER_READ_BACK_STATUS ||
+           second_frame_read_back == KAN_INVALID_RENDER_READ_BACK_STATUS ||
+           kan_read_read_back_status_get (first_frame_read_back) != KAN_RENDER_READ_BACK_STATE_FINISHED ||
+           kan_read_read_back_status_get (second_frame_read_back) != KAN_RENDER_READ_BACK_STATE_FINISHED)
     {
-        const uint64_t start_time = kan_platform_get_elapsed_nanoseconds ();
         kan_application_system_sync_in_main_thread (application_system);
-
-        const struct kan_platform_application_event_t *event;
-        while ((event = kan_application_system_event_iterator_get (application_system, event_iterator)))
-        {
-            if (event->type == KAN_PLATFORM_APPLICATION_EVENT_TYPE_QUIT)
-            {
-                exit_requested = KAN_TRUE;
-            }
-
-            event_iterator = kan_application_system_event_iterator_advance (event_iterator);
-        }
-
-        if (width != window_info->width_for_render || height != window_info->height_for_render)
-        {
-            width = window_info->width_for_render;
-            height = window_info->height_for_render;
-            kan_render_image_resize_render_target (depth_image, width, height, 1u);
-        }
-
         if (kan_render_backend_system_next_frame (render_backend_system))
         {
-            const uint64_t render_cpu_start_time = kan_platform_get_elapsed_nanoseconds ();
             struct kan_render_viewport_bounds_t cube_viewport_bounds = {
                 .x = 0.0f,
                 .y = 0.0f,
@@ -1004,7 +1038,8 @@ KAN_TEST_CASE (temp)
             if (cube_instance != KAN_INVALID_RENDER_PASS_INSTANCE)
             {
                 struct kan_float_matrix_4x4_t projection;
-                kan_perspective_projection (&projection, KAN_PI_2, ((float) width) / ((float) height), 0.01f, 5000.0f);
+                kan_perspective_projection (&projection, KAN_PI_2,
+                                            ((float) fixed_window_size) / ((float) fixed_window_size), 0.01f, 5000.0f);
 
                 struct kan_transform_3_t camera_transform = kan_transform_3_get_identity ();
                 camera_transform.location.y = 17.5f;
@@ -1080,7 +1115,8 @@ KAN_TEST_CASE (temp)
                                                          0u, 0u, MAX_INSTANCED_CUBES);
             }
 
-            if (last_render_image_frame == UINT64_MAX || frame - last_render_image_frame >= 5u)
+#define RENDER_IMAGE_EVERY 5u
+            if (last_render_image_frame == UINT64_MAX || frame - last_render_image_frame >= RENDER_IMAGE_EVERY)
             {
                 struct kan_render_viewport_bounds_t render_image_viewport_bounds = {
                     .x = 0.0f,
@@ -1110,6 +1146,13 @@ KAN_TEST_CASE (temp)
 
                 if (render_image_instance != KAN_INVALID_RENDER_PASS_INSTANCE)
                 {
+                    if (first_frame_read_back == KAN_INVALID_RENDER_READ_BACK_STATUS)
+                    {
+                        first_frame_read_back =
+                            kan_render_read_back_request_from_surface (test_surface, first_read_back_buffer, 0u);
+                        KAN_TEST_ASSERT (first_frame_read_back != KAN_INVALID_RENDER_READ_BACK_STATUS)
+                    }
+
                     kan_render_pass_instance_graphics_pipeline (render_image_instance, render_image_pipeline);
                     kan_render_pass_instance_pipeline_parameter_sets (render_image_instance, 1u, &render_image_set);
                     kan_render_pass_instance_attributes (render_image_instance,
@@ -1128,26 +1171,79 @@ KAN_TEST_CASE (temp)
                     last_render_image_frame = frame;
                 }
             }
-
-            const uint64_t render_cpu_end_time = kan_platform_get_elapsed_nanoseconds ();
-            const uint64_t render_cpu_duration = render_cpu_end_time - render_cpu_start_time;
-            printf ("[DEBUG RANDOM HITCH] Render CPU duration: %f ms.\n", ((float) render_cpu_duration) / 1000000.0f);
-        }
-
-        const uint64_t end_time = kan_platform_get_elapsed_nanoseconds ();
-        const uint64_t duration = end_time - start_time;
-
-        if (duration < 4000000u)
-        {
-            // Sleep to avoid exiting too fast.
-            kan_platform_sleep (4000000u - duration);
+            else if (frame - last_render_image_frame == RENDER_IMAGE_EVERY - 1u &&
+                     second_frame_read_back == KAN_INVALID_RENDER_READ_BACK_STATUS)
+            {
+                second_frame_read_back =
+                    kan_render_read_back_request_from_surface (test_surface, second_read_back_buffer, 0u);
+                KAN_TEST_ASSERT (second_frame_read_back != KAN_INVALID_RENDER_READ_BACK_STATUS)
+            }
         }
 
         kan_cpu_stage_separator ();
+        ++frame;
     }
 
-    free (cube_instanced_data);
-    kan_application_system_event_iterator_destroy (application_system, event_iterator);
+#define FIRST_READ_BACK_NAME "frame_0.png"
+#define SECOND_READ_BACK_NAME "frame_4.png"
+
+#define WRITE_CAPTURED(NAME)                                                                                           \
+    {                                                                                                                  \
+        struct kan_stream_t *output_stream = kan_direct_file_stream_open_for_write (NAME, KAN_TRUE);                   \
+        KAN_TEST_ASSERT (output_stream)                                                                                \
+        KAN_TEST_ASSERT (kan_image_save (output_stream, KAN_IMAGE_SAVE_FORMAT_PNG, &frame_raw_data));                  \
+        output_stream->operations->close (output_stream);                                                              \
+    }
+
+#define READ_EXPECTATION(NAME)                                                                                         \
+    {                                                                                                                  \
+        kan_image_raw_data_init (&expected_raw_data);                                                                  \
+        struct kan_stream_t *input_stream =                                                                            \
+            kan_direct_file_stream_open_for_read ("../../expectation/" NAME, KAN_TRUE);                                \
+        KAN_TEST_ASSERT (input_stream)                                                                                 \
+        KAN_TEST_ASSERT (kan_image_load (input_stream, &expected_raw_data))                                            \
+        input_stream->operations->close (input_stream);                                                                \
+    }
+
+    uint32_t *frame_rgba_data = kan_allocate_general (
+        KAN_ALLOCATION_GROUP_IGNORE, sizeof (uint32_t) * fixed_window_size * fixed_window_size, _Alignof (uint32_t));
+
+    struct kan_image_raw_data_t frame_raw_data;
+    frame_raw_data.width = (uint32_t) fixed_window_size;
+    frame_raw_data.height = (uint32_t) fixed_window_size;
+    frame_raw_data.data = (uint8_t *) frame_rgba_data;
+    struct kan_image_raw_data_t expected_raw_data;
+
+    void *frame_0_data = kan_render_buffer_begin_access (first_read_back_buffer);
+    KAN_TEST_ASSERT (frame_0_data)
+    _Static_assert (KAN_RENDER_IMAGE_FORMAT_SURFACE == KAN_RENDER_IMAGE_FORMAT_BGRA32_SRGB,
+                    "BGRA is still used for every surface.");
+    bgra_to_rgba (frame_0_data, frame_rgba_data, fixed_window_size * fixed_window_size);
+    kan_render_buffer_end_access (first_read_back_buffer);
+
+    WRITE_CAPTURED (FIRST_READ_BACK_NAME)
+    READ_EXPECTATION (FIRST_READ_BACK_NAME)
+    check_rgba_equal_enough (frame_rgba_data, (uint32_t *) expected_raw_data.data,
+                             fixed_window_size * fixed_window_size);
+    kan_image_raw_data_shutdown (&expected_raw_data);
+
+    void *frame_1_data = kan_render_buffer_begin_access (second_read_back_buffer);
+    KAN_TEST_ASSERT (frame_1_data)
+    _Static_assert (KAN_RENDER_IMAGE_FORMAT_SURFACE == KAN_RENDER_IMAGE_FORMAT_BGRA32_SRGB,
+                    "BGRA is still used for every surface.");
+    bgra_to_rgba (frame_1_data, frame_rgba_data, fixed_window_size * fixed_window_size);
+    kan_render_buffer_end_access (second_read_back_buffer);
+
+    WRITE_CAPTURED (SECOND_READ_BACK_NAME)
+    READ_EXPECTATION (SECOND_READ_BACK_NAME)
+    check_rgba_equal_enough (frame_rgba_data, (uint32_t *) expected_raw_data.data,
+                             fixed_window_size * fixed_window_size);
+    kan_image_raw_data_shutdown (&expected_raw_data);
+
+    kan_free_general (KAN_ALLOCATION_GROUP_IGNORE, frame_rgba_data,
+                      sizeof (uint32_t) * fixed_window_size * fixed_window_size);
+    kan_free_general (KAN_ALLOCATION_GROUP_IGNORE, cube_instanced_data,
+                      sizeof (struct cube_instanced_t) * MAX_INSTANCED_CUBES);
     kan_application_system_prepare_for_destroy_in_main_thread (application_system);
 
 #undef TEST_FRAMES
