@@ -2166,14 +2166,10 @@ static inline void process_surface_blit_requests (struct render_backend_system_t
     kan_cpu_section_execution_shutdown (&execution);
 }
 
-static void render_backend_system_submit_pass_instance (struct render_backend_system_t *system,
-                                                        struct render_backend_command_state_t *state,
-                                                        struct render_backend_pass_instance_t *pass_instance)
+static inline void execute_pass_instance_submission (struct render_backend_system_t *system,
+                                                     struct render_backend_command_state_t *state,
+                                                     struct render_backend_pass_instance_t *pass_instance)
 {
-    struct kan_cpu_section_execution_t execution;
-    kan_cpu_section_execution_init (&execution, system->section_submit_pass_instance);
-    vkEndCommandBuffer (pass_instance->command_buffer);
-
     // We put lots of barrier here in order to be sure that everything works properly.
     // It might not be the best from performance point of view, might need investigation later.
 
@@ -2383,6 +2379,34 @@ static void render_backend_system_submit_pass_instance (struct render_backend_sy
     {
         kan_free_general (system->utility_allocation_group, image_barriers,
                           sizeof (VkImageMemoryBarrier) * pass_instance->frame_buffer->attachments_count);
+    }
+}
+
+static void render_backend_system_submit_pass_instance (struct render_backend_system_t *system,
+                                                        struct render_backend_command_state_t *state,
+                                                        struct render_backend_pass_instance_t *pass_instance)
+{
+    struct kan_cpu_section_execution_t execution;
+    kan_cpu_section_execution_init (&execution, system->section_submit_pass_instance);
+    vkEndCommandBuffer (pass_instance->command_buffer);
+
+    if (pass_instance->render_pass_begin_info.framebuffer == VK_NULL_HANDLE)
+    {
+        pass_instance->render_pass_begin_info.framebuffer =
+            pass_instance->frame_buffer->instance_array ?
+                pass_instance->frame_buffer->instance_array[pass_instance->frame_buffer->instance_index] :
+                pass_instance->frame_buffer->instance;
+    }
+
+    if (pass_instance->render_pass_begin_info.framebuffer != VK_NULL_HANDLE)
+    {
+        execute_pass_instance_submission (system, state, pass_instance);
+    }
+    else
+    {
+        KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR,
+                 "Failed to submit instance of pass \"%s\" due to frame buffer not being ready.",
+                 pass_instance->pass->tracking_name)
     }
 
     struct render_backend_pass_instance_dependency_t *dependant = pass_instance->first_dependant;

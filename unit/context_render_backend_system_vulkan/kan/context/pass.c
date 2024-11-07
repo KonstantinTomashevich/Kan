@@ -328,7 +328,8 @@ kan_render_pass_instance_t kan_render_pass_instantiate (kan_render_pass_t pass,
                                               frame_buffer_data->instance_array[frame_buffer_data->instance_index] :
                                               frame_buffer_data->instance;
 
-    if (!pass_data->system->frame_started || selected_frame_buffer == VK_NULL_HANDLE)
+    // We intentionally skip frame buffer check as frame buffer might be created during frame end before submission.
+    if (!pass_data->system->frame_started)
     {
         kan_cpu_section_execution_shutdown (&execution);
         return KAN_INVALID_RENDER_PASS_INSTANCE;
