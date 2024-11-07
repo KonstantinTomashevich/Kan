@@ -575,60 +575,6 @@ void render_backend_compiler_state_destroy_graphics_request (struct graphics_pip
     kan_free_batched (allocation_group, request);
 }
 
-static inline VkFilter to_vulkan_filter (enum kan_render_filter_mode_t filter)
-{
-    switch (filter)
-    {
-    case KAN_RENDER_FILTER_MODE_NEAREST:
-        return VK_FILTER_NEAREST;
-
-    case KAN_RENDER_FILTER_MODE_LINEAR:
-        return VK_FILTER_LINEAR;
-    }
-
-    KAN_ASSERT (KAN_FALSE)
-    return VK_FILTER_LINEAR;
-}
-
-static inline VkSamplerMipmapMode to_vulkan_sampler_mip_map_mode (enum kan_render_mip_map_mode_t mode)
-{
-    switch (mode)
-    {
-    case KAN_RENDER_MIP_MAP_MODE_NEAREST:
-        return VK_SAMPLER_MIPMAP_MODE_NEAREST;
-
-    case KAN_RENDER_MIP_MAP_MODE_LINEAR:
-        return VK_SAMPLER_MIPMAP_MODE_LINEAR;
-    }
-
-    KAN_ASSERT (KAN_FALSE)
-    return VK_SAMPLER_MIPMAP_MODE_LINEAR;
-}
-
-static inline VkSamplerAddressMode to_vulkan_sampler_address_mode (enum kan_render_address_mode_t mode)
-{
-    switch (mode)
-    {
-    case KAN_RENDER_ADDRESS_MODE_REPEAT:
-        return VK_SAMPLER_ADDRESS_MODE_REPEAT;
-
-    case KAN_RENDER_ADDRESS_MODE_MIRRORED_REPEAT:
-        return VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT;
-
-    case KAN_RENDER_ADDRESS_MODE_CLAMP_TO_EDGE:
-        return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-
-    case KAN_RENDER_ADDRESS_MODE_MIRRORED_CLAMP_TO_EDGE:
-        return VK_SAMPLER_ADDRESS_MODE_MIRROR_CLAMP_TO_EDGE;
-
-    case KAN_RENDER_ADDRESS_MODE_CLAMP_TO_BORDER:
-        return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
-    }
-
-    KAN_ASSERT (KAN_FALSE)
-    return VK_SAMPLER_ADDRESS_MODE_REPEAT;
-}
-
 struct render_backend_graphics_pipeline_t *render_backend_system_create_graphics_pipeline (
     struct render_backend_system_t *system,
     struct kan_render_graphics_pipeline_description_t *description,
@@ -639,137 +585,6 @@ struct render_backend_graphics_pipeline_t *render_backend_system_create_graphics
 
     struct render_backend_graphics_pipeline_family_t *family =
         (struct render_backend_graphics_pipeline_family_t *) description->family;
-
-    kan_bool_t samplers_created = KAN_TRUE;
-    struct render_backend_pipeline_sampler_t *samplers = NULL;
-
-    if (description->samplers_count > 0u)
-    {
-        samplers =
-            kan_allocate_general (system->pipeline_wrapper_allocation_group,
-                                  sizeof (struct render_backend_pipeline_sampler_t) * description->samplers_count,
-                                  _Alignof (struct render_backend_pipeline_sampler_t));
-
-        for (uint64_t sampler_index = 0u; sampler_index < description->samplers_count; ++sampler_index)
-        {
-            samplers[sampler_index].sampler = VK_NULL_HANDLE;
-        }
-
-        for (uint64_t sampler_index = 0u; sampler_index < description->samplers_count; ++sampler_index)
-        {
-            struct kan_render_sampler_description_t *input = &description->samplers[sampler_index];
-            struct render_backend_pipeline_sampler_t *output = &samplers[sampler_index];
-            output->set = (uint32_t) input->parameter_set;
-            output->binding = (uint32_t) input->parameter_binding;
-
-            if (input->parameter_set >= family->descriptor_set_layouts_count)
-            {
-                KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR,
-                         "Unable to create pipeline \"%s\" from family \"%s\": found attempt to bind sampler to set "
-                         "%lu while there is only %lu sets.",
-                         description->tracking_name, family->tracking_name, (unsigned long) input->parameter_set,
-                         (unsigned long) family->descriptor_set_layouts_count)
-                samplers_created = KAN_FALSE;
-                break;
-            }
-
-            if (input->parameter_binding >= family->descriptor_set_layouts[input->parameter_set]->bindings_count)
-            {
-                KAN_LOG (
-                    render_backend_system_vulkan, KAN_LOG_ERROR,
-                    "Unable to create pipeline \"%s\" from family \"%s\": found attempt to bind sampler to binding "
-                    "%lu while there is only %lu bindings (set %lu).",
-                    description->tracking_name, family->tracking_name, (unsigned long) input->parameter_binding,
-                    (unsigned long) family->descriptor_set_layouts[input->parameter_set]->bindings_count,
-                    (unsigned long) input->parameter_set)
-                samplers_created = KAN_FALSE;
-                break;
-            }
-
-            if (family->descriptor_set_layouts[input->parameter_set]->bindings[input->parameter_binding].type !=
-                KAN_RENDER_PARAMETER_BINDING_TYPE_COMBINED_IMAGE_SAMPLER)
-            {
-                KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR,
-                         "Unable to create pipeline \"%s\" from family \"%s\": found attempt to bind sampler to set "
-                         "%lu binding %lu, but it is not an image slot.",
-                         description->tracking_name, family->tracking_name, (unsigned long) input->parameter_set,
-                         (unsigned long) input->parameter_binding)
-                samplers_created = KAN_FALSE;
-                break;
-            }
-
-            VkSamplerCreateInfo sampler_create_info = {
-                .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
-                .pNext = NULL,
-                .flags = 0u,
-                .magFilter = to_vulkan_filter (input->mag_filter),
-                .minFilter = to_vulkan_filter (input->min_filter),
-                .mipmapMode = to_vulkan_sampler_mip_map_mode (input->mip_map_mode),
-                .addressModeU = to_vulkan_sampler_address_mode (input->address_mode_u),
-                .addressModeV = to_vulkan_sampler_address_mode (input->address_mode_v),
-                .addressModeW = to_vulkan_sampler_address_mode (input->address_mode_w),
-                .mipLodBias = 0.0f,
-                .anisotropyEnable = VK_FALSE,
-                .maxAnisotropy = 1.0f,
-                .compareEnable = VK_FALSE,
-                .compareOp = VK_COMPARE_OP_NEVER,
-                .minLod = 0.0f,
-                .maxLod = 0.0f,
-                .borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE,
-                .unnormalizedCoordinates = VK_FALSE,
-            };
-
-            if (vkCreateSampler (system->device, &sampler_create_info, VULKAN_ALLOCATION_CALLBACKS (system),
-                                 &output->sampler) != VK_SUCCESS)
-            {
-                KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR,
-                         "Unable to create pipeline \"%s\" from family \"%s\": failed to create sampler at index %lu.",
-                         description->tracking_name, family->tracking_name, (unsigned long) sampler_index)
-
-                output->sampler = VK_NULL_HANDLE;
-                samplers_created = KAN_FALSE;
-                break;
-            }
-
-#if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED)
-            char debug_name[KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME];
-            snprintf (debug_name, KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME,
-                      "Sampler::ForPipeline::%s::attachment%lu", description->tracking_name,
-                      (unsigned long) sampler_index);
-
-            struct VkDebugUtilsObjectNameInfoEXT object_name = {
-                .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
-                .pNext = NULL,
-                .objectType = VK_OBJECT_TYPE_SAMPLER,
-                .objectHandle = (uint64_t) output->sampler,
-                .pObjectName = debug_name,
-            };
-
-            vkSetDebugUtilsObjectNameEXT (system->device, &object_name);
-#endif
-        }
-    }
-
-    if (!samplers_created)
-    {
-        for (uint64_t sampler_index = 0u; sampler_index < description->samplers_count; ++sampler_index)
-        {
-            if (samplers[sampler_index].sampler != VK_NULL_HANDLE)
-            {
-                vkDestroySampler (system->device, samplers[sampler_index].sampler,
-                                  VULKAN_ALLOCATION_CALLBACKS (system));
-            }
-        }
-
-        if (samplers)
-        {
-            kan_free_general (system->pipeline_wrapper_allocation_group, samplers,
-                              sizeof (struct render_backend_pipeline_sampler_t) * description->samplers_count);
-        }
-
-        kan_cpu_section_execution_shutdown (&execution);
-        return NULL;
-    }
 
     struct render_backend_graphics_pipeline_t *pipeline = kan_allocate_batched (
         system->pipeline_wrapper_allocation_group, sizeof (struct render_backend_graphics_pipeline_t));
@@ -785,9 +600,6 @@ struct render_backend_graphics_pipeline_t *render_backend_system_create_graphics
 
     pipeline->min_depth = description->min_depth;
     pipeline->max_depth = description->max_depth;
-
-    pipeline->samplers_count = description->samplers_count;
-    pipeline->samplers = samplers;
 
     // Because creation is done under resource management lock and compilation request does not require it,
     // we schedule compilation separately. Therefore, initially pipeline is in compilation failed state.
@@ -811,18 +623,6 @@ void render_backend_system_destroy_graphics_pipeline (struct render_backend_syst
         vkDestroyPipeline (system->device, pipeline->pipeline, VULKAN_ALLOCATION_CALLBACKS (system));
     }
 
-    for (uint64_t sampler_index = 0u; sampler_index < pipeline->samplers_count; ++sampler_index)
-    {
-        vkDestroySampler (system->device, pipeline->samplers[sampler_index].sampler,
-                          VULKAN_ALLOCATION_CALLBACKS (system));
-    }
-
-    if (pipeline->samplers)
-    {
-        kan_free_general (system->pipeline_wrapper_allocation_group, pipeline->samplers,
-                          sizeof (struct render_backend_pipeline_sampler_t) * pipeline->samplers_count);
-    }
-
     kan_free_batched (system->pipeline_wrapper_allocation_group, pipeline);
 }
 
@@ -837,7 +637,6 @@ kan_render_graphics_pipeline_t kan_render_graphics_pipeline_create (
 
     struct render_backend_graphics_pipeline_t *pipeline =
         render_backend_system_create_graphics_pipeline (system, description, compilation_priority);
-
     render_backend_compiler_state_request_graphics (&system->compiler_state, pipeline, description);
     kan_cpu_section_execution_shutdown (&execution);
     return pipeline ? (kan_render_graphics_pipeline_t) pipeline : KAN_INVALID_RENDER_GRAPHICS_PIPELINE;

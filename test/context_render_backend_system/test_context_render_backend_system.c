@@ -119,10 +119,12 @@ static kan_render_pass_t create_render_image_pass (kan_render_context_t render_c
     return kan_render_pass_create (render_context, &description);
 }
 
-static kan_render_graphics_pipeline_t create_render_image_pipeline (kan_render_context_t render_context,
-                                                                    kan_render_pass_t render_image_pass,
-                                                                    uint64_t *output_attribute_binding,
-                                                                    uint64_t *output_config_binding)
+static kan_render_graphics_pipeline_t create_render_image_pipeline (
+    kan_render_context_t render_context,
+    kan_render_pass_t render_image_pass,
+    kan_render_graphics_pipeline_family_t *output_family,
+    uint64_t *output_attribute_binding,
+    uint64_t *output_config_binding)
 {
     kan_rpl_parser_t parser = kan_rpl_parser_create (kan_string_intern ("render_image"));
     KAN_TEST_ASSERT (kan_rpl_parser_add_source (parser, render_image_shader, kan_string_intern ("render_image")))
@@ -211,6 +213,7 @@ static kan_render_graphics_pipeline_t create_render_image_pipeline (kan_render_c
     kan_render_graphics_pipeline_family_t family =
         kan_render_graphics_pipeline_family_create (render_context, &pipeline_family_description);
     KAN_TEST_ASSERT (family != KAN_INVALID_RENDER_GRAPHICS_PIPELINE_FAMILY)
+    *output_family = family;
 
     kan_render_code_module_t code_module = kan_render_code_module_create (
         render_context, code.size * code.item_size, code.data, kan_string_intern ("render_image"));
@@ -291,8 +294,6 @@ static kan_render_graphics_pipeline_t create_render_image_pipeline (kan_render_c
             },
         .code_modules_count = sizeof (code_modules) / sizeof (code_modules[0u]),
         .code_modules = code_modules,
-        .samplers_count = 0u,
-        .samplers = NULL,
         .tracking_name = kan_string_intern ("render_image"),
     };
 
@@ -401,6 +402,7 @@ static kan_render_pass_t create_cube_pass (kan_render_context_t render_context)
 
 static kan_render_graphics_pipeline_t create_cube_pipeline (kan_render_context_t render_context,
                                                             kan_render_pass_t cube_pass,
+                                                            kan_render_graphics_pipeline_family_t *output_family,
                                                             uint64_t *output_attribute_vertex_binding,
                                                             uint64_t *output_pass_binding,
                                                             uint64_t *output_diffuse_color_binding,
@@ -503,6 +505,15 @@ static kan_render_graphics_pipeline_t create_cube_pipeline (kan_render_context_t
     material_parameter_set_bindings[0u].used_stage_mask =
         (1u << KAN_RENDER_STAGE_GRAPHICS_VERTEX) | (1u << KAN_RENDER_STAGE_GRAPHICS_FRAGMENT);
 
+    material_parameter_set_bindings[0u].combined_image_sampler = (struct kan_render_sampler_description_t) {
+        .mag_filter = KAN_RENDER_FILTER_MODE_NEAREST,
+        .min_filter = KAN_RENDER_FILTER_MODE_NEAREST,
+        .mip_map_mode = KAN_RENDER_MIP_MAP_MODE_NEAREST,
+        .address_mode_u = KAN_RENDER_ADDRESS_MODE_REPEAT,
+        .address_mode_v = KAN_RENDER_ADDRESS_MODE_REPEAT,
+        .address_mode_w = KAN_RENDER_ADDRESS_MODE_REPEAT,
+    };
+
     KAN_TEST_ASSERT (meta.set_unstable.buffers.size == 1u)
     buffer = &((struct kan_rpl_meta_buffer_t *) meta.set_unstable.buffers.data)[0u];
     parameter_sets[2u].set = (uint32_t) KAN_RPL_SET_UNSTABLE;
@@ -532,6 +543,7 @@ static kan_render_graphics_pipeline_t create_cube_pipeline (kan_render_context_t
     kan_render_graphics_pipeline_family_t family =
         kan_render_graphics_pipeline_family_create (render_context, &pipeline_family_description);
     KAN_TEST_ASSERT (family != KAN_INVALID_RENDER_GRAPHICS_PIPELINE_FAMILY)
+    *output_family = family;
 
     kan_render_code_module_t code_module = kan_render_code_module_create (render_context, code.size * code.item_size,
                                                                           code.data, kan_string_intern ("cube"));
@@ -568,19 +580,6 @@ static kan_render_graphics_pipeline_t create_cube_pipeline (kan_render_context_t
             .code_module = code_module,
             .entry_points_count = sizeof (code_entry_points) / sizeof (code_entry_points[0u]),
             .entry_points = code_entry_points,
-        },
-    };
-
-    struct kan_render_sampler_description_t samplers[] = {
-        {
-            .parameter_set = (uint32_t) KAN_RPL_SET_MATERIAL,
-            .parameter_binding = *output_diffuse_color_binding,
-            .mag_filter = KAN_RENDER_FILTER_MODE_NEAREST,
-            .min_filter = KAN_RENDER_FILTER_MODE_NEAREST,
-            .mip_map_mode = KAN_RENDER_MIP_MAP_MODE_NEAREST,
-            .address_mode_u = KAN_RENDER_ADDRESS_MODE_REPEAT,
-            .address_mode_v = KAN_RENDER_ADDRESS_MODE_REPEAT,
-            .address_mode_w = KAN_RENDER_ADDRESS_MODE_REPEAT,
         },
     };
 
@@ -625,8 +624,6 @@ static kan_render_graphics_pipeline_t create_cube_pipeline (kan_render_context_t
             },
         .code_modules_count = sizeof (code_modules) / sizeof (code_modules[0u]),
         .code_modules = code_modules,
-        .samplers_count = sizeof (samplers) / sizeof (samplers[0u]),
-        .samplers = samplers,
         .tracking_name = kan_string_intern ("cube"),
     };
 
@@ -758,8 +755,10 @@ KAN_TEST_CASE (render_and_capture)
     uint64_t render_image_attribute_binding;
     uint64_t render_image_config_binding;
 
-    kan_render_graphics_pipeline_t render_image_pipeline = create_render_image_pipeline (
-        render_context, render_image_pass, &render_image_attribute_binding, &render_image_config_binding);
+    kan_render_graphics_pipeline_family_t render_image_pipeline_family;
+    kan_render_graphics_pipeline_t render_image_pipeline =
+        create_render_image_pipeline (render_context, render_image_pass, &render_image_pipeline_family,
+                                      &render_image_attribute_binding, &render_image_config_binding);
     KAN_TEST_ASSERT (render_image_pipeline != KAN_INVALID_RENDER_GRAPHICS_PIPELINE)
 
     uint64_t cube_attribute_vertex_binding;
@@ -767,9 +766,10 @@ KAN_TEST_CASE (render_and_capture)
     uint64_t cube_diffuse_color_binding;
     uint64_t cube_instanced_binding;
 
+    kan_render_graphics_pipeline_family_t cube_pipeline_family;
     kan_render_graphics_pipeline_t cube_pipeline =
-        create_cube_pipeline (render_context, cube_pass, &cube_attribute_vertex_binding, &cube_pass_binding,
-                              &cube_diffuse_color_binding, &cube_instanced_binding);
+        create_cube_pipeline (render_context, cube_pass, &cube_pipeline_family, &cube_attribute_vertex_binding,
+                              &cube_pass_binding, &cube_diffuse_color_binding, &cube_instanced_binding);
 
     const uint64_t render_target_image_size = 256u;
     struct kan_render_image_description_t render_target_image_description = {
@@ -921,8 +921,8 @@ KAN_TEST_CASE (render_and_capture)
     }};
 
     struct kan_render_pipeline_parameter_set_description_t render_image_set_description = {
-        .pipeline_type = KAN_RENDER_PIPELINE_TYPE_GRAPHICS,
-        .graphics_pipeline = render_image_pipeline,
+        .family_type = KAN_RENDER_PIPELINE_TYPE_GRAPHICS,
+        .graphics_family = render_image_pipeline_family,
         .set = (uint32_t) KAN_RPL_SET_MATERIAL,
         .tracking_name = kan_string_intern ("render_image"),
         .initial_bindings_count = sizeof (render_image_parameters) / sizeof (render_image_parameters[0u]),
@@ -945,8 +945,8 @@ KAN_TEST_CASE (render_and_capture)
     };
 
     struct kan_render_pipeline_parameter_set_description_t cube_pass_set_description = {
-        .pipeline_type = KAN_RENDER_PIPELINE_TYPE_GRAPHICS,
-        .graphics_pipeline = cube_pipeline,
+        .family_type = KAN_RENDER_PIPELINE_TYPE_GRAPHICS,
+        .graphics_family = cube_pipeline_family,
         .set = (uint32_t) KAN_RPL_SET_PASS,
         .tracking_name = kan_string_intern ("cube_pass"),
         .initial_bindings_count = sizeof (cube_pass_parameters) / sizeof (cube_pass_parameters[0u]),
@@ -967,8 +967,8 @@ KAN_TEST_CASE (render_and_capture)
     };
 
     struct kan_render_pipeline_parameter_set_description_t cube_material_set_description = {
-        .pipeline_type = KAN_RENDER_PIPELINE_TYPE_GRAPHICS,
-        .graphics_pipeline = cube_pipeline,
+        .family_type = KAN_RENDER_PIPELINE_TYPE_GRAPHICS,
+        .graphics_family = cube_pipeline_family,
         .set = (uint32_t) KAN_RPL_SET_MATERIAL,
         .tracking_name = kan_string_intern ("cube_material"),
         .initial_bindings_count = sizeof (cube_material_parameters) / sizeof (cube_material_parameters[0u]),
@@ -979,8 +979,8 @@ KAN_TEST_CASE (render_and_capture)
         kan_render_pipeline_parameter_set_create (render_context, &cube_material_set_description);
 
     struct kan_render_pipeline_parameter_set_description_t cube_instanced_set_description = {
-        .pipeline_type = KAN_RENDER_PIPELINE_TYPE_GRAPHICS,
-        .graphics_pipeline = cube_pipeline,
+        .family_type = KAN_RENDER_PIPELINE_TYPE_GRAPHICS,
+        .graphics_family = cube_pipeline_family,
         .set = (uint32_t) KAN_RPL_SET_UNSTABLE,
         .tracking_name = kan_string_intern ("cube_instanced"),
         .initial_bindings_count = 0u,
@@ -1150,17 +1150,19 @@ KAN_TEST_CASE (render_and_capture)
                     instanced_cube_set, sizeof (cube_unstable_parameters) / sizeof (cube_unstable_parameters[0u]),
                     cube_unstable_parameters);
 
-                kan_render_pass_instance_graphics_pipeline (cube_instance, cube_pipeline);
-                kan_render_pipeline_parameter_set_t sets[] = {pass_cube_set, material_cube_set, instanced_cube_set};
-                kan_render_pass_instance_pipeline_parameter_sets (cube_instance, sizeof (sets) / sizeof (sets[0u]),
-                                                                  sets);
+                if (kan_render_pass_instance_graphics_pipeline (cube_instance, cube_pipeline))
+                {
+                    kan_render_pipeline_parameter_set_t sets[] = {pass_cube_set, material_cube_set, instanced_cube_set};
+                    kan_render_pass_instance_pipeline_parameter_sets (cube_instance, sizeof (sets) / sizeof (sets[0u]),
+                                                                      sets);
 
-                kan_render_pass_instance_attributes (cube_instance, (uint32_t) cube_attribute_vertex_binding, 1u,
-                                                     &cube_vertex_buffer);
-                kan_render_pass_instance_indices (cube_instance, cube_index_buffer);
-                kan_render_pass_instance_instanced_draw (cube_instance, 0u,
-                                                         (uint32_t) (sizeof (cube_indices) / sizeof (cube_indices[0u])),
-                                                         0u, 0u, MAX_INSTANCED_CUBES);
+                    kan_render_pass_instance_attributes (cube_instance, (uint32_t) cube_attribute_vertex_binding, 1u,
+                                                         &cube_vertex_buffer);
+                    kan_render_pass_instance_indices (cube_instance, cube_index_buffer);
+                    kan_render_pass_instance_instanced_draw (
+                        cube_instance, 0u, (uint32_t) (sizeof (cube_indices) / sizeof (cube_indices[0u])), 0u, 0u,
+                        MAX_INSTANCED_CUBES);
+                }
             }
 
 #define RENDER_IMAGE_EVERY 5u
@@ -1203,15 +1205,18 @@ KAN_TEST_CASE (render_and_capture)
                     }
 #endif
 
-                    kan_render_pass_instance_graphics_pipeline (render_image_instance, render_image_pipeline);
-                    kan_render_pass_instance_pipeline_parameter_sets (render_image_instance, 1u, &render_image_set);
-                    kan_render_pass_instance_attributes (render_image_instance,
-                                                         (uint32_t) render_image_attribute_binding, 1u,
-                                                         &render_image_quad_vertex_buffer);
-                    kan_render_pass_instance_indices (render_image_instance, render_image_quad_index_buffer);
-                    kan_render_pass_instance_draw (
-                        render_image_instance, 0u,
-                        (uint32_t) (sizeof (render_image_quad_indices) / sizeof (render_image_quad_indices[0u])), 0u);
+                    if (kan_render_pass_instance_graphics_pipeline (render_image_instance, render_image_pipeline))
+                    {
+                        kan_render_pass_instance_pipeline_parameter_sets (render_image_instance, 1u, &render_image_set);
+                        kan_render_pass_instance_attributes (render_image_instance,
+                                                             (uint32_t) render_image_attribute_binding, 1u,
+                                                             &render_image_quad_vertex_buffer);
+                        kan_render_pass_instance_indices (render_image_instance, render_image_quad_index_buffer);
+                        kan_render_pass_instance_draw (
+                            render_image_instance, 0u,
+                            (uint32_t) (sizeof (render_image_quad_indices) / sizeof (render_image_quad_indices[0u])),
+                            0u);
+                    }
 
                     if (cube_instance != KAN_INVALID_RENDER_PASS_INSTANCE)
                     {

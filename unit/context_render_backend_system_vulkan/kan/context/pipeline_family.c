@@ -1,23 +1,90 @@
 #include <kan/context/render_backend_implementation_interface.h>
 
+static inline VkFilter to_vulkan_filter (enum kan_render_filter_mode_t filter)
+{
+    switch (filter)
+    {
+    case KAN_RENDER_FILTER_MODE_NEAREST:
+        return VK_FILTER_NEAREST;
+
+    case KAN_RENDER_FILTER_MODE_LINEAR:
+        return VK_FILTER_LINEAR;
+    }
+
+    KAN_ASSERT (KAN_FALSE)
+    return VK_FILTER_LINEAR;
+}
+
+static inline VkSamplerMipmapMode to_vulkan_sampler_mip_map_mode (enum kan_render_mip_map_mode_t mode)
+{
+    switch (mode)
+    {
+    case KAN_RENDER_MIP_MAP_MODE_NEAREST:
+        return VK_SAMPLER_MIPMAP_MODE_NEAREST;
+
+    case KAN_RENDER_MIP_MAP_MODE_LINEAR:
+        return VK_SAMPLER_MIPMAP_MODE_LINEAR;
+    }
+
+    KAN_ASSERT (KAN_FALSE)
+    return VK_SAMPLER_MIPMAP_MODE_LINEAR;
+}
+
+static inline VkSamplerAddressMode to_vulkan_sampler_address_mode (enum kan_render_address_mode_t mode)
+{
+    switch (mode)
+    {
+    case KAN_RENDER_ADDRESS_MODE_REPEAT:
+        return VK_SAMPLER_ADDRESS_MODE_REPEAT;
+
+    case KAN_RENDER_ADDRESS_MODE_MIRRORED_REPEAT:
+        return VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT;
+
+    case KAN_RENDER_ADDRESS_MODE_CLAMP_TO_EDGE:
+        return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+
+    case KAN_RENDER_ADDRESS_MODE_MIRRORED_CLAMP_TO_EDGE:
+        return VK_SAMPLER_ADDRESS_MODE_MIRROR_CLAMP_TO_EDGE;
+
+    case KAN_RENDER_ADDRESS_MODE_CLAMP_TO_BORDER:
+        return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+    }
+
+    KAN_ASSERT (KAN_FALSE)
+    return VK_SAMPLER_ADDRESS_MODE_REPEAT;
+}
+
 static inline void free_descriptor_set_layouts (struct render_backend_system_t *system,
                                                 uint64_t descriptor_set_layouts_count,
                                                 struct render_backend_descriptor_set_layout_t **descriptor_set_layouts)
 {
     for (uint64_t index = 0u; index < descriptor_set_layouts_count; ++index)
     {
-        if (descriptor_set_layouts[index] != NULL)
+        struct render_backend_descriptor_set_layout_t *layout = descriptor_set_layouts[index];
+        if (layout)
         {
-            if (descriptor_set_layouts[index]->layout != VK_NULL_HANDLE)
+            if (layout->layout != VK_NULL_HANDLE)
             {
-                vkDestroyDescriptorSetLayout (system->device, descriptor_set_layouts[index]->layout,
+                vkDestroyDescriptorSetLayout (system->device, layout->layout, VULKAN_ALLOCATION_CALLBACKS (system));
+
+                if (layout->combined_image_samplers_count > 0u)
+                {
+                    for (uint64_t binding = 0u; binding < layout->bindings_count; ++binding)
+                    {
+                        if (layout->bindings[binding].type ==
+                                KAN_RENDER_PARAMETER_BINDING_TYPE_COMBINED_IMAGE_SAMPLER &&
+                            layout->bindings[binding].sampler != VK_NULL_HANDLE)
+                        {
+                            vkDestroySampler (system->device, layout->bindings[binding].sampler,
                                               VULKAN_ALLOCATION_CALLBACKS (system));
+                        }
+                    }
+                }
             }
 
-            kan_free_general (
-                system->pipeline_family_wrapper_allocation_group, descriptor_set_layouts[index],
-                sizeof (struct render_backend_descriptor_set_layout_t) +
-                    sizeof (struct render_backend_layout_binding_t) * descriptor_set_layouts[index]->bindings_count);
+            kan_free_general (system->pipeline_family_wrapper_allocation_group, layout,
+                              sizeof (struct render_backend_descriptor_set_layout_t) +
+                                  sizeof (struct render_backend_layout_binding_t) * layout->bindings_count);
         }
     }
 
@@ -169,20 +236,22 @@ struct render_backend_graphics_pipeline_family_t *render_backend_system_create_g
         }
 
 #if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED)
-        char debug_name[KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME];
-        snprintf (debug_name, KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME,
-                  "DescriptorSetLayout::ForPipelineFamily::%s::set%lu", description->tracking_name,
-                  (unsigned long) layout_description->set);
+        {
+            char debug_name[KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME];
+            snprintf (debug_name, KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME,
+                      "DescriptorSetLayout::ForPipelineFamily::%s::set%lu", description->tracking_name,
+                      (unsigned long) layout_description->set);
 
-        struct VkDebugUtilsObjectNameInfoEXT object_name = {
-            .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
-            .pNext = NULL,
-            .objectType = VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT,
-            .objectHandle = (uint64_t) descriptor_set_layouts_for_pipeline[layout_description->set],
-            .pObjectName = debug_name,
-        };
+            struct VkDebugUtilsObjectNameInfoEXT object_name = {
+                .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
+                .pNext = NULL,
+                .objectType = VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT,
+                .objectHandle = (uint64_t) descriptor_set_layouts_for_pipeline[layout_description->set],
+                .pObjectName = debug_name,
+            };
 
-        vkSetDebugUtilsObjectNameEXT (system->device, &object_name);
+            vkSetDebugUtilsObjectNameEXT (system->device, &object_name);
+        }
 #endif
 
         struct render_backend_descriptor_set_layout_t *layout =
@@ -227,9 +296,68 @@ struct render_backend_graphics_pipeline_family_t *render_backend_system_create_g
                 break;
 
             case KAN_RENDER_PARAMETER_BINDING_TYPE_COMBINED_IMAGE_SAMPLER:
+            {
                 KAN_ASSERT (layout->combined_image_samplers_count < UINT8_MAX)
                 ++layout->combined_image_samplers_count;
+
+                VkSamplerCreateInfo sampler_create_info = {
+                    .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
+                    .pNext = NULL,
+                    .flags = 0u,
+                    .magFilter = to_vulkan_filter (binding_description->combined_image_sampler.mag_filter),
+                    .minFilter = to_vulkan_filter (binding_description->combined_image_sampler.min_filter),
+                    .mipmapMode =
+                        to_vulkan_sampler_mip_map_mode (binding_description->combined_image_sampler.mip_map_mode),
+                    .addressModeU =
+                        to_vulkan_sampler_address_mode (binding_description->combined_image_sampler.address_mode_u),
+                    .addressModeV =
+                        to_vulkan_sampler_address_mode (binding_description->combined_image_sampler.address_mode_v),
+                    .addressModeW =
+                        to_vulkan_sampler_address_mode (binding_description->combined_image_sampler.address_mode_w),
+                    .mipLodBias = 0.0f,
+                    .anisotropyEnable = VK_FALSE,
+                    .maxAnisotropy = 1.0f,
+                    .compareEnable = VK_FALSE,
+                    .compareOp = VK_COMPARE_OP_NEVER,
+                    .minLod = 0.0f,
+                    .maxLod = 0.0f,
+                    .borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE,
+                    .unnormalizedCoordinates = VK_FALSE,
+                };
+
+                if (vkCreateSampler (system->device, &sampler_create_info, VULKAN_ALLOCATION_CALLBACKS (system),
+                                     &layout->bindings[binding_description->binding].sampler) != VK_SUCCESS)
+                {
+                    KAN_LOG (
+                        render_backend_system_vulkan, KAN_LOG_ERROR,
+                        "Unable to create pipeline family \"%s\": failed to create sampler at set %lu at binding %lu.",
+                        description->tracking_name, (unsigned long) layout_description->set,
+                        (unsigned long) binding_description->binding)
+
+                    layout->bindings[binding_description->binding].sampler = VK_NULL_HANDLE;
+                    descriptor_set_layouts_created = KAN_FALSE;
+                    break;
+                }
+
+#if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED)
+                char debug_name[KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME];
+                snprintf (debug_name, KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME,
+                          "Sampler::ForPipelineFamily::%s::%lu::%lu", description->tracking_name,
+                          (unsigned long) layout_description->set, (unsigned long) binding_description->binding);
+
+                struct VkDebugUtilsObjectNameInfoEXT object_name = {
+                    .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
+                    .pNext = NULL,
+                    .objectType = VK_OBJECT_TYPE_SAMPLER,
+                    .objectHandle = (uint64_t) layout->bindings[binding_description->binding].sampler,
+                    .pObjectName = debug_name,
+                };
+
+                vkSetDebugUtilsObjectNameEXT (system->device, &object_name);
+#endif
+
                 break;
+            }
             }
         }
     }

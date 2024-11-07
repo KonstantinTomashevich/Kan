@@ -67,6 +67,8 @@ kan_context_system_handle_t render_backend_system_create (kan_allocation_group_t
     system->section_pipeline_compiler_request = kan_cpu_section_get ("render_backend_pipeline_compiler_request");
 
     system->section_pipeline_compilation = kan_cpu_section_get ("render_backend_pipeline_compilation");
+    system->section_wait_for_pipeline_compilation =
+        kan_cpu_section_get ("render_backend_wait_for_pipeline_compilation");
 
     system->section_descriptor_set_allocator_allocate =
         kan_cpu_section_get ("render_backend_descriptor_set_allocator_allocate");

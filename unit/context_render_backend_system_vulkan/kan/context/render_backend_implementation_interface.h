@@ -421,6 +421,11 @@ struct render_backend_layout_binding_t
 {
     enum kan_render_parameter_binding_type_t type;
     uint32_t used_stage_mask;
+
+    union
+    {
+        VkSampler sampler;
+    };
 };
 
 struct render_backend_descriptor_set_layout_t
@@ -486,13 +491,6 @@ enum pipeline_compilation_state_t
     PIPELINE_COMPILATION_STATE_FAILURE,
 };
 
-struct render_backend_pipeline_sampler_t
-{
-    uint32_t set;
-    uint32_t binding;
-    VkSampler sampler;
-};
-
 struct render_backend_graphics_pipeline_t
 {
     struct kan_bd_list_node_t list_node;
@@ -504,9 +502,6 @@ struct render_backend_graphics_pipeline_t
 
     float min_depth;
     float max_depth;
-
-    uint64_t samplers_count;
-    struct render_backend_pipeline_sampler_t *samplers;
 
     enum kan_render_pipeline_compilation_priority_t compilation_priority;
     enum pipeline_compilation_state_t compilation_state;
@@ -573,9 +568,6 @@ struct render_backend_pipeline_parameter_set_t
 
     uint32_t set_index;
     VkImageView *bound_image_views;
-
-    uint64_t pipeline_samplers_count;
-    struct render_backend_pipeline_sampler_t *pipeline_samplers;
 
     struct render_backend_parameter_set_render_target_attachment_t *first_render_target_attachment;
     kan_interned_string_t tracking_name;
@@ -919,6 +911,7 @@ struct render_backend_system_t
     kan_cpu_section_t section_pipeline_compiler_request;
 
     kan_cpu_section_t section_pipeline_compilation;
+    kan_cpu_section_t section_wait_for_pipeline_compilation;
 
     kan_cpu_section_t section_descriptor_set_allocator_allocate;
     kan_cpu_section_t section_descriptor_set_allocator_free;

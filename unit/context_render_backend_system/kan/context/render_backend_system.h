@@ -8,6 +8,158 @@
 #include <kan/context/application_system.h>
 #include <kan/context/context.h>
 
+///// \file
+/// \brief Contains full API of render backed context system with functional basic graphics interface.
+///
+/// \par Definition
+/// \parblock
+/// Render backend system goal is to provide full API for working with GPU and rendering. This API aims to both provide
+/// enough details for optimization and be not as low level as modern APIs like Vulkan, because we need less verbose
+/// and more concrete API to build render foundation on top of this system.
+///
+/// Currently, only the basic API needed to properly render game and build render graph is provided. This system
+/// functionality will expand as needed in the future.
+/// \endparblock
+///
+/// \par Why context system?
+/// \parblock
+/// Render backend needs to manage render surfaces and in order to do it, it must work with windows. It creates strong
+/// coupling with context application system as we need to synchronize all potentially multithreaded operations on
+/// windows through this system. Due to this strong coupling, render backend lifetime became dependent on context
+/// application system. Therefore, it was decided to fully integrate render backend into context ecosystem as system.
+/// \endparblock
+///
+/// \par Render context initialization
+/// \parblock
+/// Render context must be properly initialized in order to be used. It can't be done automatically as render backend
+/// system needs code user to provide configuration data based on device support information which is generated during
+/// system startup.
+///
+/// First of all, render context is never created if `kan_render_backend_system_config_t::disable_render` is true.
+///
+/// Then, to properly initialize context, user must select appropriate device from supported devices information.
+/// To get supported devices, use `kan_render_backend_system_get_devices`. Device query is guaranteed to be done during
+/// system startup on all implementations, therefore this function call is technically almost free. After that, program
+/// should use provided information to select supported device and pass its id to
+/// `kan_render_backend_system_select_device`. If that call has returned KAN_TRUE, then render backend is initialized
+/// successfully and cannot be reinitialized during this program execution.
+/// \endparblock
+///
+/// \par Surfaces
+/// \parblock
+/// Surfaces are used to present render results to windows. Use `kan_render_backend_system_create_surface` to create
+/// surface and `kan_render_backend_system_destroy_surface` to schedule surface destruction. Swap chain is created
+/// automatically under the hood. Swap chain recreation on window size changes is executed automatically too.
+///
+/// Due to synchronization with window manager, surface might not be ready until the next frame after its creation.
+/// It can still be attached to frame buffer as valid handle, but that means that this frame buffer will also be
+/// ready for rendering only after surface creation.
+///
+/// Keep in mind, that for window surfaces to be supported, window must be created with
+/// `kan_render_get_required_window_flags`.
+/// \endparblock
+///
+/// \par Render passes
+/// \parblock
+/// Render pass is a concept that encloses routine of rendering objects into frame buffer that has specific set of
+/// attachments. It also usually has high level meaning, but for render backend it is irrelevant. Render passes can
+/// form dependencies one on another through `kan_render_pass_add_static_dependency`.
+///
+/// In order to submit commands to render pass, it must firstly be instantiated for the current frame through
+/// `kan_render_pass_instantiate` with appropriate frame buffer, viewport, scissor and clear values. If render pass
+/// instance was successfully created, it can then receive commands through `kan_render_pass_instance_*` functions
+/// and receive frame-lifetime dependencies through `kan_render_pass_instance_add_dynamic_dependency`.
+///
+/// It is allowed to create as many instances of render passes as needed: render pass functions as blueprint for the
+/// instances. Also, instances lifetime is only one frame and they are automatically destroyed when frame ends.
+/// \endparblock
+///
+/// \par Frame buffers
+/// \parblock
+/// Frame buffers serve as collections of render targets -- images and surfaces -- for the render pass. Therefore,
+/// frame buffers are always bound to specific render passes. When surface is attached to frame buffer, swap chain
+/// image management is done automatically and frame buffer automatically selects appropriate images from it.
+/// \endparblock
+///
+/// \par Pipeline families
+/// \parblock
+/// Pipeline family contains data that might be shared by different pipelines. For example, vertex format, sets and
+/// bindings descriptions. We aim for one pipeline family per high level material.
+/// \endparblock
+///
+/// \par Pipelines
+/// \parblock
+/// Pipeline describes state of the GPU pipeline that is used to execute GPU operations like draw commands. Pipelines
+/// derive from pipeline families and also define huge amount of parameters that are unique to this pipeline.
+///
+/// Important subject is pipeline compilation. It takes considerable time and cannot be executed inside frame as it can
+/// take much more that frame time. Therefore, pipeline compilation is done on separate thread and it is advised to
+/// create all pipelines in the background and let the compile while applications works. Also, there are compilation
+/// priorities that are used to define pipeline compilation order.
+/// \endparblock
+///
+/// \par Pipeline parameter sets
+/// \parblock
+/// Pipeline parameter set describes data bindings to one particular set described in pipeline family. Sets are used to
+/// separate parameters that belong to different scopes: like pass data set, material data set, object data set.
+/// \endparblock
+///
+/// \par Buffers
+/// \parblock
+/// This implementation supports attribute, index 16 bit, index 32 bit, uniform and storage buffers. There is also a
+/// special case: read back storage buffer that is optimized for usage as read back target and cannot be used for
+/// anything else.
+/// \endparblock
+///
+/// \par Frame lifetime allocators
+/// \parblock
+/// Frame lifetime allocators are used to allocate buffer space for data that is only relevant during current frame.
+/// They reuse internal buffers and mark data with frame index, automatically clearing old data once it is safe.
+/// \endparblock
+///
+/// \par Images
+/// \parblock
+/// This implementation supports 2d (with mips) and 3d images along with render target images. Cube maps and layered
+/// images are not yet supported.
+/// \endparblock
+///
+/// \par Render cycle
+/// \parblock
+/// Render cycle is built around `kan_render_backend_system_next_frame` function: it finalizes and submits old recorded
+/// frame if any and starts new frame if possible. If function returned KAN_TRUE, then new frame was started and it is
+/// allowed to submit new rendering commands. Otherwise, it is only allowed to create/destroy resources and upload data
+/// to them. As this function execution could be relatively heavy, it is advised to execute some non-render work while
+/// this function is executing.
+/// \endparblock
+///
+/// \par Destruction routine
+/// \parblock
+/// Destroy functions do not destroy resources when they're called as these resources can be still in use on GPU.
+/// Instead, resources are placed into destroy schedule and are destroyed as soon as it is safe. Therefore, destroy
+/// call order doesn't matter: if destroy was called during them save frame (or between the same frames), it would
+/// always be executed in correct order once time is right.
+/// \endparblock
+///
+/// \par Read back
+/// \parblock
+/// It is possible to read data back from surfaces, buffers and images using buffer with
+/// KAN_RENDER_BUFFER_TYPE_READ_BACK_STORAGE type and `kan_render_read_back_request_from_*` functions. Returned
+/// `kan_render_read_back_status_t` can be used to track when read back is safe to access on CPU. It can take several
+/// frames to ensure that. `kan_render_get_read_back_max_delay_in_frames` convenience function returns maximum count
+/// of frames between read back request and its successful completion.
+/// \endparblock
+///
+/// \par Synchronization
+/// \parblock
+/// One of the goals of render backend system is to be as thread safe as possible. It means that as long as user
+/// guaranties that no other thread accesses objects that might be changed during function execution, this function
+/// call is thread. Exclusions will be writen in function details.
+///
+/// But there is two major functions that are capable to change entire render backend state:
+/// `kan_render_backend_system_next_frame` and `kan_application_system_sync_in_main_thread` (due to surfaces). These
+/// functions should never be executed simultaneously with any render backend system function.
+/// \endparblock
+
 KAN_C_HEADER_BEGIN
 
 typedef uint64_t kan_render_context_t;
@@ -68,6 +220,9 @@ typedef uint64_t kan_render_read_back_status_t;
 /// \brief Contains render backend system configuration data.
 struct kan_render_backend_system_config_t
 {
+    /// \brief If true, render backend system is fully disabled.
+    /// \details Needed due to the fact that systems are always created,
+    ///          but there is no need for render in applications like game server.
     kan_bool_t disable_render;
     kan_bool_t prefer_vsync;
 
@@ -77,6 +232,7 @@ struct kan_render_backend_system_config_t
     uint32_t version_patch;
 };
 
+/// \brief Enumerates types of GPU-like devices known to render backend.
 enum kan_render_device_type_t
 {
     KAN_RENDER_DEVICE_TYPE_DISCRETE_GPU = 0u,
@@ -86,13 +242,20 @@ enum kan_render_device_type_t
     KAN_RENDER_DEVICE_TYPE_UNKNOWN,
 };
 
+/// \brief Enumerates GPU memory types known to render backend.
 enum kan_render_device_memory_type_t
 {
+    /// \brief Fully separate memory module on GPU. Often found in standalone PCs.
     KAN_RENDER_DEVICE_MEMORY_TYPE_SEPARATE = 0u,
+
+    /// \brief Most memory is both device local and host visible. Rare.
     KAN_RENDER_DEVICE_MEMORY_TYPE_UNIFIED,
+
+    /// \brief Most memory is both device local and host coherent. Often found in laptops and mobile devices.
     KAN_RENDER_DEVICE_MEMORY_TYPE_UNIFIED_COHERENT,
 };
 
+/// \brief Enumerates all images formats known to render backend.
 enum kan_render_image_format_t
 {
     KAN_RENDER_IMAGE_FORMAT_R8_SRGB = 0u,
@@ -172,10 +335,16 @@ enum kan_render_image_format_t
     KAN_RENDER_IMAGE_FORMAT_SURFACE = KAN_RENDER_IMAGE_FORMAT_BGRA32_SRGB,
 };
 
+/// \brief For kan_render_supported_device_info_t::image_format_support. Format transfer is supported.
 #define KAN_RENDER_IMAGE_FORMAT_SUPPORT_FLAG_TRANSFER (1u << 0u)
+
+/// \brief For kan_render_supported_device_info_t::image_format_support. Format is supported as sampled image.
 #define KAN_RENDER_IMAGE_FORMAT_SUPPORT_FLAG_SAMPLED (1u << 1u)
+
+/// \brief For kan_render_supported_device_info_t::image_format_support. Format is supported as render target.
 #define KAN_RENDER_IMAGE_FORMAT_SUPPORT_FLAG_RENDER (1u << 2u)
 
+/// \brief Describes information about found supported device.
 struct kan_render_supported_device_info_t
 {
     kan_render_device_id_t id;
@@ -185,18 +354,23 @@ struct kan_render_supported_device_info_t
     uint8_t image_format_support[KAN_RENDER_IMAGE_FORMAT_COUNT];
 };
 
+/// \brief Describes information about all found supported devices.
 struct kan_render_supported_devices_t
 {
     uint64_t supported_device_count;
     struct kan_render_supported_device_info_t devices[];
 };
 
+/// \brief Returns cached information about all found supported devices.
 CONTEXT_RENDER_BACKEND_SYSTEM_API struct kan_render_supported_devices_t *kan_render_backend_system_get_devices (
     kan_context_system_handle_t render_backend_system);
 
+/// \brief Initializes render backend system with given physical device.
+///        If successfully initialized, cannot be initialized again.
 CONTEXT_RENDER_BACKEND_SYSTEM_API kan_bool_t kan_render_backend_system_select_device (
     kan_context_system_handle_t render_backend_system, kan_render_device_id_t device);
 
+/// \brief Returns render context that is used with most other render backend functions.
 CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_context_t
 kan_render_backend_system_get_render_context (kan_context_system_handle_t render_backend_system);
 
@@ -206,6 +380,7 @@ kan_render_backend_system_get_render_context (kan_context_system_handle_t render
 CONTEXT_RENDER_BACKEND_SYSTEM_API kan_bool_t
 kan_render_backend_system_next_frame (kan_context_system_handle_t render_backend_system);
 
+/// \brief Utility structure for integer regions.
 struct kan_render_integer_region_t
 {
     int32_t x;
@@ -214,28 +389,35 @@ struct kan_render_integer_region_t
     uint32_t height;
 };
 
+/// \brief Requests new render surface to be created. Surface will be created and initialized when
+///        given application window becomes available.
 CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_surface_t
 kan_render_backend_system_create_surface (kan_context_system_handle_t render_backend_system,
                                           kan_application_system_window_handle_t window,
                                           kan_interned_string_t tracking_name);
 
+/// \brief Blits given image onto given surface at the end of the frame.
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_backend_system_present_image_on_surface (
     kan_render_surface_t surface,
     kan_render_image_t image,
     struct kan_render_integer_region_t image_region,
     struct kan_render_integer_region_t surface_region);
 
+/// \brief Requests given surface to be destroyed when possible.
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_backend_system_destroy_surface (
     kan_context_system_handle_t render_backend_system, kan_render_surface_t surface);
 
+/// \brief Returns flags that are required for application windows in order to create surfaces.
 CONTEXT_RENDER_BACKEND_SYSTEM_API enum kan_platform_window_flag_t kan_render_get_required_window_flags (void);
 
+/// \brief Frame buffer supported attachment types.
 enum kan_render_frame_buffer_attachment_type_t
 {
     KAN_FRAME_BUFFER_ATTACHMENT_IMAGE = 0u,
     KAN_FRAME_BUFFER_ATTACHMENT_SURFACE,
 };
 
+/// \brief Describes one frame buffer attachment.
 struct kan_render_frame_buffer_attachment_description_t
 {
     enum kan_render_frame_buffer_attachment_type_t type;
@@ -246,6 +428,7 @@ struct kan_render_frame_buffer_attachment_description_t
     };
 };
 
+/// \brief Contains information needed for frame buffer creation.
 struct kan_render_frame_buffer_description_t
 {
     kan_render_pass_t associated_pass;
@@ -254,67 +437,20 @@ struct kan_render_frame_buffer_description_t
     kan_interned_string_t tracking_name;
 };
 
+/// \brief Requests new frame buffer to be created. Actual frame buffers will be created when all attachments are ready.
 CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_frame_buffer_t kan_render_frame_buffer_create (
     kan_render_context_t context, struct kan_render_frame_buffer_description_t *description);
 
+/// \brief Requests given frame buffer to be destroyed.
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_frame_buffer_destroy (kan_render_frame_buffer_t buffer);
 
-// TODO: Overview of how render foundation with render graph should be working.
-//       1. Render setup resource. Contains name of render graph and setup flags. Root resource for resource builder.
-//          Usually, we need only two instances: game one and editor one. Editor one can be placed in editor resources
-//          and therefore be invisible to resource builder while packaging game.
-//       2. Render graph resource. Contains descriptions of all passes and their static dependencies. Passes might
-//          require setup flags to be enabled. Reason: it would be convenient to have one render graph per project,
-//          but in this case we need to disable excessive editor-only passes in game (to avoid compiling useless
-//          pipelines that would never be needed in game). Therefore, render graph describes everything it can do and
-//          flags from render setup are used to select what is actually needed. We may even strip unneeded passes during
-//          resource building.
-//       3. Render foundation resource system always loads one render setup with its render graph and utilizes it.
-//          We do not plan to support multiple render graphs at once as it is non trivial for the architecture and
-//          use cases are not obvious.
-//       4. Materials should be able to load a create appropriate pipelines after render graph is ready.
-//       5. Render graph and materials should support hot reload of each other, including hot reload of all materials
-//          when render graph is changed. It is not easy, but should be quite straightforward.
-//       6. In every leaf world during render (do not confuse passes here with render passes):
-//          - Viewport pass. There are primary and secondary viewports. Primary viewports used to describe things that
-//            are always visible (player view, dynamic popup viewports, other player views when using split screen).
-//            Secondary viewports are only enabled when they are visible from any primary viewport (including recursive
-//            visibility from secondary which is visible from primary), therefore every secondary viewport has defined
-//            world shape for visibility test. Primary use case for secondary viewports are portals (what is inside?)
-//            and cameras (like security camera that sends its data to some monitor).
-//          - Planning pass. Here render logic decided which pass instances will be created and also allocates render
-//            target textures for them (we need texture pool for that in order to avoid excessive memory operations).
-//            All pass instances should be created during this pass, but no operations on them are permitted,
-//            neither dependency registration nor command submission.
-//          - Recording pass. Here render logic performs actual recording of command buffers for passes. Dependency
-//            registration is also permitted, but dependency through render target image usage should be handled through
-//            other way which will be discussed below.
-//       7. Render target reference is a special structure that allows materials and render logic to create a stable
-//          reference to render target which image could be replaced without breaking the reference. But it has another
-//          important usage: it allows to register producer pass instance (as field during planning pass) and
-//          consumer pass instances (as attached structures during recording pass). Then, before submitting the frame,
-//          dependency from consumer instances to producer instance will be created. In some cases, it is okay to have
-//          no producer instance or no render target image -- it should not cause crash, but could cause a visual
-//          glitch.
-//       8. Render and user code. Both planning and recording passes should be done by user mutators (render 3d unit
-//          mutators, game special mutators, etc.). It would make render more flexible and will give users more control
-//          on what is happening under the hood.
-//       9. Render target references could be a powerful tool for portals or similar techniques that would allow full
-//          world separation. For example, we may have hierarchy (root world) -> (game root world) ->
-//          [(game main world), (portal world underworld), (portal world heaven), (portal world another continent)].
-//          In this case, (game root world) scheduler would always run (game main world) first. During its update,
-//          (game main world) would register visible portals and create render target images for them (for example,
-//          take them from pools). During this registration, render target references will be created with consumers,
-//          but no producer. Then, (game root world) scheduler will use information about portals to run updates for
-//          only visible portal worlds and they would attach producer instances to appropriate target references.
-//          This sounds quite complex, but it should still be much easier than fitting all the portal worlds inside
-//          the main world and trying to manage ambient and separation of this worlds manually.
-
+/// \brief Enumerates all supported render pass types.
 enum kan_render_pass_type_t
 {
     KAN_RENDER_PASS_GRAPHICS = 0u,
 };
 
+/// \brief Enumerates supported render pass attachment types.
 enum kan_render_pass_attachment_type_t
 {
     KAN_RENDER_PASS_ATTACHMENT_COLOR = 0u,
@@ -323,6 +459,7 @@ enum kan_render_pass_attachment_type_t
     KAN_RENDER_PASS_ATTACHMENT_DEPTH_STENCIL,
 };
 
+/// \brief Enumerates supported attachment load operations.
 enum kan_render_load_operation_t
 {
     KAN_RENDER_LOAD_OPERATION_ANY = 0u,
@@ -330,6 +467,7 @@ enum kan_render_load_operation_t
     KAN_RENDER_LOAD_OPERATION_CLEAR,
 };
 
+/// \brief Enumerates supported attachment store operations.
 enum kan_render_store_operation_t
 {
     KAN_RENDER_STORE_OPERATION_ANY = 0u,
@@ -337,6 +475,7 @@ enum kan_render_store_operation_t
     KAN_RENDER_STORE_OPERATION_NONE,
 };
 
+/// \brief Describes one render pass attachment configuration.
 struct kan_render_pass_attachment_t
 {
     enum kan_render_pass_attachment_type_t type;
@@ -346,6 +485,7 @@ struct kan_render_pass_attachment_t
     enum kan_render_store_operation_t store_operation;
 };
 
+/// \brief Contains full information needed to create render pass.
 struct kan_render_pass_description_t
 {
     enum kan_render_pass_type_t type;
@@ -354,6 +494,7 @@ struct kan_render_pass_description_t
     kan_interned_string_t tracking_name;
 };
 
+/// \brief Describes viewport bounds.
 struct kan_render_viewport_bounds_t
 {
     float x;
@@ -364,6 +505,7 @@ struct kan_render_viewport_bounds_t
     float depth_max;
 };
 
+/// \brief Describes color for clearing.
 struct kan_render_clear_color_t
 {
     float r;
@@ -372,12 +514,14 @@ struct kan_render_clear_color_t
     float a;
 };
 
+/// \brief Describes depth and stencil values for clearing.
 struct kan_render_clear_depth_stencil_t
 {
     float depth;
     uint32_t stencil;
 };
 
+/// \brief Describes clear value for one attachment.
 struct kan_render_clear_value_t
 {
     union
@@ -387,15 +531,19 @@ struct kan_render_clear_value_t
     };
 };
 
+/// \brief Creates new render pass from given description.
 CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_pass_t
 kan_render_pass_create (kan_render_context_t context, struct kan_render_pass_description_t *description);
 
-/// \details Static dependency creation binds passes together and requires both passes to be destroyed during the
+/// \brief Creates dependency between render passes that will be inherited by all instances.
+/// \details Fully thread safe for both passes.
+///          Static dependency creation binds passes together and requires both passes to be destroyed during the
 ///          same frame. It shouldn't be an issue for the architecture, because passes are part of render graph and
 ///          graph should only be destroyed as a whole, not partially.
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_add_static_dependency (kan_render_pass_t pass,
                                                                               kan_render_pass_t dependency);
 
+/// \brief Instantiates render pass for given frame buffer with given configuration.
 CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_pass_instance_t
 kan_render_pass_instantiate (kan_render_pass_t pass,
                              kan_render_frame_buffer_t frame_buffer,
@@ -403,30 +551,41 @@ kan_render_pass_instantiate (kan_render_pass_t pass,
                              struct kan_render_integer_region_t *scissor,
                              struct kan_render_clear_value_t *attachment_clear_values);
 
+/// \brief Creates dependency between two render pass instances.
+/// \details Fully thread safe for both pass instances.
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_instance_add_dynamic_dependency (
     kan_render_pass_instance_t pass_instance, kan_render_pass_instance_t dependency);
 
-CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_instance_graphics_pipeline (
+/// \brief Submits graphics pipeline binding to the render pass.
+/// \return Whether pipeline was successfully bound. Binding will fail if pipeline is not compiled yet and priority is
+///         not KAN_RENDER_PIPELINE_COMPILATION_PRIORITY_CRITICAL. If priority is
+///         KAN_RENDER_PIPELINE_COMPILATION_PRIORITY_CRITICAL, function will not return until pipeline is compiled.
+CONTEXT_RENDER_BACKEND_SYSTEM_API kan_bool_t kan_render_pass_instance_graphics_pipeline (
     kan_render_pass_instance_t pass_instance, kan_render_graphics_pipeline_t graphics_pipeline);
 
+/// \brief Submits parameter set bindings to the render pass.
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_instance_pipeline_parameter_sets (
     kan_render_pass_instance_t pass_instance,
     uint32_t parameter_sets_count,
     kan_render_pipeline_parameter_set_t *parameter_sets);
 
+/// \brief Submits attributes to the render pass.
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_instance_attributes (kan_render_pass_instance_t pass_instance,
                                                                             uint32_t start_at_binding,
                                                                             uint32_t buffers_count,
                                                                             kan_render_buffer_t *buffers);
 
+/// \brief Submits indices to the render pass.
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_instance_indices (kan_render_pass_instance_t pass_instance,
                                                                          kan_render_buffer_t buffer);
 
+/// \brief Submits one instance draw call to the render pass.
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_instance_draw (kan_render_pass_instance_t pass_instance,
                                                                       uint32_t index_offset,
                                                                       uint32_t index_count,
                                                                       uint32_t vertex_offset);
 
+/// \brief Submits multiple instances draw call to the render pass.
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_instance_instanced_draw (
     kan_render_pass_instance_t pass_instance,
     uint32_t index_offset,
@@ -435,25 +594,30 @@ CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_instance_instanced_draw (
     uint32_t instance_offset,
     uint32_t instance_count);
 
+/// \brief Requests given render pass to be destroyed.
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_destroy (kan_render_pass_t pass);
 
+/// \brief Enumerates supported pipeline types.
 enum kan_render_pipeline_type_t
 {
     KAN_RENDER_PIPELINE_TYPE_GRAPHICS,
 };
 
+/// \brief Enumerates supported render stages.
 enum kan_render_stage_t
 {
     KAN_RENDER_STAGE_GRAPHICS_VERTEX = 0u,
     KAN_RENDER_STAGE_GRAPHICS_FRAGMENT,
 };
 
+/// \brief Enumerates supported attribute rates.
 enum kan_render_attribute_rate_t
 {
     KAN_RENDER_ATTRIBUTE_RATE_PER_VERTEX = 0u,
     KAN_RENDER_ATTRIBUTE_RATE_PER_INSTANCE,
 };
 
+/// \brief Provides information about attribute source buffer.
 struct kan_render_attribute_source_description_t
 {
     uint32_t binding;
@@ -461,6 +625,7 @@ struct kan_render_attribute_source_description_t
     enum kan_render_attribute_rate_t rate;
 };
 
+/// \brief Enumerates supported attribute formats.
 enum kan_render_attribute_format_t
 {
     KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_FLOAT_1,
@@ -471,6 +636,7 @@ enum kan_render_attribute_format_t
     KAN_RENDER_ATTRIBUTE_FORMAT_MATRIX_FLOAT_4_4,
 };
 
+/// \brief Describes one attribute.
 struct kan_render_attribute_description_t
 {
     uint32_t binding;
@@ -479,6 +645,7 @@ struct kan_render_attribute_description_t
     enum kan_render_attribute_format_t format;
 };
 
+/// \brief Enumerates supported types of parameter bindings.
 enum kan_render_parameter_binding_type_t
 {
     KAN_RENDER_PARAMETER_BINDING_TYPE_UNIFORM_BUFFER = 0u,
@@ -486,26 +653,72 @@ enum kan_render_parameter_binding_type_t
     KAN_RENDER_PARAMETER_BINDING_TYPE_COMBINED_IMAGE_SAMPLER,
 };
 
+/// \brief Enumerates supported filter modes.
+enum kan_render_filter_mode_t
+{
+    KAN_RENDER_FILTER_MODE_NEAREST = 0u,
+    KAN_RENDER_FILTER_MODE_LINEAR,
+};
+
+/// \brief Enumerates supported mip map modes.
+enum kan_render_mip_map_mode_t
+{
+    KAN_RENDER_MIP_MAP_MODE_NEAREST = 0u,
+    KAN_RENDER_MIP_MAP_MODE_LINEAR,
+};
+
+/// \brief Enumerates supported address modes.
+enum kan_render_address_mode_t
+{
+    KAN_RENDER_ADDRESS_MODE_REPEAT = 0u,
+    KAN_RENDER_ADDRESS_MODE_MIRRORED_REPEAT,
+    KAN_RENDER_ADDRESS_MODE_CLAMP_TO_EDGE,
+    KAN_RENDER_ADDRESS_MODE_MIRRORED_CLAMP_TO_EDGE,
+    KAN_RENDER_ADDRESS_MODE_CLAMP_TO_BORDER,
+};
+
+/// \brief Describes sampler setup for parameter binding.
+struct kan_render_sampler_description_t
+{
+    enum kan_render_filter_mode_t mag_filter;
+    enum kan_render_filter_mode_t min_filter;
+    enum kan_render_mip_map_mode_t mip_map_mode;
+    enum kan_render_address_mode_t address_mode_u;
+    enum kan_render_address_mode_t address_mode_v;
+    enum kan_render_address_mode_t address_mode_w;
+};
+
+/// \brief Describes parameter that can be bound to the pipeline.
 struct kan_render_parameter_binding_description_t
 {
     uint32_t binding;
     enum kan_render_parameter_binding_type_t type;
     uint32_t used_stage_mask;
+
+    union
+    {
+        struct kan_render_sampler_description_t combined_image_sampler;
+    };
 };
 
+/// \brief Describes set of parameters that can be bound.
 struct kan_render_parameter_set_description_t
 {
     uint32_t set;
     uint64_t bindings_count;
     struct kan_render_parameter_binding_description_t *bindings;
+
+    /// \brief True if bindings are rarely changed. False otherwise. Used for optimization.
     kan_bool_t stable_binding;
 };
 
+/// \brief Enumerates supported topologies.
 enum kan_render_graphics_topology_t
 {
     KAN_RENDER_GRAPHICS_TOPOLOGY_TRIANGLE_LIST = 0u,
 };
 
+/// \brief Describes graphics pipeline family with its attributes and parameters.
 struct kan_render_graphics_pipeline_family_description_t
 {
     enum kan_render_graphics_topology_t topology;
@@ -522,28 +735,35 @@ struct kan_render_graphics_pipeline_family_description_t
     kan_interned_string_t tracking_name;
 };
 
+/// \brief Creates new graphics pipeline family from given parameters.
 CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_graphics_pipeline_family_t kan_render_graphics_pipeline_family_create (
     kan_render_context_t context, struct kan_render_graphics_pipeline_family_description_t *description);
 
+/// \brief Requests given pipeline family to be destroyed.
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_graphics_pipeline_family_destroy (
     kan_render_graphics_pipeline_family_t family);
 
+/// \brief Creates new pipeline code module from given implementation-specific code.
 CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_code_module_t kan_render_code_module_create (
     kan_render_context_t context, uint32_t code_length, void *code, kan_interned_string_t tracking_name);
 
+/// \brief Requests given code module to be destroyed.
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_code_module_destroy (kan_render_code_module_t code_module);
 
+/// \brief Enumerates supported polygon modes,
 enum kan_render_polygon_mode_t
 {
     KAN_RENDER_POLYGON_MODE_FILL,
     KAN_RENDER_POLYGON_MODE_WIREFRAME,
 };
 
+/// \brief Enumerates supported cull modes.
 enum kan_render_cull_mode_t
 {
     KAN_RENDER_CULL_MODE_BACK = 0u,
 };
 
+/// \brief Enumerates supported blend factors.
 enum kan_render_blend_factor_t
 {
     KAN_RENDER_BLEND_FACTOR_ZERO = 0u,
@@ -563,6 +783,7 @@ enum kan_render_blend_factor_t
     KAN_RENDER_BLEND_FACTOR_SOURCE_ALPHA_SATURATE,
 };
 
+/// \brief Enumerates supported blend operations.
 enum kan_render_blend_operation_t
 {
     KAN_RENDER_BLEND_OPERATION_ADD = 0u,
@@ -572,6 +793,7 @@ enum kan_render_blend_operation_t
     KAN_RENDER_BLEND_OPERATION_MAX,
 };
 
+/// \brief Describes color output setup for one color attachment.
 struct kan_render_color_output_setup_description_t
 {
     kan_bool_t use_blend;
@@ -587,6 +809,7 @@ struct kan_render_color_output_setup_description_t
     enum kan_render_blend_operation_t alpha_blend_operation;
 };
 
+/// \brief Enumerates supported compare operations.
 enum kan_render_compare_operation_t
 {
     KAN_RENDER_COMPARE_OPERATION_NEVER = 0u,
@@ -599,6 +822,7 @@ enum kan_render_compare_operation_t
     KAN_RENDER_COMPARE_OPERATION_GREATER_OR_EQUAL,
 };
 
+/// \brief Enumerates supported stencil operations.
 enum kan_render_stencil_operation_t
 {
     KAN_RENDER_STENCIL_OPERATION_KEEP = 0u,
@@ -611,6 +835,7 @@ enum kan_render_stencil_operation_t
     KAN_RENDER_STENCIL_OPERATION_DECREMENT_AND_WRAP,
 };
 
+/// \brief Describes stencil test.
 struct kan_render_stencil_test_t
 {
     enum kan_render_stencil_operation_t on_fail;
@@ -622,12 +847,14 @@ struct kan_render_stencil_test_t
     uint32_t reference;
 };
 
+/// \brief Describes one code entry point with its stage,
 struct kan_render_pipeline_code_entry_point_t
 {
     enum kan_render_stage_t stage;
     kan_interned_string_t function_name;
 };
 
+/// \brief Describes code module usage with its entry points.
 struct kan_render_pipeline_code_module_usage_t
 {
     kan_render_code_module_t code_module;
@@ -635,39 +862,7 @@ struct kan_render_pipeline_code_module_usage_t
     struct kan_render_pipeline_code_entry_point_t *entry_points;
 };
 
-enum kan_render_filter_mode_t
-{
-    KAN_RENDER_FILTER_MODE_NEAREST = 0u,
-    KAN_RENDER_FILTER_MODE_LINEAR,
-};
-
-enum kan_render_mip_map_mode_t
-{
-    KAN_RENDER_MIP_MAP_MODE_NEAREST = 0u,
-    KAN_RENDER_MIP_MAP_MODE_LINEAR,
-};
-
-enum kan_render_address_mode_t
-{
-    KAN_RENDER_ADDRESS_MODE_REPEAT = 0u,
-    KAN_RENDER_ADDRESS_MODE_MIRRORED_REPEAT,
-    KAN_RENDER_ADDRESS_MODE_CLAMP_TO_EDGE,
-    KAN_RENDER_ADDRESS_MODE_MIRRORED_CLAMP_TO_EDGE,
-    KAN_RENDER_ADDRESS_MODE_CLAMP_TO_BORDER,
-};
-
-struct kan_render_sampler_description_t
-{
-    uint32_t parameter_set;
-    uint32_t parameter_binding;
-    enum kan_render_filter_mode_t mag_filter;
-    enum kan_render_filter_mode_t min_filter;
-    enum kan_render_mip_map_mode_t mip_map_mode;
-    enum kan_render_address_mode_t address_mode_u;
-    enum kan_render_address_mode_t address_mode_v;
-    enum kan_render_address_mode_t address_mode_w;
-};
-
+/// \brief Contains required information for graphics pipeline creation.
 struct kan_render_graphics_pipeline_description_t
 {
     kan_render_pass_t pass;
@@ -698,12 +893,10 @@ struct kan_render_graphics_pipeline_description_t
     uint64_t code_modules_count;
     struct kan_render_pipeline_code_module_usage_t *code_modules;
 
-    uint64_t samplers_count;
-    struct kan_render_sampler_description_t *samplers;
-
     kan_interned_string_t tracking_name;
 };
 
+/// \brief Enumerates pipeline compilation priorities.
 /// \details Some backends need to compile pipelines for optimization. It might take considerable time (10+ms),
 ///          therefore it should be done in non-blocking manner on separate thread. Priority manages which pipelines
 ///          are compiled first. Pipeline is allowed to be used in any method calls even when it is not compiled, but
@@ -722,22 +915,26 @@ enum kan_render_pipeline_compilation_priority_t
     KAN_RENDER_PIPELINE_COMPILATION_PRIORITY_CACHE,
 };
 
+/// \brief Creates new graphics pipeline and adds it to compilation queue.
 CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_graphics_pipeline_t
 kan_render_graphics_pipeline_create (kan_render_context_t context,
                                      struct kan_render_graphics_pipeline_description_t *description,
                                      enum kan_render_pipeline_compilation_priority_t compilation_priority);
 
+/// \brief Changes graphics pipeline compilation priority if it is still waiting for compilation.
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_graphics_pipeline_change_compilation_priority (
     kan_render_graphics_pipeline_t pipeline, enum kan_render_pipeline_compilation_priority_t compilation_priority);
 
+/// \brief Requests graphics pipeline to be destroyed.
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_graphics_pipeline_destroy (kan_render_graphics_pipeline_t pipeline);
 
+/// \brief Contains information for pipeline parameter set creation.
 struct kan_render_pipeline_parameter_set_description_t
 {
-    enum kan_render_pipeline_type_t pipeline_type;
+    enum kan_render_pipeline_type_t family_type;
     union
     {
-        kan_render_graphics_pipeline_family_t graphics_pipeline;
+        kan_render_graphics_pipeline_family_t graphics_family;
     };
 
     uint32_t set;
@@ -747,6 +944,7 @@ struct kan_render_pipeline_parameter_set_description_t
     struct kan_render_parameter_update_description_t *initial_bindings;
 };
 
+/// \brief Contains information for buffer binding update.
 struct kan_render_parameter_update_description_buffer_t
 {
     kan_render_frame_buffer_t buffer;
@@ -754,11 +952,13 @@ struct kan_render_parameter_update_description_buffer_t
     uint32_t range;
 };
 
+/// \brief Contains information for image binding update.
 struct kan_render_parameter_update_description_image_t
 {
     kan_render_image_t image;
 };
 
+/// \brief Contains information on how to update one parameter binding.
 struct kan_render_parameter_update_description_t
 {
     uint32_t binding;
@@ -769,31 +969,49 @@ struct kan_render_parameter_update_description_t
     };
 };
 
+/// \brief Creates new pipeline parameter set from given description.
 CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_pipeline_parameter_set_t kan_render_pipeline_parameter_set_create (
     kan_render_context_t context, struct kan_render_pipeline_parameter_set_description_t *description);
 
+/// \brief Updates given parameter set with new bindings.
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pipeline_parameter_set_update (
     kan_render_pipeline_parameter_set_t set,
     uint64_t bindings_count,
     struct kan_render_parameter_update_description_t *bindings);
 
+/// \brief Requests parameter set to be destroyed.
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pipeline_parameter_set_destroy (
     kan_render_pipeline_parameter_set_t set);
 
+/// \brief Enumerates supported buffer types.
 enum kan_render_buffer_type_t
 {
+    /// \brief Buffer for storing attribute data.
     KAN_RENDER_BUFFER_TYPE_ATTRIBUTE = 0u,
+
+    /// \brief Buffer for storing 16 bit indices.
     KAN_RENDER_BUFFER_TYPE_INDEX_16,
+
+    /// \brief Buffer for storing 32 bit indices.
     KAN_RENDER_BUFFER_TYPE_INDEX_32,
+
+    /// \brief Uniform buffer.
     KAN_RENDER_BUFFER_TYPE_UNIFORM,
+
+    /// \brief Arbitrary storage buffer.
     KAN_RENDER_BUFFER_TYPE_STORAGE,
+
+    /// \brief Storage buffer that functions as read back target.
     KAN_RENDER_BUFFER_TYPE_READ_BACK_STORAGE,
 };
 
+/// \brief Maximum guaranteed size of uniform buffer.
 #define KAN_UNIFORM_BUFFER_MAXIMUM_GUARANTEED_SIZE (16u * 1024u)
 
+/// \brief Maximum guaranteed size of arbitrary storage buffer.
 #define KAN_STORAGE_BUFFER_MAXIMUM_GUARANTEED_SIZE (128u * 1024u * 1024u)
 
+/// \brief Creates new buffer of given type and size.
 /// \details Optional initial data allows to directly upload initial data to buffer without transfer operation on
 ///          devices with unified memory. In other cases direct upload with this devices might not be possible
 ///          due to frames in flights feature.
@@ -803,22 +1021,34 @@ CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_buffer_t kan_render_buffer_create (
                                                                                 void *optional_initial_data,
                                                                                 kan_interned_string_t tracking_name);
 
+/// \brief Declares intent to patch buffer slice with given offset and size.
+/// \returns If it is possible to patch buffer, returns write-only pointer for updating buffer data.
+/// \invariant Buffer type is not KAN_RENDER_BUFFER_TYPE_READ_BACK_STORAGE.
 CONTEXT_RENDER_BACKEND_SYSTEM_API void *kan_render_buffer_patch (kan_render_buffer_t buffer,
                                                                  uint32_t slice_offset,
                                                                  uint32_t slice_size);
 
+/// \brief Requests read access to read back buffer.
+/// \return Point to read back buffer data on success.
+/// \invariant Buffer type is KAN_RENDER_BUFFER_TYPE_READ_BACK_STORAGE.
 CONTEXT_RENDER_BACKEND_SYSTEM_API void *kan_render_buffer_begin_access (kan_render_buffer_t buffer);
 
+/// \brief Closes read access requested previously by `kan_render_buffer_begin_access`.
+/// \invariant Buffer type is KAN_RENDER_BUFFER_TYPE_READ_BACK_STORAGE.
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_buffer_end_access (kan_render_buffer_t buffer);
 
+/// \brief Requests given buffer to be destroyed.
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_buffer_destroy (kan_render_buffer_t buffer);
 
+/// \brief Describes frame lifetime allocator allocation: buffer and data offset in this buffer.
+/// \details If buffer is invalid, then allocation has failed.
 struct kan_render_allocated_slice_t
 {
     kan_render_buffer_t buffer;
     uint32_t slice_offset;
 };
 
+/// \brief Creates new frame lifetime allocator for buffers of given type and with given page size.
 /// \details Usually, there is no need for frame lifetime allocation on device, as either way memory is transferred from
 ///          host to GPU. However, in some cases transferring data to GPU every frame is still faster than letting
 ///          GPU access host memory directly, although it is usually not noticeable, as GPU might access the same data
@@ -832,16 +1062,20 @@ kan_render_frame_lifetime_buffer_allocator_create (kan_render_context_t context,
                                                    kan_bool_t on_device,
                                                    kan_interned_string_t tracking_name);
 
+/// \brief Requests given amount of memory with given alignment from frame lifetime allocator.
+/// \details Allocated memory is automatically freed when we're sure that it is no longer used.
 CONTEXT_RENDER_BACKEND_SYSTEM_API struct kan_render_allocated_slice_t
 kan_render_frame_lifetime_buffer_allocator_allocate (kan_render_frame_lifetime_buffer_allocator_t allocator,
                                                      uint32_t size,
                                                      uint32_t alignment);
 
+/// \brief Requests given frame lifetime allocator to be destroyed.
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_frame_lifetime_buffer_allocator_destroy (
     kan_render_frame_lifetime_buffer_allocator_t allocator);
 
 // TODO: For future iterations: cube maps and layered images (aka image arrays).
 
+/// \brief Contains information for image creation.
 struct kan_render_image_description_t
 {
     enum kan_render_image_format_t format;
@@ -856,9 +1090,11 @@ struct kan_render_image_description_t
     kan_interned_string_t tracking_name;
 };
 
+/// \brief Creates image from given description.
 CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_image_t
 kan_render_image_create (kan_render_context_t context, struct kan_render_image_description_t *description);
 
+/// \brief Schedules data upload to given image mip.
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_image_upload_data (kan_render_image_t image,
                                                                      uint8_t mip,
                                                                      uint32_t data_size,
@@ -866,35 +1102,44 @@ CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_image_upload_data (kan_render_
 
 /// \brief Requests image mip generation to be executed from the first mip to the last (including it).
 /// \invariant First mip is already filled with image data using `kan_render_image_upload_data`.
+///            It is allowed to call `kan_render_image_upload_data` and then call this function during the same frame.
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_image_request_mip_generation (kan_render_image_t image,
                                                                                 uint8_t first,
                                                                                 uint8_t last);
 
-/// \brief Requests render target to be resized.
-/// \details In most cases this call results in creation of the new image under the hood.
-///          In this case, all frame buffers are updated automatically.
-///          Therefore, main goal of this function is to provide user-friendly way for recreating render targets with
-///          another size and updating attached frame buffers automatically under the hood.
+/// \brief Requests render target to be resized without breaking the attachments.
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_image_resize_render_target (kan_render_image_t image,
                                                                               uint32_t new_width,
                                                                               uint32_t new_height,
                                                                               uint32_t new_depth);
 
+/// \brief Requests given image to be destroyed.
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_image_destroy (kan_render_image_t image);
 
+/// \brief Enumerates read back request states.
 enum kan_render_read_back_state_t
 {
+    /// \brief Requests is created and not yet processed.
     KAN_RENDER_READ_BACK_STATE_REQUESTED = 0,
+
+    /// \brief Request is sent to GPU and we're waiting until it is safe to read.
     KAN_RENDER_READ_BACK_STATE_SCHEDULED,
+
+    /// \brief Request finished and it is safe to read.
     KAN_RENDER_READ_BACK_STATE_FINISHED,
+
+    /// \brief Read back operation failed.
     KAN_RENDER_READ_BACK_STATE_FAILED,
 };
 
+/// \brief Returns maximum delay between read back request and completion allowed by implementation.
 CONTEXT_RENDER_BACKEND_SYSTEM_API uint64_t kan_render_get_read_back_max_delay_in_frames (void);
 
+/// \brief Requests to read data back from surface when this frame ends.
 CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_read_back_status_t kan_render_read_back_request_from_surface (
     kan_render_surface_t surface, kan_render_buffer_t read_back_buffer, uint32_t read_back_offset);
 
+/// \brief Requests to read data back from buffer when this frame ends.
 CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_read_back_status_t
 kan_render_read_back_request_from_buffer (kan_render_buffer_t buffer,
                                           uint32_t offset,
@@ -902,12 +1147,15 @@ kan_render_read_back_request_from_buffer (kan_render_buffer_t buffer,
                                           kan_render_buffer_t read_back_buffer,
                                           uint32_t read_back_offset);
 
+/// \brief Requests to read data back from image when this frame ends.
 CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_read_back_status_t kan_render_read_back_request_from_image (
     kan_render_image_t image, uint8_t mip, kan_render_buffer_t read_back_buffer, uint32_t read_back_offset);
 
+/// \brief Queries current status of read back operation.
 CONTEXT_RENDER_BACKEND_SYSTEM_API enum kan_render_read_back_state_t kan_read_read_back_status_get (
     kan_render_read_back_status_t status);
 
+/// \brief Destroys read back status. Does not cancel read back.
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_read_back_status_destroy (kan_render_read_back_status_t status);
 
 KAN_C_HEADER_END

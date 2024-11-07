@@ -206,31 +206,26 @@ struct render_backend_pipeline_parameter_set_t *render_backend_system_create_pip
     kan_cpu_section_execution_init (&execution, system->section_create_pipeline_parameter_set_internal);
 
     struct render_backend_descriptor_set_layout_t *layout = NULL;
-    uint64_t pipeline_samplers_count = 0u;
-    struct render_backend_pipeline_sampler_t *pipeline_samplers = NULL;
-
-    switch (description->pipeline_type)
+    switch (description->family_type)
     {
     case KAN_RENDER_PIPELINE_TYPE_GRAPHICS:
     {
-        struct render_backend_graphics_pipeline_t *pipeline =
-            (struct render_backend_graphics_pipeline_t *) description->graphics_pipeline;
+        struct render_backend_graphics_pipeline_family_t *family =
+            (struct render_backend_graphics_pipeline_family_t *) description->graphics_family;
 
-        if (description->set >= pipeline->family->descriptor_set_layouts_count)
+        if (description->set >= family->descriptor_set_layouts_count)
         {
             KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR,
                      "Failed to create pipeline parameter set \"%s\": requested set %lu while pipeline family has only "
                      "%lu sets.",
                      description->tracking_name, (unsigned long) description->set,
-                     (unsigned long) pipeline->family->descriptor_set_layouts_count)
+                     (unsigned long) family->descriptor_set_layouts_count)
 
             kan_cpu_section_execution_shutdown (&execution);
             return NULL;
         }
 
-        layout = pipeline->family->descriptor_set_layouts[description->set];
-        pipeline_samplers_count = pipeline->samplers_count;
-        pipeline_samplers = pipeline->samplers;
+        layout = family->descriptor_set_layouts[description->set];
         break;
     }
     }
@@ -370,9 +365,6 @@ struct render_backend_pipeline_parameter_set_t *render_backend_system_create_pip
             set->bound_image_views[index] = VK_NULL_HANDLE;
         }
     }
-
-    set->pipeline_samplers_count = pipeline_samplers_count;
-    set->pipeline_samplers = pipeline_samplers;
 
     set->first_render_target_attachment = NULL;
     set->tracking_name = description->tracking_name;
@@ -613,17 +605,7 @@ void render_backend_apply_descriptor_set_mutation (struct render_backend_pipelin
                 this_image_info->sampler = VK_NULL_HANDLE;
                 this_image_info->imageView = VK_NULL_HANDLE;
                 this_image_info->imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-
-                for (uint64_t sampler_index = 0u; sampler_index < set_context->pipeline_samplers_count; ++sampler_index)
-                {
-                    if (set_context->pipeline_samplers[sampler_index].set == (uint32_t) set_context->set_index &&
-                        set_context->pipeline_samplers[sampler_index].binding ==
-                            (uint32_t) update_bindings[index].binding)
-                    {
-                        this_image_info->sampler = set_context->pipeline_samplers[sampler_index].sampler;
-                        break;
-                    }
-                }
+                this_image_info->sampler = set_context->layout->bindings[update_bindings[index].binding].sampler;
 
                 if (set_context->bound_image_views[update_bindings[index].binding] != VK_NULL_HANDLE)
                 {

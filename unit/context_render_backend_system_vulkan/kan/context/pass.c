@@ -535,12 +535,48 @@ void kan_render_pass_instance_add_dynamic_dependency (kan_render_pass_instance_t
     kan_atomic_int_unlock (&dependant_instance->system->pass_instance_state_management_lock);
 }
 
-void kan_render_pass_instance_graphics_pipeline (kan_render_pass_instance_t pass_instance,
-                                                 kan_render_graphics_pipeline_t graphics_pipeline)
+kan_bool_t kan_render_pass_instance_graphics_pipeline (kan_render_pass_instance_t pass_instance,
+                                                       kan_render_graphics_pipeline_t graphics_pipeline)
 {
     struct render_backend_pass_instance_t *instance = (struct render_backend_pass_instance_t *) pass_instance;
     struct render_backend_graphics_pipeline_t *pipeline =
         (struct render_backend_graphics_pipeline_t *) graphics_pipeline;
+
+    if (pipeline->pipeline == VK_NULL_HANDLE)
+    {
+        if (pipeline->compilation_priority != KAN_RENDER_PIPELINE_COMPILATION_PRIORITY_CRITICAL ||
+            pipeline->compilation_state == PIPELINE_COMPILATION_STATE_FAILURE)
+        {
+            return KAN_FALSE;
+        }
+
+        while (pipeline->compilation_state != PIPELINE_COMPILATION_STATE_SUCCESS)
+        {
+            kan_mutex_lock (pipeline->system->compiler_state.state_transition_mutex);
+            switch (pipeline->compilation_state)
+            {
+            case PIPELINE_COMPILATION_STATE_PENDING:
+            case PIPELINE_COMPILATION_STATE_EXECUTION:
+            {
+                kan_mutex_unlock (pipeline->system->compiler_state.state_transition_mutex);
+                struct kan_cpu_section_execution_t wait_execution;
+                kan_cpu_section_execution_init (&wait_execution,
+                                                pipeline->system->section_wait_for_pipeline_compilation);
+                kan_platform_sleep (KAN_CONTEXT_RENDER_BACKEND_VULKAN_COMPILATION_WAIT_NS);
+                kan_cpu_section_execution_shutdown (&wait_execution);
+                break;
+            }
+
+            case PIPELINE_COMPILATION_STATE_SUCCESS:
+                kan_mutex_unlock (pipeline->system->compiler_state.state_transition_mutex);
+                break;
+
+            case PIPELINE_COMPILATION_STATE_FAILURE:
+                kan_mutex_unlock (pipeline->system->compiler_state.state_transition_mutex);
+                return KAN_FALSE;
+            }
+        }
+    }
 
     struct render_backend_command_state_t *command_state =
         &instance->system->command_states[instance->system->current_frame_in_flight_index];
@@ -550,6 +586,8 @@ void kan_render_pass_instance_graphics_pipeline (kan_render_pass_instance_t pass
     vkCmdBindPipeline (instance->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->pipeline);
     kan_atomic_int_unlock (&command_state->command_operation_lock);
     instance->current_pipeline_layout = pipeline->family->layout;
+
+    return KAN_TRUE;
 }
 
 void kan_render_pass_instance_pipeline_parameter_sets (kan_render_pass_instance_t pass_instance,

@@ -581,6 +581,7 @@ static kan_bool_t resolve_settings (struct rpl_compiler_context_t *context,
                                     struct rpl_compiler_instance_t *instance,
                                     struct kan_rpl_intermediate_t *intermediate,
                                     struct kan_dynamic_array_t *settings_array,
+                                    kan_bool_t instance_options_allowed,
                                     struct compiler_instance_setting_node_t **first_output,
                                     struct compiler_instance_setting_node_t **last_output)
 {
@@ -589,7 +590,8 @@ static kan_bool_t resolve_settings (struct rpl_compiler_context_t *context,
     {
         struct kan_rpl_setting_t *source_setting = &((struct kan_rpl_setting_t *) settings_array->data)[setting_index];
 
-        switch (evaluate_conditional (context, intermediate, source_setting->conditional_index, KAN_TRUE))
+        switch (
+            evaluate_conditional (context, intermediate, source_setting->conditional_index, instance_options_allowed))
         {
         case CONDITIONAL_EVALUATION_RESULT_FAILED:
             result = KAN_FALSE;
@@ -1403,8 +1405,8 @@ static kan_bool_t resolve_samplers (struct rpl_compiler_context_t *context,
             struct compiler_instance_setting_node_t *first_setting = NULL;
             struct compiler_instance_setting_node_t *last_setting = NULL;
 
-            if (!resolve_settings (context, instance, intermediate, &source_sampler->settings, &first_setting,
-                                   &last_setting))
+            if (!resolve_settings (context, instance, intermediate, &source_sampler->settings, KAN_FALSE,
+                                   &first_setting, &last_setting))
             {
                 result = KAN_FALSE;
             }
@@ -4188,8 +4190,8 @@ kan_rpl_compiler_instance_t kan_rpl_compiler_context_resolve (kan_rpl_compiler_c
         struct kan_rpl_intermediate_t *intermediate =
             ((struct kan_rpl_intermediate_t **) context->modules.data)[intermediate_index];
 
-        if (!resolve_settings (context, instance, intermediate, &intermediate->settings, &instance->first_setting,
-                               &instance->last_setting))
+        if (!resolve_settings (context, instance, intermediate, &intermediate->settings, KAN_TRUE,
+                               &instance->first_setting, &instance->last_setting))
         {
             successfully_resolved = KAN_FALSE;
         }
