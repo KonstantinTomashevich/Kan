@@ -3,6 +3,7 @@
 #include <kan/api_common/mute_warnings.h>
 
 KAN_MUTE_THIRD_PARTY_WARNINGS_BEGIN
+#define CGLM_CLIPSPACE_INCLUDE_ALL
 #include <cglm/cglm.h>
 KAN_MUTE_THIRD_PARTY_WARNINGS_END
 
@@ -14,6 +15,7 @@ KAN_MUTE_THIRD_PARTY_WARNINGS_END
 KAN_C_HEADER_BEGIN
 
 #define KAN_PI CGLM_PI
+#define KAN_PI_2 CGLM_PI_2
 
 /// \brief 2 dimensional integer vector type.
 struct kan_integer_vector_2_t
@@ -449,6 +451,15 @@ static inline void kan_float_matrix_4x4_to_transform_3 (const struct kan_float_m
     transform->location.y = location_4[1u];
     transform->location.z = location_4[2u];
     glm_mat4_quat (rotation_matrix, &transform->rotation);
+    KAN_MUTE_POINTER_CONVERSION_WARNINGS_END
+}
+
+/// \brief Generation projection matrix for left-handed zero-one depth perspective projection.
+static inline void kan_perspective_projection (
+    struct kan_float_matrix_4x4_t *matrix, float field_of_view_y, float aspect_ratio, float near, float far)
+{
+    KAN_MUTE_POINTER_CONVERSION_WARNINGS_BEGIN
+    glm_perspective_lh_zo (field_of_view_y, aspect_ratio, near, far, matrix);
     KAN_MUTE_POINTER_CONVERSION_WARNINGS_END
 }
 

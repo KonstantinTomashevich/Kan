@@ -6,6 +6,7 @@ KAN_MUTE_THIRD_PARTY_WARNINGS_BEGIN
 #include <SDL3/SDL_init.h>
 #include <SDL3/SDL_mouse.h>
 #include <SDL3/SDL_video.h>
+#include <SDL3/SDL_vulkan.h>
 KAN_MUTE_THIRD_PARTY_WARNINGS_END
 
 #include <math.h>
@@ -17,12 +18,15 @@ KAN_MUTE_THIRD_PARTY_WARNINGS_END
 #include <kan/memory/allocation.h>
 #include <kan/platform/application.h>
 #include <kan/platform/sdl_allocation_adapter.h>
+#include <kan/threading/atomic.h>
 
 KAN_LOG_DEFINE_CATEGORY (platform_application);
 
 static kan_allocation_group_t application_allocation_group;
 static kan_allocation_group_t application_events_allocation_group;
 static kan_allocation_group_t application_clipboard_allocation_group;
+
+static struct kan_atomic_int_t vulkan_library_requests;
 
 static inline kan_pixel_format_t convert_pixel_format (uint32_t sdl_format)
 {
@@ -421,6 +425,8 @@ kan_bool_t kan_platform_application_init (void)
         kan_allocation_group_get_child (kan_allocation_group_root (), "platform_application");
     application_events_allocation_group = kan_allocation_group_get_child (application_allocation_group, "events");
     application_clipboard_allocation_group = kan_allocation_group_get_child (application_allocation_group, "clipboard");
+
+    vulkan_library_requests = kan_atomic_int_init (0);
     return KAN_TRUE;
 }
 
@@ -1191,6 +1197,34 @@ kan_bool_t kan_platform_application_window_get_size (kan_platform_window_id_t wi
     return KAN_TRUE;
 }
 
+kan_bool_t kan_platform_application_window_get_size_for_render (kan_platform_window_id_t window_id,
+                                                                uint32_t *output_width,
+                                                                uint32_t *output_height)
+{
+    SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) window_id);
+    if (!window)
+    {
+        KAN_LOG (platform_application, KAN_LOG_ERROR, "Unable to find window with id %llu, backend error: %s",
+                 (unsigned long long) window_id, SDL_GetError ())
+        return KAN_FALSE;
+    }
+
+    int width;
+    int height;
+
+    if (SDL_GetWindowSizeInPixels (window, &width, &height) != 0)
+    {
+        KAN_LOG (platform_application, KAN_LOG_ERROR,
+                 "Unable to get window with id %llu size for render, backend error: %s", (unsigned long long) window_id,
+                 SDL_GetError ())
+        return KAN_FALSE;
+    }
+
+    *output_width = (int32_t) width;
+    *output_height = (int32_t) height;
+    return KAN_TRUE;
+}
+
 kan_bool_t kan_platform_application_window_set_minimum_size (kan_platform_window_id_t window_id,
                                                              uint32_t width,
                                                              uint32_t height)
@@ -1461,6 +1495,53 @@ void kan_platform_application_window_set_focusable (kan_platform_window_id_t win
     SDL_SetWindowFocusable (window, focusable ? SDL_TRUE : SDL_FALSE);
 }
 
+_Static_assert (sizeof (VkInstance) <= sizeof (uint64_t), "VkInstance is not bigger than 64 bit integer.");
+_Static_assert (sizeof (VkSurfaceKHR) <= sizeof (uint64_t), "VkInstance is not bigger than 64 bit integer.");
+
+#if !defined(VK_NULL_HANDLE)
+#    define VK_NULL_HANDLE 0u
+#endif
+
+uint64_t kan_platform_application_window_create_vulkan_surface (kan_platform_window_id_t window_id,
+                                                                uint64_t vulkan_instance,
+                                                                void *vulkan_allocation_callbacks)
+{
+    SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) window_id);
+    if (!window)
+    {
+        KAN_LOG (platform_application, KAN_LOG_ERROR, "Unable to find window with id %llu, backend error: %s",
+                 (unsigned long long) window_id, SDL_GetError ())
+        return VK_NULL_HANDLE;
+    }
+
+    VkSurfaceKHR surface;
+    if (!SDL_Vulkan_CreateSurface (window, (VkInstance) vulkan_instance, vulkan_allocation_callbacks, &surface))
+    {
+        KAN_LOG (platform_application, KAN_LOG_ERROR, "Failed to create Vulkan surface, backend error: %s",
+                 SDL_GetError ())
+        return VK_NULL_HANDLE;
+    }
+
+    return (uint64_t) surface;
+}
+
+void kan_platform_application_window_destroy_vulkan_surface (kan_platform_window_id_t window_id,
+                                                             uint64_t vulkan_instance,
+                                                             uint64_t vulkan_surface,
+                                                             void *vulkan_allocation_callbacks)
+{
+    SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) window_id);
+    if (!window)
+    {
+        KAN_LOG (platform_application, KAN_LOG_ERROR, "Unable to find window with id %llu, backend error: %s",
+                 (unsigned long long) window_id, SDL_GetError ())
+        return;
+    }
+
+    SDL_Vulkan_DestroySurface ((VkInstance) vulkan_instance, (VkSurfaceKHR) vulkan_surface,
+                               vulkan_allocation_callbacks);
+}
+
 void kan_platform_application_window_destroy (kan_platform_window_id_t window_id)
 {
     SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) window_id);
@@ -1540,4 +1621,53 @@ char *kan_platform_application_extract_text_from_clipboard (void)
 PLATFORM_API void kan_platform_application_put_text_into_clipboard (const char *text)
 {
     SDL_SetClipboardText (text);
+}
+
+kan_bool_t kan_platform_application_register_vulkan_library_usage (void)
+{
+    if (kan_atomic_int_add (&vulkan_library_requests, 1) == 0)
+    {
+        if (SDL_Vulkan_LoadLibrary (NULL) == 0)
+        {
+            return KAN_TRUE;
+        }
+        else
+        {
+            KAN_LOG (platform_application, KAN_LOG_ERROR, "Failed to load Vulkan library using SDL. Error: %s.",
+                     SDL_GetError ())
+            kan_atomic_int_add (&vulkan_library_requests, -1);
+            return KAN_FALSE;
+        }
+    }
+
+    return KAN_TRUE;
+}
+
+void *kan_platform_application_request_vulkan_resolve_function (void)
+{
+    return (void *) SDL_Vulkan_GetVkGetInstanceProcAddr ();
+}
+
+void kan_platform_application_request_vulkan_extensions (struct kan_dynamic_array_t *output,
+                                                         kan_allocation_group_t allocation_group)
+{
+    uint32_t count;
+    const char *const *extensions = SDL_Vulkan_GetInstanceExtensions (&count);
+    kan_dynamic_array_init (output, (uint64_t) count, sizeof (char *), _Alignof (char *), allocation_group);
+
+    for (uint64_t index = 0u; index < (uint64_t) count; ++index)
+    {
+        char **extension_output = kan_dynamic_array_add_last (output);
+        uint64_t length = strlen (extensions[index]);
+        *extension_output = kan_allocate_general (allocation_group, length + 1u, _Alignof (char));
+        memcpy (*extension_output, extensions[index], length + 1u);
+    }
+}
+
+void kan_platform_application_unregister_vulkan_library_usage (void)
+{
+    if (kan_atomic_int_add (&vulkan_library_requests, -1) == 1)
+    {
+        SDL_Vulkan_UnloadLibrary ();
+    }
 }

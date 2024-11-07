@@ -1,3 +1,4 @@
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -99,14 +100,21 @@ KAN_TEST_CASE (generic)
     KAN_TEST_ASSERT (kan_rpl_compiler_instance_emit_meta (meta_instance, &meta))
     kan_rpl_compiler_instance_destroy (meta_instance);
 
+#define TEST_FLOATING_TOLERANCE 0.000001f
+
     KAN_TEST_CHECK (meta.pipeline_type == KAN_RPL_PIPELINE_TYPE_GRAPHICS_CLASSIC)
     KAN_TEST_CHECK (meta.graphics_classic_settings.polygon_mode == KAN_RPL_POLYGON_MODE_WIREFRAME)
     KAN_TEST_CHECK (meta.graphics_classic_settings.cull_mode == KAN_RPL_CULL_MODE_BACK)
     KAN_TEST_CHECK (meta.graphics_classic_settings.depth_test == KAN_TRUE)
     KAN_TEST_CHECK (meta.graphics_classic_settings.depth_write == KAN_TRUE)
+    KAN_TEST_CHECK (meta.graphics_classic_settings.depth_bounds_test == KAN_FALSE)
+    KAN_TEST_CHECK (meta.graphics_classic_settings.depth_compare_operation == KAN_RPL_COMPARE_OPERATION_LESS)
+    KAN_TEST_CHECK (!meta.graphics_classic_settings.stencil_test)
+    KAN_TEST_CHECK (fabs (meta.graphics_classic_settings.depth_min + 1.0) < TEST_FLOATING_TOLERANCE)
+    KAN_TEST_CHECK (fabs (meta.graphics_classic_settings.depth_max - 1.0) < TEST_FLOATING_TOLERANCE)
 
-    KAN_TEST_ASSERT (meta.buffers.size == 3u)
-    struct kan_rpl_meta_buffer_t *buffer_meta = &((struct kan_rpl_meta_buffer_t *) meta.buffers.data)[0u];
+    KAN_TEST_ASSERT (meta.attribute_buffers.size == 1u)
+    struct kan_rpl_meta_buffer_t *buffer_meta = &((struct kan_rpl_meta_buffer_t *) meta.attribute_buffers.data)[0u];
     KAN_TEST_CHECK (strcmp (buffer_meta->name, "vertex") == 0)
     KAN_TEST_CHECK (buffer_meta->binding == 0u)
     KAN_TEST_CHECK (buffer_meta->type == KAN_RPL_BUFFER_TYPE_VERTEX_ATTRIBUTE)
@@ -141,7 +149,31 @@ KAN_TEST_CASE (generic)
 
     KAN_TEST_ASSERT (buffer_meta->parameters.size == 0u)
 
-    buffer_meta = &((struct kan_rpl_meta_buffer_t *) meta.buffers.data)[1u];
+    KAN_TEST_ASSERT (meta.set_pass.buffers.size == 1u)
+    buffer_meta = &((struct kan_rpl_meta_buffer_t *) meta.set_pass.buffers.data)[0u];
+    KAN_TEST_CHECK (strcmp (buffer_meta->name, "pass") == 0)
+    KAN_TEST_CHECK (buffer_meta->binding == 0u)
+    KAN_TEST_CHECK (buffer_meta->type == KAN_RPL_BUFFER_TYPE_UNIFORM)
+    KAN_TEST_CHECK (buffer_meta->size == 64u)
+
+    KAN_TEST_ASSERT (buffer_meta->attributes.size == 0u)
+
+    KAN_TEST_ASSERT (buffer_meta->parameters.size == 1u)
+    struct kan_rpl_meta_parameter_t *parameter_meta =
+        &((struct kan_rpl_meta_parameter_t *) buffer_meta->parameters.data)[0u];
+    KAN_TEST_CHECK (strcmp (parameter_meta->name, "projection_mul_view") == 0)
+    KAN_TEST_CHECK (parameter_meta->type == KAN_RPL_META_VARIABLE_TYPE_F4X4)
+    KAN_TEST_CHECK (parameter_meta->offset == 0u)
+    KAN_TEST_CHECK (parameter_meta->total_item_count == 1u)
+    KAN_TEST_ASSERT (parameter_meta->meta.size == 2u)
+    KAN_TEST_CHECK (strcmp (((kan_interned_string_t *) parameter_meta->meta.data)[0u], "projection_view_matrix") == 0)
+    KAN_TEST_CHECK (strcmp (((kan_interned_string_t *) parameter_meta->meta.data)[1u], "hidden") == 0)
+
+    KAN_TEST_ASSERT (meta.set_material.buffers.size == 0u)
+    KAN_TEST_ASSERT (meta.set_object.buffers.size == 0u)
+    KAN_TEST_ASSERT (meta.set_unstable.buffers.size == 1u)
+
+    buffer_meta = &((struct kan_rpl_meta_buffer_t *) meta.set_unstable.buffers.data)[0u];
     KAN_TEST_CHECK (strcmp (buffer_meta->name, "instance_storage") == 0)
     KAN_TEST_CHECK (buffer_meta->binding == 0u)
     KAN_TEST_CHECK (buffer_meta->type == KAN_RPL_BUFFER_TYPE_INSTANCED_READ_ONLY_STORAGE)
@@ -150,8 +182,7 @@ KAN_TEST_CASE (generic)
     KAN_TEST_ASSERT (buffer_meta->attributes.size == 0u)
 
     KAN_TEST_ASSERT (buffer_meta->parameters.size == 2u)
-    struct kan_rpl_meta_parameter_t *parameter_meta =
-        &((struct kan_rpl_meta_parameter_t *) buffer_meta->parameters.data)[0u];
+    parameter_meta = &((struct kan_rpl_meta_parameter_t *) buffer_meta->parameters.data)[0u];
     KAN_TEST_CHECK (strcmp (parameter_meta->name, "color_multiplier") == 0)
     KAN_TEST_CHECK (parameter_meta->type == KAN_RPL_META_VARIABLE_TYPE_F4)
     KAN_TEST_CHECK (parameter_meta->offset == 0u)
@@ -167,27 +198,14 @@ KAN_TEST_CASE (generic)
     KAN_TEST_CHECK (strcmp (((kan_interned_string_t *) parameter_meta->meta.data)[0u], "model_joint_matrices") == 0)
     KAN_TEST_CHECK (strcmp (((kan_interned_string_t *) parameter_meta->meta.data)[1u], "hidden") == 0)
 
-    buffer_meta = &((struct kan_rpl_meta_buffer_t *) meta.buffers.data)[2u];
-    KAN_TEST_CHECK (strcmp (buffer_meta->name, "uniforms") == 0)
-    KAN_TEST_CHECK (buffer_meta->binding == 1u)
-    KAN_TEST_CHECK (buffer_meta->type == KAN_RPL_BUFFER_TYPE_UNIFORM)
-    KAN_TEST_CHECK (buffer_meta->size == 64u)
+    KAN_TEST_ASSERT (meta.set_pass.samplers.size == 0u)
+    KAN_TEST_ASSERT (meta.set_material.samplers.size == 1u)
+    KAN_TEST_ASSERT (meta.set_object.samplers.size == 0u)
+    KAN_TEST_ASSERT (meta.set_unstable.samplers.size == 0u)
 
-    KAN_TEST_ASSERT (buffer_meta->attributes.size == 0u)
-
-    KAN_TEST_ASSERT (buffer_meta->parameters.size == 1u)
-    parameter_meta = &((struct kan_rpl_meta_parameter_t *) buffer_meta->parameters.data)[0u];
-    KAN_TEST_CHECK (strcmp (parameter_meta->name, "projection_mul_view") == 0)
-    KAN_TEST_CHECK (parameter_meta->type == KAN_RPL_META_VARIABLE_TYPE_F4X4)
-    KAN_TEST_CHECK (parameter_meta->offset == 0u)
-    KAN_TEST_CHECK (parameter_meta->total_item_count == 1u)
-    KAN_TEST_ASSERT (parameter_meta->meta.size == 2u)
-    KAN_TEST_CHECK (strcmp (((kan_interned_string_t *) parameter_meta->meta.data)[0u], "projection_view_matrix") == 0)
-    KAN_TEST_CHECK (strcmp (((kan_interned_string_t *) parameter_meta->meta.data)[1u], "hidden") == 0)
-
-    KAN_TEST_ASSERT (meta.samplers.size == 1u)
-    struct kan_rpl_meta_sampler_t *sampler_meta = &((struct kan_rpl_meta_sampler_t *) meta.samplers.data)[0u];
-    KAN_TEST_CHECK (sampler_meta->binding == 2u)
+    struct kan_rpl_meta_sampler_t *sampler_meta =
+        &((struct kan_rpl_meta_sampler_t *) meta.set_material.samplers.data)[0u];
+    KAN_TEST_CHECK (sampler_meta->binding == 1u)
     KAN_TEST_CHECK (sampler_meta->type == KAN_RPL_SAMPLER_TYPE_2D)
     KAN_TEST_CHECK (sampler_meta->settings.mag_filter == KAN_RPL_META_SAMPLER_FILTER_NEAREST)
     KAN_TEST_CHECK (sampler_meta->settings.min_filter == KAN_RPL_META_SAMPLER_FILTER_NEAREST)
@@ -195,6 +213,29 @@ KAN_TEST_CASE (generic)
     KAN_TEST_CHECK (sampler_meta->settings.address_mode_u == KAN_RPL_META_SAMPLER_ADDRESS_MODE_REPEAT)
     KAN_TEST_CHECK (sampler_meta->settings.address_mode_v == KAN_RPL_META_SAMPLER_ADDRESS_MODE_REPEAT)
     KAN_TEST_CHECK (sampler_meta->settings.address_mode_w == KAN_RPL_META_SAMPLER_ADDRESS_MODE_REPEAT)
+
+    KAN_TEST_ASSERT (meta.color_outputs.size == 1u)
+    struct kan_rpl_meta_color_output_t *color_output =
+        &((struct kan_rpl_meta_color_output_t *) meta.color_outputs.data)[0u];
+    KAN_TEST_CHECK (color_output->components_count == 4u)
+    KAN_TEST_CHECK (color_output->use_blend)
+    KAN_TEST_CHECK (color_output->write_r)
+    KAN_TEST_CHECK (color_output->write_g)
+    KAN_TEST_CHECK (color_output->write_b)
+    KAN_TEST_CHECK (color_output->write_a)
+    KAN_TEST_CHECK (color_output->source_color_blend_factor == KAN_RPL_BLEND_FACTOR_ONE)
+    KAN_TEST_CHECK (color_output->destination_color_blend_factor == KAN_RPL_BLEND_FACTOR_ZERO)
+    KAN_TEST_CHECK (color_output->color_blend_operation == KAN_RPL_BLEND_OPERATION_ADD)
+    KAN_TEST_CHECK (color_output->source_alpha_blend_factor == KAN_RPL_BLEND_FACTOR_ONE)
+    KAN_TEST_CHECK (color_output->destination_alpha_blend_factor == KAN_RPL_BLEND_FACTOR_ZERO)
+    KAN_TEST_CHECK (color_output->alpha_blend_operation == KAN_RPL_BLEND_OPERATION_ADD)
+
+    KAN_TEST_CHECK (fabs (meta.color_blend_constant_r) < TEST_FLOATING_TOLERANCE)
+    KAN_TEST_CHECK (fabs (meta.color_blend_constant_g) < TEST_FLOATING_TOLERANCE)
+    KAN_TEST_CHECK (fabs (meta.color_blend_constant_b) < TEST_FLOATING_TOLERANCE)
+    KAN_TEST_CHECK (fabs (meta.color_blend_constant_a) < TEST_FLOATING_TOLERANCE)
+
+#undef TEST_FLOATING_TOLERANCE
 
     kan_rpl_meta_shutdown (&meta);
     struct kan_dynamic_array_t code;

@@ -50,6 +50,7 @@ struct compiler_instance_setting_node_t
 {
     struct compiler_instance_setting_node_t *next;
     kan_interned_string_t name;
+    uint64_t block;
     enum kan_rpl_setting_type_t type;
 
     union
@@ -124,12 +125,14 @@ struct flattening_name_generation_buffer_t
 };
 
 #define INVALID_LOCATION UINT64_MAX
+#define INVALID_SET UINT64_MAX
 #define INVALID_BINDING UINT64_MAX
 
 struct binding_location_assignment_counter_t
 {
     uint64_t next_attribute_buffer_binding;
-    uint64_t next_arbitrary_buffer_binding;
+    uint64_t next_arbitrary_stable_buffer_binding;
+    uint64_t next_arbitrary_unstable_buffer_binding;
     uint64_t next_attribute_location;
     uint64_t next_vertex_output_location;
     uint64_t next_fragment_output_location;
@@ -158,6 +161,7 @@ struct compiler_instance_buffer_node_t
 {
     struct compiler_instance_buffer_node_t *next;
     kan_interned_string_t name;
+    enum kan_rpl_set_t set;
     enum kan_rpl_buffer_type_t type;
     kan_bool_t used;
 
@@ -166,6 +170,8 @@ struct compiler_instance_buffer_node_t
     struct compiler_instance_declaration_node_t *first_field;
 
     uint64_t binding;
+    kan_bool_t stable_binding;
+
     struct compiler_instance_buffer_flattening_graph_node_t *flattening_graph_base;
     struct compiler_instance_buffer_flattened_declaration_t *first_flattened_declaration;
     struct compiler_instance_buffer_flattened_declaration_t *last_flattened_declaration;
@@ -181,6 +187,7 @@ struct compiler_instance_sampler_node_t
 {
     struct compiler_instance_sampler_node_t *next;
     kan_interned_string_t name;
+    enum kan_rpl_set_t set;
     enum kan_rpl_sampler_type_t type;
     kan_bool_t used;
 
@@ -566,10 +573,46 @@ struct kan_rpl_compiler_statics_t
     kan_interned_string_t interned_wireframe;
     kan_interned_string_t interned_back;
 
+    kan_interned_string_t interned_never;
+    kan_interned_string_t interned_always;
+    kan_interned_string_t interned_equal;
+    kan_interned_string_t interned_not_equal;
+    kan_interned_string_t interned_less;
+    kan_interned_string_t interned_less_or_equal;
+    kan_interned_string_t interned_greater;
+    kan_interned_string_t interned_greater_or_equal;
+
+    kan_interned_string_t interned_keep;
+    kan_interned_string_t interned_replace;
+    kan_interned_string_t interned_increment_and_clamp;
+    kan_interned_string_t interned_decrement_and_clamp;
+    kan_interned_string_t interned_invert;
+    kan_interned_string_t interned_increment_and_wrap;
+    kan_interned_string_t interned_decrement_and_wrap;
+
     kan_interned_string_t interned_polygon_mode;
     kan_interned_string_t interned_cull_mode;
     kan_interned_string_t interned_depth_test;
     kan_interned_string_t interned_depth_write;
+    kan_interned_string_t interned_depth_bounds_test;
+    kan_interned_string_t interned_depth_compare_operation;
+    kan_interned_string_t interned_depth_min;
+    kan_interned_string_t interned_depth_max;
+    kan_interned_string_t interned_stencil_test;
+    kan_interned_string_t interned_stencil_front_on_fail;
+    kan_interned_string_t interned_stencil_front_on_depth_fail;
+    kan_interned_string_t interned_stencil_front_on_pass;
+    kan_interned_string_t interned_stencil_front_compare;
+    kan_interned_string_t interned_stencil_front_compare_mask;
+    kan_interned_string_t interned_stencil_front_write_mask;
+    kan_interned_string_t interned_stencil_front_reference;
+    kan_interned_string_t interned_stencil_back_on_fail;
+    kan_interned_string_t interned_stencil_back_on_depth_fail;
+    kan_interned_string_t interned_stencil_back_on_pass;
+    kan_interned_string_t interned_stencil_back_compare;
+    kan_interned_string_t interned_stencil_back_compare_mask;
+    kan_interned_string_t interned_stencil_back_write_mask;
+    kan_interned_string_t interned_stencil_back_reference;
 
     kan_interned_string_t interned_nearest;
     kan_interned_string_t interned_linear;
@@ -586,6 +629,45 @@ struct kan_rpl_compiler_statics_t
     kan_interned_string_t interned_address_mode_u;
     kan_interned_string_t interned_address_mode_v;
     kan_interned_string_t interned_address_mode_w;
+
+    kan_interned_string_t interned_zero;
+    kan_interned_string_t interned_one;
+    kan_interned_string_t interned_source_color;
+    kan_interned_string_t interned_one_minus_source_color;
+    kan_interned_string_t interned_destination_color;
+    kan_interned_string_t interned_one_minus_destination_color;
+    kan_interned_string_t interned_source_alpha;
+    kan_interned_string_t interned_one_minus_source_alpha;
+    kan_interned_string_t interned_destination_alpha;
+    kan_interned_string_t interned_one_minus_destination_alpha;
+    kan_interned_string_t interned_constant_color;
+    kan_interned_string_t interned_one_minus_constant_color;
+    kan_interned_string_t interned_constant_alpha;
+    kan_interned_string_t interned_one_minus_constant_alpha;
+    kan_interned_string_t interned_source_alpha_saturate;
+
+    kan_interned_string_t interned_add;
+    kan_interned_string_t interned_subtract;
+    kan_interned_string_t interned_reverse_subtract;
+    kan_interned_string_t interned_min;
+    kan_interned_string_t interned_max;
+
+    kan_interned_string_t interned_color_output_use_blend;
+    kan_interned_string_t interned_color_output_write_r;
+    kan_interned_string_t interned_color_output_write_g;
+    kan_interned_string_t interned_color_output_write_b;
+    kan_interned_string_t interned_color_output_write_a;
+    kan_interned_string_t interned_color_output_source_color_blend_factor;
+    kan_interned_string_t interned_color_output_destination_color_blend_factor;
+    kan_interned_string_t interned_color_output_color_blend_operation;
+    kan_interned_string_t interned_color_output_source_alpha_blend_factor;
+    kan_interned_string_t interned_color_output_destination_alpha_blend_factor;
+    kan_interned_string_t interned_color_output_alpha_blend_operation;
+
+    kan_interned_string_t interned_color_blend_constant_r;
+    kan_interned_string_t interned_color_blend_constant_g;
+    kan_interned_string_t interned_color_blend_constant_b;
+    kan_interned_string_t interned_color_blend_constant_a;
 
     kan_interned_string_t interned_void;
 
@@ -1120,6 +1202,18 @@ struct kan_rpl_compiler_statics_t
 
     struct compiler_instance_function_node_t builtin_mix_f4;
     struct compiler_instance_declaration_node_t builtin_mix_f4_arguments[3u];
+
+    struct compiler_instance_function_node_t builtin_step_f1;
+    struct compiler_instance_declaration_node_t builtin_step_f1_arguments[2u];
+
+    struct compiler_instance_function_node_t builtin_step_f2;
+    struct compiler_instance_declaration_node_t builtin_step_f2_arguments[2u];
+
+    struct compiler_instance_function_node_t builtin_step_f3;
+    struct compiler_instance_declaration_node_t builtin_step_f3_arguments[2u];
+
+    struct compiler_instance_function_node_t builtin_step_f4;
+    struct compiler_instance_declaration_node_t builtin_step_f4_arguments[2u];
 
     struct compiler_instance_function_node_t builtin_fma_f1;
     struct compiler_instance_declaration_node_t builtin_fma_f1_arguments[3u];

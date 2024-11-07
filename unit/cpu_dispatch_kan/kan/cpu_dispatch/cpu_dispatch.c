@@ -93,16 +93,7 @@ static kan_thread_result_t worker_thread_function (kan_thread_user_data_t user_d
             {
                 kan_conditional_variable_wait (global_task_dispatcher.worker_wake_up_condition,
                                                global_task_dispatcher.task_mutex);
-
-                if (kan_atomic_int_get (&global_task_dispatcher.shutting_down))
-                {
-                    kan_mutex_unlock (global_task_dispatcher.task_mutex);
-                    return 0;
-                }
-                else
-                {
-                    continue;
-                }
+                continue;
             }
 
             KAN_ASSERT (global_task_dispatcher.tasks_first)

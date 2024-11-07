@@ -6,7 +6,7 @@ vertex_attribute_buffer vertex
     f2 uv;
 };
 
-uniform_buffer uniforms
+set_object uniform_buffer uniforms
 {
     f4x4 model_view_projection;
 };
@@ -23,7 +23,7 @@ void vertex_main (void)
     vertex_stage_output_position (uniforms.model_view_projection * position4);
 }
 
-sampler_2d diffuse_color
+set_material sampler_2d diffuse_color
 {
     setting mag_filter "nearest";
     setting min_filter "nearest";

@@ -16,7 +16,7 @@ vertex_stage_output vertex_output
     f4 world_tangent;
 };
 
-uniform_buffer volatile_uniforms
+set_object uniform_buffer volatile_uniforms
 {
     f4x4 view_projection;
     f4x4 model;
@@ -52,7 +52,7 @@ struct directional_light_t
     f4 color;
 };
 
-uniform_buffer lights
+set_pass uniform_buffer lights
 {
     f4 ambient_color;
     i4 counts;
@@ -60,14 +60,14 @@ uniform_buffer lights
     directional_light_t[max_point_lights] directional;
 };
 
-uniform_buffer material
+set_material uniform_buffer material
 {
     f4 base_color;
     f4 proughness_metallic_reflectance;
     f4 emissive;
 };
 
-sampler_2d texture_base_color
+set_material sampler_2d texture_base_color
 {
     setting mag_filter "nearest";
     setting min_filter "nearest";
@@ -77,7 +77,7 @@ sampler_2d texture_base_color
     setting address_mode_w "repeat";
 };
 
-sampler_2d texture_metallic_roughness
+set_material sampler_2d texture_metallic_roughness
 {
     setting mag_filter "nearest";
     setting min_filter "nearest";
@@ -87,7 +87,7 @@ sampler_2d texture_metallic_roughness
     setting address_mode_w "repeat";
 };
 
-sampler_2d texture_normal
+set_material sampler_2d texture_normal
 {
     setting mag_filter "nearest";
     setting min_filter "nearest";
@@ -97,7 +97,7 @@ sampler_2d texture_normal
     setting address_mode_w "repeat";
 };
 
-sampler_2d texture_occlusion
+set_material sampler_2d texture_occlusion
 {
     setting mag_filter "nearest";
     setting min_filter "nearest";
@@ -107,7 +107,7 @@ sampler_2d texture_occlusion
     setting address_mode_w "repeat";
 };
 
-sampler_2d texture_emissive
+set_material sampler_2d texture_emissive
 {
     setting mag_filter "nearest";
     setting min_filter "nearest";

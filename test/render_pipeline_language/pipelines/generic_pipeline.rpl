@@ -13,6 +13,10 @@ conditional (wireframe) setting polygon_mode "wireframe";
 setting cull_mode "back";
 setting depth_test on;
 setting depth_write on;
+setting depth_min -1.0;
+setting depth_max 1.0;
+
+setting color_output_use_blend on block 0;
 
 conditional (enable_skinning) struct joint_data_t
 {
@@ -41,27 +45,32 @@ conditional (support_instancing && !enable_skinning) instanced_attribute_buffer 
     f4x4 model_space;
 };
 
-conditional (support_instancing && enable_skinning) instanced_read_only_storage_buffer instance_storage
+set_pass uniform_buffer pass
+{
+    meta (hidden, projection_view_matrix)
+    f4x4 projection_mul_view;
+};
+
+conditional (!support_instancing) set_material uniform_buffer material
 {
     f4 color_multiplier;
+};
+
+conditional (!support_instancing) set_object uniform_buffer object
+{
+    conditional (!enable_skinning)
+    meta (hidden, model_space_matrix)
+    f4x4 model_space;
 
     conditional (enable_skinning)
     joint_data_t joint_data;
 };
 
-uniform_buffer uniforms
+conditional (support_instancing && enable_skinning) set_unstable instanced_read_only_storage_buffer instance_storage
 {
-    meta (hidden, projection_view_matrix)
-    f4x4 projection_mul_view;
-
-    conditional (!support_instancing)
     f4 color_multiplier;
 
-    conditional (!support_instancing && !enable_skinning)
-    meta (hidden, model_space_matrix)
-    f4x4 model_space;
-
-    conditional (!support_instancing && enable_skinning)
+    conditional (enable_skinning)
     joint_data_t joint_data;
 };
 
@@ -80,14 +89,14 @@ void vertex_main (void)
             instance_storage.color_multiplier)
     conditional (support_instancing && !enable_skinning) alias (color_multiplier,
             instance_vertex.color_multiplier)
-    conditional (!support_instancing) alias (color_multiplier, uniforms.color_multiplier)
+    conditional (!support_instancing) alias (color_multiplier, material.color_multiplier)
     vertex_output.color_multiplier = color_multiplier;
 
     f4 position4 = f4 {vertex.position._0, vertex.position._1, vertex.position._2, 1.0};
     conditional (enable_skinning)
     {
         conditional (support_instancing) alias (joints, instance_storage.joint_data.model_joints)
-        conditional (!support_instancing) alias (joints, uniforms.joint_data.model_joints)
+        conditional (!support_instancing) alias (joints, object.joint_data.model_joints)
         f4x4 global_joint_transform;
 
         conditional (skinning_2_weights)
@@ -111,14 +120,14 @@ void vertex_main (void)
     conditional (!enable_skinning)
     {
         conditional (support_instancing) alias (transform, instance_vertex.model_space)
-        conditional (!support_instancing) alias (transform, uniforms.model_space)
+        conditional (!support_instancing) alias (transform, object.model_space)
         position4 = transform * position4;
     }
 
-    vertex_stage_output_position (uniforms.projection_mul_view * position4);
+    vertex_stage_output_position (pass.projection_mul_view * position4);
 }
 
-sampler_2d diffuse_color
+set_material sampler_2d diffuse_color
 {
     setting mag_filter "nearest";
     setting min_filter "nearest";

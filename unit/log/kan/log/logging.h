@@ -53,17 +53,8 @@ typedef uint64_t kan_log_category_t;
 /// \brief Indicates that `kan_log_category_t` does not point to correct category.
 #define KAN_LOG_CATEGORY_INVALID 0u
 
-// clang-format off
-#if defined(_WIN32)
-#    define KAN_LOG_EXPORT __declspec(dllexport)
-#else
-#    define KAN_LOG_EXPORT
-#endif
-// clang-format on
-
 /// \brief Statically defines category to be used along with `KAN_LOG`.
-#define KAN_LOG_DEFINE_CATEGORY(NAME)                                                                                  \
-    KAN_LOG_EXPORT kan_log_category_t kan_log_category_##NAME##_reference = KAN_LOG_CATEGORY_INVALID
+#define KAN_LOG_DEFINE_CATEGORY(NAME) kan_log_category_t kan_log_category_##NAME##_reference = KAN_LOG_CATEGORY_INVALID
 
 /// \brief Requests log category with given name. If category does not exist,
 ///        it is automatically created with `KAN_LOG_DEFAULT` verbosity.
