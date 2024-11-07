@@ -639,6 +639,10 @@ static kan_render_graphics_pipeline_t create_cube_pipeline (kan_render_context_t
     return pipeline;
 }
 
+// Uncomment this define to test render in free mode with capture and auto exit.
+// #define FREE_MODE
+
+#if !defined(FREE_MODE)
 static void bgra_to_rgba (uint32_t *input_bgra, uint32_t *output_rgba, uint32_t count)
 {
     while (count--)
@@ -670,6 +674,7 @@ static void check_rgba_equal_enough (uint32_t *first, uint32_t *second, uint32_t
 
     KAN_TEST_CHECK (error_count < max_error_count)
 }
+#endif
 
 KAN_TEST_CASE (render_and_capture)
 {
@@ -726,11 +731,17 @@ KAN_TEST_CASE (render_and_capture)
 
     kan_render_backend_system_select_device (render_backend_system, picked_device);
     const uint64_t fixed_window_size = 1024u;
+    enum kan_platform_window_flag_t flags = kan_render_get_required_window_flags ();
+
+#if defined(FREE_MODE)
+    flags |= KAN_PLATFORM_WINDOW_FLAG_RESIZABLE;
+#endif
+
     kan_application_system_window_handle_t window_handle = kan_application_system_window_create (
         application_system, "Kan context_render_backend test window", fixed_window_size, fixed_window_size,
         // Not having KAN_PLATFORM_WINDOW_FLAG_RESIZABLE results in severe FPS drop on some NVIDIA drivers.
         // It is okay for automatic test, but beware in real applications.
-        kan_render_get_required_window_flags ());
+        flags);
 
     const struct kan_application_system_window_info_t *window_info =
         kan_application_system_get_window_info_from_handle (application_system, window_handle);
@@ -988,6 +999,16 @@ KAN_TEST_CASE (render_and_capture)
     uint64_t frame = 0u;
     uint64_t last_render_image_frame = UINT64_MAX;
 
+#if defined(FREE_MODE)
+    uint64_t width = fixed_window_size;
+    uint64_t height = fixed_window_size;
+    kan_bool_t exit_requested = KAN_FALSE;
+
+    kan_application_system_event_iterator_t event_iterator =
+        kan_application_system_event_iterator_create (application_system);
+
+    while (!exit_requested)
+#else
     kan_render_read_back_status_t first_frame_read_back = KAN_INVALID_RENDER_READ_BACK_STATUS;
     kan_render_read_back_status_t second_frame_read_back = KAN_INVALID_RENDER_READ_BACK_STATUS;
 
@@ -1003,8 +1024,30 @@ KAN_TEST_CASE (render_and_capture)
            second_frame_read_back == KAN_INVALID_RENDER_READ_BACK_STATUS ||
            kan_read_read_back_status_get (first_frame_read_back) != KAN_RENDER_READ_BACK_STATE_FINISHED ||
            kan_read_read_back_status_get (second_frame_read_back) != KAN_RENDER_READ_BACK_STATE_FINISHED)
+#endif
     {
         kan_application_system_sync_in_main_thread (application_system);
+
+#if defined(FREE_MODE)
+        const struct kan_platform_application_event_t *event;
+        while ((event = kan_application_system_event_iterator_get (application_system, event_iterator)))
+        {
+            if (event->type == KAN_PLATFORM_APPLICATION_EVENT_TYPE_QUIT)
+            {
+                exit_requested = KAN_TRUE;
+            }
+
+            event_iterator = kan_application_system_event_iterator_advance (event_iterator);
+        }
+
+        if (width != window_info->width_for_render || height != window_info->height_for_render)
+        {
+            width = window_info->width_for_render;
+            height = window_info->height_for_render;
+            kan_render_image_resize_render_target (depth_image, width, height, 1u);
+        }
+#endif
+
         if (kan_render_backend_system_next_frame (render_backend_system))
         {
             struct kan_render_viewport_bounds_t cube_viewport_bounds = {
@@ -1039,7 +1082,12 @@ KAN_TEST_CASE (render_and_capture)
             {
                 struct kan_float_matrix_4x4_t projection;
                 kan_perspective_projection (&projection, KAN_PI_2,
-                                            ((float) fixed_window_size) / ((float) fixed_window_size), 0.01f, 5000.0f);
+#if defined(FREE_MODE)
+                                            ((float) width) / ((float) height),
+#else
+                                            ((float) fixed_window_size) / ((float) fixed_window_size),
+#endif
+                                            0.01f, 5000.0f);
 
                 struct kan_transform_3_t camera_transform = kan_transform_3_get_identity ();
                 camera_transform.location.y = 17.5f;
@@ -1146,12 +1194,14 @@ KAN_TEST_CASE (render_and_capture)
 
                 if (render_image_instance != KAN_INVALID_RENDER_PASS_INSTANCE)
                 {
+#if !defined(FREE_MODE)
                     if (first_frame_read_back == KAN_INVALID_RENDER_READ_BACK_STATUS)
                     {
                         first_frame_read_back =
                             kan_render_read_back_request_from_surface (test_surface, first_read_back_buffer, 0u);
                         KAN_TEST_ASSERT (first_frame_read_back != KAN_INVALID_RENDER_READ_BACK_STATUS)
                     }
+#endif
 
                     kan_render_pass_instance_graphics_pipeline (render_image_instance, render_image_pipeline);
                     kan_render_pass_instance_pipeline_parameter_sets (render_image_instance, 1u, &render_image_set);
@@ -1171,6 +1221,7 @@ KAN_TEST_CASE (render_and_capture)
                     last_render_image_frame = frame;
                 }
             }
+#if !defined(FREE_MODE)
             else if (frame - last_render_image_frame == RENDER_IMAGE_EVERY - 1u &&
                      second_frame_read_back == KAN_INVALID_RENDER_READ_BACK_STATUS)
             {
@@ -1178,32 +1229,36 @@ KAN_TEST_CASE (render_and_capture)
                     kan_render_read_back_request_from_surface (test_surface, second_read_back_buffer, 0u);
                 KAN_TEST_ASSERT (second_frame_read_back != KAN_INVALID_RENDER_READ_BACK_STATUS)
             }
+#endif
         }
 
         kan_cpu_stage_separator ();
         ++frame;
     }
 
-#define FIRST_READ_BACK_NAME "frame_0.png"
-#define SECOND_READ_BACK_NAME "frame_4.png"
+#if defined(FREE_MODE)
+    kan_application_system_event_iterator_destroy (application_system, event_iterator);
+#else
+#    define FIRST_READ_BACK_NAME "frame_0.png"
+#    define SECOND_READ_BACK_NAME "frame_4.png"
 
-#define WRITE_CAPTURED(NAME)                                                                                           \
-    {                                                                                                                  \
-        struct kan_stream_t *output_stream = kan_direct_file_stream_open_for_write (NAME, KAN_TRUE);                   \
-        KAN_TEST_ASSERT (output_stream)                                                                                \
-        KAN_TEST_ASSERT (kan_image_save (output_stream, KAN_IMAGE_SAVE_FORMAT_PNG, &frame_raw_data));                  \
-        output_stream->operations->close (output_stream);                                                              \
-    }
+#    define WRITE_CAPTURED(NAME)                                                                                       \
+        {                                                                                                              \
+            struct kan_stream_t *output_stream = kan_direct_file_stream_open_for_write (NAME, KAN_TRUE);               \
+            KAN_TEST_ASSERT (output_stream)                                                                            \
+            KAN_TEST_ASSERT (kan_image_save (output_stream, KAN_IMAGE_SAVE_FORMAT_PNG, &frame_raw_data));              \
+            output_stream->operations->close (output_stream);                                                          \
+        }
 
-#define READ_EXPECTATION(NAME)                                                                                         \
-    {                                                                                                                  \
-        kan_image_raw_data_init (&expected_raw_data);                                                                  \
-        struct kan_stream_t *input_stream =                                                                            \
-            kan_direct_file_stream_open_for_read ("../../expectation/" NAME, KAN_TRUE);                                \
-        KAN_TEST_ASSERT (input_stream)                                                                                 \
-        KAN_TEST_ASSERT (kan_image_load (input_stream, &expected_raw_data))                                            \
-        input_stream->operations->close (input_stream);                                                                \
-    }
+#    define READ_EXPECTATION(NAME)                                                                                     \
+        {                                                                                                              \
+            kan_image_raw_data_init (&expected_raw_data);                                                              \
+            struct kan_stream_t *input_stream =                                                                        \
+                kan_direct_file_stream_open_for_read ("../../expectation/" NAME, KAN_TRUE);                            \
+            KAN_TEST_ASSERT (input_stream)                                                                             \
+            KAN_TEST_ASSERT (kan_image_load (input_stream, &expected_raw_data))                                        \
+            input_stream->operations->close (input_stream);                                                            \
+        }
 
     uint32_t *frame_rgba_data = kan_allocate_general (
         KAN_ALLOCATION_GROUP_IGNORE, sizeof (uint32_t) * fixed_window_size * fixed_window_size, _Alignof (uint32_t));
@@ -1242,6 +1297,8 @@ KAN_TEST_CASE (render_and_capture)
 
     kan_free_general (KAN_ALLOCATION_GROUP_IGNORE, frame_rgba_data,
                       sizeof (uint32_t) * fixed_window_size * fixed_window_size);
+#endif
+
     kan_free_general (KAN_ALLOCATION_GROUP_IGNORE, cube_instanced_data,
                       sizeof (struct cube_instanced_t) * MAX_INSTANCED_CUBES);
     kan_application_system_prepare_for_destroy_in_main_thread (application_system);
