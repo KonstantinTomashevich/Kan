@@ -166,8 +166,8 @@ void render_backend_system_destroy_image (struct render_backend_system_t *system
     VkMemoryRequirements requirements;
     vkGetImageMemoryRequirements (system->device, image->image, &requirements);
 
-    transfer_memory_between_groups (requirements.size,
-                                    image->device_allocation_group, system->memory_profiling.gpu_unmarked_group);
+    transfer_memory_between_groups (requirements.size, image->device_allocation_group,
+                                    system->memory_profiling.gpu_unmarked_group);
 #endif
 
     vmaDestroyImage (system->gpu_memory_allocator, image->image, image->allocation);
@@ -318,8 +318,8 @@ void kan_render_image_resize_render_target (kan_render_image_t image,
     VkMemoryRequirements requirements;
     vkGetImageMemoryRequirements (data->system->device, data->image, &requirements);
 
-    transfer_memory_between_groups (requirements.size,
-                                    data->system->memory_profiling.gpu_unmarked_group, data->device_allocation_group);
+    transfer_memory_between_groups (requirements.size, data->system->memory_profiling.gpu_unmarked_group,
+                                    data->device_allocation_group);
 #endif
 
     struct render_backend_schedule_state_t *schedule = render_backend_system_get_schedule_for_memory (data->system);

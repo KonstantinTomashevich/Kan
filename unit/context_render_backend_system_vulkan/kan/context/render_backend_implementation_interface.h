@@ -1333,8 +1333,7 @@ static inline void render_backend_pipeline_compiler_state_remove_graphics_reques
     request->list_node.next = NULL;
     request->list_node.previous = NULL;
 }
-static inline VkImageViewType get_image_view_type (
-    struct kan_render_image_description_t *description)
+static inline VkImageViewType get_image_view_type (struct kan_render_image_description_t *description)
 {
     if (description->depth > 1u)
     {
@@ -1346,8 +1345,7 @@ static inline VkImageViewType get_image_view_type (
     }
 }
 
-static inline VkImageAspectFlags get_image_aspects (
-    struct kan_render_image_description_t *description)
+static inline VkImageAspectFlags get_image_aspects (struct kan_render_image_description_t *description)
 {
     VkImageAspectFlags aspects = 0u;
     switch (get_image_format_class (description->format))
