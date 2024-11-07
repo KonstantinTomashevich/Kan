@@ -97,13 +97,14 @@ function (add_common_compile_options)
     endif ()
 endfunction ()
 
-set (PACKAGE_REQUIREMENT "REQUIRED")
-if (KAN_FOR_FORMAT_ONLY)
-    set (PACKAGE_REQUIREMENT)
-endif ()
-
 if (KAN_USE_VULKAN_API)
-    find_package (Vulkan ${PACKAGE_REQUIREMENT})
+    if (NOT KAN_FOR_FORMAT_ONLY)
+        find_package (Vulkan REQUIRED)
+    else ()
+        # Empty interface to be able to format Vulkan related code without Vulkan SDK.
+        add_library (VulkanHeaders INTERFACE)
+        add_library (Vulkan::Headers ALIAS VulkanHeaders)
+    endif ()
 endif ()
 
 # Position independent code should be generated when one shared library depends on another shared library.
