@@ -91,7 +91,7 @@ const char *kan_file_system_directory_iterator_advance (kan_file_system_director
 
 void kan_file_system_directory_iterator_destroy (kan_file_system_directory_iterator_t iterator)
 {
-    struct directory_iterator_t *iterator_data = KAN_HANDLE_EXTRACT (iterator);
+    struct directory_iterator_t *iterator_data = KAN_HANDLE_GET (iterator);
     FindClose (iterator_data->find_handle);
     kan_free_general (allocation_group, iterator_data, sizeof (struct directory_iterator_t));
 }
