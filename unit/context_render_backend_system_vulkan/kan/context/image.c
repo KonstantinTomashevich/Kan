@@ -177,17 +177,17 @@ void render_backend_system_destroy_image (struct render_backend_system_t *system
 kan_render_image_t kan_render_image_create (kan_render_context_t context,
                                             struct kan_render_image_description_t *description)
 {
-    struct render_backend_system_t *system = (struct render_backend_system_t *) context;
+    struct render_backend_system_t *system = KAN_HANDLE_GET (context);
     struct kan_cpu_section_execution_t execution;
     kan_cpu_section_execution_init (&execution, system->section_create_image);
     struct render_backend_image_t *image = render_backend_system_create_image (system, description);
     kan_cpu_section_execution_shutdown (&execution);
-    return image ? (kan_render_image_t) image : KAN_INVALID_RENDER_IMAGE;
+    return image ? KAN_HANDLE_SET (kan_render_image_t, image) : KAN_HANDLE_SET_INVALID (kan_render_image_t);
 }
 
 void kan_render_image_upload_data (kan_render_image_t image, uint8_t mip, uint32_t data_size, void *data)
 {
-    struct render_backend_image_t *image_data = (struct render_backend_image_t *) image;
+    struct render_backend_image_t *image_data = KAN_HANDLE_GET (image);
     struct kan_cpu_section_execution_t execution;
     kan_cpu_section_execution_init (&execution, image_data->system->section_image_upload);
 
@@ -207,8 +207,8 @@ void kan_render_image_upload_data (kan_render_image_t image, uint8_t mip, uint32
         return;
     }
 
-    void *output = kan_render_buffer_patch ((kan_render_buffer_t) staging_allocation.buffer, staging_allocation.offset,
-                                            allocation_size);
+    void *output = kan_render_buffer_patch (KAN_HANDLE_SET (kan_render_buffer_t, staging_allocation.buffer),
+                                            staging_allocation.offset, allocation_size);
 
     if (!output)
     {
@@ -241,7 +241,7 @@ void kan_render_image_upload_data (kan_render_image_t image, uint8_t mip, uint32
 
 void kan_render_image_request_mip_generation (kan_render_image_t image, uint8_t first, uint8_t last)
 {
-    struct render_backend_image_t *data = (struct render_backend_image_t *) image;
+    struct render_backend_image_t *data = KAN_HANDLE_GET (image);
     KAN_ASSERT (!data->description.render_target)
 
     struct render_backend_schedule_state_t *schedule = render_backend_system_get_schedule_for_memory (data->system);
@@ -264,7 +264,7 @@ void kan_render_image_resize_render_target (kan_render_image_t image,
                                             uint32_t new_height,
                                             uint32_t new_depth)
 {
-    struct render_backend_image_t *data = (struct render_backend_image_t *) image;
+    struct render_backend_image_t *data = KAN_HANDLE_GET (image);
     struct kan_cpu_section_execution_t execution;
     kan_cpu_section_execution_init (&execution, data->system->section_image_resize_render_target);
     KAN_ASSERT (data->description.render_target)
@@ -349,8 +349,8 @@ void kan_render_image_resize_render_target (kan_render_image_t image,
                 },
         };
 
-        kan_render_pipeline_parameter_set_update ((kan_render_pipeline_parameter_set_t) parameter_set_attachment->set,
-                                                  1u, &update);
+        kan_render_pipeline_parameter_set_update (
+            KAN_HANDLE_SET (kan_render_pipeline_parameter_set_t, parameter_set_attachment->set), 1u, &update);
         parameter_set_attachment = parameter_set_attachment->next;
     }
 
@@ -360,7 +360,7 @@ void kan_render_image_resize_render_target (kan_render_image_t image,
 
 void kan_render_image_destroy (kan_render_image_t image)
 {
-    struct render_backend_image_t *data = (struct render_backend_image_t *) image;
+    struct render_backend_image_t *data = KAN_HANDLE_GET (image);
     struct render_backend_schedule_state_t *schedule = render_backend_system_get_schedule_for_destroy (data->system);
     kan_atomic_int_lock (&schedule->schedule_lock);
 

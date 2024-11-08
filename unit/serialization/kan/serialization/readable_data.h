@@ -2,8 +2,8 @@
 
 #include <serialization_api.h>
 
-#include <kan/api_common/bool.h>
 #include <kan/api_common/c_header.h>
+#include <kan/api_common/core_types.h>
 #include <kan/memory_profiler/allocation_group.h>
 #include <kan/reflection/registry.h>
 #include <kan/serialization/state.h>
@@ -39,7 +39,7 @@
 
 KAN_C_HEADER_BEGIN
 
-typedef uint64_t kan_serialization_rd_reader_t;
+KAN_HANDLE_DEFINE (kan_serialization_rd_reader_t);
 
 /// \brief Creates new instance of reader in order to read into given instance.
 /// \param stream Stream that contains data in readable data format.
@@ -62,7 +62,7 @@ SERIALIZATION_API enum kan_serialization_state_t kan_serialization_rd_reader_ste
 /// \brief Destroys given reader instance.
 SERIALIZATION_API void kan_serialization_rd_reader_destroy (kan_serialization_rd_reader_t reader);
 
-typedef uint64_t kan_serialization_rd_writer_t;
+KAN_HANDLE_DEFINE (kan_serialization_rd_writer_t);
 
 /// \brief Creates new instance of writer in order to write given instance into given stream.
 /// \param stream Stream that serves as output for writer.

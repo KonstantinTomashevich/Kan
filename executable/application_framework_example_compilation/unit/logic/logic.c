@@ -174,8 +174,8 @@ struct test_mutator_state_t
     KAN_UP_GENERATE_STATE_QUERIES (test_mutator)
     KAN_UP_BIND_STATE (test_mutator, state)
 
-    kan_context_system_handle_t application_system_handle;
-    kan_context_system_handle_t application_framework_system_handle;
+    kan_context_system_t application_system_handle;
+    kan_context_system_t application_framework_system_handle;
 };
 
 APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_LOGIC_API void kan_universe_mutator_deploy_test_mutator (
@@ -185,7 +185,7 @@ APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_LOGIC_API void kan_universe_mutator_de
     kan_workflow_graph_node_t workflow_node,
     struct test_mutator_state_t *state)
 {
-    kan_context_handle_t context = kan_universe_get_context (universe);
+    kan_context_t context = kan_universe_get_context (universe);
     state->application_system_handle = kan_context_query (context, KAN_CONTEXT_APPLICATION_SYSTEM_NAME);
     state->application_framework_system_handle =
         kan_context_query (context, KAN_CONTEXT_APPLICATION_FRAMEWORK_SYSTEM_NAME);
@@ -332,7 +332,7 @@ APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_LOGIC_API void kan_universe_mutator_ex
             {
                 test_singleton->checked_entries = KAN_TRUE;
             }
-            else if (state->application_framework_system_handle != KAN_INVALID_CONTEXT_SYSTEM_HANDLE)
+            else if (KAN_HANDLE_IS_VALID (state->application_framework_system_handle))
             {
                 kan_application_framework_system_request_exit (state->application_framework_system_handle, -1);
             }
@@ -376,7 +376,7 @@ APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_LOGIC_API void kan_universe_mutator_ex
                                      "\"sum_1_2_3\" has incorrect data %llu.",
                                      (unsigned long long) loaded_resource->value)
 
-                            if (state->application_framework_system_handle != KAN_INVALID_CONTEXT_SYSTEM_HANDLE)
+                            if (KAN_HANDLE_IS_VALID (state->application_framework_system_handle))
                             {
                                 kan_application_framework_system_request_exit (
                                     state->application_framework_system_handle, -1);
@@ -388,7 +388,7 @@ APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_LOGIC_API void kan_universe_mutator_ex
         }
 
         if (test_singleton->checked_entries && test_singleton->loaded_test_data &&
-            state->application_framework_system_handle != KAN_INVALID_CONTEXT_SYSTEM_HANDLE)
+            KAN_HANDLE_IS_VALID (state->application_framework_system_handle))
         {
             kan_application_framework_system_request_exit (state->application_framework_system_handle, 0);
         }

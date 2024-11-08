@@ -12,15 +12,15 @@ kan_platform_dynamic_library_t kan_platform_dynamic_library_load (const char *pa
     {
         KAN_LOG (platform_dynamic_library, KAN_LOG_ERROR,
                  "Failed to load dynamic library at path \"%s\", backend error: %s", path, SDL_GetError ());
-        return KAN_INVALID_PLATFORM_DYNAMIC_LIBRARY;
+        return KAN_HANDLE_SET_INVALID (kan_platform_dynamic_library_t);
     }
 
-    return (kan_platform_dynamic_library_t) object;
+    return KAN_HANDLE_SET (kan_platform_dynamic_library_t, object);
 }
 
 void *kan_platform_dynamic_library_find_function (kan_platform_dynamic_library_t library, const char *name)
 {
-    void *function = (void *) SDL_LoadFunction ((void *) library, name);
+    void *function = (void *) SDL_LoadFunction (KAN_HANDLE_GET (library), name);
     if (!function)
     {
         KAN_LOG (platform_dynamic_library, KAN_LOG_ERROR, "Failed to find function \"%s\", backend error: %s", name,
@@ -33,5 +33,5 @@ void *kan_platform_dynamic_library_find_function (kan_platform_dynamic_library_t
 
 void kan_platform_dynamic_library_unload (kan_platform_dynamic_library_t library)
 {
-    SDL_UnloadObject ((void *) library);
+    SDL_UnloadObject (KAN_HANDLE_GET (library));
 }

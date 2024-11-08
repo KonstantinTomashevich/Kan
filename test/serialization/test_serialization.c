@@ -448,11 +448,13 @@ KAN_TEST_CASE (binary_no_interned_string_registry)
     struct map_t initial_map;
     map_init (&initial_map);
     fill_test_map (&initial_map, registry);
-    save_map_binary (&initial_map, script_storage, KAN_INVALID_SERIALIZATION_INTERNED_STRING_REGISTRY);
+    save_map_binary (&initial_map, script_storage,
+                     KAN_HANDLE_SET_INVALID (kan_serialization_interned_string_registry_t));
 
     struct map_t deserialized_map;
     map_init (&deserialized_map);
-    load_map_binary (&deserialized_map, script_storage, KAN_INVALID_SERIALIZATION_INTERNED_STRING_REGISTRY);
+    load_map_binary (&deserialized_map, script_storage,
+                     KAN_HANDLE_SET_INVALID (kan_serialization_interned_string_registry_t));
 
     check_map_equality (&initial_map, &deserialized_map);
     map_shutdown (&initial_map);

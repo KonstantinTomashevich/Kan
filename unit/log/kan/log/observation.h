@@ -54,7 +54,7 @@ struct kan_log_event_t
     char *message;
 };
 
-typedef uint64_t kan_log_event_iterator_t;
+KAN_HANDLE_DEFINE (kan_log_event_iterator_t);
 
 /// \brief Creates new iterator for log events.
 LOG_API kan_log_event_iterator_t kan_log_event_iterator_create (void);

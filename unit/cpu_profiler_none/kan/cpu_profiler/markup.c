@@ -6,7 +6,7 @@ void kan_cpu_stage_separator (void)
 
 kan_cpu_section_t kan_cpu_section_get (const char *name)
 {
-    return 0u;
+    return KAN_HANDLE_SET_INVALID (kan_cpu_section_t);
 }
 
 void kan_cpu_section_set_color (kan_cpu_section_t section, uint32_t rgba_color)

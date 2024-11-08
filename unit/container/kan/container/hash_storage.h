@@ -4,8 +4,8 @@
 
 #include <stdint.h>
 
-#include <kan/api_common/bool.h>
 #include <kan/api_common/c_header.h>
+#include <kan/api_common/core_types.h>
 #include <kan/api_common/min_max.h>
 #include <kan/container/list.h>
 #include <kan/memory_profiler/allocation_group.h>

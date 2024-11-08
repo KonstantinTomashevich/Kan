@@ -2,8 +2,8 @@
 
 #include <cpu_dispatch_api.h>
 
-#include <kan/api_common/bool.h>
 #include <kan/api_common/c_header.h>
+#include <kan/api_common/core_types.h>
 #include <kan/container/interned_string.h>
 #include <kan/container/stack_group_allocator.h>
 
@@ -46,18 +46,16 @@ struct kan_cpu_task_t
     kan_cpu_task_user_data_t user_data;
 };
 
-typedef uint64_t kan_cpu_task_handle_t;
-
-#define KAN_INVALID_CPU_TASK_HANDLE 0u
+KAN_HANDLE_DEFINE (kan_cpu_task_t);
 
 /// \brief Dispatches single task.
-CPU_DISPATCH_API kan_cpu_task_handle_t kan_cpu_task_dispatch (struct kan_cpu_task_t task);
+CPU_DISPATCH_API kan_cpu_task_t kan_cpu_task_dispatch (struct kan_cpu_task_t task);
 
 /// \brief Checks whether task is finished.
-CPU_DISPATCH_API kan_bool_t kan_cpu_task_is_finished (kan_cpu_task_handle_t task);
+CPU_DISPATCH_API kan_bool_t kan_cpu_task_is_finished (kan_cpu_task_t task);
 
 /// \brief Detaches task handle and allows dispatcher to free resources when needed. Handle is no longer usable.
-CPU_DISPATCH_API void kan_cpu_task_detach (kan_cpu_task_handle_t task);
+CPU_DISPATCH_API void kan_cpu_task_detach (kan_cpu_task_t task);
 
 /// \brief Describes list node for submitting multiple tasks at once.
 struct kan_cpu_task_list_node_t
@@ -66,7 +64,7 @@ struct kan_cpu_task_list_node_t
     struct kan_cpu_task_t task;
 
     /// \brief Field for storing dispatched task handle after dispatch.
-    kan_cpu_task_handle_t dispatch_handle;
+    kan_cpu_task_t dispatch_handle;
 };
 
 /// \brief Dispatches list of tasks. Advised when you have multiple tasks to be dispatched.

@@ -101,8 +101,8 @@ struct workflow_graph_header_t
     struct kan_atomic_int_t temporary_allocator_lock;
 
     uint64_t nodes_left_to_execute;
-    kan_mutex_handle_t nodes_left_to_execute_mutex;
-    kan_conditional_variable_handle_t nodes_left_to_execute_signal;
+    kan_mutex_t nodes_left_to_execute_mutex;
+    kan_conditional_variable_t nodes_left_to_execute_signal;
 
     kan_allocation_group_t allocation_group;
     uint64_t allocation_size;
@@ -598,14 +598,14 @@ kan_workflow_graph_builder_t kan_workflow_graph_builder_create (kan_allocation_g
     builder->node_submission_lock = kan_atomic_int_init (0);
     builder->main_group = group;
     builder->builder_group = builder_group;
-    return (kan_workflow_graph_builder_t) builder;
+    return KAN_HANDLE_SET (kan_workflow_graph_builder_t, builder);
 }
 
 kan_bool_t kan_workflow_graph_builder_register_checkpoint_dependency (kan_workflow_graph_builder_t builder,
                                                                       const char *dependency_checkpoint,
                                                                       const char *dependant_checkpoint)
 {
-    struct graph_builder_t *builder_data = (struct graph_builder_t *) builder;
+    struct graph_builder_t *builder_data = KAN_HANDLE_GET (builder);
     kan_interned_string_t interned_dependency_checkpoint = kan_string_intern (dependency_checkpoint);
     kan_interned_string_t interned_dependant_checkpoint = kan_string_intern (dependant_checkpoint);
 
@@ -647,11 +647,11 @@ static void shutdown_nodes (struct graph_builder_t *builder,
 
 kan_workflow_graph_t kan_workflow_graph_builder_finalize (kan_workflow_graph_builder_t builder)
 {
-    struct graph_builder_t *builder_data = (struct graph_builder_t *) builder;
+    struct graph_builder_t *builder_data = KAN_HANDLE_GET (builder);
     if (builder_data->nodes.items.size == 0u)
     {
         KAN_LOG (workflow_graph_builder, KAN_LOG_ERROR, "Caught attempt to finalize empty graph.")
-        return KAN_INVALID_WORKFLOW_GRAPH;
+        return KAN_HANDLE_SET_INVALID (kan_workflow_graph_t);
     }
 
     // Create missing checkpoints.
@@ -785,7 +785,7 @@ kan_workflow_graph_t kan_workflow_graph_builder_finalize (kan_workflow_graph_bui
         KAN_LOG (workflow_graph_builder, KAN_LOG_ERROR,
                  "Caught attempt to finalize graph with only checkpoints and no functional nodes.")
         kan_free_general (builder_data->builder_group, id_to_node, sizeof (void *) * next_id_to_assign);
-        return KAN_INVALID_WORKFLOW_GRAPH;
+        return KAN_HANDLE_SET_INVALID (kan_workflow_graph_t);
     }
 
     kan_bool_t is_valid = KAN_TRUE;
@@ -907,66 +907,67 @@ kan_workflow_graph_t kan_workflow_graph_builder_finalize (kan_workflow_graph_bui
     kan_free_general (builder_data->builder_group, id_to_node, sizeof (void *) * next_id_to_assign);
     shutdown_nodes (builder_data, KAN_TRUE, KAN_TRUE);
     kan_hash_storage_init (&builder_data->nodes, builder_data->builder_group, KAN_WORKFLOW_GRAPH_NODES_INITIAL_BUCKETS);
-    return result_graph ? (kan_workflow_graph_t) result_graph : KAN_INVALID_WORKFLOW_GRAPH;
+    return result_graph ? KAN_HANDLE_SET (kan_workflow_graph_t, result_graph) :
+                          KAN_HANDLE_SET_INVALID (kan_workflow_graph_t);
 }
 
 void kan_workflow_graph_builder_destroy (kan_workflow_graph_builder_t builder)
 {
-    struct graph_builder_t *builder_data = (struct graph_builder_t *) builder;
+    struct graph_builder_t *builder_data = KAN_HANDLE_GET (builder);
     shutdown_nodes (builder_data, KAN_FALSE, KAN_FALSE);
     kan_free_general (builder_data->builder_group, builder_data, sizeof (struct graph_builder_t));
 }
 
 kan_workflow_graph_node_t kan_workflow_graph_node_create (kan_workflow_graph_builder_t builder, const char *name)
 {
-    struct graph_builder_t *builder_data = (struct graph_builder_t *) builder;
+    struct graph_builder_t *builder_data = KAN_HANDLE_GET (builder);
     kan_interned_string_t interned_name = kan_string_intern (name);
     struct building_graph_node_t *node = graph_builder_create_node (builder_data, interned_name);
-    return (kan_workflow_graph_node_t) node;
+    return KAN_HANDLE_SET (kan_workflow_graph_node_t, node);
 }
 
 void kan_workflow_graph_node_set_function (kan_workflow_graph_node_t node,
                                            kan_workflow_function_t function,
                                            kan_workflow_user_data_t user_data)
 {
-    struct building_graph_node_t *node_data = (struct building_graph_node_t *) node;
+    struct building_graph_node_t *node_data = KAN_HANDLE_GET (node);
     node_data->function = function;
     node_data->user_data = user_data;
 }
 
 void kan_workflow_graph_node_insert_resource (kan_workflow_graph_node_t node, const char *resource_name)
 {
-    struct building_graph_node_t *node_data = (struct building_graph_node_t *) node;
+    struct building_graph_node_t *node_data = KAN_HANDLE_GET (node);
     add_to_interned_string_array (&node_data->resource_insert_access, kan_string_intern (resource_name));
 }
 
 void kan_workflow_graph_node_write_resource (kan_workflow_graph_node_t node, const char *resource_name)
 {
-    struct building_graph_node_t *node_data = (struct building_graph_node_t *) node;
+    struct building_graph_node_t *node_data = KAN_HANDLE_GET (node);
     add_to_interned_string_array (&node_data->resource_write_access, kan_string_intern (resource_name));
 }
 
 void kan_workflow_graph_node_read_resource (kan_workflow_graph_node_t node, const char *resource_name)
 {
-    struct building_graph_node_t *node_data = (struct building_graph_node_t *) node;
+    struct building_graph_node_t *node_data = KAN_HANDLE_GET (node);
     add_to_interned_string_array (&node_data->resource_read_access, kan_string_intern (resource_name));
 }
 
 void kan_workflow_graph_node_depend_on (kan_workflow_graph_node_t node, const char *name)
 {
-    struct building_graph_node_t *node_data = (struct building_graph_node_t *) node;
+    struct building_graph_node_t *node_data = KAN_HANDLE_GET (node);
     add_to_interned_string_array (&node_data->depends_on, kan_string_intern (name));
 }
 
 void kan_workflow_graph_node_make_dependency_of (kan_workflow_graph_node_t node, const char *name)
 {
-    struct building_graph_node_t *node_data = (struct building_graph_node_t *) node;
+    struct building_graph_node_t *node_data = KAN_HANDLE_GET (node);
     add_to_interned_string_array (&node_data->dependency_of, kan_string_intern (name));
 }
 
 kan_bool_t kan_workflow_graph_node_submit (kan_workflow_graph_node_t node)
 {
-    struct building_graph_node_t *node_data = (struct building_graph_node_t *) node;
+    struct building_graph_node_t *node_data = KAN_HANDLE_GET (node);
     if (building_graph_node_is_checkpoint (node_data))
     {
         KAN_LOG (workflow_graph_builder, KAN_LOG_ERROR,
@@ -988,7 +989,7 @@ kan_bool_t kan_workflow_graph_node_submit (kan_workflow_graph_node_t node)
 
 void kan_workflow_graph_node_destroy (kan_workflow_graph_node_t node)
 {
-    building_graph_node_destroy ((struct building_graph_node_t *) node, KAN_FALSE);
+    building_graph_node_destroy (KAN_HANDLE_GET (node), KAN_FALSE);
 }
 
 static void workflow_task_finish_function (uint64_t user_data);
@@ -1005,14 +1006,13 @@ static void workflow_task_start_function (uint64_t user_data)
                                                     .user_data = user_data,
                                                 });
 
-    kan_cpu_task_handle_t task_handle =
-        kan_cpu_job_dispatch_task (node->job, (struct kan_cpu_task_t) {
-                                                  .name = node->name,
-                                                  .function = workflow_task_execute_function,
-                                                  .user_data = user_data,
-                                              });
+    kan_cpu_task_t task_handle = kan_cpu_job_dispatch_task (node->job, (struct kan_cpu_task_t) {
+                                                                           .name = node->name,
+                                                                           .function = workflow_task_execute_function,
+                                                                           .user_data = user_data,
+                                                                       });
 
-    if (task_handle != KAN_INVALID_CPU_TASK_HANDLE)
+    if (KAN_HANDLE_IS_VALID (task_handle))
     {
         kan_cpu_task_detach (task_handle);
     }
@@ -1075,7 +1075,7 @@ static void workflow_task_finish_function (uint64_t user_data)
 
 void kan_workflow_graph_execute (kan_workflow_graph_t graph)
 {
-    struct workflow_graph_header_t *graph_header = (struct workflow_graph_header_t *) graph;
+    struct workflow_graph_header_t *graph_header = KAN_HANDLE_GET (graph);
     graph_header->nodes_left_to_execute = graph_header->total_nodes_count;
     KAN_ASSERT (graph_header->start_nodes_count > 0u)
     struct kan_cpu_task_list_node_t *first_list_node = NULL;
@@ -1113,7 +1113,7 @@ void kan_workflow_graph_execute (kan_workflow_graph_t graph)
 
 void kan_workflow_graph_destroy (kan_workflow_graph_t graph)
 {
-    struct workflow_graph_header_t *graph_header = (struct workflow_graph_header_t *) graph;
+    struct workflow_graph_header_t *graph_header = KAN_HANDLE_GET (graph);
     kan_stack_group_allocator_shutdown (&graph_header->temporary_allocator);
     kan_mutex_destroy (graph_header->nodes_left_to_execute_mutex);
     kan_conditional_variable_destroy (graph_header->nodes_left_to_execute_signal);

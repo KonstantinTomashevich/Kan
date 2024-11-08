@@ -8,54 +8,52 @@
 
 struct first_independent_system_t
 {
-    kan_context_handle_t context;
+    kan_context_t context;
     kan_allocation_group_t group;
     kan_bool_t initialized;
     kan_bool_t second_connected;
 };
 
-TEST_CONTEXT_API kan_context_system_handle_t first_independent_system_create (kan_allocation_group_t group,
-                                                                              void *user_config)
+TEST_CONTEXT_API kan_context_system_t first_independent_system_create (kan_allocation_group_t group, void *user_config)
 {
     struct first_independent_system_t *system = kan_allocate_general (group, sizeof (struct first_independent_system_t),
                                                                       _Alignof (struct first_independent_system_t));
     system->group = group;
     system->initialized = KAN_FALSE;
     system->second_connected = KAN_FALSE;
-    return (kan_context_system_handle_t) system;
+    return KAN_HANDLE_SET (kan_context_system_t, system);
 }
 
-TEST_CONTEXT_API void first_independent_system_connect (kan_context_system_handle_t handle,
-                                                        kan_context_handle_t context)
+TEST_CONTEXT_API void first_independent_system_connect (kan_context_system_t handle, kan_context_t context)
 {
-    struct first_independent_system_t *system = (struct first_independent_system_t *) handle;
+    struct first_independent_system_t *system = KAN_HANDLE_GET (handle);
     system->context = context;
     KAN_TEST_CHECK (!system->initialized)
 }
 
-TEST_CONTEXT_API void first_independent_system_init (kan_context_system_handle_t handle)
+TEST_CONTEXT_API void first_independent_system_init (kan_context_system_t handle)
 {
-    struct first_independent_system_t *system = (struct first_independent_system_t *) handle;
+    struct first_independent_system_t *system = KAN_HANDLE_GET (handle);
     KAN_TEST_CHECK (!system->initialized)
     system->initialized = KAN_TRUE;
 }
 
-TEST_CONTEXT_API void first_independent_system_shutdown (kan_context_system_handle_t handle)
+TEST_CONTEXT_API void first_independent_system_shutdown (kan_context_system_t handle)
 {
-    struct first_independent_system_t *system = (struct first_independent_system_t *) handle;
+    struct first_independent_system_t *system = KAN_HANDLE_GET (handle);
     KAN_TEST_CHECK (system->initialized)
     system->initialized = KAN_FALSE;
 }
 
-TEST_CONTEXT_API void first_independent_system_disconnect (kan_context_system_handle_t handle)
+TEST_CONTEXT_API void first_independent_system_disconnect (kan_context_system_t handle)
 {
-    struct first_independent_system_t *system = (struct first_independent_system_t *) handle;
+    struct first_independent_system_t *system = KAN_HANDLE_GET (handle);
     KAN_TEST_CHECK (!system->initialized)
 }
 
-TEST_CONTEXT_API void first_independent_system_destroy (kan_context_system_handle_t handle)
+TEST_CONTEXT_API void first_independent_system_destroy (kan_context_system_t handle)
 {
-    struct first_independent_system_t *system = (struct first_independent_system_t *) handle;
+    struct first_independent_system_t *system = KAN_HANDLE_GET (handle);
     KAN_TEST_CHECK (!system->second_connected)
     kan_free_general (system->group, system, sizeof (struct first_independent_system_t));
 }
@@ -72,29 +70,27 @@ TEST_CONTEXT_API struct kan_context_system_api_t KAN_CONTEXT_SYSTEM_API_NAME (fi
 
 struct second_independent_system_t
 {
-    kan_context_handle_t context;
+    kan_context_t context;
     kan_allocation_group_t group;
     kan_bool_t initialized;
 };
 
-TEST_CONTEXT_API kan_context_system_handle_t second_independent_system_create (kan_allocation_group_t group,
-                                                                               void *user_config)
+TEST_CONTEXT_API kan_context_system_t second_independent_system_create (kan_allocation_group_t group, void *user_config)
 {
     struct second_independent_system_t *system = kan_allocate_general (
         group, sizeof (struct second_independent_system_t), _Alignof (struct second_independent_system_t));
     system->group = group;
     system->initialized = KAN_FALSE;
-    return (kan_context_system_handle_t) system;
+    return KAN_HANDLE_SET (kan_context_system_t, system);
 }
 
-TEST_CONTEXT_API void second_independent_system_connect (kan_context_system_handle_t handle,
-                                                         kan_context_handle_t context)
+TEST_CONTEXT_API void second_independent_system_connect (kan_context_system_t handle, kan_context_t context)
 {
-    struct second_independent_system_t *system = (struct second_independent_system_t *) handle;
+    struct second_independent_system_t *system = KAN_HANDLE_GET (handle);
     system->context = context;
 
     struct first_independent_system_t *first =
-        (struct first_independent_system_t *) kan_context_query (context, "first_independent_system_t");
+        KAN_HANDLE_GET (kan_context_query (context, "first_independent_system_t"));
 
     if (first)
     {
@@ -102,23 +98,23 @@ TEST_CONTEXT_API void second_independent_system_connect (kan_context_system_hand
     }
 }
 
-TEST_CONTEXT_API void second_independent_system_init (kan_context_system_handle_t handle)
+TEST_CONTEXT_API void second_independent_system_init (kan_context_system_t handle)
 {
-    struct second_independent_system_t *system = (struct second_independent_system_t *) handle;
+    struct second_independent_system_t *system = KAN_HANDLE_GET (handle);
     system->initialized = KAN_TRUE;
 }
 
-TEST_CONTEXT_API void second_independent_system_shutdown (kan_context_system_handle_t handle)
+TEST_CONTEXT_API void second_independent_system_shutdown (kan_context_system_t handle)
 {
-    struct second_independent_system_t *system = (struct second_independent_system_t *) handle;
+    struct second_independent_system_t *system = KAN_HANDLE_GET (handle);
     system->initialized = KAN_FALSE;
 }
 
-TEST_CONTEXT_API void second_independent_system_disconnect (kan_context_system_handle_t handle)
+TEST_CONTEXT_API void second_independent_system_disconnect (kan_context_system_t handle)
 {
-    struct second_independent_system_t *system = (struct second_independent_system_t *) handle;
+    struct second_independent_system_t *system = KAN_HANDLE_GET (handle);
     struct first_independent_system_t *first =
-        (struct first_independent_system_t *) kan_context_query (system->context, "first_independent_system_t");
+        KAN_HANDLE_GET (kan_context_query (system->context, "first_independent_system_t"));
 
     if (first)
     {
@@ -126,9 +122,9 @@ TEST_CONTEXT_API void second_independent_system_disconnect (kan_context_system_h
     }
 }
 
-TEST_CONTEXT_API void second_independent_system_destroy (kan_context_system_handle_t handle)
+TEST_CONTEXT_API void second_independent_system_destroy (kan_context_system_t handle)
 {
-    struct second_independent_system_t *system = (struct second_independent_system_t *) handle;
+    struct second_independent_system_t *system = KAN_HANDLE_GET (handle);
     kan_free_general (system->group, system, sizeof (struct second_independent_system_t));
 }
 
@@ -144,15 +140,14 @@ TEST_CONTEXT_API struct kan_context_system_api_t KAN_CONTEXT_SYSTEM_API_NAME (se
 
 struct system_with_dependencies_t
 {
-    kan_context_handle_t context;
+    kan_context_t context;
     kan_allocation_group_t group;
     kan_bool_t initialized;
     kan_bool_t first_used;
     kan_bool_t second_used;
 };
 
-TEST_CONTEXT_API kan_context_system_handle_t system_with_dependencies_create (kan_allocation_group_t group,
-                                                                              void *user_config)
+TEST_CONTEXT_API kan_context_system_t system_with_dependencies_create (kan_allocation_group_t group, void *user_config)
 {
     struct system_with_dependencies_t *system = kan_allocate_general (group, sizeof (struct system_with_dependencies_t),
                                                                       _Alignof (struct system_with_dependencies_t));
@@ -160,22 +155,21 @@ TEST_CONTEXT_API kan_context_system_handle_t system_with_dependencies_create (ka
     system->initialized = KAN_FALSE;
     system->first_used = KAN_FALSE;
     system->second_used = KAN_FALSE;
-    return (kan_context_system_handle_t) system;
+    return KAN_HANDLE_SET (kan_context_system_t, system);
 }
 
-TEST_CONTEXT_API void system_with_dependencies_connect (kan_context_system_handle_t handle,
-                                                        kan_context_handle_t context)
+TEST_CONTEXT_API void system_with_dependencies_connect (kan_context_system_t handle, kan_context_t context)
 {
-    struct system_with_dependencies_t *system = (struct system_with_dependencies_t *) handle;
+    struct system_with_dependencies_t *system = KAN_HANDLE_GET (handle);
     system->context = context;
 }
 
-TEST_CONTEXT_API void system_with_dependencies_init (kan_context_system_handle_t handle)
+TEST_CONTEXT_API void system_with_dependencies_init (kan_context_system_t handle)
 {
-    struct system_with_dependencies_t *system = (struct system_with_dependencies_t *) handle;
+    struct system_with_dependencies_t *system = KAN_HANDLE_GET (handle);
 
     struct first_independent_system_t *first =
-        (struct first_independent_system_t *) kan_context_query (system->context, "first_independent_system_t");
+        KAN_HANDLE_GET (kan_context_query (system->context, "first_independent_system_t"));
 
     if (first)
     {
@@ -184,7 +178,7 @@ TEST_CONTEXT_API void system_with_dependencies_init (kan_context_system_handle_t
     }
 
     struct second_independent_system_t *second =
-        (struct second_independent_system_t *) kan_context_query (system->context, "second_independent_system_t");
+        KAN_HANDLE_GET (kan_context_query (system->context, "second_independent_system_t"));
 
     if (second)
     {
@@ -195,12 +189,12 @@ TEST_CONTEXT_API void system_with_dependencies_init (kan_context_system_handle_t
     system->initialized = KAN_TRUE;
 }
 
-TEST_CONTEXT_API void system_with_dependencies_shutdown (kan_context_system_handle_t handle)
+TEST_CONTEXT_API void system_with_dependencies_shutdown (kan_context_system_t handle)
 {
-    struct system_with_dependencies_t *system = (struct system_with_dependencies_t *) handle;
+    struct system_with_dependencies_t *system = KAN_HANDLE_GET (handle);
 
     struct first_independent_system_t *first =
-        (struct first_independent_system_t *) kan_context_query (system->context, "first_independent_system_t");
+        KAN_HANDLE_GET (kan_context_query (system->context, "first_independent_system_t"));
 
     if (first)
     {
@@ -208,7 +202,7 @@ TEST_CONTEXT_API void system_with_dependencies_shutdown (kan_context_system_hand
     }
 
     struct second_independent_system_t *second =
-        (struct second_independent_system_t *) kan_context_query (system->context, "second_independent_system_t");
+        KAN_HANDLE_GET (kan_context_query (system->context, "second_independent_system_t"));
 
     if (second)
     {
@@ -218,13 +212,13 @@ TEST_CONTEXT_API void system_with_dependencies_shutdown (kan_context_system_hand
     system->initialized = KAN_FALSE;
 }
 
-TEST_CONTEXT_API void system_with_dependencies_disconnect (kan_context_system_handle_t handle)
+TEST_CONTEXT_API void system_with_dependencies_disconnect (kan_context_system_t handle)
 {
 }
 
-TEST_CONTEXT_API void system_with_dependencies_destroy (kan_context_system_handle_t handle)
+TEST_CONTEXT_API void system_with_dependencies_destroy (kan_context_system_t handle)
 {
-    struct system_with_dependencies_t *system = (struct system_with_dependencies_t *) handle;
+    struct system_with_dependencies_t *system = KAN_HANDLE_GET (handle);
     kan_free_general (system->group, system, sizeof (struct system_with_dependencies_t));
 }
 
@@ -240,103 +234,103 @@ TEST_CONTEXT_API struct kan_context_system_api_t KAN_CONTEXT_SYSTEM_API_NAME (sy
 
 KAN_TEST_CASE (no_systems)
 {
-    kan_context_handle_t context = kan_context_create (KAN_ALLOCATION_GROUP_IGNORE);
+    kan_context_t context = kan_context_create (KAN_ALLOCATION_GROUP_IGNORE);
     kan_context_assembly (context);
-    KAN_TEST_CHECK (!kan_context_query (context, "first_independent_system_t"))
-    KAN_TEST_CHECK (!kan_context_query (context, "second_independent_system_t"))
-    KAN_TEST_CHECK (!kan_context_query (context, "system_with_dependencies_t"))
+    KAN_TEST_CHECK (!KAN_HANDLE_IS_VALID (kan_context_query (context, "first_independent_system_t")))
+    KAN_TEST_CHECK (!KAN_HANDLE_IS_VALID (kan_context_query (context, "second_independent_system_t")))
+    KAN_TEST_CHECK (!KAN_HANDLE_IS_VALID (kan_context_query (context, "system_with_dependencies_t")))
     kan_context_destroy (context);
 }
 
 KAN_TEST_CASE (only_first)
 {
-    kan_context_handle_t context = kan_context_create (KAN_ALLOCATION_GROUP_IGNORE);
+    kan_context_t context = kan_context_create (KAN_ALLOCATION_GROUP_IGNORE);
     KAN_TEST_CHECK (kan_context_request_system (context, "first_independent_system_t", NULL))
     kan_context_assembly (context);
 
     struct first_independent_system_t *first =
-        (struct first_independent_system_t *) kan_context_query (context, "first_independent_system_t");
+        KAN_HANDLE_GET (kan_context_query (context, "first_independent_system_t"));
     KAN_TEST_ASSERT (first)
     KAN_TEST_CHECK (first->initialized)
     KAN_TEST_CHECK (!first->second_connected)
 
-    KAN_TEST_CHECK (!kan_context_query (context, "second_independent_system_t"))
-    KAN_TEST_CHECK (!kan_context_query (context, "system_with_dependencies_t"))
+    KAN_TEST_CHECK (!KAN_HANDLE_IS_VALID (kan_context_query (context, "second_independent_system_t")))
+    KAN_TEST_CHECK (!KAN_HANDLE_IS_VALID (kan_context_query (context, "system_with_dependencies_t")))
     kan_context_destroy (context);
 }
 
 KAN_TEST_CASE (only_second)
 {
-    kan_context_handle_t context = kan_context_create (KAN_ALLOCATION_GROUP_IGNORE);
+    kan_context_t context = kan_context_create (KAN_ALLOCATION_GROUP_IGNORE);
     KAN_TEST_CHECK (kan_context_request_system (context, "second_independent_system_t", NULL))
     kan_context_assembly (context);
 
     struct second_independent_system_t *second =
-        (struct second_independent_system_t *) kan_context_query (context, "second_independent_system_t");
+        KAN_HANDLE_GET (kan_context_query (context, "second_independent_system_t"));
     KAN_TEST_ASSERT (second)
     KAN_TEST_CHECK (second->initialized)
 
-    KAN_TEST_CHECK (!kan_context_query (context, "first_independent_system_t"))
-    KAN_TEST_CHECK (!kan_context_query (context, "system_with_dependencies_t"))
+    KAN_TEST_CHECK (!KAN_HANDLE_IS_VALID (kan_context_query (context, "first_independent_system_t")))
+    KAN_TEST_CHECK (!KAN_HANDLE_IS_VALID (kan_context_query (context, "system_with_dependencies_t")))
     kan_context_destroy (context);
 }
 
 KAN_TEST_CASE (only_with_dependencies)
 {
-    kan_context_handle_t context = kan_context_create (KAN_ALLOCATION_GROUP_IGNORE);
+    kan_context_t context = kan_context_create (KAN_ALLOCATION_GROUP_IGNORE);
     KAN_TEST_CHECK (kan_context_request_system (context, "system_with_dependencies_t", NULL))
     kan_context_assembly (context);
 
     struct system_with_dependencies_t *system =
-        (struct system_with_dependencies_t *) kan_context_query (context, "system_with_dependencies_t");
+        KAN_HANDLE_GET (kan_context_query (context, "system_with_dependencies_t"));
     KAN_TEST_ASSERT (system)
     KAN_TEST_CHECK (system->initialized)
     KAN_TEST_CHECK (!system->first_used)
     KAN_TEST_CHECK (!system->second_used)
 
-    KAN_TEST_CHECK (!kan_context_query (context, "first_independent_system_t"))
-    KAN_TEST_CHECK (!kan_context_query (context, "second_independent_system_t"))
+    KAN_TEST_CHECK (!KAN_HANDLE_IS_VALID (kan_context_query (context, "first_independent_system_t")))
+    KAN_TEST_CHECK (!KAN_HANDLE_IS_VALID (kan_context_query (context, "second_independent_system_t")))
     kan_context_destroy (context);
 }
 
 KAN_TEST_CASE (first_and_second)
 {
-    kan_context_handle_t context = kan_context_create (KAN_ALLOCATION_GROUP_IGNORE);
+    kan_context_t context = kan_context_create (KAN_ALLOCATION_GROUP_IGNORE);
     KAN_TEST_CHECK (kan_context_request_system (context, "first_independent_system_t", NULL))
     KAN_TEST_CHECK (kan_context_request_system (context, "second_independent_system_t", NULL))
     kan_context_assembly (context);
 
     struct first_independent_system_t *first =
-        (struct first_independent_system_t *) kan_context_query (context, "first_independent_system_t");
+        KAN_HANDLE_GET (kan_context_query (context, "first_independent_system_t"));
     KAN_TEST_ASSERT (first)
     KAN_TEST_CHECK (first->initialized)
     KAN_TEST_CHECK (first->second_connected)
 
     struct second_independent_system_t *second =
-        (struct second_independent_system_t *) kan_context_query (context, "second_independent_system_t");
+        KAN_HANDLE_GET (kan_context_query (context, "second_independent_system_t"));
     KAN_TEST_ASSERT (second)
     KAN_TEST_CHECK (second->initialized)
 
-    KAN_TEST_CHECK (!kan_context_query (context, "system_with_dependencies_t"))
+    KAN_TEST_CHECK (!KAN_HANDLE_IS_VALID (kan_context_query (context, "system_with_dependencies_t")))
     kan_context_destroy (context);
 }
 
 KAN_TEST_CASE (all)
 {
-    kan_context_handle_t context = kan_context_create (KAN_ALLOCATION_GROUP_IGNORE);
+    kan_context_t context = kan_context_create (KAN_ALLOCATION_GROUP_IGNORE);
     KAN_TEST_CHECK (kan_context_request_system (context, "first_independent_system_t", NULL))
     KAN_TEST_CHECK (kan_context_request_system (context, "second_independent_system_t", NULL))
     KAN_TEST_CHECK (kan_context_request_system (context, "system_with_dependencies_t", NULL))
     kan_context_assembly (context);
 
     struct system_with_dependencies_t *system =
-        (struct system_with_dependencies_t *) kan_context_query (context, "system_with_dependencies_t");
+        KAN_HANDLE_GET (kan_context_query (context, "system_with_dependencies_t"));
     KAN_TEST_ASSERT (system)
     KAN_TEST_CHECK (system->initialized)
     KAN_TEST_CHECK (system->first_used)
     KAN_TEST_CHECK (system->second_used)
 
-    KAN_TEST_CHECK (kan_context_query (context, "first_independent_system_t"))
-    KAN_TEST_CHECK (kan_context_query (context, "second_independent_system_t"))
+    KAN_TEST_CHECK (KAN_HANDLE_IS_VALID (kan_context_query (context, "first_independent_system_t")))
+    KAN_TEST_CHECK (KAN_HANDLE_IS_VALID (kan_context_query (context, "second_independent_system_t")))
     kan_context_destroy (context);
 }

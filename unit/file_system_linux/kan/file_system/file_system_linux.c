@@ -18,21 +18,21 @@ kan_file_system_directory_iterator_t kan_file_system_directory_iterator_create (
     {
         KAN_LOG (file_system_linux, KAN_LOG_ERROR, "Failed to create directory iterator \"%s\": %s.", path,
                  strerror (errno))
-        return KAN_INVALID_FILE_SYSTEM_DIRECTORY_ITERATOR;
+        return KAN_HANDLE_SET_INVALID (kan_file_system_directory_iterator_t);
     }
 
-    return (kan_file_system_directory_iterator_t) directory;
+    return KAN_HANDLE_SET (kan_file_system_directory_iterator_t, directory);
 }
 
 const char *kan_file_system_directory_iterator_advance (kan_file_system_directory_iterator_t iterator)
 {
-    struct dirent *unix_entry = readdir ((DIR *) iterator);
+    struct dirent *unix_entry = readdir (KAN_HANDLE_GET (iterator));
     return unix_entry ? unix_entry->d_name : NULL;
 }
 
 void kan_file_system_directory_iterator_destroy (kan_file_system_directory_iterator_t iterator)
 {
-    closedir ((DIR *) iterator);
+    closedir (KAN_HANDLE_GET (iterator));
 }
 
 kan_bool_t kan_file_system_query_entry (const char *path, struct kan_file_system_entry_status_t *status)
@@ -96,7 +96,7 @@ kan_bool_t kan_file_system_remove_directory_with_content (const char *path)
 {
     // nftw is not supported everywhere, therefore we use our iterator for compatibility.
     kan_file_system_directory_iterator_t iterator = kan_file_system_directory_iterator_create (path);
-    if (iterator == KAN_INVALID_FILE_SYSTEM_DIRECTORY_ITERATOR)
+    if (!KAN_HANDLE_IS_VALID (iterator))
     {
         return KAN_FALSE;
     }
@@ -115,7 +115,7 @@ kan_bool_t kan_file_system_remove_directory_with_content (const char *path)
         }
 
         struct stat unix_status;
-        if (fstatat (dirfd ((DIR *) iterator), entry_name, &unix_status, 0) != 0)
+        if (fstatat (dirfd (KAN_HANDLE_GET (iterator)), entry_name, &unix_status, 0) != 0)
         {
             KAN_LOG (file_system_linux, KAN_LOG_ERROR, "Failed to get status of \"%s\": %s.", entry_name,
                      strerror (errno))
@@ -124,7 +124,7 @@ kan_bool_t kan_file_system_remove_directory_with_content (const char *path)
 
         if (S_ISREG (unix_status.st_mode))
         {
-            if (unlinkat (dirfd ((DIR *) iterator), entry_name, 0) != 0)
+            if (unlinkat (dirfd (KAN_HANDLE_GET (iterator)), entry_name, 0) != 0)
             {
                 KAN_LOG (file_system_linux, KAN_LOG_ERROR, "Failed to remove file \"%s\": %s.", path, strerror (errno))
                 break;

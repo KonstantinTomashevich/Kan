@@ -3,7 +3,7 @@
 #include <SDL3/SDL_init.h>
 #include <SDL3/SDL_timer.h>
 
-#include <kan/api_common/bool.h>
+#include <kan/api_common/core_types.h>
 #include <kan/error/critical.h>
 #include <kan/platform/precise_time.h>
 #include <kan/platform/sdl_allocation_adapter.h>

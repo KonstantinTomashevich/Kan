@@ -2,8 +2,8 @@
 
 #include <cpu_dispatch_api.h>
 
-#include <kan/api_common/bool.h>
 #include <kan/api_common/c_header.h>
+#include <kan/api_common/core_types.h>
 #include <kan/cpu_dispatch/task.h>
 #include <kan/error/critical.h>
 
@@ -34,9 +34,7 @@
 
 KAN_C_HEADER_BEGIN
 
-typedef uint64_t kan_cpu_job_t;
-
-#define KAN_INVALID_CPU_JOB 0u
+KAN_HANDLE_DEFINE (kan_cpu_job_t);
 
 /// \brief Creates new job instance.
 CPU_DISPATCH_API kan_cpu_job_t kan_cpu_job_create (void);
@@ -45,7 +43,7 @@ CPU_DISPATCH_API kan_cpu_job_t kan_cpu_job_create (void);
 CPU_DISPATCH_API void kan_cpu_job_set_completion_task (kan_cpu_job_t job, struct kan_cpu_task_t completion_task);
 
 /// \brief Dispatches task inside job context.
-CPU_DISPATCH_API kan_cpu_task_handle_t kan_cpu_job_dispatch_task (kan_cpu_job_t job, struct kan_cpu_task_t task);
+CPU_DISPATCH_API kan_cpu_task_t kan_cpu_job_dispatch_task (kan_cpu_job_t job, struct kan_cpu_task_t task);
 
 /// \brief Dispatches task list inside job context.
 CPU_DISPATCH_API void kan_cpu_job_dispatch_task_list (kan_cpu_job_t job, struct kan_cpu_task_list_node_t *list);
@@ -69,7 +67,7 @@ static inline void kan_cpu_job_dispatch_and_detach_task_list (kan_cpu_job_t job,
         kan_cpu_job_dispatch_task_list (job, list);
         while (list)
         {
-            KAN_ASSERT (list->dispatch_handle != KAN_INVALID_CPU_TASK_HANDLE)
+            KAN_ASSERT (KAN_HANDLE_IS_VALID (list->dispatch_handle))
             kan_cpu_task_detach (list->dispatch_handle);
             list = list->next;
         }

@@ -2,8 +2,8 @@
 
 #include <reflection_api.h>
 
-#include <kan/api_common/bool.h>
 #include <kan/api_common/c_header.h>
+#include <kan/api_common/core_types.h>
 #include <kan/reflection/patch.h>
 #include <kan/reflection/registry.h>
 
@@ -42,9 +42,7 @@
 
 KAN_C_HEADER_BEGIN
 
-typedef uint64_t kan_reflection_migration_seed_t;
-
-#define KAN_INVALID_REFLECTION_MIGRATION_SEED 0u
+KAN_HANDLE_DEFINE (kan_reflection_migration_seed_t);
 
 /// \brief Describes what will happen with structure or enumeration during migration.
 enum kan_reflection_migration_status_t
@@ -88,9 +86,7 @@ REFLECTION_API const struct kan_reflection_struct_migration_seed_t *kan_reflecti
 /// \brief Destroys given seed and frees its resources.
 REFLECTION_API void kan_reflection_migration_seed_destroy (kan_reflection_migration_seed_t seed);
 
-typedef uint64_t kan_reflection_struct_migrator_t;
-
-#define KAN_INVALID_REFLECTION_STRUCT_MIGRATOR 0u
+KAN_HANDLE_DEFINE (kan_reflection_struct_migrator_t);
 
 /// \brief Builds new migrator from given migration seed.
 REFLECTION_API kan_reflection_struct_migrator_t

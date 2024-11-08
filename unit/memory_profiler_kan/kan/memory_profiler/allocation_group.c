@@ -12,21 +12,22 @@
 kan_allocation_group_t kan_allocation_group_root (void)
 {
     lock_memory_profiling_context ();
-    kan_allocation_group_t result = (kan_allocation_group_t) retrieve_root_allocation_group_unguarded ();
+    kan_allocation_group_t result =
+        KAN_HANDLE_SET (kan_allocation_group_t, retrieve_root_allocation_group_unguarded ());
     unlock_memory_profiling_context ();
     return result;
 }
 
 kan_allocation_group_t kan_allocation_group_get_child (kan_allocation_group_t parent, const char *name)
 {
-    if (parent == KAN_ALLOCATION_GROUP_IGNORE)
+    if (!KAN_HANDLE_IS_VALID (parent))
     {
         return KAN_ALLOCATION_GROUP_IGNORE;
     }
 
     lock_memory_profiling_context ();
-    struct allocation_group_t *parent_group = retrieve_allocation_group (parent);
-    KAN_ASSERT (parent_group);
+    struct allocation_group_t *parent_group = KAN_HANDLE_GET (parent);
+    KAN_ASSERT (parent_group)
     struct allocation_group_t *child = parent_group->first_child;
 
     while (child)
@@ -34,7 +35,7 @@ kan_allocation_group_t kan_allocation_group_get_child (kan_allocation_group_t pa
         if (strcmp (child->name, name) == 0)
         {
             unlock_memory_profiling_context ();
-            return (kan_allocation_group_t) child;
+            return KAN_HANDLE_SET (kan_allocation_group_t, child);
         }
 
         child = child->next_on_level;
@@ -43,54 +44,54 @@ kan_allocation_group_t kan_allocation_group_get_child (kan_allocation_group_t pa
     child = create_allocation_group_unguarded (parent_group->first_child, name);
     parent_group->first_child = child;
     unlock_memory_profiling_context ();
-    return (kan_allocation_group_t) child;
+    return KAN_HANDLE_SET (kan_allocation_group_t, child);
 }
 
 void kan_allocation_group_allocate (kan_allocation_group_t group, uint64_t amount)
 {
-    if (group == KAN_ALLOCATION_GROUP_IGNORE)
+    if (!KAN_HANDLE_IS_VALID (group))
     {
         return;
     }
 
     lock_memory_profiling_context ();
-    struct allocation_group_t *allocation_group = retrieve_allocation_group (group);
+    struct allocation_group_t *allocation_group = KAN_HANDLE_GET (group);
     allocation_group->allocated_here += amount;
-    queue_allocate_event_unguarded (group, amount);
+    queue_allocate_event_unguarded (allocation_group, amount);
     unlock_memory_profiling_context ();
 }
 
 void kan_allocation_group_free (kan_allocation_group_t group, uint64_t amount)
 {
-    if (group == KAN_ALLOCATION_GROUP_IGNORE)
+    if (!KAN_HANDLE_IS_VALID (group))
     {
         return;
     }
 
     lock_memory_profiling_context ();
-    struct allocation_group_t *allocation_group = retrieve_allocation_group (group);
+    struct allocation_group_t *allocation_group = KAN_HANDLE_GET (group);
     KAN_ASSERT (allocation_group->allocated_here >= amount)
     allocation_group->allocated_here -= amount;
-    queue_free_event_unguarded (group, amount);
+    queue_free_event_unguarded (allocation_group, amount);
     unlock_memory_profiling_context ();
 }
 
 void kan_allocation_group_marker (kan_allocation_group_t group, const char *name)
 {
-    if (group == KAN_ALLOCATION_GROUP_IGNORE)
+    if (!KAN_HANDLE_IS_VALID (group))
     {
         return;
     }
 
     lock_memory_profiling_context ();
-    queue_marker_event_unguarded (group, name);
+    queue_marker_event_unguarded (KAN_HANDLE_GET (group), name);
     unlock_memory_profiling_context ();
 }
 
 #define KAN_ALLOCATION_GROUP_STACK_SIZE 32u
 
 static struct kan_atomic_int_t thread_local_storage_initialization_lock;
-static kan_thread_local_storage_t thread_local_storage = KAN_THREAD_LOCAL_STORAGE_INVALID;
+static kan_thread_local_storage_t thread_local_storage = KAN_TYPED_ID_32_INITIALIZE_INVALID;
 
 struct thread_local_storage_stack_t
 {
@@ -115,10 +116,10 @@ static void free_thread_local_storage_stack (void *memory)
 
 static struct thread_local_storage_stack_t *ensure_thread_local_storage (void)
 {
-    if (thread_local_storage == KAN_THREAD_LOCAL_STORAGE_INVALID)
+    if (!KAN_TYPED_ID_32_IS_VALID (thread_local_storage))
     {
         kan_atomic_int_lock (&thread_local_storage_initialization_lock);
-        if (thread_local_storage == KAN_THREAD_LOCAL_STORAGE_INVALID)
+        if (!KAN_TYPED_ID_32_IS_VALID (thread_local_storage))
         {
             thread_local_storage = kan_thread_local_storage_create ();
         }

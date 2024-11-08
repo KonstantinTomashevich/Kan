@@ -798,7 +798,7 @@ KAN_TEST_CASE (patch)
         sizeof (second.inner[0u].second), &second.inner[0u].second);
 
     kan_reflection_patch_t first_to_second = kan_reflection_patch_builder_build (patch_builder, registry, &patch_outer);
-    KAN_TEST_ASSERT (first_to_second != KAN_INVALID_REFLECTION_PATCH)
+    KAN_TEST_ASSERT (KAN_HANDLE_IS_VALID (first_to_second))
 
     struct patch_outer_t third = second;
     third.after = 3.0;
@@ -817,7 +817,7 @@ KAN_TEST_CASE (patch)
                                             sizeof (third.inner[1u].second), &third.inner[1u].second);
 
     kan_reflection_patch_t second_to_third = kan_reflection_patch_builder_build (patch_builder, registry, &patch_outer);
-    KAN_TEST_ASSERT (second_to_third != KAN_INVALID_REFLECTION_PATCH)
+    KAN_TEST_ASSERT (KAN_HANDLE_IS_VALID (second_to_third))
     kan_reflection_patch_builder_destroy (patch_builder);
 
     KAN_TEST_CHECK (!is_patch_outer_equal (&first, &second))
@@ -835,22 +835,22 @@ KAN_TEST_CASE (patch)
     kan_reflection_patch_iterator_t iterator = kan_reflection_patch_begin (first_to_second);
     kan_reflection_patch_iterator_t end = kan_reflection_patch_end (first_to_second);
 
-    KAN_TEST_ASSERT (iterator != end)
+    KAN_TEST_ASSERT (!KAN_HANDLE_IS_EQUAL (iterator, end))
     struct kan_reflection_patch_chunk_info_t chunk = kan_reflection_patch_iterator_get (iterator);
     KAN_TEST_CHECK (chunk.offset == 0u)
     KAN_TEST_CHECK (chunk.size == sizeof (double) + sizeof (struct patch_inner_t))
     iterator = kan_reflection_patch_iterator_next (iterator);
-    KAN_TEST_CHECK (iterator == end)
+    KAN_TEST_CHECK (KAN_HANDLE_IS_EQUAL (iterator, end))
 
     iterator = kan_reflection_patch_begin (second_to_third);
     end = kan_reflection_patch_end (second_to_third);
 
-    KAN_TEST_ASSERT (iterator != end)
+    KAN_TEST_ASSERT (!KAN_HANDLE_IS_EQUAL (iterator, end))
     chunk = kan_reflection_patch_iterator_get (iterator);
     KAN_TEST_CHECK (chunk.offset == sizeof (double) + sizeof (struct patch_inner_t))
     KAN_TEST_CHECK (chunk.size == sizeof (double) + sizeof (struct patch_inner_t))
     iterator = kan_reflection_patch_iterator_next (iterator);
-    KAN_TEST_CHECK (iterator == end)
+    KAN_TEST_CHECK (KAN_HANDLE_IS_EQUAL (iterator, end))
 
     // Patches will be automatically destroyed with owning registry.
     kan_reflection_registry_destroy (registry);

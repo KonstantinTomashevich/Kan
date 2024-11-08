@@ -4,8 +4,8 @@
 
 #include <stdint.h>
 
-#include <kan/api_common/bool.h>
 #include <kan/api_common/c_header.h>
+#include <kan/api_common/core_types.h>
 #include <kan/cpu_dispatch/job.h>
 #include <kan/memory_profiler/allocation_group.h>
 
@@ -97,15 +97,9 @@
 
 KAN_C_HEADER_BEGIN
 
-typedef uint64_t kan_workflow_graph_t;
-
-#define KAN_INVALID_WORKFLOW_GRAPH 0u
-
-typedef uint64_t kan_workflow_graph_builder_t;
-
-#define KAN_INVALID_WORKFLOW_GRAPH_NODE 0u
-
-typedef uint64_t kan_workflow_graph_node_t;
+KAN_HANDLE_DEFINE (kan_workflow_graph_t);
+KAN_HANDLE_DEFINE (kan_workflow_graph_builder_t);
+KAN_HANDLE_DEFINE (kan_workflow_graph_node_t);
 
 typedef uint64_t kan_workflow_user_data_t;
 

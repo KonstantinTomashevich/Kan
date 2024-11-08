@@ -35,7 +35,7 @@ static void test_task_function (kan_cpu_task_user_data_t user_data)
 }
 
 static void dispatch_separately (kan_cpu_job_t job,
-                                 kan_cpu_task_handle_t *handles_output,
+                                 kan_cpu_task_t *handles_output,
                                  struct test_task_user_data_t *user_data_output,
                                  uint64_t count)
 {
@@ -49,7 +49,7 @@ static void dispatch_separately (kan_cpu_job_t job,
             .user_data = (uint64_t) &user_data_output[index],
         };
 
-        if (job == KAN_INVALID_CPU_JOB)
+        if (!KAN_HANDLE_IS_VALID (job))
         {
             handles_output[index] = kan_cpu_task_dispatch (task);
         }
@@ -61,7 +61,7 @@ static void dispatch_separately (kan_cpu_job_t job,
 }
 
 static void dispatch_as_list (kan_cpu_job_t job,
-                              kan_cpu_task_handle_t *handles_output,
+                              kan_cpu_task_t *handles_output,
                               struct test_task_user_data_t *user_data_output,
                               uint64_t count)
 {
@@ -82,7 +82,7 @@ static void dispatch_as_list (kan_cpu_job_t job,
         };
     }
 
-    if (job == KAN_INVALID_CPU_JOB)
+    if (!KAN_HANDLE_IS_VALID (job))
     {
         kan_cpu_task_dispatch_list (nodes);
     }
@@ -99,7 +99,7 @@ static void dispatch_as_list (kan_cpu_job_t job,
     kan_free_general (KAN_ALLOCATION_GROUP_IGNORE, nodes, sizeof (struct kan_cpu_task_list_node_t) * count);
 }
 
-static void wait_until_all_finished (kan_cpu_task_handle_t *handles, uint64_t count)
+static void wait_until_all_finished (kan_cpu_task_t *handles, uint64_t count)
 {
     while (KAN_TRUE)
     {
@@ -121,9 +121,9 @@ static void wait_until_all_finished (kan_cpu_task_handle_t *handles, uint64_t co
 
 KAN_TEST_CASE (execute_1000_tasks_separate_dispatch)
 {
-    kan_cpu_task_handle_t handles[1000u];
+    kan_cpu_task_t handles[1000u];
     struct test_task_user_data_t user_data[1000u];
-    dispatch_separately (KAN_INVALID_CPU_JOB, handles, user_data, 1000u);
+    dispatch_separately (KAN_HANDLE_SET_INVALID (kan_cpu_job_t), handles, user_data, 1000u);
     wait_until_all_finished (handles, 1000u);
 
     for (uint64_t index = 0u; index < 1000u; ++index)
@@ -134,9 +134,9 @@ KAN_TEST_CASE (execute_1000_tasks_separate_dispatch)
 
 KAN_TEST_CASE (execute_1000_tasks_list_dispatch)
 {
-    kan_cpu_task_handle_t handles[1000u];
+    kan_cpu_task_t handles[1000u];
     struct test_task_user_data_t user_data[1000u];
-    dispatch_as_list (KAN_INVALID_CPU_JOB, handles, user_data, 1000u);
+    dispatch_as_list (KAN_HANDLE_SET_INVALID (kan_cpu_job_t), handles, user_data, 1000u);
     wait_until_all_finished (handles, 1000u);
 
     for (uint64_t index = 0u; index < 1000u; ++index)
@@ -149,9 +149,9 @@ KAN_TEST_CASE (execute_1000_tasks_list_dispatch)
 // execute_1000_tasks_separate_dispatch_and_detach_right_away
 KAN_TEST_CASE (execute_1000_tasks_sd_dra)
 {
-    kan_cpu_task_handle_t handles[1000u];
+    kan_cpu_task_t handles[1000u];
     struct test_task_user_data_t user_data[1000u];
-    dispatch_separately (KAN_INVALID_CPU_JOB, handles, user_data, 1000u);
+    dispatch_separately (KAN_HANDLE_SET_INVALID (kan_cpu_job_t), handles, user_data, 1000u);
 
     for (uint64_t index = 0u; index < 1000u; ++index)
     {
@@ -178,7 +178,7 @@ KAN_TEST_CASE (execute_1000_tasks_sd_dra)
 
 KAN_TEST_CASE (job_1000_tasks_separate_dispatch)
 {
-    kan_cpu_task_handle_t handles[1000u];
+    kan_cpu_task_t handles[1000u];
     struct test_task_user_data_t user_data[1000u];
     const kan_cpu_job_t job = kan_cpu_job_create ();
 
@@ -194,7 +194,7 @@ KAN_TEST_CASE (job_1000_tasks_separate_dispatch)
 
 KAN_TEST_CASE (job_1000_tasks_list_dispatch)
 {
-    kan_cpu_task_handle_t handles[1000u];
+    kan_cpu_task_t handles[1000u];
     struct test_task_user_data_t user_data[1000u];
     const kan_cpu_job_t job = kan_cpu_job_create ();
 
@@ -210,7 +210,7 @@ KAN_TEST_CASE (job_1000_tasks_list_dispatch)
 
 KAN_TEST_CASE (job_1000_tasks_detach)
 {
-    kan_cpu_task_handle_t handles[1000u];
+    kan_cpu_task_t handles[1000u];
     struct test_task_user_data_t user_data[1000u];
     const kan_cpu_job_t job = kan_cpu_job_create ();
     dispatch_as_list (job, handles, user_data, 1000u);
@@ -243,7 +243,7 @@ KAN_TEST_CASE (job_1000_tasks_detach)
 
 KAN_TEST_CASE (job_1000_completion_task)
 {
-    kan_cpu_task_handle_t handles[1000u];
+    kan_cpu_task_t handles[1000u];
     struct test_task_user_data_t user_data[1000u];
     struct test_task_user_data_t completion_task_user_data;
     completion_task_user_data.work_done = kan_atomic_int_init (0);

@@ -14,7 +14,7 @@ KAN_LOG_DEFINE_CATEGORY (context_application_framework_system);
 
 struct application_framework_system_t
 {
-    kan_context_handle_t context;
+    kan_context_t context;
     kan_allocation_group_t group;
 
     uint64_t outer_arguments_count;
@@ -29,7 +29,7 @@ struct application_framework_system_t
     kan_cpu_section_t update_section;
 };
 
-kan_context_system_handle_t application_framework_system_create (kan_allocation_group_t group, void *user_config)
+kan_context_system_t application_framework_system_create (kan_allocation_group_t group, void *user_config)
 {
     struct application_framework_system_t *system = kan_allocate_general (
         group, sizeof (struct application_framework_system_t), _Alignof (struct application_framework_system_t));
@@ -53,19 +53,19 @@ kan_context_system_handle_t application_framework_system_create (kan_allocation_
     system->exit_code = 0;
     system->min_frame_time_ns = KAN_APPLICATION_FRAMEWORK_DEFAULT_MIN_FRAME_TIME_NS;
     system->update_section = kan_cpu_section_get ("context_application_framework_system_update");
-    return (kan_context_system_handle_t) system;
+    return KAN_HANDLE_SET (kan_context_system_t, system);
 }
 
-static void application_framework_system_update (kan_context_system_handle_t handle)
+static void application_framework_system_update (kan_context_system_t handle)
 {
-    struct application_framework_system_t *framework_system = (struct application_framework_system_t *) handle;
+    struct application_framework_system_t *framework_system = KAN_HANDLE_GET (handle);
     struct kan_cpu_section_execution_t execution;
     kan_cpu_section_execution_init (&execution, framework_system->update_section);
 
-    kan_context_system_handle_t application_system =
+    kan_context_system_t application_system =
         kan_context_query (framework_system->context, KAN_CONTEXT_APPLICATION_SYSTEM_NAME);
 
-    if (application_system != KAN_INVALID_CONTEXT_SYSTEM_HANDLE)
+    if (KAN_HANDLE_IS_VALID (application_system))
     {
         const struct kan_platform_application_event_t *event;
         while (
@@ -100,56 +100,54 @@ static void application_framework_system_update (kan_context_system_handle_t han
     kan_cpu_section_execution_shutdown (&execution);
 }
 
-void application_framework_system_connect (kan_context_system_handle_t handle, kan_context_handle_t context)
+void application_framework_system_connect (kan_context_system_t handle, kan_context_t context)
 {
-    struct application_framework_system_t *system = (struct application_framework_system_t *) handle;
+    struct application_framework_system_t *system = KAN_HANDLE_GET (handle);
     system->context = context;
 
-    kan_context_system_handle_t update_system = kan_context_query (system->context, KAN_CONTEXT_UPDATE_SYSTEM_NAME);
-    if (update_system != KAN_INVALID_CONTEXT_SYSTEM_HANDLE)
+    kan_context_system_t update_system = kan_context_query (system->context, KAN_CONTEXT_UPDATE_SYSTEM_NAME);
+    if (KAN_HANDLE_IS_VALID (update_system))
     {
         kan_update_system_connect_on_run (update_system, handle, application_framework_system_update, 0u, NULL);
     }
 }
 
-void application_framework_system_init (kan_context_system_handle_t handle)
+void application_framework_system_init (kan_context_system_t handle)
 {
-    struct application_framework_system_t *system = (struct application_framework_system_t *) handle;
-    kan_context_system_handle_t application_system =
-        kan_context_query (system->context, KAN_CONTEXT_APPLICATION_SYSTEM_NAME);
+    struct application_framework_system_t *system = KAN_HANDLE_GET (handle);
+    kan_context_system_t application_system = kan_context_query (system->context, KAN_CONTEXT_APPLICATION_SYSTEM_NAME);
 
-    if (application_system != KAN_INVALID_CONTEXT_SYSTEM_HANDLE)
+    if (KAN_HANDLE_IS_VALID (application_system))
     {
         system->event_iterator = kan_application_system_event_iterator_create (application_system);
     }
 }
 
-void application_framework_system_shutdown (kan_context_system_handle_t handle)
+void application_framework_system_shutdown (kan_context_system_t handle)
 {
-    struct application_framework_system_t *system = (struct application_framework_system_t *) handle;
-    kan_context_system_handle_t application_system =
-        kan_context_query (system->context, KAN_CONTEXT_APPLICATION_SYSTEM_NAME);
+    struct application_framework_system_t *system = KAN_HANDLE_GET (handle);
+    kan_context_system_t application_system = kan_context_query (system->context, KAN_CONTEXT_APPLICATION_SYSTEM_NAME);
 
-    if (application_system != KAN_INVALID_CONTEXT_SYSTEM_HANDLE)
+    if (KAN_HANDLE_IS_VALID (application_system))
     {
         kan_application_system_event_iterator_destroy (application_system, system->event_iterator);
     }
 }
 
-void application_framework_system_disconnect (kan_context_system_handle_t handle)
+void application_framework_system_disconnect (kan_context_system_t handle)
 {
-    struct application_framework_system_t *system = (struct application_framework_system_t *) handle;
-    kan_context_system_handle_t update_system = kan_context_query (system->context, KAN_CONTEXT_UPDATE_SYSTEM_NAME);
+    struct application_framework_system_t *system = KAN_HANDLE_GET (handle);
+    kan_context_system_t update_system = kan_context_query (system->context, KAN_CONTEXT_UPDATE_SYSTEM_NAME);
 
-    if (update_system != KAN_INVALID_CONTEXT_SYSTEM_HANDLE)
+    if (KAN_HANDLE_IS_VALID (update_system))
     {
         kan_update_system_disconnect_on_run (update_system, handle);
     }
 }
 
-void application_framework_system_destroy (kan_context_system_handle_t handle)
+void application_framework_system_destroy (kan_context_system_t handle)
 {
-    struct application_framework_system_t *system = (struct application_framework_system_t *) handle;
+    struct application_framework_system_t *system = KAN_HANDLE_GET (handle);
     kan_free_general (system->group, system, sizeof (struct application_framework_system_t));
 }
 
@@ -164,41 +162,34 @@ APPLICATION_FRAMEWORK_API struct kan_context_system_api_t KAN_CONTEXT_SYSTEM_API
     .destroy = application_framework_system_destroy,
 };
 
-uint64_t kan_application_framework_system_get_arguments_count (kan_context_system_handle_t application_framework_system)
+uint64_t kan_application_framework_system_get_arguments_count (kan_context_system_t application_framework_system)
 {
-    struct application_framework_system_t *system =
-        (struct application_framework_system_t *) application_framework_system;
+    struct application_framework_system_t *system = KAN_HANDLE_GET (application_framework_system);
     return system->outer_arguments_count;
 }
 
-char **kan_application_framework_system_get_arguments (kan_context_system_handle_t application_framework_system)
+char **kan_application_framework_system_get_arguments (kan_context_system_t application_framework_system)
 {
-    struct application_framework_system_t *system =
-        (struct application_framework_system_t *) application_framework_system;
+    struct application_framework_system_t *system = KAN_HANDLE_GET (application_framework_system);
     return system->outer_arguments;
 }
 
-uint64_t kan_application_framework_get_min_frame_time_ns (kan_context_system_handle_t application_framework_system)
+uint64_t kan_application_framework_get_min_frame_time_ns (kan_context_system_t application_framework_system)
 {
-    struct application_framework_system_t *system =
-        (struct application_framework_system_t *) application_framework_system;
+    struct application_framework_system_t *system = KAN_HANDLE_GET (application_framework_system);
     return system->min_frame_time_ns;
 }
 
-void kan_application_framework_set_min_frame_time_ns (kan_context_system_handle_t application_framework_system,
+void kan_application_framework_set_min_frame_time_ns (kan_context_system_t application_framework_system,
                                                       uint64_t min_frame_time_ns)
 {
-    struct application_framework_system_t *system =
-        (struct application_framework_system_t *) application_framework_system;
+    struct application_framework_system_t *system = KAN_HANDLE_GET (application_framework_system);
     system->min_frame_time_ns = min_frame_time_ns;
 }
 
-void kan_application_framework_system_request_exit (kan_context_system_handle_t application_framework_system,
-                                                    int exit_code)
+void kan_application_framework_system_request_exit (kan_context_system_t application_framework_system, int exit_code)
 {
-    struct application_framework_system_t *system =
-        (struct application_framework_system_t *) application_framework_system;
-
+    struct application_framework_system_t *system = KAN_HANDLE_GET (application_framework_system);
     if (!system->exit_requested)
     {
         system->exit_requested = KAN_TRUE;
@@ -206,12 +197,10 @@ void kan_application_framework_system_request_exit (kan_context_system_handle_t 
     }
 }
 
-kan_bool_t kan_application_framework_system_is_exit_requested (kan_context_system_handle_t application_framework_system,
+kan_bool_t kan_application_framework_system_is_exit_requested (kan_context_system_t application_framework_system,
                                                                int *exit_code_output)
 {
-    struct application_framework_system_t *system =
-        (struct application_framework_system_t *) application_framework_system;
-
+    struct application_framework_system_t *system = KAN_HANDLE_GET (application_framework_system);
     if (system->exit_requested)
     {
         *exit_code_output = system->exit_code;

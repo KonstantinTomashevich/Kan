@@ -55,7 +55,7 @@ KAN_C_HEADER_BEGIN
 /// \brief System name for requirements and queries.
 #define KAN_CONTEXT_APPLICATION_SYSTEM_NAME "application_system_t"
 
-typedef uint64_t kan_application_system_event_iterator_t;
+KAN_HANDLE_DEFINE (kan_application_system_event_iterator_t);
 
 /// \brief Contains buffered information about available display.
 struct kan_application_system_display_info_t
@@ -72,16 +72,14 @@ struct kan_application_system_display_info_t
     struct kan_platform_display_mode_t desktop_mode;
 };
 
-typedef uint64_t kan_application_system_display_info_iterator_t;
+KAN_HANDLE_DEFINE (kan_application_system_display_info_iterator_t);
 
-typedef uint64_t kan_application_system_window_handle_t;
-
-#define KAN_INVALID_APPLICATION_SYSTEM_WINDOW_HANDLE 0u
+KAN_HANDLE_DEFINE (kan_application_system_window_t);
 
 /// \brief Contains buffered information about available window.
 struct kan_application_system_window_info_t
 {
-    kan_application_system_window_handle_t handle;
+    kan_application_system_window_t handle;
     kan_platform_window_id_t id;
     kan_platform_display_id_t display_id;
 
@@ -106,7 +104,7 @@ struct kan_application_system_window_info_t
     uint32_t maximum_height;
 };
 
-typedef uint64_t kan_application_system_window_info_iterator_t;
+KAN_HANDLE_DEFINE (kan_application_system_window_info_iterator_t);
 
 /// \brief Describes window resource binding with its user data and callbacks.
 struct kan_application_system_window_resource_binding_t
@@ -117,7 +115,7 @@ struct kan_application_system_window_resource_binding_t
 };
 
 /// \brief Resource binding id that can be used to manually remove resource without destroying window.
-typedef uint64_t kan_application_system_window_resource_id_t;
+KAN_TYPED_ID_32_DEFINE (kan_application_system_window_resource_id_t);
 
 /// \brief Contains buffered information about mouse state.
 struct kan_application_system_mouse_state_t
@@ -131,21 +129,20 @@ struct kan_application_system_mouse_state_t
 
 /// \brief Synchronizes application state with application system.
 /// \invariant Should be called in main thread every frame.
-CONTEXT_APPLICATION_SYSTEM_API void kan_application_system_sync_in_main_thread (
-    kan_context_system_handle_t system_handle);
+CONTEXT_APPLICATION_SYSTEM_API void kan_application_system_sync_in_main_thread (kan_context_system_t system_handle);
 
 /// \brief Prepares application system to be destroyed.
 /// \invariant Should be called in main thread before context destruction.
 CONTEXT_APPLICATION_SYSTEM_API void kan_application_system_prepare_for_destroy_in_main_thread (
-    kan_context_system_handle_t system_handle);
+    kan_context_system_t system_handle);
 
 /// \brief Creates new iterator for application events.
 CONTEXT_APPLICATION_SYSTEM_API kan_application_system_event_iterator_t
-kan_application_system_event_iterator_create (kan_context_system_handle_t system_handle);
+kan_application_system_event_iterator_create (kan_context_system_t system_handle);
 
 /// \brief Returns new application event or NULL if there is no more events.
 CONTEXT_APPLICATION_SYSTEM_API const struct kan_platform_application_event_t *
-kan_application_system_event_iterator_get (kan_context_system_handle_t system_handle,
+kan_application_system_event_iterator_get (kan_context_system_t system_handle,
                                            kan_application_system_event_iterator_t event_iterator);
 
 /// \brief Advances given iterator to the next event and returns new iterator value.
@@ -154,12 +151,12 @@ kan_application_system_event_iterator_advance (kan_application_system_event_iter
 
 /// \brief Destroys given application event iterator.
 CONTEXT_APPLICATION_SYSTEM_API void kan_application_system_event_iterator_destroy (
-    kan_context_system_handle_t system_handle, kan_application_system_event_iterator_t event_iterator);
+    kan_context_system_t system_handle, kan_application_system_event_iterator_t event_iterator);
 
 /// \brief Creates new iterator for querying information about displays.
 /// \invariant These iterators and display info overall are invalidated during sync, do not store them!
 CONTEXT_APPLICATION_SYSTEM_API kan_application_system_display_info_iterator_t
-kan_application_system_display_info_iterator_create (kan_context_system_handle_t system_handle);
+kan_application_system_display_info_iterator_create (kan_context_system_t system_handle);
 
 /// \brief Returns next display info or NULL if there is no more display info.
 CONTEXT_APPLICATION_SYSTEM_API const struct kan_application_system_display_info_t *
@@ -173,7 +170,7 @@ kan_application_system_display_info_iterator_advance (
 /// \brief Creates new iterator for querying information about windows.
 /// \invariant These iterators are invalidated during sync, do not store them!
 CONTEXT_APPLICATION_SYSTEM_API kan_application_system_window_info_iterator_t
-kan_application_system_window_info_iterator_create (kan_context_system_handle_t system_handle);
+kan_application_system_window_info_iterator_create (kan_context_system_t system_handle);
 
 /// \brief Returns next window info or NULL if there is no more window info.
 CONTEXT_APPLICATION_SYSTEM_API const struct kan_application_system_window_info_t *
@@ -186,12 +183,12 @@ kan_application_system_window_info_iterator_advance (
 
 /// \brief Queries window info by window handle.
 CONTEXT_APPLICATION_SYSTEM_API const struct kan_application_system_window_info_t *
-kan_application_system_get_window_info_from_handle (kan_context_system_handle_t system_handle,
-                                                    kan_application_system_window_handle_t window_handle);
+kan_application_system_get_window_info_from_handle (kan_context_system_t system_handle,
+                                                    kan_application_system_window_t window_handle);
 
 /// \brief Adapts `kan_platform_application_window_create`.
-CONTEXT_APPLICATION_SYSTEM_API kan_application_system_window_handle_t
-kan_application_system_window_create (kan_context_system_handle_t system_handle,
+CONTEXT_APPLICATION_SYSTEM_API kan_application_system_window_t
+kan_application_system_window_create (kan_context_system_t system_handle,
                                       const char *title,
                                       uint32_t width,
                                       uint32_t height,
@@ -200,22 +197,22 @@ kan_application_system_window_create (kan_context_system_handle_t system_handle,
 /// \brief Adapts `kan_platform_application_window_enter_fullscreen`.
 /// \invariant `display_mode` should point to one of the display modes from display infos.
 CONTEXT_APPLICATION_SYSTEM_API void kan_application_system_window_enter_fullscreen (
-    kan_context_system_handle_t system_handle,
-    kan_application_system_window_handle_t window_handle,
+    kan_context_system_t system_handle,
+    kan_application_system_window_t window_handle,
     const struct kan_platform_display_mode_t *display_mode);
 
 /// \brief Adapts `kan_platform_application_window_leave_fullscreen`.
 CONTEXT_APPLICATION_SYSTEM_API void kan_application_system_window_leave_fullscreen (
-    kan_context_system_handle_t system_handle, kan_application_system_window_handle_t window_handle);
+    kan_context_system_t system_handle, kan_application_system_window_t window_handle);
 
 /// \brief Adapts `kan_platform_application_window_set_title`.
 CONTEXT_APPLICATION_SYSTEM_API void kan_application_system_window_set_title (
-    kan_context_system_handle_t system_handle, kan_application_system_window_handle_t window_handle, const char *title);
+    kan_context_system_t system_handle, kan_application_system_window_t window_handle, const char *title);
 
 /// \brief Adapts `kan_platform_application_window_set_icon`.
 CONTEXT_APPLICATION_SYSTEM_API void kan_application_system_window_set_icon (
-    kan_context_system_handle_t system_handle,
-    kan_application_system_window_handle_t window_handle,
+    kan_context_system_t system_handle,
+    kan_application_system_window_t window_handle,
     kan_pixel_format_t pixel_format,
     uint32_t width,
     uint32_t height,
@@ -224,130 +221,116 @@ CONTEXT_APPLICATION_SYSTEM_API void kan_application_system_window_set_icon (
 /// \brief Sets window bounds, combines `kan_platform_application_window_set_position` and
 ///        `kan_platform_application_window_set_size`.
 CONTEXT_APPLICATION_SYSTEM_API void kan_application_system_window_set_bounds (
-    kan_context_system_handle_t system_handle,
-    kan_application_system_window_handle_t window_handle,
+    kan_context_system_t system_handle,
+    kan_application_system_window_t window_handle,
     struct kan_platform_integer_bounds_t bounds);
 
 /// \brief Adapts `kan_platform_application_window_set_minimum_size`.
 CONTEXT_APPLICATION_SYSTEM_API void kan_application_system_window_set_minimum_size (
-    kan_context_system_handle_t system_handle,
-    kan_application_system_window_handle_t window_handle,
+    kan_context_system_t system_handle,
+    kan_application_system_window_t window_handle,
     uint32_t minimum_width,
     uint32_t minimum_height);
 
 /// \brief Adapts `kan_platform_application_window_set_maximum_size`.
 CONTEXT_APPLICATION_SYSTEM_API void kan_application_system_window_set_maximum_size (
-    kan_context_system_handle_t system_handle,
-    kan_application_system_window_handle_t window_handle,
+    kan_context_system_t system_handle,
+    kan_application_system_window_t window_handle,
     uint32_t maximum_width,
     uint32_t maximum_height);
 
 /// \brief Adapts `kan_platform_application_window_set_bordered`.
 CONTEXT_APPLICATION_SYSTEM_API void kan_application_system_window_set_bordered (
-    kan_context_system_handle_t system_handle,
-    kan_application_system_window_handle_t window_handle,
-    kan_bool_t bordered);
+    kan_context_system_t system_handle, kan_application_system_window_t window_handle, kan_bool_t bordered);
 
 /// \brief Adapts `kan_platform_application_window_set_resizable`.
 CONTEXT_APPLICATION_SYSTEM_API void kan_application_system_window_set_resizable (
-    kan_context_system_handle_t system_handle,
-    kan_application_system_window_handle_t window_handle,
-    kan_bool_t resizable);
+    kan_context_system_t system_handle, kan_application_system_window_t window_handle, kan_bool_t resizable);
 
 /// \brief Adapts `kan_platform_application_window_set_always_on_top`.
 CONTEXT_APPLICATION_SYSTEM_API void kan_application_system_window_set_always_on_top (
-    kan_context_system_handle_t system_handle,
-    kan_application_system_window_handle_t window_handle,
-    kan_bool_t always_on_top);
+    kan_context_system_t system_handle, kan_application_system_window_t window_handle, kan_bool_t always_on_top);
 
 /// \brief Adapts `kan_platform_application_window_show`.
-CONTEXT_APPLICATION_SYSTEM_API void kan_application_system_window_show (
-    kan_context_system_handle_t system_handle, kan_application_system_window_handle_t window_handle);
+CONTEXT_APPLICATION_SYSTEM_API void kan_application_system_window_show (kan_context_system_t system_handle,
+                                                                        kan_application_system_window_t window_handle);
 
 /// \brief Adapts `kan_platform_application_window_hide`.
-CONTEXT_APPLICATION_SYSTEM_API void kan_application_system_window_hide (
-    kan_context_system_handle_t system_handle, kan_application_system_window_handle_t window_handle);
+CONTEXT_APPLICATION_SYSTEM_API void kan_application_system_window_hide (kan_context_system_t system_handle,
+                                                                        kan_application_system_window_t window_handle);
 
 /// \brief Adapts `kan_platform_application_window_raise`.
-CONTEXT_APPLICATION_SYSTEM_API void kan_application_system_window_raise (
-    kan_context_system_handle_t system_handle, kan_application_system_window_handle_t window_handle);
+CONTEXT_APPLICATION_SYSTEM_API void kan_application_system_window_raise (kan_context_system_t system_handle,
+                                                                         kan_application_system_window_t window_handle);
 
 /// \brief Adapts `kan_platform_application_window_minimize`.
 CONTEXT_APPLICATION_SYSTEM_API void kan_application_system_window_minimize (
-    kan_context_system_handle_t system_handle, kan_application_system_window_handle_t window_handle);
+    kan_context_system_t system_handle, kan_application_system_window_t window_handle);
 
 /// \brief Adapts `kan_platform_application_window_maximize`.
 CONTEXT_APPLICATION_SYSTEM_API void kan_application_system_window_maximize (
-    kan_context_system_handle_t system_handle, kan_application_system_window_handle_t window_handle);
+    kan_context_system_t system_handle, kan_application_system_window_t window_handle);
 
 /// \brief Adapts `kan_platform_application_window_restore`.
 CONTEXT_APPLICATION_SYSTEM_API void kan_application_system_window_restore (
-    kan_context_system_handle_t system_handle, kan_application_system_window_handle_t window_handle);
+    kan_context_system_t system_handle, kan_application_system_window_t window_handle);
 
 /// \brief Adapts `kan_platform_application_window_set_mouse_grab`.
 CONTEXT_APPLICATION_SYSTEM_API void kan_application_system_window_set_mouse_grab (
-    kan_context_system_handle_t system_handle,
-    kan_application_system_window_handle_t window_handle,
-    kan_bool_t mouse_grab);
+    kan_context_system_t system_handle, kan_application_system_window_t window_handle, kan_bool_t mouse_grab);
 
 /// \brief Adapts `kan_platform_application_window_set_keyboard_grab`.
 CONTEXT_APPLICATION_SYSTEM_API void kan_application_system_window_set_keyboard_grab (
-    kan_context_system_handle_t system_handle,
-    kan_application_system_window_handle_t window_handle,
-    kan_bool_t keyboard_grab);
+    kan_context_system_t system_handle, kan_application_system_window_t window_handle, kan_bool_t keyboard_grab);
 
 /// \brief Adapts `kan_platform_application_window_set_opacity`.
 CONTEXT_APPLICATION_SYSTEM_API void kan_application_system_window_set_opacity (
-    kan_context_system_handle_t system_handle, kan_application_system_window_handle_t window_handle, float opacity);
+    kan_context_system_t system_handle, kan_application_system_window_t window_handle, float opacity);
 
 /// \brief Adapts `kan_platform_application_window_set_focusable`.
-CONTEXT_APPLICATION_SYSTEM_API void kan_application_window_set_focusable (
-    kan_context_system_handle_t system_handle,
-    kan_application_system_window_handle_t window_handle,
-    kan_bool_t focusable);
+CONTEXT_APPLICATION_SYSTEM_API void kan_application_window_set_focusable (kan_context_system_t system_handle,
+                                                                          kan_application_system_window_t window_handle,
+                                                                          kan_bool_t focusable);
 
 /// \brief Attaches new resource to given window and returns this resource id.
 CONTEXT_APPLICATION_SYSTEM_API kan_application_system_window_resource_id_t
-kan_application_system_window_add_resource (kan_context_system_handle_t system_handle,
-                                            kan_application_system_window_handle_t window_handle,
+kan_application_system_window_add_resource (kan_context_system_t system_handle,
+                                            kan_application_system_window_t window_handle,
                                             struct kan_application_system_window_resource_binding_t binding);
 
 /// \brief Removes resource from window using this resource id without destroying the window.
 CONTEXT_APPLICATION_SYSTEM_API void kan_application_system_window_remove_resource (
-    kan_context_system_handle_t system_handle,
-    kan_application_system_window_handle_t window_handle,
+    kan_context_system_t system_handle,
+    kan_application_system_window_t window_handle,
     kan_application_system_window_resource_id_t resource_id);
 
 /// \brief Adapts `kan_platform_application_window_destroy`.
 CONTEXT_APPLICATION_SYSTEM_API void kan_application_system_window_destroy (
-    kan_context_system_handle_t system_handle, kan_application_system_window_handle_t window_handle);
+    kan_context_system_t system_handle, kan_application_system_window_t window_handle);
 
 /// \brief Returns buffered mouse state.
 CONTEXT_APPLICATION_SYSTEM_API const struct kan_application_system_mouse_state_t *
-kan_application_system_get_mouse_state (kan_context_system_handle_t system_handle);
+kan_application_system_get_mouse_state (kan_context_system_t system_handle);
 
 /// \brief Adapts `kan_platform_application_warp_mouse_global`.
-CONTEXT_APPLICATION_SYSTEM_API void kan_application_system_warp_mouse_global (kan_context_system_handle_t system_handle,
+CONTEXT_APPLICATION_SYSTEM_API void kan_application_system_warp_mouse_global (kan_context_system_t system_handle,
                                                                               float global_x,
                                                                               float global_y);
 
 /// \brief Adapts `kan_platform_application_warp_mouse_in_window`.
 CONTEXT_APPLICATION_SYSTEM_API void kan_application_system_warp_mouse_to_window (
-    kan_context_system_handle_t system_handle,
-    kan_application_system_window_handle_t window_handle,
-    float local_x,
-    float local_y);
+    kan_context_system_t system_handle, kan_application_system_window_t window_handle, float local_x, float local_y);
 
 /// \brief Adapts `kan_platform_application_system_set_cursor_visible`.
-CONTEXT_APPLICATION_SYSTEM_API void kan_application_system_set_cursor_visible (
-    kan_context_system_handle_t system_handle, kan_bool_t cursor_visible);
+CONTEXT_APPLICATION_SYSTEM_API void kan_application_system_set_cursor_visible (kan_context_system_t system_handle,
+                                                                               kan_bool_t cursor_visible);
 
 /// \brief Returns buffered clipboard text.
 CONTEXT_APPLICATION_SYSTEM_API const char *kan_application_system_clipboard_get_text (
-    kan_context_system_handle_t system_handle);
+    kan_context_system_t system_handle);
 
 /// \brief Adapts `kan_platform_application_put_text_into_clipboard`.
-CONTEXT_APPLICATION_SYSTEM_API void kan_application_system_clipboard_set_text (
-    kan_context_system_handle_t system_handle, const char *text);
+CONTEXT_APPLICATION_SYSTEM_API void kan_application_system_clipboard_set_text (kan_context_system_t system_handle,
+                                                                               const char *text);
 
 KAN_C_HEADER_END

@@ -2,8 +2,8 @@
 
 #include <resource_pipeline_api.h>
 
-#include <kan/api_common/bool.h>
 #include <kan/api_common/c_header.h>
+#include <kan/api_common/core_types.h>
 #include <kan/container/dynamic_array.h>
 #include <kan/container/hash_storage.h>
 #include <kan/container/interned_string.h>

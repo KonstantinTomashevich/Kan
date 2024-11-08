@@ -264,12 +264,12 @@ kan_stack_allocator_t kan_stack_allocator_create (kan_allocation_group_t group, 
     stack->top = stack->data;
     stack->end = stack->data + amount;
     stack->group = group;
-    return (kan_stack_allocator_t) stack;
+    return KAN_HANDLE_SET (kan_stack_allocator_t, stack);
 }
 
 void *kan_stack_allocator_allocate (kan_stack_allocator_t allocator, uint64_t amount, uint64_t alignment)
 {
-    struct stack_allocator_t *stack = (struct stack_allocator_t *) allocator;
+    struct stack_allocator_t *stack = KAN_HANDLE_GET (allocator);
     uint8_t *position = stack->top;
 
     if ((uintptr_t) position % alignment != 0u)
@@ -289,36 +289,37 @@ void *kan_stack_allocator_allocate (kan_stack_allocator_t allocator, uint64_t am
 
 void kan_stack_allocator_reset (kan_stack_allocator_t allocator)
 {
-    struct stack_allocator_t *stack = (struct stack_allocator_t *) allocator;
+    struct stack_allocator_t *stack = KAN_HANDLE_GET (allocator);
     stack->top = stack->data;
 }
 
 void *kan_stack_allocator_save_top (kan_stack_allocator_t allocator)
 {
-    return ((struct stack_allocator_t *) allocator)->top;
+    struct stack_allocator_t *stack = KAN_HANDLE_GET (allocator);
+    return stack->top;
 }
 
 void kan_stack_allocator_load_top (kan_stack_allocator_t allocator, void *top)
 {
-    struct stack_allocator_t *stack = (struct stack_allocator_t *) allocator;
+    struct stack_allocator_t *stack = KAN_HANDLE_GET (allocator);
     KAN_ASSERT ((uint8_t *) top >= stack->data && (uint8_t *) top <= stack->end)
     stack->top = top;
 }
 
 uint64_t kan_stack_allocator_get_size (kan_stack_allocator_t allocator)
 {
-    struct stack_allocator_t *stack = (struct stack_allocator_t *) allocator;
+    struct stack_allocator_t *stack = KAN_HANDLE_GET (allocator);
     return stack->end - stack->data;
 }
 
 uint64_t kan_stack_allocator_get_available (kan_stack_allocator_t allocator)
 {
-    struct stack_allocator_t *stack = (struct stack_allocator_t *) allocator;
+    struct stack_allocator_t *stack = KAN_HANDLE_GET (allocator);
     return stack->top - stack->data;
 }
 
 void kan_stack_allocator_destroy (kan_stack_allocator_t allocator)
 {
-    struct stack_allocator_t *stack = (struct stack_allocator_t *) allocator;
+    struct stack_allocator_t *stack = KAN_HANDLE_GET (allocator);
     kan_free_general (stack->group, stack, sizeof (struct stack_allocator_t) + stack->end - stack->data);
 }

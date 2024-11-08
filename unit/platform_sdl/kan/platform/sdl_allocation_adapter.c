@@ -70,7 +70,7 @@ void ensure_sdl_allocation_adapter_installed (void)
             sdl_allocation_group = kan_allocation_group_get_child (kan_allocation_group_root (), "sdl");
 
             // Do not use custom allocators if profiling is disabled.
-            if (sdl_allocation_group != KAN_ALLOCATION_GROUP_IGNORE)
+            if (KAN_HANDLE_IS_VALID (sdl_allocation_group))
             {
                 SDL_SetMemoryFunctions (sdl_malloc, sdl_calloc, sdl_realloc, sdl_free);
             }

@@ -248,8 +248,8 @@ struct struct_migration_node_t
 
 struct migration_seed_t
 {
-    struct registry_t *source_registry;
-    struct registry_t *target_registry;
+    kan_reflection_registry_t source_registry;
+    kan_reflection_registry_t target_registry;
     struct kan_hash_storage_t enums;
     struct kan_hash_storage_t structs;
 };
@@ -403,7 +403,7 @@ kan_reflection_registry_t kan_reflection_registry_create (void)
     kan_hash_storage_init (&registry->function_argument_meta_storage, group,
                            KAN_REFLECTION_FUNCTION_ARGUMENT_META_INITIAL_BUCKETS);
 
-    return (uint64_t) registry;
+    return KAN_HANDLE_SET (kan_reflection_registry_t, registry);
 }
 
 kan_bool_t kan_reflection_registry_add_enum (kan_reflection_registry_t registry,
@@ -419,7 +419,7 @@ kan_bool_t kan_reflection_registry_add_enum (kan_reflection_registry_t registry,
     KAN_ASSERT (enum_reflection->values)
 #endif
 
-    struct registry_t *registry_struct = (struct registry_t *) registry;
+    struct registry_t *registry_struct = KAN_HANDLE_GET (registry);
     struct enum_node_t *node =
         (struct enum_node_t *) kan_allocate_batched (registry_struct->allocation_group, sizeof (struct enum_node_t));
     node->node.hash = (uint64_t) enum_reflection->name;
@@ -435,7 +435,7 @@ void kan_reflection_registry_add_enum_meta (kan_reflection_registry_t registry,
                                             kan_interned_string_t meta_type_name,
                                             const void *meta)
 {
-    struct registry_t *registry_struct = (struct registry_t *) registry;
+    struct registry_t *registry_struct = KAN_HANDLE_GET (registry);
     struct enum_meta_node_t *node = (struct enum_meta_node_t *) kan_allocate_batched (registry_struct->allocation_group,
                                                                                       sizeof (struct enum_meta_node_t));
 
@@ -455,7 +455,7 @@ void kan_reflection_registry_add_enum_value_meta (kan_reflection_registry_t regi
                                                   kan_interned_string_t meta_type_name,
                                                   const void *meta)
 {
-    struct registry_t *registry_struct = (struct registry_t *) registry;
+    struct registry_t *registry_struct = KAN_HANDLE_GET (registry);
     struct enum_value_meta_node_t *node = (struct enum_value_meta_node_t *) kan_allocate_batched (
         registry_struct->allocation_group, sizeof (struct enum_value_meta_node_t));
 
@@ -547,7 +547,7 @@ kan_bool_t kan_reflection_registry_add_struct (kan_reflection_registry_t registr
     }
 #endif
 
-    struct registry_t *registry_struct = (struct registry_t *) registry;
+    struct registry_t *registry_struct = KAN_HANDLE_GET (registry);
     struct struct_node_t *node = (struct struct_node_t *) kan_allocate_batched (registry_struct->allocation_group,
                                                                                 sizeof (struct struct_node_t));
     node->node.hash = (uint64_t) struct_reflection->name;
@@ -564,7 +564,7 @@ void kan_reflection_registry_add_struct_meta (kan_reflection_registry_t registry
                                               kan_interned_string_t meta_type_name,
                                               const void *meta)
 {
-    struct registry_t *registry_struct = (struct registry_t *) registry;
+    struct registry_t *registry_struct = KAN_HANDLE_GET (registry);
     struct struct_meta_node_t *node = (struct struct_meta_node_t *) kan_allocate_batched (
         registry_struct->allocation_group, sizeof (struct struct_meta_node_t));
 
@@ -584,7 +584,7 @@ void kan_reflection_registry_add_struct_field_meta (kan_reflection_registry_t re
                                                     kan_interned_string_t meta_type_name,
                                                     const void *meta)
 {
-    struct registry_t *registry_struct = (struct registry_t *) registry;
+    struct registry_t *registry_struct = KAN_HANDLE_GET (registry);
     struct struct_field_meta_node_t *node = (struct struct_field_meta_node_t *) kan_allocate_batched (
         registry_struct->allocation_group, sizeof (struct struct_field_meta_node_t));
 
@@ -670,7 +670,7 @@ kan_bool_t kan_reflection_registry_add_function (kan_reflection_registry_t regis
     }
 #endif
 
-    struct registry_t *registry_struct = (struct registry_t *) registry;
+    struct registry_t *registry_struct = KAN_HANDLE_GET (registry);
     struct function_node_t *node = (struct function_node_t *) kan_allocate_batched (registry_struct->allocation_group,
                                                                                     sizeof (struct function_node_t));
     node->node.hash = (uint64_t) function_reflection->name;
@@ -687,7 +687,7 @@ void kan_reflection_registry_add_function_meta (kan_reflection_registry_t regist
                                                 kan_interned_string_t meta_type_name,
                                                 const void *meta)
 {
-    struct registry_t *registry_struct = (struct registry_t *) registry;
+    struct registry_t *registry_struct = KAN_HANDLE_GET (registry);
     struct function_meta_node_t *node = (struct function_meta_node_t *) kan_allocate_batched (
         registry_struct->allocation_group, sizeof (struct function_meta_node_t));
 
@@ -707,7 +707,7 @@ void kan_reflection_registry_add_function_argument_meta (kan_reflection_registry
                                                          kan_interned_string_t meta_type_name,
                                                          const void *meta)
 {
-    struct registry_t *registry_struct = (struct registry_t *) registry;
+    struct registry_t *registry_struct = KAN_HANDLE_GET (registry);
     struct function_argument_meta_node_t *node = (struct function_argument_meta_node_t *) kan_allocate_batched (
         registry_struct->allocation_group, sizeof (struct function_argument_meta_node_t));
 
@@ -726,7 +726,7 @@ void kan_reflection_registry_add_function_argument_meta (kan_reflection_registry
 const struct kan_reflection_enum_t *kan_reflection_registry_query_enum (kan_reflection_registry_t registry,
                                                                         kan_interned_string_t enum_name)
 {
-    struct registry_t *registry_struct = (struct registry_t *) registry;
+    struct registry_t *registry_struct = KAN_HANDLE_GET (registry);
     const struct kan_hash_storage_bucket_t *bucket =
         kan_hash_storage_query (&registry_struct->enum_storage, (uint64_t) enum_name);
     struct enum_node_t *node = (struct enum_node_t *) bucket->first;
@@ -748,7 +748,7 @@ const struct kan_reflection_enum_t *kan_reflection_registry_query_enum (kan_refl
 struct kan_reflection_enum_meta_iterator_t kan_reflection_registry_query_enum_meta (
     kan_reflection_registry_t registry, kan_interned_string_t enum_name, kan_interned_string_t meta_type_name)
 {
-    struct registry_t *registry_struct = (struct registry_t *) registry;
+    struct registry_t *registry_struct = KAN_HANDLE_GET (registry);
     const uint64_t hash = kan_hash_combine ((uint64_t) enum_name, (uint64_t) meta_type_name);
     const struct kan_hash_storage_bucket_t *bucket = kan_hash_storage_query (&registry_struct->enum_meta_storage, hash);
 
@@ -799,7 +799,7 @@ struct kan_reflection_enum_value_meta_iterator_t kan_reflection_registry_query_e
     kan_interned_string_t enum_value_name,
     kan_interned_string_t meta_type_name)
 {
-    struct registry_t *registry_struct = (struct registry_t *) registry;
+    struct registry_t *registry_struct = KAN_HANDLE_GET (registry);
     const uint64_t hash = kan_hash_combine (kan_hash_combine ((uint64_t) enum_name, (uint64_t) enum_value_name),
                                             (uint64_t) meta_type_name);
     const struct kan_hash_storage_bucket_t *bucket =
@@ -853,7 +853,7 @@ void kan_reflection_enum_value_meta_iterator_next (struct kan_reflection_enum_va
 const struct kan_reflection_struct_t *kan_reflection_registry_query_struct (kan_reflection_registry_t registry,
                                                                             kan_interned_string_t struct_name)
 {
-    struct registry_t *registry_struct = (struct registry_t *) registry;
+    struct registry_t *registry_struct = KAN_HANDLE_GET (registry);
     const struct kan_hash_storage_bucket_t *bucket =
         kan_hash_storage_query (&registry_struct->struct_storage, (uint64_t) struct_name);
     struct struct_node_t *node = (struct struct_node_t *) bucket->first;
@@ -875,7 +875,7 @@ const struct kan_reflection_struct_t *kan_reflection_registry_query_struct (kan_
 struct kan_reflection_struct_meta_iterator_t kan_reflection_registry_query_struct_meta (
     kan_reflection_registry_t registry, kan_interned_string_t struct_name, kan_interned_string_t meta_type_name)
 {
-    struct registry_t *registry_struct = (struct registry_t *) registry;
+    struct registry_t *registry_struct = KAN_HANDLE_GET (registry);
     const uint64_t hash = kan_hash_combine ((uint64_t) struct_name, (uint64_t) meta_type_name);
     const struct kan_hash_storage_bucket_t *bucket =
         kan_hash_storage_query (&registry_struct->struct_meta_storage, hash);
@@ -927,7 +927,7 @@ struct kan_reflection_struct_field_meta_iterator_t kan_reflection_registry_query
     kan_interned_string_t struct_field_name,
     kan_interned_string_t meta_type_name)
 {
-    struct registry_t *registry_struct = (struct registry_t *) registry;
+    struct registry_t *registry_struct = KAN_HANDLE_GET (registry);
     const uint64_t hash = kan_hash_combine (kan_hash_combine ((uint64_t) struct_name, (uint64_t) struct_field_name),
                                             (uint64_t) meta_type_name);
     const struct kan_hash_storage_bucket_t *bucket =
@@ -982,7 +982,7 @@ void kan_reflection_struct_field_meta_iterator_next (struct kan_reflection_struc
 const struct kan_reflection_function_t *kan_reflection_registry_query_function (kan_reflection_registry_t registry,
                                                                                 kan_interned_string_t function_name)
 {
-    struct registry_t *registry_struct = (struct registry_t *) registry;
+    struct registry_t *registry_struct = KAN_HANDLE_GET (registry);
     const struct kan_hash_storage_bucket_t *bucket =
         kan_hash_storage_query (&registry_struct->function_storage, (uint64_t) function_name);
     struct function_node_t *node = (struct function_node_t *) bucket->first;
@@ -1004,7 +1004,7 @@ const struct kan_reflection_function_t *kan_reflection_registry_query_function (
 struct kan_reflection_function_meta_iterator_t kan_reflection_registry_query_function_meta (
     kan_reflection_registry_t registry, kan_interned_string_t function_name, kan_interned_string_t meta_type_name)
 {
-    struct registry_t *registry_struct = (struct registry_t *) registry;
+    struct registry_t *registry_struct = KAN_HANDLE_GET (registry);
     const uint64_t hash = kan_hash_combine ((uint64_t) function_name, (uint64_t) meta_type_name);
     const struct kan_hash_storage_bucket_t *bucket =
         kan_hash_storage_query (&registry_struct->function_meta_storage, hash);
@@ -1057,7 +1057,7 @@ struct kan_reflection_function_argument_meta_iterator_t kan_reflection_registry_
     kan_interned_string_t function_argument_name,
     kan_interned_string_t meta_type_name)
 {
-    struct registry_t *registry_struct = (struct registry_t *) registry;
+    struct registry_t *registry_struct = KAN_HANDLE_GET (registry);
     const uint64_t hash = kan_hash_combine (
         kan_hash_combine ((uint64_t) function_name, (uint64_t) function_argument_name), (uint64_t) meta_type_name);
     const struct kan_hash_storage_bucket_t *bucket =
@@ -1240,14 +1240,14 @@ const struct kan_reflection_field_t *kan_reflection_registry_query_local_field (
 kan_reflection_registry_enum_iterator_t kan_reflection_registry_enum_iterator_create (
     kan_reflection_registry_t registry)
 {
-    struct registry_t *registry_struct = (struct registry_t *) registry;
-    return (kan_reflection_registry_enum_iterator_t) registry_struct->enum_storage.items.first;
+    struct registry_t *registry_struct = KAN_HANDLE_GET (registry);
+    return KAN_HANDLE_SET (kan_reflection_registry_enum_iterator_t, registry_struct->enum_storage.items.first);
 }
 
 const struct kan_reflection_enum_t *kan_reflection_registry_enum_iterator_get (
     kan_reflection_registry_enum_iterator_t iterator)
 {
-    const struct enum_node_t *node = (struct enum_node_t *) iterator;
+    const struct enum_node_t *node = KAN_HANDLE_GET (iterator);
     if (node)
     {
         return node->enum_reflection;
@@ -1259,26 +1259,26 @@ const struct kan_reflection_enum_t *kan_reflection_registry_enum_iterator_get (
 kan_reflection_registry_enum_iterator_t kan_reflection_registry_enum_iterator_next (
     kan_reflection_registry_enum_iterator_t iterator)
 {
-    const struct enum_node_t *node = (struct enum_node_t *) iterator;
+    const struct enum_node_t *node = KAN_HANDLE_GET (iterator);
     if (node)
     {
-        return (kan_reflection_registry_enum_iterator_t) node->node.list_node.next;
+        return KAN_HANDLE_SET (kan_reflection_registry_enum_iterator_t, node->node.list_node.next);
     }
 
-    return (kan_reflection_registry_enum_iterator_t) NULL;
+    return KAN_HANDLE_SET_INVALID (kan_reflection_registry_enum_iterator_t);
 }
 
 kan_reflection_registry_struct_iterator_t kan_reflection_registry_struct_iterator_create (
     kan_reflection_registry_t registry)
 {
-    struct registry_t *registry_struct = (struct registry_t *) registry;
-    return (kan_reflection_registry_struct_iterator_t) registry_struct->struct_storage.items.first;
+    struct registry_t *registry_struct = KAN_HANDLE_GET (registry);
+    return KAN_HANDLE_SET (kan_reflection_registry_struct_iterator_t, registry_struct->struct_storage.items.first);
 }
 
 const struct kan_reflection_struct_t *kan_reflection_registry_struct_iterator_get (
     kan_reflection_registry_struct_iterator_t iterator)
 {
-    const struct struct_node_t *node = (struct struct_node_t *) iterator;
+    const struct struct_node_t *node = KAN_HANDLE_GET (iterator);
     if (node)
     {
         return node->struct_reflection;
@@ -1290,26 +1290,26 @@ const struct kan_reflection_struct_t *kan_reflection_registry_struct_iterator_ge
 kan_reflection_registry_struct_iterator_t kan_reflection_registry_struct_iterator_next (
     kan_reflection_registry_struct_iterator_t iterator)
 {
-    const struct struct_node_t *node = (struct struct_node_t *) iterator;
+    const struct struct_node_t *node = KAN_HANDLE_GET (iterator);
     if (node)
     {
-        return (kan_reflection_registry_struct_iterator_t) node->node.list_node.next;
+        return KAN_HANDLE_SET (kan_reflection_registry_struct_iterator_t, node->node.list_node.next);
     }
 
-    return (kan_reflection_registry_struct_iterator_t) NULL;
+    return KAN_HANDLE_SET_INVALID (kan_reflection_registry_struct_iterator_t);
 }
 
 kan_reflection_registry_function_iterator_t kan_reflection_registry_function_iterator_create (
     kan_reflection_registry_t registry)
 {
-    struct registry_t *registry_struct = (struct registry_t *) registry;
-    return (kan_reflection_registry_function_iterator_t) registry_struct->function_storage.items.first;
+    struct registry_t *registry_struct = KAN_HANDLE_GET (registry);
+    return KAN_HANDLE_SET (kan_reflection_registry_function_iterator_t, registry_struct->function_storage.items.first);
 }
 
 const struct kan_reflection_function_t *kan_reflection_registry_function_iterator_get (
     kan_reflection_registry_function_iterator_t iterator)
 {
-    const struct function_node_t *node = (struct function_node_t *) iterator;
+    const struct function_node_t *node = KAN_HANDLE_GET (iterator);
     if (node)
     {
         return node->function_reflection;
@@ -1321,13 +1321,13 @@ const struct kan_reflection_function_t *kan_reflection_registry_function_iterato
 kan_reflection_registry_function_iterator_t kan_reflection_registry_function_iterator_next (
     kan_reflection_registry_function_iterator_t iterator)
 {
-    const struct function_node_t *node = (struct function_node_t *) iterator;
+    const struct function_node_t *node = KAN_HANDLE_GET (iterator);
     if (node)
     {
-        return (kan_reflection_registry_function_iterator_t) node->node.list_node.next;
+        return KAN_HANDLE_SET (kan_reflection_registry_function_iterator_t, node->node.list_node.next);
     }
 
-    return (kan_reflection_registry_function_iterator_t) NULL;
+    return KAN_HANDLE_SET_INVALID (kan_reflection_registry_function_iterator_t);
 }
 
 static void compiled_patch_destroy (struct compiled_patch_t *patch)
@@ -1339,7 +1339,7 @@ static void compiled_patch_destroy (struct compiled_patch_t *patch)
 
 void kan_reflection_registry_destroy (kan_reflection_registry_t registry)
 {
-    struct registry_t *registry_struct = (struct registry_t *) registry;
+    struct registry_t *registry_struct = KAN_HANDLE_GET (registry);
     struct compiled_patch_t *patch = registry_struct->first_patch;
 
     while (patch)
@@ -1458,7 +1458,7 @@ kan_reflection_patch_builder_t kan_reflection_patch_builder_create (void)
     patch_builder->node_count = 0u;
     patch_builder->stack_allocator =
         kan_stack_allocator_create (get_patch_builder_allocation_group (), KAN_REFLECTION_PATCH_BUILDER_STACK_SIZE);
-    return (kan_reflection_patch_builder_t) patch_builder;
+    return KAN_HANDLE_SET (kan_reflection_patch_builder_t, patch_builder);
 }
 
 void kan_reflection_patch_builder_add_chunk (kan_reflection_patch_builder_t builder,
@@ -1466,7 +1466,7 @@ void kan_reflection_patch_builder_add_chunk (kan_reflection_patch_builder_t buil
                                              uint64_t size,
                                              const void *data)
 {
-    struct patch_builder_t *patch_builder = (struct patch_builder_t *) builder;
+    struct patch_builder_t *patch_builder = KAN_HANDLE_GET (builder);
     const uint64_t node_size = sizeof (struct patch_builder_node_t) + size;
 
     struct patch_builder_node_t *node = (struct patch_builder_node_t *) kan_stack_allocator_allocate (
@@ -1509,7 +1509,7 @@ static void patch_builder_reset (struct patch_builder_t *patch_builder)
 
 #if defined(KAN_REFLECTION_WITH_VALIDATION) && defined(KAN_WITH_ASSERT)
 static void validate_compiled_node_internal (const struct compiled_patch_node_t *node,
-                                             kan_reflection_registry_t registry,
+                                             struct registry_t *registry,
                                              const struct kan_reflection_struct_t *type,
                                              uint64_t offset)
 {
@@ -1545,7 +1545,9 @@ static void validate_compiled_node_internal (const struct compiled_patch_node_t 
         case KAN_REFLECTION_ARCHETYPE_STRUCT:
             // We need to recursively check structure insides.
             validate_compiled_node_internal (
-                node, registry, kan_reflection_registry_query_struct (registry, field->archetype_struct.type_name),
+                node, registry,
+                kan_reflection_registry_query_struct (KAN_HANDLE_SET (kan_reflection_registry_t, registry),
+                                                      field->archetype_struct.type_name),
                 field->offset);
             break;
 
@@ -1563,7 +1565,8 @@ static void validate_compiled_node_internal (const struct compiled_patch_node_t 
             case KAN_REFLECTION_ARCHETYPE_STRUCT:
             {
                 const struct kan_reflection_struct_t *element_type = kan_reflection_registry_query_struct (
-                    registry, field->archetype_inline_array.item_archetype_struct.type_name);
+                    KAN_HANDLE_SET (kan_reflection_registry_t, registry),
+                    field->archetype_inline_array.item_archetype_struct.type_name);
 
                 for (uint64_t element_index = 0u; element_index < field->archetype_inline_array.item_count;
                      ++element_index)
@@ -1601,7 +1604,7 @@ static void validate_compiled_node_internal (const struct compiled_patch_node_t 
 }
 
 static void validate_compiled_node (const struct compiled_patch_node_t *node,
-                                    kan_reflection_registry_t registry,
+                                    struct registry_t *registry,
                                     const struct kan_reflection_struct_t *type)
 {
     if (!node)
@@ -1722,7 +1725,7 @@ static kan_bool_t compiled_patch_build_into (struct patch_builder_t *patch_build
         {
             output = (uint8_t *) kan_apply_alignment ((uint64_t) output, _Alignof (struct compiled_patch_node_t));
 #if defined(KAN_REFLECTION_WITH_VALIDATION) && defined(KAN_WITH_ASSERT)
-            validate_compiled_node (output_node, (kan_reflection_registry_t) registry_struct, type);
+            validate_compiled_node (output_node, registry_struct, type);
 #endif
 
             output_node = (struct compiled_patch_node_t *) output;
@@ -1737,7 +1740,7 @@ static kan_bool_t compiled_patch_build_into (struct patch_builder_t *patch_build
     }
 
 #if defined(KAN_REFLECTION_WITH_VALIDATION) && defined(KAN_WITH_ASSERT)
-    validate_compiled_node (output_node, (kan_reflection_registry_t) registry_struct, type);
+    validate_compiled_node (output_node, registry_struct, type);
 #endif
 
 #if defined(KAN_WITH_ASSERT)
@@ -1753,41 +1756,41 @@ kan_reflection_patch_t kan_reflection_patch_builder_build (kan_reflection_patch_
                                                            kan_reflection_registry_t registry,
                                                            const struct kan_reflection_struct_t *type)
 {
-    struct patch_builder_t *patch_builder = (struct patch_builder_t *) builder;
-    struct registry_t *registry_struct = (struct registry_t *) registry;
+    struct patch_builder_t *patch_builder = KAN_HANDLE_GET (builder);
+    struct registry_t *registry_struct = KAN_HANDLE_GET (registry);
     struct compiled_patch_t *patch =
         kan_allocate_batched (get_compiled_patch_allocation_group (), sizeof (struct compiled_patch_t));
 
     if (!compiled_patch_build_into (patch_builder, registry_struct, type, patch))
     {
         kan_free_batched (get_compiled_patch_allocation_group (), patch);
-        return KAN_INVALID_REFLECTION_PATCH;
+        return KAN_HANDLE_SET_INVALID (kan_reflection_patch_t);
     }
 
-    return (kan_reflection_patch_t) patch;
+    return KAN_HANDLE_SET (kan_reflection_patch_t, patch);
 }
 
 void kan_reflection_patch_builder_destroy (kan_reflection_patch_builder_t builder)
 {
-    struct patch_builder_t *patch_builder = (struct patch_builder_t *) builder;
+    struct patch_builder_t *patch_builder = KAN_HANDLE_GET (builder);
     kan_stack_allocator_destroy (patch_builder->stack_allocator);
 }
 
 const struct kan_reflection_struct_t *kan_reflection_patch_get_type (kan_reflection_patch_t patch)
 {
-    struct compiled_patch_t *patch_data = (struct compiled_patch_t *) patch;
+    struct compiled_patch_t *patch_data = KAN_HANDLE_GET (patch);
     return patch_data->type;
 }
 
 uint64_t kan_reflection_patch_get_chunks_count (kan_reflection_patch_t patch)
 {
-    struct compiled_patch_t *patch_data = (struct compiled_patch_t *) patch;
+    struct compiled_patch_t *patch_data = KAN_HANDLE_GET (patch);
     return patch_data->node_count;
 }
 
 void kan_reflection_patch_apply (kan_reflection_patch_t patch, void *target)
 {
-    struct compiled_patch_t *patch_data = (struct compiled_patch_t *) patch;
+    struct compiled_patch_t *patch_data = KAN_HANDLE_GET (patch);
     struct compiled_patch_node_t *node = patch_data->begin;
     const struct compiled_patch_node_t *end = patch_data->end;
 
@@ -1802,27 +1805,27 @@ void kan_reflection_patch_apply (kan_reflection_patch_t patch, void *target)
 
 kan_reflection_patch_iterator_t kan_reflection_patch_begin (kan_reflection_patch_t patch)
 {
-    struct compiled_patch_t *patch_data = (struct compiled_patch_t *) patch;
-    return (kan_reflection_patch_iterator_t) patch_data->begin;
+    struct compiled_patch_t *patch_data = KAN_HANDLE_GET (patch);
+    return KAN_HANDLE_SET (kan_reflection_patch_iterator_t, patch_data->begin);
 }
 
 kan_reflection_patch_iterator_t kan_reflection_patch_end (kan_reflection_patch_t patch)
 {
-    struct compiled_patch_t *patch_data = (struct compiled_patch_t *) patch;
-    return (kan_reflection_patch_iterator_t) patch_data->end;
+    struct compiled_patch_t *patch_data = KAN_HANDLE_GET (patch);
+    return KAN_HANDLE_SET (kan_reflection_patch_iterator_t, patch_data->end);
 }
 
 kan_reflection_patch_iterator_t kan_reflection_patch_iterator_next (kan_reflection_patch_iterator_t iterator)
 {
-    struct compiled_patch_node_t *node = (struct compiled_patch_node_t *) iterator;
+    struct compiled_patch_node_t *node = KAN_HANDLE_GET (iterator);
     uint8_t *data_end = node->data + node->size;
     data_end = (uint8_t *) kan_apply_alignment ((uint64_t) data_end, _Alignof (struct compiled_patch_node_t));
-    return (kan_reflection_patch_iterator_t) data_end;
+    return KAN_HANDLE_SET (kan_reflection_patch_iterator_t, data_end);
 }
 
 struct kan_reflection_patch_chunk_info_t kan_reflection_patch_iterator_get (kan_reflection_patch_iterator_t iterator)
 {
-    struct compiled_patch_node_t *node = (struct compiled_patch_node_t *) iterator;
+    struct compiled_patch_node_t *node = KAN_HANDLE_GET (iterator);
     struct kan_reflection_patch_chunk_info_t info;
     info.offset = node->offset;
     info.size = node->size;
@@ -1832,7 +1835,7 @@ struct kan_reflection_patch_chunk_info_t kan_reflection_patch_iterator_get (kan_
 
 void kan_reflection_patch_destroy (kan_reflection_patch_t patch)
 {
-    struct compiled_patch_t *patch_data = (struct compiled_patch_t *) patch;
+    struct compiled_patch_t *patch_data = KAN_HANDLE_GET (patch);
     if (patch_data->previous)
     {
         patch_data->previous->next = patch_data->next;
@@ -2319,8 +2322,8 @@ kan_reflection_migration_seed_t kan_reflection_migration_seed_build (kan_reflect
     const kan_allocation_group_t allocation_group = get_migration_seed_allocation_group ();
     struct migration_seed_t *migration_seed =
         (struct migration_seed_t *) kan_allocate_batched (allocation_group, sizeof (struct migration_seed_t));
-    migration_seed->source_registry = (struct registry_t *) source_registry;
-    migration_seed->target_registry = (struct registry_t *) target_registry;
+    migration_seed->source_registry = source_registry;
+    migration_seed->target_registry = target_registry;
 
     kan_hash_storage_init (&migration_seed->enums, allocation_group,
                            KAN_REFLECTION_MIGRATION_ENUM_SEED_INITIAL_BUCKETS);
@@ -2329,13 +2332,13 @@ kan_reflection_migration_seed_t kan_reflection_migration_seed_build (kan_reflect
 
     migration_seed_add_enums (migration_seed, source_registry, target_registry);
     migration_seed_add_structs (migration_seed, source_registry, target_registry);
-    return (kan_reflection_migration_seed_t) migration_seed;
+    return KAN_HANDLE_SET (kan_reflection_migration_seed_t, migration_seed);
 }
 
 const struct kan_reflection_enum_migration_seed_t *kan_reflection_migration_seed_get_for_enum (
     kan_reflection_migration_seed_t seed, kan_interned_string_t type_name)
 {
-    struct migration_seed_t *migration_seed = (struct migration_seed_t *) seed;
+    struct migration_seed_t *migration_seed = KAN_HANDLE_GET (seed);
     struct enum_migration_node_t *node = migration_seed_query_enum (migration_seed, type_name);
     return node ? &node->seed : NULL;
 }
@@ -2343,7 +2346,7 @@ const struct kan_reflection_enum_migration_seed_t *kan_reflection_migration_seed
 const struct kan_reflection_struct_migration_seed_t *kan_reflection_migration_seed_get_for_struct (
     kan_reflection_migration_seed_t seed, kan_interned_string_t type_name)
 {
-    struct migration_seed_t *migration_seed = (struct migration_seed_t *) seed;
+    struct migration_seed_t *migration_seed = KAN_HANDLE_GET (seed);
     struct struct_migration_node_t *node = migration_seed_query_struct (migration_seed, type_name);
     return node ? &node->seed : NULL;
 }
@@ -2351,15 +2354,15 @@ const struct kan_reflection_struct_migration_seed_t *kan_reflection_migration_se
 void kan_reflection_migration_seed_destroy (kan_reflection_migration_seed_t seed)
 {
     const kan_allocation_group_t allocation_group = get_migration_seed_allocation_group ();
-    struct migration_seed_t *migration_seed = (struct migration_seed_t *) seed;
+    struct migration_seed_t *migration_seed = KAN_HANDLE_GET (seed);
 
     struct kan_bd_list_node_t *node = migration_seed->enums.items.first;
     while (node)
     {
         struct kan_bd_list_node_t *next = node->next;
         struct enum_migration_node_t *migration_node = (struct enum_migration_node_t *) node;
-        const struct kan_reflection_enum_t *enum_data = kan_reflection_registry_query_enum (
-            (kan_reflection_registry_t) migration_seed->source_registry, migration_node->type_name);
+        const struct kan_reflection_enum_t *enum_data =
+            kan_reflection_registry_query_enum (migration_seed->source_registry, migration_node->type_name);
         KAN_ASSERT (enum_data)
 
         kan_free_general (allocation_group, node,
@@ -2373,8 +2376,8 @@ void kan_reflection_migration_seed_destroy (kan_reflection_migration_seed_t seed
     {
         struct kan_bd_list_node_t *next = node->next;
         struct struct_migration_node_t *migration_node = (struct struct_migration_node_t *) node;
-        const struct kan_reflection_struct_t *struct_data = kan_reflection_registry_query_struct (
-            (kan_reflection_registry_t) migration_seed->source_registry, migration_node->type_name);
+        const struct kan_reflection_struct_t *struct_data =
+            kan_reflection_registry_query_struct (migration_seed->source_registry, migration_node->type_name);
         KAN_ASSERT (struct_data)
 
         kan_free_general (allocation_group, node,
@@ -3192,8 +3195,8 @@ static struct struct_migrator_node_t *migrator_request_struct_by_type_name (stru
             return NULL;
         }
 
-        const struct kan_reflection_struct_t *source_struct = kan_reflection_registry_query_struct (
-            (kan_reflection_registry_t) migration_seed->source_registry, type_name);
+        const struct kan_reflection_struct_t *source_struct =
+            kan_reflection_registry_query_struct (migration_seed->source_registry, type_name);
 
         if (!source_struct)
         {
@@ -3211,7 +3214,7 @@ static struct struct_migrator_node_t *migrator_request_struct_by_type_name (stru
 
 kan_reflection_struct_migrator_t kan_reflection_struct_migrator_build (kan_reflection_migration_seed_t seed)
 {
-    struct migration_seed_t *migration_seed = (struct migration_seed_t *) seed;
+    struct migration_seed_t *migration_seed = KAN_HANDLE_GET (seed);
     struct migrator_t *migrator = kan_allocate_batched (get_migrator_allocation_group (), sizeof (struct migrator_t));
     migrator->source_seed = migration_seed;
 
@@ -3226,8 +3229,8 @@ kan_reflection_struct_migrator_t kan_reflection_struct_migrator_build (kan_refle
     {
         if (node->seed.status != KAN_REFLECTION_MIGRATION_REMOVED && !migrator_query_struct (migrator, node->type_name))
         {
-            const struct kan_reflection_struct_t *source_struct = kan_reflection_registry_query_struct (
-                (kan_reflection_registry_t) migration_seed->source_registry, node->type_name);
+            const struct kan_reflection_struct_t *source_struct =
+                kan_reflection_registry_query_struct (migration_seed->source_registry, node->type_name);
 
             if (source_struct)
             {
@@ -3245,7 +3248,7 @@ kan_reflection_struct_migrator_t kan_reflection_struct_migrator_build (kan_refle
     }
 
     kan_stack_allocator_destroy (algorithm_allocator);
-    return (kan_reflection_struct_migrator_t) migrator;
+    return KAN_HANDLE_SET (kan_reflection_struct_migrator_t, migrator);
 }
 
 static void migrator_adapt_numeric (uint64_t source_size,
@@ -3453,12 +3456,12 @@ static void migrator_adapt_enum (const struct migrator_t *migrator,
     KAN_ASSERT (migration_node)
     KAN_ASSERT (migration_node->seed.status == KAN_REFLECTION_MIGRATION_NEEDED)
 
-    const struct kan_reflection_enum_t *source_enum_data = kan_reflection_registry_query_enum (
-        (kan_reflection_registry_t) migrator->source_seed->source_registry, type_name);
+    const struct kan_reflection_enum_t *source_enum_data =
+        kan_reflection_registry_query_enum (migrator->source_seed->source_registry, type_name);
     KAN_ASSERT (source_enum_data)
 
-    const struct kan_reflection_enum_t *target_enum_data = kan_reflection_registry_query_enum (
-        (kan_reflection_registry_t) migrator->source_seed->target_registry, type_name);
+    const struct kan_reflection_enum_t *target_enum_data =
+        kan_reflection_registry_query_enum (migrator->source_seed->target_registry, type_name);
     KAN_ASSERT (source_enum_data)
 
     const kan_bool_t migration_single_to_single = !source_enum_data->flags && !target_enum_data->flags;
@@ -3536,7 +3539,7 @@ static void migrator_adapt_enum (const struct migrator_t *migrator,
     }
 }
 
-static void migrator_adapt_dynamic_array (struct migrator_t *migrator,
+static void migrator_adapt_dynamic_array (kan_reflection_struct_migrator_t migrator,
                                           const struct migrator_command_adapt_dynamic_array_t *command,
                                           const void *located_input,
                                           void *located_output)
@@ -3572,7 +3575,8 @@ static void migrator_adapt_dynamic_array (struct migrator_t *migrator,
             KAN_ASSERT (command->source_field->archetype_dynamic_array.item_archetype_enum.type_name ==
                         command->target_field->archetype_dynamic_array.item_archetype_enum.type_name)
 
-            migrator_adapt_enum (migrator, command->source_field->archetype_dynamic_array.item_archetype_enum.type_name,
+            migrator_adapt_enum (KAN_HANDLE_GET (migrator),
+                                 command->source_field->archetype_dynamic_array.item_archetype_enum.type_name,
                                  input_data, output);
             break;
 
@@ -3581,8 +3585,8 @@ static void migrator_adapt_dynamic_array (struct migrator_t *migrator,
                         command->target_field->archetype_dynamic_array.item_archetype_struct.type_name)
 
             kan_reflection_struct_migrator_migrate_instance (
-                (kan_reflection_struct_migrator_t) migrator,
-                command->source_field->archetype_dynamic_array.item_archetype_struct.type_name, input_data, output);
+                migrator, command->source_field->archetype_dynamic_array.item_archetype_struct.type_name, input_data,
+                output);
             break;
 
             // Archetypes below do not need any adaptation, therefore this command should not be issued.
@@ -3607,7 +3611,7 @@ void kan_reflection_struct_migrator_migrate_instance (kan_reflection_struct_migr
                                                       void *source,
                                                       void *target)
 {
-    struct migrator_t *migrator_data = (struct migrator_t *) migrator;
+    struct migrator_t *migrator_data = KAN_HANDLE_GET (migrator);
     struct struct_migrator_node_t *struct_node = migrator_query_struct (migrator_data, type_name);
 
     if (!struct_node)
@@ -3699,7 +3703,7 @@ void kan_reflection_struct_migrator_migrate_instance (kan_reflection_struct_migr
             continue;
         }
 
-        migrator_adapt_dynamic_array (migrator_data, adapt_dynamic_array_command,
+        migrator_adapt_dynamic_array (migrator, adapt_dynamic_array_command,
                                       ((uint8_t *) source) + adapt_dynamic_array_command->absolute_source_offset,
                                       ((uint8_t *) target) + adapt_dynamic_array_command->absolute_target_offset);
     }
@@ -3815,11 +3819,11 @@ static void migrate_patch_task (kan_cpu_task_user_data_t user_data)
 {
     const kan_allocation_group_t group = get_compiled_patch_allocation_group ();
     kan_reflection_patch_builder_t patch_builder = kan_reflection_patch_builder_create ();
-    struct patch_builder_t *patch_builder_data = (struct patch_builder_t *) patch_builder;
+    struct patch_builder_t *patch_builder_data = KAN_HANDLE_GET (patch_builder);
     struct patch_migration_task_data_t *data = (struct patch_migration_task_data_t *) user_data;
 
-    struct registry_t *target_registry_data = (struct registry_t *) data->target_registry;
-    struct migrator_t *migrator_data = (struct migrator_t *) data->migrator;
+    struct registry_t *target_registry_data = KAN_HANDLE_GET (data->target_registry);
+    struct migrator_t *migrator_data = KAN_HANDLE_GET (data->migrator);
     struct compiled_patch_t *patch = data->patch_begin;
 
     while (patch != data->patch_end)
@@ -4011,7 +4015,7 @@ void kan_reflection_struct_migrator_migrate_patches (kan_reflection_struct_migra
                                                      kan_reflection_registry_t target_registry)
 {
     const kan_allocation_group_t group = get_compiled_patch_allocation_group ();
-    struct registry_t *source_registry_data = (struct registry_t *) source_registry;
+    struct registry_t *source_registry_data = KAN_HANDLE_GET (source_registry);
     struct compiled_patch_t *patch = source_registry_data->first_patch;
 
     if (patch == NULL)
@@ -4072,7 +4076,7 @@ void kan_reflection_struct_migrator_migrate_patches (kan_reflection_struct_migra
 void kan_reflection_struct_migrator_destroy (kan_reflection_struct_migrator_t migrator)
 {
     const kan_allocation_group_t allocation_group = get_migrator_allocation_group ();
-    struct migrator_t *migrator_data = (struct migrator_t *) migrator;
+    struct migrator_t *migrator_data = KAN_HANDLE_GET (migrator);
 
     struct struct_migrator_node_t *node = (struct struct_migrator_node_t *) migrator_data->struct_migrators.items.first;
     while (node)

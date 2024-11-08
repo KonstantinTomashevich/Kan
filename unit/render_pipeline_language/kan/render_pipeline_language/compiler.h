@@ -2,8 +2,8 @@
 
 #include <render_pipeline_language_api.h>
 
-#include <kan/api_common/bool.h>
 #include <kan/api_common/c_header.h>
+#include <kan/api_common/core_types.h>
 #include <kan/container/dynamic_array.h>
 #include <kan/container/interned_string.h>
 #include <kan/render_pipeline_language/parser.h>
@@ -13,11 +13,8 @@
 
 KAN_C_HEADER_BEGIN
 
-typedef uint64_t kan_rpl_compiler_context_t;
-
-typedef uint64_t kan_rpl_compiler_instance_t;
-
-#define KAN_INVALID_RPL_COMPILER_INSTANCE 0u
+KAN_HANDLE_DEFINE (kan_rpl_compiler_context_t);
+KAN_HANDLE_DEFINE (kan_rpl_compiler_instance_t);
 
 /// \brief Defines entry point using its stage and function name.
 struct kan_rpl_entry_point_t

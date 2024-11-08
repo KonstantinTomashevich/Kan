@@ -6,6 +6,7 @@
 #include <stdio.h>
 
 #include <kan/api_common/c_header.h>
+#include <kan/api_common/core_types.h>
 #include <kan/container/interned_string.h>
 
 /// \file
@@ -48,13 +49,11 @@ enum kan_log_verbosity_t
     KAN_LOG_DEFAULT = KAN_LOG_INFO
 };
 
-typedef uint64_t kan_log_category_t;
-
-/// \brief Indicates that `kan_log_category_t` does not point to correct category.
-#define KAN_LOG_CATEGORY_INVALID 0u
+KAN_HANDLE_DEFINE (kan_log_category_t);
 
 /// \brief Statically defines category to be used along with `KAN_LOG`.
-#define KAN_LOG_DEFINE_CATEGORY(NAME) kan_log_category_t kan_log_category_##NAME##_reference = KAN_LOG_CATEGORY_INVALID
+#define KAN_LOG_DEFINE_CATEGORY(NAME)                                                                                  \
+    kan_log_category_t kan_log_category_##NAME##_reference = KAN_HANDLE_INITIALIZE_INVALID
 
 /// \brief Requests log category with given name. If category does not exist,
 ///        it is automatically created with `KAN_LOG_DEFAULT` verbosity.
@@ -79,7 +78,7 @@ LOG_API kan_interned_string_t kan_log_category_get_name (kan_log_category_t cate
 #define KAN_LOG_WITH_BUFFER(BUFFER_SIZE, CATEGORY, VERBOSITY, ...)                                                     \
     {                                                                                                                  \
         extern kan_log_category_t kan_log_category_##CATEGORY##_reference;                                             \
-        if (kan_log_category_##CATEGORY##_reference == KAN_LOG_CATEGORY_INVALID)                                       \
+        if (!KAN_HANDLE_IS_VALID (kan_log_category_##CATEGORY##_reference))                                            \
         {                                                                                                              \
             kan_log_category_##CATEGORY##_reference = kan_log_category_get (#CATEGORY);                                \
         }                                                                                                              \

@@ -217,7 +217,7 @@ kan_render_buffer_t kan_render_buffer_create (kan_render_context_t context,
                                               void *optional_initial_data,
                                               kan_interned_string_t tracking_name)
 {
-    struct render_backend_system_t *system = (struct render_backend_system_t *) context;
+    struct render_backend_system_t *system = KAN_HANDLE_GET (context);
     struct kan_cpu_section_execution_t execution;
     kan_cpu_section_execution_init (&execution, system->section_create_buffer);
 
@@ -227,9 +227,10 @@ kan_render_buffer_t kan_render_buffer_create (kan_render_context_t context,
     if (!buffer)
     {
         kan_cpu_section_execution_shutdown (&execution);
-        return KAN_INVALID_RENDER_BUFFER;
+        return KAN_HANDLE_SET_INVALID (kan_render_buffer_t);
     }
 
+    kan_render_buffer_t handle = KAN_HANDLE_SET (kan_render_buffer_t, buffer);
     if (optional_initial_data)
     {
         if (system->device_memory_type == KAN_RENDER_DEVICE_MEMORY_TYPE_UNIFIED ||
@@ -256,7 +257,7 @@ kan_render_buffer_t kan_render_buffer_create (kan_render_context_t context,
         }
         else
         {
-            void *data = kan_render_buffer_patch ((kan_render_buffer_t) buffer, 0u, full_size);
+            void *data = kan_render_buffer_patch (handle, 0u, full_size);
             // Patch can fail if there is no available staging memory,
             // but we have no special handling for that right now.
             KAN_ASSERT (data)
@@ -265,12 +266,12 @@ kan_render_buffer_t kan_render_buffer_create (kan_render_context_t context,
     }
 
     kan_cpu_section_execution_shutdown (&execution);
-    return (kan_render_buffer_t) buffer;
+    return handle;
 }
 
 void *kan_render_buffer_patch (kan_render_buffer_t buffer, uint32_t slice_offset, uint32_t slice_size)
 {
-    struct render_backend_buffer_t *data = (struct render_backend_buffer_t *) buffer;
+    struct render_backend_buffer_t *data = KAN_HANDLE_GET (buffer);
     // Read back buffers should be accessed through kan_render_buffer_begin_access/kan_render_buffer_end_access.
     KAN_ASSERT (data->type != KAN_RENDER_BUFFER_TYPE_READ_BACK_STORAGE)
     struct render_backend_schedule_state_t *schedule = render_backend_system_get_schedule_for_memory (data->system);
@@ -352,7 +353,7 @@ void *kan_render_buffer_patch (kan_render_buffer_t buffer, uint32_t slice_offset
 
 void *kan_render_buffer_begin_access (kan_render_buffer_t buffer)
 {
-    struct render_backend_buffer_t *data = (struct render_backend_buffer_t *) buffer;
+    struct render_backend_buffer_t *data = KAN_HANDLE_GET (buffer);
     KAN_ASSERT (data->type == KAN_RENDER_BUFFER_TYPE_READ_BACK_STORAGE)
     void *memory;
 
@@ -367,14 +368,14 @@ void *kan_render_buffer_begin_access (kan_render_buffer_t buffer)
 
 void kan_render_buffer_end_access (kan_render_buffer_t buffer)
 {
-    struct render_backend_buffer_t *data = (struct render_backend_buffer_t *) buffer;
+    struct render_backend_buffer_t *data = KAN_HANDLE_GET (buffer);
     KAN_ASSERT (data->type == KAN_RENDER_BUFFER_TYPE_READ_BACK_STORAGE)
     vmaUnmapMemory (data->system->gpu_memory_allocator, data->allocation);
 }
 
 void kan_render_buffer_destroy (kan_render_buffer_t buffer)
 {
-    struct render_backend_buffer_t *data = (struct render_backend_buffer_t *) buffer;
+    struct render_backend_buffer_t *data = KAN_HANDLE_GET (buffer);
     // Only resource family buffers can be destroyed externally through scheduling.
     KAN_ASSERT (data->family == RENDER_BACKEND_BUFFER_FAMILY_RESOURCE)
 

@@ -105,97 +105,96 @@ KAN_C_HEADER_BEGIN
 /// \brief String version of KAN_CONTEXT_REFLECTION_SYSTEM_REGISTRAR_FUNCTION.
 #define KAN_CONTEXT_REFLECTION_SYSTEM_REGISTRAR_FUNCTION_NAME "kan_reflection_system_register_statics"
 
-typedef void (*kan_context_reflection_populate_t) (kan_context_system_handle_t other_system,
+typedef void (*kan_context_reflection_populate_t) (kan_context_system_t other_system,
                                                    kan_reflection_registry_t registry);
 
-typedef void (*kan_context_reflection_finalize_t) (kan_context_system_handle_t other_system,
+typedef void (*kan_context_reflection_finalize_t) (kan_context_system_t other_system,
                                                    kan_reflection_registry_t registry);
 
-typedef void (*kan_context_reflection_generated_t) (kan_context_system_handle_t other_system,
+typedef void (*kan_context_reflection_generated_t) (kan_context_system_t other_system,
                                                     kan_reflection_registry_t registry,
                                                     kan_reflection_migration_seed_t migration_seed,
                                                     kan_reflection_struct_migrator_t migrator);
 
-typedef uint64_t kan_reflection_system_generation_iterator_t;
+KAN_HANDLE_DEFINE (kan_reflection_system_generation_iterator_t);
 
-typedef void (*kan_context_reflection_generation_iterate_t) (kan_context_system_handle_t other_system,
+typedef void (*kan_context_reflection_generation_iterate_t) (kan_context_system_t other_system,
                                                              kan_reflection_registry_t registry,
                                                              kan_reflection_system_generation_iterator_t iterator,
                                                              uint64_t iteration_index);
 
-typedef void (*kan_context_reflection_cleanup_t) (kan_context_system_handle_t other_system);
+typedef void (*kan_context_reflection_cleanup_t) (kan_context_system_t other_system);
 
-typedef void (*kan_context_reflection_pre_shutdown_t) (kan_context_system_handle_t other_system);
+typedef void (*kan_context_reflection_pre_shutdown_t) (kan_context_system_t other_system);
 
 /// \brief Connect other system as on-populate delegate.
 CONTEXT_REFLECTION_SYSTEM_API void kan_reflection_system_connect_on_populate (
-    kan_context_system_handle_t reflection_system,
-    kan_context_system_handle_t other_system,
+    kan_context_system_t reflection_system,
+    kan_context_system_t other_system,
     kan_context_reflection_populate_t functor);
 
 /// \brief Disconnect other system from on-populate delegates.
-CONTEXT_REFLECTION_SYSTEM_API void kan_reflection_system_disconnect_on_populate (
-    kan_context_system_handle_t reflection_system, kan_context_system_handle_t other_system);
+CONTEXT_REFLECTION_SYSTEM_API void kan_reflection_system_disconnect_on_populate (kan_context_system_t reflection_system,
+                                                                                 kan_context_system_t other_system);
 
 /// \brief Connect other system as on-generation-iterate delegate.
 CONTEXT_REFLECTION_SYSTEM_API void kan_reflection_system_connect_on_generation_iterate (
-    kan_context_system_handle_t reflection_system,
-    kan_context_system_handle_t other_system,
+    kan_context_system_t reflection_system,
+    kan_context_system_t other_system,
     kan_context_reflection_generation_iterate_t functor);
 
 /// \brief Disconnect other system from on-generation-iterate delegates.
 CONTEXT_REFLECTION_SYSTEM_API void kan_reflection_system_disconnect_on_generation_iterate (
-    kan_context_system_handle_t reflection_system, kan_context_system_handle_t other_system);
+    kan_context_system_t reflection_system, kan_context_system_t other_system);
 
 /// \brief Connect other system as on-finalize delegate.
 CONTEXT_REFLECTION_SYSTEM_API void kan_reflection_system_connect_on_finalize (
-    kan_context_system_handle_t reflection_system,
-    kan_context_system_handle_t other_system,
+    kan_context_system_t reflection_system,
+    kan_context_system_t other_system,
     kan_context_reflection_finalize_t functor);
 
 /// \brief Disconnect other system from on-finalize delegates.
-CONTEXT_REFLECTION_SYSTEM_API void kan_reflection_system_disconnect_on_finalize (
-    kan_context_system_handle_t reflection_system, kan_context_system_handle_t other_system);
+CONTEXT_REFLECTION_SYSTEM_API void kan_reflection_system_disconnect_on_finalize (kan_context_system_t reflection_system,
+                                                                                 kan_context_system_t other_system);
 
 /// \brief Connect other system as on-generated delegate.
 CONTEXT_REFLECTION_SYSTEM_API void kan_reflection_system_connect_on_generated (
-    kan_context_system_handle_t reflection_system,
-    kan_context_system_handle_t other_system,
+    kan_context_system_t reflection_system,
+    kan_context_system_t other_system,
     kan_context_reflection_generated_t functor);
 
 /// \brief Disconnect other system from on-generated delegates.
 CONTEXT_REFLECTION_SYSTEM_API void kan_reflection_system_disconnect_on_generated (
-    kan_context_system_handle_t reflection_system, kan_context_system_handle_t other_system);
+    kan_context_system_t reflection_system, kan_context_system_t other_system);
 
 /// \brief Connect other system as on-cleanup delegate.
-CONTEXT_REFLECTION_SYSTEM_API void kan_reflection_system_connect_on_cleanup (
-    kan_context_system_handle_t reflection_system,
-    kan_context_system_handle_t other_system,
-    kan_context_reflection_cleanup_t functor);
+CONTEXT_REFLECTION_SYSTEM_API void kan_reflection_system_connect_on_cleanup (kan_context_system_t reflection_system,
+                                                                             kan_context_system_t other_system,
+                                                                             kan_context_reflection_cleanup_t functor);
 
 /// \brief Disconnect other system from on-cleanup delegates.
-CONTEXT_REFLECTION_SYSTEM_API void kan_reflection_system_disconnect_on_cleanup (
-    kan_context_system_handle_t reflection_system, kan_context_system_handle_t other_system);
+CONTEXT_REFLECTION_SYSTEM_API void kan_reflection_system_disconnect_on_cleanup (kan_context_system_t reflection_system,
+                                                                                kan_context_system_t other_system);
 
 /// \brief Connect other system as on-pre-shutdown delegate.
 /// \details Pre-shutdown delegate is needed to destroy everything that was using generated reflection data.
 ///          As reflection users subscribe to on-generated, their shutdown will always be called after reflection
 ///          system shutdown, but there will be no reflection at this moment.
 CONTEXT_REFLECTION_SYSTEM_API void kan_reflection_system_connect_on_pre_shutdown (
-    kan_context_system_handle_t reflection_system,
-    kan_context_system_handle_t other_system,
+    kan_context_system_t reflection_system,
+    kan_context_system_t other_system,
     kan_context_reflection_pre_shutdown_t functor);
 
 /// \brief Disconnect other system from on-pre-shutdown delegates.
 CONTEXT_REFLECTION_SYSTEM_API void kan_reflection_system_disconnect_on_pre_shutdown (
-    kan_context_system_handle_t reflection_system, kan_context_system_handle_t other_system);
+    kan_context_system_t reflection_system, kan_context_system_t other_system);
 
 /// \brief Returns latest reflection registry if it exists.
 CONTEXT_REFLECTION_SYSTEM_API kan_reflection_registry_t
-kan_reflection_system_get_registry (kan_context_system_handle_t reflection_system);
+kan_reflection_system_get_registry (kan_context_system_t reflection_system);
 
 /// \brief Invalidate current reflection and triggers generation of new reflection.
-CONTEXT_REFLECTION_SYSTEM_API void kan_reflection_system_invalidate (kan_context_system_handle_t reflection_system);
+CONTEXT_REFLECTION_SYSTEM_API void kan_reflection_system_invalidate (kan_context_system_t reflection_system);
 
 /// \brief Return name of the next added enum or NULL if all events are processed.
 CONTEXT_REFLECTION_SYSTEM_API kan_interned_string_t

@@ -27,7 +27,7 @@ struct plugin_data_t
 
 struct plugin_system_t
 {
-    kan_context_handle_t context;
+    kan_context_t context;
     kan_allocation_group_t group;
 
     char *plugins_directory_path;
@@ -56,7 +56,7 @@ static void ensure_statics_initialized (void)
     }
 }
 
-kan_context_system_handle_t plugin_system_create (kan_allocation_group_t group, void *user_config)
+kan_context_system_t plugin_system_create (kan_allocation_group_t group, void *user_config)
 {
     struct plugin_system_t *system =
         kan_allocate_general (group, sizeof (struct plugin_system_t), _Alignof (struct plugin_system_t));
@@ -81,7 +81,7 @@ kan_context_system_handle_t plugin_system_create (kan_allocation_group_t group, 
             struct plugin_data_t *data = kan_dynamic_array_add_last (&system->plugins);
             KAN_ASSERT (data)
             data->name = plugin_name;
-            data->dynamic_library = KAN_INVALID_PLATFORM_DYNAMIC_LIBRARY;
+            data->dynamic_library = KAN_HANDLE_SET_INVALID (kan_platform_dynamic_library_t);
             data->last_loaded_file_time_stamp_ns = 0u;
         }
     }
@@ -97,8 +97,8 @@ kan_context_system_handle_t plugin_system_create (kan_allocation_group_t group, 
     system->newest_loaded_plugin_last_modification_file_time_ns = 0u;
     system->hot_reload_directory_id = 0u;
     system->hot_reload_after_ns = UINT64_MAX;
-    system->watcher = KAN_INVALID_FILE_SYSTEM_WATCHER;
-    return (kan_context_system_handle_t) system;
+    system->watcher = KAN_HANDLE_SET_INVALID (kan_file_system_watcher_t);
+    return KAN_HANDLE_SET (kan_context_system_t, system);
 }
 
 static inline kan_bool_t find_source_plugin_path (const char *source_path,
@@ -145,14 +145,14 @@ static inline void load_plugins (const char *path,
     for (uint64_t index = 0u; index < array->size; ++index)
     {
         struct plugin_data_t *data = &((struct plugin_data_t *) array->data)[index];
-        KAN_ASSERT (data->dynamic_library == KAN_INVALID_PLATFORM_DYNAMIC_LIBRARY)
+        KAN_ASSERT (!KAN_HANDLE_IS_VALID (data->dynamic_library))
         char library_path_buffer[KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u];
         const char *extension;
 
         if (find_source_plugin_path (path, data->name, library_path_buffer, &extension))
         {
             data->dynamic_library = kan_platform_dynamic_library_load (library_path_buffer);
-            if (data->dynamic_library == KAN_INVALID_PLATFORM_DYNAMIC_LIBRARY)
+            if (!KAN_HANDLE_IS_VALID (data->dynamic_library))
             {
                 data->last_loaded_file_time_stamp_ns = 0u;
                 KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 3u, plugin_system, KAN_LOG_ERROR,
@@ -190,20 +190,20 @@ static inline void unload_plugins (struct kan_dynamic_array_t *array)
     for (uint64_t index = 0u; index < array->size; ++index)
     {
         struct plugin_data_t *data = &((struct plugin_data_t *) array->data)[index];
-        if (data->dynamic_library != KAN_INVALID_PLATFORM_DYNAMIC_LIBRARY)
+        if (KAN_HANDLE_IS_VALID (data->dynamic_library))
         {
             kan_platform_dynamic_library_unload (data->dynamic_library);
         }
     }
 }
 
-static void on_reflection_populate (kan_context_system_handle_t other_system, kan_reflection_registry_t registry)
+static void on_reflection_populate (kan_context_system_t other_system, kan_reflection_registry_t registry)
 {
-    struct plugin_system_t *system = (struct plugin_system_t *) other_system;
+    struct plugin_system_t *system = KAN_HANDLE_GET (other_system);
     for (uint64_t index = 0u; index < system->plugins.size; ++index)
     {
         struct plugin_data_t *data = &((struct plugin_data_t *) system->plugins.data)[index];
-        if (data->dynamic_library != KAN_INVALID_PLATFORM_DYNAMIC_LIBRARY)
+        if (KAN_HANDLE_IS_VALID (data->dynamic_library))
         {
             typedef void (*registrar_function_t) (kan_reflection_registry_t registry);
             registrar_function_t function = (registrar_function_t) kan_platform_dynamic_library_find_function (
@@ -330,9 +330,9 @@ static inline void delete_hot_reload_directory (struct plugin_system_t *system, 
     }
 }
 
-void plugin_system_on_update (kan_context_system_handle_t handle)
+void plugin_system_on_update (kan_context_system_t handle)
 {
-    struct plugin_system_t *system = (struct plugin_system_t *) handle;
+    struct plugin_system_t *system = KAN_HANDLE_GET (handle);
     KAN_ASSERT (system->enable_hot_reload)
     const struct kan_file_system_watcher_event_t *event;
 
@@ -361,7 +361,7 @@ void plugin_system_on_update (kan_context_system_handle_t handle)
             struct plugin_data_t *source_data = &((struct plugin_data_t *) system->plugins.data)[index];
             struct plugin_data_t *target_data = &((struct plugin_data_t *) plugins_copy.data)[index];
             target_data->dynamic_library = source_data->dynamic_library;
-            source_data->dynamic_library = KAN_INVALID_PLATFORM_DYNAMIC_LIBRARY;
+            source_data->dynamic_library = KAN_HANDLE_SET_INVALID (kan_platform_dynamic_library_t);
             source_data->last_loaded_file_time_stamp_ns = 0u;
         }
 
@@ -371,10 +371,10 @@ void plugin_system_on_update (kan_context_system_handle_t handle)
         load_plugins (path_container.path, &system->plugins,
                       &system->newest_loaded_plugin_last_modification_file_time_ns);
 
-        kan_context_system_handle_t reflection_system =
+        kan_context_system_t reflection_system =
             kan_context_query (system->context, KAN_CONTEXT_REFLECTION_SYSTEM_NAME);
 
-        if (reflection_system != KAN_INVALID_CONTEXT_SYSTEM_HANDLE)
+        if (KAN_HANDLE_IS_VALID (reflection_system))
         {
             kan_reflection_system_invalidate (reflection_system);
         }
@@ -386,32 +386,31 @@ void plugin_system_on_update (kan_context_system_handle_t handle)
     }
 }
 
-void plugin_system_connect (kan_context_system_handle_t handle, kan_context_handle_t context)
+void plugin_system_connect (kan_context_system_t handle, kan_context_t context)
 {
-    struct plugin_system_t *system = (struct plugin_system_t *) handle;
+    struct plugin_system_t *system = KAN_HANDLE_GET (handle);
     system->context = context;
 
-    kan_context_system_handle_t reflection_system =
-        kan_context_query (system->context, KAN_CONTEXT_REFLECTION_SYSTEM_NAME);
+    kan_context_system_t reflection_system = kan_context_query (system->context, KAN_CONTEXT_REFLECTION_SYSTEM_NAME);
 
-    if (reflection_system != KAN_INVALID_CONTEXT_SYSTEM_HANDLE)
+    if (KAN_HANDLE_IS_VALID (reflection_system))
     {
         kan_reflection_system_connect_on_populate (reflection_system, handle, on_reflection_populate);
     }
 
     if (system->enable_hot_reload)
     {
-        kan_context_system_handle_t update_system = kan_context_query (system->context, KAN_CONTEXT_UPDATE_SYSTEM_NAME);
-        if (update_system != KAN_INVALID_CONTEXT_SYSTEM_HANDLE)
+        kan_context_system_t update_system = kan_context_query (system->context, KAN_CONTEXT_UPDATE_SYSTEM_NAME);
+        if (KAN_HANDLE_IS_VALID (update_system))
         {
             kan_update_system_connect_on_run (update_system, handle, plugin_system_on_update, 0u, NULL);
         }
     }
 }
 
-void plugin_system_init (kan_context_system_handle_t handle)
+void plugin_system_init (kan_context_system_t handle)
 {
-    struct plugin_system_t *system = (struct plugin_system_t *) handle;
+    struct plugin_system_t *system = KAN_HANDLE_GET (handle);
     if (system->enable_hot_reload)
     {
         update_hot_reload_id (system);
@@ -439,12 +438,12 @@ void plugin_system_init (kan_context_system_handle_t handle)
     }
 }
 
-void plugin_system_shutdown (kan_context_system_handle_t handle)
+void plugin_system_shutdown (kan_context_system_t handle)
 {
-    struct plugin_system_t *system = (struct plugin_system_t *) handle;
+    struct plugin_system_t *system = KAN_HANDLE_GET (handle);
     unload_plugins (&system->plugins);
 
-    if (system->watcher != KAN_INVALID_FILE_SYSTEM_WATCHER)
+    if (KAN_HANDLE_IS_VALID (system->watcher))
     {
         kan_file_system_watcher_iterator_destroy (system->watcher, system->watcher_iterator);
         kan_file_system_watcher_destroy (system->watcher);
@@ -456,30 +455,29 @@ void plugin_system_shutdown (kan_context_system_handle_t handle)
     }
 }
 
-void plugin_system_disconnect (kan_context_system_handle_t handle)
+void plugin_system_disconnect (kan_context_system_t handle)
 {
-    struct plugin_system_t *system = (struct plugin_system_t *) handle;
-    kan_context_system_handle_t reflection_system =
-        kan_context_query (system->context, KAN_CONTEXT_REFLECTION_SYSTEM_NAME);
+    struct plugin_system_t *system = KAN_HANDLE_GET (handle);
+    kan_context_system_t reflection_system = kan_context_query (system->context, KAN_CONTEXT_REFLECTION_SYSTEM_NAME);
 
-    if (reflection_system != KAN_INVALID_CONTEXT_SYSTEM_HANDLE)
+    if (KAN_HANDLE_IS_VALID (reflection_system))
     {
         kan_reflection_system_disconnect_on_populate (reflection_system, handle);
     }
 
     if (system->enable_hot_reload)
     {
-        kan_context_system_handle_t update_system = kan_context_query (system->context, KAN_CONTEXT_UPDATE_SYSTEM_NAME);
-        if (update_system != KAN_INVALID_CONTEXT_SYSTEM_HANDLE)
+        kan_context_system_t update_system = kan_context_query (system->context, KAN_CONTEXT_UPDATE_SYSTEM_NAME);
+        if (KAN_HANDLE_IS_VALID (update_system))
         {
             kan_update_system_disconnect_on_run (update_system, handle);
         }
     }
 }
 
-void plugin_system_destroy (kan_context_system_handle_t handle)
+void plugin_system_destroy (kan_context_system_t handle)
 {
-    struct plugin_system_t *system = (struct plugin_system_t *) handle;
+    struct plugin_system_t *system = KAN_HANDLE_GET (handle);
     if (system->plugins_directory_path)
     {
         kan_free_general (system->group, system->plugins_directory_path, strlen (system->plugins_directory_path) + 1u);
@@ -525,8 +523,8 @@ void kan_plugin_system_config_shutdown (struct kan_plugin_system_config_t *confi
     kan_dynamic_array_shutdown (&config->plugins);
 }
 
-uint64_t kan_plugin_system_get_newest_loaded_plugin_last_modification_file_time_ns (
-    kan_context_system_handle_t plugin_system)
+uint64_t kan_plugin_system_get_newest_loaded_plugin_last_modification_file_time_ns (kan_context_system_t plugin_system)
 {
-    return ((struct plugin_system_t *) plugin_system)->newest_loaded_plugin_last_modification_file_time_ns;
+    struct plugin_system_t *system = KAN_HANDLE_GET (plugin_system);
+    return system->newest_loaded_plugin_last_modification_file_time_ns;
 }

@@ -37,48 +37,47 @@ struct kan_event_queue_node_t *kan_event_queue_clean_oldest (struct kan_event_qu
     return NULL;
 }
 
-typedef uint64_t kan_event_queue_iterator_t;
-
 kan_event_queue_iterator_t kan_event_queue_iterator_create (struct kan_event_queue_t *queue)
 {
     kan_atomic_int_add (&queue->total_iterators, 1);
     kan_atomic_int_add (&queue->next_placeholder->iterators_here, 1);
-    return (kan_event_queue_iterator_t) queue->next_placeholder;
+    return KAN_HANDLE_SET (kan_event_queue_iterator_t, queue->next_placeholder);
 }
 
 kan_event_queue_iterator_t kan_event_queue_iterator_create_next (struct kan_event_queue_t *queue,
                                                                  kan_event_queue_iterator_t iterator)
 {
     kan_atomic_int_add (&queue->total_iterators, 1);
-    const struct kan_event_queue_node_t *node = (const struct kan_event_queue_node_t *) iterator;
+    const struct kan_event_queue_node_t *node = KAN_HANDLE_GET (iterator);
     KAN_ASSERT (node != queue->next_placeholder)
     struct kan_event_queue_node_t *next = node->next;
     kan_atomic_int_add (&next->iterators_here, 1);
-    return (kan_event_queue_iterator_t) next;
+    return KAN_HANDLE_SET (kan_event_queue_iterator_t, next);
 }
 
 const struct kan_event_queue_node_t *kan_event_queue_iterator_get (struct kan_event_queue_t *queue,
                                                                    kan_event_queue_iterator_t iterator)
 {
-    const struct kan_event_queue_node_t *node = (const struct kan_event_queue_node_t *) iterator;
+    const struct kan_event_queue_node_t *node = KAN_HANDLE_GET (iterator);
     return queue->next_placeholder == node ? NULL : node;
 }
 
 kan_event_queue_iterator_t kan_event_queue_iterator_advance (kan_event_queue_iterator_t iterator)
 {
-    struct kan_event_queue_node_t *node = (struct kan_event_queue_node_t *) iterator;
+    struct kan_event_queue_node_t *node = KAN_HANDLE_GET (iterator);
     if (node->next)
     {
         kan_atomic_int_add (&node->iterators_here, -1);
         kan_atomic_int_add (&node->next->iterators_here, 1);
+        return KAN_HANDLE_SET (kan_event_queue_iterator_t, node->next);
     }
 
-    return node->next ? (kan_event_queue_iterator_t) node->next : iterator;
+    return iterator;
 }
 
 kan_bool_t kan_event_queue_iterator_destroy (struct kan_event_queue_t *queue, kan_event_queue_iterator_t iterator)
 {
     kan_atomic_int_add (&queue->total_iterators, -1);
-    struct kan_event_queue_node_t *node = (struct kan_event_queue_node_t *) iterator;
+    struct kan_event_queue_node_t *node = KAN_HANDLE_GET (iterator);
     return kan_atomic_int_add (&node->iterators_here, -1) == 1;
 }

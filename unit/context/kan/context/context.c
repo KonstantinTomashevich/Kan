@@ -27,7 +27,7 @@ struct system_instance_node_t
 {
     struct kan_hash_storage_node_t node;
     kan_interned_string_t name;
-    kan_context_system_handle_t instance;
+    kan_context_system_t instance;
     struct kan_context_system_api_t *api;
     void *user_config;
     kan_bool_t initialized;
@@ -119,7 +119,7 @@ static inline void context_pop_operation (struct context_t *context)
 
 static void context_initialize_system (struct context_t *context, struct system_instance_node_t *node)
 {
-    if (node->instance == KAN_INVALID_CONTEXT_SYSTEM_HANDLE || node->initialized)
+    if (!KAN_HANDLE_IS_VALID (node->instance) || node->initialized)
     {
         return;
     }
@@ -140,8 +140,8 @@ static void context_initialize_system (struct context_t *context, struct system_
 
 static void context_shutdown_system (struct context_t *context, struct system_instance_node_t *node)
 {
-    if (node->instance == KAN_INVALID_CONTEXT_SYSTEM_HANDLE || !node->initialized ||
-        node->initialization_references_to_me > 0u || node->connection_references_to_others > 0u)
+    if (!KAN_HANDLE_IS_VALID (node->instance) || !node->initialized || node->initialization_references_to_me > 0u ||
+        node->connection_references_to_others > 0u)
     {
         return;
     }
@@ -181,7 +181,7 @@ extern struct kan_context_system_api_t *KAN_CONTEXT_SYSTEM_ARRAY_NAME[];
 void KAN_CONTEXT_SYSTEM_ARRAY_INITIALIZER_NAME (void);
 #endif
 
-kan_context_handle_t kan_context_create (kan_allocation_group_t group)
+kan_context_t kan_context_create (kan_allocation_group_t group)
 {
     KAN_CONTEXT_SYSTEM_ARRAY_INITIALIZER_NAME ();
     struct context_t *context = kan_allocate_general (group, sizeof (struct context_t), _Alignof (struct context_t));
@@ -189,12 +189,12 @@ kan_context_handle_t kan_context_create (kan_allocation_group_t group)
     kan_hash_storage_init (&context->systems, group, KAN_CONTEXT_SYSTEM_INITIAL_BUCKETS);
     context->operation_stack_top = NULL;
     context->group = group;
-    return (kan_context_handle_t) context;
+    return KAN_HANDLE_SET (kan_context_t, context);
 }
 
-kan_bool_t kan_context_request_system (kan_context_handle_t handle, const char *system_name, void *user_config)
+kan_bool_t kan_context_request_system (kan_context_t handle, const char *system_name, void *user_config)
 {
-    struct context_t *context = (struct context_t *) handle;
+    struct context_t *context = KAN_HANDLE_GET (handle);
     KAN_ASSERT (context->state == CONTEXT_STATE_COLLECTING_REQUESTS)
     const kan_interned_string_t interned_system_name = kan_string_intern (system_name);
 
@@ -223,7 +223,7 @@ kan_bool_t kan_context_request_system (kan_context_handle_t handle, const char *
     struct system_instance_node_t *node = kan_allocate_batched (context->group, sizeof (struct system_instance_node_t));
     node->node.hash = (uint64_t) interned_system_name;
     node->name = interned_system_name;
-    node->instance = KAN_INVALID_CONTEXT_SYSTEM_HANDLE;
+    node->instance = KAN_HANDLE_SET_INVALID (kan_context_system_t);
     node->api = api;
     node->user_config = user_config;
     node->initialized = KAN_FALSE;
@@ -241,9 +241,9 @@ kan_bool_t kan_context_request_system (kan_context_handle_t handle, const char *
     return KAN_TRUE;
 }
 
-void kan_context_assembly (kan_context_handle_t handle)
+void kan_context_assembly (kan_context_t handle)
 {
-    struct context_t *context = (struct context_t *) handle;
+    struct context_t *context = KAN_HANDLE_GET (handle);
     context->state = CONTEXT_STATE_CREATION;
 
     struct system_instance_node_t *node = (struct system_instance_node_t *) context->systems.items.first;
@@ -252,7 +252,7 @@ void kan_context_assembly (kan_context_handle_t handle)
         node->instance =
             node->api->create (kan_allocation_group_get_child (context->group, node->name), node->user_config);
 
-        if (node->instance == KAN_INVALID_CONTEXT_SYSTEM_HANDLE)
+        if (!KAN_HANDLE_IS_VALID (node->instance))
         {
             KAN_LOG (context, KAN_LOG_ERROR, "Failed to create instance of system \"%s\"", node->name)
         }
@@ -265,7 +265,7 @@ void kan_context_assembly (kan_context_handle_t handle)
 
     while (node)
     {
-        if (node->instance != KAN_INVALID_CONTEXT_SYSTEM_HANDLE)
+        if (KAN_HANDLE_IS_VALID (node->instance))
         {
             context_push_operation (context, node);
             node->api->connect (node->instance, handle);
@@ -289,15 +289,15 @@ void kan_context_assembly (kan_context_handle_t handle)
     context->state = CONTEXT_STATE_READY;
 }
 
-kan_context_system_handle_t kan_context_query (kan_context_handle_t handle, const char *system_name)
+kan_context_system_t kan_context_query (kan_context_t handle, const char *system_name)
 {
-    struct context_t *context = (struct context_t *) handle;
+    struct context_t *context = KAN_HANDLE_GET (handle);
     const kan_interned_string_t interned_system_name = kan_string_intern (system_name);
     struct system_instance_node_t *node = context_query_system (context, interned_system_name);
 
     if (!node)
     {
-        return KAN_INVALID_CONTEXT_SYSTEM_HANDLE;
+        return KAN_HANDLE_SET_INVALID (kan_context_system_t);
     }
 
     switch (context->state)
@@ -355,16 +355,16 @@ kan_context_system_handle_t kan_context_query (kan_context_handle_t handle, cons
     case CONTEXT_STATE_DESTRUCTION:
         // States that do not support querying.
         KAN_ASSERT (KAN_FALSE)
-        return KAN_INVALID_CONTEXT_SYSTEM_HANDLE;
+        return KAN_HANDLE_SET_INVALID (kan_context_system_t);
     }
 
     KAN_ASSERT (KAN_FALSE)
-    return KAN_INVALID_CONTEXT_SYSTEM_HANDLE;
+    return KAN_HANDLE_SET_INVALID (kan_context_system_t);
 }
 
-void kan_context_destroy (kan_context_handle_t handle)
+void kan_context_destroy (kan_context_t handle)
 {
-    struct context_t *context = (struct context_t *) handle;
+    struct context_t *context = KAN_HANDLE_GET (handle);
     KAN_ASSERT (context->state == CONTEXT_STATE_READY)
 
     context->state = CONTEXT_STATE_CONNECTED_SHUTDOWN;
@@ -381,7 +381,7 @@ void kan_context_destroy (kan_context_handle_t handle)
 
     while (node)
     {
-        if (node->instance != KAN_INVALID_CONTEXT_SYSTEM_HANDLE)
+        if (KAN_HANDLE_IS_VALID (node->instance))
         {
             KAN_ASSERT (!node->initialized)
             node->api->disconnect (node->instance);
@@ -396,7 +396,7 @@ void kan_context_destroy (kan_context_handle_t handle)
     while (node)
     {
         struct system_instance_node_t *next = (struct system_instance_node_t *) node->node.list_node.next;
-        if (node->instance != KAN_INVALID_CONTEXT_SYSTEM_HANDLE)
+        if (KAN_HANDLE_IS_VALID (node->instance))
         {
             node->api->destroy (node->instance);
         }

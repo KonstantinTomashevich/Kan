@@ -42,27 +42,27 @@ struct kan_application_framework_system_config_t
 
 /// \brief Returns count of arguments passed to application framework.
 APPLICATION_FRAMEWORK_API uint64_t
-kan_application_framework_system_get_arguments_count (kan_context_system_handle_t application_framework_system);
+kan_application_framework_system_get_arguments_count (kan_context_system_t application_framework_system);
 
 /// \brief Returns arguments passed to application framework.
 APPLICATION_FRAMEWORK_API char **kan_application_framework_system_get_arguments (
-    kan_context_system_handle_t application_framework_system);
+    kan_context_system_t application_framework_system);
 
 /// \brief Returns minimum frame time in nanoseconds.
 /// \details Minimum frame time limits maximum FPS to save hardware resources.
 APPLICATION_FRAMEWORK_API uint64_t
-kan_application_framework_get_min_frame_time_ns (kan_context_system_handle_t application_framework_system);
+kan_application_framework_get_min_frame_time_ns (kan_context_system_t application_framework_system);
 
 /// \brief Sets minimum frame time in nanoseconds.
 APPLICATION_FRAMEWORK_API void kan_application_framework_set_min_frame_time_ns (
-    kan_context_system_handle_t application_framework_system, uint64_t min_frame_time_ns);
+    kan_context_system_t application_framework_system, uint64_t min_frame_time_ns);
 
 /// \brief Request application exit with given exit code.
 APPLICATION_FRAMEWORK_API void kan_application_framework_system_request_exit (
-    kan_context_system_handle_t application_framework_system, int exit_code);
+    kan_context_system_t application_framework_system, int exit_code);
 
 /// \brief Checks if application exit has been requested.
 APPLICATION_FRAMEWORK_API kan_bool_t kan_application_framework_system_is_exit_requested (
-    kan_context_system_handle_t application_framework_system, int *exit_code_output);
+    kan_context_system_t application_framework_system, int *exit_code_output);
 
 KAN_C_HEADER_END

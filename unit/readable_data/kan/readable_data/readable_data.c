@@ -808,12 +808,12 @@ kan_readable_data_parser_t kan_readable_data_parser_create (struct kan_stream_t 
     parser->saved_symbol = parser->cursor_symbol;
 
     parser->opened_blocks = 0u;
-    return (kan_readable_data_parser_t) parser;
+    return KAN_HANDLE_SET (kan_readable_data_parser_t, parser);
 }
 
 enum kan_readable_data_parser_response_t kan_readable_data_parser_step (kan_readable_data_parser_t parser)
 {
-    struct parser_t *data = (struct parser_t *) parser;
+    struct parser_t *data = KAN_HANDLE_GET (parser);
     // Reset previous temporary allocations.
     kan_stack_group_allocator_reset (&data->temporary_allocator);
     return re2c_parse_next_event (data);
@@ -821,13 +821,13 @@ enum kan_readable_data_parser_response_t kan_readable_data_parser_step (kan_read
 
 const struct kan_readable_data_event_t *kan_readable_data_parser_get_last_event (kan_readable_data_parser_t parser)
 {
-    struct parser_t *data = (struct parser_t *) parser;
+    struct parser_t *data = KAN_HANDLE_GET (parser);
     return &data->current_event;
 }
 
 void kan_readable_data_parser_destroy (kan_readable_data_parser_t parser)
 {
-    struct parser_t *data = (struct parser_t *) parser;
+    struct parser_t *data = KAN_HANDLE_GET (parser);
     kan_stack_group_allocator_shutdown (&data->temporary_allocator);
     kan_free_general (readable_data_allocation_group, data, sizeof (struct parser_t));
 }
@@ -841,7 +841,7 @@ kan_readable_data_emitter_t kan_readable_data_emitter_create (struct kan_stream_
         kan_allocate_general (readable_data_allocation_group, sizeof (struct emitter_t), _Alignof (struct emitter_t));
     emitter->stream = output_stream;
     emitter->indentation_level = 0u;
-    return (kan_readable_data_emitter_t) emitter;
+    return KAN_HANDLE_SET (kan_readable_data_emitter_t, emitter);
 }
 
 static inline kan_bool_t emit_indentation (struct emitter_t *emitter)
@@ -948,7 +948,7 @@ static inline kan_bool_t emit_floating_literal (struct emitter_t *emitter, doubl
 kan_bool_t kan_readable_data_emitter_step (kan_readable_data_emitter_t emitter,
                                            struct kan_readable_data_event_t *emit_event)
 {
-    struct emitter_t *data = (struct emitter_t *) emitter;
+    struct emitter_t *data = KAN_HANDLE_GET (emitter);
     switch (emit_event->type)
     {
     case KAN_READABLE_DATA_EVENT_ELEMENTAL_IDENTIFIER_SETTER:
@@ -1195,6 +1195,6 @@ kan_bool_t kan_readable_data_emitter_step (kan_readable_data_emitter_t emitter,
 
 void kan_readable_data_emitter_destroy (kan_readable_data_emitter_t emitter)
 {
-    struct emitter_t *data = (struct emitter_t *) emitter;
+    struct emitter_t *data = KAN_HANDLE_GET (emitter);
     kan_free_general (readable_data_allocation_group, data, sizeof (struct emitter_t));
 }

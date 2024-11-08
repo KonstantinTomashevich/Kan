@@ -67,18 +67,19 @@ kan_render_code_module_t kan_render_code_module_create (kan_render_context_t con
                                                         void *code,
                                                         kan_interned_string_t tracking_name)
 {
-    struct render_backend_system_t *system = (struct render_backend_system_t *) context;
+    struct render_backend_system_t *system = KAN_HANDLE_GET (context);
     struct kan_cpu_section_execution_t execution;
     kan_cpu_section_execution_init (&execution, system->section_create_code_module);
     struct render_backend_code_module_t *module =
         render_backend_system_create_code_module (system, code_length, code, tracking_name);
     kan_cpu_section_execution_shutdown (&execution);
-    return module ? (kan_render_code_module_t) module : KAN_INVALID_RENDER_CODE_MODULE;
+    return module ? KAN_HANDLE_SET (kan_render_code_module_t, module) :
+                    KAN_HANDLE_SET_INVALID (kan_render_code_module_t);
 }
 
 void kan_render_code_module_destroy (kan_render_code_module_t code_module)
 {
-    struct render_backend_code_module_t *data = (struct render_backend_code_module_t *) code_module;
+    struct render_backend_code_module_t *data = KAN_HANDLE_GET (code_module);
     struct render_backend_schedule_state_t *schedule = render_backend_system_get_schedule_for_destroy (data->system);
     kan_atomic_int_lock (&schedule->schedule_lock);
 

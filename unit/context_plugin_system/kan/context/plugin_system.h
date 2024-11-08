@@ -61,6 +61,6 @@ CONTEXT_PLUGIN_SYSTEM_API void kan_plugin_system_config_shutdown (struct kan_plu
 
 /// \brief Returns newest last modification time in nanoseconds among loaded plugins.
 CONTEXT_PLUGIN_SYSTEM_API uint64_t
-kan_plugin_system_get_newest_loaded_plugin_last_modification_file_time_ns (kan_context_system_handle_t plugin_system);
+kan_plugin_system_get_newest_loaded_plugin_last_modification_file_time_ns (kan_context_system_t plugin_system);
 
 KAN_C_HEADER_END

@@ -210,8 +210,7 @@ struct render_backend_pipeline_parameter_set_t *render_backend_system_create_pip
     {
     case KAN_RENDER_PIPELINE_TYPE_GRAPHICS:
     {
-        struct render_backend_graphics_pipeline_family_t *family =
-            (struct render_backend_graphics_pipeline_family_t *) description->graphics_family;
+        struct render_backend_graphics_pipeline_family_t *family = KAN_HANDLE_GET (description->graphics_family);
 
         if (description->set >= family->descriptor_set_layouts_count)
         {
@@ -589,8 +588,9 @@ void render_backend_apply_descriptor_set_mutation (struct render_backend_pipelin
                 this_buffer_info = next_buffer_info;
                 ++next_buffer_info;
 
+                struct render_backend_buffer_t *buffer = KAN_HANDLE_GET (update_bindings[index].buffer_binding.buffer);
                 *this_buffer_info = (VkDescriptorBufferInfo) {
-                    .buffer = ((struct render_backend_buffer_t *) update_bindings[index].buffer_binding.buffer)->buffer,
+                    .buffer = buffer->buffer,
                     .offset = (uint32_t) update_bindings[index].buffer_binding.offset,
                     .range = (uint32_t) update_bindings[index].buffer_binding.range,
                 };
@@ -624,10 +624,9 @@ void render_backend_apply_descriptor_set_mutation (struct render_backend_pipelin
                     kan_atomic_int_unlock (&schedule->schedule_lock);
                 }
 
-                if (update_bindings[index].image_binding.image != KAN_INVALID_RENDER_IMAGE)
+                if (KAN_HANDLE_IS_VALID (update_bindings[index].image_binding.image))
                 {
-                    struct render_backend_image_t *image =
-                        (struct render_backend_image_t *) update_bindings[index].image_binding.image;
+                    struct render_backend_image_t *image = KAN_HANDLE_GET (update_bindings[index].image_binding.image);
 
                     VkImageViewCreateInfo create_info = {
                         .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
@@ -740,7 +739,7 @@ void render_backend_apply_descriptor_set_mutation (struct render_backend_pipelin
 kan_render_pipeline_parameter_set_t kan_render_pipeline_parameter_set_create (
     kan_render_context_t context, struct kan_render_pipeline_parameter_set_description_t *description)
 {
-    struct render_backend_system_t *system = (struct render_backend_system_t *) context;
+    struct render_backend_system_t *system = KAN_HANDLE_GET (context);
     struct kan_cpu_section_execution_t execution;
     kan_cpu_section_execution_init (&execution, system->section_create_pipeline_parameter_set);
 
@@ -750,21 +749,22 @@ kan_render_pipeline_parameter_set_t kan_render_pipeline_parameter_set_create (
     if (!set)
     {
         kan_cpu_section_execution_shutdown (&execution);
-        return KAN_INVALID_RENDER_PIPELINE_PARAMETER_SET;
+        return KAN_HANDLE_SET_INVALID (kan_render_pipeline_parameter_set_t);
     }
 
-    kan_render_pipeline_parameter_set_update ((kan_render_pipeline_parameter_set_t) set,
-                                              description->initial_bindings_count, description->initial_bindings);
+    kan_render_pipeline_parameter_set_t handle = KAN_HANDLE_SET (kan_render_pipeline_parameter_set_t, set);
+    kan_render_pipeline_parameter_set_update (handle, description->initial_bindings_count,
+                                              description->initial_bindings);
 
     kan_cpu_section_execution_shutdown (&execution);
-    return (kan_render_pipeline_parameter_set_t) set;
+    return handle;
 }
 
 void kan_render_pipeline_parameter_set_update (kan_render_pipeline_parameter_set_t set,
                                                uint64_t bindings_count,
                                                struct kan_render_parameter_update_description_t *bindings)
 {
-    struct render_backend_pipeline_parameter_set_t *data = (struct render_backend_pipeline_parameter_set_t *) set;
+    struct render_backend_pipeline_parameter_set_t *data = KAN_HANDLE_GET (set);
     struct kan_cpu_section_execution_t execution;
     kan_cpu_section_execution_init (&execution, data->system->section_pipeline_parameter_set_update);
 
@@ -783,7 +783,7 @@ void kan_render_pipeline_parameter_set_update (kan_render_pipeline_parameter_set
             struct kan_render_parameter_update_description_t *update = &bindings[binding_index];
             if (data->layout->bindings[update->binding].type ==
                     KAN_RENDER_PARAMETER_BINDING_TYPE_COMBINED_IMAGE_SAMPLER &&
-                update->image_binding.image != (kan_render_image_t) render_target_attachment->image)
+                KAN_HANDLE_GET (update->image_binding.image) != render_target_attachment->image)
             {
                 // Render target attachment changed, destroy it.
                 broken = KAN_TRUE;
@@ -866,7 +866,7 @@ void kan_render_pipeline_parameter_set_update (kan_render_pipeline_parameter_set
         struct kan_render_parameter_update_description_t *update = &bindings[binding_index];
         if (data->layout->bindings[update->binding].type == KAN_RENDER_PARAMETER_BINDING_TYPE_COMBINED_IMAGE_SAMPLER)
         {
-            struct render_backend_image_t *image = (struct render_backend_image_t *) update->image_binding.image;
+            struct render_backend_image_t *image = KAN_HANDLE_GET (update->image_binding.image);
             if (image && image->description.render_target)
             {
                 kan_bool_t already_attached_to_set = KAN_FALSE;
@@ -932,7 +932,7 @@ void kan_render_pipeline_parameter_set_update (kan_render_pipeline_parameter_set
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pipeline_parameter_set_destroy (
     kan_render_pipeline_parameter_set_t set)
 {
-    struct render_backend_pipeline_parameter_set_t *data = (struct render_backend_pipeline_parameter_set_t *) set;
+    struct render_backend_pipeline_parameter_set_t *data = KAN_HANDLE_GET (set);
     struct render_backend_schedule_state_t *schedule = render_backend_system_get_schedule_for_destroy (data->system);
     kan_atomic_int_lock (&schedule->schedule_lock);
 

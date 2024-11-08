@@ -118,13 +118,13 @@ kan_rpl_compiler_context_t kan_rpl_compiler_context_create (enum kan_rpl_pipelin
     kan_stack_group_allocator_init (&instance->resolve_allocator, STATICS.rpl_compiler_context_allocation_group,
                                     KAN_RPL_COMPILER_CONTEXT_RESOLVE_STACK);
 
-    return (kan_rpl_compiler_context_t) instance;
+    return KAN_HANDLE_SET (kan_rpl_compiler_context_t, instance);
 }
 
 kan_bool_t kan_rpl_compiler_context_use_module (kan_rpl_compiler_context_t compiler_context,
                                                 struct kan_rpl_intermediate_t *intermediate_reference)
 {
-    struct rpl_compiler_context_t *instance = (struct rpl_compiler_context_t *) compiler_context;
+    struct rpl_compiler_context_t *instance = KAN_HANDLE_GET (compiler_context);
     for (uint64_t module_index = 0u; module_index < instance->modules.size; ++module_index)
     {
         if (((struct kan_rpl_intermediate_t **) instance->modules.data)[module_index] == intermediate_reference)
@@ -200,7 +200,7 @@ kan_bool_t kan_rpl_compiler_context_set_option_flag (kan_rpl_compiler_context_t 
                                                      kan_interned_string_t name,
                                                      kan_bool_t value)
 {
-    struct rpl_compiler_context_t *instance = (struct rpl_compiler_context_t *) compiler_context;
+    struct rpl_compiler_context_t *instance = KAN_HANDLE_GET (compiler_context);
     for (uint64_t index = 0u; index < instance->option_values.size; ++index)
     {
         struct rpl_compiler_context_option_value_t *option =
@@ -228,7 +228,7 @@ kan_bool_t kan_rpl_compiler_context_set_option_count (kan_rpl_compiler_context_t
                                                       kan_interned_string_t name,
                                                       uint64_t value)
 {
-    struct rpl_compiler_context_t *instance = (struct rpl_compiler_context_t *) compiler_context;
+    struct rpl_compiler_context_t *instance = KAN_HANDLE_GET (compiler_context);
     for (uint64_t index = 0u; index < instance->option_values.size; ++index)
     {
         struct rpl_compiler_context_option_value_t *option =
@@ -255,7 +255,7 @@ kan_bool_t kan_rpl_compiler_context_set_option_count (kan_rpl_compiler_context_t
 
 void kan_rpl_compiler_instance_destroy (kan_rpl_compiler_instance_t compiler_instance)
 {
-    struct rpl_compiler_instance_t *instance = (struct rpl_compiler_instance_t *) compiler_instance;
+    struct rpl_compiler_instance_t *instance = KAN_HANDLE_GET (compiler_instance);
     kan_stack_group_allocator_shutdown (&instance->resolve_allocator);
     kan_free_general (STATICS.rpl_compiler_instance_allocation_group, instance,
                       sizeof (struct rpl_compiler_instance_t));
@@ -263,7 +263,7 @@ void kan_rpl_compiler_instance_destroy (kan_rpl_compiler_instance_t compiler_ins
 
 void kan_rpl_compiler_context_destroy (kan_rpl_compiler_context_t compiler_context)
 {
-    struct rpl_compiler_context_t *instance = (struct rpl_compiler_context_t *) compiler_context;
+    struct rpl_compiler_context_t *instance = KAN_HANDLE_GET (compiler_context);
     kan_dynamic_array_shutdown (&instance->option_values);
     kan_dynamic_array_shutdown (&instance->modules);
     kan_stack_group_allocator_shutdown (&instance->resolve_allocator);

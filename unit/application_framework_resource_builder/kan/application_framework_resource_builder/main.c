@@ -76,7 +76,7 @@ static struct
     struct kan_atomic_int_t errors_count;
 
 } global = {
-    .registry = KAN_INVALID_REFLECTION_REGISTRY,
+    .registry = KAN_HANDLE_SET_INVALID (kan_reflection_registry_t),
     .compilation_passive_queue_first = NULL,
     .compilation_passive_queue_last = NULL,
     .compilation_active_queue = NULL,
@@ -575,7 +575,7 @@ static void target_init (struct target_t *instance)
 
     kan_hash_storage_init (&instance->native, nodes_allocation_group, KAN_RESOURCE_BUILDER_TARGET_NODES_BUCKETS);
     kan_hash_storage_init (&instance->third_party, nodes_allocation_group, KAN_RESOURCE_BUILDER_TARGET_NODES_BUCKETS);
-    instance->interned_string_registry = KAN_INVALID_SERIALIZATION_INTERNED_STRING_REGISTRY;
+    instance->interned_string_registry = KAN_HANDLE_SET_INVALID (kan_serialization_interned_string_registry_t);
 
     kan_dynamic_array_init (&instance->visible_targets, 0u, sizeof (struct target_t *), _Alignof (struct target_t *),
                             targets_allocation_group);
@@ -744,7 +744,7 @@ static void target_shutdown (struct target_t *instance)
     kan_hash_storage_shutdown (&instance->native);
     kan_hash_storage_shutdown (&instance->third_party);
 
-    if (instance->interned_string_registry != KAN_INVALID_SERIALIZATION_INTERNED_STRING_REGISTRY)
+    if (KAN_HANDLE_IS_VALID (instance->interned_string_registry))
     {
         kan_serialization_interned_string_registry_destroy (instance->interned_string_registry);
     }
@@ -794,12 +794,12 @@ static int read_project (const char *path, struct kan_application_resource_proje
     return result;
 }
 
-static kan_context_handle_t create_context (const struct kan_application_resource_project_t *project,
-                                            const char *executable_path)
+static kan_context_t create_context (const struct kan_application_resource_project_t *project,
+                                     const char *executable_path)
 {
     const kan_allocation_group_t context_group =
         kan_allocation_group_get_child (kan_allocation_group_root (), "builder_context");
-    kan_context_handle_t context = kan_context_create (context_group);
+    kan_context_t context = kan_context_create (context_group);
 
     struct kan_plugin_system_config_t plugin_system_config;
     kan_plugin_system_config_init (&plugin_system_config);
@@ -955,8 +955,8 @@ static void scan_file (struct target_t *target, struct kan_file_system_path_cont
         switch (info.native_format)
         {
         case KAN_RESOURCE_INDEX_NATIVE_ITEM_FORMAT_BINARY:
-            if (!kan_serialization_binary_read_type_header (stream, &type_name,
-                                                            KAN_INVALID_SERIALIZATION_INTERNED_STRING_REGISTRY))
+            if (!kan_serialization_binary_read_type_header (
+                    stream, &type_name, KAN_HANDLE_SET_INVALID (kan_serialization_interned_string_registry_t)))
             {
                 KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, application_framework_resource_builder,
                                      KAN_LOG_ERROR, "Failed to read type header from native entry at \"%s\".",
@@ -1400,8 +1400,8 @@ static void manage_resources_native (uint64_t user_data)
     }
     else if (!node->source_data && source_references > 0)
     {
-        node->source_data =
-            load_native_data (node->source_type, node->source_path, KAN_INVALID_SERIALIZATION_INTERNED_STRING_REGISTRY);
+        node->source_data = load_native_data (node->source_type, node->source_path,
+                                              KAN_HANDLE_SET_INVALID (kan_serialization_interned_string_registry_t));
     }
 
     if (node->compilation_status == COMPILATION_STATUS_FINISHED)
@@ -1412,8 +1412,9 @@ static void manage_resources_native (uint64_t user_data)
         }
         else if (!node->compiled_data && compiled_references > 0)
         {
-            node->compiled_data = load_native_data (node->compiled_type, node->compiled_path,
-                                                    KAN_INVALID_SERIALIZATION_INTERNED_STRING_REGISTRY);
+            node->compiled_data =
+                load_native_data (node->compiled_type, node->compiled_path,
+                                  KAN_HANDLE_SET_INVALID (kan_serialization_interned_string_registry_t));
         }
     }
 
@@ -1497,7 +1498,7 @@ static inline kan_bool_t read_detected_references_cache (
     stream = kan_random_access_stream_buffer_open_for_read (stream, KAN_RESOURCE_BUILDER_IO_BUFFER);
     kan_serialization_binary_reader_t reader = kan_serialization_binary_reader_create (
         stream, container, kan_string_intern ("kan_resource_pipeline_detected_reference_container_t"),
-        global.binary_script_storage, KAN_INVALID_SERIALIZATION_INTERNED_STRING_REGISTRY,
+        global.binary_script_storage, KAN_HANDLE_SET_INVALID (kan_serialization_interned_string_registry_t),
         container->detected_references.allocation_group);
 
     enum kan_serialization_state_t serialization_state;
@@ -1755,7 +1756,7 @@ static void save_references_to_cache (struct native_entry_node_t *node, kan_bool
     kan_serialization_binary_writer_t writer = kan_serialization_binary_writer_create (
         stream, compiled ? &node->compiled_detected_references : &node->source_detected_references,
         kan_string_intern ("kan_resource_pipeline_detected_reference_container_t"), global.binary_script_storage,
-        KAN_INVALID_SERIALIZATION_INTERNED_STRING_REGISTRY);
+        KAN_HANDLE_SET_INVALID (kan_serialization_interned_string_registry_t));
 
     enum kan_serialization_state_t serialization_state;
     while ((serialization_state = kan_serialization_binary_writer_step (writer)) == KAN_SERIALIZATION_IN_PROGRESS)
@@ -2136,7 +2137,7 @@ static void process_native_node_compilation (uint64_t user_data)
             if (compiled)
             {
                 if (!save_native_data (node->compiled_data, node->compiled_path, node->compiled_type->name,
-                                       KAN_INVALID_SERIALIZATION_INTERNED_STRING_REGISTRY, KAN_TRUE))
+                                       KAN_HANDLE_SET_INVALID (kan_serialization_interned_string_registry_t), KAN_TRUE))
                 {
                     native_entry_node_unload_compiled (node);
                     KAN_LOG (application_framework_resource_builder, KAN_LOG_ERROR,
@@ -2169,7 +2170,7 @@ static void process_native_node_compilation (uint64_t user_data)
         {
             KAN_ASSERT (node->source_type == node->compiled_type)
             if (!save_native_data (node->source_data, node->compiled_path, node->source_type->name,
-                                   KAN_INVALID_SERIALIZATION_INTERNED_STRING_REGISTRY, KAN_TRUE))
+                                   KAN_HANDLE_SET_INVALID (kan_serialization_interned_string_registry_t), KAN_TRUE))
             {
                 KAN_LOG (application_framework_resource_builder, KAN_LOG_ERROR,
                          "[Target \"%s\"] Failed to compile native resource \"%s\" of type \"%s\" due to failure "
@@ -2375,8 +2376,8 @@ static void intern_strings_in_native (uint64_t user_data)
     // Everything should be unloaded after compilation.
     KAN_ASSERT (!node->compiled_data)
 
-    node->compiled_data =
-        load_native_data (node->compiled_type, node->compiled_path, KAN_INVALID_SERIALIZATION_INTERNED_STRING_REGISTRY);
+    node->compiled_data = load_native_data (node->compiled_type, node->compiled_path,
+                                            KAN_HANDLE_SET_INVALID (kan_serialization_interned_string_registry_t));
 
     if (!node->compiled_data)
     {
@@ -2519,7 +2520,7 @@ static void pack_target (uint64_t user_data)
 
     if (global.project.use_string_interning)
     {
-        KAN_ASSERT (target->interned_string_registry != KAN_INVALID_SERIALIZATION_INTERNED_STRING_REGISTRY)
+        KAN_ASSERT (KAN_HANDLE_IS_VALID (target->interned_string_registry))
         KAN_LOG (application_framework_resource_builder, KAN_LOG_INFO, "[Target \"%s\"] Saving string registry...",
                  target->name)
 
@@ -2714,7 +2715,7 @@ int main (int argument_count, char **argument_values)
 
     if (result == 0)
     {
-        kan_context_handle_t context = create_context (&global.project, argument_values[0u]);
+        kan_context_t context = create_context (&global.project, argument_values[0u]);
         kan_stack_group_allocator_init (&global.temporary_allocator, temporary_allocation_group,
                                         KAN_RESOURCE_BUILDER_TEMPORARY_STACK);
 
@@ -2722,13 +2723,13 @@ int main (int argument_count, char **argument_values)
         global.compilation_resource_management_lock = kan_atomic_int_init (0);
         global.errors_count = kan_atomic_int_init (0);
 
-        kan_context_system_handle_t plugin_system = kan_context_query (context, KAN_CONTEXT_PLUGIN_SYSTEM_NAME);
-        KAN_ASSERT (plugin_system != KAN_INVALID_CONTEXT_SYSTEM_HANDLE)
+        kan_context_system_t plugin_system = kan_context_query (context, KAN_CONTEXT_PLUGIN_SYSTEM_NAME);
+        KAN_ASSERT (KAN_HANDLE_IS_VALID (plugin_system))
         global.newest_loaded_plugin_last_modification_file_time_ns =
             kan_plugin_system_get_newest_loaded_plugin_last_modification_file_time_ns (plugin_system);
 
-        kan_context_system_handle_t reflection_system = kan_context_query (context, KAN_CONTEXT_REFLECTION_SYSTEM_NAME);
-        KAN_ASSERT (reflection_system != KAN_INVALID_CONTEXT_SYSTEM_HANDLE)
+        kan_context_system_t reflection_system = kan_context_query (context, KAN_CONTEXT_REFLECTION_SYSTEM_NAME);
+        KAN_ASSERT (KAN_HANDLE_IS_VALID (reflection_system))
         global.registry = kan_reflection_system_get_registry (reflection_system);
         global.binary_script_storage = kan_serialization_binary_script_storage_create (global.registry);
         kan_resource_pipeline_reference_type_info_storage_build (

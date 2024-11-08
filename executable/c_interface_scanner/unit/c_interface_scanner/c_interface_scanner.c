@@ -5,7 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <kan/api_common/bool.h>
+#include <kan/api_common/core_types.h>
 #include <kan/api_common/min_max.h>
 #include <kan/c_interface/builder.h>
 #include <kan/c_interface/file.h>

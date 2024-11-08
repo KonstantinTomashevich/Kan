@@ -144,7 +144,7 @@ static void execute_and_check (uint64_t nodes_count,
     }
 
     kan_workflow_graph_t graph = kan_workflow_graph_builder_finalize (builder);
-    KAN_TEST_ASSERT (graph != KAN_INVALID_WORKFLOW_GRAPH)
+    KAN_TEST_ASSERT (KAN_HANDLE_IS_VALID (graph))
     kan_workflow_graph_builder_destroy (builder);
 
     // Execute and test multiple times to check that graph is reusable.

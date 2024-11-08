@@ -909,11 +909,11 @@ KAN_TEST_CASE (singleton_access)
     kan_repository_enter_serving_mode (root_repository);
 
     {
-        kan_repository_singleton_read_access_t first_access =
+        struct kan_repository_singleton_read_access_t first_access =
             kan_repository_singleton_read_query_execute (&first_read_from_root);
 
         const struct first_singleton_t *singleton =
-            (struct first_singleton_t *) kan_repository_singleton_read_access_resolve (first_access);
+            (struct first_singleton_t *) kan_repository_singleton_read_access_resolve (&first_access);
 
         KAN_TEST_ASSERT (singleton)
         KAN_TEST_CHECK (singleton->x == 0u)
@@ -924,21 +924,21 @@ KAN_TEST_CASE (singleton_access)
         KAN_TEST_CHECK (singleton->observable_a == 0.0f)
         KAN_TEST_CHECK (singleton->observable_b == 0.0f)
 
-        kan_repository_singleton_read_access_close (first_access);
+        kan_repository_singleton_read_access_close (&first_access);
     }
 
     {
-        kan_repository_singleton_write_access_t first_access =
+        struct kan_repository_singleton_write_access_t first_access =
             kan_repository_singleton_write_query_execute (&first_write_from_child);
-        kan_repository_singleton_write_access_t second_access =
+        struct kan_repository_singleton_write_access_t second_access =
             kan_repository_singleton_write_query_execute (&second_write_from_child);
 
         struct first_singleton_t *first_singleton =
-            (struct first_singleton_t *) kan_repository_singleton_write_access_resolve (first_access);
+            (struct first_singleton_t *) kan_repository_singleton_write_access_resolve (&first_access);
         KAN_TEST_ASSERT (first_singleton)
 
         struct second_singleton_t *second_singleton =
-            (struct second_singleton_t *) kan_repository_singleton_write_access_resolve (second_access);
+            (struct second_singleton_t *) kan_repository_singleton_write_access_resolve (&second_access);
         KAN_TEST_ASSERT (second_singleton)
 
         first_singleton->x = 1u;
@@ -948,37 +948,37 @@ KAN_TEST_CASE (singleton_access)
         second_singleton->a = 42u;
         second_singleton->b = 13u;
 
-        kan_repository_singleton_write_access_close (first_access);
-        kan_repository_singleton_write_access_close (second_access);
+        kan_repository_singleton_write_access_close (&first_access);
+        kan_repository_singleton_write_access_close (&second_access);
     }
 
     {
-        kan_repository_singleton_read_access_t first_access =
+        struct kan_repository_singleton_read_access_t first_access =
             kan_repository_singleton_read_query_execute (&first_read_from_root);
 
         const struct first_singleton_t *singleton =
-            (struct first_singleton_t *) kan_repository_singleton_read_access_resolve (first_access);
+            (struct first_singleton_t *) kan_repository_singleton_read_access_resolve (&first_access);
 
         KAN_TEST_ASSERT (singleton)
         KAN_TEST_CHECK (singleton->x == 1u)
         KAN_TEST_CHECK (singleton->y == 2u)
         KAN_TEST_CHECK (singleton->observable_z == 3u)
 
-        kan_repository_singleton_read_access_close (first_access);
+        kan_repository_singleton_read_access_close (&first_access);
     }
 
     {
-        kan_repository_singleton_write_access_t second_access =
+        struct kan_repository_singleton_write_access_t second_access =
             kan_repository_singleton_write_query_execute (&second_write_from_child);
 
         struct second_singleton_t *singleton =
-            (struct second_singleton_t *) kan_repository_singleton_write_access_resolve (second_access);
+            (struct second_singleton_t *) kan_repository_singleton_write_access_resolve (&second_access);
 
         KAN_TEST_ASSERT (singleton)
         KAN_TEST_CHECK (singleton->a == 42u)
         KAN_TEST_CHECK (singleton->b == 13u)
 
-        kan_repository_singleton_write_access_close (second_access);
+        kan_repository_singleton_write_access_close (&second_access);
     }
 
     kan_repository_enter_planning_mode (root_repository);
@@ -1021,15 +1021,15 @@ KAN_TEST_CASE (singleton_write_events)
 
     // Change Z and check events.
     {
-        kan_repository_singleton_write_access_t access =
+        struct kan_repository_singleton_write_access_t access =
             kan_repository_singleton_write_query_execute (&write_singleton);
 
         struct first_singleton_t *singleton =
-            (struct first_singleton_t *) kan_repository_singleton_write_access_resolve (access);
+            (struct first_singleton_t *) kan_repository_singleton_write_access_resolve (&access);
 
         KAN_TEST_ASSERT (singleton)
         singleton->observable_z = 42u;
-        kan_repository_singleton_write_access_close (access);
+        kan_repository_singleton_write_access_close (&access);
     }
 
     check_z_changed_event (&fetch_z_changed, (struct first_singleton_z_changed_event_t) {.old_z = 0u, .new_z = 42u});
@@ -1037,16 +1037,16 @@ KAN_TEST_CASE (singleton_write_events)
 
     // Set same value to Z and check that there is no event.
     {
-        kan_repository_singleton_write_access_t access =
+        struct kan_repository_singleton_write_access_t access =
             kan_repository_singleton_write_query_execute (&write_singleton);
 
         struct first_singleton_t *singleton =
-            (struct first_singleton_t *) kan_repository_singleton_write_access_resolve (access);
+            (struct first_singleton_t *) kan_repository_singleton_write_access_resolve (&access);
 
         KAN_TEST_ASSERT (singleton)
         singleton->observable_z = 13u;
         singleton->observable_z = 42u;
-        kan_repository_singleton_write_access_close (access);
+        kan_repository_singleton_write_access_close (&access);
     }
 
     check_no_event (&fetch_z_changed);
@@ -1054,15 +1054,15 @@ KAN_TEST_CASE (singleton_write_events)
 
     // Set value to only A and check event.
     {
-        kan_repository_singleton_write_access_t access =
+        struct kan_repository_singleton_write_access_t access =
             kan_repository_singleton_write_query_execute (&write_singleton);
 
         struct first_singleton_t *singleton =
-            (struct first_singleton_t *) kan_repository_singleton_write_access_resolve (access);
+            (struct first_singleton_t *) kan_repository_singleton_write_access_resolve (&access);
 
         KAN_TEST_ASSERT (singleton)
         singleton->observable_a = 1.0f;
-        kan_repository_singleton_write_access_close (access);
+        kan_repository_singleton_write_access_close (&access);
     }
 
     check_no_event (&fetch_z_changed);
@@ -1071,15 +1071,15 @@ KAN_TEST_CASE (singleton_write_events)
 
     // Set value to only B and check event.
     {
-        kan_repository_singleton_write_access_t access =
+        struct kan_repository_singleton_write_access_t access =
             kan_repository_singleton_write_query_execute (&write_singleton);
 
         struct first_singleton_t *singleton =
-            (struct first_singleton_t *) kan_repository_singleton_write_access_resolve (access);
+            (struct first_singleton_t *) kan_repository_singleton_write_access_resolve (&access);
 
         KAN_TEST_ASSERT (singleton)
         singleton->observable_b = 2.0f;
-        kan_repository_singleton_write_access_close (access);
+        kan_repository_singleton_write_access_close (&access);
     }
 
     check_no_event (&fetch_z_changed);
@@ -1088,16 +1088,16 @@ KAN_TEST_CASE (singleton_write_events)
 
     // Set value to both A and B and check event.
     {
-        kan_repository_singleton_write_access_t access =
+        struct kan_repository_singleton_write_access_t access =
             kan_repository_singleton_write_query_execute (&write_singleton);
 
         struct first_singleton_t *singleton =
-            (struct first_singleton_t *) kan_repository_singleton_write_access_resolve (access);
+            (struct first_singleton_t *) kan_repository_singleton_write_access_resolve (&access);
 
         KAN_TEST_ASSERT (singleton)
         singleton->observable_a = 4.0f;
         singleton->observable_b = 3.0f;
-        kan_repository_singleton_write_access_close (access);
+        kan_repository_singleton_write_access_close (&access);
     }
 
     check_no_event (&fetch_z_changed);

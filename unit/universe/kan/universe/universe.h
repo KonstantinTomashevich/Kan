@@ -386,11 +386,9 @@ UNIVERSE_API void kan_universe_world_definition_init (struct kan_universe_world_
 
 UNIVERSE_API void kan_universe_world_definition_shutdown (struct kan_universe_world_definition_t *data);
 
-typedef uint64_t kan_universe_world_t;
+KAN_HANDLE_DEFINE (kan_universe_world_t);
 
-#define KAN_INVALID_UNIVERSE_WORLD 0u
-
-typedef uint64_t kan_universe_world_iterator_t;
+KAN_TYPED_ID_32_DEFINE (kan_universe_world_iterator_t);
 
 /// \brief Returns parent world of given world if any.
 UNIVERSE_API kan_universe_world_t kan_universe_world_get_parent (kan_universe_world_t world);
@@ -413,14 +411,12 @@ UNIVERSE_API kan_universe_world_t kan_universe_world_iterator_get (kan_universe_
 /// \brief Moves child world iterator to the next child world.
 UNIVERSE_API kan_universe_world_iterator_t kan_universe_world_iterator_next (kan_universe_world_iterator_t iterator);
 
-typedef uint64_t kan_universe_t;
-
-#define KAN_INVALID_UNIVERSE 0u
+KAN_HANDLE_DEFINE (kan_universe_t);
 
 /// \brief Creates new universe bound to given context and given registry.
 UNIVERSE_API kan_universe_t kan_universe_create (kan_allocation_group_t group,
                                                  kan_reflection_registry_t registry,
-                                                 kan_context_handle_t context);
+                                                 kan_context_t context);
 
 /// \brief Migrates universe to new reflection registry along with all data, all mutators and all schedulers.
 UNIVERSE_API void kan_universe_migrate (kan_universe_t universe,
@@ -432,7 +428,7 @@ UNIVERSE_API void kan_universe_migrate (kan_universe_t universe,
 UNIVERSE_API kan_reflection_registry_t kan_universe_get_reflection_registry (kan_universe_t universe);
 
 /// \brief Returns context to which this universe is bound.
-UNIVERSE_API kan_context_handle_t kan_universe_get_context (kan_universe_t universe);
+UNIVERSE_API kan_context_t kan_universe_get_context (kan_universe_t universe);
 
 /// \brief Returns root world of the universe if any.
 UNIVERSE_API kan_universe_world_t kan_universe_get_root_world (kan_universe_t universe);
@@ -466,7 +462,7 @@ UNIVERSE_API void kan_universe_undeploy_world (kan_universe_t universe, kan_univ
 /// \brief Destroys given universe and all its worlds.
 UNIVERSE_API void kan_universe_destroy (kan_universe_t universe);
 
-typedef uint64_t kan_universe_scheduler_interface_t;
+KAN_HANDLE_DEFINE (kan_universe_scheduler_interface_t);
 
 /// \brief Contains list of arguments for scheduler deploy function.
 struct kan_universe_scheduler_deploy_arguments_t

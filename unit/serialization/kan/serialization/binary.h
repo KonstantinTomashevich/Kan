@@ -2,8 +2,8 @@
 
 #include <serialization_api.h>
 
-#include <kan/api_common/bool.h>
 #include <kan/api_common/c_header.h>
+#include <kan/api_common/core_types.h>
 #include <kan/memory_profiler/allocation_group.h>
 #include <kan/reflection/registry.h>
 #include <kan/serialization/state.h>
@@ -63,7 +63,7 @@
 
 KAN_C_HEADER_BEGIN
 
-typedef uint64_t kan_serialization_binary_script_storage_t;
+KAN_HANDLE_DEFINE (kan_serialization_binary_script_storage_t);
 
 /// \brief Creates new script storage instance associated with given reflection registry.
 SERIALIZATION_API kan_serialization_binary_script_storage_t
@@ -73,9 +73,7 @@ kan_serialization_binary_script_storage_create (kan_reflection_registry_t regist
 SERIALIZATION_API void kan_serialization_binary_script_storage_destroy (
     kan_serialization_binary_script_storage_t storage);
 
-typedef uint64_t kan_serialization_interned_string_registry_t;
-
-#define KAN_INVALID_SERIALIZATION_INTERNED_STRING_REGISTRY 0u
+KAN_HANDLE_DEFINE (kan_serialization_interned_string_registry_t);
 
 /// \brief Creates new empty interned string registry, that will be later populated by writers.
 SERIALIZATION_API kan_serialization_interned_string_registry_t
@@ -87,7 +85,7 @@ SERIALIZATION_API void kan_serialization_interned_string_registry_destroy (
 
 #define KAN_INVALID_SERIALIZATION_INTERNED_STRING_REGISTRY_READER 0u
 
-typedef uint64_t kan_serialization_interned_string_registry_reader_t;
+KAN_HANDLE_DEFINE (kan_serialization_interned_string_registry_reader_t);
 
 /// \brief Creates reader for interned string registry stream.
 /// \param stream Stream with interned string registry data.
@@ -110,7 +108,7 @@ SERIALIZATION_API void kan_serialization_interned_string_registry_reader_destroy
 
 #define KAN_INVALID_SERIALIZATION_INTERNED_STRING_REGISTRY_WRITER 0u
 
-typedef uint64_t kan_serialization_interned_string_registry_writer_t;
+KAN_HANDLE_DEFINE (kan_serialization_interned_string_registry_writer_t);
 
 /// \brief Creates new writer for given interned string registry.
 SERIALIZATION_API kan_serialization_interned_string_registry_writer_t
@@ -127,7 +125,7 @@ SERIALIZATION_API void kan_serialization_interned_string_registry_writer_destroy
 
 #define KAN_INVALID_SERIALIZATION_BINARY_READER 0u
 
-typedef uint64_t kan_serialization_binary_reader_t;
+KAN_HANDLE_DEFINE (kan_serialization_binary_reader_t);
 
 /// \brief Creates new binary data reader.
 /// \param stream Binary data stream that is used as input.
@@ -158,7 +156,7 @@ SERIALIZATION_API void kan_serialization_binary_reader_destroy (kan_serializatio
 
 #define KAN_INVALID_SERIALIZATION_BINARY_WRITER 0u
 
-typedef uint64_t kan_serialization_binary_writer_t;
+KAN_HANDLE_DEFINE (kan_serialization_binary_writer_t);
 
 /// \brief Creates new binary data writer.
 /// \param stream Binary data stream that is used as output.

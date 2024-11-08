@@ -2,8 +2,8 @@
 
 #include <readable_data_api.h>
 
-#include <kan/api_common/bool.h>
 #include <kan/api_common/c_header.h>
+#include <kan/api_common/core_types.h>
 #include <kan/stream/stream.h>
 
 /// \file
@@ -206,7 +206,7 @@ enum kan_readable_data_parser_response_t
     KAN_READABLE_DATA_PARSER_RESPONSE_COMPLETED,
 };
 
-typedef uint64_t kan_readable_data_parser_t;
+KAN_HANDLE_DEFINE (kan_readable_data_parser_t);
 
 /// \brief Creates new instance of readable data parser.
 READABLE_DATA_API kan_readable_data_parser_t kan_readable_data_parser_create (struct kan_stream_t *input_stream);
@@ -222,7 +222,7 @@ READABLE_DATA_API const struct kan_readable_data_event_t *kan_readable_data_pars
 /// \brief Destroys given parser instance.
 READABLE_DATA_API void kan_readable_data_parser_destroy (kan_readable_data_parser_t parser);
 
-typedef uint64_t kan_readable_data_emitter_t;
+KAN_HANDLE_DEFINE (kan_readable_data_emitter_t);
 
 /// \brief Creates new readable data emitter instance.
 READABLE_DATA_API kan_readable_data_emitter_t kan_readable_data_emitter_create (struct kan_stream_t *output_stream);

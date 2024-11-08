@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <kan/api_common/alignment.h>
 #include <kan/api_common/min_max.h>
 #include <kan/error/critical.h>
 #include <kan/image/image.h>
@@ -24,7 +25,7 @@ static void ensure_statics_initialized (void)
 void *stb_malloc (size_t size)
 {
     ensure_statics_initialized ();
-    const uint64_t allocation_size = size + sizeof (uint64_t);
+    const uint64_t allocation_size = kan_apply_alignment (size + sizeof (uint64_t), _Alignof (uint64_t));
     uint64_t *data = kan_allocate_general (allocation_group_stb, allocation_size, _Alignof (uint64_t));
     *data = allocation_size;
     return data + 1u;
@@ -53,7 +54,7 @@ void *stb_realloc (void *pointer, size_t new_size)
 
     void *new_allocated_data = stb_malloc (new_size);
     const uint64_t old_size = *(((uint64_t *) pointer) - 1u);
-    memcpy (new_allocated_data, pointer, KAN_MIN (old_size, new_size));
+    memcpy (new_allocated_data, pointer, KAN_MIN (old_size - sizeof (uint64_t), new_size));
     stb_free (pointer);
     return new_allocated_data;
 }

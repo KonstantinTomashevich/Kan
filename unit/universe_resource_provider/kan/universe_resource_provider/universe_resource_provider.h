@@ -2,8 +2,8 @@
 
 #include <universe_resource_provider_api.h>
 
-#include <kan/api_common/bool.h>
 #include <kan/api_common/c_header.h>
+#include <kan/api_common/core_types.h>
 #include <kan/container/interned_string.h>
 #include <kan/memory_profiler/allocation_group.h>
 #include <kan/threading/atomic.h>

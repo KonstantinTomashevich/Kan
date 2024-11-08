@@ -796,7 +796,7 @@ static kan_bool_t emit_meta_gather_parameters_process_field (
 kan_bool_t kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t compiler_instance,
                                                 struct kan_rpl_meta_t *meta)
 {
-    struct rpl_compiler_instance_t *instance = (struct rpl_compiler_instance_t *) compiler_instance;
+    struct rpl_compiler_instance_t *instance = KAN_HANDLE_GET (compiler_instance);
     meta->pipeline_type = instance->pipeline_type;
     kan_bool_t valid = KAN_TRUE;
 

@@ -15,23 +15,23 @@ KAN_LOG_DEFINE_CATEGORY (update_system);
 struct update_connection_request_t
 {
     struct update_connection_request_t *next;
-    kan_context_system_handle_t system;
+    kan_context_system_t system;
     kan_context_update_run_t functor;
     kan_bool_t added;
     uint64_t dependencies_count;
     uint64_t dependencies_left;
-    kan_context_system_handle_t *dependencies;
+    kan_context_system_t *dependencies;
 };
 
 struct update_callable_t
 {
-    kan_context_system_handle_t system;
+    kan_context_system_t system;
     kan_context_update_run_t functor;
 };
 
 struct update_system_t
 {
-    kan_context_handle_t context;
+    kan_context_t context;
     kan_allocation_group_t group;
 
     /// \meta reflection_dynamic_array_type = "struct update_callable_t"
@@ -43,8 +43,7 @@ struct update_system_t
     kan_cpu_section_t update_section;
 };
 
-CONTEXT_UPDATE_SYSTEM_API kan_context_system_handle_t update_system_create (kan_allocation_group_t group,
-                                                                            void *user_config)
+CONTEXT_UPDATE_SYSTEM_API kan_context_system_t update_system_create (kan_allocation_group_t group, void *user_config)
 {
     struct update_system_t *system =
         kan_allocate_general (group, sizeof (struct update_system_t), _Alignof (struct update_system_t));
@@ -54,12 +53,12 @@ CONTEXT_UPDATE_SYSTEM_API kan_context_system_handle_t update_system_create (kan_
     system->connection_request_count = 0u;
     system->first_connection_request = NULL;
     system->update_section = kan_cpu_section_get ("context_update_system");
-    return (kan_context_system_handle_t) system;
+    return KAN_HANDLE_SET (kan_context_system_t, system);
 }
 
-CONTEXT_UPDATE_SYSTEM_API void update_system_connect (kan_context_system_handle_t handle, kan_context_handle_t context)
+CONTEXT_UPDATE_SYSTEM_API void update_system_connect (kan_context_system_t handle, kan_context_t context)
 {
-    struct update_system_t *system = (struct update_system_t *) handle;
+    struct update_system_t *system = KAN_HANDLE_GET (handle);
     system->context = context;
 }
 
@@ -85,7 +84,7 @@ static void visit_to_generate_update_sequence (struct update_system_t *system,
     {
         for (uint64_t index = 0u; index < other_request->dependencies_count; ++index)
         {
-            if (other_request->dependencies[index] == request->system)
+            if (KAN_HANDLE_IS_EQUAL (other_request->dependencies[index], request->system))
             {
                 --other_request->dependencies_left;
                 visit_to_generate_update_sequence (system, other_request);
@@ -97,9 +96,9 @@ static void visit_to_generate_update_sequence (struct update_system_t *system,
     }
 }
 
-CONTEXT_UPDATE_SYSTEM_API void update_system_init (kan_context_system_handle_t handle)
+CONTEXT_UPDATE_SYSTEM_API void update_system_init (kan_context_system_t handle)
 {
-    struct update_system_t *system = (struct update_system_t *) handle;
+    struct update_system_t *system = KAN_HANDLE_GET (handle);
     if (!system->first_connection_request)
     {
         return;
@@ -125,9 +124,8 @@ CONTEXT_UPDATE_SYSTEM_API void update_system_init (kan_context_system_handle_t h
 
         if (system->first_connection_request->dependencies)
         {
-            kan_free_general (
-                system->group, system->first_connection_request->dependencies,
-                sizeof (kan_context_system_handle_t) * system->first_connection_request->dependencies_count);
+            kan_free_general (system->group, system->first_connection_request->dependencies,
+                              sizeof (kan_context_system_t) * system->first_connection_request->dependencies_count);
         }
 
         kan_free_batched (system->group, system->first_connection_request);
@@ -141,17 +139,17 @@ CONTEXT_UPDATE_SYSTEM_API void update_system_init (kan_context_system_handle_t h
     }
 }
 
-CONTEXT_UPDATE_SYSTEM_API void update_system_shutdown (kan_context_system_handle_t handle)
+CONTEXT_UPDATE_SYSTEM_API void update_system_shutdown (kan_context_system_t handle)
 {
 }
 
-CONTEXT_UPDATE_SYSTEM_API void update_system_disconnect (kan_context_system_handle_t handle)
+CONTEXT_UPDATE_SYSTEM_API void update_system_disconnect (kan_context_system_t handle)
 {
 }
 
-CONTEXT_UPDATE_SYSTEM_API void update_system_destroy (kan_context_system_handle_t handle)
+CONTEXT_UPDATE_SYSTEM_API void update_system_destroy (kan_context_system_t handle)
 {
-    struct update_system_t *system = (struct update_system_t *) handle;
+    struct update_system_t *system = KAN_HANDLE_GET (handle);
     KAN_ASSERT (!system->first_connection_request)
     KAN_ASSERT (system->update_sequence.size == 0u)
     kan_dynamic_array_shutdown (&system->update_sequence);
@@ -168,13 +166,13 @@ CONTEXT_UPDATE_SYSTEM_API struct kan_context_system_api_t KAN_CONTEXT_SYSTEM_API
     .destroy = update_system_destroy,
 };
 
-void kan_update_system_connect_on_run (kan_context_system_handle_t update_system,
-                                       kan_context_system_handle_t other_system,
+void kan_update_system_connect_on_run (kan_context_system_t update_system,
+                                       kan_context_system_t other_system,
                                        kan_context_update_run_t functor,
                                        uint64_t dependencies_count,
-                                       kan_context_system_handle_t *dependencies)
+                                       kan_context_system_t *dependencies)
 {
-    struct update_system_t *system = (struct update_system_t *) update_system;
+    struct update_system_t *system = KAN_HANDLE_GET (update_system);
     struct update_connection_request_t *request =
         kan_allocate_batched (system->group, sizeof (struct update_connection_request_t));
     request->system = other_system;
@@ -184,10 +182,9 @@ void kan_update_system_connect_on_run (kan_context_system_handle_t update_system
 
     if (request->dependencies_count > 0u)
     {
-        request->dependencies =
-            kan_allocate_general (system->group, sizeof (kan_context_system_handle_t) * dependencies_count,
-                                  _Alignof (kan_context_system_handle_t));
-        memcpy (request->dependencies, dependencies, sizeof (kan_context_system_handle_t) * dependencies_count);
+        request->dependencies = kan_allocate_general (system->group, sizeof (kan_context_system_t) * dependencies_count,
+                                                      _Alignof (kan_context_system_t));
+        memcpy (request->dependencies, dependencies, sizeof (kan_context_system_t) * dependencies_count);
     }
     else
     {
@@ -200,17 +197,16 @@ void kan_update_system_connect_on_run (kan_context_system_handle_t update_system
     ++system->connection_request_count;
 }
 
-void kan_update_system_disconnect_on_run (kan_context_system_handle_t update_system,
-                                          kan_context_system_handle_t other_system)
+void kan_update_system_disconnect_on_run (kan_context_system_t update_system, kan_context_system_t other_system)
 {
-    struct update_system_t *system = (struct update_system_t *) update_system;
+    struct update_system_t *system = KAN_HANDLE_GET (update_system);
     // Check that we're not in connection phase.
     KAN_ASSERT (!system->first_connection_request)
 
     for (uint64_t index = 0u; index < system->update_sequence.size; ++index)
     {
         struct update_callable_t *callable = &((struct update_callable_t *) system->update_sequence.data)[index];
-        if (callable->system == other_system)
+        if (KAN_HANDLE_IS_EQUAL (callable->system, other_system))
         {
             kan_dynamic_array_remove_at (&system->update_sequence, index);
             return;
@@ -218,9 +214,9 @@ void kan_update_system_disconnect_on_run (kan_context_system_handle_t update_sys
     }
 }
 
-void kan_update_system_run (kan_context_system_handle_t update_system)
+void kan_update_system_run (kan_context_system_t update_system)
 {
-    struct update_system_t *system = (struct update_system_t *) update_system;
+    struct update_system_t *system = KAN_HANDLE_GET (update_system);
     struct kan_cpu_section_execution_t execution;
     kan_cpu_section_execution_init (&execution, system->update_section);
 

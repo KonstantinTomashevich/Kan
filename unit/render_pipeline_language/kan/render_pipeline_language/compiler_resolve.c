@@ -4137,7 +4137,7 @@ kan_rpl_compiler_instance_t kan_rpl_compiler_context_resolve (kan_rpl_compiler_c
                                                               uint64_t entry_point_count,
                                                               struct kan_rpl_entry_point_t *entry_points)
 {
-    struct rpl_compiler_context_t *context = (struct rpl_compiler_context_t *) compiler_context;
+    struct rpl_compiler_context_t *context = KAN_HANDLE_GET (compiler_context);
     struct rpl_compiler_instance_t *instance =
         kan_allocate_general (STATICS.rpl_compiler_instance_allocation_group, sizeof (struct rpl_compiler_instance_t),
                               _Alignof (struct rpl_compiler_instance_t));
@@ -4224,12 +4224,14 @@ kan_rpl_compiler_instance_t kan_rpl_compiler_context_resolve (kan_rpl_compiler_c
     }
 
     kan_stack_group_allocator_reset (&context->resolve_allocator);
+    kan_rpl_compiler_instance_t handle = KAN_HANDLE_SET (kan_rpl_compiler_instance_t, instance);
+
     if (successfully_resolved)
     {
         // Here we would like to apply optimizations on compiled AST in future.
-        return (kan_rpl_compiler_instance_t) instance;
+        return handle;
     }
 
-    kan_rpl_compiler_instance_destroy ((kan_rpl_compiler_instance_t) instance);
-    return KAN_INVALID_RPL_COMPILER_INSTANCE;
+    kan_rpl_compiler_instance_destroy (handle);
+    return KAN_HANDLE_SET_INVALID (kan_rpl_compiler_instance_t);
 }

@@ -135,29 +135,30 @@
 
 KAN_C_HEADER_BEGIN
 
-typedef uint64_t kan_repository_t;
-
-#define KAN_INVALID_REPOSITORY_SINGLETON_STORAGE 0u
-
-typedef uint64_t kan_repository_singleton_storage_t;
+KAN_HANDLE_DEFINE (kan_repository_t);
+KAN_HANDLE_DEFINE (kan_repository_singleton_storage_t);
 
 struct kan_repository_singleton_read_query_t
 {
     void *implementation_data;
 };
 
-typedef uint64_t kan_repository_singleton_read_access_t;
+struct kan_repository_singleton_read_access_t
+{
+    void *implementation_data;
+};
 
 struct kan_repository_singleton_write_query_t
 {
     void *implementation_data;
 };
 
-typedef uint64_t kan_repository_singleton_write_access_t;
+struct kan_repository_singleton_write_access_t
+{
+    void *implementation_data;
+};
 
-#define KAN_INVALID_REPOSITORY_INDEXED_STORAGE 0u
-
-typedef uint64_t kan_repository_indexed_storage_t;
+KAN_HANDLE_DEFINE (kan_repository_indexed_storage_t);
 
 struct kan_repository_indexed_insert_query_t
 {
@@ -519,7 +520,7 @@ struct kan_repository_indexed_space_write_access_t
 
 #define KAN_INVALID_REPOSITORY_EVENT_STORAGE 0u
 
-typedef uint64_t kan_repository_event_storage_t;
+KAN_HANDLE_DEFINE (kan_repository_event_storage_t);
 
 struct kan_repository_event_insert_query_t
 {
@@ -584,16 +585,17 @@ REPOSITORY_API void kan_repository_singleton_read_query_init (struct kan_reposit
 
 /// \brief Executes query to get read access to underlying singleton.
 /// \invariant Should be called in serving mode.
-REPOSITORY_API kan_repository_singleton_read_access_t
-kan_repository_singleton_read_query_execute (struct kan_repository_singleton_read_query_t *query);
+REPOSITORY_API struct kan_repository_singleton_read_access_t kan_repository_singleton_read_query_execute (
+    struct kan_repository_singleton_read_query_t *query);
 
 /// \brief Resolves read access to get pointer to underlying singleton instance.
 /// \invariant Should be called in serving mode.
-REPOSITORY_API const void *kan_repository_singleton_read_access_resolve (kan_repository_singleton_read_access_t access);
+REPOSITORY_API const void *kan_repository_singleton_read_access_resolve (
+    struct kan_repository_singleton_read_access_t *access);
 
 /// \brief Closes read access and ends its lifetime.
 /// \invariant Should be called in serving mode.
-REPOSITORY_API void kan_repository_singleton_read_access_close (kan_repository_singleton_read_access_t access);
+REPOSITORY_API void kan_repository_singleton_read_access_close (struct kan_repository_singleton_read_access_t *access);
 
 /// \brief Marks query as unused so pointed resources might be freed if possible later.
 /// \invariant Should be called in planning mode.
@@ -606,16 +608,18 @@ REPOSITORY_API void kan_repository_singleton_write_query_init (struct kan_reposi
 
 /// \brief Executes query to get read-write access to underlying singleton.
 /// \invariant Should be called in serving mode.
-REPOSITORY_API kan_repository_singleton_write_access_t
-kan_repository_singleton_write_query_execute (struct kan_repository_singleton_write_query_t *query);
+REPOSITORY_API struct kan_repository_singleton_write_access_t kan_repository_singleton_write_query_execute (
+    struct kan_repository_singleton_write_query_t *query);
 
 /// \brief Resolves read-write access to get pointer to underlying singleton instance.
 /// \invariant Should be called in serving mode.
-REPOSITORY_API void *kan_repository_singleton_write_access_resolve (kan_repository_singleton_write_access_t access);
+REPOSITORY_API void *kan_repository_singleton_write_access_resolve (
+    struct kan_repository_singleton_write_access_t *access);
 
 /// \brief Closes read-write access and ends its lifetime.
 /// \invariant Should be called in serving mode.
-REPOSITORY_API void kan_repository_singleton_write_access_close (kan_repository_singleton_write_access_t access);
+REPOSITORY_API void kan_repository_singleton_write_access_close (
+    struct kan_repository_singleton_write_access_t *access);
 
 /// \brief Marks query as unused so pointed resources might be freed if possible later.
 /// \invariant Should be called in planning mode.

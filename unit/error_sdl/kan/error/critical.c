@@ -20,7 +20,7 @@ KAN_LOG_DEFINE_CATEGORY (error);
 struct critical_error_context_t
 {
     kan_bool_t is_interactive;
-    kan_mutex_handle_t interactive_mutex;
+    kan_mutex_t interactive_mutex;
     struct kan_hash_storage_t skipped_error_storage;
 };
 

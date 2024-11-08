@@ -2,7 +2,7 @@
 
 #include <reflection_api.h>
 
-#include <kan/api_common/bool.h>
+#include <kan/api_common/core_types.h>
 #include <kan/memory_profiler/allocation_group.h>
 #include <kan/reflection/registry.h>
 
@@ -41,11 +41,9 @@
 
 KAN_C_HEADER_BEGIN
 
-typedef uint64_t kan_reflection_patch_builder_t;
+KAN_HANDLE_DEFINE (kan_reflection_patch_builder_t);
 
-typedef uint64_t kan_reflection_patch_t;
-
-#define KAN_INVALID_REFLECTION_PATCH 0u
+KAN_HANDLE_DEFINE (kan_reflection_patch_t);
 
 #define KAN_INVALID_REFLECTION_PATCH_BUILDER 0u
 
@@ -57,7 +55,7 @@ struct kan_reflection_patch_chunk_info_t
     void *data;
 };
 
-typedef uint64_t kan_reflection_patch_iterator_t;
+KAN_HANDLE_DEFINE (kan_reflection_patch_iterator_t);
 
 /// \brief Creates new instance of patch builder.
 REFLECTION_API kan_reflection_patch_builder_t kan_reflection_patch_builder_create (void);

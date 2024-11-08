@@ -272,18 +272,18 @@ void render_backend_pass_instance_add_dependency_internal (struct render_backend
 kan_render_pass_t kan_render_pass_create (kan_render_context_t context,
                                           struct kan_render_pass_description_t *description)
 {
-    struct render_backend_system_t *system = (struct render_backend_system_t *) context;
+    struct render_backend_system_t *system = KAN_HANDLE_GET (context);
     struct kan_cpu_section_execution_t execution;
     kan_cpu_section_execution_init (&execution, system->section_create_pass);
     struct render_backend_pass_t *pass = render_backend_system_create_pass (system, description);
     kan_cpu_section_execution_shutdown (&execution);
-    return pass ? (kan_render_pass_t) pass : KAN_INVALID_RENDER_PASS;
+    return pass ? KAN_HANDLE_SET (kan_render_pass_t, pass) : KAN_HANDLE_SET_INVALID (kan_render_pass_t);
 }
 
 void kan_render_pass_add_static_dependency (kan_render_pass_t pass, kan_render_pass_t dependency)
 {
-    struct render_backend_pass_t *dependant_pass = (struct render_backend_pass_t *) pass;
-    struct render_backend_pass_t *dependency_pass = (struct render_backend_pass_t *) dependency;
+    struct render_backend_pass_t *dependant_pass = KAN_HANDLE_GET (pass);
+    struct render_backend_pass_t *dependency_pass = KAN_HANDLE_GET (dependency);
 
     kan_atomic_int_lock (&dependant_pass->system->pass_static_dependency_lock);
     struct render_backend_pass_dependency_t *dependency_info = dependency_pass->first_dependant_pass;
@@ -318,8 +318,8 @@ kan_render_pass_instance_t kan_render_pass_instantiate (kan_render_pass_t pass,
                                                         struct kan_render_integer_region_t *scissor,
                                                         struct kan_render_clear_value_t *attachment_clear_values)
 {
-    struct render_backend_pass_t *pass_data = (struct render_backend_pass_t *) pass;
-    struct render_backend_frame_buffer_t *frame_buffer_data = (struct render_backend_frame_buffer_t *) frame_buffer;
+    struct render_backend_pass_t *pass_data = KAN_HANDLE_GET (pass);
+    struct render_backend_frame_buffer_t *frame_buffer_data = KAN_HANDLE_GET (frame_buffer);
 
     struct kan_cpu_section_execution_t execution;
     kan_cpu_section_execution_init (&execution, pass_data->system->section_create_pass_instance);
@@ -332,7 +332,7 @@ kan_render_pass_instance_t kan_render_pass_instantiate (kan_render_pass_t pass,
     if (!pass_data->system->frame_started)
     {
         kan_cpu_section_execution_shutdown (&execution);
-        return KAN_INVALID_RENDER_PASS_INSTANCE;
+        return KAN_HANDLE_SET_INVALID (kan_render_pass_instance_t);
     }
 
     struct render_backend_command_state_t *command_state =
@@ -409,7 +409,7 @@ kan_render_pass_instance_t kan_render_pass_instantiate (kan_render_pass_t pass,
         KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR,
                  "Failed to retrieve command buffer for new pass \"%s\" instance.", pass_data->tracking_name)
         kan_cpu_section_execution_shutdown (&execution);
-        return KAN_INVALID_RENDER_PASS_INSTANCE;
+        return KAN_HANDLE_SET_INVALID (kan_render_pass_instance_t);
     }
 
     kan_atomic_int_lock (&pass_data->system->pass_instance_state_management_lock);
@@ -422,7 +422,7 @@ kan_render_pass_instance_t kan_render_pass_instantiate (kan_render_pass_t pass,
     instance->pass = pass_data;
 
     instance->command_buffer = command_buffer;
-    instance->frame_buffer = (struct render_backend_frame_buffer_t *) frame_buffer;
+    instance->frame_buffer = KAN_HANDLE_GET (frame_buffer);
     instance->current_pipeline_layout = VK_NULL_HANDLE;
     instance->dependencies_left = 0u;
     instance->first_dependant = NULL;
@@ -521,14 +521,14 @@ kan_render_pass_instance_t kan_render_pass_instantiate (kan_render_pass_t pass,
     kan_atomic_int_unlock (&command_state->command_operation_lock);
 
     kan_cpu_section_execution_shutdown (&execution);
-    return (kan_render_pass_instance_t) instance;
+    return KAN_HANDLE_SET (kan_render_pass_instance_t, instance);
 }
 
 void kan_render_pass_instance_add_dynamic_dependency (kan_render_pass_instance_t pass_instance,
                                                       kan_render_pass_instance_t dependency)
 {
-    struct render_backend_pass_instance_t *dependant_instance = (struct render_backend_pass_instance_t *) pass_instance;
-    struct render_backend_pass_instance_t *dependency_instance = (struct render_backend_pass_instance_t *) dependency;
+    struct render_backend_pass_instance_t *dependant_instance = KAN_HANDLE_GET (pass_instance);
+    struct render_backend_pass_instance_t *dependency_instance = KAN_HANDLE_GET (dependency);
 
     kan_atomic_int_lock (&dependant_instance->system->pass_instance_state_management_lock);
     render_backend_pass_instance_add_dependency_internal (dependant_instance, dependency_instance);
@@ -538,9 +538,8 @@ void kan_render_pass_instance_add_dynamic_dependency (kan_render_pass_instance_t
 kan_bool_t kan_render_pass_instance_graphics_pipeline (kan_render_pass_instance_t pass_instance,
                                                        kan_render_graphics_pipeline_t graphics_pipeline)
 {
-    struct render_backend_pass_instance_t *instance = (struct render_backend_pass_instance_t *) pass_instance;
-    struct render_backend_graphics_pipeline_t *pipeline =
-        (struct render_backend_graphics_pipeline_t *) graphics_pipeline;
+    struct render_backend_pass_instance_t *instance = KAN_HANDLE_GET (pass_instance);
+    struct render_backend_graphics_pipeline_t *pipeline = KAN_HANDLE_GET (graphics_pipeline);
 
     if (pipeline->pipeline == VK_NULL_HANDLE)
     {
@@ -594,7 +593,7 @@ void kan_render_pass_instance_pipeline_parameter_sets (kan_render_pass_instance_
                                                        uint32_t parameter_sets_count,
                                                        kan_render_pipeline_parameter_set_t *parameter_sets)
 {
-    struct render_backend_pass_instance_t *instance = (struct render_backend_pass_instance_t *) pass_instance;
+    struct render_backend_pass_instance_t *instance = KAN_HANDLE_GET (pass_instance);
     KAN_ASSERT (instance->current_pipeline_layout)
     struct render_backend_command_state_t *command_state =
         &instance->system->command_states[instance->system->current_frame_in_flight_index];
@@ -602,9 +601,7 @@ void kan_render_pass_instance_pipeline_parameter_sets (kan_render_pass_instance_
     // Mutate unstable parameter sets if needed.
     for (uint64_t index = 0u; index < parameter_sets_count; ++index)
     {
-        struct render_backend_pipeline_parameter_set_t *set =
-            (struct render_backend_pipeline_parameter_set_t *) parameter_sets[index];
-
+        struct render_backend_pipeline_parameter_set_t *set = KAN_HANDLE_GET (parameter_sets[index]);
         if (!set->layout->stable_binding && set->unstable.last_accessed_allocation_index != UINT32_MAX &&
             set->unstable.last_accessed_allocation_index != set->system->current_frame_in_flight_index)
         {
@@ -620,8 +617,7 @@ void kan_render_pass_instance_pipeline_parameter_sets (kan_render_pass_instance_
     for (uint64_t index = 0u; index < parameter_sets_count; ++index)
     {
         // We don't implement sequential set optimization as it looks like it is not worth it in most cases for us.
-        struct render_backend_pipeline_parameter_set_t *set =
-            (struct render_backend_pipeline_parameter_set_t *) parameter_sets[index];
+        struct render_backend_pipeline_parameter_set_t *set = KAN_HANDLE_GET (parameter_sets[index]);
 
         VkDescriptorSet descriptor_set;
         if (set->layout->stable_binding)
@@ -648,7 +644,7 @@ void kan_render_pass_instance_attributes (kan_render_pass_instance_t pass_instan
                                           uint32_t buffers_count,
                                           kan_render_buffer_t *buffers)
 {
-    struct render_backend_pass_instance_t *instance = (struct render_backend_pass_instance_t *) pass_instance;
+    struct render_backend_pass_instance_t *instance = KAN_HANDLE_GET (pass_instance);
     struct render_backend_command_state_t *command_state =
         &instance->system->command_states[instance->system->current_frame_in_flight_index];
 
@@ -668,8 +664,9 @@ void kan_render_pass_instance_attributes (kan_render_pass_instance_t pass_instan
 
     for (uint64_t index = 0u; index < buffers_count; ++index)
     {
-        KAN_ASSERT (((struct render_backend_buffer_t *) buffers[index])->type == KAN_RENDER_BUFFER_TYPE_ATTRIBUTE)
-        buffer_handles[index] = ((struct render_backend_buffer_t *) buffers[index])->buffer;
+        struct render_backend_buffer_t *buffer = KAN_HANDLE_GET (buffers[index]);
+        KAN_ASSERT (buffer->type == KAN_RENDER_BUFFER_TYPE_ATTRIBUTE)
+        buffer_handles[index] = buffer->buffer;
         buffer_offsets[index] = 0u;
     }
 
@@ -689,8 +686,8 @@ void kan_render_pass_instance_attributes (kan_render_pass_instance_t pass_instan
 
 void kan_render_pass_instance_indices (kan_render_pass_instance_t pass_instance, kan_render_buffer_t buffer)
 {
-    struct render_backend_pass_instance_t *instance = (struct render_backend_pass_instance_t *) pass_instance;
-    struct render_backend_buffer_t *index_buffer = (struct render_backend_buffer_t *) buffer;
+    struct render_backend_pass_instance_t *instance = KAN_HANDLE_GET (pass_instance);
+    struct render_backend_buffer_t *index_buffer = KAN_HANDLE_GET (buffer);
 
     KAN_ASSERT (index_buffer->type == KAN_RENDER_BUFFER_TYPE_INDEX_16 ||
                 index_buffer->type == KAN_RENDER_BUFFER_TYPE_INDEX_32)
@@ -710,7 +707,7 @@ void kan_render_pass_instance_draw (kan_render_pass_instance_t pass_instance,
                                     uint32_t index_count,
                                     uint32_t vertex_offset)
 {
-    struct render_backend_pass_instance_t *instance = (struct render_backend_pass_instance_t *) pass_instance;
+    struct render_backend_pass_instance_t *instance = KAN_HANDLE_GET (pass_instance);
     struct render_backend_command_state_t *command_state =
         &instance->system->command_states[instance->system->current_frame_in_flight_index];
 
@@ -726,7 +723,7 @@ void kan_render_pass_instance_instanced_draw (kan_render_pass_instance_t pass_in
                                               uint32_t instance_offset,
                                               uint32_t instance_count)
 {
-    struct render_backend_pass_instance_t *instance = (struct render_backend_pass_instance_t *) pass_instance;
+    struct render_backend_pass_instance_t *instance = KAN_HANDLE_GET (pass_instance);
     struct render_backend_command_state_t *command_state =
         &instance->system->command_states[instance->system->current_frame_in_flight_index];
 
@@ -738,7 +735,7 @@ void kan_render_pass_instance_instanced_draw (kan_render_pass_instance_t pass_in
 
 void kan_render_pass_destroy (kan_render_pass_t pass)
 {
-    struct render_backend_pass_t *data = (struct render_backend_pass_t *) pass;
+    struct render_backend_pass_t *data = KAN_HANDLE_GET (pass);
     struct render_backend_schedule_state_t *schedule = render_backend_system_get_schedule_for_destroy (data->system);
     kan_atomic_int_lock (&schedule->schedule_lock);
 

@@ -1,7 +1,7 @@
 #include <stddef.h>
 #include <stdlib.h>
 
-#include <kan/api_common/bool.h>
+#include <kan/api_common/core_types.h>
 #include <kan/container/hash_storage.h>
 #include <kan/container/interned_string.h>
 #include <kan/cpu_profiler/markup.h>
@@ -47,7 +47,7 @@ kan_cpu_section_t kan_cpu_section_get (const char *name)
         if (node->name == interned_name)
         {
             kan_atomic_int_unlock (&section_storage_lock);
-            return (kan_cpu_section_t) node;
+            return KAN_HANDLE_SET (kan_cpu_section_t, node);
         }
 
         node = (struct section_node_t *) node->node.list_node.next;
@@ -66,12 +66,13 @@ kan_cpu_section_t kan_cpu_section_get (const char *name)
     kan_hash_storage_update_bucket_count_default (&section_storage, KAN_CPU_PROFILER_TRACY_INITIAL_SECTION_BUCKETS);
     kan_hash_storage_add (&section_storage, &new_node->node);
     kan_atomic_int_unlock (&section_storage_lock);
-    return (kan_cpu_section_t) new_node;
+    return KAN_HANDLE_SET (kan_cpu_section_t, new_node);
 }
 
 void kan_cpu_section_set_color (kan_cpu_section_t section, uint32_t rgba_color)
 {
-    ((struct section_node_t *) section)->location.color = rgba_color;
+    struct section_node_t *section_data = KAN_HANDLE_GET (section);
+    section_data->location.color = rgba_color;
 }
 
 _Static_assert (sizeof (struct kan_cpu_section_execution_t) >= sizeof (struct ___tracy_c_zone_context),
@@ -79,8 +80,8 @@ _Static_assert (sizeof (struct kan_cpu_section_execution_t) >= sizeof (struct __
 
 void kan_cpu_section_execution_init (struct kan_cpu_section_execution_t *execution, kan_cpu_section_t section)
 {
-    *(struct ___tracy_c_zone_context *) execution =
-        ___tracy_emit_zone_begin (&((struct section_node_t *) section)->location, 1);
+    struct section_node_t *section_data = KAN_HANDLE_GET (section);
+    *(struct ___tracy_c_zone_context *) execution = ___tracy_emit_zone_begin (&section_data->location, 1);
 }
 
 void kan_cpu_section_execution_shutdown (struct kan_cpu_section_execution_t *execution)

@@ -2,8 +2,8 @@
 
 #include <context_render_backend_system_api.h>
 
-#include <kan/api_common/bool.h>
 #include <kan/api_common/c_header.h>
+#include <kan/api_common/core_types.h>
 #include <kan/container/interned_string.h>
 #include <kan/context/application_system.h>
 #include <kan/context/context.h>
@@ -162,57 +162,20 @@
 
 KAN_C_HEADER_BEGIN
 
-typedef uint64_t kan_render_context_t;
-
-#define KAN_INVALID_RENDER_CONTEXT 0u
-
-typedef uint64_t kan_render_device_id_t;
-
-typedef uint64_t kan_render_surface_t;
-
-#define KAN_INVALID_RENDER_SURFACE 0u
-
-typedef uint64_t kan_render_frame_buffer_t;
-
-#define KAN_INVALID_FRAME_BUFFER 0u
-
-typedef uint64_t kan_render_pass_t;
-
-#define KAN_INVALID_RENDER_PASS 0u
-
-typedef uint64_t kan_render_pass_instance_t;
-
-#define KAN_INVALID_RENDER_PASS_INSTANCE 0u
-
-typedef uint64_t kan_render_graphics_pipeline_family_t;
-
-#define KAN_INVALID_RENDER_GRAPHICS_PIPELINE_FAMILY 0u
-
-typedef uint64_t kan_render_code_module_t;
-
-#define KAN_INVALID_RENDER_CODE_MODULE 0u
-
-typedef uint64_t kan_render_graphics_pipeline_t;
-
-#define KAN_INVALID_RENDER_GRAPHICS_PIPELINE 0u
-
-typedef uint64_t kan_render_pipeline_parameter_set_t;
-
-#define KAN_INVALID_RENDER_PIPELINE_PARAMETER_SET 0u
-
-typedef uint64_t kan_render_buffer_t;
-
-#define KAN_INVALID_RENDER_BUFFER 0u
-
-typedef uint64_t kan_render_frame_lifetime_buffer_allocator_t;
-
-typedef uint64_t kan_render_image_t;
-
-#define KAN_INVALID_RENDER_IMAGE 0u
-
-typedef uint64_t kan_render_read_back_status_t;
-
-#define KAN_INVALID_RENDER_READ_BACK_STATUS 0u
+KAN_HANDLE_DEFINE (kan_render_context_t);
+KAN_HANDLE_DEFINE (kan_render_device_t);
+KAN_HANDLE_DEFINE (kan_render_surface_t);
+KAN_HANDLE_DEFINE (kan_render_frame_buffer_t);
+KAN_HANDLE_DEFINE (kan_render_pass_t);
+KAN_HANDLE_DEFINE (kan_render_pass_instance_t);
+KAN_HANDLE_DEFINE (kan_render_graphics_pipeline_family_t);
+KAN_HANDLE_DEFINE (kan_render_code_module_t);
+KAN_HANDLE_DEFINE (kan_render_graphics_pipeline_t);
+KAN_HANDLE_DEFINE (kan_render_pipeline_parameter_set_t);
+KAN_HANDLE_DEFINE (kan_render_buffer_t);
+KAN_HANDLE_DEFINE (kan_render_frame_lifetime_buffer_allocator_t);
+KAN_HANDLE_DEFINE (kan_render_image_t);
+KAN_HANDLE_DEFINE (kan_render_read_back_status_t);
 
 /// \brief System name for requirements and queries.
 #define KAN_CONTEXT_RENDER_BACKEND_SYSTEM_NAME "render_backend_system_t"
@@ -347,7 +310,7 @@ enum kan_render_image_format_t
 /// \brief Describes information about found supported device.
 struct kan_render_supported_device_info_t
 {
-    kan_render_device_id_t id;
+    kan_render_device_t id;
     const char *name;
     enum kan_render_device_type_t device_type;
     enum kan_render_device_memory_type_t memory_type;
@@ -363,22 +326,22 @@ struct kan_render_supported_devices_t
 
 /// \brief Returns cached information about all found supported devices.
 CONTEXT_RENDER_BACKEND_SYSTEM_API struct kan_render_supported_devices_t *kan_render_backend_system_get_devices (
-    kan_context_system_handle_t render_backend_system);
+    kan_context_system_t render_backend_system);
 
 /// \brief Initializes render backend system with given physical device.
 ///        If successfully initialized, cannot be initialized again.
-CONTEXT_RENDER_BACKEND_SYSTEM_API kan_bool_t kan_render_backend_system_select_device (
-    kan_context_system_handle_t render_backend_system, kan_render_device_id_t device);
+CONTEXT_RENDER_BACKEND_SYSTEM_API kan_bool_t
+kan_render_backend_system_select_device (kan_context_system_t render_backend_system, kan_render_device_t device);
 
 /// \brief Returns render context that is used with most other render backend functions.
 CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_context_t
-kan_render_backend_system_get_render_context (kan_context_system_handle_t render_backend_system);
+kan_render_backend_system_get_render_context (kan_context_system_t render_backend_system);
 
 /// \details Submits recorded commands and presentation from previous frame, prepares data for the new frame.
 /// \return True if next frame submit should be started, false otherwise. For example, we might not be able to submit
 ///         new frame while using frames in flights when GPU is not fast enough to process all the frames.
 CONTEXT_RENDER_BACKEND_SYSTEM_API kan_bool_t
-kan_render_backend_system_next_frame (kan_context_system_handle_t render_backend_system);
+kan_render_backend_system_next_frame (kan_context_system_t render_backend_system);
 
 /// \brief Utility structure for integer regions.
 struct kan_render_integer_region_t
@@ -392,8 +355,8 @@ struct kan_render_integer_region_t
 /// \brief Requests new render surface to be created. Surface will be created and initialized when
 ///        given application window becomes available.
 CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_surface_t
-kan_render_backend_system_create_surface (kan_context_system_handle_t render_backend_system,
-                                          kan_application_system_window_handle_t window,
+kan_render_backend_system_create_surface (kan_context_system_t render_backend_system,
+                                          kan_application_system_window_t window,
                                           kan_interned_string_t tracking_name);
 
 /// \brief Blits given image onto given surface at the end of the frame.
@@ -405,7 +368,7 @@ CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_backend_system_present_image_o
 
 /// \brief Requests given surface to be destroyed when possible.
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_backend_system_destroy_surface (
-    kan_context_system_handle_t render_backend_system, kan_render_surface_t surface);
+    kan_context_system_t render_backend_system, kan_render_surface_t surface);
 
 /// \brief Returns flags that are required for application windows in order to create surfaces.
 CONTEXT_RENDER_BACKEND_SYSTEM_API enum kan_platform_window_flag_t kan_render_get_required_window_flags (void);
@@ -947,7 +910,7 @@ struct kan_render_pipeline_parameter_set_description_t
 /// \brief Contains information for buffer binding update.
 struct kan_render_parameter_update_description_buffer_t
 {
-    kan_render_frame_buffer_t buffer;
+    kan_render_buffer_t buffer;
     uint32_t offset;
     uint32_t range;
 };

@@ -25,20 +25,20 @@ KAN_C_HEADER_BEGIN
 /// \brief System name for requirements and queries.
 #define KAN_CONTEXT_UPDATE_SYSTEM_NAME "update_system_t"
 
-typedef void (*kan_context_update_run_t) (kan_context_system_handle_t system);
+typedef void (*kan_context_update_run_t) (kan_context_system_t system);
 
 /// \brief Connect other system as update delegate.
-CONTEXT_UPDATE_SYSTEM_API void kan_update_system_connect_on_run (kan_context_system_handle_t update_system,
-                                                                 kan_context_system_handle_t other_system,
+CONTEXT_UPDATE_SYSTEM_API void kan_update_system_connect_on_run (kan_context_system_t update_system,
+                                                                 kan_context_system_t other_system,
                                                                  kan_context_update_run_t functor,
                                                                  uint64_t dependencies_count,
-                                                                 kan_context_system_handle_t *dependencies);
+                                                                 kan_context_system_t *dependencies);
 
 /// \brief Disconnect other system from update delegates.
-CONTEXT_UPDATE_SYSTEM_API void kan_update_system_disconnect_on_run (kan_context_system_handle_t update_system,
-                                                                    kan_context_system_handle_t other_system);
+CONTEXT_UPDATE_SYSTEM_API void kan_update_system_disconnect_on_run (kan_context_system_t update_system,
+                                                                    kan_context_system_t other_system);
 
 /// \brief Runs all update delegates in appropriate order if possible.
-CONTEXT_UPDATE_SYSTEM_API void kan_update_system_run (kan_context_system_handle_t update_system);
+CONTEXT_UPDATE_SYSTEM_API void kan_update_system_run (kan_context_system_t update_system);
 
 KAN_C_HEADER_END

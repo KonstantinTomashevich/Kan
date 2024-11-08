@@ -278,7 +278,7 @@ struct resource_provider_state_t
 
     kan_reflection_registry_t reflection_registry;
     kan_serialization_binary_script_storage_t shared_script_storage;
-    kan_context_system_handle_t virtual_file_system;
+    kan_context_system_t virtual_file_system;
 
     /// \meta reflection_ignore_struct_field
     struct kan_stack_group_allocator_t temporary_allocator;
@@ -366,7 +366,7 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void resource_provider_private_singleton_init
     kan_dynamic_array_init (&data->loaded_string_registries, 0u, sizeof (kan_serialization_interned_string_registry_t),
                             _Alignof (kan_serialization_interned_string_registry_t), kan_allocation_group_stack_get ());
 
-    data->resource_watcher = KAN_INVALID_VIRTUAL_FILE_SYSTEM_WATCHER;
+    data->resource_watcher = KAN_HANDLE_SET_INVALID (kan_virtual_file_system_watcher_t);
 }
 
 UNIVERSE_RESOURCE_PROVIDER_KAN_API void resource_provider_private_singleton_shutdown (
@@ -384,7 +384,7 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void resource_provider_private_singleton_shut
             ((kan_serialization_interned_string_registry_t *) data->loaded_string_registries.data)[index]);
     }
 
-    if (data->resource_watcher != KAN_INVALID_VIRTUAL_FILE_SYSTEM_WATCHER)
+    if (KAN_HANDLE_IS_VALID (data->resource_watcher))
     {
         kan_virtual_file_system_watcher_iterator_destroy (data->resource_watcher, data->resource_watcher_iterator);
         kan_virtual_file_system_watcher_destroy (data->resource_watcher);
@@ -509,12 +509,12 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void mutator_template_deploy_resource_provide
     state->shared_script_storage = kan_serialization_binary_script_storage_create (state->reflection_registry);
     state->virtual_file_system =
         kan_context_query (kan_universe_get_context (universe), KAN_CONTEXT_VIRTUAL_FILE_SYSTEM_NAME);
-    KAN_ASSERT (state->virtual_file_system != KAN_INVALID_CONTEXT_SYSTEM_HANDLE)
+    KAN_ASSERT (KAN_HANDLE_IS_VALID (state->virtual_file_system))
 
     state->serialized_index_stream = NULL;
-    state->serialized_index_reader = KAN_INVALID_SERIALIZATION_BINARY_READER;
+    state->serialized_index_reader = KAN_HANDLE_SET_INVALID (kan_serialization_binary_reader_t);
     state->string_registry_stream = NULL;
-    state->string_registry_reader = KAN_INVALID_SERIALIZATION_INTERNED_STRING_REGISTRY_READER;
+    state->string_registry_reader = KAN_HANDLE_SET_INVALID (kan_serialization_interned_string_registry_reader_t);
 
     kan_workflow_graph_node_depend_on (workflow_node, KAN_RESOURCE_PROVIDER_BEGIN_CHECKPOINT);
     kan_workflow_graph_node_make_dependency_of (workflow_node, KAN_RESOURCE_PROVIDER_END_CHECKPOINT);
@@ -681,7 +681,7 @@ static struct file_scan_result_t scan_file (struct resource_provider_state_t *st
             if (kan_serialization_binary_read_type_header (
                     stream, &type_name,
                     // We expect non-indexed files to be encoded without string registries.
-                    KAN_INVALID_SERIALIZATION_INTERNED_STRING_REGISTRY))
+                    KAN_HANDLE_SET_INVALID (kan_serialization_interned_string_registry_t)))
             {
                 const char *last_slash = strrchr (path, '/');
                 const char *name_begin = last_slash ? last_slash + 1u : path;
@@ -691,7 +691,7 @@ static struct file_scan_result_t scan_file (struct resource_provider_state_t *st
                 result.name = kan_char_sequence_intern (name_begin, name_end);
 
                 add_native_entry (state, private, type_name, result.name, KAN_RESOURCE_INDEX_NATIVE_ITEM_FORMAT_BINARY,
-                                  path, KAN_INVALID_SERIALIZATION_INTERNED_STRING_REGISTRY);
+                                  path, KAN_HANDLE_SET_INVALID (kan_serialization_interned_string_registry_t));
             }
             else
             {
@@ -724,7 +724,7 @@ static struct file_scan_result_t scan_file (struct resource_provider_state_t *st
 
                 add_native_entry (state, private, type_name, result.name,
                                   KAN_RESOURCE_INDEX_NATIVE_ITEM_FORMAT_READABLE_DATA, path,
-                                  KAN_INVALID_SERIALIZATION_INTERNED_STRING_REGISTRY);
+                                  KAN_HANDLE_SET_INVALID (kan_serialization_interned_string_registry_t));
             }
             else
             {
@@ -1836,7 +1836,8 @@ static void execute_shared_serve (uint64_t user_data)
         }
 
         // Restart loading for native type if reflection has changed.
-        if (loading_operation->target_type && loading_operation->native.used_registry != state->reflection_registry)
+        if (loading_operation->target_type &&
+            !KAN_HANDLE_IS_EQUAL (loading_operation->native.used_registry, state->reflection_registry))
         {
             resource_provider_loading_operation_destroy_native (loading_operation);
             loading_operation->stream->operations->close (loading_operation->stream);
@@ -2178,7 +2179,7 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void mutator_template_execute_resource_provid
             }
 
             kan_dynamic_array_reset (&private->loaded_string_registries);
-            if (private->resource_watcher != KAN_INVALID_VIRTUAL_FILE_SYSTEM_WATCHER)
+            if (KAN_HANDLE_IS_VALID (private->resource_watcher))
             {
                 kan_virtual_file_system_watcher_iterator_destroy (private->resource_watcher,
                                                                   private->resource_watcher_iterator);
@@ -2202,7 +2203,7 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void mutator_template_execute_resource_provid
             {
                 if (state->string_registry_stream)
                 {
-                    if (state->string_registry_reader == KAN_INVALID_SERIALIZATION_INTERNED_STRING_REGISTRY_READER)
+                    if (!KAN_HANDLE_IS_VALID (state->string_registry_reader))
                     {
                         state->string_registry_reader = kan_serialization_interned_string_registry_reader_create (
                             state->string_registry_stream, state->use_load_only_string_registry);
@@ -2223,7 +2224,8 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void mutator_template_execute_resource_provid
                                  "Failed to deserialize string registry, its directory will be skipped.")
 
                         kan_serialization_interned_string_registry_reader_destroy (state->string_registry_reader);
-                        state->string_registry_reader = KAN_INVALID_SERIALIZATION_INTERNED_STRING_REGISTRY_READER;
+                        state->string_registry_reader =
+                            KAN_HANDLE_SET_INVALID (kan_serialization_interned_string_registry_reader_t);
 
                         state->string_registry_stream->operations->close (state->string_registry_stream);
                         state->string_registry_stream = NULL;
@@ -2241,11 +2243,11 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void mutator_template_execute_resource_provid
 
                 if (state->serialized_index_stream)
                 {
-                    if (state->serialized_index_reader == KAN_INVALID_SERIALIZATION_BINARY_READER)
+                    if (!KAN_HANDLE_IS_VALID (state->serialized_index_reader))
                     {
                         kan_serialization_interned_string_registry_t registry =
-                            state->string_registry_reader == KAN_INVALID_SERIALIZATION_INTERNED_STRING_REGISTRY_READER ?
-                                KAN_INVALID_SERIALIZATION_INTERNED_STRING_REGISTRY :
+                            !KAN_HANDLE_IS_VALID (state->string_registry_reader) ?
+                                KAN_HANDLE_SET_INVALID (kan_serialization_interned_string_registry_t) :
                                 kan_serialization_interned_string_registry_reader_get (state->string_registry_reader);
 
                         kan_resource_index_init (&state->serialized_index_read_buffer);
@@ -2263,9 +2265,9 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void mutator_template_execute_resource_provid
                     case KAN_SERIALIZATION_FINISHED:
                     {
                         kan_serialization_interned_string_registry_t string_registry =
-                            KAN_INVALID_SERIALIZATION_INTERNED_STRING_REGISTRY;
+                            KAN_HANDLE_SET_INVALID (kan_serialization_interned_string_registry_t);
 
-                        if (state->string_registry_reader != KAN_INVALID_SERIALIZATION_INTERNED_STRING_REGISTRY_READER)
+                        if (KAN_HANDLE_IS_VALID (state->string_registry_reader))
                         {
                             string_registry =
                                 kan_serialization_interned_string_registry_reader_get (state->string_registry_reader);
@@ -2281,13 +2283,14 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void mutator_template_execute_resource_provid
 
                             *(kan_serialization_interned_string_registry_t *) spot = string_registry;
                             kan_serialization_interned_string_registry_reader_destroy (state->string_registry_reader);
-                            state->string_registry_reader = KAN_INVALID_SERIALIZATION_INTERNED_STRING_REGISTRY_READER;
+                            state->string_registry_reader =
+                                KAN_HANDLE_SET_INVALID (kan_serialization_interned_string_registry_reader_t);
                         }
 
                         instantiate_resource_index (state, private, string_registry);
                         kan_resource_index_shutdown (&state->serialized_index_read_buffer);
                         kan_serialization_binary_reader_destroy (state->serialized_index_reader);
-                        state->serialized_index_reader = KAN_INVALID_SERIALIZATION_BINARY_READER;
+                        state->serialized_index_reader = KAN_HANDLE_SET_INVALID (kan_serialization_binary_reader_t);
 
                         state->serialized_index_stream->operations->close (state->serialized_index_stream);
                         state->serialized_index_stream = NULL;
@@ -2301,17 +2304,18 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void mutator_template_execute_resource_provid
                         KAN_LOG (universe_resource_provider, KAN_LOG_ERROR,
                                  "Failed to deserialize resource index, its directory will be skipped.")
 
-                        if (state->string_registry_reader != KAN_INVALID_SERIALIZATION_INTERNED_STRING_REGISTRY_READER)
+                        if (KAN_HANDLE_IS_VALID (state->string_registry_reader))
                         {
                             kan_serialization_interned_string_registry_destroy (
                                 kan_serialization_interned_string_registry_reader_get (state->string_registry_reader));
                             kan_serialization_interned_string_registry_reader_destroy (state->string_registry_reader);
-                            state->string_registry_reader = KAN_INVALID_SERIALIZATION_INTERNED_STRING_REGISTRY_READER;
+                            state->string_registry_reader =
+                                KAN_HANDLE_SET_INVALID (kan_serialization_interned_string_registry_reader_t);
                         }
 
                         kan_resource_index_shutdown (&state->serialized_index_read_buffer);
                         kan_serialization_binary_reader_destroy (state->serialized_index_reader);
-                        state->serialized_index_reader = KAN_INVALID_SERIALIZATION_BINARY_READER;
+                        state->serialized_index_reader = KAN_HANDLE_SET_INVALID (kan_serialization_binary_reader_t);
 
                         state->serialized_index_stream->operations->close (state->serialized_index_stream);
                         state->serialized_index_stream = NULL;
@@ -2360,7 +2364,7 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void mutator_template_execute_resource_provid
             // Events need to be always processed in order to keep everything up to date.
             // Therefore, load budget does not affect event processing.
 
-            if (private->resource_watcher != KAN_INVALID_VIRTUAL_FILE_SYSTEM_WATCHER)
+            if (KAN_HANDLE_IS_VALID (private->resource_watcher))
             {
                 kan_virtual_file_system_volume_t volume =
                     kan_virtual_file_system_get_context_volume_for_read (state->virtual_file_system);
@@ -2430,10 +2434,10 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void mutator_template_undeploy_resource_provi
     kan_serialization_binary_script_storage_destroy (state->shared_script_storage);
     if (state->serialized_index_stream)
     {
-        if (state->serialized_index_reader != KAN_INVALID_SERIALIZATION_BINARY_READER)
+        if (KAN_HANDLE_IS_VALID (state->serialized_index_reader))
         {
             kan_resource_index_shutdown (&state->serialized_index_read_buffer);
-            state->serialized_index_reader = KAN_INVALID_SERIALIZATION_BINARY_READER;
+            state->serialized_index_reader = KAN_HANDLE_SET_INVALID (kan_serialization_binary_reader_t);
         }
 
         state->serialized_index_stream->operations->close (state->serialized_index_stream);
@@ -2442,10 +2446,11 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void mutator_template_undeploy_resource_provi
 
     if (state->string_registry_stream)
     {
-        if (state->string_registry_reader != KAN_INVALID_SERIALIZATION_INTERNED_STRING_REGISTRY_READER)
+        if (KAN_HANDLE_IS_VALID (state->string_registry_reader))
         {
             kan_serialization_interned_string_registry_reader_destroy (state->string_registry_reader);
-            state->string_registry_reader = KAN_INVALID_SERIALIZATION_INTERNED_STRING_REGISTRY_READER;
+            state->string_registry_reader =
+                KAN_HANDLE_SET_INVALID (kan_serialization_interned_string_registry_reader_t);
         }
 
         state->string_registry_stream->operations->close (state->string_registry_stream);

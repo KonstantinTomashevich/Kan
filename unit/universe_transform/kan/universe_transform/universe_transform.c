@@ -41,8 +41,8 @@ UNIVERSE_TRANSFORM_API struct kan_universe_mutator_group_meta_t visual_transform
 
 void kan_transform_2_component_init (struct kan_transform_2_component_t *instance)
 {
-    instance->object_id = KAN_INVALID_UNIVERSE_OBJECT_ID;
-    instance->parent_object_id = KAN_INVALID_UNIVERSE_OBJECT_ID;
+    instance->object_id = KAN_TYPED_ID_32_SET_INVALID (kan_universe_object_id_t);
+    instance->parent_object_id = KAN_TYPED_ID_32_SET_INVALID (kan_universe_object_id_t);
 
     instance->logical_local = kan_transform_2_get_identity ();
     instance->logical_local_time_ns = 0u;
@@ -62,8 +62,8 @@ void kan_transform_2_component_init (struct kan_transform_2_component_t *instanc
 
 void kan_transform_3_component_init (struct kan_transform_3_component_t *instance)
 {
-    instance->object_id = KAN_INVALID_UNIVERSE_OBJECT_ID;
-    instance->parent_object_id = KAN_INVALID_UNIVERSE_OBJECT_ID;
+    instance->object_id = KAN_TYPED_ID_32_SET_INVALID (kan_universe_object_id_t);
+    instance->parent_object_id = KAN_TYPED_ID_32_SET_INVALID (kan_universe_object_id_t);
 
     instance->logical_local = kan_transform_3_get_identity ();
     instance->logical_local_time_ns = 0u;
@@ -145,7 +145,7 @@ void kan_transform_2_get_logical_global (struct kan_transform_2_queries_t *queri
                                          struct kan_transform_2_t *output)
 {
 #define TRANSFORM_GET_GLOBAL(TRANSFORM_TYPE, TRANSFORM_DIMENSION, MATRIX_DIMENSION, MULTIPLIER)                        \
-    if (component->parent_object_id == KAN_INVALID_UNIVERSE_OBJECT_ID)                                                 \
+    if (!KAN_TYPED_ID_32_IS_VALID (component->parent_object_id))                                                       \
     {                                                                                                                  \
         *output = component->TRANSFORM_TYPE##_local;                                                                   \
         return;                                                                                                        \
@@ -196,7 +196,8 @@ void kan_transform_2_get_logical_global (struct kan_transform_2_queries_t *queri
     else                                                                                                               \
     {                                                                                                                  \
         KAN_LOG (universe_transform, KAN_LOG_ERROR, "Unable to find parent %llu of transform %llu.",                   \
-                 (unsigned long long) component->parent_object_id, (unsigned long long) component->object_id)          \
+                 (unsigned long long) KAN_TYPED_ID_32_GET (component->parent_object_id),                               \
+                 (unsigned long long) KAN_TYPED_ID_32_GET (component->object_id))                                      \
         *output = component->TRANSFORM_TYPE##_local;                                                                   \
     }                                                                                                                  \
                                                                                                                        \
@@ -228,7 +229,7 @@ void kan_transform_2_set_logical_global (struct kan_transform_2_queries_t *queri
 {
 #define TRANSFORM_SET_GLOBAL(TRANSFORM_TYPE, TRANSFORM_DIMENSION, MATRIX_DIMENSION, MULTIPLIER, ADDITIONAL_SETTER,     \
                              ...)                                                                                      \
-    if (component->parent_object_id == KAN_INVALID_UNIVERSE_OBJECT_ID)                                                 \
+    if (!KAN_TYPED_ID_32_IS_VALID (component->parent_object_id))                                                       \
     {                                                                                                                  \
         kan_transform_##TRANSFORM_DIMENSION##_set_##TRANSFORM_TYPE##_local (queries, component,                        \
                                                                             new_transform __VA_ARGS__);                \
@@ -277,7 +278,8 @@ void kan_transform_2_set_logical_global (struct kan_transform_2_queries_t *queri
         else                                                                                                           \
         {                                                                                                              \
             KAN_LOG (universe_transform, KAN_LOG_ERROR, "Unable to find parent %llu of transform %llu.",               \
-                     (unsigned long long) component->parent_object_id, (unsigned long long) component->object_id)      \
+                     (unsigned long long) KAN_TYPED_ID_32_GET (component->parent_object_id),                           \
+                     (unsigned long long) KAN_TYPED_ID_32_GET (component->object_id))                                  \
             kan_atomic_int_unlock (&component->TRANSFORM_TYPE##_global_lock);                                          \
             kan_transform_##TRANSFORM_DIMENSION##_set_##TRANSFORM_TYPE##_local (queries, component,                    \
                                                                                 new_transform __VA_ARGS__);            \
@@ -551,9 +553,9 @@ static void visual_transform_sync_2_calculate_execute (uint64_t user_data)
     struct visual_transform_sync_##TRANSFORM_DIMENSIONS##_calculate_task_user_data_t *data =                           \
         (struct visual_transform_sync_##TRANSFORM_DIMENSIONS##_calculate_task_user_data_t *) user_data;                \
                                                                                                                        \
-    kan_repository_singleton_read_access_t time_access =                                                               \
+    struct kan_repository_singleton_read_access_t time_access =                                                        \
         kan_repository_singleton_read_query_execute (&data->source_state->read__kan_time_singleton);                   \
-    const struct kan_time_singleton_t *time = kan_repository_singleton_read_access_resolve (time_access);              \
+    const struct kan_time_singleton_t *time = kan_repository_singleton_read_access_resolve (&time_access);             \
                                                                                                                        \
     struct kan_transform_##TRANSFORM_DIMENSIONS##_component_t *component =                                             \
         kan_repository_indexed_signal_update_access_resolve (&data->transform_update_access);                          \
@@ -580,7 +582,7 @@ static void visual_transform_sync_2_calculate_execute (uint64_t user_data)
     kan_atomic_int_unlock (&component->visual_global_lock);                                                            \
                                                                                                                        \
     kan_repository_indexed_signal_update_access_close (&data->transform_update_access);                                \
-    kan_repository_singleton_read_access_close (time_access)
+    kan_repository_singleton_read_access_close (&time_access)
 
     TRANSFORM_SYNC_EXECUTE (2);
 }

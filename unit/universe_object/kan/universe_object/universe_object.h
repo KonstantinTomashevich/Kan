@@ -5,6 +5,7 @@
 #include <stdint.h>
 
 #include <kan/api_common/c_header.h>
+#include <kan/api_common/core_types.h>
 #include <kan/threading/atomic.h>
 
 /// \file
@@ -18,9 +19,7 @@
 
 KAN_C_HEADER_BEGIN
 
-typedef uint64_t kan_universe_object_id_t;
-
-#define KAN_INVALID_UNIVERSE_OBJECT_ID 0u
+KAN_TYPED_ID_32_DEFINE (kan_universe_object_id_t);
 
 /// \brief Singleton that stores id generation data.
 struct kan_object_id_generator_singleton_t
@@ -37,8 +36,9 @@ UNIVERSE_OBJECT_API void kan_object_id_generator_singleton_init (struct kan_obje
 static inline kan_universe_object_id_t kan_universe_object_id_generate (
     const struct kan_object_id_generator_singleton_t *singleton)
 {
-    return (kan_universe_object_id_t) kan_atomic_int_add (
-        &((struct kan_object_id_generator_singleton_t *) singleton)->counter, 1);
+    return KAN_TYPED_ID_32_SET (
+        kan_universe_object_id_t,
+        (uint32_t) kan_atomic_int_add (&((struct kan_object_id_generator_singleton_t *) singleton)->counter, 1));
 }
 
 KAN_C_HEADER_END

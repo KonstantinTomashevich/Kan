@@ -21,10 +21,10 @@ kan_render_read_back_status_t kan_render_read_back_request_from_surface (kan_ren
                                                                          kan_render_buffer_t read_back_buffer,
                                                                          uint32_t read_back_offset)
 {
-    struct render_backend_surface_t *surface_data = (struct render_backend_surface_t *) surface;
+    struct render_backend_surface_t *surface_data = KAN_HANDLE_GET (surface);
     KAN_ASSERT (surface_data->system->frame_started)
 
-    struct render_backend_buffer_t *read_back_buffer_data = (struct render_backend_buffer_t *) read_back_buffer;
+    struct render_backend_buffer_t *read_back_buffer_data = KAN_HANDLE_GET (read_back_buffer);
     KAN_ASSERT (read_back_buffer_data->type == KAN_RENDER_BUFFER_TYPE_READ_BACK_STORAGE)
 
     struct render_backend_read_back_status_t *status = create_empty_status (surface_data->system);
@@ -46,7 +46,7 @@ kan_render_read_back_status_t kan_render_read_back_request_from_surface (kan_ren
     item->status = status;
 
     kan_atomic_int_unlock (&schedule->schedule_lock);
-    return (kan_render_read_back_status_t) status;
+    return KAN_HANDLE_SET (kan_render_read_back_status_t, status);
 }
 
 kan_render_read_back_status_t kan_render_read_back_request_from_buffer (kan_render_buffer_t buffer,
@@ -55,10 +55,10 @@ kan_render_read_back_status_t kan_render_read_back_request_from_buffer (kan_rend
                                                                         kan_render_buffer_t read_back_buffer,
                                                                         uint32_t read_back_offset)
 {
-    struct render_backend_buffer_t *buffer_data = (struct render_backend_buffer_t *) buffer;
+    struct render_backend_buffer_t *buffer_data = KAN_HANDLE_GET (buffer);
     KAN_ASSERT (buffer_data->system->frame_started)
 
-    struct render_backend_buffer_t *read_back_buffer_data = (struct render_backend_buffer_t *) read_back_buffer;
+    struct render_backend_buffer_t *read_back_buffer_data = KAN_HANDLE_GET (read_back_buffer);
     KAN_ASSERT (read_back_buffer_data->type == KAN_RENDER_BUFFER_TYPE_READ_BACK_STORAGE)
 
     struct render_backend_read_back_status_t *status = create_empty_status (buffer_data->system);
@@ -82,7 +82,7 @@ kan_render_read_back_status_t kan_render_read_back_request_from_buffer (kan_rend
     item->status = status;
 
     kan_atomic_int_unlock (&schedule->schedule_lock);
-    return (kan_render_read_back_status_t) status;
+    return KAN_HANDLE_SET (kan_render_read_back_status_t, status);
 }
 
 kan_render_read_back_status_t kan_render_read_back_request_from_image (kan_render_image_t image,
@@ -90,10 +90,10 @@ kan_render_read_back_status_t kan_render_read_back_request_from_image (kan_rende
                                                                        kan_render_buffer_t read_back_buffer,
                                                                        uint32_t read_back_offset)
 {
-    struct render_backend_image_t *image_data = (struct render_backend_image_t *) image;
+    struct render_backend_image_t *image_data = KAN_HANDLE_GET (image);
     KAN_ASSERT (image_data->system->frame_started)
 
-    struct render_backend_buffer_t *read_back_buffer_data = (struct render_backend_buffer_t *) read_back_buffer;
+    struct render_backend_buffer_t *read_back_buffer_data = KAN_HANDLE_GET (read_back_buffer);
     KAN_ASSERT (read_back_buffer_data->type == KAN_RENDER_BUFFER_TYPE_READ_BACK_STORAGE)
 
     struct render_backend_read_back_status_t *status = create_empty_status (image_data->system);
@@ -116,17 +116,18 @@ kan_render_read_back_status_t kan_render_read_back_request_from_image (kan_rende
     item->status = status;
 
     kan_atomic_int_unlock (&schedule->schedule_lock);
-    return (kan_render_read_back_status_t) status;
+    return KAN_HANDLE_SET (kan_render_read_back_status_t, status);
 }
 
 enum kan_render_read_back_state_t kan_read_read_back_status_get (kan_render_read_back_status_t status)
 {
-    return ((struct render_backend_read_back_status_t *) status)->state;
+    struct render_backend_read_back_status_t *status_data = KAN_HANDLE_GET (status);
+    return status_data->state;
 }
 
 void kan_render_read_back_status_destroy (kan_render_read_back_status_t status)
 {
-    struct render_backend_read_back_status_t *data = (struct render_backend_read_back_status_t *) status;
+    struct render_backend_read_back_status_t *data = KAN_HANDLE_GET (status);
     data->referenced_outside = KAN_FALSE;
 
     if (!data->referenced_in_schedule)

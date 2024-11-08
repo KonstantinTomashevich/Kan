@@ -2,8 +2,8 @@
 
 #include <context_api.h>
 
-#include <kan/api_common/bool.h>
 #include <kan/api_common/c_header.h>
+#include <kan/api_common/core_types.h>
 #include <kan/memory_profiler/allocation_group.h>
 
 /// \file
@@ -84,23 +84,22 @@ KAN_C_HEADER_BEGIN
 #define KAN_CONTEXT_SYSTEM_ARRAY_INITIALIZER_NAME kan_context_fill_available_systems
 #define KAN_CONTEXT_SYSTEM_API_NAME(SYSTEM_NAME) kan_context_system_api_##SYSTEM_NAME
 
-typedef uint64_t kan_context_handle_t;
-typedef uint64_t kan_context_system_handle_t;
+KAN_HANDLE_DEFINE (kan_context_t);
+KAN_HANDLE_DEFINE (kan_context_system_t);
 
 #define KAN_INVALID_CONTEXT_SYSTEM_HANDLE 0u
 
-typedef kan_context_system_handle_t (*kan_context_system_create_functor_t) (kan_allocation_group_t group,
-                                                                            void *user_config);
+typedef kan_context_system_t (*kan_context_system_create_functor_t) (kan_allocation_group_t group, void *user_config);
 
-typedef void (*kan_context_system_connect_functor_t) (kan_context_system_handle_t handle, kan_context_handle_t context);
+typedef void (*kan_context_system_connect_functor_t) (kan_context_system_t handle, kan_context_t context);
 
-typedef void (*kan_context_system_connected_init_functor_t) (kan_context_system_handle_t handle);
+typedef void (*kan_context_system_connected_init_functor_t) (kan_context_system_t handle);
 
-typedef void (*kan_context_system_connected_shutdown_functor_t) (kan_context_system_handle_t handle);
+typedef void (*kan_context_system_connected_shutdown_functor_t) (kan_context_system_t handle);
 
-typedef void (*kan_context_system_disconnect_functor_t) (kan_context_system_handle_t handle);
+typedef void (*kan_context_system_disconnect_functor_t) (kan_context_system_t handle);
 
-typedef void (*kan_context_system_destroy_functor_t) (kan_context_system_handle_t handle);
+typedef void (*kan_context_system_destroy_functor_t) (kan_context_system_t handle);
 
 /// \brief Structure that contains system API for integration into context.
 struct kan_context_system_api_t
@@ -115,20 +114,18 @@ struct kan_context_system_api_t
 };
 
 /// \brief Creates new instance of context.
-CONTEXT_API kan_context_handle_t kan_context_create (kan_allocation_group_t group);
+CONTEXT_API kan_context_t kan_context_create (kan_allocation_group_t group);
 
 /// \brief Requests system with given name to be added to context. Should be called before `kan_context_assembly`.
-CONTEXT_API kan_bool_t kan_context_request_system (kan_context_handle_t handle,
-                                                   const char *system_name,
-                                                   void *user_config);
+CONTEXT_API kan_bool_t kan_context_request_system (kan_context_t handle, const char *system_name, void *user_config);
 
 /// \brief Assembles and initializes all the requested systems.
-CONTEXT_API void kan_context_assembly (kan_context_handle_t handle);
+CONTEXT_API void kan_context_assembly (kan_context_t handle);
 
 /// \brief Queries for system with given name. Should not be called before `kan_context_assembly`.
-CONTEXT_API kan_context_system_handle_t kan_context_query (kan_context_handle_t handle, const char *system_name);
+CONTEXT_API kan_context_system_t kan_context_query (kan_context_t handle, const char *system_name);
 
 /// \brief Destroys given context along with all its systems.
-CONTEXT_API void kan_context_destroy (kan_context_handle_t handle);
+CONTEXT_API void kan_context_destroy (kan_context_t handle);
 
 KAN_C_HEADER_END
