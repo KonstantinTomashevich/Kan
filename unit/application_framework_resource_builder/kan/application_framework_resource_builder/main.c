@@ -76,7 +76,7 @@ static struct
     struct kan_atomic_int_t errors_count;
 
 } global = {
-    .registry = KAN_HANDLE_SET_INVALID (kan_reflection_registry_t),
+    .registry = KAN_HANDLE_INITIALIZE_INVALID,
     .compilation_passive_queue_first = NULL,
     .compilation_passive_queue_last = NULL,
     .compilation_active_queue = NULL,
