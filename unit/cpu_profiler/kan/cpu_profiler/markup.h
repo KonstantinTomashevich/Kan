@@ -5,6 +5,7 @@
 #include <stdint.h>
 
 #include <kan/api_common/c_header.h>
+#include <kan/api_common/core_types.h>
 
 /// \file
 /// \brief Contains functions for marking events for CPU profiling.
@@ -41,7 +42,7 @@ KAN_C_HEADER_BEGIN
 /// \brief Separates program execution into stages. In game development it is usually frames.
 CPU_PROFILER_API void kan_cpu_stage_separator (void);
 
-typedef uint64_t kan_cpu_section_t;
+KAN_HANDLE_DEFINE (kan_cpu_section_t);
 
 /// \brief Returns section instance with given name. Creates it if it does not exist.
 CPU_PROFILER_API kan_cpu_section_t kan_cpu_section_get (const char *name);

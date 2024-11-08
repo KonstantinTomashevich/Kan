@@ -181,7 +181,7 @@ static void initial_poll_to_directory_recursive (struct watcher_t *watcher, stru
     kan_file_system_directory_iterator_t iterator =
         kan_file_system_directory_iterator_create (watcher->path_container.path);
 
-    if (iterator != KAN_INVALID_FILE_SYSTEM_DIRECTORY_ITERATOR)
+    if (KAN_HANDLE_IS_VALID (iterator))
     {
         const char *entry_name;
         while ((entry_name = kan_file_system_directory_iterator_advance (iterator)))
@@ -441,7 +441,7 @@ static void verification_poll_at_directory_recursive (struct watcher_t *watcher,
     kan_file_system_directory_iterator_t iterator =
         kan_file_system_directory_iterator_create (watcher->path_container.path);
 
-    if (iterator != KAN_INVALID_FILE_SYSTEM_DIRECTORY_ITERATOR)
+    if (KAN_HANDLE_IS_VALID (iterator))
     {
         const char *entry_name;
         while ((entry_name = kan_file_system_directory_iterator_advance (iterator)))
@@ -686,7 +686,7 @@ static void register_new_watcher (struct watcher_t *watcher)
 
     if (!server_thread_running)
     {
-        kan_thread_handle_t thread = kan_thread_create ("file_system_watcher_server", server_thread, NULL);
+        kan_thread_t thread = kan_thread_create ("file_system_watcher_server", server_thread, NULL);
         kan_thread_detach (thread);
         server_thread_running = KAN_TRUE;
     }
@@ -714,31 +714,32 @@ kan_file_system_watcher_t kan_file_system_watcher_create (const char *directory_
     initial_poll_to_directory_recursive (watcher_data, watcher_data->root_directory);
 
     register_new_watcher (watcher_data);
-    return (kan_file_system_watcher_t) watcher_data;
+    return KAN_HANDLE_SET (kan_file_system_watcher_t, watcher_data);
 }
 
 void kan_file_system_watcher_destroy (kan_file_system_watcher_t watcher)
 {
-    kan_atomic_int_set (&((struct watcher_t *) watcher)->marked_for_destroy, 1);
+    struct watcher_t *data = KAN_HANDLE_GET (watcher);
+    kan_atomic_int_set (&data->marked_for_destroy, 1);
 }
 
 kan_file_system_watcher_iterator_t kan_file_system_watcher_iterator_create (kan_file_system_watcher_t watcher)
 {
-    struct watcher_t *watcher_data = (struct watcher_t *) watcher;
+    struct watcher_t *watcher_data = KAN_HANDLE_GET (watcher);
     kan_atomic_int_lock (&watcher_data->event_queue_lock);
     kan_event_queue_iterator_t iterator = kan_event_queue_iterator_create (&watcher_data->event_queue);
     kan_atomic_int_unlock (&watcher_data->event_queue_lock);
-    return iterator;
+    return KAN_HANDLE_TRANSIT (kan_file_system_watcher_iterator_t, iterator);
 }
 
 const struct kan_file_system_watcher_event_t *kan_file_system_watcher_iterator_get (
     kan_file_system_watcher_t watcher, kan_file_system_watcher_iterator_t iterator)
 {
-    struct watcher_t *watcher_data = (struct watcher_t *) watcher;
+    struct watcher_t *watcher_data = KAN_HANDLE_GET (watcher);
     kan_atomic_int_lock (&watcher_data->event_queue_lock);
 
-    const struct event_queue_node_t *node =
-        (const struct event_queue_node_t *) kan_event_queue_iterator_get (&watcher_data->event_queue, iterator);
+    const struct event_queue_node_t *node = (const struct event_queue_node_t *) kan_event_queue_iterator_get (
+        &watcher_data->event_queue, KAN_HANDLE_TRANSIT (kan_event_queue_iterator_t, iterator));
 
     kan_atomic_int_unlock (&watcher_data->event_queue_lock);
     return node ? &node->event : NULL;
@@ -756,9 +757,11 @@ static inline void watcher_cleanup_events (struct watcher_t *watcher)
 kan_file_system_watcher_iterator_t kan_file_system_watcher_iterator_advance (
     kan_file_system_watcher_t watcher, kan_file_system_watcher_iterator_t iterator)
 {
-    struct watcher_t *watcher_data = (struct watcher_t *) watcher;
+    struct watcher_t *watcher_data = KAN_HANDLE_GET (watcher);
     kan_atomic_int_lock (&watcher_data->event_queue_lock);
-    iterator = kan_event_queue_iterator_advance (iterator);
+    iterator = KAN_HANDLE_TRANSIT (
+        kan_file_system_watcher_iterator_t,
+        kan_event_queue_iterator_advance (KAN_HANDLE_TRANSIT (kan_event_queue_iterator_t, iterator)));
 
     watcher_cleanup_events (watcher_data);
     kan_atomic_int_unlock (&watcher_data->event_queue_lock);
@@ -768,9 +771,10 @@ kan_file_system_watcher_iterator_t kan_file_system_watcher_iterator_advance (
 void kan_file_system_watcher_iterator_destroy (kan_file_system_watcher_t watcher,
                                                kan_file_system_watcher_iterator_t iterator)
 {
-    struct watcher_t *watcher_data = (struct watcher_t *) watcher;
+    struct watcher_t *watcher_data = KAN_HANDLE_GET (watcher);
     kan_atomic_int_lock (&watcher_data->event_queue_lock);
-    kan_event_queue_iterator_destroy (&watcher_data->event_queue, iterator);
+    kan_event_queue_iterator_destroy (&watcher_data->event_queue,
+                                      KAN_HANDLE_TRANSIT (kan_event_queue_iterator_t, iterator));
 
     watcher_cleanup_events (watcher_data);
     kan_atomic_int_unlock (&watcher_data->event_queue_lock);

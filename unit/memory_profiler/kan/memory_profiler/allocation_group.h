@@ -5,6 +5,7 @@
 #include <stdint.h>
 
 #include <kan/api_common/c_header.h>
+#include <kan/api_common/core_types.h>
 
 /// \file
 /// \brief Contains functions for reporting memory usage.
@@ -26,10 +27,10 @@
 
 KAN_C_HEADER_BEGIN
 
-typedef uint64_t kan_allocation_group_t;
+KAN_HANDLE_DEFINE (kan_allocation_group_t);
 
 /// \brief Value of `kan_allocation_group_t` that actually means that allocation should not be reported.
-#define KAN_ALLOCATION_GROUP_IGNORE 0u
+#define KAN_ALLOCATION_GROUP_IGNORE KAN_HANDLE_SET_INVALID (kan_allocation_group_t)
 
 /// \brief Identifier of allocation group tree root.
 MEMORY_PROFILER_API kan_allocation_group_t kan_allocation_group_root (void);

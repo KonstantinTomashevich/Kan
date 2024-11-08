@@ -481,157 +481,157 @@ kan_bool_t kan_platform_application_fetch_next_event (struct kan_platform_applic
         case SDL_EVENT_DISPLAY_ORIENTATION:
             output->type = KAN_PLATFORM_APPLICATION_EVENT_TYPE_DISPLAY_ORIENTATION_CHANGED;
             output->time_ns = event.common.timestamp;
-            output->display.id = (kan_platform_display_id_t) event.display.displayID;
+            output->display.id = KAN_TYPED_ID_32_SET (kan_platform_display_id_t, event.display.displayID);
             return KAN_TRUE;
 
         case SDL_EVENT_DISPLAY_ADDED:
             output->type = KAN_PLATFORM_APPLICATION_EVENT_TYPE_DISPLAY_ADDED;
             output->time_ns = event.common.timestamp;
-            output->display.id = (kan_platform_display_id_t) event.display.displayID;
+            output->display.id = KAN_TYPED_ID_32_SET (kan_platform_display_id_t, event.display.displayID);
             return KAN_TRUE;
 
         case SDL_EVENT_DISPLAY_REMOVED:
             output->type = KAN_PLATFORM_APPLICATION_EVENT_TYPE_DISPLAY_REMOVED;
             output->time_ns = event.common.timestamp;
-            output->display.id = (kan_platform_display_id_t) event.display.displayID;
+            output->display.id = KAN_TYPED_ID_32_SET (kan_platform_display_id_t, event.display.displayID);
             return KAN_TRUE;
 
         case SDL_EVENT_DISPLAY_MOVED:
             output->type = KAN_PLATFORM_APPLICATION_EVENT_TYPE_DISPLAY_MOVED;
             output->time_ns = event.common.timestamp;
-            output->display.id = (kan_platform_display_id_t) event.display.displayID;
+            output->display.id = KAN_TYPED_ID_32_SET (kan_platform_display_id_t, event.display.displayID);
             return KAN_TRUE;
 
         case SDL_EVENT_DISPLAY_CONTENT_SCALE_CHANGED:
             output->type = KAN_PLATFORM_APPLICATION_EVENT_TYPE_DISPLAY_CONTENT_SCALE_CHANGED;
             output->time_ns = event.common.timestamp;
-            output->display.id = (kan_platform_display_id_t) event.display.displayID;
+            output->display.id = KAN_TYPED_ID_32_SET (kan_platform_display_id_t, event.display.displayID);
             return KAN_TRUE;
 
         case SDL_EVENT_WINDOW_SHOWN:
             output->type = KAN_PLATFORM_APPLICATION_EVENT_TYPE_WINDOW_SHOWN;
             output->time_ns = event.common.timestamp;
-            output->window.id = (kan_platform_window_id_t) event.window.windowID;
+            output->window.id = KAN_TYPED_ID_32_SET (kan_platform_window_id_t, event.window.windowID);
             return KAN_TRUE;
 
         case SDL_EVENT_WINDOW_HIDDEN:
             output->type = KAN_PLATFORM_APPLICATION_EVENT_TYPE_WINDOW_HIDDEN;
             output->time_ns = event.common.timestamp;
-            output->window.id = (kan_platform_window_id_t) event.window.windowID;
+            output->window.id = KAN_TYPED_ID_32_SET (kan_platform_window_id_t, event.window.windowID);
             return KAN_TRUE;
 
         case SDL_EVENT_WINDOW_EXPOSED:
             output->type = KAN_PLATFORM_APPLICATION_EVENT_TYPE_WINDOW_EXPOSED;
             output->time_ns = event.common.timestamp;
-            output->window.id = (kan_platform_window_id_t) event.window.windowID;
+            output->window.id = KAN_TYPED_ID_32_SET (kan_platform_window_id_t, event.window.windowID);
             return KAN_TRUE;
 
         case SDL_EVENT_WINDOW_MOVED:
             output->type = KAN_PLATFORM_APPLICATION_EVENT_TYPE_WINDOW_MOVED;
             output->time_ns = event.common.timestamp;
-            output->window.id = (kan_platform_window_id_t) event.window.windowID;
+            output->window.id = KAN_TYPED_ID_32_SET (kan_platform_window_id_t, event.window.windowID);
             return KAN_TRUE;
 
         case SDL_EVENT_WINDOW_RESIZED:
             output->type = KAN_PLATFORM_APPLICATION_EVENT_TYPE_WINDOW_RESIZED;
             output->time_ns = event.common.timestamp;
-            output->window.id = (kan_platform_window_id_t) event.window.windowID;
+            output->window.id = KAN_TYPED_ID_32_SET (kan_platform_window_id_t, event.window.windowID);
             return KAN_TRUE;
 
         case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
             output->type = KAN_PLATFORM_APPLICATION_EVENT_TYPE_WINDOW_PIXEL_SIZE_CHANGED;
             output->time_ns = event.common.timestamp;
-            output->window.id = (kan_platform_window_id_t) event.window.windowID;
+            output->window.id = KAN_TYPED_ID_32_SET (kan_platform_window_id_t, event.window.windowID);
             return KAN_TRUE;
 
         case SDL_EVENT_WINDOW_MINIMIZED:
             output->type = KAN_PLATFORM_APPLICATION_EVENT_TYPE_WINDOW_MINIMIZED;
             output->time_ns = event.common.timestamp;
-            output->window.id = (kan_platform_window_id_t) event.window.windowID;
+            output->window.id = KAN_TYPED_ID_32_SET (kan_platform_window_id_t, event.window.windowID);
             return KAN_TRUE;
 
         case SDL_EVENT_WINDOW_MAXIMIZED:
             output->type = KAN_PLATFORM_APPLICATION_EVENT_TYPE_WINDOW_MAXIMIZED;
             output->time_ns = event.common.timestamp;
-            output->window.id = (kan_platform_window_id_t) event.window.windowID;
+            output->window.id = KAN_TYPED_ID_32_SET (kan_platform_window_id_t, event.window.windowID);
             return KAN_TRUE;
 
         case SDL_EVENT_WINDOW_RESTORED:
             output->type = KAN_PLATFORM_APPLICATION_EVENT_TYPE_WINDOW_RESTORED;
             output->time_ns = event.common.timestamp;
-            output->window.id = (kan_platform_window_id_t) event.window.windowID;
+            output->window.id = KAN_TYPED_ID_32_SET (kan_platform_window_id_t, event.window.windowID);
             return KAN_TRUE;
 
         case SDL_EVENT_WINDOW_MOUSE_ENTER:
             output->type = KAN_PLATFORM_APPLICATION_EVENT_TYPE_WINDOW_MOUSE_ENTER;
             output->time_ns = event.common.timestamp;
-            output->window.id = (kan_platform_window_id_t) event.window.windowID;
+            output->window.id = KAN_TYPED_ID_32_SET (kan_platform_window_id_t, event.window.windowID);
             return KAN_TRUE;
 
         case SDL_EVENT_WINDOW_MOUSE_LEAVE:
             output->type = KAN_PLATFORM_APPLICATION_EVENT_TYPE_WINDOW_MOUSE_LEAVE;
             output->time_ns = event.common.timestamp;
-            output->window.id = (kan_platform_window_id_t) event.window.windowID;
+            output->window.id = KAN_TYPED_ID_32_SET (kan_platform_window_id_t, event.window.windowID);
             return KAN_TRUE;
 
         case SDL_EVENT_WINDOW_FOCUS_GAINED:
             output->type = KAN_PLATFORM_APPLICATION_EVENT_TYPE_WINDOW_FOCUS_GAINED;
             output->time_ns = event.common.timestamp;
-            output->window.id = (kan_platform_window_id_t) event.window.windowID;
+            output->window.id = KAN_TYPED_ID_32_SET (kan_platform_window_id_t, event.window.windowID);
             return KAN_TRUE;
 
         case SDL_EVENT_WINDOW_FOCUS_LOST:
             output->type = KAN_PLATFORM_APPLICATION_EVENT_TYPE_WINDOW_FOCUS_LOST;
             output->time_ns = event.common.timestamp;
-            output->window.id = (kan_platform_window_id_t) event.window.windowID;
+            output->window.id = KAN_TYPED_ID_32_SET (kan_platform_window_id_t, event.window.windowID);
             return KAN_TRUE;
 
         case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
             output->type = KAN_PLATFORM_APPLICATION_EVENT_TYPE_WINDOW_CLOSE_REQUESTED;
             output->time_ns = event.common.timestamp;
-            output->window.id = (kan_platform_window_id_t) event.window.windowID;
+            output->window.id = KAN_TYPED_ID_32_SET (kan_platform_window_id_t, event.window.windowID);
             return KAN_TRUE;
 
         case SDL_EVENT_WINDOW_DISPLAY_CHANGED:
             output->type = KAN_PLATFORM_APPLICATION_EVENT_TYPE_WINDOW_DISPLAY_CHANGED;
             output->time_ns = event.common.timestamp;
-            output->window.id = (kan_platform_window_id_t) event.window.windowID;
+            output->window.id = KAN_TYPED_ID_32_SET (kan_platform_window_id_t, event.window.windowID);
             return KAN_TRUE;
 
         case SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED:
             output->type = KAN_PLATFORM_APPLICATION_EVENT_TYPE_WINDOW_DISPLAY_SCALE_CHANGED;
             output->time_ns = event.common.timestamp;
-            output->window.id = (kan_platform_window_id_t) event.window.windowID;
+            output->window.id = KAN_TYPED_ID_32_SET (kan_platform_window_id_t, event.window.windowID);
             return KAN_TRUE;
 
         case SDL_EVENT_WINDOW_OCCLUDED:
             output->type = KAN_PLATFORM_APPLICATION_EVENT_TYPE_WINDOW_OCCLUDED;
             output->time_ns = event.common.timestamp;
-            output->window.id = (kan_platform_window_id_t) event.window.windowID;
+            output->window.id = KAN_TYPED_ID_32_SET (kan_platform_window_id_t, event.window.windowID);
             return KAN_TRUE;
 
         case SDL_EVENT_WINDOW_ENTER_FULLSCREEN:
             output->type = KAN_PLATFORM_APPLICATION_EVENT_TYPE_WINDOW_ENTER_FULLSCREEN;
             output->time_ns = event.common.timestamp;
-            output->window.id = (kan_platform_window_id_t) event.window.windowID;
+            output->window.id = KAN_TYPED_ID_32_SET (kan_platform_window_id_t, event.window.windowID);
             return KAN_TRUE;
 
         case SDL_EVENT_WINDOW_LEAVE_FULLSCREEN:
             output->type = KAN_PLATFORM_APPLICATION_EVENT_TYPE_WINDOW_LEAVE_FULLSCREEN;
             output->time_ns = event.common.timestamp;
-            output->window.id = (kan_platform_window_id_t) event.window.windowID;
+            output->window.id = KAN_TYPED_ID_32_SET (kan_platform_window_id_t, event.window.windowID);
             return KAN_TRUE;
 
         case SDL_EVENT_WINDOW_DESTROYED:
             output->type = KAN_PLATFORM_APPLICATION_EVENT_TYPE_WINDOW_DESTROYED;
             output->time_ns = event.common.timestamp;
-            output->window.id = (kan_platform_window_id_t) event.window.windowID;
+            output->window.id = KAN_TYPED_ID_32_SET (kan_platform_window_id_t, event.window.windowID);
             return KAN_TRUE;
 
         case SDL_EVENT_KEY_DOWN:
             output->type = KAN_PLATFORM_APPLICATION_EVENT_TYPE_KEY_DOWN;
             output->time_ns = event.common.timestamp;
-            output->keyboard.window_id = (kan_platform_window_id_t) event.key.windowID;
+            output->keyboard.window_id = KAN_TYPED_ID_32_SET (kan_platform_window_id_t, event.key.windowID);
             output->keyboard.repeat = event.key.repeat > 0 ? KAN_TRUE : KAN_FALSE;
             output->keyboard.scan_code = (kan_scan_code_t) event.key.keysym.scancode;
             output->keyboard.key_code = (kan_key_code_t) event.key.keysym.sym;
@@ -641,7 +641,7 @@ kan_bool_t kan_platform_application_fetch_next_event (struct kan_platform_applic
         case SDL_EVENT_KEY_UP:
             output->type = KAN_PLATFORM_APPLICATION_EVENT_TYPE_KEY_DOWN;
             output->time_ns = event.common.timestamp;
-            output->keyboard.window_id = (kan_platform_window_id_t) event.key.windowID;
+            output->keyboard.window_id = KAN_TYPED_ID_32_SET (kan_platform_window_id_t, event.key.windowID);
             output->keyboard.repeat = event.key.repeat > 0 ? KAN_TRUE : KAN_FALSE;
             output->keyboard.scan_code = (kan_scan_code_t) event.key.keysym.scancode;
             output->keyboard.key_code = (kan_key_code_t) event.key.keysym.sym;
@@ -652,7 +652,7 @@ kan_bool_t kan_platform_application_fetch_next_event (struct kan_platform_applic
         {
             output->type = KAN_PLATFORM_APPLICATION_EVENT_TYPE_TEXT_EDITING;
             output->time_ns = event.common.timestamp;
-            output->text_editing.window_id = event.edit.windowID;
+            output->text_editing.window_id = KAN_TYPED_ID_32_SET (kan_platform_window_id_t, event.edit.windowID);
 
             const uint64_t text_length = strlen (event.edit.text);
             output->text_editing.text =
@@ -668,7 +668,7 @@ kan_bool_t kan_platform_application_fetch_next_event (struct kan_platform_applic
         {
             output->type = KAN_PLATFORM_APPLICATION_EVENT_TYPE_TEXT_INPUT;
             output->time_ns = event.common.timestamp;
-            output->text_input.window_id = event.text.windowID;
+            output->text_input.window_id = KAN_TYPED_ID_32_SET (kan_platform_window_id_t, event.text.windowID);
 
             const uint64_t text_length = strlen (event.text.text);
             output->text_input.text =
@@ -685,7 +685,7 @@ kan_bool_t kan_platform_application_fetch_next_event (struct kan_platform_applic
         case SDL_EVENT_MOUSE_MOTION:
             output->type = KAN_PLATFORM_APPLICATION_EVENT_TYPE_MOUSE_MOTION;
             output->time_ns = event.common.timestamp;
-            output->mouse_motion.window_id = (kan_platform_window_id_t) event.motion.windowID;
+            output->mouse_motion.window_id = KAN_TYPED_ID_32_SET (kan_platform_window_id_t, event.motion.windowID);
             output->mouse_motion.button_state = (uint8_t) event.motion.state;
             output->mouse_motion.window_x = event.motion.x;
             output->mouse_motion.window_y = event.motion.y;
@@ -696,7 +696,7 @@ kan_bool_t kan_platform_application_fetch_next_event (struct kan_platform_applic
         case SDL_EVENT_MOUSE_BUTTON_DOWN:
             output->type = KAN_PLATFORM_APPLICATION_EVENT_TYPE_MOUSE_BUTTON_DOWN;
             output->time_ns = event.common.timestamp;
-            output->mouse_button.window_id = (kan_platform_window_id_t) event.button.windowID;
+            output->mouse_button.window_id = KAN_TYPED_ID_32_SET (kan_platform_window_id_t, event.button.windowID);
             output->mouse_button.button = (kan_mouse_button_t) event.button.button;
             output->mouse_button.clicks = event.button.clicks;
             output->mouse_button.window_x = event.button.x;
@@ -706,7 +706,7 @@ kan_bool_t kan_platform_application_fetch_next_event (struct kan_platform_applic
         case SDL_EVENT_MOUSE_BUTTON_UP:
             output->type = KAN_PLATFORM_APPLICATION_EVENT_TYPE_MOUSE_BUTTON_UP;
             output->time_ns = event.common.timestamp;
-            output->mouse_button.window_id = (kan_platform_window_id_t) event.button.windowID;
+            output->mouse_button.window_id = KAN_TYPED_ID_32_SET (kan_platform_window_id_t, event.button.windowID);
             output->mouse_button.button = (kan_mouse_button_t) event.button.button;
             output->mouse_button.clicks = event.button.clicks;
             output->mouse_button.window_x = event.button.x;
@@ -716,7 +716,7 @@ kan_bool_t kan_platform_application_fetch_next_event (struct kan_platform_applic
         case SDL_EVENT_MOUSE_WHEEL:
             output->type = KAN_PLATFORM_APPLICATION_EVENT_TYPE_MOUSE_WHEEL;
             output->time_ns = event.common.timestamp;
-            output->mouse_wheel.window_id = (kan_platform_window_id_t) event.wheel.windowID;
+            output->mouse_wheel.window_id = KAN_TYPED_ID_32_SET (kan_platform_window_id_t, event.wheel.windowID);
             output->mouse_wheel.wheel_x = event.wheel.x;
             output->mouse_wheel.wheel_y = event.wheel.y;
             output->mouse_wheel.window_x = event.wheel.x;
@@ -768,7 +768,7 @@ void kan_platform_application_get_display_ids (struct kan_dynamic_array_t *outpu
         for (int index = 0; index < count_output; ++index)
         {
             *(kan_platform_display_id_t *) kan_dynamic_array_add_last (output_ids_array) =
-                (kan_platform_display_id_t) displays[index];
+                KAN_TYPED_ID_32_SET (kan_platform_display_id_t, displays[index]);
         }
 
         SDL_free (displays);
@@ -786,20 +786,20 @@ kan_platform_display_id_t kan_platform_application_get_primary_display_id (void)
     {
         KAN_LOG (platform_application, KAN_LOG_ERROR, "Failed to get primary display id, backend error: %s",
                  SDL_GetError ())
-        return KAN_INVALID_PLATFORM_DISPLAY_ID;
+        return KAN_TYPED_ID_32_SET_INVALID (kan_platform_display_id_t);
     }
 
-    return (kan_platform_display_id_t) id;
+    return KAN_TYPED_ID_32_SET (kan_platform_display_id_t, id);
 }
 
 kan_bool_t kan_platform_application_get_display_bounds (kan_platform_display_id_t display_id,
                                                         struct kan_platform_integer_bounds_t *output_bounds)
 {
     SDL_Rect bounds;
-    if (SDL_GetDisplayUsableBounds ((SDL_DisplayID) display_id, &bounds) != 0)
+    if (SDL_GetDisplayUsableBounds ((SDL_DisplayID) KAN_TYPED_ID_32_GET (display_id), &bounds) != 0)
     {
         KAN_LOG (platform_application, KAN_LOG_ERROR, "Failed to get display %llu bounds, backend error: %s",
-                 (unsigned long long) display_id, SDL_GetError ())
+                 (unsigned long long) KAN_TYPED_ID_32_GET (display_id), SDL_GetError ())
         return KAN_FALSE;
     }
 
@@ -813,7 +813,7 @@ kan_bool_t kan_platform_application_get_display_bounds (kan_platform_display_id_
 enum kan_platform_display_orientation_t kan_platform_application_get_display_orientation (
     kan_platform_display_id_t display_id)
 {
-    switch (SDL_GetCurrentDisplayOrientation ((SDL_DisplayID) display_id))
+    switch (SDL_GetCurrentDisplayOrientation ((SDL_DisplayID) KAN_TYPED_ID_32_GET (display_id)))
     {
     case SDL_ORIENTATION_UNKNOWN:
         return KAN_PLATFORM_DISPLAY_ORIENTATION_UNKNOWN;
@@ -836,7 +836,7 @@ enum kan_platform_display_orientation_t kan_platform_application_get_display_ori
 
 float kan_platform_application_get_display_content_scale (kan_platform_display_id_t display_id)
 {
-    const float content_scale = SDL_GetDisplayContentScale ((SDL_DisplayID) display_id);
+    const float content_scale = SDL_GetDisplayContentScale ((SDL_DisplayID) KAN_TYPED_ID_32_GET (display_id));
     return content_scale == 0.0f ? 1.0f : content_scale;
 }
 
@@ -847,7 +847,8 @@ void kan_platform_application_get_fullscreen_display_modes (kan_platform_display
     KAN_ASSERT (output_array->size == 0u)
 
     int count_output = 0;
-    const SDL_DisplayMode **modes = SDL_GetFullscreenDisplayModes ((SDL_DisplayID) display_id, &count_output);
+    const SDL_DisplayMode **modes =
+        SDL_GetFullscreenDisplayModes ((SDL_DisplayID) KAN_TYPED_ID_32_GET (display_id), &count_output);
 
     if (modes && count_output > 0)
     {
@@ -869,14 +870,14 @@ void kan_platform_application_get_fullscreen_display_modes (kan_platform_display
     else
     {
         KAN_LOG (platform_application, KAN_LOG_ERROR, "Failed to get display %llu modes, backend error: %s",
-                 (unsigned long long) display_id, SDL_GetError ())
+                 (unsigned long long) KAN_TYPED_ID_32_GET (display_id), SDL_GetError ())
     }
 }
 
 kan_bool_t kan_platform_application_get_current_display_mode (kan_platform_display_id_t display_id,
                                                               struct kan_platform_display_mode_t *output)
 {
-    const SDL_DisplayMode *mode = SDL_GetCurrentDisplayMode ((SDL_DisplayID) display_id);
+    const SDL_DisplayMode *mode = SDL_GetCurrentDisplayMode ((SDL_DisplayID) KAN_TYPED_ID_32_GET (display_id));
     if (mode)
     {
         *output = (struct kan_platform_display_mode_t) {
@@ -892,7 +893,7 @@ kan_bool_t kan_platform_application_get_current_display_mode (kan_platform_displ
     else
     {
         KAN_LOG (platform_application, KAN_LOG_ERROR, "Failed to get display %llu current mode, backend error: %s",
-                 (unsigned long long) display_id, SDL_GetError ())
+                 (unsigned long long) KAN_TYPED_ID_32_GET (display_id), SDL_GetError ())
         return KAN_FALSE;
     }
 }
@@ -900,7 +901,7 @@ kan_bool_t kan_platform_application_get_current_display_mode (kan_platform_displ
 kan_bool_t kan_platform_application_get_desktop_display_mode (kan_platform_display_id_t display_id,
                                                               struct kan_platform_display_mode_t *output)
 {
-    const SDL_DisplayMode *mode = SDL_GetDesktopDisplayMode ((SDL_DisplayID) display_id);
+    const SDL_DisplayMode *mode = SDL_GetDesktopDisplayMode ((SDL_DisplayID) KAN_TYPED_ID_32_GET (display_id));
     if (mode)
     {
         *output = (struct kan_platform_display_mode_t) {
@@ -916,7 +917,7 @@ kan_bool_t kan_platform_application_get_desktop_display_mode (kan_platform_displ
     else
     {
         KAN_LOG (platform_application, KAN_LOG_ERROR, "Failed to get display %llu desktop mode, backend error: %s",
-                 (unsigned long long) display_id, SDL_GetError ())
+                 (unsigned long long) KAN_TYPED_ID_32_GET (display_id), SDL_GetError ())
         return KAN_FALSE;
     }
 }
@@ -930,41 +931,41 @@ kan_platform_window_id_t kan_platform_application_window_create (const char *tit
     if (!window)
     {
         KAN_LOG (platform_application, KAN_LOG_ERROR, "Failed to create window, backend error: %s", SDL_GetError ())
-        return KAN_INVALID_PLATFORM_WINDOW_ID;
+        return KAN_TYPED_ID_32_SET_INVALID (kan_platform_window_id_t);
     }
 
-    return (kan_platform_window_id_t) SDL_GetWindowID (window);
+    return KAN_TYPED_ID_32_SET (kan_platform_window_id_t, SDL_GetWindowID (window));
 }
 
 kan_platform_display_id_t kan_platform_application_window_get_display_id (kan_platform_window_id_t window_id)
 {
-    SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) window_id);
+    SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) KAN_TYPED_ID_32_GET (window_id));
     if (!window)
     {
         KAN_LOG (platform_application, KAN_LOG_ERROR, "Unable to find window with id %llu, backend error: %s",
-                 (unsigned long long) window_id, SDL_GetError ())
-        return KAN_INVALID_PLATFORM_DISPLAY_ID;
+                 (unsigned long long) KAN_TYPED_ID_32_GET (window_id), SDL_GetError ())
+        return KAN_TYPED_ID_32_SET_INVALID (kan_platform_display_id_t);
     }
 
     SDL_DisplayID display_id = SDL_GetDisplayForWindow (window);
     if (display_id == 0)
     {
         KAN_LOG (platform_application, KAN_LOG_ERROR, "Failed to get display for window %llu, backend error: %s",
-                 (unsigned long long) window_id, SDL_GetError ())
-        return KAN_INVALID_PLATFORM_DISPLAY_ID;
+                 (unsigned long long) KAN_TYPED_ID_32_GET (window_id), SDL_GetError ())
+        return KAN_TYPED_ID_32_SET_INVALID (kan_platform_display_id_t);
     }
 
-    return (kan_platform_display_id_t) display_id;
+    return KAN_TYPED_ID_32_SET (kan_platform_display_id_t, display_id);
 }
 
 float kan_platform_application_window_get_pixel_density (kan_platform_window_id_t window_id)
 {
-    SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) window_id);
+    SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) KAN_TYPED_ID_32_GET (window_id));
     if (!window)
     {
         KAN_LOG (platform_application, KAN_LOG_ERROR, "Unable to find window with id %llu, backend error: %s",
-                 (unsigned long long) window_id, SDL_GetError ())
-        return KAN_INVALID_PLATFORM_DISPLAY_ID;
+                 (unsigned long long) KAN_TYPED_ID_32_GET (window_id), SDL_GetError ())
+        return 1.0f;
     }
 
     const float density = SDL_GetWindowPixelDensity (window);
@@ -973,11 +974,11 @@ float kan_platform_application_window_get_pixel_density (kan_platform_window_id_
 
 float kan_platform_application_window_get_display_scale (kan_platform_window_id_t window_id)
 {
-    SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) window_id);
+    SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) KAN_TYPED_ID_32_GET (window_id));
     if (!window)
     {
         KAN_LOG (platform_application, KAN_LOG_ERROR, "Unable to find window with id %llu, backend error: %s",
-                 (unsigned long long) window_id, SDL_GetError ())
+                 (unsigned long long) KAN_TYPED_ID_32_GET (window_id), SDL_GetError ())
         return 1.0f;
     }
 
@@ -987,11 +988,11 @@ float kan_platform_application_window_get_display_scale (kan_platform_window_id_
 
 kan_pixel_format_t kan_platform_application_window_get_pixel_format (kan_platform_window_id_t window_id)
 {
-    SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) window_id);
+    SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) KAN_TYPED_ID_32_GET (window_id));
     if (!window)
     {
         KAN_LOG (platform_application, KAN_LOG_ERROR, "Unable to find window with id %llu, backend error: %s",
-                 (unsigned long long) window_id, SDL_GetError ())
+                 (unsigned long long) KAN_TYPED_ID_32_GET (window_id), SDL_GetError ())
         return KAN_INVALID_PIXEL_FORMAT;
     }
 
@@ -1001,11 +1002,11 @@ kan_pixel_format_t kan_platform_application_window_get_pixel_format (kan_platfor
 kan_bool_t kan_platform_application_window_enter_fullscreen (kan_platform_window_id_t window_id,
                                                              const struct kan_platform_display_mode_t *display_mode)
 {
-    SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) window_id);
+    SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) KAN_TYPED_ID_32_GET (window_id));
     if (!window)
     {
         KAN_LOG (platform_application, KAN_LOG_ERROR, "Unable to find window with id %llu, backend error: %s",
-                 (unsigned long long) window_id, SDL_GetError ())
+                 (unsigned long long) KAN_TYPED_ID_32_GET (window_id), SDL_GetError ())
         return KAN_FALSE;
     }
 
@@ -1021,7 +1022,7 @@ kan_bool_t kan_platform_application_window_enter_fullscreen (kan_platform_window
         KAN_LOG (platform_application, KAN_LOG_ERROR,
                  "Unable to find appropriate display format for showing window with id %llu in fullscreen, backend "
                  "error: %s",
-                 (unsigned long long) window_id, SDL_GetError ())
+                 (unsigned long long) KAN_TYPED_ID_32_GET (window_id), SDL_GetError ())
         return KAN_FALSE;
     }
 
@@ -1030,7 +1031,7 @@ kan_bool_t kan_platform_application_window_enter_fullscreen (kan_platform_window
         KAN_LOG (platform_application, KAN_LOG_ERROR,
                  "Failed to set appropriate display format for showing window with id %llu in fullscreen, backend "
                  "error: %s",
-                 (unsigned long long) window_id, SDL_GetError ())
+                 (unsigned long long) KAN_TYPED_ID_32_GET (window_id), SDL_GetError ())
         return KAN_FALSE;
     }
 
@@ -1039,11 +1040,11 @@ kan_bool_t kan_platform_application_window_enter_fullscreen (kan_platform_window
 
 kan_bool_t kan_platform_application_window_leave_fullscreen (kan_platform_window_id_t window_id)
 {
-    SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) window_id);
+    SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) KAN_TYPED_ID_32_GET (window_id));
     if (!window)
     {
         KAN_LOG (platform_application, KAN_LOG_ERROR, "Unable to find window with id %llu, backend error: %s",
-                 (unsigned long long) window_id, SDL_GetError ())
+                 (unsigned long long) KAN_TYPED_ID_32_GET (window_id), SDL_GetError ())
         return KAN_FALSE;
     }
 
@@ -1052,11 +1053,11 @@ kan_bool_t kan_platform_application_window_leave_fullscreen (kan_platform_window
 
 enum kan_platform_window_flag_t kan_platform_application_window_get_flags (kan_platform_window_id_t window_id)
 {
-    SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) window_id);
+    SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) KAN_TYPED_ID_32_GET (window_id));
     if (!window)
     {
         KAN_LOG (platform_application, KAN_LOG_ERROR, "Unable to find window with id %llu, backend error: %s",
-                 (unsigned long long) window_id, SDL_GetError ())
+                 (unsigned long long) KAN_TYPED_ID_32_GET (window_id), SDL_GetError ())
         return 0u;
     }
 
@@ -1065,11 +1066,11 @@ enum kan_platform_window_flag_t kan_platform_application_window_get_flags (kan_p
 
 kan_bool_t kan_platform_application_window_set_title (kan_platform_window_id_t window_id, const char *title)
 {
-    SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) window_id);
+    SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) KAN_TYPED_ID_32_GET (window_id));
     if (!window)
     {
         KAN_LOG (platform_application, KAN_LOG_ERROR, "Unable to find window with id %llu, backend error: %s",
-                 (unsigned long long) window_id, SDL_GetError ())
+                 (unsigned long long) KAN_TYPED_ID_32_GET (window_id), SDL_GetError ())
         return KAN_FALSE;
     }
 
@@ -1078,11 +1079,11 @@ kan_bool_t kan_platform_application_window_set_title (kan_platform_window_id_t w
 
 const char *kan_platform_application_window_get_title (kan_platform_window_id_t window_id)
 {
-    SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) window_id);
+    SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) KAN_TYPED_ID_32_GET (window_id));
     if (!window)
     {
         KAN_LOG (platform_application, KAN_LOG_ERROR, "Unable to find window with id %llu, backend error: %s",
-                 (unsigned long long) window_id, SDL_GetError ())
+                 (unsigned long long) KAN_TYPED_ID_32_GET (window_id), SDL_GetError ())
         return NULL;
     }
 
@@ -1095,11 +1096,11 @@ kan_bool_t kan_platform_application_window_set_icon (kan_platform_window_id_t wi
                                                      uint32_t height,
                                                      const void *data)
 {
-    SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) window_id);
+    SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) KAN_TYPED_ID_32_GET (window_id));
     if (!window)
     {
         KAN_LOG (platform_application, KAN_LOG_ERROR, "Unable to find window with id %llu, backend error: %s",
-                 (unsigned long long) window_id, SDL_GetError ())
+                 (unsigned long long) KAN_TYPED_ID_32_GET (window_id), SDL_GetError ())
         return KAN_FALSE;
     }
 
@@ -1121,11 +1122,11 @@ kan_bool_t kan_platform_application_window_set_icon (kan_platform_window_id_t wi
 
 kan_bool_t kan_platform_application_window_set_position (kan_platform_window_id_t window_id, int32_t x, int32_t y)
 {
-    SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) window_id);
+    SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) KAN_TYPED_ID_32_GET (window_id));
     if (!window)
     {
         KAN_LOG (platform_application, KAN_LOG_ERROR, "Unable to find window with id %llu, backend error: %s",
-                 (unsigned long long) window_id, SDL_GetError ())
+                 (unsigned long long) KAN_TYPED_ID_32_GET (window_id), SDL_GetError ())
         return KAN_FALSE;
     }
 
@@ -1136,11 +1137,11 @@ kan_bool_t kan_platform_application_window_get_position (kan_platform_window_id_
                                                          int32_t *output_x,
                                                          int32_t *output_y)
 {
-    SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) window_id);
+    SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) KAN_TYPED_ID_32_GET (window_id));
     if (!window)
     {
         KAN_LOG (platform_application, KAN_LOG_ERROR, "Unable to find window with id %llu, backend error: %s",
-                 (unsigned long long) window_id, SDL_GetError ())
+                 (unsigned long long) KAN_TYPED_ID_32_GET (window_id), SDL_GetError ())
         return KAN_FALSE;
     }
 
@@ -1161,11 +1162,11 @@ kan_bool_t kan_platform_application_window_set_size (kan_platform_window_id_t wi
                                                      uint32_t width,
                                                      uint32_t height)
 {
-    SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) window_id);
+    SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) KAN_TYPED_ID_32_GET (window_id));
     if (!window)
     {
         KAN_LOG (platform_application, KAN_LOG_ERROR, "Unable to find window with id %llu, backend error: %s",
-                 (unsigned long long) window_id, SDL_GetError ())
+                 (unsigned long long) KAN_TYPED_ID_32_GET (window_id), SDL_GetError ())
         return KAN_FALSE;
     }
 
@@ -1176,11 +1177,11 @@ kan_bool_t kan_platform_application_window_get_size (kan_platform_window_id_t wi
                                                      uint32_t *output_width,
                                                      uint32_t *output_height)
 {
-    SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) window_id);
+    SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) KAN_TYPED_ID_32_GET (window_id));
     if (!window)
     {
         KAN_LOG (platform_application, KAN_LOG_ERROR, "Unable to find window with id %llu, backend error: %s",
-                 (unsigned long long) window_id, SDL_GetError ())
+                 (unsigned long long) KAN_TYPED_ID_32_GET (window_id), SDL_GetError ())
         return KAN_FALSE;
     }
 
@@ -1201,11 +1202,11 @@ kan_bool_t kan_platform_application_window_get_size_for_render (kan_platform_win
                                                                 uint32_t *output_width,
                                                                 uint32_t *output_height)
 {
-    SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) window_id);
+    SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) KAN_TYPED_ID_32_GET (window_id));
     if (!window)
     {
         KAN_LOG (platform_application, KAN_LOG_ERROR, "Unable to find window with id %llu, backend error: %s",
-                 (unsigned long long) window_id, SDL_GetError ())
+                 (unsigned long long) KAN_TYPED_ID_32_GET (window_id), SDL_GetError ())
         return KAN_FALSE;
     }
 
@@ -1215,8 +1216,8 @@ kan_bool_t kan_platform_application_window_get_size_for_render (kan_platform_win
     if (SDL_GetWindowSizeInPixels (window, &width, &height) != 0)
     {
         KAN_LOG (platform_application, KAN_LOG_ERROR,
-                 "Unable to get window with id %llu size for render, backend error: %s", (unsigned long long) window_id,
-                 SDL_GetError ())
+                 "Unable to get window with id %llu size for render, backend error: %s",
+                 (unsigned long long) KAN_TYPED_ID_32_GET (window_id), SDL_GetError ())
         return KAN_FALSE;
     }
 
@@ -1229,11 +1230,11 @@ kan_bool_t kan_platform_application_window_set_minimum_size (kan_platform_window
                                                              uint32_t width,
                                                              uint32_t height)
 {
-    SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) window_id);
+    SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) KAN_TYPED_ID_32_GET (window_id));
     if (!window)
     {
         KAN_LOG (platform_application, KAN_LOG_ERROR, "Unable to find window with id %llu, backend error: %s",
-                 (unsigned long long) window_id, SDL_GetError ())
+                 (unsigned long long) KAN_TYPED_ID_32_GET (window_id), SDL_GetError ())
         return KAN_FALSE;
     }
 
@@ -1244,11 +1245,11 @@ kan_bool_t kan_platform_application_window_get_minimum_size (kan_platform_window
                                                              uint32_t *output_width,
                                                              uint32_t *output_height)
 {
-    SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) window_id);
+    SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) KAN_TYPED_ID_32_GET (window_id));
     if (!window)
     {
         KAN_LOG (platform_application, KAN_LOG_ERROR, "Unable to find window with id %llu, backend error: %s",
-                 (unsigned long long) window_id, SDL_GetError ())
+                 (unsigned long long) KAN_TYPED_ID_32_GET (window_id), SDL_GetError ())
         return KAN_FALSE;
     }
 
@@ -1269,11 +1270,11 @@ kan_bool_t kan_platform_application_window_set_maximum_size (kan_platform_window
                                                              uint32_t width,
                                                              uint32_t height)
 {
-    SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) window_id);
+    SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) KAN_TYPED_ID_32_GET (window_id));
     if (!window)
     {
         KAN_LOG (platform_application, KAN_LOG_ERROR, "Unable to find window with id %llu, backend error: %s",
-                 (unsigned long long) window_id, SDL_GetError ())
+                 (unsigned long long) KAN_TYPED_ID_32_GET (window_id), SDL_GetError ())
         return KAN_FALSE;
     }
 
@@ -1284,11 +1285,11 @@ kan_bool_t kan_platform_application_window_get_maximum_size (kan_platform_window
                                                              uint32_t *output_width,
                                                              uint32_t *output_height)
 {
-    SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) window_id);
+    SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) KAN_TYPED_ID_32_GET (window_id));
     if (!window)
     {
         KAN_LOG (platform_application, KAN_LOG_ERROR, "Unable to find window with id %llu, backend error: %s",
-                 (unsigned long long) window_id, SDL_GetError ())
+                 (unsigned long long) KAN_TYPED_ID_32_GET (window_id), SDL_GetError ())
         return KAN_FALSE;
     }
 
@@ -1307,11 +1308,11 @@ kan_bool_t kan_platform_application_window_get_maximum_size (kan_platform_window
 
 kan_bool_t kan_platform_application_window_set_bordered (kan_platform_window_id_t window_id, kan_bool_t bordered)
 {
-    SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) window_id);
+    SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) KAN_TYPED_ID_32_GET (window_id));
     if (!window)
     {
         KAN_LOG (platform_application, KAN_LOG_ERROR, "Unable to find window with id %llu, backend error: %s",
-                 (unsigned long long) window_id, SDL_GetError ())
+                 (unsigned long long) KAN_TYPED_ID_32_GET (window_id), SDL_GetError ())
         return KAN_FALSE;
     }
 
@@ -1320,11 +1321,11 @@ kan_bool_t kan_platform_application_window_set_bordered (kan_platform_window_id_
 
 kan_bool_t kan_platform_application_window_set_resizable (kan_platform_window_id_t window_id, kan_bool_t resizable)
 {
-    SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) window_id);
+    SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) KAN_TYPED_ID_32_GET (window_id));
     if (!window)
     {
         KAN_LOG (platform_application, KAN_LOG_ERROR, "Unable to find window with id %llu, backend error: %s",
-                 (unsigned long long) window_id, SDL_GetError ())
+                 (unsigned long long) KAN_TYPED_ID_32_GET (window_id), SDL_GetError ())
         return KAN_FALSE;
     }
 
@@ -1334,11 +1335,11 @@ kan_bool_t kan_platform_application_window_set_resizable (kan_platform_window_id
 kan_bool_t kan_platform_application_window_set_always_on_top (kan_platform_window_id_t window_id,
                                                               kan_bool_t always_on_top)
 {
-    SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) window_id);
+    SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) KAN_TYPED_ID_32_GET (window_id));
     if (!window)
     {
         KAN_LOG (platform_application, KAN_LOG_ERROR, "Unable to find window with id %llu, backend error: %s",
-                 (unsigned long long) window_id, SDL_GetError ())
+                 (unsigned long long) KAN_TYPED_ID_32_GET (window_id), SDL_GetError ())
         return KAN_FALSE;
     }
 
@@ -1347,11 +1348,11 @@ kan_bool_t kan_platform_application_window_set_always_on_top (kan_platform_windo
 
 kan_bool_t kan_platform_application_window_show (kan_platform_window_id_t window_id)
 {
-    SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) window_id);
+    SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) KAN_TYPED_ID_32_GET (window_id));
     if (!window)
     {
         KAN_LOG (platform_application, KAN_LOG_ERROR, "Unable to find window with id %llu, backend error: %s",
-                 (unsigned long long) window_id, SDL_GetError ())
+                 (unsigned long long) KAN_TYPED_ID_32_GET (window_id), SDL_GetError ())
         return KAN_FALSE;
     }
 
@@ -1360,11 +1361,11 @@ kan_bool_t kan_platform_application_window_show (kan_platform_window_id_t window
 
 kan_bool_t kan_platform_application_window_hide (kan_platform_window_id_t window_id)
 {
-    SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) window_id);
+    SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) KAN_TYPED_ID_32_GET (window_id));
     if (!window)
     {
         KAN_LOG (platform_application, KAN_LOG_ERROR, "Unable to find window with id %llu, backend error: %s",
-                 (unsigned long long) window_id, SDL_GetError ())
+                 (unsigned long long) KAN_TYPED_ID_32_GET (window_id), SDL_GetError ())
         return KAN_FALSE;
     }
 
@@ -1373,11 +1374,11 @@ kan_bool_t kan_platform_application_window_hide (kan_platform_window_id_t window
 
 kan_bool_t kan_platform_application_window_raise (kan_platform_window_id_t window_id)
 {
-    SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) window_id);
+    SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) KAN_TYPED_ID_32_GET (window_id));
     if (!window)
     {
         KAN_LOG (platform_application, KAN_LOG_ERROR, "Unable to find window with id %llu, backend error: %s",
-                 (unsigned long long) window_id, SDL_GetError ())
+                 (unsigned long long) KAN_TYPED_ID_32_GET (window_id), SDL_GetError ())
         return KAN_FALSE;
     }
 
@@ -1386,11 +1387,11 @@ kan_bool_t kan_platform_application_window_raise (kan_platform_window_id_t windo
 
 kan_bool_t kan_platform_application_window_minimize (kan_platform_window_id_t window_id)
 {
-    SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) window_id);
+    SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) KAN_TYPED_ID_32_GET (window_id));
     if (!window)
     {
         KAN_LOG (platform_application, KAN_LOG_ERROR, "Unable to find window with id %llu, backend error: %s",
-                 (unsigned long long) window_id, SDL_GetError ())
+                 (unsigned long long) KAN_TYPED_ID_32_GET (window_id), SDL_GetError ())
         return KAN_FALSE;
     }
 
@@ -1399,11 +1400,11 @@ kan_bool_t kan_platform_application_window_minimize (kan_platform_window_id_t wi
 
 kan_bool_t kan_platform_application_window_maximize (kan_platform_window_id_t window_id)
 {
-    SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) window_id);
+    SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) KAN_TYPED_ID_32_GET (window_id));
     if (!window)
     {
         KAN_LOG (platform_application, KAN_LOG_ERROR, "Unable to find window with id %llu, backend error: %s",
-                 (unsigned long long) window_id, SDL_GetError ())
+                 (unsigned long long) KAN_TYPED_ID_32_GET (window_id), SDL_GetError ())
         return KAN_FALSE;
     }
 
@@ -1412,11 +1413,11 @@ kan_bool_t kan_platform_application_window_maximize (kan_platform_window_id_t wi
 
 kan_bool_t kan_platform_application_window_restore (kan_platform_window_id_t window_id)
 {
-    SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) window_id);
+    SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) KAN_TYPED_ID_32_GET (window_id));
     if (!window)
     {
         KAN_LOG (platform_application, KAN_LOG_ERROR, "Unable to find window with id %llu, backend error: %s",
-                 (unsigned long long) window_id, SDL_GetError ())
+                 (unsigned long long) KAN_TYPED_ID_32_GET (window_id), SDL_GetError ())
         return KAN_FALSE;
     }
 
@@ -1425,11 +1426,11 @@ kan_bool_t kan_platform_application_window_restore (kan_platform_window_id_t win
 
 kan_bool_t kan_platform_application_window_set_mouse_grab (kan_platform_window_id_t window_id, kan_bool_t grab_mouse)
 {
-    SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) window_id);
+    SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) KAN_TYPED_ID_32_GET (window_id));
     if (!window)
     {
         KAN_LOG (platform_application, KAN_LOG_ERROR, "Unable to find window with id %llu, backend error: %s",
-                 (unsigned long long) window_id, SDL_GetError ())
+                 (unsigned long long) KAN_TYPED_ID_32_GET (window_id), SDL_GetError ())
         return KAN_FALSE;
     }
 
@@ -1439,11 +1440,11 @@ kan_bool_t kan_platform_application_window_set_mouse_grab (kan_platform_window_i
 kan_bool_t kan_platform_application_window_set_keyboard_grab (kan_platform_window_id_t window_id,
                                                               kan_bool_t grab_keyboard)
 {
-    SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) window_id);
+    SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) KAN_TYPED_ID_32_GET (window_id));
     if (!window)
     {
         KAN_LOG (platform_application, KAN_LOG_ERROR, "Unable to find window with id %llu, backend error: %s",
-                 (unsigned long long) window_id, SDL_GetError ())
+                 (unsigned long long) KAN_TYPED_ID_32_GET (window_id), SDL_GetError ())
         return KAN_FALSE;
     }
 
@@ -1452,11 +1453,11 @@ kan_bool_t kan_platform_application_window_set_keyboard_grab (kan_platform_windo
 
 kan_bool_t kan_platform_application_window_set_opacity (kan_platform_window_id_t window_id, float opacity)
 {
-    SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) window_id);
+    SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) KAN_TYPED_ID_32_GET (window_id));
     if (!window)
     {
         KAN_LOG (platform_application, KAN_LOG_ERROR, "Unable to find window with id %llu, backend error: %s",
-                 (unsigned long long) window_id, SDL_GetError ())
+                 (unsigned long long) KAN_TYPED_ID_32_GET (window_id), SDL_GetError ())
         return KAN_FALSE;
     }
 
@@ -1465,11 +1466,11 @@ kan_bool_t kan_platform_application_window_set_opacity (kan_platform_window_id_t
 
 float kan_platform_application_window_get_opacity (kan_platform_window_id_t window_id)
 {
-    SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) window_id);
+    SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) KAN_TYPED_ID_32_GET (window_id));
     if (!window)
     {
         KAN_LOG (platform_application, KAN_LOG_ERROR, "Unable to find window with id %llu, backend error: %s",
-                 (unsigned long long) window_id, SDL_GetError ())
+                 (unsigned long long) KAN_TYPED_ID_32_GET (window_id), SDL_GetError ())
         return 0.0f;
     }
 
@@ -1484,11 +1485,11 @@ float kan_platform_application_window_get_opacity (kan_platform_window_id_t wind
 
 void kan_platform_application_window_set_focusable (kan_platform_window_id_t window_id, kan_bool_t focusable)
 {
-    SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) window_id);
+    SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) KAN_TYPED_ID_32_GET (window_id));
     if (!window)
     {
         KAN_LOG (platform_application, KAN_LOG_ERROR, "Unable to find window with id %llu, backend error: %s",
-                 (unsigned long long) window_id, SDL_GetError ())
+                 (unsigned long long) KAN_TYPED_ID_32_GET (window_id), SDL_GetError ())
         return;
     }
 
@@ -1506,11 +1507,11 @@ uint64_t kan_platform_application_window_create_vulkan_surface (kan_platform_win
                                                                 uint64_t vulkan_instance,
                                                                 void *vulkan_allocation_callbacks)
 {
-    SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) window_id);
+    SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) KAN_TYPED_ID_32_GET (window_id));
     if (!window)
     {
         KAN_LOG (platform_application, KAN_LOG_ERROR, "Unable to find window with id %llu, backend error: %s",
-                 (unsigned long long) window_id, SDL_GetError ())
+                 (unsigned long long) KAN_TYPED_ID_32_GET (window_id), SDL_GetError ())
         return VK_NULL_HANDLE;
     }
 
@@ -1530,11 +1531,11 @@ void kan_platform_application_window_destroy_vulkan_surface (kan_platform_window
                                                              uint64_t vulkan_surface,
                                                              void *vulkan_allocation_callbacks)
 {
-    SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) window_id);
+    SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) KAN_TYPED_ID_32_GET (window_id));
     if (!window)
     {
         KAN_LOG (platform_application, KAN_LOG_ERROR, "Unable to find window with id %llu, backend error: %s",
-                 (unsigned long long) window_id, SDL_GetError ())
+                 (unsigned long long) KAN_TYPED_ID_32_GET (window_id), SDL_GetError ())
         return;
     }
 
@@ -1544,11 +1545,11 @@ void kan_platform_application_window_destroy_vulkan_surface (kan_platform_window
 
 void kan_platform_application_window_destroy (kan_platform_window_id_t window_id)
 {
-    SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) window_id);
+    SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) KAN_TYPED_ID_32_GET (window_id));
     if (!window)
     {
         KAN_LOG (platform_application, KAN_LOG_ERROR, "Unable to find window with id %llu, backend error: %s",
-                 (unsigned long long) window_id, SDL_GetError ())
+                 (unsigned long long) KAN_TYPED_ID_32_GET (window_id), SDL_GetError ())
         return;
     }
 
@@ -1569,11 +1570,11 @@ uint8_t kan_platform_application_get_global_mouse_state (float *x, float *y)
 
 void kan_platform_application_warp_mouse_in_window (kan_platform_window_id_t window_id, float x, float y)
 {
-    SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) window_id);
+    SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) KAN_TYPED_ID_32_GET (window_id));
     if (!window)
     {
         KAN_LOG (platform_application, KAN_LOG_ERROR, "Unable to find window with id %llu, backend error: %s",
-                 (unsigned long long) window_id, SDL_GetError ())
+                 (unsigned long long) KAN_TYPED_ID_32_GET (window_id), SDL_GetError ())
         return;
     }
 

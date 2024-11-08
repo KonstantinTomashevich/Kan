@@ -56,16 +56,16 @@ kan_file_system_directory_iterator_t kan_file_system_directory_iterator_create (
                  (unsigned long) GetLastError ())
 
         kan_free_general (allocation_group, iterator, sizeof (struct directory_iterator_t));
-        return KAN_INVALID_FILE_SYSTEM_DIRECTORY_ITERATOR;
+        return KAN_HANDLE_SET_INVALID (kan_file_system_directory_iterator_t);
     }
 
     iterator->state = DIRECTORY_ITERATOR_STATE_FIRST_FILE;
-    return (kan_file_system_directory_iterator_t) iterator;
+    return KAN_HANDLE_SET (kan_file_system_directory_iterator_t, iterator);
 }
 
 const char *kan_file_system_directory_iterator_advance (kan_file_system_directory_iterator_t iterator)
 {
-    struct directory_iterator_t *iterator_data = (struct directory_iterator_t *) iterator;
+    struct directory_iterator_t *iterator_data = KAN_HANDLE_GET (iterator);
     switch (iterator_data->state)
     {
     case DIRECTORY_ITERATOR_STATE_FIRST_FILE:
@@ -91,7 +91,7 @@ const char *kan_file_system_directory_iterator_advance (kan_file_system_director
 
 void kan_file_system_directory_iterator_destroy (kan_file_system_directory_iterator_t iterator)
 {
-    struct directory_iterator_t *iterator_data = (struct directory_iterator_t *) iterator;
+    struct directory_iterator_t *iterator_data = KAN_HANDLE_GET (iterator);
     FindClose (iterator_data->find_handle);
     kan_free_general (allocation_group, iterator_data, sizeof (struct directory_iterator_t));
 }

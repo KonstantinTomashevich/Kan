@@ -4,8 +4,8 @@
 
 #include <stdint.h>
 
-#include <kan/api_common/bool.h>
 #include <kan/api_common/c_header.h>
+#include <kan/api_common/core_types.h>
 
 /// \file
 /// \brief Defines atomic types and operations on them.

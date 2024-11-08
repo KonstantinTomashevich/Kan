@@ -555,7 +555,7 @@ static void kan_resource_pipeline_detect_inside_patch_part (
     kan_reflection_patch_iterator_t search_since_iterator,
     struct kan_resource_pipeline_detected_reference_container_t *output_container)
 {
-    if (search_since_iterator == kan_reflection_patch_end (patch))
+    if (KAN_HANDLE_IS_EQUAL (search_since_iterator, kan_reflection_patch_end (patch)))
     {
         // Nothing in patch.
         return;
@@ -592,7 +592,7 @@ static void kan_resource_pipeline_detect_inside_patch_part (
                field_offset >= chunk_info.offset + chunk_info.size)
         {
             field_search_iterator = kan_reflection_patch_iterator_next (field_search_iterator);
-            if (field_search_iterator == kan_reflection_patch_end (patch))
+            if (KAN_HANDLE_IS_EQUAL (field_search_iterator, kan_reflection_patch_end (patch)))
             {
                 break;
             }
@@ -600,7 +600,7 @@ static void kan_resource_pipeline_detect_inside_patch_part (
             chunk_info = kan_reflection_patch_iterator_get (field_search_iterator);
         }
 
-        if (field_search_iterator == kan_reflection_patch_end (patch))
+        if (KAN_HANDLE_IS_EQUAL (field_search_iterator, kan_reflection_patch_end (patch)))
         {
             // Field does not present in patch even partially.
             continue;
@@ -668,7 +668,7 @@ static void kan_resource_pipeline_detect_inside_patch_part (
                     while (item_offset >= chunk_info.offset + chunk_info.size)
                     {
                         field_search_iterator = kan_reflection_patch_iterator_next (field_search_iterator);
-                        if (field_search_iterator == kan_reflection_patch_end (patch))
+                        if (KAN_HANDLE_IS_EQUAL (field_search_iterator, kan_reflection_patch_end (patch)))
                         {
                             break;
                         }
@@ -676,7 +676,7 @@ static void kan_resource_pipeline_detect_inside_patch_part (
                         chunk_info = kan_reflection_patch_iterator_get (field_search_iterator);
                     }
 
-                    if (field_search_iterator == kan_reflection_patch_end (patch))
+                    if (KAN_HANDLE_IS_EQUAL (field_search_iterator, kan_reflection_patch_end (patch)))
                     {
                         break;
                     }

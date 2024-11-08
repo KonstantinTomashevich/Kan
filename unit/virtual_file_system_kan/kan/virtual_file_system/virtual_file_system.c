@@ -751,7 +751,7 @@ static kan_bool_t file_system_watcher_add_real_watcher (struct file_system_watch
                                                         const char *real_path)
 {
     kan_file_system_watcher_t real_watcher = kan_file_system_watcher_create (real_path);
-    if (real_watcher == KAN_INVALID_FILE_SYSTEM_WATCHER)
+    if (!KAN_HANDLE_IS_VALID (real_watcher))
     {
         return KAN_FALSE;
     }
@@ -833,7 +833,7 @@ static void inform_real_directory_added (struct file_system_watcher_t *watcher,
     kan_file_system_directory_iterator_t directory_iterator =
         kan_file_system_directory_iterator_create (recursive_real_path->path);
 
-    if (directory_iterator != KAN_INVALID_FILE_SYSTEM_DIRECTORY_ITERATOR)
+    if (KAN_HANDLE_IS_VALID (directory_iterator))
     {
         const char *entry_name;
         while ((entry_name = kan_file_system_directory_iterator_advance (directory_iterator)))
@@ -943,7 +943,7 @@ static void inform_real_directory_removed (struct file_system_watcher_t *watcher
     kan_file_system_directory_iterator_t directory_iterator =
         kan_file_system_directory_iterator_create (recursive_real_path->path);
 
-    if (directory_iterator != KAN_INVALID_FILE_SYSTEM_DIRECTORY_ITERATOR)
+    if (KAN_HANDLE_IS_VALID (directory_iterator))
     {
         const char *entry_name;
         while ((entry_name = kan_file_system_directory_iterator_advance (directory_iterator)))
@@ -1574,7 +1574,8 @@ static kan_bool_t mount_read_only_pack (struct volume_t *volume,
 
     kan_serialization_binary_reader_t reader = kan_serialization_binary_reader_create (
         stream, &registry, type_name_read_only_pack_registry_t, serialization_script_storage,
-        KAN_INVALID_SERIALIZATION_INTERNED_STRING_REGISTRY, read_only_pack_operation_allocation_group);
+        KAN_HANDLE_SET_INVALID (kan_serialization_interned_string_registry_t),
+        read_only_pack_operation_allocation_group);
 
     enum kan_serialization_state_t state = KAN_SERIALIZATION_IN_PROGRESS;
     while (state != KAN_SERIALIZATION_FINISHED)
@@ -1635,14 +1636,14 @@ kan_virtual_file_system_volume_t kan_virtual_file_system_volume_create (void)
     volume->root_directory.first_mount_point_real = NULL;
     volume->root_directory.first_mount_point_read_only_pack = NULL;
     volume->first_watcher = NULL;
-    return (kan_virtual_file_system_volume_t) volume;
+    return KAN_HANDLE_SET (kan_virtual_file_system_volume_t, volume);
 }
 
 kan_bool_t kan_virtual_file_system_volume_mount_real (kan_virtual_file_system_volume_t volume,
                                                       const char *mount_path,
                                                       const char *real_file_system_path)
 {
-    struct volume_t *volume_data = (struct volume_t *) volume;
+    struct volume_t *volume_data = KAN_HANDLE_GET (volume);
     const char *path_iterator = mount_path;
     struct virtual_directory_t *current_directory = &volume_data->root_directory;
     const char *part_begin = "silence_not_initialized_warnings";
@@ -1711,7 +1712,7 @@ kan_bool_t kan_virtual_file_system_volume_mount_read_only_pack (kan_virtual_file
                                                                 const char *mount_path,
                                                                 const char *pack_real_path)
 {
-    struct volume_t *volume_data = (struct volume_t *) volume;
+    struct volume_t *volume_data = KAN_HANDLE_GET (volume);
     const char *path_iterator = mount_path;
     struct virtual_directory_t *current_directory = &volume_data->root_directory;
     const char *part_begin = "silence_not_initialized_warnings";
@@ -1758,7 +1759,7 @@ kan_bool_t kan_virtual_file_system_volume_mount_read_only_pack (kan_virtual_file
 
 kan_bool_t kan_virtual_file_system_volume_unmount (kan_virtual_file_system_volume_t volume, const char *mount_path)
 {
-    struct volume_t *volume_data = (struct volume_t *) volume;
+    struct volume_t *volume_data = KAN_HANDLE_GET (volume);
     const char *path_iterator = mount_path;
     struct virtual_directory_t *current_directory = &volume_data->root_directory;
     const char *part_begin = "silence_not_initialized_warnings";
@@ -1844,7 +1845,7 @@ kan_bool_t kan_virtual_file_system_volume_unmount (kan_virtual_file_system_volum
 
 void kan_virtual_file_system_volume_destroy (kan_virtual_file_system_volume_t volume)
 {
-    struct volume_t *volume_data = (struct volume_t *) volume;
+    struct volume_t *volume_data = KAN_HANDLE_GET (volume);
     virtual_directory_shutdown (&volume_data->root_directory);
 
     while (volume_data->first_watcher)
@@ -1861,10 +1862,10 @@ struct kan_virtual_file_system_directory_iterator_t kan_virtual_file_system_dire
 {
     struct directory_iterator_t iterator = {
         .type = DIRECTORY_ITERATOR_TYPE_REAL_DIRECTORY,
-        .real_file_system_iterator = KAN_INVALID_FILE_SYSTEM_DIRECTORY_ITERATOR,
+        .real_file_system_iterator = KAN_HANDLE_SET_INVALID (kan_file_system_directory_iterator_t),
     };
 
-    struct volume_t *volume_data = (struct volume_t *) volume;
+    struct volume_t *volume_data = KAN_HANDLE_GET (volume);
     const char *path_iterator = directory_path;
     struct virtual_directory_t *current_directory = &volume_data->root_directory;
     const char *part_begin = "silence_not_initialized_warnings";
@@ -1893,7 +1894,7 @@ struct kan_virtual_file_system_directory_iterator_t kan_virtual_file_system_dire
             mount_point_real_fill_path (mount_point_real, path_iterator, &path_container);
 
             iterator.real_file_system_iterator = kan_file_system_directory_iterator_create (path_container.path);
-            if (iterator.real_file_system_iterator == KAN_INVALID_FILE_SYSTEM_DIRECTORY_ITERATOR)
+            if (!KAN_HANDLE_IS_VALID (iterator.real_file_system_iterator))
             {
                 KAN_LOG_WITH_BUFFER (
                     KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, virtual_file_system, KAN_LOG_ERROR,
@@ -2121,7 +2122,7 @@ kan_bool_t kan_virtual_file_system_query_entry (kan_virtual_file_system_volume_t
                                                 const char *path,
                                                 struct kan_virtual_file_system_entry_status_t *status)
 {
-    struct volume_t *volume_data = (struct volume_t *) volume;
+    struct volume_t *volume_data = KAN_HANDLE_GET (volume);
     const char *path_iterator = path;
     struct virtual_directory_t *current_directory = &volume_data->root_directory;
     const char *part_begin = "silence_not_initialized_warnings";
@@ -2239,7 +2240,7 @@ kan_bool_t kan_virtual_file_system_query_entry (kan_virtual_file_system_volume_t
 
 kan_bool_t kan_virtual_file_system_check_existence (kan_virtual_file_system_volume_t volume, const char *path)
 {
-    struct volume_t *volume_data = (struct volume_t *) volume;
+    struct volume_t *volume_data = KAN_HANDLE_GET (volume);
     const char *path_iterator = path;
     struct virtual_directory_t *current_directory = &volume_data->root_directory;
     const char *part_begin = "silence_not_initialized_warnings";
@@ -2312,7 +2313,7 @@ kan_bool_t kan_virtual_file_system_check_existence (kan_virtual_file_system_volu
 
 kan_bool_t kan_virtual_file_system_remove_file (kan_virtual_file_system_volume_t volume, const char *path)
 {
-    struct volume_t *volume_data = (struct volume_t *) volume;
+    struct volume_t *volume_data = KAN_HANDLE_GET (volume);
     const char *path_iterator = path;
     struct virtual_directory_t *current_directory = &volume_data->root_directory;
     const char *part_begin = "silence_not_initialized_warnings";
@@ -2363,7 +2364,7 @@ kan_bool_t kan_virtual_file_system_remove_file (kan_virtual_file_system_volume_t
 
 kan_bool_t kan_virtual_file_system_make_directory (kan_virtual_file_system_volume_t volume, const char *path)
 {
-    struct volume_t *volume_data = (struct volume_t *) volume;
+    struct volume_t *volume_data = KAN_HANDLE_GET (volume);
     const char *path_iterator = path;
     struct virtual_directory_t *current_directory = &volume_data->root_directory;
     const char *part_begin = "silence_not_initialized_warnings";
@@ -2471,7 +2472,7 @@ kan_bool_t kan_virtual_file_system_make_directory (kan_virtual_file_system_volum
 kan_bool_t kan_virtual_file_system_remove_directory_with_content (kan_virtual_file_system_volume_t volume,
                                                                   const char *path)
 {
-    struct volume_t *volume_data = (struct volume_t *) volume;
+    struct volume_t *volume_data = KAN_HANDLE_GET (volume);
     const char *path_iterator = path;
     struct virtual_directory_t *current_directory = &volume_data->root_directory;
     const char *part_begin = "silence_not_initialized_warnings";
@@ -2537,7 +2538,7 @@ kan_bool_t kan_virtual_file_system_remove_directory_with_content (kan_virtual_fi
 
 kan_bool_t kan_virtual_file_system_remove_empty_directory (kan_virtual_file_system_volume_t volume, const char *path)
 {
-    struct volume_t *volume_data = (struct volume_t *) volume;
+    struct volume_t *volume_data = KAN_HANDLE_GET (volume);
     const char *path_iterator = path;
     struct virtual_directory_t *current_directory = &volume_data->root_directory;
     const char *part_begin = "silence_not_initialized_warnings";
@@ -2610,7 +2611,7 @@ kan_bool_t kan_virtual_file_system_remove_empty_directory (kan_virtual_file_syst
 
 struct kan_stream_t *kan_virtual_file_stream_open_for_read (kan_virtual_file_system_volume_t volume, const char *path)
 {
-    struct volume_t *volume_data = (struct volume_t *) volume;
+    struct volume_t *volume_data = KAN_HANDLE_GET (volume);
     const char *path_iterator = path;
     struct virtual_directory_t *current_directory = &volume_data->root_directory;
     const char *part_begin = "silence_not_initialized_warnings";
@@ -2711,7 +2712,7 @@ struct kan_stream_t *kan_virtual_file_stream_open_for_read (kan_virtual_file_sys
 
 struct kan_stream_t *kan_virtual_file_stream_open_for_write (kan_virtual_file_system_volume_t volume, const char *path)
 {
-    struct volume_t *volume_data = (struct volume_t *) volume;
+    struct volume_t *volume_data = KAN_HANDLE_GET (volume);
     const char *path_iterator = path;
     struct virtual_directory_t *current_directory = &volume_data->root_directory;
     const char *part_begin = "silence_not_initialized_warnings";
@@ -2770,13 +2771,13 @@ kan_virtual_file_system_read_only_pack_builder_t kan_virtual_file_system_read_on
     builder->output_stream = NULL;
     builder->beginning_offset_in_stream = 0u;
     read_only_pack_registry_init (&builder->registry);
-    return (kan_virtual_file_system_read_only_pack_builder_t) builder;
+    return KAN_HANDLE_SET (kan_virtual_file_system_read_only_pack_builder_t, builder);
 }
 
 kan_bool_t kan_virtual_file_system_read_only_pack_builder_begin (
     kan_virtual_file_system_read_only_pack_builder_t builder, struct kan_stream_t *output_stream)
 {
-    struct read_only_pack_builder_t *builder_data = (struct read_only_pack_builder_t *) builder;
+    struct read_only_pack_builder_t *builder_data = KAN_HANDLE_GET (builder);
     KAN_ASSERT (!builder_data->output_stream)
     KAN_ASSERT (kan_stream_is_writeable (output_stream))
     KAN_ASSERT (kan_stream_is_random_access (output_stream))
@@ -2800,7 +2801,7 @@ kan_bool_t kan_virtual_file_system_read_only_pack_builder_add (kan_virtual_file_
                                                                struct kan_stream_t *input_stream,
                                                                const char *path_in_pack)
 {
-    struct read_only_pack_builder_t *builder_data = (struct read_only_pack_builder_t *) builder;
+    struct read_only_pack_builder_t *builder_data = KAN_HANDLE_GET (builder);
     KAN_ASSERT (builder_data->output_stream)
     KAN_ASSERT (kan_stream_is_readable (input_stream))
     char buffer[KAN_VIRTUAL_FILE_SYSTEM_ROPACK_BUILDER_CHUNK_SIZE];
@@ -2859,7 +2860,7 @@ kan_bool_t kan_virtual_file_system_read_only_pack_builder_add (kan_virtual_file_
 kan_bool_t kan_virtual_file_system_read_only_pack_builder_finalize (
     kan_virtual_file_system_read_only_pack_builder_t builder)
 {
-    struct read_only_pack_builder_t *builder_data = (struct read_only_pack_builder_t *) builder;
+    struct read_only_pack_builder_t *builder_data = KAN_HANDLE_GET (builder);
     KAN_ASSERT (builder_data->output_stream)
 
     const uint64_t registry_position = builder_data->output_stream->operations->tell (builder_data->output_stream);
@@ -2896,7 +2897,7 @@ kan_bool_t kan_virtual_file_system_read_only_pack_builder_finalize (
 
     kan_serialization_binary_writer_t writer = kan_serialization_binary_writer_create (
         builder_data->output_stream, &builder_data->registry, type_name_read_only_pack_registry_t,
-        serialization_script_storage, KAN_INVALID_SERIALIZATION_INTERNED_STRING_REGISTRY);
+        serialization_script_storage, KAN_HANDLE_SET_INVALID (kan_serialization_interned_string_registry_t));
 
     enum kan_serialization_state_t state = KAN_SERIALIZATION_IN_PROGRESS;
     while (state != KAN_SERIALIZATION_FINISHED)
@@ -2923,7 +2924,7 @@ kan_bool_t kan_virtual_file_system_read_only_pack_builder_finalize (
 
 void kan_virtual_file_system_read_only_pack_builder_destroy (kan_virtual_file_system_read_only_pack_builder_t builder)
 {
-    struct read_only_pack_builder_t *builder_data = (struct read_only_pack_builder_t *) builder;
+    struct read_only_pack_builder_t *builder_data = KAN_HANDLE_GET (builder);
     KAN_ASSERT (!builder_data->output_stream)
     read_only_pack_registry_shutdown (&builder_data->registry);
     kan_free_batched (read_only_pack_operation_allocation_group, builder_data);
@@ -2932,7 +2933,7 @@ void kan_virtual_file_system_read_only_pack_builder_destroy (kan_virtual_file_sy
 kan_virtual_file_system_watcher_t kan_virtual_file_system_watcher_create (kan_virtual_file_system_volume_t volume,
                                                                           const char *directory_path)
 {
-    struct volume_t *volume_data = (struct volume_t *) volume;
+    struct volume_t *volume_data = KAN_HANDLE_GET (volume);
     const char *path_iterator = directory_path;
     struct virtual_directory_t *current_directory = &volume_data->root_directory;
     const char *part_begin = "silence_not_initialized_warnings";
@@ -2941,7 +2942,8 @@ kan_virtual_file_system_watcher_t kan_virtual_file_system_watcher_create (kan_vi
     switch (follow_virtual_directory_path (&current_directory, &path_iterator, &part_begin, &part_end))
     {
     case FOLLOW_PATH_RESULT_REACHED_END:
-        return (kan_virtual_file_system_watcher_t) file_system_watcher_create (volume_data, current_directory);
+        return KAN_HANDLE_SET (kan_virtual_file_system_watcher_t,
+                               file_system_watcher_create (volume_data, current_directory));
 
     case FOLLOW_PATH_RESULT_STOPPED:
     {
@@ -2960,10 +2962,10 @@ kan_virtual_file_system_watcher_t kan_virtual_file_system_watcher_create (kan_vi
                                      "Failed to create file system watcher \"%s\": unable to watch real path \"%s\".",
                                      directory_path, path_container.path)
                 file_system_watcher_destroy (watcher);
-                return KAN_INVALID_VIRTUAL_FILE_SYSTEM_WATCHER;
+                return KAN_HANDLE_SET_INVALID (kan_virtual_file_system_watcher_t);
             }
 
-            return (kan_virtual_file_system_watcher_t) watcher;
+            return KAN_HANDLE_SET (kan_virtual_file_system_watcher_t, watcher);
         }
 
         struct mount_point_read_only_pack_t *mount_point_read_only_pack =
@@ -2975,48 +2977,48 @@ kan_virtual_file_system_watcher_t kan_virtual_file_system_watcher_create (kan_vi
                      "Failed to create file system watcher \"%s\": path belongs to read only pack and therefore cannot "
                      "be modified or removed.",
                      directory_path)
-            return KAN_INVALID_VIRTUAL_FILE_SYSTEM_WATCHER;
+            return KAN_HANDLE_SET_INVALID (kan_virtual_file_system_watcher_t);
         }
 
         KAN_LOG (virtual_file_system, KAN_LOG_ERROR,
                  "Failed to create file system watcher for directory \"%s\": it does not exists.", directory_path)
-        return KAN_INVALID_VIRTUAL_FILE_SYSTEM_WATCHER;
+        return KAN_HANDLE_SET_INVALID (kan_virtual_file_system_watcher_t);
     }
 
     case FOLLOW_PATH_RESULT_FAILED:
         KAN_LOG (virtual_file_system, KAN_LOG_ERROR, "Failed to continue parsing path \"%s\" at \"%s\".",
                  directory_path, part_begin)
-        return KAN_INVALID_VIRTUAL_FILE_SYSTEM_WATCHER;
+        return KAN_HANDLE_SET_INVALID (kan_virtual_file_system_watcher_t);
     }
 
     KAN_ASSERT (KAN_FALSE)
-    return KAN_INVALID_VIRTUAL_FILE_SYSTEM_WATCHER;
+    return KAN_HANDLE_SET_INVALID (kan_virtual_file_system_watcher_t);
 }
 
 void kan_virtual_file_system_watcher_destroy (kan_virtual_file_system_watcher_t watcher)
 {
-    file_system_watcher_destroy ((struct file_system_watcher_t *) watcher);
+    file_system_watcher_destroy (KAN_HANDLE_GET (watcher));
 }
 
 kan_virtual_file_system_watcher_iterator_t kan_virtual_file_system_watcher_iterator_create (
     kan_virtual_file_system_watcher_t watcher)
 {
-    struct file_system_watcher_t *watcher_data = (struct file_system_watcher_t *) watcher;
+    struct file_system_watcher_t *watcher_data = KAN_HANDLE_GET (watcher);
     kan_atomic_int_lock (&watcher_data->event_queue_lock);
     kan_event_queue_iterator_t iterator = kan_event_queue_iterator_create (&watcher_data->event_queue);
     kan_atomic_int_unlock (&watcher_data->event_queue_lock);
-    return iterator;
+    return KAN_HANDLE_TRANSIT (kan_virtual_file_system_watcher_iterator_t, iterator);
 }
 
 const struct kan_virtual_file_system_watcher_event_t *kan_virtual_file_system_watcher_iterator_get (
     kan_virtual_file_system_watcher_t watcher, kan_virtual_file_system_watcher_iterator_t iterator)
 {
-    struct file_system_watcher_t *watcher_data = (struct file_system_watcher_t *) watcher;
+    struct file_system_watcher_t *watcher_data = KAN_HANDLE_GET (watcher);
     kan_atomic_int_lock (&watcher_data->event_queue_lock);
 
     const struct file_system_watcher_event_node_t *node =
-        (const struct file_system_watcher_event_node_t *) kan_event_queue_iterator_get (&watcher_data->event_queue,
-                                                                                        iterator);
+        (const struct file_system_watcher_event_node_t *) kan_event_queue_iterator_get (
+            &watcher_data->event_queue, KAN_HANDLE_TRANSIT (kan_event_queue_iterator_t, iterator));
 
     if (!node)
     {
@@ -3092,7 +3094,7 @@ const struct kan_virtual_file_system_watcher_event_t *kan_virtual_file_system_wa
         }
 
         node = (const struct file_system_watcher_event_node_t *) kan_event_queue_iterator_get (
-            &watcher_data->event_queue, iterator);
+            &watcher_data->event_queue, KAN_HANDLE_TRANSIT (kan_event_queue_iterator_t, iterator));
     }
 
     kan_atomic_int_unlock (&watcher_data->event_queue_lock);
@@ -3111,9 +3113,11 @@ static inline void watcher_cleanup_events (struct file_system_watcher_t *watcher
 kan_virtual_file_system_watcher_iterator_t kan_virtual_file_system_watcher_iterator_advance (
     kan_virtual_file_system_watcher_t watcher, kan_virtual_file_system_watcher_iterator_t iterator)
 {
-    struct file_system_watcher_t *watcher_data = (struct file_system_watcher_t *) watcher;
+    struct file_system_watcher_t *watcher_data = KAN_HANDLE_GET (watcher);
     kan_atomic_int_lock (&watcher_data->event_queue_lock);
-    iterator = kan_event_queue_iterator_advance (iterator);
+    iterator = KAN_HANDLE_TRANSIT (
+        kan_virtual_file_system_watcher_iterator_t,
+        kan_event_queue_iterator_advance (KAN_HANDLE_TRANSIT (kan_event_queue_iterator_t, iterator)));
 
     watcher_cleanup_events (watcher_data);
     kan_atomic_int_unlock (&watcher_data->event_queue_lock);
@@ -3123,9 +3127,10 @@ kan_virtual_file_system_watcher_iterator_t kan_virtual_file_system_watcher_itera
 void kan_virtual_file_system_watcher_iterator_destroy (kan_virtual_file_system_watcher_t watcher,
                                                        kan_virtual_file_system_watcher_iterator_t iterator)
 {
-    struct file_system_watcher_t *watcher_data = (struct file_system_watcher_t *) watcher;
+    struct file_system_watcher_t *watcher_data = KAN_HANDLE_GET (watcher);
     kan_atomic_int_lock (&watcher_data->event_queue_lock);
-    kan_event_queue_iterator_destroy (&watcher_data->event_queue, iterator);
+    kan_event_queue_iterator_destroy (&watcher_data->event_queue,
+                                      KAN_HANDLE_TRANSIT (kan_event_queue_iterator_t, iterator));
 
     watcher_cleanup_events (watcher_data);
     kan_atomic_int_unlock (&watcher_data->event_queue_lock);

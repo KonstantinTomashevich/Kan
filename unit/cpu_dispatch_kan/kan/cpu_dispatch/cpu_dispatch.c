@@ -29,8 +29,8 @@ struct job_t
     struct kan_atomic_int_t status;
     struct kan_cpu_task_t completion_task;
 
-    kan_conditional_variable_handle_t await_condition;
-    kan_mutex_handle_t await_condition_mutex;
+    kan_conditional_variable_t await_condition;
+    kan_mutex_t await_condition_mutex;
 };
 
 #define TASK_STATE_QUEUED 0
@@ -52,15 +52,15 @@ struct task_dispatcher_t
     struct task_node_t *tasks_first;
     struct task_node_t *tasks_last;
 
-    kan_mutex_handle_t task_mutex;
-    kan_conditional_variable_handle_t worker_wake_up_condition;
+    kan_mutex_t task_mutex;
+    kan_conditional_variable_t worker_wake_up_condition;
 
     kan_allocation_group_t allocation_group;
     kan_cpu_section_t execution_section;
 
     struct kan_atomic_int_t shutting_down;
     uint64_t threads_count;
-    kan_thread_handle_t *threads;
+    kan_thread_t *threads;
 };
 
 static kan_bool_t global_task_dispatcher_ready = KAN_FALSE;
@@ -185,9 +185,9 @@ static void ensure_global_task_dispatcher_ready (void)
             global_task_dispatcher.tasks_last = NULL;
 
             global_task_dispatcher.task_mutex = kan_mutex_create ();
-            KAN_ASSERT (global_task_dispatcher.task_mutex != KAN_INVALID_MUTEX_HANDLE)
+            KAN_ASSERT (KAN_HANDLE_IS_VALID (global_task_dispatcher.task_mutex))
             global_task_dispatcher.worker_wake_up_condition = kan_conditional_variable_create ();
-            KAN_ASSERT (global_task_dispatcher.worker_wake_up_condition != KAN_INVALID_CONDITIONAL_VARIABLE_HANDLE)
+            KAN_ASSERT (KAN_HANDLE_IS_VALID (global_task_dispatcher.worker_wake_up_condition))
 
             global_task_dispatcher.allocation_group =
                 kan_allocation_group_get_child (kan_allocation_group_root (), "global_cpu_dispatcher");
@@ -197,14 +197,14 @@ static void ensure_global_task_dispatcher_ready (void)
             global_task_dispatcher.threads_count = kan_platform_get_cpu_count ();
 
             global_task_dispatcher.threads = kan_allocate_general (
-                global_task_dispatcher.allocation_group,
-                sizeof (kan_thread_handle_t) * global_task_dispatcher.threads_count, _Alignof (kan_thread_handle_t));
+                global_task_dispatcher.allocation_group, sizeof (kan_thread_t) * global_task_dispatcher.threads_count,
+                _Alignof (kan_thread_t));
 
             for (uint64_t index = 0u; index < global_task_dispatcher.threads_count; ++index)
             {
                 global_task_dispatcher.threads[index] =
                     kan_thread_create ("global_cpu_dispatcher_worker", worker_thread_function, 0u);
-                KAN_ASSERT (global_task_dispatcher.threads[index] != KAN_INVALID_THREAD_HANDLE)
+                KAN_ASSERT (KAN_HANDLE_IS_VALID (global_task_dispatcher.threads[index]))
             }
 
             atexit (shutdown_global_task_dispatcher);
@@ -266,7 +266,7 @@ static void dispatch_task_list (struct job_t *job, struct kan_cpu_task_list_node
         task_node->job = job;
         task_node->task = tasks->task;
         task_node->state = kan_atomic_int_init (TASK_STATE_QUEUED);
-        tasks->dispatch_handle = (kan_cpu_task_handle_t) task_node;
+        tasks->dispatch_handle = KAN_HANDLE_SET (kan_cpu_task_t, task_node);
         task_node->next = NULL;
 
         if (end)
@@ -310,20 +310,20 @@ static void dispatch_task_list (struct job_t *job, struct kan_cpu_task_list_node
     kan_conditional_variable_signal_all (global_task_dispatcher.worker_wake_up_condition);
 }
 
-kan_cpu_task_handle_t kan_cpu_task_dispatch (struct kan_cpu_task_t task)
+kan_cpu_task_t kan_cpu_task_dispatch (struct kan_cpu_task_t task)
 {
-    return (kan_cpu_task_handle_t) dispatch_task (NULL, task);
+    return KAN_HANDLE_SET (kan_cpu_task_t, dispatch_task (NULL, task));
 }
 
-kan_bool_t kan_cpu_task_is_finished (kan_cpu_task_handle_t task)
+kan_bool_t kan_cpu_task_is_finished (kan_cpu_task_t task)
 {
-    struct task_node_t *task_node = (struct task_node_t *) task;
+    struct task_node_t *task_node = KAN_HANDLE_GET (task);
     return kan_atomic_int_get (&task_node->state) == TASK_STATE_FINISHED;
 }
 
-void kan_cpu_task_detach (kan_cpu_task_handle_t task)
+void kan_cpu_task_detach (kan_cpu_task_t task)
 {
-    struct task_node_t *task_node = (struct task_node_t *) task;
+    struct task_node_t *task_node = KAN_HANDLE_GET (task);
     while (KAN_TRUE)
     {
         int old_state = kan_atomic_int_get (&task_node->state);
@@ -362,10 +362,9 @@ static kan_allocation_group_t job_allocation_group;
 
 static void job_report_task_finished (struct job_t *job)
 {
-    struct job_t *job_data = (struct job_t *) job;
     while (KAN_TRUE)
     {
-        const int old_status = kan_atomic_int_get (&job_data->status);
+        const int old_status = kan_atomic_int_get (&job->status);
         const unsigned int old_status_bits = (unsigned int) old_status;
         const unsigned int old_status_state = old_status_bits >> JOB_STATUS_TASK_COUNT_BITS;
         KAN_ASSERT (old_status_state != JOB_STATE_COMPLETED)
@@ -379,7 +378,7 @@ static void job_report_task_finished (struct job_t *job)
         }
 
         const int new_status = (int) new_status_bits;
-        if (kan_atomic_int_compare_and_set (&job_data->status, old_status, new_status))
+        if (kan_atomic_int_compare_and_set (&job->status, old_status, new_status))
         {
             if (new_status_bits == (JOB_STATE_COMPLETED << JOB_STATUS_TASK_COUNT_BITS))
             {
@@ -389,7 +388,7 @@ static void job_report_task_finished (struct job_t *job)
 
                 if (job->completion_task.function)
                 {
-                    kan_cpu_task_detach ((kan_cpu_task_handle_t) dispatch_task (NULL, job->completion_task));
+                    kan_cpu_task_detach (KAN_HANDLE_SET (kan_cpu_task_t, dispatch_task (NULL, job->completion_task)));
                 }
 
                 if (old_status_state == JOB_STATE_DETACHED)
@@ -398,7 +397,7 @@ static void job_report_task_finished (struct job_t *job)
                 }
                 else if (old_status_state == JOB_STATE_AWAITED)
                 {
-                    KAN_ASSERT (job->await_condition != KAN_INVALID_CONDITIONAL_VARIABLE_HANDLE)
+                    KAN_ASSERT (KAN_HANDLE_IS_VALID (job->await_condition))
                     kan_conditional_variable_signal_one (job->await_condition);
                 }
 
@@ -423,30 +422,30 @@ kan_cpu_job_t kan_cpu_job_create (void)
     job->completion_task = (struct kan_cpu_task_t) {.name = NULL, .function = NULL, .user_data = 0u};
 
     // Intentionally create only if someone wait for job to be completed.
-    job->await_condition = KAN_INVALID_CONDITIONAL_VARIABLE_HANDLE;
-    job->await_condition_mutex = KAN_INVALID_MUTEX_HANDLE;
-    return (kan_cpu_job_t) job;
+    job->await_condition = KAN_HANDLE_SET_INVALID (kan_conditional_variable_t);
+    job->await_condition_mutex = KAN_HANDLE_SET_INVALID (kan_mutex_t);
+    return KAN_HANDLE_SET (kan_cpu_job_t, job);
 }
 
 void kan_cpu_job_set_completion_task (kan_cpu_job_t job, struct kan_cpu_task_t completion_task)
 {
-    struct job_t *job_data = (struct job_t *) job;
+    struct job_t *job_data = KAN_HANDLE_GET (job);
     KAN_ASSERT ((((unsigned int) kan_atomic_int_get (&job_data->status)) >> JOB_STATUS_TASK_COUNT_BITS) ==
                 JOB_STATE_ASSEMBLING)
     job_data->completion_task = completion_task;
 }
 
-kan_cpu_task_handle_t kan_cpu_job_dispatch_task (kan_cpu_job_t job, struct kan_cpu_task_t task)
+kan_cpu_task_t kan_cpu_job_dispatch_task (kan_cpu_job_t job, struct kan_cpu_task_t task)
 {
-    struct job_t *job_data = (struct job_t *) job;
+    struct job_t *job_data = KAN_HANDLE_GET (job);
     KAN_ASSERT ((((unsigned int) kan_atomic_int_get (&job_data->status)) >> JOB_STATUS_TASK_COUNT_BITS) ==
                 JOB_STATE_ASSEMBLING)
-    return (kan_cpu_task_handle_t) dispatch_task (job_data, task);
+    return KAN_HANDLE_SET (kan_cpu_task_t, dispatch_task (job_data, task));
 }
 
 void kan_cpu_job_dispatch_task_list (kan_cpu_job_t job, struct kan_cpu_task_list_node_t *list)
 {
-    struct job_t *job_data = (struct job_t *) job;
+    struct job_t *job_data = KAN_HANDLE_GET (job);
     KAN_ASSERT ((((unsigned int) kan_atomic_int_get (&job_data->status)) >> JOB_STATUS_TASK_COUNT_BITS) ==
                 JOB_STATE_ASSEMBLING)
     dispatch_task_list (job_data, list);
@@ -454,7 +453,7 @@ void kan_cpu_job_dispatch_task_list (kan_cpu_job_t job, struct kan_cpu_task_list
 
 void kan_cpu_job_release (kan_cpu_job_t job)
 {
-    struct job_t *job_data = (struct job_t *) job;
+    struct job_t *job_data = KAN_HANDLE_GET (job);
     KAN_ASSERT ((((unsigned int) kan_atomic_int_get (&job_data->status)) >> JOB_STATUS_TASK_COUNT_BITS) ==
                 JOB_STATE_ASSEMBLING)
 
@@ -480,7 +479,7 @@ void kan_cpu_job_release (kan_cpu_job_t job)
             if (new_status_bits == (JOB_STATE_COMPLETED << JOB_STATUS_TASK_COUNT_BITS) &&
                 job_data->completion_task.function)
             {
-                kan_cpu_task_detach ((kan_cpu_task_handle_t) dispatch_task (NULL, job_data->completion_task));
+                kan_cpu_task_detach (KAN_HANDLE_SET (kan_cpu_task_t, dispatch_task (NULL, job_data->completion_task)));
             }
 
             break;
@@ -490,7 +489,7 @@ void kan_cpu_job_release (kan_cpu_job_t job)
 
 void kan_cpu_job_detach (kan_cpu_job_t job)
 {
-    struct job_t *job_data = (struct job_t *) job;
+    struct job_t *job_data = KAN_HANDLE_GET (job);
     while (KAN_TRUE)
     {
         const int old_status = kan_atomic_int_get (&job_data->status);
@@ -517,16 +516,16 @@ void kan_cpu_job_detach (kan_cpu_job_t job)
 
 void kan_cpu_job_wait (kan_cpu_job_t job)
 {
-    struct job_t *job_data = (struct job_t *) job;
+    struct job_t *job_data = KAN_HANDLE_GET (job);
     if ((((unsigned int) kan_atomic_int_get (&job_data->status)) >> JOB_STATUS_TASK_COUNT_BITS) == JOB_STATE_COMPLETED)
     {
         return;
     }
 
     job_data->await_condition = kan_conditional_variable_create ();
-    KAN_ASSERT (job_data->await_condition != KAN_INVALID_CONDITIONAL_VARIABLE_HANDLE)
+    KAN_ASSERT (KAN_HANDLE_IS_VALID (job_data->await_condition))
     job_data->await_condition_mutex = kan_mutex_create ();
-    KAN_ASSERT (job_data->await_condition_mutex != KAN_INVALID_MUTEX_HANDLE)
+    KAN_ASSERT (KAN_HANDLE_IS_VALID (job_data->await_condition_mutex))
 
     while (KAN_TRUE)
     {

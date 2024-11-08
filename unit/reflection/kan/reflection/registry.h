@@ -2,8 +2,8 @@
 
 #include <reflection_api.h>
 
-#include <kan/api_common/bool.h>
 #include <kan/api_common/c_header.h>
+#include <kan/api_common/core_types.h>
 #include <kan/container/interned_string.h>
 
 /// \file
@@ -283,9 +283,7 @@ struct kan_reflection_function_argument_meta_iterator_t
     uint64_t implementation_data[5u];
 };
 
-typedef uint64_t kan_reflection_registry_t;
-
-#define KAN_INVALID_REFLECTION_REGISTRY 0u
+KAN_HANDLE_DEFINE (kan_reflection_registry_t);
 
 /// \brief Allocates new reflection registry.
 REFLECTION_API kan_reflection_registry_t kan_reflection_registry_create (void);
@@ -444,7 +442,7 @@ REFLECTION_API const struct kan_reflection_field_t *kan_reflection_registry_quer
     uint64_t *absolute_offset_output,
     uint64_t *size_with_padding_output);
 
-typedef uint64_t kan_reflection_registry_enum_iterator_t;
+KAN_HANDLE_DEFINE (kan_reflection_registry_enum_iterator_t);
 
 /// \brief Returns iterator that points to the beginning of enums storage.
 REFLECTION_API kan_reflection_registry_enum_iterator_t
@@ -458,7 +456,7 @@ REFLECTION_API const struct kan_reflection_enum_t *kan_reflection_registry_enum_
 REFLECTION_API kan_reflection_registry_enum_iterator_t
 kan_reflection_registry_enum_iterator_next (kan_reflection_registry_enum_iterator_t iterator);
 
-typedef uint64_t kan_reflection_registry_struct_iterator_t;
+KAN_HANDLE_DEFINE (kan_reflection_registry_struct_iterator_t);
 
 /// \brief Returns iterator that points to the beginning of structs storage.
 REFLECTION_API kan_reflection_registry_struct_iterator_t
@@ -472,7 +470,7 @@ REFLECTION_API const struct kan_reflection_struct_t *kan_reflection_registry_str
 REFLECTION_API kan_reflection_registry_struct_iterator_t
 kan_reflection_registry_struct_iterator_next (kan_reflection_registry_struct_iterator_t iterator);
 
-typedef uint64_t kan_reflection_registry_function_iterator_t;
+KAN_HANDLE_DEFINE (kan_reflection_registry_function_iterator_t);
 
 /// \brief Returns iterator that points to the beginning of functions storage.
 REFLECTION_API kan_reflection_registry_function_iterator_t

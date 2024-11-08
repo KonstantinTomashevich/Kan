@@ -2,7 +2,7 @@
 
 KAN_LOG_DEFINE_CATEGORY (render_backend_system_vulkan);
 
-kan_context_system_handle_t render_backend_system_create (kan_allocation_group_t group, void *user_config)
+kan_context_system_t render_backend_system_create (kan_allocation_group_t group, void *user_config)
 {
     struct render_backend_system_t *system = kan_allocate_general (group, sizeof (struct render_backend_system_t),
                                                                    _Alignof (struct render_backend_system_t));
@@ -155,7 +155,7 @@ kan_context_system_handle_t render_backend_system_create (kan_allocation_group_t
 
     if (user_config)
     {
-        struct kan_render_backend_system_config_t *config = (struct kan_render_backend_system_config_t *) user_config;
+        struct kan_render_backend_system_config_t *config = user_config;
         system->render_enabled = !config->disable_render;
         system->prefer_vsync = config->prefer_vsync;
         system->application_info_name = config->application_info_name;
@@ -173,13 +173,16 @@ kan_context_system_handle_t render_backend_system_create (kan_allocation_group_t
         system->version_patch = 0u;
     }
 
+    system->render_context_handle = system->render_enabled ? KAN_HANDLE_SET (kan_render_context_t, system) :
+                                                             KAN_HANDLE_SET_INVALID (kan_render_context_t);
+
     system->interned_temporary_staging_buffer = kan_string_intern ("temporary_staging_buffer");
-    return (kan_context_system_handle_t) system;
+    return KAN_HANDLE_SET (kan_context_system_t, system);
 }
 
-void render_backend_system_connect (kan_context_system_handle_t handle, kan_context_handle_t context)
+void render_backend_system_connect (kan_context_system_t handle, kan_context_t context)
 {
-    struct render_backend_system_t *system = (struct render_backend_system_t *) handle;
+    struct render_backend_system_t *system = KAN_HANDLE_GET (handle);
     system->context = context;
 
     // We request application system here in order to ensure that shutdown is called for render backend system
@@ -301,9 +304,9 @@ static void render_backend_system_query_devices (struct render_backend_system_t 
     for (uint64_t device_index = 0u; device_index < physical_device_count; ++device_index)
     {
         struct kan_render_supported_device_info_t *device_info = &system->supported_devices->devices[device_index];
-        _Static_assert (sizeof (kan_render_device_id_t) >= sizeof (VkPhysicalDevice),
+        _Static_assert (sizeof (kan_render_device_t) >= sizeof (VkPhysicalDevice),
                         "Can store Vulkan handle in Kan id.");
-        device_info->id = (kan_render_device_id_t) physical_devices[device_index];
+        device_info->id = KAN_HANDLE_SET (kan_render_device_t, physical_devices[device_index]);
         device_info->name = NULL;
         device_info->device_type = KAN_RENDER_DEVICE_TYPE_UNKNOWN;
         device_info->memory_type = KAN_RENDER_DEVICE_MEMORY_TYPE_SEPARATE;
@@ -378,9 +381,9 @@ static void render_backend_system_query_devices (struct render_backend_system_t 
                       sizeof (VkPhysicalDevice) * physical_device_count);
 }
 
-void render_backend_system_init (kan_context_system_handle_t handle)
+void render_backend_system_init (kan_context_system_t handle)
 {
-    struct render_backend_system_t *system = (struct render_backend_system_t *) handle;
+    struct render_backend_system_t *system = KAN_HANDLE_GET (handle);
     if (!system->render_enabled)
     {
         return;
@@ -579,9 +582,9 @@ static void render_backend_system_destroy_synchronization_objects (struct render
     }
 }
 
-void render_backend_system_shutdown (kan_context_system_handle_t handle)
+void render_backend_system_shutdown (kan_context_system_t handle)
 {
-    struct render_backend_system_t *system = (struct render_backend_system_t *) handle;
+    struct render_backend_system_t *system = KAN_HANDLE_GET (handle);
     if (!system->render_enabled)
     {
         return;
@@ -821,13 +824,13 @@ void render_backend_system_shutdown (kan_context_system_handle_t handle)
     kan_platform_application_unregister_vulkan_library_usage ();
 }
 
-void render_backend_system_disconnect (kan_context_system_handle_t handle)
+void render_backend_system_disconnect (kan_context_system_t handle)
 {
 }
 
-void render_backend_system_destroy (kan_context_system_handle_t handle)
+void render_backend_system_destroy (kan_context_system_t handle)
 {
-    struct render_backend_system_t *system = (struct render_backend_system_t *) handle;
+    struct render_backend_system_t *system = KAN_HANDLE_GET (handle);
     kan_free_general (system->main_allocation_group, system, sizeof (struct render_backend_system_t));
 }
 
@@ -842,17 +845,17 @@ struct kan_context_system_api_t KAN_CONTEXT_SYSTEM_API_NAME (render_backend_syst
 };
 
 struct kan_render_supported_devices_t *kan_render_backend_system_get_devices (
-    kan_context_system_handle_t render_backend_system)
+    kan_context_system_t render_backend_system)
 {
-    struct render_backend_system_t *system = (struct render_backend_system_t *) render_backend_system;
+    struct render_backend_system_t *system = KAN_HANDLE_GET (render_backend_system);
     return system->supported_devices;
 }
 
-kan_bool_t kan_render_backend_system_select_device (kan_context_system_handle_t render_backend_system,
-                                                    kan_render_device_id_t device)
+kan_bool_t kan_render_backend_system_select_device (kan_context_system_t render_backend_system,
+                                                    kan_render_device_t device)
 {
-    struct render_backend_system_t *system = (struct render_backend_system_t *) render_backend_system;
-    VkPhysicalDevice physical_device = (VkPhysicalDevice) device;
+    struct render_backend_system_t *system = KAN_HANDLE_GET (render_backend_system);
+    VkPhysicalDevice physical_device = (VkPhysicalDevice) KAN_HANDLE_GET (device);
 
     if (system->device)
     {
@@ -1299,10 +1302,10 @@ kan_bool_t kan_render_backend_system_select_device (kan_context_system_handle_t 
     return KAN_TRUE;
 }
 
-kan_render_context_t kan_render_backend_system_get_render_context (kan_context_system_handle_t render_backend_system)
+kan_render_context_t kan_render_backend_system_get_render_context (kan_context_system_t render_backend_system)
 {
-    struct render_backend_system_t *system = (struct render_backend_system_t *) render_backend_system;
-    return system->render_enabled ? (kan_render_context_t) system : KAN_INVALID_RENDER_CONTEXT;
+    struct render_backend_system_t *system = KAN_HANDLE_GET (render_backend_system);
+    return system->render_context_handle;
 }
 
 static void render_backend_system_begin_command_submission (struct render_backend_system_t *system)
@@ -3782,8 +3785,7 @@ static kan_bool_t render_backend_system_acquire_images (struct render_backend_sy
     struct kan_cpu_section_execution_t execution;
     kan_cpu_section_execution_init (&execution, system->section_next_frame_acquire_images);
 
-    kan_context_system_handle_t application_system =
-        kan_context_query (system->context, KAN_CONTEXT_APPLICATION_SYSTEM_NAME);
+    kan_context_system_t application_system = kan_context_query (system->context, KAN_CONTEXT_APPLICATION_SYSTEM_NAME);
 
     kan_bool_t acquired_all_images = KAN_TRUE;
     kan_bool_t any_swap_chain_outdated = KAN_FALSE;
@@ -3864,9 +3866,9 @@ static kan_bool_t render_backend_system_acquire_images (struct render_backend_sy
     return acquired_all_images && !any_swap_chain_outdated;
 }
 
-kan_bool_t kan_render_backend_system_next_frame (kan_context_system_handle_t render_backend_system)
+kan_bool_t kan_render_backend_system_next_frame (kan_context_system_t render_backend_system)
 {
-    struct render_backend_system_t *system = (struct render_backend_system_t *) render_backend_system;
+    struct render_backend_system_t *system = KAN_HANDLE_GET (render_backend_system);
     struct kan_cpu_section_execution_t next_frame_execution;
     kan_cpu_section_execution_init (&next_frame_execution, system->section_next_frame);
 
@@ -4215,23 +4217,22 @@ static void render_backend_surface_shutdown_with_window (void *user_data,
     kan_cpu_section_execution_shutdown (&execution);
 }
 
-kan_render_surface_t kan_render_backend_system_create_surface (kan_context_system_handle_t render_backend_system,
-                                                               kan_application_system_window_handle_t window,
+kan_render_surface_t kan_render_backend_system_create_surface (kan_context_system_t render_backend_system,
+                                                               kan_application_system_window_t window,
                                                                kan_interned_string_t tracking_name)
 {
-    struct render_backend_system_t *system = (struct render_backend_system_t *) render_backend_system;
+    struct render_backend_system_t *system = KAN_HANDLE_GET (render_backend_system);
     struct kan_cpu_section_execution_t execution;
     kan_cpu_section_execution_init (&execution, system->section_create_surface);
 
-    kan_context_system_handle_t application_system =
-        kan_context_query (system->context, KAN_CONTEXT_APPLICATION_SYSTEM_NAME);
+    kan_context_system_t application_system = kan_context_query (system->context, KAN_CONTEXT_APPLICATION_SYSTEM_NAME);
 
-    if (application_system == KAN_INVALID_CONTEXT_SYSTEM_HANDLE)
+    if (!KAN_HANDLE_IS_VALID (application_system))
     {
         KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR,
                  "Unable to create surfaces due to absence of application system in context.")
         kan_cpu_section_execution_shutdown (&execution);
-        return KAN_INVALID_RENDER_SURFACE;
+        return KAN_HANDLE_SET_INVALID (kan_render_surface_t);
     }
 
     struct render_backend_surface_t *new_surface =
@@ -4261,7 +4262,7 @@ kan_render_surface_t kan_render_backend_system_create_surface (kan_context_syste
                                                     });
 
     kan_cpu_section_execution_shutdown (&execution);
-    return (kan_render_surface_t) new_surface;
+    return KAN_HANDLE_SET (kan_render_surface_t, new_surface);
 }
 
 void kan_render_backend_system_present_image_on_surface (kan_render_surface_t surface,
@@ -4269,12 +4270,12 @@ void kan_render_backend_system_present_image_on_surface (kan_render_surface_t su
                                                          struct kan_render_integer_region_t image_region,
                                                          struct kan_render_integer_region_t surface_region)
 {
-    struct render_backend_surface_t *data = (struct render_backend_surface_t *) surface;
+    struct render_backend_surface_t *data = KAN_HANDLE_GET (surface);
     struct surface_blit_request_t *request =
         kan_allocate_batched (data->system->surface_wrapper_allocation_group, sizeof (struct surface_blit_request_t));
 
     request->next = NULL;
-    request->image = (struct render_backend_image_t *) image;
+    request->image = KAN_HANDLE_GET (image);
     request->image_region = image_region;
     request->surface_region = surface_region;
 
@@ -4298,17 +4299,16 @@ void kan_render_backend_system_present_image_on_surface (kan_render_surface_t su
     kan_atomic_int_unlock (&data->blit_request_lock);
 }
 
-void kan_render_backend_system_destroy_surface (kan_context_system_handle_t render_backend_system,
+void kan_render_backend_system_destroy_surface (kan_context_system_t render_backend_system,
                                                 kan_render_surface_t surface)
 {
-    struct render_backend_system_t *system = (struct render_backend_system_t *) render_backend_system;
-    struct render_backend_surface_t *surface_data = (struct render_backend_surface_t *) surface;
+    struct render_backend_system_t *system = KAN_HANDLE_GET (render_backend_system);
+    struct render_backend_surface_t *surface_data = KAN_HANDLE_GET (surface);
 
-    kan_context_system_handle_t application_system =
-        kan_context_query (system->context, KAN_CONTEXT_APPLICATION_SYSTEM_NAME);
+    kan_context_system_t application_system = kan_context_query (system->context, KAN_CONTEXT_APPLICATION_SYSTEM_NAME);
 
     // Valid surface couldn't have been created without application system.
-    KAN_ASSERT (application_system != KAN_INVALID_CONTEXT_SYSTEM_HANDLE)
+    KAN_ASSERT (KAN_HANDLE_IS_VALID (application_system))
     kan_application_system_window_remove_resource (application_system, surface_data->window_handle,
                                                    surface_data->resource_id);
 }

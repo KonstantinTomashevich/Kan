@@ -20,7 +20,7 @@ struct render_backend_frame_buffer_t *render_backend_system_create_frame_buffer 
     buffer->instance_index = UINT32_MAX;
     buffer->image_views = NULL;
 
-    buffer->pass = (struct render_backend_pass_t *) description->associated_pass;
+    buffer->pass = KAN_HANDLE_GET (description->associated_pass);
     buffer->tracking_name = description->tracking_name;
 
     buffer->attachments_count = description->attachment_count;
@@ -39,7 +39,7 @@ struct render_backend_frame_buffer_t *render_backend_system_create_frame_buffer 
         {
         case KAN_FRAME_BUFFER_ATTACHMENT_IMAGE:
         {
-            target->image = (struct render_backend_image_t *) source->image;
+            target->image = KAN_HANDLE_GET (source->image);
             KAN_ASSERT (target->image->description.render_target)
 
             struct image_frame_buffer_attachment_t *attachment = kan_allocate_batched (
@@ -53,7 +53,7 @@ struct render_backend_frame_buffer_t *render_backend_system_create_frame_buffer 
 
         case KAN_FRAME_BUFFER_ATTACHMENT_SURFACE:
         {
-            target->surface = (struct render_backend_surface_t *) source->surface;
+            target->surface = KAN_HANDLE_GET (source->surface);
             struct surface_frame_buffer_attachment_t *attachment = kan_allocate_batched (
                 system->surface_wrapper_allocation_group, sizeof (struct surface_frame_buffer_attachment_t));
 
@@ -258,19 +258,20 @@ void render_backend_system_destroy_frame_buffer (struct render_backend_system_t 
 kan_render_frame_buffer_t kan_render_frame_buffer_create (kan_render_context_t context,
                                                           struct kan_render_frame_buffer_description_t *description)
 {
-    struct render_backend_system_t *system = (struct render_backend_system_t *) context;
+    struct render_backend_system_t *system = KAN_HANDLE_GET (context);
     struct kan_cpu_section_execution_t execution;
     kan_cpu_section_execution_init (&execution, system->section_create_frame_buffer);
 
     struct render_backend_frame_buffer_t *frame_buffer =
         render_backend_system_create_frame_buffer (system, description);
     kan_cpu_section_execution_shutdown (&execution);
-    return frame_buffer ? (kan_render_frame_buffer_t) frame_buffer : KAN_INVALID_FRAME_BUFFER;
+    return frame_buffer ? KAN_HANDLE_SET (kan_render_frame_buffer_t, frame_buffer) :
+                          KAN_HANDLE_SET_INVALID (kan_render_frame_buffer_t);
 }
 
 void kan_render_frame_buffer_destroy (kan_render_frame_buffer_t buffer)
 {
-    struct render_backend_frame_buffer_t *data = (struct render_backend_frame_buffer_t *) buffer;
+    struct render_backend_frame_buffer_t *data = KAN_HANDLE_GET (buffer);
     struct render_backend_schedule_state_t *schedule = render_backend_system_get_schedule_for_destroy (data->system);
     kan_atomic_int_lock (&schedule->schedule_lock);
 

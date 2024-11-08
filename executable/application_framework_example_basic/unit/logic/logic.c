@@ -33,14 +33,14 @@ APPLICATION_FRAMEWORK_EXAMPLE_BASIC_LOGIC_API struct kan_resource_pipeline_resou
 
 struct test_singleton_t
 {
-    kan_application_system_window_handle_t window_handle;
+    kan_application_system_window_t window_handle;
     kan_bool_t test_request_added;
     uint64_t test_request_id;
 };
 
 APPLICATION_FRAMEWORK_EXAMPLE_BASIC_LOGIC_API void test_singleton_init (struct test_singleton_t *instance)
 {
-    instance->window_handle = KAN_INVALID_APPLICATION_SYSTEM_WINDOW_HANDLE;
+    instance->window_handle = KAN_HANDLE_SET_INVALID (kan_application_system_window_t);
     instance->test_request_added = KAN_FALSE;
 }
 
@@ -49,8 +49,8 @@ struct test_mutator_state_t
     KAN_UP_GENERATE_STATE_QUERIES (test_mutator)
     KAN_UP_BIND_STATE (test_mutator, state)
 
-    kan_context_system_handle_t application_system_handle;
-    kan_context_system_handle_t application_framework_system_handle;
+    kan_context_system_t application_system_handle;
+    kan_context_system_t application_framework_system_handle;
 
     kan_bool_t test_mode;
     kan_bool_t test_passed;
@@ -65,12 +65,12 @@ APPLICATION_FRAMEWORK_EXAMPLE_BASIC_LOGIC_API void kan_universe_mutator_deploy_t
     kan_workflow_graph_node_t workflow_node,
     struct test_mutator_state_t *state)
 {
-    kan_context_handle_t context = kan_universe_get_context (universe);
+    kan_context_t context = kan_universe_get_context (universe);
     state->application_system_handle = kan_context_query (context, KAN_CONTEXT_APPLICATION_SYSTEM_NAME);
     state->application_framework_system_handle =
         kan_context_query (context, KAN_CONTEXT_APPLICATION_FRAMEWORK_SYSTEM_NAME);
 
-    if (state->application_framework_system_handle != KAN_INVALID_CONTEXT_SYSTEM_HANDLE)
+    if (KAN_HANDLE_IS_VALID (state->application_framework_system_handle))
     {
         state->test_mode =
             kan_application_framework_system_get_arguments_count (state->application_framework_system_handle) == 2 &&
@@ -92,7 +92,7 @@ APPLICATION_FRAMEWORK_EXAMPLE_BASIC_LOGIC_API void kan_universe_mutator_execute_
 {
     KAN_UP_SINGLETON_WRITE (singleton, test_singleton_t)
     {
-        if (singleton->window_handle == KAN_INVALID_APPLICATION_SYSTEM_WINDOW_HANDLE)
+        if (!KAN_HANDLE_IS_VALID (singleton->window_handle))
         {
             singleton->window_handle = kan_application_system_window_create (
                 state->application_system_handle, "Title placeholder", 600u, 400u,
@@ -170,7 +170,7 @@ APPLICATION_FRAMEWORK_EXAMPLE_BASIC_LOGIC_API void kan_universe_mutator_execute_
                              "Failed to load asset.")
                 }
 
-                KAN_ASSERT (state->application_framework_system_handle != KAN_INVALID_CONTEXT_SYSTEM_HANDLE)
+                KAN_ASSERT (KAN_HANDLE_IS_VALID (state->application_framework_system_handle))
                 if (state->test_passed)
                 {
                     kan_application_framework_system_request_exit (state->application_framework_system_handle, 0);

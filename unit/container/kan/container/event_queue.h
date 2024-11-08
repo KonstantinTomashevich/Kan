@@ -5,6 +5,7 @@
 #include <stdint.h>
 
 #include <kan/api_common/c_header.h>
+#include <kan/api_common/core_types.h>
 #include <kan/threading/atomic.h>
 
 /// \file
@@ -128,9 +129,7 @@ CONTAINER_API void kan_event_queue_submit_end (struct kan_event_queue_t *queue,
 /// \brief Returns oldest node to be cleaned out or `NULL` if there is no nodes to be cleaned out.
 CONTAINER_API struct kan_event_queue_node_t *kan_event_queue_clean_oldest (struct kan_event_queue_t *queue);
 
-typedef uintptr_t kan_event_queue_iterator_t;
-
-#define KAN_INVALID_EVENT_QUEUE_ITERATOR 0u
+KAN_HANDLE_DEFINE (kan_event_queue_iterator_t);
 
 /// \brief Creates iterator for listening to events that happen after its creation.
 CONTAINER_API kan_event_queue_iterator_t kan_event_queue_iterator_create (struct kan_event_queue_t *queue);

@@ -37,7 +37,7 @@ KAN_TEST_CASE (callback)
 
     KAN_LOG (test_log, KAN_LOG_DEFAULT, "Hello, world!")
     KAN_TEST_CHECK (callback_calls == 1u)
-    KAN_TEST_CHECK (callback_category == test_category)
+    KAN_TEST_CHECK (KAN_HANDLE_IS_EQUAL (callback_category, test_category))
     KAN_TEST_CHECK (callback_verbosity == KAN_LOG_DEFAULT)
     KAN_TEST_CHECK (strcmp (callback_message, "Hello, world!") == 0)
     KAN_TEST_CHECK (callback_user_data == 0u)
@@ -46,7 +46,7 @@ KAN_TEST_CASE (callback)
     snprintf (test_message_buffer, BUFFER_SIZE, "Test formatting \"%s\" %d", "string", 42);
     KAN_LOG (test_log, KAN_LOG_DEFAULT, "Test formatting \"%s\" %d", "string", 42)
     KAN_TEST_CHECK (callback_calls == 2u)
-    KAN_TEST_CHECK (callback_category == test_category)
+    KAN_TEST_CHECK (KAN_HANDLE_IS_EQUAL (callback_category, test_category))
     KAN_TEST_CHECK (callback_verbosity == KAN_LOG_DEFAULT)
     KAN_TEST_CHECK (strcmp (callback_message, test_message_buffer) == 0)
     KAN_TEST_CHECK (callback_user_data == 0u)
@@ -74,14 +74,14 @@ KAN_TEST_CASE (events)
 
     event = kan_log_event_iterator_get (first_iterator);
     KAN_TEST_ASSERT (event)
-    KAN_TEST_CHECK (event->category == test_category)
+    KAN_TEST_CHECK (KAN_HANDLE_IS_EQUAL (event->category, test_category))
     KAN_TEST_CHECK (event->verbosity == KAN_LOG_DEFAULT)
     KAN_TEST_CHECK (strcmp (event->message, "Hello, world!") == 0)
 
     first_iterator = kan_log_event_iterator_advance (first_iterator);
     event = kan_log_event_iterator_get (first_iterator);
     KAN_TEST_ASSERT (event)
-    KAN_TEST_CHECK (event->category == test_category)
+    KAN_TEST_CHECK (KAN_HANDLE_IS_EQUAL (event->category, test_category))
     KAN_TEST_CHECK (event->verbosity == KAN_LOG_DEFAULT)
     KAN_TEST_CHECK (strcmp (event->message, test_message_buffer) == 0)
 
@@ -98,7 +98,7 @@ KAN_TEST_CASE (events)
 
     event = kan_log_event_iterator_get (second_iterator);
     KAN_TEST_ASSERT (event)
-    KAN_TEST_CHECK (event->category == test_category)
+    KAN_TEST_CHECK (KAN_HANDLE_IS_EQUAL (event->category, test_category))
     KAN_TEST_CHECK (event->verbosity == KAN_LOG_DEFAULT)
     KAN_TEST_CHECK (strcmp (event->message, "Hello, world!") == 0)
 
@@ -136,28 +136,28 @@ KAN_TEST_CASE (verbosity)
 
     const struct kan_log_event_t *event = kan_log_event_iterator_get (iterator);
     KAN_TEST_ASSERT (event)
-    KAN_TEST_CHECK (event->category == test_category)
+    KAN_TEST_CHECK (KAN_HANDLE_IS_EQUAL (event->category, test_category))
     KAN_TEST_CHECK (event->verbosity == KAN_LOG_ERROR)
     KAN_TEST_CHECK (strcmp (event->message, "See me!") == 0)
 
     iterator = kan_log_event_iterator_advance (iterator);
     event = kan_log_event_iterator_get (iterator);
     KAN_TEST_ASSERT (event)
-    KAN_TEST_CHECK (event->category == test_category)
+    KAN_TEST_CHECK (KAN_HANDLE_IS_EQUAL (event->category, test_category))
     KAN_TEST_CHECK (event->verbosity == KAN_LOG_WARNING)
     KAN_TEST_CHECK (strcmp (event->message, "And me!") == 0)
 
     iterator = kan_log_event_iterator_advance (iterator);
     event = kan_log_event_iterator_get (iterator);
     KAN_TEST_ASSERT (event)
-    KAN_TEST_CHECK (event->category == test_category)
+    KAN_TEST_CHECK (KAN_HANDLE_IS_EQUAL (event->category, test_category))
     KAN_TEST_CHECK (event->verbosity == KAN_LOG_VERBOSE)
     KAN_TEST_CHECK (strcmp (event->message, "Now everything is visible!") == 0)
 
     iterator = kan_log_event_iterator_advance (iterator);
     event = kan_log_event_iterator_get (iterator);
     KAN_TEST_ASSERT (event)
-    KAN_TEST_CHECK (event->category == test_category)
+    KAN_TEST_CHECK (KAN_HANDLE_IS_EQUAL (event->category, test_category))
     KAN_TEST_CHECK (event->verbosity == KAN_LOG_INFO)
     KAN_TEST_CHECK (strcmp (event->message, "Hello, world!") == 0)
 

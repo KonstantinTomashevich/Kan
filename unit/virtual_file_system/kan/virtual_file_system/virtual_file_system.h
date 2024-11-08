@@ -2,8 +2,8 @@
 
 #include <virtual_file_system_api.h>
 
-#include <kan/api_common/bool.h>
 #include <kan/api_common/c_header.h>
+#include <kan/api_common/core_types.h>
 #include <kan/file_system/path_container.h>
 
 /// \file
@@ -121,7 +121,7 @@
 
 KAN_C_HEADER_BEGIN
 
-typedef uint64_t kan_virtual_file_system_volume_t;
+KAN_HANDLE_DEFINE (kan_virtual_file_system_volume_t);
 
 /// \brief Holds data for directory iterator implementation.
 struct kan_virtual_file_system_directory_iterator_t
@@ -154,11 +154,8 @@ struct kan_virtual_file_system_entry_status_t
     kan_bool_t read_only;
 };
 
-typedef uint64_t kan_virtual_file_system_watcher_t;
-
-#define KAN_INVALID_VIRTUAL_FILE_SYSTEM_WATCHER 0u
-
-typedef uint64_t kan_virtual_file_system_watcher_iterator_t;
+KAN_HANDLE_DEFINE (kan_virtual_file_system_watcher_t);
+KAN_HANDLE_DEFINE (kan_virtual_file_system_watcher_iterator_t);
 
 /// \brief Enumerates supported event types for virtual file system watcher.
 enum kan_virtual_file_system_watcher_event_type_t
@@ -176,7 +173,7 @@ struct kan_virtual_file_system_watcher_event_t
     struct kan_file_system_path_container_t path_container;
 };
 
-typedef uint64_t kan_virtual_file_system_read_only_pack_builder_t;
+KAN_HANDLE_DEFINE (kan_virtual_file_system_read_only_pack_builder_t);
 
 /// \brief Creates new virtual file system volume.
 VIRTUAL_FILE_SYSTEM_API kan_virtual_file_system_volume_t kan_virtual_file_system_volume_create (void);

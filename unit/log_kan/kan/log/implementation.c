@@ -5,7 +5,7 @@
 #include <string.h>
 #include <time.h>
 
-#include <kan/api_common/bool.h>
+#include <kan/api_common/core_types.h>
 #include <kan/container/dynamic_array.h>
 #include <kan/container/event_queue.h>
 #include <kan/container/hash_storage.h>
@@ -51,7 +51,7 @@ kan_log_category_t kan_log_category_get (const char *name)
         {
             // Category already exists.
             kan_atomic_int_unlock (&category_context_lock);
-            return (kan_log_category_t) node;
+            return KAN_HANDLE_SET (kan_log_category_t, node);
         }
 
         node = (struct category_node_t *) node->node.list_node.next;
@@ -66,24 +66,24 @@ kan_log_category_t kan_log_category_get (const char *name)
     kan_hash_storage_update_bucket_count_default (&category_storage, KAN_LOG_CATEGORIES_INITIAL_BUCKETS);
     kan_hash_storage_add (&category_storage, &node->node);
     kan_atomic_int_unlock (&category_context_lock);
-    return (kan_log_category_t) node;
+    return KAN_HANDLE_SET (kan_log_category_t, node);
 }
 
 void kan_log_category_set_verbosity (kan_log_category_t category, enum kan_log_verbosity_t verbosity)
 {
-    struct category_node_t *node = (struct category_node_t *) category;
+    struct category_node_t *node = KAN_HANDLE_GET (category);
     node->verbosity = verbosity;
 }
 
 enum kan_log_verbosity_t kan_log_category_get_verbosity (kan_log_category_t category)
 {
-    struct category_node_t *node = (struct category_node_t *) category;
+    struct category_node_t *node = KAN_HANDLE_GET (category);
     return node->verbosity;
 }
 
 kan_interned_string_t kan_log_category_get_name (kan_log_category_t category)
 {
-    struct category_node_t *node = (struct category_node_t *) category;
+    struct category_node_t *node = KAN_HANDLE_GET (category);
     return node->name;
 }
 
@@ -264,8 +264,9 @@ kan_log_event_iterator_t kan_log_event_iterator_create (void)
     kan_atomic_int_lock (&logging_context_lock);
     ensure_logging_context_initialized ();
 
-    kan_log_event_iterator_t iterator =
-        (kan_log_event_iterator_t) kan_event_queue_iterator_create (&logging_context.event_queue);
+    kan_log_event_iterator_t iterator = KAN_HANDLE_TRANSIT (
+        kan_log_event_iterator_t, KAN_HANDLE_TRANSIT (kan_event_queue_iterator_t,
+                                                      kan_event_queue_iterator_create (&logging_context.event_queue)));
 
     kan_atomic_int_unlock (&logging_context_lock);
     return iterator;
@@ -277,7 +278,7 @@ const struct kan_log_event_t *kan_log_event_iterator_get (kan_log_event_iterator
     kan_atomic_int_lock (&logging_context_lock);
 
     struct event_node_t *node = (struct event_node_t *) kan_event_queue_iterator_get (
-        &logging_context.event_queue, (kan_event_queue_iterator_t) iterator);
+        &logging_context.event_queue, KAN_HANDLE_TRANSIT (kan_event_queue_iterator_t, iterator));
 
     kan_atomic_int_unlock (&logging_context_lock);
     return node ? &node->event : NULL;
@@ -299,7 +300,8 @@ kan_log_event_iterator_t kan_log_event_iterator_advance (kan_log_event_iterator_
     KAN_ASSERT (logging_context_initialized)
     kan_atomic_int_lock (&logging_context_lock);
 
-    iterator = kan_event_queue_iterator_advance ((kan_event_queue_iterator_t) iterator);
+    iterator = KAN_HANDLE_TRANSIT (kan_log_event_iterator_t, kan_event_queue_iterator_advance (KAN_HANDLE_TRANSIT (
+                                                                 kan_event_queue_iterator_t, iterator)));
     cleanup_event_queue ();
 
     kan_atomic_int_unlock (&logging_context_lock);
@@ -311,7 +313,8 @@ void kan_log_event_iterator_destroy (kan_log_event_iterator_t iterator)
     KAN_ASSERT (logging_context_initialized)
     kan_atomic_int_lock (&logging_context_lock);
 
-    kan_event_queue_iterator_destroy (&logging_context.event_queue, (kan_event_queue_iterator_t) iterator);
+    kan_event_queue_iterator_destroy (&logging_context.event_queue,
+                                      KAN_HANDLE_TRANSIT (kan_event_queue_iterator_t, iterator));
     cleanup_event_queue ();
 
     kan_atomic_int_unlock (&logging_context_lock);

@@ -9,12 +9,12 @@ KAN_LOG_DEFINE_CATEGORY (context_virtual_file_system);
 
 struct virtual_file_system_t
 {
-    kan_context_handle_t context;
+    kan_context_t context;
     kan_allocation_group_t group;
 
     kan_virtual_file_system_volume_t volume;
-    kan_mutex_handle_t access_management_mutex;
-    kan_conditional_variable_handle_t access_management_neutral_condition;
+    kan_mutex_t access_management_mutex;
+    kan_conditional_variable_t access_management_neutral_condition;
     int64_t access_management_counter;
 };
 
@@ -40,7 +40,7 @@ static inline kan_bool_t ensure_mount_path_exists (kan_virtual_file_system_volum
     return kan_virtual_file_system_make_directory (volume, path_container.path);
 }
 
-kan_context_system_handle_t virtual_file_system_create (kan_allocation_group_t group, void *user_config)
+kan_context_system_t virtual_file_system_create (kan_allocation_group_t group, void *user_config)
 {
     struct virtual_file_system_t *system =
         kan_allocate_general (group, sizeof (struct virtual_file_system_t), _Alignof (struct virtual_file_system_t));
@@ -53,7 +53,7 @@ kan_context_system_handle_t virtual_file_system_create (kan_allocation_group_t g
 
     if (user_config)
     {
-        struct kan_virtual_file_system_config_t *config = (struct kan_virtual_file_system_config_t *) user_config;
+        struct kan_virtual_file_system_config_t *config = user_config;
         struct kan_virtual_file_system_config_mount_real_t *mount_point_real = config->first_mount_real;
 
         while (mount_point_real)
@@ -102,30 +102,30 @@ kan_context_system_handle_t virtual_file_system_create (kan_allocation_group_t g
         }
     }
 
-    return (kan_context_system_handle_t) system;
+    return KAN_HANDLE_SET (kan_context_system_t, system);
 }
 
-void virtual_file_system_connect (kan_context_system_handle_t handle, kan_context_handle_t context)
+void virtual_file_system_connect (kan_context_system_t handle, kan_context_t context)
 {
-    struct virtual_file_system_t *system = (struct virtual_file_system_t *) handle;
+    struct virtual_file_system_t *system = KAN_HANDLE_GET (handle);
     system->context = context;
 }
 
-void virtual_file_system_init (kan_context_system_handle_t handle)
+void virtual_file_system_init (kan_context_system_t handle)
 {
 }
 
-void virtual_file_system_shutdown (kan_context_system_handle_t handle)
+void virtual_file_system_shutdown (kan_context_system_t handle)
 {
 }
 
-void virtual_file_system_disconnect (kan_context_system_handle_t handle)
+void virtual_file_system_disconnect (kan_context_system_t handle)
 {
 }
 
-void virtual_file_system_destroy (kan_context_system_handle_t handle)
+void virtual_file_system_destroy (kan_context_system_t handle)
 {
-    struct virtual_file_system_t *system = (struct virtual_file_system_t *) handle;
+    struct virtual_file_system_t *system = KAN_HANDLE_GET (handle);
     kan_conditional_variable_destroy (system->access_management_neutral_condition);
     kan_mutex_destroy (system->access_management_mutex);
     kan_virtual_file_system_volume_destroy (system->volume);
@@ -143,9 +143,9 @@ struct kan_context_system_api_t KAN_CONTEXT_SYSTEM_API_NAME (virtual_file_system
 };
 
 kan_virtual_file_system_volume_t kan_virtual_file_system_get_context_volume_for_read (
-    kan_context_system_handle_t virtual_file_system)
+    kan_context_system_t virtual_file_system)
 {
-    struct virtual_file_system_t *system = (struct virtual_file_system_t *) virtual_file_system;
+    struct virtual_file_system_t *system = KAN_HANDLE_GET (virtual_file_system);
     kan_mutex_lock (system->access_management_mutex);
 
     // Wait until there is no writers.
@@ -159,9 +159,9 @@ kan_virtual_file_system_volume_t kan_virtual_file_system_get_context_volume_for_
     return system->volume;
 }
 
-void kan_virtual_file_system_close_context_read_access (kan_context_system_handle_t virtual_file_system)
+void kan_virtual_file_system_close_context_read_access (kan_context_system_t virtual_file_system)
 {
-    struct virtual_file_system_t *system = (struct virtual_file_system_t *) virtual_file_system;
+    struct virtual_file_system_t *system = KAN_HANDLE_GET (virtual_file_system);
     kan_mutex_lock (system->access_management_mutex);
     KAN_ASSERT (system->access_management_counter > 0)
     const int64_t previous_value = --system->access_management_counter;
@@ -174,9 +174,9 @@ void kan_virtual_file_system_close_context_read_access (kan_context_system_handl
 }
 
 kan_virtual_file_system_volume_t kan_virtual_file_system_get_context_volume_for_write (
-    kan_context_system_handle_t virtual_file_system)
+    kan_context_system_t virtual_file_system)
 {
-    struct virtual_file_system_t *system = (struct virtual_file_system_t *) virtual_file_system;
+    struct virtual_file_system_t *system = KAN_HANDLE_GET (virtual_file_system);
     kan_mutex_lock (system->access_management_mutex);
 
     // Wait until neutral situation -- no readers and no writers.
@@ -190,9 +190,9 @@ kan_virtual_file_system_volume_t kan_virtual_file_system_get_context_volume_for_
     return system->volume;
 }
 
-void kan_virtual_file_system_close_context_write_access (kan_context_system_handle_t virtual_file_system)
+void kan_virtual_file_system_close_context_write_access (kan_context_system_t virtual_file_system)
 {
-    struct virtual_file_system_t *system = (struct virtual_file_system_t *) virtual_file_system;
+    struct virtual_file_system_t *system = KAN_HANDLE_GET (virtual_file_system);
     kan_mutex_lock (system->access_management_mutex);
     KAN_ASSERT (system->access_management_counter == -1)
     ++system->access_management_counter;

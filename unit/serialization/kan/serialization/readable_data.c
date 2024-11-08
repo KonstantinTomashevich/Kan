@@ -196,7 +196,7 @@ static inline void reader_state_pop (struct reader_state_t *reader_state)
             KAN_LOG (serialization_readable_data, KAN_LOG_ERROR,
                      "Unable to deserialize patch as it didn't specify its type through \"%s\" field.",
                      interned_string_patch_type_field)
-            *top_state->patch_state.patch_output = KAN_INVALID_REFLECTION_PATCH;
+            *top_state->patch_state.patch_output = KAN_HANDLE_SET_INVALID (kan_reflection_patch_t);
         }
 
         break;
@@ -274,7 +274,7 @@ kan_serialization_rd_reader_t kan_serialization_rd_reader_create (
 
     KAN_ASSERT (root_state.struct_state.type)
     reader_state_push (reader_state, root_state);
-    return (kan_serialization_rd_reader_t) reader_state;
+    return KAN_HANDLE_SET (kan_serialization_rd_reader_t, reader_state);
 }
 
 static inline kan_bool_t extract_output_target_parts (const struct kan_readable_data_event_t *parsed_event,
@@ -1746,7 +1746,7 @@ static inline kan_bool_t read_array_appender (struct reader_state_t *reader_stat
 
 enum kan_serialization_state_t kan_serialization_rd_reader_step (kan_serialization_rd_reader_t reader)
 {
-    struct reader_state_t *reader_state = (struct reader_state_t *) reader;
+    struct reader_state_t *reader_state = KAN_HANDLE_GET (reader);
     KAN_ASSERT (reader_state->block_state_stack.size > 0u)
 
     const enum kan_readable_data_parser_response_t response = kan_readable_data_parser_step (reader_state->parser);
@@ -1817,7 +1817,7 @@ enum kan_serialization_state_t kan_serialization_rd_reader_step (kan_serializati
 
 void kan_serialization_rd_reader_destroy (kan_serialization_rd_reader_t reader)
 {
-    struct reader_state_t *reader_state = (struct reader_state_t *) reader;
+    struct reader_state_t *reader_state = KAN_HANDLE_GET (reader);
     kan_readable_data_parser_destroy (reader_state->parser);
     kan_reflection_patch_builder_destroy (reader_state->patch_builder);
     kan_dynamic_array_shutdown (&reader_state->block_state_stack);
@@ -1850,7 +1850,7 @@ kan_serialization_rd_writer_t kan_serialization_rd_writer_create (struct kan_str
 
     root_state.struct_state.suffix_next_index_to_write = 0u;
     writer_state_push (writer_state, root_state);
-    return (kan_serialization_rd_writer_t) writer_state;
+    return KAN_HANDLE_SET (kan_serialization_rd_writer_t, writer_state);
 }
 
 static inline kan_bool_t emit_structural_setter_begin (struct writer_state_t *writer_state,
@@ -2162,7 +2162,7 @@ static inline kan_bool_t enter_patch (struct writer_state_t *writer_state,
                                       kan_bool_t as_array_appender)
 {
     kan_reflection_patch_t patch = *(kan_reflection_patch_t *) address;
-    if (patch != KAN_INVALID_REFLECTION_PATCH)
+    if (KAN_HANDLE_IS_VALID (patch))
     {
         if (as_array_appender)
         {
@@ -2881,7 +2881,7 @@ static inline kan_bool_t writer_step_patch_sub_struct (struct writer_state_t *wr
 
 static inline kan_bool_t writer_step_patch (struct writer_state_t *writer_state, struct writer_block_state_t *top_state)
 {
-    if (top_state->patch_state.current_iterator == top_state->patch_state.end_iterator)
+    if (KAN_HANDLE_IS_EQUAL (top_state->patch_state.current_iterator, top_state->patch_state.end_iterator))
     {
         return KAN_TRUE;
     }
@@ -2911,7 +2911,7 @@ static inline kan_bool_t writer_step_patch (struct writer_state_t *writer_state,
 
 enum kan_serialization_state_t kan_serialization_rd_writer_step (kan_serialization_rd_writer_t writer)
 {
-    struct writer_state_t *writer_state = (struct writer_state_t *) writer;
+    struct writer_state_t *writer_state = KAN_HANDLE_GET (writer);
     if (writer_state->block_state_stack.size == 0u)
     {
         return KAN_SERIALIZATION_FINISHED;
@@ -2998,7 +2998,7 @@ enum kan_serialization_state_t kan_serialization_rd_writer_step (kan_serializati
             break;
 
         case WRITER_BLOCK_TYPE_PATCH:
-            if (top_state->patch_state.current_iterator == top_state->patch_state.end_iterator)
+            if (KAN_HANDLE_IS_EQUAL (top_state->patch_state.current_iterator, top_state->patch_state.end_iterator))
             {
                 writer_state_pop (writer_state);
                 popped = KAN_TRUE;
@@ -3023,7 +3023,7 @@ enum kan_serialization_state_t kan_serialization_rd_writer_step (kan_serializati
 
 void kan_serialization_rd_writer_destroy (kan_serialization_rd_writer_t writer)
 {
-    struct writer_state_t *writer_state = (struct writer_state_t *) writer;
+    struct writer_state_t *writer_state = KAN_HANDLE_GET (writer);
     kan_readable_data_emitter_destroy (writer_state->emitter);
     kan_dynamic_array_shutdown (&writer_state->block_state_stack);
     kan_free_general (serialization_allocation_group, writer_state, sizeof (struct writer_state_t));

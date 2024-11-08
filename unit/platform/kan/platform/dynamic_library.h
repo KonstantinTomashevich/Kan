@@ -9,9 +9,7 @@
 
 KAN_C_HEADER_BEGIN
 
-typedef uint64_t kan_platform_dynamic_library_t;
-
-#define KAN_INVALID_PLATFORM_DYNAMIC_LIBRARY 0u
+KAN_HANDLE_DEFINE (kan_platform_dynamic_library_t);
 
 /// \brief Attempts to load dynamic library from given path.
 PLATFORM_API kan_platform_dynamic_library_t kan_platform_dynamic_library_load (const char *path);

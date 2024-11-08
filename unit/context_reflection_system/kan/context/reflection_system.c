@@ -20,42 +20,42 @@ void KAN_CONTEXT_REFLECTION_SYSTEM_REGISTRAR_FUNCTION (kan_reflection_registry_t
 struct populate_connection_node_t
 {
     struct populate_connection_node_t *next;
-    kan_context_system_handle_t other_system;
+    kan_context_system_t other_system;
     kan_context_reflection_populate_t functor;
 };
 
 struct finalize_connection_node_t
 {
     struct finalize_connection_node_t *next;
-    kan_context_system_handle_t other_system;
+    kan_context_system_t other_system;
     kan_context_reflection_finalize_t functor;
 };
 
 struct generated_connection_node_t
 {
     struct generated_connection_node_t *next;
-    kan_context_system_handle_t other_system;
+    kan_context_system_t other_system;
     kan_context_reflection_generated_t functor;
 };
 
 struct generation_iterate_connection_node_t
 {
     struct generation_iterate_connection_node_t *next;
-    kan_context_system_handle_t other_system;
+    kan_context_system_t other_system;
     kan_context_reflection_generation_iterate_t functor;
 };
 
 struct cleanup_connection_node_t
 {
     struct cleanup_connection_node_t *next;
-    kan_context_system_handle_t other_system;
+    kan_context_system_t other_system;
     kan_context_reflection_cleanup_t functor;
 };
 
 struct pre_shutdown_connection_node_t
 {
     struct pre_shutdown_connection_node_t *next;
-    kan_context_system_handle_t other_system;
+    kan_context_system_t other_system;
     kan_context_reflection_cleanup_t functor;
 };
 
@@ -177,14 +177,14 @@ struct reflection_system_t
     struct pre_shutdown_connection_node_t *first_pre_shutdown_connection;
 
     kan_allocation_group_t group;
-    kan_context_handle_t context;
+    kan_context_t context;
     kan_reflection_registry_t current_registry;
 
     kan_allocation_group_t reflection_generator_allocation_group;
     struct reflection_generator_node_t *current_registry_first_generator;
 };
 
-static kan_context_system_handle_t reflection_system_create (kan_allocation_group_t group, void *user_config)
+static kan_context_system_t reflection_system_create (kan_allocation_group_t group, void *user_config)
 {
     struct reflection_system_t *system = (struct reflection_system_t *) kan_allocate_general (
         group, sizeof (struct reflection_system_t), _Alignof (struct reflection_system_t));
@@ -196,13 +196,13 @@ static kan_context_system_handle_t reflection_system_create (kan_allocation_grou
     system->first_pre_shutdown_connection = NULL;
 
     system->group = group;
-    system->current_registry = KAN_INVALID_REFLECTION_REGISTRY;
+    system->current_registry = KAN_HANDLE_SET_INVALID (kan_reflection_registry_t);
 
     system->reflection_generator_allocation_group =
         kan_allocation_group_get_child (system->group, "reflection_generators");
     system->current_registry_first_generator = NULL;
 
-    return (kan_context_system_handle_t) system;
+    return KAN_HANDLE_SET (kan_context_system_t, system);
 }
 
 static void call_generation_iterate_task (uint64_t user_data)
@@ -211,7 +211,7 @@ static void call_generation_iterate_task (uint64_t user_data)
     if (data->connection_node)
     {
         data->connection_node->functor (data->connection_node->other_system, data->new_registry,
-                                        (kan_reflection_system_generation_iterator_t) &data->iterator,
+                                        KAN_HANDLE_SET (kan_reflection_system_generation_iterator_t, &data->iterator),
                                         data->iteration_index);
     }
     else
@@ -228,7 +228,7 @@ static void call_generation_iterate_task (uint64_t user_data)
             } arguments = {
                 .instance = data->generator_node->instance,
                 .registry = data->new_registry,
-                .iterator = (kan_reflection_system_generation_iterator_t) &data->iterator,
+                .iterator = KAN_HANDLE_SET (kan_reflection_system_generation_iterator_t, &data->iterator),
                 .iteration_index = data->iteration_index,
             };
 
@@ -683,10 +683,10 @@ static void reflection_system_generate (struct reflection_system_t *system)
     KAN_LOG (reflection_system, KAN_LOG_INFO, "Running generation callbacks.")
     struct generated_connection_node_t *generated_node = system->first_generated_connection;
 
-    kan_reflection_migration_seed_t migration_seed = KAN_INVALID_REFLECTION_MIGRATION_SEED;
-    kan_reflection_struct_migrator_t migrator = KAN_INVALID_REFLECTION_STRUCT_MIGRATOR;
+    kan_reflection_migration_seed_t migration_seed = KAN_HANDLE_SET_INVALID (kan_reflection_migration_seed_t);
+    kan_reflection_struct_migrator_t migrator = KAN_HANDLE_SET_INVALID (kan_reflection_struct_migrator_t);
 
-    if (system->current_registry != KAN_INVALID_REFLECTION_REGISTRY)
+    if (KAN_HANDLE_IS_VALID (system->current_registry))
     {
         KAN_LOG (reflection_system, KAN_LOG_INFO, "Creating migration data.")
         migration_seed = kan_reflection_migration_seed_build (system->current_registry, new_registry);
@@ -702,7 +702,7 @@ static void reflection_system_generate (struct reflection_system_t *system)
         generated_node = generated_node->next;
     }
 
-    if (system->current_registry != KAN_INVALID_REFLECTION_REGISTRY)
+    if (KAN_HANDLE_IS_VALID (system->current_registry))
     {
         KAN_LOG (reflection_system, KAN_LOG_INFO, "Destroying migration data.")
         kan_reflection_struct_migrator_destroy (migrator);
@@ -743,20 +743,20 @@ static void reflection_system_generate (struct reflection_system_t *system)
     KAN_LOG (reflection_system, KAN_LOG_INFO, "Generation routine finished successfully.")
 }
 
-static void reflection_system_connect (kan_context_system_handle_t handle, kan_context_handle_t context)
+static void reflection_system_connect (kan_context_system_t handle, kan_context_t context)
 {
-    struct reflection_system_t *system = (struct reflection_system_t *) handle;
+    struct reflection_system_t *system = KAN_HANDLE_GET (handle);
     system->context = context;
 }
 
-static void reflection_system_connected_init (kan_context_system_handle_t handle)
+static void reflection_system_connected_init (kan_context_system_t handle)
 {
-    reflection_system_generate ((struct reflection_system_t *) handle);
+    reflection_system_generate (KAN_HANDLE_GET (handle));
 }
 
-static void reflection_system_connected_shutdown (kan_context_system_handle_t handle)
+static void reflection_system_connected_shutdown (kan_context_system_t handle)
 {
-    struct reflection_system_t *system = (struct reflection_system_t *) handle;
+    struct reflection_system_t *system = KAN_HANDLE_GET (handle);
     KAN_LOG (reflection_system, KAN_LOG_INFO, "Calling pre-shutdown functors.")
     struct pre_shutdown_connection_node_t *pre_shutdown_node = system->first_pre_shutdown_connection;
 
@@ -783,19 +783,19 @@ static void reflection_system_connected_shutdown (kan_context_system_handle_t ha
         system->current_registry_first_generator = next;
     }
 
-    if (system->current_registry != KAN_INVALID_REFLECTION_REGISTRY)
+    if (KAN_HANDLE_IS_VALID (system->current_registry))
     {
         kan_reflection_registry_destroy (system->current_registry);
     }
 }
 
-static void reflection_system_disconnect (kan_context_system_handle_t handle)
+static void reflection_system_disconnect (kan_context_system_t handle)
 {
 }
 
-static void reflection_system_destroy (kan_context_system_handle_t handle)
+static void reflection_system_destroy (kan_context_system_t handle)
 {
-    struct reflection_system_t *system = (struct reflection_system_t *) handle;
+    struct reflection_system_t *system = KAN_HANDLE_GET (handle);
     KAN_ASSERT (!system->first_populate_connection)
     KAN_ASSERT (!system->first_finalize_connection)
     KAN_ASSERT (!system->first_generated_connection)
@@ -816,7 +816,7 @@ CONTEXT_REFLECTION_SYSTEM_API struct kan_context_system_api_t KAN_CONTEXT_SYSTEM
 };
 
 #define CONNECT(TYPE)                                                                                                  \
-    struct reflection_system_t *system = (struct reflection_system_t *) reflection_system;                             \
+    struct reflection_system_t *system = KAN_HANDLE_GET (reflection_system);                                           \
     struct TYPE##_connection_node_t *node = (struct TYPE##_connection_node_t *) kan_allocate_batched (                 \
         system->group, sizeof (struct TYPE##_connection_node_t));                                                      \
     node->other_system = other_system;                                                                                 \
@@ -825,10 +825,10 @@ CONTEXT_REFLECTION_SYSTEM_API struct kan_context_system_api_t KAN_CONTEXT_SYSTEM
     system->first_##TYPE##_connection = node
 
 #define DISCONNECT(TYPE)                                                                                               \
-    struct reflection_system_t *system = (struct reflection_system_t *) reflection_system;                             \
+    struct reflection_system_t *system = KAN_HANDLE_GET (reflection_system);                                           \
     struct TYPE##_connection_node_t *node = system->first_##TYPE##_connection;                                         \
                                                                                                                        \
-    while (node && node->other_system == other_system)                                                                 \
+    while (node && KAN_HANDLE_IS_EQUAL (node->other_system, other_system))                                             \
     {                                                                                                                  \
         struct TYPE##_connection_node_t *next = node->next;                                                            \
         kan_free_batched (system->group, node);                                                                        \
@@ -839,7 +839,7 @@ CONTEXT_REFLECTION_SYSTEM_API struct kan_context_system_api_t KAN_CONTEXT_SYSTEM
     while (node)                                                                                                       \
     {                                                                                                                  \
         struct TYPE##_connection_node_t *next = node->next;                                                            \
-        if (next && next->other_system == other_system)                                                                \
+        if (next && KAN_HANDLE_IS_EQUAL (next->other_system, other_system))                                            \
         {                                                                                                              \
             node->next = next->next;                                                                                   \
             kan_free_batched (system->group, next);                                                                    \
@@ -850,97 +850,97 @@ CONTEXT_REFLECTION_SYSTEM_API struct kan_context_system_api_t KAN_CONTEXT_SYSTEM
         }                                                                                                              \
     }
 
-void kan_reflection_system_connect_on_populate (kan_context_system_handle_t reflection_system,
-                                                kan_context_system_handle_t other_system,
+void kan_reflection_system_connect_on_populate (kan_context_system_t reflection_system,
+                                                kan_context_system_t other_system,
                                                 kan_context_reflection_populate_t functor)
 {
     CONNECT (populate);
 }
 
-void kan_reflection_system_disconnect_on_populate (kan_context_system_handle_t reflection_system,
-                                                   kan_context_system_handle_t other_system)
+void kan_reflection_system_disconnect_on_populate (kan_context_system_t reflection_system,
+                                                   kan_context_system_t other_system)
 {
     DISCONNECT (populate)
 }
 
-void kan_reflection_system_connect_on_generation_iterate (kan_context_system_handle_t reflection_system,
-                                                          kan_context_system_handle_t other_system,
+void kan_reflection_system_connect_on_generation_iterate (kan_context_system_t reflection_system,
+                                                          kan_context_system_t other_system,
                                                           kan_context_reflection_generation_iterate_t functor)
 {
     CONNECT (generation_iterate);
 }
 
-void kan_reflection_system_disconnect_on_generation_iterate (kan_context_system_handle_t reflection_system,
-                                                             kan_context_system_handle_t other_system)
+void kan_reflection_system_disconnect_on_generation_iterate (kan_context_system_t reflection_system,
+                                                             kan_context_system_t other_system)
 {
     DISCONNECT (generation_iterate)
 }
 
-void kan_reflection_system_connect_on_finalize (kan_context_system_handle_t reflection_system,
-                                                kan_context_system_handle_t other_system,
+void kan_reflection_system_connect_on_finalize (kan_context_system_t reflection_system,
+                                                kan_context_system_t other_system,
                                                 kan_context_reflection_finalize_t functor)
 {
     CONNECT (finalize);
 }
 
-void kan_reflection_system_disconnect_on_finalize (kan_context_system_handle_t reflection_system,
-                                                   kan_context_system_handle_t other_system)
+void kan_reflection_system_disconnect_on_finalize (kan_context_system_t reflection_system,
+                                                   kan_context_system_t other_system)
 {
     DISCONNECT (finalize)
 }
 
-void kan_reflection_system_connect_on_generated (kan_context_system_handle_t reflection_system,
-                                                 kan_context_system_handle_t other_system,
+void kan_reflection_system_connect_on_generated (kan_context_system_t reflection_system,
+                                                 kan_context_system_t other_system,
                                                  kan_context_reflection_generated_t functor)
 {
     CONNECT (generated);
 }
 
-void kan_reflection_system_disconnect_on_generated (kan_context_system_handle_t reflection_system,
-                                                    kan_context_system_handle_t other_system)
+void kan_reflection_system_disconnect_on_generated (kan_context_system_t reflection_system,
+                                                    kan_context_system_t other_system)
 {
     DISCONNECT (generated)
 }
 
-void kan_reflection_system_connect_on_cleanup (kan_context_system_handle_t reflection_system,
-                                               kan_context_system_handle_t other_system,
+void kan_reflection_system_connect_on_cleanup (kan_context_system_t reflection_system,
+                                               kan_context_system_t other_system,
                                                kan_context_reflection_cleanup_t functor)
 {
     CONNECT (cleanup);
 }
 
-void kan_reflection_system_disconnect_on_cleanup (kan_context_system_handle_t reflection_system,
-                                                  kan_context_system_handle_t other_system)
+void kan_reflection_system_disconnect_on_cleanup (kan_context_system_t reflection_system,
+                                                  kan_context_system_t other_system)
 {
     DISCONNECT (pre_shutdown)
 }
 
-void kan_reflection_system_connect_on_pre_shutdown (kan_context_system_handle_t reflection_system,
-                                                    kan_context_system_handle_t other_system,
+void kan_reflection_system_connect_on_pre_shutdown (kan_context_system_t reflection_system,
+                                                    kan_context_system_t other_system,
                                                     kan_context_reflection_pre_shutdown_t functor)
 {
     CONNECT (pre_shutdown);
 }
 
-void kan_reflection_system_disconnect_on_pre_shutdown (kan_context_system_handle_t reflection_system,
-                                                       kan_context_system_handle_t other_system) {
-    DISCONNECT (pre_shutdown)}
+void kan_reflection_system_disconnect_on_pre_shutdown (kan_context_system_t reflection_system,
+                                                       kan_context_system_t other_system) {DISCONNECT (pre_shutdown)}
 
 #undef CONNECT
 #undef DISCONNECT
 
-kan_reflection_registry_t kan_reflection_system_get_registry (kan_context_system_handle_t reflection_system)
+kan_reflection_registry_t kan_reflection_system_get_registry (kan_context_system_t reflection_system)
 {
-    return ((struct reflection_system_t *) reflection_system)->current_registry;
+    struct reflection_system_t *system = KAN_HANDLE_GET (reflection_system);
+    return system->current_registry;
 }
 
-void kan_reflection_system_invalidate (kan_context_system_handle_t reflection_system)
+void kan_reflection_system_invalidate (kan_context_system_t reflection_system)
 {
-    reflection_system_generate ((struct reflection_system_t *) reflection_system);
+    reflection_system_generate (KAN_HANDLE_GET (reflection_system));
 }
 
 #define ITERATOR_NEXT(TYPE)                                                                                            \
-    struct generation_iterator_t *iterator_data = (struct generation_iterator_t *) iterator;                           \
+    struct generation_iterator_t *iterator_data = KAN_HANDLE_GET (iterator);                                           \
     if (iterator_data->current_##TYPE)                                                                                 \
     {                                                                                                                  \
         kan_interned_string_t result = iterator_data->current_##TYPE->data->name;                                      \
@@ -989,7 +989,7 @@ kan_interned_string_t kan_reflection_system_generation_iterator_next_changed_fun
 #undef ITERATOR_NEXT
 
 #define META_ITERATOR_NEXT_TOP_LEVEL(TYPE)                                                                             \
-    struct generation_iterator_t *iterator_data = (struct generation_iterator_t *) iterator;                           \
+    struct generation_iterator_t *iterator_data = KAN_HANDLE_GET (iterator);                                           \
     if (iterator_data->current_##TYPE##_meta)                                                                          \
     {                                                                                                                  \
         struct kan_reflection_system_##TYPE##_meta_t result = {                                                        \
@@ -1007,7 +1007,7 @@ kan_interned_string_t kan_reflection_system_generation_iterator_next_changed_fun
     }
 
 #define META_ITERATOR_NEXT_LOWER_LEVEL(TYPE)                                                                           \
-    struct generation_iterator_t *iterator_data = (struct generation_iterator_t *) iterator;                           \
+    struct generation_iterator_t *iterator_data = KAN_HANDLE_GET (iterator);                                           \
     if (iterator_data->current_##TYPE##_meta)                                                                          \
     {                                                                                                                  \
         struct kan_reflection_system_##TYPE##_meta_t result = {                                                        \
@@ -1068,7 +1068,7 @@ kan_reflection_system_generation_iterator_next_added_function_argument_meta (
 #undef META_ITERATOR_NEXT_LOW_LEVEL
 
 #define APPEND_EVENT(EVENT, ENTITY)                                                                                    \
-    struct generation_iterator_t *iterator_data = (struct generation_iterator_t *) iterator;                           \
+    struct generation_iterator_t *iterator_data = KAN_HANDLE_GET (iterator);                                           \
     kan_atomic_int_lock (&iterator_data->generation_context->this_iteration_submission_lock);                          \
                                                                                                                        \
     struct ENTITY##_event_entry_node_t *node = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (                              \
@@ -1118,7 +1118,7 @@ void kan_reflection_system_generation_iterator_change_function (kan_reflection_s
 #undef APPEND_EVENT
 
 #define ADD_META_EVENT_TOP_LEVEL(EVENT, ENTITY)                                                                        \
-    struct generation_iterator_t *iterator_data = (struct generation_iterator_t *) iterator;                           \
+    struct generation_iterator_t *iterator_data = KAN_HANDLE_GET (iterator);                                           \
     kan_atomic_int_lock (&iterator_data->generation_context->this_iteration_submission_lock);                          \
     struct top_level_meta_node_t *node = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (                                    \
         &iterator_data->generation_context->temporary_allocator, struct top_level_meta_node_t);                        \
@@ -1131,7 +1131,7 @@ void kan_reflection_system_generation_iterator_change_function (kan_reflection_s
     kan_atomic_int_unlock (&iterator_data->generation_context->this_iteration_submission_lock)
 
 #define ADD_META_EVENT_LOWER_LEVEL(EVENT, ENTITY, LOWER_ENTITY)                                                        \
-    struct generation_iterator_t *iterator_data = (struct generation_iterator_t *) iterator;                           \
+    struct generation_iterator_t *iterator_data = KAN_HANDLE_GET (iterator);                                           \
     kan_atomic_int_lock (&iterator_data->generation_context->this_iteration_submission_lock);                          \
     struct lower_level_meta_node_t *node = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (                                  \
         &iterator_data->generation_context->temporary_allocator, struct lower_level_meta_node_t);                      \

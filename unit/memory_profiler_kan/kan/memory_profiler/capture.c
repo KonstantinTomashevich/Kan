@@ -11,30 +11,31 @@ struct captured_allocation_group_t
     uint64_t allocated_total;
     struct captured_allocation_group_t *next_on_level;
     struct captured_allocation_group_t *first_child;
-    struct allocation_group_t *source;
+    kan_allocation_group_t source;
 };
 
 const char *kan_captured_allocation_group_get_name (kan_captured_allocation_group_t group)
 {
-    struct captured_allocation_group_t *captured = (struct captured_allocation_group_t *) group;
-    return captured->source->name;
+    struct captured_allocation_group_t *captured = KAN_HANDLE_GET (group);
+    struct allocation_group_t *source = KAN_HANDLE_GET (captured->source);
+    return source->name;
 }
 
 kan_allocation_group_t kan_captured_allocation_group_get_source (kan_captured_allocation_group_t group)
 {
-    struct captured_allocation_group_t *captured = (struct captured_allocation_group_t *) group;
-    return (kan_allocation_group_t) captured->source;
+    struct captured_allocation_group_t *captured = KAN_HANDLE_GET (group);
+    return captured->source;
 }
 
 uint64_t kan_captured_allocation_group_get_total_allocated (kan_captured_allocation_group_t group)
 {
-    struct captured_allocation_group_t *captured = (struct captured_allocation_group_t *) group;
+    struct captured_allocation_group_t *captured = KAN_HANDLE_GET (group);
     return captured->allocated_total;
 }
 
 uint64_t kan_captured_allocation_group_get_directly_allocated (kan_captured_allocation_group_t group)
 {
-    struct captured_allocation_group_t *captured = (struct captured_allocation_group_t *) group;
+    struct captured_allocation_group_t *captured = KAN_HANDLE_GET (group);
     return captured->allocated_here;
 }
 
@@ -44,27 +45,21 @@ _Static_assert (sizeof (kan_captured_allocation_group_iterator_t) >= sizeof (uin
 kan_captured_allocation_group_iterator_t kan_captured_allocation_group_children_begin (
     kan_captured_allocation_group_t group)
 {
-    struct captured_allocation_group_t *captured = (struct captured_allocation_group_t *) group;
-    return (kan_captured_allocation_group_iterator_t) captured->first_child;
+    struct captured_allocation_group_t *captured = KAN_HANDLE_GET (group);
+    return KAN_HANDLE_SET (kan_captured_allocation_group_iterator_t, captured->first_child);
 }
 
 kan_captured_allocation_group_iterator_t kan_captured_allocation_group_children_next (
     kan_captured_allocation_group_iterator_t current)
 {
-    struct captured_allocation_group_t *captured = (struct captured_allocation_group_t *) current;
-    return (kan_captured_allocation_group_iterator_t) captured->next_on_level;
+    struct captured_allocation_group_t *captured = KAN_HANDLE_GET (current);
+    return KAN_HANDLE_SET (kan_captured_allocation_group_iterator_t, captured->next_on_level);
 }
 
 kan_captured_allocation_group_t kan_captured_allocation_group_children_get (
     kan_captured_allocation_group_iterator_t current)
 {
-    return (kan_captured_allocation_group_t) current;
-}
-
-kan_captured_allocation_group_iterator_t kan_captured_allocation_group_children_end (
-    kan_captured_allocation_group_t group)
-{
-    return 0u;
+    return KAN_HANDLE_TRANSIT (kan_captured_allocation_group_t, current);
 }
 
 static void captured_group_destroy (struct captured_allocation_group_t *group)
@@ -82,7 +77,7 @@ static void captured_group_destroy (struct captured_allocation_group_t *group)
 
 void kan_captured_allocation_group_destroy (kan_captured_allocation_group_t group)
 {
-    struct captured_allocation_group_t *captured = (struct captured_allocation_group_t *) group;
+    struct captured_allocation_group_t *captured = KAN_HANDLE_GET (group);
     KAN_ASSERT (!captured->next_on_level)
     captured_group_destroy (captured);
 }
@@ -123,7 +118,7 @@ static struct captured_allocation_group_t *capture_allocation_group_snapshot (st
     captured->allocated_total = group->allocated_here;
     captured->next_on_level = NULL;
     captured->first_child = NULL;
-    captured->source = group;
+    captured->source = KAN_HANDLE_SET (kan_allocation_group_t, group);
 
     struct allocation_group_t *real_child = group->first_child;
     while (real_child)
@@ -142,8 +137,9 @@ struct kan_allocation_group_capture_t kan_allocation_group_begin_capture (void)
 {
     lock_memory_profiling_context ();
     struct kan_allocation_group_capture_t capture;
-    capture.captured_root = (kan_captured_allocation_group_t) capture_allocation_group_snapshot (
-        retrieve_root_allocation_group_unguarded ());
+    capture.captured_root =
+        KAN_HANDLE_SET (kan_captured_allocation_group_t,
+                        capture_allocation_group_snapshot (retrieve_root_allocation_group_unguarded ()));
     capture.event_iterator = event_iterator_create_unguarded ();
     unlock_memory_profiling_context ();
     return capture;

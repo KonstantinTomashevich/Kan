@@ -54,7 +54,7 @@ struct verify_code_hot_reload_mutator_state_t
     struct kan_repository_indexed_insert_query_t insert__some_shared_struct;
     struct kan_repository_indexed_insert_query_t insert__struct_that_will_be_deleted;
 
-    kan_context_system_handle_t application_framework_system_handle;
+    kan_context_system_t application_framework_system_handle;
 };
 
 APPLICATION_FRAMEWORK_VERIFY_CODE_HOT_RELOAD_API void kan_universe_mutator_deploy_verify_code_hot_reload (
@@ -64,7 +64,7 @@ APPLICATION_FRAMEWORK_VERIFY_CODE_HOT_RELOAD_API void kan_universe_mutator_deplo
     kan_workflow_graph_node_t workflow_node,
     struct verify_code_hot_reload_mutator_state_t *state)
 {
-    kan_context_handle_t context = kan_universe_get_context (universe);
+    kan_context_t context = kan_universe_get_context (universe);
     state->application_framework_system_handle =
         kan_context_query (context, KAN_CONTEXT_APPLICATION_FRAMEWORK_SYSTEM_NAME);
     KAN_LOG (application_framework_verify_code_hot_reload, KAN_LOG_INFO, "Deployed first stage.")
@@ -73,11 +73,11 @@ APPLICATION_FRAMEWORK_VERIFY_CODE_HOT_RELOAD_API void kan_universe_mutator_deplo
 APPLICATION_FRAMEWORK_VERIFY_CODE_HOT_RELOAD_API void kan_universe_mutator_execute_verify_code_hot_reload (
     kan_cpu_job_t job, struct verify_code_hot_reload_mutator_state_t *state)
 {
-    kan_repository_singleton_write_access_t singleton_write_access =
+    struct kan_repository_singleton_write_access_t singleton_write_access =
         kan_repository_singleton_write_query_execute (&state->write__verify_code_hot_test_singleton);
     struct verify_code_hot_test_singleton_t *singleton =
         (struct verify_code_hot_test_singleton_t *) kan_repository_singleton_write_access_resolve (
-            singleton_write_access);
+            &singleton_write_access);
 
     if (singleton->test_frame == 10u)
     {
@@ -149,6 +149,6 @@ APPLICATION_FRAMEWORK_VERIFY_CODE_HOT_RELOAD_API void kan_universe_mutator_execu
         ++singleton->test_frame;
     }
 
-    kan_repository_singleton_write_access_close (singleton_write_access);
+    kan_repository_singleton_write_access_close (&singleton_write_access);
     kan_cpu_job_release (job);
 }

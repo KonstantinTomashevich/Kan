@@ -380,8 +380,9 @@ void render_backend_compiler_state_request_graphics (struct render_backend_pipel
     VkPipelineShaderStageCreateInfo *output_stage = request->shader_stages;
     for (uint64_t module_index = 0u; module_index < description->code_modules_count; ++module_index)
     {
-        VkShaderModule module =
-            ((struct render_backend_code_module_t *) description->code_modules[module_index].code_module)->module;
+        struct render_backend_code_module_t *code_module =
+            KAN_HANDLE_GET (description->code_modules[module_index].code_module);
+        VkShaderModule module = code_module->module;
 
         for (uint64_t entry_point_index = 0u;
              entry_point_index < description->code_modules[module_index].entry_points_count; ++entry_point_index)
@@ -583,9 +584,7 @@ struct render_backend_graphics_pipeline_t *render_backend_system_create_graphics
     struct kan_cpu_section_execution_t execution;
     kan_cpu_section_execution_init (&execution, system->section_create_graphics_pipeline_internal);
 
-    struct render_backend_graphics_pipeline_family_t *family =
-        (struct render_backend_graphics_pipeline_family_t *) description->family;
-
+    struct render_backend_graphics_pipeline_family_t *family = KAN_HANDLE_GET (description->family);
     struct render_backend_graphics_pipeline_t *pipeline = kan_allocate_batched (
         system->pipeline_wrapper_allocation_group, sizeof (struct render_backend_graphics_pipeline_t));
 
@@ -595,7 +594,7 @@ struct render_backend_graphics_pipeline_t *render_backend_system_create_graphics
     pipeline->system = system;
 
     pipeline->pipeline = VK_NULL_HANDLE;
-    pipeline->pass = (struct render_backend_pass_t *) description->pass;
+    pipeline->pass = KAN_HANDLE_GET (description->pass);
     pipeline->family = family;
 
     pipeline->min_depth = description->min_depth;
@@ -631,7 +630,7 @@ kan_render_graphics_pipeline_t kan_render_graphics_pipeline_create (
     struct kan_render_graphics_pipeline_description_t *description,
     enum kan_render_pipeline_compilation_priority_t compilation_priority)
 {
-    struct render_backend_system_t *system = (struct render_backend_system_t *) context;
+    struct render_backend_system_t *system = KAN_HANDLE_GET (context);
     struct kan_cpu_section_execution_t execution;
     kan_cpu_section_execution_init (&execution, system->section_create_graphics_pipeline);
 
@@ -639,13 +638,14 @@ kan_render_graphics_pipeline_t kan_render_graphics_pipeline_create (
         render_backend_system_create_graphics_pipeline (system, description, compilation_priority);
     render_backend_compiler_state_request_graphics (&system->compiler_state, pipeline, description);
     kan_cpu_section_execution_shutdown (&execution);
-    return pipeline ? (kan_render_graphics_pipeline_t) pipeline : KAN_INVALID_RENDER_GRAPHICS_PIPELINE;
+    return pipeline ? KAN_HANDLE_SET (kan_render_graphics_pipeline_t, pipeline) :
+                      KAN_HANDLE_SET_INVALID (kan_render_graphics_pipeline_t);
 }
 
 void kan_render_graphics_pipeline_change_compilation_priority (
     kan_render_graphics_pipeline_t pipeline, enum kan_render_pipeline_compilation_priority_t compilation_priority)
 {
-    struct render_backend_graphics_pipeline_t *data = (struct render_backend_graphics_pipeline_t *) pipeline;
+    struct render_backend_graphics_pipeline_t *data = KAN_HANDLE_GET (pipeline);
 
     // Shortcut to avoid excessive locking: check if it is not already too late without even locking.
     if (data->compilation_state != PIPELINE_COMPILATION_STATE_PENDING)
@@ -670,7 +670,7 @@ void kan_render_graphics_pipeline_change_compilation_priority (
 
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_graphics_pipeline_destroy (kan_render_graphics_pipeline_t pipeline)
 {
-    struct render_backend_graphics_pipeline_t *data = (struct render_backend_graphics_pipeline_t *) pipeline;
+    struct render_backend_graphics_pipeline_t *data = KAN_HANDLE_GET (pipeline);
     struct render_backend_schedule_state_t *schedule = render_backend_system_get_schedule_for_destroy (data->system);
     kan_atomic_int_lock (&schedule->schedule_lock);
 

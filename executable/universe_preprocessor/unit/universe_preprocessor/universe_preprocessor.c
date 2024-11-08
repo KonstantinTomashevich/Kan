@@ -5,7 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <kan/api_common/bool.h>
+#include <kan/api_common/core_types.h>
 #include <kan/api_common/min_max.h>
 #include <kan/container/dynamic_array.h>
 #include <kan/container/interned_string.h>
@@ -1298,7 +1298,7 @@ static inline kan_bool_t output_singleton_begin (
     // Should be ensured by previous pass.
     KAN_ASSERT (process.bound_state)
 
-    return output_use_output_line () && output_string ("kan_repository_singleton_") && output_string (access) &&
+    return output_use_output_line () && output_string ("struct kan_repository_singleton_") && output_string (access) &&
            output_string ("_access_t ") && output_string (name) &&
            output_string ("_access = kan_repository_singleton_") && output_string (access) &&
            output_string ("_query_execute (&(") && output_string (process.bound_state_path) && output_string (")->") &&
@@ -1306,7 +1306,7 @@ static inline kan_bool_t output_singleton_begin (
            output_string (");\n") && output_string (if_const) && output_string ("struct ") &&
            output_sequence (type_begin, type_end) && output_string (" *") && output_string (name) &&
            output_string (" = kan_repository_singleton_") && output_string (access) &&
-           output_string ("_access_resolve (") && output_string (name) && output_string ("_access);\nkan_bool_t ") &&
+           output_string ("_access_resolve (&") && output_string (name) && output_string ("_access);\nkan_bool_t ") &&
            output_string (name) && output_string ("_access_expired = KAN_FALSE;\n") && output_use_source_line ();
 }
 
@@ -2045,7 +2045,7 @@ static inline kan_bool_t output_singleton_close_access_unguarded (kan_interned_s
 {
     return output_string ("if (!") && output_string (name) &&
            output_string ("_access_expired)\n{\n    kan_repository_singleton_") && output_string (access) &&
-           output_string ("_access_close (") && output_string (name) && output_string ("_access);\n}\n");
+           output_string ("_access_close (&") && output_string (name) && output_string ("_access);\n}\n");
 }
 
 static inline kan_bool_t output_indexed_insert_submit_unguarded (kan_interned_string_t name)

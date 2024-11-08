@@ -1,7 +1,7 @@
 #pragma once
 
-#include <kan/api_common/bool.h>
 #include <kan/api_common/c_header.h>
+#include <kan/api_common/core_types.h>
 
 /// \file
 /// \brief Describes abstract IO stream structure and its operations.

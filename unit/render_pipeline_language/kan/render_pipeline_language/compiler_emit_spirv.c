@@ -3314,7 +3314,7 @@ kan_bool_t kan_rpl_compiler_instance_emit_spirv (kan_rpl_compiler_instance_t com
                                                  kan_allocation_group_t output_allocation_group)
 {
     kan_dynamic_array_init (output, 0u, sizeof (uint32_t), _Alignof (uint32_t), output_allocation_group);
-    struct rpl_compiler_instance_t *instance = (struct rpl_compiler_instance_t *) compiler_instance;
+    struct rpl_compiler_instance_t *instance = KAN_HANDLE_GET (compiler_instance);
     struct spirv_generation_context_t context;
     spirv_init_generation_context (&context, instance);
 

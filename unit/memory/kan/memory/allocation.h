@@ -62,7 +62,7 @@ MEMORY_API void *kan_allocate_batched (kan_allocation_group_t group, uint64_t it
 /// \brief Frees memory allocated using kan_allocate_batched.
 MEMORY_API void kan_free_batched (kan_allocation_group_t group, void *memory);
 
-typedef uint64_t kan_stack_allocator_t;
+KAN_HANDLE_DEFINE (kan_stack_allocator_t);
 
 /// \brief Creates new instance of stack allocator with given fixed size.
 /// \details All allocations will be done inside given group.

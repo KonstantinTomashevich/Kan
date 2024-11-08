@@ -53,18 +53,18 @@ struct kan_virtual_file_system_config_t
 
 /// \brief Acquires read access and returns volume. Blocking.
 CONTEXT_VIRTUAL_FILE_SYSTEM_API kan_virtual_file_system_volume_t
-kan_virtual_file_system_get_context_volume_for_read (kan_context_system_handle_t virtual_file_system);
+kan_virtual_file_system_get_context_volume_for_read (kan_context_system_t virtual_file_system);
 
 /// \brief Releases read access to volume.
 CONTEXT_VIRTUAL_FILE_SYSTEM_API void kan_virtual_file_system_close_context_read_access (
-    kan_context_system_handle_t virtual_file_system);
+    kan_context_system_t virtual_file_system);
 
 /// \brief Acquires write access and returns volume. Blocking.
 CONTEXT_VIRTUAL_FILE_SYSTEM_API kan_virtual_file_system_volume_t
-kan_virtual_file_system_get_context_volume_for_write (kan_context_system_handle_t virtual_file_system);
+kan_virtual_file_system_get_context_volume_for_write (kan_context_system_t virtual_file_system);
 
 /// \brief Releases write access to volume.
 CONTEXT_VIRTUAL_FILE_SYSTEM_API void kan_virtual_file_system_close_context_write_access (
-    kan_context_system_handle_t virtual_file_system);
+    kan_context_system_t virtual_file_system);
 
 KAN_C_HEADER_END

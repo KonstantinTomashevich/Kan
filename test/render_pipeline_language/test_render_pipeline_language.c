@@ -48,7 +48,7 @@ static void compile_pipeline (kan_rpl_compiler_context_t compiler_context, struc
 
     kan_rpl_compiler_instance_t code_instance = kan_rpl_compiler_context_resolve (
         compiler_context, sizeof (entry_points) / sizeof (entry_points[0u]), entry_points);
-    KAN_TEST_ASSERT (code_instance != KAN_INVALID_RPL_COMPILER_INSTANCE)
+    KAN_TEST_ASSERT (KAN_HANDLE_IS_VALID (code_instance))
 
     KAN_TEST_ASSERT (kan_rpl_compiler_instance_emit_spirv (code_instance, output, KAN_ALLOCATION_GROUP_IGNORE))
     kan_rpl_compiler_instance_destroy (code_instance);
@@ -93,7 +93,7 @@ KAN_TEST_CASE (generic)
     kan_rpl_compiler_context_set_option_flag (compiler_context, kan_string_intern ("wireframe"), KAN_TRUE);
 
     kan_rpl_compiler_instance_t meta_instance = kan_rpl_compiler_context_resolve (compiler_context, 0u, NULL);
-    KAN_TEST_ASSERT (meta_instance != KAN_INVALID_RPL_COMPILER_INSTANCE)
+    KAN_TEST_ASSERT (KAN_HANDLE_IS_VALID (meta_instance))
 
     struct kan_rpl_meta_t meta;
     kan_rpl_meta_init (&meta);
@@ -110,7 +110,7 @@ KAN_TEST_CASE (generic)
     KAN_TEST_CHECK (meta.graphics_classic_settings.depth_bounds_test == KAN_FALSE)
     KAN_TEST_CHECK (meta.graphics_classic_settings.depth_compare_operation == KAN_RPL_COMPARE_OPERATION_LESS)
     KAN_TEST_CHECK (!meta.graphics_classic_settings.stencil_test)
-    KAN_TEST_CHECK (fabs (meta.graphics_classic_settings.depth_min + 1.0) < TEST_FLOATING_TOLERANCE)
+    KAN_TEST_CHECK (fabs (meta.graphics_classic_settings.depth_min) < TEST_FLOATING_TOLERANCE)
     KAN_TEST_CHECK (fabs (meta.graphics_classic_settings.depth_max - 1.0) < TEST_FLOATING_TOLERANCE)
 
     KAN_TEST_ASSERT (meta.attribute_buffers.size == 1u)
@@ -322,7 +322,7 @@ static void benchmark_step (struct kan_dynamic_array_t *source, kan_bool_t finis
     kan_rpl_compiler_context_use_module (compiler_context, &intermediate);
 
     kan_rpl_compiler_instance_t meta_instance = kan_rpl_compiler_context_resolve (compiler_context, 0u, NULL);
-    KAN_TEST_ASSERT (meta_instance != KAN_INVALID_RPL_COMPILER_INSTANCE)
+    KAN_TEST_ASSERT (KAN_HANDLE_IS_VALID (meta_instance))
 
     struct kan_rpl_meta_t meta;
     kan_rpl_meta_init (&meta);

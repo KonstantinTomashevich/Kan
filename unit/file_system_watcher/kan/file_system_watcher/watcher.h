@@ -2,8 +2,8 @@
 
 #include <file_system_watcher_api.h>
 
-#include <kan/api_common/bool.h>
 #include <kan/api_common/c_header.h>
+#include <kan/api_common/core_types.h>
 #include <kan/file_system/path_container.h>
 
 /// \file
@@ -25,11 +25,8 @@
 
 KAN_C_HEADER_BEGIN
 
-typedef uint64_t kan_file_system_watcher_t;
-
-#define KAN_INVALID_FILE_SYSTEM_WATCHER 0u
-
-typedef uint64_t kan_file_system_watcher_iterator_t;
+KAN_HANDLE_DEFINE (kan_file_system_watcher_t);
+KAN_HANDLE_DEFINE (kan_file_system_watcher_iterator_t);
 
 /// \brief Lists supported file system event types.
 /// \details List of events is very minimalistic in order to be supported by all platforms.

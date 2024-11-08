@@ -87,7 +87,7 @@ struct render_backend_surface_t
     uint32_t swap_chain_creation_window_width;
     uint32_t swap_chain_creation_window_height;
 
-    kan_application_system_window_handle_t window_handle;
+    kan_application_system_window_t window_handle;
     kan_application_system_window_resource_id_t resource_id;
 };
 
@@ -744,9 +744,9 @@ struct graphics_pipeline_compilation_request_t
 ///          If this changes, we might rethink our approach.
 struct render_backend_pipeline_compiler_state_t
 {
-    kan_thread_handle_t thread;
-    kan_mutex_handle_t state_transition_mutex;
-    kan_conditional_variable_handle_t has_more_work;
+    kan_thread_t thread;
+    kan_mutex_t state_transition_mutex;
+    kan_conditional_variable_t has_more_work;
     struct kan_atomic_int_t should_terminate;
 
     struct kan_bd_list_t graphics_critical;
@@ -807,7 +807,8 @@ void render_backend_apply_descriptor_set_mutation (struct render_backend_pipelin
 
 struct render_backend_system_t
 {
-    kan_context_handle_t context;
+    kan_context_t context;
+    kan_render_context_t render_context_handle;
 
     VkInstance instance;
     VkDevice device;

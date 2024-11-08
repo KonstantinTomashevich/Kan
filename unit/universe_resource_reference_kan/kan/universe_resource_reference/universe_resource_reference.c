@@ -126,8 +126,8 @@ struct resource_reference_manager_state_t
     kan_interned_string_t workspace_directory_path;
 
     kan_serialization_binary_script_storage_t binary_script_storage;
-    kan_context_system_handle_t plugin_system;
-    kan_context_system_handle_t virtual_file_system;
+    kan_context_system_t plugin_system;
+    kan_context_system_t virtual_file_system;
 
     kan_bool_t need_to_cancel_old_operations;
     kan_allocation_group_t my_allocation_group;
@@ -219,7 +219,7 @@ UNIVERSE_RESOURCE_REFERENCE_KAN_API void mutator_template_deploy_resource_refere
     state->plugin_system = kan_context_query (kan_universe_get_context (universe), KAN_CONTEXT_PLUGIN_SYSTEM_NAME);
     state->virtual_file_system =
         kan_context_query (kan_universe_get_context (universe), KAN_CONTEXT_VIRTUAL_FILE_SYSTEM_NAME);
-    KAN_ASSERT (state->virtual_file_system != KAN_INVALID_CONTEXT_SYSTEM_HANDLE)
+    KAN_ASSERT (KAN_HANDLE_IS_VALID (state->virtual_file_system))
     state->need_to_cancel_old_operations = KAN_TRUE;
 
     kan_resource_pipeline_reference_type_info_storage_build (
@@ -537,7 +537,7 @@ static inline kan_bool_t update_references_from_cache (struct resource_reference
 
         kan_serialization_binary_reader_t reader = kan_serialization_binary_reader_create (
             input_stream, &container, kan_string_intern ("kan_resource_pipeline_detected_reference_container_t"),
-            state->binary_script_storage, KAN_INVALID_SERIALIZATION_INTERNED_STRING_REGISTRY,
+            state->binary_script_storage, KAN_HANDLE_SET_INVALID (kan_serialization_interned_string_registry_t),
             container.detected_references.allocation_group);
 
         enum kan_serialization_state_t serialization_state;
@@ -602,7 +602,7 @@ static inline uint64_t write_references_to_cache (
         stream = kan_random_access_stream_buffer_open_for_write (stream, KAN_UNIVERSE_RESOURCE_REFERENCE_IO_BUFFER);
         kan_serialization_binary_writer_t writer = kan_serialization_binary_writer_create (
             stream, container, kan_string_intern ("kan_resource_pipeline_detected_reference_container_t"),
-            state->binary_script_storage, KAN_INVALID_SERIALIZATION_INTERNED_STRING_REGISTRY);
+            state->binary_script_storage, KAN_HANDLE_SET_INVALID (kan_serialization_interned_string_registry_t));
 
         enum kan_serialization_state_t serialization_state;
         while ((serialization_state = kan_serialization_binary_writer_step (writer)) == KAN_SERIALIZATION_IN_PROGRESS)
@@ -651,7 +651,7 @@ static void process_outer_reference_operation_in_requested_state (
 
     const uint64_t transient_update_time_ns = get_last_outer_reference_update_file_time_ns (state, operation);
     const uint64_t plugin_update_time_ns =
-        state->plugin_system != KAN_INVALID_CONTEXT_SYSTEM_HANDLE ?
+        KAN_HANDLE_IS_VALID (state->plugin_system) ?
             kan_plugin_system_get_newest_loaded_plugin_last_modification_file_time_ns (state->plugin_system) :
             0u;
 

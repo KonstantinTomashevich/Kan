@@ -2,8 +2,8 @@
 
 #include <file_system_api.h>
 
-#include <kan/api_common/bool.h>
 #include <kan/api_common/c_header.h>
+#include <kan/api_common/core_types.h>
 
 /// \file
 /// \brief Contains API for working with file system entries.
@@ -19,9 +19,7 @@ enum kan_file_system_entry_type_t
     KAN_FILE_SYSTEM_ENTRY_TYPE_DIRECTORY,
 };
 
-typedef uint64_t kan_file_system_directory_iterator_t;
-
-#define KAN_INVALID_FILE_SYSTEM_DIRECTORY_ITERATOR 0u
+KAN_HANDLE_DEFINE (kan_file_system_directory_iterator_t);
 
 /// \brief Describes file system entry status.
 /// \details Minimalistic in order to be supported by all platforms.

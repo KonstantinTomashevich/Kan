@@ -154,7 +154,7 @@ static kan_render_graphics_pipeline_t create_render_image_pipeline (
 
     kan_rpl_compiler_instance_t compiler_instance = kan_rpl_compiler_context_resolve (
         compiler_context, sizeof (entry_points) / sizeof (entry_points[0u]), entry_points);
-    KAN_TEST_ASSERT (compiler_instance != KAN_INVALID_RPL_COMPILER_INSTANCE)
+    KAN_TEST_ASSERT (KAN_HANDLE_IS_VALID (compiler_instance))
 
     KAN_TEST_ASSERT (
         kan_render_backend_tools_emit_platform_code (compiler_instance, &code, KAN_ALLOCATION_GROUP_IGNORE))
@@ -212,7 +212,7 @@ static kan_render_graphics_pipeline_t create_render_image_pipeline (
 
     kan_render_graphics_pipeline_family_t family =
         kan_render_graphics_pipeline_family_create (render_context, &pipeline_family_description);
-    KAN_TEST_ASSERT (family != KAN_INVALID_RENDER_GRAPHICS_PIPELINE_FAMILY)
+    KAN_TEST_ASSERT (KAN_HANDLE_IS_VALID (family))
     *output_family = family;
 
     kan_render_code_module_t code_module = kan_render_code_module_create (
@@ -436,7 +436,7 @@ static kan_render_graphics_pipeline_t create_cube_pipeline (kan_render_context_t
 
     kan_rpl_compiler_instance_t compiler_instance = kan_rpl_compiler_context_resolve (
         compiler_context, sizeof (entry_points) / sizeof (entry_points[0u]), entry_points);
-    KAN_TEST_ASSERT (compiler_instance != KAN_INVALID_RPL_COMPILER_INSTANCE)
+    KAN_TEST_ASSERT (KAN_HANDLE_IS_VALID (compiler_instance))
 
     KAN_TEST_ASSERT (
         kan_render_backend_tools_emit_platform_code (compiler_instance, &code, KAN_ALLOCATION_GROUP_IGNORE))
@@ -542,7 +542,7 @@ static kan_render_graphics_pipeline_t create_cube_pipeline (kan_render_context_t
 
     kan_render_graphics_pipeline_family_t family =
         kan_render_graphics_pipeline_family_create (render_context, &pipeline_family_description);
-    KAN_TEST_ASSERT (family != KAN_INVALID_RENDER_GRAPHICS_PIPELINE_FAMILY)
+    KAN_TEST_ASSERT (KAN_HANDLE_IS_VALID (family))
     *output_family = family;
 
     kan_render_code_module_t code_module = kan_render_code_module_create (render_context, code.size * code.item_size,
@@ -676,7 +676,7 @@ static void check_rgba_equal_enough (uint32_t *first, uint32_t *second, uint32_t
 KAN_TEST_CASE (render_and_capture)
 {
     kan_platform_application_init ();
-    kan_context_handle_t context =
+    kan_context_t context =
         kan_context_create (kan_allocation_group_get_child (kan_allocation_group_root (), "context"));
 
     struct kan_render_backend_system_config_t render_backend_config = {
@@ -693,14 +693,13 @@ KAN_TEST_CASE (render_and_capture)
         kan_context_request_system (context, KAN_CONTEXT_RENDER_BACKEND_SYSTEM_NAME, &render_backend_config))
 
     kan_context_assembly (context);
-    kan_context_system_handle_t application_system = kan_context_query (context, KAN_CONTEXT_APPLICATION_SYSTEM_NAME);
-    kan_context_system_handle_t render_backend_system =
-        kan_context_query (context, KAN_CONTEXT_RENDER_BACKEND_SYSTEM_NAME);
+    kan_context_system_t application_system = kan_context_query (context, KAN_CONTEXT_APPLICATION_SYSTEM_NAME);
+    kan_context_system_t render_backend_system = kan_context_query (context, KAN_CONTEXT_RENDER_BACKEND_SYSTEM_NAME);
     kan_render_context_t render_context = kan_render_backend_system_get_render_context (render_backend_system);
 
     struct kan_render_supported_devices_t *devices = kan_render_backend_system_get_devices (render_backend_system);
     printf ("Devices (%lu):\n", (unsigned long) devices->supported_device_count);
-    kan_render_device_id_t picked_device;
+    kan_render_device_t picked_device = KAN_HANDLE_INITIALIZE_INVALID;
     uint64_t picked_device_index = UINT64_MAX;
 
     for (uint64_t index = 0u; index < devices->supported_device_count; ++index)
@@ -734,7 +733,7 @@ KAN_TEST_CASE (render_and_capture)
     flags |= KAN_PLATFORM_WINDOW_FLAG_RESIZABLE;
 #endif
 
-    kan_application_system_window_handle_t window_handle = kan_application_system_window_create (
+    kan_application_system_window_t window_handle = kan_application_system_window_create (
         application_system, "Kan context_render_backend test window", fixed_window_size, fixed_window_size,
         // Not having KAN_PLATFORM_WINDOW_FLAG_RESIZABLE results in severe FPS drop on some NVIDIA drivers.
         // It is okay for automatic test, but beware in real applications.
@@ -747,10 +746,10 @@ KAN_TEST_CASE (render_and_capture)
         kan_render_backend_system_create_surface (render_backend_system, window_handle, kan_string_intern ("test"));
 
     kan_render_pass_t render_image_pass = create_render_image_pass (render_context);
-    KAN_TEST_ASSERT (render_image_pass != KAN_INVALID_RENDER_PASS)
+    KAN_TEST_ASSERT (KAN_HANDLE_IS_VALID (render_image_pass))
 
     kan_render_pass_t cube_pass = create_cube_pass (render_context);
-    KAN_TEST_ASSERT (cube_pass != KAN_INVALID_RENDER_PASS)
+    KAN_TEST_ASSERT (KAN_HANDLE_IS_VALID (cube_pass))
 
     uint64_t render_image_attribute_binding;
     uint64_t render_image_config_binding;
@@ -759,7 +758,7 @@ KAN_TEST_CASE (render_and_capture)
     kan_render_graphics_pipeline_t render_image_pipeline =
         create_render_image_pipeline (render_context, render_image_pass, &render_image_pipeline_family,
                                       &render_image_attribute_binding, &render_image_config_binding);
-    KAN_TEST_ASSERT (render_image_pipeline != KAN_INVALID_RENDER_GRAPHICS_PIPELINE)
+    KAN_TEST_ASSERT (KAN_HANDLE_IS_VALID (render_image_pipeline))
 
     uint64_t cube_attribute_vertex_binding;
     uint64_t cube_pass_binding;
@@ -1009,8 +1008,8 @@ KAN_TEST_CASE (render_and_capture)
 
     while (!exit_requested)
 #else
-    kan_render_read_back_status_t first_frame_read_back = KAN_INVALID_RENDER_READ_BACK_STATUS;
-    kan_render_read_back_status_t second_frame_read_back = KAN_INVALID_RENDER_READ_BACK_STATUS;
+    kan_render_read_back_status_t first_frame_read_back = KAN_HANDLE_SET_INVALID (kan_render_read_back_status_t);
+    kan_render_read_back_status_t second_frame_read_back = KAN_HANDLE_SET_INVALID (kan_render_read_back_status_t);
 
     kan_render_buffer_t first_read_back_buffer = kan_render_buffer_create (
         render_context, KAN_RENDER_BUFFER_TYPE_READ_BACK_STORAGE, fixed_window_size * fixed_window_size * 4u, NULL,
@@ -1020,8 +1019,7 @@ KAN_TEST_CASE (render_and_capture)
         render_context, KAN_RENDER_BUFFER_TYPE_READ_BACK_STORAGE, fixed_window_size * fixed_window_size * 4u, NULL,
         kan_string_intern ("read_back_second"));
 
-    while (first_frame_read_back == KAN_INVALID_RENDER_READ_BACK_STATUS ||
-           second_frame_read_back == KAN_INVALID_RENDER_READ_BACK_STATUS ||
+    while (!KAN_HANDLE_IS_VALID (first_frame_read_back) || !KAN_HANDLE_IS_VALID (second_frame_read_back) ||
            kan_read_read_back_status_get (first_frame_read_back) != KAN_RENDER_READ_BACK_STATE_FINISHED ||
            kan_read_read_back_status_get (second_frame_read_back) != KAN_RENDER_READ_BACK_STATE_FINISHED)
 #endif
@@ -1078,7 +1076,7 @@ KAN_TEST_CASE (render_and_capture)
             kan_render_pass_instance_t cube_instance = kan_render_pass_instantiate (
                 cube_pass, surface_frame_buffer, &cube_viewport_bounds, &cube_scissor, cube_attachment_clear_values);
 
-            if (cube_instance != KAN_INVALID_RENDER_PASS_INSTANCE)
+            if (KAN_HANDLE_IS_VALID (cube_instance))
             {
                 struct kan_float_matrix_4x4_t projection;
                 kan_perspective_projection (&projection, KAN_PI_2,
@@ -1194,14 +1192,14 @@ KAN_TEST_CASE (render_and_capture)
                     render_image_pass, render_image_frame_buffer, &render_image_viewport_bounds, &render_image_scissor,
                     render_image_attachment_clear_values);
 
-                if (render_image_instance != KAN_INVALID_RENDER_PASS_INSTANCE)
+                if (KAN_HANDLE_IS_VALID (render_image_instance))
                 {
 #if !defined(FREE_MODE)
-                    if (first_frame_read_back == KAN_INVALID_RENDER_READ_BACK_STATUS)
+                    if (!KAN_HANDLE_IS_VALID (first_frame_read_back))
                     {
                         first_frame_read_back =
-                            kan_render_read_back_request_from_surface (test_surface, first_read_back_buffer, 0u);
-                        KAN_TEST_ASSERT (first_frame_read_back != KAN_INVALID_RENDER_READ_BACK_STATUS)
+                            kan_render_request_read_back_from_surface (test_surface, first_read_back_buffer, 0u);
+                        KAN_TEST_ASSERT (KAN_HANDLE_IS_VALID (first_frame_read_back))
                     }
 #endif
 
@@ -1218,7 +1216,7 @@ KAN_TEST_CASE (render_and_capture)
                             0u);
                     }
 
-                    if (cube_instance != KAN_INVALID_RENDER_PASS_INSTANCE)
+                    if (KAN_HANDLE_IS_VALID (cube_instance))
                     {
                         kan_render_pass_instance_add_dynamic_dependency (cube_instance, render_image_instance);
                     }
@@ -1228,11 +1226,11 @@ KAN_TEST_CASE (render_and_capture)
             }
 #if !defined(FREE_MODE)
             else if (frame - last_render_image_frame == RENDER_IMAGE_EVERY - 1u &&
-                     second_frame_read_back == KAN_INVALID_RENDER_READ_BACK_STATUS)
+                     !KAN_HANDLE_IS_VALID (second_frame_read_back))
             {
                 second_frame_read_back =
-                    kan_render_read_back_request_from_surface (test_surface, second_read_back_buffer, 0u);
-                KAN_TEST_ASSERT (second_frame_read_back != KAN_INVALID_RENDER_READ_BACK_STATUS)
+                    kan_render_request_read_back_from_surface (test_surface, second_read_back_buffer, 0u);
+                KAN_TEST_ASSERT (KAN_HANDLE_IS_VALID (second_frame_read_back))
             }
 #endif
         }

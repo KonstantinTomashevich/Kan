@@ -226,7 +226,7 @@ int kan_application_framework_run (const char *core_configuration_path,
             kan_serialization_binary_reader_t reader = kan_serialization_binary_reader_create (
                 configuration_stream, &core_config,
                 kan_string_intern ("kan_application_framework_core_configuration_t"), temporary_script_storage,
-                KAN_INVALID_SERIALIZATION_INTERNED_STRING_REGISTRY, config_allocation_group);
+                KAN_HANDLE_SET_INVALID (kan_serialization_interned_string_registry_t), config_allocation_group);
 
             enum kan_serialization_state_t state;
             while ((state = kan_serialization_binary_reader_step (reader)) == KAN_SERIALIZATION_IN_PROGRESS)
@@ -290,7 +290,7 @@ int kan_application_framework_run (const char *core_configuration_path,
             kan_serialization_binary_reader_t reader = kan_serialization_binary_reader_create (
                 configuration_stream, &program_config,
                 kan_string_intern ("kan_application_framework_program_configuration_t"), temporary_script_storage,
-                KAN_INVALID_SERIALIZATION_INTERNED_STRING_REGISTRY, config_allocation_group);
+                KAN_HANDLE_SET_INVALID (kan_serialization_interned_string_registry_t), config_allocation_group);
 
             enum kan_serialization_state_t state;
             while ((state = kan_serialization_binary_reader_step (reader)) == KAN_SERIALIZATION_IN_PROGRESS)
@@ -495,7 +495,7 @@ int kan_application_framework_run_with_configuration (
     }
 
     int result = 0;
-    kan_context_handle_t context = kan_context_create (context_allocation_group);
+    kan_context_t context = kan_context_create (context_allocation_group);
 
     struct kan_application_framework_system_config_t application_framework_system_config;
     application_framework_system_config.arguments_count = arguments_count;
@@ -578,16 +578,16 @@ int kan_application_framework_run_with_configuration (
     kan_context_assembly (context);
     kan_plugin_system_config_shutdown (&plugin_system_config);
     shutdown_virtual_file_system_config (&virtual_file_system_config);
-    kan_context_system_handle_t application_system = kan_context_query (context, KAN_CONTEXT_APPLICATION_SYSTEM_NAME);
+    kan_context_system_t application_system = kan_context_query (context, KAN_CONTEXT_APPLICATION_SYSTEM_NAME);
 
     if (result == 0)
     {
-        kan_context_system_handle_t application_framework_system =
+        kan_context_system_t application_framework_system =
             kan_context_query (context, KAN_CONTEXT_APPLICATION_FRAMEWORK_SYSTEM_NAME);
-        kan_context_system_handle_t universe_system = kan_context_query (context, KAN_CONTEXT_UNIVERSE_SYSTEM_NAME);
-        kan_context_system_handle_t universe_world_definition_system =
+        kan_context_system_t universe_system = kan_context_query (context, KAN_CONTEXT_UNIVERSE_SYSTEM_NAME);
+        kan_context_system_t universe_world_definition_system =
             kan_context_query (context, KAN_CONTEXT_UNIVERSE_WORLD_DEFINITION_SYSTEM_NAME);
-        kan_context_system_handle_t update_system = kan_context_query (context, KAN_CONTEXT_UPDATE_SYSTEM_NAME);
+        kan_context_system_t update_system = kan_context_query (context, KAN_CONTEXT_UPDATE_SYSTEM_NAME);
 
         const struct kan_universe_world_definition_t *root_definition = kan_universe_world_definition_system_query (
             universe_world_definition_system, core_configuration->root_world);
@@ -645,7 +645,7 @@ int kan_application_framework_run_with_configuration (
         }
     }
 
-    if (application_system != KAN_INVALID_CONTEXT_SYSTEM_HANDLE)
+    if (KAN_HANDLE_IS_VALID (application_system))
     {
         kan_application_system_prepare_for_destroy_in_main_thread (application_system);
     }

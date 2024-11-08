@@ -3,34 +3,34 @@
 #include <kan/log/logging.h>
 #include <kan/threading/conditional_variable.h>
 
-kan_conditional_variable_handle_t kan_conditional_variable_create (void)
+kan_conditional_variable_t kan_conditional_variable_create (void)
 {
     void *sdl_handle = SDL_CreateCondition ();
     if (!sdl_handle)
     {
         KAN_LOG (threading, KAN_LOG_ERROR, "Failed to create conditional variable: %s.", SDL_GetError ())
-        return KAN_INVALID_MUTEX_HANDLE;
+        return KAN_HANDLE_SET_INVALID (kan_conditional_variable_t);
     }
 
-    return (kan_conditional_variable_handle_t) sdl_handle;
+    return KAN_HANDLE_SET (kan_conditional_variable_t, sdl_handle);
 }
 
-kan_bool_t kan_conditional_variable_wait (kan_conditional_variable_handle_t handle, kan_mutex_handle_t associated_mutex)
+kan_bool_t kan_conditional_variable_wait (kan_conditional_variable_t handle, kan_mutex_t associated_mutex)
 {
-    return SDL_WaitCondition ((void *) handle, (void *) associated_mutex) == 0;
+    return SDL_WaitCondition (KAN_HANDLE_GET (handle), KAN_HANDLE_GET (associated_mutex)) == 0;
 }
 
-kan_bool_t kan_conditional_variable_signal_one (kan_conditional_variable_handle_t handle)
+kan_bool_t kan_conditional_variable_signal_one (kan_conditional_variable_t handle)
 {
-    return SDL_SignalCondition ((void *) handle) == 0;
+    return SDL_SignalCondition (KAN_HANDLE_GET (handle)) == 0;
 }
 
-kan_bool_t kan_conditional_variable_signal_all (kan_conditional_variable_handle_t handle)
+kan_bool_t kan_conditional_variable_signal_all (kan_conditional_variable_t handle)
 {
-    return SDL_BroadcastCondition ((void *) handle) == 0;
+    return SDL_BroadcastCondition (KAN_HANDLE_GET (handle)) == 0;
 }
 
-void kan_conditional_variable_destroy (kan_conditional_variable_handle_t handle)
+void kan_conditional_variable_destroy (kan_conditional_variable_t handle)
 {
-    SDL_DestroyCondition ((void *) handle);
+    SDL_DestroyCondition (KAN_HANDLE_GET (handle));
 }

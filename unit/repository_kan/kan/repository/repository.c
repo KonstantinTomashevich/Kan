@@ -2037,7 +2037,7 @@ static void observation_event_triggers_definition_build (struct observation_even
 
             event_node->flags = *event_flag;
             kan_repository_event_insert_query_init (&event_node->event_insert_query,
-                                                    (kan_repository_event_storage_t) event_storage);
+                                                    KAN_HANDLE_SET (kan_repository_event_storage_t, event_storage));
             event_node->buffer_copy_outs_count = merged_buffer_copy_outs_count;
             event_node->buffer_copy_outs = merged_buffer_copy_outs;
             event_node->record_copy_outs_count = merged_record_copy_outs_count;
@@ -2227,7 +2227,7 @@ static struct lifetime_event_trigger_list_node_t *lifetime_event_triggers_extrac
                 temporary_allocator, struct lifetime_event_trigger_list_node_t);
 
             kan_repository_event_insert_query_init (&event_node->event_insert_query,
-                                                    (kan_repository_event_storage_t) event_storage);
+                                                    KAN_HANDLE_SET (kan_repository_event_storage_t, event_storage));
             event_node->copy_outs_count = merged_copy_outs_count;
             event_node->copy_outs = merged_copy_outs;
 
@@ -2285,7 +2285,7 @@ static struct lifetime_event_trigger_list_node_t *lifetime_event_triggers_extrac
                 temporary_allocator, struct lifetime_event_trigger_list_node_t);
 
             kan_repository_event_insert_query_init (&event_node->event_insert_query,
-                                                    (kan_repository_event_storage_t) event_storage);
+                                                    KAN_HANDLE_SET (kan_repository_event_storage_t, event_storage));
             event_node->copy_outs_count = merged_copy_outs_count;
             event_node->copy_outs = merged_copy_outs;
 
@@ -2502,8 +2502,8 @@ static void cascade_deleters_definition_build (struct cascade_deleters_definitio
         first_node = node;
         ++nodes_count;
 
-        kan_repository_indexed_value_delete_query_init (&node->query, (kan_repository_indexed_storage_t) child_storage,
-                                                        meta->child_key_path);
+        kan_repository_indexed_value_delete_query_init (
+            &node->query, KAN_HANDLE_SET (kan_repository_indexed_storage_t, child_storage), meta->child_key_path);
         node->absolute_input_value_offset = parent_absolute_offset;
 
         kan_reflection_struct_meta_iterator_next (&iterator);
@@ -3809,19 +3809,20 @@ static struct repository_t *repository_create (kan_allocation_group_t allocation
 kan_repository_t kan_repository_create_root (kan_allocation_group_t allocation_group,
                                              kan_reflection_registry_t registry)
 {
-    return (kan_repository_t) repository_create (allocation_group, NULL, kan_string_intern ("root"), registry);
+    return KAN_HANDLE_SET (kan_repository_t,
+                           repository_create (allocation_group, NULL, kan_string_intern ("root"), registry));
 }
 
 kan_repository_t kan_repository_create_child (kan_repository_t parent, const char *name)
 {
-    struct repository_t *parent_repository = (struct repository_t *) parent;
+    struct repository_t *parent_repository = KAN_HANDLE_GET (parent);
 
     const kan_allocation_group_t allocation_group = kan_allocation_group_get_child (
         kan_allocation_group_get_child (parent_repository->allocation_group, "child_repositories"), name);
 
     const kan_interned_string_t interned_name = kan_string_intern (name);
-    return (kan_repository_t) repository_create (allocation_group, parent_repository, interned_name,
-                                                 parent_repository->registry);
+    return KAN_HANDLE_SET (kan_repository_t, repository_create (allocation_group, parent_repository, interned_name,
+                                                                parent_repository->registry));
 }
 
 static void repository_start_scheduled_destroy (struct repository_t *repository)
@@ -3946,7 +3947,7 @@ static void repository_enter_planning_mode_internal (struct repository_t *reposi
 
 void kan_repository_enter_planning_mode (kan_repository_t root_repository)
 {
-    struct repository_t *repository = (struct repository_t *) root_repository;
+    struct repository_t *repository = KAN_HANDLE_GET (root_repository);
     KAN_ASSERT (!repository->parent)
 
     kan_cpu_section_t section = kan_cpu_section_get ("repository_enter_planning_mode");
@@ -4030,7 +4031,7 @@ static void repository_prepare_for_migration_internal (struct repository_t *repo
 void kan_repository_prepare_for_migration (kan_repository_t root_repository,
                                            kan_reflection_migration_seed_t migration_seed)
 {
-    struct repository_t *repository = (struct repository_t *) root_repository;
+    struct repository_t *repository = KAN_HANDLE_GET (root_repository);
     KAN_ASSERT (!repository->parent)
     repository_prepare_for_migration_internal (repository, migration_seed);
 }
@@ -4361,7 +4362,7 @@ void kan_repository_migrate (kan_repository_t root_repository,
                              kan_reflection_migration_seed_t migration_seed,
                              kan_reflection_struct_migrator_t migrator)
 {
-    struct repository_t *repository = (struct repository_t *) root_repository;
+    struct repository_t *repository = KAN_HANDLE_GET (root_repository);
     KAN_ASSERT (!repository->parent)
 
     kan_cpu_section_t section = kan_cpu_section_get ("repository_migrate");
@@ -4369,7 +4370,7 @@ void kan_repository_migrate (kan_repository_t root_repository,
     kan_cpu_section_execution_init (&execution, section);
 
     kan_cpu_job_t job = kan_cpu_job_create ();
-    KAN_ASSERT (job != KAN_INVALID_CPU_JOB)
+    KAN_ASSERT (KAN_HANDLE_IS_VALID (job))
 
     struct migration_context_t context;
     kan_stack_group_allocator_init (&context.allocator,
@@ -4411,7 +4412,7 @@ static struct singleton_storage_node_t *query_singleton_storage_across_hierarchy
 kan_repository_singleton_storage_t kan_repository_singleton_storage_open (kan_repository_t repository,
                                                                           const char *type_name)
 {
-    struct repository_t *repository_data = (struct repository_t *) repository;
+    struct repository_t *repository_data = KAN_HANDLE_GET (repository);
     KAN_ASSERT (repository_data->mode == REPOSITORY_MODE_PLANNING)
     repository_storage_map_access_lock (repository_data);
     const kan_interned_string_t interned_type_name = kan_string_intern (type_name);
@@ -4427,7 +4428,7 @@ kan_repository_singleton_storage_t kan_repository_singleton_storage_open (kan_re
         {
             KAN_LOG (repository, KAN_LOG_ERROR, "Singleton type \"%s\" not found.", interned_type_name)
             repository_storage_map_access_unlock (repository_data);
-            return KAN_INVALID_REPOSITORY_SINGLETON_STORAGE;
+            return KAN_HANDLE_SET_INVALID (kan_repository_singleton_storage_t);
         }
 
         const kan_allocation_group_t storage_allocation_group = kan_allocation_group_get_child (
@@ -4468,43 +4469,45 @@ kan_repository_singleton_storage_t kan_repository_singleton_storage_open (kan_re
     }
 
     repository_storage_map_access_unlock (repository_data);
-    return (kan_repository_singleton_storage_t) storage;
+    return KAN_HANDLE_SET (kan_repository_singleton_storage_t, storage);
 }
 
 void kan_repository_singleton_read_query_init (struct kan_repository_singleton_read_query_t *query,
                                                kan_repository_singleton_storage_t storage)
 {
-    struct singleton_storage_node_t *storage_data = (struct singleton_storage_node_t *) storage;
+    struct singleton_storage_node_t *storage_data = KAN_HANDLE_GET (storage);
     kan_atomic_int_add (&storage_data->queries_count, 1);
     *(struct singleton_query_t *) query = (struct singleton_query_t) {.storage = storage_data};
 }
 
-kan_repository_singleton_read_access_t kan_repository_singleton_read_query_execute (
+struct kan_repository_singleton_read_access_t kan_repository_singleton_read_query_execute (
     struct kan_repository_singleton_read_query_t *query)
 {
     struct singleton_query_t *query_data = (struct singleton_query_t *) query;
     KAN_ASSERT (query_data->storage)
+    struct kan_repository_singleton_read_access_t result = {.implementation_data = NULL};
 
 #if defined(KAN_REPOSITORY_SAFEGUARDS_ENABLED)
     if (!safeguard_singleton_read_access_try_create (query_data->storage))
     {
-        return (kan_repository_singleton_read_access_t) NULL;
+        return result;
     }
 #endif
 
-    return (kan_repository_singleton_read_access_t) query_data->storage;
+    result.implementation_data = query_data->storage;
+    return result;
 }
 
-const void *kan_repository_singleton_read_access_resolve (kan_repository_singleton_read_access_t access)
+const void *kan_repository_singleton_read_access_resolve (struct kan_repository_singleton_read_access_t *access)
 {
-    struct singleton_storage_node_t *storage = (struct singleton_storage_node_t *) access;
+    struct singleton_storage_node_t *storage = access->implementation_data;
     return storage ? storage->singleton : NULL;
 }
 
-void kan_repository_singleton_read_access_close (kan_repository_singleton_read_access_t access)
+void kan_repository_singleton_read_access_close (struct kan_repository_singleton_read_access_t *access)
 {
 #if defined(KAN_REPOSITORY_SAFEGUARDS_ENABLED)
-    struct singleton_storage_node_t *storage = (struct singleton_storage_node_t *) access;
+    struct singleton_storage_node_t *storage = access->implementation_data;
     if (storage)
     {
         safeguard_singleton_read_access_destroyed (storage);
@@ -4525,39 +4528,41 @@ void kan_repository_singleton_read_query_shutdown (struct kan_repository_singlet
 void kan_repository_singleton_write_query_init (struct kan_repository_singleton_write_query_t *query,
                                                 kan_repository_singleton_storage_t storage)
 {
-    struct singleton_storage_node_t *storage_data = (struct singleton_storage_node_t *) storage;
+    struct singleton_storage_node_t *storage_data = KAN_HANDLE_GET (storage);
     kan_atomic_int_add (&storage_data->queries_count, 1);
     *(struct singleton_query_t *) query = (struct singleton_query_t) {.storage = storage_data};
 }
 
-kan_repository_singleton_write_access_t kan_repository_singleton_write_query_execute (
+struct kan_repository_singleton_write_access_t kan_repository_singleton_write_query_execute (
     struct kan_repository_singleton_write_query_t *query)
 {
     struct singleton_query_t *query_data = (struct singleton_query_t *) query;
     KAN_ASSERT (query_data->storage)
+    struct kan_repository_singleton_write_access_t result = {.implementation_data = NULL};
 
 #if defined(KAN_REPOSITORY_SAFEGUARDS_ENABLED)
     if (!safeguard_singleton_write_access_try_create (query_data->storage))
     {
-        return (kan_repository_singleton_write_access_t) NULL;
+        return result;
     }
 #endif
 
     observation_buffer_definition_import (&query_data->storage->observation_buffer,
                                           query_data->storage->observation_buffer_memory,
                                           query_data->storage->singleton);
-    return (kan_repository_singleton_write_access_t) query_data->storage;
+    result.implementation_data = query_data->storage;
+    return result;
 }
 
-void *kan_repository_singleton_write_access_resolve (kan_repository_singleton_write_access_t access)
+void *kan_repository_singleton_write_access_resolve (struct kan_repository_singleton_write_access_t *access)
 {
-    struct singleton_storage_node_t *storage = (struct singleton_storage_node_t *) access;
+    struct singleton_storage_node_t *storage = access->implementation_data;
     return storage ? storage->singleton : NULL;
 }
 
-void kan_repository_singleton_write_access_close (kan_repository_singleton_write_access_t access)
+void kan_repository_singleton_write_access_close (struct kan_repository_singleton_write_access_t *access)
 {
-    struct singleton_storage_node_t *storage = (struct singleton_storage_node_t *) access;
+    struct singleton_storage_node_t *storage = access->implementation_data;
     if (storage)
     {
         const uint64_t change_flags = observation_buffer_definition_compare (
@@ -4611,7 +4616,7 @@ static struct indexed_storage_node_t *query_indexed_storage_across_hierarchy (st
 kan_repository_indexed_storage_t kan_repository_indexed_storage_open (kan_repository_t repository,
                                                                       const char *type_name)
 {
-    struct repository_t *repository_data = (struct repository_t *) repository;
+    struct repository_t *repository_data = KAN_HANDLE_GET (repository);
     KAN_ASSERT (repository_data->mode == REPOSITORY_MODE_PLANNING)
     repository_storage_map_access_lock (repository_data);
     const kan_interned_string_t interned_type_name = kan_string_intern (type_name);
@@ -4627,7 +4632,7 @@ kan_repository_indexed_storage_t kan_repository_indexed_storage_open (kan_reposi
         {
             KAN_LOG (repository, KAN_LOG_ERROR, "Indexed record type \"%s\" not found.", interned_type_name)
             repository_storage_map_access_unlock (repository_data);
-            return KAN_INVALID_REPOSITORY_INDEXED_STORAGE;
+            return KAN_HANDLE_SET_INVALID (kan_repository_indexed_storage_t);
         }
 
         const kan_allocation_group_t storage_allocation_group = kan_allocation_group_get_child (
@@ -4680,7 +4685,7 @@ kan_repository_indexed_storage_t kan_repository_indexed_storage_open (kan_reposi
     }
 
     repository_storage_map_access_unlock (repository_data);
-    return (kan_repository_indexed_storage_t) storage;
+    return KAN_HANDLE_SET (kan_repository_indexed_storage_t, storage);
 }
 
 static void indexed_storage_acquire_access (struct indexed_storage_node_t *storage)
@@ -5141,7 +5146,7 @@ static void indexed_storage_report_delete_from_constant_access (struct indexed_s
 void kan_repository_indexed_insert_query_init (struct kan_repository_indexed_insert_query_t *query,
                                                kan_repository_indexed_storage_t storage)
 {
-    struct indexed_storage_node_t *storage_data = (struct indexed_storage_node_t *) storage;
+    struct indexed_storage_node_t *storage_data = KAN_HANDLE_GET (storage);
     *(struct indexed_insert_query_t *) query = (struct indexed_insert_query_t) {.storage = storage_data};
     kan_atomic_int_add (&storage_data->queries_count, 1);
 }
@@ -5244,8 +5249,7 @@ static inline void indexed_storage_sequence_query_shutdown (struct indexed_seque
 void kan_repository_indexed_sequence_read_query_init (struct kan_repository_indexed_sequence_read_query_t *query,
                                                       kan_repository_indexed_storage_t storage)
 {
-    indexed_storage_sequence_query_init ((struct indexed_storage_node_t *) storage,
-                                         (struct indexed_sequence_query_t *) query);
+    indexed_storage_sequence_query_init (KAN_HANDLE_GET (storage), (struct indexed_sequence_query_t *) query);
 }
 
 struct kan_repository_indexed_sequence_read_cursor_t kan_repository_indexed_sequence_read_query_execute (
@@ -5318,8 +5322,7 @@ void kan_repository_indexed_sequence_read_query_shutdown (struct kan_repository_
 void kan_repository_indexed_sequence_update_query_init (struct kan_repository_indexed_sequence_update_query_t *query,
                                                         kan_repository_indexed_storage_t storage)
 {
-    indexed_storage_sequence_query_init ((struct indexed_storage_node_t *) storage,
-                                         (struct indexed_sequence_query_t *) query);
+    indexed_storage_sequence_query_init (KAN_HANDLE_GET (storage), (struct indexed_sequence_query_t *) query);
 }
 
 struct kan_repository_indexed_sequence_update_cursor_t kan_repository_indexed_sequence_update_query_execute (
@@ -5396,8 +5399,7 @@ void kan_repository_indexed_sequence_update_query_shutdown (
 void kan_repository_indexed_sequence_delete_query_init (struct kan_repository_indexed_sequence_delete_query_t *query,
                                                         kan_repository_indexed_storage_t storage)
 {
-    indexed_storage_sequence_query_init ((struct indexed_storage_node_t *) storage,
-                                         (struct indexed_sequence_query_t *) query);
+    indexed_storage_sequence_query_init (KAN_HANDLE_GET (storage), (struct indexed_sequence_query_t *) query);
 }
 
 struct kan_repository_indexed_sequence_delete_cursor_t kan_repository_indexed_sequence_delete_query_execute (
@@ -5482,8 +5484,7 @@ void kan_repository_indexed_sequence_delete_query_shutdown (
 void kan_repository_indexed_sequence_write_query_init (struct kan_repository_indexed_sequence_write_query_t *query,
                                                        kan_repository_indexed_storage_t storage)
 {
-    indexed_storage_sequence_query_init ((struct indexed_storage_node_t *) storage,
-                                         (struct indexed_sequence_query_t *) query);
+    indexed_storage_sequence_query_init (KAN_HANDLE_GET (storage), (struct indexed_sequence_query_t *) query);
 }
 
 struct kan_repository_indexed_sequence_write_cursor_t kan_repository_indexed_sequence_write_query_execute (
@@ -5704,8 +5705,7 @@ void kan_repository_indexed_value_read_query_init (struct kan_repository_indexed
                                                    kan_repository_indexed_storage_t storage,
                                                    struct kan_repository_field_path_t path)
 {
-    indexed_storage_value_query_init ((struct indexed_value_query_t *) query, (struct indexed_storage_node_t *) storage,
-                                      path);
+    indexed_storage_value_query_init ((struct indexed_value_query_t *) query, KAN_HANDLE_GET (storage), path);
 }
 
 struct kan_repository_indexed_value_read_cursor_t kan_repository_indexed_value_read_query_execute (
@@ -5778,8 +5778,7 @@ void kan_repository_indexed_value_update_query_init (struct kan_repository_index
                                                      kan_repository_indexed_storage_t storage,
                                                      struct kan_repository_field_path_t path)
 {
-    indexed_storage_value_query_init ((struct indexed_value_query_t *) query, (struct indexed_storage_node_t *) storage,
-                                      path);
+    indexed_storage_value_query_init ((struct indexed_value_query_t *) query, KAN_HANDLE_GET (storage), path);
 }
 
 struct kan_repository_indexed_value_update_cursor_t kan_repository_indexed_value_update_query_execute (
@@ -5853,8 +5852,7 @@ void kan_repository_indexed_value_delete_query_init (struct kan_repository_index
                                                      kan_repository_indexed_storage_t storage,
                                                      struct kan_repository_field_path_t path)
 {
-    indexed_storage_value_query_init ((struct indexed_value_query_t *) query, (struct indexed_storage_node_t *) storage,
-                                      path);
+    indexed_storage_value_query_init ((struct indexed_value_query_t *) query, KAN_HANDLE_GET (storage), path);
 }
 
 struct kan_repository_indexed_value_delete_cursor_t kan_repository_indexed_value_delete_query_execute (
@@ -5938,8 +5936,7 @@ void kan_repository_indexed_value_write_query_init (struct kan_repository_indexe
                                                     kan_repository_indexed_storage_t storage,
                                                     struct kan_repository_field_path_t path)
 {
-    indexed_storage_value_query_init ((struct indexed_value_query_t *) query, (struct indexed_storage_node_t *) storage,
-                                      path);
+    indexed_storage_value_query_init ((struct indexed_value_query_t *) query, KAN_HANDLE_GET (storage), path);
 }
 
 struct kan_repository_indexed_value_write_cursor_t kan_repository_indexed_value_write_query_execute (
@@ -6130,8 +6127,8 @@ void kan_repository_indexed_signal_read_query_init (struct kan_repository_indexe
                                                     struct kan_repository_field_path_t path,
                                                     uint64_t signal_value)
 {
-    indexed_storage_signal_query_init ((struct indexed_signal_query_t *) query,
-                                       (struct indexed_storage_node_t *) storage, path, signal_value);
+    indexed_storage_signal_query_init ((struct indexed_signal_query_t *) query, KAN_HANDLE_GET (storage), path,
+                                       signal_value);
 }
 
 struct kan_repository_indexed_signal_read_cursor_t kan_repository_indexed_signal_read_query_execute (
@@ -6205,8 +6202,8 @@ void kan_repository_indexed_signal_update_query_init (struct kan_repository_inde
                                                       struct kan_repository_field_path_t path,
                                                       uint64_t signal_value)
 {
-    indexed_storage_signal_query_init ((struct indexed_signal_query_t *) query,
-                                       (struct indexed_storage_node_t *) storage, path, signal_value);
+    indexed_storage_signal_query_init ((struct indexed_signal_query_t *) query, KAN_HANDLE_GET (storage), path,
+                                       signal_value);
 }
 
 struct kan_repository_indexed_signal_update_cursor_t kan_repository_indexed_signal_update_query_execute (
@@ -6280,8 +6277,8 @@ void kan_repository_indexed_signal_delete_query_init (struct kan_repository_inde
                                                       struct kan_repository_field_path_t path,
                                                       uint64_t signal_value)
 {
-    indexed_storage_signal_query_init ((struct indexed_signal_query_t *) query,
-                                       (struct indexed_storage_node_t *) storage, path, signal_value);
+    indexed_storage_signal_query_init ((struct indexed_signal_query_t *) query, KAN_HANDLE_GET (storage), path,
+                                       signal_value);
 }
 
 struct kan_repository_indexed_signal_delete_cursor_t kan_repository_indexed_signal_delete_query_execute (
@@ -6365,8 +6362,8 @@ void kan_repository_indexed_signal_write_query_init (struct kan_repository_index
                                                      struct kan_repository_field_path_t path,
                                                      uint64_t signal_value)
 {
-    indexed_storage_signal_query_init ((struct indexed_signal_query_t *) query,
-                                       (struct indexed_storage_node_t *) storage, path, signal_value);
+    indexed_storage_signal_query_init ((struct indexed_signal_query_t *) query, KAN_HANDLE_GET (storage), path,
+                                       signal_value);
 }
 
 struct kan_repository_indexed_signal_write_cursor_t kan_repository_indexed_signal_write_query_execute (
@@ -6726,8 +6723,7 @@ void kan_repository_indexed_interval_read_query_init (struct kan_repository_inde
                                                       kan_repository_indexed_storage_t storage,
                                                       struct kan_repository_field_path_t path)
 {
-    indexed_storage_interval_query_init ((struct indexed_interval_query_t *) query,
-                                         (struct indexed_storage_node_t *) storage, path);
+    indexed_storage_interval_query_init ((struct indexed_interval_query_t *) query, KAN_HANDLE_GET (storage), path);
 }
 
 struct kan_repository_indexed_interval_ascending_read_cursor_t
@@ -6852,8 +6848,7 @@ void kan_repository_indexed_interval_update_query_init (struct kan_repository_in
                                                         kan_repository_indexed_storage_t storage,
                                                         struct kan_repository_field_path_t path)
 {
-    indexed_storage_interval_query_init ((struct indexed_interval_query_t *) query,
-                                         (struct indexed_storage_node_t *) storage, path);
+    indexed_storage_interval_query_init ((struct indexed_interval_query_t *) query, KAN_HANDLE_GET (storage), path);
 }
 
 struct kan_repository_indexed_interval_ascending_update_cursor_t
@@ -6984,8 +6979,7 @@ void kan_repository_indexed_interval_delete_query_init (struct kan_repository_in
                                                         kan_repository_indexed_storage_t storage,
                                                         struct kan_repository_field_path_t path)
 {
-    indexed_storage_interval_query_init ((struct indexed_interval_query_t *) query,
-                                         (struct indexed_storage_node_t *) storage, path);
+    indexed_storage_interval_query_init ((struct indexed_interval_query_t *) query, KAN_HANDLE_GET (storage), path);
 }
 
 struct kan_repository_indexed_interval_ascending_delete_cursor_t
@@ -7123,8 +7117,7 @@ void kan_repository_indexed_interval_write_query_init (struct kan_repository_ind
                                                        kan_repository_indexed_storage_t storage,
                                                        struct kan_repository_field_path_t path)
 {
-    indexed_storage_interval_query_init ((struct indexed_interval_query_t *) query,
-                                         (struct indexed_storage_node_t *) storage, path);
+    indexed_storage_interval_query_init ((struct indexed_interval_query_t *) query, KAN_HANDLE_GET (storage), path);
 }
 
 struct kan_repository_indexed_interval_ascending_write_cursor_t
@@ -7703,8 +7696,8 @@ void kan_repository_indexed_space_read_query_init (struct kan_repository_indexed
                                                    double global_max,
                                                    double leaf_size)
 {
-    indexed_storage_space_query_init ((struct indexed_space_query_t *) query, (struct indexed_storage_node_t *) storage,
-                                      min_path, max_path, global_min, global_max, leaf_size);
+    indexed_storage_space_query_init ((struct indexed_space_query_t *) query, KAN_HANDLE_GET (storage), min_path,
+                                      max_path, global_min, global_max, leaf_size);
 }
 
 struct kan_repository_indexed_space_shape_read_cursor_t kan_repository_indexed_space_read_query_execute_shape (
@@ -7832,8 +7825,8 @@ void kan_repository_indexed_space_update_query_init (struct kan_repository_index
                                                      double global_max,
                                                      double leaf_size)
 {
-    indexed_storage_space_query_init ((struct indexed_space_query_t *) query, (struct indexed_storage_node_t *) storage,
-                                      min_path, max_path, global_min, global_max, leaf_size);
+    indexed_storage_space_query_init ((struct indexed_space_query_t *) query, KAN_HANDLE_GET (storage), min_path,
+                                      max_path, global_min, global_max, leaf_size);
 }
 
 struct kan_repository_indexed_space_shape_update_cursor_t kan_repository_indexed_space_update_query_execute_shape (
@@ -7966,8 +7959,8 @@ void kan_repository_indexed_space_delete_query_init (struct kan_repository_index
                                                      double global_max,
                                                      double leaf_size)
 {
-    indexed_storage_space_query_init ((struct indexed_space_query_t *) query, (struct indexed_storage_node_t *) storage,
-                                      min_path, max_path, global_min, global_max, leaf_size);
+    indexed_storage_space_query_init ((struct indexed_space_query_t *) query, KAN_HANDLE_GET (storage), min_path,
+                                      max_path, global_min, global_max, leaf_size);
 }
 
 struct kan_repository_indexed_space_shape_delete_cursor_t kan_repository_indexed_space_delete_query_execute_shape (
@@ -8107,8 +8100,8 @@ void kan_repository_indexed_space_write_query_init (struct kan_repository_indexe
                                                     double global_max,
                                                     double leaf_size)
 {
-    indexed_storage_space_query_init ((struct indexed_space_query_t *) query, (struct indexed_storage_node_t *) storage,
-                                      min_path, max_path, global_min, global_max, leaf_size);
+    indexed_storage_space_query_init ((struct indexed_space_query_t *) query, KAN_HANDLE_GET (storage), min_path,
+                                      max_path, global_min, global_max, leaf_size);
 }
 
 struct kan_repository_indexed_space_shape_write_cursor_t kan_repository_indexed_space_write_query_execute_shape (
@@ -8274,7 +8267,7 @@ static struct event_queue_node_t *event_queue_node_allocate (kan_allocation_grou
 
 kan_repository_event_storage_t kan_repository_event_storage_open (kan_repository_t repository, const char *type_name)
 {
-    struct repository_t *repository_data = (struct repository_t *) repository;
+    struct repository_t *repository_data = KAN_HANDLE_GET (repository);
     KAN_ASSERT (repository_data->mode == REPOSITORY_MODE_PLANNING)
     repository_storage_map_access_lock (repository_data);
     const kan_interned_string_t interned_type_name = kan_string_intern (type_name);
@@ -8289,7 +8282,7 @@ kan_repository_event_storage_t kan_repository_event_storage_open (kan_repository
         {
             KAN_LOG (repository, KAN_LOG_ERROR, "Event type \"%s\" not found.", interned_type_name)
             repository_storage_map_access_unlock (repository_data);
-            return KAN_INVALID_REPOSITORY_EVENT_STORAGE;
+            return KAN_HANDLE_SET_INVALID (kan_repository_event_storage_t);
         }
 
         const kan_allocation_group_t storage_allocation_group = kan_allocation_group_get_child (
@@ -8316,13 +8309,13 @@ kan_repository_event_storage_t kan_repository_event_storage_open (kan_repository
     }
 
     repository_storage_map_access_unlock (repository_data);
-    return (kan_repository_event_storage_t) storage;
+    return KAN_HANDLE_SET (kan_repository_event_storage_t, storage);
 }
 
 void kan_repository_event_insert_query_init (struct kan_repository_event_insert_query_t *query,
                                              kan_repository_event_storage_t storage)
 {
-    struct event_storage_node_t *storage_data = (struct event_storage_node_t *) storage;
+    struct event_storage_node_t *storage_data = KAN_HANDLE_GET (storage);
     kan_atomic_int_add (&storage_data->queries_count, 1);
     *(struct event_insert_query_t *) query = (struct event_insert_query_t) {.storage = storage_data};
 }
@@ -8423,7 +8416,7 @@ void kan_repository_event_insert_query_shutdown (struct kan_repository_event_ins
 void kan_repository_event_fetch_query_init (struct kan_repository_event_fetch_query_t *query,
                                             kan_repository_event_storage_t storage)
 {
-    struct event_storage_node_t *storage_data = (struct event_storage_node_t *) storage;
+    struct event_storage_node_t *storage_data = KAN_HANDLE_GET (storage);
     kan_atomic_int_add (&storage_data->queries_count, 1);
 
     *(struct event_fetch_query_t *) query = (struct event_fetch_query_t) {
@@ -8442,14 +8435,14 @@ struct kan_repository_event_read_access_t kan_repository_event_fetch_query_next 
 
     if (!kan_event_queue_iterator_get (&query_data->storage->event_queue, query_data->iterator))
     {
-        access.iterator = KAN_INVALID_EVENT_QUEUE_ITERATOR;
+        access.iterator = KAN_HANDLE_SET_INVALID (kan_event_queue_iterator_t);
         return KAN_PUN_TYPE (struct event_read_access_t, struct kan_repository_event_read_access_t, access);
     }
 
 #if defined(KAN_REPOSITORY_SAFEGUARDS_ENABLED)
     if (!safeguard_event_read_access_try_create (query_data->storage))
     {
-        access.iterator = KAN_INVALID_EVENT_QUEUE_ITERATOR;
+        access.iterator = KAN_HANDLE_SET_INVALID (kan_event_queue_iterator_t);
         return KAN_PUN_TYPE (struct event_read_access_t, struct kan_repository_event_read_access_t, access);
     }
 #endif
@@ -8465,7 +8458,7 @@ const void *kan_repository_event_read_access_resolve (struct kan_repository_even
     struct event_read_access_t *access_data = (struct event_read_access_t *) access;
     KAN_ASSERT (access_data->storage)
 
-    if (access_data->iterator != KAN_INVALID_EVENT_QUEUE_ITERATOR)
+    if (KAN_HANDLE_IS_VALID (access_data->iterator))
     {
         struct event_queue_node_t *node = (struct event_queue_node_t *) kan_event_queue_iterator_get (
             &access_data->storage->event_queue, access_data->iterator);
@@ -8485,7 +8478,7 @@ void kan_repository_event_read_access_close (struct kan_repository_event_read_ac
     struct event_read_access_t *access_data = (struct event_read_access_t *) access;
     KAN_ASSERT (access_data->storage)
 
-    if (access_data->iterator != KAN_INVALID_EVENT_QUEUE_ITERATOR)
+    if (KAN_HANDLE_IS_VALID (access_data->iterator))
     {
 #if defined(KAN_REPOSITORY_SAFEGUARDS_ENABLED)
         safeguard_event_read_access_destroyed (access_data->storage);
@@ -9192,7 +9185,7 @@ static void repository_complete_switch_to_serving (struct repository_t *reposito
 
 void kan_repository_enter_serving_mode (kan_repository_t root_repository)
 {
-    struct repository_t *repository = (struct repository_t *) root_repository;
+    struct repository_t *repository = KAN_HANDLE_GET (root_repository);
     KAN_ASSERT (!repository->parent)
     KAN_ASSERT (repository->mode == REPOSITORY_MODE_PLANNING)
 
@@ -9210,7 +9203,7 @@ void kan_repository_enter_serving_mode (kan_repository_t root_repository)
 
     repository_init_cascade_deleters (repository, &context.allocator);
     kan_cpu_job_t job = kan_cpu_job_create ();
-    KAN_ASSERT (job != KAN_INVALID_CPU_JOB)
+    KAN_ASSERT (KAN_HANDLE_IS_VALID (job))
 
     context.task_list = NULL;
     repository_prepare_storages (repository, &context);
@@ -9267,12 +9260,12 @@ static void repository_schedule_for_destroy (struct repository_t *repository)
 
 REPOSITORY_API void kan_repository_schedule_child_destroy (kan_repository_t repository)
 {
-    repository_schedule_for_destroy ((struct repository_t *) repository);
+    repository_schedule_for_destroy (KAN_HANDLE_GET (repository));
 }
 
 void kan_repository_destroy (kan_repository_t repository)
 {
-    struct repository_t *repository_data = (struct repository_t *) repository;
+    struct repository_t *repository_data = KAN_HANDLE_GET (repository);
     KAN_ASSERT (!repository_data->parent)
     repository_destroy_internal (repository_data);
 }

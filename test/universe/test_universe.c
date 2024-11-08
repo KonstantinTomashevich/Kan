@@ -437,27 +437,24 @@ KAN_REFLECTION_EXPECT_UNIT_REGISTRAR (test_universe_post_migration);
 
 struct migration_reflection_population_system_t
 {
-    kan_context_handle_t context;
+    kan_context_t context;
     kan_allocation_group_t group;
     kan_bool_t select_post;
 };
 
-kan_context_system_handle_t migration_reflection_population_system_create (kan_allocation_group_t group,
-                                                                           void *user_config)
+kan_context_system_t migration_reflection_population_system_create (kan_allocation_group_t group, void *user_config)
 {
     struct migration_reflection_population_system_t *system =
         kan_allocate_general (group, sizeof (struct migration_reflection_population_system_t),
                               _Alignof (struct migration_reflection_population_system_t));
     system->group = group;
     system->select_post = KAN_FALSE;
-    return (kan_context_system_handle_t) system;
+    return KAN_HANDLE_SET (kan_context_system_t, system);
 }
 
-static void migration_populate_reflection (kan_context_system_handle_t handle, kan_reflection_registry_t registry)
+static void migration_populate_reflection (kan_context_system_t handle, kan_reflection_registry_t registry)
 {
-    struct migration_reflection_population_system_t *system =
-        (struct migration_reflection_population_system_t *) handle;
-
+    struct migration_reflection_population_system_t *system = KAN_HANDLE_GET (handle);
     if (system->select_post)
     {
         KAN_REFLECTION_UNIT_REGISTRAR_NAME (test_universe_post_migration) (registry);
@@ -469,45 +466,40 @@ static void migration_populate_reflection (kan_context_system_handle_t handle, k
     }
 }
 
-void migration_reflection_population_system_connect (kan_context_system_handle_t handle, kan_context_handle_t context)
+void migration_reflection_population_system_connect (kan_context_system_t handle, kan_context_t context)
 {
-    struct migration_reflection_population_system_t *system =
-        (struct migration_reflection_population_system_t *) handle;
+    struct migration_reflection_population_system_t *system = KAN_HANDLE_GET (handle);
     system->context = context;
 
-    kan_context_system_handle_t reflection_system = kan_context_query (context, KAN_CONTEXT_REFLECTION_SYSTEM_NAME);
-    if (reflection_system != KAN_INVALID_CONTEXT_SYSTEM_HANDLE)
+    kan_context_system_t reflection_system = kan_context_query (context, KAN_CONTEXT_REFLECTION_SYSTEM_NAME);
+    if (KAN_HANDLE_IS_VALID (reflection_system))
     {
         kan_reflection_system_connect_on_populate (reflection_system, handle, migration_populate_reflection);
     }
 }
 
-void migration_reflection_population_system_init (kan_context_system_handle_t handle)
+void migration_reflection_population_system_init (kan_context_system_t handle)
 {
 }
 
-void migration_reflection_population_system_shutdown (kan_context_system_handle_t handle)
+void migration_reflection_population_system_shutdown (kan_context_system_t handle)
 {
 }
 
-void migration_reflection_population_system_disconnect (kan_context_system_handle_t handle)
+void migration_reflection_population_system_disconnect (kan_context_system_t handle)
 {
-    struct migration_reflection_population_system_t *system =
-        (struct migration_reflection_population_system_t *) handle;
+    struct migration_reflection_population_system_t *system = KAN_HANDLE_GET (handle);
+    kan_context_system_t reflection_system = kan_context_query (system->context, KAN_CONTEXT_REFLECTION_SYSTEM_NAME);
 
-    kan_context_system_handle_t reflection_system =
-        kan_context_query (system->context, KAN_CONTEXT_REFLECTION_SYSTEM_NAME);
-
-    if (reflection_system != KAN_INVALID_CONTEXT_SYSTEM_HANDLE)
+    if (KAN_HANDLE_IS_VALID (reflection_system))
     {
         kan_reflection_system_disconnect_on_populate (reflection_system, handle);
     }
 }
 
-void migration_reflection_population_system_destroy (kan_context_system_handle_t handle)
+void migration_reflection_population_system_destroy (kan_context_system_t handle)
 {
-    struct migration_reflection_population_system_t *system =
-        (struct migration_reflection_population_system_t *) handle;
+    struct migration_reflection_population_system_t *system = KAN_HANDLE_GET (handle);
     kan_free_general (system->group, system, sizeof (struct migration_reflection_population_system_t));
 }
 
@@ -526,20 +518,20 @@ TEST_UNIVERSE_API struct kan_context_system_api_t KAN_CONTEXT_SYSTEM_API_NAME (
 
 KAN_TEST_CASE (update_only)
 {
-    kan_context_handle_t context = kan_context_create (KAN_ALLOCATION_GROUP_IGNORE);
+    kan_context_t context = kan_context_create (KAN_ALLOCATION_GROUP_IGNORE);
     KAN_TEST_CHECK (kan_context_request_system (context, KAN_CONTEXT_REFLECTION_SYSTEM_NAME, NULL))
     KAN_TEST_CHECK (kan_context_request_system (context, KAN_CONTEXT_UNIVERSE_SYSTEM_NAME, NULL))
     KAN_TEST_CHECK (kan_context_request_system (context, KAN_CONTEXT_UPDATE_SYSTEM_NAME, NULL))
     kan_context_assembly (context);
 
-    kan_context_system_handle_t universe_system_handle = kan_context_query (context, KAN_CONTEXT_UNIVERSE_SYSTEM_NAME);
-    KAN_TEST_ASSERT (universe_system_handle != KAN_INVALID_CONTEXT_SYSTEM_HANDLE)
+    kan_context_system_t universe_system_handle = kan_context_query (context, KAN_CONTEXT_UNIVERSE_SYSTEM_NAME);
+    KAN_TEST_ASSERT (KAN_HANDLE_IS_VALID (universe_system_handle))
 
     kan_universe_t universe = kan_universe_system_get_universe (universe_system_handle);
-    KAN_TEST_ASSERT (universe != KAN_INVALID_UNIVERSE)
+    KAN_TEST_ASSERT (KAN_HANDLE_IS_VALID (universe))
 
-    kan_context_system_handle_t update_system = kan_context_query (context, KAN_CONTEXT_UPDATE_SYSTEM_NAME);
-    KAN_TEST_ASSERT (update_system != KAN_INVALID_CONTEXT_SYSTEM_HANDLE)
+    kan_context_system_t update_system = kan_context_query (context, KAN_CONTEXT_UPDATE_SYSTEM_NAME);
+    KAN_TEST_ASSERT (KAN_HANDLE_IS_VALID (update_system))
 
     struct kan_universe_world_definition_t definition;
     kan_universe_world_definition_init (&definition);
@@ -568,20 +560,20 @@ KAN_TEST_CASE (update_only)
 
 KAN_TEST_CASE (update_several_pipelines)
 {
-    kan_context_handle_t context = kan_context_create (KAN_ALLOCATION_GROUP_IGNORE);
+    kan_context_t context = kan_context_create (KAN_ALLOCATION_GROUP_IGNORE);
     KAN_TEST_CHECK (kan_context_request_system (context, KAN_CONTEXT_REFLECTION_SYSTEM_NAME, NULL))
     KAN_TEST_CHECK (kan_context_request_system (context, KAN_CONTEXT_UNIVERSE_SYSTEM_NAME, NULL))
     KAN_TEST_CHECK (kan_context_request_system (context, KAN_CONTEXT_UPDATE_SYSTEM_NAME, NULL))
     kan_context_assembly (context);
 
-    kan_context_system_handle_t universe_system_handle = kan_context_query (context, KAN_CONTEXT_UNIVERSE_SYSTEM_NAME);
-    KAN_TEST_ASSERT (universe_system_handle != KAN_INVALID_CONTEXT_SYSTEM_HANDLE)
+    kan_context_system_t universe_system_handle = kan_context_query (context, KAN_CONTEXT_UNIVERSE_SYSTEM_NAME);
+    KAN_TEST_ASSERT (KAN_HANDLE_IS_VALID (universe_system_handle))
 
     kan_universe_t universe = kan_universe_system_get_universe (universe_system_handle);
-    KAN_TEST_ASSERT (universe != KAN_INVALID_UNIVERSE)
+    KAN_TEST_ASSERT (KAN_HANDLE_IS_VALID (universe))
 
-    kan_context_system_handle_t update_system = kan_context_query (context, KAN_CONTEXT_UPDATE_SYSTEM_NAME);
-    KAN_TEST_ASSERT (update_system != KAN_INVALID_CONTEXT_SYSTEM_HANDLE)
+    kan_context_system_t update_system = kan_context_query (context, KAN_CONTEXT_UPDATE_SYSTEM_NAME);
+    KAN_TEST_ASSERT (KAN_HANDLE_IS_VALID (update_system))
 
     struct kan_universe_world_definition_t definition;
     kan_universe_world_definition_init (&definition);
@@ -622,20 +614,20 @@ KAN_TEST_CASE (update_several_pipelines)
 
 KAN_TEST_CASE (update_mutator_multiple_threads)
 {
-    kan_context_handle_t context = kan_context_create (KAN_ALLOCATION_GROUP_IGNORE);
+    kan_context_t context = kan_context_create (KAN_ALLOCATION_GROUP_IGNORE);
     KAN_TEST_CHECK (kan_context_request_system (context, KAN_CONTEXT_REFLECTION_SYSTEM_NAME, NULL))
     KAN_TEST_CHECK (kan_context_request_system (context, KAN_CONTEXT_UNIVERSE_SYSTEM_NAME, NULL))
     KAN_TEST_CHECK (kan_context_request_system (context, KAN_CONTEXT_UPDATE_SYSTEM_NAME, NULL))
     kan_context_assembly (context);
 
-    kan_context_system_handle_t universe_system_handle = kan_context_query (context, KAN_CONTEXT_UNIVERSE_SYSTEM_NAME);
-    KAN_TEST_ASSERT (universe_system_handle != KAN_INVALID_CONTEXT_SYSTEM_HANDLE)
+    kan_context_system_t universe_system_handle = kan_context_query (context, KAN_CONTEXT_UNIVERSE_SYSTEM_NAME);
+    KAN_TEST_ASSERT (KAN_HANDLE_IS_VALID (universe_system_handle))
 
     kan_universe_t universe = kan_universe_system_get_universe (universe_system_handle);
-    KAN_TEST_ASSERT (universe != KAN_INVALID_UNIVERSE)
+    KAN_TEST_ASSERT (KAN_HANDLE_IS_VALID (universe))
 
-    kan_context_system_handle_t update_system = kan_context_query (context, KAN_CONTEXT_UPDATE_SYSTEM_NAME);
-    KAN_TEST_ASSERT (update_system != KAN_INVALID_CONTEXT_SYSTEM_HANDLE)
+    kan_context_system_t update_system = kan_context_query (context, KAN_CONTEXT_UPDATE_SYSTEM_NAME);
+    KAN_TEST_ASSERT (KAN_HANDLE_IS_VALID (update_system))
 
     struct kan_universe_world_definition_t definition;
     kan_universe_world_definition_init (&definition);
@@ -665,27 +657,26 @@ KAN_TEST_CASE (update_mutator_multiple_threads)
 
 KAN_TEST_CASE (update_hierarchy)
 {
-    kan_context_handle_t context = kan_context_create (KAN_ALLOCATION_GROUP_IGNORE);
+    kan_context_t context = kan_context_create (KAN_ALLOCATION_GROUP_IGNORE);
     KAN_TEST_CHECK (kan_context_request_system (context, KAN_CONTEXT_REFLECTION_SYSTEM_NAME, NULL))
     KAN_TEST_CHECK (kan_context_request_system (context, KAN_CONTEXT_UNIVERSE_SYSTEM_NAME, NULL))
     KAN_TEST_CHECK (kan_context_request_system (context, KAN_CONTEXT_UPDATE_SYSTEM_NAME, NULL))
     kan_context_assembly (context);
 
-    kan_context_system_handle_t universe_system_handle = kan_context_query (context, KAN_CONTEXT_UNIVERSE_SYSTEM_NAME);
-    KAN_TEST_ASSERT (universe_system_handle != KAN_INVALID_CONTEXT_SYSTEM_HANDLE)
+    kan_context_system_t universe_system_handle = kan_context_query (context, KAN_CONTEXT_UNIVERSE_SYSTEM_NAME);
+    KAN_TEST_ASSERT (KAN_HANDLE_IS_VALID (universe_system_handle))
 
     kan_universe_t universe = kan_universe_system_get_universe (universe_system_handle);
-    KAN_TEST_ASSERT (universe != KAN_INVALID_UNIVERSE)
+    KAN_TEST_ASSERT (KAN_HANDLE_IS_VALID (universe))
 
-    kan_context_system_handle_t update_system = kan_context_query (context, KAN_CONTEXT_UPDATE_SYSTEM_NAME);
-    KAN_TEST_ASSERT (update_system != KAN_INVALID_CONTEXT_SYSTEM_HANDLE)
+    kan_context_system_t update_system = kan_context_query (context, KAN_CONTEXT_UPDATE_SYSTEM_NAME);
+    KAN_TEST_ASSERT (KAN_HANDLE_IS_VALID (update_system))
 
-    kan_context_system_handle_t reflection_system_handle =
-        kan_context_query (context, KAN_CONTEXT_REFLECTION_SYSTEM_NAME);
-    KAN_TEST_ASSERT (reflection_system_handle != KAN_INVALID_CONTEXT_SYSTEM_HANDLE)
+    kan_context_system_t reflection_system_handle = kan_context_query (context, KAN_CONTEXT_REFLECTION_SYSTEM_NAME);
+    KAN_TEST_ASSERT (KAN_HANDLE_IS_VALID (reflection_system_handle))
 
     kan_reflection_registry_t registry = kan_reflection_system_get_registry (reflection_system_handle);
-    KAN_TEST_ASSERT (registry != KAN_INVALID_REFLECTION_REGISTRY)
+    KAN_TEST_ASSERT (KAN_HANDLE_IS_VALID (registry))
 
     kan_reflection_patch_builder_t patch_builder = kan_reflection_patch_builder_create ();
     const struct kan_reflection_struct_t *config_type =
@@ -763,25 +754,24 @@ KAN_TEST_CASE (update_hierarchy)
 
 KAN_TEST_CASE (migration)
 {
-    kan_context_handle_t context = kan_context_create (KAN_ALLOCATION_GROUP_IGNORE);
+    kan_context_t context = kan_context_create (KAN_ALLOCATION_GROUP_IGNORE);
     KAN_TEST_CHECK (kan_context_request_system (context, KAN_CONTEXT_REFLECTION_SYSTEM_NAME, NULL))
     KAN_TEST_CHECK (kan_context_request_system (context, KAN_CONTEXT_UNIVERSE_SYSTEM_NAME, NULL))
     KAN_TEST_CHECK (kan_context_request_system (context, KAN_CONTEXT_UPDATE_SYSTEM_NAME, NULL))
     KAN_TEST_CHECK (kan_context_request_system (context, "migration_reflection_population_system_t", NULL))
     kan_context_assembly (context);
 
-    kan_context_system_handle_t universe_system_handle = kan_context_query (context, KAN_CONTEXT_UNIVERSE_SYSTEM_NAME);
-    KAN_TEST_ASSERT (universe_system_handle != KAN_INVALID_CONTEXT_SYSTEM_HANDLE)
+    kan_context_system_t universe_system_handle = kan_context_query (context, KAN_CONTEXT_UNIVERSE_SYSTEM_NAME);
+    KAN_TEST_ASSERT (KAN_HANDLE_IS_VALID (universe_system_handle))
 
     kan_universe_t universe = kan_universe_system_get_universe (universe_system_handle);
-    KAN_TEST_ASSERT (universe != KAN_INVALID_UNIVERSE)
+    KAN_TEST_ASSERT (KAN_HANDLE_IS_VALID (universe))
 
-    kan_context_system_handle_t update_system = kan_context_query (context, KAN_CONTEXT_UPDATE_SYSTEM_NAME);
-    KAN_TEST_ASSERT (update_system != KAN_INVALID_CONTEXT_SYSTEM_HANDLE)
+    kan_context_system_t update_system = kan_context_query (context, KAN_CONTEXT_UPDATE_SYSTEM_NAME);
+    KAN_TEST_ASSERT (KAN_HANDLE_IS_VALID (update_system))
 
-    kan_context_system_handle_t reflection_system_handle =
-        kan_context_query (context, KAN_CONTEXT_REFLECTION_SYSTEM_NAME);
-    KAN_TEST_ASSERT (reflection_system_handle != KAN_INVALID_CONTEXT_SYSTEM_HANDLE)
+    kan_context_system_t reflection_system_handle = kan_context_query (context, KAN_CONTEXT_REFLECTION_SYSTEM_NAME);
+    KAN_TEST_ASSERT (KAN_HANDLE_IS_VALID (reflection_system_handle))
 
     struct kan_universe_world_definition_t definition;
     kan_universe_world_definition_init (&definition);

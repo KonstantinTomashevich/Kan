@@ -1352,9 +1352,9 @@ static inline void serialization_common_state_init (
     kan_serialization_binary_script_storage_t script_storage,
     kan_serialization_interned_string_registry_t interned_string_registry)
 {
-    state->script_storage = (struct script_storage_t *) script_storage;
-    KAN_ASSERT (state->script_storage != NULL);
-    state->optional_string_registry = (struct interned_string_registry_t *) interned_string_registry;
+    state->script_storage = KAN_HANDLE_GET (script_storage);
+    KAN_ASSERT (state->script_storage != NULL)
+    state->optional_string_registry = KAN_HANDLE_GET (interned_string_registry);
     state->stream = stream;
 
     kan_dynamic_array_init (&state->script_state_stack, 4u, sizeof (struct script_state_t),
@@ -1453,13 +1453,13 @@ kan_serialization_binary_script_storage_t kan_serialization_binary_script_storag
     kan_hash_storage_init (&script_storage->interned_string_lookup_storage, interned_string_lookup_allocation_group,
                            KAN_SERIALIZATION_BINARY_INTERNED_STRING_BUCKETS);
 
-    return (kan_serialization_binary_script_storage_t) script_storage;
+    return KAN_HANDLE_SET (kan_serialization_binary_script_storage_t, script_storage);
 }
 
 void kan_serialization_binary_script_storage_destroy (kan_serialization_binary_script_storage_t storage)
 {
     ensure_statics_initialized ();
-    struct script_storage_t *script_storage = (struct script_storage_t *) storage;
+    struct script_storage_t *script_storage = KAN_HANDLE_GET (storage);
     struct script_node_t *script_node = (struct script_node_t *) script_storage->script_storage.items.first;
 
     while (script_node)
@@ -1502,12 +1502,12 @@ void kan_serialization_binary_script_storage_destroy (kan_serialization_binary_s
 
 kan_serialization_interned_string_registry_t kan_serialization_interned_string_registry_create_empty (void)
 {
-    return (kan_serialization_interned_string_registry_t) interned_string_registry_create (KAN_FALSE);
+    return KAN_HANDLE_SET (kan_serialization_interned_string_registry_t, interned_string_registry_create (KAN_FALSE));
 }
 
 void kan_serialization_interned_string_registry_destroy (kan_serialization_interned_string_registry_t registry)
 {
-    struct interned_string_registry_t *data = (struct interned_string_registry_t *) registry;
+    struct interned_string_registry_t *data = KAN_HANDLE_GET (registry);
     kan_dynamic_array_shutdown (&data->index_to_value);
 
     if (!data->load_only)
@@ -1552,13 +1552,13 @@ kan_serialization_interned_string_registry_reader_t kan_serialization_interned_s
 
     reader->strings_read = 0u;
     kan_dynamic_array_set_capacity (&reader->registry->index_to_value, reader->strings_total);
-    return (kan_serialization_interned_string_registry_reader_t) reader;
+    return KAN_HANDLE_SET (kan_serialization_interned_string_registry_reader_t, reader);
 }
 
 enum kan_serialization_state_t kan_serialization_interned_string_registry_reader_step (
     kan_serialization_interned_string_registry_reader_t reader)
 {
-    struct interned_string_registry_reader_t *data = (struct interned_string_registry_reader_t *) reader;
+    struct interned_string_registry_reader_t *data = KAN_HANDLE_GET (reader);
     if (data->strings_read >= data->strings_total)
     {
         return KAN_SERIALIZATION_FINISHED;
@@ -1617,15 +1617,14 @@ enum kan_serialization_state_t kan_serialization_interned_string_registry_reader
 kan_serialization_interned_string_registry_t kan_serialization_interned_string_registry_reader_get (
     kan_serialization_interned_string_registry_reader_t reader)
 {
-    return (kan_serialization_interned_string_registry_t) ((struct interned_string_registry_reader_t *) reader)
-        ->registry;
+    struct interned_string_registry_reader_t *data = KAN_HANDLE_GET (reader);
+    return KAN_HANDLE_SET (kan_serialization_interned_string_registry_t, data->registry);
 }
 
 void kan_serialization_interned_string_registry_reader_destroy (
     kan_serialization_interned_string_registry_reader_t reader)
 {
-    kan_free_general (interned_string_registry_read_allocation_group,
-                      (struct interned_string_registry_reader_t *) reader,
+    kan_free_general (interned_string_registry_read_allocation_group, KAN_HANDLE_GET (reader),
                       sizeof (struct interned_string_registry_reader_t));
 }
 
@@ -1638,9 +1637,9 @@ kan_serialization_interned_string_registry_writer_t kan_serialization_interned_s
             interned_string_registry_write_allocation_group, sizeof (struct interned_string_registry_writer_t),
             _Alignof (struct interned_string_registry_writer_t));
 
-    KAN_ASSERT (registry != KAN_INVALID_SERIALIZATION_INTERNED_STRING_REGISTRY)
-    writer->registry = (struct interned_string_registry_t *) registry;
-    KAN_ASSERT (kan_stream_is_writeable (stream));
+    KAN_ASSERT (KAN_HANDLE_IS_VALID (registry))
+    writer->registry = KAN_HANDLE_GET (registry);
+    KAN_ASSERT (kan_stream_is_writeable (stream))
     writer->stream = stream;
 
     KAN_ASSERT (writer->registry->index_to_value.size <= UINT32_MAX)
@@ -1655,13 +1654,13 @@ kan_serialization_interned_string_registry_writer_t kan_serialization_interned_s
                  "Failed to initialize interned string registry writer: unable to write strings count into stream.")
     }
 
-    return (kan_serialization_interned_string_registry_writer_t) writer;
+    return KAN_HANDLE_SET (kan_serialization_interned_string_registry_writer_t, writer);
 }
 
 enum kan_serialization_state_t kan_serialization_interned_string_registry_writer_step (
     kan_serialization_interned_string_registry_writer_t writer)
 {
-    struct interned_string_registry_writer_t *data = (struct interned_string_registry_writer_t *) writer;
+    struct interned_string_registry_writer_t *data = KAN_HANDLE_GET (writer);
     if (data->strings_written >= data->strings_total)
     {
         return KAN_SERIALIZATION_FINISHED;
@@ -1691,8 +1690,7 @@ enum kan_serialization_state_t kan_serialization_interned_string_registry_writer
 void kan_serialization_interned_string_registry_writer_destroy (
     kan_serialization_interned_string_registry_writer_t writer)
 {
-    kan_free_general (interned_string_registry_write_allocation_group,
-                      (struct interned_string_registry_writer_t *) writer,
+    kan_free_general (interned_string_registry_write_allocation_group, KAN_HANDLE_GET (writer),
                       sizeof (struct interned_string_registry_writer_t));
 }
 
@@ -1718,9 +1716,9 @@ kan_serialization_binary_reader_t kan_serialization_binary_reader_create (
 
     state->buffer_size = 0u;
     state->buffer = NULL;
-    state->patch_builder = KAN_INVALID_REFLECTION_PATCH_BUILDER;
+    state->patch_builder = KAN_HANDLE_SET_INVALID (kan_reflection_patch_builder_t);
     state->child_allocation_group = deserialized_string_allocation_group;
-    return (kan_serialization_binary_reader_t) state;
+    return KAN_HANDLE_SET (kan_serialization_binary_reader_t, state);
 }
 
 static inline void ensure_read_buffer_size (struct serialization_read_state_t *state, uint64_t required_size)
@@ -1983,7 +1981,7 @@ static inline kan_bool_t read_patch_block (struct serialization_read_state_t *st
 
 enum kan_serialization_state_t kan_serialization_binary_reader_step (kan_serialization_binary_reader_t reader)
 {
-    struct serialization_read_state_t *state = (struct serialization_read_state_t *) reader;
+    struct serialization_read_state_t *state = KAN_HANDLE_GET (reader);
     if (state->common.script_state_stack.size == 0u)
     {
         return KAN_SERIALIZATION_FINISHED;
@@ -2186,7 +2184,7 @@ enum kan_serialization_state_t kan_serialization_binary_reader_step (kan_seriali
                         return KAN_SERIALIZATION_FAILED;
                     }
 
-                    if (state->patch_builder == KAN_INVALID_REFLECTION_PATCH_BUILDER)
+                    if (!KAN_HANDLE_IS_VALID (state->patch_builder))
                     {
                         state->patch_builder = kan_reflection_patch_builder_create ();
                     }
@@ -2256,7 +2254,7 @@ enum kan_serialization_state_t kan_serialization_binary_reader_step (kan_seriali
                     return KAN_SERIALIZATION_FAILED;
                 }
 
-                if (state->patch_builder == KAN_INVALID_REFLECTION_PATCH_BUILDER)
+                if (!KAN_HANDLE_IS_VALID (state->patch_builder))
                 {
                     state->patch_builder = kan_reflection_patch_builder_create ();
                 }
@@ -2318,7 +2316,7 @@ enum kan_serialization_state_t kan_serialization_binary_reader_step (kan_seriali
 
 void kan_serialization_binary_reader_destroy (kan_serialization_binary_reader_t reader)
 {
-    struct serialization_read_state_t *state = (struct serialization_read_state_t *) reader;
+    struct serialization_read_state_t *state = KAN_HANDLE_GET (reader);
     serialization_common_state_shutdown (&state->common);
 
     if (state->buffer)
@@ -2326,7 +2324,7 @@ void kan_serialization_binary_reader_destroy (kan_serialization_binary_reader_t 
         kan_free_general (serialization_allocation_group, state->buffer, state->buffer_size);
     }
 
-    if (state->patch_builder != KAN_INVALID_REFLECTION_PATCH_BUILDER)
+    if (KAN_HANDLE_IS_VALID (state->patch_builder))
     {
         kan_reflection_patch_builder_destroy (state->patch_builder);
     }
@@ -2353,7 +2351,7 @@ kan_serialization_binary_writer_t kan_serialization_binary_writer_create (
     script_storage_ensure_script_generated (state->common.script_storage, script_node);
     serialization_common_state_push_script_state (&state->common, script_node->script, (void *) instance, KAN_TRUE);
 
-    return (kan_serialization_binary_writer_t) state;
+    return KAN_HANDLE_SET (kan_serialization_binary_writer_t, state);
 }
 
 static inline kan_bool_t write_string_stateless (struct kan_stream_t *stream, const char *string_input)
@@ -2514,7 +2512,7 @@ static inline kan_bool_t write_patch_block (struct serialization_write_state_t *
 
 enum kan_serialization_state_t kan_serialization_binary_writer_step (kan_serialization_binary_writer_t writer)
 {
-    struct serialization_write_state_t *state = (struct serialization_write_state_t *) writer;
+    struct serialization_write_state_t *state = KAN_HANDLE_GET (writer);
     if (state->common.script_state_stack.size == 0u)
     {
         return KAN_SERIALIZATION_FINISHED;
@@ -2702,8 +2700,8 @@ enum kan_serialization_state_t kan_serialization_binary_writer_step (kan_seriali
             if (top_state->suffix_patch_dynamic_array.array.items_processed <
                 top_state->suffix_patch_dynamic_array.array.items_total)
             {
-                if (top_state->suffix_patch_dynamic_array.current_patch.write.current_iterator !=
-                    top_state->suffix_patch_dynamic_array.current_patch.write.end_iterator)
+                if (!KAN_HANDLE_IS_EQUAL (top_state->suffix_patch_dynamic_array.current_patch.write.current_iterator,
+                                          top_state->suffix_patch_dynamic_array.current_patch.write.end_iterator))
                 {
                     if (!write_patch_block (state, &top_state->suffix_patch_dynamic_array.current_patch))
                     {
@@ -2715,8 +2713,8 @@ enum kan_serialization_state_t kan_serialization_binary_writer_step (kan_seriali
                             top_state->suffix_patch_dynamic_array.current_patch.write.current_iterator);
                 }
 
-                if (top_state->suffix_patch_dynamic_array.current_patch.write.current_iterator ==
-                    top_state->suffix_patch_dynamic_array.current_patch.write.end_iterator)
+                if (KAN_HANDLE_IS_EQUAL (top_state->suffix_patch_dynamic_array.current_patch.write.current_iterator,
+                                         top_state->suffix_patch_dynamic_array.current_patch.write.end_iterator))
                 {
                     ++top_state->suffix_patch_dynamic_array.array.items_processed;
                     if (top_state->suffix_patch_dynamic_array.array.items_processed <
@@ -2757,7 +2755,8 @@ enum kan_serialization_state_t kan_serialization_binary_writer_step (kan_seriali
                 top_state->suffix_initialized = KAN_TRUE;
             }
 
-            if (top_state->suffix_patch.write.current_iterator != top_state->suffix_patch.write.end_iterator)
+            if (!KAN_HANDLE_IS_EQUAL (top_state->suffix_patch.write.current_iterator,
+                                      top_state->suffix_patch.write.end_iterator))
             {
                 if (!write_patch_block (state, &top_state->suffix_patch))
                 {
@@ -2768,7 +2767,8 @@ enum kan_serialization_state_t kan_serialization_binary_writer_step (kan_seriali
                     kan_reflection_patch_iterator_next (top_state->suffix_patch.write.current_iterator);
             }
 
-            if (top_state->suffix_patch.write.current_iterator == top_state->suffix_patch.write.end_iterator)
+            if (KAN_HANDLE_IS_EQUAL (top_state->suffix_patch.write.current_iterator,
+                                     top_state->suffix_patch.write.end_iterator))
             {
                 script_state_go_to_next_command (top_state);
             }
@@ -2807,7 +2807,7 @@ enum kan_serialization_state_t kan_serialization_binary_writer_step (kan_seriali
 
 void kan_serialization_binary_writer_destroy (kan_serialization_binary_writer_t writer)
 {
-    struct serialization_write_state_t *state = (struct serialization_write_state_t *) writer;
+    struct serialization_write_state_t *state = KAN_HANDLE_GET (writer);
     serialization_common_state_shutdown (&state->common);
     kan_free_general (serialization_allocation_group, state, sizeof (struct serialization_write_state_t));
 }
@@ -2818,8 +2818,7 @@ kan_bool_t kan_serialization_binary_read_type_header (
     kan_serialization_interned_string_registry_t interned_string_registry)
 {
     ensure_statics_initialized ();
-    return read_interned_string_stateless (stream, (struct interned_string_registry_t *) interned_string_registry,
-                                           type_name_output);
+    return read_interned_string_stateless (stream, KAN_HANDLE_GET (interned_string_registry), type_name_output);
 }
 
 kan_bool_t kan_serialization_binary_write_type_header (
@@ -2827,6 +2826,5 @@ kan_bool_t kan_serialization_binary_write_type_header (
     kan_interned_string_t type_name,
     kan_serialization_interned_string_registry_t interned_string_registry)
 {
-    return write_interned_string_stateless (stream, (struct interned_string_registry_t *) interned_string_registry,
-                                            type_name);
+    return write_interned_string_stateless (stream, KAN_HANDLE_GET (interned_string_registry), type_name);
 }

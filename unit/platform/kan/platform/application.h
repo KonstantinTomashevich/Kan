@@ -2,8 +2,8 @@
 
 #include <platform_api.h>
 
-#include <kan/api_common/bool.h>
 #include <kan/api_common/c_header.h>
+#include <kan/api_common/core_types.h>
 #include <kan/container/dynamic_array.h>
 #include <kan/platform/keyboard.h>
 #include <kan/platform/mouse.h>
@@ -74,9 +74,7 @@ enum kan_platform_application_event_type_t
     KAN_PLATFORM_APPLICATION_EVENT_TYPE_CLIPBOARD_UPDATE,
 };
 
-typedef uint64_t kan_platform_display_id_t;
-
-#define KAN_INVALID_PLATFORM_DISPLAY_ID 0u
+KAN_TYPED_ID_32_DEFINE (kan_platform_display_id_t);
 
 /// \brief Suffix structure for display events.
 struct kan_platform_application_event_display_t
@@ -84,9 +82,7 @@ struct kan_platform_application_event_display_t
     kan_platform_display_id_t id;
 };
 
-typedef uint64_t kan_platform_window_id_t;
-
-#define KAN_INVALID_PLATFORM_WINDOW_ID 0u
+KAN_TYPED_ID_32_DEFINE (kan_platform_window_id_t);
 
 /// \brief Suffix structure for window events.
 struct kan_platform_application_event_window_t

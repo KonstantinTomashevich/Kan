@@ -2,8 +2,8 @@
 
 #include <universe_transform_api.h>
 
-#include <kan/api_common/bool.h>
 #include <kan/api_common/c_header.h>
+#include <kan/api_common/core_types.h>
 #include <kan/inline_math/inline_math.h>
 #include <kan/threading/atomic.h>
 #include <kan/universe/universe.h>

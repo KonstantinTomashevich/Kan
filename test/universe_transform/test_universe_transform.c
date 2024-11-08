@@ -13,9 +13,9 @@
 // We're not using universe preprocessor here as we're utilizing macros to write the same logic for 2d and 3d.
 // However, the might be changed in the future.
 
-static kan_context_handle_t create_context (void)
+static kan_context_t create_context (void)
 {
-    kan_context_handle_t context =
+    kan_context_t context =
         kan_context_create (kan_allocation_group_get_child (kan_allocation_group_root (), "context"));
     KAN_TEST_CHECK (kan_context_request_system (context, KAN_CONTEXT_REFLECTION_SYSTEM_NAME, NULL))
     KAN_TEST_CHECK (kan_context_request_system (context, KAN_CONTEXT_UNIVERSE_SYSTEM_NAME, NULL))
@@ -24,7 +24,7 @@ static kan_context_handle_t create_context (void)
     return context;
 }
 
-static inline uint64_t create_transform_2 (
+static inline kan_universe_object_id_t create_transform_2 (
     struct kan_repository_singleton_read_query_t *read__kan_object_id_generator_singleton,
     struct kan_repository_indexed_insert_query_t *insert__kan_transform_2_component,
     kan_universe_object_id_t parent_object_id,
@@ -32,17 +32,17 @@ static inline uint64_t create_transform_2 (
     struct kan_transform_2_t visual_transform)
 {
 #define CREATE_TRANSFORM(DIMENSIONS)                                                                                   \
-    kan_repository_singleton_read_access_t singleton_access =                                                          \
+    struct kan_repository_singleton_read_access_t singleton_access =                                                   \
         kan_repository_singleton_read_query_execute (read__kan_object_id_generator_singleton);                         \
     const struct kan_object_id_generator_singleton_t *singleton =                                                      \
-        kan_repository_singleton_read_access_resolve (singleton_access);                                               \
+        kan_repository_singleton_read_access_resolve (&singleton_access);                                              \
                                                                                                                        \
     struct kan_repository_indexed_insertion_package_t package =                                                        \
         kan_repository_indexed_insert_query_execute (insert__kan_transform_##DIMENSIONS##_component);                  \
                                                                                                                        \
     struct kan_transform_##DIMENSIONS##_component_t *component =                                                       \
         kan_repository_indexed_insertion_package_get (&package);                                                       \
-    const uint64_t object_id = kan_universe_object_id_generate (singleton);                                            \
+    const kan_universe_object_id_t object_id = kan_universe_object_id_generate (singleton);                            \
     component->object_id = object_id;                                                                                  \
     component->parent_object_id = parent_object_id;                                                                    \
                                                                                                                        \
@@ -50,13 +50,13 @@ static inline uint64_t create_transform_2 (
     component->visual_local = visual_transform;                                                                        \
                                                                                                                        \
     kan_repository_indexed_insertion_package_submit (&package);                                                        \
-    kan_repository_singleton_read_access_close (singleton_access);                                                     \
+    kan_repository_singleton_read_access_close (&singleton_access);                                                    \
     return object_id
 
     CREATE_TRANSFORM (2);
 }
 
-static inline uint64_t create_transform_3 (
+static inline kan_universe_object_id_t create_transform_3 (
     struct kan_repository_singleton_read_query_t *read__kan_object_id_generator_singleton,
     struct kan_repository_indexed_insert_query_t *insert__kan_transform_3_component,
     kan_universe_object_id_t parent_object_id,
@@ -178,14 +178,14 @@ static inline void set_transform_local_2 (
         return;                                                                                                        \
     }                                                                                                                  \
                                                                                                                        \
-    kan_repository_singleton_read_access_t time_access =                                                               \
+    struct kan_repository_singleton_read_access_t time_access =                                                        \
         kan_repository_singleton_read_query_execute (read__kan_time_singleton);                                        \
                                                                                                                        \
-    const struct kan_time_singleton_t *time = kan_repository_singleton_read_access_resolve (time_access);              \
+    const struct kan_time_singleton_t *time = kan_repository_singleton_read_access_resolve (&time_access);             \
     kan_transform_##DIMENSIONS##_set_logical_##TYPE (queries, component, &logical_transform, time->logical_time_ns);   \
     kan_transform_##DIMENSIONS##_set_visual_##TYPE (queries, component, &visual_transform);                            \
     kan_repository_indexed_value_update_access_close (&access);                                                        \
-    kan_repository_singleton_read_access_close (time_access)
+    kan_repository_singleton_read_access_close (&time_access)
 
     SET_TRANSFORM (2, local);
 }
@@ -354,10 +354,10 @@ TEST_UNIVERSE_TRANSFORM_API void kan_universe_mutator_execute_test_global_2 (kan
     };
 
 #define TRANSFORM_GLOBAL_TEST(DIMENSIONS)                                                                              \
-    uint64_t transform_ids[6u];                                                                                        \
+    kan_universe_object_id_t transform_ids[6u];                                                                        \
     transform_ids[0u] = create_transform_##DIMENSIONS (                                                                \
         &state->read__kan_object_id_generator_singleton, &state->insert__kan_transform_##DIMENSIONS##_component,       \
-        KAN_INVALID_UNIVERSE_OBJECT_ID, initial_transform_0, initial_transform_0);                                     \
+        KAN_TYPED_ID_32_SET_INVALID (kan_universe_object_id_t), initial_transform_0, initial_transform_0);             \
                                                                                                                        \
     transform_ids[1u] = create_transform_##DIMENSIONS (&state->read__kan_object_id_generator_singleton,                \
                                                        &state->insert__kan_transform_##DIMENSIONS##_component,         \
@@ -373,7 +373,7 @@ TEST_UNIVERSE_TRANSFORM_API void kan_universe_mutator_execute_test_global_2 (kan
                                                                                                                        \
     transform_ids[4u] = create_transform_##DIMENSIONS (                                                                \
         &state->read__kan_object_id_generator_singleton, &state->insert__kan_transform_##DIMENSIONS##_component,       \
-        KAN_INVALID_UNIVERSE_OBJECT_ID, initial_transform_4, initial_transform_4);                                     \
+        KAN_TYPED_ID_32_SET_INVALID (kan_universe_object_id_t), initial_transform_4, initial_transform_4);             \
                                                                                                                        \
     transform_ids[5u] = create_transform_##DIMENSIONS (&state->read__kan_object_id_generator_singleton,                \
                                                        &state->insert__kan_transform_##DIMENSIONS##_component,         \
@@ -556,12 +556,12 @@ TEST_UNIVERSE_TRANSFORM_API void kan_universe_mutator_execute_test_global_3 (kan
 
 static void test_global (kan_interned_string_t test_mutator)
 {
-    kan_context_handle_t context = create_context ();
-    kan_context_system_handle_t universe_system_handle = kan_context_query (context, KAN_CONTEXT_UNIVERSE_SYSTEM_NAME);
-    KAN_TEST_ASSERT (universe_system_handle != KAN_INVALID_CONTEXT_SYSTEM_HANDLE)
+    kan_context_t context = create_context ();
+    kan_context_system_t universe_system_handle = kan_context_query (context, KAN_CONTEXT_UNIVERSE_SYSTEM_NAME);
+    KAN_TEST_ASSERT (KAN_HANDLE_IS_VALID (universe_system_handle))
 
     kan_universe_t universe = kan_universe_system_get_universe (universe_system_handle);
-    KAN_TEST_ASSERT (universe != KAN_INVALID_UNIVERSE)
+    KAN_TEST_ASSERT (KAN_HANDLE_IS_VALID (universe))
 
     struct kan_universe_world_definition_t definition;
     kan_universe_world_definition_init (&definition);
@@ -581,8 +581,8 @@ static void test_global (kan_interned_string_t test_mutator)
     kan_universe_deploy_root (universe, &definition);
     kan_universe_world_definition_shutdown (&definition);
 
-    kan_context_system_handle_t update_system = kan_context_query (context, KAN_CONTEXT_UPDATE_SYSTEM_NAME);
-    KAN_TEST_ASSERT (update_system != KAN_INVALID_CONTEXT_SYSTEM_HANDLE)
+    kan_context_system_t update_system = kan_context_query (context, KAN_CONTEXT_UPDATE_SYSTEM_NAME);
+    KAN_TEST_ASSERT (KAN_HANDLE_IS_VALID (update_system))
     kan_update_system_run (update_system);
 }
 
@@ -610,9 +610,9 @@ static void fake_time (struct test_sync_scheduler_state_t *state,
                        uint64_t visual_time_ns,
                        uint64_t visual_delta_ns)
 {
-    kan_repository_singleton_write_access_t time_access =
+    struct kan_repository_singleton_write_access_t time_access =
         kan_repository_singleton_write_query_execute (&state->write__kan_time_singleton);
-    struct kan_time_singleton_t *time = kan_repository_singleton_write_access_resolve (time_access);
+    struct kan_time_singleton_t *time = kan_repository_singleton_write_access_resolve (&time_access);
 
     time->logical_time_ns = logical_time_ns;
     time->logical_delta_ns = logical_delta_ns;
@@ -620,7 +620,7 @@ static void fake_time (struct test_sync_scheduler_state_t *state,
     time->visual_delta_ns = visual_delta_ns;
     time->visual_unscaled_delta_ns = visual_delta_ns;
     time->scale = 1.0f;
-    kan_repository_singleton_write_access_close (time_access);
+    kan_repository_singleton_write_access_close (&time_access);
 }
 
 TEST_UNIVERSE_TRANSFORM_API void kan_universe_scheduler_execute_test_sync_scheduler (
@@ -653,8 +653,8 @@ TEST_UNIVERSE_TRANSFORM_API void kan_universe_scheduler_execute_test_sync_schedu
 #define TRANSFORM_SYNC_BEGIN_X 10.0f
 #define TRANSFORM_SYNC_END_X 20.0f
 
-#define TRANSFORM_SYNC_PARENT_TRANSFORM_ID 1u
-#define TRANSFORM_SYNC_CHILD_TRANSFORM_ID 2u
+#define TRANSFORM_SYNC_PARENT_TRANSFORM_ID KAN_TYPED_ID_32_SET (kan_universe_object_id_t, 1u)
+#define TRANSFORM_SYNC_CHILD_TRANSFORM_ID KAN_TYPED_ID_32_SET (kan_universe_object_id_t, 2u)
 
 struct test_sync_logical_2_state_t
 {
@@ -681,23 +681,25 @@ TEST_UNIVERSE_TRANSFORM_API void kan_universe_mutator_execute_test_sync_logical_
     struct kan_transform_2_t logical_transform_end = make_transform_2_x_only (TRANSFORM_SYNC_END_X);
 
 #define TRANSFORM_SYNC_LOGICAL(DIMENSIONS)                                                                             \
-    kan_repository_singleton_read_access_t time_access =                                                               \
+    struct kan_repository_singleton_read_access_t time_access =                                                        \
         kan_repository_singleton_read_query_execute (&state->read__kan_time_singleton);                                \
-    const struct kan_time_singleton_t *time = kan_repository_singleton_read_access_resolve (time_access);              \
+    const struct kan_time_singleton_t *time = kan_repository_singleton_read_access_resolve (&time_access);             \
                                                                                                                        \
     switch (time->logical_time_ns)                                                                                     \
     {                                                                                                                  \
     case 1000u:                                                                                                        \
-        KAN_TEST_CHECK (create_transform_##DIMENSIONS (&state->read__kan_object_id_generator_singleton,                \
-                                                       &state->insert__kan_transform_##DIMENSIONS##_component,         \
-                                                       KAN_INVALID_UNIVERSE_OBJECT_ID, logical_transform_begin,        \
-                                                       kan_transform_##DIMENSIONS##_get_identity ()) ==                \
-                        TRANSFORM_SYNC_PARENT_TRANSFORM_ID)                                                            \
-        KAN_TEST_CHECK (create_transform_##DIMENSIONS (&state->read__kan_object_id_generator_singleton,                \
-                                                       &state->insert__kan_transform_##DIMENSIONS##_component,         \
-                                                       TRANSFORM_SYNC_PARENT_TRANSFORM_ID, logical_transform_begin,    \
-                                                       kan_transform_##DIMENSIONS##_get_identity ()) ==                \
-                        TRANSFORM_SYNC_CHILD_TRANSFORM_ID)                                                             \
+        KAN_TEST_CHECK (KAN_TYPED_ID_32_IS_EQUAL (                                                                     \
+            create_transform_##DIMENSIONS (&state->read__kan_object_id_generator_singleton,                            \
+                                           &state->insert__kan_transform_##DIMENSIONS##_component,                     \
+                                           KAN_TYPED_ID_32_SET_INVALID (kan_universe_object_id_t),                     \
+                                           logical_transform_begin, kan_transform_##DIMENSIONS##_get_identity ()),     \
+            TRANSFORM_SYNC_PARENT_TRANSFORM_ID))                                                                       \
+        KAN_TEST_CHECK (KAN_TYPED_ID_32_IS_EQUAL (                                                                     \
+            create_transform_##DIMENSIONS (&state->read__kan_object_id_generator_singleton,                            \
+                                           &state->insert__kan_transform_##DIMENSIONS##_component,                     \
+                                           TRANSFORM_SYNC_PARENT_TRANSFORM_ID, logical_transform_begin,                \
+                                           kan_transform_##DIMENSIONS##_get_identity ()),                              \
+            TRANSFORM_SYNC_CHILD_TRANSFORM_ID))                                                                        \
         break;                                                                                                         \
                                                                                                                        \
     case 2000u:                                                                                                        \
@@ -720,7 +722,7 @@ TEST_UNIVERSE_TRANSFORM_API void kan_universe_mutator_execute_test_sync_logical_
         break;                                                                                                         \
     }                                                                                                                  \
                                                                                                                        \
-    kan_repository_singleton_read_access_close (time_access)
+    kan_repository_singleton_read_access_close (&time_access)
 
     TRANSFORM_SYNC_LOGICAL (2);
     kan_cpu_job_release (job);
@@ -776,9 +778,9 @@ TEST_UNIVERSE_TRANSFORM_API void kan_universe_mutator_execute_test_sync_visual_2
     kan_cpu_job_t job, struct test_sync_visual_2_state_t *state)
 {
 #define TRANSFORM_SYNC_VISUAL(DIMENSIONS)                                                                              \
-    kan_repository_singleton_read_access_t time_access =                                                               \
+    struct kan_repository_singleton_read_access_t time_access =                                                        \
         kan_repository_singleton_read_query_execute (&state->read__kan_time_singleton);                                \
-    const struct kan_time_singleton_t *time = kan_repository_singleton_read_access_resolve (time_access);              \
+    const struct kan_time_singleton_t *time = kan_repository_singleton_read_access_resolve (&time_access);             \
                                                                                                                        \
     switch (time->visual_time_ns)                                                                                      \
     {                                                                                                                  \
@@ -859,7 +861,7 @@ TEST_UNIVERSE_TRANSFORM_API void kan_universe_mutator_execute_test_sync_visual_2
         break;                                                                                                         \
     }                                                                                                                  \
                                                                                                                        \
-    kan_repository_singleton_read_access_close (time_access)
+    kan_repository_singleton_read_access_close (&time_access)
 
     TRANSFORM_SYNC_VISUAL (2);
     kan_cpu_job_release (job);
@@ -893,12 +895,12 @@ static void test_sync (kan_interned_string_t test_logical_mutator,
                        kan_interned_string_t test_visual_mutator,
                        kan_interned_string_t sync_group)
 {
-    kan_context_handle_t context = create_context ();
-    kan_context_system_handle_t universe_system_handle = kan_context_query (context, KAN_CONTEXT_UNIVERSE_SYSTEM_NAME);
-    KAN_TEST_ASSERT (universe_system_handle != KAN_INVALID_CONTEXT_SYSTEM_HANDLE)
+    kan_context_t context = create_context ();
+    kan_context_system_t universe_system_handle = kan_context_query (context, KAN_CONTEXT_UNIVERSE_SYSTEM_NAME);
+    KAN_TEST_ASSERT (KAN_HANDLE_IS_VALID (universe_system_handle))
 
     kan_universe_t universe = kan_universe_system_get_universe (universe_system_handle);
-    KAN_TEST_ASSERT (universe != KAN_INVALID_UNIVERSE)
+    KAN_TEST_ASSERT (KAN_HANDLE_IS_VALID (universe))
 
     struct kan_universe_world_definition_t definition;
     kan_universe_world_definition_init (&definition);
@@ -930,8 +932,8 @@ static void test_sync (kan_interned_string_t test_logical_mutator,
     kan_universe_deploy_root (universe, &definition);
     kan_universe_world_definition_shutdown (&definition);
 
-    kan_context_system_handle_t update_system = kan_context_query (context, KAN_CONTEXT_UPDATE_SYSTEM_NAME);
-    KAN_TEST_ASSERT (update_system != KAN_INVALID_CONTEXT_SYSTEM_HANDLE)
+    kan_context_system_t update_system = kan_context_query (context, KAN_CONTEXT_UPDATE_SYSTEM_NAME);
+    KAN_TEST_ASSERT (KAN_HANDLE_IS_VALID (update_system))
     kan_update_system_run (update_system);
 }
 

@@ -3580,12 +3580,12 @@ kan_rpl_parser_t kan_rpl_parser_create (kan_interned_string_t log_name)
     parser->log_name = log_name;
     kan_stack_group_allocator_init (&parser->allocator, rpl_parser_allocation_group, KAN_RPL_PARSER_STACK_GROUP_SIZE);
     parser_processing_data_init (&parser->processing_data);
-    return (uint64_t) parser;
+    return KAN_HANDLE_SET (kan_rpl_parser_t, parser);
 }
 
 kan_bool_t kan_rpl_parser_add_source (kan_rpl_parser_t parser, const char *source, kan_interned_string_t log_name)
 {
-    struct rpl_parser_t *instance = (struct rpl_parser_t *) parser;
+    struct rpl_parser_t *instance = KAN_HANDLE_GET (parser);
     struct dynamic_parser_state_t dynamic_state = {
         .source_log_name = log_name,
         .detached_conditional = NULL,
@@ -4182,7 +4182,7 @@ static kan_bool_t build_intermediate_functions (struct rpl_parser_t *instance, s
 
 kan_bool_t kan_rpl_parser_build_intermediate (kan_rpl_parser_t parser, struct kan_rpl_intermediate_t *output)
 {
-    struct rpl_parser_t *instance = (struct rpl_parser_t *) parser;
+    struct rpl_parser_t *instance = KAN_HANDLE_GET (parser);
     output->log_name = instance->log_name;
 
     kan_dynamic_array_set_capacity (&output->expression_storage, KAN_RPL_INTERMEDIATE_EXPRESSION_STORAGE_SIZE);
@@ -4203,7 +4203,7 @@ kan_bool_t kan_rpl_parser_build_intermediate (kan_rpl_parser_t parser, struct ka
 
 void kan_rpl_parser_destroy (kan_rpl_parser_t parser)
 {
-    struct rpl_parser_t *instance = (struct rpl_parser_t *) parser;
+    struct rpl_parser_t *instance = KAN_HANDLE_GET (parser);
     kan_stack_group_allocator_shutdown (&instance->allocator);
     kan_free_general (rpl_parser_allocation_group, instance, sizeof (struct rpl_parser_t));
 }

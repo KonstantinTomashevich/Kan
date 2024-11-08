@@ -4,8 +4,8 @@
 
 #include <stdint.h>
 
-#include <kan/api_common/bool.h>
 #include <kan/api_common/c_header.h>
+#include <kan/api_common/core_types.h>
 #include <kan/memory_profiler/allocation_group.h>
 
 /// \file
@@ -67,7 +67,7 @@ struct kan_allocation_group_event_t
     };
 };
 
-typedef uint64_t kan_captured_allocation_group_t;
+KAN_HANDLE_DEFINE (kan_captured_allocation_group_t);
 
 /// \brief Returns name of given captured allocation group.
 MEMORY_PROFILER_API const char *kan_captured_allocation_group_get_name (kan_captured_allocation_group_t group);
@@ -83,7 +83,7 @@ MEMORY_PROFILER_API uint64_t kan_captured_allocation_group_get_total_allocated (
 MEMORY_PROFILER_API uint64_t
 kan_captured_allocation_group_get_directly_allocated (kan_captured_allocation_group_t group);
 
-typedef uint64_t kan_captured_allocation_group_iterator_t;
+KAN_HANDLE_DEFINE (kan_captured_allocation_group_iterator_t);
 
 /// \brief Returns iterator that points to first captured allocation group child if any.
 MEMORY_PROFILER_API kan_captured_allocation_group_iterator_t
@@ -97,14 +97,10 @@ kan_captured_allocation_group_children_next (kan_captured_allocation_group_itera
 MEMORY_PROFILER_API kan_captured_allocation_group_t
 kan_captured_allocation_group_children_get (kan_captured_allocation_group_iterator_t current);
 
-/// \brief Returns iterator that points to the end of captured allocation group children.
-MEMORY_PROFILER_API kan_captured_allocation_group_iterator_t
-kan_captured_allocation_group_children_end (kan_captured_allocation_group_t group);
-
 /// \brief Destroys captured allocation group and all its children. Should only be called on captured root!
 MEMORY_PROFILER_API void kan_captured_allocation_group_destroy (kan_captured_allocation_group_t group);
 
-typedef uint64_t kan_allocation_group_event_iterator_t;
+KAN_HANDLE_DEFINE (kan_allocation_group_event_iterator_t);
 
 /// \brief Returns memory event to which iterator is pointing right now
 ///        or `NULL` if iterator has reached end of events queue.

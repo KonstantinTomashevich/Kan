@@ -49,7 +49,7 @@ struct kan_universe_world_definition_system_config_t
 
 /// \brief Queries world definition by its unique name.
 CONTEXT_UNIVERSE_WORLD_DEFINITION_SYSTEM_API const struct kan_universe_world_definition_t *
-kan_universe_world_definition_system_query (kan_context_system_handle_t universe_world_definition_system,
+kan_universe_world_definition_system_query (kan_context_system_t universe_world_definition_system,
                                             kan_interned_string_t definition_name);
 
 KAN_C_HEADER_END

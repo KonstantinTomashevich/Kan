@@ -447,7 +447,7 @@ kan_render_frame_lifetime_buffer_allocator_t kan_render_frame_lifetime_buffer_al
     // Frame-lifetime read back just doesn't make sense as it would be destroyed right after collecting data.
     KAN_ASSERT (buffer_type != KAN_RENDER_BUFFER_TYPE_READ_BACK_STORAGE)
 
-    struct render_backend_system_t *system = (struct render_backend_system_t *) context;
+    struct render_backend_system_t *system = KAN_HANDLE_GET (context);
     struct kan_cpu_section_execution_t execution;
     kan_cpu_section_execution_init (&execution, system->section_create_frame_lifetime_allocator);
 
@@ -459,29 +459,27 @@ kan_render_frame_lifetime_buffer_allocator_t kan_render_frame_lifetime_buffer_al
             buffer_type, page_size, tracking_name);
 
     kan_cpu_section_execution_shutdown (&execution);
-    return (kan_render_frame_lifetime_buffer_allocator_t) allocator;
+    return KAN_HANDLE_SET (kan_render_frame_lifetime_buffer_allocator_t, allocator);
 }
 
 struct kan_render_allocated_slice_t kan_render_frame_lifetime_buffer_allocator_allocate (
     kan_render_frame_lifetime_buffer_allocator_t allocator, uint32_t size, uint32_t alignment)
 {
-    struct render_backend_frame_lifetime_allocator_t *data =
-        (struct render_backend_frame_lifetime_allocator_t *) allocator;
+    struct render_backend_frame_lifetime_allocator_t *data = KAN_HANDLE_GET (allocator);
     KAN_ASSERT (data->system->frame_started)
 
     struct render_backend_frame_lifetime_allocator_allocation_t allocation =
         render_backend_frame_lifetime_allocator_allocate (data, size, alignment);
 
     return (struct kan_render_allocated_slice_t) {
-        .buffer = (kan_render_buffer_t) allocation.buffer,
+        .buffer = KAN_HANDLE_SET (kan_render_buffer_t, allocation.buffer),
         .slice_offset = allocation.offset,
     };
 }
 
 void kan_render_frame_lifetime_buffer_allocator_destroy (kan_render_frame_lifetime_buffer_allocator_t allocator)
 {
-    struct render_backend_frame_lifetime_allocator_t *data =
-        (struct render_backend_frame_lifetime_allocator_t *) allocator;
+    struct render_backend_frame_lifetime_allocator_t *data = KAN_HANDLE_GET (allocator);
     // Only resource family buffers can be destroyed externally through scheduling.
     KAN_ASSERT (data->buffer_family == RENDER_BACKEND_BUFFER_FAMILY_HOST_FRAME_LIFETIME_ALLOCATOR ||
                 data->buffer_family == RENDER_BACKEND_BUFFER_FAMILY_DEVICE_FRAME_LIFETIME_ALLOCATOR)

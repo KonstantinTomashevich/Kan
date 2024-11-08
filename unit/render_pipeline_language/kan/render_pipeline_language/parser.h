@@ -2,8 +2,8 @@
 
 #include <render_pipeline_language_api.h>
 
-#include <kan/api_common/bool.h>
 #include <kan/api_common/c_header.h>
+#include <kan/api_common/core_types.h>
 #include <kan/container/dynamic_array.h>
 #include <kan/container/interned_string.h>
 
@@ -517,7 +517,7 @@ enum kan_rpl_pipeline_stage_t
     KAN_RPL_PIPELINE_STAGE_GRAPHICS_CLASSIC_FRAGMENT,
 };
 
-typedef uint64_t kan_rpl_parser_t;
+KAN_HANDLE_DEFINE (kan_rpl_parser_t);
 
 /// \brief Creates new instance of render pipeline language parser.
 RENDER_PIPELINE_LANGUAGE_API kan_rpl_parser_t kan_rpl_parser_create (kan_interned_string_t log_name);

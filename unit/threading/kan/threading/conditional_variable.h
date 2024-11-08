@@ -4,8 +4,8 @@
 
 #include <stdint.h>
 
-#include <kan/api_common/bool.h>
 #include <kan/api_common/c_header.h>
+#include <kan/api_common/core_types.h>
 #include <kan/threading/mutex.h>
 
 /// \file
@@ -13,24 +13,22 @@
 
 KAN_C_HEADER_BEGIN
 
-typedef uint64_t kan_conditional_variable_handle_t;
-
-#define KAN_INVALID_CONDITIONAL_VARIABLE_HANDLE 0u
+KAN_HANDLE_DEFINE (kan_conditional_variable_t);
 
 /// \brief Creates new conditional variable instance.
-THREADING_API kan_conditional_variable_handle_t kan_conditional_variable_create (void);
+THREADING_API kan_conditional_variable_t kan_conditional_variable_create (void);
 
 /// \brief Waits until given conditional variable is signaled, manages given mutex status.
-THREADING_API kan_bool_t kan_conditional_variable_wait (kan_conditional_variable_handle_t handle,
-                                                        kan_mutex_handle_t associated_mutex);
+THREADING_API kan_bool_t kan_conditional_variable_wait (kan_conditional_variable_t handle,
+                                                        kan_mutex_t associated_mutex);
 
 /// \brief Awakes one of the threads waiting for variable to signal.
-THREADING_API kan_bool_t kan_conditional_variable_signal_one (kan_conditional_variable_handle_t handle);
+THREADING_API kan_bool_t kan_conditional_variable_signal_one (kan_conditional_variable_t handle);
 
 /// \brief Awakes all the threads waiting for variable to signal.
-THREADING_API kan_bool_t kan_conditional_variable_signal_all (kan_conditional_variable_handle_t handle);
+THREADING_API kan_bool_t kan_conditional_variable_signal_all (kan_conditional_variable_t handle);
 
 /// \brief Destroys given conditional variable.
-THREADING_API void kan_conditional_variable_destroy (kan_conditional_variable_handle_t handle);
+THREADING_API void kan_conditional_variable_destroy (kan_conditional_variable_t handle);
 
 KAN_C_HEADER_END

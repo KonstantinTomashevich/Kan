@@ -46,7 +46,7 @@ TEST_UNIVERSE_RESOURCE_REFERENCE_API void resource_prototype_shutdown (struct re
     for (uint64_t index = 0u; index < prototype->components.size; ++index)
     {
         kan_reflection_patch_t patch = ((kan_reflection_patch_t *) prototype->components.data)[index];
-        if (patch != KAN_INVALID_REFLECTION_PATCH)
+        if (KAN_HANDLE_IS_VALID (patch))
         {
             kan_reflection_patch_destroy (patch);
         }
@@ -191,7 +191,8 @@ static void save_prototype_1 (kan_reflection_registry_t registry, const char *pa
         kan_reflection_patch_builder_build (patch_builder, registry, config_component_type);
 
     // Just to ensure that serialization is able to deal with it.
-    *(kan_reflection_patch_t *) kan_dynamic_array_add_last (&prototype_1.components) = KAN_INVALID_REFLECTION_PATCH;
+    *(kan_reflection_patch_t *) kan_dynamic_array_add_last (&prototype_1.components) =
+        KAN_HANDLE_SET_INVALID (kan_reflection_patch_t);
 
     save_rd (path, &prototype_1, kan_string_intern ("resource_prototype_t"), registry);
     resource_prototype_shutdown (&prototype_1);
@@ -227,15 +228,15 @@ static void save_prototype_2 (kan_reflection_registry_t registry, const char *pa
     kan_reflection_patch_builder_destroy (patch_builder);
 }
 
-static void setup_workspace (kan_context_handle_t context)
+static void setup_workspace (kan_context_t context)
 {
     kan_file_system_remove_directory_with_content (WORKSPACE_RESOURCES_SUB_DIRECTORY);
     kan_file_system_remove_directory_with_content (WORKSPACE_REFERENCE_CACHE_SUB_DIRECTORY);
     kan_file_system_make_directory (WORKSPACE_RESOURCES_SUB_DIRECTORY);
     kan_file_system_make_directory (WORKSPACE_REFERENCE_CACHE_SUB_DIRECTORY);
 
-    kan_context_system_handle_t reflection_system = kan_context_query (context, KAN_CONTEXT_REFLECTION_SYSTEM_NAME);
-    KAN_ASSERT (reflection_system != KAN_INVALID_CONTEXT_SYSTEM_HANDLE)
+    kan_context_system_t reflection_system = kan_context_query (context, KAN_CONTEXT_REFLECTION_SYSTEM_NAME);
+    KAN_TEST_ASSERT (KAN_HANDLE_IS_VALID (reflection_system))
     kan_reflection_registry_t registry = kan_reflection_system_get_registry (reflection_system);
 
     struct config_a_t config_a = {.x = 11u, .y = 12u};
@@ -741,9 +742,9 @@ TEST_UNIVERSE_RESOURCE_REFERENCE_API void kan_universe_mutator_execute_outer_ref
     kan_cpu_job_release (job);
 }
 
-static kan_context_handle_t setup_context (void)
+static kan_context_t setup_context (void)
 {
-    kan_context_handle_t context =
+    kan_context_t context =
         kan_context_create (kan_allocation_group_get_child (kan_allocation_group_root (), "context"));
     KAN_TEST_CHECK (kan_context_request_system (context, KAN_CONTEXT_REFLECTION_SYSTEM_NAME, NULL))
     KAN_TEST_CHECK (kan_context_request_system (context, KAN_CONTEXT_UNIVERSE_SYSTEM_NAME, NULL))
@@ -784,19 +785,19 @@ TEST_UNIVERSE_RESOURCE_REFERENCE_API void kan_universe_scheduler_execute_run_upd
     kan_universe_scheduler_interface_run_pipeline (interface, kan_string_intern ("update"));
 }
 
-static void run_test (kan_context_handle_t context, kan_interned_string_t test_mutator)
+static void run_test (kan_context_t context, kan_interned_string_t test_mutator)
 {
-    kan_context_system_handle_t universe_system_handle = kan_context_query (context, KAN_CONTEXT_UNIVERSE_SYSTEM_NAME);
-    KAN_TEST_ASSERT (universe_system_handle != KAN_INVALID_CONTEXT_SYSTEM_HANDLE)
+    kan_context_system_t universe_system_handle = kan_context_query (context, KAN_CONTEXT_UNIVERSE_SYSTEM_NAME);
+    KAN_TEST_ASSERT (KAN_HANDLE_IS_VALID (universe_system_handle))
 
     kan_universe_t universe = kan_universe_system_get_universe (universe_system_handle);
-    KAN_TEST_ASSERT (universe != KAN_INVALID_UNIVERSE)
+    KAN_TEST_ASSERT (KAN_HANDLE_IS_VALID (universe))
 
-    kan_context_system_handle_t update_system = kan_context_query (context, KAN_CONTEXT_UPDATE_SYSTEM_NAME);
-    KAN_TEST_ASSERT (update_system != KAN_INVALID_CONTEXT_SYSTEM_HANDLE)
+    kan_context_system_t update_system = kan_context_query (context, KAN_CONTEXT_UPDATE_SYSTEM_NAME);
+    KAN_TEST_ASSERT (KAN_HANDLE_IS_VALID (update_system))
 
-    kan_context_system_handle_t reflection_system = kan_context_query (context, KAN_CONTEXT_REFLECTION_SYSTEM_NAME);
-    KAN_TEST_ASSERT (reflection_system != KAN_INVALID_CONTEXT_SYSTEM_HANDLE)
+    kan_context_system_t reflection_system = kan_context_query (context, KAN_CONTEXT_REFLECTION_SYSTEM_NAME);
+    KAN_TEST_ASSERT (KAN_HANDLE_IS_VALID (reflection_system))
     kan_reflection_registry_t registry = kan_reflection_system_get_registry (reflection_system);
 
     struct kan_universe_world_definition_t definition;
@@ -883,7 +884,7 @@ static void run_test (kan_context_handle_t context, kan_interned_string_t test_m
 
 KAN_TEST_CASE (outer_reference_detection)
 {
-    kan_context_handle_t context = setup_context ();
+    kan_context_t context = setup_context ();
     setup_workspace (context);
     run_test (context, kan_string_intern ("outer_reference_detection_test"));
     kan_context_destroy (context);
@@ -891,7 +892,7 @@ KAN_TEST_CASE (outer_reference_detection)
 
 KAN_TEST_CASE (all_references_to_type_detection)
 {
-    kan_context_handle_t context = setup_context ();
+    kan_context_t context = setup_context ();
     setup_workspace (context);
     run_test (context, kan_string_intern ("all_references_to_type_detection_test"));
     kan_context_destroy (context);
@@ -899,7 +900,7 @@ KAN_TEST_CASE (all_references_to_type_detection)
 
 KAN_TEST_CASE (outer_reference_caching)
 {
-    kan_context_handle_t context = setup_context ();
+    kan_context_t context = setup_context ();
     setup_workspace (context);
     run_test (context, kan_string_intern ("outer_reference_caching_test"));
     kan_context_destroy (context);

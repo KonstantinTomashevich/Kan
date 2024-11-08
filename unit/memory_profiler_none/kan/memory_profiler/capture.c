@@ -25,25 +25,23 @@ uint64_t kan_captured_allocation_group_get_directly_allocated (kan_captured_allo
 kan_captured_allocation_group_iterator_t kan_captured_allocation_group_children_begin (
     kan_captured_allocation_group_t group)
 {
-    return 0u;
+    return KAN_HANDLE_SET_INVALID (kan_captured_allocation_group_iterator_t);
 }
 
 kan_captured_allocation_group_iterator_t kan_captured_allocation_group_children_next (
     kan_captured_allocation_group_iterator_t current)
 {
-    return 0u;
+    return KAN_HANDLE_SET_INVALID (kan_captured_allocation_group_iterator_t);
 }
 
 kan_captured_allocation_group_t kan_captured_allocation_group_children_get (
     kan_captured_allocation_group_iterator_t current)
 {
-    return 0u;
+    return KAN_HANDLE_SET_INVALID (kan_captured_allocation_group_t);
 }
 
-kan_captured_allocation_group_iterator_t kan_captured_allocation_group_children_end (
-    kan_captured_allocation_group_t group)
+void kan_captured_allocation_group_iterator_destroy (kan_captured_allocation_group_iterator_t iterator)
 {
-    return 0u;
 }
 
 void kan_captured_allocation_group_destroy (kan_captured_allocation_group_t group)
@@ -59,7 +57,7 @@ const struct kan_allocation_group_event_t *kan_allocation_group_event_iterator_g
 kan_allocation_group_event_iterator_t kan_allocation_group_event_iterator_advance (
     kan_allocation_group_event_iterator_t iterator)
 {
-    return 0u;
+    return KAN_HANDLE_SET_INVALID (kan_allocation_group_event_iterator_t);
 }
 
 void kan_allocation_group_event_iterator_destroy (kan_allocation_group_event_iterator_t iterator)
@@ -69,7 +67,7 @@ void kan_allocation_group_event_iterator_destroy (kan_allocation_group_event_ite
 struct kan_allocation_group_capture_t kan_allocation_group_begin_capture (void)
 {
     struct kan_allocation_group_capture_t capture;
-    capture.captured_root = 0u;
-    capture.event_iterator = 0u;
+    capture.captured_root = KAN_HANDLE_SET_INVALID (kan_captured_allocation_group_t);
+    capture.event_iterator = KAN_HANDLE_SET_INVALID (kan_allocation_group_event_iterator_t);
     return capture;
 }

@@ -2,7 +2,7 @@
 
 #include <string.h>
 
-#include <kan/api_common/bool.h>
+#include <kan/api_common/core_types.h>
 #include <kan/container/hash_storage.h>
 #include <kan/container/interned_string.h>
 #include <kan/container/stack_group_allocator.h>
