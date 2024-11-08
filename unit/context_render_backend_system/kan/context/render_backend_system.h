@@ -40,7 +40,7 @@
 /// Then, to properly initialize context, user must select appropriate device from supported devices information.
 /// To get supported devices, use `kan_render_backend_system_get_devices`. Device query is guaranteed to be done during
 /// system startup on all implementations, therefore this function call is technically almost free. After that, program
-/// should use provided information to select supported device and pass its id to
+/// should use provided information to select supported device and pass its handle to
 /// `kan_render_backend_system_select_device`. If that call has returned KAN_TRUE, then render backend is initialized
 /// successfully and cannot be reinitialized during this program execution.
 /// \endparblock
@@ -49,14 +49,14 @@
 /// \parblock
 /// Surfaces are used to present render results to windows. Use `kan_render_backend_system_create_surface` to create
 /// surface and `kan_render_backend_system_destroy_surface` to schedule surface destruction. Swap chain is created
-/// automatically under the hood. Swap chain recreation on window size changes is executed automatically too.
+/// automatically under the hood. Swap chain recreation on window size change is executed automatically too.
 ///
 /// Due to synchronization with window manager, surface might not be ready until the next frame after its creation.
 /// It can still be attached to frame buffer as valid handle, but that means that this frame buffer will also be
 /// ready for rendering only after surface creation.
 ///
 /// Keep in mind, that for window surfaces to be supported, window must be created with
-/// `kan_render_get_required_window_flags`.
+/// `kan_render_get_required_window_flags` enabled.
 /// \endparblock
 ///
 /// \par Render passes
@@ -65,7 +65,7 @@
 /// attachments. It also usually has high level meaning, but for render backend it is irrelevant. Render passes can
 /// form dependencies one on another through `kan_render_pass_add_static_dependency`.
 ///
-/// In order to submit commands to render pass, it must firstly be instantiated for the current frame through
+/// In order to submit commands to render pass, it must be instantiated for the current frame through
 /// `kan_render_pass_instantiate` with appropriate frame buffer, viewport, scissor and clear values. If render pass
 /// instance was successfully created, it can then receive commands through `kan_render_pass_instance_*` functions
 /// and receive frame-lifetime dependencies through `kan_render_pass_instance_add_dynamic_dependency`.
@@ -136,14 +136,14 @@
 /// \parblock
 /// Destroy functions do not destroy resources when they're called as these resources can be still in use on GPU.
 /// Instead, resources are placed into destroy schedule and are destroyed as soon as it is safe. Therefore, destroy
-/// call order doesn't matter: if destroy was called during them save frame (or between the same frames), it would
-/// always be executed in correct order once time is right.
+/// call order doesn't matter: if destroy was called during the same frame (or between the same frames), it would
+/// always be executed in the correct order once time is right.
 /// \endparblock
 ///
 /// \par Read back
 /// \parblock
 /// It is possible to read data back from surfaces, buffers and images using buffer with
-/// KAN_RENDER_BUFFER_TYPE_READ_BACK_STORAGE type and `kan_render_read_back_request_from_*` functions. Returned
+/// KAN_RENDER_BUFFER_TYPE_READ_BACK_STORAGE type through `kan_render_request_read_back_from_*` functions. Returned
 /// `kan_render_read_back_status_t` can be used to track when read back is safe to access on CPU. It can take several
 /// frames to ensure that. `kan_render_get_read_back_max_delay_in_frames` convenience function returns maximum count
 /// of frames between read back request and its successful completion.
@@ -211,7 +211,7 @@ enum kan_render_device_memory_type_t
     /// \brief Fully separate memory module on GPU. Often found in standalone PCs.
     KAN_RENDER_DEVICE_MEMORY_TYPE_SEPARATE = 0u,
 
-    /// \brief Most memory is both device local and host visible. Rare.
+    /// \brief Most memory is both device local and host visible, but not host coherent. Rare.
     KAN_RENDER_DEVICE_MEMORY_TYPE_UNIFIED,
 
     /// \brief Most memory is both device local and host coherent. Often found in laptops and mobile devices.
@@ -340,6 +340,8 @@ kan_render_backend_system_get_render_context (kan_context_system_t render_backen
 /// \details Submits recorded commands and presentation from previous frame, prepares data for the new frame.
 /// \return True if next frame submit should be started, false otherwise. For example, we might not be able to submit
 ///         new frame while using frames in flights when GPU is not fast enough to process all the frames.
+/// \details User should never call other render backend functions while this function is executing. Also, user must
+///          ensure that `kan_application_system_sync_in_main_thread` is not executed simultaneously with that function.
 CONTEXT_RENDER_BACKEND_SYSTEM_API kan_bool_t
 kan_render_backend_system_next_frame (kan_context_system_t render_backend_system);
 
@@ -992,7 +994,7 @@ CONTEXT_RENDER_BACKEND_SYSTEM_API void *kan_render_buffer_patch (kan_render_buff
                                                                  uint32_t slice_size);
 
 /// \brief Requests read access to read back buffer.
-/// \return Point to read back buffer data on success.
+/// \return Pointer to read back buffer data on success.
 /// \invariant Buffer type is KAN_RENDER_BUFFER_TYPE_READ_BACK_STORAGE.
 CONTEXT_RENDER_BACKEND_SYSTEM_API void *kan_render_buffer_begin_access (kan_render_buffer_t buffer);
 
@@ -1099,19 +1101,19 @@ enum kan_render_read_back_state_t
 CONTEXT_RENDER_BACKEND_SYSTEM_API uint64_t kan_render_get_read_back_max_delay_in_frames (void);
 
 /// \brief Requests to read data back from surface when this frame ends.
-CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_read_back_status_t kan_render_read_back_request_from_surface (
+CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_read_back_status_t kan_render_request_read_back_from_surface (
     kan_render_surface_t surface, kan_render_buffer_t read_back_buffer, uint32_t read_back_offset);
 
 /// \brief Requests to read data back from buffer when this frame ends.
 CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_read_back_status_t
-kan_render_read_back_request_from_buffer (kan_render_buffer_t buffer,
+kan_render_request_read_back_from_buffer (kan_render_buffer_t buffer,
                                           uint32_t offset,
                                           uint32_t slice,
                                           kan_render_buffer_t read_back_buffer,
                                           uint32_t read_back_offset);
 
 /// \brief Requests to read data back from image when this frame ends.
-CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_read_back_status_t kan_render_read_back_request_from_image (
+CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_read_back_status_t kan_render_request_read_back_from_image (
     kan_render_image_t image, uint8_t mip, kan_render_buffer_t read_back_buffer, uint32_t read_back_offset);
 
 /// \brief Queries current status of read back operation.

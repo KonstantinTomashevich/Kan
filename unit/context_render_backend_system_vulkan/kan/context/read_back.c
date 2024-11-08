@@ -17,7 +17,7 @@ static inline struct render_backend_read_back_status_t *create_empty_status (str
     return status;
 }
 
-kan_render_read_back_status_t kan_render_read_back_request_from_surface (kan_render_surface_t surface,
+kan_render_read_back_status_t kan_render_request_read_back_from_surface (kan_render_surface_t surface,
                                                                          kan_render_buffer_t read_back_buffer,
                                                                          uint32_t read_back_offset)
 {
@@ -49,7 +49,7 @@ kan_render_read_back_status_t kan_render_read_back_request_from_surface (kan_ren
     return KAN_HANDLE_SET (kan_render_read_back_status_t, status);
 }
 
-kan_render_read_back_status_t kan_render_read_back_request_from_buffer (kan_render_buffer_t buffer,
+kan_render_read_back_status_t kan_render_request_read_back_from_buffer (kan_render_buffer_t buffer,
                                                                         uint32_t offset,
                                                                         uint32_t slice,
                                                                         kan_render_buffer_t read_back_buffer,
@@ -85,7 +85,7 @@ kan_render_read_back_status_t kan_render_read_back_request_from_buffer (kan_rend
     return KAN_HANDLE_SET (kan_render_read_back_status_t, status);
 }
 
-kan_render_read_back_status_t kan_render_read_back_request_from_image (kan_render_image_t image,
+kan_render_read_back_status_t kan_render_request_read_back_from_image (kan_render_image_t image,
                                                                        uint8_t mip,
                                                                        kan_render_buffer_t read_back_buffer,
                                                                        uint32_t read_back_offset)

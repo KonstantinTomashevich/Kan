@@ -1198,7 +1198,7 @@ KAN_TEST_CASE (render_and_capture)
                     if (!KAN_HANDLE_IS_VALID (first_frame_read_back))
                     {
                         first_frame_read_back =
-                            kan_render_read_back_request_from_surface (test_surface, first_read_back_buffer, 0u);
+                            kan_render_request_read_back_from_surface (test_surface, first_read_back_buffer, 0u);
                         KAN_TEST_ASSERT (KAN_HANDLE_IS_VALID (first_frame_read_back))
                     }
 #endif
@@ -1229,7 +1229,7 @@ KAN_TEST_CASE (render_and_capture)
                      !KAN_HANDLE_IS_VALID (second_frame_read_back))
             {
                 second_frame_read_back =
-                    kan_render_read_back_request_from_surface (test_surface, second_read_back_buffer, 0u);
+                    kan_render_request_read_back_from_surface (test_surface, second_read_back_buffer, 0u);
                 KAN_TEST_ASSERT (KAN_HANDLE_IS_VALID (second_frame_read_back))
             }
 #endif

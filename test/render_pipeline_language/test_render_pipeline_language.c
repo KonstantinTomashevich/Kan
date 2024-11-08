@@ -110,7 +110,7 @@ KAN_TEST_CASE (generic)
     KAN_TEST_CHECK (meta.graphics_classic_settings.depth_bounds_test == KAN_FALSE)
     KAN_TEST_CHECK (meta.graphics_classic_settings.depth_compare_operation == KAN_RPL_COMPARE_OPERATION_LESS)
     KAN_TEST_CHECK (!meta.graphics_classic_settings.stencil_test)
-    KAN_TEST_CHECK (fabs (meta.graphics_classic_settings.depth_min + 1.0) < TEST_FLOATING_TOLERANCE)
+    KAN_TEST_CHECK (fabs (meta.graphics_classic_settings.depth_min) < TEST_FLOATING_TOLERANCE)
     KAN_TEST_CHECK (fabs (meta.graphics_classic_settings.depth_max - 1.0) < TEST_FLOATING_TOLERANCE)
 
     KAN_TEST_ASSERT (meta.attribute_buffers.size == 1u)
