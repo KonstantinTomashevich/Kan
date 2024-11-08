@@ -39,7 +39,7 @@ static struct
 {
     struct kan_c_interface_file_t *input_files;
     struct kan_trivial_string_buffer_t output_buffer;
-} io = {.input_files = NULL, .output_buffer = {0u, 0u, KAN_ALLOCATION_GROUP_IGNORE, NULL}};
+} io = {.input_files = NULL, .output_buffer = {0u, 0u, KAN_HANDLE_INITIALIZE_INVALID, NULL}};
 
 static struct
 {
