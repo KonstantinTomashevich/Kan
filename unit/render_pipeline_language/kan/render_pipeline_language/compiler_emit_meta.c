@@ -708,42 +708,45 @@ static kan_bool_t emit_meta_gather_parameters_process_field (
     kan_instance_size_t base_offset,
     struct compiler_instance_declaration_node_t *first_declaration,
     struct kan_rpl_meta_buffer_t *meta_output,
-    struct flattening_name_generation_buffer_t *name_generation_buffer);
+    struct kan_trivial_string_buffer_t *name_generation_buffer);
 
 static kan_bool_t emit_meta_gather_parameters_process_field_list (
     struct rpl_compiler_instance_t *instance,
     kan_instance_size_t base_offset,
     struct compiler_instance_declaration_node_t *first_declaration,
     struct kan_rpl_meta_buffer_t *meta_output,
-    struct flattening_name_generation_buffer_t *name_generation_buffer)
+    struct kan_trivial_string_buffer_t *name_generation_buffer)
 {
     kan_bool_t valid = KAN_TRUE;
     struct compiler_instance_declaration_node_t *field = first_declaration;
 
     while (field)
     {
-        const kan_loop_size_t length = name_generation_buffer->length;
-        flattening_name_generation_buffer_append (name_generation_buffer, field->variable.name);
+        const kan_instance_size_t length = name_generation_buffer->size;
+        if (name_generation_buffer->size > 0u)
+        {
+            kan_trivial_string_buffer_append_string (name_generation_buffer, ".");
+        }
 
+        kan_trivial_string_buffer_append_string (name_generation_buffer, field->variable.name);
         if (!emit_meta_gather_parameters_process_field (instance, base_offset, field, meta_output,
                                                         name_generation_buffer))
         {
             valid = KAN_FALSE;
         }
 
-        flattening_name_generation_buffer_reset (name_generation_buffer, length);
+        kan_trivial_string_buffer_reset (name_generation_buffer, length);
         field = field->next;
     }
 
     return valid;
 }
 
-static kan_bool_t emit_meta_gather_parameters_process_field (
-    struct rpl_compiler_instance_t *instance,
-    kan_instance_size_t base_offset,
-    struct compiler_instance_declaration_node_t *field,
-    struct kan_rpl_meta_buffer_t *meta_output,
-    struct flattening_name_generation_buffer_t *name_generation_buffer)
+static kan_bool_t emit_meta_gather_parameters_process_field (struct rpl_compiler_instance_t *instance,
+                                                             kan_instance_size_t base_offset,
+                                                             struct compiler_instance_declaration_node_t *field,
+                                                             struct kan_rpl_meta_buffer_t *meta_output,
+                                                             struct kan_trivial_string_buffer_t *name_generation_buffer)
 {
     if (field->variable.type.if_vector || field->variable.type.if_matrix)
     {
@@ -758,7 +761,8 @@ static kan_bool_t emit_meta_gather_parameters_process_field (
         }
 
         kan_rpl_meta_parameter_init (parameter);
-        parameter->name = kan_string_intern (name_generation_buffer->buffer);
+        parameter->name = kan_char_sequence_intern (name_generation_buffer->buffer,
+                                                    name_generation_buffer->buffer + name_generation_buffer->size);
         parameter->offset = base_offset + field->offset;
 
         if (!emit_meta_variable_type_to_meta_type (&field->variable, &parameter->type, instance->context_log_name,
@@ -799,6 +803,10 @@ kan_bool_t kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t comp
     struct rpl_compiler_instance_t *instance = KAN_HANDLE_GET (compiler_instance);
     meta->pipeline_type = instance->pipeline_type;
     kan_bool_t valid = KAN_TRUE;
+
+    struct kan_trivial_string_buffer_t name_generation_buffer;
+    kan_trivial_string_buffer_init (&name_generation_buffer, STATICS.rpl_meta_allocation_group,
+                                    KAN_RPL_COMPILER_INSTANCE_MAX_FLAT_NAME_LENGTH);
 
     kan_loop_size_t attribute_buffer_count = 0u;
     kan_loop_size_t pass_buffer_count = 0u;
@@ -996,10 +1004,6 @@ kan_bool_t kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t comp
             buffer->type == KAN_RPL_BUFFER_TYPE_INSTANCED_UNIFORM ||
             buffer->type == KAN_RPL_BUFFER_TYPE_INSTANCED_READ_ONLY_STORAGE)
         {
-            struct flattening_name_generation_buffer_t name_generation_buffer;
-            name_generation_buffer.length = 0u;
-            name_generation_buffer.buffer[0u] = '\0';
-
             if (!emit_meta_gather_parameters_process_field_list (instance, 0u, buffer->first_field, meta_buffer,
                                                                  &name_generation_buffer))
             {

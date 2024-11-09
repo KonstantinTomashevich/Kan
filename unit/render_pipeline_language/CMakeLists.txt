@@ -45,7 +45,7 @@ set (KAN_RPL_COMPILER_CONTEXT_RESOLVE_STACK "65536 " CACHE STRING
         "Size of a stack group allocator node to store all allocations for compiler context resolve.")
 set (KAN_RPL_COMPILER_INSTANCE_RESOLVE_STACK "1048576 " CACHE STRING
         "Size of a stack group allocator node to store all compiler instance data allocated during resolve.")
-set (KAN_RPL_COMPILER_INSTANCE_MAX_FLAT_NAME_LENGTH "256 " CACHE STRING
+set (KAN_RPL_COMPILER_INSTANCE_MAX_FLAT_NAME_LENGTH "256" CACHE STRING
         "Max length for flattened buffer declaration readable name.")
 set (KAN_RPL_PARSER_SPIRV_GENERATION_TEMPORARY_SIZE "1048576" CACHE STRING
         "Size of a temporary stack group allocator stack for SPIRV generation algorithm.")

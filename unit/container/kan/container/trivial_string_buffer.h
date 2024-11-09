@@ -14,8 +14,6 @@
 
 KAN_C_HEADER_BEGIN
 
-// TODO: What isn't it used anywhere? Examine and try to use it.
-
 /// \brief Trivial string buffer structure.
 struct kan_trivial_string_buffer_t
 {
@@ -86,6 +84,14 @@ static inline void kan_trivial_string_buffer_append_signed_long (struct kan_triv
     snprintf (buffer, 63u, "%ld", value);
     buffer[63u] = '\0';
     kan_trivial_string_buffer_append_string (instance, buffer);
+}
+
+/// \brief Sets buffer size to given size which is smaller than current, forgetting excess characters.
+static inline void kan_trivial_string_buffer_reset (struct kan_trivial_string_buffer_t *instance,
+                                                    kan_instance_size_t new_size)
+{
+    KAN_ASSERT (new_size <= instance->size)
+    instance->size = new_size;
 }
 
 /// \brief Shuts down string buffer and frees its resources.

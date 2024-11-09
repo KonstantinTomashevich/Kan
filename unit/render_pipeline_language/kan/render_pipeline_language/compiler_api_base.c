@@ -118,6 +118,8 @@ kan_rpl_compiler_context_t kan_rpl_compiler_context_create (enum kan_rpl_pipelin
     kan_stack_group_allocator_init (&instance->resolve_allocator, STATICS.rpl_compiler_context_allocation_group,
                                     KAN_RPL_COMPILER_CONTEXT_RESOLVE_STACK);
 
+    kan_trivial_string_buffer_init (&instance->name_generation_buffer, STATICS.rpl_compiler_context_allocation_group,
+                                    KAN_RPL_COMPILER_INSTANCE_MAX_FLAT_NAME_LENGTH);
     return KAN_HANDLE_SET (kan_rpl_compiler_context_t, instance);
 }
 
@@ -269,5 +271,6 @@ void kan_rpl_compiler_context_destroy (kan_rpl_compiler_context_t compiler_conte
     kan_dynamic_array_shutdown (&instance->option_values);
     kan_dynamic_array_shutdown (&instance->modules);
     kan_stack_group_allocator_shutdown (&instance->resolve_allocator);
+    kan_trivial_string_buffer_shutdown (&instance->name_generation_buffer);
     kan_free_general (STATICS.rpl_compiler_context_allocation_group, instance, sizeof (struct rpl_compiler_context_t));
 }

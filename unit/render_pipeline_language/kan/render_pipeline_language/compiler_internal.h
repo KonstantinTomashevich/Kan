@@ -18,6 +18,7 @@
 #include <kan/memory/allocation.h>
 #include <kan/render_pipeline_language/compiler.h>
 #include <kan/threading/atomic.h>
+#include <kan/container/trivial_string_buffer.h>
 
 /// \brief SPIRV used 32-bit integers for everything inside bytecode.
 typedef uint32_t spirv_size_t;
@@ -50,6 +51,7 @@ struct rpl_compiler_context_t
     struct kan_dynamic_array_t modules;
 
     struct kan_stack_group_allocator_t resolve_allocator;
+    struct kan_trivial_string_buffer_t name_generation_buffer;
 };
 
 struct compiler_instance_setting_node_t
@@ -124,15 +126,9 @@ struct compiler_instance_struct_node_t
     spirv_size_t spirv_id_function_pointer;
 };
 
-struct flattening_name_generation_buffer_t
-{
-    kan_instance_size_t length;
-    char buffer[KAN_RPL_COMPILER_INSTANCE_MAX_FLAT_NAME_LENGTH];
-};
-
-#define INVALID_LOCATION UINT32_MAX
-#define INVALID_SET UINT32_MAX
-#define INVALID_BINDING UINT32_MAX
+#define INVALID_LOCATION KAN_INT_MAX (kan_rpl_size_t)
+#define INVALID_SET KAN_INT_MAX (kan_rpl_size_t)
+#define INVALID_BINDING KAN_INT_MAX (kan_rpl_size_t)
 
 struct binding_location_assignment_counter_t
 {
@@ -449,6 +445,8 @@ struct rpl_compiler_instance_t
 
     struct compiler_instance_function_node_t *first_function;
     struct compiler_instance_function_node_t *last_function;
+
+    struct kan_trivial_string_buffer_t resolve_name_generation_buffer;
 };
 
 enum inbuilt_type_item_t
@@ -1374,35 +1372,6 @@ static inline struct compiler_instance_function_node_t *find_builtin_function (k
     }
 
     return NULL;
-}
-
-static inline void flattening_name_generation_buffer_reset (struct flattening_name_generation_buffer_t *buffer,
-                                                            kan_instance_size_t to_length)
-{
-    buffer->length = KAN_MIN (KAN_RPL_COMPILER_INSTANCE_MAX_FLAT_NAME_LENGTH - 1u, to_length);
-    buffer->buffer[buffer->length] = '\0';
-}
-
-static inline void flattening_name_generation_buffer_append (struct flattening_name_generation_buffer_t *buffer,
-                                                             const char *name)
-{
-    const kan_instance_size_t sub_name_length = (kan_instance_size_t) strlen (name);
-    const kan_instance_size_t new_length =
-        buffer->length > 0u ? buffer->length + 1u + sub_name_length : sub_name_length;
-    const kan_instance_size_t dot_position = buffer->length;
-    const kan_instance_size_t sub_name_position = dot_position == 0u ? 0u : dot_position + 1u;
-    flattening_name_generation_buffer_reset (buffer, new_length);
-
-    if (dot_position != 0u && dot_position < buffer->length)
-    {
-        buffer->buffer[dot_position] = '.';
-    }
-
-    if (sub_name_position < buffer->length)
-    {
-        const kan_instance_size_t to_copy = buffer->length - sub_name_position;
-        memcpy (&buffer->buffer[sub_name_position], name, to_copy);
-    }
 }
 
 static inline const char *get_type_name_for_logging (struct inbuilt_vector_type_t *if_vector,

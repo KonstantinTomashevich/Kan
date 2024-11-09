@@ -867,7 +867,6 @@ static kan_bool_t flatten_buffer_process_field (struct rpl_compiler_context_t *c
                                                 struct compiler_instance_buffer_node_t *buffer,
                                                 struct compiler_instance_declaration_node_t *declaration,
                                                 struct compiler_instance_buffer_flattening_graph_node_t *output_node,
-                                                struct flattening_name_generation_buffer_t *name_generation_buffer,
                                                 struct binding_location_assignment_counter_t *assignment_counter);
 
 static kan_bool_t flatten_buffer_process_field_list (
@@ -876,7 +875,6 @@ static kan_bool_t flatten_buffer_process_field_list (
     struct compiler_instance_buffer_node_t *buffer,
     struct compiler_instance_declaration_node_t *first_declaration,
     struct compiler_instance_buffer_flattening_graph_node_t *output_node,
-    struct flattening_name_generation_buffer_t *name_generation_buffer,
     struct binding_location_assignment_counter_t *assignment_counter)
 {
     kan_bool_t result = KAN_TRUE;
@@ -893,16 +891,16 @@ static kan_bool_t flatten_buffer_process_field_list (
         new_root->name = field->variable.name;
         new_root->flattened_result = NULL;
 
-        const kan_instance_size_t length = name_generation_buffer->length;
-        flattening_name_generation_buffer_append (name_generation_buffer, field->variable.name);
+        const kan_instance_size_t length = context->name_generation_buffer.size;
+        kan_trivial_string_buffer_append_string (&context->name_generation_buffer, ".");
+        kan_trivial_string_buffer_append_string (&context->name_generation_buffer, field->variable.name);
 
-        if (!flatten_buffer_process_field (context, instance, buffer, field, new_root, name_generation_buffer,
-                                           assignment_counter))
+        if (!flatten_buffer_process_field (context, instance, buffer, field, new_root, assignment_counter))
         {
             result = KAN_FALSE;
         }
 
-        flattening_name_generation_buffer_reset (name_generation_buffer, length);
+        kan_trivial_string_buffer_reset (&context->name_generation_buffer, length);
         if (last_root)
         {
             last_root->next_on_level = new_root;
@@ -931,7 +929,6 @@ static kan_bool_t flatten_buffer_process_field (struct rpl_compiler_context_t *c
                                                 struct compiler_instance_buffer_node_t *buffer,
                                                 struct compiler_instance_declaration_node_t *declaration,
                                                 struct compiler_instance_buffer_flattening_graph_node_t *output_node,
-                                                struct flattening_name_generation_buffer_t *name_generation_buffer,
                                                 struct binding_location_assignment_counter_t *assignment_counter)
 {
     kan_bool_t result = KAN_TRUE;
@@ -943,7 +940,9 @@ static kan_bool_t flatten_buffer_process_field (struct rpl_compiler_context_t *c
 
         flattened->next = NULL;
         flattened->source_declaration = declaration;
-        flattened->readable_name = kan_string_intern (name_generation_buffer->buffer);
+        flattened->readable_name =
+            kan_char_sequence_intern (context->name_generation_buffer.buffer,
+                                      context->name_generation_buffer.buffer + context->name_generation_buffer.size);
 
         switch (buffer->type)
         {
@@ -1002,7 +1001,7 @@ static kan_bool_t flatten_buffer_process_field (struct rpl_compiler_context_t *c
     {
         if (!flatten_buffer_process_field_list (context, instance, buffer,
                                                 declaration->variable.type.if_struct->first_field, output_node,
-                                                name_generation_buffer, assignment_counter))
+                                                assignment_counter))
         {
             result = KAN_FALSE;
         }
@@ -1017,20 +1016,15 @@ static kan_bool_t flatten_buffer (struct rpl_compiler_context_t *context,
                                   struct binding_location_assignment_counter_t *assignment_counter)
 {
     kan_bool_t result = KAN_TRUE;
-    struct flattening_name_generation_buffer_t name_generation_buffer;
-    const kan_instance_size_t buffer_name_length = (kan_instance_size_t) strlen (buffer->name);
-    const kan_instance_size_t to_copy =
-        KAN_MIN (KAN_RPL_COMPILER_INSTANCE_MAX_FLAT_NAME_LENGTH - 1u, buffer_name_length);
+    kan_trivial_string_buffer_reset (&context->name_generation_buffer, 0u);
+    kan_trivial_string_buffer_append_string (&context->name_generation_buffer, buffer->name);
 
-    flattening_name_generation_buffer_reset (&name_generation_buffer, to_copy);
-    memcpy (name_generation_buffer.buffer, buffer->name, to_copy);
-
-    if (!flatten_buffer_process_field_list (context, instance, buffer, buffer->first_field, NULL,
-                                            &name_generation_buffer, assignment_counter))
+    if (!flatten_buffer_process_field_list (context, instance, buffer, buffer->first_field, NULL, assignment_counter))
     {
         result = KAN_FALSE;
     }
 
+    kan_trivial_string_buffer_reset (&context->name_generation_buffer, 0u);
     return result;
 }
 
