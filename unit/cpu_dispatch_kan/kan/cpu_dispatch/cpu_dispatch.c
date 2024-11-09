@@ -17,7 +17,12 @@
 #define JOB_STATE_ASSEMBLING 0u
 #define JOB_STATE_RELEASED 1u
 #define JOB_STATE_DETACHED 2u
-#define JOB_STATE_COMPLETED 3u
+
+/// \brief We cannot switch to completed right away, because detach or wait function can deallocate job when it has
+///        switched to completed, but before it was able to do on-complete activities. Therefore, we use finishing
+///        when job thinks that it has completed, and then switch to completed when we're fully done.
+#define JOB_STATE_FINISHING 3u
+#define JOB_STATE_COMPLETED 4u
 
 #define JOB_STATUS_TASK_COUNT_BITS 24u
 #define JOB_STATUS_TASK_COUNT_MASK ((1u << JOB_STATUS_TASK_COUNT_BITS) - 1u)
@@ -371,13 +376,13 @@ static void job_report_task_finished (struct job_t *job)
 
         if (old_status_state != JOB_STATE_ASSEMBLING && (new_status_bits & JOB_STATUS_TASK_COUNT_MASK) == 0u)
         {
-            new_status_bits = JOB_STATE_COMPLETED << JOB_STATUS_TASK_COUNT_BITS;
+            new_status_bits = JOB_STATE_FINISHING << JOB_STATUS_TASK_COUNT_BITS;
         }
 
         const int new_status = (int) new_status_bits;
         if (kan_atomic_int_compare_and_set (&job->status, old_status, new_status))
         {
-            if (new_status_bits == (JOB_STATE_COMPLETED << JOB_STATUS_TASK_COUNT_BITS))
+            if (new_status_bits == (JOB_STATE_FINISHING << JOB_STATUS_TASK_COUNT_BITS))
             {
                 // Job is now completed fully. Check old state to choose what to do.
                 KAN_ASSERT (old_status_state == JOB_STATE_RELEASED || old_status_state == JOB_STATE_DETACHED)
@@ -391,8 +396,16 @@ static void job_report_task_finished (struct job_t *job)
                 {
                     kan_free_batched (job_allocation_group, job);
                 }
-
-                // Nothing more to do if JOB_STATE_RELEASED.
+                else
+                {
+#if defined(KAN_WITH_ASSERT)
+                    // We've already switched to finishing state, nothing should be able to bother us. Check it.
+                    KAN_ASSERT (kan_atomic_int_compare_and_set (&job->status, new_status_bits,
+                                                                JOB_STATE_COMPLETED << JOB_STATUS_TASK_COUNT_BITS))
+#else
+                    kan_atomic_int_set (&job->status, JOB_STATE_COMPLETED << JOB_STATUS_TASK_COUNT_BITS)
+#endif
+                }
             }
 
             break;
@@ -482,12 +495,17 @@ void kan_cpu_job_detach (kan_cpu_job_t job)
         const int old_status = kan_atomic_int_get (&job_data->status);
         const unsigned int old_status_bits = (unsigned int) old_status;
         const unsigned int old_status_state = old_status_bits >> JOB_STATUS_TASK_COUNT_BITS;
-        KAN_ASSERT (old_status_state == JOB_STATE_RELEASED || old_status_state == JOB_STATE_COMPLETED)
+        KAN_ASSERT (old_status_state == JOB_STATE_RELEASED || old_status_state == JOB_STATE_FINISHING ||
+                    old_status_state == JOB_STATE_COMPLETED)
 
         if (old_status_state == JOB_STATE_COMPLETED)
         {
             kan_free_batched (job_allocation_group, job_data);
             return;
+        }
+        else if (old_status_state == JOB_STATE_FINISHING)
+        {
+            continue;
         }
 
         const unsigned int old_status_tasks = old_status_bits & JOB_STATUS_TASK_COUNT_MASK;
@@ -514,13 +532,19 @@ void kan_cpu_job_wait (kan_cpu_job_t job)
         const int old_status = kan_atomic_int_get (&job_data->status);
         const unsigned int old_status_bits = (unsigned int) old_status;
         const unsigned int old_status_state = old_status_bits >> JOB_STATUS_TASK_COUNT_BITS;
-        KAN_ASSERT (old_status_state == JOB_STATE_RELEASED || old_status_state == JOB_STATE_COMPLETED)
+        KAN_ASSERT (old_status_state == JOB_STATE_RELEASED || old_status_state == JOB_STATE_FINISHING ||
+                    old_status_state == JOB_STATE_COMPLETED)
 
         // Some time passed from fast-forward check above, so we might be completed as well.
         if (old_status_state == JOB_STATE_COMPLETED)
         {
             kan_free_batched (job_allocation_group, job_data);
             return;
+        }
+        else if (old_status_state == JOB_STATE_FINISHING)
+        {
+            // No need to wait, we're almost here.
+            continue;
         }
 
         // From purist point of view, waiting like that is pretty bad. But there is a chain of thoughts for that:
