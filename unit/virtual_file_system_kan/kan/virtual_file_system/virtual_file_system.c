@@ -2059,7 +2059,7 @@ const char *kan_virtual_file_system_directory_iterator_advance (
 
                     const kan_instance_size_t extension_length =
                         iterator_data->read_only_pack_suffix.next_file->extension ?
-                            strlen (iterator_data->read_only_pack_suffix.next_file->extension) :
+                            (kan_instance_size_t) strlen (iterator_data->read_only_pack_suffix.next_file->extension) :
                             0u;
 
                     if (name_length > 0u)

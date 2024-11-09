@@ -2682,7 +2682,7 @@ static spirv_size_t spirv_emit_expression (struct spirv_generation_context_t *co
                 break;
 
             case INBUILT_TYPE_ITEM_INTEGER:
-                constant_id = spirv_request_i1_constant (context, -1);
+                constant_id = spirv_request_i1_constant (context, (spirv_signed_literal_t) -1);
                 break;
             }
 

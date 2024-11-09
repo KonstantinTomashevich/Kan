@@ -55,7 +55,7 @@ static inline void kan_trivial_string_buffer_append_char_sequence (struct kan_tr
             instance->buffer = new_buffer;
         }
 
-        strncpy (instance->buffer + instance->size, begin, length);
+        memcpy (instance->buffer + instance->size, begin, length);
         instance->size += length;
     }
 }

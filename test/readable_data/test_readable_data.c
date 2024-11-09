@@ -265,12 +265,12 @@ KAN_TEST_CASE (emit_and_parse_all_elemental_setters)
 
     struct kan_readable_data_value_node_t position_y_node = {
         .next = NULL,
-        .floating = 5.5,
+        .floating = (kan_readable_data_floating_t) 5.5,
     };
 
     struct kan_readable_data_value_node_t position_x_node = {
         .next = &position_y_node,
-        .floating = -1.34,
+        .floating = (kan_readable_data_floating_t) -1.34,
     };
 
     events_to_emit[5u] = (struct kan_readable_data_event_t) {
@@ -313,7 +313,7 @@ KAN_TEST_CASE (emit_and_parse_complex_setters)
 
     struct kan_readable_data_value_node_t max_velocity_node = {
         .next = NULL,
-        .floating = 10.0,
+        .floating = (kan_readable_data_floating_t) 10.0,
     };
 
     events_to_emit[2u] = (struct kan_readable_data_event_t) {
@@ -328,7 +328,7 @@ KAN_TEST_CASE (emit_and_parse_complex_setters)
 
     struct kan_readable_data_value_node_t max_acceleration_node = {
         .next = NULL,
-        .floating = 20.0,
+        .floating = (kan_readable_data_floating_t) 20.0,
     };
 
     events_to_emit[3u] = (struct kan_readable_data_event_t) {
@@ -517,12 +517,12 @@ KAN_TEST_CASE (human_input_corner_cases)
 
     struct kan_readable_data_value_node_t position_y_node = {
         .next = NULL,
-        .floating = 5.5,
+        .floating = (kan_readable_data_floating_t) 5.5,
     };
 
     struct kan_readable_data_value_node_t position_x_node = {
         .next = &position_y_node,
-        .floating = -1.34,
+        .floating = (kan_readable_data_floating_t) -1.34,
     };
 
     events_to_emit[5u] = (struct kan_readable_data_event_t) {

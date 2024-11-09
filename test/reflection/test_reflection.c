@@ -479,7 +479,7 @@ KAN_TEST_CASE (query_local_field)
         },
         {
             .name = kan_string_intern ("second"),
-            .offset = kan_apply_alignment (sizeof (void *), first_struct.alignment),
+            .offset = (kan_instance_size_t) kan_apply_alignment (sizeof (void *), first_struct.alignment),
             .size = first_struct.size,
             .archetype = KAN_REFLECTION_ARCHETYPE_STRUCT,
             .archetype_struct = {first_struct.name},
@@ -530,16 +530,7 @@ KAN_TEST_CASE (query_local_field)
                                                                second_second_third_path, &absolute_offset,
                                                                &size_with_padding) == &first_struct_fields[2u])
     KAN_TEST_CHECK (absolute_offset == second_struct_fields[1u].offset + first_struct_fields[2u].offset)
-
-    // Padding size is different due to different sizes on interned string pointers on different platforms.
-    if (sizeof (void *) == 4u)
-    {
-        KAN_TEST_CHECK (size_with_padding == sizeof (void *) + sizeof (uint32_t))
-    }
-    else if (sizeof (void *) == 8u)
-    {
-        KAN_TEST_CHECK (size_with_padding == sizeof (void *))
-    }
+    KAN_TEST_CHECK (size_with_padding == 8u)
 
     kan_interned_string_t second_first_third_path[] = {second_struct_fields[0u].name, first_struct_fields[2u].name};
     KAN_TEST_CHECK (kan_reflection_registry_query_local_field (registry, second_struct.name, 2u,

@@ -233,7 +233,7 @@ kan_thread_result_t render_backend_pipeline_compiler_state_worker_function (kan_
             .pVertexAttributeDescriptions = family->attributes,
         };
 
-        VkPrimitiveTopology topology;
+        VkPrimitiveTopology topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
         switch (family->topology)
         {
         case KAN_RENDER_GRAPHICS_TOPOLOGY_TRIANGLE_LIST:
@@ -424,7 +424,7 @@ void render_backend_compiler_state_request_graphics (struct render_backend_pipel
         break;
     }
 
-    VkCullModeFlags cull_mode;
+    VkCullModeFlags cull_mode = VK_CULL_MODE_BACK_BIT;
     switch (description->cull_mode)
     {
     case KAN_RENDER_CULL_MODE_BACK:

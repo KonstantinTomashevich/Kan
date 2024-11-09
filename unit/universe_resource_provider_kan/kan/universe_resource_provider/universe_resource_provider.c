@@ -2568,8 +2568,8 @@ static inline void reflection_generation_iteration_check_type (
     const kan_memory_size_t data_offset =
         kan_apply_alignment (offsetof (struct kan_resource_container_view_t, data_begin), container_alignment);
 
-    node->type.alignment = container_alignment;
-    node->type.size = kan_apply_alignment (data_offset + type->size, container_alignment);
+    node->type.alignment = (kan_instance_size_t) container_alignment;
+    node->type.size = (kan_instance_size_t) kan_apply_alignment (data_offset + type->size, container_alignment);
 
     node->type.functor_user_data = (kan_functor_user_data_t) type;
     node->type.init = generated_container_init;
@@ -2589,7 +2589,7 @@ static inline void reflection_generation_iteration_check_type (
     node->type.fields[0u].visibility_condition_values = NULL;
 
     node->type.fields[1u].name = instance->interned_stored_resource;
-    node->type.fields[1u].offset = data_offset;
+    node->type.fields[1u].offset = (kan_instance_size_t) data_offset;
     node->type.fields[1u].size = type->size;
     node->type.fields[1u].archetype = KAN_REFLECTION_ARCHETYPE_STRUCT;
     node->type.fields[1u].archetype_struct.type_name = type->name;

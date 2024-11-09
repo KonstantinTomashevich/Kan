@@ -360,7 +360,8 @@ static void optional_includable_object_append_string (char *string)
         return;
     }
 
-    kan_trivial_string_buffer_append_char_sequence (&optional_includable_object_buffer, string, strlen (string));
+    kan_trivial_string_buffer_append_char_sequence (&optional_includable_object_buffer, string,
+                                                    (kan_instance_size_t) strlen (string));
 }
 
 static void optional_includable_object_finish (void)

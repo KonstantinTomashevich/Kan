@@ -230,7 +230,7 @@ struct render_backend_pipeline_parameter_set_t *render_backend_system_create_pip
     }
     }
 
-    struct render_backend_descriptor_set_allocation_t stable_allocation;
+    struct render_backend_descriptor_set_allocation_t stable_allocation = {VK_NULL_HANDLE, NULL};
     struct render_backend_descriptor_set_allocation_t *unstable_allocations = NULL;
 
     if (layout->stable_binding)

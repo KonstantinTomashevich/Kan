@@ -44,7 +44,7 @@ struct object_record_t
     kan_instance_size_t data_y;
 };
 
-#define INVALID_PARENT_OBJECT_ID ((kan_instance_size_t) ~0ull)
+#define INVALID_PARENT_OBJECT_ID KAN_INT_MAX (kan_instance_size_t)
 
 TEST_UNIVERSE_API void object_record_init (struct object_record_t *data)
 {

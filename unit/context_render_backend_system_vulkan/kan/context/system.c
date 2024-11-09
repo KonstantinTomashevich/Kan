@@ -672,7 +672,8 @@ void render_backend_system_shutdown (kan_context_system_t handle)
             VkMemoryRequirements requirements;
             vkGetImageMemoryRequirements (system->device, detached_image_destroy->detached_image, &requirements);
 
-            transfer_memory_between_groups (requirements.size, detached_image_destroy->gpu_allocation_group,
+            transfer_memory_between_groups ((vulkan_size_t) requirements.size,
+                                            detached_image_destroy->gpu_allocation_group,
                                             system->memory_profiling.gpu_unmarked_group);
 #endif
 
@@ -2204,7 +2205,7 @@ static inline void execute_pass_instance_submission (struct render_backend_syste
         {
         case KAN_FRAME_BUFFER_ATTACHMENT_IMAGE:
         {
-            VkImageLayout target_layout;
+            VkImageLayout target_layout = VK_IMAGE_LAYOUT_UNDEFINED;
             // Currently we include everything possible into possible access flags, which is not optimal.
             VkAccessFlags possible_access_flags = 0u;
             VkAccessFlags target_access_flags = 0u;
@@ -2788,8 +2789,9 @@ static void render_backend_system_submit_read_back (struct render_backend_system
     }
 
     vkCmdPipelineBarrier (state->primary_command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-                          VK_PIPELINE_STAGE_TRANSFER_BIT, 0u, 0u, NULL, buffer_barrier_output - buffer_barriers,
-                          buffer_barriers, image_barrier_output - image_barriers, image_barriers);
+                          VK_PIPELINE_STAGE_TRANSFER_BIT, 0u, 0u, NULL,
+                          (vulkan_size_t) (buffer_barrier_output - buffer_barriers), buffer_barriers,
+                          (vulkan_size_t) (image_barrier_output - image_barriers), image_barriers);
 
     // Execute read back.
 
@@ -2935,7 +2937,7 @@ static void render_backend_system_submit_read_back (struct render_backend_system
     {
         vkCmdPipelineBarrier (state->primary_command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT,
                               VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0u, 0u, NULL, 0u, NULL,
-                              image_barrier_output - image_barriers, image_barriers);
+                              (vulkan_size_t) (image_barrier_output - image_barriers), image_barriers);
     }
 
     if (buffer_barriers != static_buffer_barriers)
@@ -3591,7 +3593,7 @@ static void render_backend_surface_create_swap_chain (struct render_backend_surf
     }
 
     kan_bool_t present_mode_found = KAN_FALSE;
-    VkPresentModeKHR surface_present_mode;
+    VkPresentModeKHR surface_present_mode = VK_PRESENT_MODE_IMMEDIATE_KHR;
 
     for (vulkan_size_t index = 0u; index < present_modes_count; ++index)
     {
@@ -4108,7 +4110,7 @@ kan_bool_t kan_render_backend_system_next_frame (kan_context_system_t render_bac
         VkMemoryRequirements requirements;
         vkGetImageMemoryRequirements (system->device, detached_image_destroy->detached_image, &requirements);
 
-        transfer_memory_between_groups (requirements.size, detached_image_destroy->gpu_allocation_group,
+        transfer_memory_between_groups ((vulkan_size_t) requirements.size, detached_image_destroy->gpu_allocation_group,
                                         system->memory_profiling.gpu_unmarked_group);
 #endif
 

@@ -151,7 +151,7 @@ struct scheduled_image_upload_t
 {
     struct scheduled_image_upload_t *next;
     struct render_backend_image_t *image;
-    vulkan_size_t mip;
+    uint8_t mip;
     struct render_backend_buffer_t *staging_buffer;
     vulkan_size_t staging_buffer_offset;
 };

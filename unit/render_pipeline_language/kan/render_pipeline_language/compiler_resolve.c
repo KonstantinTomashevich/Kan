@@ -759,7 +759,7 @@ static kan_bool_t resolve_declarations (struct rpl_compiler_context_t *context,
                                         kan_bool_t instance_options_allowed)
 {
     kan_bool_t result = KAN_TRUE;
-    kan_memory_size_t current_offset = 0u;
+    kan_instance_size_t current_offset = 0u;
 
     struct compiler_instance_declaration_node_t *first = NULL;
     struct compiler_instance_declaration_node_t *last = NULL;
@@ -809,7 +809,8 @@ static kan_bool_t resolve_declarations (struct rpl_compiler_context_t *context,
 
                 if (target_declaration->size != 0u && target_declaration->alignment != 0u)
                 {
-                    current_offset = kan_apply_alignment (current_offset, target_declaration->alignment);
+                    current_offset =
+                        (kan_instance_size_t) kan_apply_alignment (current_offset, target_declaration->alignment);
                     target_declaration->offset = current_offset;
                     current_offset += target_declaration->size;
                 }
@@ -1162,7 +1163,7 @@ static inline void calculate_size_and_alignment_from_declarations (
         declaration = declaration->next;
     }
 
-    *size_output = kan_apply_alignment (*size_output, *alignment_output);
+    *size_output = (kan_instance_size_t) kan_apply_alignment (*size_output, *alignment_output);
 }
 
 static kan_bool_t resolve_buffers (struct rpl_compiler_context_t *context,

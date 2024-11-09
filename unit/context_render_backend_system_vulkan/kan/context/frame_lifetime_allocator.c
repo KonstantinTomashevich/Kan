@@ -56,7 +56,7 @@ struct render_backend_frame_lifetime_allocator_allocation_t render_backend_frame
     {
         KAN_ASSERT (chunk->occupied_by_frame == CHUNK_FREE_MARKER)
         const vulkan_size_t memory_offset = chunk->offset;
-        const vulkan_size_t allocation_offset = kan_apply_alignment (memory_offset, alignment);
+        const vulkan_size_t allocation_offset = (vulkan_size_t) kan_apply_alignment (memory_offset, alignment);
         const vulkan_size_t allocation_size = size + allocation_offset - memory_offset;
 
         if (chunk->size >= allocation_size)

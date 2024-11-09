@@ -287,14 +287,14 @@ struct dynamic_parser_state_t
     const char *marker;
     const char *token;
 
-    size_t cursor_line;
-    size_t cursor_symbol;
-    size_t marker_line;
-    size_t marker_symbol;
+    kan_instance_size_t cursor_line;
+    kan_instance_size_t cursor_symbol;
+    kan_instance_size_t marker_line;
+    kan_instance_size_t marker_symbol;
 
     const char *saved;
-    size_t saved_line;
-    size_t saved_symbol;
+    kan_instance_size_t saved_line;
+    kan_instance_size_t saved_symbol;
 
     /*!stags:re2c format = 'const char *@@;';*/
 };

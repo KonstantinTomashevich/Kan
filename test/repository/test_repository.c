@@ -143,7 +143,7 @@ struct object_record_t
     uint32_t data_y;
 };
 
-#define INVALID_PARENT_OBJECT_ID ((uint32_t) ~0ull)
+#define INVALID_PARENT_OBJECT_ID KAN_INT_MAX (uint32_t)
 
 TEST_REPOSITORY_API void object_record_init (struct object_record_t *data)
 {
