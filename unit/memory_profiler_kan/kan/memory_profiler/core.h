@@ -14,7 +14,7 @@ void unlock_memory_profiling_context (void);
 
 struct allocation_group_t
 {
-    uint64_t allocated_here;
+    kan_memory_size_t allocated_here;
     struct allocation_group_t *next_on_level;
     struct allocation_group_t *first_child;
     char name[];
@@ -42,9 +42,9 @@ void event_iterator_destroy_unguarded (kan_allocation_group_event_iterator_t eve
 
 void queue_new_allocation_group_event_unguarded (struct allocation_group_t *group);
 
-void queue_allocate_event_unguarded (struct allocation_group_t *group, uint64_t amount);
+void queue_allocate_event_unguarded (struct allocation_group_t *group, kan_memory_size_t amount);
 
-void queue_free_event_unguarded (struct allocation_group_t *group, uint64_t amount);
+void queue_free_event_unguarded (struct allocation_group_t *group, kan_memory_size_t amount);
 
 void queue_marker_event_unguarded (struct allocation_group_t *group, const char *marker);
 

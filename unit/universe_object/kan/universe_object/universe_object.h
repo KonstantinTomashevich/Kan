@@ -27,7 +27,7 @@ struct kan_object_id_generator_singleton_t
     /// \meta reflection_ignore_struct_field
     struct kan_atomic_int_t counter;
 
-    uint64_t stub;
+    kan_instance_size_t stub;
 };
 
 UNIVERSE_OBJECT_API void kan_object_id_generator_singleton_init (struct kan_object_id_generator_singleton_t *instance);
@@ -38,7 +38,7 @@ static inline kan_universe_object_id_t kan_universe_object_id_generate (
 {
     return KAN_TYPED_ID_32_SET (
         kan_universe_object_id_t,
-        (uint32_t) kan_atomic_int_add (&((struct kan_object_id_generator_singleton_t *) singleton)->counter, 1));
+        (kan_id_32_t) kan_atomic_int_add (&((struct kan_object_id_generator_singleton_t *) singleton)->counter, 1));
 }
 
 KAN_C_HEADER_END

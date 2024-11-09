@@ -25,7 +25,7 @@ struct string_encoding_node_t
 {
     struct kan_hash_storage_node_t node;
     kan_interned_string_t string;
-    uint64_t value;
+    kan_serialized_size_t value;
 };
 
 struct string_encoding_context_t
@@ -45,9 +45,11 @@ static void string_encoding_node_destroy (struct string_encoding_node_t *node)
     kan_free_batched (kan_c_interface_allocation_group (), node);
 }
 
-static uint64_t encode_interned_string (struct string_encoding_context_t *context, kan_interned_string_t string)
+static kan_serialized_size_t encode_interned_string (struct string_encoding_context_t *context,
+                                                               kan_interned_string_t string)
 {
-    const struct kan_hash_storage_bucket_t *bucket = kan_hash_storage_query (&context->hash_storage, (uint64_t) string);
+    const struct kan_hash_storage_bucket_t *bucket =
+        kan_hash_storage_query (&context->hash_storage, (kan_hash_t) string);
     struct string_encoding_node_t *node = (struct string_encoding_node_t *) bucket->first;
     const struct string_encoding_node_t *end =
         (struct string_encoding_node_t *) (bucket->last ? bucket->last->next : NULL);
@@ -64,7 +66,7 @@ static uint64_t encode_interned_string (struct string_encoding_context_t *contex
 
     KAN_ASSERT (!context->serialized)
     struct string_encoding_node_t *new_node = string_encoding_node_create ();
-    new_node->node.hash = (uint64_t) string;
+    new_node->node.hash = (kan_hash_t) string;
     new_node->string = string;
     new_node->value = context->order.size;
 
@@ -86,7 +88,7 @@ static uint64_t encode_interned_string (struct string_encoding_context_t *contex
 static void meta_attachment_add_to_encoding_context (struct string_encoding_context_t *context,
                                                      const struct kan_c_meta_attachment_t *attachment)
 {
-    for (uint64_t meta_index = 0u; meta_index < attachment->meta_count; ++meta_index)
+    for (kan_loop_size_t meta_index = 0u; meta_index < attachment->meta_count; ++meta_index)
     {
         struct kan_c_meta_t *meta = &attachment->meta_array[meta_index];
         encode_interned_string (context, meta->name);
@@ -109,13 +111,13 @@ static void variable_add_to_encoding_context (struct string_encoding_context_t *
 static void c_interface_add_to_encoding_context (struct string_encoding_context_t *context,
                                                  const struct kan_c_interface_t *interface)
 {
-    for (uint64_t enum_index = 0u; enum_index < interface->enums_count; ++enum_index)
+    for (kan_loop_size_t enum_index = 0u; enum_index < interface->enums_count; ++enum_index)
     {
         struct kan_c_enum_t *enum_info = &interface->enums[enum_index];
         encode_interned_string (context, enum_info->name);
         meta_attachment_add_to_encoding_context (context, &enum_info->meta);
 
-        for (uint64_t value_index = 0u; value_index < enum_info->values_count; ++value_index)
+        for (kan_loop_size_t value_index = 0u; value_index < enum_info->values_count; ++value_index)
         {
             struct kan_c_enum_value_t *value = &enum_info->values[value_index];
             encode_interned_string (context, value->name);
@@ -123,32 +125,32 @@ static void c_interface_add_to_encoding_context (struct string_encoding_context_
         }
     }
 
-    for (uint64_t struct_index = 0u; struct_index < interface->structs_count; ++struct_index)
+    for (kan_loop_size_t struct_index = 0u; struct_index < interface->structs_count; ++struct_index)
     {
         struct kan_c_struct_t *struct_info = &interface->structs[struct_index];
         encode_interned_string (context, struct_info->name);
         meta_attachment_add_to_encoding_context (context, &struct_info->meta);
 
-        for (uint64_t field_index = 0u; field_index < struct_info->fields_count; ++field_index)
+        for (kan_loop_size_t field_index = 0u; field_index < struct_info->fields_count; ++field_index)
         {
             variable_add_to_encoding_context (context, &struct_info->fields[field_index]);
         }
     }
 
-    for (uint64_t function_index = 0u; function_index < interface->functions_count; ++function_index)
+    for (kan_loop_size_t function_index = 0u; function_index < interface->functions_count; ++function_index)
     {
         struct kan_c_function_t *function_info = &interface->functions[function_index];
         encode_interned_string (context, function_info->name);
         encode_interned_string (context, function_info->return_type.name);
         meta_attachment_add_to_encoding_context (context, &function_info->meta);
 
-        for (uint64_t argument_index = 0u; argument_index < function_info->arguments_count; ++argument_index)
+        for (kan_loop_size_t argument_index = 0u; argument_index < function_info->arguments_count; ++argument_index)
         {
             variable_add_to_encoding_context (context, &function_info->arguments[argument_index]);
         }
     }
 
-    for (uint64_t symbol_index = 0u; symbol_index < interface->symbols_count; ++symbol_index)
+    for (kan_loop_size_t symbol_index = 0u; symbol_index < interface->symbols_count; ++symbol_index)
     {
         variable_add_to_encoding_context (context, &interface->symbols[symbol_index]);
     }
@@ -157,18 +159,17 @@ static void c_interface_add_to_encoding_context (struct string_encoding_context_
 static kan_bool_t serialize_encoded_strings (struct string_encoding_context_t *context, struct kan_stream_t *stream)
 {
     KAN_ASSERT (context->order.size < UINT32_MAX)
-    const uint32_t count = (uint32_t) context->order.size;
+    const kan_instance_size_t count = context->order.size;
 
-    if (stream->operations->write (stream, sizeof (uint32_t), &count) != sizeof (uint32_t))
+    if (stream->operations->write (stream, sizeof (kan_instance_size_t), &count) != sizeof (kan_instance_size_t))
     {
         return KAN_FALSE;
     }
 
     kan_interned_string_t *strings = (kan_interned_string_t *) context->order.data;
-
-    for (uint64_t string_index = 0u; string_index < context->order.size; ++string_index)
+    for (kan_loop_size_t string_index = 0u; string_index < context->order.size; ++string_index)
     {
-        const uint64_t length = strlen (strings[string_index]);
+        const kan_instance_size_t length = (kan_instance_size_t) strlen (strings[string_index]);
         KAN_ASSERT (length < KAN_C_INTERFACE_ENCODED_STRING_MAX_LENGTH)
         _Static_assert (KAN_C_INTERFACE_ENCODED_STRING_MAX_LENGTH <= UINT8_MAX,
                         "Max length of encoded string fits into byte.");
@@ -197,13 +198,14 @@ static kan_bool_t meta_attachment_serialize (struct kan_c_meta_attachment_t *att
         return KAN_FALSE;
     }
 
-    for (uint64_t meta_index = 0u; meta_index < attachment->meta_count; ++meta_index)
+    for (kan_loop_size_t meta_index = 0u; meta_index < attachment->meta_count; ++meta_index)
     {
         struct kan_c_meta_t *meta = &attachment->meta_array[meta_index];
-        const uint32_t encoded_name = (uint32_t) encode_interned_string (context, meta->name);
+        const kan_serialized_size_t encoded_name = encode_interned_string (context, meta->name);
         const uint8_t type_byte = (uint8_t) meta->type;
 
-        if (stream->operations->write (stream, sizeof (uint32_t), &encoded_name) != sizeof (uint32_t) ||
+        if (stream->operations->write (stream, sizeof (kan_serialized_size_t), &encoded_name) !=
+                sizeof (kan_serialized_size_t) ||
             stream->operations->write (stream, sizeof (uint8_t), &type_byte) != sizeof (uint8_t))
         {
             return KAN_FALSE;
@@ -224,8 +226,9 @@ static kan_bool_t meta_attachment_serialize (struct kan_c_meta_attachment_t *att
 
         case KAN_C_META_STRING:
         {
-            const uint32_t encoded_value = (uint32_t) encode_interned_string (context, meta->string_value);
-            if (stream->operations->write (stream, sizeof (uint32_t), &encoded_value) != sizeof (uint32_t))
+            const kan_serialized_size_t encoded_value = encode_interned_string (context, meta->string_value);
+            if (stream->operations->write (stream, sizeof (kan_serialized_size_t), &encoded_value) !=
+                sizeof (kan_serialized_size_t))
             {
                 return KAN_FALSE;
             }
@@ -242,10 +245,11 @@ static kan_bool_t type_serialize (struct kan_c_type_t *type,
                                   struct string_encoding_context_t *context,
                                   struct kan_stream_t *stream)
 {
-    const uint32_t encoded_name = (uint32_t) encode_interned_string (context, type->name);
+    const kan_serialized_size_t encoded_name = encode_interned_string (context, type->name);
     const uint8_t archetype_byte = (uint8_t) type->archetype;
 
-    return stream->operations->write (stream, sizeof (uint32_t), &encoded_name) == sizeof (uint32_t) &&
+    return stream->operations->write (stream, sizeof (kan_serialized_size_t), &encoded_name) ==
+               sizeof (kan_serialized_size_t) &&
            stream->operations->write (stream, sizeof (uint8_t), &archetype_byte) == sizeof (uint8_t) &&
            stream->operations->write (stream, sizeof (kan_bool_t), &type->is_const) == sizeof (kan_bool_t) &&
            stream->operations->write (stream, sizeof (kan_bool_t), &type->is_array) == sizeof (kan_bool_t) &&
@@ -264,26 +268,28 @@ static kan_bool_t c_interface_serialize (const struct kan_c_interface_t *interfa
         return KAN_FALSE;
     }
 
-    for (uint64_t enum_index = 0u; enum_index < interface->enums_count; ++enum_index)
+    for (kan_loop_size_t enum_index = 0u; enum_index < interface->enums_count; ++enum_index)
     {
         struct kan_c_enum_t *enum_info = &interface->enums[enum_index];
-        uint32_t encoded_name = (uint32_t) encode_interned_string (context, enum_info->name);
+        kan_serialized_size_t encoded_name = encode_interned_string (context, enum_info->name);
         KAN_ASSERT (enum_info->values_count < UINT8_MAX)
         count = (uint8_t) enum_info->values_count;
 
-        if (stream->operations->write (stream, sizeof (uint32_t), &encoded_name) != sizeof (uint32_t) ||
+        if (stream->operations->write (stream, sizeof (kan_serialized_size_t), &encoded_name) !=
+                sizeof (kan_serialized_size_t) ||
             !meta_attachment_serialize (&enum_info->meta, context, stream) ||
             stream->operations->write (stream, sizeof (uint8_t), &count) != sizeof (uint8_t))
         {
             return KAN_FALSE;
         }
 
-        for (uint64_t value_index = 0u; value_index < enum_info->values_count; ++value_index)
+        for (kan_loop_size_t value_index = 0u; value_index < enum_info->values_count; ++value_index)
         {
             struct kan_c_enum_value_t *value = &enum_info->values[value_index];
-            encoded_name = (uint32_t) encode_interned_string (context, value->name);
+            encoded_name = encode_interned_string (context, value->name);
 
-            if (stream->operations->write (stream, sizeof (uint32_t), &encoded_name) != sizeof (uint32_t) ||
+            if (stream->operations->write (stream, sizeof (kan_serialized_size_t), &encoded_name) !=
+                    sizeof (kan_serialized_size_t) ||
                 !meta_attachment_serialize (&value->meta, context, stream))
             {
                 return KAN_FALSE;
@@ -299,26 +305,28 @@ static kan_bool_t c_interface_serialize (const struct kan_c_interface_t *interfa
         return KAN_FALSE;
     }
 
-    for (uint64_t struct_index = 0u; struct_index < interface->structs_count; ++struct_index)
+    for (kan_loop_size_t struct_index = 0u; struct_index < interface->structs_count; ++struct_index)
     {
         struct kan_c_struct_t *struct_info = &interface->structs[struct_index];
-        uint32_t encoded_name = (uint32_t) encode_interned_string (context, struct_info->name);
+        kan_serialized_size_t encoded_name = encode_interned_string (context, struct_info->name);
         KAN_ASSERT (struct_info->fields_count < UINT8_MAX)
         count = (uint8_t) struct_info->fields_count;
 
-        if (stream->operations->write (stream, sizeof (uint32_t), &encoded_name) != sizeof (uint32_t) ||
+        if (stream->operations->write (stream, sizeof (kan_serialized_size_t), &encoded_name) !=
+                sizeof (kan_serialized_size_t) ||
             !meta_attachment_serialize (&struct_info->meta, context, stream) ||
             stream->operations->write (stream, sizeof (uint8_t), &count) != sizeof (uint8_t))
         {
             return KAN_FALSE;
         }
 
-        for (uint64_t field_index = 0u; field_index < struct_info->fields_count; ++field_index)
+        for (kan_loop_size_t field_index = 0u; field_index < struct_info->fields_count; ++field_index)
         {
             struct kan_c_variable_t *field_info = &struct_info->fields[field_index];
-            encoded_name = (uint32_t) encode_interned_string (context, field_info->name);
+            encoded_name = encode_interned_string (context, field_info->name);
 
-            if (stream->operations->write (stream, sizeof (uint32_t), &encoded_name) != sizeof (uint32_t) ||
+            if (stream->operations->write (stream, sizeof (kan_serialized_size_t), &encoded_name) !=
+                    sizeof (kan_serialized_size_t) ||
                 !type_serialize (&field_info->type, context, stream) ||
                 !meta_attachment_serialize (&field_info->meta, context, stream))
             {
@@ -335,14 +343,15 @@ static kan_bool_t c_interface_serialize (const struct kan_c_interface_t *interfa
         return KAN_FALSE;
     }
 
-    for (uint64_t function_index = 0u; function_index < interface->functions_count; ++function_index)
+    for (kan_loop_size_t function_index = 0u; function_index < interface->functions_count; ++function_index)
     {
         struct kan_c_function_t *function_info = &interface->functions[function_index];
-        uint32_t encoded_name = (uint32_t) encode_interned_string (context, function_info->name);
+        kan_serialized_size_t encoded_name = encode_interned_string (context, function_info->name);
         KAN_ASSERT (function_info->arguments_count < UINT8_MAX)
         count = (uint8_t) function_info->arguments_count;
 
-        if (stream->operations->write (stream, sizeof (uint32_t), &encoded_name) != sizeof (uint32_t) ||
+        if (stream->operations->write (stream, sizeof (kan_serialized_size_t), &encoded_name) !=
+                sizeof (kan_serialized_size_t) ||
             !type_serialize (&function_info->return_type, context, stream) ||
             !meta_attachment_serialize (&function_info->meta, context, stream) ||
             stream->operations->write (stream, sizeof (uint8_t), &count) != sizeof (uint8_t))
@@ -350,12 +359,13 @@ static kan_bool_t c_interface_serialize (const struct kan_c_interface_t *interfa
             return KAN_FALSE;
         }
 
-        for (uint64_t argument_index = 0u; argument_index < function_info->arguments_count; ++argument_index)
+        for (kan_loop_size_t argument_index = 0u; argument_index < function_info->arguments_count; ++argument_index)
         {
             struct kan_c_variable_t *argument_info = &function_info->arguments[argument_index];
-            encoded_name = (uint32_t) encode_interned_string (context, argument_info->name);
+            encoded_name = encode_interned_string (context, argument_info->name);
 
-            if (stream->operations->write (stream, sizeof (uint32_t), &encoded_name) != sizeof (uint32_t) ||
+            if (stream->operations->write (stream, sizeof (kan_serialized_size_t), &encoded_name) !=
+                    sizeof (kan_serialized_size_t) ||
                 !type_serialize (&argument_info->type, context, stream) ||
                 !meta_attachment_serialize (&argument_info->meta, context, stream))
             {
@@ -372,12 +382,13 @@ static kan_bool_t c_interface_serialize (const struct kan_c_interface_t *interfa
         return KAN_FALSE;
     }
 
-    for (uint64_t symbol_index = 0u; symbol_index < interface->symbols_count; ++symbol_index)
+    for (kan_loop_size_t symbol_index = 0u; symbol_index < interface->symbols_count; ++symbol_index)
     {
         struct kan_c_variable_t *symbol_info = &interface->symbols[symbol_index];
-        const uint32_t encoded_name = (uint32_t) encode_interned_string (context, symbol_info->name);
+        const kan_serialized_size_t encoded_name = encode_interned_string (context, symbol_info->name);
 
-        if (stream->operations->write (stream, sizeof (uint32_t), &encoded_name) != sizeof (uint32_t) ||
+        if (stream->operations->write (stream, sizeof (kan_serialized_size_t), &encoded_name) !=
+                sizeof (kan_serialized_size_t) ||
             !type_serialize (&symbol_info->type, context, stream) ||
             !meta_attachment_serialize (&symbol_info->meta, context, stream))
         {
@@ -426,7 +437,7 @@ kan_bool_t kan_c_interface_serialize (const struct kan_c_interface_t *interface,
 
 struct encoded_strings_info_t
 {
-    uint64_t count;
+    kan_instance_size_t count;
     kan_interned_string_t *strings;
 };
 
@@ -435,8 +446,9 @@ static kan_bool_t deserialize_encoded_strings (struct kan_stream_t *stream, stru
     output->count = 0u;
     output->strings = NULL;
 
-    uint32_t serialized_count;
-    if (stream->operations->read (stream, sizeof (uint32_t), &serialized_count) != sizeof (uint32_t))
+    kan_instance_size_t serialized_count;
+    if (stream->operations->read (stream, sizeof (kan_instance_size_t), &serialized_count) !=
+        sizeof (kan_instance_size_t))
     {
         return KAN_FALSE;
     }
@@ -452,7 +464,7 @@ static kan_bool_t deserialize_encoded_strings (struct kan_stream_t *stream, stru
                               _Alignof (kan_interned_string_t));
     char buffer[KAN_C_INTERFACE_ENCODED_STRING_MAX_LENGTH + 1u];
 
-    for (uint64_t index = 0u; index < output->count; ++index)
+    for (kan_loop_size_t index = 0u; index < output->count; ++index)
     {
         uint8_t serialized_length;
         if (stream->operations->read (stream, sizeof (uint8_t), &serialized_length) == sizeof (uint8_t))
@@ -498,13 +510,14 @@ static kan_bool_t meta_attachment_deserialize (struct kan_c_meta_attachment_t *a
         kan_allocate_general (kan_c_interface_allocation_group (),
                               sizeof (struct kan_c_meta_t) * attachment->meta_count, _Alignof (struct kan_c_meta_t));
 
-    for (uint64_t meta_index = 0u; meta_index < attachment->meta_count; ++meta_index)
+    for (kan_loop_size_t meta_index = 0u; meta_index < attachment->meta_count; ++meta_index)
     {
         struct kan_c_meta_t *meta = &attachment->meta_array[meta_index];
-        uint32_t encoded_name;
+        kan_serialized_size_t encoded_name;
         uint8_t encoded_type;
 
-        if (stream->operations->read (stream, sizeof (uint32_t), &encoded_name) != sizeof (uint32_t) ||
+        if (stream->operations->read (stream, sizeof (kan_serialized_size_t), &encoded_name) !=
+                sizeof (kan_serialized_size_t) ||
             stream->operations->read (stream, sizeof (uint8_t), &encoded_type) != sizeof (uint8_t))
         {
             return KAN_FALSE;
@@ -528,8 +541,9 @@ static kan_bool_t meta_attachment_deserialize (struct kan_c_meta_attachment_t *a
 
         case KAN_C_META_STRING:
         {
-            uint32_t encoded_value;
-            if (stream->operations->read (stream, sizeof (uint32_t), &encoded_value) != sizeof (uint32_t))
+            kan_serialized_size_t encoded_value;
+            if (stream->operations->read (stream, sizeof (kan_serialized_size_t), &encoded_value) !=
+                sizeof (kan_serialized_size_t))
             {
                 return KAN_FALSE;
             }
@@ -547,10 +561,11 @@ static kan_bool_t type_deserialize (struct kan_c_type_t *type,
                                     struct encoded_strings_info_t *encoded_strings,
                                     struct kan_stream_t *stream)
 {
-    uint32_t encoded_name;
+    kan_serialized_size_t encoded_name;
     uint8_t archetype_byte;
 
-    if (stream->operations->read (stream, sizeof (uint32_t), &encoded_name) != sizeof (uint32_t) ||
+    if (stream->operations->read (stream, sizeof (kan_serialized_size_t), &encoded_name) !=
+            sizeof (kan_serialized_size_t) ||
         stream->operations->read (stream, sizeof (uint8_t), &archetype_byte) != sizeof (uint8_t) ||
         stream->operations->read (stream, sizeof (kan_bool_t), &type->is_const) != sizeof (kan_bool_t) ||
         stream->operations->read (stream, sizeof (kan_bool_t), &type->is_array) != sizeof (kan_bool_t) ||
@@ -576,12 +591,13 @@ static kan_bool_t c_interface_deserialize (struct kan_c_interface_t *interface,
     }
 
     kan_c_interface_init_enums_array (interface, count);
-    for (uint64_t enum_index = 0u; enum_index < interface->enums_count; ++enum_index)
+    for (kan_loop_size_t enum_index = 0u; enum_index < interface->enums_count; ++enum_index)
     {
         struct kan_c_enum_t *enum_info = &interface->enums[enum_index];
-        uint32_t encoded_name;
+        kan_serialized_size_t encoded_name;
 
-        if (stream->operations->read (stream, sizeof (uint32_t), &encoded_name) != sizeof (uint32_t) ||
+        if (stream->operations->read (stream, sizeof (kan_serialized_size_t), &encoded_name) !=
+                sizeof (kan_serialized_size_t) ||
             !meta_attachment_deserialize (&enum_info->meta, encoded_strings, stream) ||
             stream->operations->read (stream, sizeof (uint8_t), &count) != sizeof (uint8_t))
         {
@@ -591,10 +607,11 @@ static kan_bool_t c_interface_deserialize (struct kan_c_interface_t *interface,
         enum_info->name = encoded_strings->strings[encoded_name];
         kan_c_enum_init_values_array (enum_info, count);
 
-        for (uint64_t value_index = 0u; value_index < enum_info->values_count; ++value_index)
+        for (kan_loop_size_t value_index = 0u; value_index < enum_info->values_count; ++value_index)
         {
             struct kan_c_enum_value_t *value_info = &enum_info->values[value_index];
-            if (stream->operations->read (stream, sizeof (uint32_t), &encoded_name) != sizeof (uint32_t) ||
+            if (stream->operations->read (stream, sizeof (kan_serialized_size_t), &encoded_name) !=
+                    sizeof (kan_serialized_size_t) ||
                 !meta_attachment_deserialize (&value_info->meta, encoded_strings, stream))
             {
                 return KAN_FALSE;
@@ -610,12 +627,13 @@ static kan_bool_t c_interface_deserialize (struct kan_c_interface_t *interface,
     }
 
     kan_c_interface_init_structs_array (interface, count);
-    for (uint64_t struct_index = 0u; struct_index < interface->structs_count; ++struct_index)
+    for (kan_loop_size_t struct_index = 0u; struct_index < interface->structs_count; ++struct_index)
     {
         struct kan_c_struct_t *struct_info = &interface->structs[struct_index];
-        uint32_t encoded_name;
+        kan_serialized_size_t encoded_name;
 
-        if (stream->operations->read (stream, sizeof (uint32_t), &encoded_name) != sizeof (uint32_t) ||
+        if (stream->operations->read (stream, sizeof (kan_serialized_size_t), &encoded_name) !=
+                sizeof (kan_serialized_size_t) ||
             !meta_attachment_deserialize (&struct_info->meta, encoded_strings, stream) ||
             stream->operations->read (stream, sizeof (uint8_t), &count) != sizeof (uint8_t))
         {
@@ -625,10 +643,11 @@ static kan_bool_t c_interface_deserialize (struct kan_c_interface_t *interface,
         struct_info->name = encoded_strings->strings[encoded_name];
         kan_c_struct_init_fields_array (struct_info, count);
 
-        for (uint64_t index = 0u; index < struct_info->fields_count; ++index)
+        for (kan_loop_size_t index = 0u; index < struct_info->fields_count; ++index)
         {
             struct kan_c_variable_t *info = &struct_info->fields[index];
-            if (stream->operations->read (stream, sizeof (uint32_t), &encoded_name) != sizeof (uint32_t) ||
+            if (stream->operations->read (stream, sizeof (kan_serialized_size_t), &encoded_name) !=
+                    sizeof (kan_serialized_size_t) ||
                 !type_deserialize (&info->type, encoded_strings, stream) ||
                 !meta_attachment_deserialize (&info->meta, encoded_strings, stream))
             {
@@ -645,12 +664,13 @@ static kan_bool_t c_interface_deserialize (struct kan_c_interface_t *interface,
     }
 
     kan_c_interface_init_functions_array (interface, count);
-    for (uint64_t function_index = 0u; function_index < interface->functions_count; ++function_index)
+    for (kan_loop_size_t function_index = 0u; function_index < interface->functions_count; ++function_index)
     {
         struct kan_c_function_t *function_info = &interface->functions[function_index];
-        uint32_t encoded_name;
+        kan_serialized_size_t encoded_name;
 
-        if (stream->operations->read (stream, sizeof (uint32_t), &encoded_name) != sizeof (uint32_t) ||
+        if (stream->operations->read (stream, sizeof (kan_serialized_size_t), &encoded_name) !=
+                sizeof (kan_serialized_size_t) ||
             !type_deserialize (&function_info->return_type, encoded_strings, stream) ||
             !meta_attachment_deserialize (&function_info->meta, encoded_strings, stream) ||
             stream->operations->read (stream, sizeof (uint8_t), &count) != sizeof (uint8_t))
@@ -661,10 +681,11 @@ static kan_bool_t c_interface_deserialize (struct kan_c_interface_t *interface,
         function_info->name = encoded_strings->strings[encoded_name];
         kan_c_function_init_arguments_array (function_info, count);
 
-        for (uint64_t index = 0u; index < function_info->arguments_count; ++index)
+        for (kan_loop_size_t index = 0u; index < function_info->arguments_count; ++index)
         {
             struct kan_c_variable_t *info = &function_info->arguments[index];
-            if (stream->operations->read (stream, sizeof (uint32_t), &encoded_name) != sizeof (uint32_t) ||
+            if (stream->operations->read (stream, sizeof (kan_serialized_size_t), &encoded_name) !=
+                    sizeof (kan_serialized_size_t) ||
                 !type_deserialize (&info->type, encoded_strings, stream) ||
                 !meta_attachment_deserialize (&info->meta, encoded_strings, stream))
             {
@@ -681,12 +702,13 @@ static kan_bool_t c_interface_deserialize (struct kan_c_interface_t *interface,
     }
 
     kan_c_interface_init_symbols_array (interface, count);
-    for (uint64_t symbol_index = 0u; symbol_index < interface->symbols_count; ++symbol_index)
+    for (kan_loop_size_t symbol_index = 0u; symbol_index < interface->symbols_count; ++symbol_index)
     {
         struct kan_c_variable_t *symbol_info = &interface->symbols[symbol_index];
-        uint32_t encoded_name;
+        kan_serialized_size_t encoded_name;
 
-        if (stream->operations->read (stream, sizeof (uint32_t), &encoded_name) != sizeof (uint32_t) ||
+        if (stream->operations->read (stream, sizeof (kan_serialized_size_t), &encoded_name) !=
+                sizeof (kan_serialized_size_t) ||
             !type_deserialize (&symbol_info->type, encoded_strings, stream) ||
             !meta_attachment_deserialize (&symbol_info->meta, encoded_strings, stream))
         {
@@ -750,11 +772,11 @@ static void meta_attachment_shutdown (struct kan_c_meta_attachment_t *attachment
 
 void kan_c_interface_destroy (struct kan_c_interface_t *interface)
 {
-    for (uint64_t enum_index = 0u; enum_index < interface->enums_count; ++enum_index)
+    for (kan_loop_size_t enum_index = 0u; enum_index < interface->enums_count; ++enum_index)
     {
         struct kan_c_enum_t *enum_info = &interface->enums[enum_index];
 
-        for (uint64_t value_index = 0u; value_index < enum_info->values_count; ++value_index)
+        for (kan_loop_size_t value_index = 0u; value_index < enum_info->values_count; ++value_index)
         {
             meta_attachment_shutdown (&enum_info->values[value_index].meta);
         }
@@ -774,11 +796,11 @@ void kan_c_interface_destroy (struct kan_c_interface_t *interface)
                           interface->enums_count * sizeof (struct kan_c_enum_t));
     }
 
-    for (uint64_t struct_index = 0u; struct_index < interface->structs_count; ++struct_index)
+    for (kan_loop_size_t struct_index = 0u; struct_index < interface->structs_count; ++struct_index)
     {
         struct kan_c_struct_t *struct_info = &interface->structs[struct_index];
 
-        for (uint64_t field_index = 0u; field_index < struct_info->fields_count; ++field_index)
+        for (kan_loop_size_t field_index = 0u; field_index < struct_info->fields_count; ++field_index)
         {
             meta_attachment_shutdown (&struct_info->fields[field_index].meta);
         }
@@ -798,11 +820,11 @@ void kan_c_interface_destroy (struct kan_c_interface_t *interface)
                           interface->structs_count * sizeof (struct kan_c_struct_t));
     }
 
-    for (uint64_t function_index = 0u; function_index < interface->functions_count; ++function_index)
+    for (kan_loop_size_t function_index = 0u; function_index < interface->functions_count; ++function_index)
     {
         struct kan_c_function_t *function_info = &interface->functions[function_index];
 
-        for (uint64_t argument_index = 0u; argument_index < function_info->arguments_count; ++argument_index)
+        for (kan_loop_size_t argument_index = 0u; argument_index < function_info->arguments_count; ++argument_index)
         {
             meta_attachment_shutdown (&function_info->arguments[argument_index].meta);
         }
@@ -822,7 +844,7 @@ void kan_c_interface_destroy (struct kan_c_interface_t *interface)
                           interface->functions_count * sizeof (struct kan_c_function_t));
     }
 
-    for (uint64_t index = 0u; index < interface->symbols_count; ++index)
+    for (kan_loop_size_t index = 0u; index < interface->symbols_count; ++index)
     {
         meta_attachment_shutdown (&interface->symbols[index].meta);
     }

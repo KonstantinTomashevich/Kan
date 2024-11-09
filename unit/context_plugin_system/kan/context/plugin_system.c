@@ -22,7 +22,7 @@ struct plugin_data_t
 {
     kan_interned_string_t name;
     kan_platform_dynamic_library_t dynamic_library;
-    uint64_t last_loaded_file_time_stamp_ns;
+    kan_time_size_t last_loaded_file_time_stamp_ns;
 };
 
 struct plugin_system_t
@@ -32,14 +32,14 @@ struct plugin_system_t
 
     char *plugins_directory_path;
     kan_bool_t enable_hot_reload;
-    uint64_t hot_reload_update_delay_ns;
-    uint64_t hot_reload_directory_id;
+    kan_time_offset_t hot_reload_update_delay_ns;
+    kan_instance_size_t hot_reload_directory_id;
 
     /// \meta reflection_dynamic_array_type = "struct plugin_data_t"
     struct kan_dynamic_array_t plugins;
-    uint64_t newest_loaded_plugin_last_modification_file_time_ns;
+    kan_time_size_t newest_loaded_plugin_last_modification_file_time_ns;
 
-    uint64_t hot_reload_after_ns;
+    kan_time_size_t hot_reload_after_ns;
     kan_file_system_watcher_t watcher;
     kan_file_system_watcher_iterator_t watcher_iterator;
 };
@@ -66,7 +66,7 @@ kan_context_system_t plugin_system_create (kan_allocation_group_t group, void *u
     {
         struct kan_plugin_system_config_t *config = user_config;
         KAN_ASSERT (config->plugin_directory_path)
-        const uint64_t path_length = strlen (config->plugin_directory_path);
+        const kan_instance_size_t path_length = (kan_instance_size_t) strlen (config->plugin_directory_path);
         system->plugins_directory_path = kan_allocate_general (group, path_length + 1u, _Alignof (char));
         memcpy (system->plugins_directory_path, config->plugin_directory_path, path_length + 1u);
 
@@ -75,7 +75,7 @@ kan_context_system_t plugin_system_create (kan_allocation_group_t group, void *u
         kan_dynamic_array_init (&system->plugins, config->plugins.size, sizeof (struct plugin_data_t),
                                 _Alignof (struct plugin_data_t), group);
 
-        for (uint64_t index = 0u; index < config->plugins.size; ++index)
+        for (kan_loop_size_t index = 0u; index < config->plugins.size; ++index)
         {
             kan_interned_string_t plugin_name = ((kan_interned_string_t *) config->plugins.data)[index];
             struct plugin_data_t *data = kan_dynamic_array_add_last (&system->plugins);
@@ -96,7 +96,7 @@ kan_context_system_t plugin_system_create (kan_allocation_group_t group, void *u
 
     system->newest_loaded_plugin_last_modification_file_time_ns = 0u;
     system->hot_reload_directory_id = 0u;
-    system->hot_reload_after_ns = UINT64_MAX;
+    system->hot_reload_after_ns = KAN_INT_MAX (kan_time_size_t);
     system->watcher = KAN_HANDLE_SET_INVALID (kan_file_system_watcher_t);
     return KAN_HANDLE_SET (kan_context_system_t, system);
 }
@@ -139,10 +139,10 @@ static inline kan_bool_t find_source_plugin_path (const char *source_path,
 
 static inline void load_plugins (const char *path,
                                  struct kan_dynamic_array_t *array,
-                                 uint64_t *newest_loaded_file_time_ns_output)
+                                 kan_time_size_t *newest_loaded_file_time_ns_output)
 {
     *newest_loaded_file_time_ns_output = 0u;
-    for (uint64_t index = 0u; index < array->size; ++index)
+    for (kan_loop_size_t index = 0u; index < array->size; ++index)
     {
         struct plugin_data_t *data = &((struct plugin_data_t *) array->data)[index];
         KAN_ASSERT (!KAN_HANDLE_IS_VALID (data->dynamic_library))
@@ -187,7 +187,7 @@ static inline void load_plugins (const char *path,
 
 static inline void unload_plugins (struct kan_dynamic_array_t *array)
 {
-    for (uint64_t index = 0u; index < array->size; ++index)
+    for (kan_loop_size_t index = 0u; index < array->size; ++index)
     {
         struct plugin_data_t *data = &((struct plugin_data_t *) array->data)[index];
         if (KAN_HANDLE_IS_VALID (data->dynamic_library))
@@ -200,7 +200,7 @@ static inline void unload_plugins (struct kan_dynamic_array_t *array)
 static void on_reflection_populate (kan_context_system_t other_system, kan_reflection_registry_t registry)
 {
     struct plugin_system_t *system = KAN_HANDLE_GET (other_system);
-    for (uint64_t index = 0u; index < system->plugins.size; ++index)
+    for (kan_loop_size_t index = 0u; index < system->plugins.size; ++index)
     {
         struct plugin_data_t *data = &((struct plugin_data_t *) system->plugins.data)[index];
         if (KAN_HANDLE_IS_VALID (data->dynamic_library))
@@ -224,7 +224,7 @@ static void on_reflection_populate (kan_context_system_t other_system, kan_refle
 
 static inline void build_hot_reload_directory_path (struct kan_file_system_path_container_t *path_container,
                                                     const char *base_path,
-                                                    uint64_t hot_reload_id)
+                                                    kan_instance_size_t hot_reload_id)
 {
     kan_file_system_path_container_copy_string (path_container, base_path);
     char suffix_buffer[KAN_PLUGIN_SYSTEM_HOT_RELOAD_SUFFIX_BUFFER];
@@ -252,7 +252,7 @@ static inline void update_hot_reload_id (struct plugin_system_t *system)
 
 static inline void init_hot_reload_directory (struct plugin_system_t *system)
 {
-    for (uint64_t index = 0u; index < system->plugins.size; ++index)
+    for (kan_loop_size_t index = 0u; index < system->plugins.size; ++index)
     {
         struct plugin_data_t *data = &((struct plugin_data_t *) system->plugins.data)[index];
         char library_path_buffer[KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u];
@@ -288,7 +288,7 @@ static inline void init_hot_reload_directory (struct plugin_system_t *system)
             char copy_buffer[KAN_PLUGIN_SYSTEM_HOT_RELOAD_IO_BUFFER];
             while (KAN_TRUE)
             {
-                const uint64_t read =
+                const kan_memory_size_t read =
                     input_stream->operations->read (input_stream, KAN_PLUGIN_SYSTEM_HOT_RELOAD_IO_BUFFER, copy_buffer);
 
                 if (read == 0u)
@@ -296,7 +296,7 @@ static inline void init_hot_reload_directory (struct plugin_system_t *system)
                     break;
                 }
 
-                const uint64_t written = output_stream->operations->write (output_stream, read, copy_buffer);
+                const kan_memory_size_t written = output_stream->operations->write (output_stream, read, copy_buffer);
                 if (written != read)
                 {
                     KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 4u, plugin_system, KAN_LOG_ERROR,
@@ -318,7 +318,7 @@ static inline void init_hot_reload_directory (struct plugin_system_t *system)
     }
 }
 
-static inline void delete_hot_reload_directory (struct plugin_system_t *system, uint64_t directory_id)
+static inline void delete_hot_reload_directory (struct plugin_system_t *system, kan_instance_size_t directory_id)
 {
     struct kan_file_system_path_container_t path_container;
     build_hot_reload_directory_path (&path_container, system->plugins_directory_path, directory_id);
@@ -340,7 +340,8 @@ void plugin_system_on_update (kan_context_system_t handle)
     {
         if (event->entry_type == KAN_FILE_SYSTEM_ENTRY_TYPE_FILE)
         {
-            system->hot_reload_after_ns = kan_platform_get_elapsed_nanoseconds () + system->hot_reload_update_delay_ns;
+            system->hot_reload_after_ns =
+                kan_platform_get_elapsed_nanoseconds () + (kan_time_size_t) system->hot_reload_update_delay_ns;
         }
 
         system->watcher_iterator = kan_file_system_watcher_iterator_advance (system->watcher, system->watcher_iterator);
@@ -348,7 +349,7 @@ void plugin_system_on_update (kan_context_system_t handle)
 
     if (kan_platform_get_elapsed_nanoseconds () >= system->hot_reload_after_ns)
     {
-        const uint64_t old_directory_id = system->hot_reload_directory_id;
+        const kan_instance_size_t old_directory_id = system->hot_reload_directory_id;
         update_hot_reload_id (system);
         init_hot_reload_directory (system);
 
@@ -356,7 +357,7 @@ void plugin_system_on_update (kan_context_system_t handle)
         kan_dynamic_array_init (&plugins_copy, system->plugins.size, sizeof (struct plugin_data_t),
                                 _Alignof (struct plugin_data_t), system->plugins.allocation_group);
 
-        for (uint64_t index = 0u; index < system->plugins.size; ++index)
+        for (kan_loop_size_t index = 0u; index < system->plugins.size; ++index)
         {
             struct plugin_data_t *source_data = &((struct plugin_data_t *) system->plugins.data)[index];
             struct plugin_data_t *target_data = &((struct plugin_data_t *) plugins_copy.data)[index];
@@ -382,7 +383,7 @@ void plugin_system_on_update (kan_context_system_t handle)
         unload_plugins (&plugins_copy);
         kan_dynamic_array_shutdown (&plugins_copy);
         delete_hot_reload_directory (system, old_directory_id);
-        system->hot_reload_after_ns = UINT64_MAX;
+        system->hot_reload_after_ns = KAN_INT_MAX (kan_time_size_t);
     }
 }
 
@@ -523,7 +524,8 @@ void kan_plugin_system_config_shutdown (struct kan_plugin_system_config_t *confi
     kan_dynamic_array_shutdown (&config->plugins);
 }
 
-uint64_t kan_plugin_system_get_newest_loaded_plugin_last_modification_file_time_ns (kan_context_system_t plugin_system)
+kan_time_size_t kan_plugin_system_get_newest_loaded_plugin_last_modification_file_time_ns (
+    kan_context_system_t plugin_system)
 {
     struct plugin_system_t *system = KAN_HANDLE_GET (plugin_system);
     return system->newest_loaded_plugin_last_modification_file_time_ns;

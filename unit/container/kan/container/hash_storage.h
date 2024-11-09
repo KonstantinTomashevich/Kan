@@ -8,6 +8,7 @@
 #include <kan/api_common/core_types.h>
 #include <kan/api_common/min_max.h>
 #include <kan/container/list.h>
+#include <kan/hash/hash.h>
 #include <kan/memory_profiler/allocation_group.h>
 
 /// \file
@@ -94,7 +95,7 @@ KAN_C_HEADER_BEGIN
 struct kan_hash_storage_node_t
 {
     struct kan_bd_list_node_t list_node;
-    uint64_t hash;
+    kan_hash_t hash;
 };
 
 /// \brief Describes hash storage bucket.
@@ -108,8 +109,8 @@ struct kan_hash_storage_bucket_t
 struct kan_hash_storage_t
 {
     kan_allocation_group_t bucket_allocation_group;
-    uint64_t bucket_count;
-    uint64_t empty_buckets;
+    kan_instance_size_t bucket_count;
+    kan_instance_size_t empty_buckets;
     struct kan_hash_storage_bucket_t *buckets;
     struct kan_bd_list_t items;
 };
@@ -117,7 +118,7 @@ struct kan_hash_storage_t
 /// \brief Initializes given hash storage with given count of buckets and given allocation group for buckets.
 CONTAINER_API void kan_hash_storage_init (struct kan_hash_storage_t *storage,
                                           kan_allocation_group_t bucket_allocation_group,
-                                          uint64_t initial_bucket_count);
+                                          kan_instance_size_t initial_bucket_count);
 
 /// \brief Adds given node to appropriate position in hash storage.
 CONTAINER_API void kan_hash_storage_add (struct kan_hash_storage_t *storage, struct kan_hash_storage_node_t *node);
@@ -127,10 +128,11 @@ CONTAINER_API void kan_hash_storage_remove (struct kan_hash_storage_t *storage, 
 
 /// \brief Searches for the bucket that may contain nodes with given hash value.
 CONTAINER_API const struct kan_hash_storage_bucket_t *kan_hash_storage_query (struct kan_hash_storage_t *storage,
-                                                                              uint64_t hash);
+                                                                              kan_hash_t hash);
 
 /// \brief Sets new bucket count and fully restructures given hash storage.
-CONTAINER_API void kan_hash_storage_set_bucket_count (struct kan_hash_storage_t *storage, uint64_t bucket_count);
+CONTAINER_API void kan_hash_storage_set_bucket_count (struct kan_hash_storage_t *storage,
+                                                      kan_instance_size_t bucket_count);
 
 /// \brief Shuts down given hash storage and frees its resources.
 /// \details Keep in mind that nodes lifetime is managed by user and therefore all nodes should be manually freed
@@ -139,7 +141,7 @@ CONTAINER_API void kan_hash_storage_shutdown (struct kan_hash_storage_t *storage
 
 /// \brief Implements default strategy for update hash storage bucket count to appropriate values.
 static inline void kan_hash_storage_update_bucket_count_default (struct kan_hash_storage_t *storage,
-                                                                 uint64_t min_bucket_count_to_preserve)
+                                                                 kan_instance_size_t min_bucket_count_to_preserve)
 {
     const kan_bool_t can_grow =
         storage->empty_buckets * KAN_CONTAINER_HASH_STORAGE_DEFAULT_EBM < storage->bucket_count ||

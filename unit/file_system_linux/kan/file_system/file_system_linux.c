@@ -59,7 +59,7 @@ kan_bool_t kan_file_system_query_entry (const char *path, struct kan_file_system
 
     status->size = unix_status.st_size;
     status->last_modification_time_ns =
-        ((uint64_t) unix_status.st_mtim.tv_sec) * 1000000000u + unix_status.st_mtim.tv_nsec;
+        ((kan_time_size_t) unix_status.st_mtim.tv_sec) * 1000000000u + unix_status.st_mtim.tv_nsec;
 
     status->read_only = unix_status.st_mode & S_IRUSR ? KAN_FALSE : KAN_TRUE;
     return KAN_TRUE;
@@ -132,7 +132,7 @@ kan_bool_t kan_file_system_remove_directory_with_content (const char *path)
         }
         else if (S_ISDIR (unix_status.st_mode))
         {
-            const uint64_t old_length = path_container.length;
+            const kan_instance_size_t old_length = path_container.length;
             kan_file_system_path_container_append (&path_container, entry_name);
 
             if (!kan_file_system_remove_directory_with_content (path_container.path))

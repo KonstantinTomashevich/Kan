@@ -31,7 +31,7 @@ typedef void (*kan_context_update_run_t) (kan_context_system_t system);
 CONTEXT_UPDATE_SYSTEM_API void kan_update_system_connect_on_run (kan_context_system_t update_system,
                                                                  kan_context_system_t other_system,
                                                                  kan_context_update_run_t functor,
-                                                                 uint64_t dependencies_count,
+                                                                 kan_instance_size_t dependencies_count,
                                                                  kan_context_system_t *dependencies);
 
 /// \brief Disconnect other system from update delegates.

@@ -29,7 +29,7 @@ struct render_backend_frame_buffer_t *render_backend_system_create_frame_buffer 
                               sizeof (struct render_backend_frame_buffer_attachment_t) * buffer->attachments_count,
                               _Alignof (struct render_backend_frame_buffer_attachment_t));
 
-    for (uint64_t index = 0u; index < buffer->attachments_count; ++index)
+    for (kan_loop_size_t index = 0u; index < buffer->attachments_count; ++index)
     {
         struct kan_render_frame_buffer_attachment_description_t *source = &description->attachments[index];
         struct render_backend_frame_buffer_attachment_t *target = &buffer->attachments[index];
@@ -92,7 +92,7 @@ void render_backend_frame_buffer_destroy_resources (struct render_backend_system
 
     if (frame_buffer->instance_array)
     {
-        for (uint64_t index = 0u; index < frame_buffer->instance_array_size; ++index)
+        for (kan_loop_size_t index = 0u; index < frame_buffer->instance_array_size; ++index)
         {
             vkDestroyFramebuffer (system->device, frame_buffer->instance_array[index],
                                   VULKAN_ALLOCATION_CALLBACKS (system));
@@ -106,7 +106,7 @@ void render_backend_frame_buffer_destroy_resources (struct render_backend_system
 
     if (frame_buffer->image_views)
     {
-        for (uint64_t index = 0u; index < frame_buffer->attachments_count; ++index)
+        for (kan_loop_size_t index = 0u; index < frame_buffer->attachments_count; ++index)
         {
             if (frame_buffer->image_views[index] != VK_NULL_HANDLE)
             {
@@ -138,7 +138,7 @@ void render_backend_frame_buffer_schedule_resource_destroy (struct render_backen
 
     if (frame_buffer->instance_array)
     {
-        for (uint64_t index = 0u; index < frame_buffer->instance_array_size; ++index)
+        for (kan_loop_size_t index = 0u; index < frame_buffer->instance_array_size; ++index)
         {
             struct scheduled_detached_frame_buffer_destroy_t *frame_buffer_destroy =
                 KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&schedule->item_allocator,
@@ -156,7 +156,7 @@ void render_backend_frame_buffer_schedule_resource_destroy (struct render_backen
 
     if (frame_buffer->image_views)
     {
-        for (uint64_t index = 0u; index < frame_buffer->attachments_count; ++index)
+        for (kan_loop_size_t index = 0u; index < frame_buffer->attachments_count; ++index)
         {
             if (frame_buffer->image_views[index] != VK_NULL_HANDLE)
             {
@@ -179,7 +179,7 @@ void render_backend_system_destroy_frame_buffer (struct render_backend_system_t 
                                                  struct render_backend_frame_buffer_t *frame_buffer)
 {
     // Detach from surface and images if attachment is created.
-    for (uint64_t index = 0u; index < frame_buffer->attachments_count; ++index)
+    for (kan_loop_size_t index = 0u; index < frame_buffer->attachments_count; ++index)
     {
         struct render_backend_frame_buffer_attachment_t *attachment = &frame_buffer->attachments[index];
         switch (attachment->type)

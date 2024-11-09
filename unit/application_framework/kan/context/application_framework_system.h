@@ -30,7 +30,7 @@ KAN_C_HEADER_BEGIN
 struct kan_application_framework_system_config_t
 {
     /// \brief Number of arguments passed to application framework.
-    uint64_t arguments_count;
+    kan_instance_size_t arguments_count;
 
     /// \brief Arguments passed to application framework. Managed by application framework itself.
     char **arguments;
@@ -41,7 +41,7 @@ struct kan_application_framework_system_config_t
 };
 
 /// \brief Returns count of arguments passed to application framework.
-APPLICATION_FRAMEWORK_API uint64_t
+APPLICATION_FRAMEWORK_API kan_instance_size_t
 kan_application_framework_system_get_arguments_count (kan_context_system_t application_framework_system);
 
 /// \brief Returns arguments passed to application framework.
@@ -50,12 +50,12 @@ APPLICATION_FRAMEWORK_API char **kan_application_framework_system_get_arguments 
 
 /// \brief Returns minimum frame time in nanoseconds.
 /// \details Minimum frame time limits maximum FPS to save hardware resources.
-APPLICATION_FRAMEWORK_API uint64_t
+APPLICATION_FRAMEWORK_API kan_time_offset_t
 kan_application_framework_get_min_frame_time_ns (kan_context_system_t application_framework_system);
 
 /// \brief Sets minimum frame time in nanoseconds.
 APPLICATION_FRAMEWORK_API void kan_application_framework_set_min_frame_time_ns (
-    kan_context_system_t application_framework_system, uint64_t min_frame_time_ns);
+    kan_context_system_t application_framework_system, kan_time_offset_t min_frame_time_ns);
 
 /// \brief Request application exit with given exit code.
 APPLICATION_FRAMEWORK_API void kan_application_framework_system_request_exit (

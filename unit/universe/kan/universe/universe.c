@@ -55,7 +55,7 @@ struct mutator_t
     kan_bool_t from_group;
     kan_bool_t found_in_groups;
     kan_bool_t added_during_migration;
-    uint64_t *state;
+    void *state;
     kan_allocation_group_t state_allocation_group;
 };
 
@@ -510,9 +510,9 @@ struct char_sequence_t
     const char *end;
 };
 
-static uint64_t split_automated_query_name (const char *body_start, struct char_sequence_t *output)
+static kan_loop_size_t split_automated_query_name (const char *body_start, struct char_sequence_t *output)
 {
-    uint64_t count = 0u;
+    kan_loop_size_t count = 0u;
     while (*body_start != '\0')
     {
         output->begin = body_start;
@@ -581,7 +581,7 @@ static void deploy_automated_lifetime_queries (kan_reflection_registry_t registr
     KAN_ASSERT (struct_data)
     kan_repository_t repository = world->repository;
 
-    for (uint64_t field_index = 0u; field_index < struct_data->fields_count; ++field_index)
+    for (kan_loop_size_t field_index = 0u; field_index < struct_data->fields_count; ++field_index)
     {
         struct kan_reflection_field_t *field = &struct_data->fields[field_index];
         uint8_t *position = ((uint8_t *) fragment) + field->offset;
@@ -597,7 +597,7 @@ static void deploy_automated_lifetime_queries (kan_reflection_registry_t registr
             }
 
             struct char_sequence_t name_parts[KAN_UNIVERSE_MAX_AUTOMATED_QUERY_NAME_PARTS];
-            const uint64_t name_parts_count = split_automated_query_name (check_result.body_start, name_parts);
+            const kan_loop_size_t name_parts_count = split_automated_query_name (check_result.body_start, name_parts);
 
             if (name_parts_count == 0u)
             {
@@ -609,7 +609,7 @@ static void deploy_automated_lifetime_queries (kan_reflection_registry_t registr
             char queried_type_name_mutable[KAN_UNIVERSE_MAX_AUTOMATED_QUERY_TYPE_LENGTH];
             KAN_ASSERT (name_parts[0u].end - name_parts[0u].begin + 2u < KAN_UNIVERSE_MAX_AUTOMATED_QUERY_TYPE_LENGTH)
             strncpy (queried_type_name_mutable, name_parts[0u].begin, name_parts[0u].end - name_parts[0u].begin);
-            const uint64_t length = name_parts[0u].end - name_parts[0u].begin;
+            const kan_instance_size_t length = (kan_instance_size_t) (name_parts[0u].end - name_parts[0u].begin);
             queried_type_name_mutable[length] = '\0';
 
             kan_interned_string_t queried_type_name = kan_string_intern (queried_type_name_mutable);
@@ -774,7 +774,7 @@ static void deploy_automated_lifetime_queries (kan_reflection_registry_t registr
     }                                                                                                                  \
                                                                                                                        \
     kan_interned_string_t path[KAN_UNIVERSE_MAX_AUTOMATED_QUERY_NAME_PARTS - 1u];                                      \
-    for (uint64_t index = 1u; index < name_parts_count; ++index)                                                       \
+    for (kan_loop_size_t index = 1u; index < name_parts_count; ++index)                                                \
     {                                                                                                                  \
         path[index - 1u] = kan_char_sequence_intern (name_parts[index].begin, name_parts[index].end);                  \
     }                                                                                                                  \
@@ -852,7 +852,8 @@ static void deploy_automated_lifetime_queries (kan_reflection_registry_t registr
                                                                                                                        \
     KAN_ASSERT (*name_parts[name_parts_count - 1u].end == '\0')                                                        \
     char *parse_end = NULL;                                                                                            \
-    uint64_t signal_value = (uint64_t) strtoull (name_parts[name_parts_count - 1u].begin, &parse_end, 10);             \
+    kan_repository_signal_value_t signal_value =                                                                       \
+        (kan_repository_signal_value_t) strtoull (name_parts[name_parts_count - 1u].begin, &parse_end, 10);            \
                                                                                                                        \
     if (parse_end != name_parts[name_parts_count - 1u].end)                                                            \
     {                                                                                                                  \
@@ -863,7 +864,7 @@ static void deploy_automated_lifetime_queries (kan_reflection_registry_t registr
     }                                                                                                                  \
                                                                                                                        \
     kan_interned_string_t path[KAN_UNIVERSE_MAX_AUTOMATED_QUERY_NAME_PARTS - 2u];                                      \
-    for (uint64_t index = 1u; index < name_parts_count - 1u; ++index)                                                  \
+    for (kan_loop_size_t index = 1u; index < name_parts_count - 1u; ++index)                                           \
     {                                                                                                                  \
         path[index - 1u] = kan_char_sequence_intern (name_parts[index].begin, name_parts[index].end);                  \
     }                                                                                                                  \
@@ -942,7 +943,7 @@ static void deploy_automated_lifetime_queries (kan_reflection_registry_t registr
     }                                                                                                                  \
                                                                                                                        \
     kan_interned_string_t path[KAN_UNIVERSE_MAX_AUTOMATED_QUERY_NAME_PARTS - 1u];                                      \
-    for (uint64_t index = 1u; index < name_parts_count; ++index)                                                       \
+    for (kan_loop_size_t index = 1u; index < name_parts_count; ++index)                                                \
     {                                                                                                                  \
         path[index - 1u] = kan_char_sequence_intern (name_parts[index].begin, name_parts[index].end);                  \
     }                                                                                                                  \
@@ -1160,7 +1161,7 @@ static void undeploy_automated_lifetime_queries (kan_reflection_registry_t regis
         (struct kan_reflection_struct_t *) kan_reflection_registry_query_struct (registry, type_name);
     KAN_ASSERT (struct_data)
 
-    for (uint64_t field_index = 0u; field_index < struct_data->fields_count; ++field_index)
+    for (kan_loop_size_t field_index = 0u; field_index < struct_data->fields_count; ++field_index)
     {
         struct kan_reflection_field_t *field = &struct_data->fields[field_index];
         uint8_t *position = ((uint8_t *) fragment) + field->offset;
@@ -1304,7 +1305,7 @@ static void undeploy_automated_lifetime_queries (kan_reflection_registry_t regis
 static struct scheduler_api_node_t *universe_get_scheduler_api (struct universe_t *universe, kan_interned_string_t name)
 {
     const struct kan_hash_storage_bucket_t *bucket =
-        kan_hash_storage_query (&universe->scheduler_api_storage, (uint64_t) name);
+        kan_hash_storage_query (&universe->scheduler_api_storage, (kan_hash_t) name);
     struct scheduler_api_node_t *node = (struct scheduler_api_node_t *) bucket->first;
     const struct scheduler_api_node_t *node_end =
         (struct scheduler_api_node_t *) (bucket->last ? bucket->last->next : NULL);
@@ -1330,7 +1331,7 @@ static struct scheduler_api_node_t *universe_get_or_create_scheduler_api (struct
     {
         node = (struct scheduler_api_node_t *) kan_allocate_batched (universe->api_allocation_group,
                                                                      sizeof (struct scheduler_api_node_t));
-        node->node.hash = (uint64_t) name;
+        node->node.hash = (kan_hash_t) name;
         node->name = name;
 
         node->api.type = NULL;
@@ -1349,7 +1350,7 @@ static struct scheduler_api_node_t *universe_get_or_create_scheduler_api (struct
 static struct mutator_api_node_t *universe_get_mutator_api (struct universe_t *universe, kan_interned_string_t name)
 {
     const struct kan_hash_storage_bucket_t *bucket =
-        kan_hash_storage_query (&universe->mutator_api_storage, (uint64_t) name);
+        kan_hash_storage_query (&universe->mutator_api_storage, (kan_hash_t) name);
     struct mutator_api_node_t *node = (struct mutator_api_node_t *) bucket->first;
     const struct mutator_api_node_t *node_end =
         (struct mutator_api_node_t *) (bucket->last ? bucket->last->next : NULL);
@@ -1375,7 +1376,7 @@ static struct mutator_api_node_t *universe_get_or_create_mutator_api (struct uni
     {
         node = (struct mutator_api_node_t *) kan_allocate_batched (universe->api_allocation_group,
                                                                    sizeof (struct mutator_api_node_t));
-        node->node.hash = (uint64_t) name;
+        node->node.hash = (kan_hash_t) name;
         node->name = name;
 
         node->api.type = NULL;
@@ -1404,7 +1405,7 @@ static void add_mutator_to_groups (struct universe_t *universe,
     {
         kan_interned_string_t group_name = kan_string_intern (meta->group_name);
         const struct kan_hash_storage_bucket_t *bucket =
-            kan_hash_storage_query (&universe->group_multi_map_storage, (uint64_t) group_name);
+            kan_hash_storage_query (&universe->group_multi_map_storage, (kan_hash_t) group_name);
         struct group_multi_map_node_t *node = (struct group_multi_map_node_t *) bucket->first;
         const struct group_multi_map_node_t *node_end =
             (struct group_multi_map_node_t *) (bucket->last ? bucket->last->next : NULL);
@@ -1425,7 +1426,7 @@ static void add_mutator_to_groups (struct universe_t *universe,
         {
             struct group_multi_map_node_t *new_node = (struct group_multi_map_node_t *) kan_allocate_batched (
                 universe->api_allocation_group, sizeof (struct group_multi_map_node_t));
-            new_node->node.hash = (uint64_t) group_name;
+            new_node->node.hash = (kan_hash_t) group_name;
             new_node->group_name = group_name;
             new_node->mutator = mutator_name;
 
@@ -1993,10 +1994,10 @@ static void world_clean_self_preserving_repository (struct universe_t *universe,
         world_scheduler_remove (universe, world, universe->reflection_registry);
     }
 
-    for (uint64_t index = 0u; index < world->pipelines.size; ++index)
+    for (kan_loop_size_t index = 0u; index < world->pipelines.size; ++index)
     {
         struct pipeline_t *pipeline = &((struct pipeline_t *) world->pipelines.data)[index];
-        for (uint64_t mutator_index = 0u; mutator_index < pipeline->mutators.size; ++mutator_index)
+        for (kan_loop_size_t mutator_index = 0u; mutator_index < pipeline->mutators.size; ++mutator_index)
         {
             struct mutator_t *mutator = &((struct mutator_t *) pipeline->mutators.data)[mutator_index];
             mutator_clean (universe, mutator, universe->reflection_registry);
@@ -2015,7 +2016,7 @@ static void world_clean_self_preserving_repository (struct universe_t *universe,
     kan_dynamic_array_reset (&world->pipelines);
     kan_dynamic_array_set_capacity (&world->pipelines, 0u);
 
-    for (uint64_t index = 0u; index < world->configuration.size; ++index)
+    for (kan_loop_size_t index = 0u; index < world->configuration.size; ++index)
     {
         struct world_configuration_t *configuration =
             &((struct world_configuration_t *) world->configuration.data)[index];
@@ -2038,7 +2039,7 @@ struct deploy_scheduler_user_data_t
     struct world_t *world;
 };
 
-static void deploy_scheduler_execute (uint64_t user_data)
+static void deploy_scheduler_execute (kan_functor_user_data_t user_data)
 {
     struct deploy_scheduler_user_data_t *data = (struct deploy_scheduler_user_data_t *) user_data;
     KAN_ASSERT (data->world->scheduler_state)
@@ -2069,7 +2070,7 @@ struct deploy_mutator_user_data_t
     kan_workflow_graph_node_t workflow_node;
 };
 
-static void execute_mutator (kan_cpu_job_t job, uint64_t user_data)
+static void execute_mutator (kan_cpu_job_t job, kan_functor_user_data_t user_data)
 {
     struct mutator_t *mutator = (struct mutator_t *) user_data;
     KAN_ASSERT (mutator->api)
@@ -2083,7 +2084,7 @@ static void execute_mutator (kan_cpu_job_t job, uint64_t user_data)
     mutator->api->execute->call (mutator->api->execute->call_user_data, NULL, &arguments);
 }
 
-static void deploy_mutator_execute (uint64_t user_data)
+static void deploy_mutator_execute (kan_functor_user_data_t user_data)
 {
     struct deploy_mutator_user_data_t *data = (struct deploy_mutator_user_data_t *) user_data;
     KAN_ASSERT (data->mutator->state)
@@ -2105,7 +2106,8 @@ static void deploy_mutator_execute (uint64_t user_data)
         data->mutator->api->deploy->call (data->mutator->api->deploy->call_user_data, NULL, &arguments);
     }
 
-    kan_workflow_graph_node_set_function (data->workflow_node, execute_mutator, (uint64_t) data->mutator);
+    kan_workflow_graph_node_set_function (data->workflow_node, execute_mutator,
+                                          (kan_functor_user_data_t) data->mutator);
     kan_workflow_graph_node_submit (data->workflow_node);
 }
 
@@ -2121,7 +2123,7 @@ static void world_collect_deployment_tasks (struct universe_t *universe,
                                        .world = world,
                                    })
 
-    for (uint64_t index = 0u; index < world->pipelines.size; ++index)
+    for (kan_loop_size_t index = 0u; index < world->pipelines.size; ++index)
     {
         struct pipeline_t *pipeline = &((struct pipeline_t *) world->pipelines.data)[index];
         if (KAN_HANDLE_IS_VALID (pipeline->graph))
@@ -2130,7 +2132,7 @@ static void world_collect_deployment_tasks (struct universe_t *universe,
         }
 
         pipeline->graph_builder = kan_workflow_graph_builder_create (temporary_allocator->group);
-        for (uint64_t mutator_index = 0u; mutator_index < pipeline->mutators.size; ++mutator_index)
+        for (kan_loop_size_t mutator_index = 0u; mutator_index < pipeline->mutators.size; ++mutator_index)
         {
             struct mutator_t *mutator = &((struct mutator_t *) pipeline->mutators.data)[mutator_index];
             KAN_CPU_TASK_LIST_USER_STRUCT (
@@ -2146,10 +2148,11 @@ static void world_collect_deployment_tasks (struct universe_t *universe,
     }
 }
 
-static void finish_pipeline_deployment_execute (uint64_t user_data)
+static void finish_pipeline_deployment_execute (kan_functor_user_data_t user_data)
 {
     struct pipeline_t *pipeline = (struct pipeline_t *) user_data;
-    for (uint64_t dependency_index = 0u; dependency_index < pipeline->checkpoint_dependencies.size; ++dependency_index)
+    for (kan_loop_size_t dependency_index = 0u; dependency_index < pipeline->checkpoint_dependencies.size;
+         ++dependency_index)
     {
         struct kan_universe_world_checkpoint_dependency_t *dependency =
             &((struct kan_universe_world_checkpoint_dependency_t *)
@@ -2176,14 +2179,14 @@ static void world_finish_deployment (struct universe_t *universe,
                                      struct kan_cpu_task_list_node_t **list_node,
                                      struct kan_stack_group_allocator_t *temporary_allocator)
 {
-    for (uint64_t index = 0u; index < world->pipelines.size; ++index)
+    for (kan_loop_size_t index = 0u; index < world->pipelines.size; ++index)
     {
         struct pipeline_t *pipeline = &((struct pipeline_t *) world->pipelines.data)[index];
         KAN_CPU_TASK_LIST_USER_VALUE (list_node, temporary_allocator, interned_finish_pipeline_deployment,
                                       finish_pipeline_deployment_execute, pipeline)
     }
 
-    for (uint64_t index = 0u; index < world->children.size; ++index)
+    for (kan_loop_size_t index = 0u; index < world->children.size; ++index)
     {
         world_finish_deployment (universe, ((struct world_t **) world->children.data)[index], list_node,
                                  temporary_allocator);
@@ -2202,7 +2205,7 @@ static void world_hierarchy_deploy_one_by_one (struct universe_t *universe,
     kan_cpu_job_release (job);
     kan_cpu_job_wait (job);
 
-    for (uint64_t index = 0u; index < world->children.size; ++index)
+    for (kan_loop_size_t index = 0u; index < world->children.size; ++index)
     {
         world_hierarchy_deploy_one_by_one (universe, ((struct world_t **) world->children.data)[index],
                                            temporary_allocator);
@@ -2263,7 +2266,7 @@ static void world_destroy (struct universe_t *universe, struct world_t *world)
 
     if (world->parent)
     {
-        for (uint64_t index = 0u; index < world->parent->children.size; ++index)
+        for (kan_loop_size_t index = 0u; index < world->parent->children.size; ++index)
         {
             struct world_t *other_world = ((struct world_t **) world->parent->children.data)[index];
             if (other_world == world)
@@ -2356,7 +2359,7 @@ void kan_universe_world_configuration_init (struct kan_universe_world_configurat
 
 void kan_universe_world_configuration_shutdown (struct kan_universe_world_configuration_t *data)
 {
-    for (uint64_t index = 0u; index < data->variants.size; ++index)
+    for (kan_loop_size_t index = 0u; index < data->variants.size; ++index)
     {
         kan_universe_world_configuration_variant_shutdown (
             &((struct kan_universe_world_configuration_variant_t *) data->variants.data)[index]);
@@ -2401,21 +2404,21 @@ UNIVERSE_API void kan_universe_world_definition_init (struct kan_universe_world_
 
 UNIVERSE_API void kan_universe_world_definition_shutdown (struct kan_universe_world_definition_t *data)
 {
-    for (uint64_t index = 0u; index < data->configuration.size; ++index)
+    for (kan_loop_size_t index = 0u; index < data->configuration.size; ++index)
     {
         kan_universe_world_configuration_shutdown (
             &((struct kan_universe_world_configuration_t *) data->configuration.data)[index]);
     }
 
     kan_dynamic_array_shutdown (&data->configuration);
-    for (uint64_t index = 0u; index < data->pipelines.size; ++index)
+    for (kan_loop_size_t index = 0u; index < data->pipelines.size; ++index)
     {
         kan_universe_world_pipeline_definition_shutdown (
             &((struct kan_universe_world_pipeline_definition_t *) data->pipelines.data)[index]);
     }
 
     kan_dynamic_array_shutdown (&data->pipelines);
-    for (uint64_t index = 0u; index < data->children.size; ++index)
+    for (kan_loop_size_t index = 0u; index < data->children.size; ++index)
     {
         kan_universe_world_definition_shutdown (
             &((struct kan_universe_world_definition_t *) data->children.data)[index]);
@@ -2439,7 +2442,7 @@ kan_interned_string_t kan_universe_world_get_name (kan_universe_world_t world)
 const void *kan_universe_world_query_configuration (kan_universe_world_t world, kan_interned_string_t name)
 {
     struct world_t *world_data = KAN_HANDLE_GET (world);
-    for (uint64_t index = 0u; index < world_data->configuration.size; ++index)
+    for (kan_loop_size_t index = 0u; index < world_data->configuration.size; ++index)
     {
         struct world_configuration_t *configuration =
             &((struct world_configuration_t *) world_data->configuration.data)[index];
@@ -2523,7 +2526,7 @@ struct undeploy_and_migrate_scheduler_user_data_t
     kan_reflection_struct_migrator_t migrator;
 };
 
-static void undeploy_and_migrate_scheduler_execute (uint64_t user_data)
+static void undeploy_and_migrate_scheduler_execute (kan_functor_user_data_t user_data)
 {
     struct undeploy_and_migrate_scheduler_user_data_t *data =
         (struct undeploy_and_migrate_scheduler_user_data_t *) user_data;
@@ -2537,7 +2540,7 @@ static void undeploy_and_migrate_scheduler_execute (uint64_t user_data)
     }
 
     void *old_scheduler_state = data->world->scheduler_state;
-    const uint64_t old_scheduler_size = data->world->scheduler_api->type->size;
+    const kan_instance_size_t old_scheduler_size = data->world->scheduler_api->type->size;
     kan_allocation_group_t old_scheduler_state_allocation_group = data->world->scheduler_state_allocation_group;
     world_scheduler_init (data->universe, data->world);
 
@@ -2564,7 +2567,7 @@ struct undeploy_and_migrate_mutator_user_data_t
     kan_reflection_struct_migrator_t migrator;
 };
 
-static void undeploy_and_migrate_mutator_execute (uint64_t user_data)
+static void undeploy_and_migrate_mutator_execute (kan_functor_user_data_t user_data)
 {
     struct undeploy_and_migrate_mutator_user_data_t *data =
         (struct undeploy_and_migrate_mutator_user_data_t *) user_data;
@@ -2577,7 +2580,7 @@ static void undeploy_and_migrate_mutator_execute (uint64_t user_data)
     }
 
     void *old_mutator_state = data->mutator->state;
-    const uint64_t old_mutator_size = data->old_api->type->size;
+    const kan_instance_size_t old_mutator_size = data->old_api->type->size;
     kan_allocation_group_t old_mutator_allocation_group = data->mutator->state_allocation_group;
     mutator_init (data->universe, data->mutator);
 
@@ -2661,24 +2664,24 @@ static void world_migration_schedulers_mutators_migrate (struct universe_t *univ
         world_scheduler_remove (universe, world, old_reflection_registry);
     }
 
-    for (uint64_t pipeline_index = 0u; pipeline_index < world->pipelines.size; ++pipeline_index)
+    for (kan_loop_size_t pipeline_index = 0u; pipeline_index < world->pipelines.size; ++pipeline_index)
     {
         struct pipeline_t *pipeline = &((struct pipeline_t *) world->pipelines.data)[pipeline_index];
 
         // Groups might've changed due to migration.
         // We need to remove mutators that we're added from groups, but no longer belong to them.
         // Also, we need to add mutators that were added to groups due to migration.
-        for (uint64_t mutator_index = 0u; mutator_index < pipeline->mutators.size; ++mutator_index)
+        for (kan_loop_size_t mutator_index = 0u; mutator_index < pipeline->mutators.size; ++mutator_index)
         {
             struct mutator_t *mutator = &((struct mutator_t *) pipeline->mutators.data)[mutator_index];
             mutator->found_in_groups = KAN_FALSE;
         }
 
-        for (uint64_t group_index = 0u; group_index < pipeline->used_groups.size; ++group_index)
+        for (kan_loop_size_t group_index = 0u; group_index < pipeline->used_groups.size; ++group_index)
         {
             kan_interned_string_t group_name = ((kan_interned_string_t *) pipeline->used_groups.data)[group_index];
             const struct kan_hash_storage_bucket_t *bucket =
-                kan_hash_storage_query (&universe->group_multi_map_storage, (uint64_t) group_name);
+                kan_hash_storage_query (&universe->group_multi_map_storage, (kan_hash_t) group_name);
             struct group_multi_map_node_t *node = (struct group_multi_map_node_t *) bucket->first;
             const struct group_multi_map_node_t *node_end =
                 (struct group_multi_map_node_t *) (bucket->last ? bucket->last->next : NULL);
@@ -2690,7 +2693,7 @@ static void world_migration_schedulers_mutators_migrate (struct universe_t *univ
                     // Find mutator and mark it as found.
                     kan_bool_t found = KAN_FALSE;
 
-                    for (uint64_t mutator_index = 0u; mutator_index < pipeline->mutators.size; ++mutator_index)
+                    for (kan_loop_size_t mutator_index = 0u; mutator_index < pipeline->mutators.size; ++mutator_index)
                     {
                         struct mutator_t *mutator = &((struct mutator_t *) pipeline->mutators.data)[mutator_index];
                         if (mutator->name == node->mutator)
@@ -2734,7 +2737,7 @@ static void world_migration_schedulers_mutators_migrate (struct universe_t *univ
             }
         }
 
-        for (uint64_t mutator_index = 0u; mutator_index < pipeline->mutators.size;)
+        for (kan_loop_size_t mutator_index = 0u; mutator_index < pipeline->mutators.size;)
         {
             struct mutator_t *mutator = &((struct mutator_t *) pipeline->mutators.data)[mutator_index];
             if (mutator->added_during_migration)
@@ -2810,7 +2813,7 @@ static void world_migration_schedulers_mutators_migrate (struct universe_t *univ
         }
     }
 
-    for (uint64_t child_index = 0u; child_index < world->children.size; ++child_index)
+    for (kan_loop_size_t child_index = 0u; child_index < world->children.size; ++child_index)
     {
         world_migration_schedulers_mutators_migrate (universe, ((struct world_t **) world->children.data)[child_index],
                                                      old_reflection_registry, migration_seed, migrator, first_task_node,
@@ -2826,7 +2829,7 @@ struct migrate_configuration_user_data_t
     kan_reflection_struct_migrator_t migrator;
 };
 
-static void migrate_configuration_execute (uint64_t user_data)
+static void migrate_configuration_execute (kan_functor_user_data_t user_data)
 {
     struct migrate_configuration_user_data_t *data = (struct migrate_configuration_user_data_t *) user_data;
     void *old_data = data->configuration->data;
@@ -2853,7 +2856,7 @@ static void world_migrate_configuration (struct universe_t *universe,
                                          struct kan_cpu_task_list_node_t **first_task_node,
                                          struct kan_stack_group_allocator_t *temporary_allocator)
 {
-    for (uint64_t configuration_index = 0u; configuration_index < world->configuration.size;)
+    for (kan_loop_size_t configuration_index = 0u; configuration_index < world->configuration.size;)
     {
         struct world_configuration_t *configuration =
             &((struct world_configuration_t *) world->configuration.data)[configuration_index];
@@ -2896,7 +2899,7 @@ static void world_migrate_configuration (struct universe_t *universe,
         }
     }
 
-    for (uint64_t child_index = 0u; child_index < world->children.size; ++child_index)
+    for (kan_loop_size_t child_index = 0u; child_index < world->children.size; ++child_index)
     {
         world_migrate_configuration (universe, ((struct world_t **) world->children.data)[child_index], migration_seed,
                                      migrator, first_task_node, temporary_allocator);
@@ -3036,13 +3039,13 @@ static void fill_world_from_definition (struct universe_t *universe,
     KAN_ASSERT (world->configuration.size == 0u)
 
     kan_dynamic_array_set_capacity (&world->configuration, definition->configuration.size);
-    for (uint64_t index = 0u; index < definition->configuration.size; ++index)
+    for (kan_loop_size_t index = 0u; index < definition->configuration.size; ++index)
     {
         struct kan_universe_world_configuration_t *input =
             &((struct kan_universe_world_configuration_t *) definition->configuration.data)[index];
         struct kan_universe_world_configuration_variant_t *suitable_variant = NULL;
 
-        for (uint64_t variant_index = 0u; variant_index < input->variants.size; ++variant_index)
+        for (kan_loop_size_t variant_index = 0u; variant_index < input->variants.size; ++variant_index)
         {
             struct kan_universe_world_configuration_variant_t *variant =
                 &((struct kan_universe_world_configuration_variant_t *) input->variants.data)[variant_index];
@@ -3053,13 +3056,14 @@ static void fill_world_from_definition (struct universe_t *universe,
             }
 
             kan_bool_t requirement_met = KAN_TRUE;
-            for (uint64_t requirement_index = 0u; requirement_index < variant->required_tags.size; ++requirement_index)
+            for (kan_loop_size_t requirement_index = 0u; requirement_index < variant->required_tags.size;
+                 ++requirement_index)
             {
                 kan_interned_string_t requirement =
                     ((kan_interned_string_t *) variant->required_tags.data)[requirement_index];
                 kan_bool_t found = KAN_FALSE;
 
-                for (uint64_t tag_index = 0u; tag_index < universe->environment_tags.size; ++tag_index)
+                for (kan_loop_size_t tag_index = 0u; tag_index < universe->environment_tags.size; ++tag_index)
                 {
                     kan_interned_string_t tag = ((kan_interned_string_t *) universe->environment_tags.data)[tag_index];
 
@@ -3122,7 +3126,7 @@ static void fill_world_from_definition (struct universe_t *universe,
     }
 
     kan_dynamic_array_set_capacity (&world->pipelines, definition->pipelines.size);
-    for (uint64_t index = 0u; index < definition->pipelines.size; ++index)
+    for (kan_loop_size_t index = 0u; index < definition->pipelines.size; ++index)
     {
         struct kan_universe_world_pipeline_definition_t *input =
             &((struct kan_universe_world_pipeline_definition_t *) definition->pipelines.data)[index];
@@ -3144,7 +3148,7 @@ static void fill_world_from_definition (struct universe_t *universe,
                                 _Alignof (struct kan_universe_world_checkpoint_dependency_t),
                                 world->pipelines.allocation_group);
 
-        for (uint64_t group_index = 0u; group_index < input->mutator_groups.size; ++group_index)
+        for (kan_loop_size_t group_index = 0u; group_index < input->mutator_groups.size; ++group_index)
         {
             kan_interned_string_t group_name = ((kan_interned_string_t *) input->mutator_groups.data)[group_index];
             kan_interned_string_t *group_name_output =
@@ -3161,7 +3165,7 @@ static void fill_world_from_definition (struct universe_t *universe,
             kan_bool_t group_found = KAN_FALSE;
 
             const struct kan_hash_storage_bucket_t *bucket =
-                kan_hash_storage_query (&universe->group_multi_map_storage, (uint64_t) group_name);
+                kan_hash_storage_query (&universe->group_multi_map_storage, (kan_hash_t) group_name);
             struct group_multi_map_node_t *node = (struct group_multi_map_node_t *) bucket->first;
             const struct group_multi_map_node_t *node_end =
                 (struct group_multi_map_node_t *) (bucket->last ? bucket->last->next : NULL);
@@ -3205,7 +3209,7 @@ static void fill_world_from_definition (struct universe_t *universe,
         }
 
         kan_dynamic_array_set_capacity (&output->mutators, output->mutators.size + input->mutators.size);
-        for (uint64_t mutator_index = 0u; mutator_index < input->mutators.size; ++mutator_index)
+        for (kan_loop_size_t mutator_index = 0u; mutator_index < input->mutators.size; ++mutator_index)
         {
             kan_interned_string_t requested_name = ((kan_interned_string_t *) input->mutators.data)[mutator_index];
             struct mutator_api_node_t *mutator_node = universe_get_mutator_api (universe, requested_name);
@@ -3225,7 +3229,8 @@ static void fill_world_from_definition (struct universe_t *universe,
             }
         }
 
-        for (uint64_t dependency_index = 0u; dependency_index < input->checkpoint_dependencies.size; ++dependency_index)
+        for (kan_loop_size_t dependency_index = 0u; dependency_index < input->checkpoint_dependencies.size;
+             ++dependency_index)
         {
             struct kan_universe_world_checkpoint_dependency_t *dependency_input =
                 &((struct kan_universe_world_checkpoint_dependency_t *)
@@ -3247,14 +3252,15 @@ static void update_world_hierarchy_with_overlaps (struct universe_t *universe,
     world_clean_self_preserving_repository (universe, world_to_update);
     fill_world_from_definition (universe, world_to_update, new_definition);
 
-    for (uint64_t definition_child_index = 0u; definition_child_index < new_definition->children.size;
+    for (kan_loop_size_t definition_child_index = 0u; definition_child_index < new_definition->children.size;
          ++definition_child_index)
     {
         struct kan_universe_world_definition_t *definition_child =
             &((struct kan_universe_world_definition_t *) new_definition->children.data)[definition_child_index];
         kan_bool_t found_child = KAN_FALSE;
 
-        for (uint64_t world_child_index = 0u; world_child_index < world_to_update->children.size; ++world_child_index)
+        for (kan_loop_size_t world_child_index = 0u; world_child_index < world_to_update->children.size;
+             ++world_child_index)
         {
             struct world_t *world_child = ((struct world_t **) world_to_update->children.data)[world_child_index];
             if (world_child->name == definition_child->world_name)
@@ -3418,7 +3424,7 @@ void kan_universe_scheduler_interface_run_pipeline (kan_universe_scheduler_inter
     struct kan_cpu_section_execution_t execution;
     kan_cpu_section_execution_init (&execution, kan_cpu_section_get (pipeline_name));
 
-    for (uint64_t pipeline_index = 0u; pipeline_index < world->pipelines.size; ++pipeline_index)
+    for (kan_loop_size_t pipeline_index = 0u; pipeline_index < world->pipelines.size; ++pipeline_index)
     {
         struct pipeline_t *pipeline = &((struct pipeline_t *) world->pipelines.data)[pipeline_index];
         if (pipeline->name == pipeline_name)
@@ -3438,7 +3444,7 @@ void kan_universe_scheduler_interface_run_pipeline (kan_universe_scheduler_inter
 void kan_universe_scheduler_interface_update_all_children (kan_universe_scheduler_interface_t interface)
 {
     struct world_t *world = KAN_HANDLE_GET (interface);
-    for (uint64_t child_index = 0u; child_index < world->children.size; ++child_index)
+    for (kan_loop_size_t child_index = 0u; child_index < world->children.size; ++child_index)
     {
         update_world (((struct world_t **) world->children.data)[child_index]);
     }

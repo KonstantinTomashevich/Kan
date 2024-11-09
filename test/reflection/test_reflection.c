@@ -2,6 +2,7 @@
 #include <stddef.h>
 #include <string.h>
 
+#include <kan/api_common/alignment.h>
 #include <kan/api_common/min_max.h>
 #include <kan/container/dynamic_array.h>
 #include <kan/reflection/field_visibility_iterator.h>
@@ -50,7 +51,7 @@ struct example_argument_meta_min_max_t
     int64_t max_value;
 };
 
-static void function_call_functor_stub (kan_reflection_functor_user_data_t user_data,
+static void function_call_functor_stub (kan_functor_user_data_t user_data,
                                         void *return_pointer,
                                         void *arguments_pointer)
 {
@@ -478,7 +479,7 @@ KAN_TEST_CASE (query_local_field)
         },
         {
             .name = kan_string_intern ("second"),
-            .offset = sizeof (void *),
+            .offset = kan_apply_alignment (sizeof (void *), first_struct.alignment),
             .size = first_struct.size,
             .archetype = KAN_REFLECTION_ARCHETYPE_STRUCT,
             .archetype_struct = {first_struct.name},
@@ -503,8 +504,8 @@ KAN_TEST_CASE (query_local_field)
     KAN_TEST_CHECK (kan_reflection_registry_add_struct (registry, &first_struct))
     KAN_TEST_CHECK (kan_reflection_registry_add_struct (registry, &second_struct))
 
-    uint64_t absolute_offset;
-    uint64_t size_with_padding;
+    kan_instance_size_t absolute_offset;
+    kan_instance_size_t size_with_padding;
     kan_interned_string_t first_first_path[] = {first_struct_fields[0u].name};
     KAN_TEST_CHECK (kan_reflection_registry_query_local_field (registry, first_struct.name, 1u, first_first_path,
                                                                &absolute_offset,
@@ -529,7 +530,16 @@ KAN_TEST_CASE (query_local_field)
                                                                second_second_third_path, &absolute_offset,
                                                                &size_with_padding) == &first_struct_fields[2u])
     KAN_TEST_CHECK (absolute_offset == second_struct_fields[1u].offset + first_struct_fields[2u].offset)
-    KAN_TEST_CHECK (size_with_padding == sizeof (uintptr_t))
+
+    // Padding size is different due to different sizes on interned string pointers on different platforms.
+    if (sizeof (void *) == 4u)
+    {
+        KAN_TEST_CHECK (size_with_padding == sizeof (void *) + sizeof (uint32_t))
+    }
+    else if (sizeof (void *) == 8u)
+    {
+        KAN_TEST_CHECK (size_with_padding == sizeof (void *))
+    }
 
     kan_interned_string_t second_first_third_path[] = {second_struct_fields[0u].name, first_struct_fields[2u].name};
     KAN_TEST_CHECK (kan_reflection_registry_query_local_field (registry, second_struct.name, 2u,
@@ -556,8 +566,8 @@ struct struct_with_union_t
 
 KAN_TEST_CASE (field_visibility_iterator)
 {
-    int64_t first_switch_values[] = {-1, 1};
-    int64_t second_switch_values[] = {-2, 2};
+    kan_reflection_visibility_size_t first_switch_values[] = {-1, 1};
+    kan_reflection_visibility_size_t second_switch_values[] = {-2, 2};
 
     struct kan_reflection_field_t struct_with_union_fields[] = {
         {.name = kan_string_intern ("before"),
@@ -1089,7 +1099,7 @@ static void check_generic_migration_result (const struct migration_source_t *sou
     KAN_TEST_CHECK (source->dynamic_array.size == target->dynamic_array.size)
 
     const uint64_t min_size = KAN_MIN (source->dynamic_array.size, target->dynamic_array.size);
-    for (uint64_t index = 0u; index < min_size; ++index)
+    for (kan_loop_size_t index = 0u; index < min_size; ++index)
     {
         check_first_enum_migration_result (((const enum first_enum_source_t *) source->dynamic_array.data)[index],
                                            ((const enum first_enum_target_t *) target->dynamic_array.data)[index]);
@@ -1393,8 +1403,8 @@ KAN_TEST_CASE (migration)
         .fields = nesting_target_fields,
     };
 
-    int64_t first_selection_conditions[] = {(int64_t) 0u};
-    int64_t second_selection_conditions[] = {(int64_t) 1u};
+    kan_reflection_visibility_size_t first_selection_conditions[] = {(int64_t) 0u};
+    kan_reflection_visibility_size_t second_selection_conditions[] = {(int64_t) 1u};
 
     struct kan_reflection_field_t migration_source_fields[] = {
         {.name = kan_string_intern ("nesting_first"),

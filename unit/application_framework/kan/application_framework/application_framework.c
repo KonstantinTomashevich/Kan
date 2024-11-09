@@ -114,13 +114,13 @@ void kan_application_framework_core_configuration_shutdown (
     kan_dynamic_array_shutdown (&instance->systems);
     kan_dynamic_array_shutdown (&instance->plugins);
 
-    for (uint64_t index = 0u; index < instance->resource_directories.size; ++index)
+    for (kan_loop_size_t index = 0u; index < instance->resource_directories.size; ++index)
     {
         kan_application_framework_resource_directory_shutdown (
             &((struct kan_application_framework_resource_directory_t *) instance->resource_directories.data)[index]);
     }
 
-    for (uint64_t index = 0u; index < instance->resource_packs.size; ++index)
+    for (kan_loop_size_t index = 0u; index < instance->resource_packs.size; ++index)
     {
         kan_application_framework_resource_pack_shutdown (
             &((struct kan_application_framework_resource_pack_t *) instance->resource_packs.data)[index]);
@@ -167,13 +167,13 @@ void kan_application_framework_program_configuration_shutdown (
     struct kan_application_framework_program_configuration_t *instance)
 {
     kan_dynamic_array_shutdown (&instance->plugins);
-    for (uint64_t index = 0u; index < instance->resource_directories.size; ++index)
+    for (kan_loop_size_t index = 0u; index < instance->resource_directories.size; ++index)
     {
         kan_application_framework_resource_directory_shutdown (
             &((struct kan_application_framework_resource_directory_t *) instance->resource_directories.data)[index]);
     }
 
-    for (uint64_t index = 0u; index < instance->resource_packs.size; ++index)
+    for (kan_loop_size_t index = 0u; index < instance->resource_packs.size; ++index)
     {
         kan_application_framework_resource_pack_shutdown (
             &((struct kan_application_framework_resource_pack_t *) instance->resource_packs.data)[index]);
@@ -187,14 +187,14 @@ KAN_REFLECTION_EXPECT_UNIT_REGISTRAR_LOCAL (application_framework);
 
 static inline kan_bool_t is_path_to_binary (const char *path)
 {
-    const uint64_t length = strlen (path);
+    const kan_instance_size_t length = (kan_instance_size_t) strlen (path);
     return length > 4u && path[length - 4u] == '.' && path[length - 3u] == 'b' && path[length - 2u] == 'i' &&
            path[length - 1u] == 'n';
 }
 
 int kan_application_framework_run (const char *core_configuration_path,
                                    const char *program_configuration_path,
-                                   uint64_t arguments_count,
+                                   kan_instance_size_t arguments_count,
                                    char **arguments)
 {
     int result = 0;
@@ -363,7 +363,8 @@ static inline void setup_plugin_system_config (
     kan_plugin_system_config_init (plugin_system_config);
 
     KAN_ASSERT (core_configuration->plugin_directory_path)
-    const uint64_t plugin_directory_name_length = strlen (core_configuration->plugin_directory_path);
+    const kan_instance_size_t plugin_directory_name_length =
+        (kan_instance_size_t) strlen (core_configuration->plugin_directory_path);
     plugin_system_config->plugin_directory_path = kan_allocate_general (
         kan_plugin_system_config_get_allocation_group (), plugin_directory_name_length + 1u, _Alignof (char));
     memcpy (plugin_system_config->plugin_directory_path, core_configuration->plugin_directory_path,
@@ -372,13 +373,13 @@ static inline void setup_plugin_system_config (
     kan_dynamic_array_set_capacity (&plugin_system_config->plugins,
                                     core_configuration->plugins.size + program_configuration->plugins.size);
 
-    for (uint64_t index = 0u; index < core_configuration->plugins.size; ++index)
+    for (kan_loop_size_t index = 0u; index < core_configuration->plugins.size; ++index)
     {
         *(kan_interned_string_t *) kan_dynamic_array_add_last (&plugin_system_config->plugins) =
             ((kan_interned_string_t *) core_configuration->plugins.data)[index];
     }
 
-    for (uint64_t index = 0u; index < program_configuration->plugins.size; ++index)
+    for (kan_loop_size_t index = 0u; index < program_configuration->plugins.size; ++index)
     {
         *(kan_interned_string_t *) kan_dynamic_array_add_last (&plugin_system_config->plugins) =
             ((kan_interned_string_t *) program_configuration->plugins.data)[index];
@@ -392,7 +393,7 @@ static inline void add_resource_directories_to_virtual_file_system_config (
     struct kan_virtual_file_system_config_t *virtual_file_system_config,
     const struct kan_dynamic_array_t *resource_directories)
 {
-    for (uint64_t index = 0u; index < resource_directories->size; ++index)
+    for (kan_loop_size_t index = 0u; index < resource_directories->size; ++index)
     {
         struct kan_application_framework_resource_directory_t *item =
             &((struct kan_application_framework_resource_directory_t *) resource_directories->data)[index];
@@ -414,7 +415,7 @@ static inline void add_resource_packs_to_virtual_file_system_config (
     struct kan_virtual_file_system_config_t *virtual_file_system_config,
     const struct kan_dynamic_array_t *resource_packs)
 {
-    for (uint64_t index = 0u; index < resource_packs->size; ++index)
+    for (kan_loop_size_t index = 0u; index < resource_packs->size; ++index)
     {
         struct kan_application_framework_resource_pack_t *item =
             &((struct kan_application_framework_resource_pack_t *) resource_packs->data)[index];
@@ -485,7 +486,7 @@ static inline void shutdown_virtual_file_system_config (
 int kan_application_framework_run_with_configuration (
     const struct kan_application_framework_core_configuration_t *core_configuration,
     const struct kan_application_framework_program_configuration_t *program_configuration,
-    uint64_t arguments_count,
+    kan_instance_size_t arguments_count,
     char **arguments)
 {
     ensure_statics_initialized ();
@@ -565,7 +566,7 @@ int kan_application_framework_run_with_configuration (
         result = KAN_APPLICATION_FRAMEWORK_EXIT_CODE_FAILED_TO_ASSEMBLE_CONTEXT;
     }
 
-    for (uint64_t index = 0u; index < core_configuration->systems.size; ++index)
+    for (kan_loop_size_t index = 0u; index < core_configuration->systems.size; ++index)
     {
         kan_interned_string_t name = ((kan_interned_string_t *) core_configuration->systems.data)[index];
         if (!kan_context_request_system (context, name, NULL))
@@ -610,7 +611,7 @@ int kan_application_framework_run_with_configuration (
         else
         {
             kan_universe_t universe = kan_universe_system_get_universe (universe_system);
-            for (uint64_t tag_index = 0u; tag_index < core_configuration->environment_tags.size; ++tag_index)
+            for (kan_loop_size_t tag_index = 0u; tag_index < core_configuration->environment_tags.size; ++tag_index)
             {
                 kan_universe_add_environment_tag (
                     universe, ((kan_interned_string_t *) core_configuration->environment_tags.data)[tag_index]);
@@ -623,13 +624,13 @@ int kan_application_framework_run_with_configuration (
             while (!kan_application_framework_system_is_exit_requested (application_framework_system, &result))
             {
                 kan_cpu_stage_separator ();
-                const uint64_t frame_start_ns = kan_platform_get_elapsed_nanoseconds ();
+                const kan_time_size_t frame_start_ns = kan_platform_get_elapsed_nanoseconds ();
                 kan_application_system_sync_in_main_thread (application_system);
                 kan_update_system_run (update_system);
-                const uint64_t frame_end_ns = kan_platform_get_elapsed_nanoseconds ();
+                const kan_time_size_t frame_end_ns = kan_platform_get_elapsed_nanoseconds ();
 
-                const uint64_t frame_time_ns = frame_end_ns - frame_start_ns;
-                const uint64_t min_frame_time_ns =
+                const kan_time_offset_t frame_time_ns = (kan_time_offset_t) (frame_end_ns - frame_start_ns);
+                const kan_time_offset_t min_frame_time_ns =
                     kan_application_framework_get_min_frame_time_ns (application_framework_system);
 
                 if (min_frame_time_ns != 0u && frame_time_ns < min_frame_time_ns)

@@ -20,7 +20,7 @@ struct context_t
 struct node_t
 {
     struct kan_hash_storage_node_t node;
-    uint64_t length;
+    kan_instance_size_t length;
     char string[];
 };
 
@@ -55,8 +55,8 @@ kan_interned_string_t kan_char_sequence_intern (const char *begin, const char *e
         return NULL;
     }
 
-    uint64_t string_length = end - begin;
-    const uint64_t hash = kan_char_sequence_hash (begin, end);
+    kan_instance_size_t string_length = (kan_instance_size_t) (end - begin);
+    const kan_hash_t hash = kan_char_sequence_hash (begin, end);
     kan_atomic_int_lock (&lock);
 
     if (!initialized)

@@ -73,8 +73,8 @@ struct window_create_suffix_t
 {
     kan_application_system_window_t window_handle;
     const char *title;
-    uint32_t width;
-    uint32_t height;
+    kan_platform_visual_size_t width;
+    kan_platform_visual_size_t height;
     enum kan_platform_window_flag_t flags;
 };
 
@@ -99,8 +99,8 @@ struct window_set_icon_suffix_t
 {
     kan_application_system_window_t window_handle;
     kan_pixel_format_t pixel_format;
-    uint32_t width;
-    uint32_t height;
+    kan_platform_visual_size_t width;
+    kan_platform_visual_size_t height;
     const void *data;
 };
 
@@ -113,8 +113,8 @@ struct window_set_bounds_suffix_t
 struct window_set_size_limit_suffix_t
 {
     kan_application_system_window_t window_handle;
-    uint32_t width;
-    uint32_t height;
+    kan_platform_visual_size_t width;
+    kan_platform_visual_size_t height;
 };
 
 struct window_set_boolean_parameter_suffix_t
@@ -760,7 +760,7 @@ static inline void sync_info_and_clipboard (struct application_system_t *system,
         }
 
         struct display_info_holder_t *current_holder = system->first_display_info;
-        for (uint64_t index = 0u; index < display_ids.size; ++index)
+        for (kan_loop_size_t index = 0u; index < display_ids.size; ++index)
         {
             kan_platform_display_id_t display_id = ((kan_platform_display_id_t *) display_ids.data)[index];
             current_holder->info.id = display_id;
@@ -811,21 +811,21 @@ static inline void sync_info_and_clipboard (struct application_system_t *system,
             window->info.pixel_format = kan_platform_application_window_get_pixel_format (window->info.id);
             window->info.flags = kan_platform_application_window_get_flags (window->info.id);
 
-            int32_t position_x;
-            int32_t position_y;
+            kan_platform_visual_offset_t position_x;
+            kan_platform_visual_offset_t position_y;
             kan_bool_t bounds_read =
                 kan_platform_application_window_get_position (window->info.id, &position_x, &position_y);
 
-            uint32_t size_x;
-            uint32_t size_y;
+            kan_platform_visual_size_t size_x;
+            kan_platform_visual_size_t size_y;
             bounds_read &= kan_platform_application_window_get_size (window->info.id, &size_x, &size_y);
 
             if (bounds_read)
             {
                 window->info.bounds.min_x = position_x;
                 window->info.bounds.min_y = position_y;
-                window->info.bounds.max_x = position_x + (int32_t) size_x;
-                window->info.bounds.max_y = position_y + (int32_t) size_y;
+                window->info.bounds.max_x = position_x + (kan_platform_visual_offset_t) size_x;
+                window->info.bounds.max_y = position_y + (kan_platform_visual_offset_t) size_y;
             }
 
             if (!kan_platform_application_window_get_size_for_render (window->info.id, &window->info.width_for_render,
@@ -867,7 +867,7 @@ static inline void sync_info_and_clipboard (struct application_system_t *system,
         }
 
         char *extracted = kan_platform_application_extract_text_from_clipboard ();
-        const uint64_t length = strlen (extracted);
+        const kan_instance_size_t length = (kan_instance_size_t) strlen (extracted);
         system->clipboard_content = kan_allocate_general (system->clipboard_group, length + 1u, _Alignof (char));
         memcpy (system->clipboard_content, extracted, length + 1u);
         kan_free_general (kan_platform_application_get_clipboard_allocation_group (), extracted, length + 1u);
@@ -1011,8 +1011,8 @@ static inline void insert_operation (struct application_system_t *system, struct
 
 kan_application_system_window_t kan_application_system_window_create (kan_context_system_t system_handle,
                                                                       const char *title,
-                                                                      uint32_t width,
-                                                                      uint32_t height,
+                                                                      kan_platform_visual_size_t width,
+                                                                      kan_platform_visual_size_t height,
                                                                       enum kan_platform_window_flag_t flags)
 {
     struct application_system_t *system = KAN_HANDLE_GET (system_handle);
@@ -1041,7 +1041,7 @@ kan_application_system_window_t kan_application_system_window_create (kan_contex
     operation->window_create_suffix.height = height;
     operation->window_create_suffix.flags = flags;
 
-    const uint64_t title_length = strlen (title);
+    const kan_instance_size_t title_length = (kan_instance_size_t) strlen (title);
     char *title_on_stack =
         kan_stack_group_allocator_allocate (&system->operation_temporary_allocator, title_length + 1u, _Alignof (char));
     memcpy (title_on_stack, title, title_length + 1u);
@@ -1095,7 +1095,7 @@ void kan_application_system_window_set_title (kan_context_system_t system_handle
     operation->type = OPERATION_TYPE_WINDOW_SET_TITLE;
     operation->window_set_textual_parameter_suffix.window_handle = window_handle;
 
-    const uint64_t title_length = strlen (title);
+    const kan_instance_size_t title_length = (kan_instance_size_t) strlen (title);
     char *title_on_stack =
         kan_stack_group_allocator_allocate (&system->operation_temporary_allocator, title_length + 1u, _Alignof (char));
     memcpy (title_on_stack, title, title_length + 1u);
@@ -1108,8 +1108,8 @@ void kan_application_system_window_set_title (kan_context_system_t system_handle
 void kan_application_system_window_set_icon (kan_context_system_t system_handle,
                                              kan_application_system_window_t window_handle,
                                              kan_pixel_format_t pixel_format,
-                                             uint32_t width,
-                                             uint32_t height,
+                                             kan_platform_visual_size_t width,
+                                             kan_platform_visual_size_t height,
                                              const void *data)
 {
     struct application_system_t *system = KAN_HANDLE_GET (system_handle);
@@ -1147,8 +1147,8 @@ void kan_application_system_window_set_bounds (kan_context_system_t system_handl
 
 void kan_application_system_window_set_minimum_size (kan_context_system_t system_handle,
                                                      kan_application_system_window_t window_handle,
-                                                     uint32_t minimum_width,
-                                                     uint32_t minimum_height)
+                                                     kan_platform_visual_size_t minimum_width,
+                                                     kan_platform_visual_size_t minimum_height)
 {
     struct application_system_t *system = KAN_HANDLE_GET (system_handle);
     kan_atomic_int_lock (&system->operation_submission_lock);
@@ -1166,8 +1166,8 @@ void kan_application_system_window_set_minimum_size (kan_context_system_t system
 
 void kan_application_system_window_set_maximum_size (kan_context_system_t system_handle,
                                                      kan_application_system_window_t window_handle,
-                                                     uint32_t maximum_width,
-                                                     uint32_t maximum_height)
+                                                     kan_platform_visual_size_t maximum_width,
+                                                     kan_platform_visual_size_t maximum_height)
 {
     struct application_system_t *system = KAN_HANDLE_GET (system_handle);
     kan_atomic_int_lock (&system->operation_submission_lock);
@@ -1398,8 +1398,9 @@ kan_application_system_window_resource_id_t kan_application_system_window_add_re
     struct kan_application_system_window_resource_binding_t binding)
 {
     struct application_system_t *system = KAN_HANDLE_GET (system_handle);
-    kan_application_system_window_resource_id_t resource_id = KAN_TYPED_ID_32_SET (
-        kan_application_system_window_resource_id_t, (uint32_t) kan_atomic_int_add (&system->resource_id_counter, 1));
+    kan_application_system_window_resource_id_t resource_id =
+        KAN_TYPED_ID_32_SET (kan_application_system_window_resource_id_t,
+                             (kan_id_32_t) kan_atomic_int_add (&system->resource_id_counter, 1));
 
     kan_atomic_int_lock (&system->operation_submission_lock);
     struct operation_t *operation = kan_stack_group_allocator_allocate (
@@ -1517,7 +1518,7 @@ void kan_application_system_clipboard_set_text (kan_context_system_t system_hand
         &system->operation_temporary_allocator, sizeof (struct operation_t), _Alignof (struct operation_t));
     operation->type = OPERATION_TYPE_CLIPBOARD_SET_TEXT;
 
-    const uint64_t text_length = strlen (text);
+    const kan_instance_size_t text_length = (kan_instance_size_t) strlen (text);
     char *text_copied = kan_allocate_general (system->operations_group, text_length + 1u, _Alignof (char));
     memcpy (text_copied, text, text_length + 1u);
     operation->clipboard_set_text_suffix.text = text_copied;

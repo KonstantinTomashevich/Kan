@@ -126,7 +126,7 @@ KAN_HANDLE_DEFINE (kan_virtual_file_system_volume_t);
 /// \brief Holds data for directory iterator implementation.
 struct kan_virtual_file_system_directory_iterator_t
 {
-    uint64_t implementation_data[5u];
+    void *implementation_data[5u];
 };
 
 /// \brief Enumerates virtual file system entry public types.
@@ -145,10 +145,10 @@ struct kan_virtual_file_system_entry_status_t
     enum kan_virtual_file_system_entry_type_t type;
 
     /// \warning Used for KAN_VIRTUAL_FILE_SYSTEM_ENTRY_TYPE_FILE.
-    uint64_t size;
+    kan_file_size_t size;
 
     /// \warning Used for KAN_VIRTUAL_FILE_SYSTEM_ENTRY_TYPE_FILE.
-    uint64_t last_modification_time_ns;
+    kan_time_size_t last_modification_time_ns;
 
     /// \warning Used for KAN_VIRTUAL_FILE_SYSTEM_ENTRY_TYPE_FILE.
     kan_bool_t read_only;

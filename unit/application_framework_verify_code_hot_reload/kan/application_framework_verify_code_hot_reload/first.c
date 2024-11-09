@@ -13,7 +13,7 @@ KAN_LOG_DEFINE_CATEGORY (application_framework_verify_code_hot_reload);
 
 struct verify_code_hot_reload_scheduler_state_t
 {
-    uint64_t stub;
+    kan_instance_size_t stub;
 };
 
 APPLICATION_FRAMEWORK_VERIFY_CODE_HOT_RELOAD_API void kan_universe_scheduler_execute_verify_code_hot_reload (
@@ -25,8 +25,8 @@ APPLICATION_FRAMEWORK_VERIFY_CODE_HOT_RELOAD_API void kan_universe_scheduler_exe
 
 struct verify_code_hot_test_singleton_t
 {
-    uint64_t test_frame;
-    uint64_t reload_request_time;
+    kan_instance_size_t test_frame;
+    kan_time_size_t reload_request_time;
 };
 
 APPLICATION_FRAMEWORK_VERIFY_CODE_HOT_RELOAD_API void verify_code_hot_test_singleton_init (
@@ -38,13 +38,13 @@ APPLICATION_FRAMEWORK_VERIFY_CODE_HOT_RELOAD_API void verify_code_hot_test_singl
 
 struct some_shared_struct_t
 {
-    uint64_t x;
-    uint64_t y;
+    kan_instance_size_t x;
+    kan_instance_size_t y;
 };
 
 struct struct_that_will_be_deleted_t
 {
-    uint64_t id;
+    kan_instance_size_t id;
 };
 
 struct verify_code_hot_reload_mutator_state_t

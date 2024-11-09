@@ -9,7 +9,7 @@ struct universe_pair_pipeline_scheduler_state_t
     KAN_UP_GENERATE_STATE_QUERIES (universe_pair_pipeline_scheduler)
     KAN_UP_BIND_STATE (universe_pair_pipeline_scheduler, state)
 
-    uint64_t last_update_time_ns;
+    kan_time_size_t last_update_time_ns;
     kan_interned_string_t logical_pipeline_name;
     kan_interned_string_t visual_pipeline_name;
 };
@@ -25,13 +25,14 @@ UNIVERSE_PAIR_PIPELINE_SCHEDULER_API void universe_pair_pipeline_scheduler_state
 UNIVERSE_PAIR_PIPELINE_SCHEDULER_API void kan_universe_scheduler_execute_pair_pipeline (
     kan_universe_scheduler_interface_t interface, struct universe_pair_pipeline_scheduler_state_t *state)
 {
-    const uint64_t current_time = kan_platform_get_elapsed_nanoseconds ();
+    const kan_time_size_t current_time = kan_platform_get_elapsed_nanoseconds ();
     // First update is intentionally zero.
-    const uint64_t delta_ns = state->last_update_time_ns == UINT64_MAX ? 0u : current_time - state->last_update_time_ns;
+    const kan_time_offset_t delta_ns =
+        state->last_update_time_ns == UINT64_MAX ? 0u : (kan_time_offset_t) (current_time - state->last_update_time_ns);
     state->last_update_time_ns = current_time;
 
-    uint64_t logical_step_ns;
-    uint64_t logical_advance_max_ns;
+    kan_time_offset_t logical_step_ns;
+    kan_time_offset_t logical_advance_max_ns;
 
     KAN_UP_SINGLETON_READ (settings, kan_pair_pipeline_settings_singleton_t)
     {
@@ -39,14 +40,14 @@ UNIVERSE_PAIR_PIPELINE_SCHEDULER_API void kan_universe_scheduler_execute_pair_pi
         logical_advance_max_ns = settings->max_logical_advance_time_ns;
     }
 
-    uint64_t logical_advance_begin_time;
+    kan_time_size_t logical_advance_begin_time;
 
     // Update visual time.
 
     {
         KAN_UP_SINGLETON_WRITE (time, kan_time_singleton_t)
         {
-            const uint64_t scaled_delta_ns = (uint64_t) (((float) delta_ns) * time->scale);
+            const kan_time_offset_t scaled_delta_ns = (kan_time_offset_t) (((float) delta_ns) * time->scale);
             time->visual_time_ns += scaled_delta_ns;
             time->visual_delta_ns = scaled_delta_ns;
             time->visual_unscaled_delta_ns = delta_ns;
@@ -56,7 +57,7 @@ UNIVERSE_PAIR_PIPELINE_SCHEDULER_API void kan_universe_scheduler_execute_pair_pi
 
     // Advance logical time until logical time is ahead.
 
-    const uint64_t logical_advance_begin_ns = kan_platform_get_elapsed_nanoseconds ();
+    const kan_time_size_t logical_advance_begin_ns = kan_platform_get_elapsed_nanoseconds ();
     kan_bool_t run_logical = KAN_FALSE;
 
     do
@@ -64,7 +65,8 @@ UNIVERSE_PAIR_PIPELINE_SCHEDULER_API void kan_universe_scheduler_execute_pair_pi
         run_logical = KAN_FALSE;
         KAN_UP_SINGLETON_WRITE (time, kan_time_singleton_t)
         {
-            const uint64_t advance_time_spent = kan_platform_get_elapsed_nanoseconds () - logical_advance_begin_ns;
+            const kan_time_offset_t advance_time_spent =
+                (kan_time_offset_t) (kan_platform_get_elapsed_nanoseconds () - logical_advance_begin_ns);
 
             // Critical case: unable to advance properly due to not performant enough hardware.
             // Slow down to avoid death spiral.

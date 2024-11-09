@@ -8,11 +8,11 @@ struct kan_rpl_compiler_statics_t kan_rpl_compiler_statics;
 
 static void build_repeating_vector_constructor_signatures (
     struct inbuilt_vector_type_t *item,
-    uint64_t repeats,
+    kan_instance_size_t repeats,
     struct compiler_instance_declaration_node_t *declaration_array_output)
 {
     char name[3u] = "_0";
-    for (uint64_t index = 0u; index < repeats; ++index)
+    for (kan_loop_size_t index = 0u; index < repeats; ++index)
     {
         name[1u] = (char) ('0' + index);
         declaration_array_output[index] = (struct compiler_instance_declaration_node_t) {
@@ -340,7 +340,7 @@ void kan_rpl_compiler_ensure_statics_initialized (void)
         kan_hash_storage_init (&STATICS.builtin_hash_storage, STATICS.rpl_compiler_builtin_hash_allocation_group,
                                KAN_RPL_BUILTIN_HASH_STORAGE_BUCKETS);
 
-#define SPIRV_INTERNAL ((uint32_t) SPIRV_FIXED_ID_INVALID)
+#define SPIRV_INTERNAL ((spirv_size_t) SPIRV_FIXED_ID_INVALID)
 
 #define ANY_STAGE KAN_RPL_PIPELINE_STAGE_GRAPHICS_CLASSIC_VERTEX
 
@@ -358,8 +358,8 @@ void kan_rpl_compiler_ensure_statics_initialized (void)
         .required_stage = REQUIRED_STAGE,                                                                              \
         .first_buffer_access = NULL,                                                                                   \
         .first_sampler_access = NULL,                                                                                  \
-        .spirv_external_library_id = (uint32_t) SPIRV_EXTERNAL_LIBRARY,                                                \
-        .spirv_external_instruction_id = (uint32_t) SPIRV_EXTERNAL_INSTRUCTION,                                        \
+        .spirv_external_library_id = (spirv_size_t) SPIRV_EXTERNAL_LIBRARY,                                            \
+        .spirv_external_instruction_id = (spirv_size_t) SPIRV_EXTERNAL_INSTRUCTION,                                    \
         .module_name = module_standard,                                                                                \
         .source_name = source_functions,                                                                               \
         .source_line = 0u,                                                                                             \
@@ -367,7 +367,7 @@ void kan_rpl_compiler_ensure_statics_initialized (void)
                                                                                                                        \
     struct kan_rpl_compiler_builtin_node_t *node_##NAME = kan_allocate_batched (                                       \
         STATICS.rpl_compiler_builtin_hash_allocation_group, sizeof (struct kan_rpl_compiler_builtin_node_t));          \
-    node_##NAME->node.hash = (uint64_t) STATICS.builtin_##NAME.name;                                                   \
+    node_##NAME->node.hash = (kan_hash_t) STATICS.builtin_##NAME.name;                                                 \
     node_##NAME->builtin = &STATICS.builtin_##NAME;                                                                    \
     kan_hash_storage_add (&STATICS.builtin_hash_storage, &node_##NAME->node)
 

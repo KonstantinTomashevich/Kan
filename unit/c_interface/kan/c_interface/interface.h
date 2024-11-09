@@ -52,7 +52,7 @@ struct kan_c_meta_t
 /// \brief Container for all meta that is added to some declaration.
 struct kan_c_meta_attachment_t
 {
-    uint64_t meta_count;
+    kan_instance_size_t meta_count;
     struct kan_c_meta_t *meta_array;
 };
 
@@ -67,7 +67,7 @@ struct kan_c_enum_value_t
 struct kan_c_enum_t
 {
     kan_interned_string_t name;
-    uint64_t values_count;
+    kan_instance_size_t values_count;
     struct kan_c_enum_value_t *values;
     struct kan_c_meta_attachment_t meta;
 };
@@ -103,7 +103,7 @@ struct kan_c_variable_t
 struct kan_c_struct_t
 {
     kan_interned_string_t name;
-    uint64_t fields_count;
+    kan_instance_size_t fields_count;
     struct kan_c_variable_t *fields;
     struct kan_c_meta_attachment_t meta;
 };
@@ -113,7 +113,7 @@ struct kan_c_function_t
 {
     kan_interned_string_t name;
     struct kan_c_type_t return_type;
-    uint64_t arguments_count;
+    kan_instance_size_t arguments_count;
     struct kan_c_variable_t *arguments;
     struct kan_c_meta_attachment_t meta;
 };
@@ -121,16 +121,16 @@ struct kan_c_function_t
 /// \brief Contains information about all enumerations, structures, exported functions and exported symbols.
 struct kan_c_interface_t
 {
-    uint64_t enums_count;
+    kan_instance_size_t enums_count;
     struct kan_c_enum_t *enums;
 
-    uint64_t structs_count;
+    kan_instance_size_t structs_count;
     struct kan_c_struct_t *structs;
 
-    uint64_t functions_count;
+    kan_instance_size_t functions_count;
     struct kan_c_function_t *functions;
 
-    uint64_t symbols_count;
+    kan_instance_size_t symbols_count;
     struct kan_c_variable_t *symbols;
 };
 

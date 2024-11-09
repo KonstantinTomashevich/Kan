@@ -25,8 +25,10 @@ static void ensure_statics_initialized (void)
 void *stb_malloc (size_t size)
 {
     ensure_statics_initialized ();
-    const uint64_t allocation_size = kan_apply_alignment (size + sizeof (uint64_t), _Alignof (uint64_t));
-    uint64_t *data = kan_allocate_general (allocation_group_stb, allocation_size, _Alignof (uint64_t));
+    const kan_memory_size_t allocation_size =
+        kan_apply_alignment (size + sizeof (kan_memory_size_t), _Alignof (kan_memory_size_t));
+    kan_memory_size_t *data =
+        kan_allocate_general (allocation_group_stb, allocation_size, _Alignof (kan_memory_size_t));
     *data = allocation_size;
     return data + 1u;
 }
@@ -35,7 +37,7 @@ void stb_free (void *pointer)
 {
     if (pointer)
     {
-        uint64_t *allocation = ((uint64_t *) pointer) - 1u;
+        kan_memory_size_t *allocation = ((kan_memory_size_t *) pointer) - 1u;
         kan_free_general (allocation_group_stb, allocation, *allocation);
     }
 }
@@ -53,8 +55,8 @@ void *stb_realloc (void *pointer, size_t new_size)
     }
 
     void *new_allocated_data = stb_malloc (new_size);
-    const uint64_t old_size = *(((uint64_t *) pointer) - 1u);
-    memcpy (new_allocated_data, pointer, KAN_MIN (old_size - sizeof (uint64_t), new_size));
+    const kan_memory_size_t old_size = *(((kan_memory_size_t *) pointer) - 1u);
+    memcpy (new_allocated_data, pointer, KAN_MIN (old_size - sizeof (kan_memory_size_t), new_size));
     stb_free (pointer);
     return new_allocated_data;
 }
@@ -81,14 +83,14 @@ void *stb_realloc (void *pointer, size_t new_size)
 static int stb_read (void *user_data, char *output_data, int size_to_read)
 {
     struct kan_stream_t *stream = user_data;
-    uint64_t was_read = stream->operations->read (stream, (uint64_t) size_to_read, output_data);
+    kan_file_size_t was_read = stream->operations->read (stream, (kan_file_size_t) size_to_read, output_data);
     return (int) was_read;
 }
 
 static void stb_skip (void *user_data, int delta)
 {
     struct kan_stream_t *stream = user_data;
-    stream->operations->seek (stream, KAN_STREAM_SEEK_CURRENT, (int64_t) delta);
+    stream->operations->seek (stream, KAN_STREAM_SEEK_CURRENT, (kan_file_offset_t) delta);
 }
 
 static int stb_eof (void *user_data)
@@ -116,7 +118,7 @@ static stbi_io_callbacks read_io_callbacks = {
 static void stb_write (void *user_data, void *data, int size)
 {
     struct kan_stream_t *stream = user_data;
-    stream->operations->write (stream, (uint64_t) size, data);
+    stream->operations->write (stream, (kan_file_size_t) size, data);
 }
 
 void kan_image_raw_data_init (struct kan_image_raw_data_t *data)
@@ -145,8 +147,8 @@ kan_bool_t kan_image_load (struct kan_stream_t *stream, struct kan_image_raw_dat
     if (data)
     {
         KAN_ASSERT (components == 4u)
-        output->width = (uint32_t) width;
-        output->height = (uint32_t) height;
+        output->width = (kan_instance_size_t) width;
+        output->height = (kan_instance_size_t) height;
         output->data = data;
         return KAN_TRUE;
     }

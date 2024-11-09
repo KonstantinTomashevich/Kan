@@ -52,7 +52,7 @@ CPU_PROFILER_API void kan_cpu_section_set_color (kan_cpu_section_t section, uint
 
 struct kan_cpu_section_execution_t
 {
-    uint64_t implementation_data[2u];
+    void *implementation_data[2u];
 };
 
 /// \brief Informs profiler that section is entered and initializes execution context.

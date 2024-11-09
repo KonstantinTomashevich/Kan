@@ -43,7 +43,7 @@ void kan_resource_index_native_container_init (struct kan_resource_index_native_
 
 void kan_resource_index_native_container_shutdown (struct kan_resource_index_native_container_t *container)
 {
-    for (uint64_t index = 0u; index < container->items.size; ++index)
+    for (kan_loop_size_t index = 0u; index < container->items.size; ++index)
     {
         kan_resource_index_native_item_shutdown (
             &((struct kan_resource_index_native_item_t *) container->items.data)[index]);
@@ -81,13 +81,13 @@ void kan_resource_index_init (struct kan_resource_index_t *index)
 
 void kan_resource_index_shutdown (struct kan_resource_index_t *index)
 {
-    for (uint64_t native_index = 0u; native_index < index->native.size; ++native_index)
+    for (kan_loop_size_t native_index = 0u; native_index < index->native.size; ++native_index)
     {
         kan_resource_index_native_container_shutdown (
             &((struct kan_resource_index_native_container_t *) index->native.data)[native_index]);
     }
 
-    for (uint64_t third_party_index = 0u; third_party_index < index->third_party.size; ++third_party_index)
+    for (kan_loop_size_t third_party_index = 0u; third_party_index < index->third_party.size; ++third_party_index)
     {
         kan_resource_index_third_party_item_shutdown (
             &((struct kan_resource_index_third_party_item_t *) index->third_party.data)[third_party_index]);
@@ -110,7 +110,7 @@ RESOURCE_INDEX_API void kan_resource_index_add_native_entry (struct kan_resource
                                                              const char *path)
 {
     struct kan_dynamic_array_t *items_array = NULL;
-    for (uint64_t type_index = 0u; type_index < index->native.size; ++type_index)
+    for (kan_loop_size_t type_index = 0u; type_index < index->native.size; ++type_index)
     {
         struct kan_resource_index_native_container_t *container =
             &((struct kan_resource_index_native_container_t *) index->native.data)[type_index];
@@ -150,7 +150,7 @@ RESOURCE_INDEX_API void kan_resource_index_add_native_entry (struct kan_resource
     item->name = name;
     item->format = format;
 
-    const uint64_t path_length = strlen (path);
+    const kan_instance_size_t path_length = (kan_instance_size_t) strlen (path);
     item->path =
         kan_allocate_general (kan_resource_index_get_string_allocation_group (), path_length + 1u, _Alignof (char));
     memcpy (item->path, path, path_length + 1u);
@@ -159,7 +159,7 @@ RESOURCE_INDEX_API void kan_resource_index_add_native_entry (struct kan_resource
 RESOURCE_INDEX_API void kan_resource_index_add_third_party_entry (struct kan_resource_index_t *index,
                                                                   kan_interned_string_t name,
                                                                   const char *path,
-                                                                  uint64_t size)
+                                                                  kan_file_size_t size)
 {
     void *spot = kan_dynamic_array_add_last (&index->third_party);
     if (!spot)
@@ -173,7 +173,7 @@ RESOURCE_INDEX_API void kan_resource_index_add_third_party_entry (struct kan_res
     item->name = name;
     item->size = size;
 
-    const uint64_t path_length = strlen (path);
+    const kan_instance_size_t path_length = (kan_instance_size_t) strlen (path);
     item->path =
         kan_allocate_general (kan_resource_index_get_string_allocation_group (), path_length + 1u, _Alignof (char));
     memcpy (item->path, path, path_length + 1u);
@@ -197,7 +197,7 @@ void kan_resource_index_extract_info_from_path (const char *path, struct kan_res
     const char *name_begin = last_separator ? last_separator + 1u : path;
     const char *name_end = path_end;
 
-    const uint64_t path_length = path_end - path;
+    const kan_file_size_t path_length = path_end - path;
     if (path_length > 4u && *(path_end - 4u) == '.' && *(path_end - 3u) == 'b' && *(path_end - 2u) == 'i' &&
         *(path_end - 1u) == 'n')
     {

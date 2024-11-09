@@ -1,3 +1,12 @@
 register_interface (api_common)
 interface_include ("${CMAKE_CURRENT_SOURCE_DIR}")
 c_interface_scanner_setup (GLOB "*.h")
+
+set (KAN_CORE_TYPES_PRESET "x64" CACHE STRING "Preset for core types. Supported presets: x64, x32.")
+if (KAN_CORE_TYPES_PRESET STREQUAL "x64")
+    interface_compile_definitions (KAN_CORE_TYPES_PRESET_X64)
+elseif (KAN_CORE_TYPES_PRESET STREQUAL "x32")
+    interface_compile_definitions (KAN_CORE_TYPES_PRESET_X32)
+else ()
+    message (SEND_ERROR "Unknown core types preset value \"${KAN_CORE_TYPES_PRESET}\".")
+endif ()

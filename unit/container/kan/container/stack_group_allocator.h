@@ -40,12 +40,12 @@ struct kan_stack_group_allocator_t
 /// \brief Initializes stack group allocator with given allocation group and given stack size.
 CONTAINER_API void kan_stack_group_allocator_init (struct kan_stack_group_allocator_t *allocator,
                                                    kan_allocation_group_t group,
-                                                   uint64_t initial_stack_size);
+                                                   kan_instance_size_t initial_stack_size);
 
 /// \brief Allocates memory block from given stack group allocator.
 CONTAINER_API void *kan_stack_group_allocator_allocate (struct kan_stack_group_allocator_t *allocator,
-                                                        uint64_t amount,
-                                                        uint64_t alignment);
+                                                        kan_memory_size_t amount,
+                                                        kan_memory_size_t alignment);
 
 /// \brief Syntax sugar helper for kan_stack_group_allocator_allocate that avoid repeating allocated type.
 #define KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED(ALLOCATOR, TYPE)                                                      \

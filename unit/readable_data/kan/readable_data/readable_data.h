@@ -127,6 +127,15 @@
 
 KAN_C_HEADER_BEGIN
 
+/// \brief Type for unsigned integers in readable data.
+typedef kan_serialized_size_t kan_readable_data_unsigned_t;
+
+/// \brief Type for signed integers in readable data.
+typedef kan_serialized_offset_t kan_readable_data_signed_t;
+
+/// \brief Type for floating point numbers in readable data.
+typedef kan_serialized_floating_t kan_readable_data_floating_t;
+
 /// \brief Describes event types for readable data format parsers and emitters.
 enum kan_readable_data_event_type_t
 {
@@ -153,7 +162,7 @@ enum kan_readable_data_event_type_t
 };
 
 /// \brief Value for kan_readable_data_output_target_t::array_index that specified absence of array index.
-#define KAN_READABLE_DATA_ARRAY_INDEX_NONE UINT64_MAX
+#define KAN_READABLE_DATA_ARRAY_INDEX_NONE KAN_INT_MAX (kan_instance_size_t)
 
 /// \brief Describes output target for setter or array appender.
 struct kan_readable_data_output_target_t
@@ -162,7 +171,7 @@ struct kan_readable_data_output_target_t
     const char *identifier;
 
     /// \brief Array index for identifier or KAN_READABLE_DATA_ARRAY_INDEX_NONE if not in array.
-    uint64_t array_index;
+    kan_instance_size_t array_index;
 };
 
 /// \brief Value node for describing values for setters.
@@ -173,8 +182,8 @@ struct kan_readable_data_value_node_t
     {
         const char *identifier;
         const char *string;
-        int64_t integer;
-        double floating;
+        kan_readable_data_signed_t integer;
+        kan_readable_data_floating_t floating;
     };
 };
 

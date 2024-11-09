@@ -654,7 +654,7 @@ kan_bool_t kan_platform_application_fetch_next_event (struct kan_platform_applic
             output->time_ns = event.common.timestamp;
             output->text_editing.window_id = KAN_TYPED_ID_32_SET (kan_platform_window_id_t, event.edit.windowID);
 
-            const uint64_t text_length = strlen (event.edit.text);
+            const kan_instance_size_t text_length = (kan_instance_size_t) strlen (event.edit.text);
             output->text_editing.text =
                 kan_allocate_general (application_events_allocation_group, text_length + 1u, _Alignof (char));
             memcpy (output->text_editing.text, event.edit.text, text_length + 1u);
@@ -670,7 +670,7 @@ kan_bool_t kan_platform_application_fetch_next_event (struct kan_platform_applic
             output->time_ns = event.common.timestamp;
             output->text_input.window_id = KAN_TYPED_ID_32_SET (kan_platform_window_id_t, event.text.windowID);
 
-            const uint64_t text_length = strlen (event.text.text);
+            const kan_instance_size_t text_length = (kan_instance_size_t) strlen (event.text.text);
             output->text_input.text =
                 kan_allocate_general (application_events_allocation_group, text_length + 1u, _Alignof (char));
             memcpy (output->text_input.text, event.text.text, text_length + 1u);
@@ -803,10 +803,10 @@ kan_bool_t kan_platform_application_get_display_bounds (kan_platform_display_id_
         return KAN_FALSE;
     }
 
-    output_bounds->min_x = (int32_t) bounds.x;
-    output_bounds->min_y = (int32_t) bounds.y;
-    output_bounds->max_x = (int32_t) (bounds.x + bounds.w);
-    output_bounds->max_y = (int32_t) (bounds.y + bounds.h);
+    output_bounds->min_x = (kan_platform_visual_offset_t) bounds.x;
+    output_bounds->min_y = (kan_platform_visual_offset_t) bounds.y;
+    output_bounds->max_x = (kan_platform_visual_offset_t) (bounds.x + bounds.w);
+    output_bounds->max_y = (kan_platform_visual_offset_t) (bounds.y + bounds.h);
     return KAN_TRUE;
 }
 
@@ -858,8 +858,8 @@ void kan_platform_application_get_fullscreen_display_modes (kan_platform_display
             *(struct kan_platform_display_mode_t *) kan_dynamic_array_add_last (output_array) =
                 (struct kan_platform_display_mode_t) {
                     .pixel_format = convert_pixel_format (modes[index]->format),
-                    .width = (uint32_t) modes[index]->w,
-                    .height = (uint32_t) modes[index]->h,
+                    .width = (kan_platform_visual_size_t) modes[index]->w,
+                    .height = (kan_platform_visual_size_t) modes[index]->h,
                     .pixel_density = modes[index]->pixel_density,
                     .refresh_rate = modes[index]->refresh_rate,
                 };
@@ -882,8 +882,8 @@ kan_bool_t kan_platform_application_get_current_display_mode (kan_platform_displ
     {
         *output = (struct kan_platform_display_mode_t) {
             .pixel_format = convert_pixel_format (mode->format),
-            .width = (uint32_t) mode->w,
-            .height = (uint32_t) mode->h,
+            .width = (kan_platform_visual_size_t) mode->w,
+            .height = (kan_platform_visual_size_t) mode->h,
             .pixel_density = mode->pixel_density,
             .refresh_rate = mode->refresh_rate,
         };
@@ -906,8 +906,8 @@ kan_bool_t kan_platform_application_get_desktop_display_mode (kan_platform_displ
     {
         *output = (struct kan_platform_display_mode_t) {
             .pixel_format = convert_pixel_format (mode->format),
-            .width = (uint32_t) mode->w,
-            .height = (uint32_t) mode->h,
+            .width = (kan_platform_visual_size_t) mode->w,
+            .height = (kan_platform_visual_size_t) mode->h,
             .pixel_density = mode->pixel_density,
             .refresh_rate = mode->refresh_rate,
         };
@@ -923,8 +923,8 @@ kan_bool_t kan_platform_application_get_desktop_display_mode (kan_platform_displ
 }
 
 kan_platform_window_id_t kan_platform_application_window_create (const char *title,
-                                                                 uint32_t width,
-                                                                 uint32_t height,
+                                                                 kan_platform_visual_size_t width,
+                                                                 kan_platform_visual_size_t height,
                                                                  enum kan_platform_window_flag_t flags)
 {
     SDL_Window *window = SDL_CreateWindow (title, (int) width, (int) height, window_flags_to_sdl_flags (flags));
@@ -1092,8 +1092,8 @@ const char *kan_platform_application_window_get_title (kan_platform_window_id_t 
 
 kan_bool_t kan_platform_application_window_set_icon (kan_platform_window_id_t window_id,
                                                      kan_pixel_format_t pixel_format,
-                                                     uint32_t width,
-                                                     uint32_t height,
+                                                     kan_platform_visual_size_t width,
+                                                     kan_platform_visual_size_t height,
                                                      const void *data)
 {
     SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) KAN_TYPED_ID_32_GET (window_id));
@@ -1105,7 +1105,7 @@ kan_bool_t kan_platform_application_window_set_icon (kan_platform_window_id_t wi
     }
 
     // For now, we're using only 4 byte formats.
-    const uint32_t pitch = width * 4u;
+    const kan_platform_visual_size_t pitch = width * 4u;
 
     SDL_Surface *icon_surface =
         SDL_CreateSurfaceFrom ((void *) data, (int) width, (int) height, (int) pitch, pixel_format);
@@ -1120,7 +1120,9 @@ kan_bool_t kan_platform_application_window_set_icon (kan_platform_window_id_t wi
     return SDL_SetWindowIcon (window, icon_surface) == 0;
 }
 
-kan_bool_t kan_platform_application_window_set_position (kan_platform_window_id_t window_id, int32_t x, int32_t y)
+kan_bool_t kan_platform_application_window_set_position (kan_platform_window_id_t window_id,
+                                                         kan_platform_visual_offset_t x,
+                                                         kan_platform_visual_offset_t y)
 {
     SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) KAN_TYPED_ID_32_GET (window_id));
     if (!window)
@@ -1134,8 +1136,8 @@ kan_bool_t kan_platform_application_window_set_position (kan_platform_window_id_
 }
 
 kan_bool_t kan_platform_application_window_get_position (kan_platform_window_id_t window_id,
-                                                         int32_t *output_x,
-                                                         int32_t *output_y)
+                                                         kan_platform_visual_offset_t *output_x,
+                                                         kan_platform_visual_offset_t *output_y)
 {
     SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) KAN_TYPED_ID_32_GET (window_id));
     if (!window)
@@ -1153,14 +1155,14 @@ kan_bool_t kan_platform_application_window_get_position (kan_platform_window_id_
         return KAN_FALSE;
     }
 
-    *output_x = (int32_t) x;
-    *output_y = (int32_t) y;
+    *output_x = (kan_platform_visual_offset_t) x;
+    *output_y = (kan_platform_visual_offset_t) y;
     return KAN_TRUE;
 }
 
 kan_bool_t kan_platform_application_window_set_size (kan_platform_window_id_t window_id,
-                                                     uint32_t width,
-                                                     uint32_t height)
+                                                     kan_platform_visual_size_t width,
+                                                     kan_platform_visual_size_t height)
 {
     SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) KAN_TYPED_ID_32_GET (window_id));
     if (!window)
@@ -1174,8 +1176,8 @@ kan_bool_t kan_platform_application_window_set_size (kan_platform_window_id_t wi
 }
 
 kan_bool_t kan_platform_application_window_get_size (kan_platform_window_id_t window_id,
-                                                     uint32_t *output_width,
-                                                     uint32_t *output_height)
+                                                     kan_platform_visual_size_t *output_width,
+                                                     kan_platform_visual_size_t *output_height)
 {
     SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) KAN_TYPED_ID_32_GET (window_id));
     if (!window)
@@ -1193,14 +1195,14 @@ kan_bool_t kan_platform_application_window_get_size (kan_platform_window_id_t wi
         return KAN_FALSE;
     }
 
-    *output_width = (int32_t) width;
-    *output_height = (int32_t) height;
+    *output_width = (kan_platform_visual_size_t) width;
+    *output_height = (kan_platform_visual_size_t) height;
     return KAN_TRUE;
 }
 
 kan_bool_t kan_platform_application_window_get_size_for_render (kan_platform_window_id_t window_id,
-                                                                uint32_t *output_width,
-                                                                uint32_t *output_height)
+                                                                kan_platform_visual_size_t *output_width,
+                                                                kan_platform_visual_size_t *output_height)
 {
     SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) KAN_TYPED_ID_32_GET (window_id));
     if (!window)
@@ -1221,14 +1223,14 @@ kan_bool_t kan_platform_application_window_get_size_for_render (kan_platform_win
         return KAN_FALSE;
     }
 
-    *output_width = (int32_t) width;
-    *output_height = (int32_t) height;
+    *output_width = (kan_platform_visual_size_t) width;
+    *output_height = (kan_platform_visual_size_t) height;
     return KAN_TRUE;
 }
 
 kan_bool_t kan_platform_application_window_set_minimum_size (kan_platform_window_id_t window_id,
-                                                             uint32_t width,
-                                                             uint32_t height)
+                                                             kan_platform_visual_size_t width,
+                                                             kan_platform_visual_size_t height)
 {
     SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) KAN_TYPED_ID_32_GET (window_id));
     if (!window)
@@ -1242,8 +1244,8 @@ kan_bool_t kan_platform_application_window_set_minimum_size (kan_platform_window
 }
 
 kan_bool_t kan_platform_application_window_get_minimum_size (kan_platform_window_id_t window_id,
-                                                             uint32_t *output_width,
-                                                             uint32_t *output_height)
+                                                             kan_platform_visual_size_t *output_width,
+                                                             kan_platform_visual_size_t *output_height)
 {
     SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) KAN_TYPED_ID_32_GET (window_id));
     if (!window)
@@ -1261,14 +1263,14 @@ kan_bool_t kan_platform_application_window_get_minimum_size (kan_platform_window
         return KAN_FALSE;
     }
 
-    *output_width = (int32_t) width;
-    *output_height = (int32_t) height;
+    *output_width = (kan_platform_visual_size_t) width;
+    *output_height = (kan_platform_visual_size_t) height;
     return KAN_TRUE;
 }
 
 kan_bool_t kan_platform_application_window_set_maximum_size (kan_platform_window_id_t window_id,
-                                                             uint32_t width,
-                                                             uint32_t height)
+                                                             kan_platform_visual_size_t width,
+                                                             kan_platform_visual_size_t height)
 {
     SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) KAN_TYPED_ID_32_GET (window_id));
     if (!window)
@@ -1282,8 +1284,8 @@ kan_bool_t kan_platform_application_window_set_maximum_size (kan_platform_window
 }
 
 kan_bool_t kan_platform_application_window_get_maximum_size (kan_platform_window_id_t window_id,
-                                                             uint32_t *output_width,
-                                                             uint32_t *output_height)
+                                                             kan_platform_visual_size_t *output_width,
+                                                             kan_platform_visual_size_t *output_height)
 {
     SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) KAN_TYPED_ID_32_GET (window_id));
     if (!window)
@@ -1301,8 +1303,8 @@ kan_bool_t kan_platform_application_window_get_maximum_size (kan_platform_window
         return KAN_FALSE;
     }
 
-    *output_width = (int32_t) width;
-    *output_height = (int32_t) height;
+    *output_width = (kan_platform_visual_size_t) width;
+    *output_height = (kan_platform_visual_size_t) height;
     return KAN_TRUE;
 }
 
@@ -1504,7 +1506,7 @@ _Static_assert (sizeof (VkSurfaceKHR) <= sizeof (uint64_t), "VkInstance is not b
 #endif
 
 uint64_t kan_platform_application_window_create_vulkan_surface (kan_platform_window_id_t window_id,
-                                                                uint64_t vulkan_instance,
+                                                                kan_memory_size_t vulkan_instance,
                                                                 void *vulkan_allocation_callbacks)
 {
     SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) KAN_TYPED_ID_32_GET (window_id));
@@ -1527,7 +1529,7 @@ uint64_t kan_platform_application_window_create_vulkan_surface (kan_platform_win
 }
 
 void kan_platform_application_window_destroy_vulkan_surface (kan_platform_window_id_t window_id,
-                                                             uint64_t vulkan_instance,
+                                                             kan_memory_size_t vulkan_instance,
                                                              uint64_t vulkan_surface,
                                                              void *vulkan_allocation_callbacks)
 {
@@ -1611,7 +1613,7 @@ char *kan_platform_application_extract_text_from_clipboard (void)
         return NULL;
     }
 
-    uint64_t text_length = strlen (sdl_text);
+    kan_instance_size_t text_length = (kan_instance_size_t) strlen (sdl_text);
     char *kan_text = kan_allocate_general (application_clipboard_allocation_group, text_length + 1u, _Alignof (char));
     memcpy (kan_text, sdl_text, text_length + 1u);
 
@@ -1654,12 +1656,12 @@ void kan_platform_application_request_vulkan_extensions (struct kan_dynamic_arra
 {
     uint32_t count;
     const char *const *extensions = SDL_Vulkan_GetInstanceExtensions (&count);
-    kan_dynamic_array_init (output, (uint64_t) count, sizeof (char *), _Alignof (char *), allocation_group);
+    kan_dynamic_array_init (output, (kan_instance_size_t) count, sizeof (char *), _Alignof (char *), allocation_group);
 
-    for (uint64_t index = 0u; index < (uint64_t) count; ++index)
+    for (kan_loop_size_t index = 0u; index < (kan_loop_size_t) count; ++index)
     {
         char **extension_output = kan_dynamic_array_add_last (output);
-        uint64_t length = strlen (extensions[index]);
+        kan_instance_size_t length = (kan_instance_size_t) strlen (extensions[index]);
         *extension_output = kan_allocate_general (allocation_group, length + 1u, _Alignof (char));
         memcpy (*extension_output, extensions[index], length + 1u);
     }

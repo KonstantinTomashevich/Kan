@@ -18,11 +18,11 @@ KAN_LOG_DEFINE_CATEGORY (application_framework_example_basic_logic_test_mode);
 
 struct test_data_type_t
 {
-    uint64_t x;
-    uint64_t y;
+    kan_serialized_size_t x;
+    kan_serialized_size_t y;
 };
 
-_Static_assert (_Alignof (struct test_data_type_t) == _Alignof (uint64_t), "Alignment has expected value.");
+_Static_assert (_Alignof (struct test_data_type_t) <= _Alignof (kan_memory_size_t), "Alignment has expected value.");
 
 // \meta reflection_struct_meta = "test_data_type_t"
 APPLICATION_FRAMEWORK_EXAMPLE_BASIC_LOGIC_API struct kan_resource_pipeline_resource_type_meta_t test_data_type_meta = {
@@ -35,7 +35,7 @@ struct test_singleton_t
 {
     kan_application_system_window_t window_handle;
     kan_bool_t test_request_added;
-    uint64_t test_request_id;
+    kan_resource_request_id_t test_request_id;
 };
 
 APPLICATION_FRAMEWORK_EXAMPLE_BASIC_LOGIC_API void test_singleton_init (struct test_singleton_t *instance)
@@ -55,7 +55,7 @@ struct test_mutator_state_t
     kan_bool_t test_mode;
     kan_bool_t test_passed;
     kan_bool_t test_asset_loaded;
-    uint64_t test_frames_count;
+    kan_instance_size_t test_frames_count;
 };
 
 APPLICATION_FRAMEWORK_EXAMPLE_BASIC_LOGIC_API void kan_universe_mutator_deploy_test_mutator (
@@ -117,12 +117,12 @@ APPLICATION_FRAMEWORK_EXAMPLE_BASIC_LOGIC_API void kan_universe_mutator_execute_
             singleton->test_request_added = KAN_TRUE;
         }
 
-        uint64_t x = 0;
-        uint64_t y = 0;
+        kan_instance_size_t x = 0;
+        kan_instance_size_t y = 0;
 
         KAN_UP_VALUE_READ (request, kan_resource_request_t, request_id, &singleton->test_request_id)
         {
-            if (request->provided_container_id != KAN_RESOURCE_PROVIDER_CONTAINER_ID_NONE)
+            if (KAN_TYPED_ID_32_IS_VALID (request->provided_container_id))
             {
                 state->test_asset_loaded = KAN_TRUE;
                 KAN_UP_VALUE_READ (view, resource_provider_container_test_data_type_t, container_id,

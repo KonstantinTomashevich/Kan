@@ -44,7 +44,7 @@ struct kan_universe_world_definition_system_config_t
 
     /// \brief Time between last change to definition file and definition reload.
     /// \details Needed to correctly reload in case of subsequent changes to file.
-    uint64_t observation_rescan_delay_ns;
+    kan_time_offset_t observation_rescan_delay_ns;
 };
 
 /// \brief Queries world definition by its unique name.

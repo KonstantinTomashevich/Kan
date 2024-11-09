@@ -49,9 +49,9 @@ static inline void kan_critical_error_context_ensure (void)
     }
 }
 
-static inline uint64_t hash_error (const char *file, int line)
+static inline kan_hash_t hash_error (const char *file, int line)
 {
-    return kan_hash_combine (kan_string_hash (file), (uint64_t) line);
+    return kan_hash_combine (kan_string_hash (file), (kan_hash_t) line);
 }
 
 void kan_set_critical_error_interactive (kan_bool_t is_interactive)
@@ -70,7 +70,7 @@ void kan_critical_error (const char *message, const char *file, int line)
     {
         kan_mutex_lock (critical_error_context.interactive_mutex);
 
-        const uint64_t error_hash = hash_error (file, line);
+        const kan_hash_t error_hash = hash_error (file, line);
         const struct kan_hash_storage_bucket_t *bucket =
             kan_hash_storage_query (&critical_error_context.skipped_error_storage, error_hash);
 

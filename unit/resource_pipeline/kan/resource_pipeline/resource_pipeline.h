@@ -51,7 +51,7 @@ struct kan_resource_pipeline_compilation_dependency_t
 typedef kan_bool_t (*kan_resource_pipeline_compile_functor_t) (
     void *input_instance,
     void *output_instance,
-    uint64_t dependencies_count,
+    kan_instance_size_t dependencies_count,
     struct kan_resource_pipeline_compilation_dependency_t *dependencies);
 
 /// \brief Meta for marking types for native resources that should be supported by resource logic.

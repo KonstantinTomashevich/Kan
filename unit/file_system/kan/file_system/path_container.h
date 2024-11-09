@@ -22,13 +22,13 @@ KAN_C_HEADER_BEGIN
 /// \brief Contains buffer for file system entry path.
 struct kan_file_system_path_container_t
 {
-    uint64_t length;
+    kan_instance_size_t length;
     char path[KAN_FILE_SYSTEM_MAX_PATH_LENGTH];
 };
 
 /// \brief Resets path container length to given value and places null terminator at appropriate position.
 static inline void kan_file_system_path_container_reset_length (struct kan_file_system_path_container_t *container,
-                                                                uint64_t new_length)
+                                                                kan_instance_size_t new_length)
 {
     container->length = KAN_MIN (KAN_FILE_SYSTEM_MAX_PATH_LENGTH - 1u, new_length);
     container->path[container->length] = '\0';
@@ -40,7 +40,7 @@ static inline void kan_file_system_path_container_copy_char_sequence (
     const char *arbitrary_path_begin,
     const char *arbitrary_path_end)
 {
-    const uint64_t arbitrary_path_length = arbitrary_path_end - arbitrary_path_begin;
+    const kan_instance_size_t arbitrary_path_length = (kan_instance_size_t) (arbitrary_path_end - arbitrary_path_begin);
     kan_file_system_path_container_reset_length (target_container, arbitrary_path_length);
 
     if (target_container->length > 0u)
@@ -53,7 +53,7 @@ static inline void kan_file_system_path_container_copy_char_sequence (
 static inline void kan_file_system_path_container_copy_string (
     struct kan_file_system_path_container_t *target_container, const char *arbitrary_path)
 {
-    const uint64_t arbitrary_path_length = strlen (arbitrary_path);
+    const kan_instance_size_t arbitrary_path_length = (kan_instance_size_t) strlen (arbitrary_path);
     kan_file_system_path_container_copy_char_sequence (target_container, arbitrary_path,
                                                        arbitrary_path + arbitrary_path_length);
 }
@@ -70,10 +70,10 @@ static inline void kan_file_system_path_container_copy (struct kan_file_system_p
 static inline void kan_file_system_path_container_append_char_sequence (
     struct kan_file_system_path_container_t *target_container, const char *sub_path_begin, const char *sub_path_end)
 {
-    const uint64_t sub_path_length = sub_path_end - sub_path_begin;
-    const uint64_t new_length = target_container->length + 1u + sub_path_length;
-    const uint64_t slash_position = target_container->length;
-    const uint64_t sub_path_position = slash_position + 1u;
+    const kan_instance_size_t sub_path_length = (kan_instance_size_t) (sub_path_end - sub_path_begin);
+    const kan_instance_size_t new_length = target_container->length + 1u + sub_path_length;
+    const kan_instance_size_t slash_position = target_container->length;
+    const kan_instance_size_t sub_path_position = slash_position + 1u;
     kan_file_system_path_container_reset_length (target_container, new_length);
 
     if (slash_position < target_container->length)
@@ -83,7 +83,7 @@ static inline void kan_file_system_path_container_append_char_sequence (
 
     if (sub_path_position < target_container->length)
     {
-        const uint64_t to_copy = target_container->length - sub_path_position;
+        const kan_instance_size_t to_copy = target_container->length - sub_path_position;
         memcpy (&target_container->path[sub_path_position], sub_path_begin, to_copy);
     }
 }
@@ -92,7 +92,7 @@ static inline void kan_file_system_path_container_append_char_sequence (
 static inline void kan_file_system_path_container_append (struct kan_file_system_path_container_t *target_container,
                                                           const char *sub_path)
 {
-    const uint64_t sub_path_length = strlen (sub_path);
+    const kan_instance_size_t sub_path_length = (kan_instance_size_t) strlen (sub_path);
     kan_file_system_path_container_append_char_sequence (target_container, sub_path, sub_path + sub_path_length);
 }
 
@@ -100,14 +100,14 @@ static inline void kan_file_system_path_container_append (struct kan_file_system
 static inline void kan_file_system_path_container_add_suffix (struct kan_file_system_path_container_t *target_container,
                                                               const char *suffix)
 {
-    const uint64_t suffix_length = strlen (suffix);
-    const uint64_t new_length = target_container->length + suffix_length;
-    const uint64_t suffix_position = target_container->length;
+    const kan_instance_size_t suffix_length = (kan_instance_size_t) strlen (suffix);
+    const kan_instance_size_t new_length = target_container->length + suffix_length;
+    const kan_instance_size_t suffix_position = target_container->length;
     kan_file_system_path_container_reset_length (target_container, new_length);
 
     if (suffix_position < target_container->length)
     {
-        const uint64_t to_copy = target_container->length - suffix_position;
+        const kan_instance_size_t to_copy = target_container->length - suffix_position;
         memcpy (&target_container->path[suffix_position], suffix, to_copy);
     }
 }

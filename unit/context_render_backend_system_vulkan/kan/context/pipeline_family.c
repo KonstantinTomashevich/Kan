@@ -55,10 +55,10 @@ static inline VkSamplerAddressMode to_vulkan_sampler_address_mode (enum kan_rend
 }
 
 static inline void free_descriptor_set_layouts (struct render_backend_system_t *system,
-                                                uint64_t descriptor_set_layouts_count,
+                                                kan_instance_size_t descriptor_set_layouts_count,
                                                 struct render_backend_descriptor_set_layout_t **descriptor_set_layouts)
 {
-    for (uint64_t index = 0u; index < descriptor_set_layouts_count; ++index)
+    for (kan_loop_size_t index = 0u; index < descriptor_set_layouts_count; ++index)
     {
         struct render_backend_descriptor_set_layout_t *layout = descriptor_set_layouts[index];
         if (layout)
@@ -69,7 +69,7 @@ static inline void free_descriptor_set_layouts (struct render_backend_system_t *
 
                 if (layout->combined_image_samplers_count > 0u)
                 {
-                    for (uint64_t binding = 0u; binding < layout->bindings_count; ++binding)
+                    for (kan_loop_size_t binding = 0u; binding < layout->bindings_count; ++binding)
                     {
                         if (layout->bindings[binding].type ==
                                 KAN_RENDER_PARAMETER_BINDING_TYPE_COMBINED_IMAGE_SAMPLER &&
@@ -98,8 +98,8 @@ struct render_backend_graphics_pipeline_family_t *render_backend_system_create_g
     struct kan_cpu_section_execution_t execution;
     kan_cpu_section_execution_init (&execution, system->section_create_graphics_pipeline_family_internal);
 
-    uint32_t sets_count = 0u;
-    for (uint64_t index = 0u; index < description->parameter_sets_count; ++index)
+    vulkan_size_t sets_count = 0u;
+    for (kan_loop_size_t index = 0u; index < description->parameter_sets_count; ++index)
     {
         sets_count = KAN_MAX (sets_count, description->parameter_sets[index].set + 1u);
     }
@@ -121,25 +121,25 @@ struct render_backend_graphics_pipeline_family_t *render_backend_system_create_g
                               sizeof (struct render_backend_descriptor_set_layout_t *) * sets_count,
                               _Alignof (struct render_backend_descriptor_set_layout_t *));
 
-    for (uint64_t index = 0u; index < sets_count; ++index)
+    for (kan_loop_size_t index = 0u; index < sets_count; ++index)
     {
         descriptor_set_layouts[index] = NULL;
     }
 
     kan_bool_t descriptor_set_layouts_created = KAN_TRUE;
-    uint64_t bindings_size = 0u;
+    kan_instance_size_t bindings_size = 0u;
     VkDescriptorSetLayoutBinding *bindings = NULL;
 
     VkDescriptorSetLayout *descriptor_set_layouts_for_pipeline =
         kan_allocate_general (system->utility_allocation_group, sizeof (VkDescriptorSetLayout) * sets_count,
                               _Alignof (VkDescriptorSetLayout));
 
-    for (uint64_t layout_index = 0u; layout_index < sets_count; ++layout_index)
+    for (kan_loop_size_t layout_index = 0u; layout_index < sets_count; ++layout_index)
     {
         descriptor_set_layouts_for_pipeline[layout_index] = system->empty_descriptor_set_layout;
     }
 
-    for (uint64_t layout_index = 0u; layout_index < description->parameter_sets_count; ++layout_index)
+    for (kan_loop_size_t layout_index = 0u; layout_index < description->parameter_sets_count; ++layout_index)
     {
         struct kan_render_parameter_set_description_t *layout_description = &description->parameter_sets[layout_index];
         if (descriptor_set_layouts[layout_description->set])
@@ -166,14 +166,14 @@ struct render_backend_graphics_pipeline_family_t *render_backend_system_create_g
                                              _Alignof (VkDescriptorSetLayoutBinding));
         }
 
-        uint32_t bindings_count = 0u;
-        for (uint64_t binding_index = 0u; binding_index < layout_description->bindings_count; ++binding_index)
+        vulkan_size_t bindings_count = 0u;
+        for (kan_loop_size_t binding_index = 0u; binding_index < layout_description->bindings_count; ++binding_index)
         {
             struct kan_render_parameter_binding_description_t *binding_description =
                 &layout_description->bindings[binding_index];
             VkDescriptorSetLayoutBinding *vulkan_binding = &bindings[binding_index];
 
-            vulkan_binding->binding = (uint32_t) binding_description->binding;
+            vulkan_binding->binding = (vulkan_size_t) binding_description->binding;
             vulkan_binding->descriptorCount = 1u;
             vulkan_binding->stageFlags = 0u;
             vulkan_binding->pImmutableSamplers = NULL;
@@ -221,7 +221,7 @@ struct render_backend_graphics_pipeline_family_t *render_backend_system_create_g
             .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
             .pNext = NULL,
             .flags = 0u,
-            .bindingCount = (uint32_t) layout_description->bindings_count,
+            .bindingCount = (vulkan_size_t) layout_description->bindings_count,
             .pBindings = bindings,
         };
 
@@ -246,7 +246,7 @@ struct render_backend_graphics_pipeline_family_t *render_backend_system_create_g
                 .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
                 .pNext = NULL,
                 .objectType = VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT,
-                .objectHandle = (uint64_t) descriptor_set_layouts_for_pipeline[layout_description->set],
+                .objectHandle = CONVERT_HANDLE_FOR_DEBUG descriptor_set_layouts_for_pipeline[layout_description->set],
                 .pObjectName = debug_name,
             };
 
@@ -268,14 +268,14 @@ struct render_backend_graphics_pipeline_family_t *render_backend_system_create_g
         layout->storage_buffers_count = 0u;
         layout->combined_image_samplers_count = 0u;
 
-        for (uint32_t binding = 0u; binding < bindings_count; ++binding)
+        for (vulkan_size_t binding = 0u; binding < bindings_count; ++binding)
         {
             layout->bindings[binding].type = KAN_RENDER_PARAMETER_BINDING_TYPE_UNIFORM_BUFFER;
             // Bindings with zero used stage mask are treated as non-existent.
             layout->bindings[binding].used_stage_mask = 0u;
         }
 
-        for (uint64_t binding_index = 0u; binding_index < layout_description->bindings_count; ++binding_index)
+        for (kan_loop_size_t binding_index = 0u; binding_index < layout_description->bindings_count; ++binding_index)
         {
             struct kan_render_parameter_binding_description_t *binding_description =
                 &layout_description->bindings[binding_index];
@@ -349,7 +349,7 @@ struct render_backend_graphics_pipeline_family_t *render_backend_system_create_g
                     .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
                     .pNext = NULL,
                     .objectType = VK_OBJECT_TYPE_SAMPLER,
-                    .objectHandle = (uint64_t) layout->bindings[binding_description->binding].sampler,
+                    .objectHandle = CONVERT_HANDLE_FOR_DEBUG layout->bindings[binding_description->binding].sampler,
                     .pObjectName = debug_name,
                 };
 
@@ -382,7 +382,7 @@ struct render_backend_graphics_pipeline_family_t *render_backend_system_create_g
         .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
         .pNext = NULL,
         .flags = 0u,
-        .setLayoutCount = (uint32_t) sets_count,
+        .setLayoutCount = (vulkan_size_t) sets_count,
         .pSetLayouts = descriptor_set_layouts_for_pipeline,
         .pushConstantRangeCount = 0u,
         .pPushConstantRanges = NULL,
@@ -411,7 +411,7 @@ struct render_backend_graphics_pipeline_family_t *render_backend_system_create_g
         .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
         .pNext = NULL,
         .objectType = VK_OBJECT_TYPE_PIPELINE_LAYOUT,
-        .objectHandle = (uint64_t) pipeline_layout,
+        .objectHandle = CONVERT_HANDLE_FOR_DEBUG pipeline_layout,
         .pObjectName = debug_name,
     };
 
@@ -439,13 +439,13 @@ struct render_backend_graphics_pipeline_family_t *render_backend_system_create_g
                               sizeof (VkVertexInputBindingDescription) * family->input_bindings_count,
                               _Alignof (VkVertexInputBindingDescription));
 
-    for (uint64_t index = 0u; index < description->attribute_sources_count; ++index)
+    for (kan_loop_size_t index = 0u; index < description->attribute_sources_count; ++index)
     {
         struct kan_render_attribute_source_description_t *input = &description->attribute_sources[index];
         VkVertexInputBindingDescription *output = &family->input_bindings[index];
 
-        output->binding = (uint32_t) input->binding;
-        output->stride = (uint32_t) input->stride;
+        output->binding = (vulkan_size_t) input->binding;
+        output->stride = (vulkan_size_t) input->stride;
 
         switch (input->rate)
         {
@@ -460,7 +460,7 @@ struct render_backend_graphics_pipeline_family_t *render_backend_system_create_g
     }
 
     family->attributes_count = 0u;
-    for (uint64_t index = 0u; index < description->attributes_count; ++index)
+    for (kan_loop_size_t index = 0u; index < description->attributes_count; ++index)
     {
         struct kan_render_attribute_description_t *input = &description->attributes[index];
         switch (input->format)
@@ -487,12 +487,12 @@ struct render_backend_graphics_pipeline_family_t *render_backend_system_create_g
                                                _Alignof (VkVertexInputAttributeDescription));
     VkVertexInputAttributeDescription *attribute_output = family->attributes;
 
-    for (uint64_t index = 0u; index < description->attributes_count; ++index)
+    for (kan_loop_size_t index = 0u; index < description->attributes_count; ++index)
     {
         struct kan_render_attribute_description_t *input = &description->attributes[index];
-        VkFormat input_format;
-        uint32_t attribute_count;
-        uint32_t item_offset;
+        VkFormat input_format = VK_FORMAT_R32_SFLOAT;
+        kan_instance_size_t attribute_count = 1u;
+        vulkan_size_t item_offset = sizeof (float);
 
         switch (input->format)
         {
@@ -533,11 +533,11 @@ struct render_backend_graphics_pipeline_family_t *render_backend_system_create_g
             break;
         }
 
-        for (uint32_t attribute_index = 0u; attribute_index < attribute_count; ++attribute_index)
+        for (vulkan_size_t attribute_index = 0u; attribute_index < attribute_count; ++attribute_index)
         {
-            attribute_output->binding = (uint32_t) input->binding;
-            attribute_output->location = (uint32_t) input->location + attribute_index;
-            attribute_output->offset = (uint32_t) input->offset + item_offset * attribute_index;
+            attribute_output->binding = (vulkan_size_t) input->binding;
+            attribute_output->location = (vulkan_size_t) input->location + attribute_index;
+            attribute_output->offset = (vulkan_size_t) input->offset + item_offset * attribute_index;
             attribute_output->format = input_format;
             ++attribute_output;
         }

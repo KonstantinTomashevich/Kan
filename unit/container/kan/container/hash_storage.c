@@ -5,7 +5,7 @@
 
 void kan_hash_storage_init (struct kan_hash_storage_t *storage,
                             kan_allocation_group_t bucket_allocation_group,
-                            uint64_t initial_bucket_count)
+                            kan_instance_size_t initial_bucket_count)
 {
     storage->bucket_allocation_group = bucket_allocation_group;
     storage->bucket_count = initial_bucket_count;
@@ -16,7 +16,7 @@ void kan_hash_storage_init (struct kan_hash_storage_t *storage,
         kan_allocate_general (bucket_allocation_group, initial_bucket_count * sizeof (struct kan_hash_storage_bucket_t),
                               _Alignof (struct kan_hash_storage_bucket_t));
 
-    for (uint64_t index = 0; index < storage->bucket_count; ++index)
+    for (kan_loop_size_t index = 0; index < storage->bucket_count; ++index)
     {
         storage->buckets[index].first = NULL;
         storage->buckets[index].last = NULL;
@@ -61,12 +61,12 @@ void kan_hash_storage_remove (struct kan_hash_storage_t *storage, struct kan_has
     kan_bd_list_remove (&storage->items, &node->list_node);
 }
 
-const struct kan_hash_storage_bucket_t *kan_hash_storage_query (struct kan_hash_storage_t *storage, uint64_t hash)
+const struct kan_hash_storage_bucket_t *kan_hash_storage_query (struct kan_hash_storage_t *storage, kan_hash_t hash)
 {
     return &storage->buckets[hash % storage->bucket_count];
 }
 
-void kan_hash_storage_set_bucket_count (struct kan_hash_storage_t *storage, uint64_t bucket_count)
+void kan_hash_storage_set_bucket_count (struct kan_hash_storage_t *storage, kan_instance_size_t bucket_count)
 {
     if (storage->bucket_count == bucket_count)
     {

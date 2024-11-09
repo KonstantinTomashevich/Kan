@@ -17,14 +17,14 @@ struct application_framework_system_t
     kan_context_t context;
     kan_allocation_group_t group;
 
-    uint64_t outer_arguments_count;
+    kan_instance_size_t outer_arguments_count;
     char **outer_arguments;
     char *outer_auto_build_and_hot_reload_command;
 
     kan_bool_t exit_requested;
     int exit_code;
 
-    uint64_t min_frame_time_ns;
+    kan_time_offset_t min_frame_time_ns;
     kan_application_system_event_iterator_t event_iterator;
     kan_cpu_section_t update_section;
 };
@@ -162,7 +162,8 @@ APPLICATION_FRAMEWORK_API struct kan_context_system_api_t KAN_CONTEXT_SYSTEM_API
     .destroy = application_framework_system_destroy,
 };
 
-uint64_t kan_application_framework_system_get_arguments_count (kan_context_system_t application_framework_system)
+kan_instance_size_t kan_application_framework_system_get_arguments_count (
+    kan_context_system_t application_framework_system)
 {
     struct application_framework_system_t *system = KAN_HANDLE_GET (application_framework_system);
     return system->outer_arguments_count;
@@ -174,14 +175,14 @@ char **kan_application_framework_system_get_arguments (kan_context_system_t appl
     return system->outer_arguments;
 }
 
-uint64_t kan_application_framework_get_min_frame_time_ns (kan_context_system_t application_framework_system)
+kan_time_offset_t kan_application_framework_get_min_frame_time_ns (kan_context_system_t application_framework_system)
 {
     struct application_framework_system_t *system = KAN_HANDLE_GET (application_framework_system);
     return system->min_frame_time_ns;
 }
 
 void kan_application_framework_set_min_frame_time_ns (kan_context_system_t application_framework_system,
-                                                      uint64_t min_frame_time_ns)
+                                                      kan_time_offset_t min_frame_time_ns)
 {
     struct application_framework_system_t *system = KAN_HANDLE_GET (application_framework_system);
     system->min_frame_time_ns = min_frame_time_ns;

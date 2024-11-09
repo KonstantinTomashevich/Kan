@@ -227,9 +227,9 @@ kan_thread_result_t render_backend_pipeline_compiler_state_worker_function (kan_
             .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
             .pNext = NULL,
             .flags = 0u,
-            .vertexBindingDescriptionCount = (uint32_t) family->input_bindings_count,
+            .vertexBindingDescriptionCount = (vulkan_size_t) family->input_bindings_count,
             .pVertexBindingDescriptions = family->input_bindings,
-            .vertexAttributeDescriptionCount = (uint32_t) family->attributes_count,
+            .vertexAttributeDescriptionCount = (vulkan_size_t) family->attributes_count,
             .pVertexAttributeDescriptions = family->attributes,
         };
 
@@ -287,7 +287,7 @@ kan_thread_result_t render_backend_pipeline_compiler_state_worker_function (kan_
             .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
             .pNext = NULL,
             .flags = 0u,
-            .stageCount = (uint32_t) request->shader_stages_count,
+            .stageCount = (vulkan_size_t) request->shader_stages_count,
             .pStages = request->shader_stages,
             .pVertexInputState = &vertex_input_info,
             .pInputAssemblyState = &input_assembly,
@@ -333,7 +333,7 @@ kan_thread_result_t render_backend_pipeline_compiler_state_worker_function (kan_
                 .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
                 .pNext = NULL,
                 .objectType = VK_OBJECT_TYPE_PIPELINE,
-                .objectHandle = (uint64_t) pipeline,
+                .objectHandle = CONVERT_HANDLE_FOR_DEBUG pipeline,
                 .pObjectName = debug_name,
             };
 
@@ -367,7 +367,7 @@ void render_backend_compiler_state_request_graphics (struct render_backend_pipel
     pipeline->compilation_state = PIPELINE_COMPILATION_STATE_PENDING;
 
     request->shader_stages_count = 0u;
-    for (uint64_t module_index = 0u; module_index < description->code_modules_count; ++module_index)
+    for (kan_loop_size_t module_index = 0u; module_index < description->code_modules_count; ++module_index)
     {
         request->shader_stages_count += description->code_modules[module_index].entry_points_count;
     }
@@ -378,13 +378,13 @@ void render_backend_compiler_state_request_graphics (struct render_backend_pipel
                               _Alignof (VkPipelineShaderStageCreateInfo));
 
     VkPipelineShaderStageCreateInfo *output_stage = request->shader_stages;
-    for (uint64_t module_index = 0u; module_index < description->code_modules_count; ++module_index)
+    for (kan_loop_size_t module_index = 0u; module_index < description->code_modules_count; ++module_index)
     {
         struct render_backend_code_module_t *code_module =
             KAN_HANDLE_GET (description->code_modules[module_index].code_module);
         VkShaderModule module = code_module->module;
 
-        for (uint64_t entry_point_index = 0u;
+        for (kan_loop_size_t entry_point_index = 0u;
              entry_point_index < description->code_modules[module_index].entry_points_count; ++entry_point_index)
         {
             struct kan_render_pipeline_code_entry_point_t *entry_point =
@@ -412,7 +412,7 @@ void render_backend_compiler_state_request_graphics (struct render_backend_pipel
         }
     }
 
-    VkPolygonMode polygon_mode;
+    VkPolygonMode polygon_mode = VK_POLYGON_MODE_FILL;
     switch (description->polygon_mode)
     {
     case KAN_RENDER_POLYGON_MODE_FILL:
@@ -500,7 +500,7 @@ void render_backend_compiler_state_request_graphics (struct render_backend_pipel
                               sizeof (VkPipelineColorBlendAttachmentState) * request->color_blending_attachments_count,
                               _Alignof (VkPipelineColorBlendAttachmentState));
 
-    for (uint64_t attachment_index = 0u; attachment_index < request->color_blending_attachments_count;
+    for (kan_loop_size_t attachment_index = 0u; attachment_index < request->color_blending_attachments_count;
          ++attachment_index)
     {
         struct kan_render_color_output_setup_description_t *source = &description->output_setups[attachment_index];
@@ -543,7 +543,7 @@ void render_backend_compiler_state_request_graphics (struct render_backend_pipel
         .flags = 0u,
         .logicOpEnable = VK_FALSE,
         .logicOp = VK_LOGIC_OP_COPY,
-        .attachmentCount = (uint32_t) request->color_blending_attachments_count,
+        .attachmentCount = (vulkan_size_t) request->color_blending_attachments_count,
         .pAttachments = request->color_blending_attachments,
         .blendConstants =
             {

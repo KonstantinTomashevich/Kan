@@ -75,7 +75,7 @@ struct a_bit_of_everything_t
     uint32_t uint32;
     int32_t int32;
 
-    uint64_t count;
+    kan_instance_size_t count;
 
     // \meta reflection_size_field = count
     int8_t bytes[128u];

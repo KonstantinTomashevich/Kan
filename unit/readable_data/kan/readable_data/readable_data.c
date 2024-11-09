@@ -49,7 +49,7 @@ struct parser_t
 struct emitter_t
 {
     struct kan_stream_t *stream;
-    uint64_t indentation_level;
+    kan_instance_size_t indentation_level;
     char formatting_buffer[KAN_READABLE_DATA_EMIT_FORMATTING_BUFFER_SIZE];
 };
 
@@ -207,7 +207,7 @@ static enum kan_readable_data_parser_response_t re2c_parse_next_floating_value (
 
 static inline const char *re2c_internalize_identifier (struct parser_t *parser, const char *begin, const char *end)
 {
-    const uint64_t length = end - begin;
+    const kan_instance_size_t length = (kan_instance_size_t) (end - begin);
     char *copy = kan_stack_group_allocator_allocate (&parser->temporary_allocator, length + 1u, _Alignof (char));
     memcpy (copy, begin, length);
     copy[length] = '\0';
@@ -269,7 +269,7 @@ static inline const char *re2c_internalize_string_literal (struct parser_t *pars
         }
     }
 
-    uint64_t length_with_escapes = 0u;
+    kan_instance_size_t length_with_escapes = 0u;
     struct string_literal_block_node_t *block = first_block;
 
     while (block)
@@ -328,9 +328,9 @@ static inline const char *re2c_internalize_string_literal (struct parser_t *pars
     return copy;
 }
 
-static inline int64_t re2c_parse_integer (const char *begin, const char *end)
+static inline kan_readable_data_signed_t re2c_parse_integer (const char *begin, const char *end)
 {
-    int64_t result = 0u;
+    kan_readable_data_signed_t result = 0u;
     kan_bool_t positive = KAN_TRUE;
 
     if (*begin == '-')
@@ -345,7 +345,7 @@ static inline int64_t re2c_parse_integer (const char *begin, const char *end)
 
     while (begin < end)
     {
-        int64_t digit = *begin - '0';
+        kan_readable_data_signed_t digit = *begin - '0';
         KAN_ASSERT (digit >= 0 && digit <= 9)
         result = result * 10u + digit;
         ++begin;
@@ -360,9 +360,9 @@ static inline int64_t re2c_parse_integer (const char *begin, const char *end)
     return result;
 }
 
-static inline double re2c_parse_floating (const char *begin, const char *end)
+static inline kan_readable_data_floating_t re2c_parse_floating (const char *begin, const char *end)
 {
-    double result = 0.0;
+    kan_readable_data_floating_t result = 0.0f;
     kan_bool_t positive = KAN_TRUE;
 
     if (*begin == '-')
@@ -385,17 +385,17 @@ static inline double re2c_parse_floating (const char *begin, const char *end)
 
         int digit = *begin - '0';
         KAN_ASSERT (digit >= 0 && digit <= 9)
-        result = result * 10.0 + (double) digit;
+        result = result * 10.0f + (kan_readable_data_floating_t) digit;
         ++begin;
     }
 
-    double after_point_modifier = 0.1;
+    kan_readable_data_floating_t after_point_modifier = 0.1f;
     while (begin < end)
     {
         int digit = *begin - '0';
         KAN_ASSERT (digit >= 0 && digit <= 9)
-        result = result + ((double) digit) * after_point_modifier;
-        after_point_modifier *= 0.1;
+        result = result + ((kan_readable_data_floating_t) digit) * after_point_modifier;
+        after_point_modifier *= 0.1f;
         ++begin;
     }
 
@@ -419,9 +419,10 @@ static inline void re2c_save_output_target_to_event (struct parser_t *parser,
 
     if (output_target_array_index_begin)
     {
-        int64_t parsed_index = re2c_parse_integer (output_target_array_index_begin, output_target_array_index_end);
-        KAN_ASSERT (parsed_index >= 0u)
-        output_target->array_index = parsed_index;
+        kan_readable_data_signed_t parsed_index =
+            re2c_parse_integer (output_target_array_index_begin, output_target_array_index_end);
+        KAN_ASSERT (parsed_index >= 0)
+        output_target->array_index = (kan_instance_size_t) parsed_index;
     }
     else
     {
@@ -848,7 +849,7 @@ static inline kan_bool_t emit_indentation (struct emitter_t *emitter)
 {
 #define INDENTATION "    "
 #define INDENTATION_LENGTH 4u
-    for (uint64_t index = 0u; index < emitter->indentation_level; ++index)
+    for (kan_loop_size_t index = 0u; index < emitter->indentation_level; ++index)
     {
         if (emitter->stream->operations->write (emitter->stream, INDENTATION_LENGTH, INDENTATION) != INDENTATION_LENGTH)
         {
@@ -868,7 +869,7 @@ static inline kan_bool_t emit_end_of_line (struct emitter_t *emitter)
 
 static inline kan_bool_t emit_identifier (struct emitter_t *emitter, const char *identifier)
 {
-    const uint64_t identifier_length = strlen (identifier);
+    const kan_instance_size_t identifier_length = (kan_instance_size_t) strlen (identifier);
     return emitter->stream->operations->write (emitter->stream, identifier_length, identifier) == identifier_length;
 }
 
@@ -887,9 +888,9 @@ static inline kan_bool_t emit_output_target (struct emitter_t *emitter,
             return KAN_FALSE;
         }
 
-        const uint64_t formatted_length =
-            (uint64_t) snprintf (emitter->formatting_buffer, KAN_READABLE_DATA_EMIT_FORMATTING_BUFFER_SIZE, "%llu",
-                                 (unsigned long long) target->array_index);
+        const kan_instance_size_t formatted_length =
+            (kan_instance_size_t) snprintf (emitter->formatting_buffer, KAN_READABLE_DATA_EMIT_FORMATTING_BUFFER_SIZE,
+                                            "%llu", (unsigned long long) target->array_index);
 
         if (emitter->stream->operations->write (emitter->stream, formatted_length, emitter->formatting_buffer) !=
             formatted_length)
@@ -913,7 +914,7 @@ static inline kan_bool_t emit_string_literal (struct emitter_t *emitter, const c
         return KAN_FALSE;
     }
 
-    const uint64_t string_length = strlen (literal);
+    const kan_instance_size_t string_length = (kan_instance_size_t) strlen (literal);
     if (emitter->stream->operations->write (emitter->stream, string_length, literal) != string_length)
     {
         return KAN_FALSE;
@@ -927,19 +928,19 @@ static inline kan_bool_t emit_string_literal (struct emitter_t *emitter, const c
     return KAN_TRUE;
 }
 
-static inline kan_bool_t emit_integer_literal (struct emitter_t *emitter, int64_t literal)
+static inline kan_bool_t emit_integer_literal (struct emitter_t *emitter, kan_readable_data_signed_t literal)
 {
-    const uint64_t formatted_length = (uint64_t) snprintf (
+    const kan_instance_size_t formatted_length = (kan_instance_size_t) snprintf (
         emitter->formatting_buffer, KAN_READABLE_DATA_EMIT_FORMATTING_BUFFER_SIZE, "%lld", (signed long long) literal);
 
     return emitter->stream->operations->write (emitter->stream, formatted_length, emitter->formatting_buffer) ==
            formatted_length;
 }
 
-static inline kan_bool_t emit_floating_literal (struct emitter_t *emitter, double literal)
+static inline kan_bool_t emit_floating_literal (struct emitter_t *emitter, kan_readable_data_floating_t literal)
 {
-    const uint64_t formatted_length =
-        (uint64_t) snprintf (emitter->formatting_buffer, KAN_READABLE_DATA_EMIT_FORMATTING_BUFFER_SIZE, "%lf", literal);
+    const kan_instance_size_t formatted_length = (kan_instance_size_t) snprintf (
+        emitter->formatting_buffer, KAN_READABLE_DATA_EMIT_FORMATTING_BUFFER_SIZE, "%lf", literal);
 
     return emitter->stream->operations->write (emitter->stream, formatted_length, emitter->formatting_buffer) ==
            formatted_length;

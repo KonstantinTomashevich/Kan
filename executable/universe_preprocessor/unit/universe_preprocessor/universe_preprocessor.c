@@ -176,7 +176,7 @@ struct scanned_state_t
 struct
 {
     kan_allocation_group_t allocation_group;
-    uint64_t scan_bound_state_index;
+    kan_instance_size_t scan_bound_state_index;
 
     /// \meta reflection_dynamic_array_type = "struct scanned_state_t"
     struct kan_dynamic_array_t states;
@@ -214,7 +214,7 @@ enum process_query_type_t
 struct process_query_stack_node_t
 {
     struct process_query_stack_node_t *previous;
-    uint64_t blocks;
+    kan_instance_size_t blocks;
     kan_interned_string_t name;
     enum process_query_type_t query_type;
 };
@@ -222,12 +222,12 @@ struct process_query_stack_node_t
 struct
 {
     kan_allocation_group_t allocation_group;
-    uint64_t output_file_line;
+    kan_instance_size_t output_file_line;
 
     struct scanned_state_t *bound_state;
     char bound_state_path[KAN_UNIVERSE_PREPROCESSOR_STATE_PATH_MAX_LENGTH];
 
-    uint64_t blocks;
+    kan_instance_size_t blocks;
     struct process_query_stack_node_t *stack_top;
 
 } process = {
@@ -389,14 +389,14 @@ static void scanned_state_shutdown (struct scanned_state_t *state)
 static void scan_init (void)
 {
     scan.allocation_group = kan_allocation_group_get_child (kan_allocation_group_root (), "scan");
-    scan.scan_bound_state_index = UINT64_MAX;
+    scan.scan_bound_state_index = KAN_INT_MAX (kan_instance_size_t);
     kan_dynamic_array_init (&scan.states, 0u, sizeof (struct scanned_state_t), _Alignof (struct scanned_state_t),
                             scan.allocation_group);
 }
 
 static void scan_shutdown (void)
 {
-    for (uint64_t index = 0u; index < scan.states.size; ++index)
+    for (kan_loop_size_t index = 0u; index < scan.states.size; ++index)
     {
         scanned_state_shutdown (&((struct scanned_state_t *) scan.states.data)[index]);
     }
@@ -407,7 +407,7 @@ static void scan_shutdown (void)
 static inline kan_bool_t scan_generate_state_queries (const char *name_begin, const char *name_end)
 {
     const kan_interned_string_t name = kan_char_sequence_intern (name_begin, name_end);
-    for (uint64_t index = 0u; index < scan.states.size; ++index)
+    for (kan_loop_size_t index = 0u; index < scan.states.size; ++index)
     {
         struct scanned_state_t *state = &((struct scanned_state_t *) scan.states.data)[index];
         if (state->name == name)
@@ -438,7 +438,7 @@ static inline kan_bool_t scan_bind_state (const char *name_begin,
                                           const char *path_end)
 {
     const kan_interned_string_t name = kan_char_sequence_intern (name_begin, name_end);
-    for (uint64_t index = 0u; index < scan.states.size; ++index)
+    for (kan_loop_size_t index = 0u; index < scan.states.size; ++index)
     {
         struct scanned_state_t *state = &((struct scanned_state_t *) scan.states.data)[index];
         if (state->name == name)
@@ -472,7 +472,7 @@ static inline kan_bool_t scan_ensure_state_bound (void)
 static inline void insert_unique_interned_string_into_array (struct kan_dynamic_array_t *array,
                                                              kan_interned_string_t value)
 {
-    for (uint64_t index = 0u; index < array->size; ++index)
+    for (kan_loop_size_t index = 0u; index < array->size; ++index)
     {
         if (value == ((kan_interned_string_t *) array->data)[index])
         {
@@ -579,7 +579,7 @@ static inline kan_bool_t insert_unique_scanned_indexed_field_query_into_array (s
                                                                                const char *field_begin,
                                                                                const char *field_end)
 {
-    const uint64_t field_length = field_end - field_begin;
+    const kan_instance_size_t field_length = (kan_instance_size_t) (field_end - field_begin);
     if (field_length > KAN_UNIVERSE_PREPROCESSOR_TARGET_PATH_MAX_LENGTH - 1u)
     {
         fprintf (stderr, "Error. [%ld:%ld]: Found field path \"%s\" that is longer than maximum %d.\n",
@@ -588,7 +588,7 @@ static inline kan_bool_t insert_unique_scanned_indexed_field_query_into_array (s
         return KAN_FALSE;
     }
 
-    for (uint64_t index = 0u; index < array->size; ++index)
+    for (kan_loop_size_t index = 0u; index < array->size; ++index)
     {
         struct scanned_indexed_field_query_t *query = &((struct scanned_indexed_field_query_t *) array->data)[index];
         if (query->type == type && strncmp (field_begin, query->field_path, field_length) == 0)
@@ -661,7 +661,7 @@ static inline kan_bool_t insert_unique_scanned_signal_query_into_array (struct k
                                                                         const char *value_begin,
                                                                         const char *value_end)
 {
-    const uint64_t field_length = field_end - field_begin;
+    const kan_instance_size_t field_length = (kan_instance_size_t) (field_end - field_begin);
     if (field_length > KAN_UNIVERSE_PREPROCESSOR_TARGET_PATH_MAX_LENGTH - 1u)
     {
         fprintf (stderr, "Error. [%ld:%ld]: Found field path \"%s\" that is longer than maximum %d.\n",
@@ -670,7 +670,7 @@ static inline kan_bool_t insert_unique_scanned_signal_query_into_array (struct k
         return KAN_FALSE;
     }
 
-    const uint64_t value_length = value_end - value_begin;
+    const kan_instance_size_t value_length = (kan_instance_size_t) (value_end - value_begin);
     if (value_length > KAN_UNIVERSE_PREPROCESSOR_SIGNAL_VALUE_MAX_LENGTH - 1u)
     {
         fprintf (stderr, "Error. [%ld:%ld]: Found signal value literal \"%s\" that is longer than maximum %d.\n",
@@ -679,7 +679,7 @@ static inline kan_bool_t insert_unique_scanned_signal_query_into_array (struct k
         return KAN_FALSE;
     }
 
-    for (uint64_t index = 0u; index < array->size; ++index)
+    for (kan_loop_size_t index = 0u; index < array->size; ++index)
     {
         struct scanned_signal_query_t *query = &((struct scanned_signal_query_t *) array->data)[index];
         if (query->type == type && strncmp (field_begin, query->field_path, field_length) == 0 &&
@@ -828,13 +828,13 @@ static kan_bool_t scan_event_fetch (const char *name_begin,
 
 static inline kan_bool_t output_string (const char *string)
 {
-    const uint64_t string_length = strlen (string);
+    const kan_instance_size_t string_length = (kan_instance_size_t) strlen (string);
     if (string_length == 0u)
     {
         return KAN_TRUE;
     }
 
-    for (uint64_t index = 0u; index < string_length; ++index)
+    for (kan_loop_size_t index = 0u; index < string_length; ++index)
     {
         if (string[index] == '\n')
         {
@@ -847,13 +847,13 @@ static inline kan_bool_t output_string (const char *string)
 
 static inline kan_bool_t output_sequence (const char *begin, const char *end)
 {
-    const uint64_t string_length = end - begin;
+    const kan_instance_size_t string_length = (kan_instance_size_t) (end - begin);
     if (string_length == 0u)
     {
         return KAN_TRUE;
     }
 
-    for (uint64_t index = 0u; index < string_length; ++index)
+    for (kan_loop_size_t index = 0u; index < string_length; ++index)
     {
         if (begin[index] == '\n')
         {
@@ -946,7 +946,7 @@ static inline enum parse_response_t process_generate_state_queries (const char *
     kan_interned_string_t name = kan_char_sequence_intern (name_begin, name_end);
     struct scanned_state_t *state = NULL;
 
-    for (uint64_t index = 0u; index < scan.states.size; ++index)
+    for (kan_loop_size_t index = 0u; index < scan.states.size; ++index)
     {
         struct scanned_state_t *other_state = &((struct scanned_state_t *) scan.states.data)[index];
         if (other_state->name == name)
@@ -969,7 +969,7 @@ static inline enum parse_response_t process_generate_state_queries (const char *
         return PARSE_RESPONSE_FAILED;
     }
 
-    for (uint64_t index = 0u; index < state->singleton_read_queries.size; ++index)
+    for (kan_loop_size_t index = 0u; index < state->singleton_read_queries.size; ++index)
     {
         if (!output_string ("struct kan_repository_singleton_read_query_t read__") ||
             !output_string (((kan_interned_string_t *) state->singleton_read_queries.data)[index]) ||
@@ -980,7 +980,7 @@ static inline enum parse_response_t process_generate_state_queries (const char *
         }
     }
 
-    for (uint64_t index = 0u; index < state->singleton_write_queries.size; ++index)
+    for (kan_loop_size_t index = 0u; index < state->singleton_write_queries.size; ++index)
     {
         if (!output_string ("struct kan_repository_singleton_write_query_t write__") ||
             !output_string (((kan_interned_string_t *) state->singleton_write_queries.data)[index]) ||
@@ -991,7 +991,7 @@ static inline enum parse_response_t process_generate_state_queries (const char *
         }
     }
 
-    for (uint64_t index = 0u; index < state->indexed_insert_queries.size; ++index)
+    for (kan_loop_size_t index = 0u; index < state->indexed_insert_queries.size; ++index)
     {
         if (!output_string ("struct kan_repository_indexed_insert_query_t insert__") ||
             !output_string (((kan_interned_string_t *) state->indexed_insert_queries.data)[index]) ||
@@ -1002,7 +1002,7 @@ static inline enum parse_response_t process_generate_state_queries (const char *
         }
     }
 
-    for (uint64_t index = 0u; index < state->indexed_sequence_read_queries.size; ++index)
+    for (kan_loop_size_t index = 0u; index < state->indexed_sequence_read_queries.size; ++index)
     {
         if (!output_string ("struct kan_repository_indexed_sequence_read_query_t read_sequence__") ||
             !output_string (((kan_interned_string_t *) state->indexed_sequence_read_queries.data)[index]) ||
@@ -1013,7 +1013,7 @@ static inline enum parse_response_t process_generate_state_queries (const char *
         }
     }
 
-    for (uint64_t index = 0u; index < state->indexed_sequence_update_queries.size; ++index)
+    for (kan_loop_size_t index = 0u; index < state->indexed_sequence_update_queries.size; ++index)
     {
         if (!output_string ("struct kan_repository_indexed_sequence_update_query_t update_sequence__") ||
             !output_string (((kan_interned_string_t *) state->indexed_sequence_update_queries.data)[index]) ||
@@ -1024,7 +1024,7 @@ static inline enum parse_response_t process_generate_state_queries (const char *
         }
     }
 
-    for (uint64_t index = 0u; index < state->indexed_sequence_delete_queries.size; ++index)
+    for (kan_loop_size_t index = 0u; index < state->indexed_sequence_delete_queries.size; ++index)
     {
         if (!output_string ("struct kan_repository_indexed_sequence_delete_query_t delete_sequence__") ||
             !output_string (((kan_interned_string_t *) state->indexed_sequence_delete_queries.data)[index]) ||
@@ -1035,7 +1035,7 @@ static inline enum parse_response_t process_generate_state_queries (const char *
         }
     }
 
-    for (uint64_t index = 0u; index < state->indexed_sequence_write_queries.size; ++index)
+    for (kan_loop_size_t index = 0u; index < state->indexed_sequence_write_queries.size; ++index)
     {
         if (!output_string ("struct kan_repository_indexed_sequence_write_query_t write_sequence__") ||
             !output_string (((kan_interned_string_t *) state->indexed_sequence_write_queries.data)[index]) ||
@@ -1046,7 +1046,7 @@ static inline enum parse_response_t process_generate_state_queries (const char *
         }
     }
 
-    for (uint64_t index = 0u; index < state->indexed_value_read_queries.size; ++index)
+    for (kan_loop_size_t index = 0u; index < state->indexed_value_read_queries.size; ++index)
     {
         struct scanned_indexed_field_query_t *query =
             &((struct scanned_indexed_field_query_t *) state->indexed_value_read_queries.data)[index];
@@ -1060,7 +1060,7 @@ static inline enum parse_response_t process_generate_state_queries (const char *
         }
     }
 
-    for (uint64_t index = 0u; index < state->indexed_value_update_queries.size; ++index)
+    for (kan_loop_size_t index = 0u; index < state->indexed_value_update_queries.size; ++index)
     {
         struct scanned_indexed_field_query_t *query =
             &((struct scanned_indexed_field_query_t *) state->indexed_value_update_queries.data)[index];
@@ -1074,7 +1074,7 @@ static inline enum parse_response_t process_generate_state_queries (const char *
         }
     }
 
-    for (uint64_t index = 0u; index < state->indexed_value_delete_queries.size; ++index)
+    for (kan_loop_size_t index = 0u; index < state->indexed_value_delete_queries.size; ++index)
     {
         struct scanned_indexed_field_query_t *query =
             &((struct scanned_indexed_field_query_t *) state->indexed_value_delete_queries.data)[index];
@@ -1088,7 +1088,7 @@ static inline enum parse_response_t process_generate_state_queries (const char *
         }
     }
 
-    for (uint64_t index = 0u; index < state->indexed_value_write_queries.size; ++index)
+    for (kan_loop_size_t index = 0u; index < state->indexed_value_write_queries.size; ++index)
     {
         struct scanned_indexed_field_query_t *query =
             &((struct scanned_indexed_field_query_t *) state->indexed_value_write_queries.data)[index];
@@ -1102,7 +1102,7 @@ static inline enum parse_response_t process_generate_state_queries (const char *
         }
     }
 
-    for (uint64_t index = 0u; index < state->indexed_signal_read_queries.size; ++index)
+    for (kan_loop_size_t index = 0u; index < state->indexed_signal_read_queries.size; ++index)
     {
         struct scanned_signal_query_t *query =
             &((struct scanned_signal_query_t *) state->indexed_signal_read_queries.data)[index];
@@ -1116,7 +1116,7 @@ static inline enum parse_response_t process_generate_state_queries (const char *
         }
     }
 
-    for (uint64_t index = 0u; index < state->indexed_signal_update_queries.size; ++index)
+    for (kan_loop_size_t index = 0u; index < state->indexed_signal_update_queries.size; ++index)
     {
         struct scanned_signal_query_t *query =
             &((struct scanned_signal_query_t *) state->indexed_signal_update_queries.data)[index];
@@ -1130,7 +1130,7 @@ static inline enum parse_response_t process_generate_state_queries (const char *
         }
     }
 
-    for (uint64_t index = 0u; index < state->indexed_signal_delete_queries.size; ++index)
+    for (kan_loop_size_t index = 0u; index < state->indexed_signal_delete_queries.size; ++index)
     {
         struct scanned_signal_query_t *query =
             &((struct scanned_signal_query_t *) state->indexed_signal_delete_queries.data)[index];
@@ -1144,7 +1144,7 @@ static inline enum parse_response_t process_generate_state_queries (const char *
         }
     }
 
-    for (uint64_t index = 0u; index < state->indexed_signal_write_queries.size; ++index)
+    for (kan_loop_size_t index = 0u; index < state->indexed_signal_write_queries.size; ++index)
     {
         struct scanned_signal_query_t *query =
             &((struct scanned_signal_query_t *) state->indexed_signal_write_queries.data)[index];
@@ -1158,7 +1158,7 @@ static inline enum parse_response_t process_generate_state_queries (const char *
         }
     }
 
-    for (uint64_t index = 0u; index < state->indexed_interval_read_queries.size; ++index)
+    for (kan_loop_size_t index = 0u; index < state->indexed_interval_read_queries.size; ++index)
     {
         struct scanned_indexed_field_query_t *query =
             &((struct scanned_indexed_field_query_t *) state->indexed_interval_read_queries.data)[index];
@@ -1172,7 +1172,7 @@ static inline enum parse_response_t process_generate_state_queries (const char *
         }
     }
 
-    for (uint64_t index = 0u; index < state->indexed_interval_update_queries.size; ++index)
+    for (kan_loop_size_t index = 0u; index < state->indexed_interval_update_queries.size; ++index)
     {
         struct scanned_indexed_field_query_t *query =
             &((struct scanned_indexed_field_query_t *) state->indexed_interval_update_queries.data)[index];
@@ -1186,7 +1186,7 @@ static inline enum parse_response_t process_generate_state_queries (const char *
         }
     }
 
-    for (uint64_t index = 0u; index < state->indexed_interval_delete_queries.size; ++index)
+    for (kan_loop_size_t index = 0u; index < state->indexed_interval_delete_queries.size; ++index)
     {
         struct scanned_indexed_field_query_t *query =
             &((struct scanned_indexed_field_query_t *) state->indexed_interval_delete_queries.data)[index];
@@ -1200,7 +1200,7 @@ static inline enum parse_response_t process_generate_state_queries (const char *
         }
     }
 
-    for (uint64_t index = 0u; index < state->indexed_interval_write_queries.size; ++index)
+    for (kan_loop_size_t index = 0u; index < state->indexed_interval_write_queries.size; ++index)
     {
         struct scanned_indexed_field_query_t *query =
             &((struct scanned_indexed_field_query_t *) state->indexed_interval_write_queries.data)[index];
@@ -1214,7 +1214,7 @@ static inline enum parse_response_t process_generate_state_queries (const char *
         }
     }
 
-    for (uint64_t index = 0u; index < state->event_insert_queries.size; ++index)
+    for (kan_loop_size_t index = 0u; index < state->event_insert_queries.size; ++index)
     {
         if (!output_string ("struct kan_repository_event_insert_query_t insert__") ||
             !output_string (((kan_interned_string_t *) state->event_insert_queries.data)[index]) ||
@@ -1225,7 +1225,7 @@ static inline enum parse_response_t process_generate_state_queries (const char *
         }
     }
 
-    for (uint64_t index = 0u; index < state->event_fetch_queries.size; ++index)
+    for (kan_loop_size_t index = 0u; index < state->event_fetch_queries.size; ++index)
     {
         if (!output_string ("struct kan_repository_event_fetch_query_t fetch__") ||
             !output_string (((kan_interned_string_t *) state->event_fetch_queries.data)[index]) ||
@@ -1259,7 +1259,7 @@ static inline enum parse_response_t process_bind_state (const char *name_begin,
     kan_interned_string_t name = kan_char_sequence_intern (name_begin, name_end);
     process.bound_state = NULL;
 
-    for (uint64_t index = 0u; index < scan.states.size; ++index)
+    for (kan_loop_size_t index = 0u; index < scan.states.size; ++index)
     {
         struct scanned_state_t *other_state = &((struct scanned_state_t *) scan.states.data)[index];
         if (other_state->name == name)

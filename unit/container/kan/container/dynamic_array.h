@@ -43,12 +43,12 @@ KAN_C_HEADER_BEGIN
 /// \brief Contains all the data about dynamic array instance.
 struct kan_dynamic_array_t
 {
-    uint64_t size;
-    uint64_t capacity;
+    kan_instance_size_t size;
+    kan_instance_size_t capacity;
     uint8_t *data;
 
-    uint64_t item_size;
-    uint64_t item_alignment;
+    kan_instance_size_t item_size;
+    kan_instance_size_t item_alignment;
     kan_allocation_group_t allocation_group;
 };
 
@@ -59,9 +59,9 @@ struct kan_dynamic_array_t
 /// \param item_alignment Required alignment for items
 /// \param allocation_group Allocation group to log memory usage.
 CONTAINER_API void kan_dynamic_array_init (struct kan_dynamic_array_t *array,
-                                           uint64_t initial_capacity,
-                                           uint64_t item_size,
-                                           uint64_t item_alignment,
+                                           kan_instance_size_t initial_capacity,
+                                           kan_instance_size_t item_size,
+                                           kan_instance_size_t item_alignment,
                                            kan_allocation_group_t allocation_group);
 
 /// \brief Attempts to increase array size, returns pointer to usable memory block for one item on success.
@@ -71,17 +71,17 @@ CONTAINER_API void *kan_dynamic_array_add_last (struct kan_dynamic_array_t *arra
 /// \brief Attempts to increase array size, returns pointer to memory block for one item at given index on success.
 /// \details All the items after given index are moved using memory copying.
 ///          If array is already full, `NULL` will be returned instead of correct address.
-CONTAINER_API void *kan_dynamic_array_add_at (struct kan_dynamic_array_t *array, uint64_t index);
+CONTAINER_API void *kan_dynamic_array_add_at (struct kan_dynamic_array_t *array, kan_instance_size_t index);
 
 /// \brief Removes item at given index. All the items after given index are moved using memory copying.
-CONTAINER_API void kan_dynamic_array_remove_at (struct kan_dynamic_array_t *array, uint64_t index);
+CONTAINER_API void kan_dynamic_array_remove_at (struct kan_dynamic_array_t *array, kan_instance_size_t index);
 
 /// \brief Removes item at given index and copies last item to its place.
-CONTAINER_API void kan_dynamic_array_remove_swap_at (struct kan_dynamic_array_t *array, uint64_t index);
+CONTAINER_API void kan_dynamic_array_remove_swap_at (struct kan_dynamic_array_t *array, kan_instance_size_t index);
 
 /// \brief Sets new array capacity and moves all items to new data storage.
 /// \invariant Capacity should not be zero.
-CONTAINER_API void kan_dynamic_array_set_capacity (struct kan_dynamic_array_t *array, uint64_t new_capacity);
+CONTAINER_API void kan_dynamic_array_set_capacity (struct kan_dynamic_array_t *array, kan_instance_size_t new_capacity);
 
 /// \brief Resets array size to zero.
 /// \warning Keep in mind that array knows nothing about item destruction,

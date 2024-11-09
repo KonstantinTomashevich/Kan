@@ -81,7 +81,8 @@ void kan_avl_tree_init (struct kan_avl_tree_t *tree)
     tree->size = 0u;
 }
 
-struct kan_avl_tree_node_t *kan_avl_tree_find_parent_for_insertion (struct kan_avl_tree_t *tree, uint64_t tree_value)
+struct kan_avl_tree_node_t *kan_avl_tree_find_parent_for_insertion (struct kan_avl_tree_t *tree,
+                                                                    kan_avl_tree_value_t tree_value)
 {
     if (!tree->root)
     {
@@ -280,7 +281,7 @@ void kan_avl_tree_insert (struct kan_avl_tree_t *tree,
     }
 }
 
-static struct kan_avl_tree_node_t *find_closest (struct kan_avl_tree_t *tree, uint64_t tree_value)
+static struct kan_avl_tree_node_t *find_closest (struct kan_avl_tree_t *tree, kan_avl_tree_value_t tree_value)
 {
     struct kan_avl_tree_node_t *current = tree->root;
     while (current)
@@ -312,13 +313,13 @@ static struct kan_avl_tree_node_t *find_closest (struct kan_avl_tree_t *tree, ui
     return current;
 }
 
-struct kan_avl_tree_node_t *kan_avl_tree_find_equal (struct kan_avl_tree_t *tree, uint64_t tree_value)
+struct kan_avl_tree_node_t *kan_avl_tree_find_equal (struct kan_avl_tree_t *tree, kan_avl_tree_value_t tree_value)
 {
     struct kan_avl_tree_node_t *closest = find_closest (tree, tree_value);
     return closest && closest->tree_value == tree_value ? closest : NULL;
 }
 
-struct kan_avl_tree_node_t *kan_avl_tree_find_upper_bound (struct kan_avl_tree_t *tree, uint64_t tree_value)
+struct kan_avl_tree_node_t *kan_avl_tree_find_upper_bound (struct kan_avl_tree_t *tree, kan_avl_tree_value_t tree_value)
 {
     struct kan_avl_tree_node_t *closest = find_closest (tree, tree_value);
     if (!closest)
@@ -336,7 +337,7 @@ struct kan_avl_tree_node_t *kan_avl_tree_find_upper_bound (struct kan_avl_tree_t
     }
 }
 
-struct kan_avl_tree_node_t *kan_avl_tree_find_lower_bound (struct kan_avl_tree_t *tree, uint64_t tree_value)
+struct kan_avl_tree_node_t *kan_avl_tree_find_lower_bound (struct kan_avl_tree_t *tree, kan_avl_tree_value_t tree_value)
 {
     struct kan_avl_tree_node_t *closest = find_closest (tree, tree_value);
     if (!closest)

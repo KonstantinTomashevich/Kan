@@ -10,11 +10,11 @@ kan_allocation_group_t kan_allocation_group_get_child (kan_allocation_group_t pa
     return KAN_ALLOCATION_GROUP_IGNORE;
 }
 
-void kan_allocation_group_allocate (kan_allocation_group_t group, uint64_t amount)
+void kan_allocation_group_allocate (kan_allocation_group_t group, kan_memory_size_t amount)
 {
 }
 
-void kan_allocation_group_free (kan_allocation_group_t group, uint64_t amount)
+void kan_allocation_group_free (kan_allocation_group_t group, kan_memory_size_t amount)
 {
 }
 

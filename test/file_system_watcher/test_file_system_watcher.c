@@ -12,7 +12,7 @@ static kan_bool_t write_text_file (const char *file, const char *content)
         return KAN_FALSE;
     }
 
-    const uint64_t content_length = strlen (content);
+    const kan_instance_size_t content_length = (kan_instance_size_t) strlen (content);
     const kan_bool_t result = stream->operations->write (stream, strlen (content), content) == content_length;
 
     stream->operations->close (stream);

@@ -21,8 +21,8 @@ KAN_C_HEADER_BEGIN
 /// \brief Contains information about image size and data pointer if loaded successfully.
 struct kan_image_raw_data_t
 {
-    uint32_t width;
-    uint32_t height;
+    kan_instance_size_t width;
+    kan_instance_size_t height;
     uint8_t *data;
 };
 

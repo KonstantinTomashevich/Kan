@@ -1,6 +1,6 @@
 #include <kan/context/render_backend_implementation_interface.h>
 
-uint64_t kan_render_get_read_back_max_delay_in_frames (void)
+kan_instance_size_t kan_render_get_read_back_max_delay_in_frames (void)
 {
     return KAN_CONTEXT_RENDER_BACKEND_VULKAN_FRAMES_IN_FLIGHT + 1u;
 }
@@ -19,7 +19,7 @@ static inline struct render_backend_read_back_status_t *create_empty_status (str
 
 kan_render_read_back_status_t kan_render_request_read_back_from_surface (kan_render_surface_t surface,
                                                                          kan_render_buffer_t read_back_buffer,
-                                                                         uint32_t read_back_offset)
+                                                                         vulkan_size_t read_back_offset)
 {
     struct render_backend_surface_t *surface_data = KAN_HANDLE_GET (surface);
     KAN_ASSERT (surface_data->system->frame_started)
@@ -50,10 +50,10 @@ kan_render_read_back_status_t kan_render_request_read_back_from_surface (kan_ren
 }
 
 kan_render_read_back_status_t kan_render_request_read_back_from_buffer (kan_render_buffer_t buffer,
-                                                                        uint32_t offset,
-                                                                        uint32_t slice,
+                                                                        vulkan_size_t offset,
+                                                                        vulkan_size_t slice,
                                                                         kan_render_buffer_t read_back_buffer,
-                                                                        uint32_t read_back_offset)
+                                                                        vulkan_size_t read_back_offset)
 {
     struct render_backend_buffer_t *buffer_data = KAN_HANDLE_GET (buffer);
     KAN_ASSERT (buffer_data->system->frame_started)
@@ -88,7 +88,7 @@ kan_render_read_back_status_t kan_render_request_read_back_from_buffer (kan_rend
 kan_render_read_back_status_t kan_render_request_read_back_from_image (kan_render_image_t image,
                                                                        uint8_t mip,
                                                                        kan_render_buffer_t read_back_buffer,
-                                                                       uint32_t read_back_offset)
+                                                                       vulkan_size_t read_back_offset)
 {
     struct render_backend_image_t *image_data = KAN_HANDLE_GET (image);
     KAN_ASSERT (image_data->system->frame_started)

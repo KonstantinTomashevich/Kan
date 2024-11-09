@@ -101,9 +101,7 @@ KAN_HANDLE_DEFINE (kan_workflow_graph_t);
 KAN_HANDLE_DEFINE (kan_workflow_graph_builder_t);
 KAN_HANDLE_DEFINE (kan_workflow_graph_node_t);
 
-typedef uint64_t kan_workflow_user_data_t;
-
-typedef void (*kan_workflow_function_t) (kan_cpu_job_t job, kan_workflow_user_data_t user_data);
+typedef void (*kan_workflow_function_t) (kan_cpu_job_t job, kan_functor_user_data_t user_data);
 
 /// \brief Creates new graph builder instance that uses given allocation group to allocate graph.
 WORKFLOW_API kan_workflow_graph_builder_t kan_workflow_graph_builder_create (kan_allocation_group_t group);
@@ -127,7 +125,7 @@ WORKFLOW_API kan_workflow_graph_node_t kan_workflow_graph_node_create (kan_workf
 /// \brief Sets given graph node function and user data.
 WORKFLOW_API void kan_workflow_graph_node_set_function (kan_workflow_graph_node_t node,
                                                         kan_workflow_function_t function,
-                                                        kan_workflow_user_data_t user_data);
+                                                        kan_functor_user_data_t user_data);
 
 /// \brief Informs that given graph node has insert access to resource with given name.
 WORKFLOW_API void kan_workflow_graph_node_insert_resource (kan_workflow_graph_node_t node, const char *resource_name);

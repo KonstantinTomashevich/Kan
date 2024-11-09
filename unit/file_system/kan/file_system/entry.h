@@ -28,10 +28,10 @@ struct kan_file_system_entry_status_t
     enum kan_file_system_entry_type_t type;
 
     /// \warning Not used for KAN_FILE_SYSTEM_ENTRY_TYPE_DIRECTORY.
-    uint64_t size;
+    kan_file_size_t size;
 
     /// \warning Not used for KAN_FILE_SYSTEM_ENTRY_TYPE_DIRECTORY.
-    uint64_t last_modification_time_ns;
+    kan_time_size_t last_modification_time_ns;
 
     /// \warning Not used for KAN_FILE_SYSTEM_ENTRY_TYPE_DIRECTORY.
     kan_bool_t read_only;

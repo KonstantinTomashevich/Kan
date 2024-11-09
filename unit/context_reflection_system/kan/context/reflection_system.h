@@ -66,11 +66,11 @@
 /// functions that might be implemented for reflection generators:
 ///
 /// - kan_reflection_generator_<name>_bootstrap (struct kan_reflection_generator_<name>_t *instance,
-///   uint64_t bootstrap_iteration_index): This function is always called after reflection generator creation and
-///   informs it about iteration index on which this generator is created.
+///   kan_loop_size_t bootstrap_iteration_index): This function is always called after reflection generator
+///   creation and informs it about iteration index on which this generator is created.
 /// - kan_reflection_generator_<name>_iterate (struct kan_reflection_generator_<name>_t *instance,
 ///   kan_reflection_registry_t registry, kan_reflection_system_generation_iterator_t iterator,
-///   uint64_t iteration_index): Called during generation iteration. Follows the same rules as for generation
+///   kan_loop_size_t iteration_index): Called during generation iteration. Follows the same rules as for generation
 ///   iteration connections.
 /// - kan_reflection_generator_<name>_finalize (struct kan_reflection_generator_<name>_t *instance,
 ///   kan_reflection_registry_t registry): Called during finalize. Follows the same rules as for on-finalize
@@ -121,7 +121,7 @@ KAN_HANDLE_DEFINE (kan_reflection_system_generation_iterator_t);
 typedef void (*kan_context_reflection_generation_iterate_t) (kan_context_system_t other_system,
                                                              kan_reflection_registry_t registry,
                                                              kan_reflection_system_generation_iterator_t iterator,
-                                                             uint64_t iteration_index);
+                                                             kan_loop_size_t iteration_index);
 
 typedef void (*kan_context_reflection_cleanup_t) (kan_context_system_t other_system);
 

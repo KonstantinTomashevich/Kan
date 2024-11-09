@@ -137,13 +137,13 @@ TEST_REPOSITORY_API void second_singleton_init (struct second_singleton_t *data)
 
 struct object_record_t
 {
-    uint64_t object_id;
-    uint64_t parent_object_id;
-    uint64_t data_x;
-    uint64_t data_y;
+    uint32_t object_id;
+    uint32_t parent_object_id;
+    uint32_t data_x;
+    uint32_t data_y;
 };
 
-#define INVALID_PARENT_OBJECT_ID ((uint64_t) ~0ull)
+#define INVALID_PARENT_OBJECT_ID ((uint32_t) ~0ull)
 
 TEST_REPOSITORY_API void object_record_init (struct object_record_t *data)
 {
@@ -162,7 +162,7 @@ TEST_REPOSITORY_API struct kan_repository_meta_automatic_cascade_deletion_t obje
 
 struct status_record_t
 {
-    uint64_t object_id;
+    uint32_t object_id;
     kan_bool_t observable_alive;
     kan_bool_t observable_poisoned;
     kan_bool_t observable_stunned;
@@ -187,7 +187,7 @@ TEST_REPOSITORY_API struct kan_repository_meta_automatic_cascade_deletion_t stat
 
 struct status_record_on_insert_event_t
 {
-    uint64_t object_id;
+    uint32_t object_id;
     kan_bool_t initially_alive;
 };
 
@@ -210,7 +210,7 @@ TEST_REPOSITORY_API struct kan_repository_meta_automatic_on_insert_event_t statu
 
 struct status_record_on_change_event_t
 {
-    uint64_t object_id;
+    uint32_t object_id;
     kan_bool_t was_alive;
     kan_bool_t was_poisoned;
     kan_bool_t was_stunned;
@@ -286,7 +286,7 @@ TEST_REPOSITORY_API struct kan_repository_meta_automatic_on_change_event_t statu
 
 struct status_record_on_delete_event_t
 {
-    uint64_t object_id;
+    uint32_t object_id;
     kan_bool_t was_alive;
 };
 
@@ -309,7 +309,7 @@ TEST_REPOSITORY_API struct kan_repository_meta_automatic_on_delete_event_t statu
 
 struct multi_component_record_t
 {
-    uint64_t object_id;
+    uint32_t object_id;
     uint64_t some_data;
 };
 
@@ -329,7 +329,7 @@ TEST_REPOSITORY_API struct kan_repository_meta_automatic_cascade_deletion_t
 
 struct bounding_box_component_record_t
 {
-    uint64_t object_id;
+    uint32_t object_id;
     float min[3u];
     float max[3u];
 };
@@ -413,7 +413,7 @@ struct check_manual_event_from_task_user_data_t
     struct manual_event_t data;
 };
 
-static void check_manual_event_from_task_executor (uint64_t user_data_int)
+static void check_manual_event_from_task_executor (kan_functor_user_data_t user_data_int)
 {
     struct check_manual_event_from_task_user_data_t *user_data =
         (struct check_manual_event_from_task_user_data_t *) user_data_int;
@@ -590,16 +590,16 @@ static void insert_bounding_box_component_record (struct kan_repository_indexed_
 }
 
 static uint64_t query_bounding_box (struct kan_repository_indexed_space_read_query_t *query,
-                                    double min_x,
-                                    double min_y,
-                                    double min_z,
-                                    double max_x,
-                                    double max_y,
-                                    double max_z)
+                                    kan_floating_t min_x,
+                                    kan_floating_t min_y,
+                                    kan_floating_t min_z,
+                                    kan_floating_t max_x,
+                                    kan_floating_t max_y,
+                                    kan_floating_t max_z)
 {
     uint64_t flags = 0u;
-    const double min[] = {min_x, min_y, min_z};
-    const double max[] = {max_x, max_y, max_z};
+    const kan_floating_t min[] = {min_x, min_y, min_z};
+    const kan_floating_t max[] = {max_x, max_y, max_z};
 
     struct kan_repository_indexed_space_shape_read_cursor_t cursor =
         kan_repository_indexed_space_read_query_execute_shape (query, min, max);
@@ -629,17 +629,17 @@ static uint64_t query_bounding_box (struct kan_repository_indexed_space_read_que
 }
 
 static uint64_t query_ray (struct kan_repository_indexed_space_read_query_t *query,
-                           double origin_x,
-                           double origin_y,
-                           double origin_z,
-                           double direction_x,
-                           double direction_y,
-                           double direction_z,
-                           double max_time)
+                           kan_floating_t origin_x,
+                           kan_floating_t origin_y,
+                           kan_floating_t origin_z,
+                           kan_floating_t direction_x,
+                           kan_floating_t direction_y,
+                           kan_floating_t direction_z,
+                           kan_floating_t max_time)
 {
     uint64_t flags = 0u;
-    const double origin[] = {origin_x, origin_y, origin_z};
-    const double direction[] = {direction_x, direction_y, direction_z};
+    const kan_floating_t origin[] = {origin_x, origin_y, origin_z};
+    const kan_floating_t direction[] = {direction_x, direction_y, direction_z};
 
     struct kan_repository_indexed_space_ray_read_cursor_t cursor =
         kan_repository_indexed_space_read_query_execute_ray (query, origin, direction, max_time);
@@ -1170,7 +1170,7 @@ KAN_TEST_CASE (indexed_sequence_operations)
     {
         struct kan_repository_indexed_sequence_update_cursor_t cursor =
             kan_repository_indexed_sequence_update_query_execute (&update_child);
-        uint64_t objects_found = 0u;
+        kan_loop_size_t objects_found = 0u;
 
         while (KAN_TRUE)
         {
@@ -1211,7 +1211,7 @@ KAN_TEST_CASE (indexed_sequence_operations)
     {
         struct kan_repository_indexed_sequence_delete_cursor_t cursor =
             kan_repository_indexed_sequence_delete_query_execute (&delete_child);
-        uint64_t objects_found = 0u;
+        kan_loop_size_t objects_found = 0u;
 
         while (KAN_TRUE)
         {
@@ -1251,7 +1251,7 @@ KAN_TEST_CASE (indexed_sequence_operations)
     {
         struct kan_repository_indexed_sequence_write_cursor_t cursor =
             kan_repository_indexed_sequence_write_query_execute (&write_root);
-        uint64_t objects_found = 0u;
+        kan_loop_size_t objects_found = 0u;
 
         while (KAN_TRUE)
         {
@@ -1386,7 +1386,7 @@ KAN_TEST_CASE (indexed_value_operations)
         kan_repository_indexed_value_read_cursor_close (&cursor);
     }
 
-    const uint64_t id_4u = 4u;
+    const uint32_t id_4u = 4u;
 
     {
         struct kan_repository_indexed_value_read_cursor_t cursor =
@@ -1475,7 +1475,7 @@ KAN_TEST_CASE (indexed_value_operations)
             kan_repository_indexed_value_write_query_execute (&write_multi_component, &first_record_value.object_id);
 
         struct kan_repository_indexed_value_write_access_t accesses[3u];
-        for (uint64_t index = 0u; index < 3u; ++index)
+        for (kan_loop_size_t index = 0u; index < 3u; ++index)
         {
             accesses[index] = kan_repository_indexed_value_write_cursor_next (&cursor);
         }
@@ -1489,7 +1489,7 @@ KAN_TEST_CASE (indexed_value_operations)
         uint8_t found_12u = 0u;
         uint8_t found_13u = 0u;
 
-        for (uint64_t index = 0u; index < 3u; ++index)
+        for (kan_loop_size_t index = 0u; index < 3u; ++index)
         {
             struct multi_component_record_t *record =
                 (struct multi_component_record_t *) kan_repository_indexed_value_write_access_resolve (
@@ -1530,7 +1530,7 @@ KAN_TEST_CASE (indexed_value_operations)
             kan_repository_indexed_value_write_query_execute (&write_multi_component, &first_record_value.object_id);
 
         struct kan_repository_indexed_value_write_access_t accesses[2u];
-        for (uint64_t index = 0u; index < 2u; ++index)
+        for (kan_loop_size_t index = 0u; index < 2u; ++index)
         {
             accesses[index] = kan_repository_indexed_value_write_cursor_next (&cursor);
         }
@@ -1543,7 +1543,7 @@ KAN_TEST_CASE (indexed_value_operations)
         uint8_t found_42u = 0u;
         uint8_t found_13u = 0u;
 
-        for (uint64_t index = 0u; index < 2u; ++index)
+        for (kan_loop_size_t index = 0u; index < 2u; ++index)
         {
             struct multi_component_record_t *record =
                 (struct multi_component_record_t *) kan_repository_indexed_value_write_access_resolve (
@@ -1675,7 +1675,7 @@ KAN_TEST_CASE (indexed_cascade_deletion)
                                    (struct multi_component_record_t) {.object_id = 5u, .some_data = 1u});
 
     {
-        const uint64_t id_1u = 1u;
+        const uint32_t id_1u = 1u;
         struct kan_repository_indexed_value_delete_cursor_t cursor =
             kan_repository_indexed_value_delete_query_execute (&delete_object, &id_1u);
 
@@ -1791,7 +1791,7 @@ KAN_TEST_CASE (indexed_automatic_events)
     check_no_event (&fetch_on_change);
     check_no_event (&fetch_on_delete);
 
-    const uint64_t id_1u = 1u;
+    const uint32_t id_1u = 1u;
 
     {
         struct kan_repository_indexed_value_write_cursor_t cursor =
@@ -1823,7 +1823,7 @@ KAN_TEST_CASE (indexed_automatic_events)
     check_no_event (&fetch_on_insert);
     check_no_event (&fetch_on_delete);
 
-    const uint64_t id_2u = 2u;
+    const uint32_t id_2u = 2u;
 
     {
         struct kan_repository_indexed_value_write_cursor_t cursor =
@@ -1989,7 +1989,7 @@ KAN_TEST_CASE (indexed_signal_operations)
         struct status_record_t *record =
             (struct status_record_t *) kan_repository_indexed_signal_read_access_resolve (&access);
 
-        uint64_t records_found = 0u;
+        kan_loop_size_t records_found = 0u;
         kan_bool_t one_found = KAN_FALSE;
         kan_bool_t two_found = KAN_FALSE;
 
@@ -2055,7 +2055,7 @@ KAN_TEST_CASE (indexed_signal_operations)
         struct status_record_t *record =
             (struct status_record_t *) kan_repository_indexed_signal_delete_access_resolve (&access);
 
-        uint64_t records_found = 0u;
+        kan_loop_size_t records_found = 0u;
         kan_bool_t two_found = KAN_FALSE;
         kan_bool_t three_found = KAN_FALSE;
 
@@ -2098,7 +2098,7 @@ KAN_TEST_CASE (indexed_signal_operations)
         struct status_record_t *record =
             (struct status_record_t *) kan_repository_indexed_signal_write_access_resolve (&access);
 
-        uint64_t records_found = 0u;
+        kan_loop_size_t records_found = 0u;
         kan_bool_t one_found = KAN_FALSE;
         kan_bool_t four_found = KAN_FALSE;
 
@@ -2203,7 +2203,7 @@ KAN_TEST_CASE (interval_operations)
 
     kan_repository_enter_serving_mode (root_repository);
 
-    for (uint64_t index = 0u; index < 100u; ++index)
+    for (kan_loop_size_t index = 0u; index < 100u; ++index)
     {
         insert_object_record (
             &insert_child,
@@ -2216,7 +2216,7 @@ KAN_TEST_CASE (interval_operations)
         struct kan_repository_indexed_interval_ascending_read_cursor_t read_all_cursor =
             kan_repository_indexed_interval_read_query_execute_ascending (&read_x_root, NULL, NULL);
 
-        for (uint64_t index = 0u; index < 100u; ++index)
+        for (kan_loop_size_t index = 0u; index < 100u; ++index)
         {
             struct kan_repository_indexed_interval_read_access_t access =
                 kan_repository_indexed_interval_ascending_read_cursor_next (&read_all_cursor);
@@ -2239,7 +2239,7 @@ KAN_TEST_CASE (interval_operations)
         struct kan_repository_indexed_interval_descending_read_cursor_t read_all_cursor =
             kan_repository_indexed_interval_read_query_execute_descending (&read_x_root, NULL, NULL);
 
-        for (uint64_t index = 0u; index < 100u; ++index)
+        for (kan_loop_size_t index = 0u; index < 100u; ++index)
         {
             struct kan_repository_indexed_interval_read_access_t access =
                 kan_repository_indexed_interval_descending_read_cursor_next (&read_all_cursor);
@@ -2259,14 +2259,14 @@ KAN_TEST_CASE (interval_operations)
 
     // Read interval.
     {
-        const uint64_t including_start = 42u;
-        const uint64_t including_end = 69u;
+        const uint32_t including_start = 42u;
+        const uint32_t including_end = 69u;
 
         struct kan_repository_indexed_interval_ascending_read_cursor_t read_cursor =
             kan_repository_indexed_interval_read_query_execute_ascending (&read_x_root, &including_start,
                                                                           &including_end);
 
-        for (uint64_t index = including_start; index <= including_end; ++index)
+        for (kan_loop_size_t index = including_start; index <= including_end; ++index)
         {
             struct kan_repository_indexed_interval_read_access_t access =
                 kan_repository_indexed_interval_ascending_read_cursor_next (&read_cursor);
@@ -2286,11 +2286,11 @@ KAN_TEST_CASE (interval_operations)
 
     // Update everything above 49 to 0..49 to make duplicates.
     {
-        const uint64_t including_start = 50u;
+        const uint32_t including_start = 50u;
         struct kan_repository_indexed_interval_descending_update_cursor_t update_cursor =
             kan_repository_indexed_interval_update_query_execute_descending (&update_x_child, &including_start, NULL);
 
-        for (uint64_t index = including_start; index < 100u; ++index)
+        for (kan_loop_size_t index = including_start; index < 100u; ++index)
         {
             struct kan_repository_indexed_interval_update_access_t access =
                 kan_repository_indexed_interval_descending_update_cursor_next (&update_cursor);
@@ -2310,14 +2310,14 @@ KAN_TEST_CASE (interval_operations)
 
     // Read interval again.
     {
-        const uint64_t including_start = 17u;
-        const uint64_t including_end = 42u;
+        const uint32_t including_start = 17u;
+        const uint32_t including_end = 42u;
 
         struct kan_repository_indexed_interval_ascending_read_cursor_t read_cursor =
             kan_repository_indexed_interval_read_query_execute_ascending (&read_x_root, &including_start,
                                                                           &including_end);
 
-        for (uint64_t index = including_start; index <= including_end; ++index)
+        for (kan_loop_size_t index = including_start; index <= including_end; ++index)
         {
             struct kan_repository_indexed_interval_read_access_t access =
                 kan_repository_indexed_interval_ascending_read_cursor_next (&read_cursor);
@@ -2401,8 +2401,8 @@ KAN_TEST_CASE (interval_operations)
 
     // Delete everything with data_y inside [20, 60].
     {
-        const uint64_t value_20u = 20u;
-        const uint64_t value_60u = 60u;
+        const uint32_t value_20u = 20u;
+        const uint32_t value_60u = 60u;
 
         struct kan_repository_indexed_interval_descending_write_cursor_t write_cursor =
             kan_repository_indexed_interval_write_query_execute_descending (&write_y_root, &value_20u, &value_60u);
@@ -2569,8 +2569,8 @@ KAN_TEST_CASE (space_operations)
 
     // Delete box with id 2 and check that it no longer appears in queries.
     {
-        double min[] = {9.0, 7.0, 20.0};
-        double max[] = {20.0, 10.5, 50.0};
+        kan_floating_t min[] = {9.0, 7.0, 20.0};
+        kan_floating_t max[] = {20.0, 10.5, 50.0};
 
         struct kan_repository_indexed_space_shape_delete_cursor_t cursor =
             kan_repository_indexed_space_delete_query_execute_shape (&delete_child, min, max);
@@ -2595,8 +2595,8 @@ KAN_TEST_CASE (space_operations)
 
     // Edit box with id 0 in order to make it equal to previously deleted box with id 2.
     {
-        double origin[] = {10.5, 8.5, 4.5};
-        double direction[] = {2.0, 0.0, 20.0};
+        kan_floating_t origin[] = {10.5, 8.5, 4.5};
+        kan_floating_t direction[] = {2.0, 0.0, 20.0};
 
         struct kan_repository_indexed_space_ray_write_cursor_t cursor =
             kan_repository_indexed_space_write_query_execute_ray (&write_root, origin, direction, 1000.0);

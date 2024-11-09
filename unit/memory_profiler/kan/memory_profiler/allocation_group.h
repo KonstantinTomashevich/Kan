@@ -41,10 +41,10 @@ MEMORY_PROFILER_API kan_allocation_group_t kan_allocation_group_get_child (kan_a
                                                                            const char *name);
 
 /// \brief Reports allocation of given amount of memory to given group.
-MEMORY_PROFILER_API void kan_allocation_group_allocate (kan_allocation_group_t group, uint64_t amount);
+MEMORY_PROFILER_API void kan_allocation_group_allocate (kan_allocation_group_t group, kan_memory_size_t amount);
 
 /// \brief Reports deallocation of given amount of memory from given group.
-MEMORY_PROFILER_API void kan_allocation_group_free (kan_allocation_group_t group, uint64_t amount);
+MEMORY_PROFILER_API void kan_allocation_group_free (kan_allocation_group_t group, kan_memory_size_t amount);
 
 /// \brief Adds human readable marker to allocation group history (if it is being observed).
 /// \details Given marker name is copied inside on invocation.

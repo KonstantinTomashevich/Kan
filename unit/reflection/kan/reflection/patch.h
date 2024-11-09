@@ -50,8 +50,8 @@ KAN_HANDLE_DEFINE (kan_reflection_patch_t);
 /// \brief Contains information about single patch chunk.
 struct kan_reflection_patch_chunk_info_t
 {
-    uint64_t offset;
-    uint64_t size;
+    kan_instance_size_t offset;
+    kan_instance_size_t size;
     void *data;
 };
 
@@ -62,8 +62,8 @@ REFLECTION_API kan_reflection_patch_builder_t kan_reflection_patch_builder_creat
 
 /// \brief Adds new chunk to currently constructed patch. Data is copied inside.
 REFLECTION_API void kan_reflection_patch_builder_add_chunk (kan_reflection_patch_builder_t builder,
-                                                            uint64_t offset,
-                                                            uint64_t size,
+                                                            kan_instance_size_t offset,
+                                                            kan_instance_size_t size,
                                                             const void *data);
 
 /// \brief Attempts to build a patch from added chunks and registers it with given type in given registry.
@@ -79,7 +79,7 @@ REFLECTION_API void kan_reflection_patch_builder_destroy (kan_reflection_patch_b
 REFLECTION_API const struct kan_reflection_struct_t *kan_reflection_patch_get_type (kan_reflection_patch_t patch);
 
 /// \brief Gets count of chunks inside given patch.
-REFLECTION_API uint64_t kan_reflection_patch_get_chunks_count (kan_reflection_patch_t patch);
+REFLECTION_API kan_instance_size_t kan_reflection_patch_get_chunks_count (kan_reflection_patch_t patch);
 
 /// \brief Applies given patch to given memory block.
 REFLECTION_API void kan_reflection_patch_apply (kan_reflection_patch_t patch, void *target);

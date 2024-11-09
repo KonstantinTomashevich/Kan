@@ -7,8 +7,8 @@
 
 struct captured_allocation_group_t
 {
-    uint64_t allocated_here;
-    uint64_t allocated_total;
+    kan_memory_size_t allocated_here;
+    kan_memory_size_t allocated_total;
     struct captured_allocation_group_t *next_on_level;
     struct captured_allocation_group_t *first_child;
     kan_allocation_group_t source;
@@ -27,13 +27,13 @@ kan_allocation_group_t kan_captured_allocation_group_get_source (kan_captured_al
     return captured->source;
 }
 
-uint64_t kan_captured_allocation_group_get_total_allocated (kan_captured_allocation_group_t group)
+kan_memory_size_t kan_captured_allocation_group_get_total_allocated (kan_captured_allocation_group_t group)
 {
     struct captured_allocation_group_t *captured = KAN_HANDLE_GET (group);
     return captured->allocated_total;
 }
 
-uint64_t kan_captured_allocation_group_get_directly_allocated (kan_captured_allocation_group_t group)
+kan_memory_size_t kan_captured_allocation_group_get_directly_allocated (kan_captured_allocation_group_t group)
 {
     struct captured_allocation_group_t *captured = KAN_HANDLE_GET (group);
     return captured->allocated_here;

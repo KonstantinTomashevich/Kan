@@ -43,7 +43,7 @@ TEST_UNIVERSE_RESOURCE_REFERENCE_API void resource_prototype_init (struct resour
 
 TEST_UNIVERSE_RESOURCE_REFERENCE_API void resource_prototype_shutdown (struct resource_prototype_t *prototype)
 {
-    for (uint64_t index = 0u; index < prototype->components.size; ++index)
+    for (kan_loop_size_t index = 0u; index < prototype->components.size; ++index)
     {
         kan_reflection_patch_t patch = ((kan_reflection_patch_t *) prototype->components.data)[index];
         if (KAN_HANDLE_IS_VALID (patch))
@@ -107,8 +107,8 @@ TEST_UNIVERSE_RESOURCE_REFERENCE_API struct kan_resource_pipeline_reference_meta
 
 struct config_a_t
 {
-    uint64_t x;
-    uint64_t y;
+    kan_instance_size_t x;
+    kan_instance_size_t y;
 };
 
 TEST_UNIVERSE_RESOURCE_REFERENCE_API void config_a_init (struct config_a_t *instance)
@@ -126,7 +126,7 @@ TEST_UNIVERSE_RESOURCE_REFERENCE_API struct kan_resource_pipeline_resource_type_
 
 struct config_b_t
 {
-    uint64_t data;
+    kan_instance_size_t data;
     kan_interned_string_t optional_config_a;
 };
 
@@ -258,11 +258,11 @@ struct outer_reference_query_result_t
 {
     kan_interned_string_t type;
     kan_interned_string_t name;
-    uint64_t times_hit;
+    kan_instance_size_t times_hit;
 };
 
 static void test_outer_reference_query (struct kan_repository_indexed_value_read_cursor_t *cursor,
-                                        uint64_t expected_results_count,
+                                        kan_instance_size_t expected_results_count,
                                         struct outer_reference_query_result_t *expected_results)
 {
     while (KAN_TRUE)
@@ -275,7 +275,7 @@ static void test_outer_reference_query (struct kan_repository_indexed_value_read
         if (reference)
         {
             kan_bool_t expected = KAN_FALSE;
-            for (uint64_t index = 0u; index < expected_results_count; ++index)
+            for (kan_loop_size_t index = 0u; index < expected_results_count; ++index)
             {
                 if (expected_results[index].type == reference->reference_type &&
                     expected_results[index].name == reference->reference_name)
@@ -295,7 +295,7 @@ static void test_outer_reference_query (struct kan_repository_indexed_value_read
         }
     }
 
-    for (uint64_t index = 0u; index < expected_results_count; ++index)
+    for (kan_loop_size_t index = 0u; index < expected_results_count; ++index)
     {
         KAN_TEST_CHECK (expected_results[index].times_hit == 1u)
     }
@@ -571,7 +571,7 @@ struct outer_reference_caching_test_state_t
 
     // Test internal state is saved in mutator for simplicity as we're not planning hot reloading in tests.
     enum outer_reference_caching_test_stage_t stage;
-    uint64_t wait_for_change_detection_unti_ns;
+    kan_time_size_t wait_for_change_detection_unti_ns;
 };
 
 TEST_UNIVERSE_RESOURCE_REFERENCE_API void kan_universe_mutator_deploy_outer_reference_caching_test (
@@ -775,7 +775,7 @@ static kan_context_t setup_context (void)
 
 struct run_update_state_t
 {
-    uint64_t stub;
+    kan_instance_size_t stub;
 };
 
 TEST_UNIVERSE_RESOURCE_REFERENCE_API void kan_universe_scheduler_execute_run_update (

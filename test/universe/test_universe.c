@@ -14,13 +14,13 @@
 
 struct counters_singleton_t
 {
-    uint64_t update_only_scheduler_executions;
-    uint64_t update_only_mutator_executions;
+    kan_instance_size_t update_only_scheduler_executions;
+    kan_instance_size_t update_only_mutator_executions;
 
-    uint64_t double_update_scheduler_executions;
-    uint64_t double_update_second_mutator_executions;
+    kan_instance_size_t double_update_scheduler_executions;
+    kan_instance_size_t double_update_second_mutator_executions;
 
-    uint64_t world_update_counters[WORLD_CHILD_UPDATE_TEST_DEPTH];
+    kan_instance_size_t world_update_counters[WORLD_CHILD_UPDATE_TEST_DEPTH];
 };
 
 TEST_UNIVERSE_API void counters_singleton_init (struct counters_singleton_t *data)
@@ -30,7 +30,7 @@ TEST_UNIVERSE_API void counters_singleton_init (struct counters_singleton_t *dat
     data->double_update_scheduler_executions = 0u;
     data->double_update_second_mutator_executions = 0u;
 
-    for (uint64_t index = 0u; index < WORLD_CHILD_UPDATE_TEST_DEPTH; ++index)
+    for (kan_loop_size_t index = 0u; index < WORLD_CHILD_UPDATE_TEST_DEPTH; ++index)
     {
         data->world_update_counters[index] = 0u;
     }
@@ -38,13 +38,13 @@ TEST_UNIVERSE_API void counters_singleton_init (struct counters_singleton_t *dat
 
 struct object_record_t
 {
-    uint64_t object_id;
-    uint64_t parent_object_id;
-    uint64_t data_x;
-    uint64_t data_y;
+    kan_instance_size_t object_id;
+    kan_instance_size_t parent_object_id;
+    kan_instance_size_t data_x;
+    kan_instance_size_t data_y;
 };
 
-#define INVALID_PARENT_OBJECT_ID ((uint64_t) ~0ull)
+#define INVALID_PARENT_OBJECT_ID ((kan_instance_size_t) ~0ull)
 
 TEST_UNIVERSE_API void object_record_init (struct object_record_t *data)
 {
@@ -63,7 +63,7 @@ TEST_UNIVERSE_API struct kan_repository_meta_automatic_cascade_deletion_t object
 
 struct status_record_t
 {
-    uint64_t object_id;
+    kan_instance_size_t object_id;
     kan_bool_t alive;
     kan_bool_t poisoned;
     kan_bool_t stunned;
@@ -88,7 +88,7 @@ TEST_UNIVERSE_API struct kan_repository_meta_automatic_cascade_deletion_t status
 
 struct manual_event_t
 {
-    uint64_t some_data;
+    kan_instance_size_t some_data;
 };
 
 TEST_UNIVERSE_API void manual_event_init (struct manual_event_t *data)
@@ -98,7 +98,7 @@ TEST_UNIVERSE_API void manual_event_init (struct manual_event_t *data)
 
 struct world_configuration_counter_index_t
 {
-    uint64_t index;
+    kan_instance_size_t index;
 };
 
 struct run_only_update_state_t
@@ -264,7 +264,7 @@ TEST_UNIVERSE_API void kan_universe_mutator_deploy_delete_objects_and_fire_event
 TEST_UNIVERSE_API void kan_universe_mutator_execute_delete_objects_and_fire_event (
     kan_cpu_job_t job, struct delete_objects_and_fire_event_state_t *state)
 {
-    uint64_t deleted_count = 0u;
+    kan_instance_size_t deleted_count = 0u;
     KAN_UP_SEQUENCE_DELETE (object, object_record_t)
     {
         KAN_UP_ACCESS_DELETE (object);
@@ -308,10 +308,10 @@ TEST_UNIVERSE_API void kan_universe_mutator_deploy_insert_from_multiple_threads 
 struct insert_task_user_data_t
 {
     struct insert_from_multiple_threads_state_t *state;
-    uint64_t index;
+    kan_instance_size_t index;
 };
 
-static void insert_task_execute (uint64_t user_data)
+static void insert_task_execute (kan_functor_user_data_t user_data)
 {
     struct insert_task_user_data_t *data = (struct insert_task_user_data_t *) user_data;
     struct insert_from_multiple_threads_state_t *state = data->state;
@@ -337,7 +337,7 @@ TEST_UNIVERSE_API void kan_universe_mutator_execute_insert_from_multiple_threads
     kan_stack_group_allocator_reset (&state->task_data_allocator);
     struct kan_cpu_task_list_node_t *tasks_head = NULL;
 
-    for (uint64_t index = 0u; index < 16u; ++index)
+    for (kan_loop_size_t index = 0u; index < 16u; ++index)
     {
         KAN_CPU_TASK_LIST_USER_STRUCT (&tasks_head, &state->task_data_allocator, state->task_name, insert_task_execute,
                                        struct insert_task_user_data_t,
@@ -366,7 +366,7 @@ struct validate_insert_from_multiple_threads_state_t
 TEST_UNIVERSE_API void kan_universe_mutator_execute_validate_insert_from_multiple_threads (
     kan_cpu_job_t job, struct validate_insert_from_multiple_threads_state_t *state)
 {
-    uint64_t count = 0u;
+    kan_instance_size_t count = 0u;
     KAN_UP_INTERVAL_ASCENDING_READ (object, object_record_t, object_id, NULL, NULL)
     {
         KAN_TEST_CHECK (object->object_id == count)
@@ -394,7 +394,7 @@ TEST_UNIVERSE_API void kan_universe_scheduler_execute_update_with_children (
 
     KAN_UP_SINGLETON_READ (counters, counters_singleton_t)
     {
-        for (uint64_t index = 1u; index < WORLD_CHILD_UPDATE_TEST_DEPTH; ++index)
+        for (kan_loop_size_t index = 1u; index < WORLD_CHILD_UPDATE_TEST_DEPTH; ++index)
         {
             KAN_TEST_CHECK (counters->world_update_counters[index - 1u] == counters->world_update_counters[index])
         }
@@ -406,7 +406,7 @@ struct world_update_counter_state_t
     KAN_UP_GENERATE_STATE_QUERIES (world_update_counter)
     KAN_UP_BIND_STATE (world_update_counter, state)
 
-    uint64_t world_counter_index;
+    kan_instance_size_t world_counter_index;
 };
 
 TEST_UNIVERSE_API void kan_universe_mutator_deploy_world_update_counter (kan_universe_t universe,
@@ -683,9 +683,9 @@ KAN_TEST_CASE (update_hierarchy)
         kan_reflection_registry_query_struct (registry, kan_string_intern ("world_configuration_counter_index_t"));
     KAN_ASSERT (config_type != NULL)
 
-    const uint64_t _0u = 0u;
-    const uint64_t _1u = 1u;
-    const uint64_t _2u = 2u;
+    const kan_instance_size_t _0u = 0u;
+    const kan_instance_size_t _1u = 1u;
+    const kan_instance_size_t _2u = 2u;
 
     struct kan_universe_world_definition_t definition;
     kan_universe_world_definition_init (&definition);
@@ -707,7 +707,7 @@ KAN_TEST_CASE (update_hierarchy)
             kan_dynamic_array_add_last (&configuration->variants);                                                     \
         kan_universe_world_configuration_variant_init (variant);                                                       \
                                                                                                                        \
-        kan_reflection_patch_builder_add_chunk (patch_builder, 0u, 8u, INDEX);                                         \
+        kan_reflection_patch_builder_add_chunk (patch_builder, 0u, sizeof (kan_instance_size_t), INDEX);               \
         variant->data = kan_reflection_patch_builder_build (patch_builder, registry, config_type);                     \
                                                                                                                        \
         kan_dynamic_array_set_capacity (&(DEFINITION)->pipelines, 1u);                                                 \
