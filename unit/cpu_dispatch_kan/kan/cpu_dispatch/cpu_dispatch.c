@@ -8,6 +8,7 @@
 #include <kan/error/critical.h>
 #include <kan/memory/allocation.h>
 #include <kan/platform/hardware.h>
+#include <kan/platform/precise_time.h>
 #include <kan/threading/atomic.h>
 #include <kan/threading/conditional_variable.h>
 #include <kan/threading/mutex.h>
@@ -16,8 +17,7 @@
 #define JOB_STATE_ASSEMBLING 0u
 #define JOB_STATE_RELEASED 1u
 #define JOB_STATE_DETACHED 2u
-#define JOB_STATE_AWAITED 3u
-#define JOB_STATE_COMPLETED 4u
+#define JOB_STATE_COMPLETED 3u
 
 #define JOB_STATUS_TASK_COUNT_BITS 24u
 #define JOB_STATUS_TASK_COUNT_MASK ((1u << JOB_STATUS_TASK_COUNT_BITS) - 1u)
@@ -28,9 +28,6 @@ struct job_t
 {
     struct kan_atomic_int_t status;
     struct kan_cpu_task_t completion_task;
-
-    kan_conditional_variable_t await_condition;
-    kan_mutex_t await_condition_mutex;
 };
 
 #define TASK_STATE_QUEUED 0
@@ -383,8 +380,7 @@ static void job_report_task_finished (struct job_t *job)
             if (new_status_bits == (JOB_STATE_COMPLETED << JOB_STATUS_TASK_COUNT_BITS))
             {
                 // Job is now completed fully. Check old state to choose what to do.
-                KAN_ASSERT (old_status_state == JOB_STATE_RELEASED || old_status_state == JOB_STATE_DETACHED ||
-                            old_status_state == JOB_STATE_AWAITED)
+                KAN_ASSERT (old_status_state == JOB_STATE_RELEASED || old_status_state == JOB_STATE_DETACHED)
 
                 if (job->completion_task.function)
                 {
@@ -394,11 +390,6 @@ static void job_report_task_finished (struct job_t *job)
                 if (old_status_state == JOB_STATE_DETACHED)
                 {
                     kan_free_batched (job_allocation_group, job);
-                }
-                else if (old_status_state == JOB_STATE_AWAITED)
-                {
-                    KAN_ASSERT (KAN_HANDLE_IS_VALID (job->await_condition))
-                    kan_conditional_variable_signal_one (job->await_condition);
                 }
 
                 // Nothing more to do if JOB_STATE_RELEASED.
@@ -420,10 +411,6 @@ kan_cpu_job_t kan_cpu_job_create (void)
     struct job_t *job = (struct job_t *) kan_allocate_batched (job_allocation_group, sizeof (struct job_t));
     job->status = kan_atomic_int_init (JOB_STATUS_INITIAL);
     job->completion_task = (struct kan_cpu_task_t) {.name = NULL, .function = NULL, .user_data = 0u};
-
-    // Intentionally create only if someone wait for job to be completed.
-    job->await_condition = KAN_HANDLE_SET_INVALID (kan_conditional_variable_t);
-    job->await_condition_mutex = KAN_HANDLE_SET_INVALID (kan_mutex_t);
     return KAN_HANDLE_SET (kan_cpu_job_t, job);
 }
 
@@ -522,11 +509,6 @@ void kan_cpu_job_wait (kan_cpu_job_t job)
         return;
     }
 
-    job_data->await_condition = kan_conditional_variable_create ();
-    KAN_ASSERT (KAN_HANDLE_IS_VALID (job_data->await_condition))
-    job_data->await_condition_mutex = kan_mutex_create ();
-    KAN_ASSERT (KAN_HANDLE_IS_VALID (job_data->await_condition_mutex))
-
     while (KAN_TRUE)
     {
         const int old_status = kan_atomic_int_get (&job_data->status);
@@ -537,31 +519,17 @@ void kan_cpu_job_wait (kan_cpu_job_t job)
         // Some time passed from fast-forward check above, so we might be completed as well.
         if (old_status_state == JOB_STATE_COMPLETED)
         {
-            kan_conditional_variable_destroy (job_data->await_condition);
-            kan_mutex_destroy (job_data->await_condition_mutex);
             kan_free_batched (job_allocation_group, job_data);
             return;
         }
 
-        const unsigned int old_status_tasks = old_status_bits & JOB_STATUS_TASK_COUNT_MASK;
-        unsigned int new_status_bits = (JOB_STATE_AWAITED << JOB_STATUS_TASK_COUNT_BITS) | old_status_tasks;
-        const int new_status = (int) new_status_bits;
-
-        if (kan_atomic_int_compare_and_set (&job_data->status, old_status, new_status))
-        {
-            break;
-        }
+        // From purist point of view, waiting like that is pretty bad. But there is a chain of thoughts for that:
+        // - To wait properly, we need mutex with conditional variable.
+        // - Also, thread status should only be changed under that mutex.
+        // - Therefore, mutex and variable should always be created. Almost, task submission will be slower.
+        // - But for the most jobs we don't need the await routine.
+        // - And the jobs that use it can safely wait a little bit more.
+        // Therefore, correct await routine would only harm here.
+        kan_platform_sleep (KAN_CPU_DISPATCHER_WAIT_CHECK_DELAY_NS);
     }
-
-    kan_mutex_lock (job_data->await_condition_mutex);
-    while ((((unsigned int) kan_atomic_int_get (&job_data->status)) >> JOB_STATUS_TASK_COUNT_BITS) !=
-           JOB_STATE_COMPLETED)
-    {
-        kan_conditional_variable_wait (job_data->await_condition, job_data->await_condition_mutex);
-    }
-
-    kan_mutex_unlock (job_data->await_condition_mutex);
-    kan_conditional_variable_destroy (job_data->await_condition);
-    kan_mutex_destroy (job_data->await_condition_mutex);
-    kan_free_batched (job_allocation_group, job_data);
 }
