@@ -1094,5 +1094,6 @@ kan_bool_t kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t comp
         valid = KAN_FALSE;
     }
 
+    kan_trivial_string_buffer_shutdown (&name_generation_buffer);
     return valid;
 }

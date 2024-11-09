@@ -1695,7 +1695,8 @@ static kan_bool_t compiled_patch_build_into (struct patch_builder_t *patch_build
 
         if (new_node)
         {
-            patch_data_size = kan_apply_alignment (patch_data_size, _Alignof (struct compiled_patch_node_t));
+            patch_data_size =
+                (kan_instance_size_t) kan_apply_alignment (patch_data_size, _Alignof (struct compiled_patch_node_t));
             patch_data_size += sizeof (struct compiled_patch_node_t);
             ++node_count;
         }

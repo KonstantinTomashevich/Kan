@@ -58,22 +58,3 @@
 
 #    define KAN_MUTE_POINTER_CONVERSION_WARNINGS_END _Pragma ("GCC diagnostic pop")
 #endif
-
-#if defined(_MSC_VER) && !defined(__clang__)
-// clang-format off
-#    define KAN_MUTE_ARRAY_BOUNDS_WARNINGS_BEGIN                                                                       \
-        _Pragma ("warning (push)")                                                                                     \
-        _Pragma ("warning (disable : 6200)")                                                                           \
-        _Pragma ("warning (disable : 6201)")
-// clang-format on
-#    define KAN_MUTE_ARRAY_BOUNDS_WARNINGS_END _Pragma ("warning (pop)")
-#else
-// clang-format off
-#    define KAN_MUTE_ARRAY_BOUNDS_WARNINGS_BEGIN                                                                       \
-        _Pragma ("GCC diagnostic push")                                                                                \
-        _Pragma ("GCC diagnostic ignored \"-Wpragmas\"")                                                               \
-        _Pragma ("GCC diagnostic ignored \"-Warray-bounds\"")
-// clang-format on
-
-#    define KAN_MUTE_ARRAY_BOUNDS_WARNINGS_END _Pragma ("GCC diagnostic pop")
-#endif

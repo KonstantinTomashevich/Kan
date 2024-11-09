@@ -1604,8 +1604,9 @@ void add_registrar (void)
                             kan_trivial_string_buffer_append_string (
                                 &io.output_buffer,
                                 "    kan_reflection_registry_add_enum_value_meta (registry, kan_string_intern (\"");
-                            kan_trivial_string_buffer_append_char_sequence (&io.output_buffer, meta->string_value,
-                                                                            separator - meta->string_value);
+                            kan_trivial_string_buffer_append_char_sequence (
+                                &io.output_buffer, meta->string_value,
+                                (kan_instance_size_t) (separator - meta->string_value));
                             kan_trivial_string_buffer_append_string (&io.output_buffer, "\"), kan_string_intern (\"");
                             kan_trivial_string_buffer_append_string (&io.output_buffer, separator + 1u);
                             kan_trivial_string_buffer_append_string (&io.output_buffer, "\"), kan_string_intern (\"");
@@ -1643,8 +1644,9 @@ void add_registrar (void)
                             kan_trivial_string_buffer_append_string (
                                 &io.output_buffer,
                                 "    kan_reflection_registry_add_struct_field_meta (registry, kan_string_intern (\"");
-                            kan_trivial_string_buffer_append_char_sequence (&io.output_buffer, meta->string_value,
-                                                                            separator - meta->string_value);
+                            kan_trivial_string_buffer_append_char_sequence (
+                                &io.output_buffer, meta->string_value,
+                                (kan_instance_size_t) (separator - meta->string_value));
                             kan_trivial_string_buffer_append_string (&io.output_buffer, "\"), kan_string_intern (\"");
                             kan_trivial_string_buffer_append_string (&io.output_buffer, separator + 1u);
                             kan_trivial_string_buffer_append_string (&io.output_buffer, "\"), kan_string_intern (\"");
@@ -1683,8 +1685,9 @@ void add_registrar (void)
                                 &io.output_buffer,
                                 "    kan_reflection_registry_add_function_argument_meta (registry, kan_string_intern "
                                 "(\"");
-                            kan_trivial_string_buffer_append_char_sequence (&io.output_buffer, meta->string_value,
-                                                                            separator - meta->string_value);
+                            kan_trivial_string_buffer_append_char_sequence (
+                                &io.output_buffer, meta->string_value,
+                                (kan_instance_size_t) (separator - meta->string_value));
                             kan_trivial_string_buffer_append_string (&io.output_buffer, "\"), kan_string_intern (\"");
                             kan_trivial_string_buffer_append_string (&io.output_buffer, separator + 1u);
                             kan_trivial_string_buffer_append_string (&io.output_buffer, "\"), kan_string_intern (\"");

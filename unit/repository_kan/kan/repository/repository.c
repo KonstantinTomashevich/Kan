@@ -3187,7 +3187,8 @@ static kan_bool_t indexed_field_baked_data_bake_from_buffer (struct indexed_fiel
             return KAN_TRUE;
         }
 
-        buffer_offset = kan_apply_alignment (buffer_offset + chunk->size, OBSERVATION_BUFFER_ALIGNMENT);
+        buffer_offset =
+            (kan_instance_size_t) kan_apply_alignment (buffer_offset + chunk->size, OBSERVATION_BUFFER_ALIGNMENT);
     }
 
     return KAN_FALSE;
@@ -5231,10 +5232,8 @@ struct kan_repository_indexed_insertion_package_t kan_repository_indexed_insert_
         kan_allocation_group_stack_pop ();
     }
 
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_BEGIN
     return KAN_PUN_TYPE (struct indexed_insertion_package_t, struct kan_repository_indexed_insertion_package_t,
                          package);
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_END
 }
 
 void *kan_repository_indexed_insertion_package_get (struct kan_repository_indexed_insertion_package_t *package)
@@ -5320,10 +5319,9 @@ struct kan_repository_indexed_sequence_read_cursor_t kan_repository_indexed_sequ
 {
     struct indexed_sequence_cursor_t cursor =
         indexed_storage_sequence_query_execute ((struct indexed_sequence_query_t *) query);
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_BEGIN
+
     return KAN_PUN_TYPE (struct indexed_sequence_cursor_t, struct kan_repository_indexed_sequence_read_cursor_t,
                          cursor);
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_END
 }
 
 struct kan_repository_indexed_sequence_read_access_t kan_repository_indexed_sequence_read_cursor_next (
@@ -5351,10 +5349,8 @@ struct kan_repository_indexed_sequence_read_access_t kan_repository_indexed_sequ
         }
     }
 
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_BEGIN
     return KAN_PUN_TYPE (struct indexed_sequence_constant_access_t,
                          struct kan_repository_indexed_sequence_read_access_t, access);
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_END
 }
 
 const void *kan_repository_indexed_sequence_read_access_resolve (
@@ -5397,10 +5393,9 @@ struct kan_repository_indexed_sequence_update_cursor_t kan_repository_indexed_se
 {
     struct indexed_sequence_cursor_t cursor =
         indexed_storage_sequence_query_execute ((struct indexed_sequence_query_t *) query);
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_BEGIN
+
     return KAN_PUN_TYPE (struct indexed_sequence_cursor_t, struct kan_repository_indexed_sequence_update_cursor_t,
                          cursor);
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_END
 }
 
 struct kan_repository_indexed_sequence_update_access_t kan_repository_indexed_sequence_update_cursor_next (
@@ -5431,10 +5426,8 @@ struct kan_repository_indexed_sequence_update_access_t kan_repository_indexed_se
         }
     }
 
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_BEGIN
     return KAN_PUN_TYPE (struct indexed_sequence_mutable_access_t,
                          struct kan_repository_indexed_sequence_update_access_t, access);
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_END
 }
 
 void *kan_repository_indexed_sequence_update_access_resolve (
@@ -5478,10 +5471,9 @@ struct kan_repository_indexed_sequence_delete_cursor_t kan_repository_indexed_se
 {
     struct indexed_sequence_cursor_t cursor =
         indexed_storage_sequence_query_execute ((struct indexed_sequence_query_t *) query);
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_BEGIN
+
     return KAN_PUN_TYPE (struct indexed_sequence_cursor_t, struct kan_repository_indexed_sequence_delete_cursor_t,
                          cursor);
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_END
 }
 
 struct kan_repository_indexed_sequence_delete_access_t kan_repository_indexed_sequence_delete_cursor_next (
@@ -5509,10 +5501,8 @@ struct kan_repository_indexed_sequence_delete_access_t kan_repository_indexed_se
         }
     }
 
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_BEGIN
     return KAN_PUN_TYPE (struct indexed_sequence_constant_access_t,
                          struct kan_repository_indexed_sequence_delete_access_t, access);
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_END
 }
 
 const void *kan_repository_indexed_sequence_delete_access_resolve (
@@ -5567,10 +5557,9 @@ struct kan_repository_indexed_sequence_write_cursor_t kan_repository_indexed_seq
 {
     struct indexed_sequence_cursor_t cursor =
         indexed_storage_sequence_query_execute ((struct indexed_sequence_query_t *) query);
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_BEGIN
+
     return KAN_PUN_TYPE (struct indexed_sequence_cursor_t, struct kan_repository_indexed_sequence_write_cursor_t,
                          cursor);
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_END
 }
 
 struct kan_repository_indexed_sequence_write_access_t kan_repository_indexed_sequence_write_cursor_next (
@@ -5601,10 +5590,8 @@ struct kan_repository_indexed_sequence_write_access_t kan_repository_indexed_seq
         }
     }
 
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_BEGIN
     return KAN_PUN_TYPE (struct indexed_sequence_mutable_access_t,
                          struct kan_repository_indexed_sequence_write_access_t, access);
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_END
 }
 
 void *kan_repository_indexed_sequence_write_access_resolve (
@@ -5792,9 +5779,8 @@ struct kan_repository_indexed_value_read_cursor_t kan_repository_indexed_value_r
 {
     struct indexed_value_cursor_t cursor =
         indexed_storage_value_query_execute ((struct indexed_value_query_t *) query, value);
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_BEGIN
+
     return KAN_PUN_TYPE (struct indexed_value_cursor_t, struct kan_repository_indexed_value_read_cursor_t, cursor);
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_END
 }
 
 struct kan_repository_indexed_value_read_access_t kan_repository_indexed_value_read_cursor_next (
@@ -5823,10 +5809,8 @@ struct kan_repository_indexed_value_read_access_t kan_repository_indexed_value_r
         }
     }
 
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_BEGIN
     return KAN_PUN_TYPE (struct indexed_value_constant_access_t, struct kan_repository_indexed_value_read_access_t,
                          access);
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_END
 }
 
 const void *kan_repository_indexed_value_read_access_resolve (struct kan_repository_indexed_value_read_access_t *access)
@@ -5869,9 +5853,8 @@ struct kan_repository_indexed_value_update_cursor_t kan_repository_indexed_value
 {
     struct indexed_value_cursor_t cursor =
         indexed_storage_value_query_execute ((struct indexed_value_query_t *) query, value);
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_BEGIN
+
     return KAN_PUN_TYPE (struct indexed_value_cursor_t, struct kan_repository_indexed_value_update_cursor_t, cursor);
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_END
 }
 
 struct kan_repository_indexed_value_update_access_t kan_repository_indexed_value_update_cursor_next (
@@ -5903,10 +5886,8 @@ struct kan_repository_indexed_value_update_access_t kan_repository_indexed_value
         }
     }
 
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_BEGIN
     return KAN_PUN_TYPE (struct indexed_value_mutable_access_t, struct kan_repository_indexed_value_update_access_t,
                          access);
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_END
 }
 
 void *kan_repository_indexed_value_update_access_resolve (struct kan_repository_indexed_value_update_access_t *access)
@@ -5947,9 +5928,8 @@ struct kan_repository_indexed_value_delete_cursor_t kan_repository_indexed_value
 {
     struct indexed_value_cursor_t cursor =
         indexed_storage_value_query_execute ((struct indexed_value_query_t *) query, value);
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_BEGIN
+
     return KAN_PUN_TYPE (struct indexed_value_cursor_t, struct kan_repository_indexed_value_delete_cursor_t, cursor);
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_END
 }
 
 struct kan_repository_indexed_value_delete_access_t kan_repository_indexed_value_delete_cursor_next (
@@ -5978,10 +5958,8 @@ struct kan_repository_indexed_value_delete_access_t kan_repository_indexed_value
         }
     }
 
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_BEGIN
     return KAN_PUN_TYPE (struct indexed_value_constant_access_t, struct kan_repository_indexed_value_delete_access_t,
                          access);
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_END
 }
 
 const void *kan_repository_indexed_value_delete_access_resolve (
@@ -6035,9 +6013,8 @@ struct kan_repository_indexed_value_write_cursor_t kan_repository_indexed_value_
 {
     struct indexed_value_cursor_t cursor =
         indexed_storage_value_query_execute ((struct indexed_value_query_t *) query, value);
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_BEGIN
+
     return KAN_PUN_TYPE (struct indexed_value_cursor_t, struct kan_repository_indexed_value_write_cursor_t, cursor);
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_END
 }
 
 struct kan_repository_indexed_value_write_access_t kan_repository_indexed_value_write_cursor_next (
@@ -6069,10 +6046,8 @@ struct kan_repository_indexed_value_write_access_t kan_repository_indexed_value_
         }
     }
 
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_BEGIN
     return KAN_PUN_TYPE (struct indexed_value_mutable_access_t, struct kan_repository_indexed_value_write_access_t,
                          access);
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_END
 }
 
 void *kan_repository_indexed_value_write_access_resolve (struct kan_repository_indexed_value_write_access_t *access)
@@ -6231,9 +6206,8 @@ struct kan_repository_indexed_signal_read_cursor_t kan_repository_indexed_signal
 {
     struct indexed_signal_cursor_t cursor =
         indexed_storage_signal_query_execute ((struct indexed_signal_query_t *) query);
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_BEGIN
+
     return KAN_PUN_TYPE (struct indexed_signal_cursor_t, struct kan_repository_indexed_signal_read_cursor_t, cursor);
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_END
 }
 
 struct kan_repository_indexed_signal_read_access_t kan_repository_indexed_signal_read_cursor_next (
@@ -6261,10 +6235,8 @@ struct kan_repository_indexed_signal_read_access_t kan_repository_indexed_signal
         }
     }
 
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_BEGIN
     return KAN_PUN_TYPE (struct indexed_signal_constant_access_t, struct kan_repository_indexed_signal_read_access_t,
                          access);
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_END
 }
 
 const void *kan_repository_indexed_signal_read_access_resolve (
@@ -6310,9 +6282,8 @@ struct kan_repository_indexed_signal_update_cursor_t kan_repository_indexed_sign
 {
     struct indexed_signal_cursor_t cursor =
         indexed_storage_signal_query_execute ((struct indexed_signal_query_t *) query);
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_BEGIN
+
     return KAN_PUN_TYPE (struct indexed_signal_cursor_t, struct kan_repository_indexed_signal_update_cursor_t, cursor);
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_END
 }
 
 struct kan_repository_indexed_signal_update_access_t kan_repository_indexed_signal_update_cursor_next (
@@ -6343,10 +6314,8 @@ struct kan_repository_indexed_signal_update_access_t kan_repository_indexed_sign
         }
     }
 
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_BEGIN
     return KAN_PUN_TYPE (struct indexed_signal_mutable_access_t, struct kan_repository_indexed_signal_update_access_t,
                          access);
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_END
 }
 
 void *kan_repository_indexed_signal_update_access_resolve (struct kan_repository_indexed_signal_update_access_t *access)
@@ -6389,9 +6358,8 @@ struct kan_repository_indexed_signal_delete_cursor_t kan_repository_indexed_sign
 {
     struct indexed_signal_cursor_t cursor =
         indexed_storage_signal_query_execute ((struct indexed_signal_query_t *) query);
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_BEGIN
+
     return KAN_PUN_TYPE (struct indexed_signal_cursor_t, struct kan_repository_indexed_signal_delete_cursor_t, cursor);
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_END
 }
 
 struct kan_repository_indexed_signal_delete_access_t kan_repository_indexed_signal_delete_cursor_next (
@@ -6419,10 +6387,8 @@ struct kan_repository_indexed_signal_delete_access_t kan_repository_indexed_sign
         }
     }
 
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_BEGIN
     return KAN_PUN_TYPE (struct indexed_signal_constant_access_t, struct kan_repository_indexed_signal_delete_access_t,
                          access);
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_END
 }
 
 const void *kan_repository_indexed_signal_delete_access_resolve (
@@ -6478,9 +6444,8 @@ struct kan_repository_indexed_signal_write_cursor_t kan_repository_indexed_signa
 {
     struct indexed_signal_cursor_t cursor =
         indexed_storage_signal_query_execute ((struct indexed_signal_query_t *) query);
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_BEGIN
+
     return KAN_PUN_TYPE (struct indexed_signal_cursor_t, struct kan_repository_indexed_signal_write_cursor_t, cursor);
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_END
 }
 
 struct kan_repository_indexed_signal_write_access_t kan_repository_indexed_signal_write_cursor_next (
@@ -6511,10 +6476,8 @@ struct kan_repository_indexed_signal_write_access_t kan_repository_indexed_signa
         }
     }
 
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_BEGIN
     return KAN_PUN_TYPE (struct indexed_signal_mutable_access_t, struct kan_repository_indexed_signal_write_access_t,
                          access);
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_END
 }
 
 void *kan_repository_indexed_signal_write_access_resolve (struct kan_repository_indexed_signal_write_access_t *access)
@@ -6843,10 +6806,9 @@ kan_repository_indexed_interval_read_query_execute_ascending (
 {
     struct indexed_interval_cursor_t cursor =
         indexed_storage_interval_query_execute ((struct indexed_interval_query_t *) query, min, max, KAN_TRUE);
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_BEGIN
+
     return KAN_PUN_TYPE (struct indexed_interval_cursor_t,
                          struct kan_repository_indexed_interval_ascending_read_cursor_t, cursor);
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_END
 }
 
 struct kan_repository_indexed_interval_descending_read_cursor_t
@@ -6855,10 +6817,9 @@ kan_repository_indexed_interval_read_query_execute_descending (
 {
     struct indexed_interval_cursor_t cursor =
         indexed_storage_interval_query_execute ((struct indexed_interval_query_t *) query, min, max, KAN_FALSE);
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_BEGIN
+
     return KAN_PUN_TYPE (struct indexed_interval_cursor_t,
                          struct kan_repository_indexed_interval_descending_read_cursor_t, cursor);
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_END
 }
 
 struct kan_repository_indexed_interval_read_access_t kan_repository_indexed_interval_ascending_read_cursor_next (
@@ -6888,10 +6849,8 @@ struct kan_repository_indexed_interval_read_access_t kan_repository_indexed_inte
         }
     }
 
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_BEGIN
     return KAN_PUN_TYPE (struct indexed_interval_constant_access_t,
                          struct kan_repository_indexed_interval_read_access_t, access);
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_END
 }
 
 struct kan_repository_indexed_interval_read_access_t kan_repository_indexed_interval_descending_read_cursor_next (
@@ -6921,10 +6880,8 @@ struct kan_repository_indexed_interval_read_access_t kan_repository_indexed_inte
         }
     }
 
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_BEGIN
     return KAN_PUN_TYPE (struct indexed_interval_constant_access_t,
                          struct kan_repository_indexed_interval_read_access_t, access);
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_END
 }
 
 const void *kan_repository_indexed_interval_read_access_resolve (
@@ -6976,10 +6933,9 @@ kan_repository_indexed_interval_update_query_execute_ascending (
 {
     struct indexed_interval_cursor_t cursor =
         indexed_storage_interval_query_execute ((struct indexed_interval_query_t *) query, min, max, KAN_TRUE);
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_BEGIN
+
     return KAN_PUN_TYPE (struct indexed_interval_cursor_t,
                          struct kan_repository_indexed_interval_ascending_update_cursor_t, cursor);
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_END
 }
 
 struct kan_repository_indexed_interval_descending_update_cursor_t
@@ -6988,10 +6944,9 @@ kan_repository_indexed_interval_update_query_execute_descending (
 {
     struct indexed_interval_cursor_t cursor =
         indexed_storage_interval_query_execute ((struct indexed_interval_query_t *) query, min, max, KAN_FALSE);
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_BEGIN
+
     return KAN_PUN_TYPE (struct indexed_interval_cursor_t,
                          struct kan_repository_indexed_interval_descending_update_cursor_t, cursor);
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_END
 }
 
 struct kan_repository_indexed_interval_update_access_t kan_repository_indexed_interval_ascending_update_cursor_next (
@@ -7024,10 +6979,8 @@ struct kan_repository_indexed_interval_update_access_t kan_repository_indexed_in
         }
     }
 
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_BEGIN
     return KAN_PUN_TYPE (struct indexed_interval_mutable_access_t,
                          struct kan_repository_indexed_interval_update_access_t, access);
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_END
 }
 
 struct kan_repository_indexed_interval_update_access_t kan_repository_indexed_interval_descending_update_cursor_next (
@@ -7060,10 +7013,8 @@ struct kan_repository_indexed_interval_update_access_t kan_repository_indexed_in
         }
     }
 
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_BEGIN
     return KAN_PUN_TYPE (struct indexed_interval_mutable_access_t,
                          struct kan_repository_indexed_interval_update_access_t, access);
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_END
 }
 
 void *kan_repository_indexed_interval_update_access_resolve (
@@ -7115,10 +7066,9 @@ kan_repository_indexed_interval_delete_query_execute_ascending (
 {
     struct indexed_interval_cursor_t cursor =
         indexed_storage_interval_query_execute ((struct indexed_interval_query_t *) query, min, max, KAN_TRUE);
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_BEGIN
+
     return KAN_PUN_TYPE (struct indexed_interval_cursor_t,
                          struct kan_repository_indexed_interval_ascending_delete_cursor_t, cursor);
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_END
 }
 
 struct kan_repository_indexed_interval_descending_delete_cursor_t
@@ -7127,10 +7077,9 @@ kan_repository_indexed_interval_delete_query_execute_descending (
 {
     struct indexed_interval_cursor_t cursor =
         indexed_storage_interval_query_execute ((struct indexed_interval_query_t *) query, min, max, KAN_FALSE);
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_BEGIN
+
     return KAN_PUN_TYPE (struct indexed_interval_cursor_t,
                          struct kan_repository_indexed_interval_descending_delete_cursor_t, cursor);
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_END
 }
 
 struct kan_repository_indexed_interval_delete_access_t kan_repository_indexed_interval_ascending_delete_cursor_next (
@@ -7160,10 +7109,8 @@ struct kan_repository_indexed_interval_delete_access_t kan_repository_indexed_in
         }
     }
 
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_BEGIN
     return KAN_PUN_TYPE (struct indexed_interval_constant_access_t,
                          struct kan_repository_indexed_interval_delete_access_t, access);
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_END
 }
 
 struct kan_repository_indexed_interval_delete_access_t kan_repository_indexed_interval_descending_delete_cursor_next (
@@ -7193,10 +7140,8 @@ struct kan_repository_indexed_interval_delete_access_t kan_repository_indexed_in
         }
     }
 
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_BEGIN
     return KAN_PUN_TYPE (struct indexed_interval_constant_access_t,
                          struct kan_repository_indexed_interval_delete_access_t, access);
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_END
 }
 
 const void *kan_repository_indexed_interval_delete_access_resolve (
@@ -7261,10 +7206,9 @@ kan_repository_indexed_interval_write_query_execute_ascending (
 {
     struct indexed_interval_cursor_t cursor =
         indexed_storage_interval_query_execute ((struct indexed_interval_query_t *) query, min, max, KAN_TRUE);
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_BEGIN
+
     return KAN_PUN_TYPE (struct indexed_interval_cursor_t,
                          struct kan_repository_indexed_interval_ascending_write_cursor_t, cursor);
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_END
 }
 
 struct kan_repository_indexed_interval_descending_write_cursor_t
@@ -7273,10 +7217,9 @@ kan_repository_indexed_interval_write_query_execute_descending (
 {
     struct indexed_interval_cursor_t cursor =
         indexed_storage_interval_query_execute ((struct indexed_interval_query_t *) query, min, max, KAN_FALSE);
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_BEGIN
+
     return KAN_PUN_TYPE (struct indexed_interval_cursor_t,
                          struct kan_repository_indexed_interval_descending_write_cursor_t, cursor);
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_END
 }
 
 struct kan_repository_indexed_interval_write_access_t kan_repository_indexed_interval_ascending_write_cursor_next (
@@ -7309,10 +7252,8 @@ struct kan_repository_indexed_interval_write_access_t kan_repository_indexed_int
         }
     }
 
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_BEGIN
     return KAN_PUN_TYPE (struct indexed_interval_mutable_access_t,
                          struct kan_repository_indexed_interval_write_access_t, access);
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_END
 }
 
 struct kan_repository_indexed_interval_write_access_t kan_repository_indexed_interval_descending_write_cursor_next (
@@ -7345,10 +7286,8 @@ struct kan_repository_indexed_interval_write_access_t kan_repository_indexed_int
         }
     }
 
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_BEGIN
     return KAN_PUN_TYPE (struct indexed_interval_mutable_access_t,
                          struct kan_repository_indexed_interval_write_access_t, access);
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_END
 }
 
 void *kan_repository_indexed_interval_write_access_resolve (
@@ -7853,12 +7792,9 @@ struct kan_repository_indexed_space_shape_read_cursor_t kan_repository_indexed_s
     const kan_repository_indexed_floating_t *min,
     const kan_repository_indexed_floating_t *max)
 {
-    struct indexed_space_shape_cursor_t cursor =
-        indexed_storage_space_query_execute_shape ((struct indexed_space_query_t *) query, min, max);
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_BEGIN
-    return KAN_PUN_TYPE (struct indexed_space_shape_cursor_t, struct kan_repository_indexed_space_shape_read_cursor_t,
-                         cursor);
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_END
+    KAN_PUN_TYPE_RECEIVE_AND_RETURN (
+        struct indexed_space_shape_cursor_t, struct kan_repository_indexed_space_shape_read_cursor_t,
+        indexed_storage_space_query_execute_shape ((struct indexed_space_query_t *) query, min, max));
 }
 
 struct kan_repository_indexed_space_ray_read_cursor_t kan_repository_indexed_space_read_query_execute_ray (
@@ -7867,12 +7803,9 @@ struct kan_repository_indexed_space_ray_read_cursor_t kan_repository_indexed_spa
     const kan_repository_indexed_floating_t *direction,
     kan_repository_indexed_floating_t max_time)
 {
-    struct indexed_space_ray_cursor_t cursor =
-        indexed_storage_space_query_execute_ray ((struct indexed_space_query_t *) query, origin, direction, max_time);
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_BEGIN
-    return KAN_PUN_TYPE (struct indexed_space_ray_cursor_t, struct kan_repository_indexed_space_ray_read_cursor_t,
-                         cursor);
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_END
+    KAN_PUN_TYPE_RECEIVE_AND_RETURN (
+        struct indexed_space_ray_cursor_t, struct kan_repository_indexed_space_ray_read_cursor_t,
+        indexed_storage_space_query_execute_ray ((struct indexed_space_query_t *) query, origin, direction, max_time));
 }
 
 struct kan_repository_indexed_space_read_access_t kan_repository_indexed_space_shape_read_cursor_next (
@@ -7902,10 +7835,8 @@ struct kan_repository_indexed_space_read_access_t kan_repository_indexed_space_s
         }
     }
 
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_BEGIN
     return KAN_PUN_TYPE (struct indexed_space_constant_access_t, struct kan_repository_indexed_space_read_access_t,
                          access);
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_END
 }
 
 struct kan_repository_indexed_space_read_access_t kan_repository_indexed_space_ray_read_cursor_next (
@@ -7935,10 +7866,8 @@ struct kan_repository_indexed_space_read_access_t kan_repository_indexed_space_r
         }
     }
 
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_BEGIN
     return KAN_PUN_TYPE (struct indexed_space_constant_access_t, struct kan_repository_indexed_space_read_access_t,
                          access);
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_END
 }
 
 const void *kan_repository_indexed_space_read_access_resolve (struct kan_repository_indexed_space_read_access_t *access)
@@ -7992,12 +7921,9 @@ struct kan_repository_indexed_space_shape_update_cursor_t kan_repository_indexed
     const kan_repository_indexed_floating_t *min,
     const kan_repository_indexed_floating_t *max)
 {
-    struct indexed_space_shape_cursor_t cursor =
-        indexed_storage_space_query_execute_shape ((struct indexed_space_query_t *) query, min, max);
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_BEGIN
-    return KAN_PUN_TYPE (struct indexed_space_shape_cursor_t, struct kan_repository_indexed_space_shape_update_cursor_t,
-                         cursor);
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_END
+    KAN_PUN_TYPE_RECEIVE_AND_RETURN (
+        struct indexed_space_shape_cursor_t, struct kan_repository_indexed_space_shape_update_cursor_t,
+        indexed_storage_space_query_execute_shape ((struct indexed_space_query_t *) query, min, max));
 }
 
 struct kan_repository_indexed_space_ray_update_cursor_t kan_repository_indexed_space_update_query_execute_ray (
@@ -8006,12 +7932,9 @@ struct kan_repository_indexed_space_ray_update_cursor_t kan_repository_indexed_s
     const kan_repository_indexed_floating_t *direction,
     kan_repository_indexed_floating_t max_time)
 {
-    struct indexed_space_ray_cursor_t cursor =
-        indexed_storage_space_query_execute_ray ((struct indexed_space_query_t *) query, origin, direction, max_time);
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_BEGIN
-    return KAN_PUN_TYPE (struct indexed_space_ray_cursor_t, struct kan_repository_indexed_space_ray_update_cursor_t,
-                         cursor);
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_END
+    KAN_PUN_TYPE_RECEIVE_AND_RETURN (
+        struct indexed_space_ray_cursor_t, struct kan_repository_indexed_space_ray_update_cursor_t,
+        indexed_storage_space_query_execute_ray ((struct indexed_space_query_t *) query, origin, direction, max_time));
 }
 
 struct kan_repository_indexed_space_update_access_t kan_repository_indexed_space_shape_update_cursor_next (
@@ -8044,10 +7967,8 @@ struct kan_repository_indexed_space_update_access_t kan_repository_indexed_space
         }
     }
 
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_BEGIN
     return KAN_PUN_TYPE (struct indexed_space_mutable_access_t, struct kan_repository_indexed_space_update_access_t,
                          access);
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_END
 }
 
 struct kan_repository_indexed_space_update_access_t kan_repository_indexed_space_ray_update_cursor_next (
@@ -8080,10 +8001,8 @@ struct kan_repository_indexed_space_update_access_t kan_repository_indexed_space
         }
     }
 
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_BEGIN
     return KAN_PUN_TYPE (struct indexed_space_mutable_access_t, struct kan_repository_indexed_space_update_access_t,
                          access);
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_END
 }
 
 void *kan_repository_indexed_space_update_access_resolve (struct kan_repository_indexed_space_update_access_t *access)
@@ -8136,12 +8055,9 @@ struct kan_repository_indexed_space_shape_delete_cursor_t kan_repository_indexed
     const kan_repository_indexed_floating_t *min,
     const kan_repository_indexed_floating_t *max)
 {
-    struct indexed_space_shape_cursor_t cursor =
-        indexed_storage_space_query_execute_shape ((struct indexed_space_query_t *) query, min, max);
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_BEGIN
-    return KAN_PUN_TYPE (struct indexed_space_shape_cursor_t, struct kan_repository_indexed_space_shape_delete_cursor_t,
-                         cursor);
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_END
+    KAN_PUN_TYPE_RECEIVE_AND_RETURN (
+        struct indexed_space_shape_cursor_t, struct kan_repository_indexed_space_shape_delete_cursor_t,
+        indexed_storage_space_query_execute_shape ((struct indexed_space_query_t *) query, min, max));
 }
 
 struct kan_repository_indexed_space_ray_delete_cursor_t kan_repository_indexed_space_delete_query_execute_ray (
@@ -8150,12 +8066,9 @@ struct kan_repository_indexed_space_ray_delete_cursor_t kan_repository_indexed_s
     const kan_repository_indexed_floating_t *direction,
     kan_repository_indexed_floating_t max_time)
 {
-    struct indexed_space_ray_cursor_t cursor =
-        indexed_storage_space_query_execute_ray ((struct indexed_space_query_t *) query, origin, direction, max_time);
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_BEGIN
-    return KAN_PUN_TYPE (struct indexed_space_ray_cursor_t, struct kan_repository_indexed_space_ray_delete_cursor_t,
-                         cursor);
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_END
+    KAN_PUN_TYPE_RECEIVE_AND_RETURN (
+        struct indexed_space_ray_cursor_t, struct kan_repository_indexed_space_ray_delete_cursor_t,
+        indexed_storage_space_query_execute_ray ((struct indexed_space_query_t *) query, origin, direction, max_time));
 }
 
 struct kan_repository_indexed_space_delete_access_t kan_repository_indexed_space_shape_delete_cursor_next (
@@ -8185,10 +8098,8 @@ struct kan_repository_indexed_space_delete_access_t kan_repository_indexed_space
         }
     }
 
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_BEGIN
     return KAN_PUN_TYPE (struct indexed_space_constant_access_t, struct kan_repository_indexed_space_delete_access_t,
                          access);
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_END
 }
 
 struct kan_repository_indexed_space_delete_access_t kan_repository_indexed_space_ray_delete_cursor_next (
@@ -8218,10 +8129,8 @@ struct kan_repository_indexed_space_delete_access_t kan_repository_indexed_space
         }
     }
 
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_BEGIN
     return KAN_PUN_TYPE (struct indexed_space_constant_access_t, struct kan_repository_indexed_space_delete_access_t,
                          access);
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_END
 }
 
 const void *kan_repository_indexed_space_delete_access_resolve (
@@ -8287,12 +8196,9 @@ struct kan_repository_indexed_space_shape_write_cursor_t kan_repository_indexed_
     const kan_repository_indexed_floating_t *min,
     const kan_repository_indexed_floating_t *max)
 {
-    struct indexed_space_shape_cursor_t cursor =
-        indexed_storage_space_query_execute_shape ((struct indexed_space_query_t *) query, min, max);
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_BEGIN
-    return KAN_PUN_TYPE (struct indexed_space_shape_cursor_t, struct kan_repository_indexed_space_shape_write_cursor_t,
-                         cursor);
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_END
+    KAN_PUN_TYPE_RECEIVE_AND_RETURN (
+        struct indexed_space_shape_cursor_t, struct kan_repository_indexed_space_shape_write_cursor_t,
+        indexed_storage_space_query_execute_shape ((struct indexed_space_query_t *) query, min, max));
 }
 
 struct kan_repository_indexed_space_ray_write_cursor_t kan_repository_indexed_space_write_query_execute_ray (
@@ -8301,12 +8207,9 @@ struct kan_repository_indexed_space_ray_write_cursor_t kan_repository_indexed_sp
     const kan_repository_indexed_floating_t *direction,
     kan_repository_indexed_floating_t max_time)
 {
-    struct indexed_space_ray_cursor_t cursor =
-        indexed_storage_space_query_execute_ray ((struct indexed_space_query_t *) query, origin, direction, max_time);
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_BEGIN
-    return KAN_PUN_TYPE (struct indexed_space_ray_cursor_t, struct kan_repository_indexed_space_ray_write_cursor_t,
-                         cursor);
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_END
+    KAN_PUN_TYPE_RECEIVE_AND_RETURN (
+        struct indexed_space_ray_cursor_t, struct kan_repository_indexed_space_ray_write_cursor_t,
+        indexed_storage_space_query_execute_ray ((struct indexed_space_query_t *) query, origin, direction, max_time));
 }
 
 struct kan_repository_indexed_space_write_access_t kan_repository_indexed_space_shape_write_cursor_next (
@@ -8339,10 +8242,8 @@ struct kan_repository_indexed_space_write_access_t kan_repository_indexed_space_
         }
     }
 
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_BEGIN
     return KAN_PUN_TYPE (struct indexed_space_mutable_access_t, struct kan_repository_indexed_space_write_access_t,
                          access);
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_END
 }
 
 struct kan_repository_indexed_space_write_access_t kan_repository_indexed_space_ray_write_cursor_next (
@@ -8375,10 +8276,8 @@ struct kan_repository_indexed_space_write_access_t kan_repository_indexed_space_
         }
     }
 
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_BEGIN
     return KAN_PUN_TYPE (struct indexed_space_mutable_access_t, struct kan_repository_indexed_space_write_access_t,
                          access);
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_END
 }
 
 void *kan_repository_indexed_space_write_access_resolve (struct kan_repository_indexed_space_write_access_t *access)
@@ -8522,20 +8421,18 @@ struct kan_repository_event_insertion_package_t kan_repository_event_insert_quer
     if (kan_atomic_int_get (&query_data->storage->event_queue.total_iterators) == 0)
     {
         package.event = NULL;
-        KAN_MUTE_ARRAY_BOUNDS_WARNINGS_BEGIN
+
         return KAN_PUN_TYPE (struct event_insertion_package_t, struct kan_repository_event_insertion_package_t,
                              package);
-        KAN_MUTE_ARRAY_BOUNDS_WARNINGS_END
     }
 
 #if defined(KAN_REPOSITORY_SAFEGUARDS_ENABLED)
     if (!safeguard_event_insertion_package_try_create (query_data->storage))
     {
         package.event = NULL;
-        KAN_MUTE_ARRAY_BOUNDS_WARNINGS_BEGIN
+
         return KAN_PUN_TYPE (struct event_insertion_package_t, struct kan_repository_event_insertion_package_t,
                              package);
-        KAN_MUTE_ARRAY_BOUNDS_WARNINGS_END
     }
 #endif
 
@@ -8547,9 +8444,7 @@ struct kan_repository_event_insertion_package_t kan_repository_event_insert_quer
         kan_allocation_group_stack_pop ();
     }
 
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_BEGIN
     return KAN_PUN_TYPE (struct event_insertion_package_t, struct kan_repository_event_insertion_package_t, package);
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_END
 }
 
 void *kan_repository_event_insertion_package_get (struct kan_repository_event_insertion_package_t *package)
@@ -8630,27 +8525,24 @@ struct kan_repository_event_read_access_t kan_repository_event_fetch_query_next 
     if (!kan_event_queue_iterator_get (&query_data->storage->event_queue, query_data->iterator))
     {
         access.iterator = KAN_HANDLE_SET_INVALID (kan_event_queue_iterator_t);
-        KAN_MUTE_ARRAY_BOUNDS_WARNINGS_BEGIN
+
         return KAN_PUN_TYPE (struct event_read_access_t, struct kan_repository_event_read_access_t, access);
-        KAN_MUTE_ARRAY_BOUNDS_WARNINGS_END
     }
 
 #if defined(KAN_REPOSITORY_SAFEGUARDS_ENABLED)
     if (!safeguard_event_read_access_try_create (query_data->storage))
     {
         access.iterator = KAN_HANDLE_SET_INVALID (kan_event_queue_iterator_t);
-        KAN_MUTE_ARRAY_BOUNDS_WARNINGS_BEGIN
+
         return KAN_PUN_TYPE (struct event_read_access_t, struct kan_repository_event_read_access_t, access);
-        KAN_MUTE_ARRAY_BOUNDS_WARNINGS_END
     }
 #endif
 
     access.iterator = query_data->iterator;
     query_data->iterator =
         kan_event_queue_iterator_create_next (&query_data->storage->event_queue, query_data->iterator);
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_BEGIN
+
     return KAN_PUN_TYPE (struct event_read_access_t, struct kan_repository_event_read_access_t, access);
-    KAN_MUTE_ARRAY_BOUNDS_WARNINGS_END
 }
 
 const void *kan_repository_event_read_access_resolve (struct kan_repository_event_read_access_t *access)

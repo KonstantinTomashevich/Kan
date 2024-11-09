@@ -320,10 +320,10 @@ static inline kan_instance_size_t calculate_node_size (uint8_t dimension_count, 
     kan_instance_size_t size = sizeof (struct kan_space_tree_node_t);
     if (with_children)
     {
-        size += sizeof (void *) * (kan_instance_size_t) (1u << (kan_instance_size_t) dimension_count);
+        size += sizeof (void *) * ((kan_instance_size_t) 1u << (kan_instance_size_t) dimension_count);
     }
 
-    return kan_apply_alignment (size, _Alignof (struct kan_space_tree_node_t));
+    return (kan_instance_size_t) kan_apply_alignment (size, _Alignof (struct kan_space_tree_node_t));
 }
 
 static inline void reset_node_children (struct kan_space_tree_t *tree, struct kan_space_tree_node_t *node)
@@ -689,7 +689,7 @@ void kan_space_tree_init (struct kan_space_tree_t *tree,
 
     tree->allocation_group = allocation_group;
     KAN_ASSERT (dimension_count <= KAN_CONTAINER_SPACE_TREE_MAX_DIMENSIONS)
-    tree->dimension_count = (kan_space_tree_road_t) dimension_count;
+    tree->dimension_count = (uint8_t) dimension_count;
     tree->global_min = global_min;
     tree->global_max = global_max;
     tree->last_level_height = 1u;
@@ -722,9 +722,9 @@ static inline void shape_iterator_init (struct kan_space_tree_t *tree,
     iterator->current_path = iterator->min_path;
 }
 
-static inline kan_space_tree_road_t calculate_insertion_target_height (struct kan_space_tree_t *tree,
-                                                                       const kan_space_tree_floating_t *min_sequence,
-                                                                       const kan_space_tree_floating_t *max_sequence)
+static inline uint8_t calculate_insertion_target_height (struct kan_space_tree_t *tree,
+                                                         const kan_space_tree_floating_t *min_sequence,
+                                                         const kan_space_tree_floating_t *max_sequence)
 {
     kan_space_tree_floating_t max_dimension_size = 0.0;
     switch (tree->dimension_count)
@@ -740,7 +740,7 @@ static inline kan_space_tree_road_t calculate_insertion_target_height (struct ka
     }
 
     kan_space_tree_floating_t child_node_size = 0.125 * (tree->global_max - tree->global_min);
-    kan_space_tree_road_t target_height = 1u;
+    uint8_t target_height = 1u;
 
     while (max_dimension_size < child_node_size && target_height < tree->last_level_height)
     {
