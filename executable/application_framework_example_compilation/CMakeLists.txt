@@ -34,8 +34,16 @@ application_plugin_include (ABSTRACT CONCRETE application_framework_example_comp
 register_application_program (test)
 application_program_set_configuration ("${CMAKE_CURRENT_SOURCE_DIR}/configuration/program_test.rd")
 application_program_use_plugin_group (test)
-application_program_use_as_test_in_development_mode (ARGUMENTS --test PROPERTIES TIMEOUT 10)
-application_program_use_as_test_in_packaged_mode (ARGUMENTS --test PROPERTIES TIMEOUT 10)
+
+if (WIN32)
+    # Non-serial run results in timeout on Windows for some reason.
+    set (TEST_PROPERTIES TIMEOUT 10 RUN_SERIAL ON)
+else ()
+    set (TEST_PROPERTIES TIMEOUT 10)
+endif ()
+
+application_program_use_as_test_in_development_mode (ARGUMENTS --test PROPERTIES ${TEST_PROPERTIES})
+application_program_use_as_test_in_packaged_mode (ARGUMENTS --test PROPERTIES ${TEST_PROPERTIES})
 
 register_application_variant (test)
 application_variant_add_program (test)
