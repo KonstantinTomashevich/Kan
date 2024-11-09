@@ -232,8 +232,8 @@ static enum kan_render_device_memory_type_t query_device_memory_type (VkPhysical
     kan_bool_t is_host_visible[VK_MAX_MEMORY_HEAPS];
     kan_bool_t is_host_coherent[VK_MAX_MEMORY_HEAPS];
 
-    for (uint64_t memory_type_index = 0u; memory_type_index < (uint64_t) memory_properties.memoryTypeCount;
-         ++memory_type_index)
+    for (kan_loop_size_t memory_type_index = 0u;
+         memory_type_index < (kan_loop_size_t) memory_properties.memoryTypeCount; ++memory_type_index)
     {
         is_host_visible[memory_properties.memoryTypes[memory_type_index].heapIndex] |=
             (memory_properties.memoryTypes[memory_type_index].propertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) ?
@@ -249,7 +249,8 @@ static enum kan_render_device_memory_type_t query_device_memory_type (VkPhysical
     kan_bool_t any_local_non_visible = KAN_FALSE;
     kan_bool_t any_local_non_coherent = KAN_FALSE;
 
-    for (uint64_t heap_index = 0u; heap_index < (uint64_t) memory_properties.memoryHeapCount; ++heap_index)
+    for (kan_loop_size_t heap_index = 0u; heap_index < (kan_loop_size_t) memory_properties.memoryHeapCount;
+         ++heap_index)
     {
         if (memory_properties.memoryHeaps[heap_index].flags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT)
         {
@@ -274,7 +275,7 @@ static enum kan_render_device_memory_type_t query_device_memory_type (VkPhysical
 
 static void render_backend_system_query_devices (struct render_backend_system_t *system)
 {
-    uint32_t physical_device_count;
+    kan_instance_size_t physical_device_count;
     if (vkEnumeratePhysicalDevices (system->instance, &physical_device_count, NULL) != VK_SUCCESS)
     {
         KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR, "Failed to query physical devices.")
@@ -299,9 +300,9 @@ static void render_backend_system_query_devices (struct render_backend_system_t 
                               sizeof (struct kan_render_supported_devices_t) +
                                   sizeof (struct kan_render_supported_device_info_t) * physical_device_count,
                               _Alignof (struct kan_render_supported_devices_t));
-    system->supported_devices->supported_device_count = (uint64_t) physical_device_count;
+    system->supported_devices->supported_device_count = (kan_loop_size_t) physical_device_count;
 
-    for (uint64_t device_index = 0u; device_index < physical_device_count; ++device_index)
+    for (kan_loop_size_t device_index = 0u; device_index < physical_device_count; ++device_index)
     {
         struct kan_render_supported_device_info_t *device_info = &system->supported_devices->devices[device_index];
         _Static_assert (sizeof (kan_render_device_t) >= sizeof (VkPhysicalDevice),
@@ -340,28 +341,28 @@ static void render_backend_system_query_devices (struct render_backend_system_t 
         }
 
         device_info->memory_type = query_device_memory_type (physical_devices[device_index]);
-        for (uint64_t format = 0u; format < KAN_RENDER_IMAGE_FORMAT_COUNT; ++format)
+        for (kan_loop_size_t format = 0u; format < KAN_RENDER_IMAGE_FORMAT_COUNT; ++format)
         {
             device_info->image_format_support[format] = 0u;
             VkFormatProperties format_properties;
             vkGetPhysicalDeviceFormatProperties (physical_devices[device_index], image_format_to_vulkan (format),
                                                  &format_properties);
 
-            const uint32_t transfer_mask = VK_FORMAT_FEATURE_TRANSFER_SRC_BIT | VK_FORMAT_FEATURE_TRANSFER_DST_BIT;
+            const vulkan_size_t transfer_mask = VK_FORMAT_FEATURE_TRANSFER_SRC_BIT | VK_FORMAT_FEATURE_TRANSFER_DST_BIT;
             if ((format_properties.optimalTilingFeatures & transfer_mask) == transfer_mask)
             {
                 device_info->image_format_support[format] |= KAN_RENDER_IMAGE_FORMAT_SUPPORT_FLAG_TRANSFER;
             }
 
-            const uint32_t sampled_mask = VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT | VK_FORMAT_FEATURE_TRANSFER_DST_BIT;
+            const vulkan_size_t sampled_mask = VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT | VK_FORMAT_FEATURE_TRANSFER_DST_BIT;
             if ((format_properties.optimalTilingFeatures & sampled_mask) == sampled_mask)
             {
                 device_info->image_format_support[format] |= KAN_RENDER_IMAGE_FORMAT_SUPPORT_FLAG_SAMPLED;
             }
 
-            const uint32_t color_render_mask = VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT |
-                                               VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BLEND_BIT |
-                                               VK_FORMAT_FEATURE_BLIT_SRC_BIT | VK_FORMAT_FEATURE_BLIT_DST_BIT;
+            const vulkan_size_t color_render_mask = VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT |
+                                                    VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BLEND_BIT |
+                                                    VK_FORMAT_FEATURE_BLIT_SRC_BIT | VK_FORMAT_FEATURE_BLIT_DST_BIT;
 
             if ((format_properties.optimalTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT) ||
                 (format_properties.optimalTilingFeatures & color_render_mask) == color_render_mask)
@@ -410,7 +411,7 @@ void render_backend_system_init (kan_context_system_t handle)
 #endif
 
     KAN_LOG (render_backend_system_vulkan, KAN_LOG_INFO, "Preparing to create Vulkan instance. Used extensions:")
-    for (uint64_t index = 0u; index < extensions.size; ++index)
+    for (kan_loop_size_t index = 0u; index < extensions.size; ++index)
     {
         KAN_LOG (render_backend_system_vulkan, KAN_LOG_INFO, "    - %s", ((char **) extensions.data)[index])
     }
@@ -436,7 +437,7 @@ void render_backend_system_init (kan_context_system_t handle)
         .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
         .pNext = NULL,
         .pApplicationInfo = &application_info,
-        .enabledExtensionCount = (uint32_t) extensions.size,
+        .enabledExtensionCount = (vulkan_size_t) extensions.size,
         .ppEnabledExtensionNames = (const char *const *) extensions.data,
         .enabledLayerCount = 0u,
         .ppEnabledLayerNames = NULL,
@@ -454,7 +455,7 @@ void render_backend_system_init (kan_context_system_t handle)
         .pUserData = NULL,
     };
 
-    uint32_t layer_properties_count;
+    kan_instance_size_t layer_properties_count;
     vkEnumerateInstanceLayerProperties (&layer_properties_count, NULL);
 
     VkLayerProperties *layer_properties =
@@ -463,7 +464,7 @@ void render_backend_system_init (kan_context_system_t handle)
     vkEnumerateInstanceLayerProperties (&layer_properties_count, layer_properties);
     system->has_validation_layer = KAN_FALSE;
 
-    for (uint64_t index = 0u; index < layer_properties_count; ++index)
+    for (kan_loop_size_t index = 0u; index < layer_properties_count; ++index)
     {
         if (strcmp (layer_properties[index].layerName, "VK_LAYER_KHRONOS_validation") == 0)
         {
@@ -496,7 +497,7 @@ void render_backend_system_init (kan_context_system_t handle)
     }
 
     volkLoadInstance (system->instance);
-    for (uint64_t index = 0u; index < extensions.size; ++index)
+    for (kan_loop_size_t index = 0u; index < extensions.size; ++index)
     {
         kan_free_general (system->utility_allocation_group, ((char **) extensions.data)[index],
                           strlen (((char **) extensions.data)[index]) + 1u);
@@ -533,7 +534,7 @@ void render_backend_system_init (kan_context_system_t handle)
 
 static void render_backend_system_destroy_schedule_states (struct render_backend_system_t *system)
 {
-    for (uint64_t index = 0u; index < KAN_CONTEXT_RENDER_BACKEND_VULKAN_FRAMES_IN_FLIGHT; ++index)
+    for (kan_loop_size_t index = 0u; index < KAN_CONTEXT_RENDER_BACKEND_VULKAN_FRAMES_IN_FLIGHT; ++index)
     {
         struct render_backend_schedule_state_t *state = &system->schedule_states[index];
         kan_stack_group_allocator_shutdown (&state->item_allocator);
@@ -542,7 +543,7 @@ static void render_backend_system_destroy_schedule_states (struct render_backend
 
 static void render_backend_system_destroy_command_states (struct render_backend_system_t *system)
 {
-    for (uint64_t index = 0u; index < KAN_CONTEXT_RENDER_BACKEND_VULKAN_FRAMES_IN_FLIGHT; ++index)
+    for (kan_loop_size_t index = 0u; index < KAN_CONTEXT_RENDER_BACKEND_VULKAN_FRAMES_IN_FLIGHT; ++index)
     {
         struct render_backend_command_state_t *state = &system->command_states[index];
 
@@ -554,7 +555,7 @@ static void render_backend_system_destroy_command_states (struct render_backend_
             if (state->secondary_command_buffers.size > 0u)
             {
                 vkFreeCommandBuffers (system->device, state->command_pool,
-                                      (uint32_t) state->secondary_command_buffers.size,
+                                      (vulkan_size_t) state->secondary_command_buffers.size,
                                       (VkCommandBuffer *) state->secondary_command_buffers.data);
             }
 
@@ -567,7 +568,7 @@ static void render_backend_system_destroy_command_states (struct render_backend_
 
 static void render_backend_system_destroy_synchronization_objects (struct render_backend_system_t *system)
 {
-    for (uint64_t index = 0u; index < KAN_CONTEXT_RENDER_BACKEND_VULKAN_FRAMES_IN_FLIGHT; ++index)
+    for (kan_loop_size_t index = 0u; index < KAN_CONTEXT_RENDER_BACKEND_VULKAN_FRAMES_IN_FLIGHT; ++index)
     {
         if (system->render_finished_semaphores[index] != VK_NULL_HANDLE)
         {
@@ -635,7 +636,7 @@ void render_backend_system_shutdown (kan_context_system_t handle)
     }
 
     // Destroy all detached data so we won't leak memory.
-    for (uint64_t schedule_index = 0u; schedule_index < KAN_CONTEXT_RENDER_BACKEND_VULKAN_FRAMES_IN_FLIGHT;
+    for (kan_loop_size_t schedule_index = 0u; schedule_index < KAN_CONTEXT_RENDER_BACKEND_VULKAN_FRAMES_IN_FLIGHT;
          ++schedule_index)
     {
         struct render_backend_schedule_state_t *schedule = &system->schedule_states[schedule_index];
@@ -671,7 +672,8 @@ void render_backend_system_shutdown (kan_context_system_t handle)
             VkMemoryRequirements requirements;
             vkGetImageMemoryRequirements (system->device, detached_image_destroy->detached_image, &requirements);
 
-            transfer_memory_between_groups (requirements.size, detached_image_destroy->gpu_allocation_group,
+            transfer_memory_between_groups ((vulkan_size_t) requirements.size,
+                                            detached_image_destroy->gpu_allocation_group,
                                             system->memory_profiling.gpu_unmarked_group);
 #endif
 
@@ -864,7 +866,7 @@ kan_bool_t kan_render_backend_system_select_device (kan_context_system_t render_
         return KAN_FALSE;
     }
 
-    uint32_t properties_count;
+    kan_instance_size_t properties_count;
     if (vkEnumerateDeviceExtensionProperties (physical_device, NULL, &properties_count, NULL) != VK_SUCCESS)
     {
         KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR, "Unable to read physical device properties.")
@@ -882,7 +884,7 @@ kan_bool_t kan_render_backend_system_select_device (kan_context_system_t render_
     }
 
     kan_bool_t swap_chain_found = KAN_FALSE;
-    for (uint32_t index = 0u; index < properties_count; ++index)
+    for (vulkan_size_t index = 0u; index < properties_count; ++index)
     {
         if (strcmp (properties[index].extensionName, VK_KHR_SWAPCHAIN_EXTENSION_NAME) == 0)
         {
@@ -899,7 +901,7 @@ kan_bool_t kan_render_backend_system_select_device (kan_context_system_t render_
         return KAN_FALSE;
     }
 
-    uint32_t queues_count;
+    kan_instance_size_t queues_count;
     vkGetPhysicalDeviceQueueFamilyProperties (physical_device, &queues_count, NULL);
     VkQueueFamilyProperties *queues =
         kan_allocate_general (system->utility_allocation_group, sizeof (VkQueueFamilyProperties) * queues_count,
@@ -907,9 +909,9 @@ kan_bool_t kan_render_backend_system_select_device (kan_context_system_t render_
     vkGetPhysicalDeviceQueueFamilyProperties (physical_device, &queues_count, queues);
 
     system->device_queue_family_index = UINT32_MAX;
-    for (uint32_t index = 0u; index < queues_count; ++index)
+    for (vulkan_size_t index = 0u; index < queues_count; ++index)
     {
-        const uint32_t mask = VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_TRANSFER_BIT;
+        const vulkan_size_t mask = VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_TRANSFER_BIT;
         if (mask == (queues[index].queueFlags & mask))
         {
             system->device_queue_family_index = index;
@@ -975,7 +977,7 @@ kan_bool_t kan_render_backend_system_select_device (kan_context_system_t render_
             .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
             .pNext = NULL,
             .objectType = VK_OBJECT_TYPE_INSTANCE,
-            .objectHandle = (uint64_t) system->instance,
+            .objectHandle = CONVERT_HANDLE_FOR_DEBUG (kan_memory_size_t) system->instance,
             .pObjectName = "RenderContextInstance",
         };
 
@@ -986,7 +988,7 @@ kan_bool_t kan_render_backend_system_select_device (kan_context_system_t render_
             .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
             .pNext = NULL,
             .objectType = VK_OBJECT_TYPE_DEVICE,
-            .objectHandle = (uint64_t) system->device,
+            .objectHandle = CONVERT_HANDLE_FOR_DEBUG (kan_memory_size_t) system->device,
             .pObjectName = "LogicalDevice",
         };
 
@@ -1006,7 +1008,7 @@ kan_bool_t kan_render_backend_system_select_device (kan_context_system_t render_
             .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
             .pNext = NULL,
             .objectType = VK_OBJECT_TYPE_QUEUE,
-            .objectHandle = (uint64_t) system->device_queue,
+            .objectHandle = CONVERT_HANDLE_FOR_DEBUG (kan_memory_size_t) system->device_queue,
             .pObjectName = "Queue::merged_queue",
         };
 
@@ -1077,14 +1079,14 @@ kan_bool_t kan_render_backend_system_select_device (kan_context_system_t render_
         .flags = VK_FENCE_CREATE_SIGNALED_BIT,
     };
 
-    for (uint64_t index = 0u; index < KAN_CONTEXT_RENDER_BACKEND_VULKAN_FRAMES_IN_FLIGHT; ++index)
+    for (kan_loop_size_t index = 0u; index < KAN_CONTEXT_RENDER_BACKEND_VULKAN_FRAMES_IN_FLIGHT; ++index)
     {
         system->render_finished_semaphores[index] = VK_NULL_HANDLE;
         system->in_flight_fences[index] = VK_NULL_HANDLE;
     }
 
     kan_bool_t synchronization_objects_created = KAN_TRUE;
-    for (uint64_t index = 0u; index < KAN_CONTEXT_RENDER_BACKEND_VULKAN_FRAMES_IN_FLIGHT; ++index)
+    for (kan_loop_size_t index = 0u; index < KAN_CONTEXT_RENDER_BACKEND_VULKAN_FRAMES_IN_FLIGHT; ++index)
     {
         if (vkCreateSemaphore (system->device, &semaphore_creation_info, VULKAN_ALLOCATION_CALLBACKS (system),
                                &system->render_finished_semaphores[index]) != VK_SUCCESS)
@@ -1104,7 +1106,7 @@ kan_bool_t kan_render_backend_system_select_device (kan_context_system_t render_
                 .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
                 .pNext = NULL,
                 .objectType = VK_OBJECT_TYPE_SEMAPHORE,
-                .objectHandle = (uint64_t) system->render_finished_semaphores[index],
+                .objectHandle = CONVERT_HANDLE_FOR_DEBUG system->render_finished_semaphores[index],
                 .pObjectName = debug_name,
             };
 
@@ -1130,7 +1132,7 @@ kan_bool_t kan_render_backend_system_select_device (kan_context_system_t render_
                 .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
                 .pNext = NULL,
                 .objectType = VK_OBJECT_TYPE_FENCE,
-                .objectHandle = (uint64_t) system->in_flight_fences[index],
+                .objectHandle = CONVERT_HANDLE_FOR_DEBUG system->in_flight_fences[index],
                 .pObjectName = debug_name,
             };
 
@@ -1151,13 +1153,13 @@ kan_bool_t kan_render_backend_system_select_device (kan_context_system_t render_
         return KAN_FALSE;
     }
 
-    for (uint64_t index = 0u; index < KAN_CONTEXT_RENDER_BACKEND_VULKAN_FRAMES_IN_FLIGHT; ++index)
+    for (kan_loop_size_t index = 0u; index < KAN_CONTEXT_RENDER_BACKEND_VULKAN_FRAMES_IN_FLIGHT; ++index)
     {
         system->command_states[index].command_pool = VK_NULL_HANDLE;
     }
 
     kan_bool_t command_states_created = KAN_TRUE;
-    for (uint64_t index = 0u; index < KAN_CONTEXT_RENDER_BACKEND_VULKAN_FRAMES_IN_FLIGHT; ++index)
+    for (kan_loop_size_t index = 0u; index < KAN_CONTEXT_RENDER_BACKEND_VULKAN_FRAMES_IN_FLIGHT; ++index)
     {
         VkCommandPoolCreateInfo graphics_command_pool_info = {
             .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
@@ -1184,7 +1186,7 @@ kan_bool_t kan_render_backend_system_select_device (kan_context_system_t render_
                 .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
                 .pNext = NULL,
                 .objectType = VK_OBJECT_TYPE_COMMAND_POOL,
-                .objectHandle = (uint64_t) system->command_states[index].command_pool,
+                .objectHandle = CONVERT_HANDLE_FOR_DEBUG system->command_states[index].command_pool,
                 .pObjectName = debug_name,
             };
 
@@ -1254,14 +1256,14 @@ kan_bool_t kan_render_backend_system_select_device (kan_context_system_t render_
         .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
         .pNext = NULL,
         .objectType = VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT,
-        .objectHandle = (uint64_t) system->empty_descriptor_set_layout,
+        .objectHandle = CONVERT_HANDLE_FOR_DEBUG system->empty_descriptor_set_layout,
         .pObjectName = "DescriptorSetLayout::empty",
     };
 
     vkSetDebugUtilsObjectNameEXT (system->device, &object_name);
 #endif
 
-    for (uint64_t index = 0u; index < KAN_CONTEXT_RENDER_BACKEND_VULKAN_FRAMES_IN_FLIGHT; ++index)
+    for (kan_loop_size_t index = 0u; index < KAN_CONTEXT_RENDER_BACKEND_VULKAN_FRAMES_IN_FLIGHT; ++index)
     {
         struct render_backend_schedule_state_t *state = &system->schedule_states[index];
         kan_stack_group_allocator_init (&state->item_allocator, system->schedule_allocation_group,
@@ -1358,7 +1360,7 @@ static void render_backend_system_submit_transfer (struct render_backend_system_
                          buffer_unmap_flush_transfer->target_buffer->buffer, 1u, &region);
 
         VkAccessFlags destination_access_flags = 0u;
-        VkPipelineStageFlags destination_stage;
+        VkPipelineStageFlags destination_stage = 0u;
 
         switch (buffer_unmap_flush_transfer->target_buffer->type)
         {
@@ -1437,9 +1439,9 @@ static void render_backend_system_submit_transfer (struct render_backend_system_
     {
         VkImageAspectFlags image_aspect = get_image_aspects (&image_upload->image->description);
 
-        uint32_t width;
-        uint32_t height;
-        uint32_t depth;
+        vulkan_size_t width;
+        vulkan_size_t height;
+        vulkan_size_t depth;
         kan_render_image_description_calculate_size_at_mip (&image_upload->image->description, image_upload->mip,
                                                             &width, &height, &depth);
 
@@ -1456,7 +1458,7 @@ static void render_backend_system_submit_transfer (struct render_backend_system_
             .subresourceRange =
                 {
                     .aspectMask = image_aspect,
-                    .baseMipLevel = (uint32_t) image_upload->mip,
+                    .baseMipLevel = (vulkan_size_t) image_upload->mip,
                     .levelCount = 1u,
                     .baseArrayLayer = 0u,
                     .layerCount = 1u,
@@ -1468,13 +1470,13 @@ static void render_backend_system_submit_transfer (struct render_backend_system_
         image_upload->image->last_command_layout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
 
         VkBufferImageCopy copy_region = {
-            .bufferOffset = (uint32_t) image_upload->staging_buffer_offset,
+            .bufferOffset = (vulkan_size_t) image_upload->staging_buffer_offset,
             .bufferRowLength = 0u,
             .bufferImageHeight = 0u,
             .imageSubresource =
                 {
                     .aspectMask = image_aspect,
-                    .mipLevel = (uint32_t) image_upload->mip,
+                    .mipLevel = (vulkan_size_t) image_upload->mip,
                     .baseArrayLayer = 0u,
                     .layerCount = 1u,
                 },
@@ -1486,9 +1488,9 @@ static void render_backend_system_submit_transfer (struct render_backend_system_
                 },
             .imageExtent =
                 {
-                    .width = (uint32_t) width,
-                    .height = (uint32_t) height,
-                    .depth = (uint32_t) depth,
+                    .width = (vulkan_size_t) width,
+                    .height = (vulkan_size_t) height,
+                    .depth = (vulkan_size_t) depth,
                 },
         };
 
@@ -1508,7 +1510,7 @@ static void render_backend_system_submit_transfer (struct render_backend_system_
             .subresourceRange =
                 {
                     .aspectMask = image_aspect,
-                    .baseMipLevel = (uint32_t) image_upload->mip,
+                    .baseMipLevel = (vulkan_size_t) image_upload->mip,
                     .levelCount = 1u,
                     .baseArrayLayer = 0u,
                     .layerCount = 1u,
@@ -1543,15 +1545,15 @@ static inline void submit_mip_generation (struct render_backend_system_t *system
              ++output_mip)
         {
             const uint8_t input_mip = output_mip - 1u;
-            uint32_t input_width;
-            uint32_t input_height;
-            uint32_t input_depth;
+            vulkan_size_t input_width;
+            vulkan_size_t input_height;
+            vulkan_size_t input_depth;
             kan_render_image_description_calculate_size_at_mip (&image_mip_generation->image->description, input_mip,
                                                                 &input_width, &input_height, &input_depth);
 
-            uint32_t output_width;
-            uint32_t output_height;
-            uint32_t output_depth;
+            vulkan_size_t output_width;
+            vulkan_size_t output_height;
+            vulkan_size_t output_depth;
             kan_render_image_description_calculate_size_at_mip (&image_mip_generation->image->description, output_mip,
                                                                 &output_width, &output_height, &output_depth);
 
@@ -1569,7 +1571,7 @@ static inline void submit_mip_generation (struct render_backend_system_t *system
                 .subresourceRange =
                     {
                         .aspectMask = image_aspect,
-                        .baseMipLevel = (uint32_t) input_mip,
+                        .baseMipLevel = (vulkan_size_t) input_mip,
                         .levelCount = 1u,
                         .baseArrayLayer = 0u,
                         .layerCount = 1u,
@@ -1593,7 +1595,7 @@ static inline void submit_mip_generation (struct render_backend_system_t *system
                 .subresourceRange =
                     {
                         .aspectMask = image_aspect,
-                        .baseMipLevel = (uint32_t) output_mip,
+                        .baseMipLevel = (vulkan_size_t) output_mip,
                         .levelCount = 1u,
                         .baseArrayLayer = 0u,
                         .layerCount = 1u,
@@ -1608,7 +1610,7 @@ static inline void submit_mip_generation (struct render_backend_system_t *system
                 .srcSubresource =
                     {
                         .aspectMask = image_aspect,
-                        .mipLevel = (uint32_t) input_mip,
+                        .mipLevel = (vulkan_size_t) input_mip,
                         .baseArrayLayer = 0u,
                         .layerCount = 1u,
                     },
@@ -1620,15 +1622,15 @@ static inline void submit_mip_generation (struct render_backend_system_t *system
                             .z = 0,
                         },
                         {
-                            .x = (int32_t) input_width,
-                            .y = (int32_t) input_height,
-                            .z = (int32_t) input_depth,
+                            .x = (vulkan_offset_t) input_width,
+                            .y = (vulkan_offset_t) input_height,
+                            .z = (vulkan_offset_t) input_depth,
                         },
                     },
                 .dstSubresource =
                     {
                         .aspectMask = image_aspect,
-                        .mipLevel = (uint32_t) output_mip,
+                        .mipLevel = (vulkan_size_t) output_mip,
                         .baseArrayLayer = 0u,
                         .layerCount = 1u,
                     },
@@ -1640,9 +1642,9 @@ static inline void submit_mip_generation (struct render_backend_system_t *system
                             .z = 0,
                         },
                         {
-                            .x = (int32_t) output_width,
-                            .y = (int32_t) output_height,
-                            .z = (int32_t) output_depth,
+                            .x = (vulkan_offset_t) output_width,
+                            .y = (vulkan_offset_t) output_height,
+                            .z = (vulkan_offset_t) output_depth,
                         },
                     },
             };
@@ -1664,7 +1666,7 @@ static inline void submit_mip_generation (struct render_backend_system_t *system
                 .subresourceRange =
                     {
                         .aspectMask = image_aspect,
-                        .baseMipLevel = (uint32_t) input_mip,
+                        .baseMipLevel = (vulkan_size_t) input_mip,
                         .levelCount = 1u,
                         .baseArrayLayer = 0u,
                         .layerCount = 1u,
@@ -1689,7 +1691,7 @@ static inline void submit_mip_generation (struct render_backend_system_t *system
             .subresourceRange =
                 {
                     .aspectMask = image_aspect,
-                    .baseMipLevel = (uint32_t) image_mip_generation->last,
+                    .baseMipLevel = (vulkan_size_t) image_mip_generation->last,
                     .levelCount = 1u,
                     .baseArrayLayer = 0u,
                     .layerCount = 1u,
@@ -1727,12 +1729,13 @@ static inline void process_frame_buffer_create_requests (struct render_backend_s
         }
 
         kan_bool_t can_be_created = KAN_TRUE;
-        uint64_t instance_count = 1u;
-        uint32_t width = 0u;
-        uint32_t height = 0u;
-        uint64_t surface_index = UINT64_MAX;
+        kan_instance_size_t instance_count = 1u;
+        kan_render_size_t width = 0u;
+        kan_render_size_t height = 0u;
+        kan_instance_size_t surface_index = KAN_INT_MAX (kan_instance_size_t);
 
-        for (uint64_t attachment_index = 0u; attachment_index < frame_buffer->attachments_count; ++attachment_index)
+        for (kan_loop_size_t attachment_index = 0u; attachment_index < frame_buffer->attachments_count;
+             ++attachment_index)
         {
             if (frame_buffer->attachments[attachment_index].type == KAN_FRAME_BUFFER_ATTACHMENT_SURFACE)
             {
@@ -1744,7 +1747,7 @@ static inline void process_frame_buffer_create_requests (struct render_backend_s
                              frame_buffer->tracking_name)
                 }
 
-                if (surface_index == UINT64_MAX)
+                if (surface_index == KAN_INT_MAX (kan_instance_size_t))
                 {
                     instance_count = frame_buffer->attachments[attachment_index].surface->images_count;
                     surface_index = attachment_index;
@@ -1766,21 +1769,22 @@ static inline void process_frame_buffer_create_requests (struct render_backend_s
                 }
             }
 
-            uint32_t attachment_width;
-            uint32_t attachment_height;
+            vulkan_size_t attachment_width = 0u;
+            vulkan_size_t attachment_height = 0u;
 
             switch (frame_buffer->attachments[attachment_index].type)
             {
             case KAN_FRAME_BUFFER_ATTACHMENT_IMAGE:
-                attachment_width = (uint32_t) frame_buffer->attachments[attachment_index].image->description.width;
-                attachment_height = (uint32_t) frame_buffer->attachments[attachment_index].image->description.height;
+                attachment_width = (vulkan_size_t) frame_buffer->attachments[attachment_index].image->description.width;
+                attachment_height =
+                    (vulkan_size_t) frame_buffer->attachments[attachment_index].image->description.height;
                 break;
 
             case KAN_FRAME_BUFFER_ATTACHMENT_SURFACE:
-                attachment_width =
-                    (uint32_t) frame_buffer->attachments[attachment_index].surface->swap_chain_creation_window_width;
-                attachment_height =
-                    (uint32_t) frame_buffer->attachments[attachment_index].surface->swap_chain_creation_window_height;
+                attachment_width = (vulkan_size_t) frame_buffer->attachments[attachment_index]
+                                       .surface->swap_chain_creation_window_width;
+                attachment_height = (vulkan_size_t) frame_buffer->attachments[attachment_index]
+                                        .surface->swap_chain_creation_window_height;
                 break;
             }
 
@@ -1819,7 +1823,8 @@ static inline void process_frame_buffer_create_requests (struct render_backend_s
             kan_allocate_general (system->frame_buffer_wrapper_allocation_group,
                                   sizeof (VkImageView) * frame_buffer->attachments_count, _Alignof (VkImageView));
 
-        for (uint64_t attachment_index = 0u; attachment_index < frame_buffer->attachments_count; ++attachment_index)
+        for (kan_loop_size_t attachment_index = 0u; attachment_index < frame_buffer->attachments_count;
+             ++attachment_index)
         {
             switch (frame_buffer->attachments[attachment_index].type)
             {
@@ -1872,7 +1877,7 @@ static inline void process_frame_buffer_create_requests (struct render_backend_s
                         .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
                         .pNext = NULL,
                         .objectType = VK_OBJECT_TYPE_IMAGE_VIEW,
-                        .objectHandle = (uint64_t) frame_buffer->image_views[attachment_index],
+                        .objectHandle = CONVERT_HANDLE_FOR_DEBUG frame_buffer->image_views[attachment_index],
                         .pObjectName = debug_name,
                     };
 
@@ -1897,9 +1902,9 @@ static inline void process_frame_buffer_create_requests (struct render_backend_s
         }
 
         kan_bool_t created = KAN_TRUE;
-        for (uint64_t instance_index = 0u; instance_index < instance_count; ++instance_index)
+        for (kan_loop_size_t instance_index = 0u; instance_index < instance_count; ++instance_index)
         {
-            if (surface_index != UINT64_MAX)
+            if (surface_index != KAN_INT_MAX (kan_instance_size_t))
             {
                 frame_buffer->image_views[surface_index] =
                     frame_buffer->attachments[surface_index].surface->image_views[instance_index];
@@ -1910,7 +1915,7 @@ static inline void process_frame_buffer_create_requests (struct render_backend_s
                 .pNext = NULL,
                 .flags = 0u,
                 .renderPass = frame_buffer->pass->pass,
-                .attachmentCount = (uint32_t) frame_buffer->attachments_count,
+                .attachmentCount = (vulkan_size_t) frame_buffer->attachments_count,
                 .pAttachments = frame_buffer->image_views,
                 .width = width,
                 .height = height,
@@ -1942,7 +1947,7 @@ static inline void process_frame_buffer_create_requests (struct render_backend_s
                     .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
                     .pNext = NULL,
                     .objectType = VK_OBJECT_TYPE_FRAMEBUFFER,
-                    .objectHandle = (uint64_t) *output,
+                    .objectHandle = CONVERT_HANDLE_FOR_DEBUG * output,
                     .pObjectName = debug_name,
                 };
 
@@ -1951,7 +1956,7 @@ static inline void process_frame_buffer_create_requests (struct render_backend_s
 #endif
         }
 
-        if (surface_index != UINT64_MAX)
+        if (surface_index != KAN_INT_MAX (kan_instance_size_t))
         {
             frame_buffer->image_views[surface_index] = VK_NULL_HANDLE;
         }
@@ -2081,13 +2086,13 @@ static inline void process_surface_blit_requests (struct render_backend_system_t
                 .srcOffsets =
                     {
                         {
-                            .x = (int32_t) request->image_region.x,
-                            .y = (int32_t) request->image_region.y,
+                            .x = (vulkan_offset_t) request->image_region.x,
+                            .y = (vulkan_offset_t) request->image_region.y,
                             .z = 0,
                         },
                         {
-                            .x = (int32_t) request->image_region.width,
-                            .y = (int32_t) request->image_region.height,
+                            .x = (vulkan_offset_t) request->image_region.width,
+                            .y = (vulkan_offset_t) request->image_region.height,
                             .z = 1u,
                         },
                     },
@@ -2101,13 +2106,13 @@ static inline void process_surface_blit_requests (struct render_backend_system_t
                 .dstOffsets =
                     {
                         {
-                            .x = (int32_t) request->surface_region.x,
-                            .y = (int32_t) request->surface_region.y,
+                            .x = (vulkan_offset_t) request->surface_region.x,
+                            .y = (vulkan_offset_t) request->surface_region.y,
                             .z = 0,
                         },
                         {
-                            .x = (int32_t) request->surface_region.width,
-                            .y = (int32_t) request->surface_region.height,
+                            .x = (vulkan_offset_t) request->surface_region.width,
+                            .y = (vulkan_offset_t) request->surface_region.height,
                             .z = 1u,
                         },
                     },
@@ -2180,7 +2185,7 @@ static inline void execute_pass_instance_submission (struct render_backend_syste
 
     VkImageMemoryBarrier image_barriers_static[KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_INLINE_BARRIERS];
     VkImageMemoryBarrier *image_barriers = image_barriers_static;
-    uint32_t added_barriers = 0u;
+    vulkan_size_t added_barriers = 0u;
 
     if (pass_instance->frame_buffer->attachments_count > KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_INLINE_BARRIERS)
     {
@@ -2190,7 +2195,7 @@ static inline void execute_pass_instance_submission (struct render_backend_syste
                                   _Alignof (VkImageMemoryBarrier));
     }
 
-    for (uint64_t attachment_index = 0u; attachment_index < pass_instance->frame_buffer->attachments_count;
+    for (kan_loop_size_t attachment_index = 0u; attachment_index < pass_instance->frame_buffer->attachments_count;
          ++attachment_index)
     {
         struct render_backend_frame_buffer_attachment_t *attachment =
@@ -2200,7 +2205,7 @@ static inline void execute_pass_instance_submission (struct render_backend_syste
         {
         case KAN_FRAME_BUFFER_ATTACHMENT_IMAGE:
         {
-            VkImageLayout target_layout;
+            VkImageLayout target_layout = VK_IMAGE_LAYOUT_UNDEFINED;
             // Currently we include everything possible into possible access flags, which is not optimal.
             VkAccessFlags possible_access_flags = 0u;
             VkAccessFlags target_access_flags = 0u;
@@ -2322,7 +2327,7 @@ static inline void execute_pass_instance_submission (struct render_backend_syste
     // Transition readable render targets so they can be used in shaders for sampling.
     added_barriers = 0u;
 
-    for (uint64_t attachment_index = 0u; attachment_index < pass_instance->frame_buffer->attachments_count;
+    for (kan_loop_size_t attachment_index = 0u; attachment_index < pass_instance->frame_buffer->attachments_count;
          ++attachment_index)
     {
         struct render_backend_frame_buffer_attachment_t *attachment =
@@ -2583,8 +2588,8 @@ static void render_backend_system_submit_read_back (struct render_backend_system
     schedule->first_scheduled_buffer_read_back = NULL;
     schedule->first_scheduled_image_read_back = NULL;
 
-    uint64_t image_barriers_needed = 0u;
-    uint64_t buffer_barriers_needed = 0u;
+    kan_instance_size_t image_barriers_needed = 0u;
+    kan_instance_size_t buffer_barriers_needed = 0u;
 
     struct scheduled_surface_read_back_t *surface_read_back = first_surface_read_back;
     while (surface_read_back)
@@ -2784,8 +2789,9 @@ static void render_backend_system_submit_read_back (struct render_backend_system
     }
 
     vkCmdPipelineBarrier (state->primary_command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-                          VK_PIPELINE_STAGE_TRANSFER_BIT, 0u, 0u, NULL, buffer_barrier_output - buffer_barriers,
-                          buffer_barriers, image_barrier_output - image_barriers, image_barriers);
+                          VK_PIPELINE_STAGE_TRANSFER_BIT, 0u, 0u, NULL,
+                          (vulkan_size_t) (buffer_barrier_output - buffer_barriers), buffer_barriers,
+                          (vulkan_size_t) (image_barrier_output - image_barriers), image_barriers);
 
     // Execute read back.
 
@@ -2851,9 +2857,9 @@ static void render_backend_system_submit_read_back (struct render_backend_system
     {
         if (image_read_back->status->state == KAN_RENDER_READ_BACK_STATE_SCHEDULED)
         {
-            uint32_t width;
-            uint32_t height;
-            uint32_t depth;
+            vulkan_size_t width;
+            vulkan_size_t height;
+            vulkan_size_t depth;
             kan_render_image_description_calculate_size_at_mip (&image_read_back->image->description,
                                                                 image_read_back->mip, &width, &height, &depth);
 
@@ -2931,7 +2937,7 @@ static void render_backend_system_submit_read_back (struct render_backend_system
     {
         vkCmdPipelineBarrier (state->primary_command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT,
                               VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0u, 0u, NULL, 0u, NULL,
-                              image_barrier_output - image_barriers, image_barriers);
+                              (vulkan_size_t) (image_barrier_output - image_barriers), image_barriers);
     }
 
     if (buffer_barriers != static_buffer_barriers)
@@ -2991,7 +2997,7 @@ static void render_backend_system_finish_command_submission (struct render_backe
         kan_critical_error ("Failed to end recording primary buffer.", __FILE__, __LINE__);
     }
 
-    uint32_t semaphores_to_wait = 0u;
+    vulkan_size_t semaphores_to_wait = 0u;
     static VkSemaphore static_wait_semaphores[KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_INLINE_HANDLES];
     static VkPipelineStageFlags static_semaphore_stages[KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_INLINE_HANDLES];
 
@@ -3086,11 +3092,11 @@ static void render_backend_system_finish_command_submission (struct render_backe
 static void render_backend_system_submit_present (struct render_backend_system_t *system)
 {
     static VkSwapchainKHR static_swap_chains[KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_INLINE_HANDLES];
-    static uint32_t static_image_indices[KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_INLINE_HANDLES];
+    static vulkan_size_t static_image_indices[KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_INLINE_HANDLES];
 
-    uint32_t swap_chains_count = 0u;
+    vulkan_size_t swap_chains_count = 0u;
     VkSwapchainKHR *swap_chains = static_swap_chains;
-    uint32_t *image_indices = static_image_indices;
+    vulkan_size_t *image_indices = static_image_indices;
     struct render_backend_surface_t *surface = (struct render_backend_surface_t *) system->surfaces.first;
 
     while (surface)
@@ -3114,8 +3120,8 @@ static void render_backend_system_submit_present (struct render_backend_system_t
         // Too many surfaces to capture everything to static array, allocate new one.
         swap_chains = kan_allocate_general (system->utility_allocation_group, sizeof (VkSemaphore) * swap_chains_count,
                                             _Alignof (VkSwapchainKHR));
-        image_indices = kan_allocate_general (system->utility_allocation_group, sizeof (uint32_t) * swap_chains_count,
-                                              _Alignof (uint32_t));
+        image_indices = kan_allocate_general (system->utility_allocation_group,
+                                              sizeof (vulkan_size_t) * swap_chains_count, _Alignof (vulkan_size_t));
         swap_chains_count = 0u;
         surface = (struct render_backend_surface_t *) system->surfaces.first;
 
@@ -3223,7 +3229,7 @@ static void render_backend_system_submit_previous_frame (struct render_backend_s
         &system->command_states[system->current_frame_in_flight_index];
 
     KAN_ASSERT (command_state->secondary_command_buffers_used <= command_state->secondary_command_buffers.size)
-    const uint64_t excess_command_buffers =
+    const kan_instance_size_t excess_command_buffers =
         command_state->secondary_command_buffers.size - command_state->secondary_command_buffers_used;
 
     if (excess_command_buffers > 0u)
@@ -3232,7 +3238,7 @@ static void render_backend_system_submit_previous_frame (struct render_backend_s
             &((VkCommandBuffer *)
                   command_state->secondary_command_buffers.data)[command_state->secondary_command_buffers_used];
 
-        vkFreeCommandBuffers (system->device, command_state->command_pool, (uint32_t) excess_command_buffers,
+        vkFreeCommandBuffers (system->device, command_state->command_pool, (vulkan_size_t) excess_command_buffers,
                               first_excess_buffer);
 
         command_state->secondary_command_buffers.size = command_state->secondary_command_buffers_used;
@@ -3252,7 +3258,7 @@ static void render_backend_system_submit_previous_frame (struct render_backend_s
 
 static void render_backend_surface_destroy_swap_chain_image_views (struct render_backend_surface_t *surface)
 {
-    for (uint32_t view_index = 0u; view_index < surface->images_count; ++view_index)
+    for (vulkan_size_t view_index = 0u; view_index < surface->images_count; ++view_index)
     {
         if (surface->image_views[view_index] != VK_NULL_HANDLE)
         {
@@ -3300,13 +3306,13 @@ static kan_bool_t render_backend_surface_create_swap_chain_image_views (struct r
     surface->image_views = kan_allocate_general (surface->system->surface_wrapper_allocation_group,
                                                  sizeof (VkImageView) * surface->images_count, _Alignof (VkImageView));
 
-    for (uint32_t view_index = 0u; view_index < surface->images_count; ++view_index)
+    for (vulkan_size_t view_index = 0u; view_index < surface->images_count; ++view_index)
     {
         surface->image_views[view_index] = VK_NULL_HANDLE;
     }
 
     kan_bool_t views_created_successfully = KAN_TRUE;
-    for (uint32_t view_index = 0u; view_index < surface->images_count; ++view_index)
+    for (vulkan_size_t view_index = 0u; view_index < surface->images_count; ++view_index)
     {
 #if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED)
         {
@@ -3318,7 +3324,7 @@ static kan_bool_t render_backend_surface_create_swap_chain_image_views (struct r
                 .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
                 .pNext = NULL,
                 .objectType = VK_OBJECT_TYPE_IMAGE,
-                .objectHandle = (uint64_t) surface->images[view_index],
+                .objectHandle = CONVERT_HANDLE_FOR_DEBUG surface->images[view_index],
                 .pObjectName = debug_name,
             };
 
@@ -3371,7 +3377,7 @@ static kan_bool_t render_backend_surface_create_swap_chain_image_views (struct r
             .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
             .pNext = NULL,
             .objectType = VK_OBJECT_TYPE_IMAGE_VIEW,
-            .objectHandle = (uint64_t) surface->image_views[view_index],
+            .objectHandle = CONVERT_HANDLE_FOR_DEBUG surface->image_views[view_index],
             .pObjectName = debug_name,
         };
 
@@ -3389,7 +3395,7 @@ static kan_bool_t render_backend_surface_create_swap_chain_image_views (struct r
 
 static void render_backend_surface_destroy_semaphores (struct render_backend_surface_t *surface)
 {
-    for (uint64_t index = 0u; index < KAN_CONTEXT_RENDER_BACKEND_VULKAN_FRAMES_IN_FLIGHT; ++index)
+    for (kan_loop_size_t index = 0u; index < KAN_CONTEXT_RENDER_BACKEND_VULKAN_FRAMES_IN_FLIGHT; ++index)
     {
         if (surface->image_available_semaphores[index] != VK_NULL_HANDLE)
         {
@@ -3402,7 +3408,7 @@ static void render_backend_surface_destroy_semaphores (struct render_backend_sur
 
 static kan_bool_t render_backend_surface_create_semaphores (struct render_backend_surface_t *surface)
 {
-    for (uint64_t index = 0u; index < KAN_CONTEXT_RENDER_BACKEND_VULKAN_FRAMES_IN_FLIGHT; ++index)
+    for (kan_loop_size_t index = 0u; index < KAN_CONTEXT_RENDER_BACKEND_VULKAN_FRAMES_IN_FLIGHT; ++index)
     {
         surface->image_available_semaphores[index] = VK_NULL_HANDLE;
     }
@@ -3414,7 +3420,7 @@ static kan_bool_t render_backend_surface_create_semaphores (struct render_backen
         .flags = 0u,
     };
 
-    for (uint64_t index = 0u; index < KAN_CONTEXT_RENDER_BACKEND_VULKAN_FRAMES_IN_FLIGHT; ++index)
+    for (kan_loop_size_t index = 0u; index < KAN_CONTEXT_RENDER_BACKEND_VULKAN_FRAMES_IN_FLIGHT; ++index)
     {
         if (vkCreateSemaphore (surface->system->device, &semaphore_creation_info,
                                VULKAN_ALLOCATION_CALLBACKS (surface->system),
@@ -3438,7 +3444,7 @@ static kan_bool_t render_backend_surface_create_semaphores (struct render_backen
             .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
             .pNext = NULL,
             .objectType = VK_OBJECT_TYPE_SEMAPHORE,
-            .objectHandle = (uint64_t) surface->image_available_semaphores[index],
+            .objectHandle = CONVERT_HANDLE_FOR_DEBUG surface->image_available_semaphores[index],
             .pObjectName = debug_name,
         };
 
@@ -3485,7 +3491,7 @@ static void render_backend_surface_create_swap_chain (struct render_backend_surf
         return;
     }
 
-    uint32_t formats_count;
+    kan_instance_size_t formats_count;
     if (vkGetPhysicalDeviceSurfaceFormatsKHR (surface->system->physical_device, surface->surface, &formats_count,
                                               NULL) != VK_SUCCESS)
     {
@@ -3530,7 +3536,7 @@ static void render_backend_surface_create_swap_chain (struct render_backend_surf
         .colorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR,
     };
 
-    for (uint32_t index = 0u; index < formats_count; ++index)
+    for (vulkan_size_t index = 0u; index < formats_count; ++index)
     {
         if (formats[index].format == surface_format.format && formats[index].colorSpace == surface_format.colorSpace)
         {
@@ -3549,7 +3555,7 @@ static void render_backend_surface_create_swap_chain (struct render_backend_surf
         return;
     }
 
-    uint32_t present_modes_count;
+    kan_instance_size_t present_modes_count;
     if (vkGetPhysicalDeviceSurfacePresentModesKHR (surface->system->physical_device, surface->surface,
                                                    &present_modes_count, NULL) != VK_SUCCESS)
     {
@@ -3587,9 +3593,9 @@ static void render_backend_surface_create_swap_chain (struct render_backend_surf
     }
 
     kan_bool_t present_mode_found = KAN_FALSE;
-    VkPresentModeKHR surface_present_mode;
+    VkPresentModeKHR surface_present_mode = VK_PRESENT_MODE_IMMEDIATE_KHR;
 
-    for (uint32_t index = 0u; index < present_modes_count; ++index)
+    for (vulkan_size_t index = 0u; index < present_modes_count; ++index)
     {
         if ((surface->system->prefer_vsync && present_modes[index] == VK_PRESENT_MODE_FIFO_KHR) ||
             present_modes[index] == VK_PRESENT_MODE_IMMEDIATE_KHR)
@@ -3692,15 +3698,15 @@ static void render_backend_surface_create_swap_chain (struct render_backend_surf
         .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
         .pNext = NULL,
         .objectType = VK_OBJECT_TYPE_SWAPCHAIN_KHR,
-        .objectHandle = (uint64_t) surface->swap_chain,
+        .objectHandle = CONVERT_HANDLE_FOR_DEBUG surface->swap_chain,
         .pObjectName = debug_name,
     };
 
     vkSetDebugUtilsObjectNameEXT (surface->system->device, &object_name);
 #endif
 
-    surface->swap_chain_creation_window_width = (uint32_t) surface_extent.width;
-    surface->swap_chain_creation_window_height = (uint32_t) surface_extent.height;
+    surface->swap_chain_creation_window_width = (vulkan_size_t) surface_extent.width;
+    surface->swap_chain_creation_window_height = (vulkan_size_t) surface_extent.height;
 
     if (!render_backend_surface_create_swap_chain_image_views (surface, surface_format))
     {
@@ -4104,7 +4110,7 @@ kan_bool_t kan_render_backend_system_next_frame (kan_context_system_t render_bac
         VkMemoryRequirements requirements;
         vkGetImageMemoryRequirements (system->device, detached_image_destroy->detached_image, &requirements);
 
-        transfer_memory_between_groups (requirements.size, detached_image_destroy->gpu_allocation_group,
+        transfer_memory_between_groups ((vulkan_size_t) requirements.size, detached_image_destroy->gpu_allocation_group,
                                         system->memory_profiling.gpu_unmarked_group);
 #endif
 
@@ -4158,7 +4164,7 @@ static void render_backend_surface_init_with_window (void *user_data,
     kan_cpu_section_execution_init (&execution, surface->system->section_surface_init_with_window);
 
     surface->surface = (VkSurfaceKHR) kan_platform_application_window_create_vulkan_surface (
-        window_info->id, (uint64_t) surface->system->instance, VULKAN_ALLOCATION_CALLBACKS (surface->system));
+        window_info->id, (kan_memory_size_t) surface->system->instance, VULKAN_ALLOCATION_CALLBACKS (surface->system));
     render_backend_surface_create_swap_chain (surface, window_info);
     kan_cpu_section_execution_shutdown (&execution);
 }
@@ -4175,9 +4181,9 @@ static void render_backend_surface_shutdown_with_window (void *user_data,
     if (surface->surface != VK_NULL_HANDLE)
     {
         render_backend_surface_destroy_swap_chain (surface);
-        kan_platform_application_window_destroy_vulkan_surface (window_info->id, (uint64_t) surface->system->instance,
-                                                                (uint64_t) surface->surface,
-                                                                VULKAN_ALLOCATION_CALLBACKS (surface->system));
+        kan_platform_application_window_destroy_vulkan_surface (
+            window_info->id, (kan_memory_size_t) surface->system->instance, (uint64_t) surface->surface,
+            VULKAN_ALLOCATION_CALLBACKS (surface->system));
         surface->surface = VK_NULL_HANDLE;
     }
 
@@ -4197,7 +4203,7 @@ static void render_backend_surface_shutdown_with_window (void *user_data,
     while (attachment)
     {
         struct surface_frame_buffer_attachment_t *next = attachment->next;
-        for (uint64_t attachment_index = 0u; attachment_index < attachment->frame_buffer->attachments_count;
+        for (kan_loop_size_t attachment_index = 0u; attachment_index < attachment->frame_buffer->attachments_count;
              ++attachment_index)
         {
             if (attachment->frame_buffer->attachments[attachment_index].type == KAN_FRAME_BUFFER_ATTACHMENT_SURFACE &&

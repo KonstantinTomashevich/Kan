@@ -56,20 +56,21 @@ struct render_backend_descriptor_set_allocation_t render_backend_descriptor_set_
     }
 
     allocation.descriptor_set = VK_NULL_HANDLE;
-    uint64_t uniform_buffer_bindings;
-    uint64_t storage_buffer_bindings;
-    uint64_t combined_image_sampler_bindings;
+    kan_instance_size_t uniform_buffer_bindings;
+    kan_instance_size_t storage_buffer_bindings;
+    kan_instance_size_t combined_image_sampler_bindings;
 
     if (allocator->pools.first)
     {
         // Can calculate better count of sets from history.
         const float total_allocations_float = (float) allocator->total_set_allocations;
         uniform_buffer_bindings =
-            (uint64_t) (((float) allocator->uniform_buffer_binding_allocations) / total_allocations_float);
+            (kan_instance_size_t) (((float) allocator->uniform_buffer_binding_allocations) / total_allocations_float);
         storage_buffer_bindings =
-            (uint64_t) (((float) allocator->storage_buffer_binding_allocations) / total_allocations_float);
+            (kan_instance_size_t) (((float) allocator->storage_buffer_binding_allocations) / total_allocations_float);
         combined_image_sampler_bindings =
-            (uint64_t) (((float) allocator->combined_image_binding_sampler_allocations) / total_allocations_float);
+            (kan_instance_size_t) (((float) allocator->combined_image_binding_sampler_allocations) /
+                                   total_allocations_float);
     }
     else
     {
@@ -82,15 +83,15 @@ struct render_backend_descriptor_set_allocation_t render_backend_descriptor_set_
     VkDescriptorPoolSize pool_sizes[] = {
         {
             .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-            .descriptorCount = (uint32_t) uniform_buffer_bindings,
+            .descriptorCount = (vulkan_size_t) uniform_buffer_bindings,
         },
         {
             .type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-            .descriptorCount = (uint32_t) storage_buffer_bindings,
+            .descriptorCount = (vulkan_size_t) storage_buffer_bindings,
         },
         {
             .type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-            .descriptorCount = (uint32_t) combined_image_sampler_bindings,
+            .descriptorCount = (vulkan_size_t) combined_image_sampler_bindings,
         },
     };
 
@@ -122,7 +123,7 @@ struct render_backend_descriptor_set_allocation_t render_backend_descriptor_set_
         .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
         .pNext = NULL,
         .objectType = VK_OBJECT_TYPE_DESCRIPTOR_POOL,
-        .objectHandle = (uint64_t) new_pool,
+        .objectHandle = CONVERT_HANDLE_FOR_DEBUG new_pool,
         .pObjectName = debug_name,
     };
 
@@ -229,8 +230,8 @@ struct render_backend_pipeline_parameter_set_t *render_backend_system_create_pip
     }
     }
 
-    struct render_backend_descriptor_set_allocation_t stable_allocation;
-    struct render_backend_descriptor_set_allocation_t *unstable_allocations;
+    struct render_backend_descriptor_set_allocation_t stable_allocation = {VK_NULL_HANDLE, NULL};
+    struct render_backend_descriptor_set_allocation_t *unstable_allocations = NULL;
 
     if (layout->stable_binding)
     {
@@ -255,7 +256,7 @@ struct render_backend_pipeline_parameter_set_t *render_backend_system_create_pip
             .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
             .pNext = NULL,
             .objectType = VK_OBJECT_TYPE_DESCRIPTOR_SET,
-            .objectHandle = (uint64_t) stable_allocation.descriptor_set,
+            .objectHandle = CONVERT_HANDLE_FOR_DEBUG stable_allocation.descriptor_set,
             .pObjectName = debug_name,
         };
 
@@ -270,12 +271,12 @@ struct render_backend_pipeline_parameter_set_t *render_backend_system_create_pip
                                                      _Alignof (struct render_backend_descriptor_set_allocation_t));
 
         kan_bool_t allocated_successfully = KAN_TRUE;
-        for (uint64_t index = 0u; index < KAN_CONTEXT_RENDER_BACKEND_VULKAN_FRAMES_IN_FLIGHT; ++index)
+        for (kan_loop_size_t index = 0u; index < KAN_CONTEXT_RENDER_BACKEND_VULKAN_FRAMES_IN_FLIGHT; ++index)
         {
             unstable_allocations[index].descriptor_set = VK_NULL_HANDLE;
         }
 
-        for (uint64_t index = 0u; index < KAN_CONTEXT_RENDER_BACKEND_VULKAN_FRAMES_IN_FLIGHT; ++index)
+        for (kan_loop_size_t index = 0u; index < KAN_CONTEXT_RENDER_BACKEND_VULKAN_FRAMES_IN_FLIGHT; ++index)
         {
             unstable_allocations[index] =
                 render_backend_descriptor_set_allocator_allocate (system, &system->descriptor_set_allocator, layout);
@@ -299,7 +300,7 @@ struct render_backend_pipeline_parameter_set_t *render_backend_system_create_pip
                 .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
                 .pNext = NULL,
                 .objectType = VK_OBJECT_TYPE_DESCRIPTOR_SET,
-                .objectHandle = (uint64_t) unstable_allocations[index].descriptor_set,
+                .objectHandle = CONVERT_HANDLE_FOR_DEBUG unstable_allocations[index].descriptor_set,
                 .pObjectName = debug_name,
             };
 
@@ -309,7 +310,7 @@ struct render_backend_pipeline_parameter_set_t *render_backend_system_create_pip
 
         if (!allocated_successfully)
         {
-            for (uint64_t index = 0u; index < KAN_CONTEXT_RENDER_BACKEND_VULKAN_FRAMES_IN_FLIGHT; ++index)
+            for (kan_loop_size_t index = 0u; index < KAN_CONTEXT_RENDER_BACKEND_VULKAN_FRAMES_IN_FLIGHT; ++index)
             {
                 if (unstable_allocations[index].descriptor_set != VK_NULL_HANDLE)
                 {
@@ -359,7 +360,7 @@ struct render_backend_pipeline_parameter_set_t *render_backend_system_create_pip
             kan_allocate_general (system->pipeline_parameter_set_wrapper_allocation_group,
                                   sizeof (VkImageView) * layout->bindings_count, _Alignof (VkImageView));
 
-        for (uint64_t index = 0u; index < layout->bindings_count; ++index)
+        for (kan_loop_size_t index = 0u; index < layout->bindings_count; ++index)
         {
             set->bound_image_views[index] = VK_NULL_HANDLE;
         }
@@ -412,8 +413,8 @@ void render_backend_system_destroy_pipeline_parameter_set (struct render_backend
     }
     else
     {
-        for (uint64_t allocation_index = 0u; allocation_index < KAN_CONTEXT_RENDER_BACKEND_VULKAN_FRAMES_IN_FLIGHT;
-             ++allocation_index)
+        for (kan_loop_size_t allocation_index = 0u;
+             allocation_index < KAN_CONTEXT_RENDER_BACKEND_VULKAN_FRAMES_IN_FLIGHT; ++allocation_index)
         {
             render_backend_descriptor_set_allocator_free (system, &system->descriptor_set_allocator,
                                                           &set->unstable.allocations[allocation_index]);
@@ -435,7 +436,7 @@ void render_backend_system_destroy_pipeline_parameter_set (struct render_backend
 
     if (set->bound_image_views)
     {
-        for (uint64_t index = 0u; index < set->layout->bindings_count; ++index)
+        for (kan_loop_size_t index = 0u; index < set->layout->bindings_count; ++index)
         {
             // When we're destroying parameter set, it is surely already safe to destroy its image views too.
             if (set->bound_image_views[index] != VK_NULL_HANDLE)
@@ -455,7 +456,7 @@ void render_backend_system_destroy_pipeline_parameter_set (struct render_backend
 void render_backend_apply_descriptor_set_mutation (struct render_backend_pipeline_parameter_set_t *set_context,
                                                    VkDescriptorSet source_set,
                                                    VkDescriptorSet target_set,
-                                                   uint64_t update_bindings_count,
+                                                   kan_instance_size_t update_bindings_count,
                                                    struct kan_render_parameter_update_description_t *update_bindings)
 {
     struct kan_cpu_section_execution_t execution;
@@ -470,7 +471,7 @@ void render_backend_apply_descriptor_set_mutation (struct render_backend_pipelin
     const kan_bool_t transfer_needed = source_set != target_set;
     const kan_bool_t update_needed = update_bindings_count > 0u;
 
-    uint64_t transfer_count = 0u;
+    kan_instance_size_t transfer_count = 0u;
     VkCopyDescriptorSet *transfer = NULL;
 
     if (transfer_needed)
@@ -479,12 +480,12 @@ void render_backend_apply_descriptor_set_mutation (struct render_backend_pipelin
                                          sizeof (VkCopyDescriptorSet) * set_context->layout->bindings_count,
                                          _Alignof (VkCopyDescriptorSet));
 
-        for (uint32_t binding = 0u; binding < set_context->layout->bindings_count; ++binding)
+        for (vulkan_size_t binding = 0u; binding < set_context->layout->bindings_count; ++binding)
         {
             kan_bool_t should_transfer = KAN_TRUE;
             if (update_needed)
             {
-                for (uint64_t index = 0u; index < update_bindings_count; ++index)
+                for (kan_loop_size_t index = 0u; index < update_bindings_count; ++index)
                 {
                     if (update_bindings[index].binding == binding)
                     {
@@ -500,10 +501,10 @@ void render_backend_apply_descriptor_set_mutation (struct render_backend_pipelin
                     .sType = VK_STRUCTURE_TYPE_COPY_DESCRIPTOR_SET,
                     .pNext = NULL,
                     .srcSet = source_set,
-                    .srcBinding = (uint32_t) binding,
+                    .srcBinding = (vulkan_size_t) binding,
                     .srcArrayElement = 0u,
                     .dstSet = target_set,
-                    .dstBinding = (uint32_t) binding,
+                    .dstBinding = (vulkan_size_t) binding,
                     .dstArrayElement = 0u,
                     .descriptorCount = 1u,
                 };
@@ -513,18 +514,18 @@ void render_backend_apply_descriptor_set_mutation (struct render_backend_pipelin
         }
     }
 
-    uint64_t update_count = 0u;
+    kan_instance_size_t update_count = 0u;
     VkWriteDescriptorSet *update = NULL;
 
-    uint64_t buffer_info_count = 0u;
+    kan_instance_size_t buffer_info_count = 0u;
     VkDescriptorBufferInfo *buffer_info = NULL;
 
-    uint64_t image_info_count = 0u;
+    kan_instance_size_t image_info_count = 0u;
     VkDescriptorImageInfo *image_info = NULL;
 
     if (update_needed)
     {
-        for (uint64_t index = 0u; index < update_bindings_count; ++index)
+        for (kan_loop_size_t index = 0u; index < update_bindings_count; ++index)
         {
             switch (set_context->layout->bindings[update_bindings[index].binding].type)
             {
@@ -560,7 +561,7 @@ void render_backend_apply_descriptor_set_mutation (struct render_backend_pipelin
         VkDescriptorBufferInfo *next_buffer_info = buffer_info;
         VkDescriptorImageInfo *next_image_info = image_info;
 
-        for (uint64_t index = 0u; index < update_bindings_count; ++index)
+        for (kan_loop_size_t index = 0u; index < update_bindings_count; ++index)
         {
             VkDescriptorType descriptor_type = VK_DESCRIPTOR_TYPE_MAX_ENUM;
             VkDescriptorBufferInfo *this_buffer_info = NULL;
@@ -591,8 +592,8 @@ void render_backend_apply_descriptor_set_mutation (struct render_backend_pipelin
                 struct render_backend_buffer_t *buffer = KAN_HANDLE_GET (update_bindings[index].buffer_binding.buffer);
                 *this_buffer_info = (VkDescriptorBufferInfo) {
                     .buffer = buffer->buffer,
-                    .offset = (uint32_t) update_bindings[index].buffer_binding.offset,
-                    .range = (uint32_t) update_bindings[index].buffer_binding.range,
+                    .offset = (vulkan_size_t) update_bindings[index].buffer_binding.offset,
+                    .range = (vulkan_size_t) update_bindings[index].buffer_binding.range,
                 };
 
                 break;
@@ -646,7 +647,7 @@ void render_backend_apply_descriptor_set_mutation (struct render_backend_pipelin
                             {
                                 .aspectMask = get_image_aspects (&image->description),
                                 .baseMipLevel = 0u,
-                                .levelCount = (uint32_t) image->description.mips,
+                                .levelCount = (vulkan_size_t) image->description.mips,
                                 .baseArrayLayer = 0u,
                                 .layerCount = 1u,
                             },
@@ -674,7 +675,7 @@ void render_backend_apply_descriptor_set_mutation (struct render_backend_pipelin
                             .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
                             .pNext = NULL,
                             .objectType = VK_OBJECT_TYPE_IMAGE_VIEW,
-                            .objectHandle = (uint64_t) this_image_info->imageView,
+                            .objectHandle = CONVERT_HANDLE_FOR_DEBUG this_image_info->imageView,
                             .pObjectName = debug_name,
                         };
 
@@ -693,7 +694,7 @@ void render_backend_apply_descriptor_set_mutation (struct render_backend_pipelin
                 .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
                 .pNext = NULL,
                 .dstSet = target_set,
-                .dstBinding = (uint32_t) update_bindings[index].binding,
+                .dstBinding = (vulkan_size_t) update_bindings[index].binding,
                 .dstArrayElement = 0u,
                 .descriptorCount = 1u,
                 .descriptorType = descriptor_type,
@@ -706,8 +707,8 @@ void render_backend_apply_descriptor_set_mutation (struct render_backend_pipelin
         }
     }
 
-    vkUpdateDescriptorSets (set_context->system->device, (uint32_t) update_count, update, (uint32_t) transfer_count,
-                            transfer);
+    vkUpdateDescriptorSets (set_context->system->device, (vulkan_size_t) update_count, update,
+                            (vulkan_size_t) transfer_count, transfer);
 
     if (transfer)
     {
@@ -761,7 +762,7 @@ kan_render_pipeline_parameter_set_t kan_render_pipeline_parameter_set_create (
 }
 
 void kan_render_pipeline_parameter_set_update (kan_render_pipeline_parameter_set_t set,
-                                               uint64_t bindings_count,
+                                               kan_instance_size_t bindings_count,
                                                struct kan_render_parameter_update_description_t *bindings)
 {
     struct render_backend_pipeline_parameter_set_t *data = KAN_HANDLE_GET (set);
@@ -778,7 +779,7 @@ void kan_render_pipeline_parameter_set_update (kan_render_pipeline_parameter_set
         kan_bool_t broken = KAN_FALSE;
         struct render_backend_parameter_set_render_target_attachment_t *next = render_target_attachment->next;
 
-        for (uint64_t binding_index = 0u; binding_index < bindings_count; ++binding_index)
+        for (kan_loop_size_t binding_index = 0u; binding_index < bindings_count; ++binding_index)
         {
             struct kan_render_parameter_update_description_t *update = &bindings[binding_index];
             if (data->layout->bindings[update->binding].type ==
@@ -861,7 +862,7 @@ void kan_render_pipeline_parameter_set_update (kan_render_pipeline_parameter_set
         data->unstable.last_accessed_allocation_index = data->system->current_frame_in_flight_index;
     }
 
-    for (uint64_t binding_index = 0u; binding_index < bindings_count; ++binding_index)
+    for (kan_loop_size_t binding_index = 0u; binding_index < bindings_count; ++binding_index)
     {
         struct kan_render_parameter_update_description_t *update = &bindings[binding_index];
         if (data->layout->bindings[update->binding].type == KAN_RENDER_PARAMETER_BINDING_TYPE_COMBINED_IMAGE_SAMPLER)

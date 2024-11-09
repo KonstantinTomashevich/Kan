@@ -6,13 +6,13 @@
 static void *profiled_allocate (void *user_data, size_t size, size_t alignment, VkSystemAllocationScope scope)
 {
     struct memory_profiling_t *profiling = (struct memory_profiling_t *) user_data;
-    uint32_t real_alignment = KAN_MAX (alignment, _Alignof (uint32_t));
-    uint32_t real_size = kan_apply_alignment (real_alignment + size, real_alignment);
+    vulkan_size_t real_alignment = (vulkan_size_t) KAN_MAX (alignment, _Alignof (vulkan_size_t));
+    vulkan_size_t real_size = (vulkan_size_t) kan_apply_alignment (real_alignment + size, real_alignment);
 
     void *allocated_data = kan_allocate_general (profiling->driver_cpu_generic_group, real_size, real_alignment);
 
     void *accessible_data = ((uint8_t *) allocated_data) + real_alignment;
-    uint32_t *meta_output = allocated_data;
+    vulkan_size_t *meta_output = allocated_data;
     *meta_output = real_size;
     ++meta_output;
 
@@ -27,7 +27,7 @@ static void *profiled_allocate (void *user_data, size_t size, size_t alignment, 
 
 static inline void *walk_from_accessible_to_allocated (void *accessible)
 {
-    uint32_t *meta = accessible;
+    vulkan_size_t *meta = accessible;
     do
     {
         meta--;
@@ -43,14 +43,15 @@ static void *profiled_reallocate (
     void *original_user_accessible_data = original;
     void *original_allocated_data = walk_from_accessible_to_allocated (original_user_accessible_data);
 
-    const uint32_t original_real_size = *(uint32_t *) original_allocated_data;
-    const uint32_t original_data_size =
-        original_real_size - (((uint8_t *) original_user_accessible_data) - ((uint8_t *) original_allocated_data));
+    const vulkan_size_t original_real_size = *(vulkan_size_t *) original_allocated_data;
+    const vulkan_size_t original_data_size =
+        original_real_size -
+        (vulkan_size_t) (((uint8_t *) original_user_accessible_data) - ((uint8_t *) original_allocated_data));
 
     void *new_data = profiled_allocate (user_data, size, alignment, scope);
     memcpy (new_data, original, KAN_MIN ((size_t) original_data_size, size));
     kan_free_general (profiling->driver_cpu_generic_group, original_allocated_data,
-                      *(uint32_t *) original_allocated_data);
+                      *(vulkan_size_t *) original_allocated_data);
     return new_data;
 }
 
@@ -61,7 +62,7 @@ static void profiled_free (void *user_data, void *pointer)
         struct memory_profiling_t *profiling = (struct memory_profiling_t *) user_data;
         void *accessible = pointer;
         void *allocated = walk_from_accessible_to_allocated (accessible);
-        kan_free_general (profiling->driver_cpu_generic_group, allocated, *(uint32_t *) allocated);
+        kan_free_general (profiling->driver_cpu_generic_group, allocated, *(vulkan_size_t *) allocated);
     }
 }
 
@@ -84,14 +85,14 @@ static void notify_internal_cpu_free (void *user_data,
 }
 
 static void notify_device_allocation (
-    VmaAllocator allocator, uint32_t memory_type, VkDeviceMemory memory, VkDeviceSize size, void *user_data)
+    VmaAllocator allocator, vulkan_size_t memory_type, VkDeviceMemory memory, VkDeviceSize size, void *user_data)
 {
     struct memory_profiling_t *profiling = (struct memory_profiling_t *) user_data;
     kan_allocation_group_allocate (profiling->gpu_unmarked_group, size);
 }
 
 static void notify_device_free (
-    VmaAllocator allocator, uint32_t memory_type, VkDeviceMemory memory, VkDeviceSize size, void *user_data)
+    VmaAllocator allocator, vulkan_size_t memory_type, VkDeviceMemory memory, VkDeviceSize size, void *user_data)
 {
     struct memory_profiling_t *profiling = (struct memory_profiling_t *) user_data;
     kan_allocation_group_free (profiling->gpu_unmarked_group, size);

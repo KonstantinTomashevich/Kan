@@ -18,8 +18,8 @@ struct update_connection_request_t
     kan_context_system_t system;
     kan_context_update_run_t functor;
     kan_bool_t added;
-    uint64_t dependencies_count;
-    uint64_t dependencies_left;
+    kan_instance_size_t dependencies_count;
+    kan_instance_size_t dependencies_left;
     kan_context_system_t *dependencies;
 };
 
@@ -37,7 +37,7 @@ struct update_system_t
     /// \meta reflection_dynamic_array_type = "struct update_callable_t"
     struct kan_dynamic_array_t update_sequence;
 
-    uint64_t connection_request_count;
+    kan_instance_size_t connection_request_count;
     struct update_connection_request_t *first_connection_request;
 
     kan_cpu_section_t update_section;
@@ -82,7 +82,7 @@ static void visit_to_generate_update_sequence (struct update_system_t *system,
     struct update_connection_request_t *other_request = system->first_connection_request;
     while (other_request)
     {
-        for (uint64_t index = 0u; index < other_request->dependencies_count; ++index)
+        for (kan_loop_size_t index = 0u; index < other_request->dependencies_count; ++index)
         {
             if (KAN_HANDLE_IS_EQUAL (other_request->dependencies[index], request->system))
             {
@@ -169,7 +169,7 @@ CONTEXT_UPDATE_SYSTEM_API struct kan_context_system_api_t KAN_CONTEXT_SYSTEM_API
 void kan_update_system_connect_on_run (kan_context_system_t update_system,
                                        kan_context_system_t other_system,
                                        kan_context_update_run_t functor,
-                                       uint64_t dependencies_count,
+                                       kan_instance_size_t dependencies_count,
                                        kan_context_system_t *dependencies)
 {
     struct update_system_t *system = KAN_HANDLE_GET (update_system);
@@ -203,7 +203,7 @@ void kan_update_system_disconnect_on_run (kan_context_system_t update_system, ka
     // Check that we're not in connection phase.
     KAN_ASSERT (!system->first_connection_request)
 
-    for (uint64_t index = 0u; index < system->update_sequence.size; ++index)
+    for (kan_loop_size_t index = 0u; index < system->update_sequence.size; ++index)
     {
         struct update_callable_t *callable = &((struct update_callable_t *) system->update_sequence.data)[index];
         if (KAN_HANDLE_IS_EQUAL (callable->system, other_system))
@@ -220,7 +220,7 @@ void kan_update_system_run (kan_context_system_t update_system)
     struct kan_cpu_section_execution_t execution;
     kan_cpu_section_execution_init (&execution, system->update_section);
 
-    for (uint64_t index = 0u; index < system->update_sequence.size; ++index)
+    for (kan_loop_size_t index = 0u; index < system->update_sequence.size; ++index)
     {
         struct update_callable_t *callable = &((struct update_callable_t *) system->update_sequence.data)[index];
         callable->functor (callable->system);

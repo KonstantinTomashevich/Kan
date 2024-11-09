@@ -12,7 +12,7 @@ static kan_bool_t write_text_file (const char *file, const char *content)
         return KAN_FALSE;
     }
 
-    const uint64_t content_length = strlen (content);
+    const kan_instance_size_t content_length = (kan_instance_size_t) strlen (content);
     const kan_bool_t result = stream->operations->write (stream, strlen (content), content) == content_length;
 
     stream->operations->close (stream);
@@ -84,7 +84,7 @@ KAN_TEST_CASE (query_status)
     KAN_TEST_CHECK (status.type == KAN_FILE_SYSTEM_ENTRY_TYPE_FILE)
     KAN_TEST_CHECK (status.size == 13u)
     KAN_TEST_CHECK (!status.read_only)
-    uint64_t test1_last_modification_time_ns = status.last_modification_time_ns;
+    kan_time_size_t test1_last_modification_time_ns = status.last_modification_time_ns;
 
     KAN_TEST_CHECK (kan_file_system_query_entry ("test_directory/test2.txt", &status))
     KAN_TEST_CHECK (status.type == KAN_FILE_SYSTEM_ENTRY_TYPE_FILE)

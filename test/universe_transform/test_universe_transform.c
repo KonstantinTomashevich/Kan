@@ -605,10 +605,10 @@ struct test_sync_scheduler_state_t
 };
 
 static void fake_time (struct test_sync_scheduler_state_t *state,
-                       uint64_t logical_time_ns,
-                       uint64_t logical_delta_ns,
-                       uint64_t visual_time_ns,
-                       uint64_t visual_delta_ns)
+                       kan_time_size_t logical_time_ns,
+                       kan_time_offset_t logical_delta_ns,
+                       kan_time_size_t visual_time_ns,
+                       kan_time_offset_t visual_delta_ns)
 {
     struct kan_repository_singleton_write_access_t time_access =
         kan_repository_singleton_write_query_execute (&state->write__kan_time_singleton);

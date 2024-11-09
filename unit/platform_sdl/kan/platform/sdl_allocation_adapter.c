@@ -18,8 +18,9 @@ static kan_allocation_group_t sdl_allocation_group;
 
 static void *sdl_malloc (size_t size)
 {
-    const uint64_t real_size = kan_apply_alignment (size + sizeof (uint64_t), _Alignof (uint64_t));
-    uint64_t *data = kan_allocate_general (sdl_allocation_group, real_size, _Alignof (uint64_t));
+    const kan_memory_size_t real_size =
+        kan_apply_alignment (size + sizeof (kan_memory_size_t), _Alignof (kan_memory_size_t));
+    kan_memory_size_t *data = kan_allocate_general (sdl_allocation_group, real_size, _Alignof (kan_memory_size_t));
     *data = size;
     return data + 1u;
 }
@@ -34,20 +35,21 @@ static void *sdl_calloc (size_t count, size_t size)
 
 static void sdl_free (void *memory)
 {
-    uint64_t *real_memory = ((uint64_t *) memory) - 1u;
-    const uint64_t real_size = kan_apply_alignment (*real_memory + sizeof (uint64_t), _Alignof (uint64_t));
+    kan_memory_size_t *real_memory = ((kan_memory_size_t *) memory) - 1u;
+    const kan_memory_size_t real_size =
+        kan_apply_alignment (*real_memory + sizeof (kan_memory_size_t), _Alignof (kan_memory_size_t));
     kan_free_general (sdl_allocation_group, real_memory, real_size);
 }
 
-static void *sdl_realloc (void *memory, uint64_t new_size)
+static void *sdl_realloc (void *memory, kan_memory_size_t new_size)
 {
     if (memory)
     {
         if (new_size > 0u)
         {
-            const uint64_t *real_memory = ((uint64_t *) memory) - 1u;
+            const kan_memory_size_t *real_memory = ((kan_memory_size_t *) memory) - 1u;
             void *new_memory = sdl_malloc (new_size);
-            const uint64_t old_size = *real_memory;
+            const kan_memory_size_t old_size = *real_memory;
             memcpy (new_memory, memory, KAN_MIN (old_size, new_size));
             sdl_free (memory);
             return new_memory;

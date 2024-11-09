@@ -10,3 +10,12 @@
          TO target;                                                                                                    \
      } *) &(VARIABLE))                                                                                                 \
          ->target)
+
+#define KAN_PUN_TYPE_RECEIVE_AND_RETURN(FROM, TO, VARIABLE)                                                            \
+    union                                                                                                              \
+    {                                                                                                                  \
+        FROM source;                                                                                                   \
+        TO target;                                                                                                     \
+    } pun_type_data;                                                                                                   \
+    pun_type_data.source = (VARIABLE);                                                                                 \
+    return pun_type_data.target

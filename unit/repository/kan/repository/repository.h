@@ -138,6 +138,12 @@ KAN_C_HEADER_BEGIN
 KAN_HANDLE_DEFINE (kan_repository_t);
 KAN_HANDLE_DEFINE (kan_repository_singleton_storage_t);
 
+/// \brief Biggest supported integer for indexed signal values.
+typedef kan_memory_size_t kan_repository_signal_value_t;
+
+/// \brief Biggest supported floating point number for indexed fields.
+typedef kan_floating_t kan_repository_indexed_floating_t;
+
 struct kan_repository_singleton_read_query_t
 {
     void *implementation_data;
@@ -358,13 +364,13 @@ struct kan_repository_indexed_interval_read_query_t
 struct kan_repository_indexed_interval_ascending_read_cursor_t
 {
     void *implementation_data[4u];
-    uint64_t implementation_data_64[2u];
+    kan_repository_indexed_floating_t implementation_data_64[2u];
 };
 
 struct kan_repository_indexed_interval_descending_read_cursor_t
 {
     void *implementation_data[4u];
-    uint64_t implementation_data_64[2u];
+    kan_repository_indexed_floating_t implementation_data_64[2u];
 };
 
 struct kan_repository_indexed_interval_read_access_t
@@ -380,13 +386,13 @@ struct kan_repository_indexed_interval_update_query_t
 struct kan_repository_indexed_interval_ascending_update_cursor_t
 {
     void *implementation_data[4u];
-    uint64_t implementation_data_64[2u];
+    kan_repository_indexed_floating_t implementation_data_64[2u];
 };
 
 struct kan_repository_indexed_interval_descending_update_cursor_t
 {
     void *implementation_data[4u];
-    uint64_t implementation_data_64[2u];
+    kan_repository_indexed_floating_t implementation_data_64[2u];
 };
 
 struct kan_repository_indexed_interval_update_access_t
@@ -402,13 +408,13 @@ struct kan_repository_indexed_interval_delete_query_t
 struct kan_repository_indexed_interval_ascending_delete_cursor_t
 {
     void *implementation_data[4u];
-    uint64_t implementation_data_64[2u];
+    kan_repository_indexed_floating_t implementation_data_64[2u];
 };
 
 struct kan_repository_indexed_interval_descending_delete_cursor_t
 {
     void *implementation_data[4u];
-    uint64_t implementation_data_64[2u];
+    kan_repository_indexed_floating_t implementation_data_64[2u];
 };
 
 struct kan_repository_indexed_interval_delete_access_t
@@ -424,13 +430,13 @@ struct kan_repository_indexed_interval_write_query_t
 struct kan_repository_indexed_interval_ascending_write_cursor_t
 {
     void *implementation_data[4u];
-    uint64_t implementation_data_64[2u];
+    kan_repository_indexed_floating_t implementation_data_64[2u];
 };
 
 struct kan_repository_indexed_interval_descending_write_cursor_t
 {
     void *implementation_data[4u];
-    uint64_t implementation_data_64[2u];
+    kan_repository_indexed_floating_t implementation_data_64[2u];
 };
 
 struct kan_repository_indexed_interval_write_access_t
@@ -445,12 +451,12 @@ struct kan_repository_indexed_space_read_query_t
 
 struct kan_repository_indexed_space_shape_read_cursor_t
 {
-    uint64_t implementation_data_64[23u];
+    kan_repository_indexed_floating_t implementation_data_64[23u];
 };
 
 struct kan_repository_indexed_space_ray_read_cursor_t
 {
-    uint64_t implementation_data_64[33u];
+    kan_repository_indexed_floating_t implementation_data_64[33u];
 };
 
 struct kan_repository_indexed_space_read_access_t
@@ -465,12 +471,12 @@ struct kan_repository_indexed_space_update_query_t
 
 struct kan_repository_indexed_space_shape_update_cursor_t
 {
-    uint64_t implementation_data_64[23u];
+    kan_repository_indexed_floating_t implementation_data_64[23u];
 };
 
 struct kan_repository_indexed_space_ray_update_cursor_t
 {
-    uint64_t implementation_data_64[33u];
+    kan_repository_indexed_floating_t implementation_data_64[33u];
 };
 
 struct kan_repository_indexed_space_update_access_t
@@ -485,12 +491,12 @@ struct kan_repository_indexed_space_delete_query_t
 
 struct kan_repository_indexed_space_shape_delete_cursor_t
 {
-    uint64_t implementation_data_64[23u];
+    kan_repository_indexed_floating_t implementation_data_64[23u];
 };
 
 struct kan_repository_indexed_space_ray_delete_cursor_t
 {
-    uint64_t implementation_data_64[33u];
+    kan_repository_indexed_floating_t implementation_data_64[33u];
 };
 
 struct kan_repository_indexed_space_delete_access_t
@@ -505,12 +511,12 @@ struct kan_repository_indexed_space_write_query_t
 
 struct kan_repository_indexed_space_shape_write_cursor_t
 {
-    uint64_t implementation_data_64[23u];
+    kan_repository_indexed_floating_t implementation_data_64[23u];
 };
 
 struct kan_repository_indexed_space_ray_write_cursor_t
 {
-    uint64_t implementation_data_64[33u];
+    kan_repository_indexed_floating_t implementation_data_64[33u];
 };
 
 struct kan_repository_indexed_space_write_access_t
@@ -529,7 +535,7 @@ struct kan_repository_event_insert_query_t
 
 struct kan_repository_event_insertion_package_t
 {
-    uint64_t implementation_data[2u];
+    void *implementation_data[2u];
 };
 
 struct kan_repository_event_fetch_query_t
@@ -539,7 +545,7 @@ struct kan_repository_event_fetch_query_t
 
 struct kan_repository_event_read_access_t
 {
-    uint64_t implementation_data[2u];
+    void *implementation_data[2u];
 };
 
 /// \brief Creates new root repository with given reflection registry.
@@ -990,7 +996,7 @@ REPOSITORY_API void kan_repository_indexed_signal_read_query_init (
     struct kan_repository_indexed_signal_read_query_t *query,
     kan_repository_indexed_storage_t storage,
     struct kan_repository_field_path_t path,
-    uint64_t signal_value);
+    kan_repository_signal_value_t signal_value);
 
 /// \brief Returns read-only cursor that iterates over records with predefined value.
 /// \invariant Should be called in serving mode.
@@ -1031,7 +1037,7 @@ REPOSITORY_API void kan_repository_indexed_signal_update_query_init (
     struct kan_repository_indexed_signal_update_query_t *query,
     kan_repository_indexed_storage_t storage,
     struct kan_repository_field_path_t path,
-    uint64_t signal_value);
+    kan_repository_signal_value_t signal_value);
 
 /// \brief Returns read-write cursor that iterates over records with predefined value.
 /// \invariant Should be called in serving mode.
@@ -1072,7 +1078,7 @@ REPOSITORY_API void kan_repository_indexed_signal_delete_query_init (
     struct kan_repository_indexed_signal_delete_query_t *query,
     kan_repository_indexed_storage_t storage,
     struct kan_repository_field_path_t path,
-    uint64_t signal_value);
+    kan_repository_signal_value_t signal_value);
 
 /// \brief Returns read-delete cursor that iterates over records with predefined value.
 /// \invariant Should be called in serving mode.
@@ -1119,7 +1125,7 @@ REPOSITORY_API void kan_repository_indexed_signal_write_query_init (
     struct kan_repository_indexed_signal_write_query_t *query,
     kan_repository_indexed_storage_t storage,
     struct kan_repository_field_path_t path,
-    uint64_t signal_value);
+    kan_repository_signal_value_t signal_value);
 
 /// \brief Returns read-write-delete cursor that iterates over records with predefined value.
 /// \invariant Should be called in serving mode.
@@ -1423,26 +1429,26 @@ REPOSITORY_API void kan_repository_indexed_space_read_query_init (
     kan_repository_indexed_storage_t storage,
     struct kan_repository_field_path_t min_path,
     struct kan_repository_field_path_t max_path,
-    double global_min,
-    double global_max,
-    double leaf_size);
+    kan_repository_indexed_floating_t global_min,
+    kan_repository_indexed_floating_t global_max,
+    kan_repository_indexed_floating_t leaf_size);
 
 /// \brief Returns read-only cursor that iterates over records which shapes intersect with given axis aligned bounding
 ///        shape.
 /// \invariant Should be called in serving mode.
 REPOSITORY_API struct kan_repository_indexed_space_shape_read_cursor_t
 kan_repository_indexed_space_read_query_execute_shape (struct kan_repository_indexed_space_read_query_t *query,
-                                                       const double *min,
-                                                       const double *max);
+                                                       const kan_repository_indexed_floating_t *min,
+                                                       const kan_repository_indexed_floating_t *max);
 
 /// \brief Returns read-only cursor that iterates over records which shapes intersect with given ray.
 /// \details Direction is not required to be normalized, that's why we use time instead of distance here.
 /// \invariant Should be called in serving mode.
 REPOSITORY_API struct kan_repository_indexed_space_ray_read_cursor_t
 kan_repository_indexed_space_read_query_execute_ray (struct kan_repository_indexed_space_read_query_t *query,
-                                                     const double *origin,
-                                                     const double *direction,
-                                                     double max_time);
+                                                     const kan_repository_indexed_floating_t *origin,
+                                                     const kan_repository_indexed_floating_t *direction,
+                                                     kan_repository_indexed_floating_t max_time);
 
 /// \brief Returns access to the current record and moves cursor to the next one.
 /// \details If there are no more records in query result, returns access to null pointer.
@@ -1490,26 +1496,26 @@ REPOSITORY_API void kan_repository_indexed_space_update_query_init (
     kan_repository_indexed_storage_t storage,
     struct kan_repository_field_path_t min_path,
     struct kan_repository_field_path_t max_path,
-    double global_min,
-    double global_max,
-    double leaf_size);
+    kan_repository_indexed_floating_t global_min,
+    kan_repository_indexed_floating_t global_max,
+    kan_repository_indexed_floating_t leaf_size);
 
 /// \brief Returns read-write cursor that iterates over records which shapes intersect with given axis aligned bounding
 ///        shape.
 /// \invariant Should be called in serving mode.
 REPOSITORY_API struct kan_repository_indexed_space_shape_update_cursor_t
 kan_repository_indexed_space_update_query_execute_shape (struct kan_repository_indexed_space_update_query_t *query,
-                                                         const double *min,
-                                                         const double *max);
+                                                         const kan_repository_indexed_floating_t *min,
+                                                         const kan_repository_indexed_floating_t *max);
 
 /// \brief Returns read-write cursor that iterates over records which shapes intersect with given ray.
 /// \details Direction is not required to be normalized, that's why we use time instead of distance here.
 /// \invariant Should be called in serving mode.
 REPOSITORY_API struct kan_repository_indexed_space_ray_update_cursor_t
 kan_repository_indexed_space_update_query_execute_ray (struct kan_repository_indexed_space_update_query_t *query,
-                                                       const double *origin,
-                                                       const double *direction,
-                                                       double max_time);
+                                                       const kan_repository_indexed_floating_t *origin,
+                                                       const kan_repository_indexed_floating_t *direction,
+                                                       kan_repository_indexed_floating_t max_time);
 
 /// \brief Returns access to the current record and moves cursor to the next one.
 /// \details If there are no more records in query result, returns access to null pointer.
@@ -1558,26 +1564,26 @@ REPOSITORY_API void kan_repository_indexed_space_delete_query_init (
     kan_repository_indexed_storage_t storage,
     struct kan_repository_field_path_t min_path,
     struct kan_repository_field_path_t max_path,
-    double global_min,
-    double global_max,
-    double leaf_size);
+    kan_repository_indexed_floating_t global_min,
+    kan_repository_indexed_floating_t global_max,
+    kan_repository_indexed_floating_t leaf_size);
 
 /// \brief Returns read-delete cursor that iterates over records which shapes intersect with given axis aligned bounding
 ///        shape.
 /// \invariant Should be called in serving mode.
 REPOSITORY_API struct kan_repository_indexed_space_shape_delete_cursor_t
 kan_repository_indexed_space_delete_query_execute_shape (struct kan_repository_indexed_space_delete_query_t *query,
-                                                         const double *min,
-                                                         const double *max);
+                                                         const kan_repository_indexed_floating_t *min,
+                                                         const kan_repository_indexed_floating_t *max);
 
 /// \brief Returns read-delete cursor that iterates over records which shapes intersect with given ray.
 /// \details Direction is not required to be normalized, that's why we use time instead of distance here.
 /// \invariant Should be called in serving mode.
 REPOSITORY_API struct kan_repository_indexed_space_ray_delete_cursor_t
 kan_repository_indexed_space_delete_query_execute_ray (struct kan_repository_indexed_space_delete_query_t *query,
-                                                       const double *origin,
-                                                       const double *direction,
-                                                       double max_time);
+                                                       const kan_repository_indexed_floating_t *origin,
+                                                       const kan_repository_indexed_floating_t *direction,
+                                                       kan_repository_indexed_floating_t max_time);
 
 /// \brief Returns access to the current record and moves cursor to the next one.
 /// \details If there are no more records in query result, returns access to null pointer.
@@ -1631,26 +1637,26 @@ REPOSITORY_API void kan_repository_indexed_space_write_query_init (
     kan_repository_indexed_storage_t storage,
     struct kan_repository_field_path_t min_path,
     struct kan_repository_field_path_t max_path,
-    double global_min,
-    double global_max,
-    double leaf_size);
+    kan_repository_indexed_floating_t global_min,
+    kan_repository_indexed_floating_t global_max,
+    kan_repository_indexed_floating_t leaf_size);
 
 /// \brief Returns read-write-delete cursor that iterates over records which shapes intersect with given axis aligned
 ///        bounding shape.
 /// \invariant Should be called in serving mode.
 REPOSITORY_API struct kan_repository_indexed_space_shape_write_cursor_t
 kan_repository_indexed_space_write_query_execute_shape (struct kan_repository_indexed_space_write_query_t *query,
-                                                        const double *min,
-                                                        const double *max);
+                                                        const kan_repository_indexed_floating_t *min,
+                                                        const kan_repository_indexed_floating_t *max);
 
 /// \brief Returns read-write-delete cursor that iterates over records which shapes intersect with given ray.
 /// \details Direction is not required to be normalized, that's why we use time instead of distance here.
 /// \invariant Should be called in serving mode.
 REPOSITORY_API struct kan_repository_indexed_space_ray_write_cursor_t
 kan_repository_indexed_space_write_query_execute_ray (struct kan_repository_indexed_space_write_query_t *query,
-                                                      const double *origin,
-                                                      const double *direction,
-                                                      double max_time);
+                                                      const kan_repository_indexed_floating_t *origin,
+                                                      const kan_repository_indexed_floating_t *direction,
+                                                      kan_repository_indexed_floating_t max_time);
 
 /// \brief Returns access to the current record and moves cursor to the next one.
 /// \details If there are no more records in query result, returns access to null pointer.

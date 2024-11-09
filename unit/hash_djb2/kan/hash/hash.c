@@ -1,11 +1,11 @@
 #include <kan/hash/hash.h>
 
-uint64_t kan_string_hash (const char *string)
+kan_hash_t kan_string_hash (const char *string)
 {
     return kan_string_hash_append (5381u, string);
 }
 
-uint64_t kan_string_hash_append (uint64_t hash_value, const char *string)
+kan_hash_t kan_string_hash_append (kan_hash_t hash_value, const char *string)
 {
     char symbol;
     while ((symbol = *string))
@@ -17,12 +17,12 @@ uint64_t kan_string_hash_append (uint64_t hash_value, const char *string)
     return hash_value;
 }
 
-uint64_t kan_char_sequence_hash (const char *begin, const char *end)
+kan_hash_t kan_char_sequence_hash (const char *begin, const char *end)
 {
     return kan_char_sequence_hash_append (5381u, begin, end);
 }
 
-uint64_t kan_char_sequence_hash_append (uint64_t hash_value, const char *begin, const char *end)
+kan_hash_t kan_char_sequence_hash_append (kan_hash_t hash_value, const char *begin, const char *end)
 {
     char symbol;
 
@@ -36,9 +36,10 @@ uint64_t kan_char_sequence_hash_append (uint64_t hash_value, const char *begin, 
     return hash_value;
 }
 
-uint64_t kan_hash_combine (uint64_t first, uint64_t second)
+kan_hash_t kan_hash_combine (kan_hash_t first, kan_hash_t second)
 {
+    const kan_hash_t bits_in_hash = sizeof (kan_hash_t) * 8u;
     // Hash combination from Mike Ash.
     // https://www.mikeash.com/pyblog/friday-qa-2010-06-18-implementing-equality-and-hashing.html
-    return ((first << 32u) | (first >> 32u)) ^ second;
+    return ((first << (bits_in_hash / 2u)) | (first >> (bits_in_hash / 2u))) ^ second;
 }

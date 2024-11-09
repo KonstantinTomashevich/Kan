@@ -13,11 +13,18 @@
 #include <kan/api_common/min_max.h>
 #include <kan/container/hash_storage.h>
 #include <kan/container/stack_group_allocator.h>
+#include <kan/container/trivial_string_buffer.h>
 #include <kan/error/critical.h>
 #include <kan/log/logging.h>
 #include <kan/memory/allocation.h>
 #include <kan/render_pipeline_language/compiler.h>
 #include <kan/threading/atomic.h>
+
+/// \brief SPIRV used 32-bit integers for everything inside bytecode.
+typedef uint32_t spirv_size_t;
+
+/// \brief Unsigned integer type for SPIRV bytecode.
+typedef uint32_t spirv_signed_literal_t;
 
 struct rpl_compiler_context_option_value_t
 {
@@ -28,7 +35,7 @@ struct rpl_compiler_context_option_value_t
     union
     {
         kan_bool_t flag_value;
-        uint64_t count_value;
+        kan_rpl_unsigned_int_literal_t count_value;
     };
 };
 
@@ -44,20 +51,21 @@ struct rpl_compiler_context_t
     struct kan_dynamic_array_t modules;
 
     struct kan_stack_group_allocator_t resolve_allocator;
+    struct kan_trivial_string_buffer_t name_generation_buffer;
 };
 
 struct compiler_instance_setting_node_t
 {
     struct compiler_instance_setting_node_t *next;
     kan_interned_string_t name;
-    uint64_t block;
+    kan_rpl_size_t block;
     enum kan_rpl_setting_type_t type;
 
     union
     {
         kan_bool_t flag;
-        int64_t integer;
-        double floating;
+        kan_rpl_signed_int_literal_t integer;
+        float floating;
         kan_interned_string_t string;
     };
 
@@ -66,7 +74,7 @@ struct compiler_instance_setting_node_t
 
     kan_interned_string_t module_name;
     kan_interned_string_t source_name;
-    uint32_t source_line;
+    kan_rpl_size_t source_line;
 };
 
 struct compiler_instance_full_type_definition_t
@@ -75,8 +83,8 @@ struct compiler_instance_full_type_definition_t
     struct inbuilt_matrix_type_t *if_matrix;
     struct compiler_instance_struct_node_t *if_struct;
 
-    uint64_t array_dimensions_count;
-    uint64_t *array_dimensions;
+    kan_instance_size_t array_dimensions_count;
+    kan_rpl_size_t *array_dimensions;
 };
 
 struct compiler_instance_variable_t
@@ -90,52 +98,46 @@ struct compiler_instance_declaration_node_t
     struct compiler_instance_declaration_node_t *next;
     struct compiler_instance_variable_t variable;
 
-    uint64_t offset;
-    uint64_t size;
-    uint64_t alignment;
+    kan_instance_size_t offset;
+    kan_instance_size_t size;
+    kan_instance_size_t alignment;
 
-    uint64_t meta_count;
+    kan_instance_size_t meta_count;
     kan_interned_string_t *meta;
 
     kan_interned_string_t module_name;
     kan_interned_string_t source_name;
-    uint32_t source_line;
+    kan_rpl_size_t source_line;
 };
 
 struct compiler_instance_struct_node_t
 {
     struct compiler_instance_struct_node_t *next;
     kan_interned_string_t name;
-    uint64_t size;
-    uint64_t alignment;
+    kan_instance_size_t size;
+    kan_instance_size_t alignment;
     struct compiler_instance_declaration_node_t *first_field;
 
     kan_interned_string_t module_name;
     kan_interned_string_t source_name;
-    uint32_t source_line;
+    kan_rpl_size_t source_line;
 
-    uint32_t spirv_id_value;
-    uint32_t spirv_id_function_pointer;
+    spirv_size_t spirv_id_value;
+    spirv_size_t spirv_id_function_pointer;
 };
 
-struct flattening_name_generation_buffer_t
-{
-    uint64_t length;
-    char buffer[KAN_RPL_COMPILER_INSTANCE_MAX_FLAT_NAME_LENGTH];
-};
-
-#define INVALID_LOCATION UINT64_MAX
-#define INVALID_SET UINT64_MAX
-#define INVALID_BINDING UINT64_MAX
+#define INVALID_LOCATION KAN_INT_MAX (kan_rpl_size_t)
+#define INVALID_SET KAN_INT_MAX (kan_rpl_size_t)
+#define INVALID_BINDING KAN_INT_MAX (kan_rpl_size_t)
 
 struct binding_location_assignment_counter_t
 {
-    uint64_t next_attribute_buffer_binding;
-    uint64_t next_arbitrary_stable_buffer_binding;
-    uint64_t next_arbitrary_unstable_buffer_binding;
-    uint64_t next_attribute_location;
-    uint64_t next_vertex_output_location;
-    uint64_t next_fragment_output_location;
+    kan_rpl_size_t next_attribute_buffer_binding;
+    kan_rpl_size_t next_arbitrary_stable_buffer_binding;
+    kan_rpl_size_t next_arbitrary_unstable_buffer_binding;
+    kan_rpl_size_t next_attribute_location;
+    kan_rpl_size_t next_vertex_output_location;
+    kan_rpl_size_t next_fragment_output_location;
 };
 
 struct compiler_instance_buffer_flattened_declaration_t
@@ -143,10 +145,10 @@ struct compiler_instance_buffer_flattened_declaration_t
     struct compiler_instance_buffer_flattened_declaration_t *next;
     struct compiler_instance_declaration_node_t *source_declaration;
     kan_interned_string_t readable_name;
-    uint64_t location;
+    kan_rpl_size_t location;
 
-    uint32_t spirv_id_input;
-    uint32_t spirv_id_output;
+    spirv_size_t spirv_id_input;
+    spirv_size_t spirv_id_output;
 };
 
 struct compiler_instance_buffer_flattening_graph_node_t
@@ -165,22 +167,22 @@ struct compiler_instance_buffer_node_t
     enum kan_rpl_buffer_type_t type;
     kan_bool_t used;
 
-    uint64_t size;
-    uint64_t alignment;
+    kan_instance_size_t size;
+    kan_instance_size_t alignment;
     struct compiler_instance_declaration_node_t *first_field;
 
-    uint64_t binding;
+    kan_instance_size_t binding;
     kan_bool_t stable_binding;
 
     struct compiler_instance_buffer_flattening_graph_node_t *flattening_graph_base;
     struct compiler_instance_buffer_flattened_declaration_t *first_flattened_declaration;
     struct compiler_instance_buffer_flattened_declaration_t *last_flattened_declaration;
 
-    uint32_t structured_variable_spirv_id;
+    spirv_size_t structured_variable_spirv_id;
 
     kan_interned_string_t module_name;
     kan_interned_string_t source_name;
-    uint32_t source_line;
+    kan_rpl_size_t source_line;
 };
 
 struct compiler_instance_sampler_node_t
@@ -191,14 +193,14 @@ struct compiler_instance_sampler_node_t
     enum kan_rpl_sampler_type_t type;
     kan_bool_t used;
 
-    uint64_t binding;
+    kan_instance_size_t binding;
     struct compiler_instance_setting_node_t *first_setting;
 
-    uint32_t variable_spirv_id;
+    spirv_size_t variable_spirv_id;
 
     kan_interned_string_t module_name;
     kan_interned_string_t source_name;
-    uint32_t source_line;
+    kan_rpl_size_t source_line;
 };
 
 enum compiler_instance_expression_type_t
@@ -249,8 +251,8 @@ enum compiler_instance_expression_type_t
 struct compiler_instance_structured_access_suffix_t
 {
     struct compiler_instance_expression_node_t *input;
-    uint64_t access_chain_length;
-    uint64_t *access_chain_indices;
+    kan_instance_size_t access_chain_length;
+    kan_instance_size_t *access_chain_indices;
 };
 
 struct compiler_instance_variable_declaration_suffix_t
@@ -281,7 +283,7 @@ struct compiler_instance_scope_variable_item_t
     struct compiler_instance_scope_variable_item_t *next;
     struct compiler_instance_variable_t *variable;
     kan_bool_t writable;
-    uint32_t spirv_id;
+    spirv_size_t spirv_id;
 };
 
 struct compiler_instance_scope_suffix_t
@@ -326,8 +328,8 @@ struct compiler_instance_for_suffix_t
     struct compiler_instance_expression_node_t *step;
     struct compiler_instance_expression_node_t *body;
 
-    uint32_t spirv_label_break;
-    uint32_t spirv_label_continue;
+    spirv_size_t spirv_label_break;
+    spirv_size_t spirv_label_continue;
 };
 
 struct compiler_instance_while_suffix_t
@@ -335,8 +337,8 @@ struct compiler_instance_while_suffix_t
     struct compiler_instance_expression_node_t *condition;
     struct compiler_instance_expression_node_t *body;
 
-    uint32_t spirv_label_break;
-    uint32_t spirv_label_continue;
+    spirv_size_t spirv_label_break;
+    spirv_size_t spirv_label_continue;
 };
 
 struct compiler_instance_expression_output_type_t
@@ -355,8 +357,8 @@ struct compiler_instance_expression_node_t
         struct compiler_instance_scope_variable_item_t *variable_reference;
         struct compiler_instance_structured_access_suffix_t structured_access;
         struct compiler_instance_buffer_flattened_declaration_t *flattened_buffer_access;
-        int64_t integer_literal;
-        double floating_literal;
+        kan_rpl_signed_int_literal_t integer_literal;
+        float floating_literal;
         struct compiler_instance_variable_declaration_suffix_t variable_declaration;
         struct compiler_instance_binary_operation_suffix_t binary_operation;
         struct compiler_instance_unary_operation_suffix_t unary_operation;
@@ -375,7 +377,7 @@ struct compiler_instance_expression_node_t
     struct compiler_instance_expression_output_type_t output;
     kan_interned_string_t module_name;
     kan_interned_string_t source_name;
-    uint32_t source_line;
+    kan_rpl_size_t source_line;
 };
 
 struct compiler_instance_buffer_access_node_t
@@ -410,14 +412,14 @@ struct compiler_instance_function_node_t
     struct compiler_instance_buffer_access_node_t *first_buffer_access;
     struct compiler_instance_sampler_access_node_t *first_sampler_access;
 
-    uint32_t spirv_id;
-    uint32_t spirv_external_library_id;
-    uint32_t spirv_external_instruction_id;
+    spirv_size_t spirv_id;
+    spirv_size_t spirv_external_library_id;
+    spirv_size_t spirv_external_instruction_id;
     const struct spirv_generation_function_type_t *spirv_function_type;
 
     kan_interned_string_t module_name;
     kan_interned_string_t source_name;
-    uint32_t source_line;
+    kan_rpl_size_t source_line;
 };
 
 struct rpl_compiler_instance_t
@@ -426,7 +428,7 @@ struct rpl_compiler_instance_t
     kan_interned_string_t context_log_name;
     struct kan_stack_group_allocator_t resolve_allocator;
 
-    uint64_t entry_point_count;
+    kan_instance_size_t entry_point_count;
     struct kan_rpl_entry_point_t *entry_points;
 
     struct compiler_instance_setting_node_t *first_setting;
@@ -443,6 +445,8 @@ struct rpl_compiler_instance_t
 
     struct compiler_instance_function_node_t *first_function;
     struct compiler_instance_function_node_t *last_function;
+
+    struct kan_trivial_string_buffer_t resolve_name_generation_buffer;
 };
 
 enum inbuilt_type_item_t
@@ -451,7 +455,7 @@ enum inbuilt_type_item_t
     INBUILT_TYPE_ITEM_INTEGER,
 };
 
-static uint32_t inbuilt_type_item_size[] = {
+static kan_instance_size_t inbuilt_type_item_size[] = {
     4u,
     4u,
 };
@@ -460,29 +464,29 @@ struct inbuilt_vector_type_t
 {
     kan_interned_string_t name;
     enum inbuilt_type_item_t item;
-    uint32_t items_count;
+    kan_instance_size_t items_count;
     enum kan_rpl_meta_variable_type_t meta_type;
     struct compiler_instance_declaration_node_t *constructor_signature;
 
-    uint32_t spirv_id;
-    uint32_t spirv_id_input_pointer;
-    uint32_t spirv_id_output_pointer;
-    uint32_t spirv_id_function_pointer;
+    spirv_size_t spirv_id;
+    spirv_size_t spirv_id_input_pointer;
+    spirv_size_t spirv_id_output_pointer;
+    spirv_size_t spirv_id_function_pointer;
 };
 
 struct inbuilt_matrix_type_t
 {
     kan_interned_string_t name;
     enum inbuilt_type_item_t item;
-    uint32_t rows;
-    uint32_t columns;
+    kan_instance_size_t rows;
+    kan_instance_size_t columns;
     enum kan_rpl_meta_variable_type_t meta_type;
     struct compiler_instance_declaration_node_t *constructor_signature;
 
-    uint32_t spirv_id;
-    uint32_t spirv_id_input_pointer;
-    uint32_t spirv_id_output_pointer;
-    uint32_t spirv_id_function_pointer;
+    spirv_size_t spirv_id;
+    spirv_size_t spirv_id_input_pointer;
+    spirv_size_t spirv_id_output_pointer;
+    spirv_size_t spirv_id_function_pointer;
 };
 
 /// \details In common header as they are needed to initialize statics with known fixed ids.
@@ -1321,7 +1325,7 @@ void kan_rpl_compiler_ensure_statics_initialized (void);
 
 static inline struct inbuilt_vector_type_t *find_inbuilt_vector_type (kan_interned_string_t name)
 {
-    for (uint64_t index = 0u;
+    for (kan_loop_size_t index = 0u;
          index < sizeof (kan_rpl_compiler_statics.vector_types) / sizeof (kan_rpl_compiler_statics.vector_types[0u]);
          ++index)
     {
@@ -1336,7 +1340,7 @@ static inline struct inbuilt_vector_type_t *find_inbuilt_vector_type (kan_intern
 
 static inline struct inbuilt_matrix_type_t *find_inbuilt_matrix_type (kan_interned_string_t name)
 {
-    for (uint64_t index = 0u;
+    for (kan_loop_size_t index = 0u;
          index < sizeof (kan_rpl_compiler_statics.matrix_types) / sizeof (kan_rpl_compiler_statics.matrix_types[0u]);
          ++index)
     {
@@ -1352,14 +1356,14 @@ static inline struct inbuilt_matrix_type_t *find_inbuilt_matrix_type (kan_intern
 static inline struct compiler_instance_function_node_t *find_builtin_function (kan_interned_string_t name)
 {
     const struct kan_hash_storage_bucket_t *bucket =
-        kan_hash_storage_query (&STATICS.builtin_hash_storage, (uint64_t) name);
+        kan_hash_storage_query (&STATICS.builtin_hash_storage, (kan_hash_t) name);
     struct kan_rpl_compiler_builtin_node_t *node = (struct kan_rpl_compiler_builtin_node_t *) bucket->first;
     const struct kan_rpl_compiler_builtin_node_t *node_end =
         (struct kan_rpl_compiler_builtin_node_t *) (bucket->last ? bucket->last->next : NULL);
 
     while (node != node_end)
     {
-        if (node->node.hash == (uint64_t) name)
+        if (node->node.hash == (kan_hash_t) name)
         {
             return node->builtin;
         }
@@ -1368,34 +1372,6 @@ static inline struct compiler_instance_function_node_t *find_builtin_function (k
     }
 
     return NULL;
-}
-
-static inline void flattening_name_generation_buffer_reset (struct flattening_name_generation_buffer_t *buffer,
-                                                            uint64_t to_length)
-{
-    buffer->length = KAN_MIN (KAN_RPL_COMPILER_INSTANCE_MAX_FLAT_NAME_LENGTH - 1u, to_length);
-    buffer->buffer[buffer->length] = '\0';
-}
-
-static inline void flattening_name_generation_buffer_append (struct flattening_name_generation_buffer_t *buffer,
-                                                             const char *name)
-{
-    const uint64_t sub_name_length = strlen (name);
-    const uint64_t new_length = buffer->length > 0u ? buffer->length + 1u + sub_name_length : sub_name_length;
-    const uint64_t dot_position = buffer->length;
-    const uint64_t sub_name_position = dot_position == 0u ? 0u : dot_position + 1u;
-    flattening_name_generation_buffer_reset (buffer, new_length);
-
-    if (dot_position != 0u && dot_position < buffer->length)
-    {
-        buffer->buffer[dot_position] = '.';
-    }
-
-    if (sub_name_position < buffer->length)
-    {
-        const uint64_t to_copy = buffer->length - sub_name_position;
-        memcpy (&buffer->buffer[sub_name_position], name, to_copy);
-    }
 }
 
 static inline const char *get_type_name_for_logging (struct inbuilt_vector_type_t *if_vector,
@@ -1420,9 +1396,9 @@ static inline const char *get_type_name_for_logging (struct inbuilt_vector_type_
 
 static inline void calculate_full_type_definition_size_and_alignment (
     struct compiler_instance_full_type_definition_t *definition,
-    uint64_t dimension_offset,
-    uint64_t *size,
-    uint64_t *alignment)
+    kan_instance_size_t dimension_offset,
+    kan_instance_size_t *size,
+    kan_instance_size_t *alignment)
 {
     *size = 0u;
     *alignment = 0u;
@@ -1444,7 +1420,7 @@ static inline void calculate_full_type_definition_size_and_alignment (
         *alignment = definition->if_struct->alignment;
     }
 
-    for (uint64_t dimension = dimension_offset; dimension < definition->array_dimensions_count; ++dimension)
+    for (kan_loop_size_t dimension = dimension_offset; dimension < definition->array_dimensions_count; ++dimension)
     {
         *size *= definition->array_dimensions[dimension];
     }

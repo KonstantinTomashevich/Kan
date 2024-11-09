@@ -22,7 +22,7 @@ struct file_node_t
     struct file_node_t *next;
     kan_interned_string_t name;
     kan_interned_string_t extension;
-    uint64_t last_modification_time_ns;
+    kan_time_size_t last_modification_time_ns;
     kan_bool_t mark_found;
 };
 
@@ -193,7 +193,7 @@ static void initial_poll_to_directory_recursive (struct watcher_t *watcher, stru
                 continue;
             }
 
-            const uint64_t length_backup = watcher->path_container.length;
+            const kan_instance_size_t length_backup = watcher->path_container.length;
             kan_file_system_path_container_append (&watcher->path_container, entry_name);
 
             struct kan_file_system_entry_status_t status;
@@ -361,7 +361,7 @@ static void send_removal_events_to_directory_content (struct watcher_t *watcher,
     struct directory_node_t *child_directory = directory->first_child_directory;
     while (child_directory)
     {
-        const uint64_t length_backup = watcher->path_container.length;
+        const kan_instance_size_t length_backup = watcher->path_container.length;
         kan_file_system_path_container_append (&watcher->path_container, child_directory->name);
         send_removal_events_to_directory_content (watcher, child_directory);
         kan_file_system_path_container_reset_length (&watcher->path_container, length_backup);
@@ -453,7 +453,7 @@ static void verification_poll_at_directory_recursive (struct watcher_t *watcher,
                 continue;
             }
 
-            const uint64_t length_backup = watcher->path_container.length;
+            const kan_instance_size_t length_backup = watcher->path_container.length;
             kan_file_system_path_container_append (&watcher->path_container, entry_name);
 
             struct kan_file_system_entry_status_t status;
@@ -550,7 +550,7 @@ static void verification_poll_at_directory_recursive (struct watcher_t *watcher,
         }
         else
         {
-            const uint64_t length_backup = watcher->path_container.length;
+            const kan_instance_size_t length_backup = watcher->path_container.length;
             kan_file_system_path_container_append (&watcher->path_container, child_directory->name);
             send_removal_events_to_directory_content (watcher, child_directory);
             kan_file_system_path_container_reset_length (&watcher->path_container, length_backup);
@@ -659,8 +659,7 @@ static int server_thread (void *user_data)
         // We've captured serve queue value in watcher and there is no one who changes next pointers.
         // Therefore we can safely iterate and serve watchers.
 
-        const uint64_t serve_start = kan_platform_get_elapsed_nanoseconds ();
-
+        const kan_time_size_t serve_start = kan_platform_get_elapsed_nanoseconds ();
         while (watcher)
         {
             KAN_ASSERT (watcher->root_directory)
@@ -668,8 +667,8 @@ static int server_thread (void *user_data)
             watcher = watcher->next_watcher;
         }
 
-        const uint64_t serve_end = kan_platform_get_elapsed_nanoseconds ();
-        const uint64_t serve_time = serve_end - serve_start;
+        const kan_time_size_t serve_end = kan_platform_get_elapsed_nanoseconds ();
+        const kan_time_offset_t serve_time = (kan_time_offset_t) (serve_end - serve_start);
 
         if (serve_time < KAN_FILE_SYSTEM_WATCHER_UL_MIN_FRAME_NS)
         {

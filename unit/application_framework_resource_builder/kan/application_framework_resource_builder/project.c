@@ -32,7 +32,7 @@ void kan_application_resource_target_init (struct kan_application_resource_targe
 
 void kan_application_resource_target_shutdown (struct kan_application_resource_target_t *instance)
 {
-    for (uint64_t directory_index = 0u; directory_index < instance->directories.size; ++directory_index)
+    for (kan_loop_size_t directory_index = 0u; directory_index < instance->directories.size; ++directory_index)
     {
         char *directory = ((char **) instance->directories.data)[directory_index];
         if (directory)
@@ -66,7 +66,7 @@ void kan_application_resource_project_shutdown (struct kan_application_resource_
                           strlen (instance->plugin_relative_directory) + 1u);
     }
 
-    for (uint64_t target_index = 0u; target_index < instance->targets.size; ++target_index)
+    for (kan_loop_size_t target_index = 0u; target_index < instance->targets.size; ++target_index)
     {
         struct kan_application_resource_target_t *target =
             &((struct kan_application_resource_target_t *) instance->targets.data)[target_index];

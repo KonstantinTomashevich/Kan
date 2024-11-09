@@ -39,8 +39,8 @@ UNIVERSE_RESOURCE_REFERENCE_KAN_API struct kan_repository_meta_automatic_cascade
 
 struct resource_outer_reference_update_state_t
 {
-    uint64_t attachment_id;
-    uint64_t last_update_file_time_ns;
+    kan_resource_entry_id_t attachment_id;
+    kan_time_size_t last_update_file_time_ns;
 };
 
 // \meta reflection_struct_meta = "kan_resource_native_entry_t"
@@ -62,12 +62,12 @@ enum resource_outer_references_operation_state_t
 ///          To avoid this situation, we send unsuccessful response to user and manually delete operation.
 struct resource_outer_references_operation_t
 {
-    uint64_t entry_attachment_id;
+    kan_resource_entry_id_t entry_attachment_id;
     kan_interned_string_t type;
     kan_interned_string_t name;
 
     enum resource_outer_references_operation_state_t state;
-    uint64_t resource_request_id;
+    kan_resource_request_id_t resource_request_id;
 };
 
 struct resource_all_references_to_type_operation_t
@@ -78,7 +78,7 @@ struct resource_all_references_to_type_operation_t
 
 struct resource_outer_references_operation_binding_t
 {
-    uint64_t entry_attachment_id;
+    kan_resource_entry_id_t entry_attachment_id;
     kan_interned_string_t all_references_to_type;
 };
 
@@ -94,11 +94,12 @@ struct resource_reference_manager_native_container_type_data_t
 {
     kan_interned_string_t contained_type_name;
     kan_interned_string_t container_type_name;
-    uint64_t contained_type_alignment;
+    kan_memory_size_t contained_type_alignment;
     struct kan_repository_indexed_value_read_query_t read_by_id_query;
 };
 
-_Static_assert (_Alignof (struct resource_reference_manager_native_container_type_data_t) == _Alignof (uint64_t),
+_Static_assert (_Alignof (struct resource_reference_manager_native_container_type_data_t) ==
+                    _Alignof (kan_memory_size_t),
                 "Alignment matches.");
 
 struct resource_reference_manager_execution_shared_state_t
@@ -112,7 +113,7 @@ struct resource_reference_manager_execution_shared_state_t
     //// \meta reflection_ignore_struct_field
     struct kan_repository_indexed_sequence_write_cursor_t outer_reference_operation_cursor;
 
-    uint64_t end_time_ns;
+    kan_time_size_t end_time_ns;
 };
 
 struct resource_reference_manager_state_t
@@ -122,7 +123,7 @@ struct resource_reference_manager_state_t
 
     struct kan_repository_indexed_sequence_write_query_t write_sequence__resource_outer_references_operation;
 
-    uint64_t budget_ns;
+    kan_time_offset_t budget_ns;
     kan_interned_string_t workspace_directory_path;
 
     kan_serialization_binary_script_storage_t binary_script_storage;
@@ -143,10 +144,10 @@ struct resource_reference_manager_state_t
 
     kan_interned_string_t interned_resource_reference_manager_server;
 
-    uint64_t trailing_data_count;
+    kan_instance_size_t trailing_data_count;
 
     /// \meta reflection_ignore_struct_field
-    uint64_t trailing_data[0u];
+    void *trailing_data[0u];
 };
 
 _Static_assert (_Alignof (struct resource_reference_manager_state_t) ==
@@ -161,10 +162,10 @@ struct universe_resource_reference_type_node_t
 
 struct kan_reflection_generator_universe_resource_reference_t
 {
-    uint64_t boostrap_iteration;
+    kan_loop_size_t boostrap_iteration;
     kan_allocation_group_t generated_reflection_group;
     struct universe_resource_reference_type_node_t *first_resource_type;
-    uint64_t resource_types_count;
+    kan_instance_size_t resource_types_count;
 
     /// \meta reflection_ignore_struct_field
     struct kan_reflection_struct_t mutator_type;
@@ -248,7 +249,7 @@ static inline void send_outer_references_operation_response (struct resource_ref
                                                              kan_interned_string_t type,
                                                              kan_interned_string_t name,
                                                              kan_bool_t successful,
-                                                             uint64_t entry_attachment_id)
+                                                             kan_resource_entry_id_t entry_attachment_id)
 {
     KAN_UP_EVENT_INSERT (event, kan_resource_update_outer_references_response_event_t)
     {
@@ -275,7 +276,8 @@ static inline void delete_all_ongoing_operations (struct resource_reference_mana
     KAN_UP_SEQUENCE_WRITE (outer_operation, resource_outer_references_operation_t)
     {
         reset_outer_references_operation (state, outer_operation);
-        send_outer_references_operation_response (state, outer_operation->type, outer_operation->name, KAN_FALSE, 0u);
+        send_outer_references_operation_response (state, outer_operation->type, outer_operation->name, KAN_FALSE,
+                                                  KAN_TYPED_ID_32_SET_INVALID (kan_resource_entry_id_t));
         KAN_UP_ACCESS_DELETE (outer_operation);
     }
 
@@ -369,7 +371,7 @@ static inline void add_all_references_to_type (struct resource_reference_manager
 
     if (type_node)
     {
-        for (uint64_t index = 0u; index < type_node->referencer_types.size; ++index)
+        for (kan_loop_size_t index = 0u; index < type_node->referencer_types.size; ++index)
         {
             kan_interned_string_t referencer_type = ((kan_interned_string_t *) type_node->referencer_types.data)[index];
             KAN_UP_VALUE_READ (entry, kan_resource_native_entry_t, type, &referencer_type)
@@ -381,7 +383,7 @@ static inline void add_all_references_to_type (struct resource_reference_manager
 }
 
 static inline void fail_all_references_to_type_operation (struct resource_reference_manager_state_t *state,
-                                                          uint64_t failed_outer_references_operation_id)
+                                                          kan_resource_entry_id_t failed_outer_references_operation_id)
 {
     KAN_UP_VALUE_READ (binding, resource_outer_references_operation_binding_t, entry_attachment_id,
                        &failed_outer_references_operation_id)
@@ -397,13 +399,13 @@ static inline void fail_all_references_to_type_operation (struct resource_refere
     }
 }
 
-static inline uint64_t get_last_outer_reference_update_file_time_ns (
+static inline kan_time_size_t get_last_outer_reference_update_file_time_ns (
     struct resource_reference_manager_state_t *state, const struct resource_outer_references_operation_t *operation)
 {
     KAN_UP_VALUE_READ (update_state, resource_outer_reference_update_state_t, attachment_id,
                        &operation->entry_attachment_id)
     {
-        KAN_UP_QUERY_RETURN_VALUE (uint64_t, update_state->last_update_file_time_ns);
+        KAN_UP_QUERY_RETURN_VALUE (kan_time_size_t, update_state->last_update_file_time_ns);
     }
 
     return 0u;
@@ -426,9 +428,8 @@ static inline void construct_cache_file_path (struct resource_reference_manager_
     kan_file_system_path_container_append (output, operation->name);
 }
 
-static inline uint64_t get_last_outer_reference_cache_file_time_ns (struct resource_reference_manager_state_t *state,
-                                                                    const char *cache_path,
-                                                                    kan_virtual_file_system_volume_t volume)
+static inline kan_time_size_t get_last_outer_reference_cache_file_time_ns (
+    struct resource_reference_manager_state_t *state, const char *cache_path, kan_virtual_file_system_volume_t volume)
 {
     if (kan_virtual_file_system_check_existence (volume, cache_path))
     {
@@ -447,9 +448,10 @@ static inline uint64_t get_last_outer_reference_cache_file_time_ns (struct resou
     return 0u;
 }
 
-static inline uint64_t get_last_outer_reference_source_file_time_ns (struct resource_reference_manager_state_t *state,
-                                                                     const struct kan_resource_native_entry_t *entry,
-                                                                     kan_virtual_file_system_volume_t volume)
+static inline kan_time_size_t get_last_outer_reference_source_file_time_ns (
+    struct resource_reference_manager_state_t *state,
+    const struct kan_resource_native_entry_t *entry,
+    kan_virtual_file_system_volume_t volume)
 {
     struct kan_virtual_file_system_entry_status_t status;
     if (kan_virtual_file_system_query_entry (volume, entry->path, &status))
@@ -468,9 +470,9 @@ static inline uint64_t get_last_outer_reference_source_file_time_ns (struct reso
 static inline void publish_references (struct resource_reference_manager_state_t *state,
                                        const struct kan_resource_native_entry_t *entry,
                                        const struct kan_resource_pipeline_detected_reference_container_t *container,
-                                       uint64_t file_time_ns)
+                                       kan_time_size_t file_time_ns)
 {
-    uint64_t reference_output_index = 0u;
+    kan_loop_size_t reference_output_index = 0u;
     KAN_UP_VALUE_WRITE (old_reference, kan_resource_native_entry_outer_reference_t, attachment_id,
                         &entry->attachment_id)
     {
@@ -582,7 +584,7 @@ static inline kan_bool_t update_references_from_cache (struct resource_reference
     return successful;
 }
 
-static inline uint64_t write_references_to_cache (
+static inline kan_time_size_t write_references_to_cache (
     struct resource_reference_manager_state_t *state,
     const struct resource_outer_references_operation_t *operation,
     const struct kan_resource_pipeline_detected_reference_container_t *container)
@@ -649,16 +651,17 @@ static void process_outer_reference_operation_in_requested_state (
     struct kan_file_system_path_container_t cache_path;
     construct_cache_file_path (state, operation, &cache_path);
 
-    const uint64_t transient_update_time_ns = get_last_outer_reference_update_file_time_ns (state, operation);
-    const uint64_t plugin_update_time_ns =
+    const kan_time_size_t transient_update_time_ns = get_last_outer_reference_update_file_time_ns (state, operation);
+    const kan_time_size_t plugin_update_time_ns =
         KAN_HANDLE_IS_VALID (state->plugin_system) ?
             kan_plugin_system_get_newest_loaded_plugin_last_modification_file_time_ns (state->plugin_system) :
             0u;
 
     kan_virtual_file_system_volume_t volume =
         kan_virtual_file_system_get_context_volume_for_read (state->virtual_file_system);
-    const uint64_t cache_update_time_ns = get_last_outer_reference_cache_file_time_ns (state, cache_path.path, volume);
-    const uint64_t source_update_time_ns = get_last_outer_reference_source_file_time_ns (state, entry, volume);
+    const kan_time_size_t cache_update_time_ns =
+        get_last_outer_reference_cache_file_time_ns (state, cache_path.path, volume);
+    const kan_time_size_t source_update_time_ns = get_last_outer_reference_source_file_time_ns (state, entry, volume);
     kan_virtual_file_system_close_context_read_access (state->virtual_file_system);
 
     const kan_bool_t cache_is_up_to_date =
@@ -717,7 +720,7 @@ static void process_outer_reference_operation_in_waiting_resource_state (
 {
     KAN_UP_VALUE_DELETE (request, kan_resource_request_t, request_id, &operation->resource_request_id)
     {
-        if (request->provided_container_id != KAN_RESOURCE_PROVIDER_CONTAINER_ID_NONE)
+        if (KAN_TYPED_ID_32_IS_VALID (request->provided_container_id))
         {
             struct resource_reference_manager_native_container_type_data_t *type_data =
                 query_resource_type_data (state, operation->type);
@@ -744,7 +747,7 @@ static void process_outer_reference_operation_in_waiting_resource_state (
             const uint8_t *container_data = kan_repository_indexed_value_read_access_resolve (&container_access);
             KAN_ASSERT (container_data)
 
-            const uint64_t instance_offset = kan_apply_alignment (
+            const kan_memory_size_t instance_offset = kan_apply_alignment (
                 offsetof (struct kan_resource_container_view_t, data_begin), type_data->contained_type_alignment);
             const void *instance_data = container_data + instance_offset;
 
@@ -753,7 +756,7 @@ static void process_outer_reference_operation_in_waiting_resource_state (
             kan_resource_pipeline_detect_references (&state->info_storage, operation->type, instance_data,
                                                      &reference_container);
 
-            const uint64_t cache_file_time = write_references_to_cache (state, operation, &reference_container);
+            const kan_time_size_t cache_file_time = write_references_to_cache (state, operation, &reference_container);
             publish_references (state, entry, &reference_container, cache_file_time);
             kan_resource_pipeline_detected_reference_container_shutdown (&reference_container);
 
@@ -781,7 +784,7 @@ static void process_outer_reference_operation_in_waiting_resource_state (
     kan_repository_indexed_sequence_write_access_delete (operation_access);
 }
 
-static void execute_shared_serve (uint64_t user_data)
+static void execute_shared_serve (kan_functor_user_data_t user_data)
 {
     struct resource_reference_manager_state_t *state = (struct resource_reference_manager_state_t *) user_data;
     while (KAN_TRUE)
@@ -840,7 +843,8 @@ static void execute_shared_serve (uint64_t user_data)
                      "Failed to process outer references request as its entry \"%s\" of type \"%s\" does not exist.",
                      operation->name, operation->type)
 
-            send_outer_references_operation_response (state, operation->type, operation->name, KAN_FALSE, 0u);
+            send_outer_references_operation_response (state, operation->type, operation->name, KAN_FALSE,
+                                                      KAN_TYPED_ID_32_SET_INVALID (kan_resource_entry_id_t));
             fail_all_references_to_type_operation (state, operation->entry_attachment_id);
             reset_outer_references_operation (state, operation);
             kan_repository_indexed_sequence_write_access_delete (&operation_access);
@@ -858,7 +862,7 @@ static void execute_shared_serve (uint64_t user_data)
 UNIVERSE_RESOURCE_REFERENCE_KAN_API void mutator_template_execute_resource_reference_manager (
     kan_cpu_job_t job, struct resource_reference_manager_state_t *state)
 {
-    const uint64_t begin_time = kan_platform_get_elapsed_nanoseconds ();
+    const kan_time_size_t begin_time = kan_platform_get_elapsed_nanoseconds ();
     if (state->need_to_cancel_old_operations)
     {
         delete_all_ongoing_operations (state);
@@ -895,7 +899,8 @@ UNIVERSE_RESOURCE_REFERENCE_KAN_API void mutator_template_execute_resource_refer
                      "Unable to find native resource \"%s\" of type \"%s\" in order to collect its outer references.",
                      outer_references_request->name, outer_references_request->type)
             send_outer_references_operation_response (state, outer_references_request->type,
-                                                      outer_references_request->name, KAN_FALSE, 0u);
+                                                      outer_references_request->name, KAN_FALSE,
+                                                      KAN_TYPED_ID_32_SET_INVALID (kan_resource_entry_id_t));
         }
     }
 
@@ -927,7 +932,7 @@ UNIVERSE_RESOURCE_REFERENCE_KAN_API void mutator_template_execute_resource_refer
     // Process operations.
 
     kan_stack_group_allocator_reset (&state->temporary_allocator);
-    const uint64_t cpu_count = kan_platform_get_cpu_count ();
+    const kan_instance_size_t cpu_count = kan_platform_get_cpu_count ();
     struct kan_cpu_task_list_node_t *task_list_node = NULL;
 
     state->execution_shared_state.workers_left = kan_atomic_int_init ((int) cpu_count);
@@ -937,7 +942,7 @@ UNIVERSE_RESOURCE_REFERENCE_KAN_API void mutator_template_execute_resource_refer
             &state->write_sequence__resource_outer_references_operation);
     state->execution_shared_state.end_time_ns = begin_time + state->budget_ns;
 
-    for (uint64_t worker_index = 0u; worker_index < cpu_count; ++worker_index)
+    for (kan_loop_size_t worker_index = 0u; worker_index < cpu_count; ++worker_index)
     {
         KAN_CPU_TASK_LIST_USER_VALUE (&task_list_node, &state->temporary_allocator,
                                       state->interned_resource_reference_manager_server, execute_shared_serve, state)
@@ -972,7 +977,7 @@ UNIVERSE_RESOURCE_REFERENCE_KAN_API void kan_reflection_generator_universe_resou
 }
 
 UNIVERSE_RESOURCE_REFERENCE_KAN_API void kan_reflection_generator_universe_resource_reference_bootstrap (
-    struct kan_reflection_generator_universe_resource_reference_t *instance, uint64_t bootstrap_iteration)
+    struct kan_reflection_generator_universe_resource_reference_t *instance, kan_loop_size_t bootstrap_iteration)
 {
     instance->boostrap_iteration = bootstrap_iteration;
 }
@@ -998,7 +1003,7 @@ UNIVERSE_RESOURCE_REFERENCE_KAN_API void kan_reflection_generator_universe_resou
     struct kan_reflection_generator_universe_resource_reference_t *instance,
     kan_reflection_registry_t registry,
     kan_reflection_system_generation_iterator_t iterator,
-    uint64_t iteration_index)
+    kan_loop_size_t iteration_index)
 {
     KAN_UNIVERSE_REFLECTION_GENERATOR_ITERATE_TYPES_WITH_META (
         struct kan_resource_pipeline_resource_type_meta_t,

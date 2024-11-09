@@ -61,7 +61,7 @@ struct kan_allocation_group_event_t
     kan_allocation_group_t group;
     union
     {
-        uint64_t amount;
+        kan_memory_size_t amount;
 
         char *name;
     };
@@ -77,10 +77,11 @@ MEMORY_PROFILER_API kan_allocation_group_t
 kan_captured_allocation_group_get_source (kan_captured_allocation_group_t group);
 
 /// \brief Returns amount of memory inside captured allocation group including its children.
-MEMORY_PROFILER_API uint64_t kan_captured_allocation_group_get_total_allocated (kan_captured_allocation_group_t group);
+MEMORY_PROFILER_API kan_memory_size_t
+kan_captured_allocation_group_get_total_allocated (kan_captured_allocation_group_t group);
 
 /// \brief Returns amount of memory inside captured allocation group excluding its children.
-MEMORY_PROFILER_API uint64_t
+MEMORY_PROFILER_API kan_memory_size_t
 kan_captured_allocation_group_get_directly_allocated (kan_captured_allocation_group_t group);
 
 KAN_HANDLE_DEFINE (kan_captured_allocation_group_iterator_t);

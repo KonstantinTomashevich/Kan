@@ -72,25 +72,25 @@ struct kan_rpl_graphics_classic_pipeline_settings_t
     kan_bool_t depth_write;
     kan_bool_t depth_bounds_test;
     enum kan_rpl_compare_operation_t depth_compare_operation;
-    double depth_min;
-    double depth_max;
+    float depth_min;
+    float depth_max;
 
     kan_bool_t stencil_test;
     enum kan_rpl_stencil_operation_t stencil_front_on_fail;
     enum kan_rpl_stencil_operation_t stencil_front_on_depth_fail;
     enum kan_rpl_stencil_operation_t stencil_front_on_pass;
     enum kan_rpl_compare_operation_t stencil_front_compare;
-    uint32_t stencil_front_compare_mask;
-    uint32_t stencil_front_write_mask;
-    uint32_t stencil_front_reference;
+    uint8_t stencil_front_compare_mask;
+    uint8_t stencil_front_write_mask;
+    uint8_t stencil_front_reference;
 
     enum kan_rpl_stencil_operation_t stencil_back_on_fail;
     enum kan_rpl_stencil_operation_t stencil_back_on_depth_fail;
     enum kan_rpl_stencil_operation_t stencil_back_on_pass;
     enum kan_rpl_compare_operation_t stencil_back_compare;
-    uint32_t stencil_back_compare_mask;
-    uint32_t stencil_back_write_mask;
-    uint32_t stencil_back_reference;
+    uint8_t stencil_back_compare_mask;
+    uint8_t stencil_back_write_mask;
+    uint8_t stencil_back_reference;
 };
 
 static inline struct kan_rpl_graphics_classic_pipeline_settings_t kan_rpl_graphics_classic_pipeline_settings_default (
@@ -141,8 +141,8 @@ enum kan_rpl_meta_variable_type_t
 /// \brief Stores information about exposed buffer attribute.
 struct kan_rpl_meta_attribute_t
 {
-    uint64_t location;
-    uint64_t offset;
+    kan_rpl_size_t location;
+    kan_rpl_size_t offset;
     enum kan_rpl_meta_variable_type_t type;
 };
 
@@ -151,10 +151,10 @@ struct kan_rpl_meta_parameter_t
 {
     kan_interned_string_t name;
     enum kan_rpl_meta_variable_type_t type;
-    uint64_t offset;
+    kan_rpl_size_t offset;
 
     /// \brief Total item count -- 1 for single parameter, multiplication of every dimension for arrays.
-    uint64_t total_item_count;
+    kan_rpl_size_t total_item_count;
 
     /// \meta reflection_dynamic_array_type = "kan_interned_string_t"
     struct kan_dynamic_array_t meta;
@@ -171,7 +171,7 @@ struct kan_rpl_meta_buffer_t
 
     /// \brief Binding point index for buffer.
     /// \details Vertex buffer binding for vertex attribute buffers or buffer binding point for other buffers.
-    uint64_t binding;
+    kan_rpl_size_t binding;
 
     /// \brief Buffer type.
     /// \details Stage outputs are not listed in meta buffers.
@@ -179,7 +179,7 @@ struct kan_rpl_meta_buffer_t
 
     /// \brief Buffer size.
     /// \details Item size for instanced and vertex attribute buffers and full size for other buffers.
-    uint64_t size;
+    kan_rpl_size_t size;
 
     /// \brief Attributes provided by this buffer, needed for pipeline setup.
     /// \details Only provided for attribute buffers.
@@ -246,7 +246,7 @@ static inline struct kan_rpl_meta_sampler_settings_t kan_rpl_meta_sampler_settin
 struct kan_rpl_meta_sampler_t
 {
     kan_interned_string_t name;
-    uint64_t binding;
+    kan_rpl_size_t binding;
     enum kan_rpl_sampler_type_t type;
     struct kan_rpl_meta_sampler_settings_t settings;
 };
@@ -338,7 +338,7 @@ struct kan_rpl_meta_t
     union
     {
         /// \meta reflection_visibility_condition_field = "pipeline_type"
-        /// \meta reflection_visibility_condition_values = "(int64_t) KAN_RPL_PIPELINE_TYPE_GRAPHICS_CLASSIC"
+        /// \meta reflection_visibility_condition_values = "KAN_RPL_PIPELINE_TYPE_GRAPHICS_CLASSIC"
         struct kan_rpl_graphics_classic_pipeline_settings_t graphics_classic_settings;
     };
 
@@ -354,10 +354,10 @@ struct kan_rpl_meta_t
     /// \meta reflection_dynamic_array_type = "struct kan_rpl_meta_color_output_t"
     struct kan_dynamic_array_t color_outputs;
 
-    double color_blend_constant_r;
-    double color_blend_constant_g;
-    double color_blend_constant_b;
-    double color_blend_constant_a;
+    float color_blend_constant_r;
+    float color_blend_constant_g;
+    float color_blend_constant_b;
+    float color_blend_constant_a;
 };
 
 RENDER_PIPELINE_LANGUAGE_API void kan_rpl_meta_init (struct kan_rpl_meta_t *instance);
@@ -378,14 +378,14 @@ RENDER_PIPELINE_LANGUAGE_API kan_bool_t kan_rpl_compiler_context_set_option_flag
 
 /// \brief Attempts to set count option value.
 RENDER_PIPELINE_LANGUAGE_API kan_bool_t kan_rpl_compiler_context_set_option_count (
-    kan_rpl_compiler_context_t compiler_context, kan_interned_string_t name, uint64_t value);
+    kan_rpl_compiler_context_t compiler_context, kan_interned_string_t name, kan_rpl_unsigned_int_literal_t value);
 
 /// \brief Resolves context with given entry points to provide data for emit step.
 /// \details One context can be used for multiple resolves as resolves do not modify the context.
 ///          Also, resolve with zero entry points is supported for cases when only metadata is needed.
 RENDER_PIPELINE_LANGUAGE_API kan_rpl_compiler_instance_t
 kan_rpl_compiler_context_resolve (kan_rpl_compiler_context_t compiler_context,
-                                  uint64_t entry_point_count,
+                                  kan_instance_size_t entry_point_count,
                                   struct kan_rpl_entry_point_t *entry_points);
 
 /// \brief Emits meta using resolved instance data.

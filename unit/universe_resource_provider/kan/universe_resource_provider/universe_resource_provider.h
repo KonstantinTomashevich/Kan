@@ -100,8 +100,9 @@ KAN_C_HEADER_BEGIN
 /// \brief Checkpoint, that is hit after all resource provider mutators finished execution.
 #define KAN_RESOURCE_PROVIDER_END_CHECKPOINT "resource_provider_end"
 
-/// \brief Value that represents absence of valid container for native resource.
-#define KAN_RESOURCE_PROVIDER_CONTAINER_ID_NONE 0u
+KAN_TYPED_ID_32_DEFINE (kan_resource_request_id_t);
+KAN_TYPED_ID_32_DEFINE (kan_resource_container_id_t);
+KAN_TYPED_ID_32_DEFINE (kan_resource_entry_id_t);
 
 /// \brief Provides data of loaded third party resource.
 struct kan_resource_third_party_data_t
@@ -109,14 +110,14 @@ struct kan_resource_third_party_data_t
     /// \warning Might be `NULL` if resource cannot be loaded.
     void *data;
 
-    uint64_t size;
+    kan_memory_size_t size;
 };
 
 /// \brief Instance of resource request, used to communicate with resource provider.
 struct kan_resource_request_t
 {
     /// \brief Unique id of this request.
-    uint64_t request_id;
+    kan_resource_request_id_t request_id;
 
     /// \brief Type of native resource.
     /// \details Set to NULL for third party resource objects.
@@ -126,12 +127,12 @@ struct kan_resource_request_t
     kan_interned_string_t name;
 
     /// \brief Priority for resource loading if it is not already loaded.
-    uint64_t priority;
+    kan_instance_size_t priority;
 
     union
     {
         /// \brief Id of container with loaded resource if any.
-        uint64_t provided_container_id;
+        kan_resource_container_id_t provided_container_id;
 
         /// \brief Loaded third party data if any.
         struct kan_resource_third_party_data_t provided_third_party;
@@ -144,7 +145,7 @@ UNIVERSE_RESOURCE_PROVIDER_API void kan_resource_request_init (struct kan_resour
 /// \meta reflection_ignore_struct
 struct kan_resource_container_view_t
 {
-    uint64_t container_id;
+    kan_resource_container_id_t container_id;
     kan_allocation_group_t my_allocation_group;
 
     uint8_t data_begin[];
@@ -154,7 +155,7 @@ struct kan_resource_container_view_t
 struct kan_resource_request_updated_event_t
 {
     /// \brief Id of a request that is being updated.
-    uint64_t request_id;
+    kan_resource_request_id_t request_id;
 
     /// \details Providing type name here makes it possible to filter out requests of unsupported types faster.
     kan_interned_string_t type;
@@ -179,30 +180,33 @@ UNIVERSE_RESOURCE_PROVIDER_API void kan_resource_provider_singleton_init (
     struct kan_resource_provider_singleton_t *instance);
 
 /// \brief Inline helper for generation resource request ids.
-static inline uint64_t kan_next_resource_request_id (const struct kan_resource_provider_singleton_t *resource_provider)
+static inline kan_resource_request_id_t kan_next_resource_request_id (
+    const struct kan_resource_provider_singleton_t *resource_provider)
 {
     // Intentionally request const and de-const it to show that it is multithreading-safe function.
-    return kan_atomic_int_add ((struct kan_atomic_int_t *) &resource_provider->request_id_counter, 1);
+    return KAN_TYPED_ID_32_SET (
+        kan_resource_request_id_t,
+        (kan_id_32_t) kan_atomic_int_add ((struct kan_atomic_int_t *) &resource_provider->request_id_counter, 1));
 }
 
 /// \brief Structure that contains configuration for resource provider.
 struct kan_resource_provider_configuration_t
 {
     /// \brief How much time in nanoseconds should be spent scanning for resources during update.
-    uint64_t scan_budget_ns;
+    kan_time_offset_t scan_budget_ns;
 
     /// \brief How much time in nanoseconds should be spent loading resources during update.
-    uint64_t load_budget_ns;
+    kan_time_offset_t load_budget_ns;
 
     /// \brief How much time in nanoseconds to wait after file addition in order to scan it.
     /// \details Used to prevent situations when file is added and then modified, but program tries to read it before
     ///          modification.
-    uint64_t add_wait_time_ns;
+    kan_time_offset_t add_wait_time_ns;
 
     /// \brief How much time in nanoseconds to wait after file modification in order to scan it.
     /// \details Used to prevent situations when file is modified several, but program tries to read it before
     ///          all modifications are done.
-    uint64_t modify_wait_time_ns;
+    kan_time_offset_t modify_wait_time_ns;
 
     /// \brief Whether string registries should be loaded in load-only mode.
     /// \details Generally, should always be true as resource provider does not save assets at the moment.
@@ -219,7 +223,7 @@ struct kan_resource_provider_configuration_t
 struct kan_resource_native_entry_t
 {
     /// \brief Id for attaching additional data to the entry.
-    uint64_t attachment_id;
+    kan_resource_entry_id_t attachment_id;
 
     kan_interned_string_t type;
     kan_interned_string_t name;
@@ -235,10 +239,10 @@ UNIVERSE_RESOURCE_PROVIDER_API void kan_resource_native_entry_shutdown (struct k
 struct kan_resource_third_party_entry_t
 {
     /// \brief Id for attaching additional data to the entry.
-    uint64_t attachment_id;
+    kan_resource_entry_id_t attachment_id;
 
     kan_interned_string_t name;
-    uint64_t size;
+    kan_memory_size_t size;
     char *path;
     kan_allocation_group_t my_allocation_group;
 };

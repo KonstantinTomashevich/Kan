@@ -1,7 +1,7 @@
 #include <kan/context/render_backend_implementation_interface.h>
 
 struct render_backend_code_module_t *render_backend_system_create_code_module (struct render_backend_system_t *system,
-                                                                               uint32_t code_length,
+                                                                               kan_instance_size_t code_length,
                                                                                void *code,
                                                                                kan_interned_string_t tracking_name)
 {
@@ -12,7 +12,7 @@ struct render_backend_code_module_t *render_backend_system_create_code_module (s
         .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
         .pNext = NULL,
         .flags = 0u,
-        .codeSize = code_length,
+        .codeSize = (vulkan_size_t) code_length,
         .pCode = code,
     };
 
@@ -33,7 +33,7 @@ struct render_backend_code_module_t *render_backend_system_create_code_module (s
         .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
         .pNext = NULL,
         .objectType = VK_OBJECT_TYPE_SHADER_MODULE,
-        .objectHandle = (uint64_t) shader_module,
+        .objectHandle = CONVERT_HANDLE_FOR_DEBUG shader_module,
         .pObjectName = debug_name,
     };
 
@@ -63,7 +63,7 @@ void render_backend_system_destroy_code_module (struct render_backend_system_t *
 }
 
 kan_render_code_module_t kan_render_code_module_create (kan_render_context_t context,
-                                                        uint32_t code_length,
+                                                        vulkan_size_t code_length,
                                                         void *code,
                                                         kan_interned_string_t tracking_name)
 {

@@ -530,9 +530,9 @@ struct kan_universe_space_automated_lifetime_query_meta_t
 /// \brief Configuration for automatic lifetime space queries with their bounds.
 struct kan_universe_space_configuration_t
 {
-    double global_min;
-    double global_max;
-    double leaf_size;
+    kan_floating_t global_min;
+    kan_floating_t global_max;
+    kan_floating_t leaf_size;
 };
 
 /// \brief Meta for any mutator function, that adds this mutator to named group.

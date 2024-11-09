@@ -3,6 +3,7 @@
 #include <container_api.h>
 
 #include <memory.h>
+#include <stdio.h>
 #include <string.h>
 
 #include <kan/api_common/c_header.h>
@@ -17,8 +18,8 @@ KAN_C_HEADER_BEGIN
 /// \brief Trivial string buffer structure.
 struct kan_trivial_string_buffer_t
 {
-    uint64_t size;
-    uint64_t capacity;
+    kan_instance_size_t size;
+    kan_instance_size_t capacity;
     kan_allocation_group_t allocation_group;
     char *buffer;
 };
@@ -26,7 +27,7 @@ struct kan_trivial_string_buffer_t
 /// \brief Initializes trivial string buffer with initial non-zero capacity.
 static inline void kan_trivial_string_buffer_init (struct kan_trivial_string_buffer_t *instance,
                                                    kan_allocation_group_t allocation_group,
-                                                   uint64_t capacity)
+                                                   kan_instance_size_t capacity)
 {
     KAN_ASSERT (capacity > 0u)
     instance->size = 0u;
@@ -38,13 +39,13 @@ static inline void kan_trivial_string_buffer_init (struct kan_trivial_string_buf
 /// \brief Appends given amount of character from given input string to string buffer.
 static inline void kan_trivial_string_buffer_append_char_sequence (struct kan_trivial_string_buffer_t *instance,
                                                                    const char *begin,
-                                                                   uint64_t length)
+                                                                   kan_instance_size_t length)
 {
     if (length > 0u)
     {
         if (instance->size + length > instance->capacity)
         {
-            const uint64_t new_capacity = instance->capacity * 2u;
+            const kan_instance_size_t new_capacity = instance->capacity * 2u;
             char *new_buffer = kan_allocate_general (instance->allocation_group, new_capacity, _Alignof (char));
 
             memcpy (new_buffer, instance->buffer, instance->size);
@@ -54,7 +55,7 @@ static inline void kan_trivial_string_buffer_append_char_sequence (struct kan_tr
             instance->buffer = new_buffer;
         }
 
-        strncpy (instance->buffer + instance->size, begin, length);
+        memcpy (instance->buffer + instance->size, begin, length);
         instance->size += length;
     }
 }
@@ -63,7 +64,7 @@ static inline void kan_trivial_string_buffer_append_char_sequence (struct kan_tr
 static inline void kan_trivial_string_buffer_append_string (struct kan_trivial_string_buffer_t *instance,
                                                             const char *string)
 {
-    kan_trivial_string_buffer_append_char_sequence (instance, string, strlen (string));
+    kan_trivial_string_buffer_append_char_sequence (instance, string, (kan_instance_size_t) strlen (string));
 }
 
 /// \brief Formats and appends given unsigned long to string buffer.
@@ -84,6 +85,14 @@ static inline void kan_trivial_string_buffer_append_signed_long (struct kan_triv
     snprintf (buffer, 63u, "%ld", value);
     buffer[63u] = '\0';
     kan_trivial_string_buffer_append_string (instance, buffer);
+}
+
+/// \brief Sets buffer size to given size which is smaller than current, forgetting excess characters.
+static inline void kan_trivial_string_buffer_reset (struct kan_trivial_string_buffer_t *instance,
+                                                    kan_instance_size_t new_size)
+{
+    KAN_ASSERT (new_size <= instance->size)
+    instance->size = new_size;
 }
 
 /// \brief Shuts down string buffer and frees its resources.

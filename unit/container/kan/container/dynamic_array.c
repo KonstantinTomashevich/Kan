@@ -5,9 +5,9 @@
 #include <kan/memory/allocation.h>
 
 void kan_dynamic_array_init (struct kan_dynamic_array_t *array,
-                             uint64_t initial_capacity,
-                             uint64_t item_size,
-                             uint64_t item_alignment,
+                             kan_instance_size_t initial_capacity,
+                             kan_instance_size_t item_size,
+                             kan_instance_size_t item_alignment,
                              kan_allocation_group_t allocation_group)
 {
     array->size = 0;
@@ -39,7 +39,7 @@ void *kan_dynamic_array_add_last (struct kan_dynamic_array_t *array)
     return array->data + (array->size - 1u) * array->item_size;
 }
 
-void *kan_dynamic_array_add_at (struct kan_dynamic_array_t *array, uint64_t index)
+void *kan_dynamic_array_add_at (struct kan_dynamic_array_t *array, kan_instance_size_t index)
 {
     if (array->size == array->capacity)
     {
@@ -47,7 +47,7 @@ void *kan_dynamic_array_add_at (struct kan_dynamic_array_t *array, uint64_t inde
     }
 
     KAN_ASSERT (index < array->size)
-    for (uint64_t output_index = array->size; output_index > index; --output_index)
+    for (kan_loop_size_t output_index = array->size; output_index > index; --output_index)
     {
         memcpy (array->data + output_index * array->item_size, array->data + (output_index - 1u) * array->item_size,
                 array->item_size);
@@ -57,10 +57,10 @@ void *kan_dynamic_array_add_at (struct kan_dynamic_array_t *array, uint64_t inde
     return array->data + index * array->item_size;
 }
 
-void kan_dynamic_array_remove_at (struct kan_dynamic_array_t *array, uint64_t index)
+void kan_dynamic_array_remove_at (struct kan_dynamic_array_t *array, kan_instance_size_t index)
 {
     KAN_ASSERT (index < array->size)
-    for (uint64_t output_index = index; output_index < array->size - 1u; ++output_index)
+    for (kan_loop_size_t output_index = index; output_index < array->size - 1u; ++output_index)
     {
         memcpy (array->data + output_index * array->item_size, array->data + (output_index + 1u) * array->item_size,
                 array->item_size);
@@ -69,7 +69,7 @@ void kan_dynamic_array_remove_at (struct kan_dynamic_array_t *array, uint64_t in
     --array->size;
 }
 
-void kan_dynamic_array_remove_swap_at (struct kan_dynamic_array_t *array, uint64_t index)
+void kan_dynamic_array_remove_swap_at (struct kan_dynamic_array_t *array, kan_instance_size_t index)
 {
     KAN_ASSERT (index < array->size)
     if (index != array->size - 1u)
@@ -81,7 +81,7 @@ void kan_dynamic_array_remove_swap_at (struct kan_dynamic_array_t *array, uint64
     --array->size;
 }
 
-void kan_dynamic_array_set_capacity (struct kan_dynamic_array_t *array, uint64_t new_capacity)
+void kan_dynamic_array_set_capacity (struct kan_dynamic_array_t *array, kan_instance_size_t new_capacity)
 {
     if (new_capacity == array->capacity)
     {

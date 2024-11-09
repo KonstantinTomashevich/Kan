@@ -44,13 +44,13 @@ static void ensure_sdl_ready (void)
     }
 }
 
-uint64_t kan_platform_get_elapsed_nanoseconds (void)
+kan_time_size_t kan_platform_get_elapsed_nanoseconds (void)
 {
     ensure_sdl_ready ();
-    return (uint64_t) SDL_GetTicksNS ();
+    return (kan_time_size_t) SDL_GetTicksNS ();
 }
 
-void kan_platform_sleep (uint64_t nanoseconds)
+void kan_platform_sleep (kan_time_offset_t nanoseconds)
 {
     ensure_sdl_ready ();
     SDL_DelayNS (nanoseconds);

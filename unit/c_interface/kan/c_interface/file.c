@@ -13,7 +13,7 @@ void kan_c_interface_file_init (struct kan_c_interface_file_t *file)
 
 kan_bool_t kan_c_interface_file_should_have_includable_object (struct kan_c_interface_file_t *file)
 {
-    uint64_t length = strlen (file->source_file_path);
+    kan_instance_size_t length = (kan_instance_size_t) strlen (file->source_file_path);
     return length >= 2u && (file->source_file_path[length - 2u] != '.' || file->source_file_path[length - 1u] != 'h');
 }
 
@@ -40,9 +40,10 @@ C_INTERFACE_API kan_bool_t kan_c_interface_file_serialize (struct kan_c_interfac
     if (kan_c_interface_file_should_have_includable_object (file))
     {
         KAN_ASSERT (file->optional_includable_object)
-        const uint32_t object_length = (uint32_t) strlen (file->optional_includable_object);
+        const kan_serialized_size_t object_length = (kan_serialized_size_t) strlen (file->optional_includable_object);
 
-        if (stream->operations->write (stream, sizeof (uint32_t), &object_length) != sizeof (uint32_t))
+        if (stream->operations->write (stream, sizeof (kan_serialized_size_t), &object_length) !=
+            sizeof (kan_serialized_size_t))
         {
             return KAN_FALSE;
         }
@@ -81,8 +82,9 @@ C_INTERFACE_API kan_bool_t kan_c_interface_file_deserialize (struct kan_c_interf
     file->source_file_path[path_length] = '\0';
     if (kan_c_interface_file_should_have_includable_object (file))
     {
-        uint32_t object_length;
-        if (stream->operations->read (stream, sizeof (uint32_t), &object_length) != sizeof (uint32_t))
+        kan_serialized_size_t object_length;
+        if (stream->operations->read (stream, sizeof (kan_serialized_size_t), &object_length) !=
+            sizeof (kan_serialized_size_t))
         {
             return KAN_FALSE;
         }

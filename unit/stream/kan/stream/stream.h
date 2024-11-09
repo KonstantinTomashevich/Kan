@@ -29,13 +29,17 @@ enum kan_stream_seek_pivot
     KAN_STREAM_SEEK_END,
 };
 
-typedef uint64_t (*kan_stream_operation_read) (struct kan_stream_t *stream, uint64_t amount, void *output_buffer);
-typedef uint64_t (*kan_stream_operation_write) (struct kan_stream_t *stream, uint64_t amount, const void *input_buffer);
+typedef kan_file_size_t (*kan_stream_operation_read) (struct kan_stream_t *stream,
+                                                      kan_file_size_t amount,
+                                                      void *output_buffer);
+typedef kan_file_size_t (*kan_stream_operation_write) (struct kan_stream_t *stream,
+                                                       kan_file_size_t amount,
+                                                       const void *input_buffer);
 typedef kan_bool_t (*kan_stream_operation_flush) (struct kan_stream_t *stream);
-typedef uint64_t (*kan_stream_operation_tell) (struct kan_stream_t *stream);
+typedef kan_file_size_t (*kan_stream_operation_tell) (struct kan_stream_t *stream);
 typedef kan_bool_t (*kan_stream_operation_seek) (struct kan_stream_t *stream,
                                                  enum kan_stream_seek_pivot pivot,
-                                                 int64_t offset);
+                                                 kan_file_offset_t offset);
 typedef void (*kan_stream_operation_close) (struct kan_stream_t *stream);
 
 /// \brief Contains pointers to operations supported by category of streams.

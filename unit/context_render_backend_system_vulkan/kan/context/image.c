@@ -44,11 +44,11 @@ static kan_bool_t create_vulkan_image (struct render_backend_system_t *system,
         .format = image_format_to_vulkan (description->format),
         .extent =
             {
-                .width = (uint32_t) description->width,
-                .height = (uint32_t) description->height,
-                .depth = (uint32_t) description->depth,
+                .width = (vulkan_size_t) description->width,
+                .height = (vulkan_size_t) description->height,
+                .depth = (vulkan_size_t) description->depth,
             },
-        .mipLevels = (uint32_t) description->mips,
+        .mipLevels = (vulkan_size_t) description->mips,
         .arrayLayers = 1u,
         .samples = VK_SAMPLE_COUNT_1_BIT,
         .tiling = VK_IMAGE_TILING_OPTIMAL,
@@ -88,7 +88,7 @@ static kan_bool_t create_vulkan_image (struct render_backend_system_t *system,
         .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
         .pNext = NULL,
         .objectType = VK_OBJECT_TYPE_IMAGE,
-        .objectHandle = (uint64_t) *output_image,
+        .objectHandle = CONVERT_HANDLE_FOR_DEBUG * output_image,
         .pObjectName = debug_name,
     };
 
@@ -136,7 +136,7 @@ struct render_backend_image_t *render_backend_system_create_image (struct render
     VkMemoryRequirements requirements;
     vkGetImageMemoryRequirements (system->device, image->image, &requirements);
 
-    transfer_memory_between_groups (requirements.size, system->memory_profiling.gpu_unmarked_group,
+    transfer_memory_between_groups ((vulkan_size_t) requirements.size, system->memory_profiling.gpu_unmarked_group,
                                     image->device_allocation_group);
 #endif
 
@@ -166,7 +166,7 @@ void render_backend_system_destroy_image (struct render_backend_system_t *system
     VkMemoryRequirements requirements;
     vkGetImageMemoryRequirements (system->device, image->image, &requirements);
 
-    transfer_memory_between_groups (requirements.size, image->device_allocation_group,
+    transfer_memory_between_groups ((vulkan_size_t) requirements.size, image->device_allocation_group,
                                     system->memory_profiling.gpu_unmarked_group);
 #endif
 
@@ -185,7 +185,7 @@ kan_render_image_t kan_render_image_create (kan_render_context_t context,
     return image ? KAN_HANDLE_SET (kan_render_image_t, image) : KAN_HANDLE_SET_INVALID (kan_render_image_t);
 }
 
-void kan_render_image_upload_data (kan_render_image_t image, uint8_t mip, uint32_t data_size, void *data)
+void kan_render_image_upload_data (kan_render_image_t image, uint8_t mip, vulkan_size_t data_size, void *data)
 {
     struct render_backend_image_t *image_data = KAN_HANDLE_GET (image);
     struct kan_cpu_section_execution_t execution;
@@ -194,7 +194,7 @@ void kan_render_image_upload_data (kan_render_image_t image, uint8_t mip, uint32
     KAN_ASSERT (!image_data->description.render_target)
     KAN_ASSERT (mip < image_data->description.mips)
 
-    const uint32_t allocation_size = data_size;
+    const vulkan_size_t allocation_size = data_size;
     struct render_backend_frame_lifetime_allocator_allocation_t staging_allocation =
         render_backend_system_allocate_for_staging (image_data->system, allocation_size);
 
@@ -260,9 +260,9 @@ void kan_render_image_request_mip_generation (kan_render_image_t image, uint8_t 
 }
 
 void kan_render_image_resize_render_target (kan_render_image_t image,
-                                            uint32_t new_width,
-                                            uint32_t new_height,
-                                            uint32_t new_depth)
+                                            vulkan_size_t new_width,
+                                            vulkan_size_t new_height,
+                                            vulkan_size_t new_depth)
 {
     struct render_backend_image_t *data = KAN_HANDLE_GET (image);
     struct kan_cpu_section_execution_t execution;
@@ -318,8 +318,8 @@ void kan_render_image_resize_render_target (kan_render_image_t image,
     VkMemoryRequirements requirements;
     vkGetImageMemoryRequirements (data->system->device, data->image, &requirements);
 
-    transfer_memory_between_groups (requirements.size, data->system->memory_profiling.gpu_unmarked_group,
-                                    data->device_allocation_group);
+    transfer_memory_between_groups ((vulkan_size_t) requirements.size,
+                                    data->system->memory_profiling.gpu_unmarked_group, data->device_allocation_group);
 #endif
 
     struct render_backend_schedule_state_t *schedule = render_backend_system_get_schedule_for_memory (data->system);

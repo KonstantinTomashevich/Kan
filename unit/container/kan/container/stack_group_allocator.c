@@ -5,7 +5,7 @@
 
 void kan_stack_group_allocator_init (struct kan_stack_group_allocator_t *allocator,
                                      kan_allocation_group_t group,
-                                     uint64_t initial_stack_size)
+                                     kan_instance_size_t initial_stack_size)
 {
     allocator->group = group;
     struct kan_stack_group_allocator_node_t *node =
@@ -19,8 +19,8 @@ void kan_stack_group_allocator_init (struct kan_stack_group_allocator_t *allocat
 }
 
 void *kan_stack_group_allocator_allocate (struct kan_stack_group_allocator_t *allocator,
-                                          uint64_t amount,
-                                          uint64_t alignment)
+                                          kan_memory_size_t amount,
+                                          kan_memory_size_t alignment)
 {
     KAN_ASSERT (amount <= kan_stack_allocator_get_size (allocator->current_stack->stack))
     void *allocated = kan_stack_allocator_allocate (allocator->current_stack->stack, amount, alignment);

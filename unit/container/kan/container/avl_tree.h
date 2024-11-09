@@ -85,10 +85,13 @@
 
 KAN_C_HEADER_BEGIN
 
+/// \brief Type for integers stored inside AVL tree.
+typedef kan_memory_size_t kan_avl_tree_value_t;
+
 /// \brief Base structure for AVL tree nodes.
 struct kan_avl_tree_node_t
 {
-    uint64_t tree_value;
+    kan_avl_tree_value_t tree_value;
     struct kan_avl_tree_node_t *parent;
     struct kan_avl_tree_node_t *left;
     struct kan_avl_tree_node_t *right;
@@ -99,7 +102,7 @@ struct kan_avl_tree_node_t
 struct kan_avl_tree_t
 {
     struct kan_avl_tree_node_t *root;
-    uint64_t size;
+    kan_instance_size_t size;
 };
 
 /// \brief Initializes given AVL tree at given address.
@@ -107,11 +110,12 @@ CONTAINER_API void kan_avl_tree_init (struct kan_avl_tree_t *tree);
 
 /// \brief Searches for appropriate parent for inserting node with given tree value.
 CONTAINER_API struct kan_avl_tree_node_t *kan_avl_tree_find_parent_for_insertion (struct kan_avl_tree_t *tree,
-                                                                                  uint64_t tree_value);
+                                                                                  kan_avl_tree_value_t tree_value);
 
 /// \brief Checks whether it is possible to insert node with given tree value at given parent.
 /// \details Use `kan_avl_tree_find_parent_for_insertion` to get parent node before calling this function.
-static inline kan_bool_t kan_avl_tree_can_insert (struct kan_avl_tree_node_t *found_parent, uint64_t tree_value)
+static inline kan_bool_t kan_avl_tree_can_insert (struct kan_avl_tree_node_t *found_parent,
+                                                  kan_avl_tree_value_t tree_value)
 {
     return !found_parent || found_parent->tree_value != tree_value;
 }
@@ -124,15 +128,16 @@ CONTAINER_API void kan_avl_tree_insert (struct kan_avl_tree_t *tree,
                                         struct kan_avl_tree_node_t *node);
 
 /// \brief Searches for the node with exact tree value.
-CONTAINER_API struct kan_avl_tree_node_t *kan_avl_tree_find_equal (struct kan_avl_tree_t *tree, uint64_t tree_value);
+CONTAINER_API struct kan_avl_tree_node_t *kan_avl_tree_find_equal (struct kan_avl_tree_t *tree,
+                                                                   kan_avl_tree_value_t tree_value);
 
 /// \brief Searches for the node with smallest value that is greater than given value.
 CONTAINER_API struct kan_avl_tree_node_t *kan_avl_tree_find_upper_bound (struct kan_avl_tree_t *tree,
-                                                                         uint64_t tree_value);
+                                                                         kan_avl_tree_value_t tree_value);
 
 /// \brief Searches for the node with greatest value that is smaller than given value.
 CONTAINER_API struct kan_avl_tree_node_t *kan_avl_tree_find_lower_bound (struct kan_avl_tree_t *tree,
-                                                                         uint64_t tree_value);
+                                                                         kan_avl_tree_value_t tree_value);
 
 /// \brief Returns smallest node in the AVL tree.
 CONTAINER_API struct kan_avl_tree_node_t *kan_avl_tree_ascending_iteration_begin (struct kan_avl_tree_t *tree);

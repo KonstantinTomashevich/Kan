@@ -10,17 +10,19 @@
 //       We use 3.5 less memory than UE5 Octree, but we're also 3-10 times slower than UE5 octree.
 //       This needs to be investigated and improved. The best tool for doing it is `perf` on Linux.
 
-static inline uint16_t quantize (double value, double min, double max)
+static inline kan_space_tree_road_t quantize (kan_space_tree_floating_t value,
+                                              kan_space_tree_floating_t min,
+                                              kan_space_tree_floating_t max)
 {
-    const double normalized_value = (value - min) / (max - min);
-    const double clamped_value = KAN_CLAMP (normalized_value, 0.0, 1.0);
-    return (uint16_t) (clamped_value * (double) UINT16_MAX);
+    const kan_space_tree_floating_t normalized_value = (value - min) / (max - min);
+    const kan_space_tree_floating_t clamped_value = KAN_CLAMP (normalized_value, 0.0, 1.0);
+    return (kan_space_tree_road_t) (clamped_value * (kan_space_tree_floating_t) KAN_INT_MAX (kan_space_tree_road_t));
 }
 
 KAN_MUTE_UNINITIALIZED_WARNINGS_BEGIN
 
 static inline struct kan_space_tree_quantized_path_t quantize_sequence (struct kan_space_tree_t *tree,
-                                                                        const double *sequence)
+                                                                        const kan_space_tree_floating_t *sequence)
 {
     struct kan_space_tree_quantized_path_t path;
     switch (tree->dimension_count)
@@ -40,38 +42,40 @@ static inline struct kan_space_tree_quantized_path_t quantize_sequence (struct k
 
 KAN_MUTE_UNINITIALIZED_WARNINGS_END
 
-static inline double to_quantized_space (double value, double min, double max)
+static inline kan_space_tree_floating_t to_quantized_space (kan_space_tree_floating_t value,
+                                                            kan_space_tree_floating_t min,
+                                                            kan_space_tree_floating_t max)
 {
-    const double normalized_value = (value - min) / (max - min);
-    const double clamped_value = KAN_CLAMP (normalized_value, 0.0, 1.0);
-    return (clamped_value * (double) UINT16_MAX);
+    const kan_space_tree_floating_t normalized_value = (value - min) / (max - min);
+    const kan_space_tree_floating_t clamped_value = KAN_CLAMP (normalized_value, 0.0, 1.0);
+    return (clamped_value * (kan_space_tree_floating_t) KAN_INT_MAX (kan_space_tree_road_t));
 }
 
-#define FIRST_HEIGHT_SHIFT (sizeof (uint16_t) * 8u - 1u)
+#define FIRST_HEIGHT_SHIFT (sizeof (kan_space_tree_road_t) * 8u - 1u)
 
-static inline uint16_t make_height_mask (uint16_t height)
+static inline kan_space_tree_road_t make_height_mask (kan_space_tree_road_t height)
 {
     KAN_ASSERT (height <= FIRST_HEIGHT_SHIFT)
     return (1u << (FIRST_HEIGHT_SHIFT - height));
 }
 
-static inline uint16_t node_height_mask (struct kan_space_tree_node_t *node)
+static inline kan_space_tree_road_t node_height_mask (struct kan_space_tree_node_t *node)
 {
     return make_height_mask (node->height);
 }
 
-static inline uint16_t height_mask_to_root_to_height_mask (uint16_t height_mask)
+static inline kan_space_tree_road_t height_mask_to_root_to_height_mask (kan_space_tree_road_t height_mask)
 {
     KAN_ASSERT (height_mask > 0u)
     return ~(height_mask - 1u);
 }
 
-static inline uint16_t calculate_child_node_index (struct kan_space_tree_t *tree,
-                                                   struct kan_space_tree_node_t *node,
-                                                   struct kan_space_tree_quantized_path_t path)
+static inline kan_space_tree_road_t calculate_child_node_index (struct kan_space_tree_t *tree,
+                                                                struct kan_space_tree_node_t *node,
+                                                                struct kan_space_tree_quantized_path_t path)
 {
-    uint16_t index = 0u;
-    const uint16_t height_mask = node_height_mask (node);
+    kan_space_tree_road_t index = 0u;
+    const kan_space_tree_road_t height_mask = node_height_mask (node);
 
     switch (tree->dimension_count)
     {
@@ -89,13 +93,13 @@ static inline uint16_t calculate_child_node_index (struct kan_space_tree_t *tree
 }
 
 static inline void shape_iterator_reset_dimension (struct kan_space_tree_shape_iterator_t *iterator,
-                                                   uint16_t dimension_index,
-                                                   uint16_t root_to_height_mask,
-                                                   uint16_t height_mask,
-                                                   uint16_t reversed_height_mask)
+                                                   kan_space_tree_road_t dimension_index,
+                                                   kan_space_tree_road_t root_to_height_mask,
+                                                   kan_space_tree_road_t height_mask,
+                                                   kan_space_tree_road_t reversed_height_mask)
 {
-    const uint16_t masked_current = iterator->current_path.roads[dimension_index] & root_to_height_mask;
-    const uint16_t masked_min = iterator->min_path.roads[dimension_index] & root_to_height_mask;
+    const kan_space_tree_road_t masked_current = iterator->current_path.roads[dimension_index] & root_to_height_mask;
+    const kan_space_tree_road_t masked_min = iterator->min_path.roads[dimension_index] & root_to_height_mask;
 
     if (masked_current > masked_min)
     {
@@ -109,10 +113,10 @@ static inline void shape_iterator_reset_dimension (struct kan_space_tree_shape_i
 
 static inline void shape_iterator_reset_dimensions_after (struct kan_space_tree_t *tree,
                                                           struct kan_space_tree_shape_iterator_t *iterator,
-                                                          uint16_t after_dimension_index,
-                                                          uint16_t root_to_height_mask,
-                                                          uint16_t height_mask,
-                                                          uint16_t reversed_height_mask)
+                                                          kan_space_tree_road_t after_dimension_index,
+                                                          kan_space_tree_road_t root_to_height_mask,
+                                                          kan_space_tree_road_t height_mask,
+                                                          kan_space_tree_road_t reversed_height_mask)
 {
     switch (tree->dimension_count)
     {
@@ -156,9 +160,9 @@ static inline void shape_iterator_reset_dimensions_after (struct kan_space_tree_
 
 static inline void shape_iterator_reset_all_dimensions (struct kan_space_tree_t *tree,
                                                         struct kan_space_tree_shape_iterator_t *iterator,
-                                                        uint16_t root_to_height_mask,
-                                                        uint16_t height_mask,
-                                                        uint16_t reversed_height_mask)
+                                                        kan_space_tree_road_t root_to_height_mask,
+                                                        kan_space_tree_road_t height_mask,
+                                                        kan_space_tree_road_t reversed_height_mask)
 {
     switch (tree->dimension_count)
     {
@@ -175,11 +179,11 @@ static inline void shape_iterator_reset_all_dimensions (struct kan_space_tree_t 
 
 static inline kan_bool_t shape_iterator_try_step_in_dimension (struct kan_space_tree_t *tree,
                                                                struct kan_space_tree_shape_iterator_t *iterator,
-                                                               uint16_t dimension_index,
-                                                               uint16_t height_mask,
-                                                               uint16_t reversed_height_mask)
+                                                               kan_space_tree_road_t dimension_index,
+                                                               kan_space_tree_road_t height_mask,
+                                                               kan_space_tree_road_t reversed_height_mask)
 {
-    const uint16_t root_to_height_mask = height_mask_to_root_to_height_mask (height_mask);
+    const kan_space_tree_road_t root_to_height_mask = height_mask_to_root_to_height_mask (height_mask);
     const kan_bool_t can_increase = (iterator->current_path.roads[dimension_index] & height_mask) == 0u;
 
     const kan_bool_t want_increase = (iterator->current_path.roads[dimension_index] & root_to_height_mask) <
@@ -198,8 +202,8 @@ static inline kan_bool_t shape_iterator_try_step_in_dimension (struct kan_space_
 
 static inline kan_bool_t shape_iterator_try_step_on_height (struct kan_space_tree_t *tree,
                                                             struct kan_space_tree_shape_iterator_t *iterator,
-                                                            uint16_t height_mask,
-                                                            uint16_t reversed_height_mask)
+                                                            kan_space_tree_road_t height_mask,
+                                                            kan_space_tree_road_t reversed_height_mask)
 {
     switch (tree->dimension_count)
     {
@@ -273,8 +277,8 @@ static void shape_iterator_next (struct kan_space_tree_t *tree, struct kan_space
         {
             KAN_ASSERT (parent_node)
             KAN_ASSERT (parent_node->height < tree->last_level_height)
-            const uint16_t height_mask = node_height_mask (parent_node);
-            const uint16_t reversed_height_mask = ~height_mask;
+            const kan_space_tree_road_t height_mask = node_height_mask (parent_node);
+            const kan_space_tree_road_t reversed_height_mask = ~height_mask;
 
             if (!shape_iterator_try_step_on_height (tree, iterator, height_mask, reversed_height_mask))
             {
@@ -284,7 +288,7 @@ static void shape_iterator_next (struct kan_space_tree_t *tree, struct kan_space
             }
         }
 
-        uint16_t child_node_index = calculate_child_node_index (tree, parent_node, iterator->current_path);
+        kan_space_tree_road_t child_node_index = calculate_child_node_index (tree, parent_node, iterator->current_path);
         struct kan_space_tree_node_t *child_node = parent_node->children[child_node_index];
 
         while (child_node)
@@ -297,8 +301,8 @@ static void shape_iterator_next (struct kan_space_tree_t *tree, struct kan_space
             }
 
             parent_node = child_node;
-            const uint16_t child_height_mask = node_height_mask (child_node);
-            const uint16_t reversed_child_height_mask = ~child_height_mask;
+            const kan_space_tree_road_t child_height_mask = node_height_mask (child_node);
+            const kan_space_tree_road_t reversed_child_height_mask = ~child_height_mask;
 
             shape_iterator_reset_all_dimensions (tree, iterator, height_mask_to_root_to_height_mask (child_height_mask),
                                                  child_height_mask, reversed_child_height_mask);
@@ -311,15 +315,16 @@ static void shape_iterator_next (struct kan_space_tree_t *tree, struct kan_space
     }
 }
 
-static inline uint64_t calculate_node_size (uint16_t dimension_count, kan_bool_t with_children)
+static inline kan_instance_size_t calculate_node_size (uint8_t dimension_count, kan_bool_t with_children)
 {
-    uint64_t size = sizeof (struct kan_space_tree_node_t);
+    kan_instance_size_t size = sizeof (struct kan_space_tree_node_t);
     if (with_children)
     {
-        size += sizeof (void *) * (uint64_t) (1u << dimension_count);
+        const uint8_t count_of_children = 1u << dimension_count;
+        size += sizeof (void *) * (kan_instance_size_t) count_of_children;
     }
 
-    return kan_apply_alignment (size, _Alignof (struct kan_space_tree_node_t));
+    return (kan_instance_size_t) kan_apply_alignment (size, _Alignof (struct kan_space_tree_node_t));
 }
 
 static inline void reset_node_children (struct kan_space_tree_t *tree, struct kan_space_tree_node_t *node)
@@ -351,7 +356,7 @@ static inline void reset_node_children (struct kan_space_tree_t *tree, struct ka
 
 static inline struct kan_space_tree_node_t *get_or_create_child_node (struct kan_space_tree_t *tree,
                                                                       struct kan_space_tree_node_t *parent_node,
-                                                                      uint16_t child_index)
+                                                                      kan_space_tree_road_t child_index)
 {
     KAN_ASSERT (parent_node->height != tree->last_level_height)
     if (parent_node->children[child_index])
@@ -359,7 +364,7 @@ static inline struct kan_space_tree_node_t *get_or_create_child_node (struct kan
         return parent_node->children[child_index];
     }
 
-    const uint16_t child_height = parent_node->height + 1u;
+    const kan_space_tree_road_t child_height = parent_node->height + 1u;
     struct kan_space_tree_node_t *child_node = kan_allocate_batched (
         tree->allocation_group, calculate_node_size (tree->dimension_count, child_height != tree->last_level_height));
 
@@ -401,8 +406,8 @@ static void insertion_iterator_next (struct kan_space_tree_t *tree,
             KAN_ASSERT (parent_node->height < tree->last_level_height)
             KAN_ASSERT (parent_node->height < iterator->target_height)
 
-            const uint16_t height_mask = node_height_mask (parent_node);
-            const uint16_t reversed_height_mask = ~height_mask;
+            const kan_space_tree_road_t height_mask = node_height_mask (parent_node);
+            const kan_space_tree_road_t reversed_height_mask = ~height_mask;
 
             if (!shape_iterator_try_step_on_height (tree, &iterator->base, height_mask, reversed_height_mask))
             {
@@ -416,14 +421,15 @@ static void insertion_iterator_next (struct kan_space_tree_t *tree,
             parent_node = tree->root;
         }
 
-        uint16_t child_node_index = calculate_child_node_index (tree, parent_node, iterator->base.current_path);
+        kan_space_tree_road_t child_node_index =
+            calculate_child_node_index (tree, parent_node, iterator->base.current_path);
         struct kan_space_tree_node_t *child_node = get_or_create_child_node (tree, parent_node, child_node_index);
 
         while (child_node->height < iterator->target_height)
         {
             parent_node = child_node;
-            const uint16_t child_height_mask = node_height_mask (child_node);
-            const uint16_t reversed_child_height_mask = ~child_height_mask;
+            const kan_space_tree_road_t child_height_mask = node_height_mask (child_node);
+            const kan_space_tree_road_t reversed_child_height_mask = ~child_height_mask;
 
             shape_iterator_reset_all_dimensions (tree, &iterator->base,
                                                  height_mask_to_root_to_height_mask (child_height_mask),
@@ -439,50 +445,52 @@ static void insertion_iterator_next (struct kan_space_tree_t *tree,
 
 struct ray_next_t
 {
-    uint16_t next;
-    double time;
+    kan_space_tree_road_t next;
+    kan_space_tree_floating_t time;
     kan_bool_t out_of_bounds;
 };
 
 static inline struct ray_next_t get_ray_next_in_dimension (struct kan_space_tree_ray_iterator_t *iterator,
-                                                           uint16_t dimension_index,
-                                                           uint16_t height_mask,
-                                                           uint16_t height_to_root_mask)
+                                                           kan_space_tree_road_t dimension_index,
+                                                           kan_space_tree_road_t height_mask,
+                                                           kan_space_tree_road_t height_to_root_mask)
 {
     struct ray_next_t result;
-    double border_value;
+    kan_space_tree_floating_t border_value;
 
-    if (iterator->direction[dimension_index] > 0.0)
+    if (iterator->direction[dimension_index] > (kan_floating_t) 0.0)
     {
-        const uint16_t masked_current = iterator->current_path.roads[dimension_index] & height_to_root_mask;
+        const kan_space_tree_road_t masked_current =
+            iterator->current_path.roads[dimension_index] & height_to_root_mask;
         result.next = masked_current + height_mask;
 
         if (result.next < masked_current)
         {
             // Overflow.
-            border_value = (double) UINT16_MAX;
+            border_value = (kan_space_tree_floating_t) KAN_INT_MAX (kan_space_tree_road_t);
             result.out_of_bounds = KAN_TRUE;
         }
         else
         {
-            border_value = (double) result.next;
+            border_value = (kan_space_tree_floating_t) result.next;
             result.out_of_bounds = KAN_FALSE;
         }
     }
-    else if (iterator->direction[dimension_index] < 0.0)
+    else if (iterator->direction[dimension_index] < (kan_floating_t) 0.0)
     {
-        const uint16_t masked_current = iterator->current_path.roads[dimension_index] | ~height_to_root_mask;
+        const kan_space_tree_road_t masked_current =
+            iterator->current_path.roads[dimension_index] | ~height_to_root_mask;
         result.next = masked_current - height_mask;
 
         if (result.next > masked_current)
         {
             // Underflow.
-            border_value = 0.0;
+            border_value = (kan_floating_t) 0.0;
             result.out_of_bounds = KAN_TRUE;
         }
         else
         {
-            border_value = (double) result.next;
+            border_value = (kan_space_tree_floating_t) result.next;
             result.out_of_bounds = KAN_FALSE;
         }
     }
@@ -493,7 +501,7 @@ static inline struct ray_next_t get_ray_next_in_dimension (struct kan_space_tree
         return result;
     }
 
-    const double distance_to_border = border_value - iterator->position[dimension_index];
+    const kan_space_tree_floating_t distance_to_border = border_value - iterator->position[dimension_index];
     result.time = distance_to_border / iterator->direction[dimension_index];
     KAN_ASSERT (result.time >= 0.0)
     return result;
@@ -501,17 +509,17 @@ static inline struct ray_next_t get_ray_next_in_dimension (struct kan_space_tree
 
 struct ray_next_and_dimension_t
 {
-    uint16_t dimension;
-    uint16_t next;
-    double time;
+    kan_space_tree_road_t dimension;
+    kan_space_tree_road_t next;
+    kan_space_tree_floating_t time;
     kan_bool_t out_of_bounds;
 };
 
 static inline struct ray_next_and_dimension_t calculate_ray_smallest_next (
     struct kan_space_tree_t *tree,
     struct kan_space_tree_ray_iterator_t *iterator,
-    uint16_t height_mask,
-    uint16_t height_to_root_mask)
+    kan_space_tree_road_t height_mask,
+    kan_space_tree_road_t height_to_root_mask)
 {
     struct ray_next_and_dimension_t min = {KAN_CONTAINER_SPACE_TREE_MAX_DIMENSIONS + 1u, 0u, DBL_MAX, KAN_TRUE};
     switch (tree->dimension_count)
@@ -575,8 +583,8 @@ static void ray_iterator_next (struct kan_space_tree_t *tree, struct kan_space_t
 
         if (go_further)
         {
-            const uint16_t height_mask = node_height_mask (parent_node);
-            const uint16_t height_to_root_mask = height_mask_to_root_to_height_mask (height_mask);
+            const kan_space_tree_road_t height_mask = node_height_mask (parent_node);
+            const kan_space_tree_road_t height_to_root_mask = height_mask_to_root_to_height_mask (height_mask);
 
             if (iterator->current_path.combined == iterator->next_path.combined)
             {
@@ -607,7 +615,7 @@ static void ray_iterator_next (struct kan_space_tree_t *tree, struct kan_space_t
         iterator->position[DIMENSION] += iterator->direction[DIMENSION] * smallest.time;                               \
         if (DIMENSION != smallest.dimension)                                                                           \
         {                                                                                                              \
-            iterator->next_path.roads[DIMENSION] = (uint16_t) iterator->position[DIMENSION];                           \
+            iterator->next_path.roads[DIMENSION] = (kan_space_tree_road_t) iterator->position[DIMENSION];              \
         }
 
                     CASE (3u)
@@ -619,9 +627,9 @@ static void ray_iterator_next (struct kan_space_tree_t *tree, struct kan_space_t
             }
         }
 
-        const uint16_t height_mask = node_height_mask (parent_node);
-        const uint16_t root_to_height_mask = height_mask_to_root_to_height_mask (height_mask);
-        const uint16_t root_to_before_height_mask = root_to_height_mask ^ height_mask;
+        const kan_space_tree_road_t height_mask = node_height_mask (parent_node);
+        const kan_space_tree_road_t root_to_height_mask = height_mask_to_root_to_height_mask (height_mask);
+        const kan_space_tree_road_t root_to_before_height_mask = root_to_height_mask ^ height_mask;
 
         kan_bool_t next_is_not_child = KAN_FALSE;
         switch (tree->dimension_count)
@@ -649,7 +657,7 @@ static void ray_iterator_next (struct kan_space_tree_t *tree, struct kan_space_t
 
         // Next is a child, therefore we can finally descend to it.
         iterator->current_path = iterator->next_path;
-        uint16_t child_node_index = calculate_child_node_index (tree, parent_node, iterator->current_path);
+        kan_space_tree_road_t child_node_index = calculate_child_node_index (tree, parent_node, iterator->current_path);
         struct kan_space_tree_node_t *child_node = parent_node->children[child_node_index];
 
         while (child_node)
@@ -673,24 +681,24 @@ static void ray_iterator_next (struct kan_space_tree_t *tree, struct kan_space_t
 
 void kan_space_tree_init (struct kan_space_tree_t *tree,
                           kan_allocation_group_t allocation_group,
-                          uint64_t dimension_count,
-                          double global_min,
-                          double global_max,
-                          double target_leaf_cell_size)
+                          kan_instance_size_t dimension_count,
+                          kan_space_tree_floating_t global_min,
+                          kan_space_tree_floating_t global_max,
+                          kan_space_tree_floating_t target_leaf_cell_size)
 {
     KAN_ASSERT (global_max > global_min)
 
     tree->allocation_group = allocation_group;
     KAN_ASSERT (dimension_count <= KAN_CONTAINER_SPACE_TREE_MAX_DIMENSIONS)
-    tree->dimension_count = (uint16_t) dimension_count;
+    tree->dimension_count = (uint8_t) dimension_count;
     tree->global_min = global_min;
     tree->global_max = global_max;
     tree->last_level_height = 1u;
 
-    const double half_width = 0.5 * (global_max - global_min);
-    double root_child_size = target_leaf_cell_size;
+    const kan_space_tree_floating_t half_width = 0.5 * (global_max - global_min);
+    kan_space_tree_floating_t root_child_size = target_leaf_cell_size;
 
-    while (root_child_size < half_width && tree->last_level_height < 16u)
+    while (root_child_size < half_width && tree->last_level_height < KAN_SPACE_TREE_MAX_HEIGHT)
     {
         root_child_size *= 2.0;
         ++tree->last_level_height;
@@ -706,8 +714,8 @@ void kan_space_tree_init (struct kan_space_tree_t *tree,
 
 static inline void shape_iterator_init (struct kan_space_tree_t *tree,
                                         struct kan_space_tree_shape_iterator_t *iterator,
-                                        const double *min_sequence,
-                                        const double *max_sequence)
+                                        const kan_space_tree_floating_t *min_sequence,
+                                        const kan_space_tree_floating_t *max_sequence)
 {
     iterator->current_node = NULL;
     iterator->min_path = quantize_sequence (tree, min_sequence);
@@ -715,11 +723,11 @@ static inline void shape_iterator_init (struct kan_space_tree_t *tree,
     iterator->current_path = iterator->min_path;
 }
 
-static inline uint16_t calculate_insertion_target_height (struct kan_space_tree_t *tree,
-                                                          const double *min_sequence,
-                                                          const double *max_sequence)
+static inline uint8_t calculate_insertion_target_height (struct kan_space_tree_t *tree,
+                                                         const kan_space_tree_floating_t *min_sequence,
+                                                         const kan_space_tree_floating_t *max_sequence)
 {
-    double max_dimension_size = 0.0;
+    kan_space_tree_floating_t max_dimension_size = 0.0;
     switch (tree->dimension_count)
     {
     case 4u:
@@ -732,8 +740,8 @@ static inline uint16_t calculate_insertion_target_height (struct kan_space_tree_
         max_dimension_size = KAN_MAX (max_dimension_size, max_sequence[0u] - min_sequence[0u]);
     }
 
-    double child_node_size = 0.125 * (tree->global_max - tree->global_min);
-    uint16_t target_height = 1u;
+    kan_space_tree_floating_t child_node_size = 0.125 * (tree->global_max - tree->global_min);
+    uint8_t target_height = 1u;
 
     while (max_dimension_size < child_node_size && target_height < tree->last_level_height)
     {
@@ -744,9 +752,10 @@ static inline uint16_t calculate_insertion_target_height (struct kan_space_tree_
     return target_height;
 }
 
-struct kan_space_tree_insertion_iterator_t kan_space_tree_insertion_start (struct kan_space_tree_t *tree,
-                                                                           const double *min_sequence,
-                                                                           const double *max_sequence)
+struct kan_space_tree_insertion_iterator_t kan_space_tree_insertion_start (
+    struct kan_space_tree_t *tree,
+    const kan_space_tree_floating_t *min_sequence,
+    const kan_space_tree_floating_t *max_sequence)
 {
     struct kan_space_tree_insertion_iterator_t iterator;
     shape_iterator_init (tree, &iterator.base, min_sequence, max_sequence);
@@ -774,9 +783,10 @@ void kan_space_tree_insertion_insert_and_move (struct kan_space_tree_t *tree,
     insertion_iterator_next (tree, iterator);
 }
 
-CONTAINER_API struct kan_space_tree_shape_iterator_t kan_space_tree_shape_start (struct kan_space_tree_t *tree,
-                                                                                 const double *min_sequence,
-                                                                                 const double *max_sequence)
+CONTAINER_API struct kan_space_tree_shape_iterator_t kan_space_tree_shape_start (
+    struct kan_space_tree_t *tree,
+    const kan_space_tree_floating_t *min_sequence,
+    const kan_space_tree_floating_t *max_sequence)
 {
     struct kan_space_tree_shape_iterator_t iterator;
     shape_iterator_init (tree, &iterator, min_sequence, max_sequence);
@@ -791,9 +801,9 @@ CONTAINER_API void kan_space_tree_shape_move_to_next_node (struct kan_space_tree
 }
 
 struct kan_space_tree_ray_iterator_t kan_space_tree_ray_start (struct kan_space_tree_t *tree,
-                                                               const double *origin_sequence,
-                                                               const double *direction_sequence,
-                                                               double max_time)
+                                                               const kan_space_tree_floating_t *origin_sequence,
+                                                               const kan_space_tree_floating_t *direction_sequence,
+                                                               kan_space_tree_floating_t max_time)
 {
     struct kan_space_tree_ray_iterator_t iterator;
     iterator.current_path = quantize_sequence (tree, origin_sequence);
@@ -819,7 +829,8 @@ struct kan_space_tree_ray_iterator_t kan_space_tree_ray_start (struct kan_space_
     }
 #endif
 
-    const double factor = ((double) UINT16_MAX) / (tree->global_max - tree->global_min);
+    const kan_space_tree_floating_t factor =
+        ((kan_space_tree_floating_t) KAN_INT_MAX (kan_space_tree_road_t)) / (tree->global_max - tree->global_min);
     switch (tree->dimension_count)
     {
     case 4u:
@@ -836,7 +847,7 @@ struct kan_space_tree_ray_iterator_t kan_space_tree_ray_start (struct kan_space_
         iterator.direction[0u] = factor * direction_sequence[0u];
     }
 
-    iterator.travelled_time = 0.0;
+    iterator.travelled_time = (kan_floating_t) 0.0;
     KAN_ASSERT (max_time > 0.0)
     iterator.max_time = max_time;
 
@@ -851,13 +862,13 @@ void kan_space_tree_ray_move_to_next_node (struct kan_space_tree_t *tree,
 }
 
 kan_bool_t kan_space_tree_is_re_insert_needed (struct kan_space_tree_t *tree,
-                                               const double *old_min,
-                                               const double *old_max,
-                                               const double *new_min,
-                                               const double *new_max)
+                                               const kan_space_tree_floating_t *old_min,
+                                               const kan_space_tree_floating_t *old_max,
+                                               const kan_space_tree_floating_t *new_min,
+                                               const kan_space_tree_floating_t *new_max)
 {
-    const uint16_t old_height = calculate_insertion_target_height (tree, old_min, old_max);
-    const uint16_t new_height = calculate_insertion_target_height (tree, new_min, new_max);
+    const kan_space_tree_road_t old_height = calculate_insertion_target_height (tree, old_min, old_max);
+    const kan_space_tree_road_t new_height = calculate_insertion_target_height (tree, new_min, new_max);
 
     if (old_height != new_height)
     {
@@ -869,7 +880,7 @@ kan_bool_t kan_space_tree_is_re_insert_needed (struct kan_space_tree_t *tree,
 
     const struct kan_space_tree_quantized_path_t new_min_path = quantize_sequence (tree, new_min);
     const struct kan_space_tree_quantized_path_t new_max_path = quantize_sequence (tree, new_max);
-    const uint16_t height_mask = make_height_mask (old_height);
+    const kan_space_tree_road_t height_mask = make_height_mask (old_height);
 
     switch (tree->dimension_count)
     {
@@ -896,14 +907,15 @@ kan_bool_t kan_space_tree_is_re_insert_needed (struct kan_space_tree_t *tree,
 }
 
 kan_bool_t kan_space_tree_is_contained_in_one_sub_node (struct kan_space_tree_t *tree,
-                                                        const double *min,
-                                                        const double *max)
+                                                        const kan_space_tree_floating_t *min,
+                                                        const kan_space_tree_floating_t *max)
 {
-    const uint16_t height = calculate_insertion_target_height (tree, min, max);
+    const kan_space_tree_road_t height = calculate_insertion_target_height (tree, min, max);
     const struct kan_space_tree_quantized_path_t min_path = quantize_sequence (tree, min);
     const struct kan_space_tree_quantized_path_t max_path = quantize_sequence (tree, max);
-    const uint16_t height_mask = make_height_mask (height);
-    const uint16_t root_to_before_height_mask = height_mask_to_root_to_height_mask (height_mask) ^ height_mask;
+    const kan_space_tree_road_t height_mask = make_height_mask (height);
+    const kan_space_tree_road_t root_to_before_height_mask =
+        height_mask_to_root_to_height_mask (height_mask) ^ height_mask;
 
     switch (tree->dimension_count)
     {

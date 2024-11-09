@@ -2,9 +2,8 @@
 
 #include <container_api.h>
 
-#include <stdint.h>
-
 #include <kan/api_common/c_header.h>
+#include <kan/api_common/core_types.h>
 
 /// \file
 /// \brief Contains trivial implementation of bidirectional linked list.
@@ -66,7 +65,7 @@ struct kan_bd_list_node_t
 /// \brief Contains bidirectional linked list data.
 struct kan_bd_list_t
 {
-    uint64_t size;
+    kan_instance_size_t size;
     struct kan_bd_list_node_t *first;
     struct kan_bd_list_node_t *last;
 };

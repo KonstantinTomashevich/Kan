@@ -46,7 +46,7 @@ struct kan_transform_2_component_t
     kan_universe_object_id_t parent_object_id;
 
     struct kan_transform_2_t logical_local;
-    uint64_t logical_local_time_ns;
+    kan_time_size_t logical_local_time_ns;
     kan_bool_t visual_sync_needed;
     kan_bool_t visual_synced_at_least_once;
     struct kan_transform_2_t visual_local;
@@ -73,7 +73,7 @@ struct kan_transform_3_component_t
     kan_universe_object_id_t parent_object_id;
 
     struct kan_transform_3_t logical_local;
-    uint64_t logical_local_time_ns;
+    kan_time_size_t logical_local_time_ns;
     kan_bool_t visual_sync_needed;
     kan_bool_t visual_synced_at_least_once;
     struct kan_transform_3_t visual_local;
@@ -115,14 +115,14 @@ UNIVERSE_TRANSFORM_API void kan_transform_2_get_logical_global (struct kan_trans
 UNIVERSE_TRANSFORM_API void kan_transform_2_set_logical_local (struct kan_transform_2_queries_t *queries,
                                                                struct kan_transform_2_component_t *component,
                                                                const struct kan_transform_2_t *new_transform,
-                                                               uint64_t transform_logical_time_ns);
+                                                               kan_time_size_t transform_logical_time_ns);
 
 /// \brief Sets component logical global transform invalidating logical global transforms across hierarchy and
 ///        requesting visual transform sync.
 UNIVERSE_TRANSFORM_API void kan_transform_2_set_logical_global (struct kan_transform_2_queries_t *queries,
                                                                 struct kan_transform_2_component_t *component,
                                                                 const struct kan_transform_2_t *new_transform,
-                                                                uint64_t transform_logical_time_ns);
+                                                                kan_time_size_t transform_logical_time_ns);
 
 /// \brief Queries component visual global transform updating it if it is dirty.
 UNIVERSE_TRANSFORM_API void kan_transform_2_get_visual_global (struct kan_transform_2_queries_t *queries,
@@ -161,14 +161,14 @@ UNIVERSE_TRANSFORM_API void kan_transform_3_get_logical_global (struct kan_trans
 UNIVERSE_TRANSFORM_API void kan_transform_3_set_logical_local (struct kan_transform_3_queries_t *queries,
                                                                struct kan_transform_3_component_t *component,
                                                                const struct kan_transform_3_t *new_transform,
-                                                               uint64_t transform_logical_time_ns);
+                                                               kan_time_size_t transform_logical_time_ns);
 
 /// \brief Sets component logical global transform invalidating logical global transforms across hierarchy and
 ///        requesting visual transform sync.
 UNIVERSE_TRANSFORM_API void kan_transform_3_set_logical_global (struct kan_transform_3_queries_t *queries,
                                                                 struct kan_transform_3_component_t *component,
                                                                 const struct kan_transform_3_t *new_transform,
-                                                                uint64_t transform_logical_time_ns);
+                                                                kan_time_size_t transform_logical_time_ns);
 
 /// \brief Queries component visual global transform updating it if it is dirty.
 UNIVERSE_TRANSFORM_API void kan_transform_3_get_visual_global (struct kan_transform_3_queries_t *queries,

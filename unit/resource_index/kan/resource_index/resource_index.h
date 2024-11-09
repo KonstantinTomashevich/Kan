@@ -59,7 +59,7 @@ struct kan_resource_index_third_party_item_t
 {
     kan_interned_string_t name;
     char *path;
-    uint64_t size;
+    kan_file_size_t size;
 };
 
 RESOURCE_INDEX_API void kan_resource_index_third_party_item_init (struct kan_resource_index_third_party_item_t *item);
@@ -95,7 +95,7 @@ RESOURCE_INDEX_API void kan_resource_index_add_native_entry (struct kan_resource
 RESOURCE_INDEX_API void kan_resource_index_add_third_party_entry (struct kan_resource_index_t *index,
                                                                   kan_interned_string_t name,
                                                                   const char *path,
-                                                                  uint64_t size);
+                                                                  kan_file_size_t size);
 
 /// \brief Output data structure for kan_resource_index_extract_info_from_path.
 struct kan_resource_index_info_from_path_t

@@ -38,30 +38,36 @@
 
 KAN_C_HEADER_BEGIN
 
+/// \brief Bitset is built from integers of this type.
+typedef kan_memory_size_t kan_bitset_item_t;
+
+#define KAN_BITSET_ITEM_BITS (sizeof (kan_bitset_item_t) * 8u)
+
 /// \brief Represents fixed length bitset structure in memory.
 struct kan_fixed_length_bitset_t
 {
-    uint64_t items;
-    uint64_t data[];
+    kan_instance_size_t items;
+    kan_bitset_item_t data[];
 };
 
 /// \brief Calculates allocation size for the bitset with given length (count of bits).
-static inline uint64_t kan_fixed_length_bitset_calculate_allocation_size (uint64_t length)
+static inline kan_instance_size_t kan_fixed_length_bitset_calculate_allocation_size (kan_instance_size_t length)
 {
-    return sizeof (struct kan_fixed_length_bitset_t) + (length / 64u) * sizeof (uint64_t) +
-           (length % 64u == 0u ? 0u : sizeof (uint64_t));
+    return sizeof (struct kan_fixed_length_bitset_t) + (length / KAN_BITSET_ITEM_BITS) * sizeof (kan_bitset_item_t) +
+           (length % KAN_BITSET_ITEM_BITS == 0u ? 0u : sizeof (kan_bitset_item_t));
 }
 
 /// \brief Initializes allocated bitset with given length (count of bits) with zeroes.
-CONTAINER_API void kan_fixed_length_bitset_init (struct kan_fixed_length_bitset_t *bitset, uint64_t length);
+CONTAINER_API void kan_fixed_length_bitset_init (struct kan_fixed_length_bitset_t *bitset, kan_instance_size_t length);
 
 /// \brief Sets value of bit at given bit index.
 CONTAINER_API void kan_fixed_length_bitset_set (struct kan_fixed_length_bitset_t *bitset,
-                                                uint64_t index,
+                                                kan_instance_size_t index,
                                                 kan_bool_t value);
 
 /// \brief Queries value of bit at given bit index.
-CONTAINER_API kan_bool_t kan_fixed_length_bitset_get (const struct kan_fixed_length_bitset_t *bitset, uint64_t index);
+CONTAINER_API kan_bool_t kan_fixed_length_bitset_get (const struct kan_fixed_length_bitset_t *bitset,
+                                                      kan_instance_size_t index);
 
 /// \brief Performs logical or operation on every bit from two bitsets and assigns result to the first bitset.
 CONTAINER_API void kan_fixed_length_bitset_or_assign (struct kan_fixed_length_bitset_t *bitset,

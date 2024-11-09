@@ -17,6 +17,20 @@
 
 KAN_C_HEADER_BEGIN
 
+/// \brief Vulkan API uses 32 bit integers for almost any unsigned integer data.
+typedef uint32_t vulkan_size_t;
+
+/// \brief Vulkan API uses 32 bit integers for almost any signed integer data.
+typedef int32_t vulkan_offset_t;
+
+#if VK_USE_64_BIT_PTR_DEFINES == 1
+/// \brief Helper for correctly converting handles to uint64_t for debug data submission.
+#    define CONVERT_HANDLE_FOR_DEBUG (uint64_t)
+#else
+/// \brief Helper for correctly converting handles to uint64_t for debug data submission.
+#    define CONVERT_HANDLE_FOR_DEBUG
+#endif
+
 #if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_PROFILE_MEMORY)
 struct memory_profiling_t
 {
@@ -70,13 +84,13 @@ struct render_backend_surface_t
     VkSurfaceKHR surface;
 
     VkSwapchainKHR swap_chain;
-    uint32_t images_count;
+    kan_instance_size_t images_count;
     VkImage *images;
     VkImageView *image_views;
 
     VkSemaphore image_available_semaphores[KAN_CONTEXT_RENDER_BACKEND_VULKAN_FRAMES_IN_FLIGHT];
-    uint32_t acquired_image_frame;
-    uint32_t acquired_image_index;
+    vulkan_size_t acquired_image_frame;
+    vulkan_size_t acquired_image_index;
     kan_bool_t needs_recreation;
 
     enum surface_render_state_t render_state;
@@ -84,8 +98,8 @@ struct render_backend_surface_t
     struct surface_blit_request_t *first_blit_request;
     struct surface_frame_buffer_attachment_t *first_frame_buffer_attachment;
 
-    uint32_t swap_chain_creation_window_width;
-    uint32_t swap_chain_creation_window_height;
+    vulkan_size_t swap_chain_creation_window_width;
+    vulkan_size_t swap_chain_creation_window_height;
 
     kan_application_system_window_t window_handle;
     kan_application_system_window_resource_id_t resource_id;
@@ -106,7 +120,7 @@ struct render_backend_command_state_t
     /// \meta reflection_dynamic_array_type = "struct mutator_t"
     struct kan_dynamic_array_t secondary_command_buffers;
 
-    uint64_t secondary_command_buffers_used;
+    kan_instance_size_t secondary_command_buffers_used;
 };
 
 struct render_backend_descriptor_set_allocation_t
@@ -120,26 +134,26 @@ struct scheduled_buffer_unmap_flush_transfer_t
     struct scheduled_buffer_unmap_flush_transfer_t *next;
     struct render_backend_buffer_t *source_buffer;
     struct render_backend_buffer_t *target_buffer;
-    uint32_t source_offset;
-    uint32_t target_offset;
-    uint32_t size;
+    vulkan_size_t source_offset;
+    vulkan_size_t target_offset;
+    vulkan_size_t size;
 };
 
 struct scheduled_buffer_unmap_flush_t
 {
     struct scheduled_buffer_unmap_flush_t *next;
     struct render_backend_buffer_t *buffer;
-    uint32_t offset;
-    uint32_t size;
+    vulkan_size_t offset;
+    vulkan_size_t size;
 };
 
 struct scheduled_image_upload_t
 {
     struct scheduled_image_upload_t *next;
     struct render_backend_image_t *image;
-    uint32_t mip;
+    uint8_t mip;
     struct render_backend_buffer_t *staging_buffer;
-    uint32_t staging_buffer_offset;
+    vulkan_size_t staging_buffer_offset;
 };
 
 struct scheduled_frame_buffer_create_t
@@ -161,7 +175,7 @@ struct scheduled_surface_read_back_t
     struct scheduled_surface_read_back_t *next;
     struct render_backend_surface_t *surface;
     struct render_backend_buffer_t *read_back_buffer;
-    uint32_t read_back_offset;
+    vulkan_size_t read_back_offset;
     struct render_backend_read_back_status_t *status;
 };
 
@@ -169,11 +183,11 @@ struct scheduled_buffer_read_back_t
 {
     struct scheduled_buffer_read_back_t *next;
     struct render_backend_buffer_t *buffer;
-    uint32_t offset;
-    uint32_t slice;
+    vulkan_size_t offset;
+    vulkan_size_t slice;
 
     struct render_backend_buffer_t *read_back_buffer;
-    uint32_t read_back_offset;
+    vulkan_size_t read_back_offset;
 
     struct render_backend_read_back_status_t *status;
 };
@@ -185,7 +199,7 @@ struct scheduled_image_read_back_t
     uint8_t mip;
 
     struct render_backend_buffer_t *read_back_buffer;
-    uint32_t read_back_offset;
+    vulkan_size_t read_back_offset;
 
     struct render_backend_read_back_status_t *status;
 };
@@ -333,7 +347,7 @@ struct render_backend_frame_buffer_t
     struct render_backend_system_t *system;
 
     VkFramebuffer instance;
-    uint64_t instance_array_size;
+    kan_instance_size_t instance_array_size;
 
     /// \details If there is a surface attachment, we need to create a separate frame buffer for each surface image.
     ///          Therefore, in that case frame_buffer_array is used instead of frame_buffer field.
@@ -341,13 +355,13 @@ struct render_backend_frame_buffer_t
 
     /// \brief If this frame buffer is attached to surface,
     ///        this variable contains index if frame buffer instance to use.
-    uint32_t instance_index;
+    vulkan_size_t instance_index;
 
     /// \brief Image views for attached images. VK_NULL_HANDLE is inserted in place of surface attachment if any.
     VkImageView *image_views;
 
     struct render_backend_pass_t *pass;
-    uint64_t attachments_count;
+    kan_instance_size_t attachments_count;
     struct render_backend_frame_buffer_attachment_t *attachments;
     kan_interned_string_t tracking_name;
 };
@@ -403,7 +417,7 @@ struct render_backend_pass_instance_t
     struct render_backend_frame_buffer_t *frame_buffer;
     VkPipelineLayout current_pipeline_layout;
 
-    uint64_t dependencies_left;
+    kan_instance_size_t dependencies_left;
     struct render_backend_pass_instance_dependency_t *first_dependant;
 
     struct render_backend_pass_instance_t *next_in_pass;
@@ -420,7 +434,7 @@ void render_backend_pass_instance_add_dependency_internal (struct render_backend
 struct render_backend_layout_binding_t
 {
     enum kan_render_parameter_binding_type_t type;
-    uint32_t used_stage_mask;
+    vulkan_size_t used_stage_mask;
 
     union
     {
@@ -438,7 +452,7 @@ struct render_backend_descriptor_set_layout_t
     uint8_t uniform_buffers_count;
     uint8_t storage_buffers_count;
     uint8_t combined_image_samplers_count;
-    uint64_t bindings_count;
+    kan_instance_size_t bindings_count;
     struct render_backend_layout_binding_t bindings[];
 };
 
@@ -448,16 +462,16 @@ struct render_backend_graphics_pipeline_family_t
     struct render_backend_system_t *system;
 
     VkPipelineLayout layout;
-    uint64_t descriptor_set_layouts_count;
+    kan_instance_size_t descriptor_set_layouts_count;
     struct render_backend_descriptor_set_layout_t **descriptor_set_layouts;
 
     enum kan_render_graphics_topology_t topology;
     kan_interned_string_t tracking_name;
 
-    uint64_t input_bindings_count;
+    kan_instance_size_t input_bindings_count;
     VkVertexInputBindingDescription *input_bindings;
 
-    uint64_t attributes_count;
+    kan_instance_size_t attributes_count;
     VkVertexInputAttributeDescription *attributes;
 };
 
@@ -476,7 +490,7 @@ struct render_backend_code_module_t
 };
 
 struct render_backend_code_module_t *render_backend_system_create_code_module (struct render_backend_system_t *system,
-                                                                               uint32_t code_length,
+                                                                               vulkan_size_t code_length,
                                                                                void *code,
                                                                                kan_interned_string_t tracking_name);
 
@@ -544,13 +558,13 @@ struct render_backend_unstable_parameter_set_data_t
     /// \details When last accessed index is not equal to current frame index, it means that allocations wasn't yet
     ///          accessed in current frame context and set data must be copied from last accessed allocations index.
     ///          It can be detected both when updating parameter set and when submitting it to command buffer.
-    uint32_t last_accessed_allocation_index;
+    vulkan_size_t last_accessed_allocation_index;
 };
 
 struct render_backend_parameter_set_render_target_attachment_t
 {
     struct render_backend_parameter_set_render_target_attachment_t *next;
-    uint32_t binding;
+    vulkan_size_t binding;
     struct render_backend_image_t *image;
 };
 
@@ -566,7 +580,7 @@ struct render_backend_pipeline_parameter_set_t
         struct render_backend_unstable_parameter_set_data_t unstable;
     };
 
-    uint32_t set_index;
+    vulkan_size_t set_index;
     VkImageView *bound_image_views;
 
     struct render_backend_parameter_set_render_target_attachment_t *first_render_target_attachment;
@@ -588,7 +602,7 @@ struct render_backend_buffer_t
     VmaAllocation allocation;
     enum render_backend_buffer_family_t family;
     enum kan_render_buffer_type_t type;
-    uint32_t full_size;
+    vulkan_size_t full_size;
     kan_interned_string_t tracking_name;
 
 #if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_PROFILE_MEMORY)
@@ -599,7 +613,7 @@ struct render_backend_buffer_t
 struct render_backend_buffer_t *render_backend_system_create_buffer (struct render_backend_system_t *system,
                                                                      enum render_backend_buffer_family_t family,
                                                                      enum kan_render_buffer_type_t buffer_type,
-                                                                     uint32_t full_size,
+                                                                     vulkan_size_t full_size,
                                                                      kan_interned_string_t tracking_name);
 
 void render_backend_system_destroy_buffer (struct render_backend_system_t *system,
@@ -613,9 +627,9 @@ struct render_backend_frame_lifetime_allocator_chunk_t
     struct render_backend_frame_lifetime_allocator_chunk_t *previous;
     struct render_backend_frame_lifetime_allocator_chunk_t *next_free;
 
-    uint32_t offset;
-    uint32_t size;
-    uint32_t occupied_by_frame;
+    vulkan_size_t offset;
+    vulkan_size_t size;
+    vulkan_size_t occupied_by_frame;
 };
 
 struct render_backend_frame_lifetime_allocator_page_t
@@ -640,7 +654,7 @@ struct render_backend_frame_lifetime_allocator_t
 
     enum render_backend_buffer_family_t buffer_family;
     enum kan_render_buffer_type_t buffer_type;
-    uint32_t page_size;
+    vulkan_size_t page_size;
     kan_interned_string_t tracking_name;
     kan_interned_string_t buffer_tracking_name;
 };
@@ -648,7 +662,7 @@ struct render_backend_frame_lifetime_allocator_t
 struct render_backend_frame_lifetime_allocator_allocation_t
 {
     struct render_backend_buffer_t *buffer;
-    uint32_t offset;
+    vulkan_size_t offset;
 };
 
 #define STAGING_BUFFER_ALLOCATION_ALIGNMENT _Alignof (float)
@@ -657,20 +671,20 @@ struct render_backend_frame_lifetime_allocator_t *render_backend_system_create_f
     struct render_backend_system_t *system,
     enum render_backend_buffer_family_t buffer_family,
     enum kan_render_buffer_type_t buffer_type,
-    uint32_t page_size,
+    vulkan_size_t page_size,
     kan_interned_string_t tracking_name);
 
 struct render_backend_frame_lifetime_allocator_allocation_t render_backend_frame_lifetime_allocator_allocate_on_page (
     struct render_backend_frame_lifetime_allocator_t *allocator,
     struct render_backend_frame_lifetime_allocator_page_t *page,
-    uint32_t size,
-    uint32_t alignment);
+    vulkan_size_t size,
+    vulkan_size_t alignment);
 
 struct render_backend_frame_lifetime_allocator_allocation_t render_backend_frame_lifetime_allocator_allocate (
-    struct render_backend_frame_lifetime_allocator_t *allocator, uint32_t size, uint32_t alignment);
+    struct render_backend_frame_lifetime_allocator_t *allocator, vulkan_size_t size, vulkan_size_t alignment);
 
 struct render_backend_frame_lifetime_allocator_allocation_t render_backend_system_allocate_for_staging (
-    struct render_backend_system_t *system, uint32_t size);
+    struct render_backend_system_t *system, vulkan_size_t size);
 
 void render_backend_frame_lifetime_allocator_retire_old_allocations (
     struct render_backend_frame_lifetime_allocator_t *allocator);
@@ -693,7 +707,7 @@ struct image_parameter_set_attachment_t
 {
     struct image_parameter_set_attachment_t *next;
     struct render_backend_pipeline_parameter_set_t *set;
-    uint32_t binding;
+    vulkan_size_t binding;
 };
 
 struct render_backend_image_t
@@ -725,7 +739,7 @@ struct graphics_pipeline_compilation_request_t
     struct kan_bd_list_node_t list_node;
     struct render_backend_graphics_pipeline_t *pipeline;
 
-    uint64_t shader_stages_count;
+    kan_instance_size_t shader_stages_count;
     VkPipelineShaderStageCreateInfo *shader_stages;
 
     VkPipelineRasterizationStateCreateInfo rasterization;
@@ -733,7 +747,7 @@ struct graphics_pipeline_compilation_request_t
     VkPipelineDepthStencilStateCreateInfo depth_stencil;
     VkPipelineColorBlendStateCreateInfo color_blending;
 
-    uint64_t color_blending_attachments_count;
+    kan_instance_size_t color_blending_attachments_count;
     VkPipelineColorBlendAttachmentState *color_blending_attachments;
 };
 
@@ -767,7 +781,7 @@ struct render_backend_descriptor_set_pool_t
 {
     struct kan_bd_list_node_t list_node;
     VkDescriptorPool pool;
-    uint32_t active_allocations;
+    vulkan_size_t active_allocations;
 };
 
 struct render_backend_descriptor_set_allocator_t
@@ -775,10 +789,10 @@ struct render_backend_descriptor_set_allocator_t
     struct kan_bd_list_t pools;
     struct kan_atomic_int_t multithreaded_access_lock;
 
-    uint64_t total_set_allocations;
-    uint64_t uniform_buffer_binding_allocations;
-    uint64_t storage_buffer_binding_allocations;
-    uint64_t combined_image_binding_sampler_allocations;
+    kan_instance_size_t total_set_allocations;
+    kan_instance_size_t uniform_buffer_binding_allocations;
+    kan_instance_size_t storage_buffer_binding_allocations;
+    kan_instance_size_t combined_image_binding_sampler_allocations;
 };
 
 void render_backend_descriptor_set_allocator_init (struct render_backend_descriptor_set_allocator_t *allocator);
@@ -802,7 +816,7 @@ void render_backend_descriptor_set_allocator_shutdown (struct render_backend_sys
 void render_backend_apply_descriptor_set_mutation (struct render_backend_pipeline_parameter_set_t *set_context,
                                                    VkDescriptorSet source_set,
                                                    VkDescriptorSet target_set,
-                                                   uint64_t bindings_count,
+                                                   kan_instance_size_t bindings_count,
                                                    struct kan_render_parameter_update_description_t *bindings);
 
 struct render_backend_system_t
@@ -816,11 +830,11 @@ struct render_backend_system_t
     VkPhysicalDevice physical_device;
 
     VmaAllocator gpu_memory_allocator;
-    uint32_t device_queue_family_index;
+    vulkan_size_t device_queue_family_index;
     VkQueue device_queue;
 
     kan_bool_t frame_started;
-    uint32_t current_frame_in_flight_index;
+    vulkan_size_t current_frame_in_flight_index;
 
     VkSemaphore render_finished_semaphores[KAN_CONTEXT_RENDER_BACKEND_VULKAN_FRAMES_IN_FLIGHT];
     VkFence in_flight_fences[KAN_CONTEXT_RENDER_BACKEND_VULKAN_FRAMES_IN_FLIGHT];
@@ -957,9 +971,9 @@ struct render_backend_system_t
     kan_bool_t prefer_vsync;
 
     kan_interned_string_t application_info_name;
-    uint32_t version_major;
-    uint32_t version_minor;
-    uint32_t version_patch;
+    vulkan_size_t version_major;
+    vulkan_size_t version_minor;
+    vulkan_size_t version_patch;
 
     kan_interned_string_t interned_temporary_staging_buffer;
 };
@@ -969,7 +983,7 @@ struct render_backend_system_t
 
 void render_backend_memory_profiling_init (struct render_backend_system_t *system);
 
-static inline void transfer_memory_between_groups (uint32_t amount,
+static inline void transfer_memory_between_groups (vulkan_size_t amount,
                                                    kan_allocation_group_t from,
                                                    kan_allocation_group_t to)
 {
@@ -1292,7 +1306,7 @@ static inline struct render_backend_schedule_state_t *render_backend_system_get_
 static inline struct render_backend_schedule_state_t *render_backend_system_get_schedule_for_destroy (
     struct render_backend_system_t *system)
 {
-    uint32_t schedule_index = system->current_frame_in_flight_index;
+    vulkan_size_t schedule_index = system->current_frame_in_flight_index;
     if (!system->frame_started)
     {
         // If frame is not started, then we can't schedule destroy for current frame as destroy is done when frame
@@ -1367,9 +1381,9 @@ static inline VkImageAspectFlags get_image_aspects (struct kan_render_image_desc
 static inline void kan_render_image_description_calculate_size_at_mip (
     struct kan_render_image_description_t *description,
     uint8_t mip,
-    uint32_t *output_width,
-    uint32_t *output_height,
-    uint32_t *output_depth)
+    vulkan_size_t *output_width,
+    vulkan_size_t *output_height,
+    vulkan_size_t *output_depth)
 {
     KAN_ASSERT (mip < description->mips)
     *output_width = KAN_MAX (1u, description->width >> mip);

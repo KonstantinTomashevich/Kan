@@ -59,7 +59,7 @@ struct task_dispatcher_t
     kan_cpu_section_t execution_section;
 
     struct kan_atomic_int_t shutting_down;
-    uint64_t threads_count;
+    kan_instance_size_t threads_count;
     kan_thread_t *threads;
 };
 
@@ -166,7 +166,7 @@ static void shutdown_global_task_dispatcher (void)
     kan_mutex_unlock (global_task_dispatcher.task_mutex);
     kan_conditional_variable_signal_all (global_task_dispatcher.worker_wake_up_condition);
 
-    for (uint64_t index = 0u; index < global_task_dispatcher.threads_count; ++index)
+    for (kan_loop_size_t index = 0u; index < global_task_dispatcher.threads_count; ++index)
     {
         kan_thread_wait (global_task_dispatcher.threads[index]);
     }
@@ -200,7 +200,7 @@ static void ensure_global_task_dispatcher_ready (void)
                 global_task_dispatcher.allocation_group, sizeof (kan_thread_t) * global_task_dispatcher.threads_count,
                 _Alignof (kan_thread_t));
 
-            for (uint64_t index = 0u; index < global_task_dispatcher.threads_count; ++index)
+            for (kan_loop_size_t index = 0u; index < global_task_dispatcher.threads_count; ++index)
             {
                 global_task_dispatcher.threads[index] =
                     kan_thread_create ("global_cpu_dispatcher_worker", worker_thread_function, 0u);
@@ -255,7 +255,7 @@ static void dispatch_task_list (struct job_t *job, struct kan_cpu_task_list_node
     ensure_global_task_dispatcher_ready ();
     KAN_ASSERT (tasks)
 
-    uint64_t count = 0u;
+    kan_instance_size_t count = 0u;
     struct task_node_t *begin = NULL;
     struct task_node_t *end = NULL;
 

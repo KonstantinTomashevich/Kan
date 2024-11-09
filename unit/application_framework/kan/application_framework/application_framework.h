@@ -167,14 +167,14 @@ struct kan_application_framework_core_configuration_t
     kan_bool_t observe_world_definitions;
 
     /// \brief Delay between changes in universe world definition directory and definition reload.
-    uint64_t world_definition_rescan_delay_ns;
+    kan_time_offset_t world_definition_rescan_delay_ns;
 
     /// \brief Whether code hot reload is enabled.
     kan_bool_t enable_code_hot_reload;
 
     /// \brief Delay in nanoseconds between changes to original dynamic libraries and code hot reload.
     /// \details Needed to make sure that build system was able to write everything.
-    uint64_t code_hot_reload_delay_ns;
+    kan_time_offset_t code_hot_reload_delay_ns;
 
     /// \brief If ::enable_code_hot_reload and not NULL, this command is executed every time any application window
     ///        is focused in order to update and hot reload plugins if there are any changes.
@@ -215,14 +215,14 @@ APPLICATION_FRAMEWORK_API void kan_application_framework_program_configuration_s
 /// \brief Wrapper for kan_application_framework_run_with_configuration that loads configuration from given paths.
 APPLICATION_FRAMEWORK_API int kan_application_framework_run (const char *core_configuration_path,
                                                              const char *program_configuration_path,
-                                                             uint64_t arguments_count,
+                                                             kan_instance_size_t arguments_count,
                                                              char **arguments);
 
 /// \brief Executes application framework with provided configuration. Returns after execution is completed.
 APPLICATION_FRAMEWORK_API int kan_application_framework_run_with_configuration (
     const struct kan_application_framework_core_configuration_t *core_configuration,
     const struct kan_application_framework_program_configuration_t *program_configuration,
-    uint64_t arguments_count,
+    kan_instance_size_t arguments_count,
     char **arguments);
 
 KAN_C_HEADER_END

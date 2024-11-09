@@ -40,12 +40,12 @@ KAN_C_HEADER_BEGIN
 struct kan_pair_pipeline_settings_singleton_t
 {
     /// \brief Length of fixed time step for logical pipeline.
-    uint64_t logical_time_step_ns;
+    kan_time_offset_t logical_time_step_ns;
 
     /// \brief If logical pipeline advance exceeds this time limit, game will slow down to avoid death spiral.
     /// \details Logical pipeline advance is a procedure of calling logical pipeline until its time steps produce
     ///          enough time for new visual pipeline update.
-    uint64_t max_logical_advance_time_ns;
+    kan_time_offset_t max_logical_advance_time_ns;
 };
 
 UNIVERSE_PAIR_PIPELINE_SCHEDULER_API void kan_pair_pipeline_settings_singleton_init (

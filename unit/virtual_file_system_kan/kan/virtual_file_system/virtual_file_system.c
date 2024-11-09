@@ -38,8 +38,8 @@ struct read_only_pack_file_node_t
     struct kan_hash_storage_node_t node;
     kan_interned_string_t name;
     kan_interned_string_t extension;
-    uint64_t offset;
-    uint64_t size;
+    kan_file_size_t offset;
+    kan_file_size_t size;
 };
 
 struct read_only_pack_directory_t
@@ -91,8 +91,8 @@ enum follow_path_result_t
 struct read_only_pack_registry_item_t
 {
     char *path;
-    uint64_t offset;
-    uint64_t size;
+    kan_file_size_t offset;
+    kan_file_size_t size;
 };
 
 struct read_only_pack_registry_t
@@ -169,15 +169,15 @@ struct read_only_pack_file_read_stream_t
 {
     struct kan_stream_t stream;
     struct kan_stream_t *base_stream;
-    uint64_t offset;
-    uint64_t size;
-    uint64_t position;
+    kan_file_size_t offset;
+    kan_file_size_t size;
+    kan_file_size_t position;
 };
 
 struct read_only_pack_builder_t
 {
     struct kan_stream_t *output_stream;
-    uint64_t beginning_offset_in_stream;
+    kan_file_size_t beginning_offset_in_stream;
     struct read_only_pack_registry_t registry;
 };
 
@@ -442,7 +442,7 @@ static void read_only_pack_registry_init (struct read_only_pack_registry_t *regi
 
 static void read_only_pack_registry_reset (struct read_only_pack_registry_t *registry)
 {
-    for (uint64_t index = 0u; index < registry->items.size; ++index)
+    for (kan_loop_size_t index = 0u; index < registry->items.size; ++index)
     {
         struct read_only_pack_registry_item_t *item =
             &((struct read_only_pack_registry_item_t *) registry->items.data)[index];
@@ -454,7 +454,7 @@ static void read_only_pack_registry_reset (struct read_only_pack_registry_t *reg
 
 static void read_only_pack_registry_shutdown (struct read_only_pack_registry_t *registry)
 {
-    for (uint64_t index = 0u; index < registry->items.size; ++index)
+    for (kan_loop_size_t index = 0u; index < registry->items.size; ++index)
     {
         struct read_only_pack_registry_item_t *item =
             &((struct read_only_pack_registry_item_t *) registry->items.data)[index];
@@ -467,7 +467,7 @@ static void read_only_pack_registry_shutdown (struct read_only_pack_registry_t *
 static inline struct virtual_directory_t *virtual_directory_find_child_by_raw_name (
     struct virtual_directory_t *directory, const char *name_begin, const char *name_end)
 {
-    const uint64_t length = name_end - name_begin;
+    const kan_instance_size_t length = (kan_instance_size_t) (name_end - name_begin);
     struct virtual_directory_t *child = directory->first_child;
 
     while (child)
@@ -486,7 +486,7 @@ static inline struct virtual_directory_t *virtual_directory_find_child_by_raw_na
 static inline struct mount_point_real_t *virtual_directory_find_mount_point_real_by_raw_name (
     struct virtual_directory_t *directory, const char *name_begin, const char *name_end)
 {
-    const uint64_t length = name_end - name_begin;
+    const kan_instance_size_t length = (kan_instance_size_t) (name_end - name_begin);
     struct mount_point_real_t *mount_point = directory->first_mount_point_real;
 
     while (mount_point)
@@ -505,7 +505,7 @@ static inline struct mount_point_real_t *virtual_directory_find_mount_point_real
 static inline struct mount_point_read_only_pack_t *virtual_directory_find_mount_point_read_only_pack_by_raw_name (
     struct virtual_directory_t *directory, const char *name_begin, const char *name_end)
 {
-    const uint64_t length = name_end - name_begin;
+    const kan_instance_size_t length = (kan_instance_size_t) (name_end - name_begin);
     struct mount_point_read_only_pack_t *mount_point = directory->first_mount_point_read_only_pack;
 
     while (mount_point)
@@ -607,35 +607,37 @@ static inline kan_bool_t file_system_watcher_is_observing_virtual_directory (
     return KAN_FALSE;
 }
 
-static uint64_t read_only_pack_file_read (struct kan_stream_t *stream, uint64_t amount, void *output_buffer)
+static kan_file_size_t read_only_pack_file_read (struct kan_stream_t *stream,
+                                                 kan_file_size_t amount,
+                                                 void *output_buffer)
 {
     struct read_only_pack_file_read_stream_t *stream_data = (struct read_only_pack_file_read_stream_t *) stream;
-    const uint64_t can_read = stream_data->size - stream_data->position;
+    const kan_file_size_t can_read = stream_data->size - stream_data->position;
 
     if (can_read == 0u)
     {
         return 0u;
     }
 
-    const uint64_t will_read = KAN_MIN (can_read, amount);
-    const uint64_t read =
+    const kan_file_size_t will_read = KAN_MIN (can_read, amount);
+    const kan_file_size_t read =
         stream_data->base_stream->operations->read (stream_data->base_stream, will_read, output_buffer);
 
     stream_data->position += read;
     return read;
 }
 
-static uint64_t read_only_pack_file_tell (struct kan_stream_t *stream)
+static kan_file_size_t read_only_pack_file_tell (struct kan_stream_t *stream)
 {
     return ((struct read_only_pack_file_read_stream_t *) stream)->position;
 }
 
 static kan_bool_t read_only_pack_file_seek (struct kan_stream_t *stream,
                                             enum kan_stream_seek_pivot pivot,
-                                            int64_t offset)
+                                            kan_file_offset_t offset)
 {
     struct read_only_pack_file_read_stream_t *stream_data = (struct read_only_pack_file_read_stream_t *) stream;
-    int64_t new_position = 0;
+    kan_file_offset_t new_position = 0;
 
     switch (pivot)
     {
@@ -644,20 +646,20 @@ static kan_bool_t read_only_pack_file_seek (struct kan_stream_t *stream,
         break;
 
     case KAN_STREAM_SEEK_CURRENT:
-        new_position = ((int64_t) stream_data->position) + offset;
+        new_position = ((kan_file_offset_t) stream_data->position) + offset;
         break;
 
     case KAN_STREAM_SEEK_END:
-        new_position = ((int64_t) stream_data->size) + offset;
+        new_position = ((kan_file_offset_t) stream_data->size) + offset;
         break;
     }
 
-    if (new_position < 0 || new_position > (int64_t) stream_data->size)
+    if (new_position < 0 || new_position > (kan_file_offset_t) stream_data->size)
     {
         return KAN_FALSE;
     }
 
-    stream_data->position = (uint64_t) new_position;
+    stream_data->position = (kan_file_size_t) new_position;
     return stream_data->base_stream->operations->seek (stream_data->base_stream, KAN_STREAM_SEEK_START,
                                                        stream_data->offset + stream_data->position);
 }
@@ -790,7 +792,7 @@ static void file_system_watcher_destroy (struct file_system_watcher_t *watcher)
         watcher->volume->first_watcher = watcher->next;
     }
 
-    for (uint64_t index = 0u; index < watcher->real_file_system_attachments.size; ++index)
+    for (kan_loop_size_t index = 0u; index < watcher->real_file_system_attachments.size; ++index)
     {
         struct real_file_system_watcher_attachment_t *attachment =
             &((struct real_file_system_watcher_attachment_t *) watcher->real_file_system_attachments.data)[index];
@@ -844,10 +846,10 @@ static void inform_real_directory_added (struct file_system_watcher_t *watcher,
                 continue;
             }
 
-            const uint64_t length_backup_virtual = recursive_virtual_path->length;
+            const kan_instance_size_t length_backup_virtual = recursive_virtual_path->length;
             kan_file_system_path_container_append (recursive_virtual_path, entry_name);
 
-            const uint64_t length_backup_real = recursive_real_path->length;
+            const kan_instance_size_t length_backup_real = recursive_real_path->length;
             kan_file_system_path_container_append (recursive_real_path, entry_name);
 
             struct kan_file_system_entry_status_t entry_status;
@@ -954,10 +956,10 @@ static void inform_real_directory_removed (struct file_system_watcher_t *watcher
                 continue;
             }
 
-            const uint64_t length_backup_virtual = recursive_virtual_path->length;
+            const kan_instance_size_t length_backup_virtual = recursive_virtual_path->length;
             kan_file_system_path_container_append (recursive_virtual_path, entry_name);
 
-            const uint64_t length_backup_real = recursive_real_path->length;
+            const kan_instance_size_t length_backup_real = recursive_real_path->length;
             kan_file_system_path_container_append (recursive_real_path, entry_name);
 
             struct kan_file_system_entry_status_t entry_status;
@@ -1047,7 +1049,7 @@ static void inform_mount_point_real_removed (struct volume_t *volume,
             inform_real_directory_removed (file_system_watcher, &recursive_virtual_path, &recursive_real_path);
         }
 
-        for (uint64_t index = 0u; index < file_system_watcher->real_file_system_attachments.size;)
+        for (kan_loop_size_t index = 0u; index < file_system_watcher->real_file_system_attachments.size;)
         {
             struct real_file_system_watcher_attachment_t *attachment =
                 &((struct real_file_system_watcher_attachment_t *)
@@ -1092,7 +1094,7 @@ static void inform_read_only_pack_directory_added (struct file_system_watcher_t 
                                                    struct read_only_pack_directory_t *directory,
                                                    struct kan_file_system_path_container_t *recursive_path)
 {
-    const uint64_t length_backup = recursive_path->length;
+    const kan_instance_size_t length_backup = recursive_path->length;
     kan_file_system_path_container_append (recursive_path, directory->name);
 
     kan_atomic_int_lock (&watcher->event_queue_lock);
@@ -1161,7 +1163,7 @@ static void inform_read_only_pack_directory_removed (struct file_system_watcher_
                                                      struct read_only_pack_directory_t *directory,
                                                      struct kan_file_system_path_container_t *recursive_path)
 {
-    const uint64_t length_backup = recursive_path->length;
+    const kan_instance_size_t length_backup = recursive_path->length;
     kan_file_system_path_container_append (recursive_path, directory->name);
     struct read_only_pack_file_node_t *file_node = (struct read_only_pack_file_node_t *) directory->files.items.first;
 
@@ -1342,7 +1344,7 @@ static inline void mount_point_real_fill_path (struct mount_point_real_t *mount_
 static struct read_only_pack_directory_t *read_only_pack_directory_find_child (
     struct read_only_pack_directory_t *directory, const char *name_begin, const char *name_end)
 {
-    const uint64_t length = name_end - name_begin;
+    const kan_instance_size_t length = (kan_instance_size_t) (name_end - name_begin);
     struct read_only_pack_directory_t *child = directory->first_child;
 
     while (child)
@@ -1414,9 +1416,9 @@ static struct read_only_pack_file_node_t *read_only_pack_directory_find_file (
     const char *extension_begin = separator ? separator + 1u : name_end;
     const char *extension_end = name_end;
 
-    const uint64_t file_name_length = file_name_end - file_name_begin;
-    const uint64_t extension_length = extension_end - extension_begin;
-    uint64_t hash = kan_char_sequence_hash (name_begin, name_end);
+    const kan_instance_size_t file_name_length = (kan_instance_size_t) (file_name_end - file_name_begin);
+    const kan_instance_size_t extension_length = (kan_instance_size_t) (extension_end - extension_begin);
+    kan_hash_t hash = kan_char_sequence_hash (name_begin, name_end);
 
     const struct kan_hash_storage_bucket_t *bucket = kan_hash_storage_query (&directory->files, hash);
     struct read_only_pack_file_node_t *node = (struct read_only_pack_file_node_t *) bucket->first;
@@ -1554,15 +1556,17 @@ static kan_bool_t mount_read_only_pack (struct volume_t *volume,
         return KAN_FALSE;
     }
 
-    uint64_t registry_offset;
-    if (stream->operations->read (stream, sizeof (uint64_t), &registry_offset) != sizeof (uint64_t))
+    kan_file_size_t registry_offset;
+    if (stream->operations->read (stream, sizeof (kan_file_size_t), &registry_offset) != sizeof (kan_file_size_t))
     {
         KAN_LOG (virtual_file_system, KAN_LOG_ERROR, "Failed to read registry offset of read only pack at \"%s\".",
                  pack_real_path)
         return KAN_FALSE;
     }
 
-    if (!stream->operations->seek (stream, KAN_STREAM_SEEK_CURRENT, ((int64_t) registry_offset) - sizeof (uint64_t)))
+    if (!stream->operations->seek (
+            stream, KAN_STREAM_SEEK_CURRENT,
+            ((kan_file_offset_t) registry_offset) - (kan_file_offset_t) sizeof (kan_file_size_t)))
     {
         KAN_LOG (virtual_file_system, KAN_LOG_ERROR, "Failed to seek to registry of read only pack at \"%s\".",
                  pack_real_path)
@@ -1605,7 +1609,7 @@ static kan_bool_t mount_read_only_pack (struct volume_t *volume,
     mount_point->previous = NULL;
     owner_directory->first_mount_point_read_only_pack = mount_point;
 
-    const uint64_t real_path_length = strlen (pack_real_path);
+    const kan_instance_size_t real_path_length = (kan_instance_size_t) strlen (pack_real_path);
     mount_point->real_file_path =
         kan_allocate_general (hierarchy_allocation_group, real_path_length + 1u, _Alignof (char));
     memcpy (mount_point->real_file_path, pack_real_path, real_path_length + 1u);
@@ -1613,7 +1617,7 @@ static kan_bool_t mount_read_only_pack (struct volume_t *volume,
     mount_point->root_directory.name = pack_name;
     kan_bool_t result = KAN_TRUE;
 
-    for (uint64_t index = 0u; index < registry.items.size; ++index)
+    for (kan_loop_size_t index = 0u; index < registry.items.size; ++index)
     {
         struct read_only_pack_registry_item_t *item =
             &((struct read_only_pack_registry_item_t *) registry.items.data)[index];
@@ -1669,7 +1673,8 @@ kan_bool_t kan_virtual_file_system_volume_mount_real (kan_virtual_file_system_vo
                 return KAN_FALSE;
             }
 
-            const uint64_t real_file_system_path_length = strlen (real_file_system_path);
+            const kan_instance_size_t real_file_system_path_length =
+                (kan_instance_size_t) strlen (real_file_system_path);
             if (real_file_system_path_length == 0u)
             {
                 KAN_LOG (virtual_file_system, KAN_LOG_ERROR,
@@ -2047,13 +2052,14 @@ const char *kan_virtual_file_system_directory_iterator_advance (
             case READ_ONLY_PACK_DIRECTORY_ITERATOR_STAGE_FILES:
                 if (iterator_data->read_only_pack_suffix.next_file)
                 {
-                    const uint64_t name_length = iterator_data->read_only_pack_suffix.next_file->name ?
-                                                     strlen (iterator_data->read_only_pack_suffix.next_file->name) :
-                                                     0u;
+                    const kan_instance_size_t name_length =
+                        iterator_data->read_only_pack_suffix.next_file->name ?
+                            (kan_instance_size_t) strlen (iterator_data->read_only_pack_suffix.next_file->name) :
+                            0u;
 
-                    const uint64_t extension_length =
+                    const kan_instance_size_t extension_length =
                         iterator_data->read_only_pack_suffix.next_file->extension ?
-                            strlen (iterator_data->read_only_pack_suffix.next_file->extension) :
+                            (kan_instance_size_t) strlen (iterator_data->read_only_pack_suffix.next_file->extension) :
                             0u;
 
                     if (name_length > 0u)
@@ -2784,9 +2790,10 @@ kan_bool_t kan_virtual_file_system_read_only_pack_builder_begin (
 
     builder_data->output_stream = output_stream;
     builder_data->beginning_offset_in_stream = output_stream->operations->tell (output_stream);
-    uint64_t placeholder = 0u;
+    kan_file_size_t placeholder = 0u;
 
-    if (output_stream->operations->write (output_stream, sizeof (uint64_t), &placeholder) != sizeof (uint64_t))
+    if (output_stream->operations->write (output_stream, sizeof (kan_file_size_t), &placeholder) !=
+        sizeof (kan_file_size_t))
     {
         builder_data->output_stream = NULL;
         KAN_LOG (virtual_file_system, KAN_LOG_ERROR,
@@ -2816,7 +2823,7 @@ kan_bool_t kan_virtual_file_system_read_only_pack_builder_add (kan_virtual_file_
         KAN_ASSERT (item)
     }
 
-    const uint64_t path_length = strlen (path_in_pack);
+    const kan_instance_size_t path_length = (kan_instance_size_t) strlen (path_in_pack);
     item->path = kan_allocate_general (read_only_pack_operation_allocation_group, path_length + 1u, _Alignof (char));
     memcpy (item->path, path_in_pack, path_length + 1u);
 
@@ -2826,7 +2833,7 @@ kan_bool_t kan_virtual_file_system_read_only_pack_builder_add (kan_virtual_file_
 
     while (KAN_TRUE)
     {
-        uint64_t read =
+        kan_file_size_t read =
             input_stream->operations->read (input_stream, KAN_VIRTUAL_FILE_SYSTEM_ROPACK_BUILDER_CHUNK_SIZE, buffer);
 
         if (read > 0u)
@@ -2863,11 +2870,12 @@ kan_bool_t kan_virtual_file_system_read_only_pack_builder_finalize (
     struct read_only_pack_builder_t *builder_data = KAN_HANDLE_GET (builder);
     KAN_ASSERT (builder_data->output_stream)
 
-    const uint64_t registry_position = builder_data->output_stream->operations->tell (builder_data->output_stream);
+    const kan_file_size_t registry_position =
+        builder_data->output_stream->operations->tell (builder_data->output_stream);
     KAN_ASSERT (registry_position > builder_data->beginning_offset_in_stream)
 
     if (!builder_data->output_stream->operations->seek (builder_data->output_stream, KAN_STREAM_SEEK_START,
-                                                        builder_data->beginning_offset_in_stream))
+                                                        (kan_file_offset_t) builder_data->beginning_offset_in_stream))
     {
         builder_data->output_stream = NULL;
         read_only_pack_registry_reset (&builder_data->registry);
@@ -2876,9 +2884,9 @@ kan_bool_t kan_virtual_file_system_read_only_pack_builder_finalize (
         return KAN_FALSE;
     }
 
-    const uint64_t registry_offset = registry_position - builder_data->beginning_offset_in_stream;
-    if (builder_data->output_stream->operations->write (builder_data->output_stream, sizeof (uint64_t),
-                                                        &registry_offset) != sizeof (uint64_t))
+    const kan_file_size_t registry_offset = registry_position - builder_data->beginning_offset_in_stream;
+    if (builder_data->output_stream->operations->write (builder_data->output_stream, sizeof (kan_file_size_t),
+                                                        &registry_offset) != sizeof (kan_file_size_t))
     {
         builder_data->output_stream = NULL;
         read_only_pack_registry_reset (&builder_data->registry);
@@ -2887,7 +2895,7 @@ kan_bool_t kan_virtual_file_system_read_only_pack_builder_finalize (
     }
 
     if (!builder_data->output_stream->operations->seek (builder_data->output_stream, KAN_STREAM_SEEK_START,
-                                                        registry_position))
+                                                        (kan_file_offset_t) registry_position))
     {
         builder_data->output_stream = NULL;
         read_only_pack_registry_reset (&builder_data->registry);
@@ -3022,7 +3030,7 @@ const struct kan_virtual_file_system_watcher_event_t *kan_virtual_file_system_wa
 
     if (!node)
     {
-        for (uint64_t index = 0u; index < watcher_data->real_file_system_attachments.size; ++index)
+        for (kan_loop_size_t index = 0u; index < watcher_data->real_file_system_attachments.size; ++index)
         {
             struct real_file_system_watcher_attachment_t *attachment =
                 &((struct real_file_system_watcher_attachment_t *)
@@ -3071,7 +3079,8 @@ const struct kan_virtual_file_system_watcher_event_t *kan_virtual_file_system_wa
                     break;
                 }
 
-                const uint64_t real_path_length = strlen (attachment->mount_point->real_directory_path);
+                const kan_instance_size_t real_path_length =
+                    (kan_instance_size_t) strlen (attachment->mount_point->real_directory_path);
                 KAN_ASSERT (strncmp (real_event->path_container.path, attachment->mount_point->real_directory_path,
                                      real_path_length) == 0)
 

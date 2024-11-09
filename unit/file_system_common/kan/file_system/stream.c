@@ -26,14 +26,14 @@ struct file_stream_t
     FILE *file;
 };
 
-static uint64_t read (struct kan_stream_t *stream, uint64_t amount, void *output_buffer)
+static kan_file_size_t read (struct kan_stream_t *stream, kan_file_size_t amount, void *output_buffer)
 {
-    return (uint64_t) fread (output_buffer, 1u, amount, ((struct file_stream_t *) stream)->file);
+    return (kan_file_size_t) fread (output_buffer, 1u, amount, ((struct file_stream_t *) stream)->file);
 }
 
-static uint64_t write (struct kan_stream_t *stream, uint64_t amount, const void *input_buffer)
+static kan_file_size_t write (struct kan_stream_t *stream, kan_file_size_t amount, const void *input_buffer)
 {
-    return (uint64_t) fwrite (input_buffer, 1u, amount, ((struct file_stream_t *) stream)->file);
+    return (kan_file_size_t) fwrite (input_buffer, 1u, amount, ((struct file_stream_t *) stream)->file);
 }
 
 static kan_bool_t flush (struct kan_stream_t *stream)
@@ -41,12 +41,12 @@ static kan_bool_t flush (struct kan_stream_t *stream)
     return fflush (((struct file_stream_t *) stream)->file) == 0;
 }
 
-static uint64_t tell (struct kan_stream_t *stream)
+static kan_file_size_t tell (struct kan_stream_t *stream)
 {
-    return (uint64_t) ftell (((struct file_stream_t *) stream)->file);
+    return (kan_file_size_t) ftell (((struct file_stream_t *) stream)->file);
 }
 
-static kan_bool_t seek (struct kan_stream_t *stream, enum kan_stream_seek_pivot pivot, int64_t offset)
+static kan_bool_t seek (struct kan_stream_t *stream, enum kan_stream_seek_pivot pivot, kan_file_offset_t offset)
 {
     switch (pivot)
     {

@@ -12,12 +12,12 @@ kan_allocation_group_t kan_captured_allocation_group_get_source (kan_captured_al
     return KAN_ALLOCATION_GROUP_IGNORE;
 }
 
-uint64_t kan_captured_allocation_group_get_total_allocated (kan_captured_allocation_group_t group)
+kan_memory_size_t kan_captured_allocation_group_get_total_allocated (kan_captured_allocation_group_t group)
 {
     return 0u;
 }
 
-uint64_t kan_captured_allocation_group_get_directly_allocated (kan_captured_allocation_group_t group)
+kan_memory_size_t kan_captured_allocation_group_get_directly_allocated (kan_captured_allocation_group_t group)
 {
     return 0u;
 }

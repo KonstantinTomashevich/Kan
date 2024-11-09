@@ -3,6 +3,7 @@
 #include <stddef.h>
 
 #include <kan/api_common/c_header.h>
+#include <kan/api_common/core_types.h>
 #include <kan/universe/universe.h>
 
 KAN_C_HEADER_BEGIN
@@ -113,7 +114,7 @@ KAN_C_HEADER_BEGIN
 /// \brief Declares state with given name and outputs list of query fields associated with this state.
 #define KAN_UP_GENERATE_STATE_QUERIES(STATE_NAME)                                                                      \
     /* Highlight-autocomplete replacement. */                                                                          \
-    uint64_t STATE_NAME##_fake_placeholder_field;
+    kan_memory_size_t STATE_NAME##_fake_placeholder_field;
 
 /// \brief Binds state by name with given path for all queries below (until another bind overrides it).
 #define KAN_UP_BIND_STATE(STATE_NAME, STATE_PATH) /* No highlight-time replacement. */
@@ -171,83 +172,83 @@ KAN_C_HEADER_BEGIN
 #define KAN_UP_INDEXED_INSERT(NAME, TYPE)                                                                              \
     /* Highlight-autocomplete replacement. */                                                                          \
     struct TYPE *NAME = NULL;                                                                                          \
-    for (uint64_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
+    for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
 
 /// \brief Header for indexed sequence read query.
 #define KAN_UP_SEQUENCE_READ(NAME, TYPE)                                                                               \
     /* Highlight-autocomplete replacement. */                                                                          \
     const struct TYPE *NAME = NULL;                                                                                    \
-    for (uint64_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
+    for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
 
 /// \brief Header for indexed sequence update query.
 #define KAN_UP_SEQUENCE_UPDATE(NAME, TYPE)                                                                             \
     /* Highlight-autocomplete replacement. */                                                                          \
     struct TYPE *NAME = NULL;                                                                                          \
-    for (uint64_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
+    for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
 
 /// \brief Header for indexed sequence delete query.
 #define KAN_UP_SEQUENCE_DELETE(NAME, TYPE)                                                                             \
     /* Highlight-autocomplete replacement. */                                                                          \
     const struct TYPE *NAME = NULL;                                                                                    \
-    for (uint64_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
+    for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
 
 /// \brief Header for indexed sequence write query.
 #define KAN_UP_SEQUENCE_WRITE(NAME, TYPE)                                                                              \
     /* Highlight-autocomplete replacement. */                                                                          \
     struct TYPE *NAME = NULL;                                                                                          \
-    for (uint64_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
+    for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
 
 /// \brief Header for indexed value read query.
 #define KAN_UP_VALUE_READ(NAME, TYPE, FIELD, ARGUMENT_POINTER)                                                         \
     /* Highlight-autocomplete replacement. */                                                                          \
     const struct TYPE *NAME = NULL;                                                                                    \
     const void *NAME##_argument_user = ARGUMENT_POINTER;                                                               \
-    for (uint64_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
+    for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
 
 /// \brief Header for indexed value update query.
 #define KAN_UP_VALUE_UPDATE(NAME, TYPE, FIELD, ARGUMENT_POINTER)                                                       \
     /* Highlight-autocomplete replacement. */                                                                          \
     struct TYPE *NAME = NULL;                                                                                          \
     const void *NAME##_argument_user = ARGUMENT_POINTER;                                                               \
-    for (uint64_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
+    for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
 
 /// \brief Header for indexed value delete query.
 #define KAN_UP_VALUE_DELETE(NAME, TYPE, FIELD, ARGUMENT_POINTER)                                                       \
     /* Highlight-autocomplete replacement. */                                                                          \
     const struct TYPE *NAME = NULL;                                                                                    \
     const void *NAME##_argument_user = ARGUMENT_POINTER;                                                               \
-    for (uint64_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
+    for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
 
 /// \brief Header for indexed value write query.
 #define KAN_UP_VALUE_WRITE(NAME, TYPE, FIELD, ARGUMENT_POINTER)                                                        \
     /* Highlight-autocomplete replacement. */                                                                          \
     struct TYPE *NAME = NULL;                                                                                          \
     const void *NAME##_argument_user = ARGUMENT_POINTER;                                                               \
-    for (uint64_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
+    for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
 
 /// \brief Header for indexed signal read query.
 #define KAN_UP_SIGNAL_READ(NAME, TYPE, FIELD, NUMERIC_CONSTANT)                                                        \
     /* Highlight-autocomplete replacement. */                                                                          \
     const struct TYPE *NAME = NULL;                                                                                    \
-    for (uint64_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
+    for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
 
 /// \brief Header for indexed signal update query.
 #define KAN_UP_SIGNAL_UPDATE(NAME, TYPE, FIELD, NUMERIC_CONSTANT)                                                      \
     /* Highlight-autocomplete replacement. */                                                                          \
     struct TYPE *NAME = NULL;                                                                                          \
-    for (uint64_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
+    for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
 
 /// \brief Header for indexed signal delete query.
 #define KAN_UP_SIGNAL_DELETE(NAME, TYPE, FIELD, NUMERIC_CONSTANT)                                                      \
     /* Highlight-autocomplete replacement. */                                                                          \
     const struct TYPE *NAME = NULL;                                                                                    \
-    for (uint64_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
+    for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
 
 /// \brief Header for indexed signal write query.
 #define KAN_UP_SIGNAL_WRITE(NAME, TYPE, FIELD, NUMERIC_CONSTANT)                                                       \
     /* Highlight-autocomplete replacement. */                                                                          \
     struct TYPE *NAME = NULL;                                                                                          \
-    for (uint64_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
+    for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
 
 /// \brief Header for indexed interval ascending read query.
 #define KAN_UP_INTERVAL_ASCENDING_READ(NAME, TYPE, FIELD, ARGUMENT_MIN_POINTER, ARGUMENT_MAX_POINTER)                  \
@@ -255,7 +256,7 @@ KAN_C_HEADER_BEGIN
     const struct TYPE *NAME = NULL;                                                                                    \
     const void *NAME##_argument_min_user = ARGUMENT_MIN_POINTER;                                                       \
     const void *NAME##_argument_max_user = ARGUMENT_MAX_POINTER;                                                       \
-    for (uint64_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
+    for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
 
 /// \brief Header for indexed interval ascending update query.
 #define KAN_UP_INTERVAL_ASCENDING_UPDATE(NAME, TYPE, FIELD, ARGUMENT_MIN_POINTER, ARGUMENT_MAX_POINTER)                \
@@ -263,7 +264,7 @@ KAN_C_HEADER_BEGIN
     struct TYPE *NAME = NULL;                                                                                          \
     const void *NAME##_argument_min_user = ARGUMENT_MIN_POINTER;                                                       \
     const void *NAME##_argument_max_user = ARGUMENT_MAX_POINTER;                                                       \
-    for (uint64_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
+    for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
 
 /// \brief Header for indexed interval ascending delete query.
 #define KAN_UP_INTERVAL_ASCENDING_DELETE(NAME, TYPE, FIELD, ARGUMENT_MIN_POINTER, ARGUMENT_MAX_POINTER)                \
@@ -271,7 +272,7 @@ KAN_C_HEADER_BEGIN
     const struct TYPE *NAME = NULL;                                                                                    \
     const void *NAME##_argument_min_user = ARGUMENT_MIN_POINTER;                                                       \
     const void *NAME##_argument_max_user = ARGUMENT_MAX_POINTER;                                                       \
-    for (uint64_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
+    for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
 
 /// \brief Header for indexed interval ascending write query.
 #define KAN_UP_INTERVAL_ASCENDING_WRITE(NAME, TYPE, FIELD, ARGUMENT_MIN_POINTER, ARGUMENT_MAX_POINTER)                 \
@@ -279,7 +280,7 @@ KAN_C_HEADER_BEGIN
     struct TYPE *NAME = NULL;                                                                                          \
     const void *NAME##_argument_min_user = ARGUMENT_MIN_POINTER;                                                       \
     const void *NAME##_argument_max_user = ARGUMENT_MAX_POINTER;                                                       \
-    for (uint64_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
+    for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
 
 /// \brief Header for indexed interval descending read query.
 #define KAN_UP_INTERVAL_DESCENDING_READ(NAME, TYPE, FIELD, ARGUMENT_MIN_POINTER, ARGUMENT_MAX_POINTER)                 \
@@ -287,7 +288,7 @@ KAN_C_HEADER_BEGIN
     const struct TYPE *NAME = NULL;                                                                                    \
     const void *NAME##_argument_min_user = ARGUMENT_MIN_POINTER;                                                       \
     const void *NAME##_argument_max_user = ARGUMENT_MAX_POINTER;                                                       \
-    for (uint64_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
+    for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
 
 /// \brief Header for indexed interval descending update query
 #define KAN_UP_INTERVAL_DESCENDING_UPDATE(NAME, TYPE, FIELD, ARGUMENT_MIN_POINTER, ARGUMENT_MAX_POINTER)               \
@@ -295,7 +296,7 @@ KAN_C_HEADER_BEGIN
     struct TYPE *NAME = NULL;                                                                                          \
     const void *NAME##_argument_min_user = ARGUMENT_MIN_POINTER;                                                       \
     const void *NAME##_argument_max_user = ARGUMENT_MAX_POINTER;                                                       \
-    for (uint64_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
+    for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
 
 /// \brief Header for indexed interval descending delete query
 #define KAN_UP_INTERVAL_DESCENDING_DELETE(NAME, TYPE, FIELD, ARGUMENT_MIN_POINTER, ARGUMENT_MAX_POINTER)               \
@@ -303,7 +304,7 @@ KAN_C_HEADER_BEGIN
     const struct TYPE *NAME = NULL;                                                                                    \
     const void *NAME##_argument_min_user = ARGUMENT_MIN_POINTER;                                                       \
     const void *NAME##_argument_max_user = ARGUMENT_MAX_POINTER;                                                       \
-    for (uint64_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
+    for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
 
 /// \brief Header for indexed interval descending write query
 #define KAN_UP_INTERVAL_DESCENDING_WRITE(NAME, TYPE, FIELD, ARGUMENT_MIN_POINTER, ARGUMENT_MAX_POINTER)                \
@@ -311,19 +312,19 @@ KAN_C_HEADER_BEGIN
     struct TYPE *NAME = NULL;                                                                                          \
     const void *NAME##_argument_min_user = ARGUMENT_MIN_POINTER;                                                       \
     const void *NAME##_argument_max_user = ARGUMENT_MAX_POINTER;                                                       \
-    for (uint64_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
+    for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
 
 /// \brief Header for event insert query.
 /// \warning Query block is not executed if event insertion package is empty (that means that there is no readers).
 #define KAN_UP_EVENT_INSERT(NAME, TYPE)                                                                                \
     /* Highlight-autocomplete replacement. */                                                                          \
     struct TYPE *NAME = NULL;                                                                                          \
-    for (uint64_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
+    for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
 
 /// \brief Header for event fetch query.
 #define KAN_UP_EVENT_FETCH(NAME, TYPE)                                                                                 \
     /* Highlight-autocomplete replacement. */                                                                          \
     struct TYPE *NAME = NULL;                                                                                          \
-    for (uint64_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
+    for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
 
 KAN_C_HEADER_END

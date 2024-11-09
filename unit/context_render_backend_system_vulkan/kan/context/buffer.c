@@ -3,7 +3,7 @@
 struct render_backend_buffer_t *render_backend_system_create_buffer (struct render_backend_system_t *system,
                                                                      enum render_backend_buffer_family_t family,
                                                                      enum kan_render_buffer_type_t buffer_type,
-                                                                     uint32_t full_size,
+                                                                     vulkan_size_t full_size,
                                                                      kan_interned_string_t tracking_name)
 {
     struct kan_cpu_section_execution_t execution;
@@ -142,7 +142,7 @@ struct render_backend_buffer_t *render_backend_system_create_buffer (struct rend
         .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
         .pNext = NULL,
         .objectType = VK_OBJECT_TYPE_BUFFER,
-        .objectHandle = (uint64_t) buffer_handle,
+        .objectHandle = CONVERT_HANDLE_FOR_DEBUG buffer_handle,
         .pObjectName = debug_name,
     };
 
@@ -213,7 +213,7 @@ void render_backend_system_destroy_buffer (struct render_backend_system_t *syste
 
 kan_render_buffer_t kan_render_buffer_create (kan_render_context_t context,
                                               enum kan_render_buffer_type_t type,
-                                              uint32_t full_size,
+                                              vulkan_size_t full_size,
                                               void *optional_initial_data,
                                               kan_interned_string_t tracking_name)
 {
@@ -269,7 +269,7 @@ kan_render_buffer_t kan_render_buffer_create (kan_render_context_t context,
     return handle;
 }
 
-void *kan_render_buffer_patch (kan_render_buffer_t buffer, uint32_t slice_offset, uint32_t slice_size)
+void *kan_render_buffer_patch (kan_render_buffer_t buffer, vulkan_size_t slice_offset, vulkan_size_t slice_size)
 {
     struct render_backend_buffer_t *data = KAN_HANDLE_GET (buffer);
     // Read back buffers should be accessed through kan_render_buffer_begin_access/kan_render_buffer_end_access.

@@ -22,8 +22,8 @@ struct compile_time_evaluation_value_t
     union
     {
         kan_bool_t boolean_value;
-        int64_t integer_value;
-        double floating_value;
+        kan_rpl_signed_int_literal_t integer_value;
+        float floating_value;
     };
 };
 
@@ -84,7 +84,7 @@ static struct compile_time_evaluation_value_t evaluate_compile_time_expression (
     case KAN_RPL_EXPRESSION_NODE_TYPE_IDENTIFIER:
     {
         kan_bool_t found = KAN_FALSE;
-        for (uint64_t option_index = 0u; option_index < instance->option_values.size; ++option_index)
+        for (kan_loop_size_t option_index = 0u; option_index < instance->option_values.size; ++option_index)
         {
             struct rpl_compiler_context_option_value_t *option =
                 &((struct rpl_compiler_context_option_value_t *) instance->option_values.data)[option_index];
@@ -111,7 +111,7 @@ static struct compile_time_evaluation_value_t evaluate_compile_time_expression (
                         break;
 
                     case KAN_RPL_OPTION_TYPE_COUNT:
-                        if (option->count_value > INT64_MAX)
+                        if (option->count_value > KAN_INT_MAX (kan_rpl_unsigned_int_literal_t))
                         {
                             KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
                                      "[%s:%s:%s:%ld] Compile time expression uses count option \"%s\" that has value "
@@ -124,7 +124,7 @@ static struct compile_time_evaluation_value_t evaluate_compile_time_expression (
                         else
                         {
                             result.type = CONDITIONAL_EVALUATION_VALUE_TYPE_INTEGER;
-                            result.integer_value = (int64_t) option->count_value;
+                            result.integer_value = (kan_rpl_signed_int_literal_t) option->count_value;
                         }
                         break;
                     }
@@ -194,13 +194,13 @@ static struct compile_time_evaluation_value_t evaluate_compile_time_expression (
              right_operand.type == CONDITIONAL_EVALUATION_VALUE_TYPE_FLOATING)                                         \
     {                                                                                                                  \
         result.type = CONDITIONAL_EVALUATION_VALUE_TYPE_FLOATING;                                                      \
-        result.floating_value = (double) left_operand.integer_value OPERATOR right_operand.floating_value;             \
+        result.floating_value = (float) left_operand.integer_value OPERATOR right_operand.floating_value;              \
     }                                                                                                                  \
     else if (left_operand.type == CONDITIONAL_EVALUATION_VALUE_TYPE_FLOATING &&                                        \
              right_operand.type == CONDITIONAL_EVALUATION_VALUE_TYPE_INTEGER)                                          \
     {                                                                                                                  \
         result.type = CONDITIONAL_EVALUATION_VALUE_TYPE_FLOATING;                                                      \
-        result.floating_value = left_operand.floating_value OPERATOR (double) right_operand.integer_value;             \
+        result.floating_value = left_operand.floating_value OPERATOR (float) right_operand.integer_value;              \
     }                                                                                                                  \
     else                                                                                                               \
     {                                                                                                                  \
@@ -225,12 +225,12 @@ static struct compile_time_evaluation_value_t evaluate_compile_time_expression (
     else if (left_operand.type == CONDITIONAL_EVALUATION_VALUE_TYPE_INTEGER &&                                         \
              right_operand.type == CONDITIONAL_EVALUATION_VALUE_TYPE_FLOATING)                                         \
     {                                                                                                                  \
-        result.boolean_value = (double) left_operand.integer_value OPERATOR right_operand.floating_value;              \
+        result.boolean_value = (float) left_operand.integer_value OPERATOR right_operand.floating_value;               \
     }                                                                                                                  \
     else if (left_operand.type == CONDITIONAL_EVALUATION_VALUE_TYPE_FLOATING &&                                        \
              right_operand.type == CONDITIONAL_EVALUATION_VALUE_TYPE_INTEGER)                                          \
     {                                                                                                                  \
-        result.boolean_value = left_operand.floating_value OPERATOR (double) right_operand.integer_value;              \
+        result.boolean_value = left_operand.floating_value OPERATOR (float) right_operand.integer_value;               \
     }                                                                                                                  \
     else                                                                                                               \
     {                                                                                                                  \
@@ -534,7 +534,7 @@ static struct compile_time_evaluation_value_t evaluate_compile_time_expression (
 
 static enum conditional_evaluation_result_t evaluate_conditional (struct rpl_compiler_context_t *instance,
                                                                   struct kan_rpl_intermediate_t *intermediate,
-                                                                  uint64_t conditional_index,
+                                                                  kan_rpl_size_t conditional_index,
                                                                   kan_bool_t instance_options_allowed)
 {
     if (conditional_index == KAN_RPL_EXPRESSION_INDEX_NONE)
@@ -586,7 +586,7 @@ static kan_bool_t resolve_settings (struct rpl_compiler_context_t *context,
                                     struct compiler_instance_setting_node_t **last_output)
 {
     kan_bool_t result = KAN_TRUE;
-    for (uint64_t setting_index = 0u; setting_index < settings_array->size; ++setting_index)
+    for (kan_loop_size_t setting_index = 0u; setting_index < settings_array->size; ++setting_index)
     {
         struct kan_rpl_setting_t *source_setting = &((struct kan_rpl_setting_t *) settings_array->data)[setting_index];
 
@@ -655,8 +655,8 @@ static inline kan_bool_t resolve_array_dimensions (struct rpl_compiler_context_t
                                                    struct rpl_compiler_instance_t *instance,
                                                    struct kan_rpl_intermediate_t *intermediate,
                                                    struct compiler_instance_variable_t *variable,
-                                                   uint64_t dimensions_list_size,
-                                                   uint64_t dimensions_list_index,
+                                                   kan_rpl_size_t dimensions_list_size,
+                                                   kan_rpl_size_t dimensions_list_index,
                                                    kan_bool_t instance_options_allowed)
 {
     kan_bool_t result = KAN_TRUE;
@@ -665,13 +665,13 @@ static inline kan_bool_t resolve_array_dimensions (struct rpl_compiler_context_t
     if (variable->type.array_dimensions_count > 0u)
     {
         variable->type.array_dimensions = kan_stack_group_allocator_allocate (
-            &instance->resolve_allocator, sizeof (uint64_t) * variable->type.array_dimensions_count,
-            _Alignof (uint64_t));
+            &instance->resolve_allocator, sizeof (kan_instance_size_t) * variable->type.array_dimensions_count,
+            _Alignof (kan_instance_size_t));
 
-        for (uint64_t dimension = 0u; dimension < variable->type.array_dimensions_count; ++dimension)
+        for (kan_loop_size_t dimension = 0u; dimension < variable->type.array_dimensions_count; ++dimension)
         {
-            const uint64_t expression_index =
-                ((uint64_t *) intermediate->expression_lists_storage.data)[dimensions_list_index + dimension];
+            const kan_rpl_size_t expression_index =
+                ((kan_rpl_size_t *) intermediate->expression_lists_storage.data)[dimensions_list_index + dimension];
             struct kan_rpl_expression_t *expression =
                 &((struct kan_rpl_expression_t *) intermediate->expression_storage.data)[expression_index];
 
@@ -695,18 +695,18 @@ static inline kan_bool_t resolve_array_dimensions (struct rpl_compiler_context_t
                 break;
 
             case CONDITIONAL_EVALUATION_VALUE_TYPE_INTEGER:
-                if (value.integer_value > 0u && value.integer_value <= UINT32_MAX)
+                if (value.integer_value > 0 && (kan_rpl_size_t) value.integer_value <= KAN_INT_MAX (kan_rpl_size_t))
                 {
-                    variable->type.array_dimensions[dimension] = (uint64_t) value.integer_value;
+                    variable->type.array_dimensions[dimension] = (kan_rpl_size_t) value.integer_value;
                 }
                 else
                 {
                     KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
                              "[%s:%s:%s:%ld] Declaration \"%s\" array size at dimension %ld calculation resulted "
-                             "in invalid value for array size %lld.",
+                             "in invalid value for array size %ld.",
                              context->log_name, intermediate->log_name, expression->source_name,
                              (long) expression->source_line, variable->name, (long) dimension,
-                             (long long) value.integer_value)
+                             (long) value.integer_value)
                     result = KAN_FALSE;
                 }
                 break;
@@ -733,7 +733,7 @@ static inline kan_bool_t resolve_variable_type (struct rpl_compiler_context_t *c
                                                 kan_interned_string_t type_name,
                                                 kan_interned_string_t declaration_name,
                                                 kan_interned_string_t source_name,
-                                                uint64_t source_line)
+                                                kan_rpl_size_t source_line)
 {
     variable->type.if_vector = NULL;
     variable->type.if_matrix = NULL;
@@ -759,12 +759,12 @@ static kan_bool_t resolve_declarations (struct rpl_compiler_context_t *context,
                                         kan_bool_t instance_options_allowed)
 {
     kan_bool_t result = KAN_TRUE;
-    uint64_t current_offset = 0u;
+    kan_instance_size_t current_offset = 0u;
 
     struct compiler_instance_declaration_node_t *first = NULL;
     struct compiler_instance_declaration_node_t *last = NULL;
 
-    for (uint64_t declaration_index = 0u; declaration_index < declaration_array->size; ++declaration_index)
+    for (kan_loop_size_t declaration_index = 0u; declaration_index < declaration_array->size; ++declaration_index)
     {
         struct kan_rpl_declaration_t *source_declaration =
             &((struct kan_rpl_declaration_t *) declaration_array->data)[declaration_index];
@@ -809,7 +809,8 @@ static kan_bool_t resolve_declarations (struct rpl_compiler_context_t *context,
 
                 if (target_declaration->size != 0u && target_declaration->alignment != 0u)
                 {
-                    current_offset = kan_apply_alignment (current_offset, target_declaration->alignment);
+                    current_offset =
+                        (kan_instance_size_t) kan_apply_alignment (current_offset, target_declaration->alignment);
                     target_declaration->offset = current_offset;
                     current_offset += target_declaration->size;
                 }
@@ -867,7 +868,6 @@ static kan_bool_t flatten_buffer_process_field (struct rpl_compiler_context_t *c
                                                 struct compiler_instance_buffer_node_t *buffer,
                                                 struct compiler_instance_declaration_node_t *declaration,
                                                 struct compiler_instance_buffer_flattening_graph_node_t *output_node,
-                                                struct flattening_name_generation_buffer_t *name_generation_buffer,
                                                 struct binding_location_assignment_counter_t *assignment_counter);
 
 static kan_bool_t flatten_buffer_process_field_list (
@@ -876,7 +876,6 @@ static kan_bool_t flatten_buffer_process_field_list (
     struct compiler_instance_buffer_node_t *buffer,
     struct compiler_instance_declaration_node_t *first_declaration,
     struct compiler_instance_buffer_flattening_graph_node_t *output_node,
-    struct flattening_name_generation_buffer_t *name_generation_buffer,
     struct binding_location_assignment_counter_t *assignment_counter)
 {
     kan_bool_t result = KAN_TRUE;
@@ -893,16 +892,16 @@ static kan_bool_t flatten_buffer_process_field_list (
         new_root->name = field->variable.name;
         new_root->flattened_result = NULL;
 
-        const uint64_t length = name_generation_buffer->length;
-        flattening_name_generation_buffer_append (name_generation_buffer, field->variable.name);
+        const kan_instance_size_t length = context->name_generation_buffer.size;
+        kan_trivial_string_buffer_append_string (&context->name_generation_buffer, ".");
+        kan_trivial_string_buffer_append_string (&context->name_generation_buffer, field->variable.name);
 
-        if (!flatten_buffer_process_field (context, instance, buffer, field, new_root, name_generation_buffer,
-                                           assignment_counter))
+        if (!flatten_buffer_process_field (context, instance, buffer, field, new_root, assignment_counter))
         {
             result = KAN_FALSE;
         }
 
-        flattening_name_generation_buffer_reset (name_generation_buffer, length);
+        kan_trivial_string_buffer_reset (&context->name_generation_buffer, length);
         if (last_root)
         {
             last_root->next_on_level = new_root;
@@ -931,7 +930,6 @@ static kan_bool_t flatten_buffer_process_field (struct rpl_compiler_context_t *c
                                                 struct compiler_instance_buffer_node_t *buffer,
                                                 struct compiler_instance_declaration_node_t *declaration,
                                                 struct compiler_instance_buffer_flattening_graph_node_t *output_node,
-                                                struct flattening_name_generation_buffer_t *name_generation_buffer,
                                                 struct binding_location_assignment_counter_t *assignment_counter)
 {
     kan_bool_t result = KAN_TRUE;
@@ -943,7 +941,9 @@ static kan_bool_t flatten_buffer_process_field (struct rpl_compiler_context_t *c
 
         flattened->next = NULL;
         flattened->source_declaration = declaration;
-        flattened->readable_name = kan_string_intern (name_generation_buffer->buffer);
+        flattened->readable_name =
+            kan_char_sequence_intern (context->name_generation_buffer.buffer,
+                                      context->name_generation_buffer.buffer + context->name_generation_buffer.size);
 
         switch (buffer->type)
         {
@@ -1002,7 +1002,7 @@ static kan_bool_t flatten_buffer_process_field (struct rpl_compiler_context_t *c
     {
         if (!flatten_buffer_process_field_list (context, instance, buffer,
                                                 declaration->variable.type.if_struct->first_field, output_node,
-                                                name_generation_buffer, assignment_counter))
+                                                assignment_counter))
         {
             result = KAN_FALSE;
         }
@@ -1017,19 +1017,15 @@ static kan_bool_t flatten_buffer (struct rpl_compiler_context_t *context,
                                   struct binding_location_assignment_counter_t *assignment_counter)
 {
     kan_bool_t result = KAN_TRUE;
-    struct flattening_name_generation_buffer_t name_generation_buffer;
-    const uint64_t buffer_name_length = strlen (buffer->name);
-    const uint64_t to_copy = KAN_MIN (KAN_RPL_COMPILER_INSTANCE_MAX_FLAT_NAME_LENGTH - 1u, buffer_name_length);
+    kan_trivial_string_buffer_reset (&context->name_generation_buffer, 0u);
+    kan_trivial_string_buffer_append_string (&context->name_generation_buffer, buffer->name);
 
-    flattening_name_generation_buffer_reset (&name_generation_buffer, to_copy);
-    memcpy (name_generation_buffer.buffer, buffer->name, to_copy);
-
-    if (!flatten_buffer_process_field_list (context, instance, buffer, buffer->first_field, NULL,
-                                            &name_generation_buffer, assignment_counter))
+    if (!flatten_buffer_process_field_list (context, instance, buffer, buffer->first_field, NULL, assignment_counter))
     {
         result = KAN_FALSE;
     }
 
+    kan_trivial_string_buffer_reset (&context->name_generation_buffer, 0u);
     return result;
 }
 
@@ -1045,8 +1041,8 @@ static kan_bool_t resolve_buffers_validate_uniform_internals_alignment (
     {
         if (declaration->variable.type.if_vector)
         {
-            const uint32_t size = declaration->variable.type.if_vector->items_count *
-                                  inbuilt_type_item_size[declaration->variable.type.if_vector->item];
+            const kan_instance_size_t size = declaration->variable.type.if_vector->items_count *
+                                             inbuilt_type_item_size[declaration->variable.type.if_vector->item];
 
             if (size % 16u != 0u)
             {
@@ -1060,9 +1056,9 @@ static kan_bool_t resolve_buffers_validate_uniform_internals_alignment (
         }
         else if (declaration->variable.type.if_matrix)
         {
-            const uint32_t size = declaration->variable.type.if_matrix->rows *
-                                  declaration->variable.type.if_matrix->columns *
-                                  inbuilt_type_item_size[declaration->variable.type.if_matrix->item];
+            const kan_instance_size_t size = declaration->variable.type.if_matrix->rows *
+                                             declaration->variable.type.if_matrix->columns *
+                                             inbuilt_type_item_size[declaration->variable.type.if_matrix->item];
 
             if (size % 16u != 0u)
             {
@@ -1137,7 +1133,8 @@ static kan_bool_t is_global_name_occupied (struct rpl_compiler_context_t *contex
         function = function->next;
     }
 
-    for (uint64_t option_value_index = 0u; option_value_index < context->option_values.size; ++option_value_index)
+    for (kan_loop_size_t option_value_index = 0u; option_value_index < context->option_values.size;
+         ++option_value_index)
     {
         struct rpl_compiler_context_option_value_t *value =
             &((struct rpl_compiler_context_option_value_t *) context->option_values.data)[option_value_index];
@@ -1152,7 +1149,9 @@ static kan_bool_t is_global_name_occupied (struct rpl_compiler_context_t *contex
 }
 
 static inline void calculate_size_and_alignment_from_declarations (
-    struct compiler_instance_declaration_node_t *declaration, uint64_t *size_output, uint64_t *alignment_output)
+    struct compiler_instance_declaration_node_t *declaration,
+    kan_instance_size_t *size_output,
+    kan_instance_size_t *alignment_output)
 {
     *size_output = 0u;
     *alignment_output = 1u;
@@ -1164,7 +1163,7 @@ static inline void calculate_size_and_alignment_from_declarations (
         declaration = declaration->next;
     }
 
-    *size_output = kan_apply_alignment (*size_output, *alignment_output);
+    *size_output = (kan_instance_size_t) kan_apply_alignment (*size_output, *alignment_output);
 }
 
 static kan_bool_t resolve_buffers (struct rpl_compiler_context_t *context,
@@ -1173,7 +1172,7 @@ static kan_bool_t resolve_buffers (struct rpl_compiler_context_t *context,
                                    struct binding_location_assignment_counter_t *assignment_counter)
 {
     kan_bool_t result = KAN_TRUE;
-    for (uint64_t buffer_index = 0u; buffer_index < intermediate->buffers.size; ++buffer_index)
+    for (kan_loop_size_t buffer_index = 0u; buffer_index < intermediate->buffers.size; ++buffer_index)
     {
         struct kan_rpl_buffer_t *source_buffer =
             &((struct kan_rpl_buffer_t *) intermediate->buffers.data)[buffer_index];
@@ -1366,7 +1365,7 @@ static kan_bool_t resolve_samplers (struct rpl_compiler_context_t *context,
                                     struct binding_location_assignment_counter_t *assignment_counter)
 {
     kan_bool_t result = KAN_TRUE;
-    for (uint64_t sampler_index = 0u; sampler_index < intermediate->samplers.size; ++sampler_index)
+    for (kan_loop_size_t sampler_index = 0u; sampler_index < intermediate->samplers.size; ++sampler_index)
     {
         struct kan_rpl_sampler_t *source_sampler =
             &((struct kan_rpl_sampler_t *) intermediate->samplers.data)[sampler_index];
@@ -1574,12 +1573,12 @@ static kan_bool_t resolve_use_struct (struct rpl_compiler_context_t *context,
     struct kan_rpl_struct_t *intermediate_struct = NULL;
     struct kan_rpl_intermediate_t *selected_intermediate = NULL;
 
-    for (uint64_t intermediate_index = 0u; intermediate_index < context->modules.size; ++intermediate_index)
+    for (kan_loop_size_t intermediate_index = 0u; intermediate_index < context->modules.size; ++intermediate_index)
     {
         struct kan_rpl_intermediate_t *intermediate =
             ((struct kan_rpl_intermediate_t **) context->modules.data)[intermediate_index];
 
-        for (uint64_t struct_index = 0u; struct_index < intermediate->structs.size; ++struct_index)
+        for (kan_loop_size_t struct_index = 0u; struct_index < intermediate->structs.size; ++struct_index)
         {
             struct kan_rpl_struct_t *struct_data =
                 &((struct kan_rpl_struct_t *) intermediate->structs.data)[struct_index];
@@ -1659,7 +1658,7 @@ static kan_bool_t resolve_use_struct (struct rpl_compiler_context_t *context,
 static inline kan_bool_t resolve_bind_function_to_stage (struct rpl_compiler_context_t *context,
                                                          struct compiler_instance_function_node_t *function,
                                                          enum kan_rpl_pipeline_stage_t stage,
-                                                         uint64_t usage_line,
+                                                         kan_rpl_size_t usage_line,
                                                          kan_interned_string_t global_name)
 {
     if (function->has_stage_specific_access)
@@ -1687,7 +1686,7 @@ static inline kan_bool_t resolve_bind_function_to_stage (struct rpl_compiler_con
 static kan_bool_t resolve_use_buffer (struct rpl_compiler_context_t *context,
                                       struct rpl_compiler_instance_t *instance,
                                       struct compiler_instance_function_node_t *function,
-                                      uint64_t usage_line,
+                                      kan_rpl_size_t usage_line,
                                       enum kan_rpl_pipeline_stage_t stage,
                                       struct compiler_instance_buffer_node_t *buffer)
 {
@@ -1738,7 +1737,7 @@ static kan_bool_t resolve_use_sampler (struct rpl_compiler_context_t *context,
                                        struct rpl_compiler_instance_t *instance,
                                        struct compiler_instance_function_node_t *function,
                                        struct compiler_instance_sampler_node_t *sampler,
-                                       uint64_t usage_line)
+                                       kan_rpl_size_t usage_line)
 {
     struct compiler_instance_sampler_access_node_t *access_node = function->first_sampler_access;
     while (access_node)
@@ -1846,7 +1845,7 @@ static inline kan_bool_t resolve_match_signature_at_index (struct rpl_compiler_c
                                                            kan_interned_string_t module_name,
                                                            struct compiler_instance_expression_node_t *owner_expression,
                                                            struct compiler_instance_declaration_node_t *signature,
-                                                           uint64_t signature_index,
+                                                           kan_rpl_size_t signature_index,
                                                            struct compiler_instance_expression_node_t *expression)
 {
     if (signature)
@@ -1884,7 +1883,7 @@ static inline kan_bool_t resolve_match_signature_at_index (struct rpl_compiler_c
         }
         else
         {
-            for (uint64_t array_dimension_index = 0u;
+            for (kan_loop_size_t array_dimension_index = 0u;
                  array_dimension_index < signature->variable.type.array_dimensions_count; ++array_dimension_index)
             {
                 if (signature->variable.type.array_dimensions[array_dimension_index] !=
@@ -1923,20 +1922,20 @@ static inline kan_bool_t resolve_expression_array_with_signature (
     struct resolve_expression_scope_t *resolve_scope,
     struct compiler_instance_expression_node_t *target_expression,
     struct compiler_instance_expression_list_item_t **first_expression_output,
-    uint64_t expression_list_size,
-    uint64_t expression_list_index,
+    kan_rpl_size_t expression_list_size,
+    kan_rpl_size_t expression_list_index,
     struct compiler_instance_declaration_node_t *first_argument)
 {
     kan_bool_t resolved = KAN_TRUE;
     struct compiler_instance_expression_list_item_t *last_expression = NULL;
     struct compiler_instance_declaration_node_t *current_argument = first_argument;
-    uint64_t current_argument_index = 0u;
+    kan_loop_size_t current_argument_index = 0u;
 
-    for (uint64_t index = 0u; index < expression_list_size; ++index)
+    for (kan_loop_size_t index = 0u; index < expression_list_size; ++index)
     {
         struct compiler_instance_expression_node_t *resolved_expression;
-        const uint64_t expression_index =
-            ((uint64_t *) intermediate->expression_lists_storage.data)[expression_list_index + index];
+        const kan_rpl_size_t expression_index =
+            ((kan_rpl_size_t *) intermediate->expression_lists_storage.data)[expression_list_index + index];
 
         if (resolve_expression (
                 context, instance, intermediate, resolve_scope,
@@ -2085,7 +2084,7 @@ static inline kan_bool_t resolve_field_access_ascend_flattened_buffer (
     struct rpl_compiler_context_t *context,
     struct rpl_compiler_instance_t *instance,
     struct resolve_expression_scope_t *resolve_scope,
-    uint64_t stop_expression_line,
+    kan_rpl_size_t stop_expression_line,
     struct compiler_instance_buffer_node_t *buffer,
     struct resolve_fiend_access_linear_node_t *chain_first,
     struct compiler_instance_buffer_flattened_declaration_t **declaration_output,
@@ -2149,7 +2148,7 @@ static inline kan_bool_t resolve_field_access_structured (struct rpl_compiler_co
                                                           struct resolve_expression_scope_t *resolve_scope,
                                                           struct compiler_instance_expression_node_t *input_node,
                                                           struct resolve_fiend_access_linear_node_t *chain_first,
-                                                          uint64_t chain_length,
+                                                          kan_instance_size_t chain_length,
                                                           struct compiler_instance_expression_node_t *result_expression)
 {
     if (input_node->output.type.array_dimensions_count > 0u)
@@ -2174,9 +2173,9 @@ static inline kan_bool_t resolve_field_access_structured (struct rpl_compiler_co
     result_expression->structured_access.input = input_node;
     result_expression->structured_access.access_chain_length = chain_length;
     result_expression->structured_access.access_chain_indices = kan_stack_group_allocator_allocate (
-        &instance->resolve_allocator, sizeof (uint64_t) * chain_length, _Alignof (uint64_t));
+        &instance->resolve_allocator, sizeof (kan_instance_size_t) * chain_length, _Alignof (kan_instance_size_t));
 
-    uint64_t index = 0u;
+    kan_instance_size_t index = 0u;
     result_expression->output.type.if_vector = input_node->output.type.if_vector;
     result_expression->output.type.if_matrix = input_node->output.type.if_matrix;
     result_expression->output.type.if_struct = input_node->output.type.if_struct;
@@ -2466,7 +2465,7 @@ static inline kan_bool_t resolve_binary_operation (struct rpl_compiler_context_t
             return KAN_FALSE;
         }
 
-        uint64_t chain_length = 0u;
+        kan_loop_size_t chain_length = 0u;
         struct resolve_fiend_access_linear_node_t *chain_item = chain_first;
 
         while (chain_item)
@@ -2476,7 +2475,7 @@ static inline kan_bool_t resolve_binary_operation (struct rpl_compiler_context_t
         }
 
         return resolve_field_access_structured (context, instance, resolve_scope, chain_input_expression, chain_first,
-                                                chain_length, result_expression);
+                                                (kan_instance_size_t) chain_length, result_expression);
     }
 
     if (!resolve_expression (context, instance, intermediate, resolve_scope,
@@ -3131,7 +3130,8 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
         }
 
         // Search for option value that can be used here.
-        for (uint64_t option_value_index = 0u; option_value_index < context->option_values.size; ++option_value_index)
+        for (kan_loop_size_t option_value_index = 0u; option_value_index < context->option_values.size;
+             ++option_value_index)
         {
             struct rpl_compiler_context_option_value_t *value =
                 &((struct rpl_compiler_context_option_value_t *) context->option_values.data)[option_value_index];
@@ -3150,7 +3150,7 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
 
                 case KAN_RPL_OPTION_TYPE_COUNT:
                     new_expression->type = COMPILER_INSTANCE_EXPRESSION_TYPE_INTEGER_LITERAL;
-                    new_expression->integer_literal = (int64_t) value->count_value;
+                    new_expression->integer_literal = (kan_rpl_signed_int_literal_t) value->count_value;
                     new_expression->output.type.if_vector = &STATICS.type_i1;
                     return KAN_TRUE;
                 }
@@ -3285,10 +3285,10 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
         kan_bool_t resolved = KAN_TRUE;
         struct compiler_instance_expression_list_item_t *last_expression = NULL;
 
-        for (uint64_t index = 0u; index < expression->scope.statement_list_size; ++index)
+        for (kan_loop_size_t index = 0u; index < expression->scope.statement_list_size; ++index)
         {
-            const uint64_t expression_index =
-                ((uint64_t *)
+            const kan_rpl_size_t expression_index =
+                ((kan_rpl_size_t *)
                      intermediate->expression_lists_storage.data)[expression->scope.statement_list_index + index];
 
             struct kan_rpl_expression_t *parser_expression =
@@ -4076,12 +4076,12 @@ static kan_bool_t resolve_function_by_name (struct rpl_compiler_context_t *conte
     kan_bool_t result = KAN_TRUE;
     kan_bool_t resolved = KAN_FALSE;
 
-    for (uint64_t intermediate_index = 0u; intermediate_index < context->modules.size; ++intermediate_index)
+    for (kan_loop_size_t intermediate_index = 0u; intermediate_index < context->modules.size; ++intermediate_index)
     {
         struct kan_rpl_intermediate_t *intermediate =
             ((struct kan_rpl_intermediate_t **) context->modules.data)[intermediate_index];
 
-        for (uint64_t function_index = 0u; function_index < intermediate->functions.size; ++function_index)
+        for (kan_loop_size_t function_index = 0u; function_index < intermediate->functions.size; ++function_index)
         {
             struct kan_rpl_function_t *function =
                 &((struct kan_rpl_function_t *) intermediate->functions.data)[function_index];
@@ -4134,7 +4134,7 @@ static kan_bool_t resolve_function_by_name (struct rpl_compiler_context_t *conte
 }
 
 kan_rpl_compiler_instance_t kan_rpl_compiler_context_resolve (kan_rpl_compiler_context_t compiler_context,
-                                                              uint64_t entry_point_count,
+                                                              kan_instance_size_t entry_point_count,
                                                               struct kan_rpl_entry_point_t *entry_points)
 {
     struct rpl_compiler_context_t *context = KAN_HANDLE_GET (compiler_context);
@@ -4185,7 +4185,7 @@ kan_rpl_compiler_instance_t kan_rpl_compiler_context_resolve (kan_rpl_compiler_c
         .next_fragment_output_location = 0u,
     };
 
-    for (uint64_t intermediate_index = 0u; intermediate_index < context->modules.size; ++intermediate_index)
+    for (kan_loop_size_t intermediate_index = 0u; intermediate_index < context->modules.size; ++intermediate_index)
     {
         struct kan_rpl_intermediate_t *intermediate =
             ((struct kan_rpl_intermediate_t **) context->modules.data)[intermediate_index];
@@ -4209,7 +4209,7 @@ kan_rpl_compiler_instance_t kan_rpl_compiler_context_resolve (kan_rpl_compiler_c
         }
     }
 
-    for (uint64_t entry_point_index = 0u; entry_point_index < entry_point_count; ++entry_point_index)
+    for (kan_loop_size_t entry_point_index = 0u; entry_point_index < entry_point_count; ++entry_point_index)
     {
         struct compiler_instance_function_node_t *mute;
         if (!resolve_function_by_name (context, instance, entry_points[entry_point_index].function_name,

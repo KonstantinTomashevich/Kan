@@ -47,7 +47,7 @@ kan_allocation_group_t kan_allocation_group_get_child (kan_allocation_group_t pa
     return KAN_HANDLE_SET (kan_allocation_group_t, child);
 }
 
-void kan_allocation_group_allocate (kan_allocation_group_t group, uint64_t amount)
+void kan_allocation_group_allocate (kan_allocation_group_t group, kan_memory_size_t amount)
 {
     if (!KAN_HANDLE_IS_VALID (group))
     {
@@ -61,7 +61,7 @@ void kan_allocation_group_allocate (kan_allocation_group_t group, uint64_t amoun
     unlock_memory_profiling_context ();
 }
 
-void kan_allocation_group_free (kan_allocation_group_t group, uint64_t amount)
+void kan_allocation_group_free (kan_allocation_group_t group, kan_memory_size_t amount)
 {
     if (!KAN_HANDLE_IS_VALID (group))
     {
@@ -95,7 +95,7 @@ static kan_thread_local_storage_t thread_local_storage = KAN_TYPED_ID_32_INITIAL
 
 struct thread_local_storage_stack_t
 {
-    uint64_t stack_size;
+    kan_memory_size_t stack_size;
     kan_allocation_group_t stack[KAN_ALLOCATION_GROUP_STACK_SIZE];
 };
 

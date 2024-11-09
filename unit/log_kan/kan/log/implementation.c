@@ -41,7 +41,7 @@ kan_log_category_t kan_log_category_get (const char *name)
     }
 
     const struct kan_hash_storage_bucket_t *bucket =
-        kan_hash_storage_query (&category_storage, (uint64_t) interned_name);
+        kan_hash_storage_query (&category_storage, (kan_hash_t) interned_name);
     struct category_node_t *node = (struct category_node_t *) bucket->first;
     const struct category_node_t *end = (struct category_node_t *) (bucket->last ? bucket->last->next : NULL);
 
@@ -59,7 +59,7 @@ kan_log_category_t kan_log_category_get (const char *name)
 
     // Category not found: we will create it with default settings.
     node = (struct category_node_t *) kan_allocate_batched (category_storage_group, sizeof (struct category_node_t));
-    node->node.hash = (uint64_t) interned_name;
+    node->node.hash = (kan_hash_t) interned_name;
     node->name = interned_name;
     node->verbosity = KAN_LOG_DEFAULT;
 
@@ -90,7 +90,7 @@ kan_interned_string_t kan_log_category_get_name (kan_log_category_t category)
 struct callback_t
 {
     kan_log_callback_t callback;
-    uint64_t user_data;
+    kan_functor_user_data_t user_data;
 };
 
 struct event_node_t
@@ -150,7 +150,7 @@ void kan_submit_log (kan_log_category_t category, enum kan_log_verbosity_t verbo
     timespec_get (&time, TIME_UTC);
 
     struct callback_t *callbacks = (struct callback_t *) logging_context.callback_array.data;
-    for (uint64_t callback_index = 0u; callback_index < logging_context.callback_array.size; ++callback_index)
+    for (kan_loop_size_t callback_index = 0u; callback_index < logging_context.callback_array.size; ++callback_index)
     {
         callbacks[callback_index].callback (category, verbosity, time, message, callbacks[callback_index].user_data);
     }
@@ -171,7 +171,7 @@ void kan_submit_log (kan_log_category_t category, enum kan_log_verbosity_t verbo
     kan_atomic_int_unlock (&logging_context_lock);
 }
 
-void kan_log_callback_add (kan_log_callback_t callback, uint64_t user_data)
+void kan_log_callback_add (kan_log_callback_t callback, kan_functor_user_data_t user_data)
 {
     kan_atomic_int_lock (&logging_context_lock);
     ensure_logging_context_initialized ();
@@ -190,13 +190,13 @@ void kan_log_callback_add (kan_log_callback_t callback, uint64_t user_data)
     kan_atomic_int_unlock (&logging_context_lock);
 }
 
-void kan_log_callback_remove (kan_log_callback_t callback, uint64_t user_data)
+void kan_log_callback_remove (kan_log_callback_t callback, kan_functor_user_data_t user_data)
 {
     kan_atomic_int_lock (&logging_context_lock);
     ensure_logging_context_initialized ();
 
     struct callback_t *callbacks = (struct callback_t *) logging_context.callback_array.data;
-    for (uint64_t callback_index = 0u; callback_index < logging_context.callback_array.size; ++callback_index)
+    for (kan_loop_size_t callback_index = 0u; callback_index < logging_context.callback_array.size; ++callback_index)
     {
         if (callbacks[callback_index].callback == callback && callbacks[callback_index].user_data == user_data)
         {
@@ -212,7 +212,7 @@ void kan_log_default_callback (kan_log_category_t category,
                                enum kan_log_verbosity_t verbosity,
                                struct timespec time,
                                const char *message,
-                               uint64_t user_data)
+                               kan_functor_user_data_t user_data)
 {
     char date_time_string[18u];
     struct tm local_time;

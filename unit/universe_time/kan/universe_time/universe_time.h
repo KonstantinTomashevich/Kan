@@ -5,6 +5,7 @@
 #include <stdint.h>
 
 #include <kan/api_common/c_header.h>
+#include <kan/api_common/core_types.h>
 
 /// \file
 /// \brief Provides common singleton that is used to provide information about time.
@@ -44,12 +45,12 @@ KAN_C_HEADER_BEGIN
 /// \brief Contains data about time.
 struct kan_time_singleton_t
 {
-    uint64_t logical_time_ns;
-    uint64_t logical_delta_ns;
+    kan_time_size_t logical_time_ns;
+    kan_time_size_t visual_time_ns;
 
-    uint64_t visual_time_ns;
-    uint64_t visual_delta_ns;
-    uint64_t visual_unscaled_delta_ns;
+    kan_time_offset_t logical_delta_ns;
+    kan_time_offset_t visual_delta_ns;
+    kan_time_offset_t visual_unscaled_delta_ns;
 
     float scale;
 };

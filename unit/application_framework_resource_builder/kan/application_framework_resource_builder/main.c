@@ -53,7 +53,7 @@ static kan_interned_string_t interned_kan_resource_pipeline_resource_type_meta_t
 static struct
 {
     struct kan_stack_group_allocator_t temporary_allocator;
-    uint64_t newest_loaded_plugin_last_modification_file_time_ns;
+    kan_time_size_t newest_loaded_plugin_last_modification_file_time_ns;
     kan_virtual_file_system_volume_t volume;
 
     kan_reflection_registry_t registry;
@@ -137,7 +137,7 @@ struct third_party_entry_node_t
 
     kan_interned_string_t name;
     char *path;
-    uint64_t size;
+    kan_memory_size_t size;
     void *data;
     struct kan_atomic_int_t references;
 
@@ -216,7 +216,7 @@ static struct native_entry_node_t *native_entry_node_create (struct target_t *ta
     struct native_entry_node_t *node =
         kan_allocate_batched (nodes_allocation_group, sizeof (struct native_entry_node_t));
 
-    node->node.hash = (uint64_t) resource_name;
+    node->node.hash = (kan_hash_t) resource_name;
     node->target = target;
 
     node->source_type = source_type;
@@ -224,7 +224,7 @@ static struct native_entry_node_t *native_entry_node_create (struct target_t *ta
     node->compile_functor = resource_type_meta->compile;
 
     node->name = resource_name;
-    const uint64_t source_path_length = strlen (source_path);
+    const kan_instance_size_t source_path_length = (kan_instance_size_t) strlen (source_path);
     node->source_path = kan_allocate_general (nodes_allocation_group, source_path_length + 1u, _Alignof (char));
     memcpy (node->source_path, source_path, source_path_length + 1u);
 
@@ -285,7 +285,7 @@ static void *load_native_data (const struct kan_reflection_struct_t *type,
         kan_allocation_group_stack_pop ();
     }
 
-    const uint64_t length = strlen (path);
+    const kan_instance_size_t length = (kan_instance_size_t) strlen (path);
     if (length > 4u && path[length - 4u] == '.' && path[length - 3u] == 'b' && path[length - 2u] == 'i' &&
         path[length - 1u] == 'n')
     {
@@ -498,17 +498,17 @@ static void native_entry_node_destroy (struct native_entry_node_t *node)
 
 static struct third_party_entry_node_t *third_party_entry_node_create (struct target_t *target,
                                                                        kan_interned_string_t resource_name,
-                                                                       uint64_t size,
+                                                                       kan_memory_size_t size,
                                                                        const char *path)
 {
     struct third_party_entry_node_t *node =
         kan_allocate_batched (nodes_allocation_group, sizeof (struct third_party_entry_node_t));
 
-    node->node.hash = (uint64_t) resource_name;
+    node->node.hash = (kan_hash_t) resource_name;
     node->target = target;
 
     node->name = resource_name;
-    const uint64_t path_length = strlen (path);
+    const kan_instance_size_t path_length = (kan_instance_size_t) strlen (path);
     node->path = kan_allocate_general (nodes_allocation_group, path_length + 1u, _Alignof (char));
     memcpy (node->path, path, path_length + 1u);
 
@@ -533,7 +533,8 @@ static void *load_third_party_data (struct third_party_entry_node_t *node)
         return NULL;
     }
 
-    void *data = kan_allocate_general (loaded_third_party_entries_allocation_group, node->size, _Alignof (uint64_t));
+    void *data =
+        kan_allocate_general (loaded_third_party_entries_allocation_group, node->size, _Alignof (kan_memory_size_t));
     const kan_bool_t read = input_stream->operations->read (input_stream, node->size, data) == node->size;
     input_stream->operations->close (input_stream);
 
@@ -585,7 +586,7 @@ static struct native_entry_node_t *target_query_local_native_by_source_type (str
                                                                              kan_interned_string_t type,
                                                                              kan_interned_string_t name)
 {
-    const struct kan_hash_storage_bucket_t *bucket = kan_hash_storage_query (&target->native, (uint64_t) name);
+    const struct kan_hash_storage_bucket_t *bucket = kan_hash_storage_query (&target->native, (kan_hash_t) name);
     struct native_entry_node_t *node = (struct native_entry_node_t *) bucket->first;
     const struct native_entry_node_t *node_end =
         (struct native_entry_node_t *) (bucket->last ? bucket->last->next : NULL);
@@ -607,7 +608,7 @@ static struct native_entry_node_t *target_query_local_native_by_compiled_type (s
                                                                                kan_interned_string_t type,
                                                                                kan_interned_string_t name)
 {
-    const struct kan_hash_storage_bucket_t *bucket = kan_hash_storage_query (&target->native, (uint64_t) name);
+    const struct kan_hash_storage_bucket_t *bucket = kan_hash_storage_query (&target->native, (kan_hash_t) name);
     struct native_entry_node_t *node = (struct native_entry_node_t *) bucket->first;
     const struct native_entry_node_t *node_end =
         (struct native_entry_node_t *) (bucket->last ? bucket->last->next : NULL);
@@ -635,7 +636,7 @@ static struct native_entry_node_t *target_query_global_native_by_source_type (st
         return node;
     }
 
-    for (uint64_t visible_target_index = 0u; visible_target_index < target->visible_targets.size;
+    for (kan_loop_size_t visible_target_index = 0u; visible_target_index < target->visible_targets.size;
          ++visible_target_index)
     {
         node = target_query_local_native_by_source_type (
@@ -660,7 +661,7 @@ static struct native_entry_node_t *target_query_global_native_by_compiled_type (
         return node;
     }
 
-    for (uint64_t visible_target_index = 0u; visible_target_index < target->visible_targets.size;
+    for (kan_loop_size_t visible_target_index = 0u; visible_target_index < target->visible_targets.size;
          ++visible_target_index)
     {
         node = target_query_local_native_by_compiled_type (
@@ -678,7 +679,7 @@ static struct native_entry_node_t *target_query_global_native_by_compiled_type (
 static struct third_party_entry_node_t *target_query_local_third_party (struct target_t *target,
                                                                         kan_interned_string_t name)
 {
-    const struct kan_hash_storage_bucket_t *bucket = kan_hash_storage_query (&target->third_party, (uint64_t) name);
+    const struct kan_hash_storage_bucket_t *bucket = kan_hash_storage_query (&target->third_party, (kan_hash_t) name);
     struct third_party_entry_node_t *node = (struct third_party_entry_node_t *) bucket->first;
     const struct third_party_entry_node_t *node_end =
         (struct third_party_entry_node_t *) (bucket->last ? bucket->last->next : NULL);
@@ -705,7 +706,7 @@ static struct third_party_entry_node_t *target_query_global_third_party (struct 
         return node;
     }
 
-    for (uint64_t visible_target_index = 0u; visible_target_index < target->visible_targets.size;
+    for (kan_loop_size_t visible_target_index = 0u; visible_target_index < target->visible_targets.size;
          ++visible_target_index)
     {
         node = target_query_local_third_party (
@@ -807,7 +808,7 @@ static kan_context_t create_context (const struct kan_application_resource_proje
 
     struct kan_file_system_path_container_t path_container;
     kan_file_system_path_container_copy_string (&path_container, executable_path);
-    uint64_t check_index = path_container.length - 1u;
+    kan_instance_size_t check_index = path_container.length - 1u;
 
     while (check_index > 0u)
     {
@@ -826,7 +827,7 @@ static kan_context_t create_context (const struct kan_application_resource_proje
                                                                        path_container.length + 1u, _Alignof (char));
     memcpy (plugin_system_config.plugin_directory_path, path_container.path, path_container.length + 1u);
 
-    for (uint64_t index = 0u; index < project->plugins.size; ++index)
+    for (kan_loop_size_t index = 0u; index < project->plugins.size; ++index)
     {
         const kan_interned_string_t plugin_name = ((kan_interned_string_t *) project->plugins.data)[index];
         void *spot = kan_dynamic_array_add_last (&plugin_system_config.plugins);
@@ -857,13 +858,13 @@ static kan_context_t create_context (const struct kan_application_resource_proje
     return context;
 }
 
-static void target_collect_references (uint64_t build_target_index, uint64_t project_target_index)
+static void target_collect_references (kan_instance_size_t build_target_index, kan_instance_size_t project_target_index)
 {
     struct target_t *build_target = &((struct target_t *) global.targets.data)[build_target_index];
     struct kan_application_resource_target_t *project_target =
         &((struct kan_application_resource_target_t *) global.project.targets.data)[project_target_index];
 
-    for (uint64_t visible_target_index = 0u; visible_target_index < build_target->visible_targets.size;
+    for (kan_loop_size_t visible_target_index = 0u; visible_target_index < build_target->visible_targets.size;
          ++visible_target_index)
     {
         struct target_t *visible_target =
@@ -898,14 +899,14 @@ static void target_collect_references (uint64_t build_target_index, uint64_t pro
         }
     }
 
-    for (uint64_t visible_name_index = 0u; visible_name_index < project_target->visible_targets.size;
+    for (kan_loop_size_t visible_name_index = 0u; visible_name_index < project_target->visible_targets.size;
          ++visible_name_index)
     {
         kan_interned_string_t visible_name =
             ((kan_interned_string_t *) project_target->visible_targets.data)[visible_name_index];
-        uint64_t found_index = UINT64_MAX;
+        kan_instance_size_t found_index = KAN_INT_MAX (kan_instance_size_t);
 
-        for (uint64_t target_index = 0u; target_index < global.project.targets.size; ++target_index)
+        for (kan_loop_size_t target_index = 0u; target_index < global.project.targets.size; ++target_index)
         {
             if (((struct kan_application_resource_target_t *) global.project.targets.data)[target_index].name ==
                 visible_name)
@@ -915,7 +916,7 @@ static void target_collect_references (uint64_t build_target_index, uint64_t pro
             }
         }
 
-        if (found_index != UINT64_MAX)
+        if (found_index != KAN_INT_MAX (kan_instance_size_t))
         {
             // Ignore cycles.
             if (found_index != build_target_index)
@@ -1077,7 +1078,7 @@ static void scan_directory (struct target_t *target, struct kan_file_system_path
             continue;
         }
 
-        const uint64_t old_length = path_container->length;
+        const kan_instance_size_t old_length = path_container->length;
         kan_file_system_path_container_append (path_container, item_name);
         struct kan_virtual_file_system_entry_status_t status;
 
@@ -1113,7 +1114,7 @@ static void scan_directory (struct target_t *target, struct kan_file_system_path
     kan_virtual_file_system_directory_iterator_destroy (&iterator);
 }
 
-static void scan_target_for_resources (uint64_t user_data)
+static void scan_target_for_resources (kan_functor_user_data_t user_data)
 {
     struct target_t *target = (struct target_t *) user_data;
     struct kan_file_system_path_container_t path_container;
@@ -1126,10 +1127,10 @@ static void scan_target_for_resources (uint64_t user_data)
              target->name)
 }
 
-static void scan_native_for_name_collisions (uint64_t user_data)
+static void scan_native_for_name_collisions (kan_functor_user_data_t user_data)
 {
     struct native_entry_node_t *node = (struct native_entry_node_t *) user_data;
-    for (uint64_t visible_target_index = 0u; visible_target_index < node->target->visible_targets.size;
+    for (kan_loop_size_t visible_target_index = 0u; visible_target_index < node->target->visible_targets.size;
          ++visible_target_index)
     {
         struct target_t *other_target = ((struct target_t **) node->target->visible_targets.data)[visible_target_index];
@@ -1152,10 +1153,10 @@ static void scan_native_for_name_collisions (uint64_t user_data)
              node->source_type->name)
 }
 
-static void scan_third_party_for_name_collisions (uint64_t user_data)
+static void scan_third_party_for_name_collisions (kan_functor_user_data_t user_data)
 {
     struct third_party_entry_node_t *node = (struct third_party_entry_node_t *) user_data;
-    for (uint64_t visible_target_index = 0u; visible_target_index < node->target->visible_targets.size;
+    for (kan_loop_size_t visible_target_index = 0u; visible_target_index < node->target->visible_targets.size;
          ++visible_target_index)
     {
         struct target_t *other_target = ((struct target_t **) node->target->visible_targets.data)[visible_target_index];
@@ -1184,7 +1185,7 @@ static void print_node_in_dead_lock_queue (struct native_entry_node_t *node)
              "    [Target \"%s\"] Native resource \"%s\" of type \"%s\". Waits for compiled:", node->target->name,
              node->name, node->source_type->name)
 
-    for (uint64_t index = 0u; index < node->source_detected_references.detected_references.size; ++index)
+    for (kan_loop_size_t index = 0u; index < node->source_detected_references.detected_references.size; ++index)
     {
         struct kan_resource_pipeline_detected_reference_t *reference =
             &((struct kan_resource_pipeline_detected_reference_t *)
@@ -1255,7 +1256,7 @@ static void wait_in_passive_queue (struct native_entry_node_t *node)
 
 static void recursively_add_to_pack (struct native_entry_node_t *node)
 {
-    for (uint64_t index = 0u; index < node->compiled_detected_references.detected_references.size; ++index)
+    for (kan_loop_size_t index = 0u; index < node->compiled_detected_references.detected_references.size; ++index)
     {
         struct kan_resource_pipeline_detected_reference_t *reference =
             &((struct kan_resource_pipeline_detected_reference_t *)
@@ -1388,7 +1389,7 @@ static void remove_third_party_reference (struct third_party_entry_node_t *node)
     }
 }
 
-static void manage_resources_native (uint64_t user_data)
+static void manage_resources_native (kan_functor_user_data_t user_data)
 {
     struct native_entry_node_t *node = (struct native_entry_node_t *) user_data;
     int source_references = kan_atomic_int_get (&node->source_references);
@@ -1422,7 +1423,7 @@ static void manage_resources_native (uint64_t user_data)
     node->next_node_in_resource_management_queue = NULL;
 }
 
-static void manage_resources_third_party (uint64_t user_data)
+static void manage_resources_third_party (kan_functor_user_data_t user_data)
 {
     struct third_party_entry_node_t *node = (struct third_party_entry_node_t *) user_data;
     int references = kan_atomic_int_get (&node->references);
@@ -1469,7 +1470,7 @@ static inline void form_compiled_references_cache_item_path (struct native_entry
     kan_file_system_path_container_append (output, node->name);
 }
 
-static inline uint64_t get_file_last_modification_time_ns (const char *path)
+static inline kan_time_size_t get_file_last_modification_time_ns (const char *path)
 {
     struct kan_virtual_file_system_entry_status_t status;
     if (kan_virtual_file_system_query_entry (global.volume, path, &status))
@@ -1523,7 +1524,7 @@ static inline kan_bool_t read_detected_references_cache (
 
 static inline void remove_requests_for_compiled_dependencies (struct native_entry_node_t *node)
 {
-    for (uint64_t index = 0u; index < node->source_detected_references.detected_references.size; ++index)
+    for (kan_loop_size_t index = 0u; index < node->source_detected_references.detected_references.size; ++index)
     {
         struct kan_resource_pipeline_detected_reference_t *reference =
             &((struct kan_resource_pipeline_detected_reference_t *)
@@ -1545,7 +1546,7 @@ static inline void remove_requests_for_compiled_dependencies (struct native_entr
 static inline kan_bool_t request_compiled_dependencies (struct native_entry_node_t *node)
 {
     kan_bool_t successful = KAN_TRUE;
-    for (uint64_t index = 0u; index < node->source_detected_references.detected_references.size; ++index)
+    for (kan_loop_size_t index = 0u; index < node->source_detected_references.detected_references.size; ++index)
     {
         struct kan_resource_pipeline_detected_reference_t *reference =
             &((struct kan_resource_pipeline_detected_reference_t *)
@@ -1585,7 +1586,7 @@ static inline kan_bool_t request_compiled_dependencies (struct native_entry_node
 
 static inline void remove_requests_for_raw_dependencies (struct native_entry_node_t *node)
 {
-    for (uint64_t index = 0u; index < node->source_detected_references.detected_references.size; ++index)
+    for (kan_loop_size_t index = 0u; index < node->source_detected_references.detected_references.size; ++index)
     {
         struct kan_resource_pipeline_detected_reference_t *reference =
             &((struct kan_resource_pipeline_detected_reference_t *)
@@ -1620,7 +1621,7 @@ static inline void remove_requests_for_raw_dependencies (struct native_entry_nod
 static inline kan_bool_t request_raw_dependencies (struct native_entry_node_t *node)
 {
     kan_bool_t successful = KAN_TRUE;
-    for (uint64_t index = 0u; index < node->source_detected_references.detected_references.size; ++index)
+    for (kan_loop_size_t index = 0u; index < node->source_detected_references.detected_references.size; ++index)
     {
         struct kan_resource_pipeline_detected_reference_t *reference =
             &((struct kan_resource_pipeline_detected_reference_t *)
@@ -1677,13 +1678,13 @@ static inline kan_bool_t request_raw_dependencies (struct native_entry_node_t *n
 
 static kan_bool_t is_compiled_data_newer_than_dependencies (struct native_entry_node_t *node)
 {
-    const uint64_t compiled_time = get_file_last_modification_time_ns (node->compiled_path);
+    const kan_time_size_t compiled_time = get_file_last_modification_time_ns (node->compiled_path);
     if (compiled_time < global.newest_loaded_plugin_last_modification_file_time_ns)
     {
         return KAN_FALSE;
     }
 
-    for (uint64_t index = 0u; index < node->source_detected_references.detected_references.size; ++index)
+    for (kan_loop_size_t index = 0u; index < node->source_detected_references.detected_references.size; ++index)
     {
         struct kan_resource_pipeline_detected_reference_t *reference =
             &((struct kan_resource_pipeline_detected_reference_t *)
@@ -1776,7 +1777,7 @@ static void save_references_to_cache (struct native_entry_node_t *node, kan_bool
     KAN_ASSERT (serialization_state == KAN_SERIALIZATION_FINISHED)
 }
 
-static void process_native_node_compilation (uint64_t user_data)
+static void process_native_node_compilation (kan_functor_user_data_t user_data)
 {
     struct native_entry_node_t *node = (struct native_entry_node_t *) user_data;
     switch (node->compilation_status)
@@ -1796,8 +1797,8 @@ static void process_native_node_compilation (uint64_t user_data)
         struct kan_file_system_path_container_t path_container;
         form_references_cache_item_path (node, &path_container);
 
-        const uint64_t source_time_ns = get_file_last_modification_time_ns (node->source_path);
-        const uint64_t reference_cache_time_ns = get_file_last_modification_time_ns (path_container.path);
+        const kan_time_size_t source_time_ns = get_file_last_modification_time_ns (node->source_path);
+        const kan_time_size_t reference_cache_time_ns = get_file_last_modification_time_ns (path_container.path);
         node->loaded_references_from_cache = KAN_FALSE;
 
         const kan_bool_t cache_is_up_to_date =
@@ -1865,7 +1866,7 @@ static void process_native_node_compilation (uint64_t user_data)
     case COMPILATION_STATUS_WAITING_FOR_COMPILED_DEPENDENCIES:
     {
         kan_bool_t all_compiled_dependencies_ready = KAN_TRUE;
-        for (uint64_t index = 0u; index < node->source_detected_references.detected_references.size; ++index)
+        for (kan_loop_size_t index = 0u; index < node->source_detected_references.detected_references.size; ++index)
         {
             struct kan_resource_pipeline_detected_reference_t *reference =
                 &((struct kan_resource_pipeline_detected_reference_t *)
@@ -1976,9 +1977,9 @@ static void process_native_node_compilation (uint64_t user_data)
         KAN_LOG (application_framework_resource_builder, KAN_LOG_INFO,
                  "[Target \"%s\"] Compiling native resource \"%s\" of type \"%s\".", node->target->name, node->name,
                  node->source_type->name)
-        uint64_t dependencies_count = 0u;
+        kan_instance_size_t dependencies_count = 0u;
 
-        for (uint64_t index = 0u; index < node->source_detected_references.detected_references.size; ++index)
+        for (kan_loop_size_t index = 0u; index < node->source_detected_references.detected_references.size; ++index)
         {
             struct kan_resource_pipeline_detected_reference_t *reference =
                 &((struct kan_resource_pipeline_detected_reference_t *)
@@ -2065,9 +2066,9 @@ static void process_native_node_compilation (uint64_t user_data)
                 temporary_allocation_group,
                 sizeof (struct kan_resource_pipeline_compilation_dependency_t) * dependencies_count,
                 _Alignof (struct kan_resource_pipeline_compilation_dependency_t));
-            uint64_t dependency_index = 0u;
+            kan_instance_size_t dependency_index = 0u;
 
-            for (uint64_t index = 0u; index < node->source_detected_references.detected_references.size; ++index)
+            for (kan_loop_size_t index = 0u; index < node->source_detected_references.detected_references.size; ++index)
             {
                 struct kan_resource_pipeline_detected_reference_t *reference =
                     &((struct kan_resource_pipeline_detected_reference_t *)
@@ -2196,7 +2197,7 @@ static void process_native_node_compilation (uint64_t user_data)
 static void compilation_loop (void)
 {
     // We cannot risk compiling everything at once, because we can run out of memory.
-    const uint64_t max_in_active_queue = kan_platform_get_cpu_count ();
+    const kan_instance_size_t max_in_active_queue = kan_platform_get_cpu_count ();
 
     const kan_interned_string_t interned_manage_resources_native = kan_string_intern ("manage_resources_native");
     const kan_interned_string_t interned_manage_resources_third_party =
@@ -2207,7 +2208,7 @@ static void compilation_loop (void)
     while (global.compilation_active_queue || global.compilation_passive_queue_first)
     {
         struct native_entry_node_t *native_node = global.compilation_active_queue;
-        uint64_t actual_active_nodes = 0u;
+        kan_instance_size_t actual_active_nodes = 0u;
         kan_bool_t changed_statuses = KAN_FALSE;
         const kan_bool_t had_empty_active_queue = global.compilation_active_queue == NULL;
 
@@ -2369,7 +2370,7 @@ static void compilation_loop (void)
     }
 }
 
-static void intern_strings_in_native (uint64_t user_data)
+static void intern_strings_in_native (kan_functor_user_data_t user_data)
 {
     struct native_entry_node_t *node = (struct native_entry_node_t *) user_data;
     KAN_ASSERT (node->compilation_status == COMPILATION_STATUS_FINISHED)
@@ -2467,7 +2468,7 @@ static inline kan_bool_t add_to_pack (kan_virtual_file_system_read_only_pack_bui
     return KAN_TRUE;
 }
 
-static void pack_target (uint64_t user_data)
+static void pack_target (kan_functor_user_data_t user_data)
 {
     struct target_t *target = (struct target_t *) user_data;
     struct kan_file_system_path_container_t path_container;
@@ -2742,7 +2743,7 @@ int main (int argument_count, char **argument_values)
         for (int argument_index = 2; argument_index < argument_count; ++argument_index)
         {
             kan_bool_t found = KAN_FALSE;
-            for (uint64_t target_index = 0u; target_index < global.project.targets.size; ++target_index)
+            for (kan_loop_size_t target_index = 0u; target_index < global.project.targets.size; ++target_index)
             {
                 struct kan_application_resource_target_t *project_target =
                     &((struct kan_application_resource_target_t *) global.project.targets.data)[target_index];
@@ -2762,7 +2763,7 @@ int main (int argument_count, char **argument_values)
             }
         }
 
-        for (uint64_t target_index = 0u; target_index < global.project.targets.size; ++target_index)
+        for (kan_loop_size_t target_index = 0u; target_index < global.project.targets.size; ++target_index)
         {
             struct kan_application_resource_target_t *project_target =
                 &((struct kan_application_resource_target_t *) global.project.targets.data)[target_index];
@@ -2788,10 +2789,11 @@ int main (int argument_count, char **argument_values)
             kan_file_system_path_container_append (&target_directory, project_target->name);
             kan_virtual_file_system_make_directory (global.volume, target_directory.path);
 
-            for (uint64_t directory_index = 0u; directory_index < project_target->directories.size; ++directory_index)
+            for (kan_loop_size_t directory_index = 0u; directory_index < project_target->directories.size;
+                 ++directory_index)
             {
                 const char *directory = ((const char **) project_target->directories.data)[directory_index];
-                const uint64_t length = target_directory.length;
+                const kan_instance_size_t length = target_directory.length;
 
                 char index_string[32u];
                 snprintf (index_string, 32u, "%lu", (unsigned long) directory_index);
@@ -2814,7 +2816,7 @@ int main (int argument_count, char **argument_values)
             }
         }
 
-        for (uint64_t target_index = 0u; target_index < global.project.targets.size; ++target_index)
+        for (kan_loop_size_t target_index = 0u; target_index < global.project.targets.size; ++target_index)
         {
             target_collect_references (target_index, target_index);
         }
@@ -2832,7 +2834,7 @@ int main (int argument_count, char **argument_values)
             struct kan_cpu_task_list_node_t *task_list = NULL;
             const kan_interned_string_t task_name = kan_string_intern ("scan_target_for_resources");
 
-            for (uint64_t target_index = 0u; target_index < global.targets.size; ++target_index)
+            for (kan_loop_size_t target_index = 0u; target_index < global.targets.size; ++target_index)
             {
                 struct target_t *target = &((struct target_t *) global.targets.data)[target_index];
                 if (target->requested_for_build)
@@ -2865,7 +2867,7 @@ int main (int argument_count, char **argument_values)
             struct kan_cpu_task_list_node_t *task_list = NULL;
             const kan_interned_string_t task_name = kan_string_intern ("check_for_name_collisions");
 
-            for (uint64_t target_index = 0u; target_index < global.targets.size; ++target_index)
+            for (kan_loop_size_t target_index = 0u; target_index < global.targets.size; ++target_index)
             {
                 struct target_t *target = &((struct target_t *) global.targets.data)[target_index];
                 struct native_entry_node_t *native_node = (struct native_entry_node_t *) target->native.items.first;
@@ -2910,7 +2912,7 @@ int main (int argument_count, char **argument_values)
         {
             KAN_LOG (application_framework_resource_builder, KAN_LOG_INFO, "Compiling resources...")
 
-            for (uint64_t target_index = 0u; target_index < global.targets.size; ++target_index)
+            for (kan_loop_size_t target_index = 0u; target_index < global.targets.size; ++target_index)
             {
                 struct target_t *target = &((struct target_t *) global.targets.data)[target_index];
                 struct native_entry_node_t *native_node = (struct native_entry_node_t *) target->native.items.first;
@@ -2943,7 +2945,7 @@ int main (int argument_count, char **argument_values)
             struct kan_cpu_task_list_node_t *task_list = NULL;
             const kan_interned_string_t task_name = kan_string_intern ("intern_strings");
 
-            for (uint64_t target_index = 0u; target_index < global.targets.size; ++target_index)
+            for (kan_loop_size_t target_index = 0u; target_index < global.targets.size; ++target_index)
             {
                 struct target_t *target = &((struct target_t *) global.targets.data)[target_index];
                 struct native_entry_node_t *native_node = (struct native_entry_node_t *) target->native.items.first;
@@ -2982,7 +2984,7 @@ int main (int argument_count, char **argument_values)
             struct kan_cpu_task_list_node_t *task_list = NULL;
             const kan_interned_string_t task_name = kan_string_intern ("pack_target");
 
-            for (uint64_t target_index = 0u; target_index < global.targets.size; ++target_index)
+            for (kan_loop_size_t target_index = 0u; target_index < global.targets.size; ++target_index)
             {
                 struct target_t *target = &((struct target_t *) global.targets.data)[target_index];
                 if (target->requested_for_build)
@@ -3009,7 +3011,7 @@ int main (int argument_count, char **argument_values)
             kan_stack_group_allocator_reset (&global.temporary_allocator);
         }
 
-        for (uint64_t target_index = 0u; target_index < global.project.targets.size; ++target_index)
+        for (kan_loop_size_t target_index = 0u; target_index < global.project.targets.size; ++target_index)
         {
             target_shutdown (&((struct target_t *) global.targets.data)[target_index]);
         }

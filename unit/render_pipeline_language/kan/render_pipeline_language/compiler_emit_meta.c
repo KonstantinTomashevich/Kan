@@ -236,7 +236,7 @@ static inline kan_bool_t emit_meta_check_graphics_classic_setting (struct rpl_co
         SETTING_REQUIRE_POSITIVE_INTEGER
         SETTING_REQUIRE_NOT_IN_BLOCK
         {
-            meta->graphics_classic_settings.stencil_front_compare_mask = (uint32_t) setting->integer;
+            meta->graphics_classic_settings.stencil_front_compare_mask = (uint8_t) setting->integer;
         }
     }
     else if (setting->name == STATICS.interned_stencil_front_write_mask)
@@ -244,7 +244,7 @@ static inline kan_bool_t emit_meta_check_graphics_classic_setting (struct rpl_co
         SETTING_REQUIRE_POSITIVE_INTEGER
         SETTING_REQUIRE_NOT_IN_BLOCK
         {
-            meta->graphics_classic_settings.stencil_front_write_mask = (uint32_t) setting->integer;
+            meta->graphics_classic_settings.stencil_front_write_mask = (uint8_t) setting->integer;
         }
     }
     else if (setting->name == STATICS.interned_stencil_front_reference)
@@ -252,7 +252,7 @@ static inline kan_bool_t emit_meta_check_graphics_classic_setting (struct rpl_co
         SETTING_REQUIRE_POSITIVE_INTEGER
         SETTING_REQUIRE_NOT_IN_BLOCK
         {
-            meta->graphics_classic_settings.stencil_front_reference = (uint32_t) setting->integer;
+            meta->graphics_classic_settings.stencil_front_reference = (uint8_t) setting->integer;
         }
     }
     else if (setting->name == STATICS.interned_stencil_back_on_fail)
@@ -276,7 +276,7 @@ static inline kan_bool_t emit_meta_check_graphics_classic_setting (struct rpl_co
         SETTING_REQUIRE_POSITIVE_INTEGER
         SETTING_REQUIRE_NOT_IN_BLOCK
         {
-            meta->graphics_classic_settings.stencil_back_compare_mask = (uint32_t) setting->integer;
+            meta->graphics_classic_settings.stencil_back_compare_mask = (uint8_t) setting->integer;
         }
     }
     else if (setting->name == STATICS.interned_stencil_back_write_mask)
@@ -284,7 +284,7 @@ static inline kan_bool_t emit_meta_check_graphics_classic_setting (struct rpl_co
         SETTING_REQUIRE_POSITIVE_INTEGER
         SETTING_REQUIRE_NOT_IN_BLOCK
         {
-            meta->graphics_classic_settings.stencil_back_write_mask = (uint32_t) setting->integer;
+            meta->graphics_classic_settings.stencil_back_write_mask = (uint8_t) setting->integer;
         }
     }
     else if (setting->name == STATICS.interned_stencil_back_reference)
@@ -292,7 +292,7 @@ static inline kan_bool_t emit_meta_check_graphics_classic_setting (struct rpl_co
         SETTING_REQUIRE_POSITIVE_INTEGER
         SETTING_REQUIRE_NOT_IN_BLOCK
         {
-            meta->graphics_classic_settings.stencil_back_reference = (uint32_t) setting->integer;
+            meta->graphics_classic_settings.stencil_back_reference = (uint8_t) setting->integer;
         }
     }
     else
@@ -649,7 +649,7 @@ static inline kan_bool_t emit_meta_variable_type_to_meta_type (struct compiler_i
                                                                kan_interned_string_t context_log_name,
                                                                kan_interned_string_t module_name,
                                                                kan_interned_string_t source_name,
-                                                               uint64_t source_line)
+                                                               kan_rpl_size_t source_line)
 {
     if (variable->type.if_vector == &STATICS.type_f1)
     {
@@ -705,45 +705,48 @@ static inline kan_bool_t emit_meta_variable_type_to_meta_type (struct compiler_i
 
 static kan_bool_t emit_meta_gather_parameters_process_field (
     struct rpl_compiler_instance_t *instance,
-    uint64_t base_offset,
+    kan_instance_size_t base_offset,
     struct compiler_instance_declaration_node_t *first_declaration,
     struct kan_rpl_meta_buffer_t *meta_output,
-    struct flattening_name_generation_buffer_t *name_generation_buffer);
+    struct kan_trivial_string_buffer_t *name_generation_buffer);
 
 static kan_bool_t emit_meta_gather_parameters_process_field_list (
     struct rpl_compiler_instance_t *instance,
-    uint64_t base_offset,
+    kan_instance_size_t base_offset,
     struct compiler_instance_declaration_node_t *first_declaration,
     struct kan_rpl_meta_buffer_t *meta_output,
-    struct flattening_name_generation_buffer_t *name_generation_buffer)
+    struct kan_trivial_string_buffer_t *name_generation_buffer)
 {
     kan_bool_t valid = KAN_TRUE;
     struct compiler_instance_declaration_node_t *field = first_declaration;
 
     while (field)
     {
-        const uint64_t length = name_generation_buffer->length;
-        flattening_name_generation_buffer_append (name_generation_buffer, field->variable.name);
+        const kan_instance_size_t length = name_generation_buffer->size;
+        if (name_generation_buffer->size > 0u)
+        {
+            kan_trivial_string_buffer_append_string (name_generation_buffer, ".");
+        }
 
+        kan_trivial_string_buffer_append_string (name_generation_buffer, field->variable.name);
         if (!emit_meta_gather_parameters_process_field (instance, base_offset, field, meta_output,
                                                         name_generation_buffer))
         {
             valid = KAN_FALSE;
         }
 
-        flattening_name_generation_buffer_reset (name_generation_buffer, length);
+        kan_trivial_string_buffer_reset (name_generation_buffer, length);
         field = field->next;
     }
 
     return valid;
 }
 
-static kan_bool_t emit_meta_gather_parameters_process_field (
-    struct rpl_compiler_instance_t *instance,
-    uint64_t base_offset,
-    struct compiler_instance_declaration_node_t *field,
-    struct kan_rpl_meta_buffer_t *meta_output,
-    struct flattening_name_generation_buffer_t *name_generation_buffer)
+static kan_bool_t emit_meta_gather_parameters_process_field (struct rpl_compiler_instance_t *instance,
+                                                             kan_instance_size_t base_offset,
+                                                             struct compiler_instance_declaration_node_t *field,
+                                                             struct kan_rpl_meta_buffer_t *meta_output,
+                                                             struct kan_trivial_string_buffer_t *name_generation_buffer)
 {
     if (field->variable.type.if_vector || field->variable.type.if_matrix)
     {
@@ -758,7 +761,8 @@ static kan_bool_t emit_meta_gather_parameters_process_field (
         }
 
         kan_rpl_meta_parameter_init (parameter);
-        parameter->name = kan_string_intern (name_generation_buffer->buffer);
+        parameter->name = kan_char_sequence_intern (name_generation_buffer->buffer,
+                                                    name_generation_buffer->buffer + name_generation_buffer->size);
         parameter->offset = base_offset + field->offset;
 
         if (!emit_meta_variable_type_to_meta_type (&field->variable, &parameter->type, instance->context_log_name,
@@ -768,7 +772,7 @@ static kan_bool_t emit_meta_gather_parameters_process_field (
         }
 
         parameter->total_item_count = 1u;
-        for (uint64_t index = 0u; index < field->variable.type.array_dimensions_count; ++index)
+        for (kan_loop_size_t index = 0u; index < field->variable.type.array_dimensions_count; ++index)
         {
             parameter->total_item_count *= field->variable.type.array_dimensions[index];
         }
@@ -800,12 +804,16 @@ kan_bool_t kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t comp
     meta->pipeline_type = instance->pipeline_type;
     kan_bool_t valid = KAN_TRUE;
 
-    uint64_t attribute_buffer_count = 0u;
-    uint64_t pass_buffer_count = 0u;
-    uint64_t material_buffer_count = 0u;
-    uint64_t object_buffer_count = 0u;
-    uint64_t unstable_buffer_count = 0u;
-    uint64_t color_outputs = 0u;
+    struct kan_trivial_string_buffer_t name_generation_buffer;
+    kan_trivial_string_buffer_init (&name_generation_buffer, STATICS.rpl_meta_allocation_group,
+                                    KAN_RPL_COMPILER_INSTANCE_MAX_FLAT_NAME_LENGTH);
+
+    kan_loop_size_t attribute_buffer_count = 0u;
+    kan_loop_size_t pass_buffer_count = 0u;
+    kan_loop_size_t material_buffer_count = 0u;
+    kan_loop_size_t object_buffer_count = 0u;
+    kan_loop_size_t unstable_buffer_count = 0u;
+    kan_loop_size_t color_outputs = 0u;
     struct compiler_instance_buffer_node_t *buffer = instance->first_buffer;
 
     while (buffer)
@@ -872,13 +880,13 @@ kan_bool_t kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t comp
     kan_dynamic_array_set_capacity (&meta->set_unstable.buffers, unstable_buffer_count);
     kan_dynamic_array_set_capacity (&meta->color_outputs, color_outputs);
 
-    for (uint64_t output_index = 0u; output_index < color_outputs; ++output_index)
+    for (kan_loop_size_t output_index = 0u; output_index < color_outputs; ++output_index)
     {
         *(struct kan_rpl_meta_color_output_t *) kan_dynamic_array_add_last (&meta->color_outputs) =
             kan_rpl_meta_color_output_default ();
     }
 
-    uint64_t color_output_index = 0u;
+    kan_loop_size_t color_output_index = 0u;
     buffer = instance->first_buffer;
 
     while (buffer)
@@ -959,7 +967,7 @@ kan_bool_t kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t comp
         if (buffer->type == KAN_RPL_BUFFER_TYPE_VERTEX_ATTRIBUTE ||
             buffer->type == KAN_RPL_BUFFER_TYPE_INSTANCED_ATTRIBUTE)
         {
-            uint64_t count = 0u;
+            kan_loop_size_t count = 0u;
             struct compiler_instance_buffer_flattened_declaration_t *flattened_declaration =
                 buffer->first_flattened_declaration;
 
@@ -996,10 +1004,6 @@ kan_bool_t kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t comp
             buffer->type == KAN_RPL_BUFFER_TYPE_INSTANCED_UNIFORM ||
             buffer->type == KAN_RPL_BUFFER_TYPE_INSTANCED_READ_ONLY_STORAGE)
         {
-            struct flattening_name_generation_buffer_t name_generation_buffer;
-            name_generation_buffer.length = 0u;
-            name_generation_buffer.buffer[0u] = '\0';
-
             if (!emit_meta_gather_parameters_process_field_list (instance, 0u, buffer->first_field, meta_buffer,
                                                                  &name_generation_buffer))
             {
@@ -1012,10 +1016,10 @@ kan_bool_t kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t comp
         buffer = buffer->next;
     }
 
-    uint64_t pass_sampler_count = 0u;
-    uint64_t material_sampler_count = 0u;
-    uint64_t object_sampler_count = 0u;
-    uint64_t unstable_sampler_count = 0u;
+    kan_loop_size_t pass_sampler_count = 0u;
+    kan_loop_size_t material_sampler_count = 0u;
+    kan_loop_size_t object_sampler_count = 0u;
+    kan_loop_size_t unstable_sampler_count = 0u;
     struct compiler_instance_sampler_node_t *sampler = instance->first_sampler;
 
     while (sampler)
@@ -1090,5 +1094,6 @@ kan_bool_t kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t comp
         valid = KAN_FALSE;
     }
 
+    kan_trivial_string_buffer_shutdown (&name_generation_buffer);
     return valid;
 }

@@ -48,11 +48,17 @@
 
 KAN_C_HEADER_BEGIN
 
+/// \brief Fixed type for enum values inside reflection.
+typedef int32_t kan_reflection_enum_size_t;
+
+/// \brief Fixed type for visibility constants inside reflection.
+typedef int32_t kan_reflection_visibility_size_t;
+
 /// \brief Describes single enumeration value.
 struct kan_reflection_enum_value_t
 {
     kan_interned_string_t name;
-    int64_t value;
+    kan_reflection_enum_size_t value;
 };
 
 /// \brief Describes single enumeration with its values.
@@ -63,7 +69,7 @@ struct kan_reflection_enum_t
     /// \brief If true, enumeration should be treated as set of flags instead of select-single enumeration.
     kan_bool_t flags;
 
-    uint64_t values_count;
+    kan_instance_size_t values_count;
     struct kan_reflection_enum_value_t *values;
 };
 
@@ -126,7 +132,7 @@ struct kan_reflection_archetype_struct_suffix_t
 struct kan_reflection_archetype_inline_array_suffix_t
 {
     enum kan_reflection_archetype_t item_archetype;
-    uint64_t item_size;
+    kan_instance_size_t item_size;
 
     union
     {
@@ -135,7 +141,7 @@ struct kan_reflection_archetype_inline_array_suffix_t
         struct kan_reflection_archetype_struct_suffix_t item_archetype_struct_pointer;
     };
 
-    uint64_t item_count;
+    kan_instance_size_t item_count;
     const struct kan_reflection_field_t *size_field;
 };
 
@@ -145,7 +151,7 @@ struct kan_reflection_archetype_inline_array_suffix_t
 struct kan_reflection_archetype_dynamic_array_suffix_t
 {
     enum kan_reflection_archetype_t item_archetype;
-    uint64_t item_size;
+    kan_instance_size_t item_size;
 
     union
     {
@@ -159,8 +165,8 @@ struct kan_reflection_archetype_dynamic_array_suffix_t
 struct kan_reflection_field_t
 {
     kan_interned_string_t name;
-    uint64_t offset;
-    uint64_t size;
+    kan_instance_size_t offset;
+    kan_instance_size_t size;
     enum kan_reflection_archetype_t archetype;
 
     union
@@ -173,24 +179,23 @@ struct kan_reflection_field_t
     };
 
     struct kan_reflection_field_t *visibility_condition_field;
-    uint64_t visibility_condition_values_count;
-    int64_t *visibility_condition_values;
+    kan_instance_size_t visibility_condition_values_count;
+    kan_reflection_visibility_size_t *visibility_condition_values;
 };
 
-typedef uint64_t kan_reflection_functor_user_data_t;
-typedef void (*kan_reflection_initialize_functor) (kan_reflection_functor_user_data_t user_data, void *pointer);
-typedef void (*kan_reflection_shutdown_functor) (kan_reflection_functor_user_data_t user_data, void *pointer);
+typedef void (*kan_reflection_initialize_functor) (kan_functor_user_data_t user_data, void *pointer);
+typedef void (*kan_reflection_shutdown_functor) (kan_functor_user_data_t user_data, void *pointer);
 
 /// \brief Describes fixed-size structure with optional initialize and shutdown functions.
 struct kan_reflection_struct_t
 {
     kan_interned_string_t name;
-    uint64_t size;
-    uint64_t alignment;
+    kan_instance_size_t size;
+    kan_instance_size_t alignment;
     kan_reflection_initialize_functor init;
     kan_reflection_shutdown_functor shutdown;
-    kan_reflection_functor_user_data_t functor_user_data;
-    uint64_t fields_count;
+    kan_functor_user_data_t functor_user_data;
+    kan_instance_size_t fields_count;
 
     /// \details Fields must be ordered by ascending offset.
     struct kan_reflection_field_t *fields;
@@ -202,7 +207,7 @@ struct kan_reflection_struct_t
 struct kan_reflection_return_type_t
 {
     /// \warning Special case: if size is zero, then return type is void.
-    uint64_t size;
+    kan_instance_size_t size;
 
     enum kan_reflection_archetype_t archetype;
 
@@ -220,7 +225,7 @@ struct kan_reflection_return_type_t
 struct kan_reflection_argument_t
 {
     kan_interned_string_t name;
-    uint64_t size;
+    kan_instance_size_t size;
     enum kan_reflection_archetype_t archetype;
 
     union
@@ -231,7 +236,7 @@ struct kan_reflection_argument_t
     };
 };
 
-typedef void (*kan_reflection_call_functor) (kan_reflection_functor_user_data_t user_data,
+typedef void (*kan_reflection_call_functor) (kan_functor_user_data_t user_data,
                                              void *return_address,
                                              void *arguments_address);
 
@@ -240,47 +245,47 @@ struct kan_reflection_function_t
 {
     kan_interned_string_t name;
     kan_reflection_call_functor call;
-    kan_reflection_functor_user_data_t call_user_data;
+    kan_functor_user_data_t call_user_data;
 
     struct kan_reflection_return_type_t return_type;
-    uint64_t arguments_count;
+    kan_instance_size_t arguments_count;
     struct kan_reflection_argument_t *arguments;
 };
 
 /// \brief Claims memory for enum meta iterator implementation.
 struct kan_reflection_enum_meta_iterator_t
 {
-    uint64_t implementation_data[4u];
+    void *implementation_data[4u];
 };
 
 /// \brief Claims memory for enum value meta iterator implementation.
 struct kan_reflection_enum_value_meta_iterator_t
 {
-    uint64_t implementation_data[5u];
+    void *implementation_data[5u];
 };
 
 /// \brief Claims memory for struct meta iterator implementation.
 struct kan_reflection_struct_meta_iterator_t
 {
-    uint64_t implementation_data[4u];
+    void *implementation_data[4u];
 };
 
 /// \brief Claims memory for struct field meta iterator implementation.
 struct kan_reflection_struct_field_meta_iterator_t
 {
-    uint64_t implementation_data[5u];
+    void *implementation_data[5u];
 };
 
 /// \brief Claims memory for function meta iterator implementation.
 struct kan_reflection_function_meta_iterator_t
 {
-    uint64_t implementation_data[4u];
+    void *implementation_data[4u];
 };
 
 /// \brief Claims memory for function argument meta iterator implementation.
 struct kan_reflection_function_argument_meta_iterator_t
 {
-    uint64_t implementation_data[5u];
+    void *implementation_data[5u];
 };
 
 KAN_HANDLE_DEFINE (kan_reflection_registry_t);
@@ -437,10 +442,10 @@ REFLECTION_API void kan_reflection_function_argument_meta_iterator_next (
 REFLECTION_API const struct kan_reflection_field_t *kan_reflection_registry_query_local_field (
     kan_reflection_registry_t registry,
     kan_interned_string_t struct_name,
-    uint64_t path_length,
+    kan_instance_size_t path_length,
     kan_interned_string_t *path,
-    uint64_t *absolute_offset_output,
-    uint64_t *size_with_padding_output);
+    kan_instance_size_t *absolute_offset_output,
+    kan_instance_size_t *size_with_padding_output);
 
 KAN_HANDLE_DEFINE (kan_reflection_registry_enum_iterator_t);
 

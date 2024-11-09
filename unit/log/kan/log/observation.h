@@ -30,20 +30,20 @@ typedef void (*kan_log_callback_t) (kan_log_category_t category,
                                     enum kan_log_verbosity_t verbosity,
                                     struct timespec time,
                                     const char *message,
-                                    uint64_t user_data);
+                                    kan_functor_user_data_t user_data);
 
 /// \brief Adds new callback to callback sequence.
-LOG_API void kan_log_callback_add (kan_log_callback_t callback, uint64_t user_data);
+LOG_API void kan_log_callback_add (kan_log_callback_t callback, kan_functor_user_data_t user_data);
 
 /// \brief Removes callback with given user data from callback sequence.
-LOG_API void kan_log_callback_remove (kan_log_callback_t callback, uint64_t user_data);
+LOG_API void kan_log_callback_remove (kan_log_callback_t callback, kan_functor_user_data_t user_data);
 
 /// \brief Default callback that should be always added automatically, but can be removed manually.
 LOG_API void kan_log_default_callback (kan_log_category_t category,
                                        enum kan_log_verbosity_t verbosity,
                                        struct timespec time,
                                        const char *message,
-                                       uint64_t user_data);
+                                       kan_functor_user_data_t user_data);
 
 /// \brief Describes single event from log event queue.
 struct kan_log_event_t

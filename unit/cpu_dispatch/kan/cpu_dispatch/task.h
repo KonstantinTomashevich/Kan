@@ -34,16 +34,14 @@
 
 KAN_C_HEADER_BEGIN
 
-typedef uint64_t kan_cpu_task_user_data_t;
-
-typedef void (*kan_cpu_task_function_t) (kan_cpu_task_user_data_t);
+typedef void (*kan_cpu_task_function_t) (kan_functor_user_data_t);
 
 /// \brief Describes a task to be dispatched.
 struct kan_cpu_task_t
 {
     kan_interned_string_t name;
     kan_cpu_task_function_t function;
-    kan_cpu_task_user_data_t user_data;
+    kan_functor_user_data_t user_data;
 };
 
 KAN_HANDLE_DEFINE (kan_cpu_task_t);
@@ -80,8 +78,8 @@ CPU_DISPATCH_API void kan_cpu_task_dispatch_list (struct kan_cpu_task_list_node_
 /// \param ... User data designated initializer
 #define KAN_CPU_TASK_LIST_USER_STRUCT(LIST_HEAD, TEMPORARY_ALLOCATOR, NAME, FUNCTION, USER_TYPE, ...)                  \
     {                                                                                                                  \
-        _Static_assert (sizeof (USER_TYPE) > sizeof (uint64_t),                                                        \
-                        "Do not use this for user data that can fit in 64 bits.");                                     \
+        _Static_assert (sizeof (USER_TYPE) > sizeof (kan_functor_user_data_t),                                         \
+                        "Do not use this for user data that can fit in pointer.");                                     \
                                                                                                                        \
         USER_TYPE *user_data = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (TEMPORARY_ALLOCATOR, USER_TYPE);              \
         *user_data = (USER_TYPE) __VA_ARGS__;                                                                          \
@@ -92,7 +90,7 @@ CPU_DISPATCH_API void kan_cpu_task_dispatch_list (struct kan_cpu_task_list_node_
         new_node->task = (struct kan_cpu_task_t) {                                                                     \
             .name = NAME,                                                                                              \
             .function = FUNCTION,                                                                                      \
-            .user_data = (uint64_t) user_data,                                                                         \
+            .user_data = (kan_functor_user_data_t) user_data,                                                          \
         };                                                                                                             \
                                                                                                                        \
         new_node->next = *LIST_HEAD;                                                                                   \
@@ -105,11 +103,11 @@ CPU_DISPATCH_API void kan_cpu_task_dispatch_list (struct kan_cpu_task_list_node_
 /// \param TEMPORARY_ALLOCATOR Pointer to stack group allocator used for temporary allocation of cpu task.
 /// \param NAME Name of the task. Interned string.
 /// \param FUNCTION Task function to be executed.
-/// \param USER_VALUE User value that can be converted to `uint64_t`.
+/// \param USER_VALUE User value that can be converted to `kan_functor_user_data_t`.
 #define KAN_CPU_TASK_LIST_USER_VALUE(LIST_HEAD, TEMPORARY_ALLOCATOR, NAME, FUNCTION, USER_VALUE)                       \
     {                                                                                                                  \
-        _Static_assert (sizeof (USER_VALUE) <= sizeof (uint64_t),                                                      \
-                        "Do not use this for user data that cannot fit in 64 bits.");                                  \
+        _Static_assert (sizeof (USER_VALUE) <= sizeof (kan_functor_user_data_t),                                       \
+                        "Do not use this for user data that cannot fit in pointer.");                                  \
                                                                                                                        \
         struct kan_cpu_task_list_node_t *new_node =                                                                    \
             KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (TEMPORARY_ALLOCATOR, struct kan_cpu_task_list_node_t);           \
@@ -117,7 +115,7 @@ CPU_DISPATCH_API void kan_cpu_task_dispatch_list (struct kan_cpu_task_list_node_
         new_node->task = (struct kan_cpu_task_t) {                                                                     \
             .name = NAME,                                                                                              \
             .function = FUNCTION,                                                                                      \
-            .user_data = (uint64_t) USER_VALUE,                                                                        \
+            .user_data = (kan_functor_user_data_t) USER_VALUE,                                                         \
         };                                                                                                             \
                                                                                                                        \
         new_node->next = *LIST_HEAD;                                                                                   \

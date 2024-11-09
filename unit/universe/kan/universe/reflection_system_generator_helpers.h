@@ -126,7 +126,7 @@ KAN_C_HEADER_BEGIN
         kan_allocate_general (ALLOCATION_GROUP, sizeof (void *) * COUNT, _Alignof (void *));                           \
                                                                                                                        \
     NODE_TYPE *node = FIRST_NODE;                                                                                      \
-    uint64_t output_index = 0u;                                                                                        \
+    kan_loop_size_t output_index = 0u;                                                                                 \
                                                                                                                        \
     while (node)                                                                                                       \
     {                                                                                                                  \
@@ -138,7 +138,7 @@ KAN_C_HEADER_BEGIN
     QSORT ((unsigned long) COUNT, KAN_UNIVERSE_REFLECTION_GENERATOR_SORT_TYPE_NODES_LESS,                              \
            KAN_UNIVERSE_REFLECTION_GENERATOR_SORT_TYPE_NODES_SWAP);                                                    \
                                                                                                                        \
-    for (uint64_t node_index = 0u; node_index < COUNT; ++node_index)                                                   \
+    for (kan_loop_size_t node_index = 0u; node_index < COUNT; ++node_index)                                            \
     {                                                                                                                  \
         if (node_index + 1u < COUNT)                                                                                   \
         {                                                                                                              \
@@ -175,7 +175,7 @@ KAN_C_HEADER_BEGIN
 #define KAN_UNIVERSE_REFLECTION_GENERATOR_MUTATOR_FUNCTIONS(                                                           \
     PREFIX, GENERATOR_TYPE, GENERATOR_NODE_TYPE, GENERATOR_NODE_COUNT, GENERATOR_FIRST_NODE, STATE_TYPE,               \
     GENERATED_STATES_TYPE, FUNCTION_INIT, FUNCTION_DEPLOY, FUNCTION_EXECUTE, FUNCTION_UNDEPLOY, FUNCTION_SHUTDOWN)     \
-    static void PREFIX##_init (uint64_t function_user_data, void *data)                                                \
+    static void PREFIX##_init (kan_functor_user_data_t function_user_data, void *data)                                 \
     {                                                                                                                  \
         GENERATOR_TYPE *instance = (GENERATOR_TYPE *) function_user_data;                                              \
                                                                                                                        \
@@ -194,8 +194,7 @@ KAN_C_HEADER_BEGIN
         }                                                                                                              \
     }                                                                                                                  \
                                                                                                                        \
-    static void PREFIX##_deploy (kan_reflection_functor_user_data_t user_data, void *return_address,                   \
-                                 void *arguments_address)                                                              \
+    static void PREFIX##_deploy (kan_functor_user_data_t user_data, void *return_address, void *arguments_address)     \
     {                                                                                                                  \
         struct                                                                                                         \
         {                                                                                                              \
@@ -210,15 +209,14 @@ KAN_C_HEADER_BEGIN
                          arguments->state);                                                                            \
         GENERATED_STATES_TYPE *mutator_nodes = (GENERATED_STATES_TYPE *) arguments->state->trailing_data;              \
                                                                                                                        \
-        for (uint64_t index = 0u; index < arguments->state->trailing_data_count; ++index)                              \
+        for (kan_loop_size_t index = 0u; index < arguments->state->trailing_data_count; ++index)                       \
         {                                                                                                              \
             GENERATED_STATES_TYPE *node = &mutator_nodes[index];                                                       \
             PREFIX##_deploy_node (arguments->world_repository, node);                                                  \
         }                                                                                                              \
     }                                                                                                                  \
                                                                                                                        \
-    static void PREFIX##_execute (kan_reflection_functor_user_data_t user_data, void *return_address,                  \
-                                  void *arguments_address)                                                             \
+    static void PREFIX##_execute (kan_functor_user_data_t user_data, void *return_address, void *arguments_address)    \
     {                                                                                                                  \
         struct                                                                                                         \
         {                                                                                                              \
@@ -229,8 +227,7 @@ KAN_C_HEADER_BEGIN
         FUNCTION_EXECUTE (arguments->job, arguments->state);                                                           \
     }                                                                                                                  \
                                                                                                                        \
-    static void PREFIX##_undeploy (kan_reflection_functor_user_data_t user_data, void *return_address,                 \
-                                   void *arguments_address)                                                            \
+    static void PREFIX##_undeploy (kan_functor_user_data_t user_data, void *return_address, void *arguments_address)   \
     {                                                                                                                  \
         struct                                                                                                         \
         {                                                                                                              \
@@ -240,20 +237,20 @@ KAN_C_HEADER_BEGIN
         FUNCTION_UNDEPLOY (arguments->state);                                                                          \
         GENERATED_STATES_TYPE *mutator_nodes = (GENERATED_STATES_TYPE *) arguments->state->trailing_data;              \
                                                                                                                        \
-        for (uint64_t index = 0u; index < arguments->state->trailing_data_count; ++index)                              \
+        for (kan_loop_size_t index = 0u; index < arguments->state->trailing_data_count; ++index)                       \
         {                                                                                                              \
             PREFIX##_undeploy_node (&mutator_nodes[index]);                                                            \
         }                                                                                                              \
     }                                                                                                                  \
                                                                                                                        \
-    static void PREFIX##_shutdown (uint64_t function_user_data, void *data)                                            \
+    static void PREFIX##_shutdown (kan_functor_user_data_t function_user_data, void *data)                             \
     {                                                                                                                  \
         STATE_TYPE *base_state = (STATE_TYPE *) data;                                                                  \
         FUNCTION_SHUTDOWN (base_state);                                                                                \
                                                                                                                        \
         GENERATED_STATES_TYPE *mutator_nodes = (GENERATED_STATES_TYPE *) base_state->trailing_data;                    \
                                                                                                                        \
-        for (uint64_t index = 0u; index < base_state->trailing_data_count; ++index)                                    \
+        for (kan_loop_size_t index = 0u; index < base_state->trailing_data_count; ++index)                             \
         {                                                                                                              \
             PREFIX##_shutdown_node (&mutator_nodes[index]);                                                            \
         }                                                                                                              \
@@ -280,7 +277,7 @@ KAN_C_HEADER_BEGIN
     OUTPUT_PREFIX##_type.size =                                                                                        \
         sizeof (struct BASE_STATE_NAME) + sizeof (struct GENERATED_STATES_NAME) * GENERATED_STATES_COUNT;              \
                                                                                                                        \
-    OUTPUT_PREFIX##_type.functor_user_data = (uint64_t) instance;                                                      \
+    OUTPUT_PREFIX##_type.functor_user_data = (kan_functor_user_data_t) instance;                                       \
     OUTPUT_PREFIX##_type.init = FUNCTION_PREFIX##_init;                                                                \
     OUTPUT_PREFIX##_type.shutdown = FUNCTION_PREFIX##_shutdown;                                                        \
                                                                                                                        \
@@ -389,13 +386,13 @@ KAN_C_HEADER_BEGIN
 /// \param STATE_FIELD Field inside trailing sub-state using for comparison.
 /// \param SEARCH_VARIABLE Variable with value for search.
 #define KAN_UNIVERSE_REFLECTION_GENERATOR_FIND_GENERATED_STATE(STATE_TYPE, STATE_FIELD, SEARCH_VARIABLE)               \
-    uint64_t left = 0u;                                                                                                \
-    uint64_t right = state->trailing_data_count;                                                                       \
+    kan_loop_size_t left = 0u;                                                                                         \
+    kan_loop_size_t right = state->trailing_data_count;                                                                \
     STATE_TYPE *types = (STATE_TYPE *) state->trailing_data;                                                           \
                                                                                                                        \
     while (left < right)                                                                                               \
     {                                                                                                                  \
-        uint64_t middle = (left + right) / 2u;                                                                         \
+        kan_loop_size_t middle = (left + right) / 2u;                                                                  \
         if (SEARCH_VARIABLE < types[middle].STATE_FIELD)                                                               \
         {                                                                                                              \
             right = middle;                                                                                            \

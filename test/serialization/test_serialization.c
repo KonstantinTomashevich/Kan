@@ -72,7 +72,7 @@ TEST_SERIALIZATION_API void map_object_init (struct map_object_t *instance)
 
 TEST_SERIALIZATION_API void map_object_shutdown (struct map_object_t *instance)
 {
-    for (uint64_t index = 0u; index < instance->components.size; ++index)
+    for (kan_loop_size_t index = 0u; index < instance->components.size; ++index)
     {
         kan_reflection_patch_destroy (((kan_reflection_patch_t *) instance->components.data)[index]);
     }
@@ -123,7 +123,7 @@ TEST_SERIALIZATION_API void map_init (struct map_t *instance)
 
 TEST_SERIALIZATION_API void map_shutdown (struct map_t *instance)
 {
-    for (uint64_t index = 0u; index < instance->objects.size; ++index)
+    for (kan_loop_size_t index = 0u; index < instance->objects.size; ++index)
     {
         map_object_shutdown (&((struct map_object_t *) instance->objects.data)[index]);
     }
@@ -147,7 +147,7 @@ static void fill_test_map (struct map_t *map, kan_reflection_registry_t registry
     map->name = kan_string_intern ("HelloWorldMap");
     kan_dynamic_array_set_capacity (&map->objects, TEST_MAP_OBJECTS);
 
-    for (uint64_t index = 0u; index < TEST_MAP_OBJECTS; ++index)
+    for (kan_loop_size_t index = 0u; index < TEST_MAP_OBJECTS; ++index)
     {
         struct map_object_t *object = kan_dynamic_array_add_last (&map->objects);
         KAN_TEST_ASSERT (object)
@@ -242,9 +242,9 @@ static void check_map_equality (struct map_t *source_map, struct map_t *deserial
 
     KAN_TEST_CHECK (source_map->name == deserialized_map->name)
     KAN_TEST_CHECK (source_map->objects.size == deserialized_map->objects.size)
-    const uint64_t objects_to_check = KAN_MIN (source_map->objects.size, deserialized_map->objects.size);
+    const kan_instance_size_t objects_to_check = KAN_MIN (source_map->objects.size, deserialized_map->objects.size);
 
-    for (uint64_t index = 0u; index < objects_to_check; ++index)
+    for (kan_loop_size_t index = 0u; index < objects_to_check; ++index)
     {
         struct map_object_t *source_object = ((struct map_object_t *) source_map->objects.data) + index;
         struct map_object_t *deserialized_object = ((struct map_object_t *) deserialized_map->objects.data) + index;
@@ -265,10 +265,10 @@ static void check_map_equality (struct map_t *source_map, struct map_t *deserial
 
         KAN_TEST_CHECK (source_object->object_prototype == deserialized_object->object_prototype)
         KAN_TEST_CHECK (source_object->components.size == deserialized_object->components.size)
-        const uint64_t components_to_check =
+        const kan_instance_size_t components_to_check =
             KAN_MIN (source_object->components.size, deserialized_object->components.size);
 
-        for (uint64_t component_index = 0u; component_index < components_to_check; ++component_index)
+        for (kan_loop_size_t component_index = 0u; component_index < components_to_check; ++component_index)
         {
             kan_reflection_patch_t source_component =
                 ((kan_reflection_patch_t *) source_object->components.data)[component_index];

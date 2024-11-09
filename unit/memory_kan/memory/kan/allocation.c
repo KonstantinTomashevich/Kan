@@ -1,11 +1,12 @@
 #include <stdlib.h>
 
 #include <kan/api_common/alignment.h>
+#include <kan/api_common/min_max.h>
 #include <kan/error/critical.h>
 #include <kan/memory/allocation.h>
 #include <kan/threading/atomic.h>
 
-void *kan_allocate_general_no_profiling (uint64_t amount, uint64_t alignment)
+void *kan_allocate_general_no_profiling (kan_memory_size_t amount, kan_memory_size_t alignment)
 {
 #if defined(_MSC_VER)
     return _aligned_malloc (amount, alignment);
@@ -23,14 +24,14 @@ void kan_free_general_no_profiling (void *memory)
 #endif
 }
 
-void *kan_allocate_general (kan_allocation_group_t group, uint64_t amount, uint64_t alignment)
+void *kan_allocate_general (kan_allocation_group_t group, kan_memory_size_t amount, kan_memory_size_t alignment)
 {
     void *memory = kan_allocate_general_no_profiling (amount, alignment);
     kan_allocation_group_allocate (group, amount);
     return memory;
 }
 
-void kan_free_general (kan_allocation_group_t group, void *memory, uint64_t amount)
+void kan_free_general (kan_allocation_group_t group, void *memory, kan_memory_size_t amount)
 {
     kan_free_general_no_profiling (memory);
     kan_allocation_group_free (group, amount);
@@ -45,8 +46,8 @@ struct batched_allocator_page_t
 {
     struct batched_allocator_page_t *next_free_page;
     struct batched_allocator_item_t *first_free;
-    uint64_t acquired_count;
-    uint64_t item_size;
+    kan_instance_size_t acquired_count;
+    kan_memory_size_t item_size;
     uint8_t data[];
 };
 
@@ -60,7 +61,7 @@ struct batched_allocator_t
 
 #define MIN_RATIONAL_ITEMS_PER_PAGE 128u
 #define MAX_RATIONAL_ITEM_SIZE (KAN_MEMORY_PAGED_ALLOCATOR_PAGE_SIZE / MIN_RATIONAL_ITEMS_PER_PAGE)
-#define BATCHED_ALLOCATORS_COUNT (MAX_RATIONAL_ITEM_SIZE / 8u)
+#define BATCHED_ALLOCATORS_COUNT (MAX_RATIONAL_ITEM_SIZE / sizeof (void *))
 
 struct batched_allocator_context_t
 {
@@ -83,12 +84,12 @@ static inline uint8_t *get_page_data_begin (struct batched_allocator_page_t *pag
     return data_begin;
 }
 
-uint64_t kan_get_batched_allocation_max_size (void)
+kan_memory_size_t kan_get_batched_allocation_max_size (void)
 {
     return MAX_RATIONAL_ITEM_SIZE;
 }
 
-void *kan_allocate_batched (kan_allocation_group_t group, uint64_t item_size)
+void *kan_allocate_batched (kan_allocation_group_t group, kan_memory_size_t item_size)
 {
     // Super rare, therefore wrapped in double if for optimization: avoid atomic lock operations unless necessary.
     if (!batched_allocator_context)
@@ -105,7 +106,7 @@ void *kan_allocate_batched (kan_allocation_group_t group, uint64_t item_size)
             batched_allocator_context->main_group = main_group;
             batched_allocator_context->reserve_group = reserve_group;
 
-            for (uint64_t index = 0u; index < BATCHED_ALLOCATORS_COUNT; ++index)
+            for (kan_loop_size_t index = 0u; index < BATCHED_ALLOCATORS_COUNT; ++index)
             {
                 batched_allocator_context->allocators[index].lock = kan_atomic_int_init (0u);
                 batched_allocator_context->allocators[index].first_free_page = NULL;
@@ -116,9 +117,9 @@ void *kan_allocate_batched (kan_allocation_group_t group, uint64_t item_size)
     }
 
     KAN_ASSERT (item_size <= MAX_RATIONAL_ITEM_SIZE)
-    KAN_ASSERT (item_size >= 8u)
+    item_size = KAN_MAX (item_size, sizeof (void *));
 
-    struct batched_allocator_t *allocator = &batched_allocator_context->allocators[item_size / 8u - 1u];
+    struct batched_allocator_t *allocator = &batched_allocator_context->allocators[item_size / sizeof (void *) - 1u];
     kan_atomic_int_lock (&allocator->lock);
 
     if (!allocator->first_free_page)
@@ -133,7 +134,7 @@ void *kan_allocate_batched (kan_allocation_group_t group, uint64_t item_size)
         page->item_size = item_size;
         uint8_t *data_begin = get_page_data_begin (page);
 
-        const uint64_t page_meta_size = data_begin - (uint8_t *) page;
+        const kan_memory_size_t page_meta_size = data_begin - (uint8_t *) page;
         kan_allocation_group_allocate (batched_allocator_context->main_group, page_meta_size);
         kan_allocation_group_allocate (batched_allocator_context->reserve_group,
                                        KAN_MEMORY_PAGED_ALLOCATOR_PAGE_SIZE - page_meta_size);
@@ -178,7 +179,8 @@ void kan_free_batched (kan_allocation_group_t group, void *memory)
         (struct batched_allocator_page_t *) ((uintptr_t) memory -
                                              (uintptr_t) memory % KAN_MEMORY_PAGED_ALLOCATOR_PAGE_SIZE);
 
-    struct batched_allocator_t *allocator = &batched_allocator_context->allocators[page->item_size / 8u - 1u];
+    struct batched_allocator_t *allocator =
+        &batched_allocator_context->allocators[page->item_size / sizeof (void *) - 1u];
 
     struct batched_allocator_item_t *item = (struct batched_allocator_item_t *) memory;
     kan_atomic_int_lock (&allocator->lock);
@@ -209,7 +211,7 @@ void kan_free_batched (kan_allocation_group_t group, void *memory)
             other_page->next_free_page = page->next_free_page;
         }
 
-        const uint64_t page_meta_size = get_page_data_begin (page) - (uint8_t *) page;
+        const kan_memory_size_t page_meta_size = get_page_data_begin (page) - (uint8_t *) page;
         kan_allocation_group_free (batched_allocator_context->reserve_group,
                                    KAN_MEMORY_PAGED_ALLOCATOR_PAGE_SIZE - page_meta_size);
         kan_allocation_group_free (batched_allocator_context->main_group, page_meta_size);
@@ -255,7 +257,7 @@ struct stack_allocator_t
     uint8_t data[];
 };
 
-kan_stack_allocator_t kan_stack_allocator_create (kan_allocation_group_t group, uint64_t amount)
+kan_stack_allocator_t kan_stack_allocator_create (kan_allocation_group_t group, kan_memory_size_t amount)
 {
     struct stack_allocator_t *stack = (struct stack_allocator_t *) kan_allocate_general (
         group, kan_apply_alignment (sizeof (struct stack_allocator_t) + amount, _Alignof (struct stack_allocator_t)),
@@ -267,7 +269,9 @@ kan_stack_allocator_t kan_stack_allocator_create (kan_allocation_group_t group, 
     return KAN_HANDLE_SET (kan_stack_allocator_t, stack);
 }
 
-void *kan_stack_allocator_allocate (kan_stack_allocator_t allocator, uint64_t amount, uint64_t alignment)
+void *kan_stack_allocator_allocate (kan_stack_allocator_t allocator,
+                                    kan_memory_size_t amount,
+                                    kan_memory_size_t alignment)
 {
     struct stack_allocator_t *stack = KAN_HANDLE_GET (allocator);
     uint8_t *position = stack->top;
@@ -306,13 +310,13 @@ void kan_stack_allocator_load_top (kan_stack_allocator_t allocator, void *top)
     stack->top = top;
 }
 
-uint64_t kan_stack_allocator_get_size (kan_stack_allocator_t allocator)
+kan_memory_size_t kan_stack_allocator_get_size (kan_stack_allocator_t allocator)
 {
     struct stack_allocator_t *stack = KAN_HANDLE_GET (allocator);
     return stack->end - stack->data;
 }
 
-uint64_t kan_stack_allocator_get_available (kan_stack_allocator_t allocator)
+kan_memory_size_t kan_stack_allocator_get_available (kan_stack_allocator_t allocator)
 {
     struct stack_allocator_t *stack = KAN_HANDLE_GET (allocator);
     return stack->top - stack->data;

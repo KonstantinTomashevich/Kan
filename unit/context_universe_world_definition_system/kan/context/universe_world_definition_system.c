@@ -25,7 +25,7 @@ struct rescan_stack_node_t
     struct rescan_stack_node_t *next;
     kan_interned_string_t to_rescan;
     kan_bool_t is_binary;
-    uint64_t after_ns;
+    kan_time_size_t after_ns;
 };
 
 struct universe_world_definition_system_t
@@ -35,9 +35,9 @@ struct universe_world_definition_system_t
     kan_allocation_group_t observation_group;
 
     char *definitions_mount_path;
-    uint64_t definitions_mount_path_length;
+    kan_instance_size_t definitions_mount_path_length;
     kan_bool_t observe_definitions;
-    uint64_t observation_rescan_delay_ns;
+    kan_time_offset_t observation_rescan_delay_ns;
 
     kan_reflection_registry_t registry;
     kan_serialization_binary_script_storage_t binary_script_storage;
@@ -64,7 +64,7 @@ kan_context_system_t universe_world_definition_system_create (kan_allocation_gro
         struct kan_universe_world_definition_system_config_t *config =
             (struct kan_universe_world_definition_system_config_t *) user_config;
 
-        const uint64_t path_length = strlen (config->definitions_mount_path);
+        const kan_instance_size_t path_length = (kan_instance_size_t) strlen (config->definitions_mount_path);
         system->definitions_mount_path = kan_allocate_general (group, path_length + 1u, _Alignof (char));
         memcpy (system->definitions_mount_path, config->definitions_mount_path, path_length + 1u);
         system->definitions_mount_path_length = path_length;
@@ -87,8 +87,8 @@ kan_context_system_t universe_world_definition_system_create (kan_allocation_gro
 }
 
 static inline kan_bool_t extract_info_from_path (const char *path,
-                                                 uint64_t path_length,
-                                                 uint64_t base_path_length,
+                                                 kan_instance_size_t path_length,
+                                                 kan_instance_size_t base_path_length,
                                                  kan_interned_string_t *name_output,
                                                  kan_bool_t *is_binary_output)
 {
@@ -99,7 +99,7 @@ static inline kan_bool_t extract_info_from_path (const char *path,
 
     const char *name_begin = path + base_path_length + 1u;
     const char *name_end = path + path_length;
-    const uint64_t initial_name_length = name_end - name_begin;
+    const kan_instance_size_t initial_name_length = (kan_instance_size_t) (name_end - name_begin);
 
     if (initial_name_length > 4u && *(name_end - 4u) == '.' && *(name_end - 3u) == 'b' && *(name_end - 2u) == 'i' &&
         *(name_end - 1u) == 'n')
@@ -154,7 +154,7 @@ static void scan_file (struct universe_world_definition_system_t *system,
     stream = kan_random_access_stream_buffer_open_for_read (stream, KAN_UNIVERSE_WORLD_DEFINITION_SYSTEM_IO_BUFFER);
     struct world_definition_node_t *node =
         kan_allocate_batched (system->group, sizeof (struct world_definition_node_t));
-    node->node.hash = (uint64_t) name;
+    node->node.hash = (kan_hash_t) name;
     node->name = name;
 
     kan_allocation_group_stack_push (system->group);
@@ -256,7 +256,7 @@ static void scan_directory (struct universe_world_definition_system_t *system,
             continue;
         }
 
-        const uint64_t path_length = scan_path_container->length;
+        const kan_instance_size_t path_length = scan_path_container->length;
         kan_file_system_path_container_append (scan_path_container, entry_name);
         struct kan_virtual_file_system_entry_status_t status;
 
@@ -359,7 +359,7 @@ static void remove_definition_by_name (struct universe_world_definition_system_t
                                        kan_interned_string_t definition_name)
 {
     const struct kan_hash_storage_bucket_t *bucket =
-        kan_hash_storage_query (&system->stored_world_definitions, (uint64_t) definition_name);
+        kan_hash_storage_query (&system->stored_world_definitions, (kan_hash_t) definition_name);
     struct world_definition_node_t *node = (struct world_definition_node_t *) bucket->first;
     const struct world_definition_node_t *node_end =
         (struct world_definition_node_t *) (bucket->last ? bucket->last->next : NULL);
@@ -402,7 +402,7 @@ static void add_to_rescan_stack (struct universe_world_definition_system_t *syst
         node->is_binary = is_binary;
     }
 
-    node->after_ns = kan_platform_get_elapsed_nanoseconds () + system->observation_rescan_delay_ns;
+    node->after_ns = kan_platform_get_elapsed_nanoseconds () + (kan_time_size_t) system->observation_rescan_delay_ns;
 }
 
 static void universe_world_definition_system_update (kan_context_system_t handle)
@@ -449,7 +449,7 @@ static void universe_world_definition_system_update (kan_context_system_t handle
     struct rescan_stack_node_t *previous_node = NULL;
     struct rescan_stack_node_t *current_node = system->first_rescan_node;
 
-    const uint64_t elapsed_ns = kan_platform_get_elapsed_nanoseconds ();
+    const kan_time_size_t elapsed_ns = kan_platform_get_elapsed_nanoseconds ();
     struct kan_file_system_path_container_t path_container;
     kan_file_system_path_container_copy_string (&path_container, system->definitions_mount_path);
     kan_context_system_t virtual_file_system =
@@ -590,7 +590,7 @@ const struct kan_universe_world_definition_t *kan_universe_world_definition_syst
 {
     struct universe_world_definition_system_t *system = KAN_HANDLE_GET (universe_world_definition_system);
     const struct kan_hash_storage_bucket_t *bucket =
-        kan_hash_storage_query (&system->stored_world_definitions, (uint64_t) definition_name);
+        kan_hash_storage_query (&system->stored_world_definitions, (kan_hash_t) definition_name);
     struct world_definition_node_t *node = (struct world_definition_node_t *) bucket->first;
     const struct world_definition_node_t *node_end =
         (struct world_definition_node_t *) (bucket->last ? bucket->last->next : NULL);

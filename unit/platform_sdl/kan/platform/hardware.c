@@ -2,12 +2,12 @@
 
 #include <kan/platform/hardware.h>
 
-uint64_t kan_platform_get_cpu_count (void)
+kan_instance_size_t kan_platform_get_cpu_count (void)
 {
     return (uint64_t) SDL_GetCPUCount ();
 }
 
-uint64_t kan_platform_get_random_access_memory (void)
+kan_memory_size_t kan_platform_get_random_access_memory (void)
 {
-    return (uint64_t) SDL_GetSystemRAM ();
+    return (kan_memory_size_t) SDL_GetSystemRAM ();
 }

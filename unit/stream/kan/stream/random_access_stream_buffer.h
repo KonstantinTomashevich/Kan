@@ -18,10 +18,10 @@ KAN_C_HEADER_BEGIN
 
 /// \brief Wraps given source read stream into buffer with given size. Returns buffered proxy stream.
 STREAM_API struct kan_stream_t *kan_random_access_stream_buffer_open_for_read (struct kan_stream_t *source_stream,
-                                                                               uint64_t buffer_size);
+                                                                               kan_file_size_t buffer_size);
 
 /// \brief Wraps given source write stream into buffer with given size. Returns buffered proxy stream.
 STREAM_API struct kan_stream_t *kan_random_access_stream_buffer_open_for_write (struct kan_stream_t *source_stream,
-                                                                                uint64_t buffer_size);
+                                                                                kan_file_size_t buffer_size);
 
 KAN_C_HEADER_END

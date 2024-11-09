@@ -210,7 +210,7 @@ void kan_transform_2_get_logical_global (struct kan_transform_2_queries_t *queri
 void kan_transform_2_set_logical_local (struct kan_transform_2_queries_t *queries,
                                         struct kan_transform_2_component_t *component,
                                         const struct kan_transform_2_t *new_transform,
-                                        uint64_t transform_logical_time_ns)
+                                        kan_time_size_t transform_logical_time_ns)
 {
     component->logical_local = *new_transform;
     component->logical_local_time_ns = transform_logical_time_ns;
@@ -225,7 +225,7 @@ void kan_transform_2_set_logical_local (struct kan_transform_2_queries_t *querie
 void kan_transform_2_set_logical_global (struct kan_transform_2_queries_t *queries,
                                          struct kan_transform_2_component_t *component,
                                          const struct kan_transform_2_t *new_transform,
-                                         uint64_t transform_logical_time_ns)
+                                         kan_time_size_t transform_logical_time_ns)
 {
 #define TRANSFORM_SET_GLOBAL(TRANSFORM_TYPE, TRANSFORM_DIMENSION, MATRIX_DIMENSION, MULTIPLIER, ADDITIONAL_SETTER,     \
                              ...)                                                                                      \
@@ -342,7 +342,7 @@ void kan_transform_3_get_logical_global (struct kan_transform_3_queries_t *queri
 void kan_transform_3_set_logical_local (struct kan_transform_3_queries_t *queries,
                                         struct kan_transform_3_component_t *component,
                                         const struct kan_transform_3_t *new_transform,
-                                        uint64_t transform_logical_time_ns)
+                                        kan_time_size_t transform_logical_time_ns)
 {
     component->logical_local = *new_transform;
     component->logical_local_time_ns = transform_logical_time_ns;
@@ -357,7 +357,7 @@ void kan_transform_3_set_logical_local (struct kan_transform_3_queries_t *querie
 void kan_transform_3_set_logical_global (struct kan_transform_3_queries_t *queries,
                                          struct kan_transform_3_component_t *component,
                                          const struct kan_transform_3_t *new_transform,
-                                         uint64_t transform_logical_time_ns)
+                                         kan_time_size_t transform_logical_time_ns)
 {
     TRANSFORM_SET_GLOBAL (logical, 3, 4x4, kan_float_matrix_4x4_multiply_for_transform,
                           component->logical_local_time_ns = transform_logical_time_ns;
@@ -452,7 +452,7 @@ UNIVERSE_TRANSFORM_API void kan_universe_mutator_deploy_visual_transform_sync_2_
                                     KAN_UNIVERSE_TRANSFORM_VISUAL_SYNC_INV_TASK_STACK);
 }
 
-static void visual_transform_sync_2_invalidate_execute (uint64_t user_data)
+static void visual_transform_sync_2_invalidate_execute (kan_functor_user_data_t user_data)
 {
     struct visual_transform_sync_2_invalidate_task_user_data_t *data =
         (struct visual_transform_sync_2_invalidate_task_user_data_t *) user_data;
@@ -547,7 +547,7 @@ UNIVERSE_TRANSFORM_API void kan_universe_mutator_deploy_visual_transform_sync_2_
                                     KAN_UNIVERSE_TRANSFORM_VISUAL_SYNC_CALC_TASK_STACK);
 }
 
-static void visual_transform_sync_2_calculate_execute (uint64_t user_data)
+static void visual_transform_sync_2_calculate_execute (kan_functor_user_data_t user_data)
 {
 #define TRANSFORM_SYNC_EXECUTE(TRANSFORM_DIMENSIONS)                                                                   \
     struct visual_transform_sync_##TRANSFORM_DIMENSIONS##_calculate_task_user_data_t *data =                           \
@@ -560,13 +560,13 @@ static void visual_transform_sync_2_calculate_execute (uint64_t user_data)
     struct kan_transform_##TRANSFORM_DIMENSIONS##_component_t *component =                                             \
         kan_repository_indexed_signal_update_access_resolve (&data->transform_update_access);                          \
                                                                                                                        \
-    const uint64_t source_time_ns = time->visual_time_ns - time->visual_delta_ns;                                      \
-    const uint64_t target_time_ns = component->logical_local_time_ns;                                                  \
+    const kan_time_size_t source_time_ns = time->visual_time_ns - time->visual_delta_ns;                               \
+    const kan_time_size_t target_time_ns = component->logical_local_time_ns;                                           \
                                                                                                                        \
     if (component->visual_synced_at_least_once && source_time_ns < target_time_ns)                                     \
     {                                                                                                                  \
-        const uint64_t max_delta_ns = target_time_ns - source_time_ns;                                                 \
-        const uint64_t delta_ns = KAN_MIN (time->visual_delta_ns, max_delta_ns);                                       \
+        const kan_time_offset_t max_delta_ns = (kan_time_offset_t) (target_time_ns - source_time_ns);                  \
+        const kan_time_offset_t delta_ns = KAN_MIN (time->visual_delta_ns, max_delta_ns);                              \
         const float alpha = ((float) delta_ns) / ((float) max_delta_ns);                                               \
         kan_transform_##TRANSFORM_DIMENSIONS##_interpolate_visual (component, alpha);                                  \
     }                                                                                                                  \
@@ -672,7 +672,7 @@ UNIVERSE_TRANSFORM_API void kan_universe_mutator_deploy_visual_transform_sync_3_
                                     KAN_UNIVERSE_TRANSFORM_VISUAL_SYNC_INV_TASK_STACK);
 }
 
-static void visual_transform_sync_3_invalidate_execute (uint64_t user_data)
+static void visual_transform_sync_3_invalidate_execute (kan_functor_user_data_t user_data)
 {
     struct visual_transform_sync_3_invalidate_task_user_data_t *data =
         (struct visual_transform_sync_3_invalidate_task_user_data_t *) user_data;
@@ -735,7 +735,7 @@ UNIVERSE_TRANSFORM_API void kan_universe_mutator_deploy_visual_transform_sync_3_
                                     KAN_UNIVERSE_TRANSFORM_VISUAL_SYNC_CALC_TASK_STACK);
 }
 
-static void visual_transform_sync_3_calculate_execute (uint64_t user_data)
+static void visual_transform_sync_3_calculate_execute (kan_functor_user_data_t user_data)
 {
     TRANSFORM_SYNC_EXECUTE (3);
 #undef TRANSFORM_SYNC_EXECUTE

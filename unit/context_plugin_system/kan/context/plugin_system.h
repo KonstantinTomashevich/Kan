@@ -49,7 +49,7 @@ struct kan_plugin_system_config_t
     kan_bool_t enable_hot_reload;
 
     /// \brief If ::enable_hot_reload, plugin hot reload is triggered with this delay after changes.
-    uint64_t hot_reload_update_delay_ns;
+    kan_time_offset_t hot_reload_update_delay_ns;
 };
 
 CONTEXT_PLUGIN_SYSTEM_API void kan_plugin_system_config_init (struct kan_plugin_system_config_t *config);
@@ -60,7 +60,7 @@ CONTEXT_PLUGIN_SYSTEM_API kan_allocation_group_t kan_plugin_system_config_get_al
 CONTEXT_PLUGIN_SYSTEM_API void kan_plugin_system_config_shutdown (struct kan_plugin_system_config_t *config);
 
 /// \brief Returns newest last modification time in nanoseconds among loaded plugins.
-CONTEXT_PLUGIN_SYSTEM_API uint64_t
+CONTEXT_PLUGIN_SYSTEM_API kan_time_size_t
 kan_plugin_system_get_newest_loaded_plugin_last_modification_file_time_ns (kan_context_system_t plugin_system);
 
 KAN_C_HEADER_END

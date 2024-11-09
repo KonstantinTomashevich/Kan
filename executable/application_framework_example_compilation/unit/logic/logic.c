@@ -18,7 +18,7 @@ struct root_config_t
     kan_interned_string_t required_sum;
 };
 
-_Static_assert (_Alignof (struct root_config_t) == _Alignof (uint64_t), "Alignment has expected value.");
+_Static_assert (_Alignof (struct root_config_t) <= _Alignof (kan_memory_size_t), "Alignment has expected value.");
 
 // \meta reflection_struct_meta = "root_config_t"
 APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_LOGIC_API struct kan_resource_pipeline_resource_type_meta_t
@@ -37,10 +37,10 @@ APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_LOGIC_API struct kan_resource_pipeline
 
 struct sum_compiled_t
 {
-    uint64_t value;
+    kan_serialized_size_t value;
 };
 
-_Static_assert (_Alignof (struct sum_compiled_t) == _Alignof (uint64_t), "Alignment has expected value.");
+_Static_assert (_Alignof (struct sum_compiled_t) <= _Alignof (kan_memory_size_t), "Alignment has expected value.");
 
 // \meta reflection_struct_meta = "sum_compiled_t"
 APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_LOGIC_API struct kan_resource_pipeline_resource_type_meta_t
@@ -59,7 +59,7 @@ struct sum_t
     struct kan_dynamic_array_t sums;
 };
 
-_Static_assert (_Alignof (struct sum_t) == _Alignof (uint64_t), "Alignment has expected value.");
+_Static_assert (_Alignof (struct sum_t) == _Alignof (kan_memory_size_t), "Alignment has expected value.");
 
 APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_LOGIC_API void sum_init (struct sum_t *sum)
 {
@@ -77,7 +77,7 @@ APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_LOGIC_API void sum_shutdown (struct su
 
 static kan_bool_t sum_compile (void *input_instance,
                                void *output_instance,
-                               uint64_t dependencies_count,
+                               kan_instance_size_t dependencies_count,
                                struct kan_resource_pipeline_compilation_dependency_t *dependencies);
 
 // \meta reflection_struct_meta = "sum_t"
@@ -104,10 +104,10 @@ APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_LOGIC_API struct kan_resource_pipeline
 
 struct record_t
 {
-    uint64_t value;
+    kan_serialized_size_t value;
 };
 
-_Static_assert (_Alignof (struct record_t) == _Alignof (uint64_t), "Alignment has expected value.");
+_Static_assert (_Alignof (struct record_t) <= _Alignof (kan_memory_size_t), "Alignment has expected value.");
 
 // \meta reflection_struct_meta = "record_t"
 APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_LOGIC_API struct kan_resource_pipeline_resource_type_meta_t
@@ -119,7 +119,7 @@ APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_LOGIC_API struct kan_resource_pipeline
 
 static kan_bool_t sum_compile (void *input_instance,
                                void *output_instance,
-                               uint64_t dependencies_count,
+                               kan_instance_size_t dependencies_count,
                                struct kan_resource_pipeline_compilation_dependency_t *dependencies)
 {
     struct sum_compiled_t *compiled = (struct sum_compiled_t *) output_instance;
@@ -130,7 +130,7 @@ static kan_bool_t sum_compile (void *input_instance,
 
     // All dependencies are already collected from input into array,
     // therefore we're taking shortcut and not reading input.
-    for (uint64_t dependency_index = 0u; dependency_index < dependencies_count; ++dependency_index)
+    for (kan_instance_size_t dependency_index = 0u; dependency_index < dependencies_count; ++dependency_index)
     {
         struct kan_resource_pipeline_compilation_dependency_t *dependency = &dependencies[dependency_index];
         if (dependency->type == interned_record_t)
@@ -159,7 +159,7 @@ struct test_singleton_t
     kan_bool_t checked_entries;
     kan_bool_t loaded_test_data;
     kan_bool_t requested_loaded_data;
-    uint64_t test_request_id;
+    kan_resource_request_id_t test_request_id;
 };
 
 APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_LOGIC_API void test_singleton_init (struct test_singleton_t *instance)
@@ -358,7 +358,7 @@ APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_LOGIC_API void kan_universe_mutator_ex
         {
             KAN_UP_VALUE_READ (request, kan_resource_request_t, request_id, &test_singleton->test_request_id)
             {
-                if (request->provided_container_id != KAN_RESOURCE_PROVIDER_CONTAINER_ID_NONE)
+                if (KAN_TYPED_ID_32_IS_VALID (request->provided_container_id))
                 {
                     KAN_UP_VALUE_READ (view, resource_provider_container_sum_compiled_t, container_id,
                                        &request->provided_container_id)

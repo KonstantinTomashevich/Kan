@@ -12,6 +12,18 @@
 
 KAN_C_HEADER_BEGIN
 
+/// \brief Integer used to store different indices, sizes and parameters in RPL intermediate format.
+typedef kan_serialized_size_t kan_rpl_size_t;
+
+/// \brief Integer that is used for unsigned literals inside RPL.
+typedef kan_serialized_size_t kan_rpl_unsigned_int_literal_t;
+
+/// \brief Integer that is used for signed literals inside RPL.
+typedef kan_serialized_offset_t kan_rpl_signed_int_literal_t;
+
+/// \brief Integer that is used for floating point literals inside RPL.
+typedef kan_serialized_floating_t kan_rpl_floating_t;
+
 /// \brief Supported option scopes.
 enum kan_rpl_option_scope_t
 {
@@ -36,12 +48,12 @@ struct kan_rpl_option_t
     union
     {
         /// \meta reflection_visibility_condition_field = "type"
-        /// \meta reflection_visibility_condition_values = "(int64_t) KAN_RPL_OPTION_TYPE_FLAG"
+        /// \meta reflection_visibility_condition_values = "KAN_RPL_OPTION_TYPE_FLAG"
         kan_bool_t flag_default_value;
 
         /// \meta reflection_visibility_condition_field = "type"
-        /// \meta reflection_visibility_condition_values = "(int64_t) KAN_RPL_OPTION_TYPE_COUNT"
-        uint64_t count_default_value;
+        /// \meta reflection_visibility_condition_values = "KAN_RPL_OPTION_TYPE_COUNT"
+        kan_rpl_unsigned_int_literal_t count_default_value;
     };
 };
 
@@ -103,92 +115,92 @@ enum kan_rpl_expression_type_t
 };
 
 /// \brief Expression index used to specify absence of expression.
-#define KAN_RPL_EXPRESSION_INDEX_NONE UINT64_MAX
+#define KAN_RPL_EXPRESSION_INDEX_NONE UINT32_MAX
 
 /// \brief Additional expression data for variable declarations.
 struct kan_rpl_variable_declaration_data_t
 {
     kan_interned_string_t type_name;
     kan_interned_string_t variable_name;
-    uint64_t array_size_expression_list_size;
-    uint64_t array_size_expression_list_index;
+    kan_rpl_size_t array_size_expression_list_size;
+    kan_rpl_size_t array_size_expression_list_index;
 };
 
 /// \brief Additional expression data for binary operations.
 struct kan_rpl_binary_operation_data_t
 {
     enum kan_rpl_binary_operation_t operation;
-    uint64_t left_operand_index;
-    uint64_t right_operand_index;
+    kan_rpl_size_t left_operand_index;
+    kan_rpl_size_t right_operand_index;
 };
 
 /// \brief Additional expression data for unary operations.
 struct kan_rpl_unary_operation_data_t
 {
     enum kan_rpl_unary_operation_t operation;
-    uint64_t operand_index;
+    kan_rpl_size_t operand_index;
 };
 
 /// \brief Additional expression data for scopes.
 struct kan_rpl_scope_data_t
 {
-    uint64_t statement_list_size;
-    uint64_t statement_list_index;
+    kan_rpl_size_t statement_list_size;
+    kan_rpl_size_t statement_list_index;
 };
 
 /// \brief Additional expression data for function call.
 struct kan_rpl_function_call_data_t
 {
     kan_interned_string_t name;
-    uint64_t argument_list_size;
-    uint64_t argument_list_index;
+    kan_rpl_size_t argument_list_size;
+    kan_rpl_size_t argument_list_index;
 };
 
 /// \brief Additional expression data for constructor call.
 struct kan_rpl_constructor_data_t
 {
     kan_interned_string_t type_name;
-    uint64_t argument_list_size;
-    uint64_t argument_list_index;
+    kan_rpl_size_t argument_list_size;
+    kan_rpl_size_t argument_list_index;
 };
 
 /// \brief Additional expression data for if construction.
 struct kan_rpl_if_data_t
 {
-    uint64_t condition_index;
-    uint64_t true_index;
-    uint64_t false_index;
+    kan_rpl_size_t condition_index;
+    kan_rpl_size_t true_index;
+    kan_rpl_size_t false_index;
 };
 
 /// \brief Additional expression data for for construction.
 struct kan_rpl_for_data_t
 {
-    uint64_t init_index;
-    uint64_t condition_index;
-    uint64_t step_index;
-    uint64_t body_index;
+    kan_rpl_size_t init_index;
+    kan_rpl_size_t condition_index;
+    kan_rpl_size_t step_index;
+    kan_rpl_size_t body_index;
 };
 
 /// \brief Additional expression data for while construction.
 struct kan_rpl_while_data_t
 {
-    uint64_t condition_index;
-    uint64_t body_index;
+    kan_rpl_size_t condition_index;
+    kan_rpl_size_t body_index;
 };
 
 /// \brief Additional expression data for conditional scope.
 struct kan_rpl_conditional_scope_data_t
 {
-    uint64_t condition_index;
-    uint64_t body_index;
+    kan_rpl_size_t condition_index;
+    kan_rpl_size_t body_index;
 };
 
 /// \brief Additional expression data for conditional alias.
 struct kan_rpl_conditional_alias_data_t
 {
-    uint64_t condition_index;
+    kan_rpl_size_t condition_index;
     kan_interned_string_t name;
-    uint64_t expression_index;
+    kan_rpl_size_t expression_index;
 };
 
 /// \brief Defines structure that holds one expression data.
@@ -198,68 +210,68 @@ struct kan_rpl_expression_t
     union
     {
         /// \meta reflection_visibility_condition_field = "type"
-        /// \meta reflection_visibility_condition_values = "(int64_t) KAN_RPL_EXPRESSION_NODE_TYPE_IDENTIFIER"
+        /// \meta reflection_visibility_condition_values = "KAN_RPL_EXPRESSION_NODE_TYPE_IDENTIFIER"
         kan_interned_string_t identifier;
 
         /// \meta reflection_visibility_condition_field = "type"
-        /// \meta reflection_visibility_condition_values = "(int64_t) KAN_RPL_EXPRESSION_NODE_TYPE_INTEGER_LITERAL"
-        int64_t integer_literal;
+        /// \meta reflection_visibility_condition_values = "KAN_RPL_EXPRESSION_NODE_TYPE_INTEGER_LITERAL"
+        kan_rpl_signed_int_literal_t integer_literal;
 
         /// \meta reflection_visibility_condition_field = "type"
-        /// \meta reflection_visibility_condition_values = "(int64_t) KAN_RPL_EXPRESSION_NODE_TYPE_FLOATING_LITERAL"
-        double floating_literal;
+        /// \meta reflection_visibility_condition_values = "KAN_RPL_EXPRESSION_NODE_TYPE_FLOATING_LITERAL"
+        kan_rpl_floating_t floating_literal;
 
         /// \meta reflection_visibility_condition_field = "type"
-        /// \meta reflection_visibility_condition_values = "(int64_t) KAN_RPL_EXPRESSION_NODE_TYPE_VARIABLE_DECLARATION"
+        /// \meta reflection_visibility_condition_values = "KAN_RPL_EXPRESSION_NODE_TYPE_VARIABLE_DECLARATION"
         struct kan_rpl_variable_declaration_data_t variable_declaration;
 
         /// \meta reflection_visibility_condition_field = "type"
-        /// \meta reflection_visibility_condition_values = "(int64_t) KAN_RPL_EXPRESSION_NODE_TYPE_BINARY_OPERATION"
+        /// \meta reflection_visibility_condition_values = "KAN_RPL_EXPRESSION_NODE_TYPE_BINARY_OPERATION"
         struct kan_rpl_binary_operation_data_t binary_operation;
 
         /// \meta reflection_visibility_condition_field = "type"
-        /// \meta reflection_visibility_condition_values = "(int64_t) KAN_RPL_EXPRESSION_NODE_TYPE_UNARY_OPERATION"
+        /// \meta reflection_visibility_condition_values = "KAN_RPL_EXPRESSION_NODE_TYPE_UNARY_OPERATION"
         struct kan_rpl_unary_operation_data_t unary_operation;
 
         /// \meta reflection_visibility_condition_field = "type"
-        /// \meta reflection_visibility_condition_values = "(int64_t) KAN_RPL_EXPRESSION_NODE_TYPE_SCOPE"
+        /// \meta reflection_visibility_condition_values = "KAN_RPL_EXPRESSION_NODE_TYPE_SCOPE"
         struct kan_rpl_scope_data_t scope;
 
         /// \meta reflection_visibility_condition_field = "type"
-        /// \meta reflection_visibility_condition_values = "(int64_t) KAN_RPL_EXPRESSION_NODE_TYPE_FUNCTION_CALL"
+        /// \meta reflection_visibility_condition_values = "KAN_RPL_EXPRESSION_NODE_TYPE_FUNCTION_CALL"
         struct kan_rpl_function_call_data_t function_call;
 
         /// \meta reflection_visibility_condition_field = "type"
-        /// \meta reflection_visibility_condition_values = "(int64_t) KAN_RPL_EXPRESSION_NODE_TYPE_CONSTRUCTOR"
+        /// \meta reflection_visibility_condition_values = "KAN_RPL_EXPRESSION_NODE_TYPE_CONSTRUCTOR"
         struct kan_rpl_constructor_data_t constructor;
 
         /// \meta reflection_visibility_condition_field = "type"
-        /// \meta reflection_visibility_condition_values = "(int64_t) KAN_RPL_EXPRESSION_NODE_TYPE_IF"
+        /// \meta reflection_visibility_condition_values = "KAN_RPL_EXPRESSION_NODE_TYPE_IF"
         struct kan_rpl_if_data_t if_;
 
         /// \meta reflection_visibility_condition_field = "type"
-        /// \meta reflection_visibility_condition_values = "(int64_t) KAN_RPL_EXPRESSION_NODE_TYPE_FOR"
+        /// \meta reflection_visibility_condition_values = "KAN_RPL_EXPRESSION_NODE_TYPE_FOR"
         struct kan_rpl_for_data_t for_;
 
         /// \meta reflection_visibility_condition_field = "type"
-        /// \meta reflection_visibility_condition_values = "(int64_t) KAN_RPL_EXPRESSION_NODE_TYPE_WHILE"
+        /// \meta reflection_visibility_condition_values = "KAN_RPL_EXPRESSION_NODE_TYPE_WHILE"
         struct kan_rpl_while_data_t while_;
 
         /// \meta reflection_visibility_condition_field = "type"
-        /// \meta reflection_visibility_condition_values = "(int64_t) KAN_RPL_EXPRESSION_NODE_TYPE_CONDITIONAL_SCOPE"
+        /// \meta reflection_visibility_condition_values = "KAN_RPL_EXPRESSION_NODE_TYPE_CONDITIONAL_SCOPE"
         struct kan_rpl_conditional_scope_data_t conditional_scope;
 
         /// \meta reflection_visibility_condition_field = "type"
-        /// \meta reflection_visibility_condition_values = "(int64_t) KAN_RPL_EXPRESSION_NODE_TYPE_CONDITIONAL_ALIAS"
+        /// \meta reflection_visibility_condition_values = "KAN_RPL_EXPRESSION_NODE_TYPE_CONDITIONAL_ALIAS"
         struct kan_rpl_conditional_alias_data_t conditional_alias;
 
         /// \meta reflection_visibility_condition_field = "type"
-        /// \meta reflection_visibility_condition_values = "(int64_t) KAN_RPL_EXPRESSION_NODE_TYPE_RETURN"
-        uint64_t return_index;
+        /// \meta reflection_visibility_condition_values = "KAN_RPL_EXPRESSION_NODE_TYPE_RETURN"
+        kan_rpl_size_t return_index;
     };
 
     kan_interned_string_t source_name;
-    uint32_t source_line;
+    kan_rpl_size_t source_line;
 };
 
 /// \brief Enumerates supported setting types.
@@ -271,39 +283,39 @@ enum kan_rpl_setting_type_t
     KAN_RPL_SETTING_TYPE_STRING,
 };
 
-#define KAN_RPL_SETTING_BLOCK_NONE UINT64_MAX
+#define KAN_RPL_SETTING_BLOCK_NONE UINT32_MAX
 
 /// \brief Defines structure that holds one setting data.
 struct kan_rpl_setting_t
 {
     kan_interned_string_t name;
-    uint64_t block;
+    kan_rpl_size_t block;
     enum kan_rpl_setting_type_t type;
 
     union
     {
         /// \meta reflection_visibility_condition_field = "type"
-        /// \meta reflection_visibility_condition_values = "(int64_t) KAN_RPL_SETTING_TYPE_FLAG"
+        /// \meta reflection_visibility_condition_values = "KAN_RPL_SETTING_TYPE_FLAG"
         kan_bool_t flag;
 
         /// \meta reflection_visibility_condition_field = "type"
-        /// \meta reflection_visibility_condition_values = "(int64_t) KAN_RPL_SETTING_TYPE_INTEGER"
-        int64_t integer;
+        /// \meta reflection_visibility_condition_values = "KAN_RPL_SETTING_TYPE_INTEGER"
+        kan_rpl_signed_int_literal_t integer;
 
         /// \meta reflection_visibility_condition_field = "type"
-        /// \meta reflection_visibility_condition_values = "(int64_t) KAN_RPL_SETTING_TYPE_FLOATING"
-        double floating;
+        /// \meta reflection_visibility_condition_values = "KAN_RPL_SETTING_TYPE_FLOATING"
+        kan_rpl_floating_t floating;
 
         /// \meta reflection_visibility_condition_field = "type"
-        /// \meta reflection_visibility_condition_values = "(int64_t) KAN_RPL_SETTING_TYPE_STRING"
+        /// \meta reflection_visibility_condition_values = "KAN_RPL_SETTING_TYPE_STRING"
         kan_interned_string_t string;
     };
 
     /// \details Conditional expression if it is not KAN_RPL_EXPRESSION_NODE_TYPE_NOPE.
-    uint64_t conditional_index;
+    kan_rpl_size_t conditional_index;
 
     kan_interned_string_t source_name;
-    uint32_t source_line;
+    kan_rpl_size_t source_line;
 };
 
 /// \brief Defines structure that holds one declaration data: either field or function argument.
@@ -313,19 +325,19 @@ struct kan_rpl_declaration_t
     kan_interned_string_t name;
 
     /// \details Array size expressions list count if declaring array.
-    uint64_t array_size_expression_list_size;
+    kan_rpl_size_t array_size_expression_list_size;
 
     /// \details Array size expressions list index if declaring array.
-    uint64_t array_size_expression_list_index;
+    kan_rpl_size_t array_size_expression_list_index;
 
     /// \details Conditional expression if it is not KAN_RPL_EXPRESSION_NODE_TYPE_NOPE.
-    uint64_t conditional_index;
+    kan_rpl_size_t conditional_index;
 
-    uint64_t meta_list_size;
-    uint64_t meta_list_index;
+    kan_rpl_size_t meta_list_size;
+    kan_rpl_size_t meta_list_index;
 
     kan_interned_string_t source_name;
-    uint32_t source_line;
+    kan_rpl_size_t source_line;
 };
 
 /// \brief Defines structure that holds structure data.
@@ -337,10 +349,10 @@ struct kan_rpl_struct_t
     struct kan_dynamic_array_t fields;
 
     /// \details Conditional expression if it is not KAN_RPL_EXPRESSION_NODE_TYPE_NOPE.
-    uint64_t conditional_index;
+    kan_rpl_size_t conditional_index;
 
     kan_interned_string_t source_name;
-    uint32_t source_line;
+    kan_rpl_size_t source_line;
 };
 
 RENDER_PIPELINE_LANGUAGE_API void kan_rpl_struct_init (struct kan_rpl_struct_t *instance);
@@ -395,10 +407,10 @@ struct kan_rpl_buffer_t
     struct kan_dynamic_array_t fields;
 
     /// \details Conditional expression if it is not KAN_RPL_EXPRESSION_NODE_TYPE_NOPE.
-    uint64_t conditional_index;
+    kan_rpl_size_t conditional_index;
 
     kan_interned_string_t source_name;
-    uint32_t source_line;
+    kan_rpl_size_t source_line;
 };
 
 RENDER_PIPELINE_LANGUAGE_API void kan_rpl_buffer_init (struct kan_rpl_buffer_t *instance);
@@ -422,10 +434,10 @@ struct kan_rpl_sampler_t
     struct kan_dynamic_array_t settings;
 
     /// \details Conditional expression if it is not KAN_RPL_EXPRESSION_NODE_TYPE_NOPE.
-    uint64_t conditional_index;
+    kan_rpl_size_t conditional_index;
 
     kan_interned_string_t source_name;
-    uint32_t source_line;
+    kan_rpl_size_t source_line;
 };
 
 RENDER_PIPELINE_LANGUAGE_API void kan_rpl_sampler_init (struct kan_rpl_sampler_t *instance);
@@ -441,13 +453,13 @@ struct kan_rpl_function_t
     /// \meta reflection_dynamic_array_type = "struct kan_rpl_declaration_t"
     struct kan_dynamic_array_t arguments;
 
-    uint64_t body_index;
+    kan_rpl_size_t body_index;
 
     /// \details Conditional expression if it is not KAN_RPL_EXPRESSION_NODE_TYPE_NOPE.
-    uint64_t conditional_index;
+    kan_rpl_size_t conditional_index;
 
     kan_interned_string_t source_name;
-    uint32_t source_line;
+    kan_rpl_size_t source_line;
 };
 
 RENDER_PIPELINE_LANGUAGE_API void kan_rpl_function_init (struct kan_rpl_function_t *instance);
@@ -498,7 +510,7 @@ struct kan_rpl_intermediate_t
 
     /// \brief Array that is used to store expression indices for expression lists.
     /// \details For the same reason as expressions, lists of expression indices are stored in one continuous array.
-    /// \meta reflection_dynamic_array_type = "uint64_t"
+    /// \meta reflection_dynamic_array_type = "kan_rpl_size_t"
     struct kan_dynamic_array_t expression_lists_storage;
 
     /// \brief Array that is used to store all meta tags for declarations.

@@ -9,14 +9,14 @@
 #include <kan/stream/random_access_stream_buffer.h>
 #include <kan/testing/testing.h>
 
-static void emit_to_file (struct kan_readable_data_event_t *events, uint64_t events_count)
+static void emit_to_file (struct kan_readable_data_event_t *events, kan_instance_size_t events_count)
 {
     struct kan_stream_t *direct_file_stream = kan_direct_file_stream_open_for_write ("test.rd", KAN_TRUE);
     struct kan_stream_t *buffered_file_stream =
         kan_random_access_stream_buffer_open_for_write (direct_file_stream, 1024u);
 
     kan_readable_data_emitter_t emitter = kan_readable_data_emitter_create (buffered_file_stream);
-    for (uint64_t index = 0u; index < events_count; ++index)
+    for (kan_loop_size_t index = 0u; index < events_count; ++index)
     {
         KAN_TEST_CHECK (kan_readable_data_emitter_step (emitter, &events[index]))
     }
@@ -31,18 +31,18 @@ static void save_text_to_file (const char *text)
     struct kan_stream_t *buffered_file_stream =
         kan_random_access_stream_buffer_open_for_write (direct_file_stream, 1024u);
 
-    const uint64_t length = strlen (text);
+    const kan_instance_size_t length = (kan_instance_size_t) strlen (text);
     KAN_TEST_CHECK (buffered_file_stream->operations->write (buffered_file_stream, length, text) == length)
     buffered_file_stream->operations->close (buffered_file_stream);
 }
 
-static void parse_file_and_check (const struct kan_readable_data_event_t *events, uint64_t events_count)
+static void parse_file_and_check (const struct kan_readable_data_event_t *events, kan_instance_size_t events_count)
 {
     struct kan_stream_t *direct_file_stream = kan_direct_file_stream_open_for_read ("test.rd", KAN_TRUE);
     struct kan_stream_t *buffered_file_stream =
         kan_random_access_stream_buffer_open_for_read (direct_file_stream, 1024u);
 
-    uint64_t event_index = 0u;
+    kan_instance_size_t event_index = 0u;
     kan_readable_data_parser_t parser = kan_readable_data_parser_create (buffered_file_stream);
 
     while (KAN_TRUE)
@@ -265,12 +265,12 @@ KAN_TEST_CASE (emit_and_parse_all_elemental_setters)
 
     struct kan_readable_data_value_node_t position_y_node = {
         .next = NULL,
-        .floating = 5.5,
+        .floating = (kan_readable_data_floating_t) 5.5,
     };
 
     struct kan_readable_data_value_node_t position_x_node = {
         .next = &position_y_node,
-        .floating = -1.34,
+        .floating = (kan_readable_data_floating_t) -1.34,
     };
 
     events_to_emit[5u] = (struct kan_readable_data_event_t) {
@@ -313,7 +313,7 @@ KAN_TEST_CASE (emit_and_parse_complex_setters)
 
     struct kan_readable_data_value_node_t max_velocity_node = {
         .next = NULL,
-        .floating = 10.0,
+        .floating = (kan_readable_data_floating_t) 10.0,
     };
 
     events_to_emit[2u] = (struct kan_readable_data_event_t) {
@@ -328,7 +328,7 @@ KAN_TEST_CASE (emit_and_parse_complex_setters)
 
     struct kan_readable_data_value_node_t max_acceleration_node = {
         .next = NULL,
-        .floating = 20.0,
+        .floating = (kan_readable_data_floating_t) 20.0,
     };
 
     events_to_emit[3u] = (struct kan_readable_data_event_t) {
@@ -517,12 +517,12 @@ KAN_TEST_CASE (human_input_corner_cases)
 
     struct kan_readable_data_value_node_t position_y_node = {
         .next = NULL,
-        .floating = 5.5,
+        .floating = (kan_readable_data_floating_t) 5.5,
     };
 
     struct kan_readable_data_value_node_t position_x_node = {
         .next = &position_y_node,
-        .floating = -1.34,
+        .floating = (kan_readable_data_floating_t) -1.34,
     };
 
     events_to_emit[5u] = (struct kan_readable_data_event_t) {

@@ -11,10 +11,10 @@
 
 struct migration_counters_singleton_t
 {
-    uint64_t pre_migration_scheduler_counter;
-    uint64_t pre_migration_mutator_counter;
-    uint64_t post_migration_scheduler_counter;
-    uint64_t post_migration_mutator_counter;
+    kan_instance_size_t pre_migration_scheduler_counter;
+    kan_instance_size_t pre_migration_mutator_counter;
+    kan_instance_size_t post_migration_scheduler_counter;
+    kan_instance_size_t post_migration_mutator_counter;
 };
 
 TEST_UNIVERSE_POST_MIGRATION_API void migration_counters_singleton_init (struct migration_counters_singleton_t *data)

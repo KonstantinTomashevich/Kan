@@ -33,7 +33,7 @@ void kan_rpl_meta_buffer_init (struct kan_rpl_meta_buffer_t *instance)
 
 void kan_rpl_meta_buffer_shutdown (struct kan_rpl_meta_buffer_t *instance)
 {
-    for (uint64_t parameter_index = 0u; parameter_index < instance->parameters.size; ++parameter_index)
+    for (kan_loop_size_t parameter_index = 0u; parameter_index < instance->parameters.size; ++parameter_index)
     {
         kan_rpl_meta_parameter_shutdown (
             &((struct kan_rpl_meta_parameter_t *) instance->parameters.data)[parameter_index]);
@@ -53,7 +53,7 @@ void kan_rpl_meta_set_bindings_init (struct kan_rpl_meta_set_bindings_t *instanc
 
 void kan_rpl_meta_set_bindings_shutdown (struct kan_rpl_meta_set_bindings_t *instance)
 {
-    for (uint64_t index = 0u; index < instance->buffers.size; ++index)
+    for (kan_loop_size_t index = 0u; index < instance->buffers.size; ++index)
     {
         kan_rpl_meta_buffer_shutdown (&((struct kan_rpl_meta_buffer_t *) instance->buffers.data)[index]);
     }
@@ -86,7 +86,7 @@ void kan_rpl_meta_init (struct kan_rpl_meta_t *instance)
 
 void kan_rpl_meta_shutdown (struct kan_rpl_meta_t *instance)
 {
-    for (uint64_t index = 0u; index < instance->attribute_buffers.size; ++index)
+    for (kan_loop_size_t index = 0u; index < instance->attribute_buffers.size; ++index)
     {
         kan_rpl_meta_buffer_shutdown (&((struct kan_rpl_meta_buffer_t *) instance->attribute_buffers.data)[index]);
     }
@@ -118,6 +118,8 @@ kan_rpl_compiler_context_t kan_rpl_compiler_context_create (enum kan_rpl_pipelin
     kan_stack_group_allocator_init (&instance->resolve_allocator, STATICS.rpl_compiler_context_allocation_group,
                                     KAN_RPL_COMPILER_CONTEXT_RESOLVE_STACK);
 
+    kan_trivial_string_buffer_init (&instance->name_generation_buffer, STATICS.rpl_compiler_context_allocation_group,
+                                    KAN_RPL_COMPILER_INSTANCE_MAX_FLAT_NAME_LENGTH);
     return KAN_HANDLE_SET (kan_rpl_compiler_context_t, instance);
 }
 
@@ -125,7 +127,7 @@ kan_bool_t kan_rpl_compiler_context_use_module (kan_rpl_compiler_context_t compi
                                                 struct kan_rpl_intermediate_t *intermediate_reference)
 {
     struct rpl_compiler_context_t *instance = KAN_HANDLE_GET (compiler_context);
-    for (uint64_t module_index = 0u; module_index < instance->modules.size; ++module_index)
+    for (kan_loop_size_t module_index = 0u; module_index < instance->modules.size; ++module_index)
     {
         if (((struct kan_rpl_intermediate_t **) instance->modules.data)[module_index] == intermediate_reference)
         {
@@ -135,12 +137,13 @@ kan_bool_t kan_rpl_compiler_context_use_module (kan_rpl_compiler_context_t compi
         }
     }
 
-    for (uint64_t new_option_index = 0u; new_option_index < intermediate_reference->options.size; ++new_option_index)
+    for (kan_loop_size_t new_option_index = 0u; new_option_index < intermediate_reference->options.size;
+         ++new_option_index)
     {
         struct kan_rpl_option_t *new_option =
             &((struct kan_rpl_option_t *) intermediate_reference->options.data)[new_option_index];
 
-        for (uint64_t old_option_index = 0u; old_option_index < instance->option_values.size; ++old_option_index)
+        for (kan_loop_size_t old_option_index = 0u; old_option_index < instance->option_values.size; ++old_option_index)
         {
             struct rpl_compiler_context_option_value_t *old_option =
                 &((struct rpl_compiler_context_option_value_t *) instance->option_values.data)[old_option_index];
@@ -168,7 +171,8 @@ kan_bool_t kan_rpl_compiler_context_use_module (kan_rpl_compiler_context_t compi
     kan_dynamic_array_set_capacity (&instance->option_values,
                                     instance->option_values.size + intermediate_reference->options.size);
 
-    for (uint64_t new_option_index = 0u; new_option_index < intermediate_reference->options.size; ++new_option_index)
+    for (kan_loop_size_t new_option_index = 0u; new_option_index < intermediate_reference->options.size;
+         ++new_option_index)
     {
         struct kan_rpl_option_t *new_option =
             &((struct kan_rpl_option_t *) intermediate_reference->options.data)[new_option_index];
@@ -201,7 +205,7 @@ kan_bool_t kan_rpl_compiler_context_set_option_flag (kan_rpl_compiler_context_t 
                                                      kan_bool_t value)
 {
     struct rpl_compiler_context_t *instance = KAN_HANDLE_GET (compiler_context);
-    for (uint64_t index = 0u; index < instance->option_values.size; ++index)
+    for (kan_loop_size_t index = 0u; index < instance->option_values.size; ++index)
     {
         struct rpl_compiler_context_option_value_t *option =
             &((struct rpl_compiler_context_option_value_t *) instance->option_values.data)[index];
@@ -226,10 +230,10 @@ kan_bool_t kan_rpl_compiler_context_set_option_flag (kan_rpl_compiler_context_t 
 
 kan_bool_t kan_rpl_compiler_context_set_option_count (kan_rpl_compiler_context_t compiler_context,
                                                       kan_interned_string_t name,
-                                                      uint64_t value)
+                                                      kan_rpl_unsigned_int_literal_t value)
 {
     struct rpl_compiler_context_t *instance = KAN_HANDLE_GET (compiler_context);
-    for (uint64_t index = 0u; index < instance->option_values.size; ++index)
+    for (kan_loop_size_t index = 0u; index < instance->option_values.size; ++index)
     {
         struct rpl_compiler_context_option_value_t *option =
             &((struct rpl_compiler_context_option_value_t *) instance->option_values.data)[index];
@@ -267,5 +271,6 @@ void kan_rpl_compiler_context_destroy (kan_rpl_compiler_context_t compiler_conte
     kan_dynamic_array_shutdown (&instance->option_values);
     kan_dynamic_array_shutdown (&instance->modules);
     kan_stack_group_allocator_shutdown (&instance->resolve_allocator);
+    kan_trivial_string_buffer_shutdown (&instance->name_generation_buffer);
     kan_free_general (STATICS.rpl_compiler_context_allocation_group, instance, sizeof (struct rpl_compiler_context_t));
 }

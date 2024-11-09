@@ -134,7 +134,7 @@ void queue_new_allocation_group_event_unguarded (struct allocation_group_t *grou
     }
 }
 
-void queue_allocate_event_unguarded (struct allocation_group_t *group, uint64_t amount)
+void queue_allocate_event_unguarded (struct allocation_group_t *group, kan_memory_size_t amount)
 {
     if (!event_queue_initialized)
     {
@@ -151,7 +151,7 @@ void queue_allocate_event_unguarded (struct allocation_group_t *group, uint64_t 
     }
 }
 
-void queue_free_event_unguarded (struct allocation_group_t *group, uint64_t amount)
+void queue_free_event_unguarded (struct allocation_group_t *group, kan_memory_size_t amount)
 {
     if (!event_queue_initialized)
     {

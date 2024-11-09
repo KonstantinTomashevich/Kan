@@ -38,7 +38,7 @@ kan_cpu_section_t kan_cpu_section_get (const char *name)
 
     kan_interned_string_t interned_name = kan_string_intern (name);
     const struct kan_hash_storage_bucket_t *bucket =
-        kan_hash_storage_query (&section_storage, (uint64_t) interned_name);
+        kan_hash_storage_query (&section_storage, (kan_hash_t) interned_name);
     struct section_node_t *node = (struct section_node_t *) bucket->first;
     const struct section_node_t *end = (struct section_node_t *) (bucket->last ? bucket->last->next : NULL);
 
@@ -55,7 +55,7 @@ kan_cpu_section_t kan_cpu_section_get (const char *name)
 
     struct section_node_t *new_node = kan_allocate_general (KAN_ALLOCATION_GROUP_IGNORE, sizeof (struct section_node_t),
                                                             _Alignof (struct section_node_t));
-    new_node->node.hash = (uint64_t) interned_name;
+    new_node->node.hash = (kan_hash_t) interned_name;
     new_node->name = interned_name;
     new_node->location.name = name;
     new_node->location.function = NULL;

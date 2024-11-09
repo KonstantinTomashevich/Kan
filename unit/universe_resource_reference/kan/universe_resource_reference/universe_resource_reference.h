@@ -4,6 +4,7 @@
 
 #include <kan/api_common/c_header.h>
 #include <kan/universe/universe.h>
+#include <kan/universe_resource_provider/universe_resource_provider.h>
 
 /// \file
 /// \brief Provides public API for Resource Reference extension for Universe unit.
@@ -38,7 +39,7 @@ KAN_C_HEADER_BEGIN
 /// \brief Attachment for `kan_resource_native_entry_t` that describes one outer reference.
 struct kan_resource_native_entry_outer_reference_t
 {
-    uint64_t attachment_id;
+    kan_resource_entry_id_t attachment_id;
     kan_interned_string_t reference_type;
     kan_interned_string_t reference_name;
 };
@@ -58,7 +59,7 @@ struct kan_resource_update_outer_references_response_event_t
     kan_bool_t successful;
 
     /// \brief Entry attachment id is added to make parsing response result more convenient.
-    uint64_t entry_attachment_id;
+    kan_resource_entry_id_t entry_attachment_id;
 };
 
 /// \brief Requests outer reference attachments to be update on all native entries that can reference given type.
@@ -79,7 +80,7 @@ struct kan_resource_update_all_references_to_type_response_event_t
 struct kan_resource_reference_configuration_t
 {
     /// \brief Maximum time per frame for processing resource reference operations.
-    uint64_t budget_ns;
+    kan_time_offset_t budget_ns;
 
     /// \brief Virtual directory that can be used as workspace for storing outer reference caches.
     kan_interned_string_t workspace_directory_path;

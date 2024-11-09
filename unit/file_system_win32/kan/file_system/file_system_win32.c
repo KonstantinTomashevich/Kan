@@ -112,7 +112,7 @@ kan_bool_t kan_file_system_query_entry (const char *path, struct kan_file_system
             LARGE_INTEGER size;
             size.LowPart = win32_status.nFileSizeLow;
             size.HighPart = (LONG) win32_status.nFileSizeHigh;
-            status->size = (uint64_t) size.QuadPart;
+            status->size = (kan_file_size_t) size.QuadPart;
 
             SYSTEMTIME system_modification_time;
             if (FileTimeToSystemTime (&win32_status.ftLastWriteTime, &system_modification_time))
@@ -127,8 +127,9 @@ kan_bool_t kan_file_system_query_entry (const char *path, struct kan_file_system
                 };
 
                 const time_t unix_time = mktime (&system_modification_time_tm);
-                status->last_modification_time_ns = ((uint64_t) unix_time) * 1000000000u +
-                                                    ((uint64_t) system_modification_time.wMilliseconds) * 1000000u;
+                status->last_modification_time_ns =
+                    ((kan_time_size_t) unix_time) * 1000000000u +
+                    ((kan_time_size_t) system_modification_time.wMilliseconds) * 1000000u;
             }
             else
             {
@@ -185,7 +186,7 @@ kan_bool_t kan_file_system_remove_directory_with_content (const char *path)
     struct kan_file_system_path_container_t path_container;
     kan_file_system_path_container_copy_string (&path_container, path);
 
-    uint64_t old_length = path_container.length;
+    kan_instance_size_t old_length = path_container.length;
     kan_file_system_path_container_append (&path_container, "*");
     find_handle = FindFirstFile (path_container.path, &find_data);
     kan_file_system_path_container_reset_length (&path_container, old_length);

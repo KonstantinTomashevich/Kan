@@ -41,8 +41,8 @@ struct kan_reflection_visibility_iterator_t
 ///                                             and manually offset it, because it is easier for other reflection code.
 static inline kan_bool_t kan_reflection_check_visibility (
     const struct kan_reflection_field_t *visibility_condition_field,
-    uint64_t visibility_condition_values_count,
-    const int64_t *visibility_condition_values,
+    kan_instance_size_t visibility_condition_values_count,
+    const kan_reflection_visibility_size_t *visibility_condition_values,
     const void *visibility_value_pointer_with_offset)
 {
     if (visibility_condition_values_count > 0u)
@@ -50,7 +50,7 @@ static inline kan_bool_t kan_reflection_check_visibility (
         KAN_ASSERT (visibility_condition_field)
 
 #define CHECK_CONDITIONS(TYPE)                                                                                         \
-    for (uint64_t index = 0u; index < visibility_condition_values_count; ++index)                                      \
+    for (kan_loop_size_t index = 0u; index < visibility_condition_values_count; ++index)                               \
     {                                                                                                                  \
         if (*(const TYPE *) (visibility_value_pointer_with_offset) == (TYPE) visibility_condition_values[index])       \
         {                                                                                                              \

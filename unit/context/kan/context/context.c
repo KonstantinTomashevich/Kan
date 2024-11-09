@@ -31,8 +31,8 @@ struct system_instance_node_t
     struct kan_context_system_api_t *api;
     void *user_config;
     kan_bool_t initialized;
-    uint64_t connection_references_to_others;
-    uint64_t initialization_references_to_me;
+    kan_instance_size_t connection_references_to_others;
+    kan_instance_size_t initialization_references_to_me;
 
     /// \meta reflection_dynamic_array_type = "struct system_instance_node_t *"
     struct kan_dynamic_array_t initialization_references_to_others;
@@ -57,7 +57,7 @@ struct context_t
 
 static inline kan_bool_t node_array_contains (struct kan_dynamic_array_t *array, struct system_instance_node_t *node)
 {
-    for (uint64_t index = 0u; index < array->size; ++index)
+    for (kan_loop_size_t index = 0u; index < array->size; ++index)
     {
         if (((struct system_instance_node_t **) array->data)[index] == node)
         {
@@ -83,7 +83,8 @@ static inline void node_array_add (struct kan_dynamic_array_t *array, struct sys
 static struct system_instance_node_t *context_query_system (struct context_t *context,
                                                             kan_interned_string_t system_name)
 {
-    const struct kan_hash_storage_bucket_t *bucket = kan_hash_storage_query (&context->systems, (uint64_t) system_name);
+    const struct kan_hash_storage_bucket_t *bucket =
+        kan_hash_storage_query (&context->systems, (kan_hash_t) system_name);
     struct system_instance_node_t *node = (struct system_instance_node_t *) bucket->first;
     const struct system_instance_node_t *node_end =
         (struct system_instance_node_t *) (bucket->last ? bucket->last->next : NULL);
@@ -124,7 +125,8 @@ static void context_initialize_system (struct context_t *context, struct system_
         return;
     }
 
-    for (uint64_t connected_index = 0u; connected_index < node->connection_references_to_me.size; ++connected_index)
+    for (kan_loop_size_t connected_index = 0u; connected_index < node->connection_references_to_me.size;
+         ++connected_index)
     {
         context_initialize_system (
             context, ((struct system_instance_node_t **) node->connection_references_to_me.data)[connected_index]);
@@ -153,7 +155,7 @@ static void context_shutdown_system (struct context_t *context, struct system_in
     node->initialized = KAN_FALSE;
     KAN_LOG (context, KAN_LOG_INFO, "End system \"%s\" shutdown.", node->name)
 
-    for (uint64_t initialized_index = 0u; initialized_index < node->initialization_references_to_others.size;
+    for (kan_loop_size_t initialized_index = 0u; initialized_index < node->initialization_references_to_others.size;
          ++initialized_index)
     {
         struct system_instance_node_t *other_node =
@@ -162,7 +164,8 @@ static void context_shutdown_system (struct context_t *context, struct system_in
         context_shutdown_system (context, other_node);
     }
 
-    for (uint64_t connected_index = 0u; connected_index < node->connection_references_to_me.size; ++connected_index)
+    for (kan_loop_size_t connected_index = 0u; connected_index < node->connection_references_to_me.size;
+         ++connected_index)
     {
         struct system_instance_node_t *other_node =
             ((struct system_instance_node_t **) node->connection_references_to_me.data)[connected_index];
@@ -172,11 +175,11 @@ static void context_shutdown_system (struct context_t *context, struct system_in
 }
 
 #if defined(_WIN32)
-__declspec (dllimport) extern uint64_t KAN_CONTEXT_SYSTEM_COUNT_NAME;
+__declspec (dllimport) extern kan_instance_size_t KAN_CONTEXT_SYSTEM_COUNT_NAME;
 __declspec (dllimport) extern struct kan_context_system_api_t *KAN_CONTEXT_SYSTEM_ARRAY_NAME[];
 __declspec (dllimport) void KAN_CONTEXT_SYSTEM_ARRAY_INITIALIZER_NAME (void);
 #else
-extern uint64_t KAN_CONTEXT_SYSTEM_COUNT_NAME;
+extern kan_instance_size_t KAN_CONTEXT_SYSTEM_COUNT_NAME;
 extern struct kan_context_system_api_t *KAN_CONTEXT_SYSTEM_ARRAY_NAME[];
 void KAN_CONTEXT_SYSTEM_ARRAY_INITIALIZER_NAME (void);
 #endif
@@ -205,7 +208,7 @@ kan_bool_t kan_context_request_system (kan_context_t handle, const char *system_
     }
 
     struct kan_context_system_api_t *api = NULL;
-    for (uint64_t api_index = 0u; api_index < KAN_CONTEXT_SYSTEM_COUNT_NAME; ++api_index)
+    for (kan_loop_size_t api_index = 0u; api_index < (kan_loop_size_t) KAN_CONTEXT_SYSTEM_COUNT_NAME; ++api_index)
     {
         if (strcmp (KAN_CONTEXT_SYSTEM_ARRAY_NAME[api_index]->name, system_name) == 0)
         {
@@ -221,7 +224,7 @@ kan_bool_t kan_context_request_system (kan_context_t handle, const char *system_
     }
 
     struct system_instance_node_t *node = kan_allocate_batched (context->group, sizeof (struct system_instance_node_t));
-    node->node.hash = (uint64_t) interned_system_name;
+    node->node.hash = (kan_hash_t) interned_system_name;
     node->name = interned_system_name;
     node->instance = KAN_HANDLE_SET_INVALID (kan_context_system_t);
     node->api = api;

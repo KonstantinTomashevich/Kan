@@ -36,8 +36,8 @@ struct reader_patch_block_state_t
 
 struct reader_patch_sub_struct_block_state_t
 {
-    uint64_t offset;
-    uint64_t size_with_padding;
+    kan_instance_size_t offset;
+    kan_instance_size_t size_with_padding;
     const struct kan_reflection_struct_t *struct_type;
 };
 
@@ -74,19 +74,19 @@ struct writer_struct_block_state_t
 {
     struct kan_reflection_visibility_iterator_t field_iterator;
 
-    uint64_t suffix_next_index_to_write;
+    kan_instance_size_t suffix_next_index_to_write;
 };
 
 struct writer_patch_sub_struct_block_state_t
 {
     const void *imaginary_instance;
-    uint64_t scope_begin;
-    uint64_t scope_end;
+    kan_instance_size_t scope_begin;
+    kan_instance_size_t scope_end;
 
     const struct kan_reflection_field_t *current_field;
     const struct kan_reflection_field_t *end_field;
 
-    uint64_t suffix_next_index_to_write;
+    kan_instance_size_t suffix_next_index_to_write;
 };
 
 struct writer_patch_block_state_t
@@ -278,7 +278,7 @@ kan_serialization_rd_reader_t kan_serialization_rd_reader_create (
 }
 
 static inline kan_bool_t extract_output_target_parts (const struct kan_readable_data_event_t *parsed_event,
-                                                      size_t *output_target_parts_count,
+                                                      kan_instance_size_t *output_target_parts_count,
                                                       kan_interned_string_t *output_target_parts)
 {
     const char *pointer = parsed_event->output_target.identifier;
@@ -381,7 +381,7 @@ static inline kan_bool_t ensure_setter_single_value (const struct kan_readable_d
 
 static inline void copy_parsed_string (struct reader_state_t *reader_state, const char *parsed_string, void *address)
 {
-    const uint64_t length = strlen (parsed_string);
+    const kan_instance_size_t length = (kan_instance_size_t) strlen (parsed_string);
     char *string = kan_allocate_general (reader_state->child_allocation_group, length + 1u, _Alignof (char));
     memcpy (string, parsed_string, length);
     string[length] = '\0';
@@ -390,7 +390,7 @@ static inline void copy_parsed_string (struct reader_state_t *reader_state, cons
 
 static inline kan_bool_t find_enum_value (const struct kan_reflection_enum_t *enum_data,
                                           const char *parsed_string,
-                                          int64_t *output)
+                                          kan_reflection_enum_size_t *output)
 {
     const kan_interned_string_t value_name = kan_string_intern (parsed_string);
     for (size_t index = 0u; index < enum_data->values_count; ++index)
@@ -410,7 +410,7 @@ static inline kan_bool_t find_enum_value (const struct kan_reflection_enum_t *en
 static inline kan_bool_t read_to_signed_integer (struct reader_state_t *reader_state,
                                                  const struct kan_readable_data_event_t *parsed_event,
                                                  const struct kan_readable_data_value_node_t *source_node,
-                                                 uint64_t integer_size,
+                                                 kan_instance_size_t integer_size,
                                                  void *address)
 {
     if (parsed_event->type != KAN_READABLE_DATA_EVENT_ELEMENTAL_INTEGER_SETTER)
@@ -422,7 +422,7 @@ static inline kan_bool_t read_to_signed_integer (struct reader_state_t *reader_s
         return KAN_FALSE;
     }
 
-    const int64_t value = source_node->integer;
+    const kan_readable_data_signed_t value = source_node->integer;
     switch (integer_size)
     {
     case 1u:
@@ -479,7 +479,7 @@ static inline kan_bool_t read_to_signed_integer (struct reader_state_t *reader_s
 static inline kan_bool_t read_to_unsigned_integer (struct reader_state_t *reader_state,
                                                    const struct kan_readable_data_event_t *parsed_event,
                                                    const struct kan_readable_data_value_node_t *source_node,
-                                                   uint64_t integer_size,
+                                                   kan_instance_size_t integer_size,
                                                    void *address)
 {
     if (parsed_event->type != KAN_READABLE_DATA_EVENT_ELEMENTAL_INTEGER_SETTER)
@@ -491,7 +491,7 @@ static inline kan_bool_t read_to_unsigned_integer (struct reader_state_t *reader
         return KAN_FALSE;
     }
 
-    const int64_t value = source_node->integer;
+    const kan_readable_data_signed_t value = source_node->integer;
     if (value < 0)
     {
         KAN_LOG (serialization_readable_data, KAN_LOG_ERROR,
@@ -533,7 +533,7 @@ static inline kan_bool_t read_to_unsigned_integer (struct reader_state_t *reader
         return KAN_TRUE;
 
     case 4u:
-        if (value > UINT32_MAX)
+        if ((uint32_t) value > UINT32_MAX)
         {
             KAN_LOG (serialization_readable_data, KAN_LOG_ERROR,
                      "Elemental setter attempts to set value at path \"%s\" (index -- %llu), but receiver is 32 bit "
@@ -558,7 +558,7 @@ static inline kan_bool_t read_to_unsigned_integer (struct reader_state_t *reader
 static inline kan_bool_t read_to_floating (struct reader_state_t *reader_state,
                                            const struct kan_readable_data_event_t *parsed_event,
                                            const struct kan_readable_data_value_node_t *source_node,
-                                           uint64_t integer_size,
+                                           kan_instance_size_t integer_size,
                                            void *address)
 {
     if (parsed_event->type != KAN_READABLE_DATA_EVENT_ELEMENTAL_FLOATING_SETTER)
@@ -570,7 +570,7 @@ static inline kan_bool_t read_to_floating (struct reader_state_t *reader_state,
         return KAN_FALSE;
     }
 
-    const double value = source_node->floating;
+    const kan_readable_data_floating_t value = source_node->floating;
     switch (integer_size)
     {
     case 4u:
@@ -675,13 +675,13 @@ static inline kan_bool_t read_to_enum (struct reader_state_t *reader_state,
 
         while (node)
         {
-            int64_t value_i64;
-            if (!find_enum_value (enum_data, node->identifier, &value_i64))
+            kan_reflection_enum_size_t value_enum;
+            if (!find_enum_value (enum_data, node->identifier, &value_enum))
             {
                 return KAN_FALSE;
             }
 
-            *flags |= (unsigned int) value_i64;
+            *flags |= (unsigned int) value_enum;
             node = node->next;
         }
     }
@@ -693,22 +693,22 @@ static inline kan_bool_t read_to_enum (struct reader_state_t *reader_state,
         }
 
         int *value = (int *) address;
-        int64_t value_i64;
+        kan_reflection_enum_size_t value_enum;
 
-        if (!find_enum_value (enum_data, source_node->identifier, &value_i64))
+        if (!find_enum_value (enum_data, source_node->identifier, &value_enum))
         {
             return KAN_FALSE;
         }
 
-        *value = (int) value_i64;
+        *value = (int) value_enum;
     }
 
     return KAN_TRUE;
 }
 
-static inline uint64_t calculate_values_count (const struct kan_readable_data_event_t *parsed_event)
+static inline kan_loop_size_t calculate_values_count (const struct kan_readable_data_event_t *parsed_event)
 {
-    uint64_t count = 0u;
+    kan_loop_size_t count = 0u;
     const struct kan_readable_data_value_node_t *node = parsed_event->setter_value_first;
 
     while (node)
@@ -733,9 +733,9 @@ static inline kan_bool_t read_elemental_setter_into_array_element (struct reader
             array_field->archetype_inline_array.item_archetype :
             array_field->archetype_dynamic_array.item_archetype;
 
-    const uint64_t item_size = array_field->archetype == KAN_REFLECTION_ARCHETYPE_INLINE_ARRAY ?
-                                   array_field->archetype_inline_array.item_size :
-                                   array_field->archetype_dynamic_array.item_size;
+    const kan_instance_size_t item_size = array_field->archetype == KAN_REFLECTION_ARCHETYPE_INLINE_ARRAY ?
+                                              array_field->archetype_inline_array.item_size :
+                                              array_field->archetype_dynamic_array.item_size;
 
     switch (item_archetype)
     {
@@ -797,7 +797,7 @@ static inline kan_bool_t read_elemental_setter_node_into_packed_array (
     const struct kan_readable_data_event_t *parsed_event,
     struct kan_readable_data_value_node_t *node,
     enum kan_reflection_archetype_t item_archetype,
-    uint64_t item_size,
+    kan_instance_size_t item_size,
     uint8_t *output,
     kan_interned_string_t enum_type)
 {
@@ -880,8 +880,8 @@ static inline kan_bool_t read_patch_type (struct reader_state_t *reader_state,
 
 static inline void elemental_setter_item_post_read (struct reader_state_t *reader_state,
                                                     struct reader_block_state_t *top_state,
-                                                    uint64_t absolute_offset,
-                                                    uint64_t size_with_padding,
+                                                    kan_instance_size_t absolute_offset,
+                                                    kan_instance_size_t size_with_padding,
                                                     void *address)
 {
     switch (top_state->type)
@@ -896,8 +896,8 @@ static inline void elemental_setter_item_post_read (struct reader_state_t *reade
 
     case READER_BLOCK_TYPE_PATCH_SUB_STRUCT:
     {
-        uint64_t adjusted_offset = absolute_offset;
-        uint64_t adjusted_size = size_with_padding;
+        kan_instance_size_t adjusted_offset = absolute_offset;
+        kan_instance_size_t adjusted_size = size_with_padding;
 
         if (adjusted_offset + adjusted_size == top_state->patch_sub_struct_state.struct_type->size)
         {
@@ -915,7 +915,7 @@ static inline kan_bool_t read_elemental_setter (struct reader_state_t *reader_st
                                                 const struct kan_readable_data_event_t *parsed_event,
                                                 struct reader_block_state_t *top_state)
 {
-    size_t output_target_parts_count = 0u;
+    kan_instance_size_t output_target_parts_count = 0u;
     kan_interned_string_t output_target_parts[KAN_SERIALIZATION_RD_MAX_PARTS_IN_OUTPUT_TARGET];
 
     if (!extract_output_target_parts (parsed_event, &output_target_parts_count, output_target_parts))
@@ -936,8 +936,8 @@ static inline kan_bool_t read_elemental_setter (struct reader_state_t *reader_st
         return KAN_FALSE;
     }
 
-    uint64_t absolute_offset;
-    uint64_t size_with_padding;
+    kan_instance_size_t absolute_offset;
+    kan_instance_size_t size_with_padding;
 
     const struct kan_reflection_field_t *field =
         kan_reflection_registry_query_local_field (reader_state->registry, struct_type_name, output_target_parts_count,
@@ -1037,7 +1037,7 @@ static inline kan_bool_t read_elemental_setter (struct reader_state_t *reader_st
     case KAN_REFLECTION_ARCHETYPE_INLINE_ARRAY:
         if (parsed_event->output_target.array_index == KAN_READABLE_DATA_ARRAY_INDEX_NONE)
         {
-            const uint64_t count = calculate_values_count (parsed_event);
+            const kan_instance_size_t count = calculate_values_count (parsed_event);
             if (count > field->archetype_inline_array.item_count)
             {
                 KAN_LOG (serialization_readable_data, KAN_LOG_ERROR,
@@ -1049,7 +1049,7 @@ static inline kan_bool_t read_elemental_setter (struct reader_state_t *reader_st
             }
 
             struct kan_readable_data_value_node_t *node = parsed_event->setter_value_first;
-            uint64_t index = 0u;
+            kan_loop_size_t index = 0u;
 
             while (node)
             {
@@ -1073,8 +1073,8 @@ static inline kan_bool_t read_elemental_setter (struct reader_state_t *reader_st
                     return KAN_FALSE;
                 }
 
-                uint64_t item_offset = absolute_offset + field->archetype_inline_array.item_size * index;
-                uint64_t item_size_with_padding_adjustment;
+                kan_instance_size_t item_offset = absolute_offset + field->archetype_inline_array.item_size * index;
+                kan_instance_size_t item_size_with_padding_adjustment;
 
                 if (index == field->archetype_inline_array.item_count - 1u)
                 {
@@ -1126,9 +1126,9 @@ static inline kan_bool_t read_elemental_setter (struct reader_state_t *reader_st
                 return KAN_FALSE;
             }
 
-            uint64_t item_offset =
+            kan_instance_size_t item_offset =
                 absolute_offset + field->archetype_inline_array.item_size * parsed_event->output_target.array_index;
-            uint64_t item_size_with_padding_adjustment;
+            kan_instance_size_t item_size_with_padding_adjustment;
 
             if (parsed_event->output_target.array_index == field->archetype_inline_array.item_count - 1u)
             {
@@ -1157,7 +1157,7 @@ static inline kan_bool_t read_elemental_setter (struct reader_state_t *reader_st
 
         if (parsed_event->output_target.array_index == KAN_READABLE_DATA_ARRAY_INDEX_NONE)
         {
-            const uint64_t count = calculate_values_count (parsed_event);
+            const kan_loop_size_t count = calculate_values_count (parsed_event);
             struct kan_dynamic_array_t *dynamic_array = (struct kan_dynamic_array_t *) address;
 
             if (dynamic_array->size < count)
@@ -1224,8 +1224,8 @@ static inline kan_bool_t read_elemental_setter (struct reader_state_t *reader_st
 
 static inline kan_bool_t structural_setter_open_struct (struct reader_state_t *reader_state,
                                                         struct reader_block_state_t *top_state,
-                                                        uint64_t absolute_offset,
-                                                        uint64_t size_with_padding,
+                                                        kan_instance_size_t absolute_offset,
+                                                        kan_instance_size_t size_with_padding,
                                                         kan_interned_string_t type_name)
 {
     switch (top_state->type)
@@ -1293,7 +1293,7 @@ static inline kan_bool_t read_structural_setter (struct reader_state_t *reader_s
                                                  const struct kan_readable_data_event_t *parsed_event,
                                                  struct reader_block_state_t *top_state)
 {
-    size_t output_target_parts_count = 0u;
+    kan_instance_size_t output_target_parts_count = 0u;
     kan_interned_string_t output_target_parts[KAN_SERIALIZATION_RD_MAX_PARTS_IN_OUTPUT_TARGET];
 
     if (!extract_output_target_parts (parsed_event, &output_target_parts_count, output_target_parts))
@@ -1307,8 +1307,8 @@ static inline kan_bool_t read_structural_setter (struct reader_state_t *reader_s
         return KAN_FALSE;
     }
 
-    uint64_t absolute_offset;
-    uint64_t size_with_padding;
+    kan_instance_size_t absolute_offset;
+    kan_instance_size_t size_with_padding;
 
     const struct kan_reflection_field_t *field =
         kan_reflection_registry_query_local_field (reader_state->registry, struct_type_name, output_target_parts_count,
@@ -1408,10 +1408,10 @@ static inline kan_bool_t read_structural_setter (struct reader_state_t *reader_s
 
         case KAN_REFLECTION_ARCHETYPE_STRUCT:
         {
-            const uint64_t item_offset =
+            const kan_instance_size_t item_offset =
                 field->archetype_inline_array.item_size * parsed_event->output_target.array_index;
 
-            const uint64_t item_size_with_padding =
+            const kan_instance_size_t item_size_with_padding =
                 parsed_event->output_target.array_index == field->archetype_inline_array.item_size - 1u ?
                     size_with_padding - item_offset :
                     field->archetype_inline_array.item_size;
@@ -1630,7 +1630,7 @@ static inline kan_bool_t read_array_appender (struct reader_state_t *reader_stat
         return KAN_FALSE;
     }
 
-    size_t output_target_parts_count = 0u;
+    kan_instance_size_t output_target_parts_count = 0u;
     kan_interned_string_t output_target_parts[KAN_SERIALIZATION_RD_MAX_PARTS_IN_OUTPUT_TARGET];
 
     if (!extract_output_target_parts (parsed_event, &output_target_parts_count, output_target_parts))
@@ -1638,8 +1638,8 @@ static inline kan_bool_t read_array_appender (struct reader_state_t *reader_stat
         return KAN_FALSE;
     }
 
-    uint64_t absolute_offset;
-    uint64_t size_with_padding;
+    kan_instance_size_t absolute_offset;
+    kan_instance_size_t size_with_padding;
 
     const struct kan_reflection_field_t *field = kan_reflection_registry_query_local_field (
         reader_state->registry, top_state->struct_state.type->name, output_target_parts_count, output_target_parts,
@@ -1855,7 +1855,7 @@ kan_serialization_rd_writer_t kan_serialization_rd_writer_create (struct kan_str
 
 static inline kan_bool_t emit_structural_setter_begin (struct writer_state_t *writer_state,
                                                        const char *name,
-                                                       uint64_t array_index)
+                                                       kan_instance_size_t array_index)
 {
     struct kan_readable_data_event_t event;
     event.type = KAN_READABLE_DATA_EVENT_STRUCTURAL_SETTER_BEGIN;
@@ -1880,21 +1880,23 @@ static inline kan_bool_t emit_block_end (struct writer_state_t *writer_state)
     return kan_readable_data_emitter_step (writer_state->emitter, &event);
 }
 
-static inline int64_t extract_signed_integer_value (uint64_t size, const void *address)
+static inline kan_readable_data_signed_t extract_signed_integer_value (kan_instance_size_t size, const void *address)
 {
     switch (size)
     {
     case 1u:
-        return *((int8_t *) address);
+        return (kan_readable_data_signed_t) * ((int8_t *) address);
 
     case 2u:
-        return *((int16_t *) address);
+        return (kan_readable_data_signed_t) * ((int16_t *) address);
 
     case 4u:
-        return *((int32_t *) address);
+        return (kan_readable_data_signed_t) * ((int32_t *) address);
 
     case 8u:
-        return *((int64_t *) address);
+        KAN_ASSERT (*(int64_t *) address >= KAN_INT_MIN (kan_readable_data_signed_t))
+        KAN_ASSERT (*(int64_t *) address <= KAN_INT_MAX (kan_readable_data_signed_t))
+        return (kan_readable_data_signed_t) * ((int64_t *) address);
     }
 
     KAN_ASSERT (KAN_FALSE)
@@ -1903,8 +1905,8 @@ static inline int64_t extract_signed_integer_value (uint64_t size, const void *a
 
 static inline kan_bool_t emit_single_signed_integer_setter (struct writer_state_t *writer_state,
                                                             kan_interned_string_t name,
-                                                            uint64_t array_index,
-                                                            uint64_t size,
+                                                            kan_instance_size_t array_index,
+                                                            kan_instance_size_t size,
                                                             const void *address)
 {
     struct kan_readable_data_event_t event;
@@ -1921,22 +1923,22 @@ static inline kan_bool_t emit_single_signed_integer_setter (struct writer_state_
     return kan_readable_data_emitter_step (writer_state->emitter, &event);
 }
 
-static inline int64_t extract_unsigned_integer_value (uint64_t size, const void *address)
+static inline kan_readable_data_signed_t extract_unsigned_integer_value (kan_instance_size_t size, const void *address)
 {
     switch (size)
     {
     case 1u:
-        return (int64_t) * ((uint8_t *) address);
+        return (kan_readable_data_signed_t) * ((uint8_t *) address);
 
     case 2u:
-        return (int64_t) * ((uint16_t *) address);
+        return (kan_readable_data_signed_t) * ((uint16_t *) address);
 
     case 4u:
-        return (int64_t) * ((uint32_t *) address);
+        return (kan_readable_data_signed_t) * ((uint32_t *) address);
 
     case 8u:
-        KAN_ASSERT (*((uint64_t *) address) <= INT64_MAX)
-        return (int64_t) * ((uint64_t *) address);
+        KAN_ASSERT (*((uint64_t *) address) <= KAN_INT_MAX (kan_readable_data_signed_t))
+        return (kan_readable_data_signed_t) * ((uint64_t *) address);
     }
 
     KAN_ASSERT (KAN_FALSE)
@@ -1945,8 +1947,8 @@ static inline int64_t extract_unsigned_integer_value (uint64_t size, const void 
 
 static inline kan_bool_t emit_single_unsigned_integer_setter (struct writer_state_t *writer_state,
                                                               kan_interned_string_t name,
-                                                              uint64_t array_index,
-                                                              uint64_t size,
+                                                              kan_instance_size_t array_index,
+                                                              kan_instance_size_t size,
                                                               const void *address)
 {
     struct kan_readable_data_event_t event;
@@ -1963,7 +1965,7 @@ static inline kan_bool_t emit_single_unsigned_integer_setter (struct writer_stat
     return kan_readable_data_emitter_step (writer_state->emitter, &event);
 }
 
-static inline double extract_floating_value (uint64_t size, const void *address)
+static inline kan_readable_data_floating_t extract_floating_value (kan_instance_size_t size, const void *address)
 {
     switch (size)
     {
@@ -1971,17 +1973,17 @@ static inline double extract_floating_value (uint64_t size, const void *address)
         return *((float *) address);
 
     case 8u:
-        return *((double *) address);
+        return (kan_readable_data_floating_t) * ((double *) address);
     }
 
     KAN_ASSERT (KAN_FALSE)
-    return 0.0;
+    return (kan_readable_data_floating_t) 0.0;
 }
 
 static inline kan_bool_t emit_single_floating_setter (struct writer_state_t *writer_state,
                                                       kan_interned_string_t name,
-                                                      uint64_t array_index,
-                                                      uint64_t size,
+                                                      kan_instance_size_t array_index,
+                                                      kan_instance_size_t size,
                                                       const void *address)
 {
     struct kan_readable_data_event_t event;
@@ -2000,7 +2002,7 @@ static inline kan_bool_t emit_single_floating_setter (struct writer_state_t *wri
 
 static inline kan_bool_t emit_single_enum_setter (struct writer_state_t *writer_state,
                                                   kan_interned_string_t name,
-                                                  uint64_t array_index,
+                                                  kan_instance_size_t array_index,
                                                   kan_interned_string_t type_name,
                                                   const void *address)
 {
@@ -2015,14 +2017,14 @@ static inline kan_bool_t emit_single_enum_setter (struct writer_state_t *writer_
 
     if (enum_data->flags)
     {
-#define MAX_VALUE_NODES (sizeof (int) * 8u)
+#define MAX_VALUE_NODES (sizeof (kan_reflection_enum_size_t) * 8u)
         struct kan_readable_data_value_node_t value_nodes[MAX_VALUE_NODES];
-        uint64_t value_nodes_count = 0u;
+        kan_loop_size_t value_nodes_count = 0u;
         event.setter_value_first = &value_nodes[0u];
         kan_interned_string_t none_name = NULL;
         const unsigned int enum_value = *(unsigned int *) address;
 
-        for (uint64_t value_index = 0u; value_index < enum_data->values_count; ++value_index)
+        for (kan_loop_size_t value_index = 0u; value_index < enum_data->values_count; ++value_index)
         {
             const struct kan_reflection_enum_value_t *value_data = &(enum_data->values[value_index]);
             if (value_data->value == 0)
@@ -2076,7 +2078,7 @@ static inline kan_bool_t emit_single_enum_setter (struct writer_state_t *writer_
     else
     {
         const int enum_value = *(int *) address;
-        for (uint64_t value_index = 0u; value_index < enum_data->values_count; ++value_index)
+        for (kan_loop_size_t value_index = 0u; value_index < enum_data->values_count; ++value_index)
         {
             const struct kan_reflection_enum_value_t *value_data = &(enum_data->values[value_index]);
             if ((int) value_data->value == enum_value)
@@ -2098,7 +2100,7 @@ static inline kan_bool_t emit_single_enum_setter (struct writer_state_t *writer_
 
 static inline kan_bool_t emit_single_string_setter (struct writer_state_t *writer_state,
                                                     kan_interned_string_t name,
-                                                    uint64_t array_index,
+                                                    kan_instance_size_t array_index,
                                                     const void *address)
 {
     if (!*(char **) address)
@@ -2123,7 +2125,7 @@ static inline kan_bool_t emit_single_string_setter (struct writer_state_t *write
 
 static inline kan_bool_t enter_struct (struct writer_state_t *writer_state,
                                        kan_interned_string_t name,
-                                       uint64_t array_index,
+                                       kan_instance_size_t array_index,
                                        kan_interned_string_t type_name,
                                        const void *address,
                                        kan_bool_t as_array_appender)
@@ -2157,7 +2159,7 @@ static inline kan_bool_t enter_struct (struct writer_state_t *writer_state,
 
 static inline kan_bool_t enter_patch (struct writer_state_t *writer_state,
                                       kan_interned_string_t name,
-                                      uint64_t array_index,
+                                      kan_instance_size_t array_index,
                                       const void *address,
                                       kan_bool_t as_array_appender)
 {
@@ -2210,7 +2212,7 @@ static inline kan_bool_t enter_patch (struct writer_state_t *writer_state,
     return KAN_TRUE;
 }
 
-static inline kan_bool_t can_pack_array (enum kan_reflection_archetype_t archetype, uint64_t item_count)
+static inline kan_bool_t can_pack_array (enum kan_reflection_archetype_t archetype, kan_instance_size_t item_count)
 {
     if (item_count > KAN_SERIALIZATION_RD_WRITE_MAX_PACKED_ARRAY_SIZE)
     {
@@ -2247,8 +2249,8 @@ static inline kan_bool_t can_pack_array (enum kan_reflection_archetype_t archety
 static inline kan_bool_t write_packed_array (struct writer_state_t *writer_state,
                                              kan_interned_string_t identifier,
                                              enum kan_reflection_archetype_t archetype,
-                                             uint64_t item_size,
-                                             uint64_t item_count,
+                                             kan_instance_size_t item_size,
+                                             kan_instance_size_t item_count,
                                              const void *begin)
 {
     if (item_count == 0u)
@@ -2258,7 +2260,7 @@ static inline kan_bool_t write_packed_array (struct writer_state_t *writer_state
 
     const void *end = ((const uint8_t *) begin) + item_size * item_count;
     struct kan_readable_data_value_node_t value_nodes[KAN_SERIALIZATION_RD_WRITE_MAX_PACKED_ARRAY_SIZE];
-    uint64_t value_nodes_count = 0u;
+    kan_loop_size_t value_nodes_count = 0u;
 
     struct kan_readable_data_event_t event;
     event.output_target.identifier = identifier;
@@ -2421,7 +2423,7 @@ static inline kan_bool_t writer_step_struct (struct writer_state_t *writer_state
         }
         else if (top_state->struct_state.suffix_next_index_to_write < current_field->archetype_inline_array.item_count)
         {
-            const uint64_t index_to_write = top_state->struct_state.suffix_next_index_to_write++;
+            const kan_instance_size_t index_to_write = top_state->struct_state.suffix_next_index_to_write++;
             const void *array_address = address + index_to_write * current_field->archetype_inline_array.item_size;
 
             switch (current_field->archetype_inline_array.item_archetype)
@@ -2501,7 +2503,7 @@ static inline kan_bool_t writer_step_struct (struct writer_state_t *writer_state
         }
         else if (top_state->struct_state.suffix_next_index_to_write < dynamic_array->size)
         {
-            const uint64_t index_to_write = top_state->struct_state.suffix_next_index_to_write++;
+            const kan_instance_size_t index_to_write = top_state->struct_state.suffix_next_index_to_write++;
             const void *array_address =
                 ((const uint8_t *) dynamic_array->data) + index_to_write * dynamic_array->item_size;
 
@@ -2574,20 +2576,20 @@ static inline kan_bool_t writer_step_struct (struct writer_state_t *writer_state
 }
 
 static inline const struct kan_reflection_field_t *find_first_first_field_for_patch_sub_struct (
-    const struct kan_reflection_struct_t *type, uint64_t data_begin)
+    const struct kan_reflection_struct_t *type, kan_loop_size_t data_begin)
 {
     if (data_begin == 0u)
     {
         return &type->fields[0u];
     }
 
-    uint64_t first = 0u;
-    uint64_t last = type->fields_count;
+    kan_loop_size_t first = 0u;
+    kan_loop_size_t last = type->fields_count;
 
     while (first < last)
     {
-        const uint64_t middle = (first + last) / 2u;
-        const uint64_t middle_field_end = type->fields[middle].offset + type->fields[middle].size;
+        const kan_loop_size_t middle = (first + last) / 2u;
+        const kan_loop_size_t middle_field_end = type->fields[middle].offset + type->fields[middle].size;
 
         if (middle_field_end <= data_begin)
         {
@@ -2603,20 +2605,20 @@ static inline const struct kan_reflection_field_t *find_first_first_field_for_pa
 }
 
 static inline const struct kan_reflection_field_t *find_first_end_field_for_patch_sub_struct (
-    const struct kan_reflection_struct_t *type, uint64_t data_end)
+    const struct kan_reflection_struct_t *type, kan_loop_size_t data_end)
 {
     if (data_end >= type->size)
     {
         return &type->fields[type->fields_count];
     }
 
-    uint64_t first = 0u;
-    uint64_t last = type->fields_count;
+    kan_loop_size_t first = 0u;
+    kan_loop_size_t last = type->fields_count;
 
     while (first < last)
     {
-        const uint64_t middle = (first + last) / 2u;
-        const uint64_t middle_field_begin = type->fields[middle].offset;
+        const kan_loop_size_t middle = (first + last) / 2u;
+        const kan_loop_size_t middle_field_begin = type->fields[middle].offset;
 
         if (middle_field_begin < data_end)
         {
@@ -2642,9 +2644,9 @@ static inline kan_bool_t writer_patch_sub_struct_block_state_advance (struct wri
 static inline kan_bool_t enter_patch_sub_struct (struct writer_state_t *writer_state,
                                                  struct writer_block_state_t *top_state,
                                                  kan_interned_string_t block_name,
-                                                 uint64_t array_index,
-                                                 uint64_t offset,
-                                                 uint64_t size,
+                                                 kan_instance_size_t array_index,
+                                                 kan_instance_size_t offset,
+                                                 kan_instance_size_t size,
                                                  kan_interned_string_t type_name)
 {
     if (!emit_structural_setter_begin (writer_state, block_name, array_index))
@@ -2664,8 +2666,8 @@ static inline kan_bool_t enter_patch_sub_struct (struct writer_state_t *writer_s
         new_block_state.patch_sub_struct_state.scope_begin = 0u;
     }
 
-    const uint64_t left_of_data = top_state->patch_sub_struct_state.scope_end - offset;
-    const uint64_t left_of_struct = size - new_block_state.patch_sub_struct_state.scope_begin;
+    const kan_instance_size_t left_of_data = top_state->patch_sub_struct_state.scope_end - offset;
+    const kan_instance_size_t left_of_struct = size - new_block_state.patch_sub_struct_state.scope_begin;
 
     new_block_state.patch_sub_struct_state.scope_end =
         new_block_state.patch_sub_struct_state.scope_begin + KAN_MIN (left_of_data, left_of_struct);
@@ -2790,9 +2792,9 @@ static inline kan_bool_t writer_step_patch_sub_struct (struct writer_state_t *wr
                     current_field->archetype_inline_array.item_size;
             }
 
-            const uint64_t index_to_write = top_state->patch_sub_struct_state.suffix_next_index_to_write++;
-            const uint64_t item_offset = index_to_write * current_field->archetype_inline_array.item_size;
-            const uint64_t begin_offset = current_field->offset + item_offset;
+            const kan_instance_size_t index_to_write = top_state->patch_sub_struct_state.suffix_next_index_to_write++;
+            const kan_instance_size_t item_offset = index_to_write * current_field->archetype_inline_array.item_size;
+            const kan_instance_size_t begin_offset = current_field->offset + item_offset;
 
             if (begin_offset >= top_state->patch_sub_struct_state.scope_end)
             {
@@ -3083,7 +3085,7 @@ kan_bool_t kan_serialization_rd_write_type_header (struct kan_stream_t *stream, 
         return KAN_FALSE;
     }
 
-    const uint64_t type_name_length = strlen (type_name);
+    const kan_instance_size_t type_name_length = (kan_instance_size_t) strlen (type_name);
     KAN_ASSERT (type_name_length <= KAN_SERIALIZATION_RD_HEADER_MAX_TYPE_LENGTH)
 
     if (stream->operations->write (stream, type_name_length, type_name) != type_name_length)
