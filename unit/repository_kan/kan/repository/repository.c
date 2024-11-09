@@ -1661,7 +1661,8 @@ static struct copy_out_list_node_t *convert_to_buffer_copy_outs (
                 }
             }
 
-            buffer_offset = kan_apply_alignment (buffer_offset + chunk->size, OBSERVATION_BUFFER_ALIGNMENT);
+            buffer_offset =
+                (kan_instance_size_t) kan_apply_alignment (buffer_offset + chunk->size, OBSERVATION_BUFFER_ALIGNMENT);
         }
 
         input = input->next;
@@ -1923,8 +1924,8 @@ static void observation_buffer_definition_build (struct observation_buffer_defin
 
     while (chunk)
     {
-        definition->buffer_size =
-            kan_apply_alignment (definition->buffer_size + chunk->size, OBSERVATION_BUFFER_ALIGNMENT);
+        definition->buffer_size = (kan_instance_size_t) kan_apply_alignment (definition->buffer_size + chunk->size,
+                                                                             OBSERVATION_BUFFER_ALIGNMENT);
 
         definition->scenario_chunks[chunk_index] = (struct observation_buffer_scenario_chunk_t) {
             .source_offset = chunk->source_offset,
@@ -2086,7 +2087,7 @@ static void observation_event_triggers_definition_build (struct observation_even
             first_event_node = event_node;
 
             ++triggers_count;
-            triggers_array_size = kan_apply_alignment (
+            triggers_array_size = (kan_instance_size_t) kan_apply_alignment (
                 triggers_array_size + sizeof (struct observation_event_trigger_t) +
                     (merged_buffer_copy_outs_count + merged_record_copy_outs_count) * sizeof (struct copy_out_t),
                 _Alignof (struct observation_event_trigger_t));
@@ -2207,7 +2208,8 @@ static void observation_event_triggers_definition_shutdown (struct observation_e
             current_trigger = observation_event_trigger_next (current_trigger);
         }
 
-        kan_instance_size_t triggers_size = (uint8_t *) current_trigger - (uint8_t *) first_trigger;
+        kan_instance_size_t triggers_size =
+            (kan_instance_size_t) ((uint8_t *) current_trigger - (uint8_t *) first_trigger);
         kan_free_general (allocation_group, definition->event_triggers, triggers_size);
     }
 }
@@ -2274,9 +2276,10 @@ static struct lifetime_event_trigger_list_node_t *lifetime_event_triggers_extrac
             first_event_node = event_node;
 
             ++*count_output;
-            *array_size_output = kan_apply_alignment (*array_size_output + sizeof (struct lifetime_event_trigger_t) +
-                                                          merged_copy_outs_count * sizeof (struct copy_out_t),
-                                                      _Alignof (struct lifetime_event_trigger_t));
+            *array_size_output = (kan_instance_size_t) kan_apply_alignment (
+                *array_size_output + sizeof (struct lifetime_event_trigger_t) +
+                    merged_copy_outs_count * sizeof (struct copy_out_t),
+                _Alignof (struct lifetime_event_trigger_t));
         }
 
         kan_reflection_struct_meta_iterator_next (&iterator);
@@ -2332,9 +2335,10 @@ static struct lifetime_event_trigger_list_node_t *lifetime_event_triggers_extrac
             first_event_node = event_node;
 
             ++*count_output;
-            *array_size_output = kan_apply_alignment (*array_size_output + sizeof (struct lifetime_event_trigger_t) +
-                                                          merged_copy_outs_count * sizeof (struct copy_out_t),
-                                                      _Alignof (struct lifetime_event_trigger_t));
+            *array_size_output = (kan_instance_size_t) kan_apply_alignment (
+                *array_size_output + sizeof (struct lifetime_event_trigger_t) +
+                    merged_copy_outs_count * sizeof (struct copy_out_t),
+                _Alignof (struct lifetime_event_trigger_t));
         }
 
         kan_reflection_struct_meta_iterator_next (&iterator);
@@ -2482,7 +2486,8 @@ static void lifetime_event_triggers_definition_shutdown (struct lifetime_event_t
             current_trigger = lifetime_event_trigger_next (current_trigger);
         }
 
-        kan_instance_size_t triggers_size = (uint8_t *) current_trigger - (uint8_t *) first_trigger;
+        kan_instance_size_t triggers_size =
+            (kan_instance_size_t) ((uint8_t *) current_trigger - (uint8_t *) first_trigger);
         kan_free_general (allocation_group, definition->event_triggers, triggers_size);
     }
 }
@@ -2910,7 +2915,7 @@ static inline kan_repository_indexed_floating_t indexed_field_baked_data_extract
                                                                    (const uint8_t *) record + data->absolute_offset);
 }
 
-static inline kan_repository_indexed_signed_t convert_signed_to_unsigned (int64_t signed_value,
+static inline kan_repository_indexed_signed_t convert_signed_to_unsigned (kan_repository_indexed_signed_t signed_value,
                                                                           kan_instance_size_t size)
 {
     switch (size)
@@ -2970,10 +2975,10 @@ static inline kan_repository_indexed_unsigned_t indexed_field_baked_data_extract
         KAN_ASSERT (value <= (kan_repository_indexed_floating_t) KAN_INT_MAX (kan_repository_indexed_signed_t))
         KAN_ASSERT (value >= (kan_repository_indexed_floating_t) KAN_INT_MIN (kan_repository_indexed_signed_t))
 
-        kan_repository_indexed_unsigned_t unsigned_value;
-        unsigned_value = _Generic (*(kan_repository_indexed_floating_t *) NULL,
-            double: llround ((kan_repository_indexed_floating_t) value),
-            default: lroundf ((kan_repository_indexed_floating_t) value));
+        kan_repository_indexed_unsigned_t unsigned_value =
+            (kan_repository_indexed_unsigned_t) _Generic (*(kan_repository_indexed_floating_t *) NULL,
+            double: llround ((double) value),
+            default: lroundf ((float) value));
 
         return convert_signed_to_unsigned (unsigned_value, sizeof (unsigned_value));
     }
@@ -3175,7 +3180,8 @@ static kan_bool_t indexed_field_baked_data_bake_from_buffer (struct indexed_fiel
             KAN_ASSERT (field_begin >= chunk->source_offset)
             KAN_ASSERT (field_end <= chunk->source_offset + chunk->size)
 
-            const kan_instance_size_t offset = buffer_offset + (field_begin - chunk->source_offset);
+            const kan_instance_size_t offset =
+                buffer_offset + (kan_instance_size_t) (field_begin - chunk->source_offset);
             KAN_ASSERT (offset < UINT16_MAX)
             data->offset_in_buffer = (uint16_t) offset;
             return KAN_TRUE;

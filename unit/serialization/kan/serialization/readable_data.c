@@ -278,7 +278,7 @@ kan_serialization_rd_reader_t kan_serialization_rd_reader_create (
 }
 
 static inline kan_bool_t extract_output_target_parts (const struct kan_readable_data_event_t *parsed_event,
-                                                      size_t *output_target_parts_count,
+                                                      kan_instance_size_t *output_target_parts_count,
                                                       kan_interned_string_t *output_target_parts)
 {
     const char *pointer = parsed_event->output_target.identifier;
@@ -915,7 +915,7 @@ static inline kan_bool_t read_elemental_setter (struct reader_state_t *reader_st
                                                 const struct kan_readable_data_event_t *parsed_event,
                                                 struct reader_block_state_t *top_state)
 {
-    size_t output_target_parts_count = 0u;
+    kan_instance_size_t output_target_parts_count = 0u;
     kan_interned_string_t output_target_parts[KAN_SERIALIZATION_RD_MAX_PARTS_IN_OUTPUT_TARGET];
 
     if (!extract_output_target_parts (parsed_event, &output_target_parts_count, output_target_parts))
@@ -1293,7 +1293,7 @@ static inline kan_bool_t read_structural_setter (struct reader_state_t *reader_s
                                                  const struct kan_readable_data_event_t *parsed_event,
                                                  struct reader_block_state_t *top_state)
 {
-    size_t output_target_parts_count = 0u;
+    kan_instance_size_t output_target_parts_count = 0u;
     kan_interned_string_t output_target_parts[KAN_SERIALIZATION_RD_MAX_PARTS_IN_OUTPUT_TARGET];
 
     if (!extract_output_target_parts (parsed_event, &output_target_parts_count, output_target_parts))
@@ -1630,7 +1630,7 @@ static inline kan_bool_t read_array_appender (struct reader_state_t *reader_stat
         return KAN_FALSE;
     }
 
-    size_t output_target_parts_count = 0u;
+    kan_instance_size_t output_target_parts_count = 0u;
     kan_interned_string_t output_target_parts[KAN_SERIALIZATION_RD_MAX_PARTS_IN_OUTPUT_TARGET];
 
     if (!extract_output_target_parts (parsed_event, &output_target_parts_count, output_target_parts))
@@ -1880,21 +1880,23 @@ static inline kan_bool_t emit_block_end (struct writer_state_t *writer_state)
     return kan_readable_data_emitter_step (writer_state->emitter, &event);
 }
 
-static inline int64_t extract_signed_integer_value (kan_instance_size_t size, const void *address)
+static inline kan_readable_data_signed_t extract_signed_integer_value (kan_instance_size_t size, const void *address)
 {
     switch (size)
     {
     case 1u:
-        return *((int8_t *) address);
+        return (kan_readable_data_signed_t) * ((int8_t *) address);
 
     case 2u:
-        return *((int16_t *) address);
+        return (kan_readable_data_signed_t) * ((int16_t *) address);
 
     case 4u:
-        return *((int32_t *) address);
+        return (kan_readable_data_signed_t) * ((int32_t *) address);
 
     case 8u:
-        return *((int64_t *) address);
+        KAN_ASSERT (*(int64_t *) address >= KAN_INT_MIN (kan_readable_data_signed_t))
+        KAN_ASSERT (*(int64_t *) address <= KAN_INT_MAX (kan_readable_data_signed_t))
+        return (kan_readable_data_signed_t) * ((int64_t *) address);
     }
 
     KAN_ASSERT (KAN_FALSE)
@@ -1921,22 +1923,22 @@ static inline kan_bool_t emit_single_signed_integer_setter (struct writer_state_
     return kan_readable_data_emitter_step (writer_state->emitter, &event);
 }
 
-static inline int64_t extract_unsigned_integer_value (kan_instance_size_t size, const void *address)
+static inline kan_readable_data_signed_t extract_unsigned_integer_value (kan_instance_size_t size, const void *address)
 {
     switch (size)
     {
     case 1u:
-        return (int64_t) * ((uint8_t *) address);
+        return (kan_readable_data_signed_t) * ((uint8_t *) address);
 
     case 2u:
-        return (int64_t) * ((uint16_t *) address);
+        return (kan_readable_data_signed_t) * ((uint16_t *) address);
 
     case 4u:
-        return (int64_t) * ((uint32_t *) address);
+        return (kan_readable_data_signed_t) * ((uint32_t *) address);
 
     case 8u:
-        KAN_ASSERT (*((uint64_t *) address) <= INT64_MAX)
-        return (int64_t) * ((uint64_t *) address);
+        KAN_ASSERT (*((uint64_t *) address) <= KAN_INT_MAX (kan_readable_data_signed_t))
+        return (kan_readable_data_signed_t) * ((uint64_t *) address);
     }
 
     KAN_ASSERT (KAN_FALSE)

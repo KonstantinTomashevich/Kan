@@ -65,5 +65,5 @@ jobs:
         if: ${{ success() }} || ${{ failure() }}
         uses: actions/upload-artifact@v4
         with:
-          name: test_results_x32
+          name: test_results_x32_${{matrix.build_type}}
           path: ${{env.BUILD_DIRECTORY}}/Testing/Temporary

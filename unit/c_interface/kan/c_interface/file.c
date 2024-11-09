@@ -40,8 +40,7 @@ C_INTERFACE_API kan_bool_t kan_c_interface_file_serialize (struct kan_c_interfac
     if (kan_c_interface_file_should_have_includable_object (file))
     {
         KAN_ASSERT (file->optional_includable_object)
-        const kan_serialized_size_t object_length =
-            (kan_serialized_size_t) strlen (file->optional_includable_object);
+        const kan_serialized_size_t object_length = (kan_serialized_size_t) strlen (file->optional_includable_object);
 
         if (stream->operations->write (stream, sizeof (kan_serialized_size_t), &object_length) !=
             sizeof (kan_serialized_size_t))

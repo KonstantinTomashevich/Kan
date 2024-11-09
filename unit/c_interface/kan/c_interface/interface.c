@@ -46,7 +46,7 @@ static void string_encoding_node_destroy (struct string_encoding_node_t *node)
 }
 
 static kan_serialized_size_t encode_interned_string (struct string_encoding_context_t *context,
-                                                               kan_interned_string_t string)
+                                                     kan_interned_string_t string)
 {
     const struct kan_hash_storage_bucket_t *bucket =
         kan_hash_storage_query (&context->hash_storage, (kan_hash_t) string);

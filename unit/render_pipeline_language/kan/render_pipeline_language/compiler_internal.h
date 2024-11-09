@@ -13,12 +13,12 @@
 #include <kan/api_common/min_max.h>
 #include <kan/container/hash_storage.h>
 #include <kan/container/stack_group_allocator.h>
+#include <kan/container/trivial_string_buffer.h>
 #include <kan/error/critical.h>
 #include <kan/log/logging.h>
 #include <kan/memory/allocation.h>
 #include <kan/render_pipeline_language/compiler.h>
 #include <kan/threading/atomic.h>
-#include <kan/container/trivial_string_buffer.h>
 
 /// \brief SPIRV used 32-bit integers for everything inside bytecode.
 typedef uint32_t spirv_size_t;

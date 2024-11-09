@@ -1240,7 +1240,7 @@ static struct interned_string_registry_t *interned_string_registry_create (kan_b
 }
 
 static kan_serialized_size_t interned_string_registry_add_string_internal (struct interned_string_registry_t *registry,
-                                                                       kan_interned_string_t interned_string)
+                                                                           kan_interned_string_t interned_string)
 {
     KAN_ASSERT (registry->index_to_value.size <= UINT32_MAX)
     const script_size_t index = (kan_serialized_size_t) registry->index_to_value.size;
@@ -1274,7 +1274,7 @@ static kan_serialized_size_t interned_string_registry_add_string_internal (struc
 }
 
 static kan_serialized_size_t interned_string_registry_store_string (struct interned_string_registry_t *registry,
-                                                                kan_interned_string_t interned_string)
+                                                                    kan_interned_string_t interned_string)
 {
     KAN_ASSERT (!registry->load_only)
     kan_atomic_int_lock (&registry->store_lock);
@@ -1807,7 +1807,8 @@ static inline kan_bool_t read_interned_string_stateless (struct kan_stream_t *st
     else
     {
         kan_serialized_size_t string_length;
-        if (stream->operations->read (stream, sizeof (kan_serialized_size_t), &string_length) != sizeof (kan_serialized_size_t))
+        if (stream->operations->read (stream, sizeof (kan_serialized_size_t), &string_length) !=
+            sizeof (kan_serialized_size_t))
         {
             return KAN_FALSE;
         }
@@ -1852,7 +1853,8 @@ static inline kan_bool_t read_interned_string (struct serialization_read_state_t
     }
 }
 
-static inline kan_bool_t read_array_or_patch_size (struct serialization_read_state_t *state, kan_serialized_size_t *output)
+static inline kan_bool_t read_array_or_patch_size (struct serialization_read_state_t *state,
+                                                   kan_serialized_size_t *output)
 {
     return state->common.stream->operations->read (state->common.stream, sizeof (kan_serialized_size_t), output) ==
            sizeof (kan_serialized_size_t);
@@ -2376,7 +2378,8 @@ static inline kan_bool_t write_string_stateless (struct kan_stream_t *stream, co
     KAN_ASSERT (string_length_wide <= UINT32_MAX)
     const kan_serialized_size_t string_length = (kan_serialized_size_t) string_length_wide;
 
-    if (stream->operations->write (stream, sizeof (kan_serialized_size_t), &string_length) != sizeof (kan_serialized_size_t))
+    if (stream->operations->write (stream, sizeof (kan_serialized_size_t), &string_length) !=
+        sizeof (kan_serialized_size_t))
     {
         return KAN_FALSE;
     }
@@ -2401,7 +2404,8 @@ static inline kan_bool_t write_interned_string_stateless (struct kan_stream_t *s
     if (string_registry)
     {
         const script_size_t index = interned_string_registry_store_string (string_registry, input);
-        return stream->operations->write (stream, sizeof (kan_serialized_size_t), &index) == sizeof (kan_serialized_size_t);
+        return stream->operations->write (stream, sizeof (kan_serialized_size_t), &index) ==
+               sizeof (kan_serialized_size_t);
     }
 
     return write_string_stateless (stream, input);
@@ -2412,7 +2416,8 @@ static inline kan_bool_t write_interned_string (struct serialization_write_state
     return write_interned_string_stateless (state->common.stream, state->common.optional_string_registry, input);
 }
 
-static inline kan_bool_t write_array_or_patch_size (struct serialization_write_state_t *state, kan_serialized_size_t input)
+static inline kan_bool_t write_array_or_patch_size (struct serialization_write_state_t *state,
+                                                    kan_serialized_size_t input)
 {
     return state->common.stream->operations->write (state->common.stream, sizeof (kan_serialized_size_t), &input) ==
            sizeof (kan_serialized_size_t);

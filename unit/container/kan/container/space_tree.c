@@ -320,7 +320,7 @@ static inline kan_instance_size_t calculate_node_size (uint8_t dimension_count, 
     kan_instance_size_t size = sizeof (struct kan_space_tree_node_t);
     if (with_children)
     {
-        size += sizeof (void *) * (kan_instance_size_t) (1u << dimension_count);
+        size += sizeof (void *) * (kan_instance_size_t) (1u << (kan_instance_size_t) dimension_count);
     }
 
     return kan_apply_alignment (size, _Alignof (struct kan_space_tree_node_t));

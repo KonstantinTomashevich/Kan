@@ -818,7 +818,7 @@ kan_workflow_graph_t kan_workflow_graph_builder_finalize (kan_workflow_graph_bui
                 ++start_nodes_count;
             }
 
-            body_size = kan_apply_alignment (
+            body_size = (kan_instance_size_t) kan_apply_alignment (
                 body_size + sizeof (struct workflow_graph_node_t) + sizeof (void *) * node->intermediate_outcomes.size,
                 _Alignof (struct workflow_graph_node_t));
             node = (struct building_graph_node_t *) node->node.list_node.next;
@@ -829,9 +829,9 @@ kan_workflow_graph_t kan_workflow_graph_builder_finalize (kan_workflow_graph_bui
             _Static_assert (_Alignof (struct workflow_graph_header_t) == _Alignof (struct workflow_graph_node_t),
                             "Workflow header and body have matching alignment.");
 
-            const kan_instance_size_t header_size =
-                kan_apply_alignment (sizeof (struct workflow_graph_header_t) + sizeof (void *) * start_nodes_count,
-                                     sizeof (struct workflow_graph_header_t));
+            const kan_instance_size_t header_size = (kan_instance_size_t) kan_apply_alignment (
+                sizeof (struct workflow_graph_header_t) + sizeof (void *) * start_nodes_count,
+                sizeof (struct workflow_graph_header_t));
             const kan_instance_size_t graph_size = header_size + body_size;
 
             result_graph = (struct workflow_graph_header_t *) kan_allocate_general (
@@ -878,9 +878,10 @@ kan_workflow_graph_t kan_workflow_graph_builder_finalize (kan_workflow_graph_bui
                 built_node->incomes_left = kan_atomic_int_init ((int) built_node->incomes_count);
                 built_node->outcomes_count = node->intermediate_outcomes.size;
 
-                node_offset = kan_apply_alignment (node_offset + sizeof (struct workflow_graph_node_t) +
-                                                       sizeof (void *) * node->intermediate_outcomes.size,
-                                                   _Alignof (struct workflow_graph_node_t));
+                node_offset =
+                    (kan_instance_size_t) kan_apply_alignment (node_offset + sizeof (struct workflow_graph_node_t) +
+                                                                   sizeof (void *) * node->intermediate_outcomes.size,
+                                                               _Alignof (struct workflow_graph_node_t));
                 node = (struct building_graph_node_t *) node->node.list_node.next;
             }
 
@@ -897,9 +898,10 @@ kan_workflow_graph_t kan_workflow_graph_builder_finalize (kan_workflow_graph_bui
                         id_to_built_node[((kan_instance_size_t *) node->intermediate_outcomes.data)[index]];
                 }
 
-                node_offset = kan_apply_alignment (node_offset + sizeof (struct workflow_graph_node_t) +
-                                                       sizeof (void *) * node->intermediate_outcomes.size,
-                                                   _Alignof (struct workflow_graph_node_t));
+                node_offset =
+                    (kan_instance_size_t) kan_apply_alignment (node_offset + sizeof (struct workflow_graph_node_t) +
+                                                                   sizeof (void *) * node->intermediate_outcomes.size,
+                                                               _Alignof (struct workflow_graph_node_t));
                 node = (struct building_graph_node_t *) node->node.list_node.next;
             }
 

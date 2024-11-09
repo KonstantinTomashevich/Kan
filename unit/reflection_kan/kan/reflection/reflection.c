@@ -1474,8 +1474,8 @@ void kan_reflection_patch_builder_add_chunk (kan_reflection_patch_builder_t buil
                                              const void *data)
 {
     struct patch_builder_t *patch_builder = KAN_HANDLE_GET (builder);
-    const kan_instance_size_t node_size = kan_apply_alignment (offsetof (struct patch_builder_node_t, data) + size,
-                                                               _Alignof (struct patch_builder_node_t));
+    const kan_instance_size_t node_size = (kan_instance_size_t) kan_apply_alignment (
+        offsetof (struct patch_builder_node_t, data) + size, _Alignof (struct patch_builder_node_t));
 
     struct patch_builder_node_t *node = (struct patch_builder_node_t *) kan_stack_allocator_allocate (
         patch_builder->stack_allocator, node_size, _Alignof (struct patch_builder_node_t));
@@ -1665,7 +1665,7 @@ static kan_bool_t compiled_patch_build_into (struct patch_builder_t *patch_build
     kan_instance_size_t patch_data_size = 0u;
     kan_instance_size_t node_count = 0u;
 
-    for (kan_loop_size_t index = 0u; index < patch_builder->node_count; ++index)
+    for (kan_loop_size_t index = 0u; index < (kan_loop_size_t) patch_builder->node_count; ++index)
     {
         kan_bool_t new_node;
         if (index > 0u)
@@ -1703,7 +1703,8 @@ static kan_bool_t compiled_patch_build_into (struct patch_builder_t *patch_build
         patch_data_size += nodes_array[index]->size;
     }
 
-    patch_data_size = kan_apply_alignment (patch_data_size, _Alignof (struct compiled_patch_node_t));
+    patch_data_size =
+        (kan_instance_size_t) kan_apply_alignment (patch_data_size, _Alignof (struct compiled_patch_node_t));
     output_patch->type = type;
     output_patch->node_count = node_count;
     output_patch->begin = kan_allocate_general (get_compiled_patch_allocation_group (), patch_data_size,
@@ -3777,8 +3778,8 @@ static inline kan_bool_t patch_migration_evaluate_condition (kan_instance_size_t
         while (KAN_TRUE)
         {
             struct compiled_patch_node_t *node = nodes[node_index];
-            if (condition->absolute_source_offset >= node->offset &&
-                condition->absolute_source_offset < node->offset + node->size)
+            if (condition->absolute_source_offset >= (kan_instance_size_t) node->offset &&
+                condition->absolute_source_offset < (kan_instance_size_t) (node->offset + node->size))
             {
                 node_with_condition_value = node;
                 break;
@@ -3893,7 +3894,7 @@ static void migrate_patch_task (kan_functor_user_data_t user_data)
                 nodes[node_index] = node;
                 kan_instance_size_t offset = node->offset;
 
-                while (offset < node->size + node->offset)
+                while (offset < (kan_instance_size_t) (node->size + node->offset))
                 {
                     // Skip commands until we reach our address space. Also take care of conditions.
                     while (

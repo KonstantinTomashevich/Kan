@@ -3,6 +3,7 @@
 #include <container_api.h>
 
 #include <memory.h>
+#include <stdio.h>
 #include <string.h>
 
 #include <kan/api_common/c_header.h>
@@ -63,7 +64,7 @@ static inline void kan_trivial_string_buffer_append_char_sequence (struct kan_tr
 static inline void kan_trivial_string_buffer_append_string (struct kan_trivial_string_buffer_t *instance,
                                                             const char *string)
 {
-    kan_trivial_string_buffer_append_char_sequence (instance, string, strlen (string));
+    kan_trivial_string_buffer_append_char_sequence (instance, string, (kan_instance_size_t) strlen (string));
 }
 
 /// \brief Formats and appends given unsigned long to string buffer.

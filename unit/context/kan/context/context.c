@@ -175,7 +175,7 @@ static void context_shutdown_system (struct context_t *context, struct system_in
 }
 
 #if defined(_WIN32)
-__declspec (dllimport) extern kan_instance_count_t KAN_CONTEXT_SYSTEM_COUNT_NAME;
+__declspec (dllimport) extern kan_instance_size_t KAN_CONTEXT_SYSTEM_COUNT_NAME;
 __declspec (dllimport) extern struct kan_context_system_api_t *KAN_CONTEXT_SYSTEM_ARRAY_NAME[];
 __declspec (dllimport) void KAN_CONTEXT_SYSTEM_ARRAY_INITIALIZER_NAME (void);
 #else
@@ -208,7 +208,7 @@ kan_bool_t kan_context_request_system (kan_context_t handle, const char *system_
     }
 
     struct kan_context_system_api_t *api = NULL;
-    for (kan_loop_size_t api_index = 0u; api_index < KAN_CONTEXT_SYSTEM_COUNT_NAME; ++api_index)
+    for (kan_loop_size_t api_index = 0u; api_index < (kan_loop_size_t) KAN_CONTEXT_SYSTEM_COUNT_NAME; ++api_index)
     {
         if (strcmp (KAN_CONTEXT_SYSTEM_ARRAY_NAME[api_index]->name, system_name) == 0)
         {

@@ -37,7 +37,7 @@ struct universe_world_definition_system_t
     char *definitions_mount_path;
     kan_instance_size_t definitions_mount_path_length;
     kan_bool_t observe_definitions;
-    kan_instance_size_t observation_rescan_delay_ns;
+    kan_time_offset_t observation_rescan_delay_ns;
 
     kan_reflection_registry_t registry;
     kan_serialization_binary_script_storage_t binary_script_storage;
