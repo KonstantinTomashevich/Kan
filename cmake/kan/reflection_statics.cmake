@@ -1,7 +1,8 @@
 # Contains functions for informing context reflection system about static reflection registrars.
 
-# Path to reflection statics template file.
-set (KAN_REFLECTION_STATICS_TEMPLATE "${CMAKE_SOURCE_DIR}/cmake/kan/reflection_statics.c")
+# Path to reflection statics ecosystem subdirectory.
+# Reflection statics are split into ecosystems in order to put them into flattened binary directories.
+set (KAN_REFLECTION_STATICS_ECOSYSTEM "${CMAKE_SOURCE_DIR}/cmake/kan/reflection_statics_ecosystem")
 
 # Target property that holds list of reflection registrar names.
 define_property (TARGET PROPERTY REFLECTION_REGISTRARS
@@ -71,13 +72,7 @@ function (generate_artefact_reflection_data)
         list (TRANSFORM REFLECTION_REGISTRARS_CALLS APPEND ") (registry)")
         list (JOIN REFLECTION_REGISTRARS_CALLS ";\n    " REFLECTION_REGISTRARS_CALLS)
 
-        set (REFLECTION_STATICS_FILE "${CMAKE_CURRENT_BINARY_DIR}/Generated/reflection_statics_${ARTEFACT_NAME}.c")
-        message (STATUS "    Save reflection statics as \"${REFLECTION_STATICS_FILE}\".")
-        configure_file ("${KAN_REFLECTION_STATICS_TEMPLATE}" "${REFLECTION_STATICS_FILE}")
-
-        register_concrete ("${ARTEFACT_NAME}_reflection_statics")
-        concrete_sources_direct ("${REFLECTION_STATICS_FILE}")
-        concrete_require (SCOPE PRIVATE ABSTRACT reflection)
-        shared_library_include (SCOPE PUBLIC CONCRETE "${ARTEFACT_NAME}_reflection_statics")
+        get_next_flattened_binary_directory (TEMP_DIRECTORY)
+        add_subdirectory ("${KAN_REFLECTION_STATICS_ECOSYSTEM}" "${TEMP_DIRECTORY}")
     endif ()
 endfunction ()

@@ -2,7 +2,7 @@
 
 # Intended only for internal use in this file. Generates output directory for c_interface_scanner.
 function (private_c_interface_scanner_get_directory)
-    set (C_INTERFACE_SCANNER_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/c_interface_scanner" PARENT_SCOPE)
+    set (C_INTERFACE_SCANNER_DIRECTORY "${CMAKE_BINARY_DIR}/c_interface_scanner/${UNIT_NAME}" PARENT_SCOPE)
 endfunction ()
 
 # Enables c_interface_scanner commands for files inside current unit.
@@ -46,9 +46,9 @@ function (c_interface_scanner_setup)
         if (ABSOLUTE_SOURCE MATCHES "^${CMAKE_CURRENT_SOURCE_DIR}")
             set (RELATIVE_SOURCE "${FILE_TO_SCAN}")
             cmake_path (RELATIVE_PATH RELATIVE_SOURCE BASE_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
-        elseif (ABSOLUTE_SOURCE MATCHES "^${CMAKE_CURRENT_BINARY_DIR}/Generated")
+        elseif (ABSOLUTE_SOURCE MATCHES "^${CMAKE_BINARY_DIR}/generated/${UNIT_NAME}")
             set (RELATIVE_SOURCE "${FILE_TO_SCAN}")
-            cmake_path (RELATIVE_PATH RELATIVE_SOURCE BASE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/Generated")
+            cmake_path (RELATIVE_PATH RELATIVE_SOURCE BASE_DIRECTORY "${CMAKE_BINARY_DIR}/generated/${UNIT_NAME}")
         else ()
             message (SEND_ERROR "c_interface_scanner failed to determinate output path for \"${FILE_TO_SCAN}\".")
         endif ()
@@ -84,8 +84,8 @@ function (c_interface_scanner_to_interface_files INPUT_VARIABLE_NAME)
 
         if (FILE MATCHES "^${CMAKE_CURRENT_SOURCE_DIR}")
             cmake_path (RELATIVE_PATH FILE BASE_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
-        elseif (FILE MATCHES "^${CMAKE_CURRENT_BINARY_DIR}/Generated")
-            cmake_path (RELATIVE_PATH FILE BASE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/Generated")
+        elseif (FILE MATCHES "^${CMAKE_BINARY_DIR}/generated/${UNIT_NAME}")
+            cmake_path (RELATIVE_PATH FILE BASE_DIRECTORY "${CMAKE_BINARY_DIR}/generated/${UNIT_NAME}")
         else ()
             message (SEND_ERROR "c_interface_scanner failed to determinate output path for \"${FILE}\".")
         endif ()

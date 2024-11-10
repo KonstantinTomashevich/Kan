@@ -6,9 +6,10 @@ concrete_require (
         ABSTRACT context_render_backend_system cpu_profiler file_system image render_backend_tools
         CONCRETE_INTERFACE inline_math testing)
 
+file (MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/tests_resources/context_render_backend_system")
 add_custom_target (test_context_render_backend_system_copy_expectation
         COMMAND ${CMAKE_COMMAND} -E copy_directory
-        "${CMAKE_CURRENT_SOURCE_DIR}/expectation" "${CMAKE_CURRENT_BINARY_DIR}/expectation"
+        "${CMAKE_CURRENT_SOURCE_DIR}/expectation" "${CMAKE_BINARY_DIR}/tests_resources/context_render_backend_system"
         COMMENT "Copying context render backend screenshot expectation...")
 add_dependencies (test_context_render_backend_system test_context_render_backend_system_copy_expectation)
 

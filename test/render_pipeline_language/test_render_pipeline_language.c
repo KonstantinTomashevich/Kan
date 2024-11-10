@@ -15,7 +15,7 @@
 //             Therefore, here we just check that we're able to compile simple scenarios and produce something that
 //             can be valid bytecode if we're lucky.
 
-#define PIPELINE_BASE_PATH "../../pipelines/"
+#define PIPELINE_BASE_PATH "../../../tests_resources/render_pipeline_language/"
 
 static void load_pipeline_source (const char *path, struct kan_dynamic_array_t *output)
 {

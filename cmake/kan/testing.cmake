@@ -1,7 +1,8 @@
 # Declares function for automatic test extraction into separate executables and their registration inside CTest.
 
-# Path to test runner template file.
-set (KAN_TEST_RUNNER_TEMPLATE "${CMAKE_SOURCE_DIR}/cmake/kan/test_runner.c")
+# Path to test runner ecosystem subdirectory.
+# Test runners are split into ecosystems in order to put them into flattened binary directories.
+set (KAN_TEST_RUNNER_ECOSYSTEM "${CMAKE_SOURCE_DIR}/cmake/kan/test_runner_ecosystem")
 
 # Setup target to build all tests.
 add_custom_target (test_kan COMMENT "All tests must be dependencies of this target.")
@@ -29,45 +30,14 @@ function (kan_setup_tests)
         set (TEST_SOURCES ${SETUP_TEST_SOURCES})
     endif ()
 
-    file (MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/Generated")
-    foreach (TEST_SOURCE ${TEST_SOURCES})
-        if (NOT IS_ABSOLUTE "${TEST_SOURCE}")
-            set (TEST_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/${TEST_SOURCE}")
-        endif ()
+    set (GENERATED_DIRECTORY "${CMAKE_BINARY_DIR}/generated/${SETUP_TEST_SHARED_LIBRARY}")
+    file (MAKE_DIRECTORY "${GENERATED_DIRECTORY}")
 
-        if (NOT EXISTS "${TEST_SOURCE}" OR "${TEST_SOURCE}" MATCHES ".*/Generated/.*")
-            continue ()
-        endif ()
+    set (WORKSPACE_DIRECTORY "${CMAKE_BINARY_DIR}/workspace/${SETUP_TEST_SHARED_LIBRARY}/")
+    file (MAKE_DIRECTORY ${WORKSPACE_DIRECTORY})
 
-        file (STRINGS "${TEST_SOURCE}" TEST_SOURCE_LINES)
-        foreach (TEST_LINE ${TEST_SOURCE_LINES})
-            if (TEST_LINE MATCHES "^KAN_TEST_CASE.*\\((.+)\\)$")
-                set (TEST_NAME "${CMAKE_MATCH_1}")
-                message (STATUS "    Setting up test case \"${TEST_NAME}\" from source \"${TEST_SOURCE}\".")
-
-                set (TEST_RUNNER_FILE "${CMAKE_CURRENT_BINARY_DIR}/Generated/test_runner_${TEST_NAME}.c")
-                configure_file ("${KAN_TEST_RUNNER_TEMPLATE}" "${TEST_RUNNER_FILE}")
-
-                set (TEST_RUNNER_TARGET "test_runner_${SETUP_TEST_SHARED_LIBRARY}_case_${TEST_NAME}")
-                # We use cmake directly to avoid overcomplicating tests with CMakeUnitFramework executables.
-
-                add_executable ("${TEST_RUNNER_TARGET}" "${TEST_RUNNER_FILE}")
-                target_link_libraries ("${TEST_RUNNER_TARGET}" PUBLIC "${SETUP_TEST_SHARED_LIBRARY}" SDL3::SDL3)
-
-                set (TEST_WORKSPACE "${CMAKE_CURRENT_BINARY_DIR}/Workspace/${TEST_NAME}")
-                file (MAKE_DIRECTORY "${TEST_WORKSPACE}")
-
-                add_test (
-                        NAME "${SETUP_TEST_SHARED_LIBRARY}_case_${TEST_NAME}"
-                        COMMAND "${TEST_RUNNER_TARGET}"
-                        WORKING_DIRECTORY "${TEST_WORKSPACE}")
-                add_dependencies (test_kan "${TEST_RUNNER_TARGET}")
-
-                if (DEFINED SETUP_PROPERTIES)
-                    set_tests_properties (
-                            "${SETUP_TEST_SHARED_LIBRARY}_case_${TEST_NAME}" PROPERTIES ${SETUP_PROPERTIES})
-                endif ()
-            endif ()
-        endforeach ()
-    endforeach ()
+    set (TEST_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
+    set (TEST_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}")
+    get_next_flattened_binary_directory (TEMP_DIRECTORY)
+    add_subdirectory ("${KAN_TEST_RUNNER_ECOSYSTEM}" "${TEMP_DIRECTORY}")
 endfunction ()

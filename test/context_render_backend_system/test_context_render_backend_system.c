@@ -1257,8 +1257,8 @@ KAN_TEST_CASE (render_and_capture)
 #    define READ_EXPECTATION(NAME)                                                                                     \
         {                                                                                                              \
             kan_image_raw_data_init (&expected_raw_data);                                                              \
-            struct kan_stream_t *input_stream =                                                                        \
-                kan_direct_file_stream_open_for_read ("../../expectation/" NAME, KAN_TRUE);                            \
+            struct kan_stream_t *input_stream = kan_direct_file_stream_open_for_read (                                 \
+                "../../../tests_resources/context_render_backend_system/" NAME, KAN_TRUE);                             \
             KAN_TEST_ASSERT (input_stream)                                                                             \
             KAN_TEST_ASSERT (kan_image_load (input_stream, &expected_raw_data))                                        \
             input_stream->operations->close (input_stream);                                                            \
