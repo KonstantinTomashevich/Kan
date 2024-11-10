@@ -1087,7 +1087,7 @@ function (application_generate)
                         "mount_path = \\\"${KAN_APPLICATION_RESOURCES_DIRECTORY_NAME}/${MOUNT_NAME}\\\" }\\n\")\n")
             endforeach ()
 
-        elseif (TARGET "${APPLICATION_NAME}_resources_core_packaging")
+        else ()
             string (APPEND PACK_CORE_CONFIGURATOR_CONTENT "string (APPEND RESOURCE_PACKS \"+resource_packs ")
             string (APPEND PACK_CORE_CONFIGURATOR_CONTENT
                     "{ path = \\\"${KAN_APPLICATION_RESOURCES_DIRECTORY_NAME}/core.pack\\\"")
@@ -1254,20 +1254,16 @@ function (application_generate)
                     COMMAND_EXPAND_LISTS
                     VERBATIM)
 
-            if (TARGET "${APPLICATION_NAME}_resources_core_packaging")
-                set (SOURCE_DIRECTORY "${WORKSPACE_DIRECTORY}/resources_core_packaging")
-                add_custom_target ("${VARIANT}_copy_core_pack"
-                        DEPENDS "${VARIANT}_prepare_directories" "${VARIANT}_build_resources"
-                        COMMAND
-                        "${CMAKE_COMMAND}"
-                        -E copy -t
-                        "${PACK_RESOURCES_DIRECTORY}"
-                        "${SOURCE_DIRECTORY}/core.pack"
-                        COMMENT "Copying core resources for application \"${APPLICATION_NAME}\" variant \"${NAME}\"."
-                        VERBATIM)
-
-                add_dependencies ("${VARIANT}_package" "${VARIANT}_copy_core_pack")
-            endif ()
+            add_custom_target ("${VARIANT}_copy_core_pack"
+                    DEPENDS "${VARIANT}_prepare_directories" "${VARIANT}_build_resources"
+                    COMMAND
+                    "${CMAKE_COMMAND}"
+                    -E copy -t
+                    "${PACK_RESOURCES_DIRECTORY}"
+                    "${RBW_DIRECTORY}/core.pack"
+                    COMMENT "Copying core resources for application \"${APPLICATION_NAME}\" variant \"${NAME}\"."
+                    VERBATIM)
+            add_dependencies ("${VARIANT}_package" "${VARIANT}_copy_core_pack")
 
             foreach (PLUGIN ${USED_PLUGINS})
                 if (NOT PLUGIN IN_LIST CORE_PLUGINS)
