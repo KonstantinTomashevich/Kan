@@ -22,6 +22,7 @@ set (UNIT_FRAMEWORK_API_CASE "mixed_snake_case")
 
 # Include Kan CMake extensions.
 include ("${CMAKE_CURRENT_SOURCE_DIR}/cmake/kan/application.cmake")
+include ("${CMAKE_CURRENT_SOURCE_DIR}/cmake/kan/binary_directory_flattening.cmake")
 include ("${CMAKE_CURRENT_SOURCE_DIR}/cmake/kan/c_interface_scanner.cmake")
 include ("${CMAKE_CURRENT_SOURCE_DIR}/cmake/kan/clang_format.cmake")
 include ("${CMAKE_CURRENT_SOURCE_DIR}/cmake/kan/context.cmake")

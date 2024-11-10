@@ -15,14 +15,13 @@ set (KAN_APPLICATION_RC_DIRECTORY_NAME "reference_cache")
 # Name of the build-time directory to be used as workspace for resource builder.
 set (KAN_APPLICATION_RBW_DIRECTORY_NAME "resource_builder_workspace")
 
-# Name of the directory to store packaged variants of application.
-set (KAN_APPLICATION_PACKAGED_DIRECTORY_NAME "packaged")
-
 # Name of the directory to store universe world definitions in packaged variants of application.
 set (KAN_APPLICATION_PACKAGED_WORLD_DIRECTORY_NAME "world")
 
-# Path to static data template for application framework static launcher.
-set (KAN_APPLICATION_PROGRAM_LAUNCHER_STATICS_TEMPLATE "${CMAKE_SOURCE_DIR}/cmake/kan/application_launcher_statics.c")
+# Path to application program launcher statics ecosystem subdirectory.
+# Launchers statics are split into ecosystems in order to put them into flattened binary directories.
+set (KAN_APPLICATION_PROGRAM_LAUNCHER_STATICS_ECOSYSTEM
+        "${CMAKE_SOURCE_DIR}/cmake/kan/application_program_launcher_statics_ecosystem")
 
 # Name of the used application framework static launcher implementation.
 set (KAN_APPLICATION_PROGRAM_LAUNCHER_IMPLEMENTATION "sdl")
@@ -803,6 +802,9 @@ function (application_generate)
         message (FATAL_ERROR "There is no programs for application \"${APPLICATION_NAME}\"!")
     endif ()
 
+    set (GENERATED_DIRECTORY "${CMAKE_BINARY_DIR}/generated/${APPLICATION_NAME}/")
+    file (MAKE_DIRECTORY "${GENERATED_DIRECTORY}")
+
     foreach (PROGRAM ${PROGRAMS})
         get_target_property (PROGRAM_NAME "${PROGRAM}" APPLICATION_PROGRAM_NAME)
 
@@ -820,33 +822,10 @@ function (application_generate)
         set (STATICS_CORE_CONFIGURATION_PATH "${KAN_APPLICATION_CONFIGURATION_DIRECTORY_NAME}/core.rd")
         set (STATICS_PROGRAM_CONFIGURATION_PATH
                 "${KAN_APPLICATION_CONFIGURATION_DIRECTORY_NAME}/program_${PROGRAM_NAME}.rd")
-        set (STATICS_PATH
-                "${CMAKE_CURRENT_BINARY_DIR}/Generated/${APPLICATION_NAME}_program_${PROGRAM_NAME}_statics.c")
-        configure_file ("${KAN_APPLICATION_PROGRAM_LAUNCHER_STATICS_TEMPLATE}" "${STATICS_PATH}")
 
-        register_concrete ("${PROGRAM}_launcher_statics")
-        concrete_sources_direct ("${STATICS_PATH}")
-
-        register_executable ("${PROGRAM}_launcher")
-        executable_include (
-                ABSTRACT application_framework_static_launcher=${KAN_APPLICATION_PROGRAM_LAUNCHER_IMPLEMENTATION}
-                CONCRETE "${PROGRAM}_launcher_statics")
-
-        executable_link_shared_libraries ("${APPLICATION_NAME}_core_library")
-        executable_verify ()
-        executable_copy_linked_artefacts ()
-
-        foreach (PLUGIN ${CORE_PLUGINS})
-            add_dependencies ("${PROGRAM}_launcher" "${PLUGIN}_dev_copy")
-        endforeach ()
-
-        foreach (PLUGIN ${PROGRAM_PLUGINS})
-            add_dependencies ("${PROGRAM}_launcher" "${PLUGIN}_dev_copy")
-        endforeach ()
-
-        add_dependencies ("${PROGRAM}_launcher"
-                "${PROGRAM}_dev_configuration"
-                "${APPLICATION_NAME}_dev_core_configuration")
+        set (LAUNCHER_BINARY_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}")
+        get_next_flattened_binary_directory (TEMP_DIRECTORY)
+        add_subdirectory ("${KAN_APPLICATION_PROGRAM_LAUNCHER_STATICS_ECOSYSTEM}" "${TEMP_DIRECTORY}")
 
         # Find program resource targets.
 
@@ -970,10 +949,13 @@ function (application_generate)
         endif ()
     endforeach ()
 
-    set (RC_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/${KAN_APPLICATION_RC_DIRECTORY_NAME}")
+    set (WORKSPACE_DIRECTORY "${CMAKE_BINARY_DIR}/workspace/${APPLICATION_NAME}/")
+    file (MAKE_DIRECTORY "${WORKSPACE_DIRECTORY}")
+
+    set (RC_DIRECTORY "${WORKSPACE_DIRECTORY}/${KAN_APPLICATION_RC_DIRECTORY_NAME}")
     file (MAKE_DIRECTORY "${RC_DIRECTORY}")
 
-    set (RBW_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/${KAN_APPLICATION_RBW_DIRECTORY_NAME}")
+    set (RBW_DIRECTORY "${WORKSPACE_DIRECTORY}/${KAN_APPLICATION_RBW_DIRECTORY_NAME}")
     file (MAKE_DIRECTORY "${RBW_DIRECTORY}")
 
     string (APPEND PROJECT_CONTENT "reference_cache_absolute_directory = \"${RC_DIRECTORY}\"\n")
@@ -985,7 +967,7 @@ function (application_generate)
         string (APPEND PROJECT_CONTENT "use_string_interning = 0\n")
     endif ()
 
-    set (RESOURCE_PROJECT_PATH "${CMAKE_CURRENT_BINARY_DIR}/resource_project.rd")
+    set (RESOURCE_PROJECT_PATH "${WORKSPACE_DIRECTORY}/resource_project.rd")
     file (CONFIGURE OUTPUT "${RESOURCE_PROJECT_PATH}" CONTENT "${PROJECT_CONTENT}")
 
     # Add application resource builder job pool
@@ -1008,6 +990,9 @@ function (application_generate)
 
     # Generate variant package targets.
 
+    set (PACKAGED_DIRECTORY "${CMAKE_BINARY_DIR}/packaged/${APPLICATION_NAME}/")
+    file (MAKE_DIRECTORY "${PACKAGED_DIRECTORY}")
+
     foreach (VARIANT ${VARIANTS})
         get_target_property (NAME "${VARIANT}" APPLICATION_VARIANT_NAME)
         message (STATUS "    Generating variant \"${NAME}\".")
@@ -1015,8 +1000,7 @@ function (application_generate)
 
         # Set packaging directories.
 
-        set (PACK_BUILD_DIRECTORY
-                "${CMAKE_CURRENT_BINARY_DIR}/${KAN_APPLICATION_PACKAGED_DIRECTORY_NAME}/${APPLICATION_NAME}/${NAME}")
+        set (PACK_BUILD_DIRECTORY "${PACKAGED_DIRECTORY}/${NAME}")
         set (PACK_CONFIGURATION_DIRECTORY "${PACK_BUILD_DIRECTORY}/${KAN_APPLICATION_CONFIGURATION_DIRECTORY_NAME}")
         set (PACK_PLUGINS_DIRECTORY "${PACK_BUILD_DIRECTORY}/${KAN_APPLICATION_PLUGINS_DIRECTORY_NAME}")
         set (PACK_RESOURCES_DIRECTORY "${PACK_BUILD_DIRECTORY}/${KAN_APPLICATION_RESOURCES_DIRECTORY_NAME}")
@@ -1137,8 +1121,7 @@ function (application_generate)
         string (APPEND PACK_CORE_CONFIGURATOR_CONTENT
                 "configure_file (\"${CORE_CONFIGURATION}\" \"${PACK_CORE_CONFIGURATION_PATH}\")")
 
-        set (PACK_CORE_CONFIGURATOR_PATH
-                "${CMAKE_CURRENT_BINARY_DIR}/Generated/${APPLICATION_NAME}_variant_${NAME}_core_config.cmake")
+        set (PACK_CORE_CONFIGURATOR_PATH "${GENERATED_DIRECTORY}/variant_${NAME}_core_config.cmake")
         file (WRITE "${PACK_CORE_CONFIGURATOR_PATH}" "${PACK_CORE_CONFIGURATOR_CONTENT}")
 
         add_custom_target ("${VARIANT}_core_configuration"
@@ -1200,9 +1183,8 @@ function (application_generate)
             string (APPEND PACK_PROGRAM_CONFIGURATOR_CONTENT
                     "configure_file (\"${PROGRAM_CONFIGURATION}\" \"${PACK_PROGRAM_CONFIGURATION_PATH}\")")
 
-            set (GENERATED_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/Generated")
             set (PACK_PROGRAM_CONFIGURATOR_PATH
-                    "${GENERATED_DIRECTORY}/${APPLICATION_NAME}_variant_${NAME}_${PROGRAM_NAME}_config.cmake")
+                    "${GENERATED_DIRECTORY}/variant_${NAME}_${PROGRAM_NAME}_config.cmake")
             file (WRITE "${PACK_PROGRAM_CONFIGURATOR_PATH}" "${PACK_PROGRAM_CONFIGURATOR_CONTENT}")
 
             set (COMMENT_PREFIX "Building program \"${PROGRAM_NAME}\" configuration for application ")
@@ -1273,9 +1255,7 @@ function (application_generate)
                     VERBATIM)
 
             if (TARGET "${APPLICATION_NAME}_resources_core_packaging")
-                set (SOURCE_DIRECTORY
-                        "${CMAKE_CURRENT_BINARY_DIR}/Generated/${APPLICATION_NAME}_resources_core_packaging")
-
+                set (SOURCE_DIRECTORY "${WORKSPACE_DIRECTORY}/resources_core_packaging")
                 add_custom_target ("${VARIANT}_copy_core_pack"
                         DEPENDS "${VARIANT}_prepare_directories" "${VARIANT}_build_resources"
                         COMMAND

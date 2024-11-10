@@ -1,12 +1,6 @@
 add_subdirectory (unit)
 
-# We need to shorten generated file names under Windows.
-if (WIN32)
-    register_application (afe_compilation)
-else ()
-    register_application (application_framework_example_compilation)
-endif ()
-
+register_application (application_framework_example_compilation)
 application_core_include (
         ABSTRACT
         cpu_dispatch=kan cpu_profiler=none error=sdl file_system=platform_default file_system_watcher=user_level

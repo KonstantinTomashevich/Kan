@@ -1,7 +1,8 @@
 # Contains functions for integration with context unit.
 
-# Path to context statics template file.
-set (KAN_CONTEXT_STATICS_TEMPLATE "${CMAKE_SOURCE_DIR}/cmake/kan/context_statics.c")
+# Path to context statics ecosystem subdirectory.
+# Context statics are split into ecosystems in order to put them into flattened binary directories.
+set (KAN_CONTEXT_STATICS_ECOSYSTEM "${CMAKE_SOURCE_DIR}/cmake/kan/context_statics_ecosystem")
 
 # Target property that holds list of attached systems.
 define_property (TARGET PROPERTY CONTEXT_SYSTEMS
@@ -65,13 +66,7 @@ function (generate_artefact_context_data)
         list (TRANSFORM SYSTEM_APIS_DECLARATIONS APPEND ")")
         list (JOIN SYSTEM_APIS_DECLARATIONS ";\n" SYSTEM_APIS_DECLARATIONS)
 
-        set (CONTEXT_STATICS_FILE "${CMAKE_CURRENT_BINARY_DIR}/Generated/context_statics_${ARTEFACT_NAME}.c")
-        message (STATUS "    Save context statics as \"${CONTEXT_STATICS_FILE}\".")
-        configure_file ("${KAN_CONTEXT_STATICS_TEMPLATE}" "${CONTEXT_STATICS_FILE}")
-
-        register_concrete ("${ARTEFACT_NAME}_context_statics")
-        concrete_sources_direct ("${CONTEXT_STATICS_FILE}")
-        concrete_require (SCOPE PRIVATE CONCRETE_INTERFACE context)
-        shared_library_include (SCOPE PUBLIC CONCRETE "${ARTEFACT_NAME}_context_statics")
+        get_next_flattened_binary_directory (TEMP_DIRECTORY)
+        add_subdirectory ("${KAN_CONTEXT_STATICS_ECOSYSTEM}" "${TEMP_DIRECTORY}")
     endif ()
 endfunction ()

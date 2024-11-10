@@ -24,9 +24,12 @@ function (universe_concrete_setup_sources)
     set (SOURCES)
     set (OUTPUTS)
 
+    set (GENERATED_DIRECTORY "${CMAKE_BINARY_DIR}/generated/${UNIT_NAME}/")
+    file (MAKE_DIRECTORY "${GENERATED_DIRECTORY}")
+
     foreach (INPUT ${INPUT_SOURCES})
         if (NOT IS_ABSOLUTE "${INPUT}")
-            set (OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/Generated/${INPUT}")
+            set (OUTPUT "${GENERATED_DIRECTORY}/${INPUT}")
             set (INPUT "${CMAKE_CURRENT_SOURCE_DIR}/${INPUT}")
         else ()
             if (NOT INPUT MATCHES "^${CMAKE_CURRENT_SOURCE_DIR}")
@@ -35,7 +38,7 @@ function (universe_concrete_setup_sources)
             endif ()
 
             cmake_path (RELATIVE_PATH INPUT BASE_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
-            set (OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/Generated/${INPUT}")
+            set (OUTPUT "${GENERATED_DIRECTORY}/${INPUT}")
             set (INPUT "${CMAKE_CURRENT_SOURCE_DIR}/${INPUT}")
         endif ()
 

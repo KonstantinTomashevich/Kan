@@ -2,8 +2,8 @@
 
 # Sets variable with given name to path of generated C file with reflection for current unit.
 function (reflection_generator_get_output_file_path OUTPUT_VARIABLE_NAME)
-    file (MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/Generated")
-    set ("${OUTPUT_VARIABLE_NAME}" "${CMAKE_CURRENT_BINARY_DIR}/Generated/${UNIT_NAME}_reflection.c" PARENT_SCOPE)
+    file (MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/generated/${UNIT_NAME}")
+    set ("${OUTPUT_VARIABLE_NAME}" "${CMAKE_BINARY_DIR}/generated/${UNIT_NAME}/reflection.c" PARENT_SCOPE)
 endfunction ()
 
 # Sets up reflection file generation for current unit.

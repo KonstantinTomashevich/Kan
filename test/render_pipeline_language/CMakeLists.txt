@@ -3,9 +3,10 @@ concrete_include (PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 concrete_sources ("*.c")
 concrete_require (SCOPE PUBLIC ABSTRACT file_system CONCRETE_INTERFACE render_pipeline_language testing)
 
+file (MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/tests_resources/render_pipeline_language")
 add_custom_target (test_render_pipeline_language_copy_pipelines
         COMMAND ${CMAKE_COMMAND} -E copy_directory
-        "${CMAKE_CURRENT_SOURCE_DIR}/pipelines" "${CMAKE_CURRENT_BINARY_DIR}/pipelines"
+        "${CMAKE_CURRENT_SOURCE_DIR}/pipelines" "${CMAKE_BINARY_DIR}/tests_resources/render_pipeline_language"
         COMMENT "Copying render pipeline language test pipelines...")
 add_dependencies (test_render_pipeline_language test_render_pipeline_language_copy_pipelines)
 
