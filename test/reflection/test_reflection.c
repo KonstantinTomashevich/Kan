@@ -14,6 +14,8 @@
 
 #include <generator_test_first.h>
 #include <generator_test_second.h>
+#include <section_patch_types_post.h>
+#include <section_patch_types_pre.h>
 
 struct example_struct_meta_assembly_t
 {
@@ -789,13 +791,16 @@ KAN_TEST_CASE (patch)
     second.inner[0u].first = 5u;
     second.inner[0u].second = 6u;
 
-    kan_reflection_patch_builder_add_chunk (patch_builder, offsetof (struct patch_outer_t, before),
-                                            sizeof (first.before), &second.before);
+    kan_reflection_patch_builder_add_chunk (patch_builder, KAN_REFLECTION_PATCH_BUILDER_SECTION_ROOT,
+                                            offsetof (struct patch_outer_t, before), sizeof (first.before),
+                                            &second.before);
     kan_reflection_patch_builder_add_chunk (
-        patch_builder, offsetof (struct patch_outer_t, inner) + offsetof (struct patch_inner_t, first),
+        patch_builder, KAN_REFLECTION_PATCH_BUILDER_SECTION_ROOT,
+        offsetof (struct patch_outer_t, inner) + offsetof (struct patch_inner_t, first),
         sizeof (second.inner[0u].first), &second.inner[0u].first);
     kan_reflection_patch_builder_add_chunk (
-        patch_builder, offsetof (struct patch_outer_t, inner) + offsetof (struct patch_inner_t, second),
+        patch_builder, KAN_REFLECTION_PATCH_BUILDER_SECTION_ROOT,
+        offsetof (struct patch_outer_t, inner) + offsetof (struct patch_inner_t, second),
         sizeof (second.inner[0u].second), &second.inner[0u].second);
 
     kan_reflection_patch_t first_to_second = kan_reflection_patch_builder_build (patch_builder, registry, &patch_outer);
@@ -806,13 +811,13 @@ KAN_TEST_CASE (patch)
     third.inner[1u].first = 7u;
     third.inner[1u].second = 8u;
 
-    kan_reflection_patch_builder_add_chunk (patch_builder, offsetof (struct patch_outer_t, after), sizeof (first.after),
-                                            &third.after);
+    kan_reflection_patch_builder_add_chunk (patch_builder, KAN_REFLECTION_PATCH_BUILDER_SECTION_ROOT,
+                                            offsetof (struct patch_outer_t, after), sizeof (first.after), &third.after);
     kan_reflection_patch_builder_add_chunk (
-        patch_builder,
+        patch_builder, KAN_REFLECTION_PATCH_BUILDER_SECTION_ROOT,
         offsetof (struct patch_outer_t, inner) + sizeof (struct patch_inner_t) + offsetof (struct patch_inner_t, first),
         sizeof (third.inner[1u].first), &third.inner[1u].first);
-    kan_reflection_patch_builder_add_chunk (patch_builder,
+    kan_reflection_patch_builder_add_chunk (patch_builder, KAN_REFLECTION_PATCH_BUILDER_SECTION_ROOT,
                                             offsetof (struct patch_outer_t, inner) + sizeof (struct patch_inner_t) +
                                                 offsetof (struct patch_inner_t, second),
                                             sizeof (third.inner[1u].second), &third.inner[1u].second);
@@ -837,9 +842,10 @@ KAN_TEST_CASE (patch)
     kan_reflection_patch_iterator_t end = kan_reflection_patch_end (first_to_second);
 
     KAN_TEST_ASSERT (!KAN_HANDLE_IS_EQUAL (iterator, end))
-    struct kan_reflection_patch_chunk_info_t chunk = kan_reflection_patch_iterator_get (iterator);
-    KAN_TEST_CHECK (chunk.offset == 0u)
-    KAN_TEST_CHECK (chunk.size == sizeof (double) + sizeof (struct patch_inner_t))
+    struct kan_reflection_patch_node_info_t chunk = kan_reflection_patch_iterator_get (iterator);
+    KAN_TEST_CHECK (chunk.is_data_chunk)
+    KAN_TEST_CHECK (chunk.chunk_info.offset == 0u)
+    KAN_TEST_CHECK (chunk.chunk_info.size == sizeof (double) + sizeof (struct patch_inner_t))
     iterator = kan_reflection_patch_iterator_next (iterator);
     KAN_TEST_CHECK (KAN_HANDLE_IS_EQUAL (iterator, end))
 
@@ -848,8 +854,9 @@ KAN_TEST_CASE (patch)
 
     KAN_TEST_ASSERT (!KAN_HANDLE_IS_EQUAL (iterator, end))
     chunk = kan_reflection_patch_iterator_get (iterator);
-    KAN_TEST_CHECK (chunk.offset == sizeof (double) + sizeof (struct patch_inner_t))
-    KAN_TEST_CHECK (chunk.size == sizeof (double) + sizeof (struct patch_inner_t))
+    KAN_TEST_CHECK (chunk.is_data_chunk)
+    KAN_TEST_CHECK (chunk.chunk_info.offset == sizeof (double) + sizeof (struct patch_inner_t))
+    KAN_TEST_CHECK (chunk.chunk_info.size == sizeof (double) + sizeof (struct patch_inner_t))
     iterator = kan_reflection_patch_iterator_next (iterator);
     KAN_TEST_CHECK (KAN_HANDLE_IS_EQUAL (iterator, end))
 
@@ -1790,20 +1797,26 @@ KAN_TEST_CASE (migration)
 
     kan_reflection_patch_builder_t patch_builder = kan_reflection_patch_builder_create ();
 
-    kan_reflection_patch_builder_add_chunk (patch_builder, offsetof (struct migration_source_t, nesting_first),
+    kan_reflection_patch_builder_add_chunk (patch_builder, KAN_REFLECTION_PATCH_BUILDER_SECTION_ROOT,
+                                            offsetof (struct migration_source_t, nesting_first),
                                             sizeof (struct nesting_source_t), &first_migration_source.nesting_first);
-    kan_reflection_patch_builder_add_chunk (patch_builder, offsetof (struct migration_source_t, nesting_to_drop),
+    kan_reflection_patch_builder_add_chunk (patch_builder, KAN_REFLECTION_PATCH_BUILDER_SECTION_ROOT,
+                                            offsetof (struct migration_source_t, nesting_to_drop),
                                             sizeof (struct nesting_source_t), &first_migration_source.nesting_to_drop);
-    kan_reflection_patch_builder_add_chunk (patch_builder, offsetof (struct migration_source_t, nesting_second),
+    kan_reflection_patch_builder_add_chunk (patch_builder, KAN_REFLECTION_PATCH_BUILDER_SECTION_ROOT,
+                                            offsetof (struct migration_source_t, nesting_second),
                                             sizeof (struct nesting_source_t), &first_migration_source.nesting_second);
-    kan_reflection_patch_builder_add_chunk (patch_builder, offsetof (struct migration_source_t, enums_array_one),
-                                            sizeof (enum first_enum_target_t) * 4u,
-                                            first_migration_source.enums_array_one);
-    kan_reflection_patch_builder_add_chunk (patch_builder, offsetof (struct migration_source_t, numeric_to_adapt),
-                                            sizeof (uint32_t), &first_migration_source.numeric_to_adapt);
-    kan_reflection_patch_builder_add_chunk (patch_builder, offsetof (struct migration_source_t, selector),
-                                            sizeof (uint64_t), &first_migration_source.selector);
-    kan_reflection_patch_builder_add_chunk (patch_builder, offsetof (struct migration_source_t, selection_first),
+    kan_reflection_patch_builder_add_chunk (
+        patch_builder, KAN_REFLECTION_PATCH_BUILDER_SECTION_ROOT, offsetof (struct migration_source_t, enums_array_one),
+        sizeof (enum first_enum_target_t) * 4u, first_migration_source.enums_array_one);
+    kan_reflection_patch_builder_add_chunk (patch_builder, KAN_REFLECTION_PATCH_BUILDER_SECTION_ROOT,
+                                            offsetof (struct migration_source_t, numeric_to_adapt), sizeof (uint32_t),
+                                            &first_migration_source.numeric_to_adapt);
+    kan_reflection_patch_builder_add_chunk (patch_builder, KAN_REFLECTION_PATCH_BUILDER_SECTION_ROOT,
+                                            offsetof (struct migration_source_t, selector), sizeof (uint64_t),
+                                            &first_migration_source.selector);
+    kan_reflection_patch_builder_add_chunk (patch_builder, KAN_REFLECTION_PATCH_BUILDER_SECTION_ROOT,
+                                            offsetof (struct migration_source_t, selection_first),
                                             sizeof (enum first_enum_source_t), &first_migration_source.selection_first);
     kan_reflection_patch_t patch =
         kan_reflection_patch_builder_build (patch_builder, source_registry, &migration_source);
@@ -1839,6 +1852,8 @@ KAN_TEST_CASE (migration)
 }
 
 KAN_REFLECTION_EXPECT_UNIT_REGISTRAR (test_reflection);
+KAN_REFLECTION_EXPECT_UNIT_REGISTRAR (test_reflection_section_patch_types_pre);
+KAN_REFLECTION_EXPECT_UNIT_REGISTRAR (test_reflection_section_patch_types_post);
 
 KAN_TEST_CASE (generated_reflection)
 {
@@ -2067,4 +2082,169 @@ KAN_TEST_CASE (generated_reflection)
     KAN_TEST_CHECK (!kan_reflection_function_argument_meta_iterator_get (&argument_meta_iterator));
 
     kan_reflection_registry_destroy (registry);
+}
+
+KAN_TEST_CASE (patch_with_sections)
+{
+    kan_reflection_registry_t source_registry = kan_reflection_registry_create ();
+    KAN_REFLECTION_UNIT_REGISTRAR_NAME (test_reflection_section_patch_types_pre) (source_registry);
+
+    kan_reflection_registry_t target_registry = kan_reflection_registry_create ();
+    KAN_REFLECTION_UNIT_REGISTRAR_NAME (test_reflection_section_patch_types_post) (target_registry);
+
+    kan_reflection_patch_builder_t patch_builder = kan_reflection_patch_builder_create ();
+    kan_instance_size_t some_instance = 3u;
+    kan_reflection_patch_builder_add_chunk (patch_builder, KAN_REFLECTION_PATCH_BUILDER_SECTION_ROOT,
+                                            offsetof (struct root_type_pre_t, data_before),
+                                            sizeof (kan_instance_size_t), &some_instance);
+
+    some_instance = 4u;
+    kan_reflection_patch_builder_add_chunk (patch_builder, KAN_REFLECTION_PATCH_BUILDER_SECTION_ROOT,
+                                            offsetof (struct root_type_pre_t, data_after), sizeof (kan_instance_size_t),
+                                            &some_instance);
+
+    kan_reflection_patch_builder_section_t append_0_section = kan_reflection_patch_builder_add_section (
+        patch_builder, KAN_REFLECTION_PATCH_BUILDER_SECTION_ROOT,
+        KAN_REFLECTION_PATCH_SECTION_TYPE_DYNAMIC_ARRAY_APPEND, offsetof (struct root_type_pre_t, middle_structs));
+
+    kan_reflection_patch_builder_section_t append_0_inner_set_2_section = kan_reflection_patch_builder_add_section (
+        patch_builder, append_0_section, KAN_REFLECTION_PATCH_SECTION_TYPE_DYNAMIC_ARRAY_SET,
+        offsetof (struct middle_type_pre_t, inner_structs));
+
+    struct most_inner_type_pre_t inner_struct_pre = {
+        .x = 1u,
+        .y = 2u,
+        .z = 3u,
+    };
+
+    kan_reflection_patch_builder_add_chunk (patch_builder, append_0_inner_set_2_section,
+                                            sizeof (struct most_inner_type_pre_t) * 2u,
+                                            sizeof (struct most_inner_type_pre_t), &inner_struct_pre);
+
+    kan_reflection_patch_builder_section_t append_0_to_delete_set_0_section = kan_reflection_patch_builder_add_section (
+        patch_builder, append_0_section, KAN_REFLECTION_PATCH_SECTION_TYPE_DYNAMIC_ARRAY_SET,
+        offsetof (struct middle_type_pre_t, structs_to_delete));
+
+    struct type_to_delete_pre_t to_delete_pre = {
+        .some_data = 1u,
+        .some_other_data = 2u,
+    };
+
+    kan_reflection_patch_builder_add_chunk (patch_builder, append_0_to_delete_set_0_section, 0u,
+                                            sizeof (struct type_to_delete_pre_t), &to_delete_pre);
+
+    kan_reflection_patch_builder_section_t append_1_section = kan_reflection_patch_builder_add_section (
+        patch_builder, KAN_REFLECTION_PATCH_BUILDER_SECTION_ROOT,
+        KAN_REFLECTION_PATCH_SECTION_TYPE_DYNAMIC_ARRAY_APPEND, offsetof (struct root_type_pre_t, middle_structs));
+
+    kan_reflection_patch_builder_section_t append_1_enum_0_3_section = kan_reflection_patch_builder_add_section (
+        patch_builder, append_1_section, KAN_REFLECTION_PATCH_SECTION_TYPE_DYNAMIC_ARRAY_SET,
+        offsetof (struct middle_type_pre_t, enums));
+
+    enum enum_to_adapt_pre_t pre_enums[] = {
+        ENUM_TO_ADAPT_ONE_PRE,
+        ENUM_TO_ADAPT_TWO_PRE,
+        ENUM_TO_ADAPT_THREE_PRE,
+        ENUM_TO_ADAPT_THREE_PRE,
+    };
+
+    kan_reflection_patch_builder_add_chunk (patch_builder, append_1_enum_0_3_section, 0u, sizeof (pre_enums),
+                                            pre_enums);
+
+    kan_reflection_patch_t patch = kan_reflection_patch_builder_build (
+        patch_builder, source_registry,
+        kan_reflection_registry_query_struct (source_registry, kan_string_intern ("root_type_t")));
+    kan_reflection_patch_builder_destroy (patch_builder);
+
+    struct root_type_pre_t root_pre;
+    root_type_pre_init (&root_pre);
+    kan_reflection_patch_apply (patch, &root_pre);
+
+    KAN_TEST_CHECK (root_pre.data_before == 3u)
+    KAN_TEST_CHECK (root_pre.data_after == 4u)
+    KAN_TEST_ASSERT (root_pre.middle_structs.size == 2u)
+
+    struct middle_type_pre_t *first_middle_pre = &((struct middle_type_pre_t *) root_pre.middle_structs.data)[0u];
+    KAN_TEST_ASSERT (first_middle_pre->inner_structs.size == 3u)
+    struct most_inner_type_pre_t *inner_pre =
+        &((struct most_inner_type_pre_t *) first_middle_pre->inner_structs.data)[0u];
+    KAN_TEST_CHECK (inner_pre->x == 0u)
+    KAN_TEST_CHECK (inner_pre->y == 0u)
+    KAN_TEST_CHECK (inner_pre->z == 0u)
+
+    inner_pre = &((struct most_inner_type_pre_t *) first_middle_pre->inner_structs.data)[1u];
+    KAN_TEST_CHECK (inner_pre->x == 0u)
+    KAN_TEST_CHECK (inner_pre->y == 0u)
+    KAN_TEST_CHECK (inner_pre->z == 0u)
+
+    inner_pre = &((struct most_inner_type_pre_t *) first_middle_pre->inner_structs.data)[2u];
+    KAN_TEST_CHECK (inner_pre->x == inner_struct_pre.x)
+    KAN_TEST_CHECK (inner_pre->y == inner_struct_pre.y)
+    KAN_TEST_CHECK (inner_pre->z == inner_struct_pre.z)
+
+    KAN_TEST_ASSERT (first_middle_pre->structs_to_delete.size == 1u)
+    struct type_to_delete_pre_t *to_delete =
+        &((struct type_to_delete_pre_t *) first_middle_pre->structs_to_delete.data)[0u];
+    KAN_TEST_CHECK (to_delete->some_data == to_delete_pre.some_data)
+    KAN_TEST_CHECK (to_delete->some_other_data == to_delete_pre.some_other_data)
+
+    KAN_TEST_CHECK (first_middle_pre->enums.size == 0u)
+
+    struct middle_type_pre_t *second_middle_pre = &((struct middle_type_pre_t *) root_pre.middle_structs.data)[1u];
+    KAN_TEST_CHECK (second_middle_pre->inner_structs.size == 0u)
+    KAN_TEST_CHECK (second_middle_pre->structs_to_delete.size == 0u)
+    KAN_TEST_ASSERT (second_middle_pre->enums.size == 4u)
+
+    KAN_TEST_CHECK (((enum enum_to_adapt_pre_t *) second_middle_pre->enums.data)[0u] == pre_enums[0u])
+    KAN_TEST_CHECK (((enum enum_to_adapt_pre_t *) second_middle_pre->enums.data)[1u] == pre_enums[1u])
+    KAN_TEST_CHECK (((enum enum_to_adapt_pre_t *) second_middle_pre->enums.data)[2u] == pre_enums[2u])
+    KAN_TEST_CHECK (((enum enum_to_adapt_pre_t *) second_middle_pre->enums.data)[3u] == pre_enums[3u])
+    root_type_pre_shutdown (&root_pre);
+
+    kan_reflection_migration_seed_t source_to_target_migration_seed =
+        kan_reflection_migration_seed_build (source_registry, target_registry);
+    kan_reflection_struct_migrator_t source_to_target_migrator =
+        kan_reflection_struct_migrator_build (source_to_target_migration_seed);
+
+    kan_reflection_struct_migrator_migrate_patches (source_to_target_migrator, source_registry, target_registry);
+    kan_reflection_struct_migrator_destroy (source_to_target_migrator);
+    kan_reflection_migration_seed_destroy (source_to_target_migration_seed);
+
+    struct root_type_post_t root_post;
+    root_type_post_init (&root_post);
+    kan_reflection_patch_apply (patch, &root_post);
+    
+    KAN_TEST_CHECK (root_pre.data_before == 3u)
+    KAN_TEST_CHECK (root_pre.data_after == 4u)
+    KAN_TEST_ASSERT (root_pre.middle_structs.size == 2u)
+    
+    struct middle_type_post_t *first_middle_post = &((struct middle_type_post_t *) root_post.middle_structs.data)[0u];
+    KAN_TEST_ASSERT (first_middle_post->inner_structs.size == 3u)
+    struct most_inner_type_post_t *inner_post =
+        &((struct most_inner_type_post_t *) first_middle_post->inner_structs.data)[0u];
+    KAN_TEST_CHECK (inner_post->x == 0u)
+    KAN_TEST_CHECK (inner_post->y == 0u)
+
+    inner_post = &((struct most_inner_type_post_t *) first_middle_post->inner_structs.data)[1u];
+    KAN_TEST_CHECK (inner_post->x == 0u)
+    KAN_TEST_CHECK (inner_post->y == 0u)
+
+    inner_post = &((struct most_inner_type_post_t *) first_middle_post->inner_structs.data)[2u];
+    KAN_TEST_CHECK (inner_post->x == inner_struct_pre.x)
+    KAN_TEST_CHECK (inner_post->y == inner_struct_pre.y)
+
+    KAN_TEST_CHECK (first_middle_post->enums.size == 0u)
+
+    struct middle_type_post_t *second_middle_post = &((struct middle_type_post_t *) root_post.middle_structs.data)[1u];
+    KAN_TEST_CHECK (second_middle_post->inner_structs.size == 0u)
+    KAN_TEST_ASSERT (second_middle_post->enums.size == 4u)
+
+    KAN_TEST_CHECK (((enum enum_to_adapt_post_t *) second_middle_post->enums.data)[0u] == ENUM_TO_ADAPT_ONE_POST)
+    KAN_TEST_CHECK (((enum enum_to_adapt_post_t *) second_middle_post->enums.data)[1u] == ENUM_TO_ADAPT_ONE_POST)
+    KAN_TEST_CHECK (((enum enum_to_adapt_post_t *) second_middle_post->enums.data)[2u] == ENUM_TO_ADAPT_THREE_POST)
+    KAN_TEST_CHECK (((enum enum_to_adapt_post_t *) second_middle_post->enums.data)[3u] == ENUM_TO_ADAPT_THREE_POST)
+    root_type_post_shutdown (&root_post);
+
+    kan_reflection_registry_destroy (source_registry);
+    kan_reflection_registry_destroy (target_registry);
 }
