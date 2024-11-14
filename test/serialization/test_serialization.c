@@ -515,6 +515,9 @@ static void check_map_equality (struct map_t *source_map, struct map_t *deserial
                         KAN_TEST_CHECK (source_inner_data->some_random_id == deserialized_inner_data->some_random_id)
                     }
                 }
+
+                compound_component_shutdown (&source_component_data);
+                compound_component_shutdown (&deserialized_component_data);
             }
             else
             {

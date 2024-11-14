@@ -5043,11 +5043,11 @@ static void migrate_patch_task (kan_functor_user_data_t user_data)
                 context.sections[context.node->section_suffix.my_section_id - 1u] = context.current_section;
 
                 // Query data needed to correctly processed the section.
-                enum kan_reflection_archetype_t content_archetype;
+                enum kan_reflection_archetype_t content_archetype = KAN_REFLECTION_ARCHETYPE_SIGNED_INT;
                 kan_interned_string_t content_type_name = NULL;
                 // Only the item size might've been changed if migration is allowed.
-                kan_instance_size_t source_item_size;
-                kan_instance_size_t target_item_size;
+                kan_instance_size_t source_item_size = 0u;
+                kan_instance_size_t target_item_size = 0u;
 
                 switch ((enum kan_reflection_patch_section_type_t) context.node->section_suffix.packed_type)
                 {
