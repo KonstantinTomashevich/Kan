@@ -2020,8 +2020,8 @@ static uint8_t *add_section_nodes (uint8_t *output,
     KAN_ASSERT (section)
 
     COMPILED_SECTION_ID_ASSERT_POSSIBLE (section)
-    output_node->section_suffix.parent_section_id = COMPILED_SECTION_ID_GET (section->parent);
-    output_node->section_suffix.my_section_id = COMPILED_SECTION_ID_GET (section);
+    output_node->section_suffix.parent_section_id = (uint16_t) COMPILED_SECTION_ID_GET (section->parent);
+    output_node->section_suffix.my_section_id = (uint16_t) COMPILED_SECTION_ID_GET (section);
     output_patch->section_id_bound =
         KAN_MAX (output_patch->section_id_bound, output_node->section_suffix.my_section_id + 1u);
     output_node->section_suffix.packed_type = (uint16_t) section->type;
@@ -4961,7 +4961,8 @@ static void patch_migration_adapt_enum_section (struct patch_migration_context_t
 
             kan_reflection_patch_builder_add_chunk (
                 context->patch_builder, context->current_section,
-                context->node->data_suffix.offset + (input - (const uint8_t *) context->node->data_suffix.data),
+                context->node->data_suffix.offset +
+                    (kan_instance_size_t) (input - (const uint8_t *) context->node->data_suffix.data),
                 sizeof (int), &buffer);
 
             input += sizeof (int);
