@@ -3,6 +3,8 @@
 #include <context_virtual_file_system_api.h>
 
 #include <kan/api_common/c_header.h>
+#include <kan/container/dynamic_array.h>
+#include <kan/container/interned_string.h>
 #include <kan/context/context.h>
 #include <kan/virtual_file_system/virtual_file_system.h>
 
@@ -31,25 +33,32 @@ KAN_C_HEADER_BEGIN
 /// \brief Configuration item for mounting real path.
 struct kan_virtual_file_system_config_mount_real_t
 {
-    struct kan_virtual_file_system_config_mount_real_t *next;
-    char *mount_path;
-    char *real_path;
+    kan_interned_string_t mount_path;
+    kan_interned_string_t real_path;
 };
 
 /// \brief Configuration item for mounting read only pack.
 struct kan_virtual_file_system_config_mount_read_only_pack_t
 {
-    struct kan_virtual_file_system_config_mount_read_only_pack_t *next;
-    char *mount_path;
-    char *pack_real_path;
+    kan_interned_string_t mount_path;
+    kan_interned_string_t pack_real_path;
 };
 
 /// \brief Configuration type for context virtual file system.
 struct kan_virtual_file_system_config_t
 {
-    struct kan_virtual_file_system_config_mount_real_t *first_mount_real;
-    struct kan_virtual_file_system_config_mount_read_only_pack_t *first_mount_read_only_pack;
+    /// \meta reflection_dynamic_array_type = "struct kan_virtual_file_system_config_mount_real_t"
+    struct kan_dynamic_array_t mount_real;
+
+    /// \meta reflection_dynamic_array_type = "struct kan_virtual_file_system_config_mount_read_only_pack_t"
+    struct kan_dynamic_array_t mount_read_only_pack;
 };
+
+CONTEXT_VIRTUAL_FILE_SYSTEM_API void kan_virtual_file_system_config_init (
+    struct kan_virtual_file_system_config_t *instance);
+
+CONTEXT_VIRTUAL_FILE_SYSTEM_API void kan_virtual_file_system_config_shutdown (
+    struct kan_virtual_file_system_config_t *instance);
 
 /// \brief Acquires read access and returns volume. Blocking.
 CONTEXT_VIRTUAL_FILE_SYSTEM_API kan_virtual_file_system_volume_t

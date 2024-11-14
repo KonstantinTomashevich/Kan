@@ -822,7 +822,6 @@ void render_backend_apply_descriptor_set_mutation (struct render_backend_pipelin
 struct render_backend_system_t
 {
     kan_context_t context;
-    kan_render_context_t render_context_handle;
 
     VkInstance instance;
     VkDevice device;
@@ -967,7 +966,6 @@ struct render_backend_system_t
     struct memory_profiling_t memory_profiling;
 #endif
 
-    kan_bool_t render_enabled;
     kan_bool_t prefer_vsync;
 
     kan_interned_string_t application_info_name;

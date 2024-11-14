@@ -1,9 +1,5 @@
 //! kan_application_framework_program_configuration_t
 
-plugins = ${PLUGINS}
-
-${RESOURCE_DIRECTORIES}
-
-${RESOURCE_PACKS}
+${ENABLED_SYSTEMS}
 
 program_world = "test/program_root"

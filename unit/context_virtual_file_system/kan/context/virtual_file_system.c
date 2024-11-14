@@ -32,7 +32,8 @@ static inline kan_bool_t ensure_mount_path_exists (kan_virtual_file_system_volum
     kan_file_system_path_container_copy_char_sequence (&path_container, path, last_separator);
     struct kan_virtual_file_system_entry_status_t entry_status;
 
-    if (kan_virtual_file_system_query_entry (volume, path_container.path, &entry_status))
+    if (kan_virtual_file_system_check_existence (volume, path_container.path) &&
+        kan_virtual_file_system_query_entry (volume, path_container.path, &entry_status))
     {
         return entry_status.type == KAN_VIRTUAL_FILE_SYSTEM_ENTRY_TYPE_DIRECTORY;
     }
@@ -54,10 +55,11 @@ kan_context_system_t virtual_file_system_create (kan_allocation_group_t group, v
     if (user_config)
     {
         struct kan_virtual_file_system_config_t *config = user_config;
-        struct kan_virtual_file_system_config_mount_real_t *mount_point_real = config->first_mount_real;
-
-        while (mount_point_real)
+        for (kan_loop_size_t index = 0u; index < config->mount_real.size; ++index)
         {
+            struct kan_virtual_file_system_config_mount_real_t *mount_point_real =
+                &((struct kan_virtual_file_system_config_mount_real_t *) config->mount_real.data)[index];
+
             if (ensure_mount_path_exists (system->volume, mount_point_real->mount_path))
             {
                 if (!kan_virtual_file_system_volume_mount_real (system->volume, mount_point_real->mount_path,
@@ -72,15 +74,14 @@ kan_context_system_t virtual_file_system_create (kan_allocation_group_t group, v
                 KAN_LOG (context_virtual_file_system, KAN_LOG_ERROR,
                          "Failed to ensure existence of parent for mount path \"%s\".", mount_point_real->mount_path)
             }
-
-            mount_point_real = mount_point_real->next;
         }
 
-        struct kan_virtual_file_system_config_mount_read_only_pack_t *mount_point_read_only_pack =
-            config->first_mount_read_only_pack;
-
-        while (mount_point_read_only_pack)
+        for (kan_loop_size_t index = 0u; index < config->mount_read_only_pack.size; ++index)
         {
+            struct kan_virtual_file_system_config_mount_read_only_pack_t *mount_point_read_only_pack =
+                &((struct kan_virtual_file_system_config_mount_read_only_pack_t *)
+                      config->mount_read_only_pack.data)[index];
+
             if (ensure_mount_path_exists (system->volume, mount_point_read_only_pack->mount_path))
             {
                 if (!kan_virtual_file_system_volume_mount_read_only_pack (system->volume,
@@ -97,8 +98,6 @@ kan_context_system_t virtual_file_system_create (kan_allocation_group_t group, v
                          "Failed to ensure existence of parent for mount path \"%s\".",
                          mount_point_read_only_pack->mount_path)
             }
-
-            mount_point_read_only_pack = mount_point_read_only_pack->next;
         }
     }
 
@@ -141,6 +140,25 @@ struct kan_context_system_api_t KAN_CONTEXT_SYSTEM_API_NAME (virtual_file_system
     .disconnect = virtual_file_system_disconnect,
     .destroy = virtual_file_system_destroy,
 };
+
+void kan_virtual_file_system_config_init (struct kan_virtual_file_system_config_t *instance)
+{
+    kan_allocation_group_t group =
+        kan_allocation_group_get_child (kan_allocation_group_root (), "context_virtual_file_system_config");
+
+    kan_dynamic_array_init (&instance->mount_real, 0u, sizeof (struct kan_virtual_file_system_config_mount_real_t),
+                            _Alignof (struct kan_virtual_file_system_config_mount_real_t), group);
+
+    kan_dynamic_array_init (&instance->mount_read_only_pack, 0u,
+                            sizeof (struct kan_virtual_file_system_config_mount_read_only_pack_t),
+                            _Alignof (struct kan_virtual_file_system_config_mount_read_only_pack_t), group);
+}
+
+void kan_virtual_file_system_config_shutdown (struct kan_virtual_file_system_config_t *instance)
+{
+    kan_dynamic_array_shutdown (&instance->mount_real);
+    kan_dynamic_array_shutdown (&instance->mount_read_only_pack);
+}
 
 kan_virtual_file_system_volume_t kan_virtual_file_system_get_context_volume_for_read (
     kan_context_system_t virtual_file_system)

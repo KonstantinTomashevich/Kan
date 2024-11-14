@@ -356,4 +356,10 @@ CONTEXT_REFLECTION_SYSTEM_API void kan_reflection_system_generation_iterator_add
     kan_interned_string_t meta_type_name,
     void *meta);
 
+/// \brief Registers static reflection data into given repository.
+/// \details Helper for the cases when context with reflection system is not ready yet,
+///          but we need to load something through reflection.
+CONTEXT_REFLECTION_SYSTEM_API void kan_reflection_system_register_static_reflection (
+    kan_reflection_registry_t registry);
+
 KAN_C_HEADER_END

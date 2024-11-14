@@ -4,6 +4,7 @@
 
 #include <kan/api_common/c_header.h>
 #include <kan/container/dynamic_array.h>
+#include <kan/container/interned_string.h>
 #include <kan/context/context.h>
 
 /// \file
@@ -40,7 +41,8 @@ KAN_C_HEADER_BEGIN
 /// \brief Contains plugin system configuration data.
 struct kan_plugin_system_config_t
 {
-    char *plugin_directory_path;
+    /// \details Interned string in order to make it usable inside patches.
+    kan_interned_string_t plugin_directory_path;
 
     /// \meta reflection_dynamic_array_type = "kan_interned_string_t"
     struct kan_dynamic_array_t plugins;

@@ -1097,20 +1097,20 @@ void kan_reflection_system_generation_iterator_add_function (kan_reflection_syst
     APPEND_EVENT (added, function);
 }
 
-void kan_reflection_system_generation_iterator_change_enum (kan_reflection_system_generation_iterator_t iterator,
-                                                            const struct kan_reflection_enum_t *data)
+void kan_reflection_system_generation_iterator_enum_changed (kan_reflection_system_generation_iterator_t iterator,
+                                                             const struct kan_reflection_enum_t *data)
 {
     APPEND_EVENT (changed, enum);
 }
 
-void kan_reflection_system_generation_iterator_change_struct (kan_reflection_system_generation_iterator_t iterator,
-                                                              const struct kan_reflection_struct_t *data)
+void kan_reflection_system_generation_iterator_struct_changed (kan_reflection_system_generation_iterator_t iterator,
+                                                               const struct kan_reflection_struct_t *data)
 {
     APPEND_EVENT (changed, struct);
 }
 
-void kan_reflection_system_generation_iterator_change_function (kan_reflection_system_generation_iterator_t iterator,
-                                                                const struct kan_reflection_function_t *data)
+void kan_reflection_system_generation_iterator_function_changed (kan_reflection_system_generation_iterator_t iterator,
+                                                                 const struct kan_reflection_function_t *data)
 {
     APPEND_EVENT (changed, function);
 }
@@ -1200,3 +1200,8 @@ void kan_reflection_system_generation_iterator_add_function_argument_meta (
 
 #undef ADD_META_EVENT_TOP_LEVEL
 #undef ADD_META_EVENT_LOWER_LEVEL
+
+void kan_reflection_system_register_static_reflection (kan_reflection_registry_t registry)
+{
+    KAN_CONTEXT_REFLECTION_SYSTEM_REGISTRAR_FUNCTION (registry);
+}

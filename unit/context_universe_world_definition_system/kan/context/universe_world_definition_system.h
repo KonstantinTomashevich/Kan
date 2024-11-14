@@ -37,7 +37,8 @@ struct kan_universe_world_definition_system_config_t
 {
     /// \brief Path to virtual directory under which world definitions are stored.
     /// \invariant All files under this path must be world definitions, other types are not permitted.
-    char *definitions_mount_path;
+    ///            Interned string in order to be supported in patches.
+    kan_interned_string_t definitions_mount_path;
 
     /// \brief Whether system should observe definitions directory for changes and reload definitions.
     kan_bool_t observe_definitions;
@@ -46,6 +47,9 @@ struct kan_universe_world_definition_system_config_t
     /// \details Needed to correctly reload in case of subsequent changes to file.
     kan_time_offset_t observation_rescan_delay_ns;
 };
+
+CONTEXT_UNIVERSE_WORLD_DEFINITION_SYSTEM_API void kan_universe_world_definition_system_config_init (
+    struct kan_universe_world_definition_system_config_t *instance);
 
 /// \brief Queries world definition by its unique name.
 CONTEXT_UNIVERSE_WORLD_DEFINITION_SYSTEM_API const struct kan_universe_world_definition_t *

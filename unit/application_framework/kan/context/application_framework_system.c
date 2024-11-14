@@ -1,5 +1,6 @@
 #include <stddef.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include <kan/context/application_framework_system.h>
 #include <kan/context/application_system.h>
@@ -19,7 +20,7 @@ struct application_framework_system_t
 
     kan_instance_size_t outer_arguments_count;
     char **outer_arguments;
-    char *outer_auto_build_and_hot_reload_command;
+    char *auto_build_command;
 
     kan_bool_t exit_requested;
     int exit_code;
@@ -40,13 +41,23 @@ kan_context_system_t application_framework_system_create (kan_allocation_group_t
         struct kan_application_framework_system_config_t *config = user_config;
         system->outer_arguments_count = config->arguments_count;
         system->outer_arguments = config->arguments;
-        system->outer_auto_build_and_hot_reload_command = config->auto_build_and_hot_reload_command;
+
+        if (config->auto_build_command)
+        {
+            const kan_instance_size_t command_length = (kan_instance_size_t) strlen (config->auto_build_command);
+            system->auto_build_command = kan_allocate_general (group, command_length + 1u, _Alignof (char));
+            memcpy (system->auto_build_command, config->auto_build_command, command_length + 1u);
+        }
+        else
+        {
+            system->auto_build_command = NULL;
+        }
     }
     else
     {
         system->outer_arguments_count = 0u;
         system->outer_arguments = NULL;
-        system->outer_auto_build_and_hot_reload_command = NULL;
+        system->auto_build_command = NULL;
     }
 
     system->exit_requested = KAN_FALSE;
@@ -81,9 +92,9 @@ static void application_framework_system_update (kan_context_system_t handle)
             }
             else if (event->type == KAN_PLATFORM_APPLICATION_EVENT_TYPE_WINDOW_FOCUS_GAINED)
             {
-                if (!framework_system->exit_requested && framework_system->outer_auto_build_and_hot_reload_command)
+                if (!framework_system->exit_requested && framework_system->auto_build_command)
                 {
-                    const int result = system (framework_system->outer_auto_build_and_hot_reload_command);
+                    const int result = system (framework_system->auto_build_command);
                     if (result != 0)
                     {
                         KAN_LOG (context_application_framework_system, KAN_LOG_ERROR,
@@ -148,6 +159,12 @@ void application_framework_system_disconnect (kan_context_system_t handle)
 void application_framework_system_destroy (kan_context_system_t handle)
 {
     struct application_framework_system_t *system = KAN_HANDLE_GET (handle);
+    if (system->auto_build_command)
+    {
+        const kan_instance_size_t command_length = (kan_instance_size_t) strlen (system->auto_build_command);
+        kan_free_general (system->group, system->auto_build_command, command_length + 1u);
+    }
+
     kan_free_general (system->group, system, sizeof (struct application_framework_system_t));
 }
 

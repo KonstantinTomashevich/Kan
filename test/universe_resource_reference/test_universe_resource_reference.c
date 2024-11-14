@@ -29,8 +29,6 @@
 
 static kan_bool_t global_test_finished = KAN_FALSE;
 
-// TODO: Perhaps test resource types with patches with sections?
-
 struct resource_prototype_t
 {
     /// \meta reflection_dynamic_array_type = "kan_reflection_patch_t"
@@ -886,26 +884,26 @@ static kan_context_t setup_context (void)
     KAN_TEST_CHECK (kan_context_request_system (context, KAN_CONTEXT_UNIVERSE_SYSTEM_NAME, NULL))
     KAN_TEST_CHECK (kan_context_request_system (context, KAN_CONTEXT_UPDATE_SYSTEM_NAME, NULL))
 
-    struct kan_virtual_file_system_config_mount_real_t mount_point_reference_cache = {
-        .next = NULL,
-        .mount_path = WORKSPACE_REFERENCE_CACHE_MOUNT_PATH,
-        .real_path = WORKSPACE_REFERENCE_CACHE_SUB_DIRECTORY,
-    };
+    struct kan_virtual_file_system_config_t virtual_file_system_config;
+    kan_virtual_file_system_config_init (&virtual_file_system_config);
+    kan_dynamic_array_set_capacity (&virtual_file_system_config.mount_real, 2u);
 
-    struct kan_virtual_file_system_config_mount_real_t mount_point_resources = {
-        .next = &mount_point_reference_cache,
-        .mount_path = WORKSPACE_RESOURCES_MOUNT_PATH,
-        .real_path = WORKSPACE_RESOURCES_SUB_DIRECTORY,
-    };
+    struct kan_virtual_file_system_config_mount_real_t *resources =
+        kan_dynamic_array_add_last (&virtual_file_system_config.mount_real);
+    KAN_ASSERT (resources)
+    resources->mount_path = WORKSPACE_RESOURCES_MOUNT_PATH;
+    resources->real_path = WORKSPACE_RESOURCES_SUB_DIRECTORY;
 
-    struct kan_virtual_file_system_config_t virtual_file_system_config = {
-        .first_mount_real = &mount_point_resources,
-        .first_mount_read_only_pack = NULL,
-    };
+    struct kan_virtual_file_system_config_mount_real_t *reference_cache =
+        kan_dynamic_array_add_last (&virtual_file_system_config.mount_real);
+    KAN_ASSERT (reference_cache)
+    reference_cache->mount_path = WORKSPACE_REFERENCE_CACHE_MOUNT_PATH;
+    reference_cache->real_path = WORKSPACE_REFERENCE_CACHE_SUB_DIRECTORY;
 
     KAN_TEST_CHECK (
         kan_context_request_system (context, KAN_CONTEXT_VIRTUAL_FILE_SYSTEM_NAME, &virtual_file_system_config))
     kan_context_assembly (context);
+    kan_virtual_file_system_config_shutdown (&virtual_file_system_config);
     return context;
 }
 

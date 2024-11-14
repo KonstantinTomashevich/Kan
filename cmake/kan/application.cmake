@@ -26,9 +26,8 @@ set (KAN_APPLICATION_PROGRAM_LAUNCHER_STATICS_ECOSYSTEM
 # Name of the used application framework static launcher implementation.
 set (KAN_APPLICATION_PROGRAM_LAUNCHER_IMPLEMENTATION "sdl")
 
-# Whether to enable auto build and hot reload commands for development builds.
-option (KAN_APPLICATION_ENABLE_AUTO_BUILD_AND_HOT_RELOAD
-        "Whether to enable auto build and hot reload commands for development builds." ON)
+# Whether to enable auto build command for development builds.
+option (KAN_APPLICATION_ENABLE_AUTO_BUILD "Whether to enable auto build command for development builds." ON)
 
 # Whether to use raw resources instead of processed ones for packing.
 option (KAN_APPLICATION_PACK_WITH_RAW_RESOURCES
@@ -36,10 +35,6 @@ option (KAN_APPLICATION_PACK_WITH_RAW_RESOURCES
 
 # Whether string interning for packing procedure is enabled.
 option (KAN_APPLICATION_PACKER_INTERN_STRINGS "Whether string interning for packing procedure is enabled." ON)
-
-# Whether to observe for world definition changes in packaged applications.
-option (KAN_APPLICATION_OBSERVE_WORLDS_IN_PACKAGED
-        "Whether to observe for world definition changes in packaged applications." OFF)
 
 # Whether to enable code hot reload in packaged applications.
 option (KAN_APPLICATION_ENABLE_CODE_HOT_RELOAD_IN_PACKAGED
@@ -546,6 +541,111 @@ function (private_generate_code_hot_reload_test)
 endfunction ()
 
 # Intended only for internal use in this file.
+# Adds common content for core configurations (dev or pack).
+# Arguments:
+# - OUTPUT: output variable name.
+# - HOT_RELOAD: whether to enable hot reload and world observation in configuration.
+# - AUTO_BUILD: whether to enable auto build in configuration.
+# - PLUGINS: multi value argument for core plugins.
+# - TAGS: multi value argument for list of environment tags for this configuration.
+function (private_core_configurator_common_content)
+    cmake_parse_arguments (ARG "" "OUTPUT;HOT_RELOAD;AUTO_BUILD" "PLUGINS;TAGS" ${ARGV})
+    if (DEFINED ARG_UNPARSED_ARGUMENTS OR
+            NOT DEFINED ARG_OUTPUT OR
+            NOT DEFINED ARG_HOT_RELOAD OR
+            NOT DEFINED ARG_AUTO_BUILD OR
+            NOT DEFINED ARG_PLUGINS OR
+            NOT DEFINED ARG_TAGS)
+        message (FATAL_ERROR "Incorrect function arguments!")
+    endif ()
+
+    if (ARG_HOT_RELOAD)
+        set (HOT_RELOAD "1")
+    else ()
+        set (HOT_RELOAD "0")
+    endif ()
+
+    set (PREFIX "string (APPEND ENABLED_SYSTEMS \"")
+    string (APPEND CORE_CONFIGURATOR_CONTENT "${PREFIX}+enabled_systems { name = application_system_t }\\n\\n\")\n")
+    string (APPEND CORE_CONFIGURATOR_CONTENT "${PREFIX}+enabled_systems {\\n\")\n")
+    string (APPEND CORE_CONFIGURATOR_CONTENT "${PREFIX}    name = plugin_system_t\\n\")\n")
+    string (APPEND CORE_CONFIGURATOR_CONTENT "${PREFIX}    configuration {\\n\")\n")
+    string (APPEND CORE_CONFIGURATOR_CONTENT "${PREFIX}        __type = kan_plugin_system_config_t\\n\")\n")
+    string (APPEND CORE_CONFIGURATOR_CONTENT "${PREFIX}        plugin_directory_path = \\\"")
+    string (APPEND CORE_CONFIGURATOR_CONTENT "${KAN_APPLICATION_PLUGINS_DIRECTORY_NAME}")
+    string (APPEND CORE_CONFIGURATOR_CONTENT "\\\"\\n\")\n")
+    set (INDEX 0)
+
+    foreach (PLUGIN ${ARG_PLUGINS})
+        string (APPEND CORE_CONFIGURATOR_CONTENT "${PREFIX}        plugins[${INDEX}] = \\\"")
+        string (APPEND CORE_CONFIGURATOR_CONTENT "${PLUGIN}_library")
+        string (APPEND CORE_CONFIGURATOR_CONTENT "\\\"\\n\")\n")
+        math (EXPR INDEX "${INDEX} + 1")
+    endforeach ()
+
+    string (APPEND CORE_CONFIGURATOR_CONTENT "${PREFIX}        enable_hot_reload = ${HOT_RELOAD}\\n\")\n")
+    string (APPEND CORE_CONFIGURATOR_CONTENT "${PREFIX}        hot_reload_update_delay_ns = 200000000\\n\")\n")
+    string (APPEND CORE_CONFIGURATOR_CONTENT "${PREFIX}    }\\n\")\n")
+    string (APPEND CORE_CONFIGURATOR_CONTENT "${PREFIX}}\\n\\n\")\n")
+    string (APPEND CORE_CONFIGURATOR_CONTENT "${PREFIX}+enabled_systems { name = reflection_system_t }\\n\\n\")\n")
+
+    string (APPEND CORE_CONFIGURATOR_CONTENT "${PREFIX}+enabled_systems {\\n\")\n")
+    string (APPEND CORE_CONFIGURATOR_CONTENT "${PREFIX}    name = universe_system_t\\n\")\n")
+    string (APPEND CORE_CONFIGURATOR_CONTENT "${PREFIX}    configuration {\\n\")\n")
+    string (APPEND CORE_CONFIGURATOR_CONTENT "${PREFIX}        __type = kan_universe_system_config_t\\n\")\n")
+    set (INDEX 0)
+
+    foreach (TAG ${ARG_TAGS})
+        string (APPEND CORE_CONFIGURATOR_CONTENT "${PREFIX}        environment_tags[${INDEX}] = \\\"")
+        string (APPEND CORE_CONFIGURATOR_CONTENT "${TAG}")
+        string (APPEND CORE_CONFIGURATOR_CONTENT "\\\"\\n\")\n")
+        math (EXPR INDEX "${INDEX} + 1")
+    endforeach ()
+
+    string (APPEND CORE_CONFIGURATOR_CONTENT "${PREFIX}    }\\n\")\n")
+    string (APPEND CORE_CONFIGURATOR_CONTENT "${PREFIX}}\\n\\n\")\n")
+
+    string (APPEND CORE_CONFIGURATOR_CONTENT "${PREFIX}+enabled_systems {\\n\")\n")
+    string (APPEND CORE_CONFIGURATOR_CONTENT "${PREFIX}    name = universe_world_definition_system_t\\n\")\n")
+    string (APPEND CORE_CONFIGURATOR_CONTENT "${PREFIX}    configuration {\\n\")\n")
+    string (APPEND CORE_CONFIGURATOR_CONTENT
+            "${PREFIX}        __type = kan_universe_world_definition_system_config_t\\n\")\n")
+    string (APPEND CORE_CONFIGURATOR_CONTENT
+            "${PREFIX}        definitions_mount_path = \\\"universe_world_definitions\\\"\\n\")\n")
+    string (APPEND CORE_CONFIGURATOR_CONTENT "${PREFIX}        observe_definitions = ${HOT_RELOAD}\\n\")\n")
+    string (APPEND CORE_CONFIGURATOR_CONTENT "${PREFIX}        observation_rescan_delay_ns = 100000000\\n\")\n")
+    string (APPEND CORE_CONFIGURATOR_CONTENT "${PREFIX}    }\\n\")\n")
+    string (APPEND CORE_CONFIGURATOR_CONTENT "${PREFIX}}\\n\\n\")\n")
+    string (APPEND CORE_CONFIGURATOR_CONTENT "${PREFIX}+enabled_systems { name = update_system_t }\\n\\n\")\n")
+
+    if (ARG_AUTO_BUILD)
+        string (APPEND CORE_CONFIGURATOR_CONTENT "string (APPEND AUTO_BUILD_SUFFIX \"enable_auto_build = 1\\n\")\n")
+        string (APPEND CORE_CONFIGURATOR_CONTENT "string (APPEND AUTO_BUILD_SUFFIX \"auto_build_command = \\\"")
+        string (APPEND CORE_CONFIGURATOR_CONTENT "${CMAKE_COMMAND} ")
+        string (APPEND CORE_CONFIGURATOR_CONTENT "--build \\\\\\\"${CMAKE_BINARY_DIR}\\\\\\\" ")
+        string (APPEND CORE_CONFIGURATOR_CONTENT
+                "--target \\\\\\\"${APPLICATION_NAME}_dev_all_plugins\\\\\\\"\\\"\")\n")
+    endif ()
+
+    set ("${ARG_OUTPUT}" "${CORE_CONFIGURATOR_CONTENT}" PARENT_SCOPE)
+endfunction ()
+
+# Intended only for internal use in this file.
+# Adds lines to configurator needed to mount real directory inside virtual file system configuration.
+# Arguments:
+# - 1st: name of the output variable.
+# - 2nd: mount path of the directory.
+# - 3rd: real path to the directory.
+function (private_configuration_mount_real OUTPUT MOUNT_PATH REAL_PATH)
+    set (PREFIX "string (APPEND ENABLED_SYSTEMS \"")
+    string (APPEND "${OUTPUT}" "${PREFIX}        +mount_real {\\n\")\n")
+    string (APPEND "${OUTPUT}" "${PREFIX}            mount_path = \\\"${MOUNT_PATH}\\\"\\n\")\n")
+    string (APPEND "${OUTPUT}" "${PREFIX}            real_path = \\\"${REAL_PATH}\\\"\\n\")\n")
+    string (APPEND "${OUTPUT}" "${PREFIX}        }\\n\")\n")
+    set ("${OUTPUT}" "${${OUTPUT}}" PARENT_SCOPE)
+endfunction ()
+
+# Intended only for internal use in this file.
 # Macro for ease of use and simplicity.
 # Provides easy generation of minimal mount names for resource directories.
 macro (private_generate_resource_directory_mount_name DIRECTORY)
@@ -733,42 +833,34 @@ function (application_generate)
     endif ()
 
     set (DEV_CORE_CONFIGURATOR_CONTENT)
-    foreach (PLUGIN ${CORE_PLUGINS})
-        string (APPEND DEV_CORE_CONFIGURATOR_CONTENT "list (APPEND PLUGINS_LIST \"\\\"${PLUGIN}_library\\\"\")\n")
-    endforeach ()
+    private_core_configurator_common_content (
+            OUTPUT DEV_CORE_CONFIGURATOR_CONTENT
+            HOT_RELOAD ON
+            AUTO_BUILD ${KAN_APPLICATION_ENABLE_AUTO_BUILD}
+            PLUGINS ${CORE_PLUGINS}
+            TAGS ${DEVELOPMENT_TAGS})
 
-    string (APPEND DEV_CORE_CONFIGURATOR_CONTENT "list (JOIN PLUGINS_LIST \", \" PLUGINS)\n")
-    set (USED_MOUNT_NAMES)
+    set (PREFIX "string (APPEND ENABLED_SYSTEMS \"")
+    string (APPEND DEV_CORE_CONFIGURATOR_CONTENT "${PREFIX}+enabled_systems {\\n\")\n")
+    string (APPEND DEV_CORE_CONFIGURATOR_CONTENT "${PREFIX}    name = virtual_file_system_t\\n\")\n")
+    string (APPEND DEV_CORE_CONFIGURATOR_CONTENT "${PREFIX}    configuration {\\n\")\n")
+    string (APPEND DEV_CORE_CONFIGURATOR_CONTENT "${PREFIX}        __type = kan_virtual_file_system_config_t\\n\")\n")
 
     foreach (RESOURCE_DIRECTORY ${CORE_RESOURCE_DIRECTORIES})
         private_generate_resource_directory_mount_name ("${RESOURCE_DIRECTORY}")
-        string (APPEND DEV_CORE_CONFIGURATOR_CONTENT "string (APPEND RESOURCE_DIRECTORIES \"+resource_directories ")
-        string (APPEND DEV_CORE_CONFIGURATOR_CONTENT "{ path = \\\"${RESOURCE_DIRECTORY}\\\" mount_path = ")
-        string (APPEND DEV_CORE_CONFIGURATOR_CONTENT
-                "\\\"${KAN_APPLICATION_RESOURCES_DIRECTORY_NAME}/${MOUNT_NAME}\\\" }\\n\")\n")
+        private_configuration_mount_real (
+                DEV_CORE_CONFIGURATOR_CONTENT
+                "${KAN_APPLICATION_RESOURCES_DIRECTORY_NAME}/${MOUNT_NAME}"
+                "${RESOURCE_DIRECTORY}")
     endforeach ()
 
-    foreach (DEVELOPMENT_TAG ${DEVELOPMENT_TAGS})
-        string (APPEND DEV_CORE_CONFIGURATOR_CONTENT
-                "list (APPEND ENVIRONMENT_TAGS_LIST \"\\\"${DEVELOPMENT_TAG}\\\"\")\n")
-    endforeach ()
+    private_configuration_mount_real (
+            DEV_CORE_CONFIGURATOR_CONTENT
+            "universe_world_definitions"
+            "${WORLD_DIRECTORY}")
 
-    string (APPEND DEV_CORE_CONFIGURATOR_CONTENT "list (JOIN ENVIRONMENT_TAGS_LIST \", \" ENVIRONMENT_TAGS)\n")
-    string (APPEND DEV_CORE_CONFIGURATOR_CONTENT
-            "set (PLUGINS_DIRECTORY_PATH \"${KAN_APPLICATION_PLUGINS_DIRECTORY_NAME}\")\n")
-    string (APPEND DEV_CORE_CONFIGURATOR_CONTENT
-            "set (WORLDS_DIRECTORY_PATH \"${WORLD_DIRECTORY}\")\n")
-    string (APPEND DEV_CORE_CONFIGURATOR_CONTENT "set (OBSERVE_WORLD_DEFINITIONS 1)\n")
-    string (APPEND DEV_CORE_CONFIGURATOR_CONTENT "set (ENABLE_CODE_HOT_RELOAD 1)\n")
-
-    if (KAN_APPLICATION_ENABLE_AUTO_BUILD_AND_HOT_RELOAD)
-        string (APPEND DEV_CORE_CONFIGURATOR_CONTENT "set (AUTO_CODE_HOT_RELOAD_COMMAND ")
-        string (APPEND DEV_CORE_CONFIGURATOR_CONTENT
-                "\"auto_build_and_hot_reload_command = \\\"${CMAKE_COMMAND} ")
-        string (APPEND DEV_CORE_CONFIGURATOR_CONTENT "--build \\\\\\\"${CMAKE_BINARY_DIR}\\\\\\\" ")
-        string (APPEND DEV_CORE_CONFIGURATOR_CONTENT
-                "--target \\\\\\\"${APPLICATION_NAME}_dev_all_plugins\\\\\\\"\\\"\")\n")
-    endif ()
+    string (APPEND DEV_CORE_CONFIGURATOR_CONTENT "${PREFIX}    }\\n\")\n")
+    string (APPEND DEV_CORE_CONFIGURATOR_CONTENT "${PREFIX}}\")\n")
 
     set (DEV_CORE_CONFIGURATION_PATH "${DEV_CONFIGURATION_DIRECTORY}/core.rd")
     string (APPEND DEV_CORE_CONFIGURATOR_CONTENT
@@ -840,24 +932,37 @@ function (application_generate)
         endif ()
 
         set (DEV_PROGRAM_CONFIGURATOR_CONTENT)
+        string (APPEND DEV_PROGRAM_CONFIGURATOR_CONTENT "${PREFIX}+enabled_systems {\\n\")\n")
+        string (APPEND DEV_PROGRAM_CONFIGURATOR_CONTENT "${PREFIX}    name = plugin_system_t\\n\")\n")
+        string (APPEND DEV_PROGRAM_CONFIGURATOR_CONTENT "${PREFIX}    configuration {\\n\")\n")
+        string (APPEND DEV_PROGRAM_CONFIGURATOR_CONTENT "${PREFIX}        __type = kan_plugin_system_config_t\\n\")\n")
+        list (LENGTH CORE_PLUGINS INDEX)
+
         foreach (PLUGIN ${PROGRAM_PLUGINS})
-            string (APPEND DEV_PROGRAM_CONFIGURATOR_CONTENT
-                    "list (APPEND PLUGINS_LIST \"\\\"${PLUGIN}_library\\\"\")\n")
+            string (APPEND DEV_PROGRAM_CONFIGURATOR_CONTENT "${PREFIX}        plugins[${INDEX}] = \\\"")
+            string (APPEND DEV_PROGRAM_CONFIGURATOR_CONTENT "${PLUGIN}_library")
+            string (APPEND DEV_PROGRAM_CONFIGURATOR_CONTENT "\\\"\\n\")\n")
+            math (EXPR INDEX "${INDEX} + 1")
         endforeach ()
 
-        string (APPEND DEV_PROGRAM_CONFIGURATOR_CONTENT "list (JOIN PLUGINS_LIST \", \" PLUGINS)\n")
-        set (USED_MOUNT_NAMES)
+        string (APPEND DEV_PROGRAM_CONFIGURATOR_CONTENT "${PREFIX}    }\\n\")\n")
+        string (APPEND DEV_PROGRAM_CONFIGURATOR_CONTENT "${PREFIX}}\\n\\n\")\n")
+
+        string (APPEND DEV_PROGRAM_CONFIGURATOR_CONTENT "${PREFIX}+enabled_systems {\\n\")\n")
+        string (APPEND DEV_PROGRAM_CONFIGURATOR_CONTENT "${PREFIX}    name = virtual_file_system_t\\n\")\n")
+        string (APPEND DEV_PROGRAM_CONFIGURATOR_CONTENT "${PREFIX}    configuration {\\n\")\n")
+        string (APPEND DEV_PROGRAM_CONFIGURATOR_CONTENT "${PREFIX}        __type = kan_virtual_file_system_config_t\\n\")\n")
 
         foreach (RESOURCE_DIRECTORY ${RESOURCE_DIRECTORIES})
             private_generate_resource_directory_mount_name ("${RESOURCE_DIRECTORY}")
-
-            string (APPEND DEV_PROGRAM_CONFIGURATOR_CONTENT
-                    "string (APPEND RESOURCE_DIRECTORIES \"+resource_directories ")
-
-            string (APPEND DEV_PROGRAM_CONFIGURATOR_CONTENT "{ path = \\\"${RESOURCE_DIRECTORY}\\\" mount_path = ")
-            string (APPEND DEV_PROGRAM_CONFIGURATOR_CONTENT
-                    "\\\"${KAN_APPLICATION_RESOURCES_DIRECTORY_NAME}/${MOUNT_NAME}\\\" }\\n\")\n")
+            private_configuration_mount_real (
+                    DEV_PROGRAM_CONFIGURATOR_CONTENT
+                    "${KAN_APPLICATION_RESOURCES_DIRECTORY_NAME}/${MOUNT_NAME}"
+                    "${RESOURCE_DIRECTORY}")
         endforeach ()
+
+        string (APPEND DEV_PROGRAM_CONFIGURATOR_CONTENT "${PREFIX}    }\\n\")\n")
+        string (APPEND DEV_PROGRAM_CONFIGURATOR_CONTENT "${PREFIX}}\")\n")
 
         set (DEV_PROGRAM_CONFIGURATION_PATH "${DEV_CONFIGURATION_DIRECTORY}/program_${PROGRAM_NAME}.rd")
         string (APPEND DEV_PROGRAM_CONFIGURATOR_CONTENT
@@ -1070,52 +1175,48 @@ function (application_generate)
         endif ()
 
         set (PACK_CORE_CONFIGURATOR_CONTENT)
-        foreach (PLUGIN ${CORE_PLUGINS})
-            string (APPEND PACK_CORE_CONFIGURATOR_CONTENT "list (APPEND PLUGINS_LIST \"\\\"${PLUGIN}_library\\\"\")\n")
-        endforeach ()
+        private_core_configurator_common_content (
+                OUTPUT PACK_CORE_CONFIGURATOR_CONTENT
+                HOT_RELOAD ${KAN_APPLICATION_ENABLE_CODE_HOT_RELOAD_IN_PACKAGED}
+                AUTO_BUILD OFF
+                PLUGINS ${CORE_PLUGINS}
+                TAGS ${TAGS})
 
-        string (APPEND PACK_CORE_CONFIGURATOR_CONTENT "list (JOIN PLUGINS_LIST \", \" PLUGINS)\n")
+        string (APPEND PACK_CORE_CONFIGURATOR_CONTENT "${PREFIX}+enabled_systems {\\n\")\n")
+        string (APPEND PACK_CORE_CONFIGURATOR_CONTENT "${PREFIX}    name = virtual_file_system_t\\n\")\n")
+        string (APPEND PACK_CORE_CONFIGURATOR_CONTENT "${PREFIX}    configuration {\\n\")\n")
+        string (APPEND PACK_CORE_CONFIGURATOR_CONTENT "${PREFIX}        __type = kan_virtual_file_system_config_t\\n\")\n")
+        
         if (KAN_APPLICATION_PACK_WITH_RAW_RESOURCES)
             set (USED_MOUNT_NAMES)
             foreach (RESOURCE_DIRECTORY ${CORE_RESOURCE_DIRECTORIES})
                 private_generate_resource_directory_mount_name ("${RESOURCE_DIRECTORY}")
-                string (APPEND PACK_CORE_CONFIGURATOR_CONTENT
-                        "string (APPEND RESOURCE_DIRECTORIES \"+resource_directories ")
-                string (APPEND PACK_CORE_CONFIGURATOR_CONTENT
-                        "{ path = \\\"${KAN_APPLICATION_RESOURCES_DIRECTORY_NAME}/${MOUNT_NAME}\\\"")
-                string (APPEND PACK_CORE_CONFIGURATOR_CONTENT
-                        "mount_path = \\\"${KAN_APPLICATION_RESOURCES_DIRECTORY_NAME}/${MOUNT_NAME}\\\" }\\n\")\n")
+                private_configuration_mount_real (
+                        PACK_CORE_CONFIGURATOR_CONTENT
+                        "${KAN_APPLICATION_RESOURCES_DIRECTORY_NAME}/${MOUNT_NAME}"
+                        "${KAN_APPLICATION_RESOURCES_DIRECTORY_NAME}/${MOUNT_NAME}")
             endforeach ()
 
         else ()
-            string (APPEND PACK_CORE_CONFIGURATOR_CONTENT "string (APPEND RESOURCE_PACKS \"+resource_packs ")
-            string (APPEND PACK_CORE_CONFIGURATOR_CONTENT
-                    "{ path = \\\"${KAN_APPLICATION_RESOURCES_DIRECTORY_NAME}/core.pack\\\"")
-            string (APPEND PACK_CORE_CONFIGURATOR_CONTENT
-                    " mount_path = \\\"${KAN_APPLICATION_RESOURCES_DIRECTORY_NAME}/core\\\" }\\n\")\n")
+            string (APPEND PACK_CORE_CONFIGURATOR_CONTENT "${PREFIX}        +mount_read_only_pack {\\n\")\n")
+            string (APPEND PACK_CORE_CONFIGURATOR_CONTENT "${PREFIX}            mount_path = \\\"")
+            string (APPEND PACK_CORE_CONFIGURATOR_CONTENT "${KAN_APPLICATION_RESOURCES_DIRECTORY_NAME}/core")
+            string (APPEND PACK_CORE_CONFIGURATOR_CONTENT "\\\"\\n\")\n")
+
+            string (APPEND PACK_CORE_CONFIGURATOR_CONTENT "${PREFIX}            pack_real_path = \\\"")
+            string (APPEND PACK_CORE_CONFIGURATOR_CONTENT "${KAN_APPLICATION_RESOURCES_DIRECTORY_NAME}/core.pack")
+            string (APPEND PACK_CORE_CONFIGURATOR_CONTENT "\\\"\\n\")\n")
+
+            string (APPEND PACK_CORE_CONFIGURATOR_CONTENT "${PREFIX}        }\\n\")\n")
         endif ()
 
-        foreach (TAG ${TAGS})
-            string (APPEND PACK_CORE_CONFIGURATOR_CONTENT "list (APPEND ENVIRONMENT_TAGS_LIST \"\\\"${TAG}\\\"\")\n")
-        endforeach ()
+        private_configuration_mount_real (
+                PACK_CORE_CONFIGURATOR_CONTENT
+                "universe_world_definitions"
+                "${KAN_APPLICATION_PACKAGED_WORLD_DIRECTORY_NAME}")
 
-        string (APPEND PACK_CORE_CONFIGURATOR_CONTENT "list (JOIN ENVIRONMENT_TAGS_LIST \", \" ENVIRONMENT_TAGS)\n")
-        string (APPEND PACK_CORE_CONFIGURATOR_CONTENT
-                "set (PLUGINS_DIRECTORY_PATH \"${KAN_APPLICATION_PLUGINS_DIRECTORY_NAME}\")\n")
-        string (APPEND PACK_CORE_CONFIGURATOR_CONTENT
-                "set (WORLDS_DIRECTORY_PATH \"${KAN_APPLICATION_PACKAGED_WORLD_DIRECTORY_NAME}\")\n")
-
-        if (KAN_APPLICATION_OBSERVE_WORLDS_IN_PACKAGED)
-            string (APPEND PACK_CORE_CONFIGURATOR_CONTENT "set (OBSERVE_WORLD_DEFINITIONS 1)\n")
-        else ()
-            string (APPEND PACK_CORE_CONFIGURATOR_CONTENT "set (OBSERVE_WORLD_DEFINITIONS 0)\n")
-        endif ()
-
-        if (KAN_APPLICATION_ENABLE_CODE_HOT_RELOAD_IN_PACKAGED)
-            string (APPEND PACK_CORE_CONFIGURATOR_CONTENT "set (ENABLE_CODE_HOT_RELOAD 1)\n")
-        else ()
-            string (APPEND PACK_CORE_CONFIGURATOR_CONTENT "set (ENABLE_CODE_HOT_RELOAD 0)\n")
-        endif ()
+        string (APPEND PACK_CORE_CONFIGURATOR_CONTENT "${PREFIX}    }\\n\")\n")
+        string (APPEND PACK_CORE_CONFIGURATOR_CONTENT "${PREFIX}}\")\n")
 
         set (PACK_CORE_CONFIGURATION_PATH "${PACK_CONFIGURATION_DIRECTORY}/core.rd")
         string (APPEND PACK_CORE_CONFIGURATOR_CONTENT
@@ -1148,23 +1249,39 @@ function (application_generate)
             endif ()
 
             set (PACK_PROGRAM_CONFIGURATOR_CONTENT)
+            string (APPEND PACK_PROGRAM_CONFIGURATOR_CONTENT "${PREFIX}+enabled_systems {\\n\")\n")
+            string (APPEND PACK_PROGRAM_CONFIGURATOR_CONTENT "${PREFIX}    name = plugin_system_t\\n\")\n")
+            string (APPEND PACK_PROGRAM_CONFIGURATOR_CONTENT "${PREFIX}    configuration {\\n\")\n")
+            string (APPEND PACK_PROGRAM_CONFIGURATOR_CONTENT 
+                    "${PREFIX}        __type = kan_plugin_system_config_t\\n\")\n")
+            list (LENGTH CORE_PLUGINS INDEX)
+
             foreach (PLUGIN ${PROGRAM_PLUGINS})
-                string (APPEND PACK_PROGRAM_CONFIGURATOR_CONTENT
-                        "list (APPEND PLUGINS_LIST \"\\\"${PLUGIN}_library\\\"\")\n")
+                string (APPEND PACK_PROGRAM_CONFIGURATOR_CONTENT "${PREFIX}        plugins[${INDEX}] = \\\"")
+                string (APPEND PACK_PROGRAM_CONFIGURATOR_CONTENT "${PLUGIN}_library")
+                string (APPEND PACK_PROGRAM_CONFIGURATOR_CONTENT "\\\"\\n\")\n")
+                math (EXPR INDEX "${INDEX} + 1")
             endforeach ()
 
-            string (APPEND PACK_PROGRAM_CONFIGURATOR_CONTENT "list (JOIN PLUGINS_LIST \", \" PLUGINS)\n")
+            string (APPEND PACK_PROGRAM_CONFIGURATOR_CONTENT "${PREFIX}    }\\n\")\n")
+            string (APPEND PACK_PROGRAM_CONFIGURATOR_CONTENT "${PREFIX}}\\n\\n\")\n")
+
+            string (APPEND PACK_PROGRAM_CONFIGURATOR_CONTENT "${PREFIX}+enabled_systems {\\n\")\n")
+            string (APPEND PACK_PROGRAM_CONFIGURATOR_CONTENT "${PREFIX}    name = virtual_file_system_t\\n\")\n")
+            string (APPEND PACK_PROGRAM_CONFIGURATOR_CONTENT "${PREFIX}    configuration {\\n\")\n")
+            string (APPEND PACK_PROGRAM_CONFIGURATOR_CONTENT 
+                    "${PREFIX}        __type = kan_virtual_file_system_config_t\\n\")\n")
+
             if (KAN_APPLICATION_PACK_WITH_RAW_RESOURCES)
                 private_gather_plugins_resource_directories ("${PROGRAM_PLUGINS}" "RESOURCE_DIRECTORIES")
                 set (USED_MOUNT_NAMES)
 
                 foreach (RESOURCE_DIRECTORY ${RESOURCE_DIRECTORIES})
                     private_generate_resource_directory_mount_name ("${RESOURCE_DIRECTORY}")
-                    set (RELATIVE_PATH "${KAN_APPLICATION_RESOURCES_DIRECTORY_NAME}/${MOUNT_NAME}")
-                    string (APPEND PACK_PROGRAM_CONFIGURATOR_CONTENT
-                            "string (APPEND RESOURCE_DIRECTORIES \"+resource_directories ")
-                    string (APPEND PACK_PROGRAM_CONFIGURATOR_CONTENT
-                            "{ path = \\\"${RELATIVE_PATH}\\\" mount_path = \\\"${RELATIVE_PATH}\\\" }\\n\")\n")
+                    private_configuration_mount_real (
+                            PACK_PROGRAM_CONFIGURATOR_CONTENT
+                            "${KAN_APPLICATION_RESOURCES_DIRECTORY_NAME}/${MOUNT_NAME}"
+                            "${KAN_APPLICATION_RESOURCES_DIRECTORY_NAME}/${MOUNT_NAME}")
                 endforeach ()
 
             else ()
@@ -1173,11 +1290,21 @@ function (application_generate)
                     set (PACK_PATH "${KAN_APPLICATION_RESOURCES_DIRECTORY_NAME}/${PLUGIN}.pack")
                     set (MOUNT_PATH "${KAN_APPLICATION_RESOURCES_DIRECTORY_NAME}/${PLUGIN_NAME}")
 
-                    string (APPEND PACK_PROGRAM_CONFIGURATOR_CONTENT "string (APPEND RESOURCE_PACKS \"+resource_packs ")
-                    string (APPEND PACK_PROGRAM_CONFIGURATOR_CONTENT
-                            "{ path = \\\"${PACK_PATH}\\\" mount_path = \\\"${MOUNT_PATH}\\\" }\\n\")\n")
+                    string (APPEND PACK_PROGRAM_CONFIGURATOR_CONTENT "${PREFIX}        +mount_read_only_pack {\\n\")\n")
+                    string (APPEND PACK_PROGRAM_CONFIGURATOR_CONTENT "${PREFIX}            mount_path = \\\"")
+                    string (APPEND PACK_PROGRAM_CONFIGURATOR_CONTENT "${MOUNT_PATH}")
+                    string (APPEND PACK_PROGRAM_CONFIGURATOR_CONTENT "\\\"\\n\")\n")
+
+                    string (APPEND PACK_PROGRAM_CONFIGURATOR_CONTENT "${PREFIX}            pack_real_path = \\\"")
+                    string (APPEND PACK_PROGRAM_CONFIGURATOR_CONTENT "${PACK_PATH}")
+                    string (APPEND PACK_PROGRAM_CONFIGURATOR_CONTENT "\\\"\\n\")\n")
+
+                    string (APPEND PACK_PROGRAM_CONFIGURATOR_CONTENT "${PREFIX}        }\\n\")\n")
                 endforeach ()
             endif ()
+
+            string (APPEND PACK_PROGRAM_CONFIGURATOR_CONTENT "${PREFIX}    }\\n\")\n")
+            string (APPEND PACK_PROGRAM_CONFIGURATOR_CONTENT "${PREFIX}}\")\n")
 
             set (PACK_PROGRAM_CONFIGURATION_PATH "${PACK_CONFIGURATION_DIRECTORY}/program_${PROGRAM_NAME}.rd")
             string (APPEND PACK_PROGRAM_CONFIGURATOR_CONTENT

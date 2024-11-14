@@ -822,10 +822,7 @@ static kan_context_t create_context (const struct kan_application_resource_proje
 
     kan_file_system_path_container_reset_length (&path_container, check_index);
     kan_file_system_path_container_append (&path_container, project->plugin_relative_directory);
-
-    plugin_system_config.plugin_directory_path = kan_allocate_general (kan_plugin_system_config_get_allocation_group (),
-                                                                       path_container.length + 1u, _Alignof (char));
-    memcpy (plugin_system_config.plugin_directory_path, path_container.path, path_container.length + 1u);
+    plugin_system_config.plugin_directory_path = kan_string_intern (path_container.path);
 
     for (kan_loop_size_t index = 0u; index < project->plugins.size; ++index)
     {

@@ -192,17 +192,15 @@ KAN_HANDLE_DEFINE (kan_render_read_back_status_t);
 /// \brief Contains render backend system configuration data.
 struct kan_render_backend_system_config_t
 {
-    /// \brief If true, render backend system is fully disabled.
-    /// \details Needed due to the fact that systems are always created,
-    ///          but there is no need for render in applications like game server.
-    kan_bool_t disable_render;
     kan_bool_t prefer_vsync;
-
     kan_interned_string_t application_info_name;
     kan_render_size_t version_major;
     kan_render_size_t version_minor;
     kan_render_size_t version_patch;
 };
+
+CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_backend_system_config_init (
+    struct kan_render_backend_system_config_t *instance);
 
 /// \brief Enumerates types of GPU-like devices known to render backend.
 enum kan_render_device_type_t
@@ -330,7 +328,9 @@ struct kan_render_supported_device_info_t
 struct kan_render_supported_devices_t
 {
     kan_instance_size_t supported_device_count;
+    // \c_interface_scanner_disable
     struct kan_render_supported_device_info_t devices[];
+    // \c_interface_scanner_enable
 };
 
 /// \brief Returns cached information about all found supported devices.
