@@ -302,7 +302,7 @@ struct compiled_patch_section_stack_t
 {
     void *target_data;
     void *base_data;
-    struct compiled_patch_section_stack_item_t *stack_pointer;
+    struct compiled_patch_section_stack_item_t *stack_end_pointer;
     struct compiled_patch_section_stack_item_t stack[KAN_REFLECTION_PATCH_MAX_SECTION_DEPTH];
 };
 
@@ -2294,7 +2294,7 @@ static inline void compiled_patch_section_stack_init (struct compiled_patch_sect
 {
     stack->target_data = base_data;
     stack->base_data = base_data;
-    stack->stack_pointer = stack->stack - 1u;
+    stack->stack_end_pointer = stack->stack;
 }
 
 static inline void compiled_patch_section_stack_go_to (kan_reflection_registry_t registry,
@@ -2302,27 +2302,29 @@ static inline void compiled_patch_section_stack_go_to (kan_reflection_registry_t
                                                        struct compiled_patch_node_section_suffix_t *section_data)
 {
     struct compiled_patch_section_stack_item_t *old_append_section = NULL;
-    while (stack->stack_pointer >= stack->stack)
+    while (stack->stack_end_pointer > stack->stack)
     {
-        if (stack->stack_pointer->section->my_section_id == section_data->parent_section_id)
+        struct compiled_patch_section_stack_item_t *item = stack->stack_end_pointer - 1u;
+        if (item->section->my_section_id == section_data->parent_section_id)
         {
             break;
         }
 
-        if (stack->stack_pointer->section->packed_type ==
-            (uint16_t) KAN_REFLECTION_PATCH_SECTION_TYPE_DYNAMIC_ARRAY_APPEND)
+        if (item->section->packed_type == (uint16_t) KAN_REFLECTION_PATCH_SECTION_TYPE_DYNAMIC_ARRAY_APPEND)
         {
-            old_append_section = stack->stack_pointer;
+            old_append_section = item;
         }
 
-        --stack->stack_pointer;
+        --stack->stack_end_pointer;
     }
 
     KAN_ASSERT (section_data->parent_section_id == COMPILED_SECTION_ID_NONE ||
-                (stack->stack_pointer >= stack->stack &&
-                 stack->stack_pointer->section->my_section_id == section_data->parent_section_id))
+                (stack->stack_end_pointer > stack->stack &&
+                 (stack->stack_end_pointer - 1u)->section->my_section_id == section_data->parent_section_id))
 
-    void *base = stack->stack_pointer >= stack->stack ? stack->stack_pointer->target_data : stack->base_data;
+    struct compiled_patch_section_stack_item_t *stack_item =
+        stack->stack_end_pointer > stack->stack ? stack->stack_end_pointer - 1u : NULL;
+    void *base = stack_item >= stack->stack ? stack_item->target_data : stack->base_data;
     void *source = ((uint8_t *) base) + section_data->source_offset_in_parent;
     void *target = NULL;
 
@@ -2404,12 +2406,11 @@ static inline void compiled_patch_section_stack_go_to (kan_reflection_registry_t
     }
     }
 
-    ++stack->stack_pointer;
-    KAN_ASSERT (stack->stack_pointer >= stack->stack &&
-                stack->stack_pointer < stack->stack + KAN_REFLECTION_PATCH_MAX_SECTION_DEPTH)
-    stack->stack_pointer->section = section_data;
-    stack->stack_pointer->source_data = source;
-    stack->stack_pointer->target_data = target;
+    KAN_ASSERT (stack->stack_end_pointer < stack->stack + KAN_REFLECTION_PATCH_MAX_SECTION_DEPTH)
+    stack->stack_end_pointer->section = section_data;
+    stack->stack_end_pointer->source_data = source;
+    stack->stack_end_pointer->target_data = target;
+    ++stack->stack_end_pointer;
     stack->target_data = target;
 }
 
@@ -2448,17 +2449,17 @@ void kan_reflection_patch_apply (kan_reflection_patch_t patch, void *target)
     }
 
     // Reduce capacity after last appends if any.
-    while (section_stack.stack_pointer >= section_stack.stack)
+    while (section_stack.stack_end_pointer > section_stack.stack)
     {
-        if (section_stack.stack_pointer->section->packed_type ==
-            (uint16_t) KAN_REFLECTION_PATCH_SECTION_TYPE_DYNAMIC_ARRAY_APPEND)
+        struct compiled_patch_section_stack_item_t *item = section_stack.stack_end_pointer - 1u;
+        if (item->section->packed_type == (uint16_t) KAN_REFLECTION_PATCH_SECTION_TYPE_DYNAMIC_ARRAY_APPEND)
         {
             // We might've increased capacity too much while appending. Reset capacity to size.
-            struct kan_dynamic_array_t *array = section_stack.stack_pointer->source_data;
+            struct kan_dynamic_array_t *array = item->source_data;
             kan_dynamic_array_set_capacity (array, array->size);
         }
 
-        --section_stack.stack_pointer;
+        --section_stack.stack_end_pointer;
     }
 }
 
