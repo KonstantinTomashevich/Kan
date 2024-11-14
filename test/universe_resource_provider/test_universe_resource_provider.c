@@ -1023,7 +1023,8 @@ static void run_request_resources_and_check_test (kan_context_t context)
     };
 
     kan_reflection_patch_builder_t patch_builder = kan_reflection_patch_builder_create ();
-    kan_reflection_patch_builder_add_chunk (patch_builder, 0u, sizeof (struct kan_resource_provider_configuration_t),
+    kan_reflection_patch_builder_add_chunk (patch_builder, KAN_REFLECTION_PATCH_BUILDER_SECTION_ROOT, 0u,
+                                            sizeof (struct kan_resource_provider_configuration_t),
                                             &resource_provider_configuration);
     kan_reflection_patch_t resource_provider_configuration_patch = kan_reflection_patch_builder_build (
         patch_builder, registry,
@@ -1160,7 +1161,8 @@ KAN_TEST_CASE (file_system_observation)
     };
 
     kan_reflection_patch_builder_t patch_builder = kan_reflection_patch_builder_create ();
-    kan_reflection_patch_builder_add_chunk (patch_builder, 0u, sizeof (struct kan_resource_provider_configuration_t),
+    kan_reflection_patch_builder_add_chunk (patch_builder, KAN_REFLECTION_PATCH_BUILDER_SECTION_ROOT, 0u,
+                                            sizeof (struct kan_resource_provider_configuration_t),
                                             &resource_provider_configuration);
     kan_reflection_patch_t resource_provider_configuration_patch = kan_reflection_patch_builder_build (
         patch_builder, registry,
@@ -1240,7 +1242,8 @@ KAN_TEST_CASE (indexing_stress_test)
     };
 
     kan_reflection_patch_builder_t patch_builder = kan_reflection_patch_builder_create ();
-    kan_reflection_patch_builder_add_chunk (patch_builder, 0u, sizeof (struct kan_resource_provider_configuration_t),
+    kan_reflection_patch_builder_add_chunk (patch_builder, KAN_REFLECTION_PATCH_BUILDER_SECTION_ROOT, 0u,
+                                            sizeof (struct kan_resource_provider_configuration_t),
                                             &resource_provider_configuration);
     kan_reflection_patch_t resource_provider_configuration_patch = kan_reflection_patch_builder_build (
         patch_builder, registry,

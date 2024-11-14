@@ -224,8 +224,8 @@ UNIVERSE_RESOURCE_REFERENCE_KAN_API void mutator_template_deploy_resource_refere
     state->need_to_cancel_old_operations = KAN_TRUE;
 
     kan_resource_pipeline_reference_type_info_storage_build (
-        &state->info_storage, kan_allocation_group_get_child (state->my_allocation_group, "scanned"),
-        kan_universe_get_reflection_registry (universe));
+        &state->info_storage, kan_universe_get_reflection_registry (universe),
+        kan_allocation_group_get_child (state->my_allocation_group, "scanned"));
 
     kan_stack_group_allocator_init (&state->temporary_allocator, state->my_allocation_group,
                                     KAN_UNIVERSE_RESOURCE_REFERENCE_TEMPORARY_STACK);

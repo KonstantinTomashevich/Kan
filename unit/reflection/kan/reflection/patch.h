@@ -68,7 +68,7 @@ KAN_HANDLE_DEFINE (kan_reflection_patch_builder_section_t);
 
 KAN_HANDLE_DEFINE (kan_reflection_patch_t);
 KAN_HANDLE_DEFINE (kan_reflection_patch_iterator_t);
-KAN_TYPED_ID_32_DEFINE(kan_reflection_patch_serializable_section_id_t);
+KAN_TYPED_ID_32_DEFINE (kan_reflection_patch_serializable_section_id_t);
 
 /// \brief Defines supported types of patch sections.
 /// \details Section type describes how outer section address will be retrieved and how should it be managed.
@@ -150,7 +150,7 @@ REFLECTION_API kan_reflection_patch_t kan_reflection_patch_builder_build (kan_re
 /// \brief Destroys given patch builder and frees its resources.
 REFLECTION_API void kan_reflection_patch_builder_destroy (kan_reflection_patch_builder_t builder);
 
-/// \brief Gets type of structure for given patch.
+/// \brief Gets type of structure for given patch. Will be NULL if patch was invalidated during registry migration.
 REFLECTION_API const struct kan_reflection_struct_t *kan_reflection_patch_get_type (kan_reflection_patch_t patch);
 
 /// \brief Gets count of chunks inside given patch.

@@ -2213,11 +2213,11 @@ KAN_TEST_CASE (patch_with_sections)
     struct root_type_post_t root_post;
     root_type_post_init (&root_post);
     kan_reflection_patch_apply (patch, &root_post);
-    
+
     KAN_TEST_CHECK (root_pre.data_before == 3u)
     KAN_TEST_CHECK (root_pre.data_after == 4u)
     KAN_TEST_ASSERT (root_pre.middle_structs.size == 2u)
-    
+
     struct middle_type_post_t *first_middle_post = &((struct middle_type_post_t *) root_post.middle_structs.data)[0u];
     KAN_TEST_ASSERT (first_middle_post->inner_structs.size == 3u)
     struct most_inner_type_post_t *inner_post =

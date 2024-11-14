@@ -2733,8 +2733,8 @@ int main (int argument_count, char **argument_values)
         KAN_ASSERT (KAN_HANDLE_IS_VALID (reflection_system))
         global.registry = kan_reflection_system_get_registry (reflection_system);
         global.binary_script_storage = kan_serialization_binary_script_storage_create (global.registry);
-        kan_resource_pipeline_reference_type_info_storage_build (
-            &global.reference_type_info_storage, reference_type_info_storage_allocation_group, global.registry);
+        kan_resource_pipeline_reference_type_info_storage_build (&global.reference_type_info_storage, global.registry,
+                                                                 reference_type_info_storage_allocation_group);
 
         KAN_LOG (application_framework_resource_builder, KAN_LOG_INFO, "Setting up target structure...")
         kan_dynamic_array_init (&global.targets, global.project.targets.size, sizeof (struct target_t),

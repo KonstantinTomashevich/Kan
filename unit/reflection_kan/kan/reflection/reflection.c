@@ -2049,11 +2049,9 @@ static uint8_t *add_section_nodes (uint8_t *output,
     }
 
     KAN_ASSERT (session_top_level_source_type)
-    output_node->section_suffix.source_field =
-        kan_reflection_registry_query_local_field_by_offset (registry,
-                                                             session_top_level_source_type->name,
-                                                             section->source_offset % session_top_level_source_type->size,
-                                                             &output_node->section_suffix.source_field_struct);
+    output_node->section_suffix.source_field = kan_reflection_registry_query_local_field_by_offset (
+        registry, session_top_level_source_type->name, section->source_offset % session_top_level_source_type->size,
+        &output_node->section_suffix.source_field_struct);
 
     KAN_ASSERT (output_node->section_suffix.source_field)
     KAN_ASSERT (output_node->section_suffix.source_field_struct)

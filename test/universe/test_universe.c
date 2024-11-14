@@ -707,7 +707,8 @@ KAN_TEST_CASE (update_hierarchy)
             kan_dynamic_array_add_last (&configuration->variants);                                                     \
         kan_universe_world_configuration_variant_init (variant);                                                       \
                                                                                                                        \
-        kan_reflection_patch_builder_add_chunk (patch_builder, 0u, sizeof (kan_instance_size_t), INDEX);               \
+        kan_reflection_patch_builder_add_chunk (patch_builder, KAN_REFLECTION_PATCH_BUILDER_SECTION_ROOT, 0u,          \
+                                                sizeof (kan_instance_size_t), INDEX);                                  \
         variant->data = kan_reflection_patch_builder_build (patch_builder, registry, config_type);                     \
                                                                                                                        \
         kan_dynamic_array_set_capacity (&(DEFINITION)->pipelines, 1u);                                                 \

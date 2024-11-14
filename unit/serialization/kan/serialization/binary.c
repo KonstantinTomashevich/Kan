@@ -2044,8 +2044,8 @@ static inline const struct kan_reflection_field_t *find_source_field_for_child_p
     const struct kan_reflection_struct_t *parent_struct =
         kan_reflection_registry_query_struct (state->script_storage->registry, parent_type_name);
 
-    return kan_reflection_registry_query_local_field_by_offset (
-        state->script_storage->registry, parent_type_name, offset_in_parent % parent_struct->size, NULL);
+    return kan_reflection_registry_query_local_field_by_offset (state->script_storage->registry, parent_type_name,
+                                                                offset_in_parent % parent_struct->size, NULL);
 }
 
 static inline kan_bool_t read_patch_block (struct serialization_read_state_t *state,
