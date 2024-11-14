@@ -282,7 +282,7 @@ struct compiled_patch_t
 {
     const struct kan_reflection_struct_t *type;
     kan_instance_size_t node_count;
-    kan_instance_size_t max_section_id;
+    kan_instance_size_t section_id_bound;
     struct compiled_patch_node_t *begin;
     struct compiled_patch_node_t *end;
 
@@ -1318,6 +1318,116 @@ const struct kan_reflection_field_t *kan_reflection_registry_query_local_field (
     return field_reflection;
 }
 
+const struct kan_reflection_field_t *kan_reflection_registry_query_local_field_by_offset (
+    kan_reflection_registry_t registry,
+    kan_interned_string_t struct_name,
+    kan_instance_size_t exact_offset,
+    const struct kan_reflection_struct_t **output_owner_struct)
+{
+    const struct kan_reflection_struct_t *parent_type = kan_reflection_registry_query_struct (registry, struct_name);
+    kan_loop_size_t first = 0u;
+    kan_loop_size_t last = parent_type->fields_count;
+
+    while (first < last)
+    {
+        kan_loop_size_t middle = (first + last) / 2u;
+        const struct kan_reflection_field_t *field = &parent_type->fields[middle];
+
+        if (exact_offset < field->offset)
+        {
+            last = middle;
+        }
+        else if (exact_offset >= field->offset + field->size)
+        {
+            first = middle + 1u;
+        }
+        else
+        {
+            switch (field->archetype)
+            {
+            case KAN_REFLECTION_ARCHETYPE_SIGNED_INT:
+            case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
+            case KAN_REFLECTION_ARCHETYPE_FLOATING:
+            case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
+            case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:
+            case KAN_REFLECTION_ARCHETYPE_ENUM:
+            case KAN_REFLECTION_ARCHETYPE_EXTERNAL_POINTER:
+            case KAN_REFLECTION_ARCHETYPE_STRUCT_POINTER:
+            case KAN_REFLECTION_ARCHETYPE_PATCH:
+                if (field->offset == exact_offset)
+                {
+                    if (output_owner_struct)
+                    {
+                        *output_owner_struct = parent_type;
+                    }
+
+                    return field;
+                }
+
+                // Cannot look into elemental fields.
+                return NULL;
+
+            case KAN_REFLECTION_ARCHETYPE_STRUCT:
+                return kan_reflection_registry_query_local_field_by_offset (
+                    registry, field->archetype_struct.type_name, exact_offset - field->offset, output_owner_struct);
+
+            case KAN_REFLECTION_ARCHETYPE_INLINE_ARRAY:
+                switch (field->archetype_inline_array.item_archetype)
+                {
+                case KAN_REFLECTION_ARCHETYPE_SIGNED_INT:
+                case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
+                case KAN_REFLECTION_ARCHETYPE_FLOATING:
+                case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
+                case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:
+                case KAN_REFLECTION_ARCHETYPE_ENUM:
+                case KAN_REFLECTION_ARCHETYPE_EXTERNAL_POINTER:
+                case KAN_REFLECTION_ARCHETYPE_STRUCT_POINTER:
+                case KAN_REFLECTION_ARCHETYPE_PATCH:
+                    if ((exact_offset - field->offset) % field->archetype_inline_array.item_size == 0u)
+                    {
+                        if (output_owner_struct)
+                        {
+                            *output_owner_struct = parent_type;
+                        }
+
+                        return field;
+                    }
+
+                    return NULL;
+
+                case KAN_REFLECTION_ARCHETYPE_STRUCT:
+                    return kan_reflection_registry_query_local_field_by_offset (
+                        registry, field->archetype_struct.type_name,
+                        (exact_offset - field->offset) % field->archetype_inline_array.item_size, output_owner_struct);
+
+                case KAN_REFLECTION_ARCHETYPE_INLINE_ARRAY:
+                case KAN_REFLECTION_ARCHETYPE_DYNAMIC_ARRAY:
+                    KAN_ASSERT (KAN_FALSE)
+                    break;
+                }
+
+                return NULL;
+
+            case KAN_REFLECTION_ARCHETYPE_DYNAMIC_ARRAY:
+                if (field->offset == exact_offset)
+                {
+                    if (output_owner_struct)
+                    {
+                        *output_owner_struct = parent_type;
+                    }
+
+                    return field;
+                }
+
+                // Cannot look into dynamic array fields.
+                return NULL;
+            }
+        }
+    }
+
+    return NULL;
+}
+
 kan_reflection_registry_enum_iterator_t kan_reflection_registry_enum_iterator_create (
     kan_reflection_registry_t registry)
 {
@@ -1555,8 +1665,25 @@ kan_reflection_patch_builder_section_t kan_reflection_patch_builder_add_section 
     kan_instance_size_t source_offset_in_parent)
 {
     struct patch_builder_t *patch_builder = KAN_HANDLE_GET (builder);
-    struct patch_builder_section_node_t *section = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (
-        &patch_builder->temporary_allocator, struct patch_builder_section_node_t);
+
+    // Search for the same section among already registered.
+    // It is easier to get rid of excessive sections here, not later.
+
+    struct patch_builder_section_node_t *section = patch_builder->first_section;
+    while (section)
+    {
+        if (section->parent == KAN_HANDLE_GET (parent_section) &&
+            (section->type == section_type && section_type != KAN_REFLECTION_PATCH_SECTION_TYPE_DYNAMIC_ARRAY_APPEND) &&
+            section->source_offset == source_offset_in_parent)
+        {
+            return KAN_HANDLE_SET (kan_reflection_patch_builder_section_t, section);
+        }
+
+        section = section->next_in_registration_list;
+    }
+
+    section = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&patch_builder->temporary_allocator,
+                                                        struct patch_builder_section_node_t);
 
     section->next_in_registration_list = patch_builder->first_section;
     patch_builder->first_section = section;
@@ -1667,7 +1794,7 @@ static void validate_compiled_node_internal (kan_instance_size_t adjusted_node_o
         const struct kan_reflection_field_t *field = &type->fields[index];
         const kan_instance_size_t field_begin = field->offset;
 
-        if (field_begin > adjusted_node_offset + adjusted_node_size)
+        if (field_begin >= adjusted_node_offset + adjusted_node_size)
         {
             // We're over, no need to check the rest.
             return;
@@ -1797,34 +1924,11 @@ static inline void validate_compiled_node (const struct compiled_patch_node_t *n
 }
 #endif
 
-static inline kan_bool_t change_node_section_if_possible (struct patch_builder_chunk_node_t *node,
-                                                          struct patch_builder_section_node_t *section)
-{
-    KAN_ASSERT (node->section != section)
-    if (!node->section || !section || node->section->parent != section->parent)
-    {
-        return KAN_FALSE;
-    }
-
-    const kan_bool_t can_change = (node->section->type == section->type &&
-                                   section->type != KAN_REFLECTION_PATCH_SECTION_TYPE_DYNAMIC_ARRAY_APPEND) &&
-                                  (node->section->source_offset == section->source_offset);
-
-    if (can_change)
-    {
-        node->section = section;
-    }
-
-    return can_change;
-}
-
 static inline kan_bool_t patch_builder_chunk_node_less (struct patch_builder_chunk_node_t *left,
                                                         struct patch_builder_chunk_node_t *right)
 {
     // Compare by offset inside one section.
-    if (left->section == right->section ||
-        // Dirty trick, but should be okay. We need to merge sections if user has accidentally created duplicate ones.
-        change_node_section_if_possible (right, left->section))
+    if (left->section == right->section)
     {
         return left->offset < right->offset;
     }
@@ -1841,13 +1945,15 @@ static inline kan_bool_t patch_builder_chunk_node_less (struct patch_builder_chu
     }
 
     // All array set sections always go before array append sections.
-    if (left->section->type == KAN_REFLECTION_PATCH_SECTION_TYPE_DYNAMIC_ARRAY_SET &&
+    if (left->section->parent == right->section->parent &&
+        left->section->type == KAN_REFLECTION_PATCH_SECTION_TYPE_DYNAMIC_ARRAY_SET &&
         right->section->type == KAN_REFLECTION_PATCH_SECTION_TYPE_DYNAMIC_ARRAY_APPEND)
     {
         return KAN_TRUE;
     }
 
-    if (right->section->type == KAN_REFLECTION_PATCH_SECTION_TYPE_DYNAMIC_ARRAY_SET &&
+    if (left->section->parent == right->section->parent &&
+        right->section->type == KAN_REFLECTION_PATCH_SECTION_TYPE_DYNAMIC_ARRAY_SET &&
         left->section->type == KAN_REFLECTION_PATCH_SECTION_TYPE_DYNAMIC_ARRAY_APPEND)
     {
         return KAN_FALSE;
@@ -1890,94 +1996,13 @@ static inline void finish_compiled_data_node (struct compiled_patch_node_t *comp
     }
 }
 
-static void setup_section_source_field (kan_reflection_registry_t registry,
-                                        const struct kan_reflection_struct_t *parent_type,
-                                        enum kan_reflection_patch_section_type_t section_type,
-                                        kan_instance_size_t adjusted_offset,
-                                        struct compiled_patch_node_section_suffix_t *output)
-{
-    kan_loop_size_t first = 0u;
-    kan_loop_size_t last = parent_type->fields_count;
-
-    while (first < last)
-    {
-        kan_loop_size_t middle = (first + last) / 2u;
-        const struct kan_reflection_field_t *field = &parent_type->fields[middle];
-
-        if (adjusted_offset < field->offset)
-        {
-            last = middle;
-        }
-        else if (adjusted_offset >= field->offset + field->size)
-        {
-            first = middle + 1u;
-        }
-        else
-        {
-            // Should contain section source field.
-            switch (field->archetype)
-            {
-            case KAN_REFLECTION_ARCHETYPE_SIGNED_INT:
-            case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
-            case KAN_REFLECTION_ARCHETYPE_FLOATING:
-            case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
-            case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:
-            case KAN_REFLECTION_ARCHETYPE_ENUM:
-            case KAN_REFLECTION_ARCHETYPE_EXTERNAL_POINTER:
-            case KAN_REFLECTION_ARCHETYPE_STRUCT_POINTER:
-            case KAN_REFLECTION_ARCHETYPE_PATCH:
-                // These field types cannot be source fields for any sections.
-                KAN_ASSERT (KAN_FALSE)
-                return;
-
-            case KAN_REFLECTION_ARCHETYPE_STRUCT:
-            {
-                const struct kan_reflection_struct_t *struct_data =
-                    kan_reflection_registry_query_struct (registry, field->archetype_struct.type_name);
-                KAN_ASSERT (struct_data)
-                setup_section_source_field (registry, struct_data, section_type, adjusted_offset - field->offset,
-                                            output);
-                return;
-            }
-
-            case KAN_REFLECTION_ARCHETYPE_INLINE_ARRAY:
-            {
-                // Only struct inline arrays can technically contain sections inside.
-                KAN_ASSERT (field->archetype_inline_array.item_archetype == KAN_REFLECTION_ARCHETYPE_STRUCT)
-
-                const struct kan_reflection_struct_t *struct_data = kan_reflection_registry_query_struct (
-                    registry, field->archetype_inline_array.item_archetype_struct.type_name);
-                KAN_ASSERT (struct_data)
-
-                setup_section_source_field (registry, struct_data, section_type,
-                                            (adjusted_offset - field->offset) % struct_data->size, output);
-                return;
-            }
-
-            case KAN_REFLECTION_ARCHETYPE_DYNAMIC_ARRAY:
-                // Overlaps should not happen.
-                KAN_ASSERT (field->offset == adjusted_offset)
-                // Can only be source field for this section types, otherwise it is malformed.
-                KAN_ASSERT (section_type == KAN_REFLECTION_PATCH_SECTION_TYPE_DYNAMIC_ARRAY_SET ||
-                            section_type == KAN_REFLECTION_PATCH_SECTION_TYPE_DYNAMIC_ARRAY_APPEND)
-
-                output->source_field = field;
-                output->source_field_struct = parent_type;
-                return;
-            }
-        }
-    }
-
-    // Failed to find section source field. It means that patch is malformed.
-    KAN_ASSERT (KAN_FALSE)
-}
-
 static uint8_t *add_section_nodes (uint8_t *output,
                                    struct patch_builder_section_node_t *section,
                                    kan_reflection_registry_t registry,
                                    const struct kan_reflection_struct_t *base_type,
                                    struct compiled_patch_t *output_patch)
 {
+    KAN_ASSERT (!section->produced_suffix)
     if (section->parent && !section->parent->produced_suffix)
     {
         // Parent is an empty container section, we need to add it recursively here then.
@@ -1997,7 +2022,8 @@ static uint8_t *add_section_nodes (uint8_t *output,
     COMPILED_SECTION_ID_ASSERT_POSSIBLE (section)
     output_node->section_suffix.parent_section_id = COMPILED_SECTION_ID_GET (section->parent);
     output_node->section_suffix.my_section_id = COMPILED_SECTION_ID_GET (section);
-    output_patch->max_section_id = KAN_MAX (output_patch->max_section_id, output_node->section_suffix.my_section_id);
+    output_patch->section_id_bound =
+        KAN_MAX (output_patch->section_id_bound, output_node->section_suffix.my_section_id + 1u);
     output_node->section_suffix.packed_type = (uint16_t) section->type;
     output_node->section_suffix.source_offset_in_parent = section->source_offset;
     output_node->section_suffix.bounding_address = 0u;
@@ -2023,8 +2049,24 @@ static uint8_t *add_section_nodes (uint8_t *output,
     }
 
     KAN_ASSERT (session_top_level_source_type)
-    setup_section_source_field (registry, session_top_level_source_type, section->type, section->source_offset,
-                                &output_node->section_suffix);
+    output_node->section_suffix.source_field =
+        kan_reflection_registry_query_local_field_by_offset (registry,
+                                                             session_top_level_source_type->name,
+                                                             section->source_offset % session_top_level_source_type->size,
+                                                             &output_node->section_suffix.source_field_struct);
+
+    KAN_ASSERT (output_node->section_suffix.source_field)
+    KAN_ASSERT (output_node->section_suffix.source_field_struct)
+
+#if defined(KAN_WITH_ASSERT)
+    switch (section->type)
+    {
+    case KAN_REFLECTION_PATCH_SECTION_TYPE_DYNAMIC_ARRAY_SET:
+    case KAN_REFLECTION_PATCH_SECTION_TYPE_DYNAMIC_ARRAY_APPEND:
+        KAN_ASSERT (output_node->section_suffix.source_field->archetype == KAN_REFLECTION_ARCHETYPE_DYNAMIC_ARRAY)
+        break;
+    }
+#endif
 
     output += sizeof (struct compiled_patch_node_t);
     return output;
@@ -2087,8 +2129,7 @@ static kan_bool_t compiled_patch_build_into (struct patch_builder_t *patch_build
     for (kan_loop_size_t index = 0u; index < (kan_loop_size_t) patch_builder->node_count; ++index)
     {
         kan_bool_t new_node;
-        if (current_section != nodes_array[index]->section &&
-            !change_node_section_if_possible (nodes_array[index], current_section))
+        if (current_section != nodes_array[index]->section)
         {
             current_section = nodes_array[index]->section;
             struct patch_builder_section_node_t *section_to_add = current_section;
@@ -2147,7 +2188,7 @@ static kan_bool_t compiled_patch_build_into (struct patch_builder_t *patch_build
         (kan_instance_size_t) kan_apply_alignment (patch_data_size, _Alignof (struct compiled_patch_node_t));
     output_patch->type = type;
     output_patch->node_count = node_count;
-    output_patch->max_section_id = 0u;
+    output_patch->section_id_bound = 0u;
     output_patch->begin = kan_allocate_general (get_compiled_patch_allocation_group (), patch_data_size,
                                                 _Alignof (struct compiled_patch_node_t));
     output_patch->end = (struct compiled_patch_node_t *) (((uint8_t *) output_patch->begin) + patch_data_size);
@@ -2245,6 +2286,12 @@ kan_instance_size_t kan_reflection_patch_get_chunks_count (kan_reflection_patch_
     return patch_data->node_count;
 }
 
+kan_id_32_t kan_reflection_patch_get_section_id_bound (kan_reflection_patch_t patch)
+{
+    struct compiled_patch_t *patch_data = KAN_HANDLE_GET (patch);
+    return (kan_id_32_t) patch_data->section_id_bound;
+}
+
 static inline void compiled_patch_section_stack_init (struct compiled_patch_section_stack_t *stack, void *base_data)
 {
     stack->target_data = base_data;
@@ -2280,6 +2327,14 @@ static inline void compiled_patch_section_stack_go_to (kan_reflection_registry_t
     void *base = stack->stack_pointer >= stack->stack ? stack->stack_pointer->target_data : stack->base_data;
     void *source = ((uint8_t *) base) + section_data->source_offset_in_parent;
     void *target = NULL;
+
+    // We do not check the type here as appends should always come last.
+    if (old_append_section && source != old_append_section->source_data)
+    {
+        // We might've increased capacity too much while appending. Reset capacity to size.
+        struct kan_dynamic_array_t *array = old_append_section->source_data;
+        kan_dynamic_array_set_capacity (array, array->size);
+    }
 
     switch ((enum kan_reflection_patch_section_type_t) section_data->packed_type)
     {
@@ -2349,14 +2404,6 @@ static inline void compiled_patch_section_stack_go_to (kan_reflection_registry_t
 
         break;
     }
-    }
-
-    // We do not check the type here as appends should always come last.
-    if (old_append_section && source != old_append_section->source_data)
-    {
-        // We might've increased capacity too much while appending. Reset capacity to size.
-        struct kan_dynamic_array_t *array = old_append_section->source_data;
-        kan_dynamic_array_set_capacity (array, array->size);
     }
 
     ++stack->stack_pointer;
@@ -4492,14 +4539,14 @@ static inline void patch_migration_context_init (struct patch_migration_context_
     }
 
     context->sections = context->sections_fixed;
-    if (patch->max_section_id > KAN_REFLECTION_MIGRATOR_PATCH_MAX_SECTIONS)
+    if (patch->section_id_bound > KAN_REFLECTION_MIGRATOR_PATCH_MAX_SECTIONS)
     {
         context->sections =
-            kan_allocate_general (group, sizeof (kan_reflection_patch_builder_section_t) * patch->max_section_id,
+            kan_allocate_general (group, sizeof (kan_reflection_patch_builder_section_t) * patch->section_id_bound,
                                   _Alignof (kan_reflection_patch_builder_section_t));
     }
 
-    for (kan_loop_size_t index = 0u; index < (kan_loop_size_t) patch->max_section_id; ++index)
+    for (kan_loop_size_t index = 0u; index < (kan_loop_size_t) patch->section_id_bound; ++index)
     {
         context->sections[index] = KAN_HANDLE_SET_INVALID (kan_reflection_patch_builder_section_t);
     }
@@ -4942,7 +4989,7 @@ static inline void patch_migration_context_shutdown (struct patch_migration_cont
     if (context->sections != context->sections_fixed)
     {
         kan_free_general (group, context->sections,
-                          sizeof (kan_reflection_patch_builder_section_t) * context->patch->max_section_id);
+                          sizeof (kan_reflection_patch_builder_section_t) * context->patch->section_id_bound);
     }
 }
 

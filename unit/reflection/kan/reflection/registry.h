@@ -447,6 +447,14 @@ REFLECTION_API const struct kan_reflection_field_t *kan_reflection_registry_quer
     kan_instance_size_t *absolute_offset_output,
     kan_instance_size_t *size_with_padding_output);
 
+/// \brief Queries for field in fixed memory block by its offset in that memory block that is defined by given struct.
+/// \details Field can belong to a child field in a hierarchy, therefore we return owner struct if requested.
+REFLECTION_API const struct kan_reflection_field_t *kan_reflection_registry_query_local_field_by_offset (
+    kan_reflection_registry_t registry,
+    kan_interned_string_t struct_name,
+    kan_instance_size_t exact_offset,
+    const struct kan_reflection_struct_t **output_owner_struct);
+
 KAN_HANDLE_DEFINE (kan_reflection_registry_enum_iterator_t);
 
 /// \brief Returns iterator that points to the beginning of enums storage.

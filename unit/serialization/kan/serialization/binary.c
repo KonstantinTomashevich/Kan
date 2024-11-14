@@ -157,6 +157,7 @@ struct script_state_patch_read_suffix_t
 {
     script_size_t blocks_total;
     script_size_t blocks_processed;
+    script_size_t section_id_bound;
 };
 
 struct script_state_patch_write_suffix_t
@@ -200,6 +201,17 @@ struct script_state_t
     };
 };
 
+struct patch_section_state_info_t
+{
+    enum kan_reflection_patch_section_type_t type;
+    const struct kan_reflection_field_t *source_field;
+
+    union
+    {
+        kan_reflection_patch_builder_section_t read_section;
+    };
+};
+
 struct serialization_common_state_t
 {
     struct script_storage_t *script_storage;
@@ -208,6 +220,10 @@ struct serialization_common_state_t
 
     /// \meta reflection_dynamic_array_type = "struct script_state_t"
     struct kan_dynamic_array_t script_state_stack;
+
+    kan_instance_size_t patch_section_map_size;
+    struct patch_section_state_info_t *patch_section_map;
+    struct patch_section_state_info_t *last_patch_section_state;
 };
 
 struct serialization_read_state_t
@@ -601,6 +617,9 @@ static inline void add_struct_commands (struct generation_temporary_state_t *sta
         add_command (state, new_command);
     }
 }
+
+_Static_assert (sizeof (enum kan_reflection_archetype_t) == sizeof (kan_reflection_enum_size_t),
+                "Enums have expected size and we do not risk breaking binary serialization.");
 
 static inline void add_field_to_commands (struct generation_temporary_state_t *state,
                                           struct kan_reflection_field_t *field,
@@ -1372,6 +1391,10 @@ static inline void serialization_common_state_init (
 
     kan_dynamic_array_init (&state->script_state_stack, 4u, sizeof (struct script_state_t),
                             _Alignof (struct script_state_t), serialization_allocation_group);
+
+    state->patch_section_map_size = 0u;
+    state->patch_section_map = NULL;
+    state->last_patch_section_state = NULL;
 }
 
 static inline void serialization_common_state_push_script_state (
@@ -1447,6 +1470,11 @@ static inline void serialization_common_state_shutdown (struct serialization_com
     }
 
     kan_dynamic_array_shutdown (&state->script_state_stack);
+    if (state->patch_section_map)
+    {
+        kan_free_general (serialization_allocation_group, state->patch_section_map,
+                          sizeof (struct patch_section_state_info_t) * state->patch_section_map_size);
+    }
 }
 
 kan_serialization_binary_script_storage_t kan_serialization_binary_script_storage_create (
@@ -1880,16 +1908,44 @@ static inline kan_bool_t ensure_dynamic_array_read_suffix_ready (struct serializ
     return KAN_TRUE;
 }
 
+static inline void ensure_patch_section_map_is_ready (struct serialization_common_state_t *state,
+                                                      kan_instance_size_t id_bound)
+{
+    state->last_patch_section_state = NULL;
+    if (state->patch_section_map_size < id_bound)
+    {
+        if (state->patch_section_map)
+        {
+            kan_free_general (serialization_allocation_group, state->patch_section_map,
+                              sizeof (struct patch_section_state_info_t) * state->patch_section_map_size);
+        }
+
+        state->patch_section_map_size = id_bound;
+        state->patch_section_map = kan_allocate_general (
+            serialization_allocation_group, sizeof (struct patch_section_state_info_t) * state->patch_section_map_size,
+            _Alignof (struct patch_section_state_info_t));
+    }
+
+    for (kan_loop_size_t index = 0u; index < id_bound; ++index)
+    {
+        state->patch_section_map[index].source_field = NULL;
+        state->patch_section_map[index].type = KAN_REFLECTION_PATCH_SECTION_TYPE_DYNAMIC_ARRAY_SET;
+        state->patch_section_map[index].read_section = KAN_REFLECTION_PATCH_BUILDER_SECTION_ROOT;
+    }
+}
+
 static inline kan_bool_t init_patch_read_suffix (struct serialization_read_state_t *state,
                                                  struct script_state_patch_suffix_t *suffix)
 {
     if (!read_interned_string (state, &suffix->type_name) ||
-        !read_array_or_patch_size (state, &suffix->read.blocks_total))
+        !read_array_or_patch_size (state, &suffix->read.blocks_total) ||
+        !read_array_or_patch_size (state, &suffix->read.section_id_bound))
     {
         return KAN_FALSE;
     }
 
     suffix->read.blocks_processed = 0u;
+    ensure_patch_section_map_is_ready (&state->common, suffix->read.section_id_bound);
     return KAN_TRUE;
 }
 
@@ -1920,47 +1976,116 @@ static inline kan_loop_size_t upper_or_equal_bound_index (const script_size_t *p
     return first;
 }
 
-struct patch_block_info_t
+struct patch_section_info_t
+{
+    kan_reflection_patch_serializable_section_id_t parent_id;
+    kan_reflection_patch_serializable_section_id_t my_id;
+    enum kan_reflection_patch_section_type_t type;
+    kan_serialized_size_t source_offset;
+};
+
+struct patch_chunk_info_t
 {
     kan_serialized_size_t offset;
     kan_serialized_size_t size;
 };
 
+static inline kan_interned_string_t extract_parent_patch_section_struct_type (
+    struct patch_section_state_info_t *parent_state, struct script_state_patch_suffix_t *suffix)
+{
+    if (parent_state)
+    {
+        switch (parent_state->type)
+        {
+        case KAN_REFLECTION_PATCH_SECTION_TYPE_DYNAMIC_ARRAY_SET:
+        case KAN_REFLECTION_PATCH_SECTION_TYPE_DYNAMIC_ARRAY_APPEND:
+            KAN_ASSERT (parent_state->source_field->archetype == KAN_REFLECTION_ARCHETYPE_DYNAMIC_ARRAY)
+            if (parent_state->source_field->archetype_dynamic_array.item_archetype == KAN_REFLECTION_ARCHETYPE_STRUCT)
+            {
+                return parent_state->source_field->archetype_dynamic_array.item_archetype_struct.type_name;
+            }
+
+            return NULL;
+        }
+
+        return NULL;
+    }
+    else
+    {
+        return suffix->type_name;
+    }
+}
+
+static inline kan_bool_t is_patch_section_represents_interned_string_array (struct patch_section_state_info_t *state)
+{
+    if (state)
+    {
+        switch (state->type)
+        {
+        case KAN_REFLECTION_PATCH_SECTION_TYPE_DYNAMIC_ARRAY_SET:
+        case KAN_REFLECTION_PATCH_SECTION_TYPE_DYNAMIC_ARRAY_APPEND:
+            KAN_ASSERT (state->source_field->archetype == KAN_REFLECTION_ARCHETYPE_DYNAMIC_ARRAY)
+            return state->source_field->archetype_dynamic_array.item_archetype ==
+                   KAN_REFLECTION_ARCHETYPE_INTERNED_STRING;
+        }
+    }
+
+    return KAN_FALSE;
+}
+
+static inline const struct kan_reflection_field_t *find_source_field_for_child_patch_section (
+    struct serialization_common_state_t *state,
+    struct patch_section_state_info_t *parent_state,
+    struct script_state_patch_suffix_t *suffix,
+    kan_instance_size_t offset_in_parent)
+{
+    kan_interned_string_t parent_type_name = extract_parent_patch_section_struct_type (parent_state, suffix);
+    KAN_ASSERT (parent_type_name)
+    const struct kan_reflection_struct_t *parent_struct =
+        kan_reflection_registry_query_struct (state->script_storage->registry, parent_type_name);
+
+    return kan_reflection_registry_query_local_field_by_offset (
+        state->script_storage->registry, parent_type_name, offset_in_parent % parent_struct->size, NULL);
+}
+
 static inline kan_bool_t read_patch_block (struct serialization_read_state_t *state,
                                            struct script_state_patch_suffix_t *suffix)
 {
-    struct patch_block_info_t block_info;
-    if (state->common.stream->operations->read (state->common.stream, sizeof (struct patch_block_info_t),
-                                                &block_info) != sizeof (struct patch_block_info_t))
+    kan_bool_t is_data_chunk;
+    if (state->common.stream->operations->read (state->common.stream, sizeof (kan_bool_t), &is_data_chunk) !=
+        sizeof (kan_bool_t))
     {
         return KAN_FALSE;
     }
 
-    if (block_info.size == 0u)
+    if (is_data_chunk)
     {
-        return KAN_TRUE;
-    }
-
-    struct interned_string_lookup_node_t *interned_string_lookup_node =
-        script_storage_get_or_create_interned_string_lookup (state->common.script_storage, suffix->type_name);
-    script_storage_ensure_interned_string_lookup_generated (state->common.script_storage, interned_string_lookup_node);
-
-    script_size_t current_offset = block_info.offset;
-    const script_size_t end_offset = block_info.offset + block_info.size;
-
-    kan_loop_size_t next_interned_string_index = upper_or_equal_bound_index (
-        interned_string_lookup_node->interned_string_absolute_positions,
-        interned_string_lookup_node->interned_string_absolute_positions_count, current_offset);
-
-    while (current_offset < end_offset)
-    {
-        script_size_t serialized_block_end = end_offset;
-        if (next_interned_string_index < interned_string_lookup_node->interned_string_absolute_positions_count)
+        struct patch_chunk_info_t block_info;
+        if (state->common.stream->operations->read (state->common.stream, sizeof (struct patch_chunk_info_t),
+                                                    &block_info) != sizeof (struct patch_chunk_info_t))
         {
-            script_size_t next_string_offset =
-                interned_string_lookup_node->interned_string_absolute_positions[next_interned_string_index];
+            return KAN_FALSE;
+        }
 
-            if (next_string_offset == current_offset)
+        if (block_info.size == 0u)
+        {
+            return KAN_TRUE;
+        }
+
+        const kan_reflection_patch_builder_section_t section =
+            state->common.last_patch_section_state ? state->common.last_patch_section_state->read_section :
+                                                     KAN_REFLECTION_PATCH_BUILDER_SECTION_ROOT;
+
+        script_size_t current_offset = block_info.offset;
+        const script_size_t end_offset = block_info.offset + block_info.size;
+
+        // Check special case: section that is an array of interned strings.
+        if (is_patch_section_represents_interned_string_array (state->common.last_patch_section_state))
+        {
+            // Otherwise patch is malformed.
+            KAN_ASSERT (block_info.size % sizeof (kan_interned_string_t) == 0u)
+
+            while (current_offset < end_offset)
             {
                 kan_interned_string_t string;
                 if (!read_interned_string (state, &string))
@@ -1968,30 +2093,169 @@ static inline kan_bool_t read_patch_block (struct serialization_read_state_t *st
                     return KAN_FALSE;
                 }
 
-                kan_reflection_patch_builder_add_chunk (state->patch_builder, current_offset,
+                kan_reflection_patch_builder_add_chunk (state->patch_builder, section, current_offset,
                                                         sizeof (kan_interned_string_t), &string);
-
                 current_offset += sizeof (kan_interned_string_t);
-                ++next_interned_string_index;
-                continue;
             }
-            else if (next_string_offset < serialized_block_end)
+
+            return KAN_TRUE;
+        }
+
+        kan_interned_string_t parent_struct_type_name =
+            extract_parent_patch_section_struct_type (state->common.last_patch_section_state, suffix);
+
+        // Check special case: section does not contain structs and therefore can be read directly.
+        if (!parent_struct_type_name)
+        {
+            const script_size_t size = end_offset - current_offset;
+            ensure_read_buffer_size (state, size);
+
+            if (state->common.stream->operations->read (state->common.stream, size, state->buffer) != size)
             {
-                KAN_ASSERT (next_string_offset > current_offset)
-                serialized_block_end = next_string_offset;
+                return KAN_FALSE;
+            }
+
+            kan_reflection_patch_builder_add_chunk (state->patch_builder, section, current_offset, size, state->buffer);
+            return KAN_TRUE;
+        }
+
+        struct interned_string_lookup_node_t *interned_string_lookup_node =
+            script_storage_get_or_create_interned_string_lookup (state->common.script_storage, parent_struct_type_name);
+        script_storage_ensure_interned_string_lookup_generated (state->common.script_storage,
+                                                                interned_string_lookup_node);
+
+        const struct kan_reflection_struct_t *struct_type =
+            kan_reflection_registry_query_struct (state->common.script_storage->registry, parent_struct_type_name);
+        KAN_ASSERT (struct_type)
+
+        while (current_offset < end_offset)
+        {
+            script_size_t local_current_offset = current_offset % struct_type->size;
+            const script_size_t local_end_offset =
+                KAN_MIN (local_current_offset + (end_offset - current_offset), struct_type->size);
+
+            kan_loop_size_t next_interned_string_index = upper_or_equal_bound_index (
+                interned_string_lookup_node->interned_string_absolute_positions,
+                interned_string_lookup_node->interned_string_absolute_positions_count, local_current_offset);
+
+            while (local_current_offset < local_end_offset)
+            {
+                script_size_t serialized_block_end = local_end_offset;
+                if (next_interned_string_index < interned_string_lookup_node->interned_string_absolute_positions_count)
+                {
+                    script_size_t next_string_offset =
+                        interned_string_lookup_node->interned_string_absolute_positions[next_interned_string_index];
+
+                    if (next_string_offset == local_current_offset)
+                    {
+                        kan_interned_string_t string;
+                        if (!read_interned_string (state, &string))
+                        {
+                            return KAN_FALSE;
+                        }
+
+                        kan_reflection_patch_builder_add_chunk (state->patch_builder, section, current_offset,
+                                                                sizeof (kan_interned_string_t), &string);
+
+                        local_current_offset += sizeof (kan_interned_string_t);
+                        current_offset += sizeof (kan_interned_string_t);
+                        ++next_interned_string_index;
+                        continue;
+                    }
+                    else if (next_string_offset < serialized_block_end)
+                    {
+                        KAN_ASSERT (next_string_offset > local_current_offset)
+                        serialized_block_end = next_string_offset;
+                    }
+                }
+
+                const script_size_t size = serialized_block_end - local_current_offset;
+                ensure_read_buffer_size (state, size);
+
+                if (state->common.stream->operations->read (state->common.stream, size, state->buffer) != size)
+                {
+                    return KAN_FALSE;
+                }
+
+                kan_reflection_patch_builder_add_chunk (state->patch_builder, section, current_offset, size,
+                                                        state->buffer);
+                local_current_offset = serialized_block_end;
+                current_offset += size;
             }
         }
 
-        const script_size_t size = serialized_block_end - current_offset;
-        ensure_read_buffer_size (state, size);
+        kan_loop_size_t next_interned_string_index = upper_or_equal_bound_index (
+            interned_string_lookup_node->interned_string_absolute_positions,
+            interned_string_lookup_node->interned_string_absolute_positions_count, current_offset);
 
-        if (state->common.stream->operations->read (state->common.stream, size, state->buffer) != size)
+        while (current_offset < end_offset)
+        {
+            script_size_t serialized_block_end = end_offset;
+            if (next_interned_string_index < interned_string_lookup_node->interned_string_absolute_positions_count)
+            {
+                script_size_t next_string_offset =
+                    interned_string_lookup_node->interned_string_absolute_positions[next_interned_string_index];
+
+                if (next_string_offset == current_offset)
+                {
+                    kan_interned_string_t string;
+                    if (!read_interned_string (state, &string))
+                    {
+                        return KAN_FALSE;
+                    }
+
+                    kan_reflection_patch_builder_add_chunk (state->patch_builder, section, current_offset,
+                                                            sizeof (kan_interned_string_t), &string);
+
+                    current_offset += sizeof (kan_interned_string_t);
+                    ++next_interned_string_index;
+                    continue;
+                }
+                else if (next_string_offset < serialized_block_end)
+                {
+                    KAN_ASSERT (next_string_offset > current_offset)
+                    serialized_block_end = next_string_offset;
+                }
+            }
+
+            const script_size_t size = serialized_block_end - current_offset;
+            ensure_read_buffer_size (state, size);
+
+            if (state->common.stream->operations->read (state->common.stream, size, state->buffer) != size)
+            {
+                return KAN_FALSE;
+            }
+
+            kan_reflection_patch_builder_add_chunk (state->patch_builder, section, current_offset, size, state->buffer);
+            current_offset = serialized_block_end;
+        }
+    }
+    else
+    {
+        struct patch_section_info_t section_info;
+        if (state->common.stream->operations->read (state->common.stream, sizeof (struct patch_section_info_t),
+                                                    &section_info) != sizeof (struct patch_section_info_t))
         {
             return KAN_FALSE;
         }
 
-        kan_reflection_patch_builder_add_chunk (state->patch_builder, current_offset, size, state->buffer);
-        current_offset = serialized_block_end;
+        struct patch_section_state_info_t *parent_state =
+            KAN_TYPED_ID_32_IS_VALID (section_info.parent_id) ?
+                &state->common.patch_section_map[KAN_TYPED_ID_32_GET (section_info.parent_id)] :
+                NULL;
+        KAN_ASSERT (!parent_state || parent_state->source_field)
+
+        struct patch_section_state_info_t *my_state =
+            &state->common.patch_section_map[KAN_TYPED_ID_32_GET (section_info.my_id)];
+
+        my_state->source_field = find_source_field_for_child_patch_section (&state->common, parent_state, suffix,
+                                                                            section_info.source_offset);
+
+        my_state->type = section_info.type;
+        my_state->read_section = kan_reflection_patch_builder_add_section (
+            state->patch_builder, parent_state ? parent_state->read_section : KAN_REFLECTION_PATCH_BUILDER_SECTION_ROOT,
+            section_info.type, section_info.source_offset);
+        state->common.last_patch_section_state = my_state;
     }
 
     return KAN_TRUE;
@@ -2446,9 +2710,9 @@ static inline kan_bool_t init_patch_write_suffix (struct serialization_write_sta
                                                   kan_reflection_patch_t patch,
                                                   struct script_state_patch_suffix_t *suffix)
 {
-    const kan_instance_size_t chunks_count_wide = kan_reflection_patch_get_chunks_count (patch);
     if (!write_interned_string (state, kan_reflection_patch_get_type (patch)->name) ||
-        !write_array_or_patch_size (state, (kan_serialized_size_t) chunks_count_wide))
+        !write_array_or_patch_size (state, (kan_serialized_size_t) kan_reflection_patch_get_chunks_count (patch)) ||
+        !write_array_or_patch_size (state, (kan_serialized_size_t) kan_reflection_patch_get_section_id_bound (patch)))
     {
         return KAN_FALSE;
     }
@@ -2456,74 +2720,168 @@ static inline kan_bool_t init_patch_write_suffix (struct serialization_write_sta
     suffix->type_name = kan_reflection_patch_get_type (patch)->name;
     suffix->write.current_iterator = kan_reflection_patch_begin (patch);
     suffix->write.end_iterator = kan_reflection_patch_end (patch);
+
+    ensure_patch_section_map_is_ready (&state->common, kan_reflection_patch_get_section_id_bound (patch));
     return KAN_TRUE;
 }
 
 static inline kan_bool_t write_patch_block (struct serialization_write_state_t *state,
                                             struct script_state_patch_suffix_t *suffix)
 {
-    struct kan_reflection_patch_chunk_info_t chunk = kan_reflection_patch_iterator_get (suffix->write.current_iterator);
-    struct patch_block_info_t block_info;
-    block_info.offset = (kan_serialized_size_t) chunk.offset;
-    block_info.size = (kan_serialized_size_t) chunk.size;
-
-    if (state->common.stream->operations->write (state->common.stream, sizeof (struct patch_block_info_t),
-                                                 &block_info) != sizeof (struct patch_block_info_t))
+    struct kan_reflection_patch_node_info_t node = kan_reflection_patch_iterator_get (suffix->write.current_iterator);
+    if (state->common.stream->operations->write (state->common.stream, sizeof (kan_bool_t), &node.is_data_chunk) !=
+        sizeof (kan_bool_t))
     {
         return KAN_FALSE;
     }
 
-    if (block_info.size == 0u)
+    if (node.is_data_chunk)
     {
-        return KAN_TRUE;
-    }
+        struct patch_chunk_info_t block_info;
+        block_info.offset = (kan_serialized_size_t) node.chunk_info.offset;
+        block_info.size = (kan_serialized_size_t) node.chunk_info.size;
 
-    struct interned_string_lookup_node_t *interned_string_lookup_node =
-        script_storage_get_or_create_interned_string_lookup (state->common.script_storage, suffix->type_name);
-    script_storage_ensure_interned_string_lookup_generated (state->common.script_storage, interned_string_lookup_node);
-
-    script_size_t current_offset = block_info.offset;
-    const script_size_t end_offset = block_info.offset + block_info.size;
-
-    kan_loop_size_t next_interned_string_index = upper_or_equal_bound_index (
-        interned_string_lookup_node->interned_string_absolute_positions,
-        interned_string_lookup_node->interned_string_absolute_positions_count, current_offset);
-
-    while (current_offset < end_offset)
-    {
-        script_size_t serialized_block_end = end_offset;
-        const uint8_t *data_begin = ((const uint8_t *) chunk.data) + current_offset;
-
-        if (next_interned_string_index < interned_string_lookup_node->interned_string_absolute_positions_count)
+        if (state->common.stream->operations->write (state->common.stream, sizeof (struct patch_chunk_info_t),
+                                                     &block_info) != sizeof (struct patch_chunk_info_t))
         {
-            script_size_t next_string_offset =
-                interned_string_lookup_node->interned_string_absolute_positions[next_interned_string_index];
+            return KAN_FALSE;
+        }
 
-            if (next_string_offset == current_offset)
+        if (block_info.size == 0u)
+        {
+            return KAN_TRUE;
+        }
+
+        script_size_t current_offset = block_info.offset;
+        const script_size_t end_offset = block_info.offset + block_info.size;
+
+        // Check special case: section that is an array of interned strings.
+        if (is_patch_section_represents_interned_string_array (state->common.last_patch_section_state))
+        {
+            // Otherwise patch is malformed.
+            KAN_ASSERT (block_info.size % sizeof (kan_interned_string_t) == 0u)
+
+            while (current_offset < end_offset)
             {
+                const uint8_t *data_begin =
+                    ((const uint8_t *) node.chunk_info.data) + (current_offset - node.chunk_info.offset);
+
                 if (!write_interned_string (state, *(kan_interned_string_t *) data_begin))
                 {
                     return KAN_FALSE;
                 }
 
                 current_offset += sizeof (kan_interned_string_t);
-                ++next_interned_string_index;
-                continue;
             }
-            else if (next_string_offset < serialized_block_end)
-            {
-                KAN_ASSERT (next_string_offset > current_offset)
-                serialized_block_end = next_string_offset;
-            }
+
+            return KAN_TRUE;
         }
 
-        const script_size_t size = serialized_block_end - current_offset;
-        if (state->common.stream->operations->write (state->common.stream, size, data_begin) != size)
+        kan_interned_string_t parent_struct_type_name =
+            extract_parent_patch_section_struct_type (state->common.last_patch_section_state, suffix);
+
+        // Check special case: section does not contain structs and therefore can be read directly.
+        if (!parent_struct_type_name)
+        {
+            const script_size_t size = end_offset - current_offset;
+            if (state->common.stream->operations->write (state->common.stream, size, node.chunk_info.data) != size)
+            {
+                return KAN_FALSE;
+            }
+
+            return KAN_TRUE;
+        }
+
+        struct interned_string_lookup_node_t *interned_string_lookup_node =
+            script_storage_get_or_create_interned_string_lookup (state->common.script_storage, parent_struct_type_name);
+        script_storage_ensure_interned_string_lookup_generated (state->common.script_storage,
+                                                                interned_string_lookup_node);
+
+        const struct kan_reflection_struct_t *struct_type =
+            kan_reflection_registry_query_struct (state->common.script_storage->registry, parent_struct_type_name);
+        KAN_ASSERT (struct_type)
+
+        while (current_offset < end_offset)
+        {
+            script_size_t local_current_offset = current_offset % struct_type->size;
+            const script_size_t local_end_offset =
+                KAN_MIN (local_current_offset + (end_offset - current_offset), struct_type->size);
+
+            kan_loop_size_t next_interned_string_index = upper_or_equal_bound_index (
+                interned_string_lookup_node->interned_string_absolute_positions,
+                interned_string_lookup_node->interned_string_absolute_positions_count, local_current_offset);
+
+            while (local_current_offset < local_end_offset)
+            {
+                script_size_t serialized_block_end = local_end_offset;
+                const uint8_t *data_begin =
+                    ((const uint8_t *) node.chunk_info.data) + (current_offset - node.chunk_info.offset);
+
+                if (next_interned_string_index < interned_string_lookup_node->interned_string_absolute_positions_count)
+                {
+                    script_size_t next_string_offset =
+                        interned_string_lookup_node->interned_string_absolute_positions[next_interned_string_index];
+
+                    if (next_string_offset == local_current_offset)
+                    {
+                        if (!write_interned_string (state, *(kan_interned_string_t *) data_begin))
+                        {
+                            return KAN_FALSE;
+                        }
+
+                        local_current_offset += sizeof (kan_interned_string_t);
+                        current_offset += sizeof (kan_interned_string_t);
+                        ++next_interned_string_index;
+                        continue;
+                    }
+                    else if (next_string_offset < serialized_block_end)
+                    {
+                        KAN_ASSERT (next_string_offset > local_current_offset)
+                        serialized_block_end = next_string_offset;
+                    }
+                }
+
+                const script_size_t size = serialized_block_end - local_current_offset;
+                if (state->common.stream->operations->write (state->common.stream, size, data_begin) != size)
+                {
+                    return KAN_FALSE;
+                }
+
+                local_current_offset = serialized_block_end;
+                current_offset += size;
+            }
+        }
+    }
+    else
+    {
+        struct patch_section_info_t section_info = {
+            .parent_id = node.section_info.parent_section_id,
+            .my_id = node.section_info.section_id,
+            .type = node.section_info.type,
+            .source_offset = node.section_info.source_offset_in_parent,
+        };
+
+        if (state->common.stream->operations->write (state->common.stream, sizeof (struct patch_section_info_t),
+                                                     &section_info) != sizeof (struct patch_section_info_t))
         {
             return KAN_FALSE;
         }
 
-        current_offset = serialized_block_end;
+        struct patch_section_state_info_t *parent_state =
+            KAN_TYPED_ID_32_IS_VALID (node.section_info.parent_section_id) ?
+                &state->common.patch_section_map[KAN_TYPED_ID_32_GET (node.section_info.parent_section_id)] :
+                NULL;
+        KAN_ASSERT (!parent_state || parent_state->source_field)
+
+        struct patch_section_state_info_t *my_state =
+            &state->common.patch_section_map[KAN_TYPED_ID_32_GET (node.section_info.section_id)];
+
+        my_state->source_field = find_source_field_for_child_patch_section (&state->common, parent_state, suffix,
+                                                                            node.section_info.source_offset_in_parent);
+
+        KAN_ASSERT (my_state->source_field)
+        my_state->type = node.section_info.type;
+        state->common.last_patch_section_state = my_state;
     }
 
     return KAN_TRUE;

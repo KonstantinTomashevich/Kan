@@ -97,6 +97,9 @@ struct kan_reflection_patch_chunk_info_t
 };
 
 /// \brief Contains information about single patch section.
+/// \details Due to optimization requirements, it is guaranteed that sections are not duplicated, therefore every
+///          kan_reflection_patch_section_info_t::section_id is unique in patch scope and there cannot be several
+///          nodes for the same section inside a patch.
 struct kan_reflection_patch_section_info_t
 {
     kan_reflection_patch_serializable_section_id_t parent_section_id;
@@ -152,6 +155,9 @@ REFLECTION_API const struct kan_reflection_struct_t *kan_reflection_patch_get_ty
 
 /// \brief Gets count of chunks inside given patch.
 REFLECTION_API kan_instance_size_t kan_reflection_patch_get_chunks_count (kan_reflection_patch_t patch);
+
+/// \brief Returns value which is guaranteed to be bigger than all section ids in patch.
+REFLECTION_API kan_id_32_t kan_reflection_patch_get_section_id_bound (kan_reflection_patch_t patch);
 
 /// \brief Applies given patch to given memory block and its child blocks through patch sections.
 REFLECTION_API void kan_reflection_patch_apply (kan_reflection_patch_t patch, void *target);

@@ -20,6 +20,7 @@ enum reader_block_type_t
     READER_BLOCK_TYPE_STRUCT = 0u,
     READER_BLOCK_TYPE_PATCH,
     READER_BLOCK_TYPE_PATCH_SUB_STRUCT,
+    READER_BLOCK_TYPE_PATCH_SECTION,
 };
 
 struct reader_struct_block_state_t
@@ -36,9 +37,16 @@ struct reader_patch_block_state_t
 
 struct reader_patch_sub_struct_block_state_t
 {
+    kan_reflection_patch_builder_section_t current_section;
     kan_instance_size_t offset;
     kan_instance_size_t size_with_padding;
     const struct kan_reflection_struct_t *struct_type;
+};
+
+struct reader_patch_section_block_state_t
+{
+    kan_reflection_patch_builder_section_t current_section;
+    const struct kan_reflection_struct_t *content_type;
 };
 
 struct reader_block_state_t
@@ -49,6 +57,7 @@ struct reader_block_state_t
         struct reader_struct_block_state_t struct_state;
         struct reader_patch_block_state_t patch_state;
         struct reader_patch_sub_struct_block_state_t patch_sub_struct_state;
+        struct reader_patch_section_block_state_t patch_section_state;
     };
 };
 
@@ -87,6 +96,17 @@ struct writer_patch_sub_struct_block_state_t
     const struct kan_reflection_field_t *end_field;
 
     kan_instance_size_t suffix_next_index_to_write;
+    kan_instance_size_t close_blocks_on_exit;
+};
+
+struct writer_section_stack_item_t
+{
+    kan_reflection_patch_serializable_section_id_t id;
+    enum kan_reflection_patch_section_type_t type;
+    const struct kan_reflection_field_t *source_field;
+    kan_instance_size_t source_offset;
+    kan_instance_size_t support_blocks_opened;
+    kan_instance_size_t array_set_current_index;
 };
 
 struct writer_patch_block_state_t
@@ -94,6 +114,10 @@ struct writer_patch_block_state_t
     kan_reflection_patch_t patch;
     kan_reflection_patch_iterator_t current_iterator;
     kan_reflection_patch_iterator_t end_iterator;
+
+    kan_instance_size_t additional_node_offset;
+    kan_instance_size_t section_stack_size;
+    struct writer_section_stack_item_t *section_stack;
 };
 
 struct writer_block_state_t
@@ -169,6 +193,10 @@ static inline void reader_state_push (struct reader_state_t *reader_state, struc
     case READER_BLOCK_TYPE_PATCH_SUB_STRUCT:
         output->patch_sub_struct_state = block_state.patch_sub_struct_state;
         break;
+
+    case READER_BLOCK_TYPE_PATCH_SECTION:
+        output->patch_section_state = block_state.patch_section_state;
+        break;
     }
 }
 
@@ -182,6 +210,7 @@ static inline void reader_state_pop (struct reader_state_t *reader_state)
     {
     case READER_BLOCK_TYPE_STRUCT:
     case READER_BLOCK_TYPE_PATCH_SUB_STRUCT:
+    case READER_BLOCK_TYPE_PATCH_SECTION:
         break;
 
     case READER_BLOCK_TYPE_PATCH:
@@ -238,6 +267,27 @@ static inline void writer_state_push (struct writer_state_t *writer_state, struc
 
 static inline void writer_state_pop (struct writer_state_t *writer_state)
 {
+    struct writer_block_state_t *last =
+        &((struct writer_block_state_t *)
+              writer_state->block_state_stack.data)[writer_state->block_state_stack.size - 1u];
+
+    switch (last->type)
+    {
+    case WRITER_BLOCK_TYPE_STRUCT:
+    case WRITER_BLOCK_TYPE_PATCH_SUB_STRUCT:
+        break;
+
+    case WRITER_BLOCK_TYPE_PATCH:
+        if (last->patch_state.section_stack)
+        {
+            kan_free_general (
+                serialization_allocation_group, last->patch_state.section_stack,
+                sizeof (struct writer_section_stack_item_t) * KAN_SERIALIZATION_RD_WRITER_PATCH_SECTION_STACK_MAX);
+        }
+
+        break;
+    }
+
     kan_dynamic_array_remove_swap_at (&writer_state->block_state_stack, writer_state->block_state_stack.size - 1u);
 }
 
@@ -341,6 +391,9 @@ static inline kan_interned_string_t extract_struct_type_name (struct reader_bloc
 
     case READER_BLOCK_TYPE_PATCH_SUB_STRUCT:
         return top_state->patch_sub_struct_state.struct_type->name;
+
+    case READER_BLOCK_TYPE_PATCH_SECTION:
+        return top_state->patch_section_state.content_type->name;
     }
 
     KAN_ASSERT (KAN_FALSE)
@@ -890,8 +943,8 @@ static inline void elemental_setter_item_post_read (struct reader_state_t *reade
         break;
 
     case READER_BLOCK_TYPE_PATCH:
-        kan_reflection_patch_builder_add_chunk (reader_state->patch_builder, absolute_offset, size_with_padding,
-                                                address);
+        kan_reflection_patch_builder_add_chunk (reader_state->patch_builder, KAN_REFLECTION_PATCH_BUILDER_SECTION_ROOT,
+                                                absolute_offset, size_with_padding, address);
         break;
 
     case READER_BLOCK_TYPE_PATCH_SUB_STRUCT:
@@ -905,10 +958,38 @@ static inline void elemental_setter_item_post_read (struct reader_state_t *reade
         }
 
         adjusted_offset += top_state->patch_sub_struct_state.offset;
-        kan_reflection_patch_builder_add_chunk (reader_state->patch_builder, adjusted_offset, adjusted_size, address);
+        kan_reflection_patch_builder_add_chunk (reader_state->patch_builder,
+                                                top_state->patch_sub_struct_state.current_section, adjusted_offset,
+                                                adjusted_size, address);
         break;
     }
+
+    case READER_BLOCK_TYPE_PATCH_SECTION:
+        kan_reflection_patch_builder_add_chunk (reader_state->patch_builder,
+                                                top_state->patch_section_state.current_section, absolute_offset,
+                                                size_with_padding, address);
+        break;
     }
+}
+
+static inline kan_reflection_patch_builder_section_t reader_block_state_extract_patch_section (
+    struct reader_block_state_t *top_state)
+{
+    switch (top_state->type)
+    {
+    case READER_BLOCK_TYPE_STRUCT:
+    case READER_BLOCK_TYPE_PATCH:
+        return KAN_REFLECTION_PATCH_BUILDER_SECTION_ROOT;
+
+    case READER_BLOCK_TYPE_PATCH_SUB_STRUCT:
+        return top_state->patch_sub_struct_state.current_section;
+
+    case READER_BLOCK_TYPE_PATCH_SECTION:
+        return top_state->patch_section_state.current_section;
+    }
+
+    KAN_ASSERT (KAN_FALSE)
+    return KAN_REFLECTION_PATCH_BUILDER_SECTION_ROOT;
 }
 
 static inline kan_bool_t read_elemental_setter (struct reader_state_t *reader_state,
@@ -962,6 +1043,7 @@ static inline kan_bool_t read_elemental_setter (struct reader_state_t *reader_st
 
     case READER_BLOCK_TYPE_PATCH:
     case READER_BLOCK_TYPE_PATCH_SUB_STRUCT:
+    case READER_BLOCK_TYPE_PATCH_SECTION:
         address = &patch_single_value_read_buffer;
         break;
     }
@@ -1061,6 +1143,7 @@ static inline kan_bool_t read_elemental_setter (struct reader_state_t *reader_st
                     break;
                 case READER_BLOCK_TYPE_PATCH:
                 case READER_BLOCK_TYPE_PATCH_SUB_STRUCT:
+                case READER_BLOCK_TYPE_PATCH_SECTION:
                     output_address = address;
                     break;
                 }
@@ -1117,6 +1200,7 @@ static inline kan_bool_t read_elemental_setter (struct reader_state_t *reader_st
                 break;
             case READER_BLOCK_TYPE_PATCH:
             case READER_BLOCK_TYPE_PATCH_SUB_STRUCT:
+            case READER_BLOCK_TYPE_PATCH_SECTION:
                 output_address = address;
                 break;
             }
@@ -1146,66 +1230,132 @@ static inline kan_bool_t read_elemental_setter (struct reader_state_t *reader_st
         }
 
     case KAN_REFLECTION_ARCHETYPE_DYNAMIC_ARRAY:
-        if (top_state->type == READER_BLOCK_TYPE_PATCH || top_state->type == READER_BLOCK_TYPE_PATCH_SUB_STRUCT)
+    {
+        switch (top_state->type)
         {
-            KAN_LOG (serialization_readable_data, KAN_LOG_ERROR,
-                     "Elemental setter attempts to set value at path \"%s\" which is a dynamic array, but setting "
-                     "values of dynamic arrays is not supported for patches.",
-                     parsed_event->output_target.identifier)
-            return KAN_FALSE;
-        }
-
-        if (parsed_event->output_target.array_index == KAN_READABLE_DATA_ARRAY_INDEX_NONE)
-        {
-            const kan_loop_size_t count = calculate_values_count (parsed_event);
-            struct kan_dynamic_array_t *dynamic_array = (struct kan_dynamic_array_t *) address;
-
-            if (dynamic_array->size < count)
+        case READER_BLOCK_TYPE_STRUCT:
+            // Reading into normal array that is already in memory.
+            if (parsed_event->output_target.array_index == KAN_READABLE_DATA_ARRAY_INDEX_NONE)
             {
-                if (dynamic_array->capacity < count)
+                const kan_loop_size_t count = calculate_values_count (parsed_event);
+                struct kan_dynamic_array_t *dynamic_array = (struct kan_dynamic_array_t *) address;
+
+                if (dynamic_array->size < count)
                 {
-                    kan_dynamic_array_set_capacity (dynamic_array, count);
+                    if (dynamic_array->capacity < count)
+                    {
+                        kan_dynamic_array_set_capacity (dynamic_array, count);
+                    }
+
+                    dynamic_array->size = count;
                 }
 
-                dynamic_array->size = count;
-            }
+                struct kan_readable_data_value_node_t *node = parsed_event->setter_value_first;
+                uint8_t *output = dynamic_array->data;
 
-            struct kan_readable_data_value_node_t *node = parsed_event->setter_value_first;
-            uint8_t *output = dynamic_array->data;
-
-            while (node)
-            {
-                if (!read_elemental_setter_node_into_packed_array (
-                        reader_state, parsed_event, node, field->archetype_dynamic_array.item_archetype,
-                        dynamic_array->item_size, output, field->archetype_dynamic_array.item_archetype_enum.type_name))
+                while (node)
                 {
-                    return KAN_FALSE;
+                    if (!read_elemental_setter_node_into_packed_array (
+                            reader_state, parsed_event, node, field->archetype_dynamic_array.item_archetype,
+                            dynamic_array->item_size, output,
+                            field->archetype_dynamic_array.item_archetype_enum.type_name))
+                    {
+                        return KAN_FALSE;
+                    }
+
+                    output += dynamic_array->item_size;
+                    node = node->next;
                 }
 
-                output += dynamic_array->item_size;
-                node = node->next;
+                return KAN_TRUE;
+            }
+            else
+            {
+                struct kan_dynamic_array_t *dynamic_array = (struct kan_dynamic_array_t *) address;
+                if (dynamic_array->size <= parsed_event->output_target.array_index)
+                {
+                    if (dynamic_array->capacity <= parsed_event->output_target.array_index)
+                    {
+                        kan_dynamic_array_set_capacity (dynamic_array, parsed_event->output_target.array_index + 1u);
+                    }
+
+                    dynamic_array->size = parsed_event->output_target.array_index + 1u;
+                }
+
+                void *array_address =
+                    dynamic_array->data + dynamic_array->item_size * parsed_event->output_target.array_index;
+
+                return read_elemental_setter_into_array_element (reader_state, parsed_event, field, array_address);
             }
 
-            return KAN_TRUE;
-        }
-        else
+        case READER_BLOCK_TYPE_PATCH:
+        case READER_BLOCK_TYPE_PATCH_SUB_STRUCT:
+        case READER_BLOCK_TYPE_PATCH_SECTION:
         {
-            struct kan_dynamic_array_t *dynamic_array = (struct kan_dynamic_array_t *) address;
-            if (dynamic_array->size <= parsed_event->output_target.array_index)
+            if (top_state->type == READER_BLOCK_TYPE_PATCH_SUB_STRUCT)
             {
-                if (dynamic_array->capacity <= parsed_event->output_target.array_index)
-                {
-                    kan_dynamic_array_set_capacity (dynamic_array, parsed_event->output_target.array_index + 1u);
-                }
-
-                dynamic_array->size = parsed_event->output_target.array_index + 1u;
+                absolute_offset += top_state->patch_sub_struct_state.offset;
             }
 
-            void *array_address =
-                dynamic_array->data + dynamic_array->item_size * parsed_event->output_target.array_index;
+            struct reader_block_state_t block_state = {
+                .type = READER_BLOCK_TYPE_PATCH_SECTION,
+                .patch_section_state = {
+                    .current_section = kan_reflection_patch_builder_add_section (
+                        reader_state->patch_builder, reader_block_state_extract_patch_section (top_state),
+                        KAN_REFLECTION_PATCH_SECTION_TYPE_DYNAMIC_ARRAY_SET, absolute_offset),
+                    .content_type = NULL,
+                }};
 
-            return read_elemental_setter_into_array_element (reader_state, parsed_event, field, array_address);
+            reader_state_push (reader_state, block_state);
+            top_state = &((struct reader_block_state_t *)
+                              reader_state->block_state_stack.data)[reader_state->block_state_stack.size - 1u];
+            kan_bool_t result = KAN_TRUE;
+
+            if (parsed_event->output_target.array_index == KAN_READABLE_DATA_ARRAY_INDEX_NONE)
+            {
+                struct kan_readable_data_value_node_t *node = parsed_event->setter_value_first;
+                kan_instance_size_t output_offset = 0u;
+
+                while (node)
+                {
+                    if (!read_elemental_setter_node_into_packed_array (
+                            reader_state, parsed_event, node, field->archetype_dynamic_array.item_archetype,
+                            field->archetype_dynamic_array.item_size, address,
+                            field->archetype_dynamic_array.item_archetype_enum.type_name))
+                    {
+                        result = KAN_FALSE;
+                        break;
+                    }
+
+                    elemental_setter_item_post_read (reader_state, top_state, output_offset,
+                                                     field->archetype_dynamic_array.item_size, address);
+                    output_offset += field->archetype_dynamic_array.item_size;
+                    node = node->next;
+                }
+            }
+            else
+            {
+                if (read_elemental_setter_into_array_element (reader_state, parsed_event, field, address))
+                {
+                    elemental_setter_item_post_read (
+                        reader_state, top_state,
+                        parsed_event->output_target.array_index * field->archetype_dynamic_array.item_size,
+                        field->archetype_dynamic_array.item_size, address);
+                }
+                else
+                {
+                    result = KAN_FALSE;
+                }
+            }
+
+            reader_state_pop (reader_state);
+            return result;
         }
+        }
+
+        KAN_ASSERT (KAN_FALSE)
+        return KAN_FALSE;
+    }
 
     case KAN_REFLECTION_ARCHETYPE_EXTERNAL_POINTER:
     case KAN_REFLECTION_ARCHETYPE_STRUCT:
@@ -1258,6 +1408,7 @@ static inline kan_bool_t structural_setter_open_struct (struct reader_state_t *r
             .type = READER_BLOCK_TYPE_PATCH_SUB_STRUCT,
             .patch_sub_struct_state =
                 {
+                    .current_section = KAN_REFLECTION_PATCH_BUILDER_SECTION_ROOT,
                     .offset = absolute_offset,
                     .size_with_padding = size_with_padding,
                     .struct_type = kan_reflection_registry_query_struct (reader_state->registry, type_name),
@@ -1274,7 +1425,25 @@ static inline kan_bool_t structural_setter_open_struct (struct reader_state_t *r
             .type = READER_BLOCK_TYPE_PATCH_SUB_STRUCT,
             .patch_sub_struct_state =
                 {
+                    .current_section = top_state->patch_sub_struct_state.current_section,
                     .offset = top_state->patch_sub_struct_state.offset + absolute_offset,
+                    .size_with_padding = size_with_padding,
+                    .struct_type = kan_reflection_registry_query_struct (reader_state->registry, type_name),
+                },
+        };
+
+        reader_state_push (reader_state, new_state);
+        return KAN_TRUE;
+    }
+
+    case READER_BLOCK_TYPE_PATCH_SECTION:
+    {
+        struct reader_block_state_t new_state = {
+            .type = READER_BLOCK_TYPE_PATCH_SUB_STRUCT,
+            .patch_sub_struct_state =
+                {
+                    .current_section = top_state->patch_section_state.current_section,
+                    .offset = absolute_offset,
                     .size_with_padding = size_with_padding,
                     .struct_type = kan_reflection_registry_query_struct (reader_state->registry, type_name),
                 },
@@ -1473,31 +1642,43 @@ static inline kan_bool_t read_structural_setter (struct reader_state_t *reader_s
             return KAN_FALSE;
         }
 
-        if (top_state->type != READER_BLOCK_TYPE_STRUCT)
+        void *real_array_address = NULL;
+        kan_reflection_patch_builder_section_t patch_section = KAN_REFLECTION_PATCH_BUILDER_SECTION_ROOT;
+        kan_instance_size_t patch_section_internal_offset = 0u;
+
+        switch (top_state->type)
         {
-            KAN_LOG (serialization_readable_data, KAN_LOG_ERROR,
-                     "Structural setter attempts to set value at path \"%s[%llu]\" which holds dynamic array, but "
-                     "dynamic arrays can only receive values when not inside patch",
-                     parsed_event->output_target.identifier,
-                     (unsigned long long) parsed_event->output_target.array_index)
-            return KAN_FALSE;
+        case READER_BLOCK_TYPE_STRUCT:
+        {
+            struct kan_dynamic_array_t *dynamic_array =
+                (struct kan_dynamic_array_t *) (((uint8_t *) top_state->struct_state.instance) + absolute_offset);
+
+            if (dynamic_array->capacity < parsed_event->output_target.array_index + 1u)
+            {
+                kan_dynamic_array_set_capacity (dynamic_array, (parsed_event->output_target.array_index + 1u) * 2u);
+            }
+
+            if (dynamic_array->size < parsed_event->output_target.array_index + 1u)
+            {
+                dynamic_array->size = parsed_event->output_target.array_index + 1u;
+            }
+
+            real_array_address =
+                ((uint8_t *) dynamic_array->data) + dynamic_array->item_size * parsed_event->output_target.array_index;
+            break;
         }
 
-        struct kan_dynamic_array_t *dynamic_array =
-            (struct kan_dynamic_array_t *) (((uint8_t *) top_state->struct_state.instance) + absolute_offset);
+        case READER_BLOCK_TYPE_PATCH:
+        case READER_BLOCK_TYPE_PATCH_SUB_STRUCT:
+        case READER_BLOCK_TYPE_PATCH_SECTION:
+            patch_section = kan_reflection_patch_builder_add_section (
+                reader_state->patch_builder, reader_block_state_extract_patch_section (top_state),
+                KAN_REFLECTION_PATCH_SECTION_TYPE_DYNAMIC_ARRAY_SET, absolute_offset);
 
-        if (dynamic_array->capacity < parsed_event->output_target.array_index + 1u)
-        {
-            kan_dynamic_array_set_capacity (dynamic_array, (parsed_event->output_target.array_index + 1u) * 2u);
+            patch_section_internal_offset =
+                parsed_event->output_target.array_index * field->archetype_dynamic_array.item_size;
+            break;
         }
-
-        if (dynamic_array->size < parsed_event->output_target.array_index + 1u)
-        {
-            dynamic_array->size = parsed_event->output_target.array_index + 1u;
-        }
-
-        void *array_address =
-            ((uint8_t *) dynamic_array->data) + dynamic_array->item_size * parsed_event->output_target.array_index;
 
         switch (field->archetype_dynamic_array.item_archetype)
         {
@@ -1523,24 +1704,50 @@ static inline kan_bool_t read_structural_setter (struct reader_state_t *reader_s
 
         case KAN_REFLECTION_ARCHETYPE_STRUCT:
         {
-            struct reader_block_state_t new_state = {
-                .type = READER_BLOCK_TYPE_STRUCT,
-                .struct_state =
-                    {
-                        .instance = array_address,
-                        .type = kan_reflection_registry_query_struct (
-                            reader_state->registry, field->archetype_dynamic_array.item_archetype_struct.type_name),
-                    },
-            };
+            const struct kan_reflection_struct_t *type = kan_reflection_registry_query_struct (
+                reader_state->registry, field->archetype_dynamic_array.item_archetype_struct.type_name);
+            KAN_ASSERT (type)
 
-            KAN_ASSERT (new_state.struct_state.type)
-            if (new_state.struct_state.type->init)
+            switch (top_state->type)
             {
-                new_state.struct_state.type->init (new_state.struct_state.type->functor_user_data, array_address);
+            case READER_BLOCK_TYPE_STRUCT:
+            {
+                struct reader_block_state_t new_state = {
+                    .type = READER_BLOCK_TYPE_STRUCT,
+                    .struct_state =
+                        {
+                            .instance = real_array_address,
+                            .type = type,
+                        },
+                };
+
+                if (new_state.struct_state.type->init)
+                {
+                    new_state.struct_state.type->init (new_state.struct_state.type->functor_user_data,
+                                                       real_array_address);
+                }
+
+                reader_state_push (reader_state, new_state);
+                return KAN_TRUE;
             }
 
-            reader_state_push (reader_state, new_state);
-            return KAN_TRUE;
+            case READER_BLOCK_TYPE_PATCH:
+            case READER_BLOCK_TYPE_PATCH_SUB_STRUCT:
+            case READER_BLOCK_TYPE_PATCH_SECTION:
+            {
+                struct reader_block_state_t new_state = {
+                    .type = READER_BLOCK_TYPE_PATCH_SUB_STRUCT,
+                    .patch_sub_struct_state = {
+                        .current_section = patch_section,
+                        .offset = patch_section_internal_offset,
+                        .size_with_padding = field->archetype_dynamic_array.item_size,
+                        .struct_type = type,
+                    }};
+
+                reader_state_push (reader_state, new_state);
+                return KAN_TRUE;
+            }
+            }
         }
 
         case KAN_REFLECTION_ARCHETYPE_STRUCT_POINTER:
@@ -1558,14 +1765,30 @@ static inline kan_bool_t read_structural_setter (struct reader_state_t *reader_s
 
         case KAN_REFLECTION_ARCHETYPE_PATCH:
         {
-            struct reader_block_state_t new_state = {.type = READER_BLOCK_TYPE_PATCH,
-                                                     .patch_state = {
-                                                         .patch_output = array_address,
-                                                         .type = NULL,
-                                                     }};
+            switch (top_state->type)
+            {
+            case READER_BLOCK_TYPE_STRUCT:
+            {
+                struct reader_block_state_t new_state = {.type = READER_BLOCK_TYPE_PATCH,
+                                                         .patch_state = {
+                                                             .patch_output = real_array_address,
+                                                             .type = NULL,
+                                                         }};
 
-            reader_state_push (reader_state, new_state);
-            return KAN_TRUE;
+                reader_state_push (reader_state, new_state);
+                return KAN_TRUE;
+            }
+
+            case READER_BLOCK_TYPE_PATCH:
+            case READER_BLOCK_TYPE_PATCH_SUB_STRUCT:
+            case READER_BLOCK_TYPE_PATCH_SECTION:
+                KAN_LOG (serialization_readable_data, KAN_LOG_ERROR,
+                         "Structural setter attempts to set value at path \"%s[%llu]\" which holds dynamic array of "
+                         "patches, but dynamic arrays of patches are unsupported inside patches",
+                         parsed_event->output_target.identifier,
+                         (unsigned long long) parsed_event->output_target.array_index)
+                return KAN_FALSE;
+            }
         }
         }
     }
@@ -1621,15 +1844,6 @@ static inline kan_bool_t read_array_appender (struct reader_state_t *reader_stat
         return KAN_FALSE;
     }
 
-    if (top_state->type != READER_BLOCK_TYPE_STRUCT)
-    {
-        KAN_LOG (serialization_readable_data, KAN_LOG_ERROR,
-                 "Array appender attempts to set value at path \"%s\", but array appenders inside patches are not "
-                 "supported.",
-                 parsed_event->output_target.identifier)
-        return KAN_FALSE;
-    }
-
     kan_instance_size_t output_target_parts_count = 0u;
     kan_interned_string_t output_target_parts[KAN_SERIALIZATION_RD_MAX_PARTS_IN_OUTPUT_TARGET];
 
@@ -1641,9 +1855,33 @@ static inline kan_bool_t read_array_appender (struct reader_state_t *reader_stat
     kan_instance_size_t absolute_offset;
     kan_instance_size_t size_with_padding;
 
-    const struct kan_reflection_field_t *field = kan_reflection_registry_query_local_field (
-        reader_state->registry, top_state->struct_state.type->name, output_target_parts_count, output_target_parts,
-        &absolute_offset, &size_with_padding);
+    const struct kan_reflection_struct_t *base_type = NULL;
+    kan_instance_size_t additional_offset = 0u;
+
+    switch (top_state->type)
+    {
+    case READER_BLOCK_TYPE_STRUCT:
+        base_type = top_state->struct_state.type;
+        break;
+
+    case READER_BLOCK_TYPE_PATCH:
+        base_type = top_state->patch_state.type;
+        break;
+
+    case READER_BLOCK_TYPE_PATCH_SECTION:
+        // If we got there, then something is wrong with the flow.
+        KAN_ASSERT (KAN_FALSE)
+        break;
+
+    case READER_BLOCK_TYPE_PATCH_SUB_STRUCT:
+        base_type = top_state->patch_sub_struct_state.struct_type;
+        additional_offset = top_state->patch_sub_struct_state.offset;
+        break;
+    }
+
+    const struct kan_reflection_field_t *field =
+        kan_reflection_registry_query_local_field (reader_state->registry, base_type->name, output_target_parts_count,
+                                                   output_target_parts, &absolute_offset, &size_with_padding);
 
     if (!field)
     {
@@ -1661,17 +1899,36 @@ static inline kan_bool_t read_array_appender (struct reader_state_t *reader_stat
         return KAN_FALSE;
     }
 
-    struct kan_dynamic_array_t *dynamic_array =
-        (struct kan_dynamic_array_t *) (((uint8_t *) top_state->struct_state.instance) + absolute_offset);
+    void *real_spot = NULL;
+    kan_reflection_patch_builder_section_t patch_section = KAN_REFLECTION_PATCH_BUILDER_SECTION_ROOT;
 
-    void *spot = kan_dynamic_array_add_last (dynamic_array);
-    if (!spot)
+    switch (top_state->type)
     {
-        kan_dynamic_array_set_capacity (dynamic_array, KAN_MAX (1u, dynamic_array->capacity * 2u));
-        spot = kan_dynamic_array_add_last (dynamic_array);
+    case READER_BLOCK_TYPE_STRUCT:
+    {
+        struct kan_dynamic_array_t *dynamic_array =
+            (struct kan_dynamic_array_t *) (((uint8_t *) top_state->struct_state.instance) + absolute_offset);
+
+        real_spot = kan_dynamic_array_add_last (dynamic_array);
+        if (!real_spot)
+        {
+            kan_dynamic_array_set_capacity (dynamic_array, KAN_MAX (1u, dynamic_array->capacity * 2u));
+            real_spot = kan_dynamic_array_add_last (dynamic_array);
+        }
+
+        KAN_ASSERT (real_spot)
+        break;
     }
 
-    KAN_ASSERT (spot)
+    case READER_BLOCK_TYPE_PATCH:
+    case READER_BLOCK_TYPE_PATCH_SUB_STRUCT:
+    case READER_BLOCK_TYPE_PATCH_SECTION:
+        patch_section = kan_reflection_patch_builder_add_section (
+            reader_state->patch_builder, reader_block_state_extract_patch_section (top_state),
+            KAN_REFLECTION_PATCH_SECTION_TYPE_DYNAMIC_ARRAY_APPEND, additional_offset + absolute_offset);
+        break;
+    }
+
     switch (field->archetype_dynamic_array.item_archetype)
     {
     case KAN_REFLECTION_ARCHETYPE_SIGNED_INT:
@@ -1695,24 +1952,48 @@ static inline kan_bool_t read_array_appender (struct reader_state_t *reader_stat
 
     case KAN_REFLECTION_ARCHETYPE_STRUCT:
     {
-        struct reader_block_state_t new_state = {
-            .type = READER_BLOCK_TYPE_STRUCT,
-            .struct_state =
-                {
-                    .instance = spot,
-                    .type = kan_reflection_registry_query_struct (
-                        reader_state->registry, field->archetype_dynamic_array.item_archetype_struct.type_name),
-                },
-        };
+        const struct kan_reflection_struct_t *type = kan_reflection_registry_query_struct (
+            reader_state->registry, field->archetype_dynamic_array.item_archetype_struct.type_name);
+        KAN_ASSERT (type)
 
-        KAN_ASSERT (new_state.struct_state.type)
-        if (new_state.struct_state.type->init)
+        switch (top_state->type)
         {
-            new_state.struct_state.type->init (new_state.struct_state.type->functor_user_data, spot);
+        case READER_BLOCK_TYPE_STRUCT:
+        {
+            struct reader_block_state_t new_state = {
+                .type = READER_BLOCK_TYPE_STRUCT,
+                .struct_state =
+                    {
+                        .instance = real_spot,
+                        .type = type,
+                    },
+            };
+
+            if (new_state.struct_state.type->init)
+            {
+                new_state.struct_state.type->init (new_state.struct_state.type->functor_user_data, real_spot);
+            }
+
+            reader_state_push (reader_state, new_state);
+            return KAN_TRUE;
         }
 
-        reader_state_push (reader_state, new_state);
-        return KAN_TRUE;
+        case READER_BLOCK_TYPE_PATCH:
+        case READER_BLOCK_TYPE_PATCH_SUB_STRUCT:
+        case READER_BLOCK_TYPE_PATCH_SECTION:
+        {
+            struct reader_block_state_t new_state = {.type = READER_BLOCK_TYPE_PATCH_SUB_STRUCT,
+                                                     .patch_sub_struct_state = {
+                                                         .current_section = patch_section,
+                                                         .offset = 0u,
+                                                         .size_with_padding = field->archetype_dynamic_array.item_size,
+                                                         .struct_type = type,
+                                                     }};
+
+            reader_state_push (reader_state, new_state);
+            return KAN_TRUE;
+        }
+        }
     }
 
     case KAN_REFLECTION_ARCHETYPE_STRUCT_POINTER:
@@ -1728,16 +2009,30 @@ static inline kan_bool_t read_array_appender (struct reader_state_t *reader_stat
         return KAN_FALSE;
 
     case KAN_REFLECTION_ARCHETYPE_PATCH:
-    {
-        struct reader_block_state_t new_state = {.type = READER_BLOCK_TYPE_PATCH,
-                                                 .patch_state = {
-                                                     .patch_output = spot,
-                                                     .type = NULL,
-                                                 }};
+        switch (top_state->type)
+        {
+        case READER_BLOCK_TYPE_STRUCT:
+        {
+            struct reader_block_state_t new_state = {.type = READER_BLOCK_TYPE_PATCH,
+                                                     .patch_state = {
+                                                         .patch_output = real_spot,
+                                                         .type = NULL,
+                                                     }};
 
-        reader_state_push (reader_state, new_state);
-        return KAN_TRUE;
-    }
+            reader_state_push (reader_state, new_state);
+            return KAN_TRUE;
+        }
+
+        case READER_BLOCK_TYPE_PATCH:
+        case READER_BLOCK_TYPE_PATCH_SUB_STRUCT:
+        case READER_BLOCK_TYPE_PATCH_SECTION:
+            KAN_LOG (serialization_readable_data, KAN_LOG_ERROR,
+                     "Array appender attempts to set value at path \"%s\", but array appenders that append patches "
+                     "inside patches are not supported.",
+                     parsed_event->output_target.identifier)
+            return KAN_FALSE;
+            break;
+        }
     }
 
     KAN_ASSERT (KAN_FALSE)
@@ -2164,7 +2459,7 @@ static inline kan_bool_t enter_patch (struct writer_state_t *writer_state,
                                       kan_bool_t as_array_appender)
 {
     kan_reflection_patch_t patch = *(kan_reflection_patch_t *) address;
-    if (KAN_HANDLE_IS_VALID (patch))
+    if (KAN_HANDLE_IS_VALID (patch) && kan_reflection_patch_get_type (patch))
     {
         if (as_array_appender)
         {
@@ -2187,6 +2482,9 @@ static inline kan_bool_t enter_patch (struct writer_state_t *writer_state,
                                                               .patch = patch,
                                                               .current_iterator = kan_reflection_patch_begin (patch),
                                                               .end_iterator = kan_reflection_patch_end (patch),
+                                                              .additional_node_offset = 0u,
+                                                              .section_stack_size = 0u,
+                                                              .section_stack = NULL,
                                                           }});
 
         const struct kan_reflection_struct_t *patch_struct = kan_reflection_patch_get_type (patch);
@@ -2633,6 +2931,101 @@ static inline const struct kan_reflection_field_t *find_first_end_field_for_patc
     return &type->fields[first];
 }
 
+static const struct kan_reflection_field_t *open_patch_section_source_field (
+    struct writer_state_t *writer_state,
+    const struct kan_reflection_struct_t *source_type,
+    kan_instance_size_t offset_in_source_type,
+    kan_instance_size_t *support_blocks_counter)
+{
+    kan_loop_size_t first = 0u;
+    kan_loop_size_t last = source_type->fields_count;
+
+    while (first < last)
+    {
+        kan_loop_size_t middle = (first + last) / 2u;
+        const struct kan_reflection_field_t *field = &source_type->fields[middle];
+
+        if (offset_in_source_type < field->offset)
+        {
+            last = middle;
+        }
+        else if (offset_in_source_type >= field->offset + field->size)
+        {
+            first = middle + 1u;
+        }
+        else
+        {
+            // Should contain section source field.
+            switch (field->archetype)
+            {
+            case KAN_REFLECTION_ARCHETYPE_SIGNED_INT:
+            case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
+            case KAN_REFLECTION_ARCHETYPE_FLOATING:
+            case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
+            case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:
+            case KAN_REFLECTION_ARCHETYPE_ENUM:
+            case KAN_REFLECTION_ARCHETYPE_EXTERNAL_POINTER:
+            case KAN_REFLECTION_ARCHETYPE_STRUCT_POINTER:
+            case KAN_REFLECTION_ARCHETYPE_PATCH:
+                // These field types cannot be source fields for any sections.
+                return NULL;
+
+            case KAN_REFLECTION_ARCHETYPE_STRUCT:
+            {
+                const struct kan_reflection_struct_t *struct_data =
+                    kan_reflection_registry_query_struct (writer_state->registry, field->archetype_struct.type_name);
+                KAN_ASSERT (struct_data)
+
+                ++support_blocks_counter;
+                if (!emit_structural_setter_begin (writer_state, field->name, KAN_READABLE_DATA_ARRAY_INDEX_NONE))
+                {
+                    return KAN_FALSE;
+                }
+
+                return open_patch_section_source_field (writer_state, struct_data,
+                                                        offset_in_source_type - field->offset, support_blocks_counter);
+            }
+
+            case KAN_REFLECTION_ARCHETYPE_INLINE_ARRAY:
+            {
+                // Only struct inline arrays can technically contain sections inside.
+                if (field->archetype_inline_array.item_archetype == KAN_REFLECTION_ARCHETYPE_STRUCT)
+                {
+                    const struct kan_reflection_struct_t *struct_data = kan_reflection_registry_query_struct (
+                        writer_state->registry, field->archetype_inline_array.item_archetype_struct.type_name);
+                    KAN_ASSERT (struct_data)
+
+                    ++support_blocks_counter;
+                    if (!emit_structural_setter_begin (writer_state, field->name,
+                                                       (offset_in_source_type - field->offset) / struct_data->size))
+                    {
+                        return KAN_FALSE;
+                    }
+
+                    return open_patch_section_source_field (writer_state, struct_data,
+                                                            (offset_in_source_type - field->offset) % struct_data->size,
+                                                            support_blocks_counter);
+                }
+
+                // Nothing to do on.
+                return NULL;
+            }
+
+            case KAN_REFLECTION_ARCHETYPE_DYNAMIC_ARRAY:
+                if (offset_in_source_type == field->offset)
+                {
+                    return field;
+                }
+
+                // Nothing to do on overlap.
+                return NULL;
+            }
+        }
+    }
+
+    return NULL;
+}
+
 // Returning bool for convenient chaining.
 static inline kan_bool_t writer_patch_sub_struct_block_state_advance (struct writer_block_state_t *top_state)
 {
@@ -2684,6 +3077,7 @@ static inline kan_bool_t enter_patch_sub_struct (struct writer_state_t *writer_s
         find_first_end_field_for_patch_sub_struct (type, new_block_state.patch_sub_struct_state.scope_end);
 
     new_block_state.patch_sub_struct_state.suffix_next_index_to_write = 0u;
+    new_block_state.patch_sub_struct_state.close_blocks_on_exit = 1u;
 
     writer_patch_sub_struct_block_state_advance (top_state);
     writer_state_push (writer_state, new_block_state);
@@ -2867,7 +3261,8 @@ static inline kan_bool_t writer_step_patch_sub_struct (struct writer_state_t *wr
 
     case KAN_REFLECTION_ARCHETYPE_DYNAMIC_ARRAY:
         KAN_LOG (serialization_readable_data, KAN_LOG_ERROR,
-                 "Found field \"%s\" that is a dynamic array. Dynamic arrays inside patches are not supported.",
+                 "Found field \"%s\" that is a dynamic array. Changing dynamic arrays inside patches is supported only "
+                 "through sections.",
                  current_field->name)
         return KAN_FALSE;
 
@@ -2881,6 +3276,102 @@ static inline kan_bool_t writer_step_patch_sub_struct (struct writer_state_t *wr
     return KAN_FALSE;
 }
 
+static inline void writer_step_patch_enter_struct (struct writer_state_t *writer_state,
+                                                   struct writer_block_state_t *top_state,
+                                                   struct kan_reflection_patch_node_info_t *node,
+                                                   const struct kan_reflection_struct_t *container_type)
+{
+    const kan_instance_size_t begin_offset = node->chunk_info.offset + top_state->patch_state.additional_node_offset;
+    const kan_instance_size_t end_offset = KAN_MIN (node->chunk_info.offset + node->chunk_info.size,
+                                                    (1u + begin_offset / container_type->size) * container_type->size);
+
+    struct writer_block_state_t new_state;
+    new_state.type = WRITER_BLOCK_TYPE_PATCH_SUB_STRUCT;
+    new_state.patch_sub_struct_state.imaginary_instance = ((const uint8_t *) node->chunk_info.data) +
+                                                          top_state->patch_state.additional_node_offset -
+                                                          begin_offset % container_type->size;
+
+    new_state.patch_sub_struct_state.scope_begin = begin_offset % container_type->size;
+    new_state.patch_sub_struct_state.scope_end =
+        new_state.patch_sub_struct_state.scope_begin + (end_offset - begin_offset);
+
+    new_state.patch_sub_struct_state.current_field =
+        find_first_first_field_for_patch_sub_struct (container_type, new_state.patch_sub_struct_state.scope_begin);
+
+    new_state.patch_sub_struct_state.end_field =
+        find_first_end_field_for_patch_sub_struct (container_type, new_state.patch_sub_struct_state.scope_end);
+
+    new_state.patch_sub_struct_state.suffix_next_index_to_write = 0u;
+    new_state.patch_sub_struct_state.close_blocks_on_exit = 0u;
+    writer_state_push (writer_state, new_state);
+
+    top_state->patch_state.additional_node_offset = end_offset - node->chunk_info.offset;
+}
+
+static kan_bool_t writer_step_patch_manage_array_set_index_internal (struct writer_state_t *writer_state,
+                                                                     struct writer_block_state_t *top_state,
+                                                                     kan_instance_size_t section_index,
+                                                                     kan_instance_size_t required_offset,
+                                                                     kan_instance_size_t max_affected_index)
+{
+    struct writer_section_stack_item_t *section = &top_state->patch_state.section_stack[section_index];
+    if (section_index < max_affected_index && section->type != KAN_REFLECTION_PATCH_SECTION_TYPE_DYNAMIC_ARRAY_SET)
+    {
+        return KAN_TRUE;
+    }
+
+    if (section_index > 0u)
+    {
+        if (!writer_step_patch_manage_array_set_index_internal (writer_state, top_state, section_index - 1u,
+                                                                section->source_offset, max_affected_index))
+        {
+            return KAN_FALSE;
+        }
+    }
+
+    if (section_index < max_affected_index)
+    {
+        const kan_instance_size_t item_size = section->source_field->archetype_dynamic_array.item_size;
+        const kan_instance_size_t needed_index = required_offset / item_size;
+
+        if (needed_index != section->array_set_current_index)
+        {
+            if (section->array_set_current_index != KAN_INT_MAX (kan_instance_size_t))
+            {
+                if (!emit_block_end (writer_state))
+                {
+                    return KAN_FALSE;
+                }
+            }
+            else
+            {
+                ++section->support_blocks_opened;
+            }
+
+            section->array_set_current_index = needed_index;
+            if (!emit_structural_setter_begin (writer_state, section->source_field->name, needed_index))
+            {
+                return KAN_FALSE;
+            }
+        }
+    }
+
+    return KAN_TRUE;
+}
+
+static inline kan_bool_t writer_step_patch_manage_array_set_index (struct writer_state_t *writer_state,
+                                                                   struct writer_block_state_t *top_state,
+                                                                   kan_instance_size_t base_offset,
+                                                                   kan_bool_t include_self)
+{
+    KAN_ASSERT (top_state->patch_state.section_stack_size > 0u)
+    const kan_instance_size_t last_index = top_state->patch_state.section_stack_size - 1u;
+
+    return writer_step_patch_manage_array_set_index_internal (
+        writer_state, top_state, last_index, base_offset + top_state->patch_state.additional_node_offset,
+        include_self ? last_index + 1u : last_index);
+}
+
 static inline kan_bool_t writer_step_patch (struct writer_state_t *writer_state, struct writer_block_state_t *top_state)
 {
     if (KAN_HANDLE_IS_EQUAL (top_state->patch_state.current_iterator, top_state->patch_state.end_iterator))
@@ -2888,26 +3379,285 @@ static inline kan_bool_t writer_step_patch (struct writer_state_t *writer_state,
         return KAN_TRUE;
     }
 
-    struct kan_reflection_patch_chunk_info_t chunk =
+    struct kan_reflection_patch_node_info_t node =
         kan_reflection_patch_iterator_get (top_state->patch_state.current_iterator);
-    top_state->patch_state.current_iterator =
-        kan_reflection_patch_iterator_next (top_state->patch_state.current_iterator);
 
-    struct writer_block_state_t new_state;
-    new_state.type = WRITER_BLOCK_TYPE_PATCH_SUB_STRUCT;
-    new_state.patch_sub_struct_state.imaginary_instance = ((const uint8_t *) chunk.data) - chunk.offset;
-    new_state.patch_sub_struct_state.scope_begin = chunk.offset;
-    new_state.patch_sub_struct_state.scope_end = chunk.offset + chunk.size;
+    if (node.is_data_chunk)
+    {
+        struct writer_section_stack_item_t *top_section = NULL;
+        if (top_state->patch_state.section_stack_size > 0u)
+        {
+            top_section = &top_state->patch_state.section_stack[top_state->patch_state.section_stack_size - 1u];
+        }
 
-    const struct kan_reflection_struct_t *patch_type = kan_reflection_patch_get_type (top_state->patch_state.patch);
-    new_state.patch_sub_struct_state.current_field =
-        find_first_first_field_for_patch_sub_struct (patch_type, new_state.patch_sub_struct_state.scope_begin);
+        if (top_section)
+        {
+            enum kan_reflection_archetype_t item_archetype = KAN_REFLECTION_ARCHETYPE_SIGNED_INT;
+            kan_instance_size_t item_size = 0u;
+            kan_interned_string_t item_type_name = NULL;
+            kan_bool_t will_need_to_include_self_for_array_set = KAN_FALSE;
 
-    new_state.patch_sub_struct_state.end_field =
-        find_first_end_field_for_patch_sub_struct (patch_type, new_state.patch_sub_struct_state.scope_end);
+            switch (top_section->type)
+            {
+            case KAN_REFLECTION_PATCH_SECTION_TYPE_DYNAMIC_ARRAY_SET:
+            case KAN_REFLECTION_PATCH_SECTION_TYPE_DYNAMIC_ARRAY_APPEND:
+                item_archetype = top_section->source_field->archetype_dynamic_array.item_archetype;
+                item_size = top_section->source_field->archetype_dynamic_array.item_size;
 
-    new_state.patch_sub_struct_state.suffix_next_index_to_write = 0u;
-    writer_state_push (writer_state, new_state);
+                switch (item_archetype)
+                {
+                case KAN_REFLECTION_ARCHETYPE_SIGNED_INT:
+                case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
+                case KAN_REFLECTION_ARCHETYPE_FLOATING:
+                case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
+                case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:
+                case KAN_REFLECTION_ARCHETYPE_EXTERNAL_POINTER:
+                case KAN_REFLECTION_ARCHETYPE_STRUCT_POINTER:
+                case KAN_REFLECTION_ARCHETYPE_INLINE_ARRAY:
+                case KAN_REFLECTION_ARCHETYPE_DYNAMIC_ARRAY:
+                case KAN_REFLECTION_ARCHETYPE_PATCH:
+                    will_need_to_include_self_for_array_set = KAN_FALSE;
+                    break;
+
+                case KAN_REFLECTION_ARCHETYPE_ENUM:
+                    item_type_name = top_section->source_field->archetype_dynamic_array.item_archetype_enum.type_name;
+                    will_need_to_include_self_for_array_set = KAN_FALSE;
+                    break;
+
+                case KAN_REFLECTION_ARCHETYPE_STRUCT:
+                    item_type_name = top_section->source_field->archetype_dynamic_array.item_archetype_struct.type_name;
+                    will_need_to_include_self_for_array_set = KAN_TRUE;
+                    break;
+                }
+
+                break;
+            }
+
+            writer_step_patch_manage_array_set_index (
+                writer_state, top_state, node.chunk_info.offset,
+                top_section->type == KAN_REFLECTION_PATCH_SECTION_TYPE_DYNAMIC_ARRAY_SET ?
+                    will_need_to_include_self_for_array_set :
+                    KAN_FALSE);
+
+            kan_loop_size_t elemental_iteration = 0u;
+            switch (item_archetype)
+            {
+#define EMIT_ELEMENTAL(TYPE)                                                                                           \
+    while (top_state->patch_state.additional_node_offset < node.chunk_info.size &&                                     \
+           elemental_iteration < KAN_SERIALIZATION_RD_WRITER_PATCH_ELEMENTAL_ITERATIONS)                               \
+    {                                                                                                                  \
+        if (!emit_single_##TYPE##_setter (                                                                             \
+                writer_state, top_section->source_field->name,                                                         \
+                (top_state->patch_state.additional_node_offset + node.chunk_info.offset) / item_size, item_size,       \
+                ((uint8_t *) node.chunk_info.data) + top_state->patch_state.additional_node_offset))                   \
+        {                                                                                                              \
+            return KAN_FALSE;                                                                                          \
+        }                                                                                                              \
+                                                                                                                       \
+        top_state->patch_state.additional_node_offset += item_size;                                                    \
+        ++elemental_iteration;                                                                                         \
+    }
+
+            case KAN_REFLECTION_ARCHETYPE_SIGNED_INT:
+                KAN_ASSERT (top_section->type == KAN_REFLECTION_PATCH_SECTION_TYPE_DYNAMIC_ARRAY_SET)
+                EMIT_ELEMENTAL (signed_integer)
+                break;
+
+            case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
+                KAN_ASSERT (top_section->type == KAN_REFLECTION_PATCH_SECTION_TYPE_DYNAMIC_ARRAY_SET)
+                EMIT_ELEMENTAL (unsigned_integer)
+                break;
+
+            case KAN_REFLECTION_ARCHETYPE_FLOATING:
+                KAN_ASSERT (top_section->type == KAN_REFLECTION_PATCH_SECTION_TYPE_DYNAMIC_ARRAY_SET)
+                EMIT_ELEMENTAL (floating)
+                break;
+
+#undef EMIT_ELEMENTAL
+
+            case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
+            case KAN_REFLECTION_ARCHETYPE_EXTERNAL_POINTER:
+            case KAN_REFLECTION_ARCHETYPE_STRUCT_POINTER:
+            case KAN_REFLECTION_ARCHETYPE_INLINE_ARRAY:
+            case KAN_REFLECTION_ARCHETYPE_DYNAMIC_ARRAY:
+            case KAN_REFLECTION_ARCHETYPE_PATCH:
+                KAN_ASSERT (KAN_FALSE)
+                break;
+
+            case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:
+                KAN_ASSERT (top_section->type == KAN_REFLECTION_PATCH_SECTION_TYPE_DYNAMIC_ARRAY_SET)
+
+                while (top_state->patch_state.additional_node_offset < node.chunk_info.size && elemental_iteration < 32)
+                {
+                    if (!emit_single_string_setter (
+                            writer_state, top_section->source_field->name,
+                            (top_state->patch_state.additional_node_offset + node.chunk_info.offset) / item_size,
+                            ((uint8_t *) node.chunk_info.data) + top_state->patch_state.additional_node_offset))
+                    {
+                        return KAN_FALSE;
+                    }
+
+                    top_state->patch_state.additional_node_offset += item_size;
+                    ++elemental_iteration;
+                }
+
+                break;
+
+            case KAN_REFLECTION_ARCHETYPE_ENUM:
+                KAN_ASSERT (top_section->type == KAN_REFLECTION_PATCH_SECTION_TYPE_DYNAMIC_ARRAY_SET)
+
+                while (top_state->patch_state.additional_node_offset < node.chunk_info.size && elemental_iteration < 32)
+                {
+                    if (!emit_single_enum_setter (
+                            writer_state, top_section->source_field->name,
+                            (top_state->patch_state.additional_node_offset + node.chunk_info.offset) / item_size,
+                            item_type_name,
+                            ((uint8_t *) node.chunk_info.data) + top_state->patch_state.additional_node_offset))
+                    {
+                        return KAN_FALSE;
+                    }
+
+                    top_state->patch_state.additional_node_offset += item_size;
+                    ++elemental_iteration;
+                }
+
+                break;
+
+            case KAN_REFLECTION_ARCHETYPE_STRUCT:
+                writer_step_patch_enter_struct (
+                    writer_state, top_state, &node,
+                    kan_reflection_registry_query_struct (writer_state->registry, item_type_name));
+                break;
+            }
+        }
+        else
+        {
+            writer_step_patch_enter_struct (writer_state, top_state, &node,
+                                            kan_reflection_patch_get_type (top_state->patch_state.patch));
+        }
+
+        if (top_state->patch_state.additional_node_offset >= node.chunk_info.size)
+        {
+            top_state->patch_state.current_iterator =
+                kan_reflection_patch_iterator_next (top_state->patch_state.current_iterator);
+            top_state->patch_state.additional_node_offset = 0u;
+        }
+    }
+    else
+    {
+        if (!top_state->patch_state.section_stack)
+        {
+            top_state->patch_state.section_stack = kan_allocate_general (
+                serialization_allocation_group,
+                sizeof (struct writer_section_stack_item_t) * KAN_SERIALIZATION_RD_WRITER_PATCH_SECTION_STACK_MAX,
+                _Alignof (struct writer_section_stack_item_t));
+        }
+
+        while (top_state->patch_state.section_stack_size > 0u)
+        {
+            if (KAN_TYPED_ID_32_IS_EQUAL (
+                    top_state->patch_state.section_stack[top_state->patch_state.section_stack_size - 1u].id,
+                    node.section_info.parent_section_id))
+            {
+                break;
+            }
+
+            struct writer_section_stack_item_t *item =
+                &top_state->patch_state.section_stack[top_state->patch_state.section_stack_size - 1u];
+
+            while (item->support_blocks_opened)
+            {
+                if (!emit_block_end (writer_state))
+                {
+                    return KAN_FALSE;
+                }
+
+                --item->support_blocks_opened;
+            }
+
+            --top_state->patch_state.section_stack_size;
+        }
+
+        const struct kan_reflection_struct_t *source_type =
+            kan_reflection_patch_get_type (top_state->patch_state.patch);
+        struct writer_section_stack_item_t *top_section = NULL;
+
+        if (top_state->patch_state.section_stack_size > 0u)
+        {
+            top_section = &top_state->patch_state.section_stack[top_state->patch_state.section_stack_size - 1u];
+            switch (top_section->type)
+            {
+            case KAN_REFLECTION_PATCH_SECTION_TYPE_DYNAMIC_ARRAY_SET:
+            case KAN_REFLECTION_PATCH_SECTION_TYPE_DYNAMIC_ARRAY_APPEND:
+            {
+                // Otherwise patch is malformed.
+                KAN_ASSERT (top_section->source_field->archetype == KAN_REFLECTION_ARCHETYPE_DYNAMIC_ARRAY)
+                KAN_ASSERT (top_section->source_field->archetype_dynamic_array.item_archetype ==
+                            KAN_REFLECTION_ARCHETYPE_STRUCT)
+
+                source_type = kan_reflection_registry_query_struct (
+                    writer_state->registry,
+                    top_section->source_field->archetype_dynamic_array.item_archetype_struct.type_name);
+                break;
+            }
+            }
+        }
+
+        kan_instance_size_t support_blocks = 0u;
+        const struct kan_reflection_field_t *new_source_field = open_patch_section_source_field (
+            writer_state, source_type, node.section_info.source_offset_in_parent % source_type->size, &support_blocks);
+
+        if (!new_source_field)
+        {
+            KAN_LOG (serialization_readable_data, KAN_LOG_ERROR,
+                     "Unable to open patch section source field at offset %lu of type \"%s\"h.",
+                     (unsigned long) (node.section_info.source_offset_in_parent % source_type->size), source_type->name)
+            return KAN_FALSE;
+        }
+
+        if (top_state->patch_state.section_stack_size >= KAN_SERIALIZATION_RD_WRITER_PATCH_SECTION_STACK_MAX)
+        {
+            KAN_LOG (serialization_readable_data, KAN_LOG_ERROR,
+                     "Unable to serialize patch due to patch section stack overflow.")
+            return KAN_FALSE;
+        }
+
+        switch (node.section_info.type)
+        {
+        case KAN_REFLECTION_PATCH_SECTION_TYPE_DYNAMIC_ARRAY_SET:
+            break;
+
+        case KAN_REFLECTION_PATCH_SECTION_TYPE_DYNAMIC_ARRAY_APPEND:
+            if (top_state->patch_state.section_stack_size > 0u)
+            {
+                writer_step_patch_manage_array_set_index (writer_state, top_state,
+                                                          node.section_info.source_offset_in_parent, KAN_TRUE);
+            }
+
+            ++support_blocks;
+            if (!emit_array_appender_begin (writer_state, new_source_field->name))
+            {
+                return KAN_FALSE;
+            }
+
+            break;
+        }
+
+        top_state->patch_state.section_stack[top_state->patch_state.section_stack_size] =
+            (struct writer_section_stack_item_t) {
+                .id = node.section_info.section_id,
+                .type = node.section_info.type,
+                .source_field = new_source_field,
+                .source_offset = node.section_info.source_offset_in_parent,
+                .support_blocks_opened = support_blocks,
+                .array_set_current_index = KAN_INT_MAX (kan_instance_size_t),
+            };
+
+        ++top_state->patch_state.section_stack_size;
+        top_state->patch_state.current_iterator =
+            kan_reflection_patch_iterator_next (top_state->patch_state.current_iterator);
+    }
+
     return KAN_TRUE;
 }
 
@@ -2979,22 +3729,18 @@ enum kan_serialization_state_t kan_serialization_rd_writer_step (kan_serializati
         case WRITER_BLOCK_TYPE_PATCH_SUB_STRUCT:
             if (top_state->patch_sub_struct_state.current_field == top_state->patch_sub_struct_state.end_field)
             {
-                writer_state_pop (writer_state);
-                popped = KAN_TRUE;
-
-                KAN_ASSERT (writer_state->block_state_stack.size > 0u)
-                struct writer_block_state_t *state_below =
-                    &((struct writer_block_state_t *)
-                          writer_state->block_state_stack.data)[writer_state->block_state_stack.size - 1u];
-
-                // Do not emit block end for patch root sub structs.
-                if (state_below->type != WRITER_BLOCK_TYPE_PATCH)
+                while (top_state->patch_sub_struct_state.close_blocks_on_exit > 0u)
                 {
                     if (!emit_block_end (writer_state))
                     {
                         return KAN_SERIALIZATION_FAILED;
                     }
+
+                    --top_state->patch_sub_struct_state.close_blocks_on_exit;
                 }
+
+                writer_state_pop (writer_state);
+                popped = KAN_TRUE;
             }
 
             break;
@@ -3002,6 +3748,24 @@ enum kan_serialization_state_t kan_serialization_rd_writer_step (kan_serializati
         case WRITER_BLOCK_TYPE_PATCH:
             if (KAN_HANDLE_IS_EQUAL (top_state->patch_state.current_iterator, top_state->patch_state.end_iterator))
             {
+                while (top_state->patch_state.section_stack_size > 0u)
+                {
+                    struct writer_section_stack_item_t *item =
+                        &top_state->patch_state.section_stack[top_state->patch_state.section_stack_size - 1u];
+
+                    while (item->support_blocks_opened)
+                    {
+                        if (!emit_block_end (writer_state))
+                        {
+                            return KAN_SERIALIZATION_FAILED;
+                        }
+
+                        --item->support_blocks_opened;
+                    }
+
+                    --top_state->patch_state.section_stack_size;
+                }
+
                 writer_state_pop (writer_state);
                 popped = KAN_TRUE;
 
