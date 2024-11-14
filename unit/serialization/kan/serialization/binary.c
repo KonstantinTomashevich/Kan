@@ -252,6 +252,8 @@ static kan_allocation_group_t interned_string_registry_read_allocation_group;
 static kan_allocation_group_t interned_string_registry_write_allocation_group;
 static kan_allocation_group_t serialization_allocation_group;
 
+static kan_interned_string_t interned_invalid_patch_type_t;
+
 static kan_bool_t statics_initialized = KAN_FALSE;
 static struct kan_atomic_int_t statics_initialization_lock = {.value = 0};
 
@@ -279,6 +281,8 @@ static void ensure_statics_initialized (void)
                 kan_allocation_group_get_child (interned_string_registry_allocation_group, "write");
             serialization_allocation_group =
                 kan_allocation_group_get_child (kan_allocation_group_root (), "serialization_binary");
+
+            interned_invalid_patch_type_t = kan_string_intern ("invalid_patch_type_t");
             statics_initialized = KAN_TRUE;
         }
 
@@ -1937,14 +1941,28 @@ static inline void ensure_patch_section_map_is_ready (struct serialization_commo
 static inline kan_bool_t init_patch_read_suffix (struct serialization_read_state_t *state,
                                                  struct script_state_patch_suffix_t *suffix)
 {
-    if (!read_interned_string (state, &suffix->type_name) ||
-        !read_array_or_patch_size (state, &suffix->read.blocks_total) ||
-        !read_array_or_patch_size (state, &suffix->read.section_id_bound))
+    if (!read_interned_string (state, &suffix->type_name))
     {
         return KAN_FALSE;
     }
 
-    suffix->read.blocks_processed = 0u;
+    if (suffix->type_name != interned_invalid_patch_type_t)
+    {
+        if (!read_array_or_patch_size (state, &suffix->read.blocks_total) ||
+            !read_array_or_patch_size (state, &suffix->read.section_id_bound))
+        {
+            return KAN_FALSE;
+        }
+
+        suffix->read.blocks_processed = 0u;
+    }
+    else
+    {
+        suffix->read.blocks_processed = 0u;
+        suffix->read.blocks_total = 0u;
+        suffix->read.section_id_bound = 0u;
+    }
+
     ensure_patch_section_map_is_ready (&state->common, suffix->read.section_id_bound);
     return KAN_TRUE;
 }
@@ -2500,11 +2518,19 @@ enum kan_serialization_state_t kan_serialization_binary_reader_step (kan_seriali
                                                     sizeof (kan_reflection_patch_t) *
                                                         top_state->suffix_patch_dynamic_array.array.items_processed);
 
-                    *patch = kan_reflection_patch_builder_build (
-                        state->patch_builder, state->common.script_storage->registry,
-                        kan_reflection_registry_query_struct (
-                            state->common.script_storage->registry,
-                            top_state->suffix_patch_dynamic_array.current_patch.type_name));
+                    if (top_state->suffix_patch_dynamic_array.current_patch.type_name != interned_invalid_patch_type_t)
+                    {
+                        *patch = kan_reflection_patch_builder_build (
+                            state->patch_builder, state->common.script_storage->registry,
+                            kan_reflection_registry_query_struct (
+                                state->common.script_storage->registry,
+                                top_state->suffix_patch_dynamic_array.current_patch.type_name));
+                    }
+                    else
+                    {
+                        *patch = KAN_HANDLE_SET_INVALID (kan_reflection_patch_t);
+                    }
+
                     ++top_state->suffix_patch_dynamic_array.array.items_processed;
                     ++array->size;
 
@@ -2557,10 +2583,18 @@ enum kan_serialization_state_t kan_serialization_binary_reader_step (kan_seriali
             if (top_state->suffix_patch.read.blocks_processed >= top_state->suffix_patch.read.blocks_total)
             {
                 kan_reflection_patch_t *patch = (kan_reflection_patch_t *) address;
-                *patch = kan_reflection_patch_builder_build (
-                    state->patch_builder, state->common.script_storage->registry,
-                    kan_reflection_registry_query_struct (state->common.script_storage->registry,
-                                                          top_state->suffix_patch.type_name));
+                if (top_state->suffix_patch.type_name != interned_invalid_patch_type_t)
+                {
+                    *patch = kan_reflection_patch_builder_build (
+                        state->patch_builder, state->common.script_storage->registry,
+                        kan_reflection_registry_query_struct (state->common.script_storage->registry,
+                                                              top_state->suffix_patch.type_name));
+                }
+                else
+                {
+                    *patch = KAN_HANDLE_SET_INVALID (kan_reflection_patch_t);
+                }
+
                 script_state_go_to_next_command (top_state);
             }
 
@@ -2710,18 +2744,35 @@ static inline kan_bool_t init_patch_write_suffix (struct serialization_write_sta
                                                   kan_reflection_patch_t patch,
                                                   struct script_state_patch_suffix_t *suffix)
 {
-    if (!write_interned_string (state, kan_reflection_patch_get_type (patch)->name) ||
-        !write_array_or_patch_size (state, (kan_serialized_size_t) kan_reflection_patch_get_chunks_count (patch)) ||
-        !write_array_or_patch_size (state, (kan_serialized_size_t) kan_reflection_patch_get_section_id_bound (patch)))
+    if (KAN_HANDLE_IS_VALID (patch) && kan_reflection_patch_get_type (patch))
     {
-        return KAN_FALSE;
+        if (!write_interned_string (state, kan_reflection_patch_get_type (patch)->name) ||
+            !write_array_or_patch_size (state, (kan_serialized_size_t) kan_reflection_patch_get_chunks_count (patch)) ||
+            !write_array_or_patch_size (state,
+                                        (kan_serialized_size_t) kan_reflection_patch_get_section_id_bound (patch)))
+        {
+            return KAN_FALSE;
+        }
+
+        suffix->type_name = kan_reflection_patch_get_type (patch)->name;
+        suffix->write.current_iterator = kan_reflection_patch_begin (patch);
+        suffix->write.end_iterator = kan_reflection_patch_end (patch);
+
+        ensure_patch_section_map_is_ready (&state->common, kan_reflection_patch_get_section_id_bound (patch));
+    }
+    else
+    {
+        if (!write_interned_string (state, interned_invalid_patch_type_t))
+        {
+            return KAN_FALSE;
+        }
+
+        suffix->type_name = interned_invalid_patch_type_t;
+        suffix->write.current_iterator = KAN_HANDLE_SET_INVALID (kan_reflection_patch_iterator_t);
+        suffix->write.end_iterator = KAN_HANDLE_SET_INVALID (kan_reflection_patch_iterator_t);
+        ensure_patch_section_map_is_ready (&state->common, 0u);
     }
 
-    suffix->type_name = kan_reflection_patch_get_type (patch)->name;
-    suffix->write.current_iterator = kan_reflection_patch_begin (patch);
-    suffix->write.end_iterator = kan_reflection_patch_end (patch);
-
-    ensure_patch_section_map_is_ready (&state->common, kan_reflection_patch_get_section_id_bound (patch));
     return KAN_TRUE;
 }
 
