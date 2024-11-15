@@ -680,7 +680,6 @@ KAN_TEST_CASE (render_and_capture)
         kan_context_create (kan_allocation_group_get_child (kan_allocation_group_root (), "context"));
 
     struct kan_render_backend_system_config_t render_backend_config = {
-        .disable_render = KAN_FALSE,
         .prefer_vsync = KAN_FALSE,
         .application_info_name = kan_string_intern ("Kan autotest"),
         .version_major = 1u,

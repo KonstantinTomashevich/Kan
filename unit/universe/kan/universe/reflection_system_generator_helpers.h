@@ -323,19 +323,19 @@ KAN_C_HEADER_BEGIN
                                                                                                                        \
     OUTPUT_PREFIX##_deploy_function.arguments[0u].name = kan_string_intern ("universe");                               \
     OUTPUT_PREFIX##_deploy_function.arguments[0u].size = sizeof (kan_universe_t);                                      \
-    OUTPUT_PREFIX##_deploy_function.arguments[0u].archetype = KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT;                   \
+    OUTPUT_PREFIX##_deploy_function.arguments[0u].archetype = KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL;               \
                                                                                                                        \
     OUTPUT_PREFIX##_deploy_function.arguments[1u].name = kan_string_intern ("world");                                  \
     OUTPUT_PREFIX##_deploy_function.arguments[1u].size = sizeof (kan_universe_world_t);                                \
-    OUTPUT_PREFIX##_deploy_function.arguments[1u].archetype = KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT;                   \
+    OUTPUT_PREFIX##_deploy_function.arguments[1u].archetype = KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL;               \
                                                                                                                        \
     OUTPUT_PREFIX##_deploy_function.arguments[2u].name = kan_string_intern ("world_repository");                       \
     OUTPUT_PREFIX##_deploy_function.arguments[2u].size = sizeof (kan_repository_t);                                    \
-    OUTPUT_PREFIX##_deploy_function.arguments[2u].archetype = KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT;                   \
+    OUTPUT_PREFIX##_deploy_function.arguments[2u].archetype = KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL;               \
                                                                                                                        \
     OUTPUT_PREFIX##_deploy_function.arguments[3u].name = kan_string_intern ("workflow_node");                          \
     OUTPUT_PREFIX##_deploy_function.arguments[3u].size = sizeof (kan_workflow_graph_node_t);                           \
-    OUTPUT_PREFIX##_deploy_function.arguments[3u].archetype = KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT;                   \
+    OUTPUT_PREFIX##_deploy_function.arguments[3u].archetype = KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL;               \
                                                                                                                        \
     OUTPUT_PREFIX##_deploy_function.arguments[4u].name = kan_string_intern ("state");                                  \
     OUTPUT_PREFIX##_deploy_function.arguments[4u].size = sizeof (void *);                                              \
@@ -356,7 +356,7 @@ KAN_C_HEADER_BEGIN
                                                                                                                        \
     OUTPUT_PREFIX##_execute_function.arguments[0u].name = kan_string_intern ("job");                                   \
     OUTPUT_PREFIX##_execute_function.arguments[0u].size = sizeof (kan_cpu_job_t);                                      \
-    OUTPUT_PREFIX##_execute_function.arguments[0u].archetype = KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT;                  \
+    OUTPUT_PREFIX##_execute_function.arguments[0u].archetype = KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL;              \
                                                                                                                        \
     OUTPUT_PREFIX##_execute_function.arguments[1u].name = kan_string_intern ("state");                                 \
     OUTPUT_PREFIX##_execute_function.arguments[1u].size = sizeof (void *);                                             \

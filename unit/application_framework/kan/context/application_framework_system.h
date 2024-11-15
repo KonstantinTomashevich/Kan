@@ -35,9 +35,9 @@ struct kan_application_framework_system_config_t
     /// \brief Arguments passed to application framework. Managed by application framework itself.
     char **arguments;
 
-    /// \brief Command for automatic plugin code build and hot reload. Managed by application framework itself.
+    /// \brief Command for automatic plugin code build and hot reload.
     /// \details It should be left NULL when hot reload is disabled.
-    char *auto_build_and_hot_reload_command;
+    char *auto_build_command;
 };
 
 /// \brief Returns count of arguments passed to application framework.

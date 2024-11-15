@@ -2,6 +2,14 @@
 
 KAN_LOG_DEFINE_CATEGORY (render_backend_system_vulkan);
 
+void kan_render_backend_system_config_init (struct kan_render_backend_system_config_t *instance)
+{
+    instance->prefer_vsync = KAN_FALSE;
+    instance->version_major = 1u;
+    instance->version_minor = 0u;
+    instance->version_patch = 0u;
+}
+
 kan_context_system_t render_backend_system_create (kan_allocation_group_t group, void *user_config)
 {
     struct render_backend_system_t *system = kan_allocate_general (group, sizeof (struct render_backend_system_t),
@@ -156,7 +164,6 @@ kan_context_system_t render_backend_system_create (kan_allocation_group_t group,
     if (user_config)
     {
         struct kan_render_backend_system_config_t *config = user_config;
-        system->render_enabled = !config->disable_render;
         system->prefer_vsync = config->prefer_vsync;
         system->application_info_name = config->application_info_name;
         system->version_major = config->version_major;
@@ -165,16 +172,12 @@ kan_context_system_t render_backend_system_create (kan_allocation_group_t group,
     }
     else
     {
-        system->render_enabled = KAN_TRUE;
         system->prefer_vsync = KAN_FALSE;
         system->application_info_name = kan_string_intern ("unnamed_application");
         system->version_major = 1u;
         system->version_minor = 0u;
         system->version_patch = 0u;
     }
-
-    system->render_context_handle = system->render_enabled ? KAN_HANDLE_SET (kan_render_context_t, system) :
-                                                             KAN_HANDLE_SET_INVALID (kan_render_context_t);
 
     system->interned_temporary_staging_buffer = kan_string_intern ("temporary_staging_buffer");
     return KAN_HANDLE_SET (kan_context_system_t, system);
@@ -385,11 +388,6 @@ static void render_backend_system_query_devices (struct render_backend_system_t 
 void render_backend_system_init (kan_context_system_t handle)
 {
     struct render_backend_system_t *system = KAN_HANDLE_GET (handle);
-    if (!system->render_enabled)
-    {
-        return;
-    }
-
     if (!kan_platform_application_register_vulkan_library_usage ())
     {
         kan_critical_error ("Failed to register vulkan library usage, unable to continue properly.", __FILE__,
@@ -586,11 +584,6 @@ static void render_backend_system_destroy_synchronization_objects (struct render
 void render_backend_system_shutdown (kan_context_system_t handle)
 {
     struct render_backend_system_t *system = KAN_HANDLE_GET (handle);
-    if (!system->render_enabled)
-    {
-        return;
-    }
-
     vkDeviceWaitIdle (system->device);
     // All surfaces should've been automatically destroyed during application system shutdown.
     KAN_ASSERT (!system->surfaces.first)
@@ -1307,7 +1300,7 @@ kan_bool_t kan_render_backend_system_select_device (kan_context_system_t render_
 kan_render_context_t kan_render_backend_system_get_render_context (kan_context_system_t render_backend_system)
 {
     struct render_backend_system_t *system = KAN_HANDLE_GET (render_backend_system);
-    return system->render_context_handle;
+    return KAN_HANDLE_SET (kan_render_context_t, system);
 }
 
 static void render_backend_system_begin_command_submission (struct render_backend_system_t *system)

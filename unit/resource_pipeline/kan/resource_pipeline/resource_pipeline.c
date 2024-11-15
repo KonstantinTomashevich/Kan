@@ -64,10 +64,11 @@ static inline void kan_resource_pipeline_type_info_node_add_field (
     void *spot = kan_dynamic_array_add_last (&type_node->fields_to_check);
     if (!spot)
     {
-        kan_dynamic_array_set_capacity (&type_node->fields_to_check, type_node->fields_to_check.size);
+        kan_dynamic_array_set_capacity (&type_node->fields_to_check, type_node->fields_to_check.size * 2u);
         spot = kan_dynamic_array_add_last (&type_node->fields_to_check);
     }
 
+    KAN_ASSERT (spot)
     *(struct kan_resource_pipeline_reference_field_info_t *) spot =
         (struct kan_resource_pipeline_reference_field_info_t) {
             .field = field,
@@ -144,6 +145,7 @@ kan_resource_pipeline_type_info_storage_get_or_create_node (
         case KAN_REFLECTION_ARCHETYPE_SIGNED_INT:
         case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
         case KAN_REFLECTION_ARCHETYPE_FLOATING:
+        case KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL:
         case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
         case KAN_REFLECTION_ARCHETYPE_ENUM:
         case KAN_REFLECTION_ARCHETYPE_EXTERNAL_POINTER:
@@ -171,6 +173,7 @@ kan_resource_pipeline_type_info_storage_get_or_create_node (
             case KAN_REFLECTION_ARCHETYPE_SIGNED_INT:
             case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
             case KAN_REFLECTION_ARCHETYPE_FLOATING:
+            case KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL:
             case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
             case KAN_REFLECTION_ARCHETYPE_ENUM:
             case KAN_REFLECTION_ARCHETYPE_EXTERNAL_POINTER:
@@ -207,6 +210,7 @@ kan_resource_pipeline_type_info_storage_get_or_create_node (
             case KAN_REFLECTION_ARCHETYPE_SIGNED_INT:
             case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
             case KAN_REFLECTION_ARCHETYPE_FLOATING:
+            case KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL:
             case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
             case KAN_REFLECTION_ARCHETYPE_ENUM:
             case KAN_REFLECTION_ARCHETYPE_EXTERNAL_POINTER:
@@ -403,9 +407,10 @@ static inline void kan_resource_pipeline_type_info_storage_scan (
 
 void kan_resource_pipeline_reference_type_info_storage_build (
     struct kan_resource_pipeline_reference_type_info_storage_t *storage,
-    kan_allocation_group_t allocation_group,
-    kan_reflection_registry_t registry)
+    kan_reflection_registry_t registry,
+    kan_allocation_group_t allocation_group)
 {
+    storage->registry = registry;
     storage->scanned_allocation_group = allocation_group;
     kan_hash_storage_init (&storage->scanned_types, storage->scanned_allocation_group,
                            KAN_RESOURCE_PIPELINE_SCAN_BUCKETS);
@@ -530,6 +535,7 @@ static inline kan_instance_size_t extract_inline_array_size (const void *struct_
             break;
 
         case KAN_REFLECTION_ARCHETYPE_FLOATING:
+        case KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL:
         case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
         case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:
         case KAN_REFLECTION_ARCHETYPE_ENUM:
@@ -547,20 +553,13 @@ static inline kan_instance_size_t extract_inline_array_size (const void *struct_
     return array_field->archetype_inline_array.item_count;
 }
 
-static void kan_resource_pipeline_detect_inside_patch_part (
+static void kan_resource_pipeline_detect_inside_data_chunk_for_struct_instance (
     struct kan_resource_pipeline_reference_type_info_storage_t *storage,
-    kan_reflection_patch_t patch,
     kan_instance_size_t part_offset,
     kan_interned_string_t part_type_name,
-    kan_reflection_patch_iterator_t search_since_iterator,
+    struct kan_reflection_patch_chunk_info_t *chunk,
     struct kan_resource_pipeline_detected_reference_container_t *output_container)
 {
-    if (KAN_HANDLE_IS_EQUAL (search_since_iterator, kan_reflection_patch_end (patch)))
-    {
-        // Nothing in patch.
-        return;
-    }
-
     struct kan_resource_pipeline_reference_type_info_node_t *type_node =
         kan_resource_pipeline_type_info_storage_query_type_node (storage, part_type_name);
 
@@ -585,24 +584,8 @@ static void kan_resource_pipeline_detect_inside_patch_part (
         }
 
         kan_instance_size_t field_offset = part_offset + field_info->field->offset;
-        kan_reflection_patch_iterator_t field_search_iterator = search_since_iterator;
-        struct kan_reflection_patch_chunk_info_t chunk_info = kan_reflection_patch_iterator_get (field_search_iterator);
-
-        while (field_offset + field_info->field->size <= chunk_info.offset ||
-               field_offset >= chunk_info.offset + chunk_info.size)
+        if (field_offset + field_info->field->size <= chunk->offset || field_offset >= chunk->offset + chunk->size)
         {
-            field_search_iterator = kan_reflection_patch_iterator_next (field_search_iterator);
-            if (KAN_HANDLE_IS_EQUAL (field_search_iterator, kan_reflection_patch_end (patch)))
-            {
-                break;
-            }
-
-            chunk_info = kan_reflection_patch_iterator_get (field_search_iterator);
-        }
-
-        if (KAN_HANDLE_IS_EQUAL (field_search_iterator, kan_reflection_patch_end (patch)))
-        {
-            // Field does not present in patch even partially.
             continue;
         }
 
@@ -611,6 +594,7 @@ static void kan_resource_pipeline_detect_inside_patch_part (
         case KAN_REFLECTION_ARCHETYPE_SIGNED_INT:
         case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
         case KAN_REFLECTION_ARCHETYPE_FLOATING:
+        case KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL:
         case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
         case KAN_REFLECTION_ARCHETYPE_ENUM:
         case KAN_REFLECTION_ARCHETYPE_EXTERNAL_POINTER:
@@ -622,10 +606,10 @@ static void kan_resource_pipeline_detect_inside_patch_part (
 
         case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:
         {
-            KAN_ASSERT (field_offset >= chunk_info.offset &&
-                        field_offset + sizeof (kan_interned_string_t) <= chunk_info.offset + chunk_info.size)
-            const kan_instance_size_t offset_in_chunk = field_offset - chunk_info.offset;
-            const void *address = (const uint8_t *) chunk_info.data + offset_in_chunk;
+            KAN_ASSERT (field_offset >= chunk->offset &&
+                        field_offset + sizeof (kan_interned_string_t) <= chunk->offset + chunk->size)
+            const kan_instance_size_t offset_in_chunk = field_offset - chunk->offset;
+            const void *address = ((const uint8_t *) chunk->data) + offset_in_chunk;
 
             kan_resource_pipeline_detected_container_add_reference (
                 output_container, field_info->type, *(kan_interned_string_t *) address, field_info->compilation_usage);
@@ -633,82 +617,60 @@ static void kan_resource_pipeline_detect_inside_patch_part (
         }
 
         case KAN_REFLECTION_ARCHETYPE_STRUCT:
-            kan_resource_pipeline_detect_inside_patch_part (storage, patch, field_offset,
-                                                            field_info->field->archetype_struct.type_name,
-                                                            field_search_iterator, output_container);
+            kan_resource_pipeline_detect_inside_data_chunk_for_struct_instance (
+                storage, field_offset, field_info->field->archetype_struct.type_name, chunk, output_container);
             break;
 
         case KAN_REFLECTION_ARCHETYPE_INLINE_ARRAY:
         {
             // Inline arrays in patches are always treated as full.
             const kan_instance_size_t size = field_info->field->archetype_inline_array.item_count;
+            kan_instance_size_t current_offset = field_offset;
+            const kan_instance_size_t end_offset =
+                KAN_MIN (chunk->offset + chunk->size, field_offset + field_info->field->size);
 
             switch (field_info->field->archetype_inline_array.item_archetype)
             {
             case KAN_REFLECTION_ARCHETYPE_SIGNED_INT:
             case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
             case KAN_REFLECTION_ARCHETYPE_FLOATING:
+            case KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL:
             case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
             case KAN_REFLECTION_ARCHETYPE_ENUM:
             case KAN_REFLECTION_ARCHETYPE_EXTERNAL_POINTER:
-            case KAN_REFLECTION_ARCHETYPE_STRUCT:
             case KAN_REFLECTION_ARCHETYPE_STRUCT_POINTER:
             case KAN_REFLECTION_ARCHETYPE_INLINE_ARRAY:
             case KAN_REFLECTION_ARCHETYPE_DYNAMIC_ARRAY:
+            case KAN_REFLECTION_ARCHETYPE_PATCH:
                 KAN_ASSERT (KAN_FALSE)
                 break;
 
             case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:
             {
-                for (kan_loop_size_t index = 0u; index < size; ++index)
+                while (current_offset < end_offset)
                 {
-                    const kan_instance_size_t item_offset =
-                        field_offset + index * field_info->field->archetype_inline_array.item_size;
-
-                    while (item_offset >= chunk_info.offset + chunk_info.size)
-                    {
-                        field_search_iterator = kan_reflection_patch_iterator_next (field_search_iterator);
-                        if (KAN_HANDLE_IS_EQUAL (field_search_iterator, kan_reflection_patch_end (patch)))
-                        {
-                            break;
-                        }
-
-                        chunk_info = kan_reflection_patch_iterator_get (field_search_iterator);
-                    }
-
-                    if (KAN_HANDLE_IS_EQUAL (field_search_iterator, kan_reflection_patch_end (patch)))
-                    {
-                        break;
-                    }
-
-                    if (item_offset < chunk_info.offset)
-                    {
-                        continue;
-                    }
-
-                    KAN_ASSERT (item_offset + sizeof (kan_interned_string_t) <= chunk_info.offset + chunk_info.size)
-                    const kan_instance_size_t offset_in_chunk = item_offset - chunk_info.offset;
-                    const void *address = (const uint8_t *) chunk_info.data + offset_in_chunk;
+                    const kan_instance_size_t offset_in_chunk = current_offset - chunk->offset;
+                    const void *address = ((const uint8_t *) chunk->data) + offset_in_chunk;
 
                     kan_resource_pipeline_detected_container_add_reference (output_container, field_info->type,
                                                                             *(kan_interned_string_t *) address,
                                                                             field_info->compilation_usage);
+                    current_offset += size;
                 }
 
                 break;
             }
 
-            case KAN_REFLECTION_ARCHETYPE_PATCH:
-                for (kan_loop_size_t index = 0u; index < size; ++index)
+            case KAN_REFLECTION_ARCHETYPE_STRUCT:
+                while (current_offset < end_offset)
                 {
-                    const kan_instance_size_t item_offset =
-                        field_offset + index * field_info->field->archetype_inline_array.item_size;
+                    kan_resource_pipeline_detect_inside_data_chunk_for_struct_instance (
+                        storage, current_offset, field_info->field->archetype_struct.type_name, chunk,
+                        output_container);
 
-                    kan_resource_pipeline_detect_inside_patch_part (
-                        storage, patch, item_offset,
-                        field_info->field->archetype_inline_array.item_archetype_struct.type_name,
-                        field_search_iterator, output_container);
+                    current_offset += size;
                 }
+
                 break;
             }
 
@@ -718,13 +680,224 @@ static void kan_resource_pipeline_detect_inside_patch_part (
     }
 }
 
+struct patch_section_stack_item_t
+{
+    kan_reflection_patch_serializable_section_id_t id;
+    enum kan_reflection_patch_section_type_t type;
+    const struct kan_reflection_struct_t *source_field_type;
+    const struct kan_reflection_field_t *source_field;
+};
+
+struct patch_section_stack_t
+{
+    struct patch_section_stack_item_t *stack_end;
+    struct patch_section_stack_item_t stack[KAN_RESOURCE_PIPELINE_PATCH_SECTION_STACK_SIZE];
+};
+
 static inline void kan_resource_pipeline_detect_inside_patch (
     struct kan_resource_pipeline_reference_type_info_storage_t *storage,
     kan_reflection_patch_t patch,
     struct kan_resource_pipeline_detected_reference_container_t *output_container)
 {
-    kan_resource_pipeline_detect_inside_patch_part (storage, patch, 0u, kan_reflection_patch_get_type (patch)->name,
-                                                    kan_reflection_patch_begin (patch), output_container);
+    const struct kan_reflection_struct_t *patch_type = kan_reflection_patch_get_type (patch);
+    if (!patch_type)
+    {
+        return;
+    }
+
+    struct patch_section_stack_t stack;
+    stack.stack_end = stack.stack;
+
+    kan_reflection_patch_iterator_t patch_iterator = kan_reflection_patch_begin (patch);
+    const kan_reflection_patch_iterator_t patch_end = kan_reflection_patch_end (patch);
+
+    while (!KAN_HANDLE_IS_EQUAL (patch_iterator, patch_end))
+    {
+        struct kan_reflection_patch_node_info_t node = kan_reflection_patch_iterator_get (patch_iterator);
+        if (node.is_data_chunk)
+        {
+            if (stack.stack_end > stack.stack)
+            {
+                struct patch_section_stack_item_t *current_stack_item = stack.stack_end - 1u;
+                enum kan_reflection_archetype_t item_archetype = KAN_REFLECTION_ARCHETYPE_STRUCT;
+                kan_instance_size_t item_size = 0u;
+                kan_interned_string_t item_type_name = NULL;
+
+                switch (current_stack_item->type)
+                {
+                case KAN_REFLECTION_PATCH_SECTION_TYPE_DYNAMIC_ARRAY_SET:
+                case KAN_REFLECTION_PATCH_SECTION_TYPE_DYNAMIC_ARRAY_APPEND:
+                    KAN_ASSERT (current_stack_item->source_field->archetype == KAN_REFLECTION_ARCHETYPE_DYNAMIC_ARRAY)
+                    item_archetype = current_stack_item->source_field->archetype_dynamic_array.item_archetype;
+                    item_size = current_stack_item->source_field->archetype_dynamic_array.item_size;
+
+                    switch (item_archetype)
+                    {
+                    case KAN_REFLECTION_ARCHETYPE_SIGNED_INT:
+                    case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
+                    case KAN_REFLECTION_ARCHETYPE_FLOATING:
+                    case KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL:
+                    case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
+                    case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:
+                    case KAN_REFLECTION_ARCHETYPE_EXTERNAL_POINTER:
+                    case KAN_REFLECTION_ARCHETYPE_STRUCT_POINTER:
+                    case KAN_REFLECTION_ARCHETYPE_INLINE_ARRAY:
+                    case KAN_REFLECTION_ARCHETYPE_DYNAMIC_ARRAY:
+                    case KAN_REFLECTION_ARCHETYPE_PATCH:
+                        break;
+
+                    case KAN_REFLECTION_ARCHETYPE_ENUM:
+                        item_type_name =
+                            current_stack_item->source_field->archetype_dynamic_array.item_archetype_enum.type_name;
+                        break;
+
+                    case KAN_REFLECTION_ARCHETYPE_STRUCT:
+                        item_type_name =
+                            current_stack_item->source_field->archetype_dynamic_array.item_archetype_struct.type_name;
+                        break;
+                    }
+
+                    break;
+                }
+
+                switch (current_stack_item->type)
+                {
+                case KAN_REFLECTION_PATCH_SECTION_TYPE_DYNAMIC_ARRAY_SET:
+                    switch (item_archetype)
+                    {
+                    case KAN_REFLECTION_ARCHETYPE_SIGNED_INT:
+                    case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
+                    case KAN_REFLECTION_ARCHETYPE_FLOATING:
+                    case KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL:
+                    case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
+                    case KAN_REFLECTION_ARCHETYPE_ENUM:
+                    case KAN_REFLECTION_ARCHETYPE_EXTERNAL_POINTER:
+                    case KAN_REFLECTION_ARCHETYPE_STRUCT_POINTER:
+                    case KAN_REFLECTION_ARCHETYPE_INLINE_ARRAY:
+                    case KAN_REFLECTION_ARCHETYPE_DYNAMIC_ARRAY:
+                    case KAN_REFLECTION_ARCHETYPE_PATCH:
+                        break;
+
+                    case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:
+                    {
+                        // Special case. Interned string array might be reference array.
+                        struct kan_resource_pipeline_reference_type_info_node_t *type_node =
+                            kan_resource_pipeline_type_info_storage_query_type_node (
+                                storage, current_stack_item->source_field_type->name);
+
+                        for (kan_loop_size_t field_index = 0u; field_index < type_node->fields_to_check.size;
+                             ++field_index)
+                        {
+                            struct kan_resource_pipeline_reference_field_info_t *field_info =
+                                &((struct kan_resource_pipeline_reference_field_info_t *)
+                                      type_node->fields_to_check.data)[field_index];
+
+                            if (field_info->field == current_stack_item->source_field)
+                            {
+                                // This interned string array is actually a reference array.
+                                kan_instance_size_t offset = 0u;
+
+                                while (offset < node.chunk_info.size)
+                                {
+                                    const void *address = ((const uint8_t *) node.chunk_info.data) + offset;
+                                    kan_resource_pipeline_detected_container_add_reference (
+                                        output_container, field_info->type, *(kan_interned_string_t *) address,
+                                        field_info->compilation_usage);
+                                    offset += sizeof (kan_interned_string_t);
+                                }
+
+                                break;
+                            }
+                        }
+
+                        break;
+                    }
+
+                    case KAN_REFLECTION_ARCHETYPE_STRUCT:
+                    {
+                        kan_instance_size_t current_offset = node.chunk_info.offset;
+                        const kan_instance_size_t end_offset = node.chunk_info.offset + node.chunk_info.size;
+
+                        while (current_offset < end_offset)
+                        {
+                            const kan_instance_size_t struct_begin_offset = current_offset - current_offset % item_size;
+                            const kan_instance_size_t struct_end_offset = struct_begin_offset + item_size;
+
+                            kan_resource_pipeline_detect_inside_data_chunk_for_struct_instance (
+                                storage, struct_begin_offset, item_type_name, &node.chunk_info, output_container);
+                            current_offset = struct_end_offset;
+                        }
+
+                        break;
+                    }
+                    }
+
+                    break;
+
+                case KAN_REFLECTION_PATCH_SECTION_TYPE_DYNAMIC_ARRAY_APPEND:
+                    // Only structs can be appended, otherwise patch is malformed or this code is outdated.
+                    KAN_ASSERT (item_archetype == KAN_REFLECTION_ARCHETYPE_STRUCT)
+                    kan_resource_pipeline_detect_inside_data_chunk_for_struct_instance (
+                        storage, 0u, item_type_name, &node.chunk_info, output_container);
+                    break;
+                }
+            }
+            else
+            {
+                // We're inside main section and therefore are able to use simplified logic.
+                kan_resource_pipeline_detect_inside_data_chunk_for_struct_instance (storage, 0u, patch_type->name,
+                                                                                    &node.chunk_info, output_container);
+            }
+        }
+        else
+        {
+            while (stack.stack_end > stack.stack)
+            {
+                struct patch_section_stack_item_t *current_stack_item = stack.stack_end - 1u;
+                if (KAN_TYPED_ID_32_IS_EQUAL (current_stack_item->id, node.section_info.parent_section_id))
+                {
+                    break;
+                }
+
+                --stack.stack_end;
+            }
+
+            struct patch_section_stack_item_t *parent_section =
+                stack.stack_end > stack.stack ? stack.stack_end - 1u : NULL;
+
+            kan_interned_string_t parent_struct_name = patch_type->name;
+            kan_instance_size_t parent_struct_size = patch_type->size;
+
+            if (parent_section)
+            {
+                switch (parent_section->type)
+                {
+                case KAN_REFLECTION_PATCH_SECTION_TYPE_DYNAMIC_ARRAY_SET:
+                case KAN_REFLECTION_PATCH_SECTION_TYPE_DYNAMIC_ARRAY_APPEND:
+                    KAN_ASSERT (parent_section->source_field->archetype == KAN_REFLECTION_ARCHETYPE_DYNAMIC_ARRAY)
+                    // Only structs can be parents to sections.
+                    KAN_ASSERT (parent_section->source_field->archetype_dynamic_array.item_archetype ==
+                                KAN_REFLECTION_ARCHETYPE_STRUCT)
+                    parent_struct_name =
+                        parent_section->source_field->archetype_dynamic_array.item_archetype_struct.type_name;
+                    parent_struct_size = parent_section->source_field->archetype_dynamic_array.item_size;
+                    break;
+                }
+            }
+
+            KAN_ASSERT (stack.stack_end < stack.stack + KAN_RESOURCE_PIPELINE_PATCH_SECTION_STACK_SIZE)
+            stack.stack_end->id = node.section_info.section_id;
+            stack.stack_end->type = node.section_info.type;
+
+            stack.stack_end->source_field = kan_reflection_registry_query_local_field_by_offset (
+                storage->registry, parent_struct_name, node.section_info.source_offset_in_parent % parent_struct_size,
+                &stack.stack_end->source_field_type);
+            KAN_ASSERT (stack.stack_end->source_field)
+            ++stack.stack_end;
+        }
+
+        patch_iterator = kan_reflection_patch_iterator_next (patch_iterator);
+    }
 }
 
 void kan_resource_pipeline_detect_references (
@@ -765,6 +938,7 @@ void kan_resource_pipeline_detect_references (
             case KAN_REFLECTION_ARCHETYPE_SIGNED_INT:
             case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
             case KAN_REFLECTION_ARCHETYPE_FLOATING:
+            case KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL:
             case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
             case KAN_REFLECTION_ARCHETYPE_ENUM:
             case KAN_REFLECTION_ARCHETYPE_EXTERNAL_POINTER:
@@ -817,6 +991,7 @@ void kan_resource_pipeline_detect_references (
             case KAN_REFLECTION_ARCHETYPE_SIGNED_INT:
             case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
             case KAN_REFLECTION_ARCHETYPE_FLOATING:
+            case KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL:
             case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
             case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:
             case KAN_REFLECTION_ARCHETYPE_ENUM:
@@ -838,6 +1013,7 @@ void kan_resource_pipeline_detect_references (
                 case KAN_REFLECTION_ARCHETYPE_SIGNED_INT:
                 case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
                 case KAN_REFLECTION_ARCHETYPE_FLOATING:
+                case KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL:
                 case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
                 case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:
                 case KAN_REFLECTION_ARCHETYPE_ENUM:
@@ -880,6 +1056,7 @@ void kan_resource_pipeline_detect_references (
                 case KAN_REFLECTION_ARCHETYPE_SIGNED_INT:
                 case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
                 case KAN_REFLECTION_ARCHETYPE_FLOATING:
+                case KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL:
                 case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
                 case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:
                 case KAN_REFLECTION_ARCHETYPE_ENUM:

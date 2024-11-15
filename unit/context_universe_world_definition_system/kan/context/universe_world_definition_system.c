@@ -34,7 +34,7 @@ struct universe_world_definition_system_t
     kan_allocation_group_t group;
     kan_allocation_group_t observation_group;
 
-    char *definitions_mount_path;
+    kan_interned_string_t definitions_mount_path;
     kan_instance_size_t definitions_mount_path_length;
     kan_bool_t observe_definitions;
     kan_time_offset_t observation_rescan_delay_ns;
@@ -64,10 +64,8 @@ kan_context_system_t universe_world_definition_system_create (kan_allocation_gro
         struct kan_universe_world_definition_system_config_t *config =
             (struct kan_universe_world_definition_system_config_t *) user_config;
 
-        const kan_instance_size_t path_length = (kan_instance_size_t) strlen (config->definitions_mount_path);
-        system->definitions_mount_path = kan_allocate_general (group, path_length + 1u, _Alignof (char));
-        memcpy (system->definitions_mount_path, config->definitions_mount_path, path_length + 1u);
-        system->definitions_mount_path_length = path_length;
+        system->definitions_mount_path = config->definitions_mount_path;
+        system->definitions_mount_path_length = (kan_instance_size_t) strlen (system->definitions_mount_path);
         system->observe_definitions = config->observe_definitions;
         system->observation_rescan_delay_ns = config->observation_rescan_delay_ns;
     }
@@ -562,8 +560,6 @@ void universe_world_definition_system_disconnect (kan_context_system_t handle)
 void universe_world_definition_system_destroy (kan_context_system_t handle)
 {
     struct universe_world_definition_system_t *system = KAN_HANDLE_GET (handle);
-    kan_free_general (system->group, system->definitions_mount_path, system->definitions_mount_path_length + 1u);
-
     while (system->first_rescan_node)
     {
         struct rescan_stack_node_t *next = system->first_rescan_node->next;
@@ -584,6 +580,13 @@ CONTEXT_UNIVERSE_WORLD_DEFINITION_SYSTEM_API struct kan_context_system_api_t KAN
     .disconnect = universe_world_definition_system_disconnect,
     .destroy = universe_world_definition_system_destroy,
 };
+
+void kan_universe_world_definition_system_config_init (struct kan_universe_world_definition_system_config_t *instance)
+{
+    instance->definitions_mount_path = NULL;
+    instance->observe_definitions = KAN_FALSE;
+    instance->observation_rescan_delay_ns = 300000000u;
+}
 
 const struct kan_universe_world_definition_t *kan_universe_world_definition_system_query (
     kan_context_system_t universe_world_definition_system, kan_interned_string_t definition_name)

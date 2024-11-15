@@ -322,9 +322,9 @@ static void add_to_reflection_generators_if_needed (kan_reflection_registry_t re
         if (node->iterate_function->arguments_count != 4u ||
             node->iterate_function->arguments[0u].archetype != KAN_REFLECTION_ARCHETYPE_STRUCT_POINTER ||
             node->iterate_function->arguments[0u].archetype_struct_pointer.type_name != type->name ||
-            node->iterate_function->arguments[1u].archetype != KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT ||
+            node->iterate_function->arguments[1u].archetype != KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL ||
             node->iterate_function->arguments[1u].size != sizeof (void *) ||
-            node->iterate_function->arguments[2u].archetype != KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT ||
+            node->iterate_function->arguments[2u].archetype != KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL ||
             node->iterate_function->arguments[2u].size != sizeof (void *) ||
             node->iterate_function->arguments[3u].archetype != KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT ||
             node->iterate_function->arguments[3u].size != sizeof (kan_loop_size_t))
@@ -342,7 +342,7 @@ static void add_to_reflection_generators_if_needed (kan_reflection_registry_t re
         if (node->finalize_function->arguments_count != 2u ||
             node->finalize_function->arguments[0u].archetype != KAN_REFLECTION_ARCHETYPE_STRUCT_POINTER ||
             node->finalize_function->arguments[0u].archetype_struct_pointer.type_name != type->name ||
-            node->finalize_function->arguments[1u].archetype != KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT ||
+            node->finalize_function->arguments[1u].archetype != KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL ||
             node->finalize_function->arguments[1u].size != sizeof (void *))
         {
             KAN_LOG (reflection_system, KAN_LOG_ERROR,
@@ -1097,20 +1097,20 @@ void kan_reflection_system_generation_iterator_add_function (kan_reflection_syst
     APPEND_EVENT (added, function);
 }
 
-void kan_reflection_system_generation_iterator_change_enum (kan_reflection_system_generation_iterator_t iterator,
-                                                            const struct kan_reflection_enum_t *data)
+void kan_reflection_system_generation_iterator_enum_changed (kan_reflection_system_generation_iterator_t iterator,
+                                                             const struct kan_reflection_enum_t *data)
 {
     APPEND_EVENT (changed, enum);
 }
 
-void kan_reflection_system_generation_iterator_change_struct (kan_reflection_system_generation_iterator_t iterator,
-                                                              const struct kan_reflection_struct_t *data)
+void kan_reflection_system_generation_iterator_struct_changed (kan_reflection_system_generation_iterator_t iterator,
+                                                               const struct kan_reflection_struct_t *data)
 {
     APPEND_EVENT (changed, struct);
 }
 
-void kan_reflection_system_generation_iterator_change_function (kan_reflection_system_generation_iterator_t iterator,
-                                                                const struct kan_reflection_function_t *data)
+void kan_reflection_system_generation_iterator_function_changed (kan_reflection_system_generation_iterator_t iterator,
+                                                                 const struct kan_reflection_function_t *data)
 {
     APPEND_EVENT (changed, function);
 }
@@ -1200,3 +1200,8 @@ void kan_reflection_system_generation_iterator_add_function_argument_meta (
 
 #undef ADD_META_EVENT_TOP_LEVEL
 #undef ADD_META_EVENT_LOWER_LEVEL
+
+void kan_reflection_system_register_static_reflection (kan_reflection_registry_t registry)
+{
+    KAN_CONTEXT_REFLECTION_SYSTEM_REGISTRAR_FUNCTION (registry);
+}

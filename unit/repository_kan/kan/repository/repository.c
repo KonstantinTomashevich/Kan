@@ -1149,6 +1149,7 @@ static kan_bool_t validation_field_is_observable (kan_reflection_registry_t regi
     case KAN_REFLECTION_ARCHETYPE_SIGNED_INT:
     case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
     case KAN_REFLECTION_ARCHETYPE_FLOATING:
+    case KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL:
     case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:
     case KAN_REFLECTION_ARCHETYPE_ENUM:
         return KAN_TRUE;
@@ -1272,6 +1273,7 @@ static kan_bool_t validation_single_value_index_is_possible (const struct kan_re
     case KAN_REFLECTION_ARCHETYPE_SIGNED_INT:
     case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
     case KAN_REFLECTION_ARCHETYPE_FLOATING:
+    case KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL:
     case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:
     case KAN_REFLECTION_ARCHETYPE_ENUM:
         if (field->size > sizeof (uint64_t))
@@ -1340,6 +1342,7 @@ static kan_bool_t validation_multi_value_index_is_possible (const struct kan_ref
     case KAN_REFLECTION_ARCHETYPE_SIGNED_INT:
     case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
     case KAN_REFLECTION_ARCHETYPE_FLOATING:
+    case KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL:
         if (field->archetype_inline_array.item_size > sizeof (uint64_t))
         {
             KAN_LOG (repository_validation, KAN_LOG_ERROR,
@@ -2966,6 +2969,7 @@ static inline kan_repository_indexed_unsigned_t indexed_field_baked_data_extract
         break;
 
     case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
+    case KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL:
         return indexed_field_baked_data_extract_unsigned_from_pointer (data, pointer);
 
     case KAN_REFLECTION_ARCHETYPE_FLOATING:
@@ -3049,6 +3053,7 @@ static inline void indexed_field_baked_data_extract_and_convert_floating_array_f
         break;
 
     case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
+    case KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL:
         switch (item_size)
         {
             CONVERT_CASE (1u, uint8_t)

@@ -822,10 +822,7 @@ static kan_context_t create_context (const struct kan_application_resource_proje
 
     kan_file_system_path_container_reset_length (&path_container, check_index);
     kan_file_system_path_container_append (&path_container, project->plugin_relative_directory);
-
-    plugin_system_config.plugin_directory_path = kan_allocate_general (kan_plugin_system_config_get_allocation_group (),
-                                                                       path_container.length + 1u, _Alignof (char));
-    memcpy (plugin_system_config.plugin_directory_path, path_container.path, path_container.length + 1u);
+    plugin_system_config.plugin_directory_path = kan_string_intern (path_container.path);
 
     for (kan_loop_size_t index = 0u; index < project->plugins.size; ++index)
     {
@@ -2733,8 +2730,8 @@ int main (int argument_count, char **argument_values)
         KAN_ASSERT (KAN_HANDLE_IS_VALID (reflection_system))
         global.registry = kan_reflection_system_get_registry (reflection_system);
         global.binary_script_storage = kan_serialization_binary_script_storage_create (global.registry);
-        kan_resource_pipeline_reference_type_info_storage_build (
-            &global.reference_type_info_storage, reference_type_info_storage_allocation_group, global.registry);
+        kan_resource_pipeline_reference_type_info_storage_build (&global.reference_type_info_storage, global.registry,
+                                                                 reference_type_info_storage_allocation_group);
 
         KAN_LOG (application_framework_resource_builder, KAN_LOG_INFO, "Setting up target structure...")
         kan_dynamic_array_init (&global.targets, global.project.targets.size, sizeof (struct target_t),

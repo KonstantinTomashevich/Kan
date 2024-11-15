@@ -105,6 +105,58 @@ TEST_UNIVERSE_RESOURCE_REFERENCE_API struct kan_resource_pipeline_reference_meta
         .compilation_usage = KAN_RESOURCE_REFERENCE_COMPILATION_USAGE_TYPE_NOT_NEEDED,
 };
 
+struct compound_component_pass_t
+{
+    kan_interned_string_t name;
+
+    /// \meta reflection_dynamic_array_type = "kan_interned_string_t"
+    struct kan_dynamic_array_t configs;
+};
+
+TEST_UNIVERSE_RESOURCE_REFERENCE_API void compound_component_pass_init (struct compound_component_pass_t *instance)
+{
+    instance->name = NULL;
+    kan_dynamic_array_init (&instance->configs, 0u, sizeof (kan_interned_string_t), _Alignof (kan_interned_string_t),
+                            KAN_ALLOCATION_GROUP_IGNORE);
+}
+
+TEST_UNIVERSE_RESOURCE_REFERENCE_API void compound_component_pass_shutdown (struct compound_component_pass_t *instance)
+{
+    kan_dynamic_array_shutdown (&instance->configs);
+}
+
+// \meta reflection_struct_field_meta = "compound_component_pass_t.configs"
+TEST_UNIVERSE_RESOURCE_REFERENCE_API struct kan_resource_pipeline_reference_meta_t
+    compound_component_pass_configs_meta = {
+        .type = "config_a_t",
+        .compilation_usage = KAN_RESOURCE_REFERENCE_COMPILATION_USAGE_TYPE_NOT_NEEDED,
+};
+
+struct compound_component_t
+{
+    kan_interned_string_t name;
+
+    /// \meta reflection_dynamic_array_type = "struct compound_component_pass_t"
+    struct kan_dynamic_array_t passes;
+};
+
+TEST_UNIVERSE_RESOURCE_REFERENCE_API void compound_component_init (struct compound_component_t *instance)
+{
+    instance->name = NULL;
+    kan_dynamic_array_init (&instance->passes, 0u, sizeof (struct compound_component_pass_t),
+                            _Alignof (struct compound_component_pass_t), KAN_ALLOCATION_GROUP_IGNORE);
+}
+
+TEST_UNIVERSE_RESOURCE_REFERENCE_API void compound_component_shutdown (struct compound_component_t *instance)
+{
+    for (kan_loop_size_t index = 0u; index < (kan_loop_size_t) instance->passes.size; ++index)
+    {
+        compound_component_pass_shutdown (&((struct compound_component_pass_t *) instance->passes.data)[index]);
+    }
+
+    kan_dynamic_array_shutdown (&instance->passes);
+}
+
 struct config_a_t
 {
     kan_instance_size_t x;
@@ -180,13 +232,15 @@ static void save_prototype_1 (kan_reflection_registry_t registry, const char *pa
     kan_dynamic_array_set_capacity (&prototype_1.components, 3u);
 
     struct prototype_component_t prototype_component = {.inner_prototype = kan_string_intern ("prototype_2")};
-    kan_reflection_patch_builder_add_chunk (patch_builder, 0u, sizeof (prototype_component), &prototype_component);
+    kan_reflection_patch_builder_add_chunk (patch_builder, KAN_REFLECTION_PATCH_BUILDER_SECTION_ROOT, 0u,
+                                            sizeof (prototype_component), &prototype_component);
     *(kan_reflection_patch_t *) kan_dynamic_array_add_last (&prototype_1.components) =
         kan_reflection_patch_builder_build (patch_builder, registry, prototype_component_type);
 
     struct config_component_t config_component = {.optional_config_a = NULL,
                                                   .optional_config_b = kan_string_intern ("config_b_2")};
-    kan_reflection_patch_builder_add_chunk (patch_builder, 0u, sizeof (config_component), &config_component);
+    kan_reflection_patch_builder_add_chunk (patch_builder, KAN_REFLECTION_PATCH_BUILDER_SECTION_ROOT, 0u,
+                                            sizeof (config_component), &config_component);
     *(kan_reflection_patch_t *) kan_dynamic_array_add_last (&prototype_1.components) =
         kan_reflection_patch_builder_build (patch_builder, registry, config_component_type);
 
@@ -212,19 +266,71 @@ static void save_prototype_2 (kan_reflection_registry_t registry, const char *pa
 
     struct config_component_t config_component_1 = {.optional_config_a = NULL,
                                                     .optional_config_b = kan_string_intern ("config_b_1")};
-    kan_reflection_patch_builder_add_chunk (patch_builder, 0u, sizeof (config_component_1), &config_component_1);
+    kan_reflection_patch_builder_add_chunk (patch_builder, KAN_REFLECTION_PATCH_BUILDER_SECTION_ROOT, 0u,
+                                            sizeof (config_component_1), &config_component_1);
     *(kan_reflection_patch_t *) kan_dynamic_array_add_last (&prototype_2.components) =
         kan_reflection_patch_builder_build (patch_builder, registry, config_component_type);
 
     struct config_component_t config_component_2 = {.optional_config_a = kan_string_intern ("config_a"),
                                                     .optional_config_b = kan_string_intern ("config_b_1")};
-    kan_reflection_patch_builder_add_chunk (patch_builder, 0u, sizeof (config_component_2), &config_component_2);
+    kan_reflection_patch_builder_add_chunk (patch_builder, KAN_REFLECTION_PATCH_BUILDER_SECTION_ROOT, 0u,
+                                            sizeof (config_component_2), &config_component_2);
     *(kan_reflection_patch_t *) kan_dynamic_array_add_last (&prototype_2.components) =
         kan_reflection_patch_builder_build (patch_builder, registry, config_component_type);
 
     save_rd (path, &prototype_2, kan_string_intern ("resource_prototype_t"), registry);
     resource_prototype_shutdown (&prototype_2);
 
+    kan_reflection_patch_builder_destroy (patch_builder);
+}
+
+static void save_prototype_3 (kan_reflection_registry_t registry, const char *path)
+{
+    const struct kan_reflection_struct_t *compound_component_type =
+        kan_reflection_registry_query_struct (registry, kan_string_intern ("compound_component_t"));
+
+    kan_reflection_patch_builder_t patch_builder = kan_reflection_patch_builder_create ();
+    struct resource_prototype_t prototype_3;
+    resource_prototype_init (&prototype_3);
+    kan_dynamic_array_set_capacity (&prototype_3.components, 1u);
+
+    kan_reflection_patch_builder_section_t passes_set_section = kan_reflection_patch_builder_add_section (
+        patch_builder, KAN_REFLECTION_PATCH_BUILDER_SECTION_ROOT, KAN_REFLECTION_PATCH_SECTION_TYPE_DYNAMIC_ARRAY_SET,
+        offsetof (struct compound_component_t, passes));
+
+    kan_reflection_patch_builder_section_t pass_1_set_section = kan_reflection_patch_builder_add_section (
+        patch_builder, passes_set_section, KAN_REFLECTION_PATCH_SECTION_TYPE_DYNAMIC_ARRAY_SET,
+        offsetof (struct compound_component_pass_t, configs));
+
+    kan_interned_string_t string = kan_string_intern ("config_a");
+    kan_reflection_patch_builder_add_chunk (patch_builder, pass_1_set_section, 0u, sizeof (kan_interned_string_t),
+                                            &string);
+
+    kan_reflection_patch_builder_section_t pass_2_set_section = kan_reflection_patch_builder_add_section (
+        patch_builder, passes_set_section, KAN_REFLECTION_PATCH_SECTION_TYPE_DYNAMIC_ARRAY_SET,
+        sizeof (struct compound_component_pass_t) + offsetof (struct compound_component_pass_t, configs));
+
+    string = kan_string_intern ("config_a_absent");
+    kan_reflection_patch_builder_add_chunk (patch_builder, pass_2_set_section, sizeof (kan_interned_string_t),
+                                            sizeof (kan_interned_string_t), &string);
+
+    kan_reflection_patch_builder_section_t passes_append_section = kan_reflection_patch_builder_add_section (
+        patch_builder, KAN_REFLECTION_PATCH_BUILDER_SECTION_ROOT,
+        KAN_REFLECTION_PATCH_SECTION_TYPE_DYNAMIC_ARRAY_APPEND, offsetof (struct compound_component_t, passes));
+
+    kan_reflection_patch_builder_section_t pass_3_set_section = kan_reflection_patch_builder_add_section (
+        patch_builder, passes_append_section, KAN_REFLECTION_PATCH_SECTION_TYPE_DYNAMIC_ARRAY_SET,
+        offsetof (struct compound_component_pass_t, configs));
+
+    string = kan_string_intern ("config_a_absent_again");
+    kan_reflection_patch_builder_add_chunk (patch_builder, pass_3_set_section, sizeof (kan_interned_string_t) * 2u,
+                                            sizeof (kan_interned_string_t), &string);
+
+    *(kan_reflection_patch_t *) kan_dynamic_array_add_last (&prototype_3.components) =
+        kan_reflection_patch_builder_build (patch_builder, registry, compound_component_type);
+
+    save_rd (path, &prototype_3, kan_string_intern ("resource_prototype_t"), registry);
+    resource_prototype_shutdown (&prototype_3);
     kan_reflection_patch_builder_destroy (patch_builder);
 }
 
@@ -252,6 +358,7 @@ static void setup_workspace (kan_context_t context)
 
     save_prototype_1 (registry, WORKSPACE_RESOURCES_SUB_DIRECTORY "/prototype_1.rd");
     save_prototype_2 (registry, WORKSPACE_RESOURCES_SUB_DIRECTORY "/prototype_2.rd");
+    save_prototype_3 (registry, WORKSPACE_RESOURCES_SUB_DIRECTORY "/prototype_3.rd");
 }
 
 struct outer_reference_query_result_t
@@ -511,6 +618,9 @@ TEST_UNIVERSE_RESOURCE_REFERENCE_API void kan_universe_mutator_execute_all_refer
 
         kan_bool_t config_b_1_found = KAN_FALSE;
         kan_bool_t prototype_2_found = KAN_FALSE;
+        kan_bool_t prototype_3_a_found = KAN_FALSE;
+        kan_bool_t prototype_3_a_absent_found = KAN_FALSE;
+        kan_bool_t prototype_3_a_absent_again_found = KAN_FALSE;
 
         KAN_UP_VALUE_READ (reference, kan_resource_native_entry_outer_reference_t, reference_type, &response->type)
         {
@@ -529,6 +639,27 @@ TEST_UNIVERSE_RESOURCE_REFERENCE_API void kan_universe_mutator_execute_all_refer
                     KAN_TEST_CHECK (!prototype_2_found)
                     prototype_2_found = KAN_TRUE;
                 }
+                else if (entry->type == kan_string_intern ("resource_prototype_t") &&
+                         entry->name == kan_string_intern ("prototype_3") &&
+                         reference->reference_name == kan_string_intern ("config_a"))
+                {
+                    KAN_TEST_CHECK (!prototype_3_a_found)
+                    prototype_3_a_found = KAN_TRUE;
+                }
+                else if (entry->type == kan_string_intern ("resource_prototype_t") &&
+                         entry->name == kan_string_intern ("prototype_3") &&
+                         reference->reference_name == kan_string_intern ("config_a_absent"))
+                {
+                    KAN_TEST_CHECK (!prototype_3_a_absent_found)
+                    prototype_3_a_absent_found = KAN_TRUE;
+                }
+                else if (entry->type == kan_string_intern ("resource_prototype_t") &&
+                         entry->name == kan_string_intern ("prototype_3") &&
+                         reference->reference_name == kan_string_intern ("config_a_absent_again"))
+                {
+                    KAN_TEST_CHECK (!prototype_3_a_absent_again_found)
+                    prototype_3_a_absent_again_found = KAN_TRUE;
+                }
                 else
                 {
                     KAN_TEST_CHECK (KAN_FALSE)
@@ -542,6 +673,9 @@ TEST_UNIVERSE_RESOURCE_REFERENCE_API void kan_universe_mutator_execute_all_refer
 
         KAN_TEST_CHECK (config_b_1_found)
         KAN_TEST_CHECK (prototype_2_found)
+        KAN_TEST_CHECK (prototype_3_a_found)
+        KAN_TEST_CHECK (prototype_3_a_absent_found)
+        KAN_TEST_CHECK (prototype_3_a_absent_again_found)
     }
 
     kan_cpu_job_release (job);
@@ -750,26 +884,26 @@ static kan_context_t setup_context (void)
     KAN_TEST_CHECK (kan_context_request_system (context, KAN_CONTEXT_UNIVERSE_SYSTEM_NAME, NULL))
     KAN_TEST_CHECK (kan_context_request_system (context, KAN_CONTEXT_UPDATE_SYSTEM_NAME, NULL))
 
-    struct kan_virtual_file_system_config_mount_real_t mount_point_reference_cache = {
-        .next = NULL,
-        .mount_path = WORKSPACE_REFERENCE_CACHE_MOUNT_PATH,
-        .real_path = WORKSPACE_REFERENCE_CACHE_SUB_DIRECTORY,
-    };
+    struct kan_virtual_file_system_config_t virtual_file_system_config;
+    kan_virtual_file_system_config_init (&virtual_file_system_config);
+    kan_dynamic_array_set_capacity (&virtual_file_system_config.mount_real, 2u);
 
-    struct kan_virtual_file_system_config_mount_real_t mount_point_resources = {
-        .next = &mount_point_reference_cache,
-        .mount_path = WORKSPACE_RESOURCES_MOUNT_PATH,
-        .real_path = WORKSPACE_RESOURCES_SUB_DIRECTORY,
-    };
+    struct kan_virtual_file_system_config_mount_real_t *resources =
+        kan_dynamic_array_add_last (&virtual_file_system_config.mount_real);
+    KAN_ASSERT (resources)
+    resources->mount_path = WORKSPACE_RESOURCES_MOUNT_PATH;
+    resources->real_path = WORKSPACE_RESOURCES_SUB_DIRECTORY;
 
-    struct kan_virtual_file_system_config_t virtual_file_system_config = {
-        .first_mount_real = &mount_point_resources,
-        .first_mount_read_only_pack = NULL,
-    };
+    struct kan_virtual_file_system_config_mount_real_t *reference_cache =
+        kan_dynamic_array_add_last (&virtual_file_system_config.mount_real);
+    KAN_ASSERT (reference_cache)
+    reference_cache->mount_path = WORKSPACE_REFERENCE_CACHE_MOUNT_PATH;
+    reference_cache->real_path = WORKSPACE_REFERENCE_CACHE_SUB_DIRECTORY;
 
     KAN_TEST_CHECK (
         kan_context_request_system (context, KAN_CONTEXT_VIRTUAL_FILE_SYSTEM_NAME, &virtual_file_system_config))
     kan_context_assembly (context);
+    kan_virtual_file_system_config_shutdown (&virtual_file_system_config);
     return context;
 }
 
@@ -816,7 +950,8 @@ static void run_test (kan_context_t context, kan_interned_string_t test_mutator)
         .resource_directory_path = kan_string_intern (WORKSPACE_RESOURCES_MOUNT_PATH),
     };
 
-    kan_reflection_patch_builder_add_chunk (patch_builder, 0u, sizeof (struct kan_resource_provider_configuration_t),
+    kan_reflection_patch_builder_add_chunk (patch_builder, KAN_REFLECTION_PATCH_BUILDER_SECTION_ROOT, 0u,
+                                            sizeof (struct kan_resource_provider_configuration_t),
                                             &resource_provider_configuration);
     kan_reflection_patch_t resource_provider_configuration_patch = kan_reflection_patch_builder_build (
         patch_builder, registry,
@@ -827,7 +962,8 @@ static void run_test (kan_context_t context, kan_interned_string_t test_mutator)
         .workspace_directory_path = kan_string_intern (WORKSPACE_REFERENCE_CACHE_MOUNT_PATH),
     };
 
-    kan_reflection_patch_builder_add_chunk (patch_builder, 0u, sizeof (struct kan_resource_reference_configuration_t),
+    kan_reflection_patch_builder_add_chunk (patch_builder, KAN_REFLECTION_PATCH_BUILDER_SECTION_ROOT, 0u,
+                                            sizeof (struct kan_resource_reference_configuration_t),
                                             &resource_reference_configuration);
     kan_reflection_patch_t resource_reference_configuration_patch = kan_reflection_patch_builder_build (
         patch_builder, registry,

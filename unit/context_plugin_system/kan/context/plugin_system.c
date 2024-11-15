@@ -30,7 +30,7 @@ struct plugin_system_t
     kan_context_t context;
     kan_allocation_group_t group;
 
-    char *plugins_directory_path;
+    kan_interned_string_t plugins_directory_path;
     kan_bool_t enable_hot_reload;
     kan_time_offset_t hot_reload_update_delay_ns;
     kan_instance_size_t hot_reload_directory_id;
@@ -66,9 +66,7 @@ kan_context_system_t plugin_system_create (kan_allocation_group_t group, void *u
     {
         struct kan_plugin_system_config_t *config = user_config;
         KAN_ASSERT (config->plugin_directory_path)
-        const kan_instance_size_t path_length = (kan_instance_size_t) strlen (config->plugin_directory_path);
-        system->plugins_directory_path = kan_allocate_general (group, path_length + 1u, _Alignof (char));
-        memcpy (system->plugins_directory_path, config->plugin_directory_path, path_length + 1u);
+        system->plugins_directory_path = config->plugin_directory_path;
 
         system->enable_hot_reload = config->enable_hot_reload;
         system->hot_reload_update_delay_ns = config->hot_reload_update_delay_ns;
@@ -479,11 +477,6 @@ void plugin_system_disconnect (kan_context_system_t handle)
 void plugin_system_destroy (kan_context_system_t handle)
 {
     struct plugin_system_t *system = KAN_HANDLE_GET (handle);
-    if (system->plugins_directory_path)
-    {
-        kan_free_general (system->group, system->plugins_directory_path, strlen (system->plugins_directory_path) + 1u);
-    }
-
     kan_dynamic_array_shutdown (&system->plugins);
     kan_free_general (system->group, system, sizeof (struct plugin_system_t));
 }
@@ -505,6 +498,7 @@ void kan_plugin_system_config_init (struct kan_plugin_system_config_t *config)
     config->enable_hot_reload = KAN_FALSE;
     kan_dynamic_array_init (&config->plugins, KAN_PLUGIN_SYSTEM_PLUGINS_INITIAL_SIZE, sizeof (kan_interned_string_t),
                             _Alignof (kan_interned_string_t), config_allocation_group);
+    config->hot_reload_update_delay_ns = 300000000u;
 }
 
 kan_allocation_group_t kan_plugin_system_config_get_allocation_group (void)
@@ -515,12 +509,6 @@ kan_allocation_group_t kan_plugin_system_config_get_allocation_group (void)
 
 void kan_plugin_system_config_shutdown (struct kan_plugin_system_config_t *config)
 {
-    if (config->plugin_directory_path)
-    {
-        kan_free_general (config_allocation_group, config->plugin_directory_path,
-                          strlen (config->plugin_directory_path) + 1u);
-    }
-
     kan_dynamic_array_shutdown (&config->plugins);
 }
 

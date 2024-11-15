@@ -91,7 +91,7 @@ static const char *helper_macros =
     "        uint64_t: KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT, \\\n"
     "        float: KAN_REFLECTION_ARCHETYPE_FLOATING, \\\n"
     "        double: KAN_REFLECTION_ARCHETYPE_FLOATING, \\\n"
-    "        default: KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT)\n\n"
+    "        default: KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL)\n\n"
     "#define ARCHETYPE_SELECTION_HELPER(STRUCTURE, FIELD) \\\n"
     "    ARCHETYPE_SELECTION_HELPER_GENERIC(((struct STRUCTURE *) NULL)->FIELD)\n\n"
     "#define SIZE_OF_FIELD(STRUCTURE, FIELD) sizeof (((struct STRUCTURE *) NULL)->FIELD)\n\n"

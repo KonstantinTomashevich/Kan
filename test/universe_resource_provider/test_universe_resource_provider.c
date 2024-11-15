@@ -975,20 +975,20 @@ static kan_context_t setup_context (void)
     KAN_TEST_CHECK (kan_context_request_system (context, KAN_CONTEXT_UNIVERSE_SYSTEM_NAME, NULL))
     KAN_TEST_CHECK (kan_context_request_system (context, KAN_CONTEXT_UPDATE_SYSTEM_NAME, NULL))
 
-    struct kan_virtual_file_system_config_mount_real_t mount_point = {
-        .next = NULL,
-        .mount_path = WORKSPACE_MOUNT_PATH,
-        .real_path = WORKSPACE_SUB_DIRECTORY,
-    };
+    struct kan_virtual_file_system_config_t virtual_file_system_config;
+    kan_virtual_file_system_config_init (&virtual_file_system_config);
+    kan_dynamic_array_set_capacity (&virtual_file_system_config.mount_real, 1u);
 
-    struct kan_virtual_file_system_config_t virtual_file_system_config = {
-        .first_mount_real = &mount_point,
-        .first_mount_read_only_pack = NULL,
-    };
+    struct kan_virtual_file_system_config_mount_real_t *workspace =
+        kan_dynamic_array_add_last (&virtual_file_system_config.mount_real);
+    KAN_ASSERT (workspace)
+    workspace->mount_path = WORKSPACE_MOUNT_PATH;
+    workspace->real_path = WORKSPACE_SUB_DIRECTORY;
 
     KAN_TEST_CHECK (
         kan_context_request_system (context, KAN_CONTEXT_VIRTUAL_FILE_SYSTEM_NAME, &virtual_file_system_config))
     kan_context_assembly (context);
+    kan_virtual_file_system_config_shutdown (&virtual_file_system_config);
     return context;
 }
 
@@ -1023,7 +1023,8 @@ static void run_request_resources_and_check_test (kan_context_t context)
     };
 
     kan_reflection_patch_builder_t patch_builder = kan_reflection_patch_builder_create ();
-    kan_reflection_patch_builder_add_chunk (patch_builder, 0u, sizeof (struct kan_resource_provider_configuration_t),
+    kan_reflection_patch_builder_add_chunk (patch_builder, KAN_REFLECTION_PATCH_BUILDER_SECTION_ROOT, 0u,
+                                            sizeof (struct kan_resource_provider_configuration_t),
                                             &resource_provider_configuration);
     kan_reflection_patch_t resource_provider_configuration_patch = kan_reflection_patch_builder_build (
         patch_builder, registry,
@@ -1160,7 +1161,8 @@ KAN_TEST_CASE (file_system_observation)
     };
 
     kan_reflection_patch_builder_t patch_builder = kan_reflection_patch_builder_create ();
-    kan_reflection_patch_builder_add_chunk (patch_builder, 0u, sizeof (struct kan_resource_provider_configuration_t),
+    kan_reflection_patch_builder_add_chunk (patch_builder, KAN_REFLECTION_PATCH_BUILDER_SECTION_ROOT, 0u,
+                                            sizeof (struct kan_resource_provider_configuration_t),
                                             &resource_provider_configuration);
     kan_reflection_patch_t resource_provider_configuration_patch = kan_reflection_patch_builder_build (
         patch_builder, registry,
@@ -1240,7 +1242,8 @@ KAN_TEST_CASE (indexing_stress_test)
     };
 
     kan_reflection_patch_builder_t patch_builder = kan_reflection_patch_builder_create ();
-    kan_reflection_patch_builder_add_chunk (patch_builder, 0u, sizeof (struct kan_resource_provider_configuration_t),
+    kan_reflection_patch_builder_add_chunk (patch_builder, KAN_REFLECTION_PATCH_BUILDER_SECTION_ROOT, 0u,
+                                            sizeof (struct kan_resource_provider_configuration_t),
                                             &resource_provider_configuration);
     kan_reflection_patch_t resource_provider_configuration_patch = kan_reflection_patch_builder_build (
         patch_builder, registry,

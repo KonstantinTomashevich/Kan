@@ -93,92 +93,48 @@ KAN_C_HEADER_BEGIN
 /// \brief Application framework exit code when it failed to correctly assemble execution context.
 #define KAN_APPLICATION_FRAMEWORK_EXIT_CODE_FAILED_TO_ASSEMBLE_CONTEXT -3
 
+/// \brief Application framework exit code when it failed to find required systems.
+/// \details Required systems are application system, application framework system, universe system
+///          universe world definition system and update system.
+#define KAN_APPLICATION_FRAMEWORK_EXIT_CODE_FAILED_TO_CREATE_REQUIRED_SYSTEMS -4
+
 /// \brief Application framework exit code when it failed to find definitions for either root or program worlds.
-#define KAN_APPLICATION_FRAMEWORK_EXIT_CODE_FAILED_TO_FIND_WORLD_DEFINITIONS -4
+#define KAN_APPLICATION_FRAMEWORK_EXIT_CODE_FAILED_TO_FIND_WORLD_DEFINITIONS -5
 
 /// \brief Returns allocation group that should be used to allocate strings inside configuration structures.
 APPLICATION_FRAMEWORK_API kan_allocation_group_t kan_application_framework_get_configuration_allocation_group (void);
 
-/// \brief Describes used resource directory for application framework configuration.
-struct kan_application_framework_resource_directory_t
+/// \brief Configuration node that contains context system name and optionally its configuration as patch.
+struct kan_application_framework_system_configuration_t
 {
-    /// \brief Real path to resource directory.
-    char *path;
-
-    /// \brief Path to which this resource directory should be mounted.
-    char *mount_path;
+    kan_interned_string_t name;
+    kan_reflection_patch_t configuration;
 };
 
-APPLICATION_FRAMEWORK_API void kan_application_framework_resource_directory_init (
-    struct kan_application_framework_resource_directory_t *instance);
+APPLICATION_FRAMEWORK_API void kan_application_framework_system_configuration_init (
+    struct kan_application_framework_system_configuration_t *instance);
 
-APPLICATION_FRAMEWORK_API void kan_application_framework_resource_directory_shutdown (
-    struct kan_application_framework_resource_directory_t *instance);
-
-/// \brief Describes used resource read-only pack for application framework configuration.
-struct kan_application_framework_resource_pack_t
-{
-    /// \brief Real path to resource read-only pack.
-    char *path;
-
-    /// \brief Path to which this resource pack should be mounted.
-    char *mount_path;
-};
-
-APPLICATION_FRAMEWORK_API void kan_application_framework_resource_pack_init (
-    struct kan_application_framework_resource_pack_t *instance);
-
-APPLICATION_FRAMEWORK_API void kan_application_framework_resource_pack_shutdown (
-    struct kan_application_framework_resource_pack_t *instance);
+APPLICATION_FRAMEWORK_API void kan_application_framework_system_configuration_shutdown (
+    struct kan_application_framework_system_configuration_t *instance);
 
 /// \brief Structure for application framework core configuration.
 struct kan_application_framework_core_configuration_t
 {
-    /// \brief Additional user systems to be requested.
-    /// \meta reflection_dynamic_array_type = "kan_interned_string_t"
-    struct kan_dynamic_array_t systems;
-
-    /// \brief List of core plugins.
-    /// \meta reflection_dynamic_array_type = "kan_interned_string_t"
-    struct kan_dynamic_array_t plugins;
-
-    /// \brief List of core resource directories.
-    /// \meta reflection_dynamic_array_type = "struct kan_application_framework_resource_directory_t"
-    struct kan_dynamic_array_t resource_directories;
-
-    /// \brief List of core resource read-only packs.
-    /// \meta reflection_dynamic_array_type = "struct kan_application_framework_resource_pack_t"
-    struct kan_dynamic_array_t resource_packs;
-
-    /// \brief List of environment tags that will be passed to universe.
-    /// \meta reflection_dynamic_array_type = "kan_interned_string_t"
-    struct kan_dynamic_array_t environment_tags;
+    /// \brief List of enabled systems with their configurations.
+    /// \meta reflection_dynamic_array_type = "struct kan_application_framework_system_configuration_t"
+    struct kan_dynamic_array_t enabled_systems;
 
     /// \brief Name of the definition of the universe shared root world.
     kan_interned_string_t root_world;
 
-    /// \brief Path to the the plugin directory.
-    char *plugin_directory_path;
+    /// \brief Whether auto build feature is enabled.
+    /// \details Auto build is a development-only feature that executes given command every time window is receiving
+    ///          focus in order to trigger code hot reload if necessary.
+    kan_bool_t enable_auto_build;
 
-    /// \brief Path to the the universe world definitions directory.
-    char *world_directory_path;
-
-    /// \brief Whether universe world definition directory should be observed for changes.
-    kan_bool_t observe_world_definitions;
-
-    /// \brief Delay between changes in universe world definition directory and definition reload.
-    kan_time_offset_t world_definition_rescan_delay_ns;
-
-    /// \brief Whether code hot reload is enabled.
-    kan_bool_t enable_code_hot_reload;
-
-    /// \brief Delay in nanoseconds between changes to original dynamic libraries and code hot reload.
-    /// \details Needed to make sure that build system was able to write everything.
-    kan_time_offset_t code_hot_reload_delay_ns;
-
-    /// \brief If ::enable_code_hot_reload and not NULL, this command is executed every time any application window
+    /// \brief If ::enable_auto_build and not NULL, this command is executed every time any application window
     ///        is focused in order to update and hot reload plugins if there are any changes.
-    char *auto_build_and_hot_reload_command;
+    char *auto_build_command;
 };
 
 APPLICATION_FRAMEWORK_API void kan_application_framework_core_configuration_init (
@@ -190,17 +146,11 @@ APPLICATION_FRAMEWORK_API void kan_application_framework_core_configuration_shut
 /// \brief Structure for application framework per-program configuration.
 struct kan_application_framework_program_configuration_t
 {
-    /// \brief List of program-specific plugins.
-    /// \meta reflection_dynamic_array_type = "kan_interned_string_t"
-    struct kan_dynamic_array_t plugins;
-
-    /// \brief List of program-specific resource directories.
-    /// \meta reflection_dynamic_array_type = "struct kan_application_framework_resource_directory_t"
-    struct kan_dynamic_array_t resource_directories;
-
-    /// \brief List of program-specific resource read-only packs.
-    /// \meta reflection_dynamic_array_type = "struct kan_application_framework_resource_pack_t"
-    struct kan_dynamic_array_t resource_packs;
+    /// \brief List of enabled systems with their configuration.
+    /// \details If system is listed both in core configuration and in program configuration,
+    ///          then configurations are merged and program configuration is applied on top of core configuration.
+    /// \meta reflection_dynamic_array_type = "struct kan_application_framework_system_configuration_t"
+    struct kan_dynamic_array_t enabled_systems;
 
     /// \brief Name of the definition of the program-specific universe child world.
     kan_interned_string_t program_world;
@@ -218,11 +168,17 @@ APPLICATION_FRAMEWORK_API int kan_application_framework_run (const char *core_co
                                                              kan_instance_size_t arguments_count,
                                                              char **arguments);
 
-/// \brief Executes application framework with provided configuration. Returns after execution is completed.
+/// \brief Executes application framework with provided configuration and registry used to read it.
+///        Returns after execution is completed.
+/// \details Provided registry and configuration are automatically destroyed when application framework succeeds in
+///          context assembly. The only exception is when
+///          KAN_APPLICATION_FRAMEWORK_EXIT_CODE_FAILED_TO_INITIALIZE_PLATFORM error code is returned as platform
+///          initialization happens before context assembly.
 APPLICATION_FRAMEWORK_API int kan_application_framework_run_with_configuration (
-    const struct kan_application_framework_core_configuration_t *core_configuration,
-    const struct kan_application_framework_program_configuration_t *program_configuration,
+    struct kan_application_framework_core_configuration_t *core_configuration,
+    struct kan_application_framework_program_configuration_t *program_configuration,
     kan_instance_size_t arguments_count,
-    char **arguments);
+    char **arguments,
+    kan_reflection_registry_t configuration_loading_registry);
 
 KAN_C_HEADER_END

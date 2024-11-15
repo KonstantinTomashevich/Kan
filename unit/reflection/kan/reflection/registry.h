@@ -85,6 +85,11 @@ enum kan_reflection_archetype_t
     /// \brief Depending on size, either float or double
     KAN_REFLECTION_ARCHETYPE_FLOATING,
 
+    /// \brief Elemental value that is packed into structure, like handle or typed id 32.
+    /// \details These values need additional care during migration as we need to wipe their content before
+    ///          calling shutdown to avoid destroying migrated data handle.
+    KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL,
+
     /// \brief Pointer to string that is not interned.
     KAN_REFLECTION_ARCHETYPE_STRING_POINTER,
 
@@ -446,6 +451,14 @@ REFLECTION_API const struct kan_reflection_field_t *kan_reflection_registry_quer
     kan_interned_string_t *path,
     kan_instance_size_t *absolute_offset_output,
     kan_instance_size_t *size_with_padding_output);
+
+/// \brief Queries for field in fixed memory block by its offset in that memory block that is defined by given struct.
+/// \details Field can belong to a child field in a hierarchy, therefore we return owner struct if requested.
+REFLECTION_API const struct kan_reflection_field_t *kan_reflection_registry_query_local_field_by_offset (
+    kan_reflection_registry_t registry,
+    kan_interned_string_t struct_name,
+    kan_instance_size_t exact_offset,
+    const struct kan_reflection_struct_t **output_owner_struct);
 
 KAN_HANDLE_DEFINE (kan_reflection_registry_enum_iterator_t);
 

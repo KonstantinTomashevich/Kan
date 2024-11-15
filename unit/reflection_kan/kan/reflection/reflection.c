@@ -197,39 +197,113 @@ struct registry_t
     struct compiled_patch_t *first_patch;
 };
 
-struct patch_builder_node_t
+struct patch_builder_section_node_t
 {
-    struct patch_builder_node_t *next;
+    struct patch_builder_section_node_t *next_in_registration_list;
+    struct patch_builder_section_node_t *parent;
+    enum kan_reflection_patch_section_type_t type;
+    kan_instance_size_t source_offset;
+    kan_instance_size_t registration_index;
+    kan_bool_t counted_for_size;
+    struct compiled_patch_node_section_suffix_t *produced_suffix;
+};
+
+struct patch_builder_chunk_node_t
+{
+    struct patch_builder_chunk_node_t *next;
+    struct patch_builder_section_node_t *section;
     uint16_t offset;
     uint16_t size;
-    uint8_t data[];
+
+    /// \details Memory size is used because chunk data is usually passed from fields and therefore is aligned.
+    ///          Preserving its alignment we can increase memory copy speed.
+    kan_memory_size_t data[];
 };
 
 struct patch_builder_t
 {
-    struct patch_builder_node_t *first_node;
-    struct patch_builder_node_t *last_node;
+    struct patch_builder_chunk_node_t *first_node;
+    struct patch_builder_chunk_node_t *last_node;
     kan_instance_size_t node_count;
-    kan_stack_allocator_t stack_allocator;
+
+    /// \details Section order does not really matter, we only need them here for get or add function.
+    struct patch_builder_section_node_t *first_section;
+
+    struct kan_stack_group_allocator_t temporary_allocator;
+};
+
+#define COMPILED_SECTION_ID_NONE 0u
+#define COMPILED_SECTION_ID_ASSERT_POSSIBLE(SECTION) KAN_ASSERT ((SECTION)->registration_index + 1u < UINT16_MAX)
+#define COMPILED_SECTION_ID_GET(SECTION) ((SECTION) ? (SECTION)->registration_index + 1u : COMPILED_SECTION_ID_NONE)
+
+struct compiled_patch_node_section_suffix_t
+{
+    uint16_t parent_section_id;
+    uint16_t my_section_id;
+    uint16_t packed_type;
+    kan_instance_size_t source_offset_in_parent;
+
+    // Data below might seem like a huge bloat, as we're increasing size of a compiled patch node in general.
+    // But it is not as bad as it sounds, because implementation handles data sections differently and they
+    // do not claim the space needed for the data below if their data does not cover this suffix.
+
+    /// \brief Value of address since which the data is never written through this section.
+    /// \details Needed to handle array sections as it is required to determinate minimum array size for patch.
+    kan_instance_size_t bounding_address;
+
+    /// \brief Field inside parent section from which this section was created.
+    const struct kan_reflection_field_t *source_field;
+
+    /// \brief Type of the structure inside which source field was found.
+    const struct kan_reflection_struct_t *source_field_struct;
+};
+
+struct compiled_patch_node_data_suffix_t
+{
+    kan_instance_size_t offset;
+    kan_instance_size_t size;
+
+    /// \details Memory size is used because data is used chained to struct fields and is therefore aligned.
+    ///          Preserving its alignment we can increase memory copy speed.
+    kan_memory_size_t data[];
 };
 
 struct compiled_patch_node_t
 {
-    uint16_t offset;
-    uint16_t size;
-    uint8_t data[];
+    kan_bool_t is_data_node;
+    union
+    {
+        struct compiled_patch_node_section_suffix_t section_suffix;
+        struct compiled_patch_node_data_suffix_t data_suffix;
+    };
 };
 
 struct compiled_patch_t
 {
     const struct kan_reflection_struct_t *type;
     kan_instance_size_t node_count;
+    kan_instance_size_t section_id_bound;
     struct compiled_patch_node_t *begin;
     struct compiled_patch_node_t *end;
 
     struct registry_t *registry;
     struct compiled_patch_t *next;
     struct compiled_patch_t *previous;
+};
+
+struct compiled_patch_section_stack_item_t
+{
+    struct compiled_patch_node_section_suffix_t *section;
+    void *target_data;
+    void *source_data;
+};
+
+struct compiled_patch_section_stack_t
+{
+    void *target_data;
+    void *base_data;
+    struct compiled_patch_section_stack_item_t *stack_end_pointer;
+    struct compiled_patch_section_stack_item_t stack[KAN_REFLECTION_PATCH_MAX_SECTION_DEPTH];
 };
 
 struct enum_migration_node_t
@@ -509,6 +583,7 @@ kan_bool_t kan_reflection_registry_add_struct (kan_reflection_registry_t registr
             break;
 
         case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
+        case KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL:
             KAN_ASSERT (field_reflection->size == sizeof (uint8_t) || field_reflection->size == sizeof (uint16_t) ||
                         field_reflection->size == sizeof (uint32_t) || field_reflection->size == sizeof (uint64_t))
             break;
@@ -617,6 +692,7 @@ static inline void reflection_function_validate_archetype (enum kan_reflection_a
         break;
 
     case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
+    case KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL:
         KAN_ASSERT (size == sizeof (uint8_t) || size == sizeof (uint16_t) || size == sizeof (uint32_t) ||
                     size == sizeof (uint64_t))
         break;
@@ -1200,6 +1276,7 @@ const struct kan_reflection_field_t *kan_reflection_registry_query_local_field (
             case KAN_REFLECTION_ARCHETYPE_SIGNED_INT:
             case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
             case KAN_REFLECTION_ARCHETYPE_FLOATING:
+            case KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL:
             case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
             case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:
             case KAN_REFLECTION_ARCHETYPE_ENUM:
@@ -1242,6 +1319,118 @@ const struct kan_reflection_field_t *kan_reflection_registry_query_local_field (
     }
 
     return field_reflection;
+}
+
+const struct kan_reflection_field_t *kan_reflection_registry_query_local_field_by_offset (
+    kan_reflection_registry_t registry,
+    kan_interned_string_t struct_name,
+    kan_instance_size_t exact_offset,
+    const struct kan_reflection_struct_t **output_owner_struct)
+{
+    const struct kan_reflection_struct_t *parent_type = kan_reflection_registry_query_struct (registry, struct_name);
+    kan_loop_size_t first = 0u;
+    kan_loop_size_t last = parent_type->fields_count;
+
+    while (first < last)
+    {
+        kan_loop_size_t middle = (first + last) / 2u;
+        const struct kan_reflection_field_t *field = &parent_type->fields[middle];
+
+        if (exact_offset < field->offset)
+        {
+            last = middle;
+        }
+        else if (exact_offset >= field->offset + field->size)
+        {
+            first = middle + 1u;
+        }
+        else
+        {
+            switch (field->archetype)
+            {
+            case KAN_REFLECTION_ARCHETYPE_SIGNED_INT:
+            case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
+            case KAN_REFLECTION_ARCHETYPE_FLOATING:
+            case KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL:
+            case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
+            case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:
+            case KAN_REFLECTION_ARCHETYPE_ENUM:
+            case KAN_REFLECTION_ARCHETYPE_EXTERNAL_POINTER:
+            case KAN_REFLECTION_ARCHETYPE_STRUCT_POINTER:
+            case KAN_REFLECTION_ARCHETYPE_PATCH:
+                if (field->offset == exact_offset)
+                {
+                    if (output_owner_struct)
+                    {
+                        *output_owner_struct = parent_type;
+                    }
+
+                    return field;
+                }
+
+                // Cannot look into elemental fields.
+                return NULL;
+
+            case KAN_REFLECTION_ARCHETYPE_STRUCT:
+                return kan_reflection_registry_query_local_field_by_offset (
+                    registry, field->archetype_struct.type_name, exact_offset - field->offset, output_owner_struct);
+
+            case KAN_REFLECTION_ARCHETYPE_INLINE_ARRAY:
+                switch (field->archetype_inline_array.item_archetype)
+                {
+                case KAN_REFLECTION_ARCHETYPE_SIGNED_INT:
+                case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
+                case KAN_REFLECTION_ARCHETYPE_FLOATING:
+                case KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL:
+                case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
+                case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:
+                case KAN_REFLECTION_ARCHETYPE_ENUM:
+                case KAN_REFLECTION_ARCHETYPE_EXTERNAL_POINTER:
+                case KAN_REFLECTION_ARCHETYPE_STRUCT_POINTER:
+                case KAN_REFLECTION_ARCHETYPE_PATCH:
+                    if ((exact_offset - field->offset) % field->archetype_inline_array.item_size == 0u)
+                    {
+                        if (output_owner_struct)
+                        {
+                            *output_owner_struct = parent_type;
+                        }
+
+                        return field;
+                    }
+
+                    return NULL;
+
+                case KAN_REFLECTION_ARCHETYPE_STRUCT:
+                    return kan_reflection_registry_query_local_field_by_offset (
+                        registry, field->archetype_struct.type_name,
+                        (exact_offset - field->offset) % field->archetype_inline_array.item_size, output_owner_struct);
+
+                case KAN_REFLECTION_ARCHETYPE_INLINE_ARRAY:
+                case KAN_REFLECTION_ARCHETYPE_DYNAMIC_ARRAY:
+                    KAN_ASSERT (KAN_FALSE)
+                    break;
+                }
+
+                return NULL;
+
+            case KAN_REFLECTION_ARCHETYPE_DYNAMIC_ARRAY:
+                if (field->offset == exact_offset)
+                {
+                    if (output_owner_struct)
+                    {
+                        *output_owner_struct = parent_type;
+                    }
+
+                    return field;
+                }
+
+                // Cannot look into dynamic array fields.
+                return NULL;
+            }
+        }
+    }
+
+    return NULL;
 }
 
 kan_reflection_registry_enum_iterator_t kan_reflection_registry_enum_iterator_create (
@@ -1340,7 +1529,11 @@ kan_reflection_registry_function_iterator_t kan_reflection_registry_function_ite
 static void compiled_patch_destroy (struct compiled_patch_t *patch)
 {
     const kan_allocation_group_t group = get_compiled_patch_allocation_group ();
-    kan_free_general (group, patch->begin, ((uint8_t *) patch->end) - (uint8_t *) patch->begin);
+    if (patch->begin)
+    {
+        kan_free_general (group, patch->begin, ((uint8_t *) patch->end) - (uint8_t *) patch->begin);
+    }
+
     kan_free_batched (group, patch);
 }
 
@@ -1463,33 +1656,72 @@ kan_reflection_patch_builder_t kan_reflection_patch_builder_create (void)
     patch_builder->first_node = NULL;
     patch_builder->last_node = NULL;
     patch_builder->node_count = 0u;
-    patch_builder->stack_allocator =
-        kan_stack_allocator_create (get_patch_builder_allocation_group (), KAN_REFLECTION_PATCH_BUILDER_STACK_SIZE);
+
+    patch_builder->first_section = NULL;
+    kan_stack_group_allocator_init (&patch_builder->temporary_allocator, get_patch_builder_allocation_group (),
+                                    KAN_REFLECTION_PATCH_BUILDER_STACK_SIZE);
     return KAN_HANDLE_SET (kan_reflection_patch_builder_t, patch_builder);
 }
 
+kan_reflection_patch_builder_section_t kan_reflection_patch_builder_add_section (
+    kan_reflection_patch_builder_t builder,
+    kan_reflection_patch_builder_section_t parent_section,
+    enum kan_reflection_patch_section_type_t section_type,
+    kan_instance_size_t source_offset_in_parent)
+{
+    struct patch_builder_t *patch_builder = KAN_HANDLE_GET (builder);
+
+    // Search for the same section among already registered.
+    // It is easier to get rid of excessive sections here, not later.
+
+    struct patch_builder_section_node_t *section = patch_builder->first_section;
+    while (section)
+    {
+        if (section->parent == KAN_HANDLE_GET (parent_section) &&
+            (section->type == section_type && section_type != KAN_REFLECTION_PATCH_SECTION_TYPE_DYNAMIC_ARRAY_APPEND) &&
+            section->source_offset == source_offset_in_parent)
+        {
+            return KAN_HANDLE_SET (kan_reflection_patch_builder_section_t, section);
+        }
+
+        section = section->next_in_registration_list;
+    }
+
+    section = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&patch_builder->temporary_allocator,
+                                                        struct patch_builder_section_node_t);
+
+    section->next_in_registration_list = patch_builder->first_section;
+    patch_builder->first_section = section;
+
+    section->parent = KAN_HANDLE_GET (parent_section);
+    section->type = section_type;
+    section->source_offset = source_offset_in_parent;
+
+    section->registration_index =
+        section->next_in_registration_list ? section->next_in_registration_list->registration_index + 1u : 0u;
+
+    section->counted_for_size = KAN_FALSE;
+    section->produced_suffix = NULL;
+    return KAN_HANDLE_SET (kan_reflection_patch_builder_section_t, section);
+}
+
 void kan_reflection_patch_builder_add_chunk (kan_reflection_patch_builder_t builder,
+                                             kan_reflection_patch_builder_section_t section,
                                              kan_instance_size_t offset,
                                              kan_instance_size_t size,
                                              const void *data)
 {
     struct patch_builder_t *patch_builder = KAN_HANDLE_GET (builder);
     const kan_instance_size_t node_size = (kan_instance_size_t) kan_apply_alignment (
-        offsetof (struct patch_builder_node_t, data) + size, _Alignof (struct patch_builder_node_t));
+        offsetof (struct patch_builder_chunk_node_t, data) + size, _Alignof (struct patch_builder_chunk_node_t));
 
-    struct patch_builder_node_t *node = (struct patch_builder_node_t *) kan_stack_allocator_allocate (
-        patch_builder->stack_allocator, node_size, _Alignof (struct patch_builder_node_t));
-    KAN_ASSERT (node)
-
-    if (!node)
-    {
-        KAN_LOG (reflection_patch_builder, KAN_LOG_ERROR, "Patch builder memory buffer overflow.")
-        return;
-    }
+    struct patch_builder_chunk_node_t *node = (struct patch_builder_chunk_node_t *) kan_stack_group_allocator_allocate (
+        &patch_builder->temporary_allocator, node_size, _Alignof (struct patch_builder_chunk_node_t));
 
     KAN_ASSERT (offset < UINT16_MAX)
     KAN_ASSERT (size < UINT16_MAX)
     node->next = NULL;
+    node->section = KAN_HANDLE_GET (section);
     node->offset = (uint16_t) offset;
     node->size = (uint16_t) size;
     memcpy (node->data, data, size);
@@ -1512,29 +1744,69 @@ static void patch_builder_reset (struct patch_builder_t *patch_builder)
     patch_builder->first_node = NULL;
     patch_builder->last_node = NULL;
     patch_builder->node_count = 0u;
-    kan_stack_allocator_reset (patch_builder->stack_allocator);
+    patch_builder->first_section = NULL;
+    kan_stack_group_allocator_reset (&patch_builder->temporary_allocator);
 }
 
 #if defined(KAN_REFLECTION_WITH_VALIDATION) && defined(KAN_WITH_ASSERT)
-static void validate_compiled_node_internal (const struct compiled_patch_node_t *node,
-                                             struct registry_t *registry,
-                                             const struct kan_reflection_struct_t *type,
-                                             kan_instance_size_t offset)
+static void validate_compiled_node_internal (kan_instance_size_t adjusted_node_offset,
+                                             kan_instance_size_t adjusted_node_size,
+                                             kan_reflection_registry_t registry,
+                                             const struct kan_reflection_struct_t *type);
+
+static inline void call_validation_for_array_subset (kan_instance_size_t adjusted_node_offset,
+                                                     kan_instance_size_t adjusted_node_size,
+                                                     kan_reflection_registry_t registry,
+                                                     const struct kan_reflection_struct_t *element_type,
+                                                     kan_instance_size_t array_begin_offset,
+                                                     kan_instance_size_t array_begin_end)
+{
+    const kan_instance_size_t item_size = element_type->size;
+    const kan_instance_size_t affects_from_local =
+        KAN_MAX (array_begin_offset, adjusted_node_offset) - array_begin_offset;
+
+    const kan_instance_size_t affects_till_local =
+        KAN_MIN (array_begin_end, adjusted_node_offset + adjusted_node_size) - array_begin_offset;
+
+    if (affects_till_local - affects_from_local > item_size)
+    {
+        // Full coverage of every element type.
+        validate_compiled_node_internal (0u, item_size, registry, element_type);
+    }
+    else if (affects_from_local / item_size != affects_till_local / item_size)
+    {
+        // Covers two different parts of the element.
+        validate_compiled_node_internal (affects_from_local % item_size, item_size - affects_from_local % item_size,
+                                         registry, element_type);
+        validate_compiled_node_internal (0u, affects_till_local % item_size, registry, element_type);
+    }
+    else
+    {
+        // Covers one continuous part of the element.
+        validate_compiled_node_internal (affects_from_local % item_size, affects_till_local % item_size, registry,
+                                         element_type);
+    }
+}
+
+static void validate_compiled_node_internal (kan_instance_size_t adjusted_node_offset,
+                                             kan_instance_size_t adjusted_node_size,
+                                             kan_reflection_registry_t registry,
+                                             const struct kan_reflection_struct_t *type)
 {
     KAN_ASSERT (type)
     for (kan_loop_size_t index = 0u; index < type->fields_count; ++index)
     {
         const struct kan_reflection_field_t *field = &type->fields[index];
-        const kan_instance_size_t field_begin = field->offset + offset;
+        const kan_instance_size_t field_begin = field->offset;
 
-        if (field_begin > node->offset)
+        if (field_begin >= adjusted_node_offset + adjusted_node_size)
         {
             // We're over, no need to check the rest.
             return;
         }
 
         const kan_instance_size_t field_end = field_begin + field->size;
-        if (field_end < node->offset)
+        if (field_end <= adjusted_node_offset)
         {
             // We can technically use binary search, but it looks like an overkill for validation.
             continue;
@@ -1545,6 +1817,7 @@ static void validate_compiled_node_internal (const struct compiled_patch_node_t 
         case KAN_REFLECTION_ARCHETYPE_SIGNED_INT:
         case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
         case KAN_REFLECTION_ARCHETYPE_FLOATING:
+        case KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL:
         case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:
         case KAN_REFLECTION_ARCHETYPE_ENUM:
             // Supported archetype.
@@ -1553,10 +1826,8 @@ static void validate_compiled_node_internal (const struct compiled_patch_node_t 
         case KAN_REFLECTION_ARCHETYPE_STRUCT:
             // We need to recursively check structure insides.
             validate_compiled_node_internal (
-                node, registry,
-                kan_reflection_registry_query_struct (KAN_HANDLE_SET (kan_reflection_registry_t, registry),
-                                                      field->archetype_struct.type_name),
-                field->offset);
+                KAN_MAX (adjusted_node_offset, field_begin - field_begin), KAN_MIN (adjusted_node_size, field->size),
+                registry, kan_reflection_registry_query_struct (registry, field->archetype_struct.type_name));
             break;
 
         case KAN_REFLECTION_ARCHETYPE_INLINE_ARRAY:
@@ -1565,6 +1836,7 @@ static void validate_compiled_node_internal (const struct compiled_patch_node_t 
             case KAN_REFLECTION_ARCHETYPE_SIGNED_INT:
             case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
             case KAN_REFLECTION_ARCHETYPE_FLOATING:
+            case KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL:
             case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:
             case KAN_REFLECTION_ARCHETYPE_ENUM:
                 // Supported archetype.
@@ -1573,16 +1845,10 @@ static void validate_compiled_node_internal (const struct compiled_patch_node_t 
             case KAN_REFLECTION_ARCHETYPE_STRUCT:
             {
                 const struct kan_reflection_struct_t *element_type = kan_reflection_registry_query_struct (
-                    KAN_HANDLE_SET (kan_reflection_registry_t, registry),
-                    field->archetype_inline_array.item_archetype_struct.type_name);
+                    registry, field->archetype_inline_array.item_archetype_struct.type_name);
 
-                for (kan_loop_size_t element_index = 0u; element_index < field->archetype_inline_array.item_count;
-                     ++element_index)
-                {
-                    validate_compiled_node_internal (node, registry, element_type,
-                                                     field->offset + element_index * element_type->size);
-                }
-
+                call_validation_for_array_subset (adjusted_node_offset, adjusted_node_size, registry, element_type,
+                                                  field_begin, field_end);
                 break;
             }
 
@@ -1611,37 +1877,235 @@ static void validate_compiled_node_internal (const struct compiled_patch_node_t 
     }
 }
 
-static void validate_compiled_node (const struct compiled_patch_node_t *node,
-                                    struct registry_t *registry,
-                                    const struct kan_reflection_struct_t *type)
+static inline void validate_compiled_node (const struct compiled_patch_node_t *node,
+                                           kan_reflection_registry_t registry,
+                                           const struct kan_reflection_struct_t *base_type,
+                                           struct compiled_patch_node_section_suffix_t *current_compiled_section)
 {
     if (!node)
     {
         return;
     }
 
-    validate_compiled_node_internal (node, registry, type, 0u);
+    if (current_compiled_section)
+    {
+        switch ((enum kan_reflection_patch_section_type_t) current_compiled_section->packed_type)
+        {
+        case KAN_REFLECTION_PATCH_SECTION_TYPE_DYNAMIC_ARRAY_SET:
+        {
+            if (current_compiled_section->source_field->archetype_dynamic_array.item_archetype ==
+                KAN_REFLECTION_ARCHETYPE_STRUCT)
+            {
+                const struct kan_reflection_struct_t *inner_struct = kan_reflection_registry_query_struct (
+                    registry,
+                    current_compiled_section->source_field->archetype_dynamic_array.item_archetype_struct.type_name);
+                KAN_ASSERT (inner_struct)
+
+                call_validation_for_array_subset (node->data_suffix.offset, node->data_suffix.size, registry,
+                                                  inner_struct, 0u, KAN_INT_MAX (kan_instance_size_t));
+            }
+
+            break;
+        }
+
+        case KAN_REFLECTION_PATCH_SECTION_TYPE_DYNAMIC_ARRAY_APPEND:
+            if (current_compiled_section->source_field->archetype_dynamic_array.item_archetype ==
+                KAN_REFLECTION_ARCHETYPE_STRUCT)
+            {
+                const struct kan_reflection_struct_t *inner_struct = kan_reflection_registry_query_struct (
+                    registry,
+                    current_compiled_section->source_field->archetype_dynamic_array.item_archetype_struct.type_name);
+                KAN_ASSERT (inner_struct)
+
+                validate_compiled_node_internal (node->data_suffix.offset, node->data_suffix.size, registry,
+                                                 inner_struct);
+            }
+
+            break;
+        }
+    }
+    else
+    {
+        validate_compiled_node_internal (node->data_suffix.offset, node->data_suffix.size, registry, base_type);
+    }
 }
 #endif
+
+static inline kan_bool_t patch_builder_chunk_node_less (struct patch_builder_chunk_node_t *left,
+                                                        struct patch_builder_chunk_node_t *right)
+{
+    // Compare by offset inside one section.
+    if (left->section == right->section)
+    {
+        return left->offset < right->offset;
+    }
+
+    // Chunks from the root section always go first.
+    if (!left->section)
+    {
+        return KAN_TRUE;
+    }
+
+    if (!right->section)
+    {
+        return KAN_FALSE;
+    }
+
+    // All array set sections always go before array append sections.
+    if (left->section->parent == right->section->parent &&
+        left->section->type == KAN_REFLECTION_PATCH_SECTION_TYPE_DYNAMIC_ARRAY_SET &&
+        right->section->type == KAN_REFLECTION_PATCH_SECTION_TYPE_DYNAMIC_ARRAY_APPEND)
+    {
+        return KAN_TRUE;
+    }
+
+    if (left->section->parent == right->section->parent &&
+        right->section->type == KAN_REFLECTION_PATCH_SECTION_TYPE_DYNAMIC_ARRAY_SET &&
+        left->section->type == KAN_REFLECTION_PATCH_SECTION_TYPE_DYNAMIC_ARRAY_APPEND)
+    {
+        return KAN_FALSE;
+    }
+
+    // Organize sections of the same parent by source offset if possible.
+    if (left->section->parent == right->section->parent &&
+        left->section->type != KAN_REFLECTION_PATCH_SECTION_TYPE_DYNAMIC_ARRAY_APPEND &&
+        right->section->type != KAN_REFLECTION_PATCH_SECTION_TYPE_DYNAMIC_ARRAY_APPEND)
+    {
+        return left->section->source_offset < right->section->source_offset;
+    }
+
+    // If no other conditions met, registration index is used in order to avoid writing into child sections before
+    // writing into parent ones.
+    return left->section->registration_index < right->section->registration_index;
+}
+
+static inline void finish_compiled_data_node (struct compiled_patch_node_t *compiled_node,
+                                              struct registry_t *registry_struct,
+                                              const struct kan_reflection_struct_t *type,
+                                              struct compiled_patch_node_section_suffix_t *current_compiled_section)
+
+{
+    if (!compiled_node)
+    {
+        return;
+    }
+
+#if defined(KAN_REFLECTION_WITH_VALIDATION) && defined(KAN_WITH_ASSERT)
+    validate_compiled_node (compiled_node, KAN_HANDLE_SET (kan_reflection_registry_t, registry_struct), type,
+                            current_compiled_section);
+#endif
+
+    if (current_compiled_section)
+    {
+        current_compiled_section->bounding_address =
+            KAN_MAX (current_compiled_section->bounding_address,
+                     compiled_node->data_suffix.offset + compiled_node->data_suffix.size);
+    }
+}
+
+static uint8_t *add_section_nodes (uint8_t *output,
+                                   struct patch_builder_section_node_t *section,
+                                   kan_reflection_registry_t registry,
+                                   const struct kan_reflection_struct_t *base_type,
+                                   struct compiled_patch_t *output_patch)
+{
+    KAN_ASSERT (!section->produced_suffix)
+    if (section->parent && !section->parent->produced_suffix)
+    {
+        // Parent is an empty container section, we need to add it recursively here then.
+        output = add_section_nodes (output, section->parent, registry, base_type, output_patch);
+    }
+
+    output = (uint8_t *) kan_apply_alignment ((kan_memory_size_t) output, _Alignof (struct compiled_patch_node_t));
+    struct compiled_patch_node_t *output_node = (struct compiled_patch_node_t *) output;
+
+    section->produced_suffix = &output_node->section_suffix;
+    output_node->is_data_node = KAN_FALSE;
+    KAN_ASSERT (section->registration_index + 1u < UINT16_MAX)
+
+    // Everything that belongs to the root section should be processed first and should not appear later.
+    KAN_ASSERT (section)
+
+    COMPILED_SECTION_ID_ASSERT_POSSIBLE (section)
+    output_node->section_suffix.parent_section_id = (uint16_t) COMPILED_SECTION_ID_GET (section->parent);
+    output_node->section_suffix.my_section_id = (uint16_t) COMPILED_SECTION_ID_GET (section);
+    output_patch->section_id_bound =
+        KAN_MAX (output_patch->section_id_bound, output_node->section_suffix.my_section_id + 1u);
+    output_node->section_suffix.packed_type = (uint16_t) section->type;
+    output_node->section_suffix.source_offset_in_parent = section->source_offset;
+    output_node->section_suffix.bounding_address = 0u;
+
+    const struct kan_reflection_struct_t *session_top_level_source_type = base_type;
+    if (section->parent)
+    {
+        const struct kan_reflection_field_t *parent_source_field = section->parent->produced_suffix->source_field;
+        KAN_ASSERT (parent_source_field)
+
+        switch (section->parent->type)
+        {
+        case KAN_REFLECTION_PATCH_SECTION_TYPE_DYNAMIC_ARRAY_SET:
+        case KAN_REFLECTION_PATCH_SECTION_TYPE_DYNAMIC_ARRAY_APPEND:
+        {
+            // Only arrays of structs can contain other sections inside.
+            KAN_ASSERT (parent_source_field->archetype_dynamic_array.item_archetype == KAN_REFLECTION_ARCHETYPE_STRUCT)
+            session_top_level_source_type = kan_reflection_registry_query_struct (
+                registry, parent_source_field->archetype_dynamic_array.item_archetype_struct.type_name);
+            break;
+        }
+        }
+    }
+
+    KAN_ASSERT (session_top_level_source_type)
+    output_node->section_suffix.source_field = kan_reflection_registry_query_local_field_by_offset (
+        registry, session_top_level_source_type->name, section->source_offset % session_top_level_source_type->size,
+        &output_node->section_suffix.source_field_struct);
+
+    KAN_ASSERT (output_node->section_suffix.source_field)
+    KAN_ASSERT (output_node->section_suffix.source_field_struct)
+
+#if defined(KAN_WITH_ASSERT)
+    switch (section->type)
+    {
+    case KAN_REFLECTION_PATCH_SECTION_TYPE_DYNAMIC_ARRAY_SET:
+    case KAN_REFLECTION_PATCH_SECTION_TYPE_DYNAMIC_ARRAY_APPEND:
+        KAN_ASSERT (output_node->section_suffix.source_field->archetype == KAN_REFLECTION_ARCHETYPE_DYNAMIC_ARRAY)
+        break;
+    }
+#endif
+
+    output += sizeof (struct compiled_patch_node_t);
+    return output;
+}
+
+static inline void compiled_patch_add_to_registry (struct compiled_patch_t *patch, struct registry_t *registry_struct)
+{
+    patch->registry = registry_struct;
+    patch->previous = NULL;
+
+    kan_atomic_int_lock (&registry_struct->patch_addition_lock);
+    patch->next = registry_struct->first_patch;
+
+    if (registry_struct->first_patch)
+    {
+        registry_struct->first_patch->previous = patch;
+    }
+
+    registry_struct->first_patch = patch;
+    kan_atomic_int_unlock (&registry_struct->patch_addition_lock);
+}
 
 static kan_bool_t compiled_patch_build_into (struct patch_builder_t *patch_builder,
                                              struct registry_t *registry_struct,
                                              const struct kan_reflection_struct_t *type,
                                              struct compiled_patch_t *output_patch)
 {
-    struct patch_builder_node_t **nodes_array = (struct patch_builder_node_t **) kan_stack_allocator_allocate (
-        patch_builder->stack_allocator, patch_builder->node_count * sizeof (struct patch_builder_node_t *),
-        _Alignof (struct patch_builder_node_t *));
-    KAN_ASSERT (nodes_array)
+    struct patch_builder_chunk_node_t **nodes_array =
+        (struct patch_builder_chunk_node_t **) kan_stack_group_allocator_allocate (
+            &patch_builder->temporary_allocator,
+            patch_builder->node_count * sizeof (struct patch_builder_chunk_node_t *),
+            _Alignof (struct patch_builder_chunk_node_t *));
 
-    if (!nodes_array)
-    {
-        patch_builder_reset (patch_builder);
-        KAN_LOG (reflection_patch_builder, KAN_LOG_ERROR, "Patch builder memory buffer overflow.")
-        return KAN_FALSE;
-    }
-
-    struct patch_builder_node_t *node = patch_builder->first_node;
+    struct patch_builder_chunk_node_t *node = patch_builder->first_node;
     for (kan_loop_size_t index = 0u; index < patch_builder->node_count; ++index)
     {
         KAN_ASSERT (node)
@@ -1650,10 +2114,11 @@ static kan_bool_t compiled_patch_build_into (struct patch_builder_t *patch_build
     }
 
     {
-        struct patch_builder_node_t *temporary;
+        struct patch_builder_chunk_node_t *temporary;
         unsigned long sort_length = (unsigned long) patch_builder->node_count;
 
-#define LESS(first_index, second_index) (nodes_array[first_index]->offset < nodes_array[second_index]->offset)
+#define LESS(first_index, second_index)                                                                                \
+    patch_builder_chunk_node_less (nodes_array[first_index], nodes_array[second_index])
 #define SWAP(first_index, second_index)                                                                                \
     temporary = nodes_array[first_index], nodes_array[first_index] = nodes_array[second_index],                        \
     nodes_array[second_index] = temporary
@@ -1662,13 +2127,32 @@ static kan_bool_t compiled_patch_build_into (struct patch_builder_t *patch_build
 #undef SWAP
     }
 
+    struct patch_builder_section_node_t *current_section = NULL;
     kan_instance_size_t patch_data_size = 0u;
     kan_instance_size_t node_count = 0u;
 
     for (kan_loop_size_t index = 0u; index < (kan_loop_size_t) patch_builder->node_count; ++index)
     {
         kan_bool_t new_node;
-        if (index > 0u)
+        if (current_section != nodes_array[index]->section)
+        {
+            current_section = nodes_array[index]->section;
+            struct patch_builder_section_node_t *section_to_add = current_section;
+
+            while (section_to_add && !section_to_add->counted_for_size)
+            {
+                patch_data_size = (kan_instance_size_t) kan_apply_alignment (patch_data_size,
+                                                                             _Alignof (struct compiled_patch_node_t)) +
+                                  sizeof (struct compiled_patch_node_t);
+
+                ++node_count;
+                section_to_add->counted_for_size = KAN_TRUE;
+                section_to_add = section_to_add->parent;
+            }
+
+            new_node = KAN_TRUE;
+        }
+        else if (index > 0u)
         {
             const uint16_t last_node_end = nodes_array[index - 1u]->offset + nodes_array[index - 1u]->size;
             const uint16_t new_node_begin = nodes_array[index]->offset;
@@ -1697,7 +2181,8 @@ static kan_bool_t compiled_patch_build_into (struct patch_builder_t *patch_build
         {
             patch_data_size =
                 (kan_instance_size_t) kan_apply_alignment (patch_data_size, _Alignof (struct compiled_patch_node_t));
-            patch_data_size += sizeof (struct compiled_patch_node_t);
+            patch_data_size += offsetof (struct compiled_patch_node_t, data_suffix) +
+                               offsetof (struct compiled_patch_node_data_suffix_t, data);
             ++node_count;
         }
 
@@ -1708,52 +2193,59 @@ static kan_bool_t compiled_patch_build_into (struct patch_builder_t *patch_build
         (kan_instance_size_t) kan_apply_alignment (patch_data_size, _Alignof (struct compiled_patch_node_t));
     output_patch->type = type;
     output_patch->node_count = node_count;
+    output_patch->section_id_bound = 0u;
     output_patch->begin = kan_allocate_general (get_compiled_patch_allocation_group (), patch_data_size,
                                                 _Alignof (struct compiled_patch_node_t));
     output_patch->end = (struct compiled_patch_node_t *) (((uint8_t *) output_patch->begin) + patch_data_size);
+    compiled_patch_add_to_registry (output_patch, registry_struct);
 
-    output_patch->registry = registry_struct;
-    output_patch->previous = NULL;
-    output_patch->next = registry_struct->first_patch;
-
-    kan_atomic_int_lock (&registry_struct->patch_addition_lock);
-    if (registry_struct->first_patch)
-    {
-        registry_struct->first_patch->previous = output_patch;
-    }
-
-    registry_struct->first_patch = output_patch;
-    kan_atomic_int_unlock (&registry_struct->patch_addition_lock);
-
+    current_section = NULL;
+    struct compiled_patch_node_section_suffix_t *current_section_suffix = NULL;
     uint8_t *output = (uint8_t *) output_patch->begin;
     struct compiled_patch_node_t *output_node = NULL;
 
     for (kan_loop_size_t index = 0u; index < patch_builder->node_count; ++index)
     {
-        if (index == 0u ||
-            nodes_array[index - 1u]->offset + nodes_array[index - 1u]->size != nodes_array[index]->offset)
+        kan_bool_t new_node;
+        if (current_section != nodes_array[index]->section)
         {
+            finish_compiled_data_node (output_node, registry_struct, type, current_section_suffix);
+            current_section = nodes_array[index]->section;
+
+            output =
+                add_section_nodes (output, current_section, KAN_HANDLE_SET (kan_reflection_registry_t, registry_struct),
+                                   type, output_patch);
+            current_section_suffix = current_section->produced_suffix;
+            output_node = NULL;
+            new_node = KAN_TRUE;
+        }
+        else
+        {
+            new_node = index == 0u ||
+                       nodes_array[index - 1u]->offset + nodes_array[index - 1u]->size != nodes_array[index]->offset;
+        }
+
+        if (new_node)
+        {
+            finish_compiled_data_node (output_node, registry_struct, type, current_section_suffix);
             output =
                 (uint8_t *) kan_apply_alignment ((kan_memory_size_t) output, _Alignof (struct compiled_patch_node_t));
-#if defined(KAN_REFLECTION_WITH_VALIDATION) && defined(KAN_WITH_ASSERT)
-            validate_compiled_node (output_node, registry_struct, type);
-#endif
-
             output_node = (struct compiled_patch_node_t *) output;
-            output_node->offset = nodes_array[index]->offset;
-            output_node->size = 0u;
-            output += sizeof (struct compiled_patch_node_t);
+
+            output_node->is_data_node = KAN_TRUE;
+            output_node->data_suffix.offset = nodes_array[index]->offset;
+            output_node->data_suffix.size = 0u;
+
+            output += offsetof (struct compiled_patch_node_t, data_suffix) +
+                      offsetof (struct compiled_patch_node_data_suffix_t, data);
         }
 
         memcpy (output, nodes_array[index]->data, nodes_array[index]->size);
-        output_node->size += nodes_array[index]->size;
+        output_node->data_suffix.size += nodes_array[index]->size;
         output += nodes_array[index]->size;
     }
 
-#if defined(KAN_REFLECTION_WITH_VALIDATION) && defined(KAN_WITH_ASSERT)
-    validate_compiled_node (output_node, registry_struct, type);
-#endif
-
+    finish_compiled_data_node (output_node, registry_struct, type, current_section_suffix);
 #if defined(KAN_WITH_ASSERT)
     output = (uint8_t *) kan_apply_alignment ((kan_memory_size_t) output, _Alignof (struct compiled_patch_node_t));
     KAN_ASSERT ((struct compiled_patch_node_t *) output == output_patch->end)
@@ -1784,7 +2276,7 @@ kan_reflection_patch_t kan_reflection_patch_builder_build (kan_reflection_patch_
 void kan_reflection_patch_builder_destroy (kan_reflection_patch_builder_t builder)
 {
     struct patch_builder_t *patch_builder = KAN_HANDLE_GET (builder);
-    kan_stack_allocator_destroy (patch_builder->stack_allocator);
+    kan_stack_group_allocator_shutdown (&patch_builder->temporary_allocator);
 }
 
 const struct kan_reflection_struct_t *kan_reflection_patch_get_type (kan_reflection_patch_t patch)
@@ -1799,19 +2291,182 @@ kan_instance_size_t kan_reflection_patch_get_chunks_count (kan_reflection_patch_
     return patch_data->node_count;
 }
 
+kan_id_32_t kan_reflection_patch_get_section_id_bound (kan_reflection_patch_t patch)
+{
+    struct compiled_patch_t *patch_data = KAN_HANDLE_GET (patch);
+    return (kan_id_32_t) patch_data->section_id_bound;
+}
+
+static inline void compiled_patch_section_stack_init (struct compiled_patch_section_stack_t *stack, void *base_data)
+{
+    stack->target_data = base_data;
+    stack->base_data = base_data;
+    stack->stack_end_pointer = stack->stack;
+}
+
+static inline void compiled_patch_section_stack_go_to (kan_reflection_registry_t registry,
+                                                       struct compiled_patch_section_stack_t *stack,
+                                                       struct compiled_patch_node_section_suffix_t *section_data)
+{
+    struct compiled_patch_section_stack_item_t *old_append_section = NULL;
+    while (stack->stack_end_pointer > stack->stack)
+    {
+        struct compiled_patch_section_stack_item_t *item = stack->stack_end_pointer - 1u;
+        if (item->section->my_section_id == section_data->parent_section_id)
+        {
+            break;
+        }
+
+        if (item->section->packed_type == (uint16_t) KAN_REFLECTION_PATCH_SECTION_TYPE_DYNAMIC_ARRAY_APPEND)
+        {
+            old_append_section = item;
+        }
+
+        --stack->stack_end_pointer;
+    }
+
+    KAN_ASSERT (section_data->parent_section_id == COMPILED_SECTION_ID_NONE ||
+                (stack->stack_end_pointer > stack->stack &&
+                 (stack->stack_end_pointer - 1u)->section->my_section_id == section_data->parent_section_id))
+
+    struct compiled_patch_section_stack_item_t *stack_item =
+        stack->stack_end_pointer > stack->stack ? stack->stack_end_pointer - 1u : NULL;
+    void *base = stack_item >= stack->stack ? stack_item->target_data : stack->base_data;
+    void *source = ((uint8_t *) base) + section_data->source_offset_in_parent;
+    void *target = NULL;
+
+    // We do not check the type here as appends should always come last.
+    if (old_append_section && source != old_append_section->source_data)
+    {
+        // We might've increased capacity too much while appending. Reset capacity to size.
+        struct kan_dynamic_array_t *array = old_append_section->source_data;
+        kan_dynamic_array_set_capacity (array, array->size);
+    }
+
+    switch ((enum kan_reflection_patch_section_type_t) section_data->packed_type)
+    {
+    case KAN_REFLECTION_PATCH_SECTION_TYPE_DYNAMIC_ARRAY_SET:
+    {
+        struct kan_dynamic_array_t *array = source;
+        kan_instance_size_t required_size = section_data->bounding_address / array->item_size;
+
+        if (section_data->bounding_address % array->item_size != 0u)
+        {
+            ++required_size;
+        }
+
+        if (array->capacity < required_size)
+        {
+            kan_dynamic_array_set_capacity (array, required_size);
+        }
+
+        if (section_data->source_field->archetype_dynamic_array.item_archetype == KAN_REFLECTION_ARCHETYPE_STRUCT)
+        {
+            const struct kan_reflection_struct_t *inner_struct = kan_reflection_registry_query_struct (
+                registry, section_data->source_field->archetype_dynamic_array.item_archetype_struct.type_name);
+            KAN_ASSERT (inner_struct)
+
+            if (inner_struct->init)
+            {
+                uint8_t *output = array->data + array->size * array->item_size;
+                uint8_t *end = array->data + required_size * array->item_size;
+
+                while (output < end)
+                {
+                    inner_struct->init (inner_struct->functor_user_data, output);
+                    output += array->item_size;
+                }
+            }
+        }
+
+        array->size = required_size;
+        target = array->data;
+        break;
+    }
+
+    case KAN_REFLECTION_PATCH_SECTION_TYPE_DYNAMIC_ARRAY_APPEND:
+    {
+        struct kan_dynamic_array_t *array = source;
+        target = kan_dynamic_array_add_last (array);
+
+        if (!target)
+        {
+            kan_dynamic_array_set_capacity (array,
+                                            KAN_MAX (KAN_REFLECTION_PATCH_ARRAY_APPEND_BASE_COUNT, array->size * 2u));
+            target = kan_dynamic_array_add_last (array);
+            KAN_ASSERT (target);
+        }
+
+        if (section_data->source_field->archetype_dynamic_array.item_archetype == KAN_REFLECTION_ARCHETYPE_STRUCT)
+        {
+            const struct kan_reflection_struct_t *inner_struct = kan_reflection_registry_query_struct (
+                registry, section_data->source_field->archetype_dynamic_array.item_archetype_struct.type_name);
+            KAN_ASSERT (inner_struct)
+
+            if (inner_struct->init)
+            {
+                inner_struct->init (inner_struct->functor_user_data, target);
+            }
+        }
+
+        break;
+    }
+    }
+
+    KAN_ASSERT (stack->stack_end_pointer < stack->stack + KAN_REFLECTION_PATCH_MAX_SECTION_DEPTH)
+    stack->stack_end_pointer->section = section_data;
+    stack->stack_end_pointer->source_data = source;
+    stack->stack_end_pointer->target_data = target;
+    ++stack->stack_end_pointer;
+    stack->target_data = target;
+}
+
 void kan_reflection_patch_apply (kan_reflection_patch_t patch, void *target)
 {
     struct compiled_patch_t *patch_data = KAN_HANDLE_GET (patch);
     struct compiled_patch_node_t *node = patch_data->begin;
     const struct compiled_patch_node_t *end = patch_data->end;
 
+    if (!node)
+    {
+        return;
+    }
+
+    struct compiled_patch_section_stack_t section_stack;
+    compiled_patch_section_stack_init (&section_stack, target);
+
     while (node != end)
     {
-        memcpy (((uint8_t *) target) + node->offset, node->data, node->size);
-        uint8_t *data_end = node->data + node->size;
-        data_end =
-            (uint8_t *) kan_apply_alignment ((kan_memory_size_t) data_end, _Alignof (struct compiled_patch_node_t));
-        node = (struct compiled_patch_node_t *) data_end;
+        if (node->is_data_node)
+        {
+            memcpy (((uint8_t *) section_stack.target_data) + node->data_suffix.offset, node->data_suffix.data,
+                    node->data_suffix.size);
+            uint8_t *data_end = ((uint8_t *) node->data_suffix.data) + node->data_suffix.size;
+            data_end =
+                (uint8_t *) kan_apply_alignment ((kan_memory_size_t) data_end, _Alignof (struct compiled_patch_node_t));
+            node = (struct compiled_patch_node_t *) data_end;
+        }
+        else
+        {
+            compiled_patch_section_stack_go_to (KAN_HANDLE_SET (kan_reflection_registry_t, patch_data->registry),
+                                                &section_stack, &node->section_suffix);
+            // Sections have standard size.
+            ++node;
+        }
+    }
+
+    // Reduce capacity after last appends if any.
+    while (section_stack.stack_end_pointer > section_stack.stack)
+    {
+        struct compiled_patch_section_stack_item_t *item = section_stack.stack_end_pointer - 1u;
+        if (item->section->packed_type == (uint16_t) KAN_REFLECTION_PATCH_SECTION_TYPE_DYNAMIC_ARRAY_APPEND)
+        {
+            // We might've increased capacity too much while appending. Reset capacity to size.
+            struct kan_dynamic_array_t *array = item->source_data;
+            kan_dynamic_array_set_capacity (array, array->size);
+        }
+
+        --section_stack.stack_end_pointer;
     }
 }
 
@@ -1830,18 +2485,44 @@ kan_reflection_patch_iterator_t kan_reflection_patch_end (kan_reflection_patch_t
 kan_reflection_patch_iterator_t kan_reflection_patch_iterator_next (kan_reflection_patch_iterator_t iterator)
 {
     struct compiled_patch_node_t *node = KAN_HANDLE_GET (iterator);
-    uint8_t *data_end = node->data + node->size;
-    data_end = (uint8_t *) kan_apply_alignment ((kan_memory_size_t) data_end, _Alignof (struct compiled_patch_node_t));
-    return KAN_HANDLE_SET (kan_reflection_patch_iterator_t, data_end);
+    if (node->is_data_node)
+    {
+        uint8_t *data_end = ((uint8_t *) node->data_suffix.data) + node->data_suffix.size;
+        data_end =
+            (uint8_t *) kan_apply_alignment ((kan_memory_size_t) data_end, _Alignof (struct compiled_patch_node_t));
+        return KAN_HANDLE_SET (kan_reflection_patch_iterator_t, data_end);
+    }
+    else
+    {
+        // Sections have standard size.
+        return KAN_HANDLE_SET (kan_reflection_patch_iterator_t, node + 1u);
+    }
 }
 
-struct kan_reflection_patch_chunk_info_t kan_reflection_patch_iterator_get (kan_reflection_patch_iterator_t iterator)
+struct kan_reflection_patch_node_info_t kan_reflection_patch_iterator_get (kan_reflection_patch_iterator_t iterator)
 {
     struct compiled_patch_node_t *node = KAN_HANDLE_GET (iterator);
-    struct kan_reflection_patch_chunk_info_t info;
-    info.offset = node->offset;
-    info.size = node->size;
-    info.data = node->data;
+    struct kan_reflection_patch_node_info_t info;
+    info.is_data_chunk = node->is_data_node;
+
+    if (info.is_data_chunk)
+    {
+        info.chunk_info.offset = node->data_suffix.offset;
+        info.chunk_info.size = node->data_suffix.size;
+        info.chunk_info.data = node->data_suffix.data;
+    }
+    else
+    {
+        KAN_ASSERT (!KAN_TYPED_ID_32_IS_VALID (
+            KAN_TYPED_ID_32_SET (kan_reflection_patch_serializable_section_id_t, COMPILED_SECTION_ID_NONE)))
+        info.section_info.parent_section_id = KAN_TYPED_ID_32_SET (kan_reflection_patch_serializable_section_id_t,
+                                                                   node->section_suffix.parent_section_id);
+        info.section_info.section_id =
+            KAN_TYPED_ID_32_SET (kan_reflection_patch_serializable_section_id_t, node->section_suffix.my_section_id);
+        info.section_info.type = (enum kan_reflection_patch_section_type_t) node->section_suffix.packed_type;
+        info.section_info.source_offset_in_parent = node->section_suffix.source_offset_in_parent;
+    }
+
     return info;
 }
 
@@ -2126,6 +2807,7 @@ static struct struct_migration_node_t *migration_seed_add_struct (
                         case KAN_REFLECTION_ARCHETYPE_SIGNED_INT:
                         case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
                         case KAN_REFLECTION_ARCHETYPE_FLOATING:
+                        case KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL:
                         case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
                         case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:
                         case KAN_REFLECTION_ARCHETYPE_EXTERNAL_POINTER:
@@ -2156,6 +2838,7 @@ static struct struct_migration_node_t *migration_seed_add_struct (
                                 case KAN_REFLECTION_ARCHETYPE_SIGNED_INT:
                                 case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
                                 case KAN_REFLECTION_ARCHETYPE_FLOATING:
+                                case KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL:
                                 case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
                                 case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:
                                 case KAN_REFLECTION_ARCHETYPE_EXTERNAL_POINTER:
@@ -2206,6 +2889,7 @@ static struct struct_migration_node_t *migration_seed_add_struct (
                                 case KAN_REFLECTION_ARCHETYPE_SIGNED_INT:
                                 case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
                                 case KAN_REFLECTION_ARCHETYPE_FLOATING:
+                                case KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL:
                                 case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
                                 case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:
                                 case KAN_REFLECTION_ARCHETYPE_EXTERNAL_POINTER:
@@ -2915,6 +3599,7 @@ static struct struct_migrator_node_t *migrator_add_struct (struct migrator_t *mi
                                            algorithm_allocator, &queues);
             break;
 
+        case KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL:
         case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
         case KAN_REFLECTION_ARCHETYPE_EXTERNAL_POINTER:
         case KAN_REFLECTION_ARCHETYPE_STRUCT_POINTER:
@@ -2974,6 +3659,7 @@ static struct struct_migrator_node_t *migrator_add_struct (struct migrator_t *mi
                                                    algorithm_allocator, &queues);
                     break;
 
+                case KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL:
                 case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
                 case KAN_REFLECTION_ARCHETYPE_EXTERNAL_POINTER:
                 case KAN_REFLECTION_ARCHETYPE_STRUCT_POINTER:
@@ -3029,11 +3715,14 @@ static struct struct_migrator_node_t *migrator_add_struct (struct migrator_t *mi
                     source_field->archetype_dynamic_array.item_size == target_field->archetype_dynamic_array.item_size;
                 break;
 
+            case KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL:
             case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
             case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:
             case KAN_REFLECTION_ARCHETYPE_EXTERNAL_POINTER:
             case KAN_REFLECTION_ARCHETYPE_STRUCT_POINTER:
             case KAN_REFLECTION_ARCHETYPE_PATCH:
+                KAN_ASSERT (source_field->archetype_dynamic_array.item_size ==
+                            target_field->archetype_dynamic_array.item_size)
                 can_copy = KAN_TRUE;
                 break;
 
@@ -3445,6 +4134,7 @@ static void migrator_adapt_numeric (kan_instance_size_t source_size,
         }
         break;
 
+    case KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL:
     case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
     case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:
     case KAN_REFLECTION_ARCHETYPE_ENUM:
@@ -3461,21 +4151,17 @@ static void migrator_adapt_numeric (kan_instance_size_t source_size,
     KAN_ASSERT (KAN_FALSE)
 }
 
-static void migrator_adapt_enum (const struct migrator_t *migrator,
-                                 kan_interned_string_t type_name,
-                                 const void *located_input,
-                                 void *located_output)
+static void migrator_adapt_enum_with_migration_node (const struct migrator_t *migrator,
+                                                     struct enum_migration_node_t *migration_node,
+                                                     const void *located_input,
+                                                     void *located_output)
 {
-    struct enum_migration_node_t *migration_node = migration_seed_query_enum (migrator->source_seed, type_name);
-    KAN_ASSERT (migration_node)
-    KAN_ASSERT (migration_node->seed.status == KAN_REFLECTION_MIGRATION_NEEDED)
-
     const struct kan_reflection_enum_t *source_enum_data =
-        kan_reflection_registry_query_enum (migrator->source_seed->source_registry, type_name);
+        kan_reflection_registry_query_enum (migrator->source_seed->source_registry, migration_node->type_name);
     KAN_ASSERT (source_enum_data)
 
     const struct kan_reflection_enum_t *target_enum_data =
-        kan_reflection_registry_query_enum (migrator->source_seed->target_registry, type_name);
+        kan_reflection_registry_query_enum (migrator->source_seed->target_registry, migration_node->type_name);
     KAN_ASSERT (source_enum_data)
 
     const kan_bool_t migration_single_to_single = !source_enum_data->flags && !target_enum_data->flags;
@@ -3506,7 +4192,7 @@ static void migrator_adapt_enum (const struct migrator_t *migrator,
 
         KAN_LOG (reflection_migrator, KAN_LOG_ERROR,
                  "Encountered unknown value \"%d\" of enum \"%s\". Resetting it to first correct value \"%s\".",
-                 enum_value, type_name, target_enum_data->values[0].name)
+                 enum_value, migration_node->type_name, target_enum_data->values[0].name)
 
         if (migration_single_to_single)
         {
@@ -3548,9 +4234,20 @@ static void migrator_adapt_enum (const struct migrator_t *migrator,
         KAN_LOG (reflection_migrator, KAN_LOG_ERROR,
                  "Encountered empty value of flags-based enum \"%s\" while converting it to single value enum. "
                  "Resetting it to first correct value \"%s\".",
-                 type_name, target_enum_data->values[0].name)
+                 migration_node->type_name, target_enum_data->values[0].name)
         *(int *) located_output = (int) target_enum_data->values[0].value;
     }
+}
+
+static inline void migrator_adapt_enum (const struct migrator_t *migrator,
+                                        kan_interned_string_t type_name,
+                                        const void *located_input,
+                                        void *located_output)
+{
+    struct enum_migration_node_t *migration_node = migration_seed_query_enum (migrator->source_seed, type_name);
+    KAN_ASSERT (migration_node)
+    KAN_ASSERT (migration_node->seed.status == KAN_REFLECTION_MIGRATION_NEEDED)
+    migrator_adapt_enum_with_migration_node (migrator, migration_node, located_input, located_output);
 }
 
 static void migrator_adapt_dynamic_array (kan_reflection_struct_migrator_t migrator,
@@ -3604,6 +4301,7 @@ static void migrator_adapt_dynamic_array (kan_reflection_struct_migrator_t migra
             break;
 
             // Archetypes below do not need any adaptation, therefore this command should not be issued.
+        case KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL:
         case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
         case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:
         case KAN_REFLECTION_ARCHETYPE_EXTERNAL_POINTER:
@@ -3749,38 +4447,206 @@ enum patch_condition_status_t
     PATCH_CONDITION_STATUS_NOT_CALCULATED,
 };
 
-static inline kan_bool_t patch_migration_evaluate_condition (kan_instance_size_t condition_index,
-                                                             struct migrator_condition_t *conditions,
-                                                             enum patch_condition_status_t *condition_statuses,
-                                                             kan_instance_size_t node_index,
-                                                             struct compiled_patch_node_t **nodes)
+struct patch_migration_task_data_t
+{
+    kan_reflection_registry_t target_registry;
+    kan_reflection_struct_migrator_t migrator;
+    struct compiled_patch_t *patch_begin;
+    struct compiled_patch_t *patch_end;
+};
+
+struct patch_migration_context_t
+{
+    kan_reflection_patch_builder_t patch_builder;
+
+    struct compiled_patch_t *patch;
+    struct compiled_patch_node_t *node;
+    kan_instance_size_t node_index;
+
+    struct migrator_t *migrator_data;
+    struct struct_migrator_node_t *migrator_node;
+    kan_reflection_patch_builder_section_t current_section;
+
+    kan_instance_size_t source_instance_size;
+    kan_instance_size_t target_instance_size;
+    kan_instance_size_t current_instance_index;
+
+    struct compiled_patch_node_t **nodes;
+    enum patch_condition_status_t *conditions;
+    kan_reflection_patch_builder_section_t *sections;
+
+    struct migrator_command_copy_t *copy_command;
+    const struct migrator_command_copy_t *copy_command_end;
+
+    struct migrator_command_adapt_numeric_t *adapt_numeric_command;
+    const struct migrator_command_adapt_numeric_t *adapt_numeric_command_end;
+
+    struct migrator_command_adapt_enum_t *adapt_enum_command;
+    const struct migrator_command_adapt_enum_t *adapt_enum_command_end;
+
+    struct compiled_patch_node_t *nodes_fixed[KAN_REFLECTION_MIGRATOR_PATCH_MAX_NODES];
+    enum patch_condition_status_t conditions_fixed[KAN_REFLECTION_MIGRATOR_MAX_CONDITIONS];
+    kan_reflection_patch_builder_section_t sections_fixed[KAN_REFLECTION_MIGRATOR_PATCH_MAX_SECTIONS];
+};
+
+static inline void patch_migration_reset_conditions (struct patch_migration_context_t *context)
+{
+    for (kan_loop_size_t condition_index = 0u; condition_index < context->migrator_node->conditions_count;
+         ++condition_index)
+    {
+        context->conditions[condition_index] = PATCH_CONDITION_STATUS_NOT_CALCULATED;
+    }
+}
+
+static inline void patch_migration_context_set_commands_from_migrator (struct patch_migration_context_t *context)
+{
+    context->copy_command = context->migrator_node->copy_commands;
+    context->copy_command_end = context->migrator_node->copy_commands + context->migrator_node->copy_commands_count;
+
+    context->adapt_numeric_command = context->migrator_node->adapt_numeric_commands;
+    context->adapt_numeric_command_end =
+        context->migrator_node->adapt_numeric_commands + context->migrator_node->adapt_numeric_commands_count;
+
+    context->adapt_enum_command = context->migrator_node->adapt_enum_commands;
+    context->adapt_enum_command_end =
+        context->migrator_node->adapt_enum_commands + context->migrator_node->adapt_enum_commands_count;
+
+    patch_migration_reset_conditions (context);
+}
+
+static inline void patch_migration_context_init (struct patch_migration_context_t *context,
+                                                 kan_reflection_patch_builder_t patch_builder,
+                                                 struct compiled_patch_t *patch,
+                                                 struct migrator_t *migrator_data,
+                                                 struct struct_migrator_node_t *base_migrator_node)
+{
+    const kan_allocation_group_t group = get_compiled_patch_allocation_group ();
+    context->patch_builder = patch_builder;
+
+    context->patch = patch;
+    context->node = patch->begin;
+    context->node_index = 0u;
+
+    context->migrator_data = migrator_data;
+    context->migrator_node = base_migrator_node;
+    context->current_section = KAN_HANDLE_SET_INVALID (kan_reflection_patch_builder_section_t);
+
+    const struct kan_reflection_struct_t *target_type =
+        kan_reflection_registry_query_struct (context->migrator_data->source_seed->target_registry, patch->type->name);
+    KAN_ASSERT (target_type)
+
+    context->source_instance_size = patch->type->size;
+    context->target_instance_size = target_type->size;
+    context->current_instance_index = KAN_INT_MAX (kan_instance_size_t);
+
+    context->nodes = context->nodes_fixed;
+    if (patch->node_count > KAN_REFLECTION_MIGRATOR_PATCH_MAX_NODES)
+    {
+        context->nodes = kan_allocate_general (group, sizeof (struct compiled_patch_node_t *) * patch->node_count,
+                                               _Alignof (struct compiled_patch_node_t *));
+    }
+
+    context->conditions = context->conditions_fixed;
+    if (base_migrator_node->conditions_count > KAN_REFLECTION_MIGRATOR_MAX_CONDITIONS)
+    {
+        context->conditions =
+            kan_allocate_general (group, sizeof (enum patch_condition_status_t) * base_migrator_node->conditions_count,
+                                  _Alignof (enum patch_condition_status_t));
+    }
+
+    context->sections = context->sections_fixed;
+    if (patch->section_id_bound > KAN_REFLECTION_MIGRATOR_PATCH_MAX_SECTIONS)
+    {
+        context->sections =
+            kan_allocate_general (group, sizeof (kan_reflection_patch_builder_section_t) * patch->section_id_bound,
+                                  _Alignof (kan_reflection_patch_builder_section_t));
+    }
+
+    for (kan_loop_size_t index = 0u; index < (kan_loop_size_t) patch->section_id_bound; ++index)
+    {
+        context->sections[index] = KAN_HANDLE_SET_INVALID (kan_reflection_patch_builder_section_t);
+    }
+
+    context->nodes[context->node_index] = context->node;
+    patch_migration_context_set_commands_from_migrator (context);
+}
+
+static inline void patch_migration_context_switch_to_struct (struct patch_migration_context_t *context,
+                                                             kan_interned_string_t type_name)
+{
+    const kan_instance_size_t old_conditions_count = context->migrator_node->conditions_count;
+
+    context->migrator_node = migrator_query_struct (context->migrator_data, type_name);
+    KAN_ASSERT (context->migrator_node)
+
+    const struct kan_reflection_struct_t *source_type =
+        kan_reflection_registry_query_struct (context->migrator_data->source_seed->source_registry, type_name);
+    KAN_ASSERT (source_type)
+
+    const struct kan_reflection_struct_t *target_type =
+        kan_reflection_registry_query_struct (context->migrator_data->source_seed->target_registry, type_name);
+    KAN_ASSERT (target_type)
+
+    context->source_instance_size = source_type->size;
+    context->target_instance_size = target_type->size;
+    context->current_instance_index = KAN_INT_MAX (kan_instance_size_t);
+
+    if (context->migrator_node->conditions_count >
+        KAN_MAX (KAN_REFLECTION_MIGRATOR_MAX_CONDITIONS, old_conditions_count))
+    {
+        const kan_allocation_group_t group = get_compiled_patch_allocation_group ();
+        if (context->conditions != context->conditions_fixed)
+        {
+            kan_free_general (group, context->conditions,
+                              sizeof (enum patch_condition_status_t) * old_conditions_count);
+        }
+
+        context->conditions = kan_allocate_general (
+            group, sizeof (enum patch_condition_status_t) * context->migrator_node->conditions_count,
+            _Alignof (enum patch_condition_status_t));
+    }
+
+    patch_migration_context_set_commands_from_migrator (context);
+}
+
+static kan_bool_t patch_migration_evaluate_condition (struct patch_migration_context_t *context,
+                                                      kan_instance_size_t condition_index)
 {
     if (condition_index == MIGRATOR_CONDITION_INDEX_NONE)
     {
         return KAN_TRUE;
     }
 
-    if (condition_statuses[condition_index] == PATCH_CONDITION_STATUS_NOT_CALCULATED)
+    if (context->conditions[condition_index] == PATCH_CONDITION_STATUS_NOT_CALCULATED)
     {
-        const struct migrator_condition_t *condition = &conditions[condition_index];
+        const struct migrator_condition_t *condition = &context->migrator_node->conditions[condition_index];
         if (condition->parent_condition_index != MIGRATOR_CONDITION_INDEX_NONE)
         {
-            if (!patch_migration_evaluate_condition (condition->parent_condition_index, conditions, condition_statuses,
-                                                     node_index, nodes))
+            if (!patch_migration_evaluate_condition (context, condition->parent_condition_index))
             {
-                condition_statuses[condition_index] = PATCH_CONDITION_STATUS_FALSE;
+                context->conditions[condition_index] = PATCH_CONDITION_STATUS_FALSE;
                 return KAN_FALSE;
             }
         }
 
         struct compiled_patch_node_t *node_with_condition_value = NULL;
+        kan_instance_size_t instance_locality_offset = context->current_instance_index * context->source_instance_size;
+        kan_instance_size_t node_index = context->node_index;
 
         // Search for node with condition value.
         while (KAN_TRUE)
         {
-            struct compiled_patch_node_t *node = nodes[node_index];
-            if (condition->absolute_source_offset >= (kan_instance_size_t) node->offset &&
-                condition->absolute_source_offset < (kan_instance_size_t) (node->offset + node->size))
+            struct compiled_patch_node_t *node = context->nodes[node_index];
+            if (!node->is_data_node)
+            {
+                // Reached section declaration. Anything before it doesn't matter.
+                break;
+            }
+
+            if (instance_locality_offset + condition->absolute_source_offset >=
+                    (kan_instance_size_t) node->data_suffix.offset &&
+                instance_locality_offset + condition->absolute_source_offset <
+                    (kan_instance_size_t) (node->data_suffix.offset + node->data_suffix.size))
             {
                 node_with_condition_value = node;
                 break;
@@ -3799,12 +4665,12 @@ static inline kan_bool_t patch_migration_evaluate_condition (kan_instance_size_t
         if (node_with_condition_value)
         {
             const kan_instance_size_t offset_in_node =
-                condition->absolute_source_offset - node_with_condition_value->offset;
+                condition->absolute_source_offset - node_with_condition_value->data_suffix.offset;
             const kan_bool_t check_result = kan_reflection_check_visibility (
                 condition->condition_field, condition->condition_values_count, condition->condition_values,
-                node_with_condition_value->data + offset_in_node);
+                ((uint8_t *) node_with_condition_value->data_suffix.data) + offset_in_node);
 
-            condition_statuses[condition_index] =
+            context->conditions[condition_index] =
                 check_result ? PATCH_CONDITION_STATUS_TRUE : PATCH_CONDITION_STATUS_FALSE;
         }
         else
@@ -3813,23 +4679,336 @@ static inline kan_bool_t patch_migration_evaluate_condition (kan_instance_size_t
             // otherwise, we treat it as false to avoid multiple command execution.
             const kan_bool_t first_on_this_address =
                 condition_index == 0u ||
-                conditions[condition_index - 1].absolute_source_offset != condition->absolute_source_offset;
+                context->migrator_node->conditions[condition_index - 1].absolute_source_offset !=
+                    condition->absolute_source_offset;
 
-            condition_statuses[condition_index] =
+            context->conditions[condition_index] =
                 first_on_this_address ? PATCH_CONDITION_STATUS_TRUE : PATCH_CONDITION_STATUS_FALSE;
         }
     }
 
-    return condition_statuses[condition_index] == PATCH_CONDITION_STATUS_TRUE;
+    return context->conditions[condition_index] == PATCH_CONDITION_STATUS_TRUE;
 }
 
-struct patch_migration_task_data_t
+static inline void patch_migration_increment_node (struct patch_migration_context_t *context)
 {
-    kan_reflection_registry_t target_registry;
-    kan_reflection_struct_migrator_t migrator;
-    struct compiled_patch_t *patch_begin;
-    struct compiled_patch_t *patch_end;
-};
+    if (context->node->is_data_node)
+    {
+        uint8_t *data_end = ((uint8_t *) context->node->data_suffix.data) + context->node->data_suffix.size;
+        data_end =
+            (uint8_t *) kan_apply_alignment ((kan_memory_size_t) data_end, _Alignof (struct compiled_patch_node_t));
+        context->node = (struct compiled_patch_node_t *) data_end;
+    }
+    else
+    {
+        // Sections have standard size.
+        ++context->node;
+    }
+
+    ++context->node_index;
+    if (context->node_index < context->patch->node_count)
+    {
+        context->nodes[context->node_index] = context->node;
+    }
+}
+
+static kan_bool_t patch_migration_data_step (struct patch_migration_context_t *context)
+{
+    if (!context->node->is_data_node)
+    {
+        return KAN_FALSE;
+    }
+
+    kan_instance_size_t global_offset = context->node->data_suffix.offset;
+    const kan_instance_size_t global_node_end = context->node->data_suffix.offset + context->node->data_suffix.size;
+
+    while (global_offset < global_node_end)
+    {
+        const kan_instance_size_t instance_index = global_offset / context->source_instance_size;
+        if (context->current_instance_index != instance_index &&
+            context->current_instance_index != KAN_INT_MAX (kan_instance_size_t))
+        {
+            // Instance has changed, need to instance-dependent state.
+
+            // Reset commands.
+            context->copy_command = context->migrator_node->copy_commands;
+            context->adapt_numeric_command = context->migrator_node->adapt_numeric_commands;
+            context->adapt_enum_command = context->migrator_node->adapt_enum_commands;
+
+            // Reset conditions.
+            for (kan_loop_size_t condition_index = 0u; condition_index < context->migrator_node->conditions_count;
+                 ++condition_index)
+            {
+                context->conditions[condition_index] = PATCH_CONDITION_STATUS_NOT_CALCULATED;
+            }
+        }
+
+        context->current_instance_index = instance_index;
+        const kan_instance_size_t local_offset = global_offset % context->source_instance_size;
+        const kan_instance_size_t global_source_instance_begin =
+            context->current_instance_index * context->source_instance_size;
+        const kan_instance_size_t global_target_instance_begin =
+            context->current_instance_index * context->target_instance_size;
+
+        // Skip commands until we reach our address space. Also take care of conditions.
+        while (context->copy_command != context->copy_command_end &&
+               (context->copy_command->absolute_source_offset + context->copy_command->size < local_offset ||
+                !patch_migration_evaluate_condition (context, context->copy_command->condition_index)))
+        {
+            ++context->copy_command;
+        }
+
+        while (context->adapt_numeric_command != context->adapt_numeric_command_end &&
+               (context->adapt_numeric_command->absolute_source_offset + context->adapt_numeric_command->source_size <
+                    local_offset ||
+                !patch_migration_evaluate_condition (context, context->adapt_numeric_command->condition_index)))
+        {
+            ++context->adapt_numeric_command;
+        }
+
+        while (context->adapt_enum_command != context->adapt_enum_command_end &&
+               (context->adapt_enum_command->absolute_source_offset + sizeof (int) < local_offset ||
+                !patch_migration_evaluate_condition (context, context->adapt_enum_command->condition_index)))
+        {
+            ++context->adapt_enum_command;
+        }
+
+        // Try to apply one of the commands if possible.
+        if (context->copy_command != context->copy_command_end &&
+            local_offset >= context->copy_command->absolute_source_offset &&
+            local_offset < context->copy_command->absolute_source_offset + context->copy_command->size)
+        {
+            const kan_instance_size_t local_offset_from_source =
+                local_offset - context->copy_command->absolute_source_offset;
+            const kan_instance_size_t size = context->copy_command->size - local_offset_from_source;
+
+            kan_reflection_patch_builder_add_chunk (
+                context->patch_builder, context->current_section,
+                global_target_instance_begin + context->copy_command->absolute_target_offset + local_offset_from_source,
+                context->copy_command->size - local_offset_from_source,
+                ((uint8_t *) context->node->data_suffix.data) + (global_offset - context->node->data_suffix.offset));
+
+            global_offset += size;
+            ++context->copy_command;
+        }
+        else if (context->adapt_numeric_command != context->adapt_numeric_command_end &&
+                 local_offset == context->adapt_numeric_command->absolute_source_offset)
+        {
+            uint64_t output_buffer;
+            migrator_adapt_numeric (
+                context->adapt_numeric_command->source_size, context->adapt_numeric_command->target_size,
+                context->adapt_numeric_command->archetype,
+                ((uint8_t *) context->node->data_suffix.data) + (global_offset - context->node->data_suffix.offset),
+                &output_buffer);
+
+            kan_reflection_patch_builder_add_chunk (
+                context->patch_builder, context->current_section,
+                global_target_instance_begin + context->adapt_numeric_command->absolute_target_offset,
+                context->adapt_numeric_command->target_size, &output_buffer);
+
+            global_offset += context->adapt_numeric_command->source_size;
+            ++context->adapt_numeric_command;
+        }
+        else if (context->adapt_enum_command != context->adapt_enum_command_end &&
+                 local_offset == context->adapt_enum_command->absolute_source_offset)
+        {
+            int output_buffer;
+            migrator_adapt_enum (
+                context->migrator_data, context->adapt_enum_command->type_name,
+                ((uint8_t *) context->node->data_suffix.data) + (global_offset - context->node->data_suffix.offset),
+                &output_buffer);
+
+            kan_reflection_patch_builder_add_chunk (
+                context->patch_builder, context->current_section,
+                global_target_instance_begin + context->adapt_enum_command->absolute_target_offset, sizeof (int),
+                &output_buffer);
+
+            global_offset += sizeof (int);
+            ++context->adapt_enum_command;
+        }
+        else
+        {
+            // Partition is absent in target registry and therefore should be dropped.
+            // Move offset to the first next command.
+
+            const kan_instance_size_t global_next_instance =
+                global_source_instance_begin + context->source_instance_size;
+            const kan_instance_size_t copy_offset = context->copy_command != context->copy_command_end ?
+                                                        context->copy_command->absolute_source_offset :
+                                                        global_next_instance;
+
+            const kan_instance_size_t adapt_numeric_offset =
+                context->adapt_numeric_command != context->adapt_numeric_command_end ?
+                    context->adapt_numeric_command->absolute_source_offset :
+                    global_next_instance;
+
+            const kan_instance_size_t adapt_enum_offset =
+                context->adapt_enum_command != context->adapt_enum_command_end ?
+                    context->adapt_enum_command->absolute_source_offset :
+                    global_next_instance;
+
+            global_offset = KAN_MIN (copy_offset, KAN_MIN (adapt_numeric_offset, adapt_enum_offset));
+        }
+    }
+
+    patch_migration_increment_node (context);
+    return KAN_TRUE;
+}
+
+static inline void patch_migration_skip_sections_if_not_needed (
+    struct patch_migration_context_t *context,
+    struct struct_migration_node_t **migration_node,
+    const struct kan_reflection_field_t **migration_target_field)
+{
+    while (context->node != context->patch->end)
+    {
+        // Ensure that we still need this section after migration.
+        kan_bool_t skip_section = KAN_TRUE;
+
+        if (context->node->section_suffix.parent_section_id == COMPILED_SECTION_ID_NONE ||
+            KAN_HANDLE_IS_VALID (context->sections[context->node->section_suffix.parent_section_id - 1u]))
+        {
+            *migration_node = migration_seed_query_struct (context->migrator_data->source_seed,
+                                                           context->node->section_suffix.source_field_struct->name);
+
+            if (*migration_node && (*migration_node)->seed.status != KAN_REFLECTION_MIGRATION_REMOVED)
+            {
+                const kan_instance_size_t source_field_index =
+                    (kan_instance_size_t) (context->node->section_suffix.source_field -
+                                           context->node->section_suffix.source_field_struct->fields);
+                *migration_target_field = (*migration_node)->seed.field_remap[source_field_index];
+
+                if (*migration_target_field)
+                {
+                    skip_section = KAN_FALSE;
+                }
+            }
+        }
+
+        if (skip_section)
+        {
+            patch_migration_increment_node (context);
+            while (context->node != context->patch->end && context->node->is_data_node)
+            {
+                patch_migration_increment_node (context);
+            }
+        }
+        else
+        {
+            break;
+        }
+    }
+}
+
+static void patch_migration_plain_section (struct patch_migration_context_t *context)
+{
+    // We think that this section hasn't changed at all. Just copy it then.
+    patch_migration_increment_node (context);
+
+    while (context->node != context->patch->end)
+    {
+        if (!context->node->is_data_node)
+        {
+            return;
+        }
+
+        kan_reflection_patch_builder_add_chunk (context->patch_builder, context->current_section,
+                                                context->node->data_suffix.offset, context->node->data_suffix.size,
+                                                context->node->data_suffix.data);
+        patch_migration_increment_node (context);
+    }
+}
+
+static void patch_migration_adapt_numeric_section (struct patch_migration_context_t *context,
+                                                   enum kan_reflection_archetype_t content_archetype,
+                                                   kan_instance_size_t source_item_size,
+                                                   kan_instance_size_t target_item_size)
+{
+    // We think that this a section of numbers that need to be adapted.
+    patch_migration_increment_node (context);
+
+    while (context->node != context->patch->end)
+    {
+        if (!context->node->is_data_node)
+        {
+            return;
+        }
+
+        const uint8_t *input = (const uint8_t *) context->node->data_suffix.data;
+        const uint8_t *end = input + context->node->data_suffix.size;
+        KAN_ASSERT (context->node->data_suffix.offset % source_item_size == 0u)
+        kan_instance_size_t output_offset = target_item_size * (context->node->data_suffix.offset / source_item_size);
+
+        while (input < end)
+        {
+            uint64_t buffer;
+            migrator_adapt_numeric (source_item_size, target_item_size, content_archetype, input, &buffer);
+
+            kan_reflection_patch_builder_add_chunk (context->patch_builder, context->current_section, output_offset,
+                                                    target_item_size, &buffer);
+
+            input += source_item_size;
+            output_offset += target_item_size;
+        }
+
+        patch_migration_increment_node (context);
+    }
+}
+
+static void patch_migration_adapt_enum_section (struct patch_migration_context_t *context,
+                                                struct enum_migration_node_t *migration_node)
+{
+    // We think that this a section of numbers that need to be adapted.
+    patch_migration_increment_node (context);
+
+    while (context->node != context->patch->end)
+    {
+        if (!context->node->is_data_node)
+        {
+            return;
+        }
+
+        const uint8_t *input = (const uint8_t *) context->node->data_suffix.data;
+        const uint8_t *end = input + context->node->data_suffix.size;
+
+        while (input < end)
+        {
+            int buffer;
+            migrator_adapt_enum_with_migration_node (context->migrator_data, migration_node, input, &buffer);
+
+            kan_reflection_patch_builder_add_chunk (
+                context->patch_builder, context->current_section,
+                context->node->data_suffix.offset +
+                    (kan_instance_size_t) (input - (const uint8_t *) context->node->data_suffix.data),
+                sizeof (int), &buffer);
+
+            input += sizeof (int);
+        }
+
+        patch_migration_increment_node (context);
+    }
+}
+
+static inline void patch_migration_context_shutdown (struct patch_migration_context_t *context)
+{
+    const kan_allocation_group_t group = get_compiled_patch_allocation_group ();
+    if (context->conditions != context->conditions_fixed)
+    {
+        kan_free_general (group, context->conditions,
+                          sizeof (enum patch_condition_status_t) * context->migrator_node->conditions_count);
+    }
+
+    if (context->nodes != context->nodes_fixed)
+    {
+        kan_free_general (group, context->nodes, sizeof (struct compiled_patch_node_t *) * context->patch->node_count);
+    }
+
+    if (context->sections != context->sections_fixed)
+    {
+        kan_free_general (group, context->sections,
+                          sizeof (kan_reflection_patch_builder_section_t) * context->patch->section_id_bound);
+    }
+}
 
 static void migrate_patch_task (kan_functor_user_data_t user_data)
 {
@@ -3845,164 +5024,134 @@ static void migrate_patch_task (kan_functor_user_data_t user_data)
     while (patch != data->patch_end)
     {
         struct compiled_patch_t *next = patch->next;
-        struct struct_migrator_node_t *migrator_node = migrator_query_struct (migrator_data, patch->type->name);
+        struct struct_migrator_node_t *migrator_node =
+            patch->type ? migrator_query_struct (migrator_data, patch->type->name) : NULL;
 
-        if (migrator_node)
+        if (migrator_node && patch->begin)
         {
-            struct compiled_patch_node_t *nodes_fixed[KAN_REFLECTION_MIGRATOR_PATCH_MAX_NODES];
-            struct compiled_patch_node_t **nodes = nodes_fixed;
+            struct patch_migration_context_t context;
+            patch_migration_context_init (&context, patch_builder, patch, migrator_data, migrator_node);
 
-            if (patch->node_count > KAN_REFLECTION_MIGRATOR_PATCH_MAX_NODES)
+            while (context.node != patch->end)
             {
-                nodes = kan_allocate_general (group, sizeof (struct compiled_patch_node_t *) * patch->node_count,
-                                              _Alignof (struct compiled_patch_node_t *));
-            }
-
-            enum patch_condition_status_t conditions_fixed[KAN_REFLECTION_MIGRATOR_MAX_CONDITIONS];
-            enum patch_condition_status_t *conditions = conditions_fixed;
-
-            if (migrator_node->conditions_count > KAN_REFLECTION_MIGRATOR_MAX_CONDITIONS)
-            {
-                conditions = kan_allocate_general (
-                    group, sizeof (enum patch_condition_status_t) * migrator_node->conditions_count,
-                    _Alignof (enum patch_condition_status_t));
-            }
-
-            for (kan_loop_size_t condition_index = 0u; condition_index < migrator_node->conditions_count;
-                 ++condition_index)
-            {
-                conditions[condition_index] = PATCH_CONDITION_STATUS_NOT_CALCULATED;
-            }
-
-            struct compiled_patch_node_t *node = patch->begin;
-            const struct compiled_patch_node_t *end = patch->end;
-            kan_instance_size_t node_index = 0u;
-
-            struct migrator_command_copy_t *copy_command = migrator_node->copy_commands;
-            const struct migrator_command_copy_t *copy_command_end =
-                migrator_node->copy_commands + migrator_node->copy_commands_count;
-
-            struct migrator_command_adapt_numeric_t *adapt_numeric_command = migrator_node->adapt_numeric_commands;
-            const struct migrator_command_adapt_numeric_t *adapt_numeric_command_end =
-                migrator_node->adapt_numeric_commands + migrator_node->adapt_numeric_commands_count;
-
-            struct migrator_command_adapt_enum_t *adapt_enum_command = migrator_node->adapt_enum_commands;
-            const struct migrator_command_adapt_enum_t *adapt_enum_command_end =
-                migrator_node->adapt_enum_commands + migrator_node->adapt_enum_commands_count;
-
-            while (node != end)
-            {
-                nodes[node_index] = node;
-                kan_instance_size_t offset = node->offset;
-
-                while (offset < (kan_instance_size_t) (node->size + node->offset))
+                if (patch_migration_data_step (&context))
                 {
-                    // Skip commands until we reach our address space. Also take care of conditions.
-                    while (
-                        copy_command != copy_command_end &&
-                        (copy_command->absolute_source_offset + copy_command->size < offset ||
-                         !patch_migration_evaluate_condition (copy_command->condition_index, migrator_node->conditions,
-                                                              conditions, node_index, nodes)))
+                    continue;
+                }
+
+                KAN_ASSERT (!context.node->is_data_node)
+                struct struct_migration_node_t *migration_node = NULL;
+                const struct kan_reflection_field_t *migration_target_field = NULL;
+                patch_migration_skip_sections_if_not_needed (&context, &migration_node, &migration_target_field);
+
+                if (context.node == patch->end)
+                {
+                    // Skipped to the end of the patch.
+                    break;
+                }
+
+                // Register new section.
+                context.current_section = kan_reflection_patch_builder_add_section (
+                    patch_builder,
+                    context.node->section_suffix.parent_section_id == COMPILED_SECTION_ID_NONE ?
+                        KAN_HANDLE_SET_INVALID (kan_reflection_patch_builder_section_t) :
+                        context.sections[context.node->section_suffix.parent_section_id - 1u],
+                    (enum kan_reflection_patch_section_type_t) context.node->section_suffix.packed_type,
+                    context.node->section_suffix.source_offset_in_parent -
+                        context.node->section_suffix.source_field->offset + migration_target_field->offset);
+                context.sections[context.node->section_suffix.my_section_id - 1u] = context.current_section;
+
+                // Query data needed to correctly processed the section.
+                enum kan_reflection_archetype_t content_archetype = KAN_REFLECTION_ARCHETYPE_SIGNED_INT;
+                kan_interned_string_t content_type_name = NULL;
+                // Only the item size might've been changed if migration is allowed.
+                kan_instance_size_t source_item_size = 0u;
+                kan_instance_size_t target_item_size = 0u;
+
+                switch ((enum kan_reflection_patch_section_type_t) context.node->section_suffix.packed_type)
+                {
+                case KAN_REFLECTION_PATCH_SECTION_TYPE_DYNAMIC_ARRAY_SET:
+                case KAN_REFLECTION_PATCH_SECTION_TYPE_DYNAMIC_ARRAY_APPEND:
+                {
+                    content_archetype = migration_target_field->archetype_dynamic_array.item_archetype;
+                    if (content_archetype == KAN_REFLECTION_ARCHETYPE_STRUCT)
                     {
-                        ++copy_command;
+                        content_type_name =
+                            migration_target_field->archetype_dynamic_array.item_archetype_struct.type_name;
+                    }
+                    else if (content_archetype == KAN_REFLECTION_ARCHETYPE_ENUM)
+                    {
+                        content_type_name =
+                            migration_target_field->archetype_dynamic_array.item_archetype_enum.type_name;
                     }
 
-                    while (
-                        adapt_numeric_command != adapt_numeric_command_end &&
-                        (adapt_numeric_command->absolute_source_offset + adapt_numeric_command->source_size < offset ||
-                         !patch_migration_evaluate_condition (adapt_numeric_command->condition_index,
-                                                              migrator_node->conditions, conditions, node_index,
-                                                              nodes)))
-                    {
-                        ++adapt_numeric_command;
-                    }
+                    source_item_size = context.node->section_suffix.source_field->archetype_dynamic_array.item_size;
+                    target_item_size = migration_target_field->archetype_dynamic_array.item_size;
+                    break;
+                }
+                }
 
-                    while (adapt_enum_command != adapt_enum_command_end &&
-                           (adapt_enum_command->absolute_source_offset + sizeof (int) < offset ||
-                            !patch_migration_evaluate_condition (adapt_enum_command->condition_index,
-                                                                 migrator_node->conditions, conditions, node_index,
-                                                                 nodes)))
+                switch (content_archetype)
+                {
+                case KAN_REFLECTION_ARCHETYPE_SIGNED_INT:
+                case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
+                case KAN_REFLECTION_ARCHETYPE_FLOATING:
+                    if (source_item_size == target_item_size)
                     {
-                        ++adapt_enum_command;
-                    }
-
-                    if (copy_command != copy_command_end && offset >= copy_command->absolute_source_offset &&
-                        offset < copy_command->absolute_source_offset + copy_command->size)
-                    {
-                        const kan_instance_size_t offset_from_source = offset - copy_command->absolute_source_offset;
-                        const kan_instance_size_t size = copy_command->size - offset_from_source;
-
-                        kan_reflection_patch_builder_add_chunk (
-                            patch_builder, copy_command->absolute_target_offset + offset_from_source,
-                            copy_command->size - offset_from_source, node->data + (offset - node->offset));
-                        offset += size;
-                        ++copy_command;
-                    }
-                    else if (adapt_numeric_command != adapt_numeric_command_end &&
-                             offset == adapt_numeric_command->absolute_source_offset)
-                    {
-                        uint64_t output_buffer;
-                        migrator_adapt_numeric (adapt_numeric_command->source_size, adapt_numeric_command->target_size,
-                                                adapt_numeric_command->archetype, node->data + (offset - node->offset),
-                                                &output_buffer);
-
-                        kan_reflection_patch_builder_add_chunk (patch_builder,
-                                                                adapt_numeric_command->absolute_target_offset,
-                                                                adapt_numeric_command->target_size, &output_buffer);
-                        offset += adapt_numeric_command->source_size;
-                        ++adapt_numeric_command;
-                    }
-                    else if (adapt_enum_command != adapt_enum_command_end &&
-                             offset == adapt_enum_command->absolute_source_offset)
-                    {
-                        int output_buffer;
-                        migrator_adapt_enum (migrator_data, adapt_enum_command->type_name,
-                                             node->data + (offset - node->offset), &output_buffer);
-
-                        kan_reflection_patch_builder_add_chunk (
-                            patch_builder, adapt_enum_command->absolute_target_offset, sizeof (int), &output_buffer);
-                        offset += sizeof (int);
-                        ++adapt_enum_command;
+                        patch_migration_plain_section (&context);
                     }
                     else
                     {
-                        // Partition is absent in target registry and therefore should be dropped.
-                        // Move offset to the first next command.
-
-                        const kan_instance_size_t copy_offset =
-                            copy_command != copy_command_end ? copy_command->absolute_source_offset : patch->type->size;
-
-                        const kan_instance_size_t adapt_numeric_offset =
-                            adapt_numeric_command != adapt_numeric_command_end ?
-                                adapt_numeric_command->absolute_source_offset :
-                                patch->type->size;
-
-                        const kan_instance_size_t adapt_enum_offset = adapt_enum_command != adapt_enum_command_end ?
-                                                                          adapt_enum_command->absolute_source_offset :
-                                                                          patch->type->size;
-
-                        offset = KAN_MIN (copy_offset, KAN_MIN (adapt_numeric_offset, adapt_enum_offset));
+                        patch_migration_adapt_numeric_section (&context, content_archetype, source_item_size,
+                                                               target_item_size);
                     }
+
+                    break;
+
+                case KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL:
+                case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:
+                case KAN_REFLECTION_ARCHETYPE_PATCH:
+                    KAN_ASSERT (source_item_size == target_item_size)
+                    patch_migration_plain_section (&context);
+                    break;
+
+                case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
+                case KAN_REFLECTION_ARCHETYPE_EXTERNAL_POINTER:
+                case KAN_REFLECTION_ARCHETYPE_STRUCT_POINTER:
+                case KAN_REFLECTION_ARCHETYPE_INLINE_ARRAY:
+                case KAN_REFLECTION_ARCHETYPE_DYNAMIC_ARRAY:
+                    // Cannot be content of sections. Broken patch?
+                    KAN_ASSERT (KAN_FALSE)
+                    break;
+
+                case KAN_REFLECTION_ARCHETYPE_ENUM:
+                {
+                    KAN_ASSERT (source_item_size == target_item_size)
+                    struct enum_migration_node_t *enum_migration_node =
+                        migration_seed_query_enum (migrator_data->source_seed, content_type_name);
+
+                    if (enum_migration_node->seed.status == KAN_REFLECTION_MIGRATION_NEEDED)
+                    {
+                        patch_migration_adapt_enum_section (&context, enum_migration_node);
+                    }
+                    else
+                    {
+                        patch_migration_plain_section (&context);
+                    }
+
+                    break;
                 }
 
-                uint8_t *data_end = node->data + node->size;
-                data_end = (uint8_t *) kan_apply_alignment ((kan_memory_size_t) data_end,
-                                                            _Alignof (struct compiled_patch_node_t));
-                node = (struct compiled_patch_node_t *) data_end;
-                ++node_index;
+                case KAN_REFLECTION_ARCHETYPE_STRUCT:
+                {
+                    patch_migration_context_switch_to_struct (&context, content_type_name);
+                    patch_migration_increment_node (&context);
+                    break;
+                }
+                }
             }
 
-            if (conditions != conditions_fixed)
-            {
-                kan_free_general (group, conditions,
-                                  sizeof (enum patch_condition_status_t) * migrator_node->conditions_count);
-            }
-
-            if (nodes != nodes_fixed)
-            {
-                kan_free_general (group, nodes, sizeof (struct compiled_patch_node_t *) * patch->node_count);
-            }
-
+            patch_migration_context_shutdown (&context);
             // Destroy old nodes.
             kan_free_general (group, patch->begin, ((uint8_t *) patch->end) - (uint8_t *) patch->begin);
 
@@ -4013,13 +5162,32 @@ static void migrate_patch_task (kan_functor_user_data_t user_data)
             {
                 KAN_LOG (reflection_migrator, KAN_LOG_ERROR, "Failed to migrate patch under address %p.",
                          (void *) patch)
-                kan_free_batched (get_compiled_patch_allocation_group (), patch);
+
+                // Cannot just delete it as it still can be referenced somewhere.
+                patch->type = NULL;
+                patch->begin = NULL;
+                patch->end = NULL;
+
+                // Still need to add to registry as it can be referenced until it is destroyed.
+                compiled_patch_add_to_registry (patch, target_registry_data);
             }
         }
         else
         {
-            // Type is deleted, therefore patch should be destroyed too.
-            compiled_patch_destroy (patch);
+            // Type is deleted, therefore patch its data should be invalidated.
+            // We cannot delete it right away as it can still be references somewhere.
+
+            if (patch->begin)
+            {
+                kan_free_general (group, patch->begin, ((uint8_t *) patch->end) - (uint8_t *) patch->begin);
+            }
+
+            patch->type = NULL;
+            patch->begin = NULL;
+            patch->end = NULL;
+
+            // Still need to add to registry as it can be referenced until it is destroyed.
+            compiled_patch_add_to_registry (patch, target_registry_data);
         }
 
         patch = next;

@@ -128,14 +128,16 @@ struct kan_resource_pipeline_reference_type_info_storage_t
     /// \meta reflection_ignore_struct_field
     struct kan_hash_storage_t scanned_types;
 
+    kan_reflection_registry_t registry;
+
     kan_allocation_group_t scanned_allocation_group;
 };
 
 /// \brief Builds reference type info storage from given registry, allocating it in given allocation group.
 RESOURCE_PIPELINE_API void kan_resource_pipeline_reference_type_info_storage_build (
     struct kan_resource_pipeline_reference_type_info_storage_t *storage,
-    kan_allocation_group_t allocation_group,
-    kan_reflection_registry_t registry);
+    kan_reflection_registry_t registry,
+    kan_allocation_group_t allocation_group);
 
 /// \brief Queries resource type info node for particular type.
 RESOURCE_PIPELINE_API const struct kan_resource_pipeline_reference_type_info_node_t *
