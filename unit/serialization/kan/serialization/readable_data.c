@@ -798,6 +798,7 @@ static inline kan_bool_t read_elemental_setter_into_array_element (struct reader
                                        array_address);
 
     case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
+    case KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL:
         return ensure_setter_single_value (parsed_event) &&
                read_to_unsigned_integer (reader_state, parsed_event, parsed_event->setter_value_first, item_size,
                                          array_address);
@@ -860,6 +861,7 @@ static inline kan_bool_t read_elemental_setter_node_into_packed_array (
         return read_to_signed_integer (reader_state, parsed_event, node, item_size, output);
 
     case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
+    case KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL:
         return read_to_unsigned_integer (reader_state, parsed_event, node, item_size, output);
 
     case KAN_REFLECTION_ARCHETYPE_FLOATING:
@@ -1062,6 +1064,7 @@ static inline kan_bool_t read_elemental_setter (struct reader_state_t *reader_st
         return KAN_TRUE;
 
     case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
+    case KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL:
         if (!ensure_setter_single_value (parsed_event) || !ensure_output_target_is_not_array_element (parsed_event) ||
             !read_to_unsigned_integer (reader_state, parsed_event, parsed_event->setter_value_first, field->size,
                                        address))
@@ -1496,6 +1499,7 @@ static inline kan_bool_t read_structural_setter (struct reader_state_t *reader_s
     case KAN_REFLECTION_ARCHETYPE_SIGNED_INT:
     case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
     case KAN_REFLECTION_ARCHETYPE_FLOATING:
+    case KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL:
     case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
     case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:
     case KAN_REFLECTION_ARCHETYPE_ENUM:
@@ -1558,6 +1562,7 @@ static inline kan_bool_t read_structural_setter (struct reader_state_t *reader_s
         case KAN_REFLECTION_ARCHETYPE_SIGNED_INT:
         case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
         case KAN_REFLECTION_ARCHETYPE_FLOATING:
+        case KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL:
         case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
         case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:
         case KAN_REFLECTION_ARCHETYPE_ENUM:
@@ -1685,6 +1690,7 @@ static inline kan_bool_t read_structural_setter (struct reader_state_t *reader_s
         case KAN_REFLECTION_ARCHETYPE_SIGNED_INT:
         case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
         case KAN_REFLECTION_ARCHETYPE_FLOATING:
+        case KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL:
         case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
         case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:
         case KAN_REFLECTION_ARCHETYPE_ENUM:
@@ -1934,6 +1940,7 @@ static inline kan_bool_t read_array_appender (struct reader_state_t *reader_stat
     case KAN_REFLECTION_ARCHETYPE_SIGNED_INT:
     case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
     case KAN_REFLECTION_ARCHETYPE_FLOATING:
+    case KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL:
     case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
     case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:
     case KAN_REFLECTION_ARCHETYPE_ENUM:
@@ -2522,6 +2529,7 @@ static inline kan_bool_t can_pack_array (enum kan_reflection_archetype_t archety
     case KAN_REFLECTION_ARCHETYPE_SIGNED_INT:
     case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
     case KAN_REFLECTION_ARCHETYPE_FLOATING:
+    case KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL:
     case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
     case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:
         return KAN_TRUE;
@@ -2582,6 +2590,7 @@ static inline kan_bool_t write_packed_array (struct writer_state_t *writer_state
         return kan_readable_data_emitter_step (writer_state->emitter, &event);
 
     case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
+    case KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL:
         event.type = KAN_READABLE_DATA_EVENT_ELEMENTAL_INTEGER_SETTER;
 
         while (begin < end)
@@ -2670,6 +2679,7 @@ static inline kan_bool_t writer_step_struct (struct writer_state_t *writer_state
                writer_struct_block_state_advance (top_state);
 
     case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
+    case KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL:
         return emit_single_unsigned_integer_setter (writer_state, current_field->name,
                                                     KAN_READABLE_DATA_ARRAY_INDEX_NONE, current_field->size, address) &&
                writer_struct_block_state_advance (top_state);
@@ -2732,6 +2742,7 @@ static inline kan_bool_t writer_step_struct (struct writer_state_t *writer_state
                                                           array_address);
 
             case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
+            case KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL:
                 return emit_single_unsigned_integer_setter (writer_state, current_field->name, index_to_write,
                                                             current_field->archetype_inline_array.item_size,
                                                             array_address);
@@ -2812,6 +2823,7 @@ static inline kan_bool_t writer_step_struct (struct writer_state_t *writer_state
                                                           dynamic_array->item_size, array_address);
 
             case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
+            case KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL:
                 return emit_single_unsigned_integer_setter (writer_state, current_field->name, index_to_write,
                                                             dynamic_array->item_size, array_address);
 
@@ -2961,6 +2973,7 @@ static const struct kan_reflection_field_t *open_patch_section_source_field (
             case KAN_REFLECTION_ARCHETYPE_SIGNED_INT:
             case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
             case KAN_REFLECTION_ARCHETYPE_FLOATING:
+            case KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL:
             case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
             case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:
             case KAN_REFLECTION_ARCHETYPE_ENUM:
@@ -3115,6 +3128,7 @@ static inline kan_bool_t writer_step_patch_sub_struct (struct writer_state_t *wr
                writer_patch_sub_struct_block_state_advance (top_state);
 
     case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
+    case KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL:
         KAN_ASSERT (current_field->offset >= top_state->patch_sub_struct_state.scope_begin)
         KAN_ASSERT (current_field->offset + current_field->size <= top_state->patch_sub_struct_state.scope_end)
         return emit_single_unsigned_integer_setter (writer_state, current_field->name,
@@ -3205,6 +3219,7 @@ static inline kan_bool_t writer_step_patch_sub_struct (struct writer_state_t *wr
                                                           array_address);
 
             case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
+            case KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL:
                 return emit_single_unsigned_integer_setter (writer_state, current_field->name, index_to_write,
                                                             current_field->archetype_inline_array.item_size,
                                                             array_address);
@@ -3409,6 +3424,7 @@ static inline kan_bool_t writer_step_patch (struct writer_state_t *writer_state,
                 case KAN_REFLECTION_ARCHETYPE_SIGNED_INT:
                 case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
                 case KAN_REFLECTION_ARCHETYPE_FLOATING:
+                case KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL:
                 case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
                 case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:
                 case KAN_REFLECTION_ARCHETYPE_EXTERNAL_POINTER:
@@ -3464,6 +3480,7 @@ static inline kan_bool_t writer_step_patch (struct writer_state_t *writer_state,
                 break;
 
             case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
+            case KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL:
                 KAN_ASSERT (top_section->type == KAN_REFLECTION_PATCH_SECTION_TYPE_DYNAMIC_ARRAY_SET)
                 EMIT_ELEMENTAL (unsigned_integer)
                 break;

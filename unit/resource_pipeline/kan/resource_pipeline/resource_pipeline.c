@@ -145,6 +145,7 @@ kan_resource_pipeline_type_info_storage_get_or_create_node (
         case KAN_REFLECTION_ARCHETYPE_SIGNED_INT:
         case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
         case KAN_REFLECTION_ARCHETYPE_FLOATING:
+        case KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL:
         case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
         case KAN_REFLECTION_ARCHETYPE_ENUM:
         case KAN_REFLECTION_ARCHETYPE_EXTERNAL_POINTER:
@@ -172,6 +173,7 @@ kan_resource_pipeline_type_info_storage_get_or_create_node (
             case KAN_REFLECTION_ARCHETYPE_SIGNED_INT:
             case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
             case KAN_REFLECTION_ARCHETYPE_FLOATING:
+            case KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL:
             case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
             case KAN_REFLECTION_ARCHETYPE_ENUM:
             case KAN_REFLECTION_ARCHETYPE_EXTERNAL_POINTER:
@@ -208,6 +210,7 @@ kan_resource_pipeline_type_info_storage_get_or_create_node (
             case KAN_REFLECTION_ARCHETYPE_SIGNED_INT:
             case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
             case KAN_REFLECTION_ARCHETYPE_FLOATING:
+            case KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL:
             case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
             case KAN_REFLECTION_ARCHETYPE_ENUM:
             case KAN_REFLECTION_ARCHETYPE_EXTERNAL_POINTER:
@@ -532,6 +535,7 @@ static inline kan_instance_size_t extract_inline_array_size (const void *struct_
             break;
 
         case KAN_REFLECTION_ARCHETYPE_FLOATING:
+        case KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL:
         case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
         case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:
         case KAN_REFLECTION_ARCHETYPE_ENUM:
@@ -590,6 +594,7 @@ static void kan_resource_pipeline_detect_inside_data_chunk_for_struct_instance (
         case KAN_REFLECTION_ARCHETYPE_SIGNED_INT:
         case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
         case KAN_REFLECTION_ARCHETYPE_FLOATING:
+        case KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL:
         case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
         case KAN_REFLECTION_ARCHETYPE_ENUM:
         case KAN_REFLECTION_ARCHETYPE_EXTERNAL_POINTER:
@@ -629,6 +634,7 @@ static void kan_resource_pipeline_detect_inside_data_chunk_for_struct_instance (
             case KAN_REFLECTION_ARCHETYPE_SIGNED_INT:
             case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
             case KAN_REFLECTION_ARCHETYPE_FLOATING:
+            case KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL:
             case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
             case KAN_REFLECTION_ARCHETYPE_ENUM:
             case KAN_REFLECTION_ARCHETYPE_EXTERNAL_POINTER:
@@ -730,6 +736,7 @@ static inline void kan_resource_pipeline_detect_inside_patch (
                     case KAN_REFLECTION_ARCHETYPE_SIGNED_INT:
                     case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
                     case KAN_REFLECTION_ARCHETYPE_FLOATING:
+                    case KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL:
                     case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
                     case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:
                     case KAN_REFLECTION_ARCHETYPE_EXTERNAL_POINTER:
@@ -761,6 +768,7 @@ static inline void kan_resource_pipeline_detect_inside_patch (
                     case KAN_REFLECTION_ARCHETYPE_SIGNED_INT:
                     case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
                     case KAN_REFLECTION_ARCHETYPE_FLOATING:
+                    case KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL:
                     case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
                     case KAN_REFLECTION_ARCHETYPE_ENUM:
                     case KAN_REFLECTION_ARCHETYPE_EXTERNAL_POINTER:
@@ -930,6 +938,7 @@ void kan_resource_pipeline_detect_references (
             case KAN_REFLECTION_ARCHETYPE_SIGNED_INT:
             case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
             case KAN_REFLECTION_ARCHETYPE_FLOATING:
+            case KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL:
             case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
             case KAN_REFLECTION_ARCHETYPE_ENUM:
             case KAN_REFLECTION_ARCHETYPE_EXTERNAL_POINTER:
@@ -982,6 +991,7 @@ void kan_resource_pipeline_detect_references (
             case KAN_REFLECTION_ARCHETYPE_SIGNED_INT:
             case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
             case KAN_REFLECTION_ARCHETYPE_FLOATING:
+            case KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL:
             case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
             case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:
             case KAN_REFLECTION_ARCHETYPE_ENUM:
@@ -1003,6 +1013,7 @@ void kan_resource_pipeline_detect_references (
                 case KAN_REFLECTION_ARCHETYPE_SIGNED_INT:
                 case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
                 case KAN_REFLECTION_ARCHETYPE_FLOATING:
+                case KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL:
                 case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
                 case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:
                 case KAN_REFLECTION_ARCHETYPE_ENUM:
@@ -1045,6 +1056,7 @@ void kan_resource_pipeline_detect_references (
                 case KAN_REFLECTION_ARCHETYPE_SIGNED_INT:
                 case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
                 case KAN_REFLECTION_ARCHETYPE_FLOATING:
+                case KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL:
                 case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
                 case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:
                 case KAN_REFLECTION_ARCHETYPE_ENUM:

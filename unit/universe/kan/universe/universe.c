@@ -1585,15 +1585,15 @@ static void universe_fill_api_storages (struct universe_t *universe)
             if (scheduler_node->api.deploy->arguments_count == 4u)
             {
                 passing_signature &=
-                    scheduler_node->api.deploy->arguments[0u].archetype == KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT &&
+                    scheduler_node->api.deploy->arguments[0u].archetype == KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL &&
                     scheduler_node->api.deploy->arguments[0u].size == sizeof (kan_universe_t);
 
                 passing_signature &=
-                    scheduler_node->api.deploy->arguments[1u].archetype == KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT &&
+                    scheduler_node->api.deploy->arguments[1u].archetype == KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL &&
                     scheduler_node->api.deploy->arguments[1u].size == sizeof (kan_universe_world_t);
 
                 passing_signature &=
-                    scheduler_node->api.deploy->arguments[2u].archetype == KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT &&
+                    scheduler_node->api.deploy->arguments[2u].archetype == KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL &&
                     scheduler_node->api.deploy->arguments[2u].size == sizeof (kan_repository_t);
 
                 passing_signature &=
@@ -1623,7 +1623,7 @@ static void universe_fill_api_storages (struct universe_t *universe)
             if (scheduler_node->api.execute->arguments_count == 2u)
             {
                 passing_signature &=
-                    scheduler_node->api.execute->arguments[0u].archetype == KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT &&
+                    scheduler_node->api.execute->arguments[0u].archetype == KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL &&
                     scheduler_node->api.execute->arguments[0u].size == sizeof (kan_universe_scheduler_interface_t);
 
                 passing_signature &=
@@ -1741,19 +1741,19 @@ static void universe_fill_api_storages (struct universe_t *universe)
             if (mutator_node->api.deploy->arguments_count == 5u)
             {
                 passing_signature &=
-                    mutator_node->api.deploy->arguments[0u].archetype == KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT &&
+                    mutator_node->api.deploy->arguments[0u].archetype == KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL &&
                     mutator_node->api.deploy->arguments[0u].size == sizeof (kan_universe_t);
 
                 passing_signature &=
-                    mutator_node->api.deploy->arguments[1u].archetype == KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT &&
+                    mutator_node->api.deploy->arguments[1u].archetype == KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL &&
                     mutator_node->api.deploy->arguments[1u].size == sizeof (kan_universe_world_t);
 
                 passing_signature &=
-                    mutator_node->api.deploy->arguments[2u].archetype == KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT &&
+                    mutator_node->api.deploy->arguments[2u].archetype == KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL &&
                     mutator_node->api.deploy->arguments[2u].size == sizeof (kan_repository_t);
 
                 passing_signature &=
-                    mutator_node->api.deploy->arguments[3u].archetype == KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT &&
+                    mutator_node->api.deploy->arguments[3u].archetype == KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL &&
                     mutator_node->api.deploy->arguments[3u].size == sizeof (kan_workflow_graph_node_t);
 
                 passing_signature &=
@@ -1783,7 +1783,7 @@ static void universe_fill_api_storages (struct universe_t *universe)
             if (mutator_node->api.execute->arguments_count == 2u)
             {
                 passing_signature &=
-                    mutator_node->api.execute->arguments[0u].archetype == KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT &&
+                    mutator_node->api.execute->arguments[0u].archetype == KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL &&
                     mutator_node->api.execute->arguments[0u].size == sizeof (kan_cpu_job_t);
 
                 passing_signature &=

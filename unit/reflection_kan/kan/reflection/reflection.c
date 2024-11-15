@@ -583,6 +583,7 @@ kan_bool_t kan_reflection_registry_add_struct (kan_reflection_registry_t registr
             break;
 
         case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
+        case KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL:
             KAN_ASSERT (field_reflection->size == sizeof (uint8_t) || field_reflection->size == sizeof (uint16_t) ||
                         field_reflection->size == sizeof (uint32_t) || field_reflection->size == sizeof (uint64_t))
             break;
@@ -691,6 +692,7 @@ static inline void reflection_function_validate_archetype (enum kan_reflection_a
         break;
 
     case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
+    case KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL:
         KAN_ASSERT (size == sizeof (uint8_t) || size == sizeof (uint16_t) || size == sizeof (uint32_t) ||
                     size == sizeof (uint64_t))
         break;
@@ -1274,6 +1276,7 @@ const struct kan_reflection_field_t *kan_reflection_registry_query_local_field (
             case KAN_REFLECTION_ARCHETYPE_SIGNED_INT:
             case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
             case KAN_REFLECTION_ARCHETYPE_FLOATING:
+            case KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL:
             case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
             case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:
             case KAN_REFLECTION_ARCHETYPE_ENUM:
@@ -1348,6 +1351,7 @@ const struct kan_reflection_field_t *kan_reflection_registry_query_local_field_b
             case KAN_REFLECTION_ARCHETYPE_SIGNED_INT:
             case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
             case KAN_REFLECTION_ARCHETYPE_FLOATING:
+            case KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL:
             case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
             case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:
             case KAN_REFLECTION_ARCHETYPE_ENUM:
@@ -1377,6 +1381,7 @@ const struct kan_reflection_field_t *kan_reflection_registry_query_local_field_b
                 case KAN_REFLECTION_ARCHETYPE_SIGNED_INT:
                 case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
                 case KAN_REFLECTION_ARCHETYPE_FLOATING:
+                case KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL:
                 case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
                 case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:
                 case KAN_REFLECTION_ARCHETYPE_ENUM:
@@ -1812,6 +1817,7 @@ static void validate_compiled_node_internal (kan_instance_size_t adjusted_node_o
         case KAN_REFLECTION_ARCHETYPE_SIGNED_INT:
         case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
         case KAN_REFLECTION_ARCHETYPE_FLOATING:
+        case KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL:
         case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:
         case KAN_REFLECTION_ARCHETYPE_ENUM:
             // Supported archetype.
@@ -1830,6 +1836,7 @@ static void validate_compiled_node_internal (kan_instance_size_t adjusted_node_o
             case KAN_REFLECTION_ARCHETYPE_SIGNED_INT:
             case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
             case KAN_REFLECTION_ARCHETYPE_FLOATING:
+            case KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL:
             case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:
             case KAN_REFLECTION_ARCHETYPE_ENUM:
                 // Supported archetype.
@@ -2800,6 +2807,7 @@ static struct struct_migration_node_t *migration_seed_add_struct (
                         case KAN_REFLECTION_ARCHETYPE_SIGNED_INT:
                         case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
                         case KAN_REFLECTION_ARCHETYPE_FLOATING:
+                        case KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL:
                         case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
                         case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:
                         case KAN_REFLECTION_ARCHETYPE_EXTERNAL_POINTER:
@@ -2830,6 +2838,7 @@ static struct struct_migration_node_t *migration_seed_add_struct (
                                 case KAN_REFLECTION_ARCHETYPE_SIGNED_INT:
                                 case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
                                 case KAN_REFLECTION_ARCHETYPE_FLOATING:
+                                case KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL:
                                 case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
                                 case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:
                                 case KAN_REFLECTION_ARCHETYPE_EXTERNAL_POINTER:
@@ -2880,6 +2889,7 @@ static struct struct_migration_node_t *migration_seed_add_struct (
                                 case KAN_REFLECTION_ARCHETYPE_SIGNED_INT:
                                 case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
                                 case KAN_REFLECTION_ARCHETYPE_FLOATING:
+                                case KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL:
                                 case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
                                 case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:
                                 case KAN_REFLECTION_ARCHETYPE_EXTERNAL_POINTER:
@@ -3589,6 +3599,7 @@ static struct struct_migrator_node_t *migrator_add_struct (struct migrator_t *mi
                                            algorithm_allocator, &queues);
             break;
 
+        case KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL:
         case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
         case KAN_REFLECTION_ARCHETYPE_EXTERNAL_POINTER:
         case KAN_REFLECTION_ARCHETYPE_STRUCT_POINTER:
@@ -3648,6 +3659,7 @@ static struct struct_migrator_node_t *migrator_add_struct (struct migrator_t *mi
                                                    algorithm_allocator, &queues);
                     break;
 
+                case KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL:
                 case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
                 case KAN_REFLECTION_ARCHETYPE_EXTERNAL_POINTER:
                 case KAN_REFLECTION_ARCHETYPE_STRUCT_POINTER:
@@ -3703,11 +3715,14 @@ static struct struct_migrator_node_t *migrator_add_struct (struct migrator_t *mi
                     source_field->archetype_dynamic_array.item_size == target_field->archetype_dynamic_array.item_size;
                 break;
 
+            case KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL:
             case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
             case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:
             case KAN_REFLECTION_ARCHETYPE_EXTERNAL_POINTER:
             case KAN_REFLECTION_ARCHETYPE_STRUCT_POINTER:
             case KAN_REFLECTION_ARCHETYPE_PATCH:
+                KAN_ASSERT (source_field->archetype_dynamic_array.item_size ==
+                            target_field->archetype_dynamic_array.item_size)
                 can_copy = KAN_TRUE;
                 break;
 
@@ -4119,6 +4134,7 @@ static void migrator_adapt_numeric (kan_instance_size_t source_size,
         }
         break;
 
+    case KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL:
     case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
     case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:
     case KAN_REFLECTION_ARCHETYPE_ENUM:
@@ -4285,6 +4301,7 @@ static void migrator_adapt_dynamic_array (kan_reflection_struct_migrator_t migra
             break;
 
             // Archetypes below do not need any adaptation, therefore this command should not be issued.
+        case KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL:
         case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
         case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:
         case KAN_REFLECTION_ARCHETYPE_EXTERNAL_POINTER:
@@ -5091,6 +5108,13 @@ static void migrate_patch_task (kan_functor_user_data_t user_data)
 
                     break;
 
+                case KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL:
+                case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:
+                case KAN_REFLECTION_ARCHETYPE_PATCH:
+                    KAN_ASSERT (source_item_size == target_item_size)
+                    patch_migration_plain_section (&context);
+                    break;
+
                 case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
                 case KAN_REFLECTION_ARCHETYPE_EXTERNAL_POINTER:
                 case KAN_REFLECTION_ARCHETYPE_STRUCT_POINTER:
@@ -5098,12 +5122,6 @@ static void migrate_patch_task (kan_functor_user_data_t user_data)
                 case KAN_REFLECTION_ARCHETYPE_DYNAMIC_ARRAY:
                     // Cannot be content of sections. Broken patch?
                     KAN_ASSERT (KAN_FALSE)
-                    break;
-
-                case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:
-                case KAN_REFLECTION_ARCHETYPE_PATCH:
-                    KAN_ASSERT (source_item_size == target_item_size)
-                    patch_migration_plain_section (&context);
                     break;
 
                 case KAN_REFLECTION_ARCHETYPE_ENUM:

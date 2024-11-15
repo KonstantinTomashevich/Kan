@@ -635,6 +635,7 @@ static inline void add_field_to_commands (struct generation_temporary_state_t *s
     case KAN_REFLECTION_ARCHETYPE_SIGNED_INT:
     case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
     case KAN_REFLECTION_ARCHETYPE_FLOATING:
+    case KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL:
     case KAN_REFLECTION_ARCHETYPE_ENUM:
         add_command (state,
                      build_block_command (condition_index, (script_size_t) field->offset, (script_size_t) field->size));
@@ -658,6 +659,7 @@ static inline void add_field_to_commands (struct generation_temporary_state_t *s
         case KAN_REFLECTION_ARCHETYPE_SIGNED_INT:
         case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
         case KAN_REFLECTION_ARCHETYPE_FLOATING:
+        case KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL:
         case KAN_REFLECTION_ARCHETYPE_ENUM:
             add_command (state, build_block_command (condition_index, (script_size_t) field->offset,
                                                      (script_size_t) (field->archetype_inline_array.item_size *
@@ -735,6 +737,7 @@ static inline void add_field_to_commands (struct generation_temporary_state_t *s
         case KAN_REFLECTION_ARCHETYPE_SIGNED_INT:
         case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
         case KAN_REFLECTION_ARCHETYPE_FLOATING:
+        case KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL:
         case KAN_REFLECTION_ARCHETYPE_ENUM:
             add_command (state,
                          build_block_dynamic_array_command (condition_index, (script_size_t) field->offset,
@@ -1132,6 +1135,7 @@ static void script_storage_ensure_interned_string_lookup_generated (struct scrip
                 case KAN_REFLECTION_ARCHETYPE_SIGNED_INT:
                 case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
                 case KAN_REFLECTION_ARCHETYPE_FLOATING:
+                case KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL:
                 case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
                 case KAN_REFLECTION_ARCHETYPE_ENUM:
                 case KAN_REFLECTION_ARCHETYPE_EXTERNAL_POINTER:
@@ -1147,6 +1151,7 @@ static void script_storage_ensure_interned_string_lookup_generated (struct scrip
             case KAN_REFLECTION_ARCHETYPE_SIGNED_INT:
             case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
             case KAN_REFLECTION_ARCHETYPE_FLOATING:
+            case KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL:
             case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
             case KAN_REFLECTION_ARCHETYPE_ENUM:
             case KAN_REFLECTION_ARCHETYPE_EXTERNAL_POINTER:
@@ -1198,6 +1203,7 @@ static void script_storage_ensure_interned_string_lookup_generated (struct scrip
             case KAN_REFLECTION_ARCHETYPE_SIGNED_INT:
             case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
             case KAN_REFLECTION_ARCHETYPE_FLOATING:
+            case KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL:
             case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
             case KAN_REFLECTION_ARCHETYPE_ENUM:
             case KAN_REFLECTION_ARCHETYPE_EXTERNAL_POINTER:
@@ -1213,6 +1219,7 @@ static void script_storage_ensure_interned_string_lookup_generated (struct scrip
         case KAN_REFLECTION_ARCHETYPE_SIGNED_INT:
         case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
         case KAN_REFLECTION_ARCHETYPE_FLOATING:
+        case KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL:
         case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
         case KAN_REFLECTION_ARCHETYPE_ENUM:
         case KAN_REFLECTION_ARCHETYPE_EXTERNAL_POINTER:

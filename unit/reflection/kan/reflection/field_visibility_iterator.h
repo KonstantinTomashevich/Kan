@@ -81,6 +81,7 @@ static inline kan_bool_t kan_reflection_check_visibility (
             break;
 
         case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
+        case KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL:
             switch (visibility_condition_field->size)
             {
             case 1u:

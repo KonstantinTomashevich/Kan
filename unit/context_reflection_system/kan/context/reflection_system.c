@@ -322,9 +322,9 @@ static void add_to_reflection_generators_if_needed (kan_reflection_registry_t re
         if (node->iterate_function->arguments_count != 4u ||
             node->iterate_function->arguments[0u].archetype != KAN_REFLECTION_ARCHETYPE_STRUCT_POINTER ||
             node->iterate_function->arguments[0u].archetype_struct_pointer.type_name != type->name ||
-            node->iterate_function->arguments[1u].archetype != KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT ||
+            node->iterate_function->arguments[1u].archetype != KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL ||
             node->iterate_function->arguments[1u].size != sizeof (void *) ||
-            node->iterate_function->arguments[2u].archetype != KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT ||
+            node->iterate_function->arguments[2u].archetype != KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL ||
             node->iterate_function->arguments[2u].size != sizeof (void *) ||
             node->iterate_function->arguments[3u].archetype != KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT ||
             node->iterate_function->arguments[3u].size != sizeof (kan_loop_size_t))
@@ -342,7 +342,7 @@ static void add_to_reflection_generators_if_needed (kan_reflection_registry_t re
         if (node->finalize_function->arguments_count != 2u ||
             node->finalize_function->arguments[0u].archetype != KAN_REFLECTION_ARCHETYPE_STRUCT_POINTER ||
             node->finalize_function->arguments[0u].archetype_struct_pointer.type_name != type->name ||
-            node->finalize_function->arguments[1u].archetype != KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT ||
+            node->finalize_function->arguments[1u].archetype != KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL ||
             node->finalize_function->arguments[1u].size != sizeof (void *))
         {
             KAN_LOG (reflection_system, KAN_LOG_ERROR,

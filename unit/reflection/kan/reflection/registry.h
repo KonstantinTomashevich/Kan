@@ -85,6 +85,11 @@ enum kan_reflection_archetype_t
     /// \brief Depending on size, either float or double
     KAN_REFLECTION_ARCHETYPE_FLOATING,
 
+    /// \brief Elemental value that is packed into structure, like handle or typed id 32.
+    /// \details These values need additional care during migration as we need to wipe their content before
+    ///          calling shutdown to avoid destroying migrated data handle.
+    KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL,
+
     /// \brief Pointer to string that is not interned.
     KAN_REFLECTION_ARCHETYPE_STRING_POINTER,
 
