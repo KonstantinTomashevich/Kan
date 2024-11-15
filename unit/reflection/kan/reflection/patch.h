@@ -12,7 +12,7 @@
 /// \par Patching
 /// \parblock
 /// Patching is a series of modifications that can be applied to main block of memory passed as argument and to
-/// other blocks of memory that are visible from the main block, if they are properly declared during patch build
+/// other blocks of memory that are visible from the main block if they are properly declared during patch build
 /// process. Patching essentially overrides data using offsets and is not well aware of reflection (which is only
 /// used to access child blocks of memory). Section mechanism is used to change data blocks and will be described
 /// on building paragraph.
@@ -45,7 +45,7 @@
 /// \parblock
 /// Patches should not override fields of `KAN_REFLECTION_ARCHETYPE_STRING_POINTER`,
 /// `KAN_REFLECTION_ARCHETYPE_STRUCT_POINTER`, `KAN_REFLECTION_ARCHETYPE_DYNAMIC_ARRAY`,
-/// `KAN_REFLECTION_ARCHETYPE_PATCH` as these archetypes technically point to the outer block of memory.
+/// `KAN_REFLECTION_ARCHETYPE_PATCH` as these archetypes technically point to the undeclared outer block of memory.
 /// If patch needs to access data in other block of memory using these fields, sections with appropriate types and
 /// offsets should be created.
 /// \endparblock
