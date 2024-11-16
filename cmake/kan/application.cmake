@@ -21,7 +21,7 @@ set (KAN_APPLICATION_PACKAGED_WORLD_DIRECTORY_NAME "world")
 # Path to application program launcher statics ecosystem subdirectory.
 # Launchers statics are split into ecosystems in order to put them into flattened binary directories.
 set (KAN_APPLICATION_PROGRAM_LAUNCHER_STATICS_ECOSYSTEM
-        "${CMAKE_SOURCE_DIR}/cmake/kan/application_program_launcher_statics_ecosystem")
+        "${PROJECT_SOURCE_DIR}/cmake/kan/application_program_launcher_statics_ecosystem")
 
 # Name of the used application framework static launcher implementation.
 set (KAN_APPLICATION_PROGRAM_LAUNCHER_IMPLEMENTATION "sdl")
@@ -215,7 +215,7 @@ function (application_set_world_directory DIRECTORY)
         endif ()
 
         file (COPY_FILE
-                "${CMAKE_SOURCE_DIR}/cmake/kan/verify_code_hot_reload_world.rd"
+                "${PROJECT_SOURCE_DIR}/cmake/kan/verify_code_hot_reload_world.rd"
                 "${DIRECTORY}/optional/verify_code_hot_reload.rd")
 
     else ()
@@ -526,7 +526,7 @@ function (private_generate_code_hot_reload_test)
     # Register verification program.
 
     register_application_program (verify_code_hot_reload)
-    application_program_set_configuration ("${CMAKE_SOURCE_DIR}/cmake/kan/verify_code_hot_reload_configuration.rd")
+    application_program_set_configuration ("${PROJECT_SOURCE_DIR}/cmake/kan/verify_code_hot_reload_configuration.rd")
     application_program_use_as_test_in_development_mode (
             ARGUMENTS
             "${CMAKE_COMMAND}" "${CMAKE_BINARY_DIR}" "${APPLICATION_NAME}_dev_all_plugins" "$<CONFIG>"
@@ -877,7 +877,7 @@ function (application_generate)
     # Generate resource builder executable.
 
     register_executable ("${APPLICATION_NAME}_resource_builder")
-    executable_include (CONCRETE application_framework_resource_builder)
+    executable_include (CONCRETE application_framework_resource_builder application_framework_resource_project)
 
     executable_link_shared_libraries ("${APPLICATION_NAME}_core_library")
     executable_verify ()
@@ -1072,6 +1072,9 @@ function (application_generate)
         string (APPEND PROJECT_CONTENT "use_string_interning = 0\n")
     endif ()
 
+    string (APPEND PROJECT_CONTENT "application_source_directory = \"${CMAKE_CURRENT_SOURCE_DIR}\"\n")
+    string (APPEND PROJECT_CONTENT "kan_source_directory = \"${PROJECT_SOURCE_DIR}\"\n")
+    string (APPEND PROJECT_CONTENT "source_directory = \"${CMAKE_SOURCE_DIR}\"\n")
     set (RESOURCE_PROJECT_PATH "${WORKSPACE_DIRECTORY}/resource_project.rd")
     file (CONFIGURE OUTPUT "${RESOURCE_PROJECT_PATH}" CONTENT "${PROJECT_CONTENT}")
 

@@ -2,7 +2,7 @@
 
 # Path to reflection statics ecosystem subdirectory.
 # Reflection statics are split into ecosystems in order to put them into flattened binary directories.
-set (KAN_REFLECTION_STATICS_ECOSYSTEM "${CMAKE_SOURCE_DIR}/cmake/kan/reflection_statics_ecosystem")
+set (KAN_REFLECTION_STATICS_ECOSYSTEM "${PROJECT_SOURCE_DIR}/cmake/kan/reflection_statics_ecosystem")
 
 # Target property that holds list of reflection registrar names.
 define_property (TARGET PROPERTY REFLECTION_REGISTRARS

@@ -1,6 +1,6 @@
 #include <string.h>
 
-#include <kan/application_framework_resource_builder/project.h>
+#include <kan/application_framework_resource_project/project.h>
 #include <kan/memory/allocation.h>
 
 static kan_allocation_group_t allocation_group;
@@ -56,6 +56,9 @@ void kan_application_resource_project_init (struct kan_application_resource_proj
     instance->reference_cache_absolute_directory = NULL;
     instance->output_absolute_directory = NULL;
     instance->use_string_interning = KAN_TRUE;
+    instance->application_source_directory = NULL;
+    instance->kan_source_directory = NULL;
+    instance->source_directory = NULL;
 }
 
 void kan_application_resource_project_shutdown (struct kan_application_resource_project_t *instance)
@@ -86,5 +89,22 @@ void kan_application_resource_project_shutdown (struct kan_application_resource_
     {
         kan_free_general (allocation_group, instance->output_absolute_directory,
                           strlen (instance->output_absolute_directory) + 1u);
+    }
+
+    if (instance->application_source_directory)
+    {
+        kan_free_general (allocation_group, instance->application_source_directory,
+                          strlen (instance->application_source_directory) + 1u);
+    }
+
+    if (instance->kan_source_directory)
+    {
+        kan_free_general (allocation_group, instance->kan_source_directory,
+                          strlen (instance->kan_source_directory) + 1u);
+    }
+
+    if (instance->source_directory)
+    {
+        kan_free_general (allocation_group, instance->source_directory, strlen (instance->source_directory) + 1u);
     }
 }
