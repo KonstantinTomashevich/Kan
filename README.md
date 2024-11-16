@@ -39,3 +39,4 @@ This project uses several third-party open source libraries, listened in alphabe
 - [volk](https://github.com/zeux/volk.git) -- meta loader for Vulkan graphics API.
 - [VulkanMemoryAllocator](https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator) -- library for allocating
   GPU memory for Vulkan graphics API.
+- [xxHash](https://github.com/Cyan4973/xxHash) -- fast hash algorithm.

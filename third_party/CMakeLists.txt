@@ -35,6 +35,10 @@ if (KAN_USE_VULKAN_API)
     add_subdirectory (VulkanMemoryAllocator)
 endif ()
 
+# xxHash
+add_library (xxHash INTERFACE)
+target_include_directories (xxHash INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/xxHash")
+
 # re2c
 # Hack to fix re2c build on Linux: it needs stdc++, but it is not linked to it by default.
 # Due to this issue, re2c is registered last.
