@@ -1073,7 +1073,7 @@ function (application_generate)
     endif ()
 
     string (APPEND PROJECT_CONTENT "application_source_directory = \"${CMAKE_CURRENT_SOURCE_DIR}\"\n")
-    string (APPEND PROJECT_CONTENT "kan_source_directory = \"${PROJECT_SOURCE_DIR}\"\n")
+    string (APPEND PROJECT_CONTENT "project_source_directory = \"${PROJECT_SOURCE_DIR}\"\n")
     string (APPEND PROJECT_CONTENT "source_directory = \"${CMAKE_SOURCE_DIR}\"\n")
     set (RESOURCE_PROJECT_PATH "${WORKSPACE_DIRECTORY}/resource_project.rd")
     file (CONFIGURE OUTPUT "${RESOURCE_PROJECT_PATH}" CONTENT "${PROJECT_CONTENT}")

@@ -57,7 +57,7 @@ void kan_application_resource_project_init (struct kan_application_resource_proj
     instance->output_absolute_directory = NULL;
     instance->use_string_interning = KAN_TRUE;
     instance->application_source_directory = NULL;
-    instance->kan_source_directory = NULL;
+    instance->project_source_directory = NULL;
     instance->source_directory = NULL;
 }
 
@@ -97,10 +97,10 @@ void kan_application_resource_project_shutdown (struct kan_application_resource_
                           strlen (instance->application_source_directory) + 1u);
     }
 
-    if (instance->kan_source_directory)
+    if (instance->project_source_directory)
     {
-        kan_free_general (allocation_group, instance->kan_source_directory,
-                          strlen (instance->kan_source_directory) + 1u);
+        kan_free_general (allocation_group, instance->project_source_directory,
+                          strlen (instance->project_source_directory) + 1u);
     }
 
     if (instance->source_directory)

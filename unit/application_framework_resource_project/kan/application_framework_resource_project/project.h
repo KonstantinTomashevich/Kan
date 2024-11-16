@@ -65,8 +65,8 @@ struct kan_application_resource_project_t
     /// \brief Location of the directory where this application is defined.
     char *application_source_directory;
 
-    /// \brief Location of the directory where Kan is defined. Different from ::source_directory when using submodules.
-    char *kan_source_directory;
+    /// \brief Location of the directory where current CMake project is defined.
+    char *project_source_directory;
 
     /// \brief Location of CMake generation source directory.
     char *source_directory;

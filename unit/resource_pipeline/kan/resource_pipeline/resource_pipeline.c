@@ -1,4 +1,5 @@
 #include <stddef.h>
+#include <string.h>
 
 #include <kan/error/critical.h>
 #include <kan/log/logging.h>
@@ -10,6 +11,7 @@
 KAN_LOG_DEFINE_CATEGORY (resource_reference);
 
 static kan_allocation_group_t detected_references_container_allocation_group;
+static kan_allocation_group_t resource_import_rule_allocation_group;
 static kan_bool_t statics_initialized = KAN_FALSE;
 
 static void ensure_statics_initialized (void)
@@ -18,6 +20,8 @@ static void ensure_statics_initialized (void)
     {
         detected_references_container_allocation_group =
             kan_allocation_group_get_child (kan_allocation_group_root (), "kan_resource_pipeline_detected_container");
+        resource_import_rule_allocation_group =
+            kan_allocation_group_get_child (kan_allocation_group_root (), "resource_import_rule");
         statics_initialized = KAN_TRUE;
     }
 }
@@ -1097,4 +1101,61 @@ void kan_resource_pipeline_detect_references (
             }
         }
     }
+}
+
+kan_allocation_group_t kan_resource_import_rule_get_allocation_group (void)
+{
+    return resource_import_rule_allocation_group;
+}
+
+void kan_resource_import_input_init (struct kan_resource_import_input_t *instance)
+{
+    instance->source_path = NULL;
+    instance->size = 0u;
+    instance->checksum = 0u;
+    kan_dynamic_array_init (&instance->outputs, 0u, sizeof (struct kan_resource_import_output_t),
+                            _Alignof (struct kan_resource_import_output_t), resource_import_rule_allocation_group);
+}
+
+void kan_resource_import_input_shutdown (struct kan_resource_import_input_t *instance)
+{
+    if (instance->source_path)
+    {
+        kan_free_general (resource_import_rule_allocation_group, instance->source_path,
+                          strlen (instance->source_path) + 1u);
+    }
+
+    kan_dynamic_array_shutdown (&instance->outputs);
+}
+
+void kan_resource_import_rule_init (struct kan_resource_import_rule_t *instance)
+{
+    ensure_statics_initialized ();
+    instance->source_path_root = KAN_RESOURCE_IMPORT_SOURCE_PATH_ROOT_FILE_DIRECTORY;
+    instance->source_path_rule = KAN_RESOURCE_IMPORT_SOURCE_PATH_RULE_EXACT;
+    instance->source_path = NULL;
+
+    instance->extension_filter = NULL;
+    instance->configuration = KAN_HANDLE_SET_INVALID (kan_reflection_patch_t);
+
+    kan_dynamic_array_init (&instance->last_import, 0u, sizeof (struct kan_resource_import_input_t),
+                            _Alignof (struct kan_resource_import_input_t), resource_import_rule_allocation_group);
+}
+
+void kan_resource_import_rule_shutdown (struct kan_resource_import_rule_t *instance)
+{
+    if (instance->source_path)
+    {
+        kan_free_general (resource_import_rule_allocation_group, instance->source_path,
+                          strlen (instance->source_path) + 1u);
+    }
+
+    kan_reflection_patch_destroy (instance->configuration);
+    for (kan_loop_size_t index = 0u; index < instance->last_import.size; ++index)
+    {
+        kan_resource_import_input_shutdown (
+            &((struct kan_resource_import_input_t *) instance->last_import.data)[index]);
+    }
+
+    kan_dynamic_array_shutdown (&instance->last_import);
 }
