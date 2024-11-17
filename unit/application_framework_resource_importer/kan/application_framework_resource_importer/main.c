@@ -218,7 +218,7 @@ static void create_import_rule_using_stream (struct kan_stream_t *stream,
         }
 
         rule->directory_part_length = (kan_instance_size_t) (last_separator - rule_path);
-        kan_instance_size_t path_length = strlen (rule_path);
+        const kan_instance_size_t path_length = (kan_instance_size_t) strlen (rule_path);
         rule->path = kan_allocate_general (allocation_group, path_length + 1u, _Alignof (char));
         memcpy (rule->path, rule_path, path_length + 1u);
 
