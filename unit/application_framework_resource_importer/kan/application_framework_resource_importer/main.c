@@ -886,8 +886,9 @@ static void serve_process_request (kan_functor_user_data_t user_data)
         if (!rule->meta->functor (input_stream, input->source_path, global.registry, rule->configuration_instance,
                                   &interface))
         {
-            KAN_LOG (application_framework_resource_importer, KAN_LOG_ERROR,
-                     "Failure during import of \"%s\" for the rule \"%s\".", path_container.path, rule->path)
+            KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, application_framework_resource_importer,
+                                 KAN_LOG_ERROR, "Failure during import of \"%s\" for the rule \"%s\".",
+                                 path_container.path, rule->path)
             kan_atomic_int_add (&global.errors_count, 1);
             kan_atomic_int_add (&rule->input_errors, 1);
         }
