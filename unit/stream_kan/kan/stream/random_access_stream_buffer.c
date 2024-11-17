@@ -178,6 +178,7 @@ static kan_file_size_t buffered_write (struct kan_stream_t *stream, kan_file_siz
             // Too big to fit into buffer, write directly.
             written = data->source_stream->operations->write (data->source_stream, amount, input_buffer);
             data->stream_position += written;
+            data->buffer_position = data->stream_position;
         }
         else
         {
