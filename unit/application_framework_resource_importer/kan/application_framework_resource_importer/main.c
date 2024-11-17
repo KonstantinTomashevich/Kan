@@ -736,6 +736,7 @@ static kan_bool_t import_interface_produce (kan_functor_user_data_t user_data,
             {
             }
 
+            kan_serialization_rd_writer_destroy (writer);
             if (state != KAN_SERIALIZATION_FINISHED)
             {
                 KAN_ASSERT (state == KAN_SERIALIZATION_FAILED)
@@ -774,6 +775,7 @@ static kan_bool_t import_interface_produce (kan_functor_user_data_t user_data,
             {
             }
 
+            kan_serialization_binary_writer_destroy (writer);
             if (state != KAN_SERIALIZATION_FINISHED)
             {
                 KAN_ASSERT (state == KAN_SERIALIZATION_FAILED)
@@ -1013,6 +1015,7 @@ static void serve_finish_request (kan_functor_user_data_t user_data)
                     {
                     }
 
+                    kan_serialization_rd_writer_destroy (writer);
                     if (state != KAN_SERIALIZATION_FINISHED)
                     {
                         KAN_ASSERT (state == KAN_SERIALIZATION_FAILED)
