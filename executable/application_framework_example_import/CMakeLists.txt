@@ -1,6 +1,6 @@
 add_subdirectory (unit)
 
-register_application (application_framework_example_basic)
+register_application (application_framework_example_import)
 application_core_include (
         ABSTRACT
         cpu_dispatch=kan cpu_profiler=none error=sdl file_system=platform_default file_system_watcher=user_level
@@ -20,10 +20,13 @@ application_add_development_environment_tag (development)
 register_application_plugin (NAME base GROUP base)
 application_plugin_include (
         ABSTRACT universe_resource_provider=kan
-        CONCRETE universe_single_pipeline_scheduler universe_time)
+        CONCRETE application_framework_example_import_icon universe_single_pipeline_scheduler universe_time)
 
 register_application_plugin (NAME logic GROUP test)
-application_plugin_include (ABSTRACT CONCRETE application_framework_example_basic_logic)
+application_plugin_include (CONCRETE application_framework_example_import_logic)
+
+register_application_plugin (NAME import GROUP import)
+application_plugin_include (ABSTRACT image=stb CONCRETE application_framework_example_import_icon_import)
 
 register_application_program (test)
 application_program_set_configuration ("${CMAKE_CURRENT_SOURCE_DIR}/configuration/program_test.rd")
@@ -37,3 +40,20 @@ application_variant_add_program (test)
 application_variant_add_environment_tag (packaged)
 
 application_generate ()
+
+# Make import always required as dependency of resource build.
+# IT IS NOT RECOMMENDED. It is just for the sake of testing.
+
+application_get_resource_importer_target_name (RESOURCE_IMPORTER)
+application_get_resource_project_path (RESOURCE_PROJECT)
+
+add_custom_target (
+        application_framework_example_import_do_import
+        COMMAND ${RESOURCE_IMPORTER} "${RESOURCE_PROJECT}" "application_framework_example_import_plugin_logic"
+        COMMENT "Run resource import for application_framework_example_import.")
+
+# Variant naming is not public in application framework as variants shouldn't be addressed like that.
+# But here we're doing it for testing in order to always execute resource importer as part of tests here.
+add_dependencies (
+        application_framework_example_import_variant_test_build_resources
+        application_framework_example_import_do_import)
