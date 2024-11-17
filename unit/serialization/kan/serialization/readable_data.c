@@ -2571,6 +2571,7 @@ static inline kan_bool_t write_packed_array (struct writer_state_t *writer_state
     struct kan_readable_data_event_t event;
     event.output_target.identifier = identifier;
     event.output_target.array_index = KAN_READABLE_DATA_ARRAY_INDEX_NONE;
+    event.setter_value_first = value_nodes;
 
     switch (archetype)
     {
