@@ -5,7 +5,7 @@ concrete_require (
         SCOPE PUBLIC
         ABSTRACT cpu_dispatch error file_system log memory platform reflection virtual_file_system
         CONCRETE_INTERFACE
-        application_framework_resource_project context context_plugin_system context_reflection_system resource_index
+        application_framework_resource_tool context context_plugin_system context_reflection_system resource_index
         resource_pipeline serialization)
 
 set (KAN_RESOURCE_BUILDER_IO_BUFFER "4096" CACHE STRING "Size of a buffer for buffered reading and writing.")

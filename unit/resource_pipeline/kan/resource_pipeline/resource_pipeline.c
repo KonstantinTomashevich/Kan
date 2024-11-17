@@ -8,7 +8,9 @@
 #include <kan/reflection/patch.h>
 #include <kan/resource_pipeline/resource_pipeline.h>
 
+// \c_interface_scanner_disable
 KAN_LOG_DEFINE_CATEGORY (resource_reference);
+// \c_interface_scanner_enable
 
 static kan_allocation_group_t detected_references_container_allocation_group;
 static kan_allocation_group_t resource_import_rule_allocation_group;
@@ -684,6 +686,7 @@ static void kan_resource_pipeline_detect_inside_data_chunk_for_struct_instance (
     }
 }
 
+// \c_interface_scanner_disable
 struct patch_section_stack_item_t
 {
     kan_reflection_patch_serializable_section_id_t id;
@@ -697,6 +700,7 @@ struct patch_section_stack_t
     struct patch_section_stack_item_t *stack_end;
     struct patch_section_stack_item_t stack[KAN_RESOURCE_PIPELINE_PATCH_SECTION_STACK_SIZE];
 };
+// \c_interface_scanner_enable
 
 static inline void kan_resource_pipeline_detect_inside_patch (
     struct kan_resource_pipeline_reference_type_info_storage_t *storage,
@@ -1103,6 +1107,14 @@ void kan_resource_pipeline_detect_references (
     }
 }
 
+/// \brief We need to make import rule resource type as it resides in resource directories.
+/// \meta reflection_struct_meta = "kan_resource_import_rule_t"
+RESOURCE_PIPELINE_API struct kan_resource_pipeline_resource_type_meta_t kan_resource_import_rule_resource_type = {
+    .root = KAN_FALSE,
+    .compilation_output_type_name = NULL,
+    .compile = NULL,
+};
+
 kan_allocation_group_t kan_resource_import_rule_get_allocation_group (void)
 {
     return resource_import_rule_allocation_group;
@@ -1111,10 +1123,9 @@ kan_allocation_group_t kan_resource_import_rule_get_allocation_group (void)
 void kan_resource_import_input_init (struct kan_resource_import_input_t *instance)
 {
     instance->source_path = NULL;
-    instance->size = 0u;
     instance->checksum = 0u;
-    kan_dynamic_array_init (&instance->outputs, 0u, sizeof (struct kan_resource_import_output_t),
-                            _Alignof (struct kan_resource_import_output_t), resource_import_rule_allocation_group);
+    kan_dynamic_array_init (&instance->outputs, 0u, sizeof (char *), _Alignof (char *),
+                            resource_import_rule_allocation_group);
 }
 
 void kan_resource_import_input_shutdown (struct kan_resource_import_input_t *instance)
@@ -1123,6 +1134,12 @@ void kan_resource_import_input_shutdown (struct kan_resource_import_input_t *ins
     {
         kan_free_general (resource_import_rule_allocation_group, instance->source_path,
                           strlen (instance->source_path) + 1u);
+    }
+
+    for (kan_loop_size_t index = 0u; index < instance->outputs.size; ++index)
+    {
+        char *output = ((char **) instance->outputs.data)[index];
+        kan_free_general (resource_import_rule_allocation_group, output, strlen (output) + 1u);
     }
 
     kan_dynamic_array_shutdown (&instance->outputs);
@@ -1150,7 +1167,11 @@ void kan_resource_import_rule_shutdown (struct kan_resource_import_rule_t *insta
                           strlen (instance->source_path) + 1u);
     }
 
-    kan_reflection_patch_destroy (instance->configuration);
+    if (KAN_HANDLE_IS_VALID (instance->configuration))
+    {
+        kan_reflection_patch_destroy (instance->configuration);
+    }
+
     for (kan_loop_size_t index = 0u; index < instance->last_import.size; ++index)
     {
         kan_resource_import_input_shutdown (

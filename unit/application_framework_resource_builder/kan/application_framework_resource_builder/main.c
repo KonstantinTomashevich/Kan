@@ -1,5 +1,6 @@
 #include <kan/api_common/min_max.h>
-#include <kan/application_framework_resource_project/project.h>
+#include <kan/application_framework_resource_tool/context.h>
+#include <kan/application_framework_resource_tool/project.h>
 #include <kan/container/hash_storage.h>
 #include <kan/context/context.h>
 #include <kan/context/plugin_system.h>
@@ -7,7 +8,6 @@
 #include <kan/cpu_dispatch/job.h>
 #include <kan/cpu_dispatch/task.h>
 #include <kan/error/critical.h>
-#include <kan/file_system/entry.h>
 #include <kan/file_system/path_container.h>
 #include <kan/file_system/stream.h>
 #include <kan/log/logging.h>
@@ -751,108 +751,6 @@ static void target_shutdown (struct target_t *instance)
     }
 
     kan_dynamic_array_shutdown (&instance->visible_targets);
-}
-
-KAN_REFLECTION_EXPECT_UNIT_REGISTRAR_LOCAL (application_framework_resource_project);
-
-static int read_project (const char *path, struct kan_application_resource_project_t *project)
-{
-    struct kan_stream_t *input_stream = kan_direct_file_stream_open_for_read (path, KAN_TRUE);
-    if (!input_stream)
-    {
-        KAN_LOG (application_framework_resource_builder, KAN_LOG_ERROR, "Failed to open project at \"%s\".", path)
-        return ERROR_CODE_FAILED_TO_READ_PROJECT;
-    }
-
-    input_stream = kan_random_access_stream_buffer_open_for_read (input_stream, KAN_RESOURCE_BUILDER_IO_BUFFER);
-    kan_reflection_registry_t local_registry = kan_reflection_registry_create ();
-    KAN_REFLECTION_UNIT_REGISTRAR_NAME (application_framework_resource_project) (local_registry);
-    int result = 0;
-
-    kan_serialization_rd_reader_t reader = kan_serialization_rd_reader_create (
-        input_stream, project, kan_string_intern ("kan_application_resource_project_t"), local_registry,
-        kan_application_resource_project_allocation_group_get ());
-
-    enum kan_serialization_state_t serialization_state;
-    while ((serialization_state = kan_serialization_rd_reader_step (reader)) == KAN_SERIALIZATION_IN_PROGRESS)
-    {
-    }
-
-    kan_serialization_rd_reader_destroy (reader);
-    input_stream->operations->close (input_stream);
-
-    if (serialization_state == KAN_SERIALIZATION_FAILED)
-    {
-        KAN_LOG (application_framework_resource_builder, KAN_LOG_ERROR, "Failed to read project from \"%s\".", path)
-        result = ERROR_CODE_FAILED_TO_READ_PROJECT;
-    }
-    else
-    {
-        KAN_ASSERT (serialization_state == KAN_SERIALIZATION_FINISHED)
-    }
-
-    kan_reflection_registry_destroy (local_registry);
-    return result;
-}
-
-static kan_context_t create_context (const struct kan_application_resource_project_t *project,
-                                     const char *executable_path)
-{
-    const kan_allocation_group_t context_group =
-        kan_allocation_group_get_child (kan_allocation_group_root (), "builder_context");
-    kan_context_t context = kan_context_create (context_group);
-
-    struct kan_plugin_system_config_t plugin_system_config;
-    kan_plugin_system_config_init (&plugin_system_config);
-    plugin_system_config.enable_hot_reload = KAN_FALSE;
-
-    struct kan_file_system_path_container_t path_container;
-    kan_file_system_path_container_copy_string (&path_container, executable_path);
-    kan_instance_size_t check_index = path_container.length - 1u;
-
-    while (check_index > 0u)
-    {
-        if (path_container.path[check_index] == '/' || path_container.path[check_index] == '\\')
-        {
-            break;
-        }
-
-        --check_index;
-    }
-
-    kan_file_system_path_container_reset_length (&path_container, check_index);
-    kan_file_system_path_container_append (&path_container, project->plugin_relative_directory);
-    plugin_system_config.plugin_directory_path = kan_string_intern (path_container.path);
-
-    for (kan_loop_size_t index = 0u; index < project->plugins.size; ++index)
-    {
-        const kan_interned_string_t plugin_name = ((kan_interned_string_t *) project->plugins.data)[index];
-        void *spot = kan_dynamic_array_add_last (&plugin_system_config.plugins);
-
-        if (!spot)
-        {
-            kan_dynamic_array_set_capacity (&plugin_system_config.plugins,
-                                            KAN_MAX (1u, plugin_system_config.plugins.capacity * 2u));
-            spot = kan_dynamic_array_add_last (&plugin_system_config.plugins);
-            KAN_ASSERT (spot)
-        }
-
-        *(kan_interned_string_t *) spot = plugin_name;
-    }
-
-    if (!kan_context_request_system (context, KAN_CONTEXT_PLUGIN_SYSTEM_NAME, &plugin_system_config))
-    {
-        KAN_LOG (application_framework_resource_builder, KAN_LOG_ERROR, "Failed to request plugin system.")
-    }
-
-    if (!kan_context_request_system (context, KAN_CONTEXT_REFLECTION_SYSTEM_NAME, NULL))
-    {
-        KAN_LOG (application_framework_resource_builder, KAN_LOG_ERROR, "Failed to request reflection system.")
-    }
-
-    kan_context_assembly (context);
-    kan_plugin_system_config_shutdown (&plugin_system_config);
-    return context;
 }
 
 static void target_collect_references (kan_instance_size_t build_target_index, kan_instance_size_t project_target_index)
@@ -2681,9 +2579,16 @@ int main (int argument_count, char **argument_values)
 
     KAN_LOG (application_framework_resource_builder, KAN_LOG_INFO, "Reading project...")
     kan_application_resource_project_init (&global.project);
-    int result = read_project (argument_values[1u], &global.project);
-    global.volume = kan_virtual_file_system_volume_create ();
+    int result = 0;
 
+    if (!kan_application_resource_project_read (argument_values[1u], &global.project))
+    {
+        KAN_LOG (application_framework_resource_builder, KAN_LOG_ERROR, "Failed to read project from \"%s\".",
+                 argument_values[1u])
+        result = ERROR_CODE_FAILED_TO_READ_PROJECT;
+    }
+
+    global.volume = kan_virtual_file_system_volume_create ();
     if (result == 0)
     {
         KAN_LOG (application_framework_resource_builder, KAN_LOG_INFO, "Preparing virtual file system...")
@@ -2713,7 +2618,7 @@ int main (int argument_count, char **argument_values)
 
     if (result == 0)
     {
-        kan_context_t context = create_context (&global.project, argument_values[0u]);
+        kan_context_t context = kan_application_create_resource_tool_context (&global.project, argument_values[0u]);
         kan_stack_group_allocator_init (&global.temporary_allocator, temporary_allocation_group,
                                         KAN_RESOURCE_BUILDER_TEMPORARY_STACK);
 

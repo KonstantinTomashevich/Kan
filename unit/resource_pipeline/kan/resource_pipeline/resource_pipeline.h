@@ -222,11 +222,13 @@ enum kan_resource_import_source_path_rule_t
     KAN_RESOURCE_IMPORT_SOURCE_PATH_RULE_HIERARCHY,
 };
 
-/// \brief Describes one resource file produced by import rule.
-struct kan_resource_import_output_t
+/// \brief Structure for serializing import input checksum.
+/// \details We use serializable structure in order to properly serialize checksum bits because
+///          readable data doesn't support values that cannot fit into 32-bit integer.
+struct kan_resource_import_serializable_checksum_t
 {
-    kan_interned_string_t type_name;
-    kan_interned_string_t name;
+    kan_serialized_offset_t bits_1;
+    kan_serialized_offset_t bits_2;
 };
 
 /// \brief Describes concrete input file used during last execution of import rule and its products.
@@ -234,15 +236,18 @@ struct kan_resource_import_input_t
 {
     char *source_path;
 
-    /// \brief Input file size. Used to avoid calculating checksum when file size was changed and therefore file is
-    ///        obviously changed too.
-    kan_file_size_t size;
+    union
+    {
+        /// \brief Checksum is used to detected whether source file was changed.
+        struct kan_resource_import_serializable_checksum_t serializable_checksum;
 
-    /// \brief Checksum for checking whether input file was changed.
-    kan_file_size_t checksum;
+        // \c_interface_scanner_disable
+        kan_file_size_t checksum;
+        // \c_interface_scanner_enable
+    };
 
-    /// \brief Outputs that were produced during last import execution.
-    /// \meta reflection_dynamic_array_type = "struct kan_resource_import_output_t"
+    /// \brief Relative (to the rule) paths of outputs that were produced during last import execution.
+    /// \meta reflection_dynamic_array_type = "char *"
     struct kan_dynamic_array_t outputs;
 };
 
@@ -258,7 +263,7 @@ struct kan_resource_import_rule_t
     enum kan_resource_import_source_path_rule_t source_path_rule;
     char *source_path;
 
-    /// \brief If not NULL, only files ending with this extension will be accepted.
+    /// \brief If not NULL, only files ending with this extension will be accepted. Ignored for exact path rule.
     kan_interned_string_t extension_filter;
 
     /// \brief Describes import configuration. Should always be present as it is used to select import functor.
@@ -275,7 +280,7 @@ RESOURCE_PIPELINE_API void kan_resource_import_rule_shutdown (struct kan_resourc
 
 /// \brief Type of function for registering resources produced from import.
 typedef kan_bool_t (*kan_resource_import_interface_produce) (kan_functor_user_data_t user_data,
-                                                             kan_interned_string_t name,
+                                                             const char *relative_path,
                                                              kan_interned_string_t type_name,
                                                              void *data);
 
@@ -289,6 +294,7 @@ struct kan_resource_import_interface_t
 /// \brief Type of import functor function.
 /// \warning Returning failure (KAN_FALSE) from import functor does not revert already produced resources.
 typedef kan_bool_t (*kan_resource_import_functor) (struct kan_stream_t *input_stream,
+                                                   const char *input_path,
                                                    kan_reflection_registry_t registry,
                                                    void *configuration,
                                                    struct kan_resource_import_interface_t *interface);
@@ -299,6 +305,9 @@ struct kan_resource_import_configuration_type_meta_t
 {
     /// \brief Functor that will be called for every input file separately, possibly from multiple threads at once.
     kan_resource_import_functor functor;
+
+    /// \brief True if source files can be compared using checksum.
+    kan_bool_t allow_checksum;
 };
 
 KAN_C_HEADER_END

@@ -1,7 +1,12 @@
 #include <string.h>
 
-#include <kan/application_framework_resource_project/project.h>
+#include <kan/application_framework_resource_tool/project.h>
+#include <kan/error/critical.h>
+#include <kan/file_system/stream.h>
 #include <kan/memory/allocation.h>
+#include <kan/reflection/generated_reflection.h>
+#include <kan/serialization/readable_data.h>
+#include <kan/stream/random_access_stream_buffer.h>
 
 static kan_allocation_group_t allocation_group;
 static kan_bool_t statics_initialized = KAN_FALSE;
@@ -107,4 +112,44 @@ void kan_application_resource_project_shutdown (struct kan_application_resource_
     {
         kan_free_general (allocation_group, instance->source_directory, strlen (instance->source_directory) + 1u);
     }
+}
+
+KAN_REFLECTION_EXPECT_UNIT_REGISTRAR (application_framework_resource_tool);
+
+kan_bool_t kan_application_resource_project_read (const char *path, struct kan_application_resource_project_t *project)
+{
+    struct kan_stream_t *input_stream = kan_direct_file_stream_open_for_read (path, KAN_TRUE);
+    if (!input_stream)
+    {
+        return KAN_FALSE;
+    }
+
+    input_stream = kan_random_access_stream_buffer_open_for_read (input_stream, KAN_RESOURCE_PROJECT_IO_BUFFER);
+    kan_reflection_registry_t local_registry = kan_reflection_registry_create ();
+    KAN_REFLECTION_UNIT_REGISTRAR_NAME (application_framework_resource_tool) (local_registry);
+    kan_bool_t result = KAN_TRUE;
+
+    kan_serialization_rd_reader_t reader = kan_serialization_rd_reader_create (
+        input_stream, project, kan_string_intern ("kan_application_resource_project_t"), local_registry,
+        kan_application_resource_project_allocation_group_get ());
+
+    enum kan_serialization_state_t serialization_state;
+    while ((serialization_state = kan_serialization_rd_reader_step (reader)) == KAN_SERIALIZATION_IN_PROGRESS)
+    {
+    }
+
+    kan_serialization_rd_reader_destroy (reader);
+    input_stream->operations->close (input_stream);
+
+    if (serialization_state == KAN_SERIALIZATION_FAILED)
+    {
+        result = KAN_FALSE;
+    }
+    else
+    {
+        KAN_ASSERT (serialization_state == KAN_SERIALIZATION_FINISHED)
+    }
+
+    kan_reflection_registry_destroy (local_registry);
+    return result;
 }
