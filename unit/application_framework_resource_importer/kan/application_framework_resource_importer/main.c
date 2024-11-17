@@ -266,8 +266,8 @@ static void scan_file_as_potential_rule (struct kan_file_system_path_container_t
         struct kan_stream_t *input_stream = kan_direct_file_stream_open_for_read (path_container->path, KAN_TRUE);
         if (!input_stream)
         {
-            KAN_LOG (application_framework_resource_importer, KAN_LOG_ERROR, "Failed to open resource file at \"%s\".",
-                     path_container->path)
+            KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, application_framework_resource_importer,
+                                 KAN_LOG_ERROR, "Failed to open resource file at \"%s\".", path_container->path)
             kan_atomic_int_add (&global.errors_count, 1);
             return;
         }
@@ -277,8 +277,8 @@ static void scan_file_as_potential_rule (struct kan_file_system_path_container_t
 
         if (!kan_serialization_rd_read_type_header (input_stream, &type_name))
         {
-            KAN_LOG (application_framework_resource_importer, KAN_LOG_ERROR, "Failed read type header of \"%s\".",
-                     path_container->path)
+            KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, application_framework_resource_importer,
+                                 KAN_LOG_ERROR, "Failed read type header of \"%s\".", path_container->path)
             kan_atomic_int_add (&global.errors_count, 1);
             input_stream->operations->close (input_stream);
             return;
@@ -823,8 +823,9 @@ static void serve_process_request (kan_functor_user_data_t user_data)
     struct kan_stream_t *input_stream = kan_direct_file_stream_open_for_read (path_container.path, KAN_TRUE);
     if (!input_stream)
     {
-        KAN_LOG (application_framework_resource_importer, KAN_LOG_ERROR,
-                 "Unable to open input \"%s\" for the rule \"%s\".", path_container.path, rule->path)
+        KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, application_framework_resource_importer,
+                             KAN_LOG_ERROR, "Unable to open input \"%s\" for the rule \"%s\".", path_container.path,
+                             rule->path)
         serve_process_request_end_by_error (rule);
         return;
     }
@@ -845,8 +846,9 @@ static void serve_process_request (kan_functor_user_data_t user_data)
         input->checksum = kan_checksum_finalize (state);
         if (!input_stream->operations->seek (input_stream, KAN_STREAM_SEEK_START, 0))
         {
-            KAN_LOG (application_framework_resource_importer, KAN_LOG_ERROR,
-                     "Failed to get size of \"%s\" for the rule \"%s\".", path_container.path, rule->path)
+            KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, application_framework_resource_importer,
+                                 KAN_LOG_ERROR, "Failed to get size of \"%s\" for the rule \"%s\".",
+                                 path_container.path, rule->path)
             serve_process_request_end_by_error (rule);
             return;
         }
@@ -862,9 +864,10 @@ static void serve_process_request (kan_functor_user_data_t user_data)
 
             if (strcmp (old_input->source_path, input->source_path) == 0 && old_input->checksum == input->checksum)
             {
-                KAN_LOG (application_framework_resource_importer, KAN_LOG_INFO,
-                         "Skipping import of \"%s\" for the rule \"%s\" as its data seems old.", path_container.path,
-                         rule->path)
+                KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, application_framework_resource_importer,
+                                     KAN_LOG_INFO,
+                                     "Skipping import of \"%s\" for the rule \"%s\" as its data seems old.",
+                                     path_container.path, rule->path)
                 use_old_import_data = KAN_TRUE;
                 break;
             }
@@ -950,20 +953,23 @@ static void serve_finish_request (kan_functor_user_data_t user_data)
 
                     if (arguments.keep_resources)
                     {
-                        KAN_LOG (application_framework_resource_importer, KAN_LOG_WARNING,
-                                 "Output \"%s\" of rule \"%s\" is no longer produced and is dangling.",
-                                 path_container.path, rule->path)
+                        KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u,
+                                             application_framework_resource_importer, KAN_LOG_WARNING,
+                                             "Output \"%s\" of rule \"%s\" is no longer produced and is dangling.",
+                                             path_container.path, rule->path)
                     }
                     else
                     {
-                        KAN_LOG (application_framework_resource_importer, KAN_LOG_INFO,
-                                 "Deleting dangling output \"%s\" of rule \"%s\".", path_container.path, rule->path)
+                        KAN_LOG_WITH_BUFFER (
+                            KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, application_framework_resource_importer, KAN_LOG_INFO,
+                            "Deleting dangling output \"%s\" of rule \"%s\".", path_container.path, rule->path)
 
                         if (!kan_file_system_remove_file (path_container.path))
                         {
-                            KAN_LOG (application_framework_resource_importer, KAN_LOG_ERROR,
-                                     "Failed to delete dangling output \"%s\" of rule \"%s\".", path_container.path,
-                                     rule->path)
+                            KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u,
+                                                 application_framework_resource_importer, KAN_LOG_ERROR,
+                                                 "Failed to delete dangling output \"%s\" of rule \"%s\".",
+                                                 path_container.path, rule->path)
                             kan_atomic_int_add (&global.errors_count, 1);
                             has_errors = KAN_TRUE;
                         }
