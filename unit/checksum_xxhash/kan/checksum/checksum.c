@@ -1,8 +1,8 @@
 #include <kan/api_common/mute_warnings.h>
 
 KAN_MUTE_THIRD_PARTY_WARNINGS_BEGIN
-#define XXH_INLINE_ALL
-#define XXH_NO_STDLIB
+#define XXH_IMPLEMENTATION
+#define XXH_STATIC_LINKING_ONLY
 #include <xxhash.h>
 KAN_MUTE_THIRD_PARTY_WARNINGS_END
 
