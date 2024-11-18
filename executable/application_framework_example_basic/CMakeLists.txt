@@ -28,7 +28,7 @@ application_plugin_include (ABSTRACT CONCRETE application_framework_example_basi
 register_application_program (test)
 application_program_set_configuration ("${CMAKE_CURRENT_SOURCE_DIR}/configuration/program_test.rd")
 application_program_use_plugin_group (test)
-# These tests create windows and creating too much windows in parallel might slow down the system.
+# These tests create windows and spamming windows is both not good visually and might brick some environments.
 application_program_use_as_test_in_development_mode (ARGUMENTS --test PROPERTIES TIMEOUT 10 RUN_SERIAL ON)
 application_program_use_as_test_in_packaged_mode (ARGUMENTS --test PROPERTIES TIMEOUT 10 RUN_SERIAL ON)
 

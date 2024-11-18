@@ -47,7 +47,7 @@
 /// well. Import rule can reference one or more inputs through source path. It contains one configuration patch that
 /// can be used to fetch the right import functor through `kan_resource_import_configuration_type_meta_t`. Also,
 /// import rule stores last import data that can be used to check whether source files have changed and also to manage
-/// produce resources by deleting the ones that were produced earlier and are not produced right now.
+/// produced resources by deleting the ones that were produced earlier and are not produced right now.
 /// \endparblock
 
 KAN_C_HEADER_BEGIN
@@ -195,26 +195,26 @@ RESOURCE_PIPELINE_API kan_allocation_group_t kan_resource_import_rule_get_alloca
 /// \brief Describes root directory that is used as prefix for import rule source path.
 enum kan_resource_import_source_path_root_t
 {
-    /// \brief Resource path is relative to the directory in which import rule is stored.
+    /// \brief Source path is relative to the directory in which import rule is stored.
     KAN_RESOURCE_IMPORT_SOURCE_PATH_ROOT_FILE_DIRECTORY = 0u,
 
-    /// \brief Resource path is relative to the resource directory root in which import rule is stored.
+    /// \brief Source path is relative to the resource directory root in which import rule is stored.
     KAN_RESOURCE_IMPORT_SOURCE_PATH_ROOT_RESOURCE_DIRECTORY,
 
-    /// \brief Resource path is relative to the application CMake source directory.
+    /// \brief Source path is relative to the application CMake source directory.
     KAN_RESOURCE_IMPORT_SOURCE_PATH_ROOT_APPLICATION_SOURCE,
 
-    /// \brief Resource path is relative to the CMake project source of project to which application belongs.
+    /// \brief Source path is relative to the CMake project source of project to which application belongs.
     KAN_RESOURCE_IMPORT_SOURCE_PATH_ROOT_PROJECT_SOURCE,
 
-    /// \brief Resource path is relative to CMake source directory (source for the whole generation).
+    /// \brief Source path is relative to CMake source directory (source for the whole generation).
     KAN_RESOURCE_IMPORT_SOURCE_PATH_ROOT_CMAKE_SOURCE,
 };
 
 /// \brief Describes how import rule source path should be used.
 enum kan_resource_import_source_path_rule_t
 {
-    /// \brief Rule has only one source file which can be found can exact source path.
+    /// \brief Rule has only one source file which can be found by exact source path.
     KAN_RESOURCE_IMPORT_SOURCE_PATH_RULE_EXACT = 0u,
 
     /// \brief Rule has multiple source files which are found in directory hierarchy and source path points to the root
@@ -263,13 +263,14 @@ struct kan_resource_import_rule_t
     enum kan_resource_import_source_path_rule_t source_path_rule;
     char *source_path;
 
-    /// \brief If not NULL, only files ending with this extension will be accepted. Ignored for exact path rule.
+    /// \brief If not NULL, only files ending with this extension will be accepted.
+    /// \details Ignored when ::source_path_rule is KAN_RESOURCE_IMPORT_SOURCE_PATH_RULE_EXACT.
     kan_interned_string_t extension_filter;
 
     /// \brief Describes import configuration. Should always be present as it is used to select import functor.
     kan_reflection_patch_t configuration;
 
-    /// \brief Describes what was used during last import procedure.
+    /// \brief Describes inputs and outputs during last import procedure.
     /// \meta reflection_dynamic_array_type = "struct kan_resource_import_input_t"
     struct kan_dynamic_array_t last_import;
 };
