@@ -2,7 +2,7 @@
 
 # Path to context statics ecosystem subdirectory.
 # Context statics are split into ecosystems in order to put them into flattened binary directories.
-set (KAN_CONTEXT_STATICS_ECOSYSTEM "${CMAKE_SOURCE_DIR}/cmake/kan/context_statics_ecosystem")
+set (KAN_CONTEXT_STATICS_ECOSYSTEM "${PROJECT_SOURCE_DIR}/cmake/kan/context_statics_ecosystem")
 
 # Target property that holds list of attached systems.
 define_property (TARGET PROPERTY CONTEXT_SYSTEMS

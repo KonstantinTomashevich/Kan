@@ -21,7 +21,7 @@ set (KAN_APPLICATION_PACKAGED_WORLD_DIRECTORY_NAME "world")
 # Path to application program launcher statics ecosystem subdirectory.
 # Launchers statics are split into ecosystems in order to put them into flattened binary directories.
 set (KAN_APPLICATION_PROGRAM_LAUNCHER_STATICS_ECOSYSTEM
-        "${CMAKE_SOURCE_DIR}/cmake/kan/application_program_launcher_statics_ecosystem")
+        "${PROJECT_SOURCE_DIR}/cmake/kan/application_program_launcher_statics_ecosystem")
 
 # Name of the used application framework static launcher implementation.
 set (KAN_APPLICATION_PROGRAM_LAUNCHER_IMPLEMENTATION "sdl")
@@ -215,7 +215,7 @@ function (application_set_world_directory DIRECTORY)
         endif ()
 
         file (COPY_FILE
-                "${CMAKE_SOURCE_DIR}/cmake/kan/verify_code_hot_reload_world.rd"
+                "${PROJECT_SOURCE_DIR}/cmake/kan/verify_code_hot_reload_world.rd"
                 "${DIRECTORY}/optional/verify_code_hot_reload.rd")
 
     else ()
@@ -450,6 +450,21 @@ function (application_variant_add_environment_tag TAG)
             APPLICATION_VARIANT_ENVIRONMENT_TAGS "${TAGS}")
 endfunction ()
 
+# Sets variable with given name to the of resource builder target for current application.
+function (application_get_resource_builder_target_name OUTPUT)
+    set ("${OUTPUT}" "${APPLICATION_NAME}_resource_builder" PARENT_SCOPE)
+endfunction ()
+
+# Sets variable with given name to the of resource importer target for current application.
+function (application_get_resource_importer_target_name OUTPUT)
+    set ("${OUTPUT}" "${APPLICATION_NAME}_resource_importer" PARENT_SCOPE)
+endfunction ()
+
+# Sets variable with given name to path of resource project for current application.
+function (application_get_resource_project_path OUTPUT)
+    set ("${OUTPUT}" "${CMAKE_BINARY_DIR}/workspace/${APPLICATION_NAME}/resource_project.rd" PARENT_SCOPE)
+endfunction ()
+
 # Intended only for internal use in this file.
 # Gathers all resource directories used by given list of plugins and outputs resulting list to OUTPUT variable.
 function (private_gather_plugins_resource_directories PLUGINS OUTPUT)
@@ -526,7 +541,7 @@ function (private_generate_code_hot_reload_test)
     # Register verification program.
 
     register_application_program (verify_code_hot_reload)
-    application_program_set_configuration ("${CMAKE_SOURCE_DIR}/cmake/kan/verify_code_hot_reload_configuration.rd")
+    application_program_set_configuration ("${PROJECT_SOURCE_DIR}/cmake/kan/verify_code_hot_reload_configuration.rd")
     application_program_use_as_test_in_development_mode (
             ARGUMENTS
             "${CMAKE_COMMAND}" "${CMAKE_BINARY_DIR}" "${APPLICATION_NAME}_dev_all_plugins" "$<CONFIG>"
@@ -876,17 +891,34 @@ function (application_generate)
 
     # Generate resource builder executable.
 
-    register_executable ("${APPLICATION_NAME}_resource_builder")
-    executable_include (CONCRETE application_framework_resource_builder)
+    application_get_resource_builder_target_name (TARGET_NAME)
+    register_executable ("${TARGET_NAME}")
+    executable_include (CONCRETE application_framework_resource_builder application_framework_resource_tool)
 
     executable_link_shared_libraries ("${APPLICATION_NAME}_core_library")
     executable_verify ()
     executable_copy_linked_artefacts ()
 
     foreach (PLUGIN ${PLUGINS})
-        add_dependencies ("${APPLICATION_NAME}_resource_builder" "${PLUGIN}_dev_copy")
+        add_dependencies ("${TARGET_NAME}" "${PLUGIN}_dev_copy")
     endforeach ()
+    
+    # Generate resource importer executable.
 
+    application_get_resource_importer_target_name (TARGET_NAME)
+    register_executable ("${TARGET_NAME}")
+    executable_include (
+            ABSTRACT checksum=xxhash
+            CONCRETE application_framework_resource_importer application_framework_resource_tool)
+
+    executable_link_shared_libraries ("${APPLICATION_NAME}_core_library")
+    executable_verify ()
+    executable_copy_linked_artefacts ()
+
+    foreach (PLUGIN ${PLUGINS})
+        add_dependencies ("${TARGET_NAME}" "${PLUGIN}_dev_copy")
+    endforeach ()
+    
     # Generate programs.
 
     get_target_property (PROGRAMS "${APPLICATION_NAME}" APPLICATION_PROGRAMS)
@@ -1072,7 +1104,10 @@ function (application_generate)
         string (APPEND PROJECT_CONTENT "use_string_interning = 0\n")
     endif ()
 
-    set (RESOURCE_PROJECT_PATH "${WORKSPACE_DIRECTORY}/resource_project.rd")
+    string (APPEND PROJECT_CONTENT "application_source_directory = \"${CMAKE_CURRENT_SOURCE_DIR}\"\n")
+    string (APPEND PROJECT_CONTENT "project_source_directory = \"${PROJECT_SOURCE_DIR}\"\n")
+    string (APPEND PROJECT_CONTENT "source_directory = \"${CMAKE_SOURCE_DIR}\"\n")
+    application_get_resource_project_path (RESOURCE_PROJECT_PATH)
     file (CONFIGURE OUTPUT "${RESOURCE_PROJECT_PATH}" CONTENT "${PROJECT_CONTENT}")
 
     # Add application resource builder job pool
@@ -1369,13 +1404,14 @@ function (application_generate)
                 endif ()
             endforeach ()
 
+            application_get_resource_builder_target_name (RESOURCE_BUILDER)
             add_custom_target ("${VARIANT}_build_resources"
                     DEPENDS
                     "${VARIANT}_prepare_directories"
-                    "${APPLICATION_NAME}_resource_builder"
+                    "${RESOURCE_BUILDER}"
                     ${CORE_PLUGINS}
                     ${USED_PLUGINS}
-                    COMMAND "${APPLICATION_NAME}_resource_builder" "${RESOURCE_PROJECT_PATH}" ${BUILDER_TARGETS}
+                    COMMAND "${RESOURCE_BUILDER}" "${RESOURCE_PROJECT_PATH}" ${BUILDER_TARGETS}
                     JOB_POOL "${APPLICATION_NAME}_resource_builder_pool"
                     COMMENT "Running resource builder for application \"${APPLICATION_NAME}\" variant \"${NAME}\"."
                     COMMAND_EXPAND_LISTS

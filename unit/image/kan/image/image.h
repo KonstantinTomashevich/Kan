@@ -23,6 +23,8 @@ struct kan_image_raw_data_t
 {
     kan_instance_size_t width;
     kan_instance_size_t height;
+
+    /// \brief Image data in RGBA format.
     uint8_t *data;
 };
 

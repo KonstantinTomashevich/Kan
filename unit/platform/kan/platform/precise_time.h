@@ -15,6 +15,9 @@ KAN_C_HEADER_BEGIN
 /// \brief Returns count of nanoseconds since precise time initialization (initialization may happen during this call).
 PLATFORM_API kan_time_size_t kan_platform_get_elapsed_nanoseconds (void);
 
+/// \brief Returns count of nanoseconds since Unix epoch in nanoseconds in UTC zone.
+PLATFORM_API kan_time_size_t kan_platform_get_epoch_nanoseconds_utc (void);
+
 /// \brief Transfers current thread to sleeping state for given amount of nanoseconds.
 PLATFORM_API void kan_platform_sleep (kan_time_offset_t nanoseconds);
 

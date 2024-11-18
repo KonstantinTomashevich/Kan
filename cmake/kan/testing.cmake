@@ -2,7 +2,7 @@
 
 # Path to test runner ecosystem subdirectory.
 # Test runners are split into ecosystems in order to put them into flattened binary directories.
-set (KAN_TEST_RUNNER_ECOSYSTEM "${CMAKE_SOURCE_DIR}/cmake/kan/test_runner_ecosystem")
+set (KAN_TEST_RUNNER_ECOSYSTEM "${PROJECT_SOURCE_DIR}/cmake/kan/test_runner_ecosystem")
 
 # Setup target to build all tests.
 add_custom_target (test_kan COMMENT "All tests must be dependencies of this target.")

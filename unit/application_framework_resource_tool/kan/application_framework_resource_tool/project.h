@@ -1,18 +1,18 @@
 #pragma once
 
-#include <application_framework_resource_builder_api.h>
+#include <application_framework_resource_tool_api.h>
 
 #include <kan/api_common/c_header.h>
 #include <kan/container/dynamic_array.h>
 #include <kan/container/interned_string.h>
 
 /// \file
-/// \brief Contains project format declaration for resource builder.
+/// \brief Contains project format declaration for application framework tools.
 
 KAN_C_HEADER_BEGIN
 
 /// \brief Allocation group used for project data allocation.
-APPLICATION_FRAMEWORK_RESOURCE_BUILDER_API kan_allocation_group_t
+APPLICATION_FRAMEWORK_RESOURCE_TOOL_API kan_allocation_group_t
 kan_application_resource_project_allocation_group_get (void);
 
 /// \brief Defines one resource building target.
@@ -33,13 +33,13 @@ struct kan_application_resource_target_t
     struct kan_dynamic_array_t visible_targets;
 };
 
-APPLICATION_FRAMEWORK_RESOURCE_BUILDER_API void kan_application_resource_target_init (
+APPLICATION_FRAMEWORK_RESOURCE_TOOL_API void kan_application_resource_target_init (
     struct kan_application_resource_target_t *instance);
 
-APPLICATION_FRAMEWORK_RESOURCE_BUILDER_API void kan_application_resource_target_shutdown (
+APPLICATION_FRAMEWORK_RESOURCE_TOOL_API void kan_application_resource_target_shutdown (
     struct kan_application_resource_target_t *instance);
 
-/// \brief Defines project format for resource builder.
+/// \brief Defines project format for application framework tools.
 struct kan_application_resource_project_t
 {
     /// \brief Relative path to directory with plugin to be loaded.
@@ -61,12 +61,25 @@ struct kan_application_resource_project_t
 
     /// \brief Whether to enable string interning pass for data compression.
     kan_bool_t use_string_interning;
+
+    /// \brief Location of the directory where this application is defined.
+    char *application_source_directory;
+
+    /// \brief Location of the directory where current CMake project is defined.
+    char *project_source_directory;
+
+    /// \brief Location of CMake generation source directory.
+    char *source_directory;
 };
 
-APPLICATION_FRAMEWORK_RESOURCE_BUILDER_API void kan_application_resource_project_init (
+APPLICATION_FRAMEWORK_RESOURCE_TOOL_API void kan_application_resource_project_init (
     struct kan_application_resource_project_t *instance);
 
-APPLICATION_FRAMEWORK_RESOURCE_BUILDER_API void kan_application_resource_project_shutdown (
+APPLICATION_FRAMEWORK_RESOURCE_TOOL_API void kan_application_resource_project_shutdown (
     struct kan_application_resource_project_t *instance);
+
+/// \brief Reads project from given real path using temporary registry for deserialization.
+APPLICATION_FRAMEWORK_RESOURCE_TOOL_API kan_bool_t
+kan_application_resource_project_read (const char *path, struct kan_application_resource_project_t *project);
 
 KAN_C_HEADER_END

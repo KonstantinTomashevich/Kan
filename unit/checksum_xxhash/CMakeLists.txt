@@ -1,0 +1,5 @@
+register_concrete (checksum_xxhash)
+concrete_include (PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+concrete_sources ("*.c")
+concrete_require (SCOPE PRIVATE ABSTRACT memory THIRD_PARTY xxHash)
+concrete_implements_abstract (checksum)
