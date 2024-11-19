@@ -638,8 +638,8 @@ function (private_core_configurator_common_content)
         string (APPEND CORE_CONFIGURATOR_CONTENT "string (APPEND AUTO_BUILD_SUFFIX \"auto_build_command = \\\"")
         string (APPEND CORE_CONFIGURATOR_CONTENT "${CMAKE_COMMAND} ")
         string (APPEND CORE_CONFIGURATOR_CONTENT "--build \\\\\\\"${CMAKE_BINARY_DIR}\\\\\\\" ")
-        string (APPEND CORE_CONFIGURATOR_CONTENT
-                "--target \\\\\\\"${APPLICATION_NAME}_dev_all_plugins\\\\\\\"\\\"\")\n")
+        string (APPEND CORE_CONFIGURATOR_CONTENT "--target \\\\\\\"${APPLICATION_NAME}_dev_all_plugins\\\\\\\" ")
+        string (APPEND CORE_CONFIGURATOR_CONTENT "--config $<CONFIG>\\\"\")\n")
     endif ()
 
     set ("${ARG_OUTPUT}" "${CORE_CONFIGURATOR_CONTENT}" PARENT_SCOPE)
