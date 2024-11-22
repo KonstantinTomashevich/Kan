@@ -8,7 +8,6 @@
 #include <kan/context/universe_system.h>
 #include <kan/context/universe_world_definition_system.h>
 #include <kan/context/update_system.h>
-#include <kan/context/virtual_file_system.h>
 #include <kan/cpu_profiler/markup.h>
 #include <kan/file_system/stream.h>
 #include <kan/log/logging.h>

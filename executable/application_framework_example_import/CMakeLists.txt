@@ -48,12 +48,12 @@ application_get_resource_importer_target_name (RESOURCE_IMPORTER)
 application_get_resource_project_path (RESOURCE_PROJECT)
 
 add_custom_target (
-        application_framework_example_import_do_import
-        COMMAND ${RESOURCE_IMPORTER} "${RESOURCE_PROJECT}" "application_framework_example_import_plugin_logic"
+        application_framework_example_import_import_icons
+        COMMAND ${RESOURCE_IMPORTER} "${RESOURCE_PROJECT}" "--rule" "import_icons"
         COMMENT "Run resource import for application_framework_example_import.")
 
 # Variant naming is not public in application framework as variants shouldn't be addressed like that.
 # But here we're doing it for testing in order to always execute resource importer as part of tests here.
 add_dependencies (
         application_framework_example_import_variant_test_build_resources
-        application_framework_example_import_do_import)
+        application_framework_example_import_import_icons)

@@ -61,6 +61,9 @@ static struct
     struct kan_resource_pipeline_reference_type_info_storage_t reference_type_info_storage;
 
     struct kan_application_resource_project_t project;
+    const char *project_directory_path;
+    const char *project_directory_path_end;
+
     /// \meta reflection_dynamic_array_type = "struct target_t"
     struct kan_dynamic_array_t targets;
 
@@ -2579,6 +2582,8 @@ int main (int argument_count, char **argument_values)
 
     KAN_LOG (application_framework_resource_builder, KAN_LOG_INFO, "Reading project...")
     kan_application_resource_project_init (&global.project);
+    global.project_directory_path = argument_values[1u];
+    global.project_directory_path_end = strrchr (global.project_directory_path, '/');
     int result = 0;
 
     if (!kan_application_resource_project_read (argument_values[1u], &global.project))
@@ -2592,20 +2597,35 @@ int main (int argument_count, char **argument_values)
     if (result == 0)
     {
         KAN_LOG (application_framework_resource_builder, KAN_LOG_INFO, "Preparing virtual file system...")
-        if (!kan_virtual_file_system_volume_mount_real (global.volume, VFS_OUTPUT_DIRECTORY,
-                                                        global.project.output_absolute_directory))
+        struct kan_file_system_path_container_t source_directory;
+        if (global.project_directory_path_end)
+        {
+            kan_file_system_path_container_copy_char_sequence (&source_directory, global.project_directory_path,
+                                                               global.project_directory_path_end);
+        }
+        else
+        {
+            kan_file_system_path_container_reset_length (&source_directory, 0u);
+        }
+
+        const kan_instance_size_t source_length = source_directory.length;
+        kan_file_system_path_container_append (&source_directory, global.project.output_absolute_directory);
+
+        if (!kan_virtual_file_system_volume_mount_real (global.volume, VFS_OUTPUT_DIRECTORY, source_directory.path))
         {
             KAN_LOG (application_framework_resource_builder, KAN_LOG_ERROR, "Unable to mount output directory \"%s\".",
-                     global.project.output_absolute_directory)
+                     source_directory.path)
             result = ERROR_CODE_VFS_SETUP_FAILURE;
         }
 
+        kan_file_system_path_container_reset_length (&source_directory, source_length);
+        kan_file_system_path_container_append (&source_directory, global.project.reference_cache_absolute_directory);
+
         if (!kan_virtual_file_system_volume_mount_real (global.volume, VFS_RAW_REFERENCE_CACHE_DIRECTORY,
-                                                        global.project.reference_cache_absolute_directory))
+                                                        source_directory.path))
         {
             KAN_LOG (application_framework_resource_builder, KAN_LOG_ERROR,
-                     "Unable to mount reference cache directory \"%s\".",
-                     global.project.reference_cache_absolute_directory)
+                     "Unable to mount reference cache directory \"%s\".", source_directory.path)
             result = ERROR_CODE_VFS_SETUP_FAILURE;
         }
 
@@ -2686,6 +2706,17 @@ int main (int argument_count, char **argument_values)
             build_target->name = project_target->name;
             build_target->source = project_target;
 
+            struct kan_file_system_path_container_t source_directory;
+            if (global.project_directory_path_end)
+            {
+                kan_file_system_path_container_copy_char_sequence (&source_directory, global.project_directory_path,
+                                                                   global.project_directory_path_end);
+            }
+            else
+            {
+                kan_file_system_path_container_reset_length (&source_directory, 0u);
+            }
+
             struct kan_file_system_path_container_t target_directory;
             kan_file_system_path_container_copy_string (&target_directory, VFS_TARGETS_DIRECTORY);
             kan_file_system_path_container_append (&target_directory, project_target->name);
@@ -2695,13 +2726,16 @@ int main (int argument_count, char **argument_values)
                  ++directory_index)
             {
                 const char *directory = ((const char **) project_target->directories.data)[directory_index];
-                const kan_instance_size_t length = target_directory.length;
+                const kan_instance_size_t source_length = source_directory.length;
+                kan_file_system_path_container_append (&source_directory, directory);
 
+                const kan_instance_size_t target_length = target_directory.length;
                 char index_string[32u];
                 snprintf (index_string, 32u, "%lu", (unsigned long) directory_index);
                 kan_file_system_path_container_append (&target_directory, index_string);
 
-                if (!kan_virtual_file_system_volume_mount_real (global.volume, target_directory.path, directory))
+                if (!kan_virtual_file_system_volume_mount_real (global.volume, target_directory.path,
+                                                                source_directory.path))
                 {
                     KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, application_framework_resource_builder,
                                          KAN_LOG_ERROR, "Unable to mount \"%s\" at \"%s\".", directory,
@@ -2709,7 +2743,8 @@ int main (int argument_count, char **argument_values)
                     kan_atomic_int_add (&global.errors_count, 1);
                 }
 
-                kan_file_system_path_container_reset_length (&target_directory, length);
+                kan_file_system_path_container_reset_length (&source_directory, source_length);
+                kan_file_system_path_container_reset_length (&target_directory, target_length);
             }
 
             if (global.project.use_string_interning)

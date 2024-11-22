@@ -30,6 +30,20 @@ KAN_LOG_DEFINE_CATEGORY (application_framework_resource_importer);
 #define ERROR_CODE_FAILED_TO_READ_IMPORT_RULES -3
 #define ERROR_CODE_ERRORS_DURING_IMPORT -4
 
+struct request_target_t
+{
+    struct request_target_t *next;
+    const char *target;
+};
+
+struct request_rule_t
+{
+    struct request_rule_t *next;
+    const char *rule;
+};
+
+static kan_allocation_group_t arguments_allocation_group;
+
 static struct
 {
     const char *executable_path;
@@ -38,16 +52,16 @@ static struct
     kan_bool_t keep_resources;
     kan_bool_t check_is_data_new;
 
-    kan_instance_size_t requests_count;
-    char **requests;
+    struct request_target_t *target_requests;
+    struct request_rule_t *rule_requests;
 
 } arguments = {
     .project_path = NULL,
     .keep_resources = KAN_FALSE,
     .check_is_data_new = KAN_FALSE,
 
-    .requests_count = 0u,
-    .requests = NULL,
+    .target_requests = NULL,
+    .rule_requests = NULL,
 };
 
 struct rule_t
@@ -65,10 +79,11 @@ struct rule_t
     const struct kan_resource_import_configuration_type_meta_t *meta;
 
     struct kan_dynamic_array_t new_import_inputs;
+    char *owner_resource_directory_path;
+    kan_instance_size_t owner_resource_directory_path_length;
 
     const char *external_source_path_root;
     kan_instance_size_t source_path_root_length;
-    const char *external_owner_resource_directory_path;
 };
 
 struct rule_start_request_t
@@ -93,6 +108,9 @@ struct rule_finish_request_t
 static struct
 {
     struct kan_application_resource_project_t project;
+    const char *project_directory_path;
+    const char *project_directory_path_end;
+
     kan_reflection_registry_t registry;
     kan_serialization_binary_script_storage_t binary_script_storage;
 
@@ -118,6 +136,10 @@ static struct
     kan_allocation_group_t temporary_allocation_group;
     kan_allocation_group_t configuration_allocation_group;
 
+    struct kan_file_system_path_container_t resolved_application_source_directory;
+    struct kan_file_system_path_container_t resolved_project_source_directory;
+    struct kan_file_system_path_container_t resolved_source_directory;
+
 } global = {
     .registry = KAN_HANDLE_INITIALIZE_INVALID,
     .binary_script_storage = KAN_HANDLE_INITIALIZE_INVALID,
@@ -142,9 +164,11 @@ static inline void rule_init (struct rule_t *rule)
                             _Alignof (struct kan_resource_import_input_t),
                             kan_resource_import_rule_get_allocation_group ());
 
+    rule->owner_resource_directory_path = NULL;
+    rule->owner_resource_directory_path_length = 0u;
+
     rule->external_source_path_root = NULL;
     rule->source_path_root_length = 0u;
-    rule->external_owner_resource_directory_path = NULL;
 }
 
 static inline void rule_shutdown (struct rule_t *rule)
@@ -161,6 +185,12 @@ static inline void rule_shutdown (struct rule_t *rule)
     {
         kan_resource_import_input_shutdown (
             &((struct kan_resource_import_input_t *) rule->new_import_inputs.data)[index]);
+    }
+
+    if (rule->owner_resource_directory_path)
+    {
+        kan_free_general (allocation_group, rule->owner_resource_directory_path,
+                          rule->owner_resource_directory_path_length + 1u);
     }
 
     kan_dynamic_array_shutdown (&rule->new_import_inputs);
@@ -182,13 +212,18 @@ static inline void destroy_all_rules (void)
 }
 
 static void create_import_rule_using_stream (struct kan_stream_t *stream,
-                                             const char *rule_path,
-                                             const char *owner_resource_directory_path)
+                                             struct kan_file_system_path_container_t *rule_path,
+                                             struct kan_file_system_path_container_t *owner_resource_directory_path)
 {
     kan_allocation_group_t allocation_group = kan_resource_import_rule_get_allocation_group ();
     struct rule_t *rule = kan_allocate_batched (allocation_group, sizeof (struct rule_t));
     rule_init (rule);
-    rule->external_owner_resource_directory_path = owner_resource_directory_path;
+
+    rule->owner_resource_directory_path =
+        kan_allocate_general (allocation_group, owner_resource_directory_path->length + 1u, _Alignof (char));
+    memcpy (rule->owner_resource_directory_path, owner_resource_directory_path->path,
+            owner_resource_directory_path->length + 1u);
+    rule->owner_resource_directory_path_length = owner_resource_directory_path->length;
 
     kan_serialization_rd_reader_t reader = kan_serialization_rd_reader_create (
         stream, &rule->import_rule, global.interned_kan_resource_import_rule_t, global.registry, allocation_group);
@@ -201,15 +236,16 @@ static void create_import_rule_using_stream (struct kan_stream_t *stream,
     kan_serialization_rd_reader_destroy (reader);
     if (serialization_state == KAN_SERIALIZATION_FINISHED)
     {
-        KAN_LOG (application_framework_resource_importer, KAN_LOG_INFO, "Using import rule from \"%s\".", rule_path)
+        KAN_LOG (application_framework_resource_importer, KAN_LOG_INFO, "Using import rule from \"%s\".",
+                 rule_path->path)
         rule->inputs_left_to_process = kan_atomic_int_init (0);
 
-        const char *last_separator = strrchr (rule_path, '/');
+        const char *last_separator = strrchr (rule_path->path, '/');
         if (!last_separator)
         {
             KAN_ASSERT (serialization_state == KAN_SERIALIZATION_FAILED)
             KAN_LOG (application_framework_resource_importer, KAN_LOG_ERROR,
-                     "Unable to get directory path part from \"%s\".", rule_path)
+                     "Unable to get directory path part from \"%s\".", rule_path->path)
 
             kan_atomic_int_add (&global.errors_count, 1);
             rule_shutdown (rule);
@@ -217,10 +253,9 @@ static void create_import_rule_using_stream (struct kan_stream_t *stream,
             return;
         }
 
-        rule->directory_part_length = (kan_instance_size_t) (last_separator - rule_path);
-        const kan_instance_size_t path_length = (kan_instance_size_t) strlen (rule_path);
-        rule->path = kan_allocate_general (allocation_group, path_length + 1u, _Alignof (char));
-        memcpy (rule->path, rule_path, path_length + 1u);
+        rule->directory_part_length = (kan_instance_size_t) (last_separator - rule_path->path);
+        rule->path = kan_allocate_general (allocation_group, rule_path->length + 1u, _Alignof (char));
+        memcpy (rule->path, rule_path->path, rule_path->length + 1u);
 
         kan_atomic_int_lock (&global.rule_registration_lock);
         rule->next_in_list = global.first_rule;
@@ -231,7 +266,7 @@ static void create_import_rule_using_stream (struct kan_stream_t *stream,
     {
         KAN_ASSERT (serialization_state == KAN_SERIALIZATION_FAILED)
         KAN_LOG (application_framework_resource_importer, KAN_LOG_ERROR, "Failed to read import rule at \"%s\".",
-                 rule_path)
+                 rule_path->path)
 
         kan_atomic_int_add (&global.errors_count, 1);
         rule_shutdown (rule);
@@ -239,35 +274,55 @@ static void create_import_rule_using_stream (struct kan_stream_t *stream,
     }
 }
 
-static void create_import_rule_from_path (const char *rule_path)
+struct target_scan_state_t
 {
-    struct kan_stream_t *input_stream = kan_direct_file_stream_open_for_read (rule_path, KAN_TRUE);
-    if (!input_stream)
-    {
-        KAN_LOG (application_framework_resource_importer, KAN_LOG_ERROR, "Failed to open import rule at \"%s\".",
-                 rule_path)
-        kan_atomic_int_add (&global.errors_count, 1);
-        return;
-    }
+    kan_bool_t whole_target_included;
+    struct kan_file_system_path_container_t work_path_container;
+    struct kan_file_system_path_container_t resource_directory_container;
+};
 
-    input_stream = kan_random_access_stream_buffer_open_for_read (input_stream, KAN_RESOURCE_IMPORTER_IO_BUFFER);
-    create_import_rule_using_stream (input_stream, rule_path, NULL);
-    input_stream->operations->close (input_stream);
-}
-
-static void scan_file_as_potential_rule (struct kan_file_system_path_container_t *path_container,
-                                         const char *resource_directory)
+static void scan_file_as_potential_rule (struct target_scan_state_t *state)
 {
     // We expect rules only in readable data format.
-    if (path_container->length >= 3u && path_container->path[path_container->length - 3u] == '.' &&
-        path_container->path[path_container->length - 2u] == 'r' &&
-        path_container->path[path_container->length - 1u] == 'd')
+    if (state->work_path_container.length >= 3u &&
+        state->work_path_container.path[state->work_path_container.length - 3u] == '.' &&
+        state->work_path_container.path[state->work_path_container.length - 2u] == 'r' &&
+        state->work_path_container.path[state->work_path_container.length - 1u] == 'd')
     {
-        struct kan_stream_t *input_stream = kan_direct_file_stream_open_for_read (path_container->path, KAN_TRUE);
+        if (!state->whole_target_included)
+        {
+            // If not whole target included, check resource name first.
+            const char *last_separator = strrchr (state->work_path_container.path, '/');
+            const char *name_begin = last_separator ? last_separator + 1u : state->work_path_container.path;
+            const char *name_end = &state->work_path_container.path[state->work_path_container.length - 3u];
+            const kan_instance_size_t name_length = (kan_instance_size_t) (name_end - name_begin);
+            struct request_rule_t *request = arguments.rule_requests;
+
+            while (request)
+            {
+                if (name_length == (kan_instance_size_t) strlen (request->rule) &&
+                    strncmp (name_begin, request->rule, name_length) == 0)
+                {
+                    break;
+                }
+
+                request = request->next;
+            }
+
+            if (!request)
+            {
+                // Even if this is a rule, it is not requested anyway.
+                return;
+            }
+        }
+
+        struct kan_stream_t *input_stream =
+            kan_direct_file_stream_open_for_read (state->work_path_container.path, KAN_TRUE);
         if (!input_stream)
         {
             KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, application_framework_resource_importer,
-                                 KAN_LOG_ERROR, "Failed to open resource file at \"%s\".", path_container->path)
+                                 KAN_LOG_ERROR, "Failed to open resource file at \"%s\".",
+                                 state->work_path_container.path)
             kan_atomic_int_add (&global.errors_count, 1);
             return;
         }
@@ -278,7 +333,7 @@ static void scan_file_as_potential_rule (struct kan_file_system_path_container_t
         if (!kan_serialization_rd_read_type_header (input_stream, &type_name))
         {
             KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, application_framework_resource_importer,
-                                 KAN_LOG_ERROR, "Failed read type header of \"%s\".", path_container->path)
+                                 KAN_LOG_ERROR, "Failed read type header of \"%s\".", state->work_path_container.path)
             kan_atomic_int_add (&global.errors_count, 1);
             input_stream->operations->close (input_stream);
             return;
@@ -286,17 +341,18 @@ static void scan_file_as_potential_rule (struct kan_file_system_path_container_t
 
         if (type_name == global.interned_kan_resource_import_rule_t)
         {
-            create_import_rule_using_stream (input_stream, path_container->path, resource_directory);
+            create_import_rule_using_stream (input_stream, &state->work_path_container,
+                                             &state->resource_directory_container);
         }
 
         input_stream->operations->close (input_stream);
     }
 }
 
-static void scan_directory_for_rules (struct kan_file_system_path_container_t *path_container,
-                                      const char *resource_directory)
+static void scan_directory_for_rules (struct target_scan_state_t *state)
 {
-    kan_file_system_directory_iterator_t iterator = kan_file_system_directory_iterator_create (path_container->path);
+    kan_file_system_directory_iterator_t iterator =
+        kan_file_system_directory_iterator_create (state->work_path_container.path);
     const char *item_name;
 
     while ((item_name = kan_file_system_directory_iterator_advance (iterator)))
@@ -308,37 +364,38 @@ static void scan_directory_for_rules (struct kan_file_system_path_container_t *p
             continue;
         }
 
-        const kan_instance_size_t old_length = path_container->length;
-        kan_file_system_path_container_append (path_container, item_name);
+        const kan_instance_size_t old_length = state->work_path_container.length;
+        kan_file_system_path_container_append (&state->work_path_container, item_name);
         struct kan_file_system_entry_status_t status;
 
-        if (kan_file_system_query_entry (path_container->path, &status))
+        if (kan_file_system_query_entry (state->work_path_container.path, &status))
         {
             switch (status.type)
             {
             case KAN_FILE_SYSTEM_ENTRY_TYPE_UNKNOWN:
                 KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, application_framework_resource_importer,
-                                     KAN_LOG_ERROR, "Entry \"%s\" has unknown type.", path_container->path)
+                                     KAN_LOG_ERROR, "Entry \"%s\" has unknown type.", state->work_path_container.path)
                 kan_atomic_int_add (&global.errors_count, 1);
                 break;
 
             case KAN_FILE_SYSTEM_ENTRY_TYPE_FILE:
-                scan_file_as_potential_rule (path_container, resource_directory);
+                scan_file_as_potential_rule (state);
                 break;
 
             case KAN_FILE_SYSTEM_ENTRY_TYPE_DIRECTORY:
-                scan_directory_for_rules (path_container, resource_directory);
+                scan_directory_for_rules (state);
                 break;
             }
         }
         else
         {
             KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, application_framework_resource_importer,
-                                 KAN_LOG_ERROR, "Failed to query status of entry \"%s\".", path_container->path)
+                                 KAN_LOG_ERROR, "Failed to query status of entry \"%s\".",
+                                 state->work_path_container.path)
             kan_atomic_int_add (&global.errors_count, 1);
         }
 
-        kan_file_system_path_container_reset_length (path_container, old_length);
+        kan_file_system_path_container_reset_length (&state->work_path_container, old_length);
     }
 
     kan_file_system_directory_iterator_destroy (iterator);
@@ -347,12 +404,38 @@ static void scan_directory_for_rules (struct kan_file_system_path_container_t *p
 static void scan_target_for_rules (kan_functor_user_data_t user_data)
 {
     struct kan_application_resource_target_t *target = (struct kan_application_resource_target_t *) user_data;
-    struct kan_file_system_path_container_t path_container;
+    struct target_scan_state_t state;
+    struct request_target_t *target_request = arguments.target_requests;
+
+    while (target_request)
+    {
+        if (strcmp (target->name, target_request->target) == 0)
+        {
+            break;
+        }
+
+        target_request = target_request->next;
+    }
+
+    state.whole_target_included = target_request != NULL;
+    if (global.project_directory_path_end)
+    {
+        kan_file_system_path_container_copy_char_sequence (
+            &state.resource_directory_container, global.project_directory_path, global.project_directory_path_end);
+    }
+    else
+    {
+        kan_file_system_path_container_reset_length (&state.resource_directory_container, 0u);
+    }
 
     for (kan_loop_size_t index = 0u; index < target->directories.size; ++index)
     {
-        kan_file_system_path_container_copy_string (&path_container, ((char **) target->directories.data)[index]);
-        scan_directory_for_rules (&path_container, ((char **) target->directories.data)[index]);
+        const kan_instance_size_t length = state.resource_directory_container.length;
+        kan_file_system_path_container_append (&state.resource_directory_container,
+                                               ((char **) target->directories.data)[index]);
+        kan_file_system_path_container_copy (&state.work_path_container, &state.resource_directory_container);
+        scan_directory_for_rules (&state);
+        kan_file_system_path_container_reset_length (&state.resource_directory_container, length);
     }
 
     KAN_LOG (application_framework_resource_importer, KAN_LOG_INFO, "Done scanning for import rules in target \"%s\".",
@@ -543,67 +626,23 @@ static void serve_start_request (kan_functor_user_data_t user_data)
         break;
 
     case KAN_RESOURCE_IMPORT_SOURCE_PATH_ROOT_RESOURCE_DIRECTORY:
-        if (rule->external_owner_resource_directory_path)
-        {
-            rule->external_source_path_root = rule->external_owner_resource_directory_path;
-            rule->source_path_root_length = (kan_instance_size_t) strlen (rule->external_source_path_root);
-        }
-        else
-        {
-            // Received rule without provided external resource path (directly as argument, perhaps).
-            // We need to find resource directory path ourselves.
-            const kan_instance_size_t path_length = (kan_instance_size_t) strlen (rule->path);
-
-            for (kan_loop_size_t target_index = 0u; target_index < global.project.targets.size; ++target_index)
-            {
-                struct kan_application_resource_target_t *target =
-                    &((struct kan_application_resource_target_t *) global.project.targets.data)[target_index];
-
-                for (kan_loop_size_t directory_index = 0u; directory_index < target->directories.size;
-                     ++directory_index)
-                {
-                    const char *directory_path = ((char **) target->directories.data)[directory_index];
-                    const kan_instance_size_t directory_path_length = (kan_instance_size_t) strlen (directory_path);
-
-                    if (directory_path_length < path_length &&
-                        strncmp (rule->path, directory_path, directory_path_length) == 0)
-                    {
-                        rule->source_path_root_length = directory_path_length;
-                        rule->external_source_path_root = directory_path;
-                        break;
-                    }
-                }
-
-                if (rule->external_source_path_root)
-                {
-                    break;
-                }
-            }
-
-            if (!rule->external_source_path_root)
-            {
-                KAN_LOG (application_framework_resource_importer, KAN_LOG_ERROR,
-                         "Unable to parent resource directory for the rule \"%s\".", rule->path)
-                serve_start_request_end_by_error ();
-                return;
-            }
-        }
-
+        rule->external_source_path_root = rule->owner_resource_directory_path;
+        rule->source_path_root_length = rule->owner_resource_directory_path_length;
         break;
 
     case KAN_RESOURCE_IMPORT_SOURCE_PATH_ROOT_APPLICATION_SOURCE:
-        rule->external_source_path_root = global.project.application_source_directory;
-        rule->source_path_root_length = (kan_instance_size_t) strlen (rule->external_source_path_root);
+        rule->external_source_path_root = global.resolved_application_source_directory.path;
+        rule->source_path_root_length = global.resolved_application_source_directory.length;
         break;
 
     case KAN_RESOURCE_IMPORT_SOURCE_PATH_ROOT_PROJECT_SOURCE:
-        rule->external_source_path_root = global.project.project_source_directory;
-        rule->source_path_root_length = (kan_instance_size_t) strlen (rule->external_source_path_root);
+        rule->external_source_path_root = global.resolved_project_source_directory.path;
+        rule->source_path_root_length = global.resolved_project_source_directory.length;
         break;
 
     case KAN_RESOURCE_IMPORT_SOURCE_PATH_ROOT_CMAKE_SOURCE:
-        rule->external_source_path_root = global.project.source_directory;
-        rule->source_path_root_length = (kan_instance_size_t) strlen (rule->external_source_path_root);
+        rule->external_source_path_root = global.resolved_source_directory.path;
+        rule->source_path_root_length = global.resolved_source_directory.length;
         break;
     }
 
@@ -915,6 +954,10 @@ static void serve_finish_request (kan_functor_user_data_t user_data)
     if (kan_atomic_int_get (&rule->input_errors) == 0)
     {
         kan_bool_t has_errors = KAN_FALSE;
+        struct kan_file_system_path_container_t path_container;
+        kan_file_system_path_container_copy_char_sequence (&path_container, rule->path,
+                                                           rule->path + rule->directory_part_length);
+
         for (kan_loop_size_t old_index = 0u; old_index < rule->import_rule.last_import.size; ++old_index)
         {
             struct kan_resource_import_input_t *old_input =
@@ -949,9 +992,7 @@ static void serve_finish_request (kan_functor_user_data_t user_data)
 
                 if (!found_in_new)
                 {
-                    struct kan_file_system_path_container_t path_container;
-                    kan_file_system_path_container_copy_char_sequence (&path_container, rule->path,
-                                                                       rule->path + rule->directory_part_length);
+                    kan_instance_size_t length = path_container.length;
                     kan_file_system_path_container_append (&path_container, old_output);
 
                     if (arguments.keep_resources)
@@ -977,6 +1018,8 @@ static void serve_finish_request (kan_functor_user_data_t user_data)
                             has_errors = KAN_TRUE;
                         }
                     }
+
+                    kan_file_system_path_container_reset_length (&path_container, length);
                 }
             }
         }
@@ -1070,7 +1113,7 @@ int main (int argument_count, char **argument_values)
     {
         KAN_LOG (application_framework_resource_importer, KAN_LOG_ERROR,
                  "Incorrect number of arguments. Expected arguments: <path_to_resource_project_file> flags...? "
-                 "rules_or_targets_to_check...")
+                 "[--target target_name]... [--rule rule_name]...")
         KAN_LOG (application_framework_resource_importer, KAN_LOG_ERROR, "Where flags are:")
         KAN_LOG (application_framework_resource_importer, KAN_LOG_ERROR,
                  "    --keep_resources: avoid deleting resources that were previously imported but are no longer "
@@ -1078,17 +1121,19 @@ int main (int argument_count, char **argument_values)
         KAN_LOG (application_framework_resource_importer, KAN_LOG_ERROR,
                  "    --check_is_data_new: check source files size and checksum and skip import if they're the same.")
         KAN_LOG (application_framework_resource_importer, KAN_LOG_ERROR,
-                 "It is possible to provide either paths to rules or target names.")
+                 "When target is provided, all rules for this target are executed.")
         KAN_LOG (application_framework_resource_importer, KAN_LOG_ERROR,
-                 "All provided paths must be absolute in order to make parent resource directory search easier.")
-        KAN_LOG (application_framework_resource_importer, KAN_LOG_ERROR,
-                 "When target is provided, all rules from it are executed.")
+                 "When rule is provided, rule with given name is searched across all targets.")
         return ERROR_CODE_INCORRECT_ARGUMENTS;
     }
+
+    arguments_allocation_group =
+        kan_allocation_group_get_child (kan_allocation_group_root (), "resource_importer_arguments");
 
     arguments.executable_path = argument_values[0u];
     arguments.project_path = argument_values[1u];
     kan_instance_size_t argument_index = 2u;
+    kan_bool_t arguments_have_errors = KAN_FALSE;
 
     while (argument_index < (kan_instance_size_t) argument_count)
     {
@@ -1100,16 +1145,58 @@ int main (int argument_count, char **argument_values)
         {
             arguments.check_is_data_new = KAN_TRUE;
         }
+        else if (strcmp (argument_values[argument_index], "--target") == 0)
+        {
+            ++argument_index;
+            if (argument_index < (kan_instance_size_t) argument_count)
+            {
+                struct request_target_t *target_request =
+                    kan_allocate_batched (arguments_allocation_group, sizeof (struct request_target_t));
+                target_request->target = argument_values[argument_index];
+                target_request->next = arguments.target_requests;
+                arguments.target_requests = target_request;
+            }
+            else
+            {
+                KAN_LOG (application_framework_resource_importer, KAN_LOG_ERROR,
+                         "Encountered \"--target\" as last argument.")
+                arguments_have_errors = KAN_TRUE;
+            }
+        }
+        else if (strcmp (argument_values[argument_index], "--rule") == 0)
+        {
+            ++argument_index;
+            if (argument_index < (kan_instance_size_t) argument_count)
+            {
+                struct request_rule_t *rule_request =
+                    kan_allocate_batched (arguments_allocation_group, sizeof (struct request_rule_t));
+                rule_request->rule = argument_values[argument_index];
+                rule_request->next = arguments.rule_requests;
+                arguments.rule_requests = rule_request;
+            }
+            else
+            {
+                KAN_LOG (application_framework_resource_importer, KAN_LOG_ERROR,
+                         "Encountered \"--rule\" as last argument.")
+                arguments_have_errors = KAN_TRUE;
+            }
+        }
         else
         {
-            arguments.requests_count = (kan_instance_size_t) argument_count - argument_index;
-            arguments.requests = argument_values + argument_index;
+            KAN_LOG (application_framework_resource_importer, KAN_LOG_ERROR, "Encountered unknown argument \"%s\".",
+                     argument_values[argument_index])
+            arguments_have_errors = KAN_TRUE;
         }
 
         ++argument_index;
     }
 
-    if (arguments.requests_count == 0u)
+    if (arguments_have_errors)
+    {
+        return ERROR_CODE_INCORRECT_ARGUMENTS;
+    }
+
+    if (!arguments.target_requests && !arguments.rule_requests)
     {
         KAN_LOG (application_framework_resource_importer, KAN_LOG_ERROR, "No rules or targets provided.")
         return ERROR_CODE_INCORRECT_ARGUMENTS;
@@ -1118,6 +1205,8 @@ int main (int argument_count, char **argument_values)
     int result = 0;
     KAN_LOG (application_framework_resource_importer, KAN_LOG_INFO, "Reading project...")
     kan_application_resource_project_init (&global.project);
+    global.project_directory_path = argument_values[1u];
+    global.project_directory_path_end = strrchr (global.project_directory_path, '/');
 
     if (!kan_application_resource_project_read (argument_values[1u], &global.project))
     {
@@ -1125,6 +1214,33 @@ int main (int argument_count, char **argument_values)
                  argument_values[1u])
         kan_application_resource_project_shutdown (&global.project);
         return ERROR_CODE_FAILED_TO_READ_PROJECT;
+    }
+
+    if (global.project_directory_path_end)
+    {
+        kan_file_system_path_container_copy_char_sequence (&global.resolved_application_source_directory,
+                                                           global.project_directory_path,
+                                                           global.project_directory_path_end);
+        kan_file_system_path_container_append (&global.resolved_application_source_directory,
+                                               global.project.application_source_directory);
+
+        kan_file_system_path_container_copy_char_sequence (&global.resolved_project_source_directory,
+                                                           global.project_directory_path,
+                                                           global.project_directory_path_end);
+        kan_file_system_path_container_append (&global.resolved_project_source_directory,
+                                               global.project.project_source_directory);
+
+        kan_file_system_path_container_copy_char_sequence (
+            &global.resolved_source_directory, global.project_directory_path, global.project_directory_path_end);
+        kan_file_system_path_container_append (&global.resolved_source_directory, global.project.source_directory);
+    }
+    else
+    {
+        kan_file_system_path_container_copy_string (&global.resolved_application_source_directory,
+                                                    global.project.application_source_directory);
+        kan_file_system_path_container_copy_string (&global.resolved_project_source_directory,
+                                                    global.project.project_source_directory);
+        kan_file_system_path_container_copy_string (&global.resolved_source_directory, global.project.source_directory);
     }
 
     global.interned_kan_resource_import_rule_t = kan_string_intern ("kan_resource_import_rule_t");
@@ -1157,27 +1273,11 @@ int main (int argument_count, char **argument_values)
     struct kan_cpu_task_list_node_t *task_list = NULL;
     const kan_interned_string_t task_name = kan_string_intern ("scan_target_for_rules");
 
-    for (kan_loop_size_t request_index = 0u; request_index < (kan_loop_size_t) arguments.requests_count;
-         ++request_index)
+    for (kan_loop_size_t target_index = 0u; target_index < global.project.targets.size; ++target_index)
     {
-        kan_bool_t processed_as_target = KAN_FALSE;
-        for (kan_loop_size_t target_index = 0u; target_index < global.project.targets.size; ++target_index)
-        {
-            struct kan_application_resource_target_t *target =
-                &((struct kan_application_resource_target_t *) global.project.targets.data)[target_index];
-
-            if (strcmp (target->name, arguments.requests[request_index]) == 0)
-            {
-                processed_as_target = KAN_TRUE;
-                KAN_CPU_TASK_LIST_USER_VALUE (&task_list, &global.temporary_allocator, task_name, scan_target_for_rules,
-                                              target)
-            }
-        }
-
-        if (!processed_as_target)
-        {
-            create_import_rule_from_path (arguments.requests[request_index]);
-        }
+        struct kan_application_resource_target_t *target =
+            &((struct kan_application_resource_target_t *) global.project.targets.data)[target_index];
+        KAN_CPU_TASK_LIST_USER_VALUE (&task_list, &global.temporary_allocator, task_name, scan_target_for_rules, target)
     }
 
     if (task_list)
@@ -1186,6 +1286,28 @@ int main (int argument_count, char **argument_values)
         kan_cpu_job_dispatch_and_detach_task_list (job, task_list);
         kan_cpu_job_release (job);
         kan_cpu_job_wait (job);
+    }
+
+    // Clear target requests after scan execution.
+    struct request_target_t *target_request = arguments.target_requests;
+    arguments.target_requests = NULL;
+
+    while (target_request)
+    {
+        struct request_target_t *next = target_request->next;
+        kan_free_batched (arguments_allocation_group, target_request);
+        target_request = next;
+    }
+
+    // Clear rule requests after scan execution.
+    struct request_rule_t *rule_request = arguments.rule_requests;
+    arguments.rule_requests = NULL;
+
+    while (rule_request)
+    {
+        struct request_rule_t *next = rule_request->next;
+        kan_free_batched (arguments_allocation_group, rule_request);
+        rule_request = next;
     }
 
     kan_stack_group_allocator_reset (&global.temporary_allocator);
