@@ -1625,7 +1625,9 @@ enum kan_serialization_state_t kan_serialization_interned_string_registry_reader
 
     if (string_length == 0u)
     {
-        return KAN_SERIALIZATION_FAILED;
+        interned_string_registry_add_string_internal (data->registry, NULL);
+        ++data->strings_read;
+        return data->strings_read >= data->strings_total ? KAN_SERIALIZATION_FINISHED : KAN_SERIALIZATION_IN_PROGRESS;
     }
 
 #define MAX_SIZE_ON_STACK 1023u
@@ -1723,6 +1725,13 @@ enum kan_serialization_state_t kan_serialization_interned_string_registry_writer
     kan_interned_string_t string =
         ((kan_interned_string_t *) data->registry->index_to_value.data)[data->strings_written];
 
+    // Replacement for the writing. NULL interned strings are acceptable, but we cannot serialize them.
+    // Therefore, we store empty strings that will be converted to NULLs on read.
+    if (!string)
+    {
+        string = "";
+    }
+
     kan_serialized_size_t string_length = (kan_serialized_size_t) strlen (string);
     if (data->stream->operations->write (data->stream, sizeof (kan_serialized_size_t), &string_length) !=
         sizeof (kan_serialized_size_t))
@@ -1730,9 +1739,12 @@ enum kan_serialization_state_t kan_serialization_interned_string_registry_writer
         return KAN_SERIALIZATION_FAILED;
     }
 
-    if (data->stream->operations->write (data->stream, string_length, string) != string_length)
+    if (string_length > 0u)
     {
-        return KAN_SERIALIZATION_FAILED;
+        if (data->stream->operations->write (data->stream, string_length, string) != string_length)
+        {
+            return KAN_SERIALIZATION_FAILED;
+        }
     }
 
     ++data->strings_written;
@@ -1850,6 +1862,12 @@ static inline kan_bool_t read_interned_string_stateless (struct kan_stream_t *st
             sizeof (kan_serialized_size_t))
         {
             return KAN_FALSE;
+        }
+
+        if (string_length == 0u)
+        {
+            *output = NULL;
+            return KAN_TRUE;
         }
 
         char *string_memory = kan_allocate_general (serialization_allocation_group, string_length, _Alignof (char));
@@ -2711,6 +2729,18 @@ static inline kan_bool_t write_interned_string_stateless (struct kan_stream_t *s
         const script_size_t index = interned_string_registry_store_string (string_registry, input);
         return stream->operations->write (stream, sizeof (kan_serialized_size_t), &index) ==
                sizeof (kan_serialized_size_t);
+    }
+
+    // Having NULL interned strings as no-option value is totally valid.
+    if (!input)
+    {
+        kan_serialized_size_t size = 0u;
+        if (stream->operations->write (stream, sizeof (kan_serialized_size_t), &size) != sizeof (kan_serialized_size_t))
+        {
+            return KAN_FALSE;
+        }
+
+        return KAN_TRUE;
     }
 
     return write_string_stateless (stream, input);
