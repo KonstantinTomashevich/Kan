@@ -40,7 +40,12 @@ kan_bool_t kan_file_system_query_entry (const char *path, struct kan_file_system
     struct stat unix_status;
     if (stat (path, &unix_status) != 0)
     {
-        KAN_LOG (file_system_linux, KAN_LOG_ERROR, "Failed to get status of \"%s\": %s.", path, strerror (errno))
+        // False as a result of query on non-existent file is not treated like an error.
+        if (errno != ENOENT)
+        {
+            KAN_LOG (file_system_linux, KAN_LOG_ERROR, "Failed to get status of \"%s\": %s.", path, strerror (errno))
+        }
+
         return KAN_FALSE;
     }
 
@@ -85,6 +90,12 @@ kan_bool_t kan_file_system_make_directory (const char *path)
 {
     if (mkdir (path, S_IRWXU | S_IRWXG | S_IRWXO) != 0)
     {
+        if (errno == EEXIST)
+        {
+            // Special case; we're okay with directory already existing.
+            return KAN_TRUE;
+        }
+
         KAN_LOG (file_system_linux, KAN_LOG_ERROR, "Failed to create directory \"%s\": %s.", path, strerror (errno))
         return KAN_FALSE;
     }

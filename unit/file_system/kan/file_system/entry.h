@@ -47,7 +47,7 @@ FILE_SYSTEM_API const char *kan_file_system_directory_iterator_advance (kan_file
 /// \brief Frees given directory content iterator.
 FILE_SYSTEM_API void kan_file_system_directory_iterator_destroy (kan_file_system_directory_iterator_t iterator);
 
-/// \brief Queries status of entry at given path. Returns KAN_TRUE on success.
+/// \brief Queries status of entry at given path. Returns KAN_TRUE on success. Returns KAN_FALSE if file does not exist.
 FILE_SYSTEM_API kan_bool_t kan_file_system_query_entry (const char *path,
                                                         struct kan_file_system_entry_status_t *status);
 
@@ -58,6 +58,7 @@ FILE_SYSTEM_API kan_bool_t kan_file_system_check_existence (const char *path);
 FILE_SYSTEM_API kan_bool_t kan_file_system_remove_file (const char *path);
 
 /// \brief Attempts to create directory entry at given path. Returns KAN_TRUE on success.
+/// \warning We treat failure due to the existence of directory as success, as it is much more convenient for tools.
 FILE_SYSTEM_API kan_bool_t kan_file_system_make_directory (const char *path);
 
 /// \brief Attempts to remove directory entry and all its children at given path. Returns KAN_TRUE on success.

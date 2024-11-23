@@ -144,8 +144,13 @@ kan_bool_t kan_file_system_query_entry (const char *path, struct kan_file_system
         return KAN_TRUE;
     }
 
-    KAN_LOG (file_system_win32, KAN_LOG_ERROR, "Failed to query info about \"%s\": error code %lu.", path,
-             (unsigned long) GetLastError ())
+    // False as a result of query on non-existent file is not treated like an error.
+    if (GetLastError () != ERROR_FILE_NOT_FOUND)
+    {
+        KAN_LOG (file_system_win32, KAN_LOG_ERROR, "Failed to query info about \"%s\": error code %lu.", path,
+                 (unsigned long) GetLastError ())
+    }
+
     return KAN_FALSE;
 }
 
@@ -168,7 +173,9 @@ kan_bool_t kan_file_system_remove_file (const char *path)
 
 kan_bool_t kan_file_system_make_directory (const char *path)
 {
-    if (CreateDirectory (path, NULL))
+    if (CreateDirectory (path, NULL) ||
+        // Special case; we're okay with directory already existing.
+        GetLastError () == ERROR_ALREADY_EXISTS)
     {
         return KAN_TRUE;
     }
