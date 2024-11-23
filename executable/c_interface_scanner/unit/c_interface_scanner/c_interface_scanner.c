@@ -478,6 +478,12 @@ static const char *capture_meta_value_end;
  "/""*" { if (!parse_subroutine_multi_line_comment ()) { return PARSE_RESPONSE_FAILED; } continue; }
  "//" { if (!parse_subroutine_single_line_comment ()) { return PARSE_RESPONSE_FAILED; } continue; }
 
+ "#line" separator+ [0-9]+ separator+ .+ separator?
+ {
+     // Line preprocessor. Special case: do not append to includable object.
+     continue;
+ }
+
  separator | any_preprocessor { optional_includable_object_append_token (); continue; }
 
  *
@@ -594,7 +600,7 @@ static enum parse_response_t parse_main (void)
          }
 
          // Forbidden typedef.
-         "typedef" separator+ ("enum" | "struct") [^;]+ ";"
+         "typedef" separator+ ("enum" | "struct") [a-zA-Z0-9_]+ ";"
          {
              fprintf (stderr, "Error. [%ld:%ld]: Encountered struct/enum hiding typedef, it confuses parser.\n",
                 (long) io.cursor_line, (long) io.cursor_symbol);
