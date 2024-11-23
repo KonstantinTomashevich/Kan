@@ -27,8 +27,6 @@ _Static_assert (_Alignof (struct test_data_type_t) <= _Alignof (kan_memory_size_
 // \meta reflection_struct_meta = "test_data_type_t"
 APPLICATION_FRAMEWORK_EXAMPLE_BASIC_LOGIC_API struct kan_resource_pipeline_resource_type_meta_t test_data_type_meta = {
     .root = KAN_TRUE,
-    .compilation_output_type_name = NULL,
-    .compile = NULL,
 };
 
 struct test_singleton_t
@@ -177,7 +175,7 @@ APPLICATION_FRAMEWORK_EXAMPLE_BASIC_LOGIC_API void kan_universe_mutator_execute_
                 }
                 else
                 {
-                    kan_application_framework_system_request_exit (state->application_framework_system_handle, -1);
+                    kan_application_framework_system_request_exit (state->application_framework_system_handle, 1);
                 }
             }
         }

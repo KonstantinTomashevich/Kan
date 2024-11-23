@@ -13,7 +13,11 @@ KAN_LOG_DEFINE_CATEGORY (resource_reference);
 // \c_interface_scanner_enable
 
 static kan_allocation_group_t detected_references_container_allocation_group;
+static kan_allocation_group_t platform_configuration_allocation_group;
 static kan_allocation_group_t resource_import_rule_allocation_group;
+static kan_interned_string_t interned_kan_resource_pipeline_resource_type_meta_t;
+static kan_interned_string_t interned_kan_resource_pipeline_byproduct_type_meta_t;
+static kan_interned_string_t interned_kan_resource_pipeline_reference_meta_t;
 static kan_bool_t statics_initialized = KAN_FALSE;
 
 static void ensure_statics_initialized (void)
@@ -22,10 +26,36 @@ static void ensure_statics_initialized (void)
     {
         detected_references_container_allocation_group =
             kan_allocation_group_get_child (kan_allocation_group_root (), "kan_resource_pipeline_detected_container");
+        platform_configuration_allocation_group = kan_allocation_group_get_child (
+            kan_allocation_group_root (), "kan_resource_pipeline_platform_configuration_t");
         resource_import_rule_allocation_group =
-            kan_allocation_group_get_child (kan_allocation_group_root (), "resource_import_rule");
+            kan_allocation_group_get_child (kan_allocation_group_root (), "kan_resource_import_rule_t");
+        interned_kan_resource_pipeline_resource_type_meta_t =
+            kan_string_intern ("kan_resource_pipeline_resource_type_meta_t");
+        interned_kan_resource_pipeline_byproduct_type_meta_t =
+            kan_string_intern ("kan_resource_pipeline_byproduct_type_meta_t");
+        interned_kan_resource_pipeline_reference_meta_t = kan_string_intern ("kan_resource_pipeline_reference_meta_t");
         statics_initialized = KAN_TRUE;
     }
+}
+
+void kan_resource_pipeline_platform_configuration_init (struct kan_resource_pipeline_platform_configuration_t *instance)
+{
+    ensure_statics_initialized ();
+    instance->parent = NULL;
+    kan_dynamic_array_init (&instance->configuration, 0u, sizeof (kan_reflection_patch_t),
+                            _Alignof (kan_reflection_patch_t), platform_configuration_allocation_group);
+}
+
+void kan_resource_pipeline_platform_configuration_shutdown (
+    struct kan_resource_pipeline_platform_configuration_t *instance)
+{
+    for (kan_loop_size_t index = 0u; index < instance->configuration.size; ++index)
+    {
+        kan_reflection_patch_destroy (((kan_reflection_patch_t *) instance->configuration.data)[index]);
+    }
+
+    kan_dynamic_array_shutdown (&instance->configuration);
 }
 
 static inline struct kan_resource_pipeline_reference_type_info_node_t *
@@ -52,14 +82,27 @@ kan_resource_pipeline_type_info_storage_query_type_node (
     return NULL;
 }
 
-static inline kan_bool_t is_resource_type (kan_reflection_registry_t registry,
-                                           const struct kan_reflection_struct_t *struct_data,
-                                           kan_interned_string_t interned_kan_resource_pipeline_resource_type_meta_t)
+static inline kan_bool_t is_resource_or_byproduct_type (kan_reflection_registry_t registry,
+                                                        const struct kan_reflection_struct_t *struct_data)
 
 {
     struct kan_reflection_struct_meta_iterator_t meta_iterator = kan_reflection_registry_query_struct_meta (
         registry, struct_data->name, interned_kan_resource_pipeline_resource_type_meta_t);
-    return kan_reflection_struct_meta_iterator_get (&meta_iterator) ? KAN_TRUE : KAN_FALSE;
+
+    if (kan_reflection_struct_meta_iterator_get (&meta_iterator))
+    {
+        return KAN_TRUE;
+    }
+
+    meta_iterator = kan_reflection_registry_query_struct_meta (registry, struct_data->name,
+                                                               interned_kan_resource_pipeline_byproduct_type_meta_t);
+
+    if (kan_reflection_struct_meta_iterator_get (&meta_iterator))
+    {
+        return KAN_TRUE;
+    }
+
+    return KAN_FALSE;
 }
 
 static inline void kan_resource_pipeline_type_info_node_add_field (
@@ -105,9 +148,7 @@ kan_resource_pipeline_type_info_storage_get_or_create_node (
     struct kan_resource_pipeline_reference_type_info_storage_t *storage,
     kan_reflection_registry_t registry,
     const struct kan_reflection_struct_t *root_struct_data,
-    const struct kan_reflection_struct_t *struct_data,
-    kan_interned_string_t interned_kan_resource_pipeline_resource_type_meta_t,
-    kan_interned_string_t interned_kan_resource_reference_pipeline_meta_t)
+    const struct kan_reflection_struct_t *struct_data)
 {
     struct kan_resource_pipeline_reference_type_info_node_t *type_node =
         kan_resource_pipeline_type_info_storage_query_type_node (storage, struct_data->name);
@@ -135,8 +176,7 @@ kan_resource_pipeline_type_info_storage_get_or_create_node (
     kan_hash_storage_update_bucket_count_default (&storage->scanned_types, KAN_RESOURCE_PIPELINE_SCAN_BUCKETS);
     kan_hash_storage_add (&storage->scanned_types, &type_node->node);
 
-    const kan_bool_t root_is_resource_type =
-        is_resource_type (registry, root_struct_data, interned_kan_resource_pipeline_resource_type_meta_t);
+    const kan_bool_t root_is_resource_type = is_resource_or_byproduct_type (registry, root_struct_data);
     type_node->is_resource_type = root_struct_data == struct_data && root_is_resource_type;
     type_node->contains_patches = KAN_FALSE;
 
@@ -252,7 +292,7 @@ kan_resource_pipeline_type_info_storage_get_or_create_node (
         {
             struct kan_reflection_struct_field_meta_iterator_t meta_iterator =
                 kan_reflection_registry_query_struct_field_meta (registry, struct_data->name, field_data->name,
-                                                                 interned_kan_resource_reference_pipeline_meta_t);
+                                                                 interned_kan_resource_pipeline_reference_meta_t);
 
             const struct kan_resource_pipeline_reference_meta_t *meta =
                 kan_reflection_struct_field_meta_iterator_get (&meta_iterator);
@@ -269,14 +309,11 @@ kan_resource_pipeline_type_info_storage_get_or_create_node (
                     const struct kan_reflection_struct_t *referenced_type =
                         kan_reflection_registry_query_struct (registry, kan_string_intern (meta->type));
 
-                    if (referenced_type && is_resource_type (registry, referenced_type,
-                                                             interned_kan_resource_pipeline_resource_type_meta_t))
+                    if (referenced_type && is_resource_or_byproduct_type (registry, referenced_type))
                     {
                         struct kan_resource_pipeline_reference_type_info_node_t *referenced_type_node =
                             kan_resource_pipeline_type_info_storage_get_or_create_node (
-                                storage, registry, referenced_type, referenced_type,
-                                interned_kan_resource_pipeline_resource_type_meta_t,
-                                interned_kan_resource_reference_pipeline_meta_t);
+                                storage, registry, referenced_type, referenced_type);
 
                         kan_resource_pipeline_type_info_node_add_referencer (referenced_type_node,
                                                                              root_struct_data->name);
@@ -299,10 +336,8 @@ kan_resource_pipeline_type_info_storage_get_or_create_node (
             KAN_ASSERT (child_type)
 
             struct kan_resource_pipeline_reference_type_info_node_t *child_type_node =
-                kan_resource_pipeline_type_info_storage_get_or_create_node (
-                    storage, registry, root_struct_data, child_type,
-                    interned_kan_resource_pipeline_resource_type_meta_t,
-                    interned_kan_resource_reference_pipeline_meta_t);
+                kan_resource_pipeline_type_info_storage_get_or_create_node (storage, registry, root_struct_data,
+                                                                            child_type);
 
             if (child_type_node->fields_to_check.size > 0u)
             {
@@ -328,21 +363,15 @@ static inline void kan_resource_pipeline_type_info_storage_scan (
     struct kan_resource_pipeline_reference_type_info_storage_t *storage, kan_reflection_registry_t registry)
 {
     kan_reflection_registry_struct_iterator_t iterator = kan_reflection_registry_struct_iterator_create (registry);
-    const kan_interned_string_t interned_kan_resource_pipeline_resource_type_meta_t =
-        kan_string_intern ("kan_resource_pipeline_resource_type_meta_t");
-    const kan_interned_string_t interned_kan_resource_pipeline_reference_meta_t =
-        kan_string_intern ("kan_resource_pipeline_reference_meta_t");
     const struct kan_reflection_struct_t *struct_data;
 
     // Start by scanning only resource types to avoid issues when resource types are scanned as part of records that
     // store them in runtime (for example resource provider containers).
     while ((struct_data = kan_reflection_registry_struct_iterator_get (iterator)))
     {
-        if (is_resource_type (registry, struct_data, interned_kan_resource_pipeline_resource_type_meta_t))
+        if (is_resource_or_byproduct_type (registry, struct_data))
         {
-            kan_resource_pipeline_type_info_storage_get_or_create_node (
-                storage, registry, struct_data, struct_data, interned_kan_resource_pipeline_resource_type_meta_t,
-                interned_kan_resource_pipeline_reference_meta_t);
+            kan_resource_pipeline_type_info_storage_get_or_create_node (storage, registry, struct_data, struct_data);
         }
 
         iterator = kan_reflection_registry_struct_iterator_next (iterator);
@@ -353,10 +382,7 @@ static inline void kan_resource_pipeline_type_info_storage_scan (
 
     while ((struct_data = kan_reflection_registry_struct_iterator_get (iterator)))
     {
-        kan_resource_pipeline_type_info_storage_get_or_create_node (storage, registry, struct_data, struct_data,
-                                                                    interned_kan_resource_pipeline_resource_type_meta_t,
-                                                                    interned_kan_resource_pipeline_reference_meta_t);
-
+        kan_resource_pipeline_type_info_storage_get_or_create_node (storage, registry, struct_data, struct_data);
         iterator = kan_reflection_registry_struct_iterator_next (iterator);
     }
 
@@ -416,6 +442,7 @@ void kan_resource_pipeline_reference_type_info_storage_build (
     kan_reflection_registry_t registry,
     kan_allocation_group_t allocation_group)
 {
+    ensure_statics_initialized ();
     storage->registry = registry;
     storage->scanned_allocation_group = allocation_group;
     kan_hash_storage_init (&storage->scanned_types, storage->scanned_allocation_group,
@@ -916,6 +943,7 @@ void kan_resource_pipeline_detect_references (
 {
     struct kan_resource_pipeline_reference_type_info_node_t *type_node =
         kan_resource_pipeline_type_info_storage_query_type_node (storage, referencer_type_name);
+
     if (!type_node)
     {
         // Does not reference anything.
@@ -1111,8 +1139,6 @@ void kan_resource_pipeline_detect_references (
 /// \meta reflection_struct_meta = "kan_resource_import_rule_t"
 RESOURCE_PIPELINE_API struct kan_resource_pipeline_resource_type_meta_t kan_resource_import_rule_resource_type = {
     .root = KAN_FALSE,
-    .compilation_output_type_name = NULL,
-    .compile = NULL,
 };
 
 kan_allocation_group_t kan_resource_import_rule_get_allocation_group (void)

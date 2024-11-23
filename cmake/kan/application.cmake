@@ -146,6 +146,10 @@ define_property (TARGET PROPERTY APPLICATION_VARIANT_ENVIRONMENT_TAGS
         BRIEF_DOCS "Contains application variant environment tags."
         FULL_DOCS "Contains application variant environment tags.")
 
+define_property (TARGET PROPERTY APPLICATION_PLATFORM_CONFIGURATION
+        BRIEF_DOCS "Path to resource builder configuration file for current platform."
+        FULL_DOCS "Path to resource builder configuration file for current platform.")
+
 define_property (TARGET PROPERTY UNIT_RESOURCE_DIRECTORIES
         BRIEF_DOCS "List of resource directories that are used by this unit."
         FULL_DOCS "List of resource directories that are used by this unit.")
@@ -448,6 +452,12 @@ function (application_variant_add_environment_tag TAG)
     list (APPEND TAGS "${TAG}")
     set_target_properties ("${APPLICATION_NAME}_variant_${APPLICATION_VARIANT_NAME}" PROPERTIES
             APPLICATION_VARIANT_ENVIRONMENT_TAGS "${TAGS}")
+endfunction ()
+
+# Sets path to application platform configuration for building resources.
+function (application_core_set_resource_platform_configuration CONFIGURATION_PATH)
+    message (STATUS "    Setting resource platform configuration to \"${CONFIGURATION_PATH}\".")
+    set_target_properties ("${APPLICATION_NAME}" PROPERTIES APPLICATION_PLATFORM_CONFIGURATION "${CONFIGURATION_PATH}")
 endfunction ()
 
 # Sets variable with given name to the of resource builder target for current application.
@@ -814,6 +824,7 @@ function (application_generate)
     foreach (PLUGIN ${PLUGINS})
         add_custom_target ("${PLUGIN}_dev_copy")
         setup_shared_library_copy (
+                IF_DIFFERENT
                 LIBRARY "${PLUGIN}_library"
                 USER "${PLUGIN}_dev_copy"
                 OUTPUT ${DEV_PLUGINS_DIRECTORY}
@@ -1109,11 +1120,11 @@ function (application_generate)
 
     set (RC_DIRECTORY_LOCAL "${RC_DIRECTORY}")
     cmake_path (RELATIVE_PATH RC_DIRECTORY_LOCAL BASE_DIRECTORY "${RESOURCE_PROJECT_DIRECTORY}")
-    string (APPEND PROJECT_CONTENT "reference_cache_absolute_directory = \"${RC_DIRECTORY_LOCAL}\"\n")
+    string (APPEND PROJECT_CONTENT "reference_cache_directory = \"${RC_DIRECTORY_LOCAL}\"\n")
 
     set (RBW_DIRECTORY_LOCAL "${RBW_DIRECTORY}")
     cmake_path (RELATIVE_PATH RBW_DIRECTORY_LOCAL BASE_DIRECTORY "${RESOURCE_PROJECT_DIRECTORY}")
-    string (APPEND PROJECT_CONTENT "output_absolute_directory = \"${RBW_DIRECTORY_LOCAL}\"\n")
+    string (APPEND PROJECT_CONTENT "output_directory = \"${RBW_DIRECTORY_LOCAL}\"\n")
 
     if (KAN_APPLICATION_PACKER_INTERN_STRINGS)
         string (APPEND PROJECT_CONTENT "use_string_interning = 1\n")
@@ -1132,6 +1143,10 @@ function (application_generate)
     set (SOURCE_DIRECTORY "${CMAKE_SOURCE_DIR}")
     cmake_path (RELATIVE_PATH SOURCE_DIRECTORY BASE_DIRECTORY "${RESOURCE_PROJECT_DIRECTORY}")
     string (APPEND PROJECT_CONTENT "source_directory = \"${SOURCE_DIRECTORY}\"\n")
+
+    get_target_property (PLATFORM_CONFIGURATION_PATH "${APPLICATION_NAME}" APPLICATION_PLATFORM_CONFIGURATION)
+    cmake_path (RELATIVE_PATH PLATFORM_CONFIGURATION_PATH BASE_DIRECTORY "${RESOURCE_PROJECT_DIRECTORY}")
+    string (APPEND PROJECT_CONTENT "platform_configuration = \"${PLATFORM_CONFIGURATION_PATH}\"\n")
 
     application_get_resource_project_path (RESOURCE_PROJECT_PATH)
     file (CONFIGURE OUTPUT "${RESOURCE_PROJECT_PATH}" CONTENT "${PROJECT_CONTENT}")
@@ -1429,6 +1444,8 @@ function (application_generate)
                     list (APPEND BUILDER_TARGETS "${PLUGIN}")
                 endif ()
             endforeach ()
+
+            # TODO: All custom target commands should use relative paths from build directory. Refactor it later.
 
             application_get_resource_builder_target_name (RESOURCE_BUILDER)
             add_custom_target ("${VARIANT}_build_resources"

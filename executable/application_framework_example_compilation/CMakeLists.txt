@@ -12,6 +12,8 @@ application_core_include (
         context_virtual_file_system readable_data resource_index resource_pipeline serialization universe)
 
 application_core_set_configuration ("${CMAKE_CURRENT_SOURCE_DIR}/configuration/core.rd")
+application_core_set_resource_platform_configuration (
+        "${CMAKE_CURRENT_SOURCE_DIR}/configuration/default_platform_configuration.rd")
 application_core_use_plugin_group (base)
 
 application_set_world_directory ("${CMAKE_CURRENT_SOURCE_DIR}/world")
@@ -22,17 +24,30 @@ application_plugin_include (
         ABSTRACT universe_resource_provider=kan
         CONCRETE universe_single_pipeline_scheduler universe_time)
 
-register_application_plugin (NAME logic GROUP test)
-application_plugin_include (ABSTRACT CONCRETE application_framework_example_compilation_logic)
+register_application_plugin (NAME basic GROUP basic)
+application_plugin_include (ABSTRACT CONCRETE application_framework_example_compilation_basic)
 
-register_application_program (test)
-application_program_set_configuration ("${CMAKE_CURRENT_SOURCE_DIR}/configuration/program_test.rd")
-application_program_use_plugin_group (test)
+register_application_program (basic)
+application_program_set_configuration ("${CMAKE_CURRENT_SOURCE_DIR}/configuration/program_basic.rd")
+application_program_use_plugin_group (basic)
 application_program_use_as_test_in_development_mode (ARGUMENTS --test PROPERTIES TIMEOUT 10)
 application_program_use_as_test_in_packaged_mode (ARGUMENTS --test PROPERTIES TIMEOUT 10)
 
-register_application_variant (test)
-application_variant_add_program (test)
+register_application_variant (basic)
+application_variant_add_program (basic)
+application_variant_add_environment_tag (packaged)
+
+register_application_plugin (NAME byproduct GROUP byproduct)
+application_plugin_include (ABSTRACT CONCRETE application_framework_example_compilation_byproduct)
+
+register_application_program (byproduct)
+application_program_set_configuration ("${CMAKE_CURRENT_SOURCE_DIR}/configuration/program_byproduct.rd")
+application_program_use_plugin_group (byproduct)
+application_program_use_as_test_in_development_mode (ARGUMENTS --test PROPERTIES TIMEOUT 10)
+application_program_use_as_test_in_packaged_mode (ARGUMENTS --test PROPERTIES TIMEOUT 10)
+
+register_application_variant (byproduct)
+application_variant_add_program (byproduct)
 application_variant_add_environment_tag (packaged)
 
 application_generate ()

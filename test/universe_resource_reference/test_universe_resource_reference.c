@@ -58,8 +58,6 @@ TEST_UNIVERSE_RESOURCE_REFERENCE_API void resource_prototype_shutdown (struct re
 // \meta reflection_struct_meta = "resource_prototype_t"
 TEST_UNIVERSE_RESOURCE_REFERENCE_API struct kan_resource_pipeline_resource_type_meta_t resource_prototype_type_meta = {
     .root = KAN_TRUE,
-    .compilation_output_type_name = NULL,
-    .compile = NULL,
 };
 
 struct prototype_component_t
@@ -172,8 +170,6 @@ TEST_UNIVERSE_RESOURCE_REFERENCE_API void config_a_init (struct config_a_t *inst
 // \meta reflection_struct_meta = "config_a_t"
 TEST_UNIVERSE_RESOURCE_REFERENCE_API struct kan_resource_pipeline_resource_type_meta_t config_a_type_meta = {
     .root = KAN_TRUE,
-    .compilation_output_type_name = NULL,
-    .compile = NULL,
 };
 
 struct config_b_t
@@ -191,8 +187,6 @@ TEST_UNIVERSE_RESOURCE_REFERENCE_API void config_b_init (struct config_b_t *inst
 // \meta reflection_struct_meta = "config_b_t"
 TEST_UNIVERSE_RESOURCE_REFERENCE_API struct kan_resource_pipeline_resource_type_meta_t config_b_type_meta = {
     .root = KAN_TRUE,
-    .compilation_output_type_name = NULL,
-    .compile = NULL,
 };
 
 // \meta reflection_struct_field_meta = "config_b_t.optional_config_a"

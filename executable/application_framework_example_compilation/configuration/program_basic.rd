@@ -2,4 +2,4 @@
 
 ${ENABLED_SYSTEMS}
 
-program_world = "test/program_root"
+program_world = "test/program_basic"

@@ -12,6 +12,8 @@ application_core_include (
         context_virtual_file_system readable_data resource_index resource_pipeline serialization universe)
 
 application_core_set_configuration ("${CMAKE_CURRENT_SOURCE_DIR}/configuration/core.rd")
+application_core_set_resource_platform_configuration (
+        "${CMAKE_CURRENT_SOURCE_DIR}/configuration/default_platform_configuration.rd")
 application_core_use_plugin_group (base)
 
 application_set_world_directory ("${CMAKE_CURRENT_SOURCE_DIR}/world")

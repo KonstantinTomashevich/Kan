@@ -5,8 +5,6 @@
 /// \meta reflection_struct_meta = "icon_t"
 APPLICATION_FRAMEWORK_EXAMPLE_IMPORT_ICON_API struct kan_resource_pipeline_resource_type_meta_t icon_resource_type = {
     .root = KAN_TRUE,
-    .compilation_output_type_name = NULL,
-    .compile = NULL,
 };
 
 void icon_init (struct icon_t *icon)
