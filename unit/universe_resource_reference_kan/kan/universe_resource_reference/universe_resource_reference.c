@@ -366,14 +366,30 @@ static inline void add_all_references_to_type (struct resource_reference_manager
         }
     }
 
-    const struct kan_resource_reference_type_info_node_t *type_node =
-        kan_resource_reference_type_info_storage_query (&state->info_storage, type);
-
-    if (type_node)
+    if (type)
     {
-        for (kan_loop_size_t index = 0u; index < type_node->referencer_types.size; ++index)
+        const struct kan_resource_reference_type_info_node_t *type_node =
+            kan_resource_reference_type_info_storage_query (&state->info_storage, type);
+
+        if (type_node)
         {
-            kan_interned_string_t referencer_type = ((kan_interned_string_t *) type_node->referencer_types.data)[index];
+            for (kan_loop_size_t index = 0u; index < type_node->referencer_types.size; ++index)
+            {
+                kan_interned_string_t referencer_type =
+                    ((kan_interned_string_t *) type_node->referencer_types.data)[index];
+                KAN_UP_VALUE_READ (entry, kan_resource_native_entry_t, type, &referencer_type)
+                {
+                    add_outer_references_operation_for_entry (state, entry, type);
+                }
+            }
+        }
+    }
+    else
+    {
+        for (kan_loop_size_t index = 0u; index < state->info_storage.third_party_referencers.size; ++index)
+        {
+            kan_interned_string_t referencer_type =
+                ((kan_interned_string_t *) state->info_storage.third_party_referencers.data)[index];
             KAN_UP_VALUE_READ (entry, kan_resource_native_entry_t, type, &referencer_type)
             {
                 add_outer_references_operation_for_entry (state, entry, type);

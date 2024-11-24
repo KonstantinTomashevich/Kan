@@ -121,15 +121,22 @@ static inline void kan_resource_type_info_node_add_field (struct kan_resource_re
     };
 }
 
-static inline void kan_resource_type_info_node_add_referencer (
-    struct kan_resource_reference_type_info_node_t *referenced_type_node, kan_interned_string_t referencer_name)
+static inline void add_unique_reference_name (struct kan_dynamic_array_t *target_array,
+                                              kan_interned_string_t referencer_name)
 {
-    void *spot = kan_dynamic_array_add_last (&referenced_type_node->referencer_types);
+    for (kan_loop_size_t index = 0u; index < target_array->size; ++index)
+    {
+        if (referencer_name == ((kan_interned_string_t *) target_array->data)[index])
+        {
+            return;
+        }
+    }
+
+    void *spot = kan_dynamic_array_add_last (target_array);
     if (!spot)
     {
-        kan_dynamic_array_set_capacity (&referenced_type_node->referencer_types,
-                                        referenced_type_node->referencer_types.size * 2u);
-        spot = kan_dynamic_array_add_last (&referenced_type_node->referencer_types);
+        kan_dynamic_array_set_capacity (target_array, target_array->size * 2u);
+        spot = kan_dynamic_array_add_last (target_array);
     }
 
     *(kan_interned_string_t *) spot = referencer_name;
@@ -296,24 +303,31 @@ static struct kan_resource_reference_type_info_node_t *kan_resource_type_info_st
                 // patches.
                 if (root_is_resource_type)
                 {
-                    const struct kan_reflection_struct_t *referenced_type =
-                        kan_reflection_registry_query_struct (registry, kan_string_intern (meta->type));
-
-                    if (referenced_type && is_resource_or_byproduct_type (registry, referenced_type))
+                    if (meta->type)
                     {
-                        struct kan_resource_reference_type_info_node_t *referenced_type_node =
-                            kan_resource_type_info_storage_get_or_create_node (storage, registry, referenced_type,
-                                                                               referenced_type);
+                        const struct kan_reflection_struct_t *referenced_type =
+                            kan_reflection_registry_query_struct (registry, kan_string_intern (meta->type));
 
-                        kan_resource_type_info_node_add_referencer (referenced_type_node, root_struct_data->name);
+                        if (referenced_type && is_resource_or_byproduct_type (registry, referenced_type))
+                        {
+                            struct kan_resource_reference_type_info_node_t *referenced_type_node =
+                                kan_resource_type_info_storage_get_or_create_node (storage, registry, referenced_type,
+                                                                                   referenced_type);
+
+                            add_unique_reference_name (&referenced_type_node->referencer_types, root_struct_data->name);
+                        }
+                        else
+                        {
+                            KAN_LOG (resource_reference, KAN_LOG_ERROR,
+                                     "Field \"%s\" of type \"%s\" is marked as resource reference, but specified type "
+                                     "\"%s\" "
+                                     "is not a resource type.",
+                                     field_data->name, struct_data->name, meta->type)
+                        }
                     }
                     else
                     {
-                        KAN_LOG (
-                            resource_reference, KAN_LOG_ERROR,
-                            "Field \"%s\" of type \"%s\" is marked as resource reference, but specified type \"%s\" "
-                            "is not a resource type.",
-                            field_data->name, struct_data->name, meta->type)
+                        add_unique_reference_name (&storage->third_party_referencers, root_struct_data->name);
                     }
                 }
             }
@@ -373,7 +387,7 @@ static inline void kan_resource_type_info_storage_scan (struct kan_resource_refe
         iterator = kan_reflection_registry_struct_iterator_next (iterator);
     }
 
-    // Make patchers references to all resource types.
+    // Make patchers references to all resource types including third party ones.
     struct kan_resource_reference_type_info_node_t *type_node =
         (struct kan_resource_reference_type_info_node_t *) storage->scanned_types.items.first;
 
@@ -381,6 +395,7 @@ static inline void kan_resource_type_info_storage_scan (struct kan_resource_refe
     {
         if (type_node->is_resource_type && type_node->contains_patches)
         {
+            add_unique_reference_name (&storage->third_party_referencers, type_node->type_name);
             struct kan_resource_reference_type_info_node_t *other_type_node =
                 (struct kan_resource_reference_type_info_node_t *) storage->scanned_types.items.first;
 
@@ -388,7 +403,7 @@ static inline void kan_resource_type_info_storage_scan (struct kan_resource_refe
             {
                 if (other_type_node->is_resource_type)
                 {
-                    kan_resource_type_info_node_add_referencer (other_type_node, type_node->type_name);
+                    add_unique_reference_name (&other_type_node->referencer_types, type_node->type_name);
                 }
 
                 other_type_node =
@@ -433,6 +448,9 @@ void kan_resource_reference_type_info_storage_build (struct kan_resource_referen
     storage->scanned_allocation_group = allocation_group;
     kan_hash_storage_init (&storage->scanned_types, storage->scanned_allocation_group,
                            KAN_RESOURCE_PIPELINE_SCAN_BUCKETS);
+    kan_dynamic_array_init (&storage->third_party_referencers, KAN_RESOURCE_PIPELINE_SCAN_ARRAY_INITIAL_SIZE,
+                            sizeof (kan_interned_string_t), _Alignof (kan_interned_string_t),
+                            storage->scanned_allocation_group);
     kan_resource_type_info_storage_scan (storage, registry);
 }
 
@@ -457,6 +475,7 @@ void kan_resource_reference_type_info_storage_shutdown (struct kan_resource_refe
     }
 
     kan_hash_storage_shutdown (&storage->scanned_types);
+    kan_dynamic_array_shutdown (&storage->third_party_referencers);
 }
 
 void kan_resource_detected_reference_container_init (struct kan_resource_detected_reference_container_t *instance)

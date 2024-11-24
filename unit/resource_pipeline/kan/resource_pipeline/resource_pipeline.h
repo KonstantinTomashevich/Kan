@@ -64,8 +64,6 @@
 /// produced resources by deleting the ones that were produced earlier and are not produced right now.
 /// \endparblock
 
-// TODO: Looks like reference detection doesn't work with third party objects. Check it, at least it prints errors.
-
 // TODO: Compilation states are not yet tested. Create simple example for testing compilation states?
 
 // TODO: Should byproduct functions be automated through reflection?
@@ -279,6 +277,10 @@ struct kan_resource_reference_type_info_storage_t
 {
     /// \meta reflection_ignore_struct_field
     struct kan_hash_storage_t scanned_types;
+
+    /// \brief Contains list of resource type names that can reference third party resources.
+    /// \meta reflection_dynamic_array_type = "kan_interned_string_t"
+    struct kan_dynamic_array_t third_party_referencers;
 
     kan_reflection_registry_t registry;
 
