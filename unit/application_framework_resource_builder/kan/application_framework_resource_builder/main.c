@@ -16,6 +16,7 @@
 #include <kan/memory/allocation.h>
 #include <kan/platform/hardware.h>
 #include <kan/reflection/generated_reflection.h>
+#include <kan/reflection/struct_helpers.h>
 #include <kan/resource_index/resource_index.h>
 #include <kan/resource_pipeline/resource_pipeline.h>
 #include <kan/serialization/binary.h>
@@ -1219,7 +1220,10 @@ static void scan_file (struct target_t *target, struct kan_file_system_path_cont
                 kan_allocate_batched (nodes_allocation_group, sizeof (struct byproduct_node_t));
             byproduct_node_init (byproduct_node);
 
-            byproduct_node->node.hash = node->byproduct_meta->hash (node->source_data);
+            byproduct_node->node.hash =
+                node->byproduct_meta->hash ?
+                    node->byproduct_meta->hash (node->source_data) :
+                    kan_reflection_hash_struct (global.registry, node->source_type, node->source_data);
             byproduct_node->entry = node;
             node->linked_byproduct = byproduct_node;
 
@@ -2101,7 +2105,10 @@ static kan_interned_string_t interface_register_byproduct (kan_functor_user_data
         return NULL;
     }
 
-    const kan_hash_t byproduct_hash = meta->hash (byproduct_data);
+    const kan_hash_t byproduct_hash = meta->hash ?
+                                          meta->hash (byproduct_data) :
+                                          kan_reflection_hash_struct (global.registry, byproduct_type, byproduct_data);
+
     kan_atomic_int_lock (&source_node->target->byproduct_registration_lock);
     const struct kan_hash_storage_bucket_t *bucket =
         kan_hash_storage_query (&source_node->target->byproducts, (kan_hash_t) byproduct_hash);
@@ -2111,7 +2118,10 @@ static kan_interned_string_t interface_register_byproduct (kan_functor_user_data
     while (node != node_end)
     {
         KAN_ASSERT (node->entry->source_data)
-        if (node->node.hash == byproduct_hash && meta->is_equal (node->entry->source_data, byproduct_data))
+        if (node->node.hash == byproduct_hash && node->entry->source_type == byproduct_type &&
+            (meta->is_equal ? meta->is_equal (node->entry->source_data, byproduct_data) :
+                              kan_reflection_are_structs_equal (global.registry, byproduct_type,
+                                                                node->entry->source_data, byproduct_data)))
         {
             break;
         }
@@ -2172,7 +2182,15 @@ static kan_interned_string_t interface_register_byproduct (kan_functor_user_data
             kan_allocation_group_stack_pop ();
         }
 
-        meta->move (node->entry->source_data, byproduct_data);
+        if (meta->move)
+        {
+            meta->move (node->entry->source_data, byproduct_data);
+        }
+        else
+        {
+            kan_reflection_move_struct (global.registry, byproduct_type, node->entry->source_data, byproduct_data);
+        }
+
         kan_hash_storage_update_bucket_count_default (&source_node->target->native,
                                                       KAN_RESOURCE_BUILDER_TARGET_NODES_BUCKETS);
         kan_hash_storage_add (&source_node->target->native, &node->entry->node);
@@ -2198,10 +2216,17 @@ static kan_interned_string_t interface_register_byproduct (kan_functor_user_data
             kan_atomic_int_add (&global.errors_count, 1);
         }
     }
-    else if (meta->reset)
+    else
     {
         // Byproduct already exist, reset user data.
-        meta->reset (byproduct_data);
+        if (meta->reset)
+        {
+            meta->reset (byproduct_data);
+        }
+        else
+        {
+            kan_reflection_reset_struct (global.registry, byproduct_type, byproduct_data);
+        }
     }
 
     return node->entry->name;

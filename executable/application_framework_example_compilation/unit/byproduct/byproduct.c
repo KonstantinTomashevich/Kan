@@ -67,30 +67,12 @@ struct shader_object_source_byproduct_t
     kan_interned_string_t source;
 };
 
-static kan_hash_t shader_object_source_byproduct_hash (void *instance)
-{
-    return (kan_hash_t) ((struct shader_object_source_byproduct_t *) instance)->source;
-}
-
-static kan_bool_t shader_object_source_byproduct_is_equal (const void *first, const void *second)
-{
-    return ((struct shader_object_source_byproduct_t *) first)->source ==
-           ((struct shader_object_source_byproduct_t *) second)->source;
-}
-
-static void shader_object_source_byproduct_move (void *to, void *from)
-{
-    struct shader_object_source_byproduct_t *target = to;
-    struct shader_object_source_byproduct_t *source = from;
-    target->source = source->source;
-}
-
 // \meta reflection_struct_meta = "shader_object_source_byproduct_t"
 APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API struct kan_resource_byproduct_type_meta_t
     shader_object_source_byproduct_byproduct_type_meta = {
-        .hash = shader_object_source_byproduct_hash,
-        .is_equal = shader_object_source_byproduct_is_equal,
-        .move = shader_object_source_byproduct_move,
+        .hash = NULL,
+        .is_equal = NULL,
+        .move = NULL,
         .reset = NULL,
 };
 
@@ -295,103 +277,13 @@ APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API void pipeline_instance_b
     kan_dynamic_array_shutdown (&instance->options);
 }
 
-static kan_hash_t pipeline_instance_byproduct_hash (void *instance)
-{
-    struct pipeline_instance_byproduct_t *data = instance;
-    kan_hash_t hash = 0u;
-
-#define APPEND                                                                                                         \
-    if (hash == 0u)                                                                                                    \
-    {                                                                                                                  \
-        hash = sub_hash;                                                                                               \
-    }                                                                                                                  \
-    else                                                                                                               \
-    {                                                                                                                  \
-        hash = kan_hash_combine (hash, sub_hash);                                                                      \
-    }
-
-    for (kan_loop_size_t index = 0u; index < data->sources.size; ++index)
-    {
-        const kan_hash_t sub_hash = (kan_hash_t) ((kan_interned_string_t *) data->sources.data)[index];
-        APPEND
-    }
-
-    for (kan_loop_size_t index = 0u; index < data->options.size; ++index)
-    {
-        struct material_pass_option_t *option = &((struct material_pass_option_t *) data->options.data)[index];
-        const kan_hash_t sub_hash = kan_hash_combine ((kan_hash_t) option->name, (kan_hash_t) option->value);
-        APPEND
-    }
-
-#undef APPEND
-    return hash;
-}
-
-static kan_bool_t pipeline_instance_byproduct_is_equal (const void *first, const void *second)
-{
-    const struct pipeline_instance_byproduct_t *data_first = first;
-    const struct pipeline_instance_byproduct_t *data_second = second;
-
-    if (data_first->sources.size != data_second->sources.size || data_first->options.size != data_second->options.size)
-    {
-        return KAN_FALSE;
-    }
-
-    for (kan_loop_size_t index = 0u; index < data_first->sources.size; ++index)
-    {
-        if (((kan_interned_string_t *) data_first->sources.data)[index] !=
-            ((kan_interned_string_t *) data_second->sources.data)[index])
-        {
-            return KAN_FALSE;
-        }
-    }
-
-    for (kan_loop_size_t index = 0u; index < data_first->options.size; ++index)
-    {
-        struct material_pass_option_t *option_first =
-            &((struct material_pass_option_t *) data_first->options.data)[index];
-        struct material_pass_option_t *option_second =
-            &((struct material_pass_option_t *) data_second->options.data)[index];
-
-        if (option_first->name != option_second->name || option_first->value != option_second->value)
-        {
-            return KAN_FALSE;
-        }
-    }
-
-    return KAN_TRUE;
-}
-
-static void pipeline_instance_byproduct_move (void *to, void *from)
-{
-    struct pipeline_instance_byproduct_t *target = to;
-    struct pipeline_instance_byproduct_t *source = from;
-
-    target->sources = source->sources;
-    source->sources.size = 0u;
-    source->sources.capacity = 0u;
-    source->sources.data = NULL;
-
-    target->options = source->options;
-    source->options.size = 0u;
-    source->options.capacity = 0u;
-    source->options.data = NULL;
-}
-
-static void pipeline_instance_byproduct_reset (void *byproduct)
-{
-    struct pipeline_instance_byproduct_t *data = byproduct;
-    data->sources.size = 0u;
-    data->options.size = 0u;
-}
-
 // \meta reflection_struct_meta = "pipeline_instance_byproduct_t"
 APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API struct kan_resource_byproduct_type_meta_t
     pipeline_instance_byproduct_byproduct_type_meta = {
-        .hash = pipeline_instance_byproduct_hash,
-        .is_equal = pipeline_instance_byproduct_is_equal,
-        .move = pipeline_instance_byproduct_move,
-        .reset = pipeline_instance_byproduct_reset,
+        .hash = NULL,
+        .is_equal = NULL,
+        .move = NULL,
+        .reset = NULL,
 };
 
 static enum kan_resource_compile_result_t pipeline_instance_byproduct_compile (

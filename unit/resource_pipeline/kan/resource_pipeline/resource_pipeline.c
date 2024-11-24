@@ -6,6 +6,7 @@
 #include <kan/memory/allocation.h>
 #include <kan/reflection/field_visibility_iterator.h>
 #include <kan/reflection/patch.h>
+#include <kan/reflection/struct_helpers.h>
 #include <kan/resource_pipeline/resource_pipeline.h>
 
 // \c_interface_scanner_disable
@@ -528,65 +529,6 @@ static inline void kan_resource_detected_container_add_reference (
     spot->compilation_usage = compilation_usage;
 }
 
-static inline kan_instance_size_t extract_inline_array_size (const void *struct_data,
-                                                             const struct kan_reflection_field_t *array_field)
-{
-    if (array_field->archetype_inline_array.size_field)
-    {
-        const struct kan_reflection_field_t *size_field = array_field->archetype_inline_array.size_field;
-        const void *size_field_address = ((const uint8_t *) struct_data) + size_field->offset;
-
-        switch (size_field->archetype)
-        {
-        case KAN_REFLECTION_ARCHETYPE_SIGNED_INT:
-            switch (size_field->size)
-            {
-            case 1u:
-                return (kan_instance_size_t) * (int8_t *) size_field_address;
-            case 2u:
-                return (kan_instance_size_t) * (int16_t *) size_field_address;
-            case 4u:
-                return (kan_instance_size_t) * (int32_t *) size_field_address;
-            case 8u:
-                return (kan_instance_size_t) * (int64_t *) size_field_address;
-            }
-
-            break;
-
-        case KAN_REFLECTION_ARCHETYPE_UNSIGNED_INT:
-            switch (size_field->size)
-            {
-            case 1u:
-                return (kan_instance_size_t) * (uint8_t *) size_field_address;
-            case 2u:
-                return (kan_instance_size_t) * (uint16_t *) size_field_address;
-            case 4u:
-                return (kan_instance_size_t) * (uint32_t *) size_field_address;
-            case 8u:
-                return (kan_instance_size_t) * (uint64_t *) size_field_address;
-            }
-
-            break;
-
-        case KAN_REFLECTION_ARCHETYPE_FLOATING:
-        case KAN_REFLECTION_ARCHETYPE_PACKED_ELEMENTAL:
-        case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
-        case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:
-        case KAN_REFLECTION_ARCHETYPE_ENUM:
-        case KAN_REFLECTION_ARCHETYPE_EXTERNAL_POINTER:
-        case KAN_REFLECTION_ARCHETYPE_STRUCT:
-        case KAN_REFLECTION_ARCHETYPE_STRUCT_POINTER:
-        case KAN_REFLECTION_ARCHETYPE_INLINE_ARRAY:
-        case KAN_REFLECTION_ARCHETYPE_DYNAMIC_ARRAY:
-        case KAN_REFLECTION_ARCHETYPE_PATCH:
-            KAN_ASSERT (KAN_FALSE)
-            break;
-        }
-    }
-
-    return array_field->archetype_inline_array.item_count;
-}
-
 static void kan_resource_detect_inside_data_chunk_for_struct_instance (
     struct kan_resource_reference_type_info_storage_t *storage,
     kan_instance_size_t part_offset,
@@ -992,7 +934,9 @@ void kan_resource_detect_references (struct kan_resource_reference_type_info_sto
 
             case KAN_REFLECTION_ARCHETYPE_INLINE_ARRAY:
             {
-                const kan_instance_size_t size = extract_inline_array_size (referencer_data, field_info->field);
+                const kan_instance_size_t size =
+                    kan_reflection_get_inline_array_size (field_info->field, referencer_data);
+
                 for (kan_loop_size_t index = 0u; index < size; ++index)
                 {
                     kan_resource_detected_container_add_reference (output_container, field_info->type,
@@ -1043,7 +987,9 @@ void kan_resource_detect_references (struct kan_resource_reference_type_info_sto
 
             case KAN_REFLECTION_ARCHETYPE_INLINE_ARRAY:
             {
-                const kan_instance_size_t size = extract_inline_array_size (referencer_data, field_info->field);
+                const kan_instance_size_t size =
+                    kan_reflection_get_inline_array_size (field_info->field, referencer_data);
+
                 switch (field_info->field->archetype_inline_array.item_archetype)
                 {
                 case KAN_REFLECTION_ARCHETYPE_SIGNED_INT:

@@ -66,8 +66,6 @@
 
 // TODO: Compilation states are not yet tested. Create simple example for testing compilation states?
 
-// TODO: Should byproduct functions be automated through reflection?
-
 KAN_C_HEADER_BEGIN
 
 /// \brief Meta for marking types for native resources that should be supported by resource logic.
@@ -180,22 +178,26 @@ struct kan_resource_byproduct_type_meta_t
 {
     /// \brief Byproduct hash function pointer.
     /// \details Hash function is used to map equal byproducts than can replace each other.
+    ///          Leave NULL to use kan_reflection_hash_struct.
     kan_resource_byproduct_hash_functor_t hash;
 
     /// \brief Byproduct equality check function.
     /// \details When byproducts have the same hash, resource logic should check whether byproducts are equal and
     ///          therefore can replace each other to avoid resource duplication.
+    ///          Leave NULL to use kan_reflection_are_structs_equal.
     kan_resource_byproduct_is_equal_functor_t is_equal;
 
     /// \brief Byproduct move function.
     /// \details Byproduct move function is used to move byproduct data from user allocation into resource tool
     ///          allocation. Its primary goal is to let user reuse one byproduct allocation (possibly even on stack)
     ///          and move data to the new allocations automatically when byproduct is really new.
+    ///          Leave NULL to use kan_reflection_move_struct.
     kan_resource_byproduct_move_functor_t move;
 
     /// \brief Byproduct reset function.
     /// \details Used to automatically reset given byproduct if registration detected that equal byproduct already
     ///          exists. Can be NULL if no reset is needed.
+    ///          Leave NULL to use kan_reflection_reset_struct.
     kan_resource_byproduct_reset_functor_t reset;
 };
 

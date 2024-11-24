@@ -5,8 +5,8 @@ concrete_require (
         SCOPE PUBLIC
         ABSTRACT cpu_dispatch error file_system log memory platform reflection virtual_file_system
         CONCRETE_INTERFACE
-        application_framework_resource_tool context context_plugin_system context_reflection_system resource_index
-        resource_pipeline serialization)
+        application_framework_resource_tool context context_plugin_system context_reflection_system reflection_helpers
+        resource_index resource_pipeline serialization)
 
 c_interface_scanner_setup (GLOB "*.h")
 reflection_generator_setup (GLOB "*.h")
