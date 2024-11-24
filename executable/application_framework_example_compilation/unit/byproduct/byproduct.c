@@ -36,16 +36,15 @@ APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API void shader_object_shutd
 }
 
 // \meta reflection_struct_meta = "shader_object_t"
-APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API struct kan_resource_pipeline_resource_type_meta_t
+APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API struct kan_resource_resource_type_meta_t
     shader_object_resource_type_meta = {
         .root = KAN_FALSE,
 };
 
-static enum kan_resource_pipeline_compile_result_t shader_object_compile (
-    struct kan_resource_pipeline_compile_state_t *state);
+static enum kan_resource_compile_result_t shader_object_compile (struct kan_resource_compile_state_t *state);
 
 // \meta reflection_struct_meta = "shader_object_t"
-APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API struct kan_resource_pipeline_compilable_meta_t
+APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API struct kan_resource_compilable_meta_t
     shader_object_compilable_meta = {
         .output_type_name = "shader_object_compiled_t",
         .configuration_type_name = NULL,
@@ -54,7 +53,7 @@ APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API struct kan_resource_pipe
 };
 
 // \meta reflection_struct_field_meta = "shader_object_t.sources"
-APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API struct kan_resource_pipeline_reference_meta_t
+APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API struct kan_resource_reference_meta_t
     shader_object_sources_reference_meta = {
         .type = NULL, // Null means third party.
         .compilation_usage = KAN_RESOURCE_REFERENCE_COMPILATION_USAGE_TYPE_NEEDED_RAW,
@@ -87,7 +86,7 @@ static void shader_object_source_byproduct_move (void *to, void *from)
 }
 
 // \meta reflection_struct_meta = "shader_object_source_byproduct_t"
-APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API struct kan_resource_pipeline_byproduct_type_meta_t
+APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API struct kan_resource_byproduct_type_meta_t
     shader_object_source_byproduct_byproduct_type_meta = {
         .hash = shader_object_source_byproduct_hash,
         .is_equal = shader_object_source_byproduct_is_equal,
@@ -95,11 +94,11 @@ APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API struct kan_resource_pipe
         .reset = NULL,
 };
 
-static enum kan_resource_pipeline_compile_result_t shader_object_source_byproduct_compile (
-    struct kan_resource_pipeline_compile_state_t *state);
+static enum kan_resource_compile_result_t shader_object_source_byproduct_compile (
+    struct kan_resource_compile_state_t *state);
 
 // \meta reflection_struct_meta = "shader_object_source_byproduct_t"
-APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API struct kan_resource_pipeline_compilable_meta_t
+APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API struct kan_resource_compilable_meta_t
     shader_object_source_byproduct_compilable_meta = {
         .output_type_name = "shader_object_source_byproduct_compiled_t",
         .configuration_type_name = NULL,
@@ -108,7 +107,7 @@ APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API struct kan_resource_pipe
 };
 
 // \meta reflection_struct_field_meta = "shader_object_source_byproduct_t.source"
-APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API struct kan_resource_pipeline_reference_meta_t
+APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API struct kan_resource_reference_meta_t
     shader_object_source_byproduct_source_meta = {
         .type = NULL, // Null means third party.
         .compilation_usage = KAN_RESOURCE_REFERENCE_COMPILATION_USAGE_TYPE_NEEDED_RAW,
@@ -123,13 +122,13 @@ struct shader_object_source_byproduct_compiled_t
 };
 
 // \meta reflection_struct_meta = "shader_object_source_byproduct_compiled_t"
-APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API struct kan_resource_pipeline_resource_type_meta_t
+APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API struct kan_resource_resource_type_meta_t
     shader_object_source_byproduct_compiled_meta = {
         .root = KAN_FALSE,
 };
 
-static enum kan_resource_pipeline_compile_result_t shader_object_source_byproduct_compile (
-    struct kan_resource_pipeline_compile_state_t *state)
+static enum kan_resource_compile_result_t shader_object_source_byproduct_compile (
+    struct kan_resource_compile_state_t *state)
 {
     // As this is only an example, not real material compiler, we just fill the stub here.
     ((struct shader_object_source_byproduct_compiled_t *) state->output_instance)->stub = 0u;
@@ -162,20 +161,19 @@ APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API void shader_object_compi
 }
 
 // \meta reflection_struct_meta = "shader_object_compiled_t"
-APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API struct kan_resource_pipeline_resource_type_meta_t
+APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API struct kan_resource_resource_type_meta_t
     shader_object_compiled_resource_type_meta = {
         .root = KAN_FALSE,
 };
 
 // \meta reflection_struct_field_meta = "shader_object_compiled_t.sources"
-APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API struct kan_resource_pipeline_reference_meta_t
+APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API struct kan_resource_reference_meta_t
     shader_object_compiled_sources_reference_meta = {
         .type = "shader_object_source_byproduct_t",
         .compilation_usage = KAN_RESOURCE_REFERENCE_COMPILATION_USAGE_TYPE_NOT_NEEDED};
 
 // As mentioned above, shader object compilation translates third party source links into byproducts.
-static enum kan_resource_pipeline_compile_result_t shader_object_compile (
-    struct kan_resource_pipeline_compile_state_t *state)
+static enum kan_resource_compile_result_t shader_object_compile (struct kan_resource_compile_state_t *state)
 {
     struct shader_object_t *input = state->input_instance;
     struct shader_object_t *output = state->output_instance;
@@ -246,17 +244,16 @@ APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API void material_shutdown (
 }
 
 // \meta reflection_struct_meta = "material_t"
-APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API struct kan_resource_pipeline_resource_type_meta_t
+APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API struct kan_resource_resource_type_meta_t
     material_resource_type_meta = {
         .root = KAN_TRUE,
 };
 
-static enum kan_resource_pipeline_compile_result_t material_compile (
-    struct kan_resource_pipeline_compile_state_t *state);
+static enum kan_resource_compile_result_t material_compile (struct kan_resource_compile_state_t *state);
 
 // \meta reflection_struct_meta = "material_t"
-APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API struct kan_resource_pipeline_compilable_meta_t
-    material_compilable_meta = {
+APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API struct kan_resource_compilable_meta_t material_compilable_meta =
+    {
         .output_type_name = "material_compiled_t",
         .configuration_type_name = NULL,
         .state_type_name = NULL,
@@ -264,7 +261,7 @@ APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API struct kan_resource_pipe
 };
 
 // \meta reflection_struct_field_meta = "material_t.shader"
-APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API struct kan_resource_pipeline_reference_meta_t
+APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API struct kan_resource_reference_meta_t
     material_sources_reference_meta = {
         .type = "shader_object_t",
         .compilation_usage = KAN_RESOURCE_REFERENCE_COMPILATION_USAGE_TYPE_NEEDED_COMPILED,
@@ -389,7 +386,7 @@ static void pipeline_instance_byproduct_reset (void *byproduct)
 }
 
 // \meta reflection_struct_meta = "pipeline_instance_byproduct_t"
-APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API struct kan_resource_pipeline_byproduct_type_meta_t
+APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API struct kan_resource_byproduct_type_meta_t
     pipeline_instance_byproduct_byproduct_type_meta = {
         .hash = pipeline_instance_byproduct_hash,
         .is_equal = pipeline_instance_byproduct_is_equal,
@@ -397,11 +394,11 @@ APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API struct kan_resource_pipe
         .reset = pipeline_instance_byproduct_reset,
 };
 
-static enum kan_resource_pipeline_compile_result_t pipeline_instance_byproduct_compile (
-    struct kan_resource_pipeline_compile_state_t *state);
+static enum kan_resource_compile_result_t pipeline_instance_byproduct_compile (
+    struct kan_resource_compile_state_t *state);
 
 // \meta reflection_struct_meta = "pipeline_instance_byproduct_t"
-APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API struct kan_resource_pipeline_compilable_meta_t
+APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API struct kan_resource_compilable_meta_t
     pipeline_instance_byproduct_compilable_meta = {
         .output_type_name = "pipeline_instance_byproduct_compiled_t",
         .configuration_type_name = "pipeline_instance_platform_configuration_t",
@@ -410,7 +407,7 @@ APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API struct kan_resource_pipe
 };
 
 // \meta reflection_struct_field_meta = "pipeline_instance_byproduct_t.sources"
-APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API struct kan_resource_pipeline_reference_meta_t
+APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API struct kan_resource_reference_meta_t
     pipeline_instance_byproduct_source_meta = {
         .type = "shader_object_source_byproduct_t",
         .compilation_usage = KAN_RESOURCE_REFERENCE_COMPILATION_USAGE_TYPE_NEEDED_COMPILED,
@@ -445,13 +442,13 @@ struct pipeline_instance_byproduct_compiled_t
 };
 
 // \meta reflection_struct_meta = "pipeline_instance_byproduct_compiled_t"
-APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API struct kan_resource_pipeline_resource_type_meta_t
+APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API struct kan_resource_resource_type_meta_t
     pipeline_instance_byproduct_compiled_meta = {
         .root = KAN_FALSE,
 };
 
-static enum kan_resource_pipeline_compile_result_t pipeline_instance_byproduct_compile (
-    struct kan_resource_pipeline_compile_state_t *state)
+static enum kan_resource_compile_result_t pipeline_instance_byproduct_compile (
+    struct kan_resource_compile_state_t *state)
 {
     KAN_ASSERT (state->platform_configuration)
     struct pipeline_instance_platform_configuration_t *configuration = state->platform_configuration;
@@ -490,20 +487,19 @@ APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API void material_compiled_s
 }
 
 // \meta reflection_struct_meta = "material_compiled_t"
-APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API struct kan_resource_pipeline_resource_type_meta_t
+APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API struct kan_resource_resource_type_meta_t
     material_compiled_resource_type_meta = {
         .root = KAN_TRUE,
 };
 
 // \meta reflection_struct_field_meta = "material_pass_compiled_t.pipeline_instance"
-APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API struct kan_resource_pipeline_reference_meta_t
+APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API struct kan_resource_reference_meta_t
     material_pass_compiled_t_pipeline_instance_meta = {
         .type = "pipeline_instance_byproduct_t",
         .compilation_usage = KAN_RESOURCE_REFERENCE_COMPILATION_USAGE_TYPE_NOT_NEEDED,
 };
 
-static enum kan_resource_pipeline_compile_result_t material_compile (
-    struct kan_resource_pipeline_compile_state_t *state)
+static enum kan_resource_compile_result_t material_compile (struct kan_resource_compile_state_t *state)
 {
     struct material_t *source = state->input_instance;
     struct material_compiled_t *target = state->output_instance;

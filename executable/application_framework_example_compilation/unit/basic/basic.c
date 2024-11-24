@@ -21,13 +21,13 @@ struct root_config_t
 _Static_assert (_Alignof (struct root_config_t) <= _Alignof (kan_memory_size_t), "Alignment has expected value.");
 
 // \meta reflection_struct_meta = "root_config_t"
-APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BASIC_API struct kan_resource_pipeline_resource_type_meta_t
+APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BASIC_API struct kan_resource_resource_type_meta_t
     root_config_resource_type_meta = {
         .root = KAN_TRUE,
 };
 
 // \meta reflection_struct_field_meta = "root_config_t.required_sum"
-APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BASIC_API struct kan_resource_pipeline_reference_meta_t
+APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BASIC_API struct kan_resource_reference_meta_t
     root_config_required_sum_reference_meta = {
         .type = "sum_t",
         .compilation_usage = KAN_RESOURCE_REFERENCE_COMPILATION_USAGE_TYPE_NOT_NEEDED,
@@ -41,7 +41,7 @@ struct sum_compiled_t
 _Static_assert (_Alignof (struct sum_compiled_t) <= _Alignof (kan_memory_size_t), "Alignment has expected value.");
 
 // \meta reflection_struct_meta = "sum_compiled_t"
-APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BASIC_API struct kan_resource_pipeline_resource_type_meta_t
+APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BASIC_API struct kan_resource_resource_type_meta_t
     sum_compiled_resource_type_meta = {
         .root = KAN_FALSE,
 };
@@ -71,32 +71,29 @@ APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BASIC_API void sum_shutdown (struct su
     kan_dynamic_array_shutdown (&sum->sums);
 }
 
-static enum kan_resource_pipeline_compile_result_t sum_compile (struct kan_resource_pipeline_compile_state_t *state);
+static enum kan_resource_compile_result_t sum_compile (struct kan_resource_compile_state_t *state);
 
 // \meta reflection_struct_meta = "sum_t"
-APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BASIC_API struct kan_resource_pipeline_resource_type_meta_t
-    sum_resource_type_meta = {
-        .root = KAN_FALSE,
+APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BASIC_API struct kan_resource_resource_type_meta_t sum_resource_type_meta = {
+    .root = KAN_FALSE,
 };
 
 // \meta reflection_struct_meta = "sum_t"
-APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BASIC_API struct kan_resource_pipeline_compilable_meta_t sum_compilable_meta =
-    {
-        .output_type_name = "sum_compiled_t",
-        .configuration_type_name = NULL,
-        .state_type_name = NULL,
-        .functor = sum_compile,
+APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BASIC_API struct kan_resource_compilable_meta_t sum_compilable_meta = {
+    .output_type_name = "sum_compiled_t",
+    .configuration_type_name = NULL,
+    .state_type_name = NULL,
+    .functor = sum_compile,
 };
 
 // \meta reflection_struct_field_meta = "sum_t.records"
-APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BASIC_API struct kan_resource_pipeline_reference_meta_t
-    sum_records_reference_meta = {
-        .type = "record_t",
-        .compilation_usage = KAN_RESOURCE_REFERENCE_COMPILATION_USAGE_TYPE_NEEDED_RAW,
+APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BASIC_API struct kan_resource_reference_meta_t sum_records_reference_meta = {
+    .type = "record_t",
+    .compilation_usage = KAN_RESOURCE_REFERENCE_COMPILATION_USAGE_TYPE_NEEDED_RAW,
 };
 
 // \meta reflection_struct_field_meta = "sum_t.sums"
-APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BASIC_API struct kan_resource_pipeline_reference_meta_t
+APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BASIC_API struct kan_resource_reference_meta_t
     sum_required_sum_reference_meta = {
         .type = "sum_t",
         .compilation_usage = KAN_RESOURCE_REFERENCE_COMPILATION_USAGE_TYPE_NEEDED_COMPILED,
@@ -110,12 +107,12 @@ struct record_t
 _Static_assert (_Alignof (struct record_t) <= _Alignof (kan_memory_size_t), "Alignment has expected value.");
 
 // \meta reflection_struct_meta = "record_t"
-APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BASIC_API struct kan_resource_pipeline_resource_type_meta_t
-    record_resource_type_meta = {
+APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BASIC_API struct kan_resource_resource_type_meta_t record_resource_type_meta =
+    {
         .root = KAN_FALSE,
 };
 
-static enum kan_resource_pipeline_compile_result_t sum_compile (struct kan_resource_pipeline_compile_state_t *state)
+static enum kan_resource_compile_result_t sum_compile (struct kan_resource_compile_state_t *state)
 {
     struct sum_compiled_t *compiled = (struct sum_compiled_t *) state->output_instance;
     compiled->value = 0u;
@@ -127,7 +124,7 @@ static enum kan_resource_pipeline_compile_result_t sum_compile (struct kan_resou
     // therefore we're taking shortcut and not reading input.
     for (kan_instance_size_t dependency_index = 0u; dependency_index < state->dependencies_count; ++dependency_index)
     {
-        struct kan_resource_pipeline_compilation_dependency_t *dependency = &state->dependencies[dependency_index];
+        struct kan_resource_compilation_dependency_t *dependency = &state->dependencies[dependency_index];
         if (dependency->type == interned_record_t)
         {
             const struct record_t *dependency_record = dependency->data;

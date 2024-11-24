@@ -1,4 +1,4 @@
-//! kan_resource_pipeline_platform_configuration_t
+//! kan_resource_platform_configuration_t
 parent = ""
 
 +configuration {

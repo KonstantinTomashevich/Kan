@@ -56,7 +56,7 @@ TEST_UNIVERSE_RESOURCE_REFERENCE_API void resource_prototype_shutdown (struct re
 }
 
 // \meta reflection_struct_meta = "resource_prototype_t"
-TEST_UNIVERSE_RESOURCE_REFERENCE_API struct kan_resource_pipeline_resource_type_meta_t resource_prototype_type_meta = {
+TEST_UNIVERSE_RESOURCE_REFERENCE_API struct kan_resource_resource_type_meta_t resource_prototype_type_meta = {
     .root = KAN_TRUE,
 };
 
@@ -71,10 +71,9 @@ TEST_UNIVERSE_RESOURCE_REFERENCE_API void prototype_component_init (struct proto
 }
 
 // \meta reflection_struct_field_meta = "prototype_component_t.inner_prototype"
-TEST_UNIVERSE_RESOURCE_REFERENCE_API struct kan_resource_pipeline_reference_meta_t
-    prototype_component_inner_prototype_meta = {
-        .type = "resource_prototype_t",
-        .compilation_usage = KAN_RESOURCE_REFERENCE_COMPILATION_USAGE_TYPE_NOT_NEEDED,
+TEST_UNIVERSE_RESOURCE_REFERENCE_API struct kan_resource_reference_meta_t prototype_component_inner_prototype_meta = {
+    .type = "resource_prototype_t",
+    .compilation_usage = KAN_RESOURCE_REFERENCE_COMPILATION_USAGE_TYPE_NOT_NEEDED,
 };
 
 struct config_component_t
@@ -90,17 +89,15 @@ TEST_UNIVERSE_RESOURCE_REFERENCE_API void config_component_init (struct config_c
 }
 
 // \meta reflection_struct_field_meta = "config_component_t.optional_config_a"
-TEST_UNIVERSE_RESOURCE_REFERENCE_API struct kan_resource_pipeline_reference_meta_t
-    config_component_optional_config_a_meta = {
-        .type = "config_a_t",
-        .compilation_usage = KAN_RESOURCE_REFERENCE_COMPILATION_USAGE_TYPE_NOT_NEEDED,
+TEST_UNIVERSE_RESOURCE_REFERENCE_API struct kan_resource_reference_meta_t config_component_optional_config_a_meta = {
+    .type = "config_a_t",
+    .compilation_usage = KAN_RESOURCE_REFERENCE_COMPILATION_USAGE_TYPE_NOT_NEEDED,
 };
 
 // \meta reflection_struct_field_meta = "config_component_t.optional_config_b"
-TEST_UNIVERSE_RESOURCE_REFERENCE_API struct kan_resource_pipeline_reference_meta_t
-    config_component_optional_config_b_meta = {
-        .type = "config_b_t",
-        .compilation_usage = KAN_RESOURCE_REFERENCE_COMPILATION_USAGE_TYPE_NOT_NEEDED,
+TEST_UNIVERSE_RESOURCE_REFERENCE_API struct kan_resource_reference_meta_t config_component_optional_config_b_meta = {
+    .type = "config_b_t",
+    .compilation_usage = KAN_RESOURCE_REFERENCE_COMPILATION_USAGE_TYPE_NOT_NEEDED,
 };
 
 struct compound_component_pass_t
@@ -124,10 +121,9 @@ TEST_UNIVERSE_RESOURCE_REFERENCE_API void compound_component_pass_shutdown (stru
 }
 
 // \meta reflection_struct_field_meta = "compound_component_pass_t.configs"
-TEST_UNIVERSE_RESOURCE_REFERENCE_API struct kan_resource_pipeline_reference_meta_t
-    compound_component_pass_configs_meta = {
-        .type = "config_a_t",
-        .compilation_usage = KAN_RESOURCE_REFERENCE_COMPILATION_USAGE_TYPE_NOT_NEEDED,
+TEST_UNIVERSE_RESOURCE_REFERENCE_API struct kan_resource_reference_meta_t compound_component_pass_configs_meta = {
+    .type = "config_a_t",
+    .compilation_usage = KAN_RESOURCE_REFERENCE_COMPILATION_USAGE_TYPE_NOT_NEEDED,
 };
 
 struct compound_component_t
@@ -168,7 +164,7 @@ TEST_UNIVERSE_RESOURCE_REFERENCE_API void config_a_init (struct config_a_t *inst
 }
 
 // \meta reflection_struct_meta = "config_a_t"
-TEST_UNIVERSE_RESOURCE_REFERENCE_API struct kan_resource_pipeline_resource_type_meta_t config_a_type_meta = {
+TEST_UNIVERSE_RESOURCE_REFERENCE_API struct kan_resource_resource_type_meta_t config_a_type_meta = {
     .root = KAN_TRUE,
 };
 
@@ -185,12 +181,12 @@ TEST_UNIVERSE_RESOURCE_REFERENCE_API void config_b_init (struct config_b_t *inst
 }
 
 // \meta reflection_struct_meta = "config_b_t"
-TEST_UNIVERSE_RESOURCE_REFERENCE_API struct kan_resource_pipeline_resource_type_meta_t config_b_type_meta = {
+TEST_UNIVERSE_RESOURCE_REFERENCE_API struct kan_resource_resource_type_meta_t config_b_type_meta = {
     .root = KAN_TRUE,
 };
 
 // \meta reflection_struct_field_meta = "config_b_t.optional_config_a"
-TEST_UNIVERSE_RESOURCE_REFERENCE_API struct kan_resource_pipeline_reference_meta_t config_b_optional_config_a_meta = {
+TEST_UNIVERSE_RESOURCE_REFERENCE_API struct kan_resource_reference_meta_t config_b_optional_config_a_meta = {
     .type = "config_a_t",
     .compilation_usage = KAN_RESOURCE_REFERENCE_COMPILATION_USAGE_TYPE_NOT_NEEDED,
 };

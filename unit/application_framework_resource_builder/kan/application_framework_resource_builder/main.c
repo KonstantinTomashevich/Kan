@@ -56,10 +56,10 @@ static kan_allocation_group_t loaded_third_party_entries_allocation_group;
 static kan_allocation_group_t compilation_state_allocation_group;
 static kan_allocation_group_t temporary_allocation_group;
 
-static kan_interned_string_t interned_kan_resource_pipeline_resource_type_meta_t;
-static kan_interned_string_t interned_kan_resource_pipeline_compilable_meta_t;
-static kan_interned_string_t interned_kan_resource_pipeline_byproduct_type_meta_t;
-static kan_interned_string_t interned_kan_resource_pipeline_platform_configuration_t;
+static kan_interned_string_t interned_kan_resource_resource_type_meta_t;
+static kan_interned_string_t interned_kan_resource_compilable_meta_t;
+static kan_interned_string_t interned_kan_resource_byproduct_type_meta_t;
+static kan_interned_string_t interned_kan_resource_platform_configuration_t;
 static kan_interned_string_t interned_kan_resource_target_byproduct_state_t;
 
 static struct
@@ -70,7 +70,7 @@ static struct
 
     kan_reflection_registry_t registry;
     kan_serialization_binary_script_storage_t binary_script_storage;
-    struct kan_resource_pipeline_reference_type_info_storage_t reference_type_info_storage;
+    struct kan_resource_reference_type_info_storage_t reference_type_info_storage;
 
     struct kan_application_resource_project_t project;
     const char *project_directory_path;
@@ -179,8 +179,8 @@ struct native_entry_node_t
     const struct kan_reflection_struct_t *source_type;
     const struct kan_reflection_struct_t *compiled_type;
 
-    const struct kan_resource_pipeline_compilable_meta_t *compilable_meta;
-    const struct kan_resource_pipeline_byproduct_type_meta_t *byproduct_meta;
+    const struct kan_resource_compilable_meta_t *compilable_meta;
+    const struct kan_resource_byproduct_type_meta_t *byproduct_meta;
 
     kan_interned_string_t name;
     char *source_path;
@@ -204,8 +204,8 @@ struct native_entry_node_t
     struct native_entry_node_t *previous_node_in_compilation_queue;
     struct native_entry_node_t *next_node_in_resource_management_queue;
 
-    struct kan_resource_pipeline_detected_reference_container_t source_detected_references;
-    struct kan_resource_pipeline_detected_reference_container_t compiled_detected_references;
+    struct kan_resource_detected_reference_container_t source_detected_references;
+    struct kan_resource_detected_reference_container_t compiled_detected_references;
 
     struct byproduct_node_t *linked_byproduct;
 };
@@ -251,14 +251,14 @@ static struct native_entry_node_t *native_entry_node_create (struct target_t *ta
         return NULL;
     }
 
-    const struct kan_resource_pipeline_resource_type_meta_t *resource_type_meta =
-        find_singular_struct_meta (source_type_name, interned_kan_resource_pipeline_resource_type_meta_t);
+    const struct kan_resource_resource_type_meta_t *resource_type_meta =
+        find_singular_struct_meta (source_type_name, interned_kan_resource_resource_type_meta_t);
 
-    const struct kan_resource_pipeline_compilable_meta_t *compilable_meta =
-        find_singular_struct_meta (source_type_name, interned_kan_resource_pipeline_compilable_meta_t);
+    const struct kan_resource_compilable_meta_t *compilable_meta =
+        find_singular_struct_meta (source_type_name, interned_kan_resource_compilable_meta_t);
 
-    const struct kan_resource_pipeline_byproduct_type_meta_t *byproduct_meta =
-        find_singular_struct_meta (source_type_name, interned_kan_resource_pipeline_byproduct_type_meta_t);
+    const struct kan_resource_byproduct_type_meta_t *byproduct_meta =
+        find_singular_struct_meta (source_type_name, interned_kan_resource_byproduct_type_meta_t);
 
     if (!resource_type_meta && !byproduct_meta)
     {
@@ -331,8 +331,8 @@ static struct native_entry_node_t *native_entry_node_create (struct target_t *ta
     node->previous_node_in_compilation_queue = NULL;
     node->next_node_in_resource_management_queue = NULL;
 
-    kan_resource_pipeline_detected_reference_container_init (&node->source_detected_references);
-    kan_resource_pipeline_detected_reference_container_init (&node->compiled_detected_references);
+    kan_resource_detected_reference_container_init (&node->source_detected_references);
+    kan_resource_detected_reference_container_init (&node->compiled_detected_references);
 
     node->linked_byproduct = NULL;
     return node;
@@ -642,8 +642,8 @@ static void native_entry_node_destroy (struct native_entry_node_t *node)
     native_entry_node_unload_source (node);
     native_entry_node_unload_compiled (node);
 
-    kan_resource_pipeline_detected_reference_container_shutdown (&node->source_detected_references);
-    kan_resource_pipeline_detected_reference_container_shutdown (&node->compiled_detected_references);
+    kan_resource_detected_reference_container_shutdown (&node->source_detected_references);
+    kan_resource_detected_reference_container_shutdown (&node->compiled_detected_references);
 }
 
 static struct third_party_entry_node_t *third_party_entry_node_create (struct target_t *target,
@@ -722,10 +722,10 @@ static void third_party_entry_node_destroy (struct third_party_entry_node_t *nod
 static void load_platform_configuration (struct kan_file_system_path_container_t *path)
 {
     const struct kan_reflection_struct_t *file_type =
-        kan_reflection_registry_query_struct (global.registry, interned_kan_resource_pipeline_platform_configuration_t);
+        kan_reflection_registry_query_struct (global.registry, interned_kan_resource_platform_configuration_t);
     KAN_ASSERT (file_type)
 
-    struct kan_resource_pipeline_platform_configuration_t *configuration = load_native_data_from_real_file_system (
+    struct kan_resource_platform_configuration_t *configuration = load_native_data_from_real_file_system (
         file_type, path->path, KAN_HANDLE_SET_INVALID (kan_serialization_interned_string_registry_t));
 
     if (!configuration)
@@ -799,9 +799,9 @@ static void load_platform_configuration (struct kan_file_system_path_container_t
         kan_reflection_patch_apply (patch, instance->data);
     }
 
-    kan_resource_pipeline_platform_configuration_shutdown (configuration);
+    kan_resource_platform_configuration_shutdown (configuration);
     kan_free_general (loaded_native_entries_allocation_group, configuration,
-                      sizeof (struct kan_resource_pipeline_platform_configuration_t));
+                      sizeof (struct kan_resource_platform_configuration_t));
 }
 
 static void byproduct_node_init (struct byproduct_node_t *instance)
@@ -1474,8 +1474,8 @@ static void print_node_in_dead_lock_queue (struct native_entry_node_t *node)
 
     for (kan_loop_size_t index = 0u; index < node->source_detected_references.detected_references.size; ++index)
     {
-        struct kan_resource_pipeline_detected_reference_t *reference =
-            &((struct kan_resource_pipeline_detected_reference_t *)
+        struct kan_resource_detected_reference_t *reference =
+            &((struct kan_resource_detected_reference_t *)
                   node->source_detected_references.detected_references.data)[index];
 
         if (reference->compilation_usage == KAN_RESOURCE_REFERENCE_COMPILATION_USAGE_TYPE_NEEDED_COMPILED)
@@ -1558,8 +1558,8 @@ static void recursively_add_to_pack (struct native_entry_node_t *node)
 {
     for (kan_loop_size_t index = 0u; index < node->compiled_detected_references.detected_references.size; ++index)
     {
-        struct kan_resource_pipeline_detected_reference_t *reference =
-            &((struct kan_resource_pipeline_detected_reference_t *)
+        struct kan_resource_detected_reference_t *reference =
+            &((struct kan_resource_detected_reference_t *)
                   node->compiled_detected_references.detected_references.data)[index];
 
         if (reference->type)
@@ -1783,10 +1783,9 @@ static inline kan_time_size_t get_file_last_modification_time_ns (const char *pa
     return KAN_INT_MAX (kan_time_size_t);
 }
 
-static inline kan_bool_t read_detected_references_cache (
-    struct native_entry_node_t *node,
-    struct kan_resource_pipeline_detected_reference_container_t *container,
-    const char *path)
+static inline kan_bool_t read_detected_references_cache (struct native_entry_node_t *node,
+                                                         struct kan_resource_detected_reference_container_t *container,
+                                                         const char *path)
 {
     struct kan_stream_t *stream = kan_virtual_file_stream_open_for_read (global.volume, path);
     if (!stream)
@@ -1800,7 +1799,7 @@ static inline kan_bool_t read_detected_references_cache (
 
     stream = kan_random_access_stream_buffer_open_for_read (stream, KAN_RESOURCE_BUILDER_IO_BUFFER);
     kan_serialization_binary_reader_t reader = kan_serialization_binary_reader_create (
-        stream, container, kan_string_intern ("kan_resource_pipeline_detected_reference_container_t"),
+        stream, container, kan_string_intern ("kan_resource_detected_reference_container_t"),
         global.binary_script_storage, KAN_HANDLE_SET_INVALID (kan_serialization_interned_string_registry_t),
         container->detected_references.allocation_group);
 
@@ -1828,8 +1827,8 @@ static inline void remove_requests_for_compiled_dependencies (struct native_entr
 {
     for (kan_loop_size_t index = 0u; index < node->source_detected_references.detected_references.size; ++index)
     {
-        struct kan_resource_pipeline_detected_reference_t *reference =
-            &((struct kan_resource_pipeline_detected_reference_t *)
+        struct kan_resource_detected_reference_t *reference =
+            &((struct kan_resource_detected_reference_t *)
                   node->source_detected_references.detected_references.data)[index];
 
         if (reference->compilation_usage == KAN_RESOURCE_REFERENCE_COMPILATION_USAGE_TYPE_NEEDED_COMPILED)
@@ -1850,8 +1849,8 @@ static inline kan_bool_t request_compiled_dependencies (struct native_entry_node
     kan_bool_t successful = KAN_TRUE;
     for (kan_loop_size_t index = 0u; index < node->source_detected_references.detected_references.size; ++index)
     {
-        struct kan_resource_pipeline_detected_reference_t *reference =
-            &((struct kan_resource_pipeline_detected_reference_t *)
+        struct kan_resource_detected_reference_t *reference =
+            &((struct kan_resource_detected_reference_t *)
                   node->source_detected_references.detected_references.data)[index];
 
         if (reference->compilation_usage == KAN_RESOURCE_REFERENCE_COMPILATION_USAGE_TYPE_NEEDED_COMPILED)
@@ -1890,8 +1889,8 @@ static inline void remove_requests_for_raw_dependencies (struct native_entry_nod
 {
     for (kan_loop_size_t index = 0u; index < node->source_detected_references.detected_references.size; ++index)
     {
-        struct kan_resource_pipeline_detected_reference_t *reference =
-            &((struct kan_resource_pipeline_detected_reference_t *)
+        struct kan_resource_detected_reference_t *reference =
+            &((struct kan_resource_detected_reference_t *)
                   node->source_detected_references.detected_references.data)[index];
 
         if (reference->compilation_usage == KAN_RESOURCE_REFERENCE_COMPILATION_USAGE_TYPE_NEEDED_RAW)
@@ -1925,8 +1924,8 @@ static inline kan_bool_t request_raw_dependencies (struct native_entry_node_t *n
     kan_bool_t successful = KAN_TRUE;
     for (kan_loop_size_t index = 0u; index < node->source_detected_references.detected_references.size; ++index)
     {
-        struct kan_resource_pipeline_detected_reference_t *reference =
-            &((struct kan_resource_pipeline_detected_reference_t *)
+        struct kan_resource_detected_reference_t *reference =
+            &((struct kan_resource_detected_reference_t *)
                   node->source_detected_references.detected_references.data)[index];
 
         if (reference->compilation_usage == KAN_RESOURCE_REFERENCE_COMPILATION_USAGE_TYPE_NEEDED_RAW)
@@ -1988,8 +1987,8 @@ static kan_bool_t is_compiled_data_newer_than_dependencies (struct native_entry_
 
     for (kan_loop_size_t index = 0u; index < node->source_detected_references.detected_references.size; ++index)
     {
-        struct kan_resource_pipeline_detected_reference_t *reference =
-            &((struct kan_resource_pipeline_detected_reference_t *)
+        struct kan_resource_detected_reference_t *reference =
+            &((struct kan_resource_detected_reference_t *)
                   node->source_detected_references.detected_references.data)[index];
 
         if (reference->compilation_usage == KAN_RESOURCE_REFERENCE_COMPILATION_USAGE_TYPE_NEEDED_RAW)
@@ -2089,14 +2088,14 @@ static kan_interned_string_t interface_register_byproduct (kan_functor_user_data
         return NULL;
     }
 
-    const struct kan_resource_pipeline_byproduct_type_meta_t *meta =
-        find_singular_struct_meta (byproduct_type_name, interned_kan_resource_pipeline_byproduct_type_meta_t);
+    const struct kan_resource_byproduct_type_meta_t *meta =
+        find_singular_struct_meta (byproduct_type_name, interned_kan_resource_byproduct_type_meta_t);
 
     if (!meta)
     {
         KAN_LOG (application_framework_resource_builder, KAN_LOG_ERROR,
                  "[Target \"%s\"] Failed to register byproduct of type \"%s\" from native resource \"%s\" of type "
-                 "\"%s\" as it has no \"kan_resource_pipeline_byproduct_type_meta_t\" meta.",
+                 "\"%s\" as it has no \"kan_resource_byproduct_type_meta_t\" meta.",
                  source_node->target->name, byproduct_type_name, source_node->name, source_node->source_type->name)
         kan_atomic_int_add (&global.errors_count, 1);
         return NULL;
@@ -2236,7 +2235,7 @@ static void save_references_to_cache (struct native_entry_node_t *node, kan_bool
     stream = kan_random_access_stream_buffer_open_for_write (stream, KAN_RESOURCE_BUILDER_IO_BUFFER);
     kan_serialization_binary_writer_t writer = kan_serialization_binary_writer_create (
         stream, compiled ? &node->compiled_detected_references : &node->source_detected_references,
-        kan_string_intern ("kan_resource_pipeline_detected_reference_container_t"), global.binary_script_storage,
+        kan_string_intern ("kan_resource_detected_reference_container_t"), global.binary_script_storage,
         KAN_HANDLE_SET_INVALID (kan_serialization_interned_string_registry_t));
 
     enum kan_serialization_state_t serialization_state;
@@ -2326,8 +2325,8 @@ static void process_native_node_compilation (kan_functor_user_data_t user_data)
                  "[Target \"%s\"] Detecting reference of native resource \"%s\" of type \"%s\".", node->target->name,
                  node->name, node->source_type->name)
 
-        kan_resource_pipeline_detect_references (&global.reference_type_info_storage, node->source_type->name,
-                                                 node->source_data, &node->source_detected_references);
+        kan_resource_detect_references (&global.reference_type_info_storage, node->source_type->name, node->source_data,
+                                        &node->source_detected_references);
         save_references_to_cache (node, KAN_FALSE);
 
         if (request_compiled_dependencies (node))
@@ -2348,8 +2347,8 @@ static void process_native_node_compilation (kan_functor_user_data_t user_data)
         kan_bool_t all_compiled_dependencies_ready = KAN_TRUE;
         for (kan_loop_size_t index = 0u; index < node->source_detected_references.detected_references.size; ++index)
         {
-            struct kan_resource_pipeline_detected_reference_t *reference =
-                &((struct kan_resource_pipeline_detected_reference_t *)
+            struct kan_resource_detected_reference_t *reference =
+                &((struct kan_resource_detected_reference_t *)
                       node->source_detected_references.detected_references.data)[index];
 
             if (reference->compilation_usage == KAN_RESOURCE_REFERENCE_COMPILATION_USAGE_TYPE_NEEDED_COMPILED)
@@ -2462,8 +2461,8 @@ static void process_native_node_compilation (kan_functor_user_data_t user_data)
 
         for (kan_loop_size_t index = 0u; index < node->source_detected_references.detected_references.size; ++index)
         {
-            struct kan_resource_pipeline_detected_reference_t *reference =
-                &((struct kan_resource_pipeline_detected_reference_t *)
+            struct kan_resource_detected_reference_t *reference =
+                &((struct kan_resource_detected_reference_t *)
                       node->source_detected_references.detected_references.data)[index];
 
             if (reference->compilation_usage == KAN_RESOURCE_REFERENCE_COMPILATION_USAGE_TYPE_NEEDED_RAW)
@@ -2540,19 +2539,18 @@ static void process_native_node_compilation (kan_functor_user_data_t user_data)
             return;
         }
 
-        struct kan_resource_pipeline_compilation_dependency_t *dependency_array = NULL;
+        struct kan_resource_compilation_dependency_t *dependency_array = NULL;
         if (dependencies_count > 0u)
         {
             dependency_array = kan_allocate_general (
-                temporary_allocation_group,
-                sizeof (struct kan_resource_pipeline_compilation_dependency_t) * dependencies_count,
-                _Alignof (struct kan_resource_pipeline_compilation_dependency_t));
+                temporary_allocation_group, sizeof (struct kan_resource_compilation_dependency_t) * dependencies_count,
+                _Alignof (struct kan_resource_compilation_dependency_t));
             kan_instance_size_t dependency_index = 0u;
 
             for (kan_loop_size_t index = 0u; index < node->source_detected_references.detected_references.size; ++index)
             {
-                struct kan_resource_pipeline_detected_reference_t *reference =
-                    &((struct kan_resource_pipeline_detected_reference_t *)
+                struct kan_resource_detected_reference_t *reference =
+                    &((struct kan_resource_detected_reference_t *)
                           node->source_detected_references.detected_references.data)[index];
 
                 if (reference->compilation_usage == KAN_RESOURCE_REFERENCE_COMPILATION_USAGE_TYPE_NEEDED_RAW)
@@ -2607,7 +2605,7 @@ static void process_native_node_compilation (kan_functor_user_data_t user_data)
                 kan_allocation_group_stack_pop ();
             }
 
-            struct kan_resource_pipeline_compile_state_t state = {
+            struct kan_resource_compile_state_t state = {
                 .input_instance = node->source_data,
                 .output_instance = node->compiled_data,
                 .platform_configuration = NULL,
@@ -2619,7 +2617,7 @@ static void process_native_node_compilation (kan_functor_user_data_t user_data)
                 .register_byproduct = interface_register_byproduct,
             };
 
-            enum kan_resource_pipeline_compile_result_t compile_result = KAN_RESOURCE_PIPELINE_COMPILE_IN_PROGRESS;
+            enum kan_resource_compile_result_t compile_result = KAN_RESOURCE_PIPELINE_COMPILE_IN_PROGRESS;
             if (node->compilable_meta->configuration_type_name)
             {
                 struct platform_configuration_t *configuration = global.platform_configurations;
@@ -2699,7 +2697,7 @@ static void process_native_node_compilation (kan_functor_user_data_t user_data)
             if (dependency_array)
             {
                 kan_free_general (temporary_allocation_group, dependency_array,
-                                  sizeof (struct kan_resource_pipeline_compilation_dependency_t) * dependencies_count);
+                                  sizeof (struct kan_resource_compilation_dependency_t) * dependencies_count);
             }
 
             if (compile_result == KAN_RESOURCE_PIPELINE_COMPILE_FINISHED)
@@ -2717,8 +2715,8 @@ static void process_native_node_compilation (kan_functor_user_data_t user_data)
                     return;
                 }
 
-                kan_resource_pipeline_detect_references (&global.reference_type_info_storage, node->compiled_type->name,
-                                                         node->compiled_data, &node->compiled_detected_references);
+                kan_resource_detect_references (&global.reference_type_info_storage, node->compiled_type->name,
+                                                node->compiled_data, &node->compiled_detected_references);
 
                 save_references_to_cache (node, KAN_TRUE);
                 node->pending_compilation_status = COMPILATION_STATUS_FINISHED;
@@ -2750,8 +2748,8 @@ static void process_native_node_compilation (kan_functor_user_data_t user_data)
                 return;
             }
 
-            kan_resource_pipeline_detect_references (&global.reference_type_info_storage, node->source_type->name,
-                                                     node->source_data, &node->compiled_detected_references);
+            kan_resource_detect_references (&global.reference_type_info_storage, node->source_type->name,
+                                            node->source_data, &node->compiled_detected_references);
 
             save_references_to_cache (node, KAN_TRUE);
             node->pending_compilation_status = COMPILATION_STATUS_FINISHED;
@@ -3307,13 +3305,10 @@ int main (int argument_count, char **argument_values)
         kan_allocation_group_get_child (kan_allocation_group_root (), "compilation_state");
     temporary_allocation_group = kan_allocation_group_get_child (kan_allocation_group_root (), "temporary");
 
-    interned_kan_resource_pipeline_resource_type_meta_t =
-        kan_string_intern ("kan_resource_pipeline_resource_type_meta_t");
-    interned_kan_resource_pipeline_compilable_meta_t = kan_string_intern ("kan_resource_pipeline_compilable_meta_t");
-    interned_kan_resource_pipeline_byproduct_type_meta_t =
-        kan_string_intern ("kan_resource_pipeline_byproduct_type_meta_t");
-    interned_kan_resource_pipeline_platform_configuration_t =
-        kan_string_intern ("kan_resource_pipeline_platform_configuration_t");
+    interned_kan_resource_resource_type_meta_t = kan_string_intern ("kan_resource_resource_type_meta_t");
+    interned_kan_resource_compilable_meta_t = kan_string_intern ("kan_resource_compilable_meta_t");
+    interned_kan_resource_byproduct_type_meta_t = kan_string_intern ("kan_resource_byproduct_type_meta_t");
+    interned_kan_resource_platform_configuration_t = kan_string_intern ("kan_resource_platform_configuration_t");
     interned_kan_resource_target_byproduct_state_t = kan_string_intern ("kan_resource_target_byproduct_state_t");
 
     KAN_LOG (application_framework_resource_builder, KAN_LOG_INFO, "Reading project...")
@@ -3397,8 +3392,8 @@ int main (int argument_count, char **argument_values)
         KAN_REFLECTION_UNIT_REGISTRAR_NAME (application_framework_resource_builder) (global.registry);
 
         global.binary_script_storage = kan_serialization_binary_script_storage_create (global.registry);
-        kan_resource_pipeline_reference_type_info_storage_build (&global.reference_type_info_storage, global.registry,
-                                                                 reference_type_info_storage_allocation_group);
+        kan_resource_reference_type_info_storage_build (&global.reference_type_info_storage, global.registry,
+                                                        reference_type_info_storage_allocation_group);
 
         {
             KAN_LOG (application_framework_resource_builder, KAN_LOG_INFO, "Loading platform configuration...")
@@ -3778,7 +3773,7 @@ int main (int argument_count, char **argument_values)
         kan_dynamic_array_shutdown (&global.targets);
         kan_stack_group_allocator_shutdown (&global.temporary_allocator);
         kan_serialization_binary_script_storage_destroy (global.binary_script_storage);
-        kan_resource_pipeline_reference_type_info_storage_shutdown (&global.reference_type_info_storage);
+        kan_resource_reference_type_info_storage_shutdown (&global.reference_type_info_storage);
         kan_context_destroy (context);
     }
 
