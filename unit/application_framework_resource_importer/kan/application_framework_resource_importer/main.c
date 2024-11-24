@@ -108,9 +108,6 @@ struct rule_finish_request_t
 static struct
 {
     struct kan_application_resource_project_t project;
-    const char *project_directory_path;
-    const char *project_directory_path_end;
-
     kan_reflection_registry_t registry;
     kan_serialization_binary_script_storage_t binary_script_storage;
 
@@ -135,10 +132,6 @@ static struct
 
     kan_allocation_group_t temporary_allocation_group;
     kan_allocation_group_t configuration_allocation_group;
-
-    struct kan_file_system_path_container_t resolved_application_source_directory;
-    struct kan_file_system_path_container_t resolved_project_source_directory;
-    struct kan_file_system_path_container_t resolved_source_directory;
 
 } global = {
     .registry = KAN_HANDLE_INITIALIZE_INVALID,
@@ -418,24 +411,12 @@ static void scan_target_for_rules (kan_functor_user_data_t user_data)
     }
 
     state.whole_target_included = target_request != NULL;
-    if (global.project_directory_path_end)
-    {
-        kan_file_system_path_container_copy_char_sequence (
-            &state.resource_directory_container, global.project_directory_path, global.project_directory_path_end);
-    }
-    else
-    {
-        kan_file_system_path_container_reset_length (&state.resource_directory_container, 0u);
-    }
-
     for (kan_loop_size_t index = 0u; index < target->directories.size; ++index)
     {
-        const kan_instance_size_t length = state.resource_directory_container.length;
-        kan_file_system_path_container_append (&state.resource_directory_container,
-                                               ((char **) target->directories.data)[index]);
+        kan_file_system_path_container_copy_string (&state.resource_directory_container,
+                                                    ((char **) target->directories.data)[index]);
         kan_file_system_path_container_copy (&state.work_path_container, &state.resource_directory_container);
         scan_directory_for_rules (&state);
-        kan_file_system_path_container_reset_length (&state.resource_directory_container, length);
     }
 
     KAN_LOG (application_framework_resource_importer, KAN_LOG_INFO, "Done scanning for import rules in target \"%s\".",
@@ -631,18 +612,18 @@ static void serve_start_request (kan_functor_user_data_t user_data)
         break;
 
     case KAN_RESOURCE_IMPORT_SOURCE_PATH_ROOT_APPLICATION_SOURCE:
-        rule->external_source_path_root = global.resolved_application_source_directory.path;
-        rule->source_path_root_length = global.resolved_application_source_directory.length;
+        rule->external_source_path_root = global.project.application_source_directory;
+        rule->source_path_root_length = (kan_instance_size_t) strlen (rule->external_source_path_root);
         break;
 
     case KAN_RESOURCE_IMPORT_SOURCE_PATH_ROOT_PROJECT_SOURCE:
-        rule->external_source_path_root = global.resolved_project_source_directory.path;
-        rule->source_path_root_length = global.resolved_project_source_directory.length;
+        rule->external_source_path_root = global.project.project_source_directory;
+        rule->source_path_root_length = (kan_instance_size_t) strlen (rule->external_source_path_root);
         break;
 
     case KAN_RESOURCE_IMPORT_SOURCE_PATH_ROOT_CMAKE_SOURCE:
-        rule->external_source_path_root = global.resolved_source_directory.path;
-        rule->source_path_root_length = global.resolved_source_directory.length;
+        rule->external_source_path_root = global.project.source_directory;
+        rule->source_path_root_length = (kan_instance_size_t) strlen (rule->external_source_path_root);
         break;
     }
 
@@ -1205,8 +1186,6 @@ int main (int argument_count, char **argument_values)
     int result = 0;
     KAN_LOG (application_framework_resource_importer, KAN_LOG_INFO, "Reading project...")
     kan_application_resource_project_init (&global.project);
-    global.project_directory_path = argument_values[1u];
-    global.project_directory_path_end = strrchr (global.project_directory_path, '/');
 
     if (!kan_application_resource_project_read (argument_values[1u], &global.project))
     {
@@ -1214,33 +1193,6 @@ int main (int argument_count, char **argument_values)
                  argument_values[1u])
         kan_application_resource_project_shutdown (&global.project);
         return ERROR_CODE_FAILED_TO_READ_PROJECT;
-    }
-
-    if (global.project_directory_path_end)
-    {
-        kan_file_system_path_container_copy_char_sequence (&global.resolved_application_source_directory,
-                                                           global.project_directory_path,
-                                                           global.project_directory_path_end);
-        kan_file_system_path_container_append (&global.resolved_application_source_directory,
-                                               global.project.application_source_directory);
-
-        kan_file_system_path_container_copy_char_sequence (&global.resolved_project_source_directory,
-                                                           global.project_directory_path,
-                                                           global.project_directory_path_end);
-        kan_file_system_path_container_append (&global.resolved_project_source_directory,
-                                               global.project.project_source_directory);
-
-        kan_file_system_path_container_copy_char_sequence (
-            &global.resolved_source_directory, global.project_directory_path, global.project_directory_path_end);
-        kan_file_system_path_container_append (&global.resolved_source_directory, global.project.source_directory);
-    }
-    else
-    {
-        kan_file_system_path_container_copy_string (&global.resolved_application_source_directory,
-                                                    global.project.application_source_directory);
-        kan_file_system_path_container_copy_string (&global.resolved_project_source_directory,
-                                                    global.project.project_source_directory);
-        kan_file_system_path_container_copy_string (&global.resolved_source_directory, global.project.source_directory);
     }
 
     global.interned_kan_resource_import_rule_t = kan_string_intern ("kan_resource_import_rule_t");

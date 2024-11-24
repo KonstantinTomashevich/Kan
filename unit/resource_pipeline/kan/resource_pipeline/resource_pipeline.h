@@ -64,8 +64,6 @@
 /// produced resources by deleting the ones that were produced earlier and are not produced right now.
 /// \endparblock
 
-// TODO: Compilation states are not yet tested. Create simple example for testing compilation states?
-
 KAN_C_HEADER_BEGIN
 
 /// \brief Meta for marking types for native resources that should be supported by resource logic.

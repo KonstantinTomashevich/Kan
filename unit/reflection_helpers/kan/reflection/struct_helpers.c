@@ -155,16 +155,16 @@ kan_hash_t kan_reflection_hash_struct (kan_reflection_registry_t registry,
         switch (SIZE)                                                                                                  \
         {                                                                                                              \
         case 1u:                                                                                                       \
-            APPEND_HASH (*(int8_t *) ADDRESS);                                                                         \
+            APPEND_HASH (*(int8_t *) (ADDRESS));                                                                       \
             break;                                                                                                     \
         case 2u:                                                                                                       \
-            APPEND_HASH (*(int16_t *) ADDRESS);                                                                        \
+            APPEND_HASH (*(int16_t *) (ADDRESS));                                                                      \
             break;                                                                                                     \
         case 4u:                                                                                                       \
-            APPEND_HASH (*(int32_t *) ADDRESS);                                                                        \
+            APPEND_HASH (*(int32_t *) (ADDRESS));                                                                      \
             break;                                                                                                     \
         case 8u:                                                                                                       \
-            APPEND_HASH (*(int64_t *) ADDRESS);                                                                        \
+            APPEND_HASH (*(int64_t *) (ADDRESS));                                                                      \
             break;                                                                                                     \
         }                                                                                                              \
                                                                                                                        \
@@ -175,16 +175,16 @@ kan_hash_t kan_reflection_hash_struct (kan_reflection_registry_t registry,
         switch (SIZE)                                                                                                  \
         {                                                                                                              \
         case 1u:                                                                                                       \
-            APPEND_HASH (*(uint8_t *) ADDRESS);                                                                        \
+            APPEND_HASH (*(uint8_t *) (ADDRESS));                                                                      \
             break;                                                                                                     \
         case 2u:                                                                                                       \
-            APPEND_HASH (*(uint16_t *) ADDRESS);                                                                       \
+            APPEND_HASH (*(uint16_t *) (ADDRESS));                                                                     \
             break;                                                                                                     \
         case 4u:                                                                                                       \
-            APPEND_HASH (*(uint32_t *) ADDRESS);                                                                       \
+            APPEND_HASH (*(uint32_t *) (ADDRESS));                                                                     \
             break;                                                                                                     \
         case 8u:                                                                                                       \
-            APPEND_HASH (*(uint64_t *) ADDRESS);                                                                       \
+            APPEND_HASH (*(uint64_t *) (ADDRESS));                                                                     \
             break;                                                                                                     \
         }                                                                                                              \
                                                                                                                        \
@@ -194,25 +194,25 @@ kan_hash_t kan_reflection_hash_struct (kan_reflection_registry_t registry,
         switch (SIZE)                                                                                                  \
         {                                                                                                              \
         case 4u:                                                                                                       \
-            APPEND_HASH (*(float *) ADDRESS);                                                                          \
+            APPEND_HASH (*(float *) (ADDRESS));                                                                        \
             break;                                                                                                     \
         case 8u:                                                                                                       \
-            APPEND_HASH (*(double *) ADDRESS);                                                                         \
+            APPEND_HASH (*(double *) (ADDRESS));                                                                       \
             break;                                                                                                     \
         }                                                                                                              \
                                                                                                                        \
         break;                                                                                                         \
                                                                                                                        \
     case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:                                                                      \
-        APPEND_HASH (kan_string_hash (*(const char **) ADDRESS))                                                       \
+        APPEND_HASH (kan_string_hash (*(const char **) (ADDRESS)))                                                     \
         break;                                                                                                         \
                                                                                                                        \
     case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:                                                                     \
-        APPEND_HASH (*(kan_interned_string_t *) ADDRESS);                                                              \
+        APPEND_HASH (*(kan_interned_string_t *) (ADDRESS));                                                            \
         break;                                                                                                         \
                                                                                                                        \
     case KAN_REFLECTION_ARCHETYPE_ENUM:                                                                                \
-        APPEND_HASH (*(int *) ADDRESS)                                                                                 \
+        APPEND_HASH (*(int *) (ADDRESS))                                                                               \
         break;                                                                                                         \
                                                                                                                        \
     case KAN_REFLECTION_ARCHETYPE_EXTERNAL_POINTER:                                                                    \
@@ -221,7 +221,7 @@ kan_hash_t kan_reflection_hash_struct (kan_reflection_registry_t registry,
         break;                                                                                                         \
                                                                                                                        \
     case KAN_REFLECTION_ARCHETYPE_PATCH:                                                                               \
-        APPEND_HASH (KAN_HANDLE_GET (*(kan_reflection_patch_t *) ADDRESS))                                             \
+        APPEND_HASH (KAN_HANDLE_GET (*(kan_reflection_patch_t *) (ADDRESS)))                                           \
         break;
 
             TRIVIAL_HASHES (address, iterator.field->size)
@@ -332,16 +332,16 @@ kan_bool_t kan_reflection_are_structs_equal (kan_reflection_registry_t registry,
         switch (SIZE)                                                                                                  \
         {                                                                                                              \
         case 1u:                                                                                                       \
-            CHECK_EQUALITY (*(int8_t *) FIRST_ADDRESS, *(int8_t *) SECOND_ADDRESS);                                    \
+            CHECK_EQUALITY (*(int8_t *) (FIRST_ADDRESS), *(int8_t *) (SECOND_ADDRESS));                                \
             break;                                                                                                     \
         case 2u:                                                                                                       \
-            CHECK_EQUALITY (*(int16_t *) FIRST_ADDRESS, *(int16_t *) SECOND_ADDRESS);                                  \
+            CHECK_EQUALITY (*(int16_t *) (FIRST_ADDRESS), *(int16_t *) (SECOND_ADDRESS));                              \
             break;                                                                                                     \
         case 4u:                                                                                                       \
-            CHECK_EQUALITY (*(int32_t *) FIRST_ADDRESS, *(int32_t *) SECOND_ADDRESS);                                  \
+            CHECK_EQUALITY (*(int32_t *) (FIRST_ADDRESS), *(int32_t *) (SECOND_ADDRESS));                              \
             break;                                                                                                     \
         case 8u:                                                                                                       \
-            CHECK_EQUALITY (*(int64_t *) FIRST_ADDRESS, *(int64_t *) SECOND_ADDRESS);                                  \
+            CHECK_EQUALITY (*(int64_t *) (FIRST_ADDRESS), *(int64_t *) (SECOND_ADDRESS));                              \
             break;                                                                                                     \
         }                                                                                                              \
                                                                                                                        \
@@ -352,16 +352,16 @@ kan_bool_t kan_reflection_are_structs_equal (kan_reflection_registry_t registry,
         switch (SIZE)                                                                                                  \
         {                                                                                                              \
         case 1u:                                                                                                       \
-            CHECK_EQUALITY (*(uint8_t *) FIRST_ADDRESS, *(uint8_t *) SECOND_ADDRESS);                                  \
+            CHECK_EQUALITY (*(uint8_t *) (FIRST_ADDRESS), *(uint8_t *) (SECOND_ADDRESS));                              \
             break;                                                                                                     \
         case 2u:                                                                                                       \
-            CHECK_EQUALITY (*(uint16_t *) FIRST_ADDRESS, *(uint16_t *) SECOND_ADDRESS);                                \
+            CHECK_EQUALITY (*(uint16_t *) (FIRST_ADDRESS), *(uint16_t *) (SECOND_ADDRESS));                            \
             break;                                                                                                     \
         case 4u:                                                                                                       \
-            CHECK_EQUALITY (*(uint32_t *) FIRST_ADDRESS, *(uint32_t *) SECOND_ADDRESS);                                \
+            CHECK_EQUALITY (*(uint32_t *) (FIRST_ADDRESS), *(uint32_t *) (SECOND_ADDRESS));                            \
             break;                                                                                                     \
         case 8u:                                                                                                       \
-            CHECK_EQUALITY (*(uint64_t *) FIRST_ADDRESS, *(uint64_t *) SECOND_ADDRESS);                                \
+            CHECK_EQUALITY (*(uint64_t *) (FIRST_ADDRESS), *(uint64_t *) (SECOND_ADDRESS));                            \
             break;                                                                                                     \
         }                                                                                                              \
                                                                                                                        \
@@ -371,20 +371,20 @@ kan_bool_t kan_reflection_are_structs_equal (kan_reflection_registry_t registry,
         switch (SIZE)                                                                                                  \
         {                                                                                                              \
         case 4u:                                                                                                       \
-            CHECK_EQUALITY (*(float *) FIRST_ADDRESS, *(float *) SECOND_ADDRESS);                                      \
+            CHECK_EQUALITY (*(float *) (FIRST_ADDRESS), *(float *) (SECOND_ADDRESS));                                  \
             break;                                                                                                     \
         case 8u:                                                                                                       \
-            CHECK_EQUALITY (*(double *) FIRST_ADDRESS, *(double *) SECOND_ADDRESS);                                    \
+            CHECK_EQUALITY (*(double *) (FIRST_ADDRESS), *(double *) (SECOND_ADDRESS));                                \
             break;                                                                                                     \
         }                                                                                                              \
                                                                                                                        \
         break;                                                                                                         \
                                                                                                                        \
     case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:                                                                      \
-        if (FIRST_ADDRESS != SECOND_ADDRESS)                                                                           \
+        if ((FIRST_ADDRESS) != (SECOND_ADDRESS))                                                                       \
         {                                                                                                              \
-            if (!FIRST_ADDRESS || !SECOND_ADDRESS ||                                                                   \
-                strcmp (*(const char **) FIRST_ADDRESS, *(const char **) SECOND_ADDRESS) != 0)                         \
+            if (!(FIRST_ADDRESS) || !(SECOND_ADDRESS) ||                                                               \
+                strcmp (*(const char **) (FIRST_ADDRESS), *(const char **) (SECOND_ADDRESS)) != 0)                     \
             {                                                                                                          \
                 return KAN_FALSE;                                                                                      \
             }                                                                                                          \
@@ -393,11 +393,11 @@ kan_bool_t kan_reflection_are_structs_equal (kan_reflection_registry_t registry,
         break;                                                                                                         \
                                                                                                                        \
     case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:                                                                     \
-        CHECK_EQUALITY (*(kan_interned_string_t *) FIRST_ADDRESS, *(kan_interned_string_t *) SECOND_ADDRESS);          \
+        CHECK_EQUALITY (*(kan_interned_string_t *) (FIRST_ADDRESS), *(kan_interned_string_t *) (SECOND_ADDRESS));      \
         break;                                                                                                         \
                                                                                                                        \
     case KAN_REFLECTION_ARCHETYPE_ENUM:                                                                                \
-        CHECK_EQUALITY (*(int *) FIRST_ADDRESS, *(int *) SECOND_ADDRESS);                                              \
+        CHECK_EQUALITY (*(int *) (FIRST_ADDRESS), *(int *) (SECOND_ADDRESS));                                          \
         break;                                                                                                         \
                                                                                                                        \
     case KAN_REFLECTION_ARCHETYPE_EXTERNAL_POINTER:                                                                    \
@@ -406,8 +406,8 @@ kan_bool_t kan_reflection_are_structs_equal (kan_reflection_registry_t registry,
         break;                                                                                                         \
                                                                                                                        \
     case KAN_REFLECTION_ARCHETYPE_PATCH:                                                                               \
-        if (!KAN_HANDLE_IS_EQUAL (*(kan_reflection_patch_t *) FIRST_ADDRESS,                                           \
-                                  *(kan_reflection_patch_t *) SECOND_ADDRESS))                                         \
+        if (!KAN_HANDLE_IS_EQUAL (*(kan_reflection_patch_t *) (FIRST_ADDRESS),                                         \
+                                  *(kan_reflection_patch_t *) (SECOND_ADDRESS)))                                       \
         {                                                                                                              \
             return KAN_FALSE;                                                                                          \
         }                                                                                                              \
@@ -685,7 +685,7 @@ void kan_reflection_move_struct (kan_reflection_registry_t registry,
 
         case KAN_REFLECTION_ARCHETYPE_DYNAMIC_ARRAY:
         {
-            struct kan_dynamic_array_t *target_array = source_address;
+            struct kan_dynamic_array_t *target_array = target_address;
             struct kan_dynamic_array_t *source_array = source_address;
             *target_array = *source_array;
             source_array->size = 0u;

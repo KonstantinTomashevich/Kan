@@ -470,15 +470,9 @@ function (application_get_resource_importer_target_name OUTPUT)
     set ("${OUTPUT}" "${APPLICATION_NAME}_resource_importer" PARENT_SCOPE)
 endfunction ()
 
-# Sets variable with given name to path of the directory where resource project will be stored for current application.
-function (application_get_resource_project_directory_path OUTPUT)
-    set ("${OUTPUT}" "${CMAKE_BINARY_DIR}/workspace/${APPLICATION_NAME}" PARENT_SCOPE)
-endfunction ()
-
 # Sets variable with given name to path of resource project for current application.
 function (application_get_resource_project_path OUTPUT)
-    application_get_resource_project_directory_path (PROJECT_DIRECTORY)
-    set ("${OUTPUT}" "${PROJECT_DIRECTORY}/resource_project.rd" PARENT_SCOPE)
+    set ("${OUTPUT}" "${CMAKE_BINARY_DIR}/workspace/${APPLICATION_NAME}/resource_project.rd" PARENT_SCOPE)
 endfunction ()
 
 # Intended only for internal use in this file.
@@ -580,7 +574,7 @@ endfunction ()
 # - PLUGINS: multi value argument for core plugins.
 # - TAGS: multi value argument for list of environment tags for this configuration.
 function (private_core_configurator_common_content)
-    cmake_parse_arguments (ARG "" "OUTPUT;HOT_RELOAD;AUTO_BUILD;AUTO_BUILD_DIRECTORY" "PLUGINS;TAGS" ${ARGV})
+    cmake_parse_arguments (ARG "" "OUTPUT;HOT_RELOAD;AUTO_BUILD" "PLUGINS;TAGS" ${ARGV})
     if (DEFINED ARG_UNPARSED_ARGUMENTS OR
             NOT DEFINED ARG_OUTPUT OR
             NOT DEFINED ARG_HOT_RELOAD OR
@@ -649,12 +643,11 @@ function (private_core_configurator_common_content)
     string (APPEND CORE_CONFIGURATOR_CONTENT "${PREFIX}}\\n\\n\")\n")
     string (APPEND CORE_CONFIGURATOR_CONTENT "${PREFIX}+enabled_systems { name = update_system_t }\\n\\n\")\n")
 
-    if (ARG_AUTO_BUILD AND DEFINED ARG_AUTO_BUILD_DIRECTORY)
+    if (ARG_AUTO_BUILD )
         string (APPEND CORE_CONFIGURATOR_CONTENT "string (APPEND AUTO_BUILD_SUFFIX \"enable_auto_build = 1\\n\")\n")
         string (APPEND CORE_CONFIGURATOR_CONTENT "string (APPEND AUTO_BUILD_SUFFIX \"auto_build_command = \\\"")
         string (APPEND CORE_CONFIGURATOR_CONTENT "${CMAKE_COMMAND} ")
-        string (APPEND CORE_CONFIGURATOR_CONTENT
-                "--build \\\\\\\"$<PATH:RELATIVE_PATH,${CMAKE_BINARY_DIR},${ARG_AUTO_BUILD_DIRECTORY}>\\\\\\\" ")
+        string (APPEND CORE_CONFIGURATOR_CONTENT "--build \\\\\\\"${CMAKE_BINARY_DIR}>\\\\\\\" ")
         string (APPEND CORE_CONFIGURATOR_CONTENT "--target \\\\\\\"${APPLICATION_NAME}_dev_all_plugins\\\\\\\" ")
         string (APPEND CORE_CONFIGURATOR_CONTENT "--config $<CONFIG>\\\"\")\n")
     endif ()
@@ -870,7 +863,6 @@ function (application_generate)
             OUTPUT DEV_CORE_CONFIGURATOR_CONTENT
             HOT_RELOAD ON
             AUTO_BUILD ${KAN_APPLICATION_ENABLE_AUTO_BUILD}
-            AUTO_BUILD_DIRECTORY ${DEV_BUILD_DIRECTORY}
             PLUGINS ${CORE_PLUGINS}
             TAGS ${DEVELOPMENT_TAGS})
 
@@ -885,14 +877,10 @@ function (application_generate)
         private_configuration_mount_real (
                 DEV_CORE_CONFIGURATOR_CONTENT
                 "${KAN_APPLICATION_RESOURCES_DIRECTORY_NAME}/${MOUNT_NAME}"
-                "$<PATH:RELATIVE_PATH,${RESOURCE_DIRECTORY},${DEV_BUILD_DIRECTORY}>")
+                "${RESOURCE_DIRECTORY}>")
     endforeach ()
 
-    private_configuration_mount_real (
-            DEV_CORE_CONFIGURATOR_CONTENT
-            "universe_world_definitions"
-            "$<PATH:RELATIVE_PATH,${WORLD_DIRECTORY},${DEV_BUILD_DIRECTORY}>")
-
+    private_configuration_mount_real (DEV_CORE_CONFIGURATOR_CONTENT "universe_world_definitions" "${WORLD_DIRECTORY}")
     string (APPEND DEV_CORE_CONFIGURATOR_CONTENT "${PREFIX}    }\\n\")\n")
     string (APPEND DEV_CORE_CONFIGURATOR_CONTENT "${PREFIX}}\")\n")
 
@@ -1009,7 +997,7 @@ function (application_generate)
             private_configuration_mount_real (
                     DEV_PROGRAM_CONFIGURATOR_CONTENT
                     "${KAN_APPLICATION_RESOURCES_DIRECTORY_NAME}/${MOUNT_NAME}"
-                    "$<PATH:RELATIVE_PATH,${RESOURCE_DIRECTORY},${DEV_BUILD_DIRECTORY}>")
+                    "${RESOURCE_DIRECTORY}")
         endforeach ()
 
         string (APPEND DEV_PROGRAM_CONFIGURATOR_CONTENT "${PREFIX}    }\\n\")\n")
@@ -1070,8 +1058,6 @@ function (application_generate)
     endforeach ()
 
     string (APPEND PROJECT_CONTENT "\n\n")
-    application_get_resource_project_directory_path (RESOURCE_PROJECT_DIRECTORY)
-
     string (APPEND PROJECT_CONTENT "+targets {\n")
     string (APPEND PROJECT_CONTENT "    name = core\n")
 
@@ -1079,7 +1065,6 @@ function (application_generate)
         string (APPEND PROJECT_CONTENT "    directories =\n")
 
         foreach (DIRECTORY ${CORE_RESOURCE_DIRECTORIES})
-            cmake_path (RELATIVE_PATH DIRECTORY BASE_DIRECTORY "${RESOURCE_PROJECT_DIRECTORY}")
             string (APPEND PROJECT_CONTENT "        \"${DIRECTORY}\",\n")
         endforeach ()
     endif ()
@@ -1096,7 +1081,6 @@ function (application_generate)
                 set (COMMA "")
 
                 foreach (DIRECTORY ${PLUGIN_DIRECTORIES})
-                    cmake_path (RELATIVE_PATH DIRECTORY BASE_DIRECTORY "${RESOURCE_PROJECT_DIRECTORY}")
                     string (APPEND PROJECT_CONTENT "${COMMA}        \"${DIRECTORY}\"")
                     set (COMMA ",\n")
                 endforeach ()
@@ -1118,13 +1102,8 @@ function (application_generate)
     set (RBW_DIRECTORY "${WORKSPACE_DIRECTORY}/${KAN_APPLICATION_RBW_DIRECTORY_NAME}")
     file (MAKE_DIRECTORY "${RBW_DIRECTORY}")
 
-    set (RC_DIRECTORY_LOCAL "${RC_DIRECTORY}")
-    cmake_path (RELATIVE_PATH RC_DIRECTORY_LOCAL BASE_DIRECTORY "${RESOURCE_PROJECT_DIRECTORY}")
-    string (APPEND PROJECT_CONTENT "reference_cache_directory = \"${RC_DIRECTORY_LOCAL}\"\n")
-
-    set (RBW_DIRECTORY_LOCAL "${RBW_DIRECTORY}")
-    cmake_path (RELATIVE_PATH RBW_DIRECTORY_LOCAL BASE_DIRECTORY "${RESOURCE_PROJECT_DIRECTORY}")
-    string (APPEND PROJECT_CONTENT "output_directory = \"${RBW_DIRECTORY_LOCAL}\"\n")
+    string (APPEND PROJECT_CONTENT "reference_cache_directory = \"${RC_DIRECTORY}\"\n")
+    string (APPEND PROJECT_CONTENT "output_directory = \"${RBW_DIRECTORY}\"\n")
 
     if (KAN_APPLICATION_PACKER_INTERN_STRINGS)
         string (APPEND PROJECT_CONTENT "use_string_interning = 1\n")
@@ -1132,20 +1111,11 @@ function (application_generate)
         string (APPEND PROJECT_CONTENT "use_string_interning = 0\n")
     endif ()
 
-    set (APPLICATION_SOURCE_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
-    cmake_path (RELATIVE_PATH APPLICATION_SOURCE_DIRECTORY BASE_DIRECTORY "${RESOURCE_PROJECT_DIRECTORY}")
-    string (APPEND PROJECT_CONTENT "application_source_directory = \"${APPLICATION_SOURCE_DIRECTORY}\"\n")
-
-    set (PROJECT_SOURCE_DIRECTORY "${PROJECT_SOURCE_DIR}")
-    cmake_path (RELATIVE_PATH PROJECT_SOURCE_DIRECTORY BASE_DIRECTORY "${RESOURCE_PROJECT_DIRECTORY}")
-    string (APPEND PROJECT_CONTENT "project_source_directory = \"${PROJECT_SOURCE_DIRECTORY}\"\n")
-
-    set (SOURCE_DIRECTORY "${CMAKE_SOURCE_DIR}")
-    cmake_path (RELATIVE_PATH SOURCE_DIRECTORY BASE_DIRECTORY "${RESOURCE_PROJECT_DIRECTORY}")
-    string (APPEND PROJECT_CONTENT "source_directory = \"${SOURCE_DIRECTORY}\"\n")
+    string (APPEND PROJECT_CONTENT "application_source_directory = \"${CMAKE_CURRENT_SOURCE_DIR}\"\n")
+    string (APPEND PROJECT_CONTENT "project_source_directory = \"${PROJECT_SOURCE_DIR}\"\n")
+    string (APPEND PROJECT_CONTENT "source_directory = \"${CMAKE_SOURCE_DIR}\"\n")
 
     get_target_property (PLATFORM_CONFIGURATION_PATH "${APPLICATION_NAME}" APPLICATION_PLATFORM_CONFIGURATION)
-    cmake_path (RELATIVE_PATH PLATFORM_CONFIGURATION_PATH BASE_DIRECTORY "${RESOURCE_PROJECT_DIRECTORY}")
     string (APPEND PROJECT_CONTENT "platform_configuration = \"${PLATFORM_CONFIGURATION_PATH}\"\n")
 
     application_get_resource_project_path (RESOURCE_PROJECT_PATH)
@@ -1444,8 +1414,6 @@ function (application_generate)
                     list (APPEND BUILDER_TARGETS "${PLUGIN}")
                 endif ()
             endforeach ()
-
-            # TODO: All custom target commands should use relative paths from build directory. Refactor it later.
 
             application_get_resource_builder_target_name (RESOURCE_BUILDER)
             add_custom_target ("${VARIANT}_build_resources"

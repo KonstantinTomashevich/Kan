@@ -22,7 +22,7 @@ struct kan_application_resource_target_t
     /// \brief Name of this target.
     kan_interned_string_t name;
 
-    /// \brief Directories to look for resources of this target. Relative to project file.
+    /// \brief Directories to look for resources of this target. Absolute.
     /// \meta reflection_dynamic_array_type = "char *"
     struct kan_dynamic_array_t directories;
 
@@ -53,26 +53,25 @@ struct kan_application_resource_project_t
     /// \meta reflection_dynamic_array_type = "struct kan_application_resource_target_t"
     struct kan_dynamic_array_t targets;
 
-    /// \brief Path to directory that is used as shared reference cache (might be shared with editors).
-    ///        Relative to project file.
+    /// \brief Path to directory that is used as shared reference cache (might be shared with editors). Absolute.
     char *reference_cache_directory;
 
-    /// \brief Path to directory to save resource build output. Relative to project file.
+    /// \brief Path to directory to save resource build output. Absolute.
     char *output_directory;
 
     /// \brief Whether to enable string interning pass for data compression.
     kan_bool_t use_string_interning;
 
-    /// \brief Location of the directory where this application is defined. Relative to project file.
+    /// \brief Location of the directory where this application is defined. Absolute.
     char *application_source_directory;
 
-    /// \brief Location of the directory where current CMake project is defined. Relative to project file.
+    /// \brief Location of the directory where current CMake project is defined. Absolute.
     char *project_source_directory;
 
-    /// \brief Location of CMake generation source directory. Relative to project file.
+    /// \brief Location of CMake generation source directory. Absolute.
     char *source_directory;
 
-    /// \brief Location of platform configuration file for resource building. Relative to project file.
+    /// \brief Location of platform configuration file for resource building. Absolute.
     char *platform_configuration;
 };
 
