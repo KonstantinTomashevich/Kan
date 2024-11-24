@@ -484,6 +484,7 @@ struct byproduct_test_singleton_t
     kan_resource_request_id_t material_2_request_id;
     kan_resource_request_id_t material_3_request_id;
     kan_resource_request_id_t material_4_request_id;
+    kan_resource_request_id_t any_pipeline_request_id;
 };
 
 APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API void byproduct_test_singleton_init (
@@ -496,6 +497,7 @@ APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API void byproduct_test_sing
     instance->material_2_request_id = KAN_TYPED_ID_32_SET_INVALID (kan_resource_request_id_t);
     instance->material_3_request_id = KAN_TYPED_ID_32_SET_INVALID (kan_resource_request_id_t);
     instance->material_4_request_id = KAN_TYPED_ID_32_SET_INVALID (kan_resource_request_id_t);
+    instance->any_pipeline_request_id = KAN_TYPED_ID_32_SET_INVALID (kan_resource_request_id_t);
 }
 
 struct byproduct_mutator_state_t
@@ -727,6 +729,24 @@ static void insert_missing_requests (struct byproduct_mutator_state_t *state,
             test_singleton->material_4_request_id = request->request_id;
         }
     }
+
+    if (!KAN_TYPED_ID_32_IS_VALID (test_singleton->any_pipeline_request_id))
+    {
+        const kan_interned_string_t type = kan_string_intern ("pipeline_instance_byproduct_compiled_t");
+        KAN_UP_VALUE_READ (entry, kan_resource_native_entry_t, type, &type)
+        {
+            KAN_UP_INDEXED_INSERT (request, kan_resource_request_t)
+            {
+                request->request_id = kan_next_resource_request_id (provider_singleton);
+                request->type = type;
+                request->name = entry->name;
+                request->priority = 0u;
+                test_singleton->any_pipeline_request_id = request->request_id;
+            }
+
+            KAN_UP_QUERY_BREAK;
+        }
+    }
 }
 
 static void check_if_requests_are_loaded (struct byproduct_mutator_state_t *state,
@@ -751,6 +771,11 @@ static void check_if_requests_are_loaded (struct byproduct_mutator_state_t *stat
     KAN_UP_VALUE_READ (request_4, kan_resource_request_t, request_id, &test_singleton->material_4_request_id)
     {
         test_singleton->loaded_data &= KAN_TYPED_ID_32_IS_VALID (request_4->provided_container_id);
+    }
+
+    KAN_UP_VALUE_READ (pipeline_request, kan_resource_request_t, request_id, &test_singleton->any_pipeline_request_id)
+    {
+        test_singleton->loaded_data &= KAN_TYPED_ID_32_IS_VALID (pipeline_request->provided_container_id);
     }
 }
 
@@ -882,7 +907,27 @@ static void validate_loaded_data (struct byproduct_mutator_state_t *state,
         test_singleton->data_valid = KAN_FALSE;
     }
 
-    // TODO: Somehow augment test to check pipeline format to ensure that they've received accurate configuration?
+    // Check random pipeline instance that it was compiled with expected format from configuration.
+    KAN_UP_VALUE_READ (request, kan_resource_request_t, request_id, &test_singleton->any_pipeline_request_id)
+    {
+        KAN_UP_VALUE_READ (view, resource_provider_container_pipeline_instance_byproduct_compiled_t, container_id,
+                           &request->provided_container_id)
+        {
+            kan_memory_size_t offset = offsetof (struct kan_resource_container_view_t, data_begin);
+            offset = kan_apply_alignment (offset, _Alignof (struct pipeline_instance_byproduct_compiled_t));
+            struct pipeline_instance_byproduct_compiled_t *pipeline =
+                (struct pipeline_instance_byproduct_compiled_t *) (((uint8_t *) view) + offset);
+
+            if (pipeline->format != PIPELINE_INSTANCE_PLATFORM_FORMAT_SPIRV)
+            {
+                KAN_LOG (application_framework_example_compilation_byproduct, KAN_LOG_ERROR,
+                         "Expected any pipeline to have format from default configuration, but pipeline \"%s\" "
+                         "received format %lu!",
+                         request->name, (unsigned long) pipeline->format)
+                test_singleton->data_valid = KAN_FALSE;
+            }
+        }
+    }
 }
 
 APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API void kan_universe_mutator_execute_byproduct_mutator (
