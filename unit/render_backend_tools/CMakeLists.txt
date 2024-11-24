@@ -1,5 +1,0 @@
-register_abstract (render_backend_tools)
-abstract_include ("${CMAKE_CURRENT_SOURCE_DIR}")
-abstract_require (CONCRETE_INTERFACE render_pipeline_language INTERFACE api_common)
-c_interface_scanner_setup (GLOB "*.h")
-abstract_register_implementation (NAME vulkan PARTS render_backend_tools_vulkan)

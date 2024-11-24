@@ -384,6 +384,15 @@ CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_backend_system_destroy_surface
 /// \brief Returns flags that are required for application windows in order to create surfaces.
 CONTEXT_RENDER_BACKEND_SYSTEM_API enum kan_platform_window_flag_t kan_render_get_required_window_flags (void);
 
+/// \brief Enumerates known code formats that can be passed to render backends.
+enum kan_render_code_format_t
+{
+    KAN_RENDER_CODE_FORMAT_SPIRV = 0u,
+};
+
+/// \brief Returns bitmask of code formats supported by current render backend.
+CONTEXT_RENDER_BACKEND_SYSTEM_API kan_memory_size_t kan_render_get_supported_code_format_flags (void);
+
 /// \brief Frame buffer supported attachment types.
 enum kan_render_frame_buffer_attachment_type_t
 {

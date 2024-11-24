@@ -3,8 +3,8 @@ concrete_include (PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 concrete_sources ("*.c")
 concrete_require (
         SCOPE PUBLIC
-        ABSTRACT context_render_backend_system cpu_profiler file_system image render_backend_tools
-        CONCRETE_INTERFACE inline_math testing)
+        ABSTRACT context_render_backend_system cpu_profiler file_system image
+        CONCRETE_INTERFACE inline_math render_pipeline_language testing)
 
 file (MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/tests_resources/context_render_backend_system")
 add_custom_target (test_context_render_backend_system_copy_expectation
@@ -25,7 +25,7 @@ foreach (IMPLEMENTATION ${CONTEXT_RENDER_BACKEND_SYSTEM_IMPLEMENTATIONS})
             ABSTRACT
             context_render_backend_system=${IMPLEMENTATION} cpu_dispatch=kan cpu_profiler=tracy error=sdl
             file_system=platform_default hash=djb2 image=stb log=kan memory=kan memory_profiler=none platform=sdl
-            reflection=kan render_backend_tools=${IMPLEMENTATION} stream=kan threading=sdl
+            reflection=kan stream=kan threading=sdl
             CONCRETE
             container context context_application_system inline_math render_pipeline_language testing
             test_context_render_backend_system)
