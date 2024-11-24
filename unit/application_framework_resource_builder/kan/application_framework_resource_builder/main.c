@@ -2611,6 +2611,7 @@ static void process_native_node_compilation (kan_functor_user_data_t user_data)
                 .platform_configuration = NULL,
                 .deadline = KAN_INT_MAX (kan_time_size_t),
                 .user_state = NULL,
+                .runtime_compilation = KAN_FALSE,
                 .dependencies_count = dependencies_count,
                 .dependencies = dependency_array,
                 .interface_user_data = (kan_functor_user_data_t) node,

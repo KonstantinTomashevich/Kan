@@ -113,6 +113,9 @@ struct kan_resource_compile_state_t
     /// \brief Pointer to the pre-initialized user state structure if required for compilation.
     void *user_state;
 
+    /// \brief True of compiling during runtime, not from tool.
+    kan_bool_t runtime_compilation;
+
     /// \brief Count of dependencies in ::dependencies array.
     kan_instance_size_t dependencies_count;
 
