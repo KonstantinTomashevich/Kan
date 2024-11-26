@@ -229,16 +229,16 @@ static void create_import_rule_using_stream (struct kan_stream_t *stream,
     kan_serialization_rd_reader_destroy (reader);
     if (serialization_state == KAN_SERIALIZATION_FINISHED)
     {
-        KAN_LOG (application_framework_resource_importer, KAN_LOG_INFO, "Using import rule from \"%s\".",
-                 rule_path->path)
+        KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, application_framework_resource_importer,
+                             KAN_LOG_INFO, "Using import rule from \"%s\".", rule_path->path)
         rule->inputs_left_to_process = kan_atomic_int_init (0);
 
         const char *last_separator = strrchr (rule_path->path, '/');
         if (!last_separator)
         {
             KAN_ASSERT (serialization_state == KAN_SERIALIZATION_FAILED)
-            KAN_LOG (application_framework_resource_importer, KAN_LOG_ERROR,
-                     "Unable to get directory path part from \"%s\".", rule_path->path)
+            KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, application_framework_resource_importer,
+                                 KAN_LOG_ERROR, "Unable to get directory path part from \"%s\".", rule_path->path)
 
             kan_atomic_int_add (&global.errors_count, 1);
             rule_shutdown (rule);
@@ -258,8 +258,8 @@ static void create_import_rule_using_stream (struct kan_stream_t *stream,
     else
     {
         KAN_ASSERT (serialization_state == KAN_SERIALIZATION_FAILED)
-        KAN_LOG (application_framework_resource_importer, KAN_LOG_ERROR, "Failed to read import rule at \"%s\".",
-                 rule_path->path)
+        KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, application_framework_resource_importer,
+                             KAN_LOG_ERROR, "Failed to read import rule at \"%s\".", rule_path->path)
 
         kan_atomic_int_add (&global.errors_count, 1);
         rule_shutdown (rule);

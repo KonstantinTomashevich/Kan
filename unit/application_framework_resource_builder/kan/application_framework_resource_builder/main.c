@@ -3003,8 +3003,9 @@ static void save_target_byproduct_state (kan_functor_user_data_t user_data)
     if (!save_native_data (&state, path_container.path, interned_kan_resource_target_byproduct_state_t,
                            KAN_HANDLE_SET_INVALID (kan_serialization_interned_string_registry_t), KAN_TRUE))
     {
-        KAN_LOG (application_framework_resource_builder, KAN_LOG_INFO,
-                 "[Target \"%s\"] Failed to save byproduct state to \"%s\".", target->name, path_container.path)
+        KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, application_framework_resource_builder, KAN_LOG_INFO,
+                             "[Target \"%s\"] Failed to save byproduct state to \"%s\".", target->name,
+                             path_container.path)
         kan_atomic_int_add (&global.errors_count, 1);
     }
 
