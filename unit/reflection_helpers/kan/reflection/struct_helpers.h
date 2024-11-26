@@ -12,7 +12,7 @@
 KAN_C_HEADER_BEGIN
 
 /// \brief Extracts inline array size using size field if provided in reflection data.
-REFLECTION_API kan_instance_size_t kan_reflection_get_inline_array_size (
+REFLECTION_HELPERS_API kan_instance_size_t kan_reflection_get_inline_array_size (
     const struct kan_reflection_field_t *array_field, const void *owner_struct_instance);
 
 /// \brief Hashes all visible fields including child structures and dynamic arrays.
