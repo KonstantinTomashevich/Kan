@@ -2127,7 +2127,7 @@ static kan_interned_string_t interface_register_byproduct (kan_functor_user_data
         node = (struct byproduct_node_t *) node->node.list_node.next;
     }
 
-    const kan_bool_t needs_new_node = node == NULL;
+    const kan_bool_t needs_new_node = node == node_end;
     if (needs_new_node)
     {
         node = kan_allocate_batched (nodes_allocation_group, sizeof (struct byproduct_node_t));

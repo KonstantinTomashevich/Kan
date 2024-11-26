@@ -691,6 +691,7 @@ void kan_reflection_move_struct (kan_reflection_registry_t registry,
             source_array->size = 0u;
             source_array->capacity = 0u;
             source_array->data = NULL;
+            break;
         }
         }
 
