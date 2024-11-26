@@ -51,4 +51,17 @@ register_application_variant (byproduct)
 application_variant_add_program (byproduct)
 application_variant_add_environment_tag (packaged)
 
+register_application_plugin (NAME state GROUP state)
+application_plugin_include (ABSTRACT CONCRETE application_framework_example_compilation_state)
+
+register_application_program (state)
+application_program_set_configuration ("${CMAKE_CURRENT_SOURCE_DIR}/configuration/program_state.rd")
+application_program_use_plugin_group (state)
+application_program_use_as_test_in_development_mode (ARGUMENTS --test PROPERTIES TIMEOUT 10)
+application_program_use_as_test_in_packaged_mode (ARGUMENTS --test PROPERTIES TIMEOUT 10)
+
+register_application_variant (state)
+application_variant_add_program (state)
+application_variant_add_environment_tag (packaged)
+
 application_generate ()
