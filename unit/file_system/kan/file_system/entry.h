@@ -67,4 +67,13 @@ FILE_SYSTEM_API kan_bool_t kan_file_system_remove_directory_with_content (const 
 /// \brief Attempts to remove empty directory entry at given path. Returns KAN_TRUE on success.
 FILE_SYSTEM_API kan_bool_t kan_file_system_remove_empty_directory (const char *path);
 
+/// \brief Creates .lock file in one system call, should be used as a cross-process locking mechanism.
+/// \details If `blocking` is KAN_TRUE, tries to create file until success (with pauses between attempts).
+///          Can be unreliable on some systems and it is advised to use CMake Job Pools for tools whenever possible
+///          instead of lock files, but some make programs do not support job pools unfortunately.
+FILE_SYSTEM_API kan_bool_t kan_file_system_lock_file_create (const char *directory_path, kan_bool_t blocking);
+
+/// \brief Removes .lock file created by kan_file_system_lock_file_create.
+FILE_SYSTEM_API void kan_file_system_lock_file_destroy (const char *directory_path);
+
 KAN_C_HEADER_END

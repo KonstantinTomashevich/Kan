@@ -10,6 +10,7 @@
 #include <kan/cpu_dispatch/job.h>
 #include <kan/cpu_dispatch/task.h>
 #include <kan/error/critical.h>
+#include <kan/file_system/entry.h>
 #include <kan/file_system/path_container.h>
 #include <kan/file_system/stream.h>
 #include <kan/log/logging.h>
@@ -27,13 +28,14 @@
 
 #define ERROR_CODE_INCORRECT_ARGUMENTS -1
 #define ERROR_CODE_FAILED_TO_READ_PROJECT -2
-#define ERROR_CODE_VFS_SETUP_FAILURE -3
-#define ERROR_CODE_FAILED_TO_LOAD_PLATFORM_CONFIGURATION -4
-#define ERROR_CODE_FAILED_TO_SETUP_TARGETS -5
-#define ERROR_CODE_FAILED_TO_SCAN_TARGETS -6
-#define ERROR_CODE_FAILED_TO_COMPILE_RESOURCES -7
-#define ERROR_CODE_FAILED_TO_INTERN_STRING -8
-#define ERROR_CODE_FAILED_TO_PACK_TARGETS -9
+#define ERROR_CODE_FAILED_TO_LOCK_DIRECTORY -3
+#define ERROR_CODE_VFS_SETUP_FAILURE -4
+#define ERROR_CODE_FAILED_TO_LOAD_PLATFORM_CONFIGURATION -5
+#define ERROR_CODE_FAILED_TO_SETUP_TARGETS -6
+#define ERROR_CODE_FAILED_TO_SCAN_TARGETS -7
+#define ERROR_CODE_FAILED_TO_COMPILE_RESOURCES -8
+#define ERROR_CODE_FAILED_TO_INTERN_STRING -9
+#define ERROR_CODE_FAILED_TO_PACK_TARGETS -10
 
 #define VFS_TARGETS_DIRECTORY "targets"
 #define VFS_RAW_REFERENCE_CACHE_DIRECTORY "reference_cache"
@@ -3347,6 +3349,21 @@ int main (int argument_count, char **argument_values)
         result = ERROR_CODE_FAILED_TO_READ_PROJECT;
     }
 
+    kan_bool_t locked_directory = KAN_FALSE;
+    if (result == 0)
+    {
+        if (kan_file_system_lock_file_create (global.project.output_directory, KAN_TRUE))
+        {
+            locked_directory = KAN_TRUE;
+        }
+        else
+        {
+            KAN_LOG (application_framework_resource_builder, KAN_LOG_ERROR, "Failed to lock output directory \"%s\".",
+                     global.project.output_directory)
+            result = ERROR_CODE_FAILED_TO_LOCK_DIRECTORY;
+        }
+    }
+
     global.volume = kan_virtual_file_system_volume_create ();
     if (result == 0)
     {
@@ -3760,6 +3777,12 @@ int main (int argument_count, char **argument_values)
     kan_virtual_file_system_remove_directory_with_content (global.volume,
                                                            VFS_OUTPUT_DIRECTORY "/" SUB_DIRECTORY_TEMPORARY);
     kan_virtual_file_system_volume_destroy (global.volume);
+
+    if (locked_directory)
+    {
+        kan_file_system_lock_file_destroy (global.project.output_directory);
+    }
+
     kan_application_resource_project_shutdown (&global.project);
     return result;
 }
