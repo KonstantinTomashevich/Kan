@@ -508,7 +508,8 @@ static inline void *load_native_data_from_real_file_system (
     struct kan_stream_t *input_stream = kan_direct_file_stream_open_for_read (path, KAN_TRUE);
     if (!input_stream)
     {
-        KAN_LOG (application_framework_resource_builder, KAN_LOG_ERROR, "Failed to open resource at path \"%s\".", path)
+        KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, application_framework_resource_builder,
+                             KAN_LOG_ERROR, "Failed to open resource at path \"%s\".", path)
         kan_atomic_int_add (&global.errors_count, 1);
         return NULL;
     }
