@@ -1072,8 +1072,9 @@ function (application_generate)
     string (APPEND PROJECT_CONTENT "}\n\n")
     foreach (PLUGIN ${PLUGINS})
         if (NOT PLUGIN IN_LIST CORE_PLUGINS)
+            get_target_property (PLUGIN_NAME "${PLUGIN}" APPLICATION_PLUGIN_NAME)
             string (APPEND PROJECT_CONTENT "+targets {\n")
-            string (APPEND PROJECT_CONTENT "    name = ${PLUGIN}\n")
+            string (APPEND PROJECT_CONTENT "    name = ${PLUGIN_NAME}\n")
 
             private_gather_plugins_resource_directories ("${PLUGIN}" PLUGIN_DIRECTORIES)
             if (PLUGIN_DIRECTORIES)
@@ -1333,7 +1334,7 @@ function (application_generate)
             else ()
                 foreach (PLUGIN ${PROGRAM_PLUGINS})
                     get_target_property (PLUGIN_NAME "${PLUGIN}" APPLICATION_PLUGIN_NAME)
-                    set (PACK_PATH "${KAN_APPLICATION_RESOURCES_DIRECTORY_NAME}/${PLUGIN}.pack")
+                    set (PACK_PATH "${KAN_APPLICATION_RESOURCES_DIRECTORY_NAME}/${PLUGIN_NAME}.pack")
                     set (MOUNT_PATH "${KAN_APPLICATION_RESOURCES_DIRECTORY_NAME}/${PLUGIN_NAME}")
 
                     string (APPEND PACK_PROGRAM_CONFIGURATOR_CONTENT "${PREFIX}        +mount_read_only_pack {\\n\")\n")
@@ -1411,7 +1412,8 @@ function (application_generate)
             set (BUILDER_TARGETS)
             foreach (PLUGIN ${USED_PLUGINS})
                 if (NOT PLUGIN IN_LIST CORE_PLUGINS)
-                    list (APPEND BUILDER_TARGETS "${PLUGIN}")
+                    get_target_property (PLUGIN_NAME "${PLUGIN}" APPLICATION_PLUGIN_NAME)
+                    list (APPEND BUILDER_TARGETS "${PLUGIN_NAME}")
                 endif ()
             endforeach ()
 
@@ -1453,7 +1455,7 @@ function (application_generate)
                             "${CMAKE_COMMAND}"
                             -E copy -t
                             "${PACK_RESOURCES_DIRECTORY}"
-                            "${RBW_DIRECTORY}/${PLUGIN}.pack"
+                            "${RBW_DIRECTORY}/${PLUGIN_NAME}.pack"
                             COMMENT "${COMMENT_PREFIX}${COMMENT_SUFFIX}"
                             VERBATIM)
 
