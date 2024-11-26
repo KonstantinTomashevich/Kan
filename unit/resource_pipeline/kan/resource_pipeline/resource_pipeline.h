@@ -35,7 +35,7 @@
 /// Resources can be marked as compilable using `kan_resource_compilable_meta_t` meta, which contains
 /// essential data for resource compilation. When resource is compilable, it means that it would be replaced by
 /// other, more optimized and ready for use, resource of specified type during resource building process. When
-/// resource isn't compilable, it is just converted to binary format (with string interned if specified by user).
+/// resource isn't compilable, it is just converted to binary format (with strings interned if specified by user).
 ///
 /// Compilation is a process of transforming data to a more optimized and ready to use format, that is done through
 /// compile functor. Compilation can be done inside resource building tool or by application in runtime if needed.
@@ -194,8 +194,7 @@ struct kan_resource_byproduct_type_meta_t
 
     /// \brief Byproduct reset function.
     /// \details Used to automatically reset given byproduct if registration detected that equal byproduct already
-    ///          exists. Can be NULL if no reset is needed.
-    ///          Leave NULL to use kan_reflection_reset_struct.
+    ///          exists. Leave NULL to use kan_reflection_reset_struct.
     kan_resource_byproduct_reset_functor_t reset;
 };
 

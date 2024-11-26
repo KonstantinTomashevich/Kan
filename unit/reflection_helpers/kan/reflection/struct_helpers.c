@@ -744,8 +744,6 @@ void kan_reflection_reset_struct (kan_reflection_registry_t registry,
         case KAN_REFLECTION_ARCHETYPE_STRING_POINTER:
         case KAN_REFLECTION_ARCHETYPE_EXTERNAL_POINTER:
         case KAN_REFLECTION_ARCHETYPE_STRUCT_POINTER:
-            // Patches are not supported either as we don't know whether to destroy or invalidate them.
-        case KAN_REFLECTION_ARCHETYPE_PATCH:
             KAN_ASSERT (KAN_FALSE)
             break;
 
@@ -779,6 +777,15 @@ void kan_reflection_reset_struct (kan_reflection_registry_t registry,
                     }
                 }
             }
+            else if (iterator.field->archetype_inline_array.item_archetype == KAN_REFLECTION_ARCHETYPE_PATCH)
+            {
+                for (kan_loop_size_t index = 0u; index < (kan_loop_size_t) size; ++index)
+                {
+                    kan_reflection_patch_destroy (
+                        *(kan_reflection_patch_t *) (((uint8_t *) address) +
+                                                     iterator.field->archetype_inline_array.item_size * index));
+                }
+            }
 
             break;
         }
@@ -800,10 +807,23 @@ void kan_reflection_reset_struct (kan_reflection_registry_t registry,
                     }
                 }
             }
+            else if (iterator.field->archetype_inline_array.item_archetype == KAN_REFLECTION_ARCHETYPE_PATCH)
+            {
+                for (kan_loop_size_t index = 0u; index < (kan_loop_size_t) array->size; ++index)
+                {
+                    kan_reflection_patch_destroy (
+                        *(kan_reflection_patch_t *) (((uint8_t *) array->data) + array->item_size * index));
+                }
+            }
 
             array->size = 0u;
             break;
         }
+
+        case KAN_REFLECTION_ARCHETYPE_PATCH:
+            kan_reflection_patch_destroy (*(kan_reflection_patch_t *) address);
+            *(kan_reflection_patch_t *) address = KAN_HANDLE_SET_INVALID (kan_reflection_patch_t);
+            break;
         }
 
         kan_reflection_visibility_iterator_advance (&iterator);

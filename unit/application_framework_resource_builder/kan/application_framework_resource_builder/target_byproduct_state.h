@@ -16,7 +16,7 @@ struct kan_resource_target_byproduct_production_t
     kan_interned_string_t byproduct_name;
 };
 
-/// \brief Contains cached information about byproduct production to correct byproduct processing possible when
+/// \brief Contains cached information about byproduct production to make correct byproduct processing possible when
 ///        compilation of up to date resources is skipped.
 struct kan_resource_target_byproduct_state_t
 {

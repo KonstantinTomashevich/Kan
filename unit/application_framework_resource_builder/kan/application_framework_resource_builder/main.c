@@ -2994,6 +2994,12 @@ static void save_target_byproduct_state (kan_functor_user_data_t user_data)
             output->byproduct_name = node->entry->name;
         }
 
+        if (node->produced_from.size == 0u)
+        {
+            // Node weren't actually produced and only exists due to cache from previous iteration. Delete it.
+            kan_virtual_file_system_remove_file (global.volume, node->entry->source_path);
+        }
+
         node = (struct byproduct_node_t *) node->node.list_node.next;
     }
 
