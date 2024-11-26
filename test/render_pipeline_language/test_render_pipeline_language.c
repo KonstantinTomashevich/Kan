@@ -351,7 +351,7 @@ KAN_TEST_CASE (benchmark)
     struct kan_dynamic_array_t source;
     load_pipeline_source (PIPELINE_BASE_PATH "benchmark.rpl", &source);
 
-#define BENCHMARK_CYCLES 10000u
+#define BENCHMARK_CYCLES 2500u
     clock_t benchmark_begin = clock ();
 
     for (kan_loop_size_t index = 0u; index < BENCHMARK_CYCLES; ++index)

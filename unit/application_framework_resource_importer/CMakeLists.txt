@@ -6,7 +6,7 @@ concrete_require (
         ABSTRACT checksum cpu_dispatch error file_system log memory platform reflection
         CONCRETE_INTERFACE
         application_framework_resource_tool context context_plugin_system context_reflection_system
-        resource_pipeline serialization)
+        reflection_helpers resource_pipeline serialization)
 
 set (KAN_RESOURCE_IMPORTER_IO_BUFFER "4096" CACHE STRING "Size of a buffer for buffered reading and writing.")
 set (KAN_RESOURCE_IMPORTER_TEMPORARY_STACK "32768 " CACHE STRING "Size of one stack item for temporary allocator.")

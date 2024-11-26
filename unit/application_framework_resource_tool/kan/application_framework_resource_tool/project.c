@@ -58,12 +58,13 @@ void kan_application_resource_project_init (struct kan_application_resource_proj
                             allocation_group);
     kan_dynamic_array_init (&instance->targets, 0u, sizeof (struct kan_application_resource_target_t),
                             _Alignof (struct kan_application_resource_target_t), allocation_group);
-    instance->reference_cache_absolute_directory = NULL;
-    instance->output_absolute_directory = NULL;
+    instance->reference_cache_directory = NULL;
+    instance->output_directory = NULL;
     instance->use_string_interning = KAN_TRUE;
     instance->application_source_directory = NULL;
     instance->project_source_directory = NULL;
     instance->source_directory = NULL;
+    instance->platform_configuration = NULL;
 }
 
 void kan_application_resource_project_shutdown (struct kan_application_resource_project_t *instance)
@@ -84,16 +85,15 @@ void kan_application_resource_project_shutdown (struct kan_application_resource_
     kan_dynamic_array_shutdown (&instance->plugins);
     kan_dynamic_array_shutdown (&instance->targets);
 
-    if (instance->reference_cache_absolute_directory)
+    if (instance->reference_cache_directory)
     {
-        kan_free_general (allocation_group, instance->reference_cache_absolute_directory,
-                          strlen (instance->reference_cache_absolute_directory) + 1u);
+        kan_free_general (allocation_group, instance->reference_cache_directory,
+                          strlen (instance->reference_cache_directory) + 1u);
     }
 
-    if (instance->output_absolute_directory)
+    if (instance->output_directory)
     {
-        kan_free_general (allocation_group, instance->output_absolute_directory,
-                          strlen (instance->output_absolute_directory) + 1u);
+        kan_free_general (allocation_group, instance->output_directory, strlen (instance->output_directory) + 1u);
     }
 
     if (instance->application_source_directory)
@@ -111,6 +111,12 @@ void kan_application_resource_project_shutdown (struct kan_application_resource_
     if (instance->source_directory)
     {
         kan_free_general (allocation_group, instance->source_directory, strlen (instance->source_directory) + 1u);
+    }
+
+    if (instance->platform_configuration)
+    {
+        kan_free_general (allocation_group, instance->platform_configuration,
+                          strlen (instance->platform_configuration) + 1u);
     }
 }
 

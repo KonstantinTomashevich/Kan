@@ -22,8 +22,8 @@ foreach (IMPLEMENTATION ${PROVIDER_IMPLEMENTATIONS})
             virtual_file_system=kan workflow=kan
             CONCRETE
             container context context_plugin_system context_reflection_system context_update_system
-            context_virtual_file_system resource_index resource_pipeline readable_data serialization testing
-            test_universe_resource_reference universe)
+            context_virtual_file_system reflection_helpers resource_index resource_pipeline readable_data
+            serialization testing test_universe_resource_reference universe)
 
     generate_artefact_context_data ()
     generate_artefact_reflection_data ()

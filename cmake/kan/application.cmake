@@ -146,6 +146,10 @@ define_property (TARGET PROPERTY APPLICATION_VARIANT_ENVIRONMENT_TAGS
         BRIEF_DOCS "Contains application variant environment tags."
         FULL_DOCS "Contains application variant environment tags.")
 
+define_property (TARGET PROPERTY APPLICATION_PLATFORM_CONFIGURATION
+        BRIEF_DOCS "Path to resource builder configuration file for current platform."
+        FULL_DOCS "Path to resource builder configuration file for current platform.")
+
 define_property (TARGET PROPERTY UNIT_RESOURCE_DIRECTORIES
         BRIEF_DOCS "List of resource directories that are used by this unit."
         FULL_DOCS "List of resource directories that are used by this unit.")
@@ -450,6 +454,12 @@ function (application_variant_add_environment_tag TAG)
             APPLICATION_VARIANT_ENVIRONMENT_TAGS "${TAGS}")
 endfunction ()
 
+# Sets path to application platform configuration for building resources.
+function (application_core_set_resource_platform_configuration CONFIGURATION_PATH)
+    message (STATUS "    Setting resource platform configuration to \"${CONFIGURATION_PATH}\".")
+    set_target_properties ("${APPLICATION_NAME}" PROPERTIES APPLICATION_PLATFORM_CONFIGURATION "${CONFIGURATION_PATH}")
+endfunction ()
+
 # Sets variable with given name to the of resource builder target for current application.
 function (application_get_resource_builder_target_name OUTPUT)
     set ("${OUTPUT}" "${APPLICATION_NAME}_resource_builder" PARENT_SCOPE)
@@ -633,11 +643,11 @@ function (private_core_configurator_common_content)
     string (APPEND CORE_CONFIGURATOR_CONTENT "${PREFIX}}\\n\\n\")\n")
     string (APPEND CORE_CONFIGURATOR_CONTENT "${PREFIX}+enabled_systems { name = update_system_t }\\n\\n\")\n")
 
-    if (ARG_AUTO_BUILD)
+    if (ARG_AUTO_BUILD )
         string (APPEND CORE_CONFIGURATOR_CONTENT "string (APPEND AUTO_BUILD_SUFFIX \"enable_auto_build = 1\\n\")\n")
         string (APPEND CORE_CONFIGURATOR_CONTENT "string (APPEND AUTO_BUILD_SUFFIX \"auto_build_command = \\\"")
         string (APPEND CORE_CONFIGURATOR_CONTENT "${CMAKE_COMMAND} ")
-        string (APPEND CORE_CONFIGURATOR_CONTENT "--build \\\\\\\"${CMAKE_BINARY_DIR}\\\\\\\" ")
+        string (APPEND CORE_CONFIGURATOR_CONTENT "--build \\\\\\\"${CMAKE_BINARY_DIR}>\\\\\\\" ")
         string (APPEND CORE_CONFIGURATOR_CONTENT "--target \\\\\\\"${APPLICATION_NAME}_dev_all_plugins\\\\\\\" ")
         string (APPEND CORE_CONFIGURATOR_CONTENT "--config $<CONFIG>\\\"\")\n")
     endif ()
@@ -807,6 +817,7 @@ function (application_generate)
     foreach (PLUGIN ${PLUGINS})
         add_custom_target ("${PLUGIN}_dev_copy")
         setup_shared_library_copy (
+                IF_DIFFERENT
                 LIBRARY "${PLUGIN}_library"
                 USER "${PLUGIN}_dev_copy"
                 OUTPUT ${DEV_PLUGINS_DIRECTORY}
@@ -866,14 +877,10 @@ function (application_generate)
         private_configuration_mount_real (
                 DEV_CORE_CONFIGURATOR_CONTENT
                 "${KAN_APPLICATION_RESOURCES_DIRECTORY_NAME}/${MOUNT_NAME}"
-                "${RESOURCE_DIRECTORY}")
+                "${RESOURCE_DIRECTORY}>")
     endforeach ()
 
-    private_configuration_mount_real (
-            DEV_CORE_CONFIGURATOR_CONTENT
-            "universe_world_definitions"
-            "${WORLD_DIRECTORY}")
-
+    private_configuration_mount_real (DEV_CORE_CONFIGURATOR_CONTENT "universe_world_definitions" "${WORLD_DIRECTORY}")
     string (APPEND DEV_CORE_CONFIGURATOR_CONTENT "${PREFIX}    }\\n\")\n")
     string (APPEND DEV_CORE_CONFIGURATOR_CONTENT "${PREFIX}}\")\n")
 
@@ -1065,8 +1072,9 @@ function (application_generate)
     string (APPEND PROJECT_CONTENT "}\n\n")
     foreach (PLUGIN ${PLUGINS})
         if (NOT PLUGIN IN_LIST CORE_PLUGINS)
+            get_target_property (PLUGIN_NAME "${PLUGIN}" APPLICATION_PLUGIN_NAME)
             string (APPEND PROJECT_CONTENT "+targets {\n")
-            string (APPEND PROJECT_CONTENT "    name = ${PLUGIN}\n")
+            string (APPEND PROJECT_CONTENT "    name = ${PLUGIN_NAME}\n")
 
             private_gather_plugins_resource_directories ("${PLUGIN}" PLUGIN_DIRECTORIES)
             if (PLUGIN_DIRECTORIES)
@@ -1095,8 +1103,8 @@ function (application_generate)
     set (RBW_DIRECTORY "${WORKSPACE_DIRECTORY}/${KAN_APPLICATION_RBW_DIRECTORY_NAME}")
     file (MAKE_DIRECTORY "${RBW_DIRECTORY}")
 
-    string (APPEND PROJECT_CONTENT "reference_cache_absolute_directory = \"${RC_DIRECTORY}\"\n")
-    string (APPEND PROJECT_CONTENT "output_absolute_directory = \"${RBW_DIRECTORY}\"\n")
+    string (APPEND PROJECT_CONTENT "reference_cache_directory = \"${RC_DIRECTORY}\"\n")
+    string (APPEND PROJECT_CONTENT "output_directory = \"${RBW_DIRECTORY}\"\n")
 
     if (KAN_APPLICATION_PACKER_INTERN_STRINGS)
         string (APPEND PROJECT_CONTENT "use_string_interning = 1\n")
@@ -1107,6 +1115,10 @@ function (application_generate)
     string (APPEND PROJECT_CONTENT "application_source_directory = \"${CMAKE_CURRENT_SOURCE_DIR}\"\n")
     string (APPEND PROJECT_CONTENT "project_source_directory = \"${PROJECT_SOURCE_DIR}\"\n")
     string (APPEND PROJECT_CONTENT "source_directory = \"${CMAKE_SOURCE_DIR}\"\n")
+
+    get_target_property (PLATFORM_CONFIGURATION_PATH "${APPLICATION_NAME}" APPLICATION_PLATFORM_CONFIGURATION)
+    string (APPEND PROJECT_CONTENT "platform_configuration = \"${PLATFORM_CONFIGURATION_PATH}\"\n")
+
     application_get_resource_project_path (RESOURCE_PROJECT_PATH)
     file (CONFIGURE OUTPUT "${RESOURCE_PROJECT_PATH}" CONTENT "${PROJECT_CONTENT}")
 
@@ -1322,7 +1334,7 @@ function (application_generate)
             else ()
                 foreach (PLUGIN ${PROGRAM_PLUGINS})
                     get_target_property (PLUGIN_NAME "${PLUGIN}" APPLICATION_PLUGIN_NAME)
-                    set (PACK_PATH "${KAN_APPLICATION_RESOURCES_DIRECTORY_NAME}/${PLUGIN}.pack")
+                    set (PACK_PATH "${KAN_APPLICATION_RESOURCES_DIRECTORY_NAME}/${PLUGIN_NAME}.pack")
                     set (MOUNT_PATH "${KAN_APPLICATION_RESOURCES_DIRECTORY_NAME}/${PLUGIN_NAME}")
 
                     string (APPEND PACK_PROGRAM_CONFIGURATOR_CONTENT "${PREFIX}        +mount_read_only_pack {\\n\")\n")
@@ -1400,7 +1412,8 @@ function (application_generate)
             set (BUILDER_TARGETS)
             foreach (PLUGIN ${USED_PLUGINS})
                 if (NOT PLUGIN IN_LIST CORE_PLUGINS)
-                    list (APPEND BUILDER_TARGETS "${PLUGIN}")
+                    get_target_property (PLUGIN_NAME "${PLUGIN}" APPLICATION_PLUGIN_NAME)
+                    list (APPEND BUILDER_TARGETS "${PLUGIN_NAME}")
                 endif ()
             endforeach ()
 
@@ -1442,7 +1455,7 @@ function (application_generate)
                             "${CMAKE_COMMAND}"
                             -E copy -t
                             "${PACK_RESOURCES_DIRECTORY}"
-                            "${RBW_DIRECTORY}/${PLUGIN}.pack"
+                            "${RBW_DIRECTORY}/${PLUGIN_NAME}.pack"
                             COMMENT "${COMMENT_PREFIX}${COMMENT_SUFFIX}"
                             VERBATIM)
 

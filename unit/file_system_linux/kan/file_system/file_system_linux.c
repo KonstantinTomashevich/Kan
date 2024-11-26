@@ -1,5 +1,6 @@
 #include <dirent.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -7,7 +8,7 @@
 #include <kan/file_system/entry.h>
 #include <kan/file_system/path_container.h>
 #include <kan/log/logging.h>
-#include <kan/threading/atomic.h>
+#include <kan/platform/precise_time.h>
 
 KAN_LOG_DEFINE_CATEGORY (file_system_linux);
 
@@ -40,7 +41,12 @@ kan_bool_t kan_file_system_query_entry (const char *path, struct kan_file_system
     struct stat unix_status;
     if (stat (path, &unix_status) != 0)
     {
-        KAN_LOG (file_system_linux, KAN_LOG_ERROR, "Failed to get status of \"%s\": %s.", path, strerror (errno))
+        // False as a result of query on non-existent file is not treated like an error.
+        if (errno != ENOENT)
+        {
+            KAN_LOG (file_system_linux, KAN_LOG_ERROR, "Failed to get status of \"%s\": %s.", path, strerror (errno))
+        }
+
         return KAN_FALSE;
     }
 
@@ -85,6 +91,12 @@ kan_bool_t kan_file_system_make_directory (const char *path)
 {
     if (mkdir (path, S_IRWXU | S_IRWXG | S_IRWXO) != 0)
     {
+        if (errno == EEXIST)
+        {
+            // Special case; we're okay with directory already existing.
+            return KAN_TRUE;
+        }
+
         KAN_LOG (file_system_linux, KAN_LOG_ERROR, "Failed to create directory \"%s\": %s.", path, strerror (errno))
         return KAN_FALSE;
     }
@@ -157,4 +169,44 @@ kan_bool_t kan_file_system_remove_empty_directory (const char *path)
     }
 
     return KAN_TRUE;
+}
+
+kan_bool_t kan_file_system_lock_file_create (const char *directory_path, kan_bool_t blocking)
+{
+    struct kan_file_system_path_container_t container;
+    kan_file_system_path_container_copy_string (&container, directory_path);
+    kan_file_system_path_container_append (&container, ".lock");
+
+    while (KAN_TRUE)
+    {
+        int file_descriptor = creat (container.path, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+        if (file_descriptor != -1)
+        {
+            KAN_LOG (file_system_linux, KAN_LOG_INFO, "Locked directory \"%s\" using lock file.", directory_path)
+            close (file_descriptor);
+            return KAN_TRUE;
+        }
+
+        if (!blocking)
+        {
+            KAN_LOG (file_system_linux, KAN_LOG_INFO, "Failed to lock directory \"%s\" using lock file.",
+                     directory_path)
+            break;
+        }
+
+        KAN_LOG (file_system_linux, KAN_LOG_INFO,
+                 "Failed to lock directory \"%s\" using lock file, waiting for another chance...", directory_path)
+        kan_platform_sleep (KAN_FILE_SYSTEM_LINUX_LOCK_FILE_WAIT_NS);
+    }
+
+    return KAN_FALSE;
+}
+
+FILE_SYSTEM_API void kan_file_system_lock_file_destroy (const char *directory_path)
+{
+    struct kan_file_system_path_container_t container;
+    kan_file_system_path_container_copy_string (&container, directory_path);
+    kan_file_system_path_container_append (&container, ".lock");
+    unlink (container.path);
+    KAN_LOG (file_system_linux, KAN_LOG_INFO, "Unlocked directory \"%s\" using lock file.", directory_path)
 }

@@ -2,7 +2,7 @@ register_concrete (resource_pipeline)
 concrete_include (PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 concrete_sources ("*.c")
 
-concrete_require (SCOPE PUBLIC ABSTRACT reflection stream CONCRETE_INTERFACE container)
+concrete_require (SCOPE PUBLIC ABSTRACT reflection stream CONCRETE_INTERFACE container reflection_helpers)
 concrete_require (SCOPE PRIVATE ABSTRACT error log)
 
 c_interface_scanner_setup (GLOB "*.c" "*.h")

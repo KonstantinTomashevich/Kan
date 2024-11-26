@@ -4316,3 +4316,8 @@ enum kan_platform_window_flag_t kan_render_get_required_window_flags (void)
 {
     return KAN_PLATFORM_WINDOW_FLAG_SUPPORTS_VULKAN;
 }
+
+kan_memory_size_t kan_render_get_supported_code_format_flags (void)
+{
+    return (1u << KAN_RENDER_CODE_FORMAT_SPIRV);
+}

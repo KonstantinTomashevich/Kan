@@ -9,9 +9,21 @@
 #include <kan/inline_math/inline_math.h>
 #include <kan/memory/allocation.h>
 #include <kan/platform/application.h>
-#include <kan/platform/precise_time.h>
-#include <kan/render_backend_tools/render_backend_tools.h>
+#include <kan/render_pipeline_language/compiler.h>
 #include <kan/testing/testing.h>
+
+static inline kan_bool_t emit_render_code (kan_rpl_compiler_instance_t compiler_instance,
+                                           struct kan_dynamic_array_t *output,
+                                           kan_allocation_group_t output_allocation_group)
+{
+    const kan_memory_size_t supported_formats = kan_render_get_supported_code_format_flags ();
+    if (supported_formats & (1u << KAN_RENDER_CODE_FORMAT_SPIRV))
+    {
+        return kan_rpl_compiler_instance_emit_spirv (compiler_instance, output, output_allocation_group);
+    }
+
+    return KAN_FALSE;
+}
 
 struct render_image_config_t
 {
@@ -156,8 +168,7 @@ static kan_render_graphics_pipeline_t create_render_image_pipeline (
         compiler_context, sizeof (entry_points) / sizeof (entry_points[0u]), entry_points);
     KAN_TEST_ASSERT (KAN_HANDLE_IS_VALID (compiler_instance))
 
-    KAN_TEST_ASSERT (
-        kan_render_backend_tools_emit_platform_code (compiler_instance, &code, KAN_ALLOCATION_GROUP_IGNORE))
+    KAN_TEST_ASSERT (emit_render_code (compiler_instance, &code, KAN_ALLOCATION_GROUP_IGNORE))
     KAN_TEST_ASSERT (kan_rpl_compiler_instance_emit_meta (compiler_instance, &meta))
     kan_rpl_compiler_instance_destroy (compiler_instance);
 
@@ -438,8 +449,7 @@ static kan_render_graphics_pipeline_t create_cube_pipeline (kan_render_context_t
         compiler_context, sizeof (entry_points) / sizeof (entry_points[0u]), entry_points);
     KAN_TEST_ASSERT (KAN_HANDLE_IS_VALID (compiler_instance))
 
-    KAN_TEST_ASSERT (
-        kan_render_backend_tools_emit_platform_code (compiler_instance, &code, KAN_ALLOCATION_GROUP_IGNORE))
+    KAN_TEST_ASSERT (emit_render_code (compiler_instance, &code, KAN_ALLOCATION_GROUP_IGNORE))
     KAN_TEST_ASSERT (kan_rpl_compiler_instance_emit_meta (compiler_instance, &meta))
     kan_rpl_compiler_instance_destroy (compiler_instance);
 

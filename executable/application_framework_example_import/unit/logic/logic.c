@@ -146,7 +146,7 @@ APPLICATION_FRAMEWORK_EXAMPLE_IMPORT_LOGIC_API void kan_universe_mutator_execute
                 }
                 else
                 {
-                    kan_application_framework_system_request_exit (state->application_framework_system_handle, -1);
+                    kan_application_framework_system_request_exit (state->application_framework_system_handle, 1);
                 }
             }
         }

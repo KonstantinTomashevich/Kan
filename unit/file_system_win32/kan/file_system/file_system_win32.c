@@ -10,6 +10,7 @@ KAN_MUTE_THIRD_PARTY_WARNINGS_END
 #include <kan/file_system/path_container.h>
 #include <kan/log/logging.h>
 #include <kan/memory/allocation.h>
+#include <kan/platform/precise_time.h>
 
 KAN_LOG_DEFINE_CATEGORY (file_system_win32);
 
@@ -144,8 +145,13 @@ kan_bool_t kan_file_system_query_entry (const char *path, struct kan_file_system
         return KAN_TRUE;
     }
 
-    KAN_LOG (file_system_win32, KAN_LOG_ERROR, "Failed to query info about \"%s\": error code %lu.", path,
-             (unsigned long) GetLastError ())
+    // False as a result of query on non-existent file is not treated like an error.
+    if (GetLastError () != ERROR_PATH_NOT_FOUND)
+    {
+        KAN_LOG (file_system_win32, KAN_LOG_ERROR, "Failed to query info about \"%s\": error code %lu.", path,
+                 (unsigned long) GetLastError ())
+    }
+
     return KAN_FALSE;
 }
 
@@ -168,7 +174,9 @@ kan_bool_t kan_file_system_remove_file (const char *path)
 
 kan_bool_t kan_file_system_make_directory (const char *path)
 {
-    if (CreateDirectory (path, NULL))
+    if (CreateDirectory (path, NULL) ||
+        // Special case; we're okay with directory already existing.
+        GetLastError () == ERROR_ALREADY_EXISTS)
     {
         return KAN_TRUE;
     }
@@ -240,4 +248,46 @@ kan_bool_t kan_file_system_remove_empty_directory (const char *path)
     KAN_LOG (file_system_win32, KAN_LOG_ERROR, "Failed to remove directory \"%s\": error code %lu.", path,
              (unsigned long) GetLastError ())
     return KAN_FALSE;
+}
+
+kan_bool_t kan_file_system_lock_file_create (const char *directory_path, kan_bool_t blocking)
+{
+    struct kan_file_system_path_container_t container;
+    kan_file_system_path_container_copy_string (&container, directory_path);
+    kan_file_system_path_container_append (&container, ".lock");
+
+    while (KAN_TRUE)
+    {
+        HANDLE file_handle =
+            CreateFile (container.path, GENERIC_WRITE, 0, NULL, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, NULL);
+
+        if (file_handle != INVALID_HANDLE_VALUE)
+        {
+            KAN_LOG (file_system_win32, KAN_LOG_INFO, "Locked directory \"%s\" using lock file.", directory_path)
+            CloseHandle (file_handle);
+            return KAN_TRUE;
+        }
+
+        if (!blocking)
+        {
+            KAN_LOG (file_system_win32, KAN_LOG_INFO, "Failed to lock directory \"%s\" using lock file.",
+                     directory_path)
+            break;
+        }
+
+        KAN_LOG (file_system_win32, KAN_LOG_INFO,
+                 "Failed to lock directory \"%s\" using lock file, waiting for another chance...", directory_path)
+        kan_platform_sleep (KAN_FILE_SYSTEM_WIN32_LOCK_FILE_WAIT_NS);
+    }
+
+    return KAN_FALSE;
+}
+
+FILE_SYSTEM_API void kan_file_system_lock_file_destroy (const char *directory_path)
+{
+    struct kan_file_system_path_container_t container;
+    kan_file_system_path_container_copy_string (&container, directory_path);
+    kan_file_system_path_container_append (&container, ".lock");
+    DeleteFile (container.path);
+    KAN_LOG (file_system_win32, KAN_LOG_INFO, "Unlocked directory \"%s\" using lock file.", directory_path)
 }

@@ -9,9 +9,12 @@ application_core_include (
         CONCRETE
         application_framework container context context_application_system context_plugin_system
         context_reflection_system context_universe_world_definition_system context_update_system
-        context_virtual_file_system readable_data resource_index resource_pipeline serialization universe)
+        context_virtual_file_system readable_data reflection_helpers resource_index resource_pipeline serialization
+        universe)
 
 application_core_set_configuration ("${CMAKE_CURRENT_SOURCE_DIR}/configuration/core.rd")
+application_core_set_resource_platform_configuration (
+        "${CMAKE_CURRENT_SOURCE_DIR}/configuration/default_platform_configuration.rd")
 application_core_use_plugin_group (base)
 
 application_set_world_directory ("${CMAKE_CURRENT_SOURCE_DIR}/world")
@@ -48,12 +51,12 @@ application_get_resource_importer_target_name (RESOURCE_IMPORTER)
 application_get_resource_project_path (RESOURCE_PROJECT)
 
 add_custom_target (
-        application_framework_example_import_do_import
-        COMMAND ${RESOURCE_IMPORTER} "${RESOURCE_PROJECT}" "application_framework_example_import_plugin_logic"
+        application_framework_example_import_import_icons
+        COMMAND ${RESOURCE_IMPORTER} "${RESOURCE_PROJECT}" "--rule" "import_icons"
         COMMENT "Run resource import for application_framework_example_import.")
 
 # Variant naming is not public in application framework as variants shouldn't be addressed like that.
 # But here we're doing it for testing in order to always execute resource importer as part of tests here.
 add_dependencies (
         application_framework_example_import_variant_test_build_resources
-        application_framework_example_import_do_import)
+        application_framework_example_import_import_icons)
