@@ -10,6 +10,7 @@ KAN_MUTE_THIRD_PARTY_WARNINGS_END
 #include <kan/file_system/path_container.h>
 #include <kan/log/logging.h>
 #include <kan/memory/allocation.h>
+#include <kan/platform/precise_time.h>
 
 KAN_LOG_DEFINE_CATEGORY (file_system_win32);
 
@@ -260,7 +261,7 @@ kan_bool_t kan_file_system_lock_file_create (const char *directory_path, kan_boo
         HANDLE file_handle =
             CreateFile (container.path, GENERIC_WRITE, 0, NULL, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, NULL);
 
-        if (file_handle != -1)
+        if (file_handle != INVALID_HANDLE_VALUE)
         {
             KAN_LOG (file_system_win32, KAN_LOG_INFO, "Locked directory \"%s\" using lock file.", directory_path)
             CloseHandle (file_handle);
