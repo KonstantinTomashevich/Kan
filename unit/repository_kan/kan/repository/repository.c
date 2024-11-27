@@ -2721,8 +2721,8 @@ static kan_bool_t return_uniqueness_watcher_register (struct return_uniqueness_w
             struct return_uniqueness_watcher_hash_node_t *hash_node = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (
                 temporary_allocator, struct return_uniqueness_watcher_hash_node_t);
 
-            hash_node->node.hash = (kan_hash_t) record;
-            hash_node->record = record;
+            hash_node->node.hash = (kan_hash_t) list_node->record;
+            hash_node->record = list_node->record;
 
             kan_hash_storage_add (&watcher->hash_storage, &hash_node->node);
             list_node = list_node->next;
@@ -7697,9 +7697,9 @@ static inline void indexed_storage_space_shape_cursor_fix (struct indexed_space_
         if (kan_check_if_bounds_intersect (cursor->index->baked_dimension_count, cursor->min, cursor->max, record_min,
                                            record_max))
         {
-            if (return_uniqueness_watcher_register (&cursor->uniqueness_watcher, cursor->current_sub_node->record,
-                                                    &cursor->index->storage->maintenance_lock,
-                                                    &cursor->index->storage->temporary_allocator))
+            if (return_uniqueness_watcher_register (
+                    &cursor->uniqueness_watcher, cursor->current_sub_node->record->record,
+                    &cursor->index->storage->maintenance_lock, &cursor->index->storage->temporary_allocator))
             {
                 break;
             }
@@ -7740,9 +7740,9 @@ static inline void indexed_storage_space_ray_cursor_fix (struct indexed_space_ra
 
         if (output.hit && output.time <= cursor->max_time)
         {
-            if (return_uniqueness_watcher_register (&cursor->uniqueness_watcher, cursor->current_sub_node->record,
-                                                    &cursor->index->storage->maintenance_lock,
-                                                    &cursor->index->storage->temporary_allocator))
+            if (return_uniqueness_watcher_register (
+                    &cursor->uniqueness_watcher, cursor->current_sub_node->record->record,
+                    &cursor->index->storage->maintenance_lock, &cursor->index->storage->temporary_allocator))
             {
                 break;
             }
