@@ -117,7 +117,8 @@ void *kan_allocate_batched (kan_allocation_group_t group, kan_memory_size_t item
     }
 
     KAN_ASSERT (item_size <= MAX_RATIONAL_ITEM_SIZE)
-    item_size = KAN_MAX (item_size, sizeof (void *));
+    // Make sure that item size is always multiple of pointer alignment.
+    item_size = kan_apply_alignment (item_size, _Alignof (void *));
 
     struct batched_allocator_t *allocator = &batched_allocator_context->allocators[item_size / sizeof (void *) - 1u];
     kan_atomic_int_lock (&allocator->lock);
