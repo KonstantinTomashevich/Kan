@@ -5,7 +5,7 @@ concrete_require (SCOPE PUBLIC ABSTRACT error log memory CONCRETE_INTERFACE cont
 
 set (KAN_C_INTERFACE_STRING_ENCODING_INITIAL_CAPACITY "32" CACHE STRING
         "Initial capacity for string encoding order dynamic array.")
-set (KAN_C_INTERFACE_STRING_ENCODING_INITIAL_BUCKETS "8" CACHE STRING
+set (KAN_C_INTERFACE_STRING_ENCODING_INITIAL_BUCKETS "11" CACHE STRING
         "Initial count of buckets for interned string encoding algorithm.")
 set (KAN_C_INTERFACE_ENCODED_STRING_MAX_LENGTH "128" CACHE STRING
         "Maximum length of string encoded in serialized c interface.")

@@ -12,7 +12,7 @@ register_unit_reflection ()
 reflection_generator_get_output_file_path (REFLECTION_GENERATOR_OUTPUT_FILE_PATH)
 concrete_sources_direct ("${REFLECTION_GENERATOR_OUTPUT_FILE_PATH}")
 
-set (KAN_RESOURCE_PIPELINE_SCAN_BUCKETS "64" CACHE STRING
+set (KAN_RESOURCE_PIPELINE_SCAN_BUCKETS "67" CACHE STRING
         "Initial count of buckets for scanned information about resource types and references in them.")
 set (KAN_RESOURCE_PIPELINE_SCAN_ARRAY_INITIAL_SIZE "64" CACHE STRING
         "Initial size for info arrays for scanned types in reference scan.")

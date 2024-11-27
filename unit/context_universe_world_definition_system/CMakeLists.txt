@@ -15,7 +15,7 @@ register_unit_reflection ()
 reflection_generator_get_output_file_path (REFLECTION_GENERATOR_OUTPUT_FILE_PATH)
 concrete_sources_direct ("${REFLECTION_GENERATOR_OUTPUT_FILE_PATH}")
 
-set (KAN_UNIVERSE_WORLD_DEFINITION_SYSTEM_BUCKETS "16" CACHE STRING
+set (KAN_UNIVERSE_WORLD_DEFINITION_SYSTEM_BUCKETS "17" CACHE STRING
         "Initial count of buckets for universe world definition system storage.")
 
 set (KAN_UNIVERSE_WORLD_DEFINITION_SYSTEM_IO_BUFFER "4096" CACHE STRING
