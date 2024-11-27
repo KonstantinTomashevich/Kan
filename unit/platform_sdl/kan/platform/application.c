@@ -415,7 +415,7 @@ kan_bool_t kan_platform_application_init (void)
     ensure_sdl_allocation_adapter_installed ();
     KAN_ASSERT (!SDL_WasInit (SDL_INIT_VIDEO | SDL_INIT_EVENTS))
 
-    if (SDL_InitSubSystem (SDL_INIT_VIDEO | SDL_INIT_EVENTS) != 0)
+    if (!SDL_InitSubSystem (SDL_INIT_VIDEO | SDL_INIT_EVENTS))
     {
         KAN_LOG (platform_application, KAN_LOG_CRITICAL_ERROR, "Failed to initialize SDL backend for application.")
         return KAN_FALSE;
@@ -633,9 +633,9 @@ kan_bool_t kan_platform_application_fetch_next_event (struct kan_platform_applic
             output->time_ns = event.common.timestamp;
             output->keyboard.window_id = KAN_TYPED_ID_32_SET (kan_platform_window_id_t, event.key.windowID);
             output->keyboard.repeat = event.key.repeat > 0 ? KAN_TRUE : KAN_FALSE;
-            output->keyboard.scan_code = (kan_scan_code_t) event.key.keysym.scancode;
-            output->keyboard.key_code = (kan_key_code_t) event.key.keysym.sym;
-            output->keyboard.modifiers = (kan_key_modifier_mask_t) event.key.keysym.mod;
+            output->keyboard.scan_code = (kan_scan_code_t) event.key.scancode;
+            output->keyboard.key_code = (kan_key_code_t) event.key.key;
+            output->keyboard.modifiers = (kan_key_modifier_mask_t) event.key.mod;
             return KAN_TRUE;
 
         case SDL_EVENT_KEY_UP:
@@ -643,9 +643,9 @@ kan_bool_t kan_platform_application_fetch_next_event (struct kan_platform_applic
             output->time_ns = event.common.timestamp;
             output->keyboard.window_id = KAN_TYPED_ID_32_SET (kan_platform_window_id_t, event.key.windowID);
             output->keyboard.repeat = event.key.repeat > 0 ? KAN_TRUE : KAN_FALSE;
-            output->keyboard.scan_code = (kan_scan_code_t) event.key.keysym.scancode;
-            output->keyboard.key_code = (kan_key_code_t) event.key.keysym.sym;
-            output->keyboard.modifiers = (kan_key_modifier_mask_t) event.key.keysym.mod;
+            output->keyboard.scan_code = (kan_scan_code_t) event.key.scancode;
+            output->keyboard.key_code = (kan_key_code_t) event.key.key;
+            output->keyboard.modifiers = (kan_key_modifier_mask_t) event.key.mod;
             return KAN_TRUE;
 
         case SDL_EVENT_TEXT_EDITING:
@@ -796,7 +796,7 @@ kan_bool_t kan_platform_application_get_display_bounds (kan_platform_display_id_
                                                         struct kan_platform_integer_bounds_t *output_bounds)
 {
     SDL_Rect bounds;
-    if (SDL_GetDisplayUsableBounds ((SDL_DisplayID) KAN_TYPED_ID_32_GET (display_id), &bounds) != 0)
+    if (!SDL_GetDisplayUsableBounds ((SDL_DisplayID) KAN_TYPED_ID_32_GET (display_id), &bounds))
     {
         KAN_LOG (platform_application, KAN_LOG_ERROR, "Failed to get display %llu bounds, backend error: %s",
                  (unsigned long long) KAN_TYPED_ID_32_GET (display_id), SDL_GetError ())
@@ -847,7 +847,7 @@ void kan_platform_application_get_fullscreen_display_modes (kan_platform_display
     KAN_ASSERT (output_array->size == 0u)
 
     int count_output = 0;
-    const SDL_DisplayMode **modes =
+    SDL_DisplayMode **modes =
         SDL_GetFullscreenDisplayModes ((SDL_DisplayID) KAN_TYPED_ID_32_GET (display_id), &count_output);
 
     if (modes && count_output > 0)
@@ -1010,14 +1010,21 @@ kan_bool_t kan_platform_application_window_enter_fullscreen (kan_platform_window
         return KAN_FALSE;
     }
 
-    const SDL_DisplayMode *closest_mode =
-        SDL_GetClosestFullscreenDisplayMode (SDL_GetDisplayForWindow (window), (int) display_mode->width,
-                                             (int) display_mode->height, display_mode->refresh_rate, KAN_TRUE);
+    SDL_DisplayMode closest_mode;
+    if (!SDL_GetClosestFullscreenDisplayMode (SDL_GetDisplayForWindow (window), (int) display_mode->width,
+                                              (int) display_mode->height, display_mode->refresh_rate, true,
+                                              &closest_mode))
+    {
+        KAN_LOG (platform_application, KAN_LOG_ERROR,
+                 "Unable to get closest fullscreen display mode in order to enter fullscreen, backend error: %s",
+                 SDL_GetError ())
+        return KAN_FALSE;
+    }
 
-    if ((uint32_t) closest_mode->format != display_mode->pixel_format || closest_mode->w != (int) display_mode->width ||
-        closest_mode->h != (int) display_mode->height ||
-        fabs (closest_mode->refresh_rate - display_mode->refresh_rate) > 0.01f ||
-        fabs (closest_mode->pixel_density - display_mode->pixel_density) > 0.01f)
+    if ((uint32_t) closest_mode.format != display_mode->pixel_format || closest_mode.w != (int) display_mode->width ||
+        closest_mode.h != (int) display_mode->height ||
+        fabs (closest_mode.refresh_rate - display_mode->refresh_rate) > 0.01f ||
+        fabs (closest_mode.pixel_density - display_mode->pixel_density) > 0.01f)
     {
         KAN_LOG (platform_application, KAN_LOG_ERROR,
                  "Unable to find appropriate display format for showing window with id %llu in fullscreen, backend "
@@ -1026,7 +1033,7 @@ kan_bool_t kan_platform_application_window_enter_fullscreen (kan_platform_window
         return KAN_FALSE;
     }
 
-    if (SDL_SetWindowFullscreenMode (window, closest_mode) != 0)
+    if (!SDL_SetWindowFullscreenMode (window, &closest_mode))
     {
         KAN_LOG (platform_application, KAN_LOG_ERROR,
                  "Failed to set appropriate display format for showing window with id %llu in fullscreen, backend "
@@ -1035,7 +1042,7 @@ kan_bool_t kan_platform_application_window_enter_fullscreen (kan_platform_window
         return KAN_FALSE;
     }
 
-    return SDL_SetWindowFullscreen (window, SDL_TRUE) == 0;
+    return SDL_SetWindowFullscreen (window, true);
 }
 
 kan_bool_t kan_platform_application_window_leave_fullscreen (kan_platform_window_id_t window_id)
@@ -1048,7 +1055,7 @@ kan_bool_t kan_platform_application_window_leave_fullscreen (kan_platform_window
         return KAN_FALSE;
     }
 
-    return SDL_SetWindowFullscreen (window, SDL_FALSE) == 0;
+    return SDL_SetWindowFullscreen (window, false);
 }
 
 enum kan_platform_window_flag_t kan_platform_application_window_get_flags (kan_platform_window_id_t window_id)
@@ -1074,7 +1081,7 @@ kan_bool_t kan_platform_application_window_set_title (kan_platform_window_id_t w
         return KAN_FALSE;
     }
 
-    return SDL_SetWindowTitle (window, title) == 0;
+    return SDL_SetWindowTitle (window, title);
 }
 
 const char *kan_platform_application_window_get_title (kan_platform_window_id_t window_id)
@@ -1108,7 +1115,7 @@ kan_bool_t kan_platform_application_window_set_icon (kan_platform_window_id_t wi
     const kan_platform_visual_size_t pitch = width * 4u;
 
     SDL_Surface *icon_surface =
-        SDL_CreateSurfaceFrom ((void *) data, (int) width, (int) height, (int) pitch, pixel_format);
+        SDL_CreateSurfaceFrom ((int) width, (int) height, pixel_format, (void *) data, (int) pitch);
 
     if (!icon_surface)
     {
@@ -1117,7 +1124,7 @@ kan_bool_t kan_platform_application_window_set_icon (kan_platform_window_id_t wi
         return KAN_FALSE;
     }
 
-    return SDL_SetWindowIcon (window, icon_surface) == 0;
+    return SDL_SetWindowIcon (window, icon_surface);
 }
 
 kan_bool_t kan_platform_application_window_set_position (kan_platform_window_id_t window_id,
@@ -1132,7 +1139,7 @@ kan_bool_t kan_platform_application_window_set_position (kan_platform_window_id_
         return KAN_FALSE;
     }
 
-    return SDL_SetWindowPosition (window, (int) x, (int) y) == 0;
+    return SDL_SetWindowPosition (window, (int) x, (int) y);
 }
 
 kan_bool_t kan_platform_application_window_get_position (kan_platform_window_id_t window_id,
@@ -1172,7 +1179,7 @@ kan_bool_t kan_platform_application_window_set_size (kan_platform_window_id_t wi
         return KAN_FALSE;
     }
 
-    return SDL_SetWindowSize (window, (int) width, (int) height) == 0;
+    return SDL_SetWindowSize (window, (int) width, (int) height);
 }
 
 kan_bool_t kan_platform_application_window_get_size (kan_platform_window_id_t window_id,
@@ -1215,7 +1222,7 @@ kan_bool_t kan_platform_application_window_get_size_for_render (kan_platform_win
     int width;
     int height;
 
-    if (SDL_GetWindowSizeInPixels (window, &width, &height) != 0)
+    if (!SDL_GetWindowSizeInPixels (window, &width, &height))
     {
         KAN_LOG (platform_application, KAN_LOG_ERROR,
                  "Unable to get window with id %llu size for render, backend error: %s",
@@ -1240,7 +1247,7 @@ kan_bool_t kan_platform_application_window_set_minimum_size (kan_platform_window
         return KAN_FALSE;
     }
 
-    return SDL_SetWindowMinimumSize (window, (int) width, (int) height) == 0;
+    return SDL_SetWindowMinimumSize (window, (int) width, (int) height);
 }
 
 kan_bool_t kan_platform_application_window_get_minimum_size (kan_platform_window_id_t window_id,
@@ -1280,7 +1287,7 @@ kan_bool_t kan_platform_application_window_set_maximum_size (kan_platform_window
         return KAN_FALSE;
     }
 
-    return SDL_SetWindowMaximumSize (window, (int) width, (int) height) == 0;
+    return SDL_SetWindowMaximumSize (window, (int) width, (int) height);
 }
 
 kan_bool_t kan_platform_application_window_get_maximum_size (kan_platform_window_id_t window_id,
@@ -1318,7 +1325,7 @@ kan_bool_t kan_platform_application_window_set_bordered (kan_platform_window_id_
         return KAN_FALSE;
     }
 
-    return SDL_SetWindowBordered (window, bordered ? SDL_TRUE : SDL_FALSE) == 0;
+    return SDL_SetWindowBordered (window, bordered ? true : false);
 }
 
 kan_bool_t kan_platform_application_window_set_resizable (kan_platform_window_id_t window_id, kan_bool_t resizable)
@@ -1331,7 +1338,7 @@ kan_bool_t kan_platform_application_window_set_resizable (kan_platform_window_id
         return KAN_FALSE;
     }
 
-    return SDL_SetWindowResizable (window, resizable ? SDL_TRUE : SDL_FALSE) == 0;
+    return SDL_SetWindowResizable (window, resizable ? true : false);
 }
 
 kan_bool_t kan_platform_application_window_set_always_on_top (kan_platform_window_id_t window_id,
@@ -1345,7 +1352,7 @@ kan_bool_t kan_platform_application_window_set_always_on_top (kan_platform_windo
         return KAN_FALSE;
     }
 
-    return SDL_SetWindowAlwaysOnTop (window, always_on_top ? SDL_TRUE : SDL_FALSE) == 0;
+    return SDL_SetWindowAlwaysOnTop (window, always_on_top ? true : false);
 }
 
 kan_bool_t kan_platform_application_window_show (kan_platform_window_id_t window_id)
@@ -1358,7 +1365,7 @@ kan_bool_t kan_platform_application_window_show (kan_platform_window_id_t window
         return KAN_FALSE;
     }
 
-    return SDL_ShowWindow (window) == 0;
+    return SDL_ShowWindow (window);
 }
 
 kan_bool_t kan_platform_application_window_hide (kan_platform_window_id_t window_id)
@@ -1371,7 +1378,7 @@ kan_bool_t kan_platform_application_window_hide (kan_platform_window_id_t window
         return KAN_FALSE;
     }
 
-    return SDL_HideWindow (window) == 0;
+    return SDL_HideWindow (window);
 }
 
 kan_bool_t kan_platform_application_window_raise (kan_platform_window_id_t window_id)
@@ -1384,7 +1391,7 @@ kan_bool_t kan_platform_application_window_raise (kan_platform_window_id_t windo
         return KAN_FALSE;
     }
 
-    return SDL_RaiseWindow (window) == 0;
+    return SDL_RaiseWindow (window);
 }
 
 kan_bool_t kan_platform_application_window_minimize (kan_platform_window_id_t window_id)
@@ -1397,7 +1404,7 @@ kan_bool_t kan_platform_application_window_minimize (kan_platform_window_id_t wi
         return KAN_FALSE;
     }
 
-    return SDL_MinimizeWindow (window) == 0;
+    return SDL_MinimizeWindow (window);
 }
 
 kan_bool_t kan_platform_application_window_maximize (kan_platform_window_id_t window_id)
@@ -1410,7 +1417,7 @@ kan_bool_t kan_platform_application_window_maximize (kan_platform_window_id_t wi
         return KAN_FALSE;
     }
 
-    return SDL_MaximizeWindow (window) == 0;
+    return SDL_MaximizeWindow (window);
 }
 
 kan_bool_t kan_platform_application_window_restore (kan_platform_window_id_t window_id)
@@ -1423,7 +1430,7 @@ kan_bool_t kan_platform_application_window_restore (kan_platform_window_id_t win
         return KAN_FALSE;
     }
 
-    return SDL_RestoreWindow (window) == 0;
+    return SDL_RestoreWindow (window);
 }
 
 kan_bool_t kan_platform_application_window_set_mouse_grab (kan_platform_window_id_t window_id, kan_bool_t grab_mouse)
@@ -1436,7 +1443,7 @@ kan_bool_t kan_platform_application_window_set_mouse_grab (kan_platform_window_i
         return KAN_FALSE;
     }
 
-    return SDL_SetWindowMouseGrab (window, grab_mouse ? SDL_TRUE : SDL_FALSE) == 0;
+    return SDL_SetWindowMouseGrab (window, grab_mouse ? true : false);
 }
 
 kan_bool_t kan_platform_application_window_set_keyboard_grab (kan_platform_window_id_t window_id,
@@ -1450,7 +1457,7 @@ kan_bool_t kan_platform_application_window_set_keyboard_grab (kan_platform_windo
         return KAN_FALSE;
     }
 
-    return SDL_SetWindowKeyboardGrab (window, grab_keyboard ? SDL_TRUE : SDL_FALSE) == 0;
+    return SDL_SetWindowKeyboardGrab (window, grab_keyboard ? true : false);
 }
 
 kan_bool_t kan_platform_application_window_set_opacity (kan_platform_window_id_t window_id, float opacity)
@@ -1463,7 +1470,7 @@ kan_bool_t kan_platform_application_window_set_opacity (kan_platform_window_id_t
         return KAN_FALSE;
     }
 
-    return SDL_SetWindowOpacity (window, opacity) == 0;
+    return SDL_SetWindowOpacity (window, opacity);
 }
 
 float kan_platform_application_window_get_opacity (kan_platform_window_id_t window_id)
@@ -1476,13 +1483,7 @@ float kan_platform_application_window_get_opacity (kan_platform_window_id_t wind
         return 0.0f;
     }
 
-    float result;
-    if (SDL_GetWindowOpacity (window, &result) != 0)
-    {
-        return 0.0f;
-    }
-
-    return result;
+    return SDL_GetWindowOpacity (window);
 }
 
 void kan_platform_application_window_set_focusable (kan_platform_window_id_t window_id, kan_bool_t focusable)
@@ -1495,7 +1496,7 @@ void kan_platform_application_window_set_focusable (kan_platform_window_id_t win
         return;
     }
 
-    SDL_SetWindowFocusable (window, focusable ? SDL_TRUE : SDL_FALSE);
+    SDL_SetWindowFocusable (window, focusable ? true : false);
 }
 
 _Static_assert (sizeof (VkInstance) <= sizeof (uint64_t), "VkInstance is not bigger than 64 bit integer.");
@@ -1630,7 +1631,7 @@ kan_bool_t kan_platform_application_register_vulkan_library_usage (void)
 {
     if (kan_atomic_int_add (&vulkan_library_requests, 1) == 0)
     {
-        if (SDL_Vulkan_LoadLibrary (NULL) == 0)
+        if (SDL_Vulkan_LoadLibrary (NULL))
         {
             return KAN_TRUE;
         }

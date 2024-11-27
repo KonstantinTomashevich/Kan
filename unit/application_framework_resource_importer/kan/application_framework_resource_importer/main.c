@@ -1287,7 +1287,7 @@ int main (int argument_count, char **argument_values)
         }
 
         // We need to limit count of max requests in serving in order to avoid using too much memory.
-        const kan_instance_size_t max_requests_in_serving = kan_platform_get_cpu_count ();
+        const kan_instance_size_t max_requests_in_serving = kan_platform_get_cpu_logical_core_count ();
         kan_mutex_lock (global.request_management_mutex);
 
         const kan_interned_string_t task_start = kan_string_intern ("rule_start");

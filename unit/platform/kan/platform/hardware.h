@@ -13,7 +13,7 @@
 KAN_C_HEADER_BEGIN
 
 /// \brief Returns count of available cpu cores, including logical cores.
-PLATFORM_API kan_instance_size_t kan_platform_get_cpu_count (void);
+PLATFORM_API kan_instance_size_t kan_platform_get_cpu_logical_core_count (void);
 
 /// \brief Returns amount of installed random access memory in megabytes.
 PLATFORM_API kan_memory_size_t kan_platform_get_random_access_memory (void);

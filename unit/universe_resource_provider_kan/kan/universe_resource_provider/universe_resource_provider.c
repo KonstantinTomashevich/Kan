@@ -2430,7 +2430,7 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void mutator_template_execute_resource_provid
             process_delayed_reload (state, private);
 
             kan_stack_group_allocator_reset (&state->temporary_allocator);
-            const kan_instance_size_t cpu_count = kan_platform_get_cpu_count ();
+            const kan_instance_size_t cpu_count = kan_platform_get_cpu_logical_core_count ();
             struct kan_cpu_task_list_node_t *task_list_node = NULL;
 
             state->execution_shared_state.workers_left = kan_atomic_int_init ((int) cpu_count);

@@ -196,7 +196,7 @@ static void ensure_global_task_dispatcher_ready (void)
             global_task_dispatcher.execution_section = kan_cpu_section_get ("cpu_dispatch_task");
 
             global_task_dispatcher.shutting_down = kan_atomic_int_init (0);
-            global_task_dispatcher.threads_count = kan_platform_get_cpu_count ();
+            global_task_dispatcher.threads_count = kan_platform_get_cpu_logical_core_count ();
 
             global_task_dispatcher.threads = kan_allocate_general (
                 global_task_dispatcher.allocation_group, sizeof (kan_thread_t) * global_task_dispatcher.threads_count,

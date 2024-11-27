@@ -110,8 +110,7 @@ void universe_system_connect (kan_context_system_t handle, kan_context_t context
 
     if (KAN_HANDLE_IS_VALID (update_system))
     {
-        kan_update_system_connect_on_run (update_system, handle, on_update_run, 1u,
-                                          &plugin_system, 0u, NULL);
+        kan_update_system_connect_on_run (update_system, handle, on_update_run, 1u, &plugin_system, 0u, NULL);
     }
 }
 

@@ -21,5 +21,5 @@ const struct kan_mouse_button_table_t *kan_platform_get_mouse_button_table (void
 
 uint8_t kan_platform_get_mouse_button_mask (kan_mouse_button_t button)
 {
-    return SDL_BUTTON (button);
+    return SDL_BUTTON_MASK (button);
 }

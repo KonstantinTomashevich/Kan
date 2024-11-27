@@ -2790,7 +2790,7 @@ static void process_native_node_compilation (kan_functor_user_data_t user_data)
 static void compilation_loop (void)
 {
     // We cannot risk compiling everything at once, because we can run out of memory.
-    const kan_instance_size_t max_in_active_queue = kan_platform_get_cpu_count ();
+    const kan_instance_size_t max_in_active_queue = kan_platform_get_cpu_logical_core_count ();
 
     const kan_interned_string_t interned_manage_resources_native = kan_string_intern ("manage_resources_native");
     const kan_interned_string_t interned_manage_resources_third_party =

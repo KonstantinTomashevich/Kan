@@ -260,10 +260,6 @@ struct kan_scan_code_table_t
     kan_scan_code_t audio_play;
     kan_scan_code_t audio_mute;
     kan_scan_code_t media_select;
-    kan_scan_code_t www;
-    kan_scan_code_t mail;
-    kan_scan_code_t calculator;
-    kan_scan_code_t computer;
 
     kan_scan_code_t ac_search;
     kan_scan_code_t ac_home;
@@ -273,19 +269,8 @@ struct kan_scan_code_table_t
     kan_scan_code_t ac_refresh;
     kan_scan_code_t ac_bookmarks;
 
-    kan_scan_code_t brightness_down;
-    kan_scan_code_t brightness_up;
-    kan_scan_code_t display_switch;
-
-    kan_scan_code_t keyboard_illumination_toggle;
-    kan_scan_code_t keyboard_illumination_down;
-    kan_scan_code_t keyboard_illumination_up;
-
     kan_scan_code_t eject;
     kan_scan_code_t sleep;
-
-    kan_scan_code_t app_1;
-    kan_scan_code_t app_2;
 
     kan_scan_code_t audio_rewind;
     kan_scan_code_t audio_fast_forward;
