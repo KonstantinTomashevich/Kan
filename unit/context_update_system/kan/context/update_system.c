@@ -3,6 +3,7 @@
 #include <stddef.h>
 #include <string.h>
 
+#include <kan/api_common/min_max.h>
 #include <kan/container/dynamic_array.h>
 #include <kan/context/update_system.h>
 #include <kan/cpu_profiler/markup.h>
@@ -17,10 +18,13 @@ struct update_connection_request_t
     struct update_connection_request_t *next;
     kan_context_system_t system;
     kan_context_update_run_t functor;
+
     kan_bool_t added;
-    kan_instance_size_t dependencies_count;
+    kan_bool_t proxy;
     kan_instance_size_t dependencies_left;
-    kan_context_system_t *dependencies;
+
+    /// \meta reflection_dynamic_array_type = "kan_context_system_t"
+    struct kan_dynamic_array_t dependencies;
 };
 
 struct update_callable_t
@@ -65,7 +69,7 @@ CONTEXT_UPDATE_SYSTEM_API void update_system_connect (kan_context_system_t handl
 static void visit_to_generate_update_sequence (struct update_system_t *system,
                                                struct update_connection_request_t *request)
 {
-    if (request->dependencies_left > 0u || request->added)
+    if (request->dependencies_left > 0u || request->added || request->proxy)
     {
         return;
     }
@@ -82,9 +86,10 @@ static void visit_to_generate_update_sequence (struct update_system_t *system,
     struct update_connection_request_t *other_request = system->first_connection_request;
     while (other_request)
     {
-        for (kan_loop_size_t index = 0u; index < other_request->dependencies_count; ++index)
+        for (kan_loop_size_t index = 0u; index < other_request->dependencies.size; ++index)
         {
-            if (KAN_HANDLE_IS_EQUAL (other_request->dependencies[index], request->system))
+            if (KAN_HANDLE_IS_EQUAL (((kan_context_system_t *) other_request->dependencies.data)[index],
+                                     request->system))
             {
                 --other_request->dependencies_left;
                 visit_to_generate_update_sequence (system, other_request);
@@ -117,17 +122,12 @@ CONTEXT_UPDATE_SYSTEM_API void update_system_init (kan_context_system_t handle)
     while (system->first_connection_request)
     {
         struct update_connection_request_t *next = system->first_connection_request->next;
-        if (!system->first_connection_request->added)
+        if (!system->first_connection_request->added && !system->first_connection_request->proxy)
         {
             any_not_added = KAN_TRUE;
         }
 
-        if (system->first_connection_request->dependencies)
-        {
-            kan_free_general (system->group, system->first_connection_request->dependencies,
-                              sizeof (kan_context_system_t) * system->first_connection_request->dependencies_count);
-        }
-
+        kan_dynamic_array_shutdown (&system->first_connection_request->dependencies);
         kan_free_batched (system->group, system->first_connection_request);
         system->first_connection_request = next;
     }
@@ -137,6 +137,8 @@ CONTEXT_UPDATE_SYSTEM_API void update_system_init (kan_context_system_t handle)
         KAN_LOG (update_system, KAN_LOG_ERROR,
                  "Unable to generate full update graph due to cycles or incorrect dependencies.")
     }
+
+    kan_dynamic_array_set_capacity (&system->update_sequence, system->update_sequence.size);
 }
 
 CONTEXT_UPDATE_SYSTEM_API void update_system_shutdown (kan_context_system_t handle)
@@ -170,28 +172,96 @@ void kan_update_system_connect_on_run (kan_context_system_t update_system,
                                        kan_context_system_t other_system,
                                        kan_context_update_run_t functor,
                                        kan_instance_size_t dependencies_count,
-                                       kan_context_system_t *dependencies)
+                                       kan_context_system_t *dependencies,
+                                       kan_instance_size_t dependency_of_count,
+                                       kan_context_system_t *dependency_of)
 {
     struct update_system_t *system = KAN_HANDLE_GET (update_system);
-    struct update_connection_request_t *request =
-        kan_allocate_batched (system->group, sizeof (struct update_connection_request_t));
+    struct update_connection_request_t *request = system->first_connection_request;
+
+    while (request)
+    {
+        if (KAN_HANDLE_IS_EQUAL (request->system, other_system))
+        {
+            if (!request->proxy)
+            {
+                KAN_LOG (update_system, KAN_LOG_ERROR, "Caught attempt to register the same system twice.")
+                return;
+            }
+
+            break;
+        }
+
+        request = request->next;
+    }
+
+    if (!request)
+    {
+        request = kan_allocate_batched (system->group, sizeof (struct update_connection_request_t));
+        request->dependencies_left = 0u;
+        kan_dynamic_array_init (&request->dependencies, 0u, sizeof (kan_context_system_t),
+                                _Alignof (kan_context_system_t), system->group);
+    }
+
     request->system = other_system;
     request->functor = functor;
-    request->dependencies_count = dependencies_count;
-    request->dependencies_left = dependencies_count;
 
-    if (request->dependencies_count > 0u)
+    if (dependencies_count > 0u)
     {
-        request->dependencies = kan_allocate_general (system->group, sizeof (kan_context_system_t) * dependencies_count,
-                                                      _Alignof (kan_context_system_t));
-        memcpy (request->dependencies, dependencies, sizeof (kan_context_system_t) * dependencies_count);
+        request->dependencies_left += dependencies_count;
+        if (request->dependencies.capacity < request->dependencies_left)
+        {
+            kan_dynamic_array_set_capacity (&request->dependencies,
+                                            KAN_MAX (request->dependencies_left, request->dependencies.capacity * 2u));
+        }
+
+        for (kan_loop_size_t index = 0u; index < dependencies_count; ++index)
+        {
+            *(kan_context_system_t *) kan_dynamic_array_add_last (&request->dependencies) = dependencies[index];
+        }
     }
-    else
+
+    for (kan_loop_size_t index = 0u; index < (kan_loop_size_t) dependency_of_count; ++index)
     {
-        request->dependencies = NULL;
+        const kan_context_system_t dependency_of_system = dependency_of[index];
+        struct update_connection_request_t *other_request = system->first_connection_request;
+
+        while (other_request)
+        {
+            if (KAN_HANDLE_IS_EQUAL (other_request->system, dependency_of_system))
+            {
+                break;
+            }
+
+            other_request = other_request->next;
+        }
+
+        if (!other_request)
+        {
+            other_request = kan_allocate_batched (system->group, sizeof (struct update_connection_request_t));
+            other_request->system = dependency_of_system;
+            other_request->functor = NULL;
+            other_request->added = KAN_FALSE;
+            other_request->proxy = KAN_TRUE;
+            other_request->dependencies_left = 0u;
+            kan_dynamic_array_init (&other_request->dependencies, 0u, sizeof (kan_context_system_t),
+                                    _Alignof (kan_context_system_t), system->group);
+        }
+
+        ++other_request->dependencies_left;
+        if (other_request->dependencies.capacity < other_request->dependencies_left)
+        {
+            kan_dynamic_array_set_capacity (
+                &other_request->dependencies,
+                KAN_MAX (other_request->dependencies_left, other_request->dependencies.capacity * 2u));
+        }
+
+        *(kan_context_system_t *) kan_dynamic_array_add_last (&request->dependencies) = other_system;
     }
 
     request->added = KAN_FALSE;
+    request->proxy = KAN_FALSE;
+
     request->next = system->first_connection_request;
     system->first_connection_request = request;
     ++system->connection_request_count;

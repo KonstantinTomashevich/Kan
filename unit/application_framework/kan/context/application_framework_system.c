@@ -119,7 +119,7 @@ void application_framework_system_connect (kan_context_system_t handle, kan_cont
     kan_context_system_t update_system = kan_context_query (system->context, KAN_CONTEXT_UPDATE_SYSTEM_NAME);
     if (KAN_HANDLE_IS_VALID (update_system))
     {
-        kan_update_system_connect_on_run (update_system, handle, application_framework_system_update, 0u, NULL);
+        kan_update_system_connect_on_run (update_system, handle, application_framework_system_update, 0u, NULL, 0u, NULL);
     }
 }
 

@@ -12,7 +12,7 @@
 /// \parblock
 /// Goal of the update system is to register all update callbacks and sort them in topological order using provided
 /// dependency handles. Every system that is provided as dependency must also be connected to update system during
-/// connection stage.
+/// connection stage. However, systems provided through "dependency of" routine are allowed to be never registered.
 /// \endparblock
 ///
 /// \par Thread safety
@@ -32,7 +32,9 @@ CONTEXT_UPDATE_SYSTEM_API void kan_update_system_connect_on_run (kan_context_sys
                                                                  kan_context_system_t other_system,
                                                                  kan_context_update_run_t functor,
                                                                  kan_instance_size_t dependencies_count,
-                                                                 kan_context_system_t *dependencies);
+                                                                 kan_context_system_t *dependencies,
+                                                                 kan_instance_size_t dependency_of_count,
+                                                                 kan_context_system_t *dependency_of);
 
 /// \brief Disconnect other system from update delegates.
 CONTEXT_UPDATE_SYSTEM_API void kan_update_system_disconnect_on_run (kan_context_system_t update_system,
