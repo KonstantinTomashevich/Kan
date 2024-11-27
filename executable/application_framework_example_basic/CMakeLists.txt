@@ -4,8 +4,8 @@ register_application (application_framework_example_basic)
 application_core_include (
         ABSTRACT
         cpu_dispatch=kan cpu_profiler=none error=sdl file_system=platform_default file_system_watcher=user_level
-        hash=djb2 log=kan memory=kan memory_profiler=none platform=sdl reflection=kan repository=kan stream=kan
-        threading=sdl virtual_file_system=kan workflow=kan
+        hash=djb2 log=kan memory=kan memory_profiler=none platform=sdl precise_time=sdl reflection=kan repository=kan
+        stream=kan threading=sdl virtual_file_system=kan workflow=kan
         CONCRETE
         application_framework container context context_application_system context_plugin_system
         context_reflection_system context_universe_world_definition_system context_update_system

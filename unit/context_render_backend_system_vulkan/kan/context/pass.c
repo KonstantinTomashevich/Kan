@@ -561,7 +561,7 @@ kan_bool_t kan_render_pass_instance_graphics_pipeline (kan_render_pass_instance_
                 struct kan_cpu_section_execution_t wait_execution;
                 kan_cpu_section_execution_init (&wait_execution,
                                                 pipeline->system->section_wait_for_pipeline_compilation);
-                kan_platform_sleep (KAN_CONTEXT_RENDER_BACKEND_VULKAN_COMPILATION_WAIT_NS);
+                kan_precise_time_sleep (KAN_CONTEXT_RENDER_BACKEND_VULKAN_COMPILATION_WAIT_NS);
                 kan_cpu_section_execution_shutdown (&wait_execution);
                 break;
             }

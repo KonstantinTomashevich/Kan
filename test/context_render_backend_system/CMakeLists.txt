@@ -25,7 +25,7 @@ foreach (IMPLEMENTATION ${CONTEXT_RENDER_BACKEND_SYSTEM_IMPLEMENTATIONS})
             ABSTRACT
             context_render_backend_system=${IMPLEMENTATION} cpu_dispatch=kan cpu_profiler=tracy error=sdl
             file_system=platform_default hash=djb2 image=stb log=kan memory=kan memory_profiler=none platform=sdl
-            reflection=kan stream=kan threading=sdl
+            precise_time=sdl reflection=kan stream=kan threading=sdl
             CONCRETE
             container context context_application_system inline_math render_pipeline_language testing
             test_context_render_backend_system)

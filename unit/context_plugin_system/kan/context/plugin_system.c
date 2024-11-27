@@ -15,7 +15,7 @@
 #include <kan/log/logging.h>
 #include <kan/memory/allocation.h>
 #include <kan/platform/dynamic_library.h>
-#include <kan/platform/precise_time.h>
+#include <kan/precise_time/precise_time.h>
 
 KAN_LOG_DEFINE_CATEGORY (plugin_system);
 
@@ -340,13 +340,13 @@ void plugin_system_on_update (kan_context_system_t handle)
         if (event->entry_type == KAN_FILE_SYSTEM_ENTRY_TYPE_FILE)
         {
             system->hot_reload_after_ns =
-                kan_platform_get_elapsed_nanoseconds () + (kan_time_size_t) system->hot_reload_update_delay_ns;
+                kan_precise_time_get_elapsed_nanoseconds () + (kan_time_size_t) system->hot_reload_update_delay_ns;
         }
 
         system->watcher_iterator = kan_file_system_watcher_iterator_advance (system->watcher, system->watcher_iterator);
     }
 
-    if (kan_platform_get_elapsed_nanoseconds () >= system->hot_reload_after_ns)
+    if (kan_precise_time_get_elapsed_nanoseconds () >= system->hot_reload_after_ns)
     {
         const kan_instance_size_t old_directory_id = system->hot_reload_directory_id;
         update_hot_reload_id (system);

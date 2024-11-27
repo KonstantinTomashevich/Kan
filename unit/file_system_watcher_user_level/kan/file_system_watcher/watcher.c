@@ -5,7 +5,7 @@
 #include <kan/file_system_watcher/watcher.h>
 #include <kan/log/logging.h>
 #include <kan/memory/allocation.h>
-#include <kan/platform/precise_time.h>
+#include <kan/precise_time/precise_time.h>
 #include <kan/threading/thread.h>
 
 KAN_LOG_DEFINE_CATEGORY (file_system_watcher);
@@ -659,7 +659,7 @@ static int server_thread (void *user_data)
         // We've captured serve queue value in watcher and there is no one who changes next pointers.
         // Therefore we can safely iterate and serve watchers.
 
-        const kan_time_size_t serve_start = kan_platform_get_elapsed_nanoseconds ();
+        const kan_time_size_t serve_start = kan_precise_time_get_elapsed_nanoseconds ();
         while (watcher)
         {
             KAN_ASSERT (watcher->root_directory)
@@ -667,12 +667,12 @@ static int server_thread (void *user_data)
             watcher = watcher->next_watcher;
         }
 
-        const kan_time_size_t serve_end = kan_platform_get_elapsed_nanoseconds ();
+        const kan_time_size_t serve_end = kan_precise_time_get_elapsed_nanoseconds ();
         const kan_time_offset_t serve_time = (kan_time_offset_t) (serve_end - serve_start);
 
         if (serve_time < KAN_FILE_SYSTEM_WATCHER_UL_MIN_FRAME_NS)
         {
-            kan_platform_sleep (KAN_FILE_SYSTEM_WATCHER_UL_MIN_FRAME_NS - serve_time);
+            kan_precise_time_sleep (KAN_FILE_SYSTEM_WATCHER_UL_MIN_FRAME_NS - serve_time);
         }
     }
 }

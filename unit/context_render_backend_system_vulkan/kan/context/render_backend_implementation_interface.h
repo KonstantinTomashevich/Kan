@@ -10,7 +10,7 @@
 #include <kan/cpu_profiler/markup.h>
 #include <kan/memory/allocation.h>
 #include <kan/platform/application.h>
-#include <kan/platform/precise_time.h>
+#include <kan/precise_time/precise_time.h>
 #include <kan/threading/atomic.h>
 #include <kan/threading/conditional_variable.h>
 #include <kan/threading/mutex.h>

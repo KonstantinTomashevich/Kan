@@ -11,7 +11,7 @@
 #include <kan/context/virtual_file_system.h>
 #include <kan/file_system/entry.h>
 #include <kan/file_system/stream.h>
-#include <kan/platform/precise_time.h>
+#include <kan/precise_time/precise_time.h>
 #include <kan/reflection/generated_reflection.h>
 #include <kan/reflection/patch.h>
 #include <kan/resource_pipeline/resource_pipeline.h>
@@ -750,10 +750,10 @@ TEST_UNIVERSE_RESOURCE_REFERENCE_API void kan_universe_mutator_execute_outer_ref
     {
         // Overwrite prototype to change file and expect cache to be invalidated.
         // One ms sleeps are added to make sure that there is no error due to missed cache invalidation.
-        kan_platform_sleep (1000000u);
+        kan_precise_time_sleep (1000000u);
 
         save_prototype_2 (state->registry, WORKSPACE_RESOURCES_SUB_DIRECTORY "/prototype_1.rd");
-        state->wait_for_change_detection_unti_ns = kan_platform_get_elapsed_nanoseconds () + 300000000u;
+        state->wait_for_change_detection_unti_ns = kan_precise_time_get_elapsed_nanoseconds () + 300000000u;
         state->stage = OUTER_REFERENCE_CACHING_TEST_STAGE_CHANGED_WAITING_FOR_CHANGE_DETECTION;
         break;
     }
@@ -761,7 +761,7 @@ TEST_UNIVERSE_RESOURCE_REFERENCE_API void kan_universe_mutator_execute_outer_ref
     case OUTER_REFERENCE_CACHING_TEST_STAGE_CHANGED_WAITING_FOR_CHANGE_DETECTION:
     {
         // We need to give internal logic enough time to safely detect file change.
-        if (kan_platform_get_elapsed_nanoseconds () > state->wait_for_change_detection_unti_ns)
+        if (kan_precise_time_get_elapsed_nanoseconds () > state->wait_for_change_detection_unti_ns)
         {
             KAN_UP_EVENT_INSERT (event, kan_resource_update_outer_references_request_event_t)
             {

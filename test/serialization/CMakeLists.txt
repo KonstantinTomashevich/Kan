@@ -15,7 +15,7 @@ shared_library_include (
         SCOPE PUBLIC
         ABSTRACT
         cpu_dispatch=kan cpu_profiler=none error=sdl file_system=platform_default hash=djb2 log=kan memory=kan
-        memory_profiler=none platform=sdl reflection=kan stream=kan threading=sdl
+        memory_profiler=none platform=sdl precise_time=sdl reflection=kan stream=kan threading=sdl
         CONCRETE container serialization readable_data testing test_serialization)
 
 shared_library_verify ()

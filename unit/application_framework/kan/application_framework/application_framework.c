@@ -13,7 +13,7 @@
 #include <kan/file_system/stream.h>
 #include <kan/log/logging.h>
 #include <kan/platform/application.h>
-#include <kan/platform/precise_time.h>
+#include <kan/precise_time/precise_time.h>
 #include <kan/reflection/generated_reflection.h>
 #include <kan/serialization/binary.h>
 #include <kan/serialization/readable_data.h>
@@ -514,10 +514,10 @@ int kan_application_framework_run_with_configuration (
             while (!kan_application_framework_system_is_exit_requested (application_framework_system, &result))
             {
                 kan_cpu_stage_separator ();
-                const kan_time_size_t frame_start_ns = kan_platform_get_elapsed_nanoseconds ();
+                const kan_time_size_t frame_start_ns = kan_precise_time_get_elapsed_nanoseconds ();
                 kan_application_system_sync_in_main_thread (application_system);
                 kan_update_system_run (update_system);
-                const kan_time_size_t frame_end_ns = kan_platform_get_elapsed_nanoseconds ();
+                const kan_time_size_t frame_end_ns = kan_precise_time_get_elapsed_nanoseconds ();
 
                 const kan_time_offset_t frame_time_ns = (kan_time_offset_t) (frame_end_ns - frame_start_ns);
                 const kan_time_offset_t min_frame_time_ns =
@@ -527,7 +527,7 @@ int kan_application_framework_run_with_configuration (
                 {
                     struct kan_cpu_section_execution_t cooling_execution;
                     kan_cpu_section_execution_init (&cooling_execution, cooling_section);
-                    kan_platform_sleep (min_frame_time_ns - frame_time_ns);
+                    kan_precise_time_sleep (min_frame_time_ns - frame_time_ns);
                     kan_cpu_section_execution_shutdown (&cooling_execution);
                 }
             }

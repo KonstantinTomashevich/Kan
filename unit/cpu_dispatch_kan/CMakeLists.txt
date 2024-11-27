@@ -1,7 +1,7 @@
 register_concrete (cpu_dispatch_kan)
 concrete_include (PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
 concrete_sources ("*.c")
-concrete_require (SCOPE PRIVATE ABSTRACT cpu_profiler error memory platform threading)
+concrete_require (SCOPE PRIVATE ABSTRACT cpu_profiler error memory platform precise_time threading)
 concrete_implements_abstract (cpu_dispatch)
 c_interface_scanner_setup (GLOB "*.c" "*.h")
 

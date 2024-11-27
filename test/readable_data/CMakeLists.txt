@@ -7,8 +7,8 @@ register_shared_library (test_readable_data_library)
 shared_library_include (
         SCOPE PUBLIC
         ABSTRACT
-        error=sdl file_system=platform_default hash=djb2 log=kan memory=kan memory_profiler=none platform=sdl stream=kan
-        threading=sdl
+        error=sdl file_system=platform_default hash=djb2 log=kan memory=kan memory_profiler=none platform=sdl
+        precise_time=sdl stream=kan threading=sdl
         CONCRETE container readable_data testing test_readable_data)
 
 shared_library_verify ()

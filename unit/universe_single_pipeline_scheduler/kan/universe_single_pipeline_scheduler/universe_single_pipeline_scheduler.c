@@ -1,4 +1,4 @@
-#include <kan/platform/precise_time.h>
+#include <kan/precise_time/precise_time.h>
 #include <kan/universe/preprocessor_markup.h>
 #include <kan/universe/universe.h>
 #include <kan/universe_single_pipeline_scheduler/universe_single_pipeline_scheduler.h>
@@ -23,7 +23,7 @@ UNIVERSE_SINGLE_PIPELINE_SCHEDULER_API void universe_single_pipeline_scheduler_s
 UNIVERSE_SINGLE_PIPELINE_SCHEDULER_API void kan_universe_scheduler_execute_single_pipeline (
     kan_universe_scheduler_interface_t interface, struct universe_single_pipeline_scheduler_state_t *state)
 {
-    const kan_time_size_t current_time = kan_platform_get_elapsed_nanoseconds ();
+    const kan_time_size_t current_time = kan_precise_time_get_elapsed_nanoseconds ();
     // First update is intentionally zero.
     const kan_time_offset_t delta_ns =
         (kan_time_offset_t) (state->last_update_time_ns == KAN_INT_MAX (kan_time_size_t) ?

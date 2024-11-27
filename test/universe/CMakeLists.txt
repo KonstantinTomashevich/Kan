@@ -19,7 +19,7 @@ shared_library_include (
         SCOPE PUBLIC
         ABSTRACT
         cpu_dispatch=kan cpu_profiler=none error=sdl hash=djb2 log=kan memory=kan memory_profiler=none platform=sdl
-        reflection=kan repository=kan threading=sdl workflow=kan
+        precise_time=sdl reflection=kan repository=kan threading=sdl workflow=kan
         CONCRETE
         container context context_reflection_system context_update_system testing test_universe
         test_universe_post_migration test_universe_pre_migration universe)

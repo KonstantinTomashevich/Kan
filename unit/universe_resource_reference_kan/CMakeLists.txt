@@ -5,7 +5,7 @@ concrete_implements_abstract (universe_resource_reference)
 
 concrete_require (
         SCOPE PRIVATE
-        ABSTRACT log platform universe_resource_reference universe_resource_provider virtual_file_system
+        ABSTRACT log platform precise_time universe_resource_reference universe_resource_provider virtual_file_system
         CONCRETE_INTERFACE
         context_plugin_system context_reflection_system context_virtual_file_system serialization resource_pipeline
         universe_resource_reference_reflection)

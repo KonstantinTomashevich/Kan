@@ -7,7 +7,7 @@
 #include <kan/cpu_profiler/markup.h>
 #include <kan/log/logging.h>
 #include <kan/memory/allocation.h>
-#include <kan/platform/precise_time.h>
+#include <kan/precise_time/precise_time.h>
 #include <kan/serialization/binary.h>
 #include <kan/serialization/readable_data.h>
 #include <kan/stream/random_access_stream_buffer.h>
@@ -401,7 +401,8 @@ static void add_to_rescan_stack (struct universe_world_definition_system_t *syst
         node->is_binary = is_binary;
     }
 
-    node->after_ns = kan_platform_get_elapsed_nanoseconds () + (kan_time_size_t) system->observation_rescan_delay_ns;
+    node->after_ns =
+        kan_precise_time_get_elapsed_nanoseconds () + (kan_time_size_t) system->observation_rescan_delay_ns;
 }
 
 static void universe_world_definition_system_update (kan_context_system_t handle)
@@ -448,7 +449,7 @@ static void universe_world_definition_system_update (kan_context_system_t handle
     struct rescan_stack_node_t *previous_node = NULL;
     struct rescan_stack_node_t *current_node = system->first_rescan_node;
 
-    const kan_time_size_t elapsed_ns = kan_platform_get_elapsed_nanoseconds ();
+    const kan_time_size_t elapsed_ns = kan_precise_time_get_elapsed_nanoseconds ();
     struct kan_file_system_path_container_t path_container;
     kan_file_system_path_container_copy_string (&path_container, system->definitions_mount_path);
     kan_context_system_t virtual_file_system =

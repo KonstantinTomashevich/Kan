@@ -1,0 +1,6 @@
+register_concrete (precise_time_sdl)
+concrete_include (PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+concrete_sources ("*.c")
+concrete_require (SCOPE PRIVATE ABSTRACT error log THIRD_PARTY SDL3::SDL3)
+concrete_implements_abstract (precise_time)
+c_interface_scanner_setup (GLOB "*.c" "*.h")

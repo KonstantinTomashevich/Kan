@@ -3988,7 +3988,7 @@ kan_bool_t kan_render_backend_system_next_frame (kan_context_system_t render_bac
                 // The best solution is to delay destruction, but to do that we also need to delay family destruction.
                 // It is a rare case, therefore we're using simplistic wait here instead of real delay.
                 kan_mutex_unlock (system->compiler_state.state_transition_mutex);
-                kan_platform_sleep (KAN_CONTEXT_RENDER_BACKEND_VULKAN_COMPILATION_WAIT_NS);
+                kan_precise_time_sleep (KAN_CONTEXT_RENDER_BACKEND_VULKAN_COMPILATION_WAIT_NS);
                 break;
 
             case PIPELINE_COMPILATION_STATE_SUCCESS:

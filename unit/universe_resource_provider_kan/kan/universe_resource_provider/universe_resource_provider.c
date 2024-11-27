@@ -10,7 +10,7 @@
 #include <kan/context/virtual_file_system.h>
 #include <kan/log/logging.h>
 #include <kan/platform/hardware.h>
-#include <kan/platform/precise_time.h>
+#include <kan/precise_time/precise_time.h>
 #include <kan/resource_index/resource_index.h>
 #include <kan/resource_pipeline/resource_pipeline.h>
 #include <kan/serialization/binary.h>
@@ -1458,7 +1458,8 @@ static inline void on_file_added (struct resource_provider_state_t *state,
         kan_resource_index_extract_info_from_path (path, &info_from_path);
 
         addition->name_for_search = info_from_path.name;
-        const kan_time_size_t investigate_after_ns = kan_platform_get_elapsed_nanoseconds () + state->add_wait_time_ns;
+        const kan_time_size_t investigate_after_ns =
+            kan_precise_time_get_elapsed_nanoseconds () + state->add_wait_time_ns;
         KAN_ASSERT (KAN_PACKED_TIMER_IS_SAFE_TO_SET (investigate_after_ns))
         addition->investigate_after_timer = KAN_PACKED_TIMER_SET (investigate_after_ns);
     }
@@ -1487,7 +1488,7 @@ static inline void on_file_modified (struct resource_provider_state_t *state,
                 if (suffix->request_count > 0u)
                 {
                     const kan_time_size_t reload_after_ns =
-                        kan_platform_get_elapsed_nanoseconds () + state->modify_wait_time_ns;
+                        kan_precise_time_get_elapsed_nanoseconds () + state->modify_wait_time_ns;
                     KAN_ASSERT (KAN_PACKED_TIMER_IS_SAFE_TO_SET (reload_after_ns))
                     suffix->reload_after_real_time_timer = KAN_PACKED_TIMER_SET (reload_after_ns);
                 }
@@ -1507,7 +1508,7 @@ static inline void on_file_modified (struct resource_provider_state_t *state,
                 if (suffix->request_count > 0u)
                 {
                     const kan_time_size_t reload_after_ns =
-                        kan_platform_get_elapsed_nanoseconds () + state->modify_wait_time_ns;
+                        kan_precise_time_get_elapsed_nanoseconds () + state->modify_wait_time_ns;
                     KAN_ASSERT (KAN_PACKED_TIMER_IS_SAFE_TO_SET (reload_after_ns))
                     suffix->reload_after_real_time_timer = KAN_PACKED_TIMER_SET (reload_after_ns);
                 }
@@ -1523,7 +1524,7 @@ static inline void on_file_modified (struct resource_provider_state_t *state,
         if (strcmp (path, addition->path) == 0)
         {
             const kan_time_size_t investigate_after_ns =
-                kan_platform_get_elapsed_nanoseconds () + state->add_wait_time_ns;
+                kan_precise_time_get_elapsed_nanoseconds () + state->add_wait_time_ns;
             KAN_ASSERT (KAN_PACKED_TIMER_IS_SAFE_TO_SET (investigate_after_ns))
             addition->investigate_after_timer = KAN_PACKED_TIMER_SET (investigate_after_ns);
             KAN_UP_QUERY_RETURN_VOID;
@@ -1722,8 +1723,8 @@ static inline void process_file_addition (struct resource_provider_state_t *stat
 static inline void process_delayed_addition (struct resource_provider_state_t *state,
                                              struct resource_provider_private_singleton_t *private)
 {
-    KAN_ASSERT (KAN_PACKED_TIMER_IS_SAFE_TO_SET (kan_platform_get_elapsed_nanoseconds ()))
-    const kan_packed_timer_t current_timer = KAN_PACKED_TIMER_SET (kan_platform_get_elapsed_nanoseconds ());
+    KAN_ASSERT (KAN_PACKED_TIMER_IS_SAFE_TO_SET (kan_precise_time_get_elapsed_nanoseconds ()))
+    const kan_packed_timer_t current_timer = KAN_PACKED_TIMER_SET (kan_precise_time_get_elapsed_nanoseconds ());
 
     KAN_UP_INTERVAL_ASCENDING_WRITE (delayed_addition, resource_provider_delayed_file_addition_t,
                                      investigate_after_timer, NULL, &current_timer)
@@ -1736,8 +1737,8 @@ static inline void process_delayed_addition (struct resource_provider_state_t *s
 static inline void process_delayed_reload (struct resource_provider_state_t *state,
                                            struct resource_provider_private_singleton_t *private)
 {
-    KAN_ASSERT (KAN_PACKED_TIMER_IS_SAFE_TO_SET (kan_platform_get_elapsed_nanoseconds ()))
-    const kan_packed_timer_t current_timer = KAN_PACKED_TIMER_SET (kan_platform_get_elapsed_nanoseconds ());
+    KAN_ASSERT (KAN_PACKED_TIMER_IS_SAFE_TO_SET (kan_precise_time_get_elapsed_nanoseconds ()))
+    const kan_packed_timer_t current_timer = KAN_PACKED_TIMER_SET (kan_precise_time_get_elapsed_nanoseconds ());
 
     KAN_UP_INTERVAL_ASCENDING_UPDATE (native_suffix, resource_provider_native_entry_suffix_t,
                                       reload_after_real_time_timer, NULL, &current_timer)
@@ -1824,7 +1825,7 @@ static void execute_shared_serve (kan_functor_user_data_t user_data)
     struct resource_provider_state_t *state = (struct resource_provider_state_t *) user_data;
     while (KAN_TRUE)
     {
-        if (kan_platform_get_elapsed_nanoseconds () > state->execution_shared_state.end_time_ns)
+        if (kan_precise_time_get_elapsed_nanoseconds () > state->execution_shared_state.end_time_ns)
         {
             // Shutdown: no more time.
             if (kan_atomic_int_add (&state->execution_shared_state.workers_left, -1) == 1)
@@ -1970,7 +1971,7 @@ static void execute_shared_serve (kan_functor_user_data_t user_data)
                 while ((serialization_state = kan_serialization_binary_reader_step (
                             loading_operation->native.binary_reader)) == KAN_SERIALIZATION_IN_PROGRESS)
                 {
-                    if (kan_platform_get_elapsed_nanoseconds () > state->execution_shared_state.end_time_ns)
+                    if (kan_precise_time_get_elapsed_nanoseconds () > state->execution_shared_state.end_time_ns)
                     {
                         // Shutdown: no more time.
                         kan_repository_indexed_interval_write_access_close (&loading_operation_access);
@@ -1992,7 +1993,7 @@ static void execute_shared_serve (kan_functor_user_data_t user_data)
                 while ((serialization_state = kan_serialization_rd_reader_step (
                             loading_operation->native.readable_data_reader)) == KAN_SERIALIZATION_IN_PROGRESS)
                 {
-                    if (kan_platform_get_elapsed_nanoseconds () > state->execution_shared_state.end_time_ns)
+                    if (kan_precise_time_get_elapsed_nanoseconds () > state->execution_shared_state.end_time_ns)
                     {
                         // Shutdown: no more time.
                         kan_repository_indexed_interval_write_access_close (&loading_operation_access);
@@ -2040,7 +2041,7 @@ static void execute_shared_serve (kan_functor_user_data_t user_data)
                     serialization_state = KAN_SERIALIZATION_FINISHED;
                 }
 
-                if (kan_platform_get_elapsed_nanoseconds () > state->execution_shared_state.end_time_ns)
+                if (kan_precise_time_get_elapsed_nanoseconds () > state->execution_shared_state.end_time_ns)
                 {
                     // Shutdown: no more time.
                     kan_repository_indexed_interval_write_access_close (&loading_operation_access);
@@ -2184,7 +2185,7 @@ static void execute_shared_serve (kan_functor_user_data_t user_data)
 UNIVERSE_RESOURCE_PROVIDER_KAN_API void mutator_template_execute_resource_provider (
     kan_cpu_job_t job, struct resource_provider_state_t *state)
 {
-    const kan_time_size_t begin_time = kan_platform_get_elapsed_nanoseconds ();
+    const kan_time_size_t begin_time = kan_precise_time_get_elapsed_nanoseconds ();
     KAN_UP_SINGLETON_WRITE (public, kan_resource_provider_singleton_t)
     KAN_UP_SINGLETON_WRITE (private, resource_provider_private_singleton_t)
     {
@@ -2218,13 +2219,13 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void mutator_template_execute_resource_provid
         }
 
         if (private->status == RESOURCE_PROVIDER_STATUS_SCANNING &&
-            begin_time + state->scan_budget_ns > kan_platform_get_elapsed_nanoseconds ())
+            begin_time + state->scan_budget_ns > kan_precise_time_get_elapsed_nanoseconds ())
         {
             kan_virtual_file_system_volume_t volume =
                 kan_virtual_file_system_get_context_volume_for_read (state->virtual_file_system);
 
             while (private->scan_item_stack.size > 0u &&
-                   begin_time + state->scan_budget_ns > kan_platform_get_elapsed_nanoseconds ())
+                   begin_time + state->scan_budget_ns > kan_precise_time_get_elapsed_nanoseconds ())
             {
                 if (state->string_registry_stream)
                 {
@@ -2384,7 +2385,7 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void mutator_template_execute_resource_provid
         }
 
         if (private->status == RESOURCE_PROVIDER_STATUS_SERVING &&
-            begin_time + state->load_budget_ns > kan_platform_get_elapsed_nanoseconds ())
+            begin_time + state->load_budget_ns > kan_precise_time_get_elapsed_nanoseconds ())
         {
             // Events need to be always processed in order to keep everything up to date.
             // Therefore, load budget does not affect event processing.

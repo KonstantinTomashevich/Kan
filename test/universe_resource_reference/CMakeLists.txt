@@ -4,7 +4,7 @@ universe_concrete_setup_sources (GLOB "*.c")
 
 concrete_require (
         SCOPE PUBLIC
-        ABSTRACT file_system platform universe_resource_provider universe_resource_reference
+        ABSTRACT file_system platform precise_time universe_resource_provider universe_resource_reference
         CONCRETE_INTERFACE
         context_reflection_system context_update_system context_virtual_file_system serialization testing universe)
 
@@ -17,9 +17,9 @@ foreach (IMPLEMENTATION ${PROVIDER_IMPLEMENTATIONS})
             SCOPE PUBLIC
             ABSTRACT
             cpu_dispatch=kan cpu_profiler=none error=sdl file_system=platform_default file_system_watcher=user_level
-            hash=djb2 log=kan memory=kan memory_profiler=none platform=sdl reflection=kan repository=kan stream=kan
-            threading=sdl universe_resource_provider=kan universe_resource_reference=${IMPLEMENTATION}
-            virtual_file_system=kan workflow=kan
+            hash=djb2 log=kan memory=kan memory_profiler=none platform=sdl precise_time=sdl reflection=kan
+            repository=kan stream=kan threading=sdl universe_resource_provider=kan
+            universe_resource_reference=${IMPLEMENTATION} virtual_file_system=kan workflow=kan
             CONCRETE
             container context context_plugin_system context_reflection_system context_update_system
             context_virtual_file_system reflection_helpers resource_index resource_pipeline readable_data

@@ -8,7 +8,7 @@ concrete_sources ("*.c" "*.cpp")
 
 concrete_require (
         SCOPE PRIVATE
-        ABSTRACT cpu_profiler error log memory threading
+        ABSTRACT cpu_profiler error log memory precise_time threading
         THIRD_PARTY volk Vulkan::Headers VulkanMemoryAllocator)
 
 # stdc++ is required by VulkanMemoryAllocator and is not provided by default on non-MSVC compilers.

@@ -8,7 +8,7 @@
 #include <kan/error/critical.h>
 #include <kan/memory/allocation.h>
 #include <kan/platform/hardware.h>
-#include <kan/platform/precise_time.h>
+#include <kan/precise_time/precise_time.h>
 #include <kan/threading/atomic.h>
 #include <kan/threading/conditional_variable.h>
 #include <kan/threading/mutex.h>
@@ -554,6 +554,6 @@ void kan_cpu_job_wait (kan_cpu_job_t job)
         // - But for the most jobs we don't need the await routine.
         // - And the jobs that use it can safely wait a little bit more.
         // Therefore, correct await routine would only harm here.
-        kan_platform_sleep (KAN_CPU_DISPATCHER_WAIT_CHECK_DELAY_NS);
+        kan_precise_time_sleep (KAN_CPU_DISPATCHER_WAIT_CHECK_DELAY_NS);
     }
 }

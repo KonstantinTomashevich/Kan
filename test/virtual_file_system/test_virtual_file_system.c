@@ -1,7 +1,7 @@
 #include <string.h>
 
 #include <kan/memory/allocation.h>
-#include <kan/platform/precise_time.h>
+#include <kan/precise_time/precise_time.h>
 #include <kan/stream/stream.h>
 #include <kan/testing/testing.h>
 #include <kan/virtual_file_system/virtual_file_system.h>
@@ -50,7 +50,7 @@ static kan_bool_t read_text_file (kan_virtual_file_system_volume_t volume,
 
 static void give_some_time_for_poll (void)
 {
-    kan_platform_sleep (300000000u); // 300ms
+    kan_precise_time_sleep (300000000u); // 300ms
 }
 
 KAN_TEST_CASE (create_and_remove_empty_directory)

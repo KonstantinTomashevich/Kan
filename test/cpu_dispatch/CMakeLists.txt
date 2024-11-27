@@ -1,7 +1,7 @@
 register_concrete (test_cpu_dispatch)
 concrete_include (PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 concrete_sources ("*.c")
-concrete_require (SCOPE PUBLIC ABSTRACT cpu_dispatch platform CONCRETE_INTERFACE testing)
+concrete_require (SCOPE PUBLIC ABSTRACT cpu_dispatch precise_time CONCRETE_INTERFACE testing)
 
 abstract_get_implementations (ABSTRACT cpu_dispatch OUTPUT MEMORY_IMPLEMENTATIONS)
 foreach (IMPLEMENTATION ${MEMORY_IMPLEMENTATIONS})
@@ -12,7 +12,7 @@ foreach (IMPLEMENTATION ${MEMORY_IMPLEMENTATIONS})
             SCOPE PUBLIC
             ABSTRACT
             cpu_dispatch=${IMPLEMENTATION} cpu_profiler=none error=sdl hash=djb2 log=kan memory=kan memory_profiler=none
-            platform=sdl threading=sdl
+            platform=sdl precise_time=sdl threading=sdl
 
             CONCRETE container testing test_cpu_dispatch)
 

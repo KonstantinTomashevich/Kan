@@ -12,7 +12,7 @@
 #include <kan/context/virtual_file_system.h>
 #include <kan/file_system/entry.h>
 #include <kan/file_system/stream.h>
-#include <kan/platform/precise_time.h>
+#include <kan/precise_time/precise_time.h>
 #include <kan/reflection/generated_reflection.h>
 #include <kan/resource_index/resource_index.h>
 #include <kan/resource_pipeline/resource_pipeline.h>
@@ -1275,13 +1275,13 @@ KAN_TEST_CASE (indexing_stress_test)
     kan_universe_deploy_root (universe, &definition);
     kan_universe_world_definition_shutdown (&definition);
 
-    const kan_time_size_t time_begin = kan_platform_get_elapsed_nanoseconds ();
+    const kan_time_size_t time_begin = kan_precise_time_get_elapsed_nanoseconds ();
     while (!global_test_finished)
     {
         kan_update_system_run (update_system);
     }
 
-    const kan_time_size_t time_end = kan_platform_get_elapsed_nanoseconds ();
+    const kan_time_size_t time_end = kan_precise_time_get_elapsed_nanoseconds ();
     printf ("Indexed stress test raw time: %lluns\n", (unsigned long long) (time_end - time_begin));
     kan_context_destroy (context);
 }

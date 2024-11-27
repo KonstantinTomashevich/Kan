@@ -5,7 +5,7 @@
 #include <kan/context/all_system_names.h>
 #include <kan/context/application_framework_system.h>
 #include <kan/log/logging.h>
-#include <kan/platform/precise_time.h>
+#include <kan/precise_time/precise_time.h>
 #include <kan/universe/universe.h>
 
 // \c_interface_scanner_disable
@@ -130,7 +130,7 @@ APPLICATION_FRAMEWORK_VERIFY_CODE_HOT_RELOAD_API void kan_universe_mutator_execu
 
     if (singleton->test_frame == 0u &&
         // If reload was somehow skipped, request it again.
-        kan_platform_get_elapsed_nanoseconds () - singleton->reload_request_time > 500000000u)
+        kan_precise_time_get_elapsed_nanoseconds () - singleton->reload_request_time > 500000000u)
     {
         // Started in second state, reload back to first.
         KAN_ASSERT (kan_application_framework_system_get_arguments_count (state->application_framework_system_handle) ==
@@ -167,7 +167,7 @@ APPLICATION_FRAMEWORK_VERIFY_CODE_HOT_RELOAD_API void kan_universe_mutator_execu
             }
             else
             {
-                singleton->reload_request_time = kan_platform_get_elapsed_nanoseconds ();
+                singleton->reload_request_time = kan_precise_time_get_elapsed_nanoseconds ();
             }
         }
 
