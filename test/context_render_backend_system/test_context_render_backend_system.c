@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <kan/context/all_system_names.h>
 #include <kan/context/render_backend_system.h>
 #include <kan/cpu_profiler/markup.h>
 #include <kan/file_system/stream.h>

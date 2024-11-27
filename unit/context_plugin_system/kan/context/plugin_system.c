@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include <kan/container/interned_string.h>
+#include <kan/context/all_system_names.h>
 #include <kan/context/plugin_system.h>
 #include <kan/context/reflection_system.h>
 #include <kan/context/update_system.h>

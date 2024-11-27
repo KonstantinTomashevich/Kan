@@ -3,9 +3,9 @@ concrete_include (PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 concrete_sources ("*.c")
 concrete_require (SCOPE PUBLIC CONCRETE_INTERFACE context testing)
 
-register_context_system (first_independent_system_t)
-register_context_system (second_independent_system_t)
-register_context_system (system_with_dependencies_t)
+register_context_system (NAME first_independent_system_t PRIVATE)
+register_context_system (NAME second_independent_system_t PRIVATE)
+register_context_system (NAME system_with_dependencies_t PRIVATE)
 
 register_shared_library (test_context_library)
 shared_library_include (

@@ -7,7 +7,7 @@ concrete_require (
         ABSTRACT cpu_profiler error log memory platform
         CONCRETE_INTERFACE context_reflection_system context_update_system context_virtual_file_system serialization)
 
-register_context_system (universe_world_definition_system_t)
+register_context_system (NAME universe_world_definition_system_t)
 c_interface_scanner_setup (GLOB "*.h")
 reflection_generator_setup (GLOB "*.h")
 register_unit_reflection ()

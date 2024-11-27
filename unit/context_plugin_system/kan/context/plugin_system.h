@@ -35,9 +35,6 @@
 
 KAN_C_HEADER_BEGIN
 
-/// \brief System name for requirements and queries.
-#define KAN_CONTEXT_PLUGIN_SYSTEM_NAME "plugin_system_t"
-
 /// \brief Contains plugin system configuration data.
 struct kan_plugin_system_config_t
 {

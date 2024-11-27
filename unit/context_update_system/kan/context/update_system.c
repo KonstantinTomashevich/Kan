@@ -5,6 +5,7 @@
 
 #include <kan/api_common/min_max.h>
 #include <kan/container/dynamic_array.h>
+#include <kan/context/all_system_names.h>
 #include <kan/context/update_system.h>
 #include <kan/cpu_profiler/markup.h>
 #include <kan/error/critical.h>
@@ -69,19 +70,22 @@ CONTEXT_UPDATE_SYSTEM_API void update_system_connect (kan_context_system_t handl
 static void visit_to_generate_update_sequence (struct update_system_t *system,
                                                struct update_connection_request_t *request)
 {
-    if (request->dependencies_left > 0u || request->added || request->proxy)
+    if (request->dependencies_left > 0u || request->added)
     {
         return;
     }
 
     request->added = KAN_TRUE;
-    struct update_callable_t *callable = kan_dynamic_array_add_last (&system->update_sequence);
-    KAN_ASSERT (callable);
+    if (!request->proxy)
+    {
+        struct update_callable_t *callable = kan_dynamic_array_add_last (&system->update_sequence);
+        KAN_ASSERT (callable);
 
-    *callable = (struct update_callable_t) {
-        .system = request->system,
-        .functor = request->functor,
-    };
+        *callable = (struct update_callable_t) {
+            .system = request->system,
+            .functor = request->functor,
+        };
+    }
 
     struct update_connection_request_t *other_request = system->first_connection_request;
     while (other_request)
@@ -112,6 +116,30 @@ CONTEXT_UPDATE_SYSTEM_API void update_system_init (kan_context_system_t handle)
     kan_dynamic_array_set_capacity (&system->update_sequence, system->connection_request_count);
     struct update_connection_request_t *request = system->first_connection_request;
 
+    // Calculate dependency left counts. We do it here so we wouldn't count unregistered systems.
+    // It is okay to loop over everything as there shouldn't be lots of context systems.
+    while (request)
+    {
+        for (kan_loop_size_t index = 0u; index < request->dependencies.size; ++index)
+        {
+            const kan_context_system_t dependency = ((kan_context_system_t *) request->dependencies.data)[index];
+            struct update_connection_request_t *other_request = system->first_connection_request;
+
+            while (other_request)
+            {
+                if (KAN_HANDLE_IS_EQUAL (other_request->system, dependency))
+                {
+                    ++request->dependencies_left;
+                }
+
+                other_request = other_request->next;
+            }
+        }
+
+        request = request->next;
+    }
+
+    request = system->first_connection_request;
     while (request)
     {
         visit_to_generate_update_sequence (system, request);
@@ -208,24 +236,31 @@ void kan_update_system_connect_on_run (kan_context_system_t update_system,
 
     if (dependencies_count > 0u)
     {
-        request->dependencies_left += dependencies_count;
-        if (request->dependencies.capacity < request->dependencies_left)
+        if (request->dependencies.capacity < request->dependencies.size + dependencies_count)
         {
-            kan_dynamic_array_set_capacity (&request->dependencies,
-                                            KAN_MAX (request->dependencies_left, request->dependencies.capacity * 2u));
+            kan_dynamic_array_set_capacity (
+                &request->dependencies,
+                KAN_MAX (request->dependencies.size + dependencies_count, request->dependencies.capacity * 2u));
         }
 
         for (kan_loop_size_t index = 0u; index < dependencies_count; ++index)
         {
-            *(kan_context_system_t *) kan_dynamic_array_add_last (&request->dependencies) = dependencies[index];
+            if (KAN_HANDLE_IS_VALID (dependencies[index]))
+            {
+                *(kan_context_system_t *) kan_dynamic_array_add_last (&request->dependencies) = dependencies[index];
+            }
         }
     }
 
     for (kan_loop_size_t index = 0u; index < (kan_loop_size_t) dependency_of_count; ++index)
     {
         const kan_context_system_t dependency_of_system = dependency_of[index];
-        struct update_connection_request_t *other_request = system->first_connection_request;
+        if (!KAN_HANDLE_IS_VALID (dependency_of_system))
+        {
+            continue;
+        }
 
+        struct update_connection_request_t *other_request = system->first_connection_request;
         while (other_request)
         {
             if (KAN_HANDLE_IS_EQUAL (other_request->system, dependency_of_system))
@@ -248,15 +283,15 @@ void kan_update_system_connect_on_run (kan_context_system_t update_system,
                                     _Alignof (kan_context_system_t), system->group);
         }
 
-        ++other_request->dependencies_left;
-        if (other_request->dependencies.capacity < other_request->dependencies_left)
+        kan_context_system_t *spot = kan_dynamic_array_add_last (&other_request->dependencies);
+        if (!spot)
         {
-            kan_dynamic_array_set_capacity (
-                &other_request->dependencies,
-                KAN_MAX (other_request->dependencies_left, other_request->dependencies.capacity * 2u));
+            kan_dynamic_array_set_capacity (&other_request->dependencies,
+                                            KAN_MAX (1u, other_request->dependencies.capacity * 2u));
+            spot = kan_dynamic_array_add_last (&other_request->dependencies);
         }
 
-        *(kan_context_system_t *) kan_dynamic_array_add_last (&request->dependencies) = other_system;
+        *spot = other_system;
     }
 
     request->added = KAN_FALSE;

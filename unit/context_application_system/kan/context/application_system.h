@@ -52,9 +52,6 @@
 
 KAN_C_HEADER_BEGIN
 
-/// \brief System name for requirements and queries.
-#define KAN_CONTEXT_APPLICATION_SYSTEM_NAME "application_system_t"
-
 KAN_HANDLE_DEFINE (kan_application_system_event_iterator_t);
 
 /// \brief Contains buffered information about available display.

@@ -4,7 +4,7 @@ concrete_sources ("*.c")
 concrete_require (SCOPE PUBLIC ABSTRACT virtual_file_system CONCRETE_INTERFACE context)
 concrete_require (SCOPE PRIVATE ABSTRACT error log memory reflection)
 
-register_context_system (virtual_file_system_t)
+register_context_system (NAME virtual_file_system_t)
 c_interface_scanner_setup (GLOB "*.h")
 reflection_generator_setup (GLOB "*.h")
 register_unit_reflection ()

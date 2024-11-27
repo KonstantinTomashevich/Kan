@@ -1,7 +1,7 @@
 register_concrete (test_universe)
 concrete_include (PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 universe_concrete_setup_sources (DIRECT "test_universe.c")
-register_context_system (migration_reflection_population_system_t)
+register_context_system (NAME migration_reflection_population_system_t PRIVATE)
 concrete_require (SCOPE PUBLIC CONCRETE_INTERFACE context_reflection_system context_update_system testing universe)
 
 register_concrete (test_universe_pre_migration)

@@ -1,4 +1,5 @@
 #include <kan/application_framework_resource_tool/context.h>
+#include <kan/context/all_system_names.h>
 #include <kan/context/plugin_system.h>
 #include <kan/context/reflection_system.h>
 #include <kan/error/critical.h>

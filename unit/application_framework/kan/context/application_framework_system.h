@@ -23,9 +23,6 @@
 
 KAN_C_HEADER_BEGIN
 
-/// \brief System name for requirements and queries.
-#define KAN_CONTEXT_APPLICATION_FRAMEWORK_SYSTEM_NAME "application_framework_system_t"
-
 /// \brief Contains configuration for application framework system.
 struct kan_application_framework_system_config_t
 {

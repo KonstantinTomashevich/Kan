@@ -1,5 +1,5 @@
 register_concrete (context)
-concrete_include (PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
+concrete_include (PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}" "${KAN_CONTEXT_ALL_SYSTEM_NAMES_INCLUDE_BASE}")
 concrete_sources ("*.c")
 concrete_require (SCOPE PUBLIC ABSTRACT memory_profiler)
 concrete_require (SCOPE PRIVATE ABSTRACT error log memory CONCRETE_INTERFACE container)

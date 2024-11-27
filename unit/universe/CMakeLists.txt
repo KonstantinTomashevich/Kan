@@ -6,7 +6,7 @@ concrete_require (
         SCOPE PRIVATE
         ABSTRACT cpu_profiler error log memory
         CONCRETE_INTERFACE context_reflection_system context_update_system)
-register_context_system (universe_system_t)
+register_context_system (NAME universe_system_t)
 
 c_interface_scanner_setup (GLOB "*.h")
 reflection_generator_setup (GLOB "*.h")

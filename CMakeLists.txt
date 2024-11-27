@@ -26,6 +26,7 @@ include ("${CMAKE_CURRENT_SOURCE_DIR}/cmake/kan/binary_directory_flattening.cmak
 include ("${CMAKE_CURRENT_SOURCE_DIR}/cmake/kan/c_interface_scanner.cmake")
 include ("${CMAKE_CURRENT_SOURCE_DIR}/cmake/kan/clang_format.cmake")
 include ("${CMAKE_CURRENT_SOURCE_DIR}/cmake/kan/context.cmake")
+include ("${CMAKE_CURRENT_SOURCE_DIR}/cmake/kan/cumulative_file_generation.cmake")
 include ("${CMAKE_CURRENT_SOURCE_DIR}/cmake/kan/global_options.cmake")
 include ("${CMAKE_CURRENT_SOURCE_DIR}/cmake/kan/reflection_generator.cmake")
 include ("${CMAKE_CURRENT_SOURCE_DIR}/cmake/kan/reflection_statics.cmake")
@@ -39,3 +40,5 @@ add_subdirectory (third_party)
 add_subdirectory (unit)
 add_subdirectory (test)
 add_subdirectory (executable)
+
+cumulative_file_generation_execute ()

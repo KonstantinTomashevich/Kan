@@ -186,9 +186,6 @@ KAN_HANDLE_DEFINE (kan_render_frame_lifetime_buffer_allocator_t);
 KAN_HANDLE_DEFINE (kan_render_image_t);
 KAN_HANDLE_DEFINE (kan_render_read_back_status_t);
 
-/// \brief System name for requirements and queries.
-#define KAN_CONTEXT_RENDER_BACKEND_SYSTEM_NAME "render_backend_system_t"
-
 /// \brief Contains render backend system configuration data.
 struct kan_render_backend_system_config_t
 {

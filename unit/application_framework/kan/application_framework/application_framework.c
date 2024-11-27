@@ -1,6 +1,7 @@
 #include <string.h>
 
 #include <kan/application_framework/application_framework.h>
+#include <kan/context/all_system_names.h>
 #include <kan/context/application_framework_system.h>
 #include <kan/context/application_system.h>
 #include <kan/context/plugin_system.h>

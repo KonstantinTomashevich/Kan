@@ -2,6 +2,7 @@
 
 #include <stdlib.h>
 
+#include <kan/context/all_system_names.h>
 #include <kan/context/application_framework_system.h>
 #include <kan/log/logging.h>
 #include <kan/platform/precise_time.h>

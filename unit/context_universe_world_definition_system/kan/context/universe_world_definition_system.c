@@ -1,4 +1,5 @@
 #include <kan/container/hash_storage.h>
+#include <kan/context/all_system_names.h>
 #include <kan/context/reflection_system.h>
 #include <kan/context/universe_world_definition_system.h>
 #include <kan/context/update_system.h>
@@ -514,10 +515,12 @@ void universe_world_definition_system_connect (kan_context_system_t handle, kan_
     if (system->observe_definitions)
     {
         kan_context_system_t update_system = kan_context_query (system->context, KAN_CONTEXT_UPDATE_SYSTEM_NAME);
+        kan_context_system_t universe_system = kan_context_query (system->context, KAN_CONTEXT_UNIVERSE_SYSTEM_NAME);
+
         if (KAN_HANDLE_IS_VALID (update_system))
         {
             kan_update_system_connect_on_run (update_system, handle, universe_world_definition_system_update, 0u, NULL,
-                                              0u, NULL);
+                                              1u, &universe_system);
         }
     }
 }

@@ -4,6 +4,7 @@
 #include <kan/api_common/min_max.h>
 #include <kan/container/list.h>
 #include <kan/container/stack_group_allocator.h>
+#include <kan/context/all_system_names.h>
 #include <kan/context/render_backend_system.h>
 #include <kan/context/vulkan_memory_allocator.h>
 #include <kan/cpu_profiler/markup.h>

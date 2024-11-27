@@ -4,6 +4,7 @@
 
 #include <kan/api_common/alignment.h>
 #include <kan/container/hash_storage.h>
+#include <kan/context/all_system_names.h>
 #include <kan/context/plugin_system.h>
 #include <kan/context/reflection_system.h>
 #include <kan/context/virtual_file_system.h>

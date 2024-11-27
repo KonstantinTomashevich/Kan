@@ -1,6 +1,7 @@
 #include <stddef.h>
 #include <string.h>
 
+#include <kan/context/all_system_names.h>
 #include <kan/context/reflection_system.h>
 #include <kan/context/universe_system.h>
 #include <kan/context/update_system.h>
@@ -105,9 +106,12 @@ void universe_system_connect (kan_context_system_t handle, kan_context_t context
     }
 
     kan_context_system_t update_system = kan_context_query (context, KAN_CONTEXT_UPDATE_SYSTEM_NAME);
+    kan_context_system_t plugin_system = kan_context_query (context, KAN_CONTEXT_PLUGIN_SYSTEM_NAME);
+
     if (KAN_HANDLE_IS_VALID (update_system))
     {
-        kan_update_system_connect_on_run (update_system, handle, on_update_run, 0u, NULL, 0u, NULL);
+        kan_update_system_connect_on_run (update_system, handle, on_update_run, 1u,
+                                          &plugin_system, 0u, NULL);
     }
 }
 

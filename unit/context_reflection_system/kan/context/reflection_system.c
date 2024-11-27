@@ -2,6 +2,7 @@
 #include <string.h>
 
 #include <kan/container/stack_group_allocator.h>
+#include <kan/context/all_system_names.h>
 #include <kan/context/reflection_system.h>
 #include <kan/cpu_dispatch/job.h>
 #include <kan/error/critical.h>

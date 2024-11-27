@@ -29,9 +29,6 @@
 
 KAN_C_HEADER_BEGIN
 
-/// \brief System name for requirements and queries.
-#define KAN_CONTEXT_UNIVERSE_WORLD_DEFINITION_SYSTEM_NAME "universe_world_definition_system_t"
-
 /// \brief Describes configuration for universe world definition system.
 struct kan_universe_world_definition_system_config_t
 {

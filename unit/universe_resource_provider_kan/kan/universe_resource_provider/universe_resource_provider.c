@@ -5,6 +5,7 @@
 
 #include <kan/api_common/alignment.h>
 #include <kan/api_common/min_max.h>
+#include <kan/context/all_system_names.h>
 #include <kan/context/reflection_system.h>
 #include <kan/context/virtual_file_system.h>
 #include <kan/log/logging.h>

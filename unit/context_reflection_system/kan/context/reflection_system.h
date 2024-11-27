@@ -96,9 +96,6 @@
 
 KAN_C_HEADER_BEGIN
 
-/// \brief System name for requirements and queries.
-#define KAN_CONTEXT_REFLECTION_SYSTEM_NAME "reflection_system_t"
-
 /// \brief Name of the function that is used to register static reflection data.
 #define KAN_CONTEXT_REFLECTION_SYSTEM_REGISTRAR_FUNCTION kan_reflection_system_register_statics
 

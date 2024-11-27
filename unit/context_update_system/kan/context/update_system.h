@@ -11,8 +11,8 @@
 /// \par Definition
 /// \parblock
 /// Goal of the update system is to register all update callbacks and sort them in topological order using provided
-/// dependency handles. Every system that is provided as dependency must also be connected to update system during
-/// connection stage. However, systems provided through "dependency of" routine are allowed to be never registered.
+/// dependency handles. Systems provided through dependency routine are allowed to never be connected. In that case,
+/// these dependencies will be skipped.
 /// \endparblock
 ///
 /// \par Thread safety
@@ -22,12 +22,10 @@
 
 KAN_C_HEADER_BEGIN
 
-/// \brief System name for requirements and queries.
-#define KAN_CONTEXT_UPDATE_SYSTEM_NAME "update_system_t"
-
 typedef void (*kan_context_update_run_t) (kan_context_system_t system);
 
 /// \brief Connect other system as update delegate.
+/// \details System handles in dependencies and dependency of arrays are allowed to be invalid for code simplification.
 CONTEXT_UPDATE_SYSTEM_API void kan_update_system_connect_on_run (kan_context_system_t update_system,
                                                                  kan_context_system_t other_system,
                                                                  kan_context_update_run_t functor,
