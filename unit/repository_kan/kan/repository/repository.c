@@ -710,9 +710,9 @@ struct indexed_space_shape_cursor_t
     struct space_index_t *index;
     struct kan_space_tree_shape_iterator_t iterator;
     struct space_index_sub_node_t *current_sub_node;
+    struct return_uniqueness_watcher_t uniqueness_watcher;
     kan_repository_indexed_floating_t min[KAN_CONTAINER_SPACE_TREE_MAX_DIMENSIONS];
     kan_repository_indexed_floating_t max[KAN_CONTAINER_SPACE_TREE_MAX_DIMENSIONS];
-    struct return_uniqueness_watcher_t uniqueness_watcher;
 };
 
 _Static_assert (sizeof (struct indexed_space_shape_cursor_t) <=
@@ -745,10 +745,10 @@ struct indexed_space_ray_cursor_t
     struct space_index_t *index;
     struct kan_space_tree_ray_iterator_t iterator;
     struct space_index_sub_node_t *current_sub_node;
+    struct return_uniqueness_watcher_t uniqueness_watcher;
+    kan_repository_indexed_floating_t max_time;
     kan_repository_indexed_floating_t origin[KAN_CONTAINER_SPACE_TREE_MAX_DIMENSIONS];
     kan_repository_indexed_floating_t direction[KAN_CONTAINER_SPACE_TREE_MAX_DIMENSIONS];
-    kan_repository_indexed_floating_t max_time;
-    struct return_uniqueness_watcher_t uniqueness_watcher;
 };
 
 _Static_assert (sizeof (struct indexed_space_ray_cursor_t) <=
@@ -2668,15 +2668,13 @@ static void return_uniqueness_watcher_init (struct return_uniqueness_watcher_t *
     watcher->first_node = NULL;
 }
 
-static kan_bool_t return_uniqueness_watcher_register (struct return_uniqueness_watcher_t *watcher,
-                                                      struct indexed_storage_record_node_t *record,
-                                                      struct kan_atomic_int_t *temporary_allocator_lock,
-                                                      struct kan_stack_group_allocator_t *temporary_allocator)
+static kan_bool_t return_uniqueness_watcher_is_registered (struct return_uniqueness_watcher_t *watcher,
+                                                           struct indexed_storage_record_node_t *record)
 {
     if (watcher->unique_count > KAN_REPOSITORY_UNIQUENESS_WATCHER_SIMPLICITY_LIMIT)
     {
         const struct kan_hash_storage_bucket_t *bucket =
-            kan_hash_storage_query (&watcher->hash_storage, (kan_hash_t) record);
+            kan_hash_storage_query (&watcher->hash_storage, KAN_HASH_OBJECT_POINTER (record));
 
         struct return_uniqueness_watcher_hash_node_t *node =
             (struct return_uniqueness_watcher_hash_node_t *) bucket->first;
@@ -2687,7 +2685,7 @@ static kan_bool_t return_uniqueness_watcher_register (struct return_uniqueness_w
         {
             if (node->record == record)
             {
-                return KAN_FALSE;
+                return KAN_TRUE;
             }
 
             node = (struct return_uniqueness_watcher_hash_node_t *) node->node.list_node.next;
@@ -2700,13 +2698,21 @@ static kan_bool_t return_uniqueness_watcher_register (struct return_uniqueness_w
         {
             if (node->record == record)
             {
-                return KAN_FALSE;
+                return KAN_TRUE;
             }
 
             node = node->next;
         }
     }
 
+    return KAN_FALSE;
+}
+
+static void return_uniqueness_watcher_register_new (struct return_uniqueness_watcher_t *watcher,
+                                                    struct indexed_storage_record_node_t *record,
+                                                    struct kan_atomic_int_t *temporary_allocator_lock,
+                                                    struct kan_stack_group_allocator_t *temporary_allocator)
+{
     ++watcher->unique_count;
     if (watcher->unique_count == KAN_REPOSITORY_UNIQUENESS_WATCHER_SIMPLICITY_LIMIT + 1u)
     {
@@ -2721,7 +2727,7 @@ static kan_bool_t return_uniqueness_watcher_register (struct return_uniqueness_w
             struct return_uniqueness_watcher_hash_node_t *hash_node = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (
                 temporary_allocator, struct return_uniqueness_watcher_hash_node_t);
 
-            hash_node->node.hash = (kan_hash_t) list_node->record;
+            hash_node->node.hash = KAN_HASH_OBJECT_POINTER (list_node->record);
             hash_node->record = list_node->record;
 
             kan_hash_storage_add (&watcher->hash_storage, &hash_node->node);
@@ -2741,7 +2747,7 @@ static kan_bool_t return_uniqueness_watcher_register (struct return_uniqueness_w
             temporary_allocator, struct return_uniqueness_watcher_hash_node_t);
         kan_atomic_int_unlock (temporary_allocator_lock);
 
-        hash_node->node.hash = (kan_hash_t) record;
+        hash_node->node.hash = KAN_HASH_OBJECT_POINTER (record);
         hash_node->record = record;
         kan_hash_storage_add (&watcher->hash_storage, &hash_node->node);
     }
@@ -2756,8 +2762,6 @@ static kan_bool_t return_uniqueness_watcher_register (struct return_uniqueness_w
         list_node->record = record;
         watcher->first_node = list_node;
     }
-
-    return KAN_TRUE;
 }
 
 static void return_uniqueness_watcher_shutdown (struct return_uniqueness_watcher_t *watcher)
@@ -7672,35 +7676,43 @@ static inline void indexed_storage_space_shape_cursor_fix (struct indexed_space_
 {
     while (cursor->current_sub_node)
     {
-#if defined(KAN_REPOSITORY_SAFEGUARDS_ENABLED)
-        if (!safeguard_indexed_read_access_try_create (cursor->index->storage, cursor->current_sub_node->record))
+        if (!return_uniqueness_watcher_is_registered (&cursor->uniqueness_watcher, cursor->current_sub_node->record))
         {
-            cursor->current_sub_node = NULL;
-            break;
-        }
-#endif
-
-        kan_repository_indexed_floating_t record_min[KAN_CONTAINER_SPACE_TREE_MAX_DIMENSIONS];
-        indexed_field_baked_data_extract_and_convert_floating_array_from_record (
-            &cursor->index->baked_min, cursor->index->baked_archetype, cursor->index->baked_dimension_count,
-            cursor->current_sub_node->record->record, record_min);
-
-        kan_repository_indexed_floating_t record_max[KAN_CONTAINER_SPACE_TREE_MAX_DIMENSIONS];
-        indexed_field_baked_data_extract_and_convert_floating_array_from_record (
-            &cursor->index->baked_max, cursor->index->baked_archetype, cursor->index->baked_dimension_count,
-            cursor->current_sub_node->record->record, record_max);
-
-#if defined(KAN_REPOSITORY_SAFEGUARDS_ENABLED)
-        safeguard_indexed_read_access_destroyed (cursor->current_sub_node->record);
-#endif
-
-        if (kan_check_if_bounds_intersect (cursor->index->baked_dimension_count, cursor->min, cursor->max, record_min,
-                                           record_max))
-        {
-            if (return_uniqueness_watcher_register (
-                    &cursor->uniqueness_watcher, cursor->current_sub_node->record->record,
-                    &cursor->index->storage->maintenance_lock, &cursor->index->storage->temporary_allocator))
+            kan_bool_t inside = cursor->iterator.is_inner_node;
+            if (!inside)
             {
+#if defined(KAN_REPOSITORY_SAFEGUARDS_ENABLED)
+                if (!safeguard_indexed_read_access_try_create (cursor->index->storage,
+                                                               cursor->current_sub_node->record))
+                {
+                    cursor->current_sub_node = NULL;
+                    break;
+                }
+#endif
+
+                kan_repository_indexed_floating_t record_min[KAN_CONTAINER_SPACE_TREE_MAX_DIMENSIONS];
+                indexed_field_baked_data_extract_and_convert_floating_array_from_record (
+                    &cursor->index->baked_min, cursor->index->baked_archetype, cursor->index->baked_dimension_count,
+                    cursor->current_sub_node->record->record, record_min);
+
+                kan_repository_indexed_floating_t record_max[KAN_CONTAINER_SPACE_TREE_MAX_DIMENSIONS];
+                indexed_field_baked_data_extract_and_convert_floating_array_from_record (
+                    &cursor->index->baked_max, cursor->index->baked_archetype, cursor->index->baked_dimension_count,
+                    cursor->current_sub_node->record->record, record_max);
+
+                inside = kan_check_if_bounds_intersect (cursor->index->baked_dimension_count, cursor->min, cursor->max,
+                                                        record_min, record_max);
+
+#if defined(KAN_REPOSITORY_SAFEGUARDS_ENABLED)
+                safeguard_indexed_read_access_destroyed (cursor->current_sub_node->record);
+#endif
+            }
+
+            if (inside)
+            {
+                return_uniqueness_watcher_register_new (&cursor->uniqueness_watcher, cursor->current_sub_node->record,
+                                                        &cursor->index->storage->maintenance_lock,
+                                                        &cursor->index->storage->temporary_allocator);
                 break;
             }
         }
@@ -7721,29 +7733,30 @@ static inline void indexed_storage_space_ray_cursor_fix (struct indexed_space_ra
         }
 #endif
 
-        kan_repository_indexed_floating_t record_min[KAN_CONTAINER_SPACE_TREE_MAX_DIMENSIONS];
-        indexed_field_baked_data_extract_and_convert_floating_array_from_record (
-            &cursor->index->baked_min, cursor->index->baked_archetype, cursor->index->baked_dimension_count,
-            cursor->current_sub_node->record->record, record_min);
+        if (!return_uniqueness_watcher_is_registered (&cursor->uniqueness_watcher, cursor->current_sub_node->record))
+        {
+            kan_repository_indexed_floating_t record_min[KAN_CONTAINER_SPACE_TREE_MAX_DIMENSIONS];
+            indexed_field_baked_data_extract_and_convert_floating_array_from_record (
+                &cursor->index->baked_min, cursor->index->baked_archetype, cursor->index->baked_dimension_count,
+                cursor->current_sub_node->record->record, record_min);
 
-        kan_repository_indexed_floating_t record_max[KAN_CONTAINER_SPACE_TREE_MAX_DIMENSIONS];
-        indexed_field_baked_data_extract_and_convert_floating_array_from_record (
-            &cursor->index->baked_max, cursor->index->baked_archetype, cursor->index->baked_dimension_count,
-            cursor->current_sub_node->record->record, record_max);
+            kan_repository_indexed_floating_t record_max[KAN_CONTAINER_SPACE_TREE_MAX_DIMENSIONS];
+            indexed_field_baked_data_extract_and_convert_floating_array_from_record (
+                &cursor->index->baked_max, cursor->index->baked_archetype, cursor->index->baked_dimension_count,
+                cursor->current_sub_node->record->record, record_max);
 
 #if defined(KAN_REPOSITORY_SAFEGUARDS_ENABLED)
-        safeguard_indexed_read_access_destroyed (cursor->current_sub_node->record);
+            safeguard_indexed_read_access_destroyed (cursor->current_sub_node->record);
 #endif
 
-        struct kan_ray_intersection_output_t output = kan_check_if_ray_and_bounds_intersect (
-            cursor->index->baked_dimension_count, record_min, record_max, cursor->origin, cursor->direction);
+            struct kan_ray_intersection_output_t output = kan_check_if_ray_and_bounds_intersect (
+                cursor->index->baked_dimension_count, record_min, record_max, cursor->origin, cursor->direction);
 
-        if (output.hit && output.time <= cursor->max_time)
-        {
-            if (return_uniqueness_watcher_register (
-                    &cursor->uniqueness_watcher, cursor->current_sub_node->record->record,
-                    &cursor->index->storage->maintenance_lock, &cursor->index->storage->temporary_allocator))
+            if (output.hit && output.time <= cursor->max_time)
             {
+                return_uniqueness_watcher_register_new (&cursor->uniqueness_watcher, cursor->current_sub_node->record,
+                                                        &cursor->index->storage->maintenance_lock,
+                                                        &cursor->index->storage->temporary_allocator);
                 break;
             }
         }

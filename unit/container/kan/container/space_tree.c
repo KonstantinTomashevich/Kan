@@ -235,6 +235,36 @@ static inline kan_bool_t shape_iterator_try_step_on_height (struct kan_space_tre
     return KAN_FALSE;
 }
 
+static inline void shape_iterator_update_is_inner_node (struct kan_space_tree_t *tree,
+                                                        struct kan_space_tree_shape_iterator_t *iterator)
+{
+    iterator->is_inner_node = KAN_TRUE;
+    if (iterator->current_node)
+    {
+        kan_space_tree_road_t mask = height_mask_to_root_to_height_mask (node_height_mask (iterator->current_node)) |
+                                     node_height_mask (iterator->current_node);
+        switch (tree->dimension_count)
+        {
+        case 4u:
+            iterator->is_inner_node &=
+                (iterator->min_path.roads[3u] & mask) < (iterator->current_path.roads[3u] & mask) &&
+                (iterator->current_path.roads[3u] & mask) < (iterator->max_path.roads[3u] & mask);
+        case 3u:
+            iterator->is_inner_node &=
+                (iterator->min_path.roads[2u] & mask) < (iterator->current_path.roads[2u] & mask) &&
+                (iterator->current_path.roads[2u] & mask) < (iterator->max_path.roads[2u] & mask);
+        case 2u:
+            iterator->is_inner_node &=
+                (iterator->min_path.roads[1u] & mask) < (iterator->current_path.roads[1u] & mask) &&
+                (iterator->current_path.roads[1u] & mask) < (iterator->max_path.roads[1u] & mask);
+        case 1u:
+            iterator->is_inner_node &=
+                (iterator->min_path.roads[0u] & mask) < (iterator->current_path.roads[0u] & mask) &&
+                (iterator->current_path.roads[0u] & mask) < (iterator->max_path.roads[0u] & mask);
+        }
+    }
+}
+
 static void shape_iterator_next (struct kan_space_tree_t *tree, struct kan_space_tree_shape_iterator_t *iterator)
 {
     struct kan_space_tree_node_t *parent_node = NULL;
@@ -262,6 +292,7 @@ static void shape_iterator_next (struct kan_space_tree_t *tree, struct kan_space
                 KAN_ASSERT (iterator->current_node->height == 0u)
                 KAN_ASSERT (iterator->current_node == tree->root)
                 iterator->current_node = NULL;
+                shape_iterator_update_is_inner_node (tree, iterator);
                 return;
             }
         }
@@ -284,6 +315,7 @@ static void shape_iterator_next (struct kan_space_tree_t *tree, struct kan_space
             {
                 // Nothing more to visit in hierarchy, therefore we can visit parent.
                 iterator->current_node = parent_node;
+                shape_iterator_update_is_inner_node (tree, iterator);
                 return;
             }
         }
@@ -297,6 +329,7 @@ static void shape_iterator_next (struct kan_space_tree_t *tree, struct kan_space
             {
                 // Last level -- no children possible.
                 iterator->current_node = child_node;
+                shape_iterator_update_is_inner_node (tree, iterator);
                 return;
             }
 

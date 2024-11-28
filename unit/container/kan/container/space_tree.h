@@ -222,6 +222,9 @@ struct kan_space_tree_shape_iterator_t
 
     /// \brief Current node from which user can take sub nodes for further querying.
     struct kan_space_tree_node_t *current_node;
+
+    /// \brief True when current node is fully inside query bounds and therefore bounds checks can be skipped.
+    kan_bool_t is_inner_node;
 };
 
 /// \brief Structure of iterator used for insertion of axis aligned bounding shapes.

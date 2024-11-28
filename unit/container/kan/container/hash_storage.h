@@ -113,6 +113,7 @@ struct kan_hash_storage_t
     kan_instance_size_t empty_buckets;
     struct kan_hash_storage_bucket_t *buckets;
     struct kan_bd_list_t items;
+    kan_memory_offset_t balance_since_last_resize;
 };
 
 /// \brief Initializes given hash storage with given count of buckets and given allocation group for buckets.
@@ -139,6 +140,11 @@ CONTAINER_API void kan_hash_storage_set_bucket_count (struct kan_hash_storage_t 
 ///          before shutting down hash storage.
 CONTAINER_API void kan_hash_storage_shutdown (struct kan_hash_storage_t *storage);
 
+/// \brief To make object pointer hashes more reliable, we need to divide them by their size to avoid alignment-related
+///        grouping of nodes in buckets.
+// TODO: Use it on other places.
+#define KAN_HASH_OBJECT_POINTER(POINTER) ((kan_hash_t) ((kan_memory_size_t) (POINTER)) / sizeof ((POINTER)[0u]))
+
 /// \brief Implements default strategy for update hash storage bucket count to appropriate values.
 static inline void kan_hash_storage_update_bucket_count_default (struct kan_hash_storage_t *storage,
                                                                  kan_instance_size_t min_bucket_count_to_preserve)
@@ -154,13 +160,17 @@ static inline void kan_hash_storage_update_bucket_count_default (struct kan_hash
         storage->empty_buckets * KAN_CONTAINER_HASH_STORAGE_DEFAULT_EBM >= storage->bucket_count &&
         storage->bucket_count > min_bucket_count_to_preserve;
 
+    const kan_bool_t reducing_item_count =
+        storage->balance_since_last_resize <=
+        -(kan_memory_offset_t) storage->bucket_count / KAN_CONTAINER_HASH_STORAGE_DEFAULT_EBM;
+
     if (can_grow && has_many_items)
     {
         kan_hash_storage_set_bucket_count (
             storage, storage->bucket_count * KAN_MAX (2u, storage->items.size / storage->bucket_count *
                                                               KAN_CONTAINER_HASH_STORAGE_DEFAULT_LOAD_FACTOR));
     }
-    else if (can_shrink)
+    else if (can_shrink && reducing_item_count)
     {
         kan_hash_storage_set_bucket_count (
             storage, KAN_MAX (min_bucket_count_to_preserve, storage->bucket_count - storage->empty_buckets));

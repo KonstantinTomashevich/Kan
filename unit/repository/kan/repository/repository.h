@@ -451,12 +451,12 @@ struct kan_repository_indexed_space_read_query_t
 
 struct kan_repository_indexed_space_shape_read_cursor_t
 {
-    kan_repository_indexed_floating_t implementation_data_64[23u];
+    kan_repository_indexed_floating_t implementation_data_64[24u];
 };
 
 struct kan_repository_indexed_space_ray_read_cursor_t
 {
-    kan_repository_indexed_floating_t implementation_data_64[33u];
+    kan_repository_indexed_floating_t implementation_data_64[34u];
 };
 
 struct kan_repository_indexed_space_read_access_t
@@ -471,12 +471,12 @@ struct kan_repository_indexed_space_update_query_t
 
 struct kan_repository_indexed_space_shape_update_cursor_t
 {
-    kan_repository_indexed_floating_t implementation_data_64[23u];
+    kan_repository_indexed_floating_t implementation_data_64[24u];
 };
 
 struct kan_repository_indexed_space_ray_update_cursor_t
 {
-    kan_repository_indexed_floating_t implementation_data_64[33u];
+    kan_repository_indexed_floating_t implementation_data_64[34u];
 };
 
 struct kan_repository_indexed_space_update_access_t
@@ -491,12 +491,12 @@ struct kan_repository_indexed_space_delete_query_t
 
 struct kan_repository_indexed_space_shape_delete_cursor_t
 {
-    kan_repository_indexed_floating_t implementation_data_64[23u];
+    kan_repository_indexed_floating_t implementation_data_64[24u];
 };
 
 struct kan_repository_indexed_space_ray_delete_cursor_t
 {
-    kan_repository_indexed_floating_t implementation_data_64[33u];
+    kan_repository_indexed_floating_t implementation_data_64[34u];
 };
 
 struct kan_repository_indexed_space_delete_access_t
@@ -511,12 +511,12 @@ struct kan_repository_indexed_space_write_query_t
 
 struct kan_repository_indexed_space_shape_write_cursor_t
 {
-    kan_repository_indexed_floating_t implementation_data_64[23u];
+    kan_repository_indexed_floating_t implementation_data_64[24u];
 };
 
 struct kan_repository_indexed_space_ray_write_cursor_t
 {
-    kan_repository_indexed_floating_t implementation_data_64[33u];
+    kan_repository_indexed_floating_t implementation_data_64[34u];
 };
 
 struct kan_repository_indexed_space_write_access_t
