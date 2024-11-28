@@ -327,7 +327,7 @@ static void add_array_bootstrap_common_internals (enum kan_c_archetype_t archety
 static kan_bool_t is_functor_registered (kan_interned_string_t functor_name)
 {
     const struct kan_hash_storage_bucket_t *bucket =
-        kan_hash_storage_query (&functor_registry, (kan_hash_t) functor_name);
+        kan_hash_storage_query (&functor_registry, KAN_HASH_OBJECT_POINTER (functor_name));
     struct functor_registry_node_t *node = (struct functor_registry_node_t *) bucket->first;
     const struct functor_registry_node_t *node_end =
         (struct functor_registry_node_t *) (bucket->last ? bucket->last->next : NULL);
@@ -355,7 +355,7 @@ static void register_functor (kan_interned_string_t functor_name)
     struct functor_registry_node_t *node =
         kan_allocate_batched (KAN_ALLOCATION_GROUP_IGNORE, sizeof (struct functor_registry_node_t));
 
-    node->node.hash = (kan_hash_t) functor_name;
+    node->node.hash = KAN_HASH_OBJECT_POINTER (functor_name);
     node->name = functor_name;
 
     kan_hash_storage_update_bucket_count_default (&functor_registry, KAN_REFLECTION_GENERATOR_FUNCTORS_INITIAL_BUCKETS);

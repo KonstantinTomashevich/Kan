@@ -500,7 +500,7 @@ kan_bool_t kan_reflection_registry_add_enum (kan_reflection_registry_t registry,
     struct registry_t *registry_struct = KAN_HANDLE_GET (registry);
     struct enum_node_t *node =
         (struct enum_node_t *) kan_allocate_batched (registry_struct->allocation_group, sizeof (struct enum_node_t));
-    node->node.hash = (kan_hash_t) enum_reflection->name;
+    node->node.hash = KAN_HASH_OBJECT_POINTER (enum_reflection->name);
     node->enum_reflection = enum_reflection;
 
     kan_hash_storage_update_bucket_count_default (&registry_struct->enum_storage, KAN_REFLECTION_ENUM_INITIAL_BUCKETS);
@@ -517,7 +517,7 @@ void kan_reflection_registry_add_enum_meta (kan_reflection_registry_t registry,
     struct enum_meta_node_t *node = (struct enum_meta_node_t *) kan_allocate_batched (registry_struct->allocation_group,
                                                                                       sizeof (struct enum_meta_node_t));
 
-    node->node.hash = kan_hash_combine ((kan_hash_t) enum_name, (kan_hash_t) meta_type_name);
+    node->node.hash = kan_hash_combine (KAN_HASH_OBJECT_POINTER (enum_name), KAN_HASH_OBJECT_POINTER (meta_type_name));
     node->enum_name = enum_name;
     node->meta_type_name = meta_type_name;
     node->meta = meta;
@@ -537,8 +537,9 @@ void kan_reflection_registry_add_enum_value_meta (kan_reflection_registry_t regi
     struct enum_value_meta_node_t *node = (struct enum_value_meta_node_t *) kan_allocate_batched (
         registry_struct->allocation_group, sizeof (struct enum_value_meta_node_t));
 
-    node->node.hash = kan_hash_combine (kan_hash_combine ((kan_hash_t) enum_name, (kan_hash_t) enum_value_name),
-                                        (kan_hash_t) meta_type_name);
+    node->node.hash = kan_hash_combine (
+        kan_hash_combine (KAN_HASH_OBJECT_POINTER (enum_name), KAN_HASH_OBJECT_POINTER (enum_value_name)),
+        KAN_HASH_OBJECT_POINTER (meta_type_name));
     node->enum_name = enum_name;
     node->enum_value_name = enum_value_name;
     node->meta_type_name = meta_type_name;
@@ -629,7 +630,7 @@ kan_bool_t kan_reflection_registry_add_struct (kan_reflection_registry_t registr
     struct registry_t *registry_struct = KAN_HANDLE_GET (registry);
     struct struct_node_t *node = (struct struct_node_t *) kan_allocate_batched (registry_struct->allocation_group,
                                                                                 sizeof (struct struct_node_t));
-    node->node.hash = (kan_hash_t) struct_reflection->name;
+    node->node.hash = KAN_HASH_OBJECT_POINTER (struct_reflection->name);
     node->struct_reflection = struct_reflection;
 
     kan_hash_storage_update_bucket_count_default (&registry_struct->struct_storage,
@@ -647,7 +648,8 @@ void kan_reflection_registry_add_struct_meta (kan_reflection_registry_t registry
     struct struct_meta_node_t *node = (struct struct_meta_node_t *) kan_allocate_batched (
         registry_struct->allocation_group, sizeof (struct struct_meta_node_t));
 
-    node->node.hash = kan_hash_combine ((kan_hash_t) struct_name, (kan_hash_t) meta_type_name);
+    node->node.hash =
+        kan_hash_combine (KAN_HASH_OBJECT_POINTER (struct_name), KAN_HASH_OBJECT_POINTER (meta_type_name));
     node->struct_name = struct_name;
     node->meta_type_name = meta_type_name;
     node->meta = meta;
@@ -667,8 +669,9 @@ void kan_reflection_registry_add_struct_field_meta (kan_reflection_registry_t re
     struct struct_field_meta_node_t *node = (struct struct_field_meta_node_t *) kan_allocate_batched (
         registry_struct->allocation_group, sizeof (struct struct_field_meta_node_t));
 
-    node->node.hash = kan_hash_combine (kan_hash_combine ((kan_hash_t) struct_name, (kan_hash_t) struct_field_name),
-                                        (kan_hash_t) meta_type_name);
+    node->node.hash = kan_hash_combine (
+        kan_hash_combine (KAN_HASH_OBJECT_POINTER (struct_name), KAN_HASH_OBJECT_POINTER (struct_field_name)),
+        KAN_HASH_OBJECT_POINTER (meta_type_name));
     node->struct_name = struct_name;
     node->struct_field_name = struct_field_name;
     node->meta_type_name = meta_type_name;
@@ -753,7 +756,7 @@ kan_bool_t kan_reflection_registry_add_function (kan_reflection_registry_t regis
     struct registry_t *registry_struct = KAN_HANDLE_GET (registry);
     struct function_node_t *node = (struct function_node_t *) kan_allocate_batched (registry_struct->allocation_group,
                                                                                     sizeof (struct function_node_t));
-    node->node.hash = (kan_hash_t) function_reflection->name;
+    node->node.hash = KAN_HASH_OBJECT_POINTER (function_reflection->name);
     node->function_reflection = function_reflection;
 
     kan_hash_storage_update_bucket_count_default (&registry_struct->function_storage,
@@ -771,7 +774,8 @@ void kan_reflection_registry_add_function_meta (kan_reflection_registry_t regist
     struct function_meta_node_t *node = (struct function_meta_node_t *) kan_allocate_batched (
         registry_struct->allocation_group, sizeof (struct function_meta_node_t));
 
-    node->node.hash = kan_hash_combine ((kan_hash_t) function_name, (kan_hash_t) meta_type_name);
+    node->node.hash =
+        kan_hash_combine (KAN_HASH_OBJECT_POINTER (function_name), KAN_HASH_OBJECT_POINTER (meta_type_name));
     node->function_name = function_name;
     node->meta_type_name = meta_type_name;
     node->meta = meta;
@@ -791,9 +795,9 @@ void kan_reflection_registry_add_function_argument_meta (kan_reflection_registry
     struct function_argument_meta_node_t *node = (struct function_argument_meta_node_t *) kan_allocate_batched (
         registry_struct->allocation_group, sizeof (struct function_argument_meta_node_t));
 
-    node->node.hash =
-        kan_hash_combine (kan_hash_combine ((kan_hash_t) function_name, (kan_hash_t) function_argument_name),
-                          (kan_hash_t) meta_type_name);
+    node->node.hash = kan_hash_combine (
+        kan_hash_combine (KAN_HASH_OBJECT_POINTER (function_name), KAN_HASH_OBJECT_POINTER (function_argument_name)),
+        KAN_HASH_OBJECT_POINTER (meta_type_name));
     node->function_name = function_name;
     node->function_argument_name = function_argument_name;
     node->meta_type_name = meta_type_name;
@@ -809,7 +813,7 @@ const struct kan_reflection_enum_t *kan_reflection_registry_query_enum (kan_refl
 {
     struct registry_t *registry_struct = KAN_HANDLE_GET (registry);
     const struct kan_hash_storage_bucket_t *bucket =
-        kan_hash_storage_query (&registry_struct->enum_storage, (kan_hash_t) enum_name);
+        kan_hash_storage_query (&registry_struct->enum_storage, KAN_HASH_OBJECT_POINTER (enum_name));
     struct enum_node_t *node = (struct enum_node_t *) bucket->first;
     const struct enum_node_t *end = (struct enum_node_t *) (bucket->last ? bucket->last->next : NULL);
 
@@ -830,7 +834,8 @@ struct kan_reflection_enum_meta_iterator_t kan_reflection_registry_query_enum_me
     kan_reflection_registry_t registry, kan_interned_string_t enum_name, kan_interned_string_t meta_type_name)
 {
     struct registry_t *registry_struct = KAN_HANDLE_GET (registry);
-    const kan_hash_t hash = kan_hash_combine ((kan_hash_t) enum_name, (kan_hash_t) meta_type_name);
+    const kan_hash_t hash =
+        kan_hash_combine (KAN_HASH_OBJECT_POINTER (enum_name), KAN_HASH_OBJECT_POINTER (meta_type_name));
     const struct kan_hash_storage_bucket_t *bucket = kan_hash_storage_query (&registry_struct->enum_meta_storage, hash);
 
     struct enum_meta_iterator_t iterator = {
@@ -881,8 +886,9 @@ struct kan_reflection_enum_value_meta_iterator_t kan_reflection_registry_query_e
     kan_interned_string_t meta_type_name)
 {
     struct registry_t *registry_struct = KAN_HANDLE_GET (registry);
-    const kan_hash_t hash = kan_hash_combine (kan_hash_combine ((kan_hash_t) enum_name, (kan_hash_t) enum_value_name),
-                                              (kan_hash_t) meta_type_name);
+    const kan_hash_t hash = kan_hash_combine (
+        kan_hash_combine (KAN_HASH_OBJECT_POINTER (enum_name), KAN_HASH_OBJECT_POINTER (enum_value_name)),
+        KAN_HASH_OBJECT_POINTER (meta_type_name));
     const struct kan_hash_storage_bucket_t *bucket =
         kan_hash_storage_query (&registry_struct->enum_value_meta_storage, hash);
 
@@ -936,7 +942,7 @@ const struct kan_reflection_struct_t *kan_reflection_registry_query_struct (kan_
 {
     struct registry_t *registry_struct = KAN_HANDLE_GET (registry);
     const struct kan_hash_storage_bucket_t *bucket =
-        kan_hash_storage_query (&registry_struct->struct_storage, (kan_hash_t) struct_name);
+        kan_hash_storage_query (&registry_struct->struct_storage, KAN_HASH_OBJECT_POINTER (struct_name));
     struct struct_node_t *node = (struct struct_node_t *) bucket->first;
     const struct struct_node_t *end = (struct struct_node_t *) (bucket->last ? bucket->last->next : NULL);
 
@@ -957,7 +963,8 @@ struct kan_reflection_struct_meta_iterator_t kan_reflection_registry_query_struc
     kan_reflection_registry_t registry, kan_interned_string_t struct_name, kan_interned_string_t meta_type_name)
 {
     struct registry_t *registry_struct = KAN_HANDLE_GET (registry);
-    const kan_hash_t hash = kan_hash_combine ((kan_hash_t) struct_name, (kan_hash_t) meta_type_name);
+    const kan_hash_t hash =
+        kan_hash_combine (KAN_HASH_OBJECT_POINTER (struct_name), KAN_HASH_OBJECT_POINTER (meta_type_name));
     const struct kan_hash_storage_bucket_t *bucket =
         kan_hash_storage_query (&registry_struct->struct_meta_storage, hash);
 
@@ -1010,7 +1017,8 @@ struct kan_reflection_struct_field_meta_iterator_t kan_reflection_registry_query
 {
     struct registry_t *registry_struct = KAN_HANDLE_GET (registry);
     const kan_hash_t hash = kan_hash_combine (
-        kan_hash_combine ((kan_hash_t) struct_name, (kan_hash_t) struct_field_name), (kan_hash_t) meta_type_name);
+        kan_hash_combine (KAN_HASH_OBJECT_POINTER (struct_name), KAN_HASH_OBJECT_POINTER (struct_field_name)),
+        KAN_HASH_OBJECT_POINTER (meta_type_name));
     const struct kan_hash_storage_bucket_t *bucket =
         kan_hash_storage_query (&registry_struct->struct_field_meta_storage, hash);
 
@@ -1065,7 +1073,7 @@ const struct kan_reflection_function_t *kan_reflection_registry_query_function (
 {
     struct registry_t *registry_struct = KAN_HANDLE_GET (registry);
     const struct kan_hash_storage_bucket_t *bucket =
-        kan_hash_storage_query (&registry_struct->function_storage, (kan_hash_t) function_name);
+        kan_hash_storage_query (&registry_struct->function_storage, KAN_HASH_OBJECT_POINTER (function_name));
     struct function_node_t *node = (struct function_node_t *) bucket->first;
     const struct function_node_t *end = (struct function_node_t *) (bucket->last ? bucket->last->next : NULL);
 
@@ -1086,7 +1094,8 @@ struct kan_reflection_function_meta_iterator_t kan_reflection_registry_query_fun
     kan_reflection_registry_t registry, kan_interned_string_t function_name, kan_interned_string_t meta_type_name)
 {
     struct registry_t *registry_struct = KAN_HANDLE_GET (registry);
-    const kan_hash_t hash = kan_hash_combine ((kan_hash_t) function_name, (kan_hash_t) meta_type_name);
+    const kan_hash_t hash =
+        kan_hash_combine (KAN_HASH_OBJECT_POINTER (function_name), KAN_HASH_OBJECT_POINTER (meta_type_name));
     const struct kan_hash_storage_bucket_t *bucket =
         kan_hash_storage_query (&registry_struct->function_meta_storage, hash);
 
@@ -1139,9 +1148,9 @@ struct kan_reflection_function_argument_meta_iterator_t kan_reflection_registry_
     kan_interned_string_t meta_type_name)
 {
     struct registry_t *registry_struct = KAN_HANDLE_GET (registry);
-    const kan_hash_t hash =
-        kan_hash_combine (kan_hash_combine ((kan_hash_t) function_name, (kan_hash_t) function_argument_name),
-                          (kan_hash_t) meta_type_name);
+    const kan_hash_t hash = kan_hash_combine (
+        kan_hash_combine (KAN_HASH_OBJECT_POINTER (function_name), KAN_HASH_OBJECT_POINTER (function_argument_name)),
+        KAN_HASH_OBJECT_POINTER (meta_type_name));
     const struct kan_hash_storage_bucket_t *bucket =
         kan_hash_storage_query (&registry_struct->function_argument_meta_storage, hash);
 
@@ -2579,7 +2588,7 @@ static void migration_seed_add_enums (struct migration_seed_t *migration_seed,
         struct enum_migration_node_t *node =
             kan_allocate_general (allocation_group, node_size, _Alignof (struct enum_migration_node_t));
 
-        node->node.hash = (kan_hash_t) source_enum_data->name;
+        node->node.hash = KAN_HASH_OBJECT_POINTER (source_enum_data->name);
         node->type_name = source_enum_data->name;
 
         const struct kan_reflection_enum_t *target_enum_data =
@@ -2641,7 +2650,7 @@ static struct enum_migration_node_t *migration_seed_query_enum (struct migration
                                                                 kan_interned_string_t type_name)
 {
     const struct kan_hash_storage_bucket_t *bucket =
-        kan_hash_storage_query (&migration_seed->enums, (kan_hash_t) type_name);
+        kan_hash_storage_query (&migration_seed->enums, KAN_HASH_OBJECT_POINTER (type_name));
 
     struct enum_migration_node_t *node = (struct enum_migration_node_t *) bucket->first;
     const struct enum_migration_node_t *end =
@@ -2664,7 +2673,7 @@ static struct struct_migration_node_t *migration_seed_query_struct (struct migra
                                                                     kan_interned_string_t type_name)
 {
     const struct kan_hash_storage_bucket_t *bucket =
-        kan_hash_storage_query (&migration_seed->structs, (kan_hash_t) type_name);
+        kan_hash_storage_query (&migration_seed->structs, KAN_HASH_OBJECT_POINTER (type_name));
 
     struct struct_migration_node_t *node = (struct struct_migration_node_t *) bucket->first;
     const struct struct_migration_node_t *end =
@@ -2772,7 +2781,7 @@ static struct struct_migration_node_t *migration_seed_add_struct (
     struct struct_migration_node_t *node =
         kan_allocate_general (allocation_group, node_size, _Alignof (struct struct_migration_node_t));
 
-    node->node.hash = (kan_hash_t) source_struct_data->name;
+    node->node.hash = KAN_HASH_OBJECT_POINTER (source_struct_data->name);
     node->type_name = source_struct_data->name;
     const struct kan_reflection_struct_t *target_struct_data =
         kan_reflection_registry_query_struct (target_registry, source_struct_data->name);
@@ -3107,7 +3116,7 @@ static struct struct_migrator_node_t *migrator_query_struct (struct migrator_t *
                                                              kan_interned_string_t type_name)
 {
     const struct kan_hash_storage_bucket_t *bucket =
-        kan_hash_storage_query (&migrator->struct_migrators, (kan_hash_t) type_name);
+        kan_hash_storage_query (&migrator->struct_migrators, KAN_HASH_OBJECT_POINTER (type_name));
 
     struct struct_migrator_node_t *node = (struct struct_migrator_node_t *) bucket->first;
     const struct struct_migrator_node_t *end =
@@ -3775,7 +3784,7 @@ static struct struct_migrator_node_t *migrator_add_struct (struct migrator_t *mi
 
     struct struct_migrator_node_t *struct_migrator =
         kan_allocate_batched (get_migrator_allocation_group (), sizeof (struct struct_migrator_node_t));
-    struct_migrator->node.hash = (kan_hash_t) source_struct->name;
+    struct_migrator->node.hash = KAN_HASH_OBJECT_POINTER (source_struct->name);
     struct_migrator->type_name = source_struct->name;
 
     _Static_assert (_Alignof (struct migrator_condition_t) == _Alignof (struct migrator_command_copy_t),

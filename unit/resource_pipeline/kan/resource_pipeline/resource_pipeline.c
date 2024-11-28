@@ -60,7 +60,7 @@ static inline struct kan_resource_reference_type_info_node_t *kan_resource_type_
     struct kan_resource_reference_type_info_storage_t *storage, kan_interned_string_t type_name)
 {
     const struct kan_hash_storage_bucket_t *bucket =
-        kan_hash_storage_query (&storage->scanned_types, (kan_hash_t) type_name);
+        kan_hash_storage_query (&storage->scanned_types, KAN_HASH_OBJECT_POINTER (type_name));
     struct kan_resource_reference_type_info_node_t *node =
         (struct kan_resource_reference_type_info_node_t *) bucket->first;
     const struct kan_resource_reference_type_info_node_t *node_end =
@@ -159,7 +159,7 @@ static struct kan_resource_reference_type_info_node_t *kan_resource_type_info_st
 
     type_node = kan_allocate_batched (storage->scanned_allocation_group,
                                       sizeof (struct kan_resource_reference_type_info_node_t));
-    type_node->node.hash = (kan_hash_t) struct_data->name;
+    type_node->node.hash = KAN_HASH_OBJECT_POINTER (struct_data->name);
     type_node->type_name = struct_data->name;
 
     kan_dynamic_array_init (&type_node->fields_to_check, KAN_RESOURCE_PIPELINE_SCAN_ARRAY_INITIAL_SIZE,

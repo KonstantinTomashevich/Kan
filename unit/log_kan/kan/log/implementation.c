@@ -41,7 +41,7 @@ kan_log_category_t kan_log_category_get (const char *name)
     }
 
     const struct kan_hash_storage_bucket_t *bucket =
-        kan_hash_storage_query (&category_storage, (kan_hash_t) interned_name);
+        kan_hash_storage_query (&category_storage, KAN_HASH_OBJECT_POINTER (interned_name));
     struct category_node_t *node = (struct category_node_t *) bucket->first;
     const struct category_node_t *end = (struct category_node_t *) (bucket->last ? bucket->last->next : NULL);
 
@@ -59,7 +59,7 @@ kan_log_category_t kan_log_category_get (const char *name)
 
     // Category not found: we will create it with default settings.
     node = (struct category_node_t *) kan_allocate_batched (category_storage_group, sizeof (struct category_node_t));
-    node->node.hash = (kan_hash_t) interned_name;
+    node->node.hash = KAN_HASH_OBJECT_POINTER (interned_name);
     node->name = interned_name;
     node->verbosity = KAN_LOG_DEFAULT;
 

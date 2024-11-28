@@ -294,7 +294,7 @@ static struct script_node_t *script_storage_get_script_internal (struct script_s
                                                                  kan_interned_string_t type_name)
 {
     const struct kan_hash_storage_bucket_t *bucket =
-        kan_hash_storage_query (&storage->script_storage, (kan_hash_t) type_name);
+        kan_hash_storage_query (&storage->script_storage, KAN_HASH_OBJECT_POINTER (type_name));
     struct script_node_t *node = (struct script_node_t *) bucket->first;
     const struct script_node_t *node_end = (struct script_node_t *) (bucket->last ? bucket->last->next : NULL);
 
@@ -321,7 +321,7 @@ static struct script_node_t *script_storage_get_or_create_script (struct script_
     {
         ensure_statics_initialized ();
         node = (struct script_node_t *) kan_allocate_batched (script_allocation_group, sizeof (struct script_node_t));
-        node->node.hash = (kan_hash_t) type_name;
+        node->node.hash = KAN_HASH_OBJECT_POINTER (type_name);
         node->type_name = type_name;
         node->script_generation_lock = kan_atomic_int_init (0);
         node->script = NULL;
@@ -946,7 +946,7 @@ static struct interned_string_lookup_node_t *script_storage_get_interned_string_
     struct script_storage_t *storage, kan_interned_string_t type_name)
 {
     const struct kan_hash_storage_bucket_t *bucket =
-        kan_hash_storage_query (&storage->interned_string_lookup_storage, (kan_hash_t) type_name);
+        kan_hash_storage_query (&storage->interned_string_lookup_storage, KAN_HASH_OBJECT_POINTER (type_name));
     struct interned_string_lookup_node_t *node = (struct interned_string_lookup_node_t *) bucket->first;
     const struct interned_string_lookup_node_t *node_end =
         (struct interned_string_lookup_node_t *) (bucket->last ? bucket->last->next : NULL);
@@ -977,7 +977,7 @@ static struct interned_string_lookup_node_t *script_storage_get_or_create_intern
         node = (struct interned_string_lookup_node_t *) kan_allocate_batched (
             interned_string_lookup_allocation_group, sizeof (struct interned_string_lookup_node_t));
 
-        node->node.hash = (kan_hash_t) type_name;
+        node->node.hash = KAN_HASH_OBJECT_POINTER (type_name);
         node->type_name = type_name;
         node->interned_string_absolute_positions_generation_lock = kan_atomic_int_init (0);
         node->interned_string_absolute_positions_generated = kan_atomic_int_init (0);
@@ -1291,7 +1291,7 @@ static kan_serialized_size_t interned_string_registry_add_string_internal (struc
         struct interned_string_registry_node_t *node = kan_allocate_batched (
             interned_string_registry_allocation_group, sizeof (struct interned_string_registry_node_t));
 
-        node->node.hash = (kan_hash_t) interned_string;
+        node->node.hash = KAN_HASH_OBJECT_POINTER (interned_string);
         node->value = interned_string;
         node->index = index;
 
@@ -1310,7 +1310,7 @@ static kan_serialized_size_t interned_string_registry_store_string (struct inter
     kan_atomic_int_lock (&registry->store_lock);
 
     const struct kan_hash_storage_bucket_t *bucket =
-        kan_hash_storage_query (&registry->value_to_index, (kan_hash_t) interned_string);
+        kan_hash_storage_query (&registry->value_to_index, KAN_HASH_OBJECT_POINTER (interned_string));
     struct interned_string_registry_node_t *node = (struct interned_string_registry_node_t *) bucket->first;
     const struct interned_string_registry_node_t *node_end =
         (struct interned_string_registry_node_t *) (bucket->last ? bucket->last->next : NULL);

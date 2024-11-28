@@ -153,7 +153,7 @@ static void scan_file (struct universe_world_definition_system_t *system,
     stream = kan_random_access_stream_buffer_open_for_read (stream, KAN_UNIVERSE_WORLD_DEFINITION_SYSTEM_IO_BUFFER);
     struct world_definition_node_t *node =
         kan_allocate_batched (system->group, sizeof (struct world_definition_node_t));
-    node->node.hash = (kan_hash_t) name;
+    node->node.hash = KAN_HASH_OBJECT_POINTER (name);
     node->name = name;
 
     kan_allocation_group_stack_push (system->group);
@@ -358,7 +358,7 @@ static void remove_definition_by_name (struct universe_world_definition_system_t
                                        kan_interned_string_t definition_name)
 {
     const struct kan_hash_storage_bucket_t *bucket =
-        kan_hash_storage_query (&system->stored_world_definitions, (kan_hash_t) definition_name);
+        kan_hash_storage_query (&system->stored_world_definitions, KAN_HASH_OBJECT_POINTER (definition_name));
     struct world_definition_node_t *node = (struct world_definition_node_t *) bucket->first;
     const struct world_definition_node_t *node_end =
         (struct world_definition_node_t *) (bucket->last ? bucket->last->next : NULL);
@@ -598,7 +598,7 @@ const struct kan_universe_world_definition_t *kan_universe_world_definition_syst
 {
     struct universe_world_definition_system_t *system = KAN_HANDLE_GET (universe_world_definition_system);
     const struct kan_hash_storage_bucket_t *bucket =
-        kan_hash_storage_query (&system->stored_world_definitions, (kan_hash_t) definition_name);
+        kan_hash_storage_query (&system->stored_world_definitions, KAN_HASH_OBJECT_POINTER (definition_name));
     struct world_definition_node_t *node = (struct world_definition_node_t *) bucket->first;
     const struct world_definition_node_t *node_end =
         (struct world_definition_node_t *) (bucket->last ? bucket->last->next : NULL);

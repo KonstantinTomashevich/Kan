@@ -134,7 +134,8 @@ struct resource_info_node_t
 static inline kan_instance_size_t query_resource (struct kan_hash_storage_t *hash_storage,
                                                   kan_interned_string_t resource_name)
 {
-    const struct kan_hash_storage_bucket_t *bucket = kan_hash_storage_query (hash_storage, (kan_hash_t) resource_name);
+    const struct kan_hash_storage_bucket_t *bucket =
+        kan_hash_storage_query (hash_storage, KAN_HASH_OBJECT_POINTER (resource_name));
     struct resource_info_node_t *node = (struct resource_info_node_t *) bucket->first;
     const struct resource_info_node_t *node_end =
         (struct resource_info_node_t *) (bucket->last ? bucket->last->next : NULL);
@@ -164,7 +165,7 @@ static inline void register_resource (struct kan_hash_storage_t *hash_storage,
 
     struct resource_info_node_t *node =
         KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (temporary_allocator, struct resource_info_node_t);
-    node->node.hash = (kan_hash_t) resource_name;
+    node->node.hash = KAN_HASH_OBJECT_POINTER (resource_name);
     node->name = resource_name;
     node->id = *id_counter;
 
@@ -533,7 +534,8 @@ static void building_graph_node_destroy (struct building_graph_node_t *node, kan
 static struct building_graph_node_t *graph_builder_find_node (struct graph_builder_t *builder,
                                                               kan_interned_string_t name)
 {
-    const struct kan_hash_storage_bucket_t *bucket = kan_hash_storage_query (&builder->nodes, (kan_hash_t) name);
+    const struct kan_hash_storage_bucket_t *bucket =
+        kan_hash_storage_query (&builder->nodes, KAN_HASH_OBJECT_POINTER (name));
     struct building_graph_node_t *node = (struct building_graph_node_t *) bucket->first;
     const struct building_graph_node_t *node_end =
         (struct building_graph_node_t *) (bucket->last ? bucket->last->next : NULL);
@@ -556,7 +558,7 @@ static struct building_graph_node_t *graph_builder_create_node (struct graph_bui
 {
     struct building_graph_node_t *node =
         kan_allocate_batched (builder->builder_group, sizeof (struct building_graph_node_t));
-    node->node.hash = (kan_hash_t) name;
+    node->node.hash = KAN_HASH_OBJECT_POINTER (name);
 
     node->name = name;
     node->function = NULL;

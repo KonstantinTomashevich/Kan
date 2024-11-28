@@ -289,7 +289,7 @@ static struct native_entry_node_t *native_entry_node_create (struct target_t *ta
     struct native_entry_node_t *node =
         kan_allocate_batched (nodes_allocation_group, sizeof (struct native_entry_node_t));
 
-    node->node.hash = (kan_hash_t) resource_name;
+    node->node.hash = KAN_HASH_OBJECT_POINTER (resource_name);
     node->target = target;
 
     node->source_type = source_type;
@@ -656,7 +656,7 @@ static struct third_party_entry_node_t *third_party_entry_node_create (struct ta
     struct third_party_entry_node_t *node =
         kan_allocate_batched (nodes_allocation_group, sizeof (struct third_party_entry_node_t));
 
-    node->node.hash = (kan_hash_t) resource_name;
+    node->node.hash = KAN_HASH_OBJECT_POINTER (resource_name);
     node->target = target;
 
     node->name = resource_name;
@@ -860,7 +860,8 @@ static struct native_entry_node_t *target_query_local_native_by_source_type (str
                                                                              kan_interned_string_t type,
                                                                              kan_interned_string_t name)
 {
-    const struct kan_hash_storage_bucket_t *bucket = kan_hash_storage_query (&target->native, (kan_hash_t) name);
+    const struct kan_hash_storage_bucket_t *bucket =
+        kan_hash_storage_query (&target->native, KAN_HASH_OBJECT_POINTER (name));
     struct native_entry_node_t *node = (struct native_entry_node_t *) bucket->first;
     const struct native_entry_node_t *node_end =
         (struct native_entry_node_t *) (bucket->last ? bucket->last->next : NULL);
@@ -882,7 +883,8 @@ static struct native_entry_node_t *target_query_local_native_by_compiled_type (s
                                                                                kan_interned_string_t type,
                                                                                kan_interned_string_t name)
 {
-    const struct kan_hash_storage_bucket_t *bucket = kan_hash_storage_query (&target->native, (kan_hash_t) name);
+    const struct kan_hash_storage_bucket_t *bucket =
+        kan_hash_storage_query (&target->native, KAN_HASH_OBJECT_POINTER (name));
     struct native_entry_node_t *node = (struct native_entry_node_t *) bucket->first;
     const struct native_entry_node_t *node_end =
         (struct native_entry_node_t *) (bucket->last ? bucket->last->next : NULL);
@@ -953,7 +955,8 @@ static struct native_entry_node_t *target_query_global_native_by_compiled_type (
 static struct third_party_entry_node_t *target_query_local_third_party (struct target_t *target,
                                                                         kan_interned_string_t name)
 {
-    const struct kan_hash_storage_bucket_t *bucket = kan_hash_storage_query (&target->third_party, (kan_hash_t) name);
+    const struct kan_hash_storage_bucket_t *bucket =
+        kan_hash_storage_query (&target->third_party, KAN_HASH_OBJECT_POINTER (name));
     struct third_party_entry_node_t *node = (struct third_party_entry_node_t *) bucket->first;
     const struct third_party_entry_node_t *node_end =
         (struct third_party_entry_node_t *) (bucket->last ? bucket->last->next : NULL);
@@ -1392,8 +1395,8 @@ static void scan_target_for_resources (kan_functor_user_data_t user_data)
                 struct byproduct_production_node_t *new_node =
                     kan_allocate_batched (nodes_allocation_group, sizeof (struct byproduct_production_node_t));
 
-                new_node->node.hash =
-                    kan_hash_combine ((kan_hash_t) production->resource_type, (kan_hash_t) production->resource_name);
+                new_node->node.hash = kan_hash_combine (KAN_HASH_OBJECT_POINTER (production->resource_type),
+                                                        KAN_HASH_OBJECT_POINTER (production->resource_name));
 
                 new_node->resource_type = production->resource_type;
                 new_node->resource_name = production->resource_name;
@@ -2038,11 +2041,12 @@ static inline void confirm_loaded_byproduct_production (struct target_t *target,
                                                         kan_interned_string_t resource_type,
                                                         kan_interned_string_t resource_name)
 {
-    const kan_hash_t resource_hash = kan_hash_combine ((kan_hash_t) resource_type, (kan_hash_t) resource_name);
+    const kan_hash_t resource_hash =
+        kan_hash_combine (KAN_HASH_OBJECT_POINTER (resource_type), KAN_HASH_OBJECT_POINTER (resource_name));
     kan_atomic_int_lock (&target->byproduct_registration_lock);
 
     const struct kan_hash_storage_bucket_t *bucket =
-        kan_hash_storage_query (&target->loaded_byproduct_production, (kan_hash_t) resource_hash);
+        kan_hash_storage_query (&target->loaded_byproduct_production, resource_hash);
     struct byproduct_production_node_t *node = (struct byproduct_production_node_t *) bucket->first;
     const struct byproduct_production_node_t *node_end =
         (struct byproduct_production_node_t *) (bucket->last ? bucket->last->next : NULL);
@@ -2112,7 +2116,7 @@ static kan_interned_string_t interface_register_byproduct (kan_functor_user_data
 
     kan_atomic_int_lock (&source_node->target->byproduct_registration_lock);
     const struct kan_hash_storage_bucket_t *bucket =
-        kan_hash_storage_query (&source_node->target->byproducts, (kan_hash_t) byproduct_hash);
+        kan_hash_storage_query (&source_node->target->byproducts, byproduct_hash);
     struct byproduct_node_t *node = (struct byproduct_node_t *) bucket->first;
     const struct byproduct_node_t *node_end = (struct byproduct_node_t *) (bucket->last ? bucket->last->next : NULL);
 

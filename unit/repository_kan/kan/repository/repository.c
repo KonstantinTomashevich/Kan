@@ -175,6 +175,10 @@ struct return_uniqueness_origin_t
     kan_return_uniqueness_cursor_id_t cursors[KAN_REPOSITORY_RETURN_UNIQUENESS_MAX_CURSORS];
 };
 
+// TODO: We can make access register access much more cache friendly by introducing complex structure-of-arrays like
+//       solution, so accessed ids for cursor id will be much easier to access for the cache. It should give us some
+//       additional speed as we seem to be locked by cache misses right now.
+
 struct return_uniqueness_access_register_t
 {
     kan_return_uniqueness_cursor_id_t accessed_ids[KAN_REPOSITORY_RETURN_UNIQUENESS_MAX_CURSORS];
@@ -4428,7 +4432,7 @@ static struct singleton_storage_node_t *query_singleton_storage_across_hierarchy
                                                                                   kan_interned_string_t type_name)
 {
     const struct kan_hash_storage_bucket_t *bucket =
-        kan_hash_storage_query (&repository->singleton_storages, (kan_hash_t) type_name);
+        kan_hash_storage_query (&repository->singleton_storages, KAN_HASH_OBJECT_POINTER (type_name));
     struct singleton_storage_node_t *node = (struct singleton_storage_node_t *) bucket->first;
     const struct singleton_storage_node_t *end =
         (struct singleton_storage_node_t *) (bucket->last ? bucket->last->next : NULL);
@@ -4474,7 +4478,7 @@ kan_repository_singleton_storage_t kan_repository_singleton_storage_open (kan_re
         storage = (struct singleton_storage_node_t *) kan_allocate_batched (storage_allocation_group,
                                                                             sizeof (struct singleton_storage_node_t));
 
-        storage->node.hash = (kan_hash_t) interned_type_name;
+        storage->node.hash = KAN_HASH_OBJECT_POINTER (interned_type_name);
         storage->type = singleton_type;
         storage->queries_count = kan_atomic_int_init (0);
 
@@ -4632,7 +4636,7 @@ static struct indexed_storage_node_t *query_indexed_storage_across_hierarchy (st
                                                                               kan_interned_string_t type_name)
 {
     const struct kan_hash_storage_bucket_t *bucket =
-        kan_hash_storage_query (&repository->indexed_storages, (kan_hash_t) type_name);
+        kan_hash_storage_query (&repository->indexed_storages, KAN_HASH_OBJECT_POINTER (type_name));
     struct indexed_storage_node_t *node = (struct indexed_storage_node_t *) bucket->first;
     const struct indexed_storage_node_t *end =
         (struct indexed_storage_node_t *) (bucket->last ? bucket->last->next : NULL);
@@ -4678,7 +4682,7 @@ kan_repository_indexed_storage_t kan_repository_indexed_storage_open (kan_reposi
         storage = (struct indexed_storage_node_t *) kan_allocate_batched (storage_allocation_group,
                                                                           sizeof (struct indexed_storage_node_t));
 
-        storage->node.hash = (kan_hash_t) interned_type_name;
+        storage->node.hash = KAN_HASH_OBJECT_POINTER (interned_type_name);
         storage->repository = repository_data;
         storage->type = indexed_type;
 
@@ -7701,17 +7705,17 @@ static inline void indexed_storage_space_ray_cursor_fix (struct indexed_space_ra
 {
     while (cursor->current_sub_node)
     {
-#if defined(KAN_REPOSITORY_SAFEGUARDS_ENABLED)
-        if (!safeguard_indexed_read_access_try_create (cursor->index->storage, cursor->current_sub_node->record))
-        {
-            cursor->current_sub_node = NULL;
-            break;
-        }
-#endif
-
         if (!return_uniqueness_is_registered (cursor->current_sub_node->uniqueness_register,
                                               cursor->return_uniqueness_id))
         {
+#if defined(KAN_REPOSITORY_SAFEGUARDS_ENABLED)
+            if (!safeguard_indexed_read_access_try_create (cursor->index->storage, cursor->current_sub_node->record))
+            {
+                cursor->current_sub_node = NULL;
+                break;
+            }
+#endif
+
             kan_repository_indexed_floating_t record_min[KAN_CONTAINER_SPACE_TREE_MAX_DIMENSIONS];
             indexed_field_baked_data_extract_and_convert_floating_array_from_record (
                 &cursor->index->baked_min, cursor->index->baked_archetype, cursor->index->baked_dimension_count,
@@ -8321,7 +8325,7 @@ static struct event_storage_node_t *query_event_storage_across_hierarchy (struct
                                                                           kan_interned_string_t type_name)
 {
     const struct kan_hash_storage_bucket_t *bucket =
-        kan_hash_storage_query (&repository->event_storages, (kan_hash_t) type_name);
+        kan_hash_storage_query (&repository->event_storages, KAN_HASH_OBJECT_POINTER (type_name));
     struct event_storage_node_t *node = (struct event_storage_node_t *) bucket->first;
     const struct event_storage_node_t *end = (struct event_storage_node_t *) (bucket->last ? bucket->last->next : NULL);
 
@@ -8372,7 +8376,7 @@ kan_repository_event_storage_t kan_repository_event_storage_open (kan_repository
         storage = (struct event_storage_node_t *) kan_allocate_batched (storage_allocation_group,
                                                                         sizeof (struct event_storage_node_t));
 
-        storage->node.hash = (kan_hash_t) interned_type_name;
+        storage->node.hash = KAN_HASH_OBJECT_POINTER (interned_type_name);
         storage->allocation_group = storage_allocation_group;
         storage->type = event_type;
         storage->single_threaded_operations_lock = kan_atomic_int_init (0);

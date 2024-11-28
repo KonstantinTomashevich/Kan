@@ -140,11 +140,6 @@ CONTAINER_API void kan_hash_storage_set_bucket_count (struct kan_hash_storage_t 
 ///          before shutting down hash storage.
 CONTAINER_API void kan_hash_storage_shutdown (struct kan_hash_storage_t *storage);
 
-/// \brief To make object pointer hashes more reliable, we need to divide them by their size to avoid alignment-related
-///        grouping of nodes in buckets.
-// TODO: Use it on other places.
-#define KAN_HASH_OBJECT_POINTER(POINTER) ((kan_hash_t) ((kan_memory_size_t) (POINTER)) / sizeof ((POINTER)[0u]))
-
 /// \brief Implements default strategy for update hash storage bucket count to appropriate values.
 static inline void kan_hash_storage_update_bucket_count_default (struct kan_hash_storage_t *storage,
                                                                  kan_instance_size_t min_bucket_count_to_preserve)

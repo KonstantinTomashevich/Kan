@@ -561,6 +561,7 @@ enum spirv_fixed_ids_t
 struct kan_rpl_compiler_builtin_node_t
 {
     struct kan_hash_storage_node_t node;
+    kan_interned_string_t name;
     struct compiler_instance_function_node_t *builtin;
 };
 
@@ -1356,14 +1357,14 @@ static inline struct inbuilt_matrix_type_t *find_inbuilt_matrix_type (kan_intern
 static inline struct compiler_instance_function_node_t *find_builtin_function (kan_interned_string_t name)
 {
     const struct kan_hash_storage_bucket_t *bucket =
-        kan_hash_storage_query (&STATICS.builtin_hash_storage, (kan_hash_t) name);
+        kan_hash_storage_query (&STATICS.builtin_hash_storage, KAN_HASH_OBJECT_POINTER (name));
     struct kan_rpl_compiler_builtin_node_t *node = (struct kan_rpl_compiler_builtin_node_t *) bucket->first;
     const struct kan_rpl_compiler_builtin_node_t *node_end =
         (struct kan_rpl_compiler_builtin_node_t *) (bucket->last ? bucket->last->next : NULL);
 
     while (node != node_end)
     {
-        if (node->node.hash == (kan_hash_t) name)
+        if (node->name == name)
         {
             return node->builtin;
         }

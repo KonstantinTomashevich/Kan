@@ -13,6 +13,10 @@ KAN_C_HEADER_BEGIN
 /// \brief Integer type that is used for storing hashes across Kan.
 typedef kan_memory_size_t kan_hash_t;
 
+/// \brief To make object pointer hashes more reliable, we need to divide them by their size to avoid alignment-related
+///        grouping of nodes in buckets.
+#define KAN_HASH_OBJECT_POINTER(POINTER) ((kan_hash_t) ((kan_memory_size_t) (POINTER)) / sizeof ((POINTER)[0u]))
+
 /// \brief Hashes given null-terminated string.
 HASH_API kan_hash_t kan_string_hash (const char *string);
 

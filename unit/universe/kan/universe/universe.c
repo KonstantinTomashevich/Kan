@@ -1305,7 +1305,7 @@ static void undeploy_automated_lifetime_queries (kan_reflection_registry_t regis
 static struct scheduler_api_node_t *universe_get_scheduler_api (struct universe_t *universe, kan_interned_string_t name)
 {
     const struct kan_hash_storage_bucket_t *bucket =
-        kan_hash_storage_query (&universe->scheduler_api_storage, (kan_hash_t) name);
+        kan_hash_storage_query (&universe->scheduler_api_storage, KAN_HASH_OBJECT_POINTER (name));
     struct scheduler_api_node_t *node = (struct scheduler_api_node_t *) bucket->first;
     const struct scheduler_api_node_t *node_end =
         (struct scheduler_api_node_t *) (bucket->last ? bucket->last->next : NULL);
@@ -1331,7 +1331,7 @@ static struct scheduler_api_node_t *universe_get_or_create_scheduler_api (struct
     {
         node = (struct scheduler_api_node_t *) kan_allocate_batched (universe->api_allocation_group,
                                                                      sizeof (struct scheduler_api_node_t));
-        node->node.hash = (kan_hash_t) name;
+        node->node.hash = KAN_HASH_OBJECT_POINTER (name);
         node->name = name;
 
         node->api.type = NULL;
@@ -1350,7 +1350,7 @@ static struct scheduler_api_node_t *universe_get_or_create_scheduler_api (struct
 static struct mutator_api_node_t *universe_get_mutator_api (struct universe_t *universe, kan_interned_string_t name)
 {
     const struct kan_hash_storage_bucket_t *bucket =
-        kan_hash_storage_query (&universe->mutator_api_storage, (kan_hash_t) name);
+        kan_hash_storage_query (&universe->mutator_api_storage, KAN_HASH_OBJECT_POINTER (name));
     struct mutator_api_node_t *node = (struct mutator_api_node_t *) bucket->first;
     const struct mutator_api_node_t *node_end =
         (struct mutator_api_node_t *) (bucket->last ? bucket->last->next : NULL);
@@ -1376,7 +1376,7 @@ static struct mutator_api_node_t *universe_get_or_create_mutator_api (struct uni
     {
         node = (struct mutator_api_node_t *) kan_allocate_batched (universe->api_allocation_group,
                                                                    sizeof (struct mutator_api_node_t));
-        node->node.hash = (kan_hash_t) name;
+        node->node.hash = KAN_HASH_OBJECT_POINTER (name);
         node->name = name;
 
         node->api.type = NULL;
@@ -1405,7 +1405,7 @@ static void add_mutator_to_groups (struct universe_t *universe,
     {
         kan_interned_string_t group_name = kan_string_intern (meta->group_name);
         const struct kan_hash_storage_bucket_t *bucket =
-            kan_hash_storage_query (&universe->group_multi_map_storage, (kan_hash_t) group_name);
+            kan_hash_storage_query (&universe->group_multi_map_storage, KAN_HASH_OBJECT_POINTER (group_name));
         struct group_multi_map_node_t *node = (struct group_multi_map_node_t *) bucket->first;
         const struct group_multi_map_node_t *node_end =
             (struct group_multi_map_node_t *) (bucket->last ? bucket->last->next : NULL);
@@ -1426,7 +1426,7 @@ static void add_mutator_to_groups (struct universe_t *universe,
         {
             struct group_multi_map_node_t *new_node = (struct group_multi_map_node_t *) kan_allocate_batched (
                 universe->api_allocation_group, sizeof (struct group_multi_map_node_t));
-            new_node->node.hash = (kan_hash_t) group_name;
+            new_node->node.hash = KAN_HASH_OBJECT_POINTER (group_name);
             new_node->group_name = group_name;
             new_node->mutator = mutator_name;
 
@@ -2681,7 +2681,7 @@ static void world_migration_schedulers_mutators_migrate (struct universe_t *univ
         {
             kan_interned_string_t group_name = ((kan_interned_string_t *) pipeline->used_groups.data)[group_index];
             const struct kan_hash_storage_bucket_t *bucket =
-                kan_hash_storage_query (&universe->group_multi_map_storage, (kan_hash_t) group_name);
+                kan_hash_storage_query (&universe->group_multi_map_storage, KAN_HASH_OBJECT_POINTER (group_name));
             struct group_multi_map_node_t *node = (struct group_multi_map_node_t *) bucket->first;
             const struct group_multi_map_node_t *node_end =
                 (struct group_multi_map_node_t *) (bucket->last ? bucket->last->next : NULL);
@@ -3165,7 +3165,7 @@ static void fill_world_from_definition (struct universe_t *universe,
             kan_bool_t group_found = KAN_FALSE;
 
             const struct kan_hash_storage_bucket_t *bucket =
-                kan_hash_storage_query (&universe->group_multi_map_storage, (kan_hash_t) group_name);
+                kan_hash_storage_query (&universe->group_multi_map_storage, KAN_HASH_OBJECT_POINTER (group_name));
             struct group_multi_map_node_t *node = (struct group_multi_map_node_t *) bucket->first;
             const struct group_multi_map_node_t *node_end =
                 (struct group_multi_map_node_t *) (bucket->last ? bucket->last->next : NULL);
