@@ -17,6 +17,7 @@ KAN_MUTE_THIRD_PARTY_WARNINGS_END
 #include <kan/log/logging.h>
 #include <kan/memory/allocation.h>
 #include <kan/platform/application.h>
+#include <kan/platform/conversion.h>
 #include <kan/platform/sdl_allocation_adapter.h>
 #include <kan/threading/atomic.h>
 
@@ -27,233 +28,6 @@ static kan_allocation_group_t application_events_allocation_group;
 static kan_allocation_group_t application_clipboard_allocation_group;
 
 static struct kan_atomic_int_t vulkan_library_requests;
-
-static inline kan_pixel_format_t convert_pixel_format (uint32_t sdl_format)
-{
-    return (kan_pixel_format_t) sdl_format;
-}
-
-static inline uint32_t window_flags_to_sdl_flags (enum kan_platform_window_flag_t flags)
-{
-    uint32_t sdl_flags = 0u;
-    if (flags & KAN_PLATFORM_WINDOW_FLAG_FULLSCREEN)
-    {
-        sdl_flags |= SDL_WINDOW_FULLSCREEN;
-    }
-
-    if (flags & KAN_PLATFORM_WINDOW_FLAG_SUPPORTS_OPEN_GL)
-    {
-        sdl_flags |= SDL_WINDOW_OPENGL;
-    }
-
-    if (flags & KAN_PLATFORM_WINDOW_FLAG_SUPPORTS_VULKAN)
-    {
-        sdl_flags |= SDL_WINDOW_VULKAN;
-    }
-
-    if (flags & KAN_PLATFORM_WINDOW_FLAG_SUPPORTS_METAL)
-    {
-        sdl_flags |= SDL_WINDOW_METAL;
-    }
-
-    if (flags & KAN_PLATFORM_WINDOW_FLAG_OCCLUDED)
-    {
-        sdl_flags |= SDL_WINDOW_OCCLUDED;
-    }
-
-    if (flags & KAN_PLATFORM_WINDOW_FLAG_HIDDEN)
-    {
-        sdl_flags |= SDL_WINDOW_HIDDEN;
-    }
-
-    if (flags & KAN_PLATFORM_WINDOW_FLAG_BORDERLESS)
-    {
-        sdl_flags |= SDL_WINDOW_BORDERLESS;
-    }
-
-    if (flags & KAN_PLATFORM_WINDOW_FLAG_TRANSPARENT)
-    {
-        sdl_flags |= SDL_WINDOW_TRANSPARENT;
-    }
-
-    if (flags & KAN_PLATFORM_WINDOW_FLAG_RESIZABLE)
-    {
-        sdl_flags |= SDL_WINDOW_RESIZABLE;
-    }
-
-    if (flags & KAN_PLATFORM_WINDOW_FLAG_MINIMIZED)
-    {
-        sdl_flags |= SDL_WINDOW_MINIMIZED;
-    }
-
-    if (flags & KAN_PLATFORM_WINDOW_FLAG_MAXIMIZED)
-    {
-        sdl_flags |= SDL_WINDOW_MAXIMIZED;
-    }
-
-    if (flags & KAN_PLATFORM_WINDOW_FLAG_UTILITY)
-    {
-        sdl_flags |= SDL_WINDOW_UTILITY;
-    }
-
-    if (flags & KAN_PLATFORM_WINDOW_FLAG_TOOLTIP)
-    {
-        sdl_flags |= SDL_WINDOW_TOOLTIP;
-    }
-
-    if (flags & KAN_PLATFORM_WINDOW_FLAG_POPUP)
-    {
-        sdl_flags |= SDL_WINDOW_POPUP_MENU;
-    }
-
-    if (flags & KAN_PLATFORM_WINDOW_FLAG_ALWAYS_ON_TOP)
-    {
-        sdl_flags |= SDL_WINDOW_ALWAYS_ON_TOP;
-    }
-
-    if (flags & KAN_PLATFORM_WINDOW_FLAG_HIGH_PIXEL_DENSITY)
-    {
-        sdl_flags |= SDL_WINDOW_HIGH_PIXEL_DENSITY;
-    }
-
-    if (flags & KAN_PLATFORM_WINDOW_FLAG_MOUSE_GRABBED)
-    {
-        sdl_flags |= SDL_WINDOW_MOUSE_GRABBED;
-    }
-
-    if (flags & KAN_PLATFORM_WINDOW_FLAG_KEYBOARD_GRABBED)
-    {
-        sdl_flags |= SDL_WINDOW_KEYBOARD_GRABBED;
-    }
-
-    if (flags & KAN_PLATFORM_WINDOW_FLAG_INPUT_FOCUS)
-    {
-        sdl_flags |= SDL_WINDOW_INPUT_FOCUS;
-    }
-
-    if (flags & KAN_PLATFORM_WINDOW_FLAG_MOUSE_FOCUS)
-    {
-        sdl_flags |= SDL_WINDOW_MOUSE_FOCUS;
-    }
-
-    if (flags & KAN_PLATFORM_WINDOW_FLAG_MOUSE_CAPTURE)
-    {
-        sdl_flags |= SDL_WINDOW_MOUSE_CAPTURE;
-    }
-
-    return sdl_flags;
-}
-
-static inline enum kan_platform_window_flag_t sdl_flags_to_window_flags (uint64_t sdl_flags)
-{
-    enum kan_platform_window_flag_t flags = 0u;
-    if (sdl_flags & SDL_WINDOW_FULLSCREEN)
-    {
-        flags |= KAN_PLATFORM_WINDOW_FLAG_FULLSCREEN;
-    }
-
-    if (sdl_flags & SDL_WINDOW_OPENGL)
-    {
-        flags |= KAN_PLATFORM_WINDOW_FLAG_SUPPORTS_OPEN_GL;
-    }
-
-    if (sdl_flags & SDL_WINDOW_VULKAN)
-    {
-        flags |= KAN_PLATFORM_WINDOW_FLAG_SUPPORTS_VULKAN;
-    }
-
-    if (sdl_flags & SDL_WINDOW_METAL)
-    {
-        flags |= KAN_PLATFORM_WINDOW_FLAG_SUPPORTS_METAL;
-    }
-
-    if (sdl_flags & SDL_WINDOW_OCCLUDED)
-    {
-        flags |= KAN_PLATFORM_WINDOW_FLAG_OCCLUDED;
-    }
-
-    if (sdl_flags & SDL_WINDOW_HIDDEN)
-    {
-        flags |= KAN_PLATFORM_WINDOW_FLAG_HIDDEN;
-    }
-
-    if (sdl_flags & SDL_WINDOW_BORDERLESS)
-    {
-        flags |= KAN_PLATFORM_WINDOW_FLAG_BORDERLESS;
-    }
-
-    if (sdl_flags & SDL_WINDOW_TRANSPARENT)
-    {
-        flags |= KAN_PLATFORM_WINDOW_FLAG_TRANSPARENT;
-    }
-
-    if (sdl_flags & SDL_WINDOW_RESIZABLE)
-    {
-        flags |= KAN_PLATFORM_WINDOW_FLAG_RESIZABLE;
-    }
-
-    if (sdl_flags & SDL_WINDOW_MINIMIZED)
-    {
-        flags |= KAN_PLATFORM_WINDOW_FLAG_MINIMIZED;
-    }
-
-    if (sdl_flags & SDL_WINDOW_MAXIMIZED)
-    {
-        flags |= KAN_PLATFORM_WINDOW_FLAG_MAXIMIZED;
-    }
-
-    if (sdl_flags & SDL_WINDOW_UTILITY)
-    {
-        flags |= KAN_PLATFORM_WINDOW_FLAG_UTILITY;
-    }
-
-    if (sdl_flags & SDL_WINDOW_TOOLTIP)
-    {
-        flags |= KAN_PLATFORM_WINDOW_FLAG_TOOLTIP;
-    }
-
-    if (sdl_flags & SDL_WINDOW_POPUP_MENU)
-    {
-        flags |= KAN_PLATFORM_WINDOW_FLAG_POPUP;
-    }
-
-    if (sdl_flags & SDL_WINDOW_ALWAYS_ON_TOP)
-    {
-        flags |= KAN_PLATFORM_WINDOW_FLAG_ALWAYS_ON_TOP;
-    }
-
-    if (sdl_flags & SDL_WINDOW_HIGH_PIXEL_DENSITY)
-    {
-        flags |= KAN_PLATFORM_WINDOW_FLAG_HIGH_PIXEL_DENSITY;
-    }
-
-    if (sdl_flags & SDL_WINDOW_MOUSE_GRABBED)
-    {
-        flags |= KAN_PLATFORM_WINDOW_FLAG_MOUSE_GRABBED;
-    }
-
-    if (sdl_flags & SDL_WINDOW_KEYBOARD_GRABBED)
-    {
-        flags |= KAN_PLATFORM_WINDOW_FLAG_KEYBOARD_GRABBED;
-    }
-
-    if (sdl_flags & SDL_WINDOW_INPUT_FOCUS)
-    {
-        flags |= KAN_PLATFORM_WINDOW_FLAG_INPUT_FOCUS;
-    }
-
-    if (sdl_flags & SDL_WINDOW_MOUSE_FOCUS)
-    {
-        flags |= KAN_PLATFORM_WINDOW_FLAG_MOUSE_FOCUS;
-    }
-
-    if (sdl_flags & SDL_WINDOW_MOUSE_CAPTURE)
-    {
-        flags |= KAN_PLATFORM_WINDOW_FLAG_MOUSE_CAPTURE;
-    }
-
-    return flags;
-}
 
 static inline uint8_t convert_mouse_state (uint32_t sdl_state)
 {
@@ -633,9 +407,9 @@ kan_bool_t kan_platform_application_fetch_next_event (struct kan_platform_applic
             output->time_ns = event.common.timestamp;
             output->keyboard.window_id = KAN_TYPED_ID_32_SET (kan_platform_window_id_t, event.key.windowID);
             output->keyboard.repeat = event.key.repeat > 0 ? KAN_TRUE : KAN_FALSE;
-            output->keyboard.scan_code = (kan_scan_code_t) event.key.scancode;
-            output->keyboard.key_code = (kan_key_code_t) event.key.key;
-            output->keyboard.modifiers = (kan_key_modifier_mask_t) event.key.mod;
+            output->keyboard.scan_code = to_kan_scan_code (event.key.scancode);
+            output->keyboard.key_code = (kan_platform_key_code_t) event.key.key;
+            output->keyboard.modifiers = to_kan_modifier_mask (event.key.mod);
             return KAN_TRUE;
 
         case SDL_EVENT_KEY_UP:
@@ -643,9 +417,9 @@ kan_bool_t kan_platform_application_fetch_next_event (struct kan_platform_applic
             output->time_ns = event.common.timestamp;
             output->keyboard.window_id = KAN_TYPED_ID_32_SET (kan_platform_window_id_t, event.key.windowID);
             output->keyboard.repeat = event.key.repeat > 0 ? KAN_TRUE : KAN_FALSE;
-            output->keyboard.scan_code = (kan_scan_code_t) event.key.scancode;
-            output->keyboard.key_code = (kan_key_code_t) event.key.key;
-            output->keyboard.modifiers = (kan_key_modifier_mask_t) event.key.mod;
+            output->keyboard.scan_code = to_kan_scan_code (event.key.scancode);
+            output->keyboard.key_code = (kan_platform_key_code_t) event.key.key;
+            output->keyboard.modifiers = to_kan_modifier_mask (event.key.mod);
             return KAN_TRUE;
 
         case SDL_EVENT_TEXT_EDITING:
@@ -697,7 +471,7 @@ kan_bool_t kan_platform_application_fetch_next_event (struct kan_platform_applic
             output->type = KAN_PLATFORM_APPLICATION_EVENT_TYPE_MOUSE_BUTTON_DOWN;
             output->time_ns = event.common.timestamp;
             output->mouse_button.window_id = KAN_TYPED_ID_32_SET (kan_platform_window_id_t, event.button.windowID);
-            output->mouse_button.button = (kan_mouse_button_t) event.button.button;
+            output->mouse_button.button = to_kan_mouse_button (event.button.button);
             output->mouse_button.clicks = event.button.clicks;
             output->mouse_button.window_x = event.button.x;
             output->mouse_button.window_y = event.button.y;
@@ -707,7 +481,7 @@ kan_bool_t kan_platform_application_fetch_next_event (struct kan_platform_applic
             output->type = KAN_PLATFORM_APPLICATION_EVENT_TYPE_MOUSE_BUTTON_UP;
             output->time_ns = event.common.timestamp;
             output->mouse_button.window_id = KAN_TYPED_ID_32_SET (kan_platform_window_id_t, event.button.windowID);
-            output->mouse_button.button = (kan_mouse_button_t) event.button.button;
+            output->mouse_button.button = to_kan_mouse_button (event.button.button);
             output->mouse_button.clicks = event.button.clicks;
             output->mouse_button.window_x = event.button.x;
             output->mouse_button.window_y = event.button.y;
@@ -857,7 +631,7 @@ void kan_platform_application_get_fullscreen_display_modes (kan_platform_display
         {
             *(struct kan_platform_display_mode_t *) kan_dynamic_array_add_last (output_array) =
                 (struct kan_platform_display_mode_t) {
-                    .pixel_format = convert_pixel_format (modes[index]->format),
+                    .pixel_format = to_kan_pixel_format (modes[index]->format),
                     .width = (kan_platform_visual_size_t) modes[index]->w,
                     .height = (kan_platform_visual_size_t) modes[index]->h,
                     .pixel_density = modes[index]->pixel_density,
@@ -881,7 +655,7 @@ kan_bool_t kan_platform_application_get_current_display_mode (kan_platform_displ
     if (mode)
     {
         *output = (struct kan_platform_display_mode_t) {
-            .pixel_format = convert_pixel_format (mode->format),
+            .pixel_format = to_kan_pixel_format (mode->format),
             .width = (kan_platform_visual_size_t) mode->w,
             .height = (kan_platform_visual_size_t) mode->h,
             .pixel_density = mode->pixel_density,
@@ -905,7 +679,7 @@ kan_bool_t kan_platform_application_get_desktop_display_mode (kan_platform_displ
     if (mode)
     {
         *output = (struct kan_platform_display_mode_t) {
-            .pixel_format = convert_pixel_format (mode->format),
+            .pixel_format = to_kan_pixel_format (mode->format),
             .width = (kan_platform_visual_size_t) mode->w,
             .height = (kan_platform_visual_size_t) mode->h,
             .pixel_density = mode->pixel_density,
@@ -927,7 +701,7 @@ kan_platform_window_id_t kan_platform_application_window_create (const char *tit
                                                                  kan_platform_visual_size_t height,
                                                                  enum kan_platform_window_flag_t flags)
 {
-    SDL_Window *window = SDL_CreateWindow (title, (int) width, (int) height, window_flags_to_sdl_flags (flags));
+    SDL_Window *window = SDL_CreateWindow (title, (int) width, (int) height, to_sdl_window_flags (flags));
     if (!window)
     {
         KAN_LOG (platform_application, KAN_LOG_ERROR, "Failed to create window, backend error: %s", SDL_GetError ())
@@ -986,17 +760,17 @@ float kan_platform_application_window_get_display_scale (kan_platform_window_id_
     return scale == 0.0f ? 1.0f : scale;
 }
 
-kan_pixel_format_t kan_platform_application_window_get_pixel_format (kan_platform_window_id_t window_id)
+enum kan_platform_pixel_format_t kan_platform_application_window_get_pixel_format (kan_platform_window_id_t window_id)
 {
     SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) KAN_TYPED_ID_32_GET (window_id));
     if (!window)
     {
         KAN_LOG (platform_application, KAN_LOG_ERROR, "Unable to find window with id %llu, backend error: %s",
                  (unsigned long long) KAN_TYPED_ID_32_GET (window_id), SDL_GetError ())
-        return KAN_INVALID_PIXEL_FORMAT;
+        return KAN_PLATFORM_PIXEL_FORMAT_UNKNOWN;
     }
 
-    return (kan_pixel_format_t) SDL_GetWindowPixelFormat (window);
+    return to_kan_pixel_format (SDL_GetWindowPixelFormat (window));
 }
 
 kan_bool_t kan_platform_application_window_enter_fullscreen (kan_platform_window_id_t window_id,
@@ -1068,7 +842,7 @@ enum kan_platform_window_flag_t kan_platform_application_window_get_flags (kan_p
         return 0u;
     }
 
-    return sdl_flags_to_window_flags (SDL_GetWindowFlags (window));
+    return to_kan_window_flags (SDL_GetWindowFlags (window));
 }
 
 kan_bool_t kan_platform_application_window_set_title (kan_platform_window_id_t window_id, const char *title)
@@ -1098,7 +872,7 @@ const char *kan_platform_application_window_get_title (kan_platform_window_id_t 
 }
 
 kan_bool_t kan_platform_application_window_set_icon (kan_platform_window_id_t window_id,
-                                                     kan_pixel_format_t pixel_format,
+                                                     enum kan_platform_pixel_format_t pixel_format,
                                                      kan_platform_visual_size_t width,
                                                      kan_platform_visual_size_t height,
                                                      const void *data)
@@ -1114,8 +888,8 @@ kan_bool_t kan_platform_application_window_set_icon (kan_platform_window_id_t wi
     // For now, we're using only 4 byte formats.
     const kan_platform_visual_size_t pitch = width * 4u;
 
-    SDL_Surface *icon_surface =
-        SDL_CreateSurfaceFrom ((int) width, (int) height, pixel_format, (void *) data, (int) pitch);
+    SDL_Surface *icon_surface = SDL_CreateSurfaceFrom ((int) width, (int) height, to_sdl_pixel_format (pixel_format),
+                                                       (void *) data, (int) pitch);
 
     if (!icon_surface)
     {

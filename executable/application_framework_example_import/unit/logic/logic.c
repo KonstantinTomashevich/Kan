@@ -121,7 +121,7 @@ APPLICATION_FRAMEWORK_EXAMPLE_IMPORT_LOGIC_API void kan_universe_mutator_execute
 
                         kan_application_system_window_set_icon (
                             state->application_system_handle, singleton->window_handle,
-                            kan_platform_get_pixel_format_table ()->rgba_32, (kan_platform_visual_size_t) icon->width,
+                            KAN_PLATFORM_PIXEL_FORMAT_RGBA32, (kan_platform_visual_size_t) icon->width,
                             (kan_platform_visual_size_t) icon->height, icon->pixels.data);
                     }
                 }

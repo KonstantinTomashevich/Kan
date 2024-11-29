@@ -98,7 +98,7 @@ struct window_set_textual_parameter_suffix_t
 struct window_set_icon_suffix_t
 {
     kan_application_system_window_t window_handle;
-    kan_pixel_format_t pixel_format;
+    enum kan_platform_pixel_format_t pixel_format;
     kan_platform_visual_size_t width;
     kan_platform_visual_size_t height;
     const void *data;
@@ -713,7 +713,6 @@ static inline void clean_and_pull_events (struct application_system_t *system, k
     while (kan_platform_application_fetch_next_event (&event))
     {
         struct event_node_t *node = (struct event_node_t *) kan_event_queue_submit_begin (&system->event_queue);
-
         if (node)
         {
             kan_platform_application_event_move (&event, &node->event);
@@ -1107,7 +1106,7 @@ void kan_application_system_window_set_title (kan_context_system_t system_handle
 
 void kan_application_system_window_set_icon (kan_context_system_t system_handle,
                                              kan_application_system_window_t window_handle,
-                                             kan_pixel_format_t pixel_format,
+                                             enum kan_platform_pixel_format_t pixel_format,
                                              kan_platform_visual_size_t width,
                                              kan_platform_visual_size_t height,
                                              const void *data)

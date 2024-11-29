@@ -103,9 +103,9 @@ struct kan_platform_application_event_keyboard_t
 {
     kan_platform_window_id_t window_id;
     kan_bool_t repeat;
-    kan_scan_code_t scan_code;
-    kan_key_code_t key_code;
-    kan_key_modifier_mask_t modifiers;
+    enum kan_platform_scan_code_t scan_code;
+    kan_platform_key_code_t key_code;
+    enum kan_platform_modifier_mask_t modifiers;
 };
 
 /// \brief Suffix structure for text editing events.
@@ -139,7 +139,7 @@ struct kan_platform_application_event_mouse_motion_t
 struct kan_platform_application_event_mouse_button_t
 {
     kan_platform_window_id_t window_id;
-    kan_mouse_button_t button;
+    enum kan_platform_mouse_button_t button;
     uint8_t clicks;
     float window_x;
     float window_y;
@@ -204,7 +204,7 @@ enum kan_platform_display_orientation_t
 /// \brief Describes display mode.
 struct kan_platform_display_mode_t
 {
-    kan_pixel_format_t pixel_format;
+    enum kan_platform_pixel_format_t pixel_format;
     kan_platform_visual_size_t width;
     kan_platform_visual_size_t height;
     float pixel_density;
@@ -302,7 +302,8 @@ PLATFORM_API float kan_platform_application_window_get_pixel_density (kan_platfo
 PLATFORM_API float kan_platform_application_window_get_display_scale (kan_platform_window_id_t window_id);
 
 /// \brief Queries pixel format for given window.
-PLATFORM_API kan_pixel_format_t kan_platform_application_window_get_pixel_format (kan_platform_window_id_t window_id);
+PLATFORM_API enum kan_platform_pixel_format_t kan_platform_application_window_get_pixel_format (
+    kan_platform_window_id_t window_id);
 
 /// \brief Switches window display to given mode and makes window fullscreen.
 PLATFORM_API kan_bool_t kan_platform_application_window_enter_fullscreen (
@@ -325,7 +326,7 @@ PLATFORM_API const char *kan_platform_application_window_get_title (kan_platform
 /// \brief Updates window icon.
 /// \warning Pixel data is not copied and should be preserved by used.
 PLATFORM_API kan_bool_t kan_platform_application_window_set_icon (kan_platform_window_id_t window_id,
-                                                                  kan_pixel_format_t pixel_format,
+                                                                  enum kan_platform_pixel_format_t pixel_format,
                                                                   kan_platform_visual_size_t width,
                                                                   kan_platform_visual_size_t height,
                                                                   const void *data);

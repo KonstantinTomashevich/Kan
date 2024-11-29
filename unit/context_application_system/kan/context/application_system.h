@@ -84,7 +84,7 @@ struct kan_application_system_window_info_t
     float display_scale;
     float opacity;
 
-    kan_pixel_format_t pixel_format;
+    enum kan_platform_pixel_format_t pixel_format;
     enum kan_platform_window_flag_t flags;
     struct kan_platform_integer_bounds_t bounds;
 
@@ -210,7 +210,7 @@ CONTEXT_APPLICATION_SYSTEM_API void kan_application_system_window_set_title (
 CONTEXT_APPLICATION_SYSTEM_API void kan_application_system_window_set_icon (
     kan_context_system_t system_handle,
     kan_application_system_window_t window_handle,
-    kan_pixel_format_t pixel_format,
+    enum kan_platform_pixel_format_t pixel_format,
     kan_platform_visual_size_t width,
     kan_platform_visual_size_t height,
     const void *data);
