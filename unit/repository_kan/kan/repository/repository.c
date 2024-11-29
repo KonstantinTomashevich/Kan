@@ -7542,6 +7542,12 @@ static inline void indexed_storage_space_ray_cursor_next (struct indexed_space_r
 
 static inline void indexed_storage_space_shape_cursor_fix (struct indexed_space_shape_cursor_t *cursor)
 {
+    // TODO: According to valgrind cachegrind, more than 60% of this function execution time is consumed by cache
+    //       misses. We can theoretically fix that by introducing some spatial-aware allocation pattern at least
+    //       for sub nodes (but it wound be good in space tree too). By allocating sub nodes in spatial boxes, for
+    //       example 4x4x4x1x4 (where last 4 is count of sub nodes per layer), we might be able to reduce cache misses
+    //       by a lot as nearest sub nodes will be stored near each other in memory layout.
+
     while (cursor->current_sub_node)
     {
         if (kan_space_tree_shape_is_first_occurrence (&cursor->index->tree, cursor->current_sub_node->object_min,
