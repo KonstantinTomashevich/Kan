@@ -240,6 +240,9 @@ struct kan_space_tree_ray_iterator_t
     struct kan_space_tree_quantized_path_t current_path;
     struct kan_space_tree_quantized_path_t next_path;
 
+    kan_bool_t has_previous_path_on_level;
+    struct kan_space_tree_quantized_path_t previous_path_on_level;
+
     /// \brief Current node from which user can take sub nodes for further querying.
     struct kan_space_tree_node_t *current_node;
 
@@ -294,6 +297,12 @@ CONTAINER_API struct kan_space_tree_shape_iterator_t kan_space_tree_shape_start 
 CONTAINER_API void kan_space_tree_shape_move_to_next_node (struct kan_space_tree_t *tree,
                                                            struct kan_space_tree_shape_iterator_t *iterator);
 
+/// \brief Uses space tree invariants to check whether
+///        occurrence of object in current node is the first in this iteration.
+CONTAINER_API kan_bool_t kan_space_tree_shape_is_first_occurrence (struct kan_space_tree_t *tree,
+                                                                   struct kan_space_tree_quantized_path_t object_min,
+                                                                   struct kan_space_tree_shape_iterator_t *iterator);
+
 /// \brief Whether given shape iteration is finished.
 static inline kan_bool_t kan_space_tree_shape_is_finished (struct kan_space_tree_shape_iterator_t *iterator)
 {
@@ -311,6 +320,13 @@ CONTAINER_API struct kan_space_tree_ray_iterator_t kan_space_tree_ray_start (
 /// \brief Moves ray iterator to the next node that may contain intersections.
 CONTAINER_API void kan_space_tree_ray_move_to_next_node (struct kan_space_tree_t *tree,
                                                          struct kan_space_tree_ray_iterator_t *iterator);
+
+/// \brief Uses space tree invariants to check whether
+///        occurrence of object in current node is the first in this iteration.
+CONTAINER_API kan_bool_t kan_space_tree_ray_is_first_occurrence (struct kan_space_tree_t *tree,
+                                                                 struct kan_space_tree_quantized_path_t object_min,
+                                                                 struct kan_space_tree_quantized_path_t object_max,
+                                                                 struct kan_space_tree_ray_iterator_t *iterator);
 
 /// \brief Whether given ray iteration is finished.
 static inline kan_bool_t kan_space_tree_ray_is_finished (struct kan_space_tree_ray_iterator_t *iterator)

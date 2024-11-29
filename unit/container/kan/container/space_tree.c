@@ -6,10 +6,6 @@
 #include <kan/error/critical.h>
 #include <kan/memory/allocation.h>
 
-// TODO: Current implementation is very good at keeping memory usage low, but it's not efficient due to cache misses.
-//       We use 3.5 less memory than UE5 Octree, but we're also 3-10 times slower than UE5 octree.
-//       This needs to be investigated and improved. The best tool for doing it is `perf` on Linux.
-
 static inline kan_space_tree_road_t quantize (kan_space_tree_floating_t value,
                                               kan_space_tree_floating_t min,
                                               kan_space_tree_floating_t max)
@@ -238,30 +234,30 @@ static inline kan_bool_t shape_iterator_try_step_on_height (struct kan_space_tre
 static inline void shape_iterator_update_is_inner_node (struct kan_space_tree_t *tree,
                                                         struct kan_space_tree_shape_iterator_t *iterator)
 {
-    iterator->is_inner_node = KAN_TRUE;
-    if (iterator->current_node)
+    if (!iterator->current_node || iterator->current_node->height == 0u)
     {
-        kan_space_tree_road_t mask = height_mask_to_root_to_height_mask (node_height_mask (iterator->current_node)) |
-                                     node_height_mask (iterator->current_node);
-        switch (tree->dimension_count)
-        {
-        case 4u:
-            iterator->is_inner_node &=
-                (iterator->min_path.roads[3u] & mask) < (iterator->current_path.roads[3u] & mask) &&
-                (iterator->current_path.roads[3u] & mask) < (iterator->max_path.roads[3u] & mask);
-        case 3u:
-            iterator->is_inner_node &=
-                (iterator->min_path.roads[2u] & mask) < (iterator->current_path.roads[2u] & mask) &&
-                (iterator->current_path.roads[2u] & mask) < (iterator->max_path.roads[2u] & mask);
-        case 2u:
-            iterator->is_inner_node &=
-                (iterator->min_path.roads[1u] & mask) < (iterator->current_path.roads[1u] & mask) &&
-                (iterator->current_path.roads[1u] & mask) < (iterator->max_path.roads[1u] & mask);
-        case 1u:
-            iterator->is_inner_node &=
-                (iterator->min_path.roads[0u] & mask) < (iterator->current_path.roads[0u] & mask) &&
-                (iterator->current_path.roads[0u] & mask) < (iterator->max_path.roads[0u] & mask);
-        }
+        iterator->is_inner_node = KAN_FALSE;
+        return;
+    }
+
+    iterator->is_inner_node = KAN_TRUE;
+    const kan_space_tree_road_t mask =
+        height_mask_to_root_to_height_mask (make_height_mask (iterator->current_node->height - 1u));
+
+    switch (tree->dimension_count)
+    {
+    case 4u:
+        iterator->is_inner_node &= (iterator->min_path.roads[3u] & mask) < (iterator->current_path.roads[3u] & mask) &&
+                                   (iterator->current_path.roads[3u] & mask) < (iterator->max_path.roads[3u] & mask);
+    case 3u:
+        iterator->is_inner_node &= (iterator->min_path.roads[2u] & mask) < (iterator->current_path.roads[2u] & mask) &&
+                                   (iterator->current_path.roads[2u] & mask) < (iterator->max_path.roads[2u] & mask);
+    case 2u:
+        iterator->is_inner_node &= (iterator->min_path.roads[1u] & mask) < (iterator->current_path.roads[1u] & mask) &&
+                                   (iterator->current_path.roads[1u] & mask) < (iterator->max_path.roads[1u] & mask);
+    case 1u:
+        iterator->is_inner_node &= (iterator->min_path.roads[0u] & mask) < (iterator->current_path.roads[0u] & mask) &&
+                                   (iterator->current_path.roads[0u] & mask) < (iterator->max_path.roads[0u] & mask);
     }
 }
 
@@ -476,99 +472,160 @@ static void insertion_iterator_next (struct kan_space_tree_t *tree,
     }
 }
 
-struct ray_next_t
+struct ray_target_t
 {
-    kan_space_tree_road_t next;
+    kan_space_tree_road_t road;
     kan_space_tree_floating_t time;
     kan_bool_t out_of_bounds;
 };
 
-static inline struct ray_next_t get_ray_next_in_dimension (struct kan_space_tree_ray_iterator_t *iterator,
-                                                           kan_space_tree_road_t dimension_index,
-                                                           kan_space_tree_road_t height_mask,
-                                                           kan_space_tree_road_t height_to_root_mask)
-{
-    struct ray_next_t result;
-    kan_space_tree_floating_t border_value;
-
-    if (iterator->direction[dimension_index] > (kan_floating_t) 0.0)
-    {
-        const kan_space_tree_road_t masked_current =
-            iterator->current_path.roads[dimension_index] & height_to_root_mask;
-        result.next = masked_current + height_mask;
-
-        if (result.next < masked_current)
-        {
-            // Overflow.
-            border_value = (kan_space_tree_floating_t) KAN_INT_MAX (kan_space_tree_road_t);
-            result.out_of_bounds = KAN_TRUE;
-        }
-        else
-        {
-            border_value = (kan_space_tree_floating_t) result.next;
-            result.out_of_bounds = KAN_FALSE;
-        }
+#define FUNCTION_GET_RAT_TARGET_IN_DIMENSION(DIRECTION_NAME, DIRECTION_SIGN)                                           \
+    static inline struct ray_target_t get_ray_##DIRECTION_NAME##_in_dimension (                                        \
+        struct kan_space_tree_ray_iterator_t *iterator, kan_space_tree_road_t dimension_index,                         \
+        kan_space_tree_road_t height_mask, kan_space_tree_road_t height_to_root_mask)                                  \
+    {                                                                                                                  \
+        struct ray_target_t result;                                                                                    \
+        kan_space_tree_floating_t border_value;                                                                        \
+                                                                                                                       \
+        if (DIRECTION_SIGN iterator->direction[dimension_index] > (kan_floating_t) 0.0)                                \
+        {                                                                                                              \
+            const kan_space_tree_road_t masked_current =                                                               \
+                iterator->current_path.roads[dimension_index] & height_to_root_mask;                                   \
+            result.road = masked_current + height_mask;                                                                \
+                                                                                                                       \
+            if (result.road < masked_current)                                                                          \
+            {                                                                                                          \
+                /* Overflow. */                                                                                        \
+                border_value = (kan_space_tree_floating_t) KAN_INT_MAX (kan_space_tree_road_t);                        \
+                result.out_of_bounds = KAN_TRUE;                                                                       \
+            }                                                                                                          \
+            else                                                                                                       \
+            {                                                                                                          \
+                border_value = (kan_space_tree_floating_t) result.road;                                                \
+                result.out_of_bounds = KAN_FALSE;                                                                      \
+            }                                                                                                          \
+        }                                                                                                              \
+        else if (DIRECTION_SIGN iterator->direction[dimension_index] < (kan_floating_t) 0.0)                           \
+        {                                                                                                              \
+            const kan_space_tree_road_t masked_current =                                                               \
+                iterator->current_path.roads[dimension_index] | ~height_to_root_mask;                                  \
+            result.road = masked_current - height_mask;                                                                \
+                                                                                                                       \
+            if (result.road > masked_current)                                                                          \
+            {                                                                                                          \
+                /* Underflow. */                                                                                       \
+                border_value = (kan_floating_t) 0.0;                                                                   \
+                result.out_of_bounds = KAN_TRUE;                                                                       \
+            }                                                                                                          \
+            else                                                                                                       \
+            {                                                                                                          \
+                border_value = (kan_space_tree_floating_t) result.road;                                                \
+                result.out_of_bounds = KAN_FALSE;                                                                      \
+            }                                                                                                          \
+        }                                                                                                              \
+        else                                                                                                           \
+        {                                                                                                              \
+            result.time = DBL_MAX;                                                                                     \
+            result.out_of_bounds = KAN_TRUE;                                                                           \
+            return result;                                                                                             \
+        }                                                                                                              \
+                                                                                                                       \
+        const kan_space_tree_floating_t distance_to_border = border_value - iterator->position[dimension_index];       \
+        result.time = distance_to_border / DIRECTION_SIGN iterator->direction[dimension_index];                        \
+        KAN_ASSERT (result.time >= 0.0)                                                                                \
+        return result;                                                                                                 \
     }
-    else if (iterator->direction[dimension_index] < (kan_floating_t) 0.0)
-    {
-        const kan_space_tree_road_t masked_current =
-            iterator->current_path.roads[dimension_index] | ~height_to_root_mask;
-        result.next = masked_current - height_mask;
 
-        if (result.next > masked_current)
-        {
-            // Underflow.
-            border_value = (kan_floating_t) 0.0;
-            result.out_of_bounds = KAN_TRUE;
-        }
-        else
-        {
-            border_value = (kan_space_tree_floating_t) result.next;
-            result.out_of_bounds = KAN_FALSE;
-        }
-    }
-    else
-    {
-        result.time = DBL_MAX;
-        result.out_of_bounds = KAN_TRUE;
-        return result;
-    }
+FUNCTION_GET_RAT_TARGET_IN_DIMENSION (next, +)
+FUNCTION_GET_RAT_TARGET_IN_DIMENSION (previous, -)
+#undef FUNCTION_GET_RAT_TARGET_IN_DIMENSION
 
-    const kan_space_tree_floating_t distance_to_border = border_value - iterator->position[dimension_index];
-    result.time = distance_to_border / iterator->direction[dimension_index];
-    KAN_ASSERT (result.time >= 0.0)
-    return result;
-}
-
-struct ray_next_and_dimension_t
+struct ray_target_and_dimension_t
 {
     kan_space_tree_road_t dimension;
-    kan_space_tree_road_t next;
+    kan_space_tree_road_t target;
     kan_space_tree_floating_t time;
     kan_bool_t out_of_bounds;
 };
 
-static inline struct ray_next_and_dimension_t calculate_ray_smallest_next (
-    struct kan_space_tree_t *tree,
-    struct kan_space_tree_ray_iterator_t *iterator,
-    kan_space_tree_road_t height_mask,
-    kan_space_tree_road_t height_to_root_mask)
+#define FUNCTION_CALCULATE_RAY_SMALLEST_TARGET_CASE(NAME, DIMENSION)                                                   \
+    case (DIMENSION + 1u):                                                                                             \
+    {                                                                                                                  \
+        struct ray_target_t result =                                                                                   \
+            get_ray_##NAME##_in_dimension (iterator, DIMENSION, height_mask, height_to_root_mask);                     \
+        if (result.time < smallest.time)                                                                               \
+        {                                                                                                              \
+            smallest.dimension = DIMENSION;                                                                            \
+            smallest.target = result.road;                                                                             \
+            smallest.time = result.time;                                                                               \
+            smallest.out_of_bounds = result.out_of_bounds;                                                             \
+        }                                                                                                              \
+    }
+
+#define FUNCTION_CALCULATE_RAY_SMALLEST_TARGET(NAME)                                                                   \
+    static inline struct ray_target_and_dimension_t calculate_ray_smallest_##NAME (                                    \
+        struct kan_space_tree_t *tree, struct kan_space_tree_ray_iterator_t *iterator,                                 \
+        kan_space_tree_road_t height_mask, kan_space_tree_road_t height_to_root_mask)                                  \
+    {                                                                                                                  \
+        struct ray_target_and_dimension_t smallest = {KAN_CONTAINER_SPACE_TREE_MAX_DIMENSIONS + 1u, 0u, DBL_MAX,       \
+                                                      KAN_TRUE};                                                       \
+        switch (tree->dimension_count)                                                                                 \
+        {                                                                                                              \
+            FUNCTION_CALCULATE_RAY_SMALLEST_TARGET_CASE (NAME, 3u)                                                     \
+            FUNCTION_CALCULATE_RAY_SMALLEST_TARGET_CASE (NAME, 2u)                                                     \
+            FUNCTION_CALCULATE_RAY_SMALLEST_TARGET_CASE (NAME, 1u)                                                     \
+            FUNCTION_CALCULATE_RAY_SMALLEST_TARGET_CASE (NAME, 0u)                                                     \
+        }                                                                                                              \
+                                                                                                                       \
+        return smallest;                                                                                               \
+    }
+
+FUNCTION_CALCULATE_RAY_SMALLEST_TARGET (next)
+FUNCTION_CALCULATE_RAY_SMALLEST_TARGET (previous)
+
+#undef FUNCTION_CALCULATE_RAY_SMALLEST_TARGET
+#undef FUNCTION_CALCULATE_RAY_SMALLEST_TARGET_CASE
+
+static inline void ray_calculate_previous_path_on_level (struct kan_space_tree_t *tree,
+                                                         struct kan_space_tree_ray_iterator_t *iterator)
 {
-    struct ray_next_and_dimension_t min = {KAN_CONTAINER_SPACE_TREE_MAX_DIMENSIONS + 1u, 0u, DBL_MAX, KAN_TRUE};
+    if (!iterator->current_node || !iterator->current_node->parent)
+    {
+        iterator->has_previous_path_on_level = KAN_FALSE;
+        return;
+    }
+
+    const kan_space_tree_road_t height_mask = node_height_mask (iterator->current_node->parent);
+    const kan_space_tree_road_t height_to_root_mask = height_mask_to_root_to_height_mask (height_mask);
+
+    struct ray_target_and_dimension_t smallest =
+        calculate_ray_smallest_previous (tree, iterator, height_mask, height_to_root_mask);
+
+    if (smallest.out_of_bounds)
+    {
+        // Previous is out of bounds, therefore there is no previous.
+        iterator->has_previous_path_on_level = KAN_FALSE;
+        return;
+    }
+
+    if (iterator->travelled_time < smallest.time)
+    {
+        // Never been so long back, therefore no previous.
+        iterator->has_previous_path_on_level = KAN_FALSE;
+        return;
+    }
+
+    iterator->has_previous_path_on_level = KAN_TRUE;
+    iterator->previous_path_on_level.roads[smallest.dimension] = smallest.target;
+
     switch (tree->dimension_count)
     {
 #define CASE(DIMENSION)                                                                                                \
     case (DIMENSION + 1u):                                                                                             \
-    {                                                                                                                  \
-        struct ray_next_t result = get_ray_next_in_dimension (iterator, DIMENSION, height_mask, height_to_root_mask);  \
-        if (result.time < min.time)                                                                                    \
+        if (DIMENSION != smallest.dimension)                                                                           \
         {                                                                                                              \
-            min.dimension = DIMENSION;                                                                                 \
-            min.next = result.next;                                                                                    \
-            min.time = result.time;                                                                                    \
-            min.out_of_bounds = result.out_of_bounds;                                                                  \
-        }                                                                                                              \
-    }
+            iterator->previous_path_on_level.roads[DIMENSION] = iterator->current_path.roads[DIMENSION];               \
+        }
 
         CASE (3u)
         CASE (2u)
@@ -576,8 +633,6 @@ static inline struct ray_next_and_dimension_t calculate_ray_smallest_next (
         CASE (0u)
 #undef CASE
     }
-
-    return min;
 }
 
 static void ray_iterator_next (struct kan_space_tree_t *tree, struct kan_space_tree_ray_iterator_t *iterator)
@@ -604,6 +659,7 @@ static void ray_iterator_next (struct kan_space_tree_t *tree, struct kan_space_t
                 KAN_ASSERT (iterator->current_node->height == 0u)
                 KAN_ASSERT (iterator->current_node == tree->root)
                 iterator->current_node = NULL;
+                ray_calculate_previous_path_on_level (tree, iterator);
                 return;
             }
         }
@@ -625,10 +681,11 @@ static void ray_iterator_next (struct kan_space_tree_t *tree, struct kan_space_t
                 {
                     // We've checked full ray time, now we just need to walk through parents up to the root.
                     iterator->current_node = parent_node;
+                    ray_calculate_previous_path_on_level (tree, iterator);
                     return;
                 }
 
-                struct ray_next_and_dimension_t smallest =
+                struct ray_target_and_dimension_t smallest =
                     calculate_ray_smallest_next (tree, iterator, height_mask, height_to_root_mask);
 
                 if (smallest.out_of_bounds)
@@ -639,7 +696,7 @@ static void ray_iterator_next (struct kan_space_tree_t *tree, struct kan_space_t
                 }
 
                 iterator->travelled_time += smallest.time;
-                iterator->next_path.roads[smallest.dimension] = smallest.next;
+                iterator->next_path.roads[smallest.dimension] = smallest.target;
 
                 switch (tree->dimension_count)
                 {
@@ -685,6 +742,7 @@ static void ray_iterator_next (struct kan_space_tree_t *tree, struct kan_space_t
         {
             // Next is not child of current parent node, therefore we'll visit parent and continue upper.
             iterator->current_node = parent_node;
+            ray_calculate_previous_path_on_level (tree, iterator);
             return;
         }
 
@@ -699,6 +757,7 @@ static void ray_iterator_next (struct kan_space_tree_t *tree, struct kan_space_t
             {
                 // Last level -- no children possible.
                 iterator->current_node = child_node;
+                ray_calculate_previous_path_on_level (tree, iterator);
                 return;
             }
 
@@ -833,6 +892,49 @@ CONTAINER_API void kan_space_tree_shape_move_to_next_node (struct kan_space_tree
     shape_iterator_next (tree, iterator);
 }
 
+kan_bool_t kan_space_tree_shape_is_first_occurrence (struct kan_space_tree_t *tree,
+                                                     struct kan_space_tree_quantized_path_t object_min,
+                                                     struct kan_space_tree_shape_iterator_t *iterator)
+{
+    if (iterator->current_node->height == 0u)
+    {
+        return KAN_TRUE;
+    }
+
+    const kan_space_tree_road_t mask =
+        height_mask_to_root_to_height_mask (make_height_mask (iterator->current_node->height - 1u));
+
+    switch (tree->dimension_count)
+    {
+    case 4u:
+        if (KAN_MAX (object_min.roads[3u] & mask, iterator->min_path.roads[3u] & mask) !=
+            (iterator->current_path.roads[3u] & mask))
+        {
+            return KAN_FALSE;
+        }
+    case 3u:
+        if (KAN_MAX (object_min.roads[2u] & mask, iterator->min_path.roads[2u] & mask) !=
+            (iterator->current_path.roads[2u] & mask))
+        {
+            return KAN_FALSE;
+        }
+    case 2u:
+        if (KAN_MAX (object_min.roads[1u] & mask, iterator->min_path.roads[1u] & mask) !=
+            (iterator->current_path.roads[1u] & mask))
+        {
+            return KAN_FALSE;
+        }
+    case 1u:
+        if (KAN_MAX (object_min.roads[0u] & mask, iterator->min_path.roads[0u] & mask) !=
+            (iterator->current_path.roads[0u] & mask))
+        {
+            return KAN_FALSE;
+        }
+    }
+
+    return KAN_TRUE;
+}
+
 struct kan_space_tree_ray_iterator_t kan_space_tree_ray_start (struct kan_space_tree_t *tree,
                                                                const kan_space_tree_floating_t *origin_sequence,
                                                                const kan_space_tree_floating_t *direction_sequence,
@@ -841,6 +943,8 @@ struct kan_space_tree_ray_iterator_t kan_space_tree_ray_start (struct kan_space_
     struct kan_space_tree_ray_iterator_t iterator;
     iterator.current_path = quantize_sequence (tree, origin_sequence);
     iterator.next_path = iterator.current_path;
+    iterator.has_previous_path_on_level = KAN_FALSE;
+    iterator.previous_path_on_level = iterator.current_path;
     iterator.current_node = NULL;
 
 #if defined(KAN_WITH_ASSERT)
@@ -892,6 +996,53 @@ void kan_space_tree_ray_move_to_next_node (struct kan_space_tree_t *tree,
                                            struct kan_space_tree_ray_iterator_t *iterator)
 {
     ray_iterator_next (tree, iterator);
+}
+
+kan_bool_t kan_space_tree_ray_is_first_occurrence (struct kan_space_tree_t *tree,
+                                                   struct kan_space_tree_quantized_path_t object_min,
+                                                   struct kan_space_tree_quantized_path_t object_max,
+                                                   struct kan_space_tree_ray_iterator_t *iterator)
+{
+    if (!iterator->has_previous_path_on_level)
+    {
+        // There was nothing before, so it is always a first occurrence.
+        return KAN_TRUE;
+    }
+
+    const kan_space_tree_road_t mask =
+        height_mask_to_root_to_height_mask (make_height_mask (iterator->current_node->height - 1u));
+
+    // Sub node is the first occurrence for the ray only and if only
+    // previous path on this level didn't contain the same object.
+    switch (tree->dimension_count)
+    {
+    case 4u:
+        if ((iterator->previous_path_on_level.roads[3u] & mask) < (object_min.roads[3u] & mask) ||
+            (iterator->previous_path_on_level.roads[3u] & mask) > (object_max.roads[3u] & mask))
+        {
+            return KAN_TRUE;
+        }
+    case 3u:
+        if ((iterator->previous_path_on_level.roads[2u] & mask) < (object_min.roads[2u] & mask) ||
+            (iterator->previous_path_on_level.roads[2u] & mask) > (object_max.roads[2u] & mask))
+        {
+            return KAN_TRUE;
+        }
+    case 2u:
+        if ((iterator->previous_path_on_level.roads[1u] & mask) < (object_min.roads[1u] & mask) ||
+            (iterator->previous_path_on_level.roads[1u] & mask) > (object_max.roads[1u] & mask))
+        {
+            return KAN_TRUE;
+        }
+    case 1u:
+        if ((iterator->previous_path_on_level.roads[0u] & mask) < (object_min.roads[0u] & mask) ||
+            (iterator->previous_path_on_level.roads[0u] & mask) > (object_max.roads[0u] & mask))
+        {
+            return KAN_TRUE;
+        }
+    }
+
+    return KAN_FALSE;
 }
 
 kan_bool_t kan_space_tree_is_re_insert_needed (struct kan_space_tree_t *tree,

@@ -30,12 +30,6 @@ KAN_LOG_DEFINE_CATEGORY (repository);
 /// \details Always 64 bit as observation support depends on it.
 typedef uint64_t kan_repository_mask_t;
 
-/// \brief Integer for cursor ids for return uniqueness routine for some indices.
-typedef kan_memory_size_t kan_return_uniqueness_cursor_id_t;
-
-#define KAN_RETURN_UNIQUENESS_CURSOR_ID_INVALID 0u
-#define KAN_RETURN_UNIQUENESS_CURSOR_ID_FIRST 1u
-
 /// \brief Biggest unsigned integer supported by repository for indexing.
 typedef kan_memory_size_t kan_repository_indexed_unsigned_t;
 
@@ -166,23 +160,6 @@ struct cascade_deleters_definition_t
 {
     kan_instance_size_t cascade_deleters_count;
     struct cascade_deleter_t *cascade_deleters;
-};
-
-struct return_uniqueness_origin_t
-{
-    struct kan_atomic_int_t management_lock;
-    kan_return_uniqueness_cursor_id_t cursors_next_id;
-    kan_return_uniqueness_cursor_id_t cursors[KAN_REPOSITORY_RETURN_UNIQUENESS_MAX_CURSORS];
-};
-
-// TODO: We can make access register access much more cache friendly by introducing complex structure-of-arrays like
-//       solution, so accessed ids for cursor id will be much easier to access for the cache. It should give us some
-//       additional speed as we seem to be locked by cache misses right now.
-
-struct return_uniqueness_access_register_t
-{
-    kan_return_uniqueness_cursor_id_t accessed_ids[KAN_REPOSITORY_RETURN_UNIQUENESS_MAX_CURSORS];
-    kan_instance_size_t references;
 };
 
 struct singleton_storage_node_t
@@ -384,8 +361,9 @@ struct interval_index_t
 struct space_index_sub_node_t
 {
     struct kan_space_tree_sub_node_t sub_node;
+    struct kan_space_tree_quantized_path_t object_min;
+    struct kan_space_tree_quantized_path_t object_max;
     struct indexed_storage_record_node_t *record;
-    struct return_uniqueness_access_register_t *uniqueness_register;
 };
 
 struct space_index_t
@@ -407,8 +385,6 @@ struct space_index_t
     kan_repository_indexed_floating_t source_global_min;
     kan_repository_indexed_floating_t source_global_max;
     kan_repository_indexed_floating_t source_leaf_size;
-
-    struct return_uniqueness_origin_t return_uniqueness;
 };
 
 struct indexed_insert_query_t
@@ -717,7 +693,6 @@ struct indexed_space_shape_cursor_t
     struct space_index_t *index;
     struct kan_space_tree_shape_iterator_t iterator;
     struct space_index_sub_node_t *current_sub_node;
-    kan_return_uniqueness_cursor_id_t return_uniqueness_id;
     kan_repository_indexed_floating_t min[KAN_CONTAINER_SPACE_TREE_MAX_DIMENSIONS];
     kan_repository_indexed_floating_t max[KAN_CONTAINER_SPACE_TREE_MAX_DIMENSIONS];
 };
@@ -752,7 +727,6 @@ struct indexed_space_ray_cursor_t
     struct space_index_t *index;
     struct kan_space_tree_ray_iterator_t iterator;
     struct space_index_sub_node_t *current_sub_node;
-    kan_return_uniqueness_cursor_id_t return_uniqueness_id;
     kan_repository_indexed_floating_t max_time;
     kan_repository_indexed_floating_t origin[KAN_CONTAINER_SPACE_TREE_MAX_DIMENSIONS];
     kan_repository_indexed_floating_t direction[KAN_CONTAINER_SPACE_TREE_MAX_DIMENSIONS];
@@ -2669,66 +2643,6 @@ static void singleton_storage_node_shutdown_and_free (struct singleton_storage_n
     kan_free_batched (node->allocation_group, node);
 }
 
-static kan_return_uniqueness_cursor_id_t return_uniqueness_request_cursor_id (struct return_uniqueness_origin_t *origin)
-{
-    kan_atomic_int_lock (&origin->management_lock);
-    kan_return_uniqueness_cursor_id_t id = origin->cursors_next_id++;
-
-    if (origin->cursors[id % KAN_REPOSITORY_RETURN_UNIQUENESS_MAX_CURSORS] != KAN_RETURN_UNIQUENESS_CURSOR_ID_INVALID)
-    {
-        kan_critical_error ("Too many cursors with return uniqueness per origin (usually index).", __FILE__, __LINE__);
-    }
-
-    origin->cursors[id % KAN_REPOSITORY_RETURN_UNIQUENESS_MAX_CURSORS] = id;
-    kan_atomic_int_unlock (&origin->management_lock);
-    return id;
-}
-
-static inline kan_bool_t return_uniqueness_is_registered (struct return_uniqueness_access_register_t *access_register,
-                                                          kan_return_uniqueness_cursor_id_t cursor_id)
-{
-    return access_register->accessed_ids[cursor_id % KAN_REPOSITORY_RETURN_UNIQUENESS_MAX_CURSORS] == cursor_id;
-}
-
-static inline void return_uniqueness_register (struct return_uniqueness_access_register_t *access_register,
-                                               kan_return_uniqueness_cursor_id_t cursor_id)
-{
-    access_register->accessed_ids[cursor_id % KAN_REPOSITORY_RETURN_UNIQUENESS_MAX_CURSORS] = cursor_id;
-}
-
-static void return_uniqueness_relieve_cursor_id (struct return_uniqueness_origin_t *origin,
-                                                 kan_return_uniqueness_cursor_id_t cursor_id)
-{
-    kan_atomic_int_lock (&origin->management_lock);
-    origin->cursors[cursor_id % KAN_REPOSITORY_RETURN_UNIQUENESS_MAX_CURSORS] = KAN_RETURN_UNIQUENESS_CURSOR_ID_INVALID;
-    kan_atomic_int_unlock (&origin->management_lock);
-}
-
-static inline struct return_uniqueness_access_register_t *return_uniqueness_request_register (
-    kan_allocation_group_t group)
-{
-    struct return_uniqueness_access_register_t *access_register =
-        kan_allocate_batched (group, sizeof (struct return_uniqueness_access_register_t));
-    access_register->references = 0u;
-
-    for (kan_loop_size_t index = 0u; index < KAN_REPOSITORY_RETURN_UNIQUENESS_MAX_CURSORS; ++index)
-    {
-        access_register->accessed_ids[index] = KAN_RETURN_UNIQUENESS_CURSOR_ID_INVALID;
-    }
-
-    return access_register;
-}
-
-static inline void return_uniqueness_relieve_register (struct return_uniqueness_access_register_t *access_register,
-                                                       kan_allocation_group_t group)
-{
-    --access_register->references;
-    if (access_register->references == 0u)
-    {
-        kan_free_batched (group, access_register);
-    }
-}
-
 static void indexed_storage_shutdown_and_free_record_node (struct indexed_storage_node_t *storage,
                                                            struct indexed_storage_record_node_t *record)
 {
@@ -3489,7 +3403,6 @@ static void interval_index_shutdown_and_free (struct interval_index_t *interval_
 
 static void space_index_insert_record_with_bounds (struct space_index_t *space_index,
                                                    struct indexed_storage_record_node_t *record_node,
-                                                   struct return_uniqueness_access_register_t *access_register,
                                                    const kan_repository_indexed_floating_t *min,
                                                    const kan_repository_indexed_floating_t *max)
 {
@@ -3498,9 +3411,9 @@ static void space_index_insert_record_with_bounds (struct space_index_t *space_i
     {
         struct space_index_sub_node_t *sub_node = (struct space_index_sub_node_t *) kan_allocate_batched (
             space_index->storage->space_index_allocation_group, sizeof (struct space_index_sub_node_t));
+        sub_node->object_min = iterator.base.min_path;
+        sub_node->object_max = iterator.base.max_path;
         sub_node->record = record_node;
-        sub_node->uniqueness_register = access_register;
-        ++access_register->references;
         kan_space_tree_insertion_insert_and_move (&space_index->tree, &iterator, &sub_node->sub_node);
     }
 }
@@ -3526,9 +3439,7 @@ static void space_index_insert_record (struct space_index_t *space_index,
     kan_repository_indexed_floating_t max[KAN_CONTAINER_SPACE_TREE_MAX_DIMENSIONS];
     KAN_ASSERT (space_index->baked_dimension_count <= KAN_CONTAINER_SPACE_TREE_MAX_DIMENSIONS)
     space_index_get_min_max_from_record (space_index, record_node, min, max);
-    space_index_insert_record_with_bounds (
-        space_index, record_node,
-        return_uniqueness_request_register (space_index->storage->space_index_allocation_group), min, max);
+    space_index_insert_record_with_bounds (space_index, record_node, min, max);
 }
 
 struct space_index_sub_node_deletion_order_t
@@ -3564,9 +3475,6 @@ static inline void space_index_delete_all_sub_nodes (struct space_index_t *space
                 to_delete->node = node;
                 to_delete->sub_node = typed_sub_node;
                 first_to_delete = to_delete;
-
-                return_uniqueness_relieve_register (typed_sub_node->uniqueness_register,
-                                                    space_index->storage->space_index_allocation_group);
             }
 
             sub_node = sub_node->next;
@@ -3627,9 +3535,6 @@ static void space_index_delete_by_sub_node (struct space_index_t *space_index,
                                             struct kan_stack_group_allocator_t *temporary_allocator)
 {
     struct indexed_storage_record_node_t *record_node = sub_node->record;
-    return_uniqueness_relieve_register (sub_node->uniqueness_register,
-                                        space_index->storage->space_index_allocation_group);
-
     kan_space_tree_delete (&space_index->tree, tree_node, &sub_node->sub_node);
     kan_free_batched (space_index->storage->space_index_allocation_group, sub_node);
 
@@ -3669,9 +3574,7 @@ static void space_index_update (struct space_index_t *space_index,
     if (kan_space_tree_is_re_insert_needed (&space_index->tree, old_min, old_max, new_min, new_max))
     {
         space_index_delete_all_sub_nodes (space_index, old_min, old_max, record_node, temporary_allocator);
-        space_index_insert_record_with_bounds (
-            space_index, record_node,
-            return_uniqueness_request_register (space_index->storage->space_index_allocation_group), new_min, new_max);
+        space_index_insert_record_with_bounds (space_index, record_node, new_min, new_max);
     }
 }
 
@@ -3695,9 +3598,7 @@ static void space_index_update_with_sub_node (struct space_index_t *space_index,
     {
         space_index_delete_by_sub_node (space_index, tree_node, sub_node, observation_buffer_memory,
                                         temporary_allocator);
-        space_index_insert_record_with_bounds (
-            space_index, record_node,
-            return_uniqueness_request_register (space_index->storage->space_index_allocation_group), new_min, new_max);
+        space_index_insert_record_with_bounds (space_index, record_node, new_min, new_max);
     }
 }
 
@@ -3711,9 +3612,6 @@ static void space_index_shutdown_sub_nodes (struct space_index_t *space_index, s
     while (node->first_sub_node)
     {
         struct kan_space_tree_sub_node_t *next = node->first_sub_node->next;
-        return_uniqueness_relieve_register (
-            ((struct space_index_sub_node_t *) node->first_sub_node)->uniqueness_register,
-            space_index->storage->space_index_allocation_group);
         kan_free_batched (space_index->storage->space_index_allocation_group, node->first_sub_node);
         node->first_sub_node = next;
     }
@@ -7441,14 +7339,6 @@ static struct space_index_t *indexed_storage_find_or_create_space_index (struct 
     index->baked_archetype = baked_min_archetype;
     index->baked_dimension_count = baked_min_count;
 
-    index->return_uniqueness.management_lock = kan_atomic_int_init (0);
-    index->return_uniqueness.cursors_next_id = KAN_RETURN_UNIQUENESS_CURSOR_ID_FIRST;
-
-    for (kan_loop_size_t cursor_index = 0u; cursor_index < KAN_REPOSITORY_RETURN_UNIQUENESS_MAX_CURSORS; ++cursor_index)
-    {
-        index->return_uniqueness.cursors[cursor_index] = KAN_RETURN_UNIQUENESS_CURSOR_ID_INVALID;
-    }
-
     kan_space_tree_init (&index->tree, storage->space_index_allocation_group, baked_min_count, global_min, global_max,
                          leaf_size);
 
@@ -7499,7 +7389,6 @@ static inline struct indexed_space_shape_cursor_t indexed_storage_space_query_ex
 
     struct indexed_space_shape_cursor_t cursor;
     cursor.index = query_data->index;
-    cursor.return_uniqueness_id = return_uniqueness_request_cursor_id (&query->index->return_uniqueness);
 
     switch (cursor.index->baked_dimension_count)
     {
@@ -7563,7 +7452,6 @@ static inline struct indexed_space_ray_cursor_t indexed_storage_space_query_exec
 
     struct indexed_space_ray_cursor_t cursor;
     cursor.index = query_data->index;
-    cursor.return_uniqueness_id = return_uniqueness_request_cursor_id (&query->index->return_uniqueness);
 
     switch (cursor.index->baked_dimension_count)
     {
@@ -7656,8 +7544,8 @@ static inline void indexed_storage_space_shape_cursor_fix (struct indexed_space_
 {
     while (cursor->current_sub_node)
     {
-        if (!return_uniqueness_is_registered (cursor->current_sub_node->uniqueness_register,
-                                              cursor->return_uniqueness_id))
+        if (kan_space_tree_shape_is_first_occurrence (&cursor->index->tree, cursor->current_sub_node->object_min,
+                                                      &cursor->iterator))
         {
             kan_bool_t inside = cursor->iterator.is_inner_node;
             if (!inside)
@@ -7691,8 +7579,6 @@ static inline void indexed_storage_space_shape_cursor_fix (struct indexed_space_
 
             if (inside)
             {
-                return_uniqueness_register (cursor->current_sub_node->uniqueness_register,
-                                            cursor->return_uniqueness_id);
                 break;
             }
         }
@@ -7705,8 +7591,8 @@ static inline void indexed_storage_space_ray_cursor_fix (struct indexed_space_ra
 {
     while (cursor->current_sub_node)
     {
-        if (!return_uniqueness_is_registered (cursor->current_sub_node->uniqueness_register,
-                                              cursor->return_uniqueness_id))
+        if (kan_space_tree_ray_is_first_occurrence (&cursor->index->tree, cursor->current_sub_node->object_min,
+                                                    cursor->current_sub_node->object_max, &cursor->iterator))
         {
 #if defined(KAN_REPOSITORY_SAFEGUARDS_ENABLED)
             if (!safeguard_indexed_read_access_try_create (cursor->index->storage, cursor->current_sub_node->record))
@@ -7735,8 +7621,6 @@ static inline void indexed_storage_space_ray_cursor_fix (struct indexed_space_ra
 
             if (output.hit && output.time <= cursor->max_time)
             {
-                return_uniqueness_register (cursor->current_sub_node->uniqueness_register,
-                                            cursor->return_uniqueness_id);
                 break;
             }
         }
@@ -7749,7 +7633,6 @@ static inline void indexed_storage_space_shape_cursor_close (struct indexed_spac
 {
     if (cursor->index)
     {
-        return_uniqueness_relieve_cursor_id (&cursor->index->return_uniqueness, cursor->return_uniqueness_id);
         indexed_storage_release_access (cursor->index->storage);
     }
 }
@@ -7758,7 +7641,6 @@ static inline void indexed_storage_space_ray_cursor_close (struct indexed_space_
 {
     if (cursor->index)
     {
-        return_uniqueness_relieve_cursor_id (&cursor->index->return_uniqueness, cursor->return_uniqueness_id);
         indexed_storage_release_access (cursor->index->storage);
     }
 }
