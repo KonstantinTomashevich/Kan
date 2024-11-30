@@ -169,8 +169,10 @@ struct kan_space_tree_quantized_path_t
 /// \brief Describes space tree node structure.
 struct kan_space_tree_node_t
 {
-    struct kan_space_tree_node_t *parent;
     uint8_t height;
+
+    /// \details Index in `kan_space_tree_node_children_allocation_t` of parent.
+    uint8_t index_in_array;
 
     // We don't use dynamic array for sub nodes in order to reduce memory footprint of nodes,
     // because dynamic arrays are relatively big and a bit of overkill for our needs here.
@@ -179,19 +181,25 @@ struct kan_space_tree_node_t
     uint16_t sub_nodes_count;
     void *sub_nodes;
 
-    /// \brief Array of children, size depends on dimension count of tree.
-    /// \warning Nodes with last level height of the tree do not have this array at all!
-    struct kan_space_tree_node_t *children[];
+    /// \brief Pointer to allocation that is used to store all children at once for cache coherency.
+    struct kan_space_tree_node_children_allocation_t *children_allocation;
+};
+
+/// \brief Structure that stores all `kan_space_tree_node_t` as one allocation for better cache coherency.
+struct kan_space_tree_node_children_allocation_t
+{
+    struct kan_space_tree_node_t *parent;
+    struct kan_space_tree_node_t children[];
 };
 
 /// \brief Root structure of space tree implementation.
 struct kan_space_tree_t
 {
-    struct kan_space_tree_node_t *root;
     uint8_t dimension_count;
     uint8_t last_level_height;
     uint16_t sub_node_size;
     uint16_t sub_node_alignment;
+    struct kan_space_tree_node_t root;
     kan_space_tree_floating_t global_min;
     kan_space_tree_floating_t global_max;
     kan_allocation_group_t nodes_allocation_group;
@@ -267,7 +275,7 @@ CONTAINER_API struct kan_space_tree_insertion_iterator_t kan_space_tree_insertio
 /// \brief Inserts given sub node into tree and moves to the next node for the insertion.
 /// \invariant kan_space_tree_insertion_is_finished is KAN_FALSE.
 CONTAINER_API void *kan_space_tree_insertion_insert_and_move (struct kan_space_tree_t *tree,
-                                                             struct kan_space_tree_insertion_iterator_t *iterator);
+                                                              struct kan_space_tree_insertion_iterator_t *iterator);
 
 /// \brief Whether given insertion iteration is finished.
 static inline kan_bool_t kan_space_tree_insertion_is_finished (struct kan_space_tree_insertion_iterator_t *iterator)

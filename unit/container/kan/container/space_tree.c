@@ -67,11 +67,11 @@ static inline kan_space_tree_road_t height_mask_to_root_to_height_mask (kan_spac
     return ~(height_mask - 1u);
 }
 
-static inline kan_space_tree_road_t calculate_child_node_index (struct kan_space_tree_t *tree,
-                                                                struct kan_space_tree_node_t *node,
-                                                                struct kan_space_tree_quantized_path_t path)
+static inline uint8_t calculate_child_node_index (struct kan_space_tree_t *tree,
+                                                  struct kan_space_tree_node_t *node,
+                                                  struct kan_space_tree_quantized_path_t path)
 {
-    kan_space_tree_road_t index = 0u;
+    uint8_t index = 0u;
     const kan_space_tree_road_t height_mask = node_height_mask (node);
 
     switch (tree->dimension_count)
@@ -262,6 +262,18 @@ static inline void shape_iterator_update_is_inner_node (struct kan_space_tree_t 
     }
 }
 
+static inline struct kan_space_tree_node_t *kan_space_tree_node_get_parent (struct kan_space_tree_node_t *node)
+{
+    if (node->height == 0u)
+    {
+        return NULL;
+    }
+
+    uint8_t *allocation_address = ((uint8_t *) (node - node->index_in_array)) -
+                                  offsetof (struct kan_space_tree_node_children_allocation_t, children);
+    return ((struct kan_space_tree_node_children_allocation_t *) allocation_address)->parent;
+}
+
 static void shape_iterator_next (struct kan_space_tree_t *tree, struct kan_space_tree_shape_iterator_t *iterator)
 {
     struct kan_space_tree_node_t *parent_node = NULL;
@@ -281,13 +293,13 @@ static void shape_iterator_next (struct kan_space_tree_t *tree, struct kan_space
         {
             KAN_ASSERT (!parent_node)
             // If we're in current, then all children of current are visited. Therefore, go to parent.
-            parent_node = iterator->current_node->parent;
+            parent_node = kan_space_tree_node_get_parent (iterator->current_node);
 
             if (!parent_node)
             {
                 // We've visited root, that means we've already visited everything.
                 KAN_ASSERT (iterator->current_node->height == 0u)
-                KAN_ASSERT (iterator->current_node == tree->root)
+                KAN_ASSERT (iterator->current_node == &tree->root)
                 iterator->current_node = NULL;
                 shape_iterator_update_is_inner_node (tree, iterator);
                 return;
@@ -297,7 +309,7 @@ static void shape_iterator_next (struct kan_space_tree_t *tree, struct kan_space
         if (!parent_node)
         {
             // We don't have current, it means that we're either starting from scratch or restarting iteration again.
-            parent_node = tree->root;
+            parent_node = &tree->root;
             go_further = KAN_FALSE;
         }
 
@@ -317,11 +329,10 @@ static void shape_iterator_next (struct kan_space_tree_t *tree, struct kan_space
             }
         }
 
-        kan_space_tree_road_t child_node_index = calculate_child_node_index (tree, parent_node, iterator->current_path);
-        struct kan_space_tree_node_t *child_node = parent_node->children[child_node_index];
-
-        while (child_node)
+        uint8_t child_node_index = calculate_child_node_index (tree, parent_node, iterator->current_path);
+        while (parent_node->children_allocation)
         {
+            struct kan_space_tree_node_t *child_node = &parent_node->children_allocation->children[child_node_index];
             if (child_node->height == tree->last_level_height)
             {
                 // Last level -- no children possible.
@@ -337,50 +348,10 @@ static void shape_iterator_next (struct kan_space_tree_t *tree, struct kan_space
             shape_iterator_reset_all_dimensions (tree, iterator, height_mask_to_root_to_height_mask (child_height_mask),
                                                  child_height_mask, reversed_child_height_mask);
             child_node_index = calculate_child_node_index (tree, parent_node, iterator->current_path);
-            child_node = parent_node->children[child_node_index];
         }
 
         // We've technically reached null node and will be repositioned in next while iteration.
         iterator->current_node = NULL;
-    }
-}
-
-static inline kan_instance_size_t calculate_node_size (uint8_t dimension_count, kan_bool_t with_children)
-{
-    kan_instance_size_t size = sizeof (struct kan_space_tree_node_t);
-    if (with_children)
-    {
-        const uint8_t count_of_children = 1u << dimension_count;
-        size += sizeof (void *) * (kan_instance_size_t) count_of_children;
-    }
-
-    return (kan_instance_size_t) kan_apply_alignment (size, _Alignof (struct kan_space_tree_node_t));
-}
-
-static inline void reset_node_children (struct kan_space_tree_t *tree, struct kan_space_tree_node_t *node)
-{
-    switch (tree->dimension_count)
-    {
-    case 4u:
-        node->children[15u] = NULL;
-        node->children[14u] = NULL;
-        node->children[13u] = NULL;
-        node->children[12u] = NULL;
-        node->children[11u] = NULL;
-        node->children[10u] = NULL;
-        node->children[9u] = NULL;
-        node->children[8u] = NULL;
-    case 3u:
-        node->children[7u] = NULL;
-        node->children[6u] = NULL;
-        node->children[5u] = NULL;
-        node->children[4u] = NULL;
-    case 2u:
-        node->children[3u] = NULL;
-        node->children[2u] = NULL;
-    case 1u:
-        node->children[1u] = NULL;
-        node->children[0u] = NULL;
     }
 }
 
@@ -389,29 +360,32 @@ static inline struct kan_space_tree_node_t *get_or_create_child_node (struct kan
                                                                       kan_space_tree_road_t child_index)
 {
     KAN_ASSERT (parent_node->height != tree->last_level_height)
-    if (parent_node->children[child_index])
+    if (parent_node->children_allocation)
     {
-        return parent_node->children[child_index];
+        return &parent_node->children_allocation->children[child_index];
     }
 
     const kan_space_tree_road_t child_height = parent_node->height + 1u;
-    struct kan_space_tree_node_t *child_node =
-        kan_allocate_batched (tree->nodes_allocation_group,
-                              calculate_node_size (tree->dimension_count, child_height != tree->last_level_height));
+    const kan_instance_size_t children_count = 1u << tree->dimension_count;
 
-    child_node->parent = parent_node;
-    child_node->height = (uint8_t) child_height;
-    child_node->sub_nodes_capacity = 0u;
-    child_node->sub_nodes_count = 0u;
-    child_node->sub_nodes = NULL;
+    struct kan_space_tree_node_children_allocation_t *children_allocation =
+        kan_allocate_batched (tree->nodes_allocation_group, sizeof (struct kan_space_tree_node_children_allocation_t) +
+                                                                sizeof (struct kan_space_tree_node_t) * children_count);
+    children_allocation->parent = parent_node;
 
-    if (child_height != tree->last_level_height)
+    for (kan_loop_size_t index = 0u; index < (kan_loop_size_t) children_count; ++index)
     {
-        reset_node_children (tree, child_node);
+        struct kan_space_tree_node_t *child_node = &children_allocation->children[index];
+        child_node->index_in_array = (uint8_t) index;
+        child_node->height = (uint8_t) child_height;
+        child_node->sub_nodes_capacity = 0u;
+        child_node->sub_nodes_count = 0u;
+        child_node->sub_nodes = NULL;
+        child_node->children_allocation = NULL;
     }
 
-    parent_node->children[child_index] = child_node;
-    return child_node;
+    parent_node->children_allocation = children_allocation;
+    return &parent_node->children_allocation->children[child_index];
 }
 
 static void insertion_iterator_next (struct kan_space_tree_t *tree,
@@ -425,13 +399,13 @@ static void insertion_iterator_next (struct kan_space_tree_t *tree,
             // If we have current, then we're in a middle of iteration and need to step further.
 
             // If we're in current, then all children of current are visited. Therefore, go to parent.
-            parent_node = iterator->base.current_node->parent;
+            parent_node = kan_space_tree_node_get_parent (iterator->base.current_node);
 
             if (!parent_node)
             {
                 // We've visited root, that means we've already visited everything.
                 KAN_ASSERT (iterator->base.current_node->height == 0u)
-                KAN_ASSERT (iterator->base.current_node == tree->root)
+                KAN_ASSERT (iterator->base.current_node == &tree->root)
                 iterator->base.current_node = NULL;
                 return;
             }
@@ -451,11 +425,10 @@ static void insertion_iterator_next (struct kan_space_tree_t *tree,
         else
         {
             // We don't have current, it means that we're either starting from scratch or restarting iteration again.
-            parent_node = tree->root;
+            parent_node = &tree->root;
         }
 
-        kan_space_tree_road_t child_node_index =
-            calculate_child_node_index (tree, parent_node, iterator->base.current_path);
+        uint8_t child_node_index = calculate_child_node_index (tree, parent_node, iterator->base.current_path);
         struct kan_space_tree_node_t *child_node = get_or_create_child_node (tree, parent_node, child_node_index);
 
         while (child_node->height < iterator->target_height)
@@ -593,7 +566,7 @@ FUNCTION_CALCULATE_RAY_SMALLEST_TARGET (previous)
 static inline void ray_calculate_previous_path_on_level (struct kan_space_tree_t *tree,
                                                          struct kan_space_tree_ray_iterator_t *iterator)
 {
-    if (!iterator->current_node || !iterator->current_node->parent ||
+    if (!iterator->current_node || iterator->current_node->height == 0u ||
         // No need to spend time on calculations if we don't have sub nodes anyway.
         !iterator->current_node->sub_nodes)
     {
@@ -601,7 +574,7 @@ static inline void ray_calculate_previous_path_on_level (struct kan_space_tree_t
         return;
     }
 
-    const kan_space_tree_road_t height_mask = node_height_mask (iterator->current_node->parent);
+    const kan_space_tree_road_t height_mask = make_height_mask (iterator->current_node->height - 1u);
     const kan_space_tree_road_t height_to_root_mask = height_mask_to_root_to_height_mask (height_mask);
 
     struct ray_target_and_dimension_t smallest =
@@ -658,12 +631,12 @@ static void ray_iterator_next (struct kan_space_tree_t *tree, struct kan_space_t
 
         if (iterator->current_node)
         {
-            parent_node = iterator->current_node->parent;
+            parent_node = kan_space_tree_node_get_parent (iterator->current_node);
             if (!parent_node)
             {
                 // We've visited root, that means we've already visited everything.
                 KAN_ASSERT (iterator->current_node->height == 0u)
-                KAN_ASSERT (iterator->current_node == tree->root)
+                KAN_ASSERT (iterator->current_node == &tree->root)
                 iterator->current_node = NULL;
                 ray_calculate_previous_path_on_level (tree, iterator);
                 return;
@@ -672,7 +645,7 @@ static void ray_iterator_next (struct kan_space_tree_t *tree, struct kan_space_t
 
         if (!parent_node)
         {
-            parent_node = tree->root;
+            parent_node = &tree->root;
             go_further = KAN_FALSE;
         }
 
@@ -754,11 +727,11 @@ static void ray_iterator_next (struct kan_space_tree_t *tree, struct kan_space_t
 
         // Next is a child, therefore we can finally descend to it.
         iterator->current_path = iterator->next_path;
-        kan_space_tree_road_t child_node_index = calculate_child_node_index (tree, parent_node, iterator->current_path);
-        struct kan_space_tree_node_t *child_node = parent_node->children[child_node_index];
+        uint8_t child_node_index = calculate_child_node_index (tree, parent_node, iterator->current_path);
 
-        while (child_node)
+        while (parent_node->children_allocation)
         {
+            struct kan_space_tree_node_t *child_node = &parent_node->children_allocation->children[child_node_index];
             if (child_node->height == tree->last_level_height)
             {
                 // Last level -- no children possible.
@@ -769,7 +742,6 @@ static void ray_iterator_next (struct kan_space_tree_t *tree, struct kan_space_t
 
             parent_node = child_node;
             child_node_index = calculate_child_node_index (tree, parent_node, iterator->current_path);
-            child_node = parent_node->children[child_node_index];
         }
 
         // We've technically reached null node and will be repositioned in next while iteration.
@@ -810,14 +782,11 @@ void kan_space_tree_init (struct kan_space_tree_t *tree,
         ++tree->last_level_height;
     }
 
-    tree->root = (struct kan_space_tree_node_t *) kan_allocate_batched (
-        allocation_group, calculate_node_size (tree->dimension_count, KAN_TRUE));
-    tree->root->parent = NULL;
-    tree->root->height = 0u;
-    tree->root->sub_nodes_capacity = 0u;
-    tree->root->sub_nodes_count = 0u;
-    tree->root->sub_nodes = NULL;
-    reset_node_children (tree, tree->root);
+    tree->root.height = 0u;
+    tree->root.sub_nodes_capacity = 0u;
+    tree->root.sub_nodes_count = 0u;
+    tree->root.sub_nodes = NULL;
+    tree->root.children_allocation = NULL;
 }
 
 static inline void shape_iterator_init (struct kan_space_tree_t *tree,
@@ -1157,43 +1126,47 @@ kan_bool_t kan_space_tree_is_contained_in_one_sub_node (struct kan_space_tree_t 
 
 static kan_bool_t is_node_empty (struct kan_space_tree_t *tree, struct kan_space_tree_node_t *node)
 {
-    if (node->sub_nodes_count == 0u)
+    if (node->sub_nodes_count > 0u)
     {
         return KAN_FALSE;
     }
 
-    kan_bool_t has_children = KAN_FALSE;
-    if (node->height != tree->last_level_height)
+    if (node->children_allocation)
     {
-        switch (tree->dimension_count)
+        const kan_instance_size_t children_count = 1u << tree->dimension_count;
+        for (kan_loop_size_t index = 0u; index < (kan_loop_size_t) children_count; ++index)
         {
-        case 4u:
-            has_children = node->children[0u] || node->children[1u] || node->children[2u] || node->children[3u] ||
-                           node->children[4u] || node->children[5u] || node->children[6u] || node->children[7u] ||
-                           node->children[8u] || node->children[9u] || node->children[10u] || node->children[11u] ||
-                           node->children[12u] || node->children[13u] || node->children[14u] || node->children[15u];
-            break;
-        case 3u:
-            has_children = node->children[0u] || node->children[1u] || node->children[2u] || node->children[3u] ||
-                           node->children[4u] || node->children[5u] || node->children[6u] || node->children[7u];
-            break;
-        case 2u:
-            has_children = node->children[0u] || node->children[1u] || node->children[2u] || node->children[3u];
-            break;
-        case 1u:
-            has_children = node->children[0u] || node->children[1u];
-            break;
+            struct kan_space_tree_node_t *child_node = &node->children_allocation->children[index];
+            // Intentionally do not use recursion here as we're only using this function to go from bottom to top.
+            if (child_node->sub_nodes_count > 0u || child_node->children_allocation)
+            {
+                return KAN_FALSE;
+            }
         }
     }
 
-    return !has_children;
+    // Either no children or all children are empty.
+    return KAN_TRUE;
 }
 
-static inline void kan_space_tree_node_free (struct kan_space_tree_t *tree, struct kan_space_tree_node_t *node)
+static inline void kan_space_tree_node_shutdown_empty (struct kan_space_tree_t *tree, struct kan_space_tree_node_t *node)
 {
-    kan_free_general (tree->sub_nodes_allocation_group, node->sub_nodes,
-                      tree->sub_node_size * node->sub_nodes_capacity);
-    kan_free_batched (tree->nodes_allocation_group, node);
+    if (node->sub_nodes)
+    {
+        kan_free_general (tree->sub_nodes_allocation_group, node->sub_nodes,
+                          tree->sub_node_size * node->sub_nodes_capacity);
+
+        node->sub_nodes_capacity = 0u;
+        node->sub_nodes_count = 0u;
+        node->sub_nodes = NULL;
+    }
+
+    // We only use this function for empty nodes, therefore no need for recursive deallocation of children.
+    if (node->children_allocation)
+    {
+        kan_free_batched (tree->nodes_allocation_group, node->children_allocation);
+        node->children_allocation = NULL;
+    }
 }
 
 void kan_space_tree_delete (struct kan_space_tree_t *tree, struct kan_space_tree_node_t *node, void *sub_node)
@@ -1218,44 +1191,10 @@ void kan_space_tree_delete (struct kan_space_tree_t *tree, struct kan_space_tree
         }
     }
 
-    while (node != tree->root && is_node_empty (tree, node))
+    while (node != &tree->root && is_node_empty (tree, node))
     {
-        struct kan_space_tree_node_t *parent = node->parent;
-        kan_space_tree_node_free (tree, node);
-
-        // Could be optimized out if we knew node path.
-        switch (tree->dimension_count)
-        {
-#define IF(INDEX)                                                                                                      \
-    if (parent->children[INDEX] == node)                                                                               \
-    {                                                                                                                  \
-        parent->children[INDEX] = NULL;                                                                                \
-        break;                                                                                                         \
-    }
-
-        case 4u:
-            IF (15u)
-            IF (14u)
-            IF (13u)
-            IF (12u)
-            IF (11u)
-            IF (10u)
-            IF (9u)
-            IF (8u)
-        case 3u:
-            IF (7u)
-            IF (6u)
-            IF (5u)
-            IF (4u)
-        case 2u:
-            IF (3u)
-            IF (2u)
-        case 1u:
-            IF (1u)
-            IF (0u)
-#undef IF
-        }
-
+        struct kan_space_tree_node_t *parent = kan_space_tree_node_get_parent (node);
+        kan_space_tree_node_shutdown_empty (tree, node);
         node = parent;
     }
 }
@@ -1267,37 +1206,19 @@ static void space_tree_destroy_node (struct kan_space_tree_t *tree, struct kan_s
         return;
     }
 
-    if (node->height != tree->last_level_height)
+    if (node->children_allocation)
     {
-        switch (tree->dimension_count)
+        const kan_instance_size_t children_count = 1u << tree->dimension_count;
+        for (kan_loop_size_t index = 0u; index < (kan_loop_size_t) children_count; ++index)
         {
-        case 4u:
-            space_tree_destroy_node (tree, node->children[15u]);
-            space_tree_destroy_node (tree, node->children[14u]);
-            space_tree_destroy_node (tree, node->children[13u]);
-            space_tree_destroy_node (tree, node->children[12u]);
-            space_tree_destroy_node (tree, node->children[11u]);
-            space_tree_destroy_node (tree, node->children[10u]);
-            space_tree_destroy_node (tree, node->children[9u]);
-            space_tree_destroy_node (tree, node->children[8u]);
-        case 3u:
-            space_tree_destroy_node (tree, node->children[7u]);
-            space_tree_destroy_node (tree, node->children[6u]);
-            space_tree_destroy_node (tree, node->children[5u]);
-            space_tree_destroy_node (tree, node->children[4u]);
-        case 2u:
-            space_tree_destroy_node (tree, node->children[3u]);
-            space_tree_destroy_node (tree, node->children[2u]);
-        case 1u:
-            space_tree_destroy_node (tree, node->children[1u]);
-            space_tree_destroy_node (tree, node->children[0u]);
+            space_tree_destroy_node (tree, &node->children_allocation->children[index]);
         }
     }
 
-    kan_space_tree_node_free (tree, node);
+    kan_space_tree_node_shutdown_empty (tree, node);
 }
 
 void kan_space_tree_shutdown (struct kan_space_tree_t *tree)
 {
-    space_tree_destroy_node (tree, tree->root);
+    space_tree_destroy_node (tree, &tree->root);
 }
