@@ -59,3 +59,18 @@
 
 #    define KAN_MUTE_POINTER_CONVERSION_WARNINGS_END _Pragma ("GCC diagnostic pop")
 #endif
+
+#if defined(_MSC_VER) && !defined(__clang__)
+#    define KAN_MUTE_UNUSED_WARNINGS_BEGIN _Pragma ("warning (push)") _Pragma ("warning (disable : 4189)")
+#    define KAN_MUTE_UNUSED_WARNINGS_END _Pragma ("warning (pop)")
+#else
+// clang-format off
+#    define KAN_MUTE_UNUSED_WARNINGS_BEGIN                                                                             \
+        _Pragma ("GCC diagnostic push")                                                                                \
+        _Pragma ("GCC diagnostic ignored \"-Wpragmas\"")                                                               \
+        _Pragma ("GCC diagnostic ignored \"-Wunused-variable\"")                                                       \
+        _Pragma ("GCC diagnostic ignored \"-Wunused-but-set-variable\"")
+// clang-format on
+
+#    define KAN_MUTE_UNUSED_WARNINGS_END _Pragma ("GCC diagnostic pop")
+#endif

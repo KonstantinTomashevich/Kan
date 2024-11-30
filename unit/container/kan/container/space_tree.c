@@ -1,5 +1,6 @@
 #include <float.h>
 #include <stddef.h>
+#include <string.h>
 
 #include <kan/api_common/min_max.h>
 #include <kan/container/space_tree.h>
@@ -394,12 +395,15 @@ static inline struct kan_space_tree_node_t *get_or_create_child_node (struct kan
     }
 
     const kan_space_tree_road_t child_height = parent_node->height + 1u;
-    struct kan_space_tree_node_t *child_node = kan_allocate_batched (
-        tree->allocation_group, calculate_node_size (tree->dimension_count, child_height != tree->last_level_height));
+    struct kan_space_tree_node_t *child_node =
+        kan_allocate_batched (tree->nodes_allocation_group,
+                              calculate_node_size (tree->dimension_count, child_height != tree->last_level_height));
 
     child_node->parent = parent_node;
     child_node->height = (uint8_t) child_height;
-    child_node->first_sub_node = NULL;
+    child_node->sub_nodes_capacity = 0u;
+    child_node->sub_nodes_count = 0u;
+    child_node->sub_nodes = NULL;
 
     if (child_height != tree->last_level_height)
     {
@@ -591,7 +595,7 @@ static inline void ray_calculate_previous_path_on_level (struct kan_space_tree_t
 {
     if (!iterator->current_node || !iterator->current_node->parent ||
         // No need to spend time on calculations if we don't have sub nodes anyway.
-        !iterator->current_node->first_sub_node)
+        !iterator->current_node->sub_nodes)
     {
         iterator->has_previous_path_on_level = KAN_FALSE;
         return;
@@ -776,15 +780,23 @@ static void ray_iterator_next (struct kan_space_tree_t *tree, struct kan_space_t
 void kan_space_tree_init (struct kan_space_tree_t *tree,
                           kan_allocation_group_t allocation_group,
                           kan_instance_size_t dimension_count,
+                          kan_instance_size_t sub_node_size,
+                          kan_instance_size_t sub_node_alignment,
                           kan_space_tree_floating_t global_min,
                           kan_space_tree_floating_t global_max,
                           kan_space_tree_floating_t target_leaf_cell_size)
 {
     KAN_ASSERT (global_max > global_min)
+    KAN_ASSERT (sub_node_size < UINT16_MAX)
+    KAN_ASSERT (sub_node_alignment < UINT16_MAX)
 
-    tree->allocation_group = allocation_group;
+    tree->nodes_allocation_group = kan_allocation_group_get_child (allocation_group, "space_tree_nodes");
+    tree->sub_nodes_allocation_group = kan_allocation_group_get_child (allocation_group, "space_tree_sub_nodes");
+
     KAN_ASSERT (dimension_count <= KAN_CONTAINER_SPACE_TREE_MAX_DIMENSIONS)
     tree->dimension_count = (uint8_t) dimension_count;
+    tree->sub_node_size = (uint16_t) sub_node_size;
+    tree->sub_node_alignment = (uint16_t) sub_node_alignment;
     tree->global_min = global_min;
     tree->global_max = global_max;
     tree->last_level_height = 1u;
@@ -802,7 +814,9 @@ void kan_space_tree_init (struct kan_space_tree_t *tree,
         allocation_group, calculate_node_size (tree->dimension_count, KAN_TRUE));
     tree->root->parent = NULL;
     tree->root->height = 0u;
-    tree->root->first_sub_node = NULL;
+    tree->root->sub_nodes_capacity = 0u;
+    tree->root->sub_nodes_count = 0u;
+    tree->root->sub_nodes = NULL;
     reset_node_children (tree, tree->root);
 }
 
@@ -858,23 +872,41 @@ struct kan_space_tree_insertion_iterator_t kan_space_tree_insertion_start (
     return iterator;
 }
 
-void kan_space_tree_insertion_insert_and_move (struct kan_space_tree_t *tree,
-                                               struct kan_space_tree_insertion_iterator_t *iterator,
-                                               struct kan_space_tree_sub_node_t *sub_node)
+static inline void kan_space_tree_node_reallocate_sub_nodes (struct kan_space_tree_t *tree,
+                                                             struct kan_space_tree_node_t *node,
+                                                             uint16_t new_capacity)
+{
+    const uint16_t old_capacity = node->sub_nodes_capacity;
+    void *old_sub_nodes = node->sub_nodes;
+
+    node->sub_nodes_capacity = new_capacity;
+    node->sub_nodes = kan_allocate_general (tree->sub_nodes_allocation_group, tree->sub_node_size * new_capacity,
+                                            tree->sub_node_alignment);
+
+    if (old_sub_nodes)
+    {
+        memcpy (node->sub_nodes, old_sub_nodes, tree->sub_node_size * node->sub_nodes_count);
+        kan_free_general (tree->sub_nodes_allocation_group, old_sub_nodes, tree->sub_node_size * old_capacity);
+    }
+}
+
+void *kan_space_tree_insertion_insert_and_move (struct kan_space_tree_t *tree,
+                                                struct kan_space_tree_insertion_iterator_t *iterator)
 {
     KAN_ASSERT (!kan_space_tree_insertion_is_finished (iterator))
     struct kan_space_tree_node_t *node = iterator->base.current_node;
 
-    sub_node->next = node->first_sub_node;
-    sub_node->previous = NULL;
-
-    if (node->first_sub_node)
+    if (node->sub_nodes_count >= node->sub_nodes_capacity)
     {
-        node->first_sub_node->previous = sub_node;
+        kan_space_tree_node_reallocate_sub_nodes (tree, node,
+                                                  node->sub_nodes_capacity + KAN_CONTAINER_SPACE_TREE_SUB_NODE_SLICE);
     }
 
-    node->first_sub_node = sub_node;
+    void *new_sub_node = ((uint8_t *) node->sub_nodes) + tree->sub_node_size * node->sub_nodes_count;
+    ++node->sub_nodes_count;
+
     insertion_iterator_next (tree, iterator);
+    return new_sub_node;
 }
 
 CONTAINER_API struct kan_space_tree_shape_iterator_t kan_space_tree_shape_start (
@@ -1125,7 +1157,7 @@ kan_bool_t kan_space_tree_is_contained_in_one_sub_node (struct kan_space_tree_t 
 
 static kan_bool_t is_node_empty (struct kan_space_tree_t *tree, struct kan_space_tree_node_t *node)
 {
-    if (node->first_sub_node)
+    if (node->sub_nodes_count == 0u)
     {
         return KAN_FALSE;
     }
@@ -1157,29 +1189,39 @@ static kan_bool_t is_node_empty (struct kan_space_tree_t *tree, struct kan_space
     return !has_children;
 }
 
-void kan_space_tree_delete (struct kan_space_tree_t *tree,
-                            struct kan_space_tree_node_t *node,
-                            struct kan_space_tree_sub_node_t *sub_node)
+static inline void kan_space_tree_node_free (struct kan_space_tree_t *tree, struct kan_space_tree_node_t *node)
 {
-    if (sub_node->previous)
+    kan_free_general (tree->sub_nodes_allocation_group, node->sub_nodes,
+                      tree->sub_node_size * node->sub_nodes_capacity);
+    kan_free_batched (tree->nodes_allocation_group, node);
+}
+
+void kan_space_tree_delete (struct kan_space_tree_t *tree, struct kan_space_tree_node_t *node, void *sub_node)
+{
+    KAN_ASSERT (sub_node >= node->sub_nodes &&
+                (uint8_t *) sub_node < ((uint8_t *) node->sub_nodes) + tree->sub_node_size * node->sub_nodes_capacity)
+
+    void *last_sub_node = ((uint8_t *) node->sub_nodes) + tree->sub_node_size * (node->sub_nodes_count - 1u);
+    if (sub_node != last_sub_node)
     {
-        sub_node->previous->next = sub_node->next;
-    }
-    else
-    {
-        KAN_ASSERT (node->first_sub_node == sub_node)
-        node->first_sub_node = sub_node->next;
+        memcpy (sub_node, last_sub_node, tree->sub_node_size);
     }
 
-    if (sub_node->next)
+    --node->sub_nodes_count;
+    if (node->sub_nodes_count > 0u)
     {
-        sub_node->next->previous = sub_node->previous;
+        // Do not bother with empty nodes as we'll just delete them.
+        if (node->sub_nodes_capacity - node->sub_nodes_count >= 2u * KAN_CONTAINER_SPACE_TREE_SUB_NODE_SLICE)
+        {
+            kan_space_tree_node_reallocate_sub_nodes (
+                tree, node, node->sub_nodes_capacity - KAN_CONTAINER_SPACE_TREE_SUB_NODE_SLICE);
+        }
     }
 
     while (node != tree->root && is_node_empty (tree, node))
     {
         struct kan_space_tree_node_t *parent = node->parent;
-        kan_free_batched (tree->allocation_group, node);
+        kan_space_tree_node_free (tree, node);
 
         // Could be optimized out if we knew node path.
         switch (tree->dimension_count)
@@ -1252,7 +1294,7 @@ static void space_tree_destroy_node (struct kan_space_tree_t *tree, struct kan_s
         }
     }
 
-    kan_free_batched (tree->allocation_group, node);
+    kan_space_tree_node_free (tree, node);
 }
 
 void kan_space_tree_shutdown (struct kan_space_tree_t *tree)
