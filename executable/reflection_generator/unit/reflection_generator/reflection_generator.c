@@ -1515,6 +1515,7 @@ void add_registrar (void)
                                              ") (kan_reflection_registry_t registry)\n"
                                              "{\n"
                                              "    ensure_reflection_is_ready ();\n"
+                                             "    KAN_MUTE_UNUSED_WARNINGS_BEGIN\n"
                                              "    kan_bool_t success;\n\n");
 
     for (kan_loop_size_t file_index = 0u; file_index < arguments.input_files_count; ++file_index)
@@ -1706,6 +1707,7 @@ void add_registrar (void)
         kan_trivial_string_buffer_append_string (&io.output_buffer, "\"\n\n");
     }
 
+    kan_trivial_string_buffer_append_string (&io.output_buffer, "    KAN_MUTE_UNUSED_WARNINGS_END");
     kan_trivial_string_buffer_append_string (&io.output_buffer, "}\n\n");
 }
 

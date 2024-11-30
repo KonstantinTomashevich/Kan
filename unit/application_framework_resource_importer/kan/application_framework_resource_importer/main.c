@@ -1210,9 +1210,6 @@ int main (int argument_count, char **argument_values)
     global.rule_registration_lock = kan_atomic_int_init (0);
 
     kan_context_t context = kan_application_create_resource_tool_context (&global.project, argument_values[0u]);
-    kan_context_system_t plugin_system = kan_context_query (context, KAN_CONTEXT_PLUGIN_SYSTEM_NAME);
-    KAN_ASSERT (KAN_HANDLE_IS_VALID (plugin_system))
-
     kan_context_system_t reflection_system = kan_context_query (context, KAN_CONTEXT_REFLECTION_SYSTEM_NAME);
     KAN_ASSERT (KAN_HANDLE_IS_VALID (reflection_system))
 

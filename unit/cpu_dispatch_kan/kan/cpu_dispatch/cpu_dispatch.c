@@ -403,7 +403,7 @@ static void job_report_task_finished (struct job_t *job)
                     KAN_ASSERT (kan_atomic_int_compare_and_set (&job->status, new_status_bits,
                                                                 JOB_STATE_COMPLETED << JOB_STATUS_TASK_COUNT_BITS))
 #else
-                    kan_atomic_int_set (&job->status, JOB_STATE_COMPLETED << JOB_STATUS_TASK_COUNT_BITS)
+                    kan_atomic_int_set (&job->status, JOB_STATE_COMPLETED << JOB_STATUS_TASK_COUNT_BITS);
 #endif
                 }
             }
