@@ -589,7 +589,9 @@ FUNCTION_CALCULATE_RAY_SMALLEST_TARGET (previous)
 static inline void ray_calculate_previous_path_on_level (struct kan_space_tree_t *tree,
                                                          struct kan_space_tree_ray_iterator_t *iterator)
 {
-    if (!iterator->current_node || !iterator->current_node->parent)
+    if (!iterator->current_node || !iterator->current_node->parent ||
+        // No need to spend time on calculations if we don't have sub nodes anyway.
+        !iterator->current_node->first_sub_node)
     {
         iterator->has_previous_path_on_level = KAN_FALSE;
         return;
