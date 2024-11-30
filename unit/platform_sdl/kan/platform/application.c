@@ -1273,7 +1273,28 @@ void kan_platform_application_window_set_focusable (kan_platform_window_id_t win
     SDL_SetWindowFocusable (window, focusable ? true : false);
 }
 
-_Static_assert (sizeof (VkInstance) <= sizeof (uint64_t), "VkInstance is not bigger than 64 bit integer.");
+kan_bool_t kan_platform_application_window_set_text_input_enabled (kan_platform_window_id_t window_id,
+                                                                   kan_bool_t enabled)
+{
+    SDL_Window *window = SDL_GetWindowFromID ((SDL_WindowID) KAN_TYPED_ID_32_GET (window_id));
+    if (!window)
+    {
+        KAN_LOG (platform_application, KAN_LOG_ERROR, "Unable to find window with id %llu, backend error: %s",
+                 (unsigned long long) KAN_TYPED_ID_32_GET (window_id), SDL_GetError ())
+        return KAN_FALSE;
+    }
+
+    if (enabled)
+    {
+        return SDL_StartTextInput (window);
+    }
+    else
+    {
+        return SDL_StopTextInput (window);
+    }
+}
+
+_Static_assert (sizeof (VkInstance) <= sizeof (kan_memory_size_t), "VkInstance is not bigger than 64 bit integer.");
 _Static_assert (sizeof (VkSurfaceKHR) <= sizeof (uint64_t), "VkInstance is not bigger than 64 bit integer.");
 
 #if !defined(VK_NULL_HANDLE)

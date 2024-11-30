@@ -166,8 +166,15 @@ struct kan_platform_application_event_t
         struct kan_platform_application_event_display_t display;
         struct kan_platform_application_event_window_t window;
         struct kan_platform_application_event_keyboard_t keyboard;
+
+        /// \details Only sent when text input is enabled through
+        ///          `kan_platform_application_window_set_text_input_enabled`.
         struct kan_platform_application_event_text_editing_t text_editing;
+
+        /// \details Only sent when text input is enabled through
+        ///          `kan_platform_application_window_set_text_input_enabled`.
         struct kan_platform_application_event_text_input_t text_input;
+
         struct kan_platform_application_event_mouse_motion_t mouse_motion;
         struct kan_platform_application_event_mouse_button_t mouse_button;
         struct kan_platform_application_event_mouse_wheel_t mouse_wheel;
@@ -423,6 +430,12 @@ PLATFORM_API float kan_platform_application_window_get_opacity (kan_platform_win
 /// \brief Sets whether given window is focusable.
 PLATFORM_API void kan_platform_application_window_set_focusable (kan_platform_window_id_t window_id,
                                                                  kan_bool_t focusable);
+
+/// \brief Sets whether window has text input enabled and receives text input events.
+/// \details On desktop, it only changes whether text input events are received.
+///          On mobile and console, it also controls on screen keyboard.
+PLATFORM_API kan_bool_t kan_platform_application_window_set_text_input_enabled (kan_platform_window_id_t window_id,
+                                                                                kan_bool_t enabled);
 
 /// \brief Attempts to create Vulkan surface on given window using given Vulkan instance.
 PLATFORM_API uint64_t kan_platform_application_window_create_vulkan_surface (kan_platform_window_id_t window_id,
