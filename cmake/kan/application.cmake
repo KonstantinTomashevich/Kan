@@ -556,7 +556,7 @@ function (private_generate_code_hot_reload_test)
             ARGUMENTS
             "${CMAKE_COMMAND}" "${CMAKE_BINARY_DIR}" "${APPLICATION_NAME}_dev_all_plugins" "$<CONFIG>"
             # We need big timeout due to slow machines on GitHub Actions.
-            PROPERTIES RUN_SERIAL ON TIMEOUT 60 LABELS SLOW)
+            PROPERTIES RUN_SERIAL ON TIMEOUT 60 LABELS VERIFY_HOT_RELOAD)
 
     foreach (PLUGIN_GROUP ${PLUGIN_GROUPS})
         application_program_use_plugin_group ("${PLUGIN_GROUP}")
