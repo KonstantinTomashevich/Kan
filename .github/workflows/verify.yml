@@ -17,15 +17,19 @@ jobs:
           - preset: debug_linux_gcc
             os: ubuntu-24.04
             build_type: Debug
+            libraries_arch: x64
           - preset: debug_linux_gcc_x32
             os: ubuntu-24.04
             build_type: Debug
+            libraries_arch: x32
           - preset: debug_linux_clang
             os: ubuntu-24.04
             build_type: Debug
+            libraries_arch: x64
           - preset: sanitize_linux_clang
             os: ubuntu-24.04
             build_type: Debug
+            libraries_arch: x64
           - preset: debug_windows_msvc
             os: windows-2022
             build_type: Debug
@@ -35,12 +39,15 @@ jobs:
           - preset: release_linux_gcc
             os: ubuntu-24.04
             build_type: Release
+            libraries_arch: x64
           - preset: release_linux_gcc_x32
             os: ubuntu-24.04
             build_type: Release
+            libraries_arch: x32
           - preset: release_linux_clang
             os: ubuntu-24.04
             build_type: Release
+            libraries_arch: x64
           - preset: release_windows_msvc
             os: windows-2022
             build_type: Release
@@ -69,7 +76,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install ninja-build gcc-multilib g++-multilib
 
       - name: Install x64 required libraries (Ubuntu)
-        if: matrix.os == 'ubuntu-24.04'
+        if: matrix.os == 'ubuntu-24.04' && matrix.libraries_arch == 'x64'
         run: >
           sudo apt-get update && 
           sudo apt-get install 
@@ -78,7 +85,7 @@ jobs:
           libegl1-mesa-dev libdbus-1-dev libibus-1.0-dev libudev-dev fcitx-libs-dev
 
       - name: Install x32 required libraries (Ubuntu)
-        if: matrix.os == 'ubuntu-24.04'
+        if: matrix.os == 'ubuntu-24.04' && matrix.libraries_arch == 'x32'
         run: >
           sudo dpkg --add-architecture i386 &&
           sudo apt-get update && 
