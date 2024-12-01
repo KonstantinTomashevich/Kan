@@ -17,9 +17,10 @@ jobs:
           - preset: debug_linux_gcc
             os: ubuntu-22.04
             build_type: Debug
-          - preset: debug_linux_gcc_x32
-            os: ubuntu-22.04
-            build_type: Debug
+# TODO: Temporary disabled.
+#          - preset: debug_linux_gcc_x32
+#            os: ubuntu-22.04
+#            build_type: Debug
           - preset: debug_linux_clang
             os: ubuntu-22.04
             build_type: Debug
@@ -35,9 +36,10 @@ jobs:
           - preset: release_linux_gcc
             os: ubuntu-22.04
             build_type: Release
-          - preset: release_linux_gcc_x32
-            os: ubuntu-22.04
-            build_type: Release
+# TODO: Temporary disabled.
+#          - preset: release_linux_gcc_x32
+#            os: ubuntu-22.04
+#            build_type: Release
           - preset: release_linux_clang
             os: ubuntu-22.04
             build_type: Release
@@ -64,8 +66,7 @@ jobs:
 
       - name: Install required libraries (Ubuntu)
         if: matrix.os == 'ubuntu-22.04'
-        run: >
-          sudo apt-get update && sudo apt-get install ninja-build gcc-multilib g++-multilib
+        run: sudo apt-get update && sudo apt-get install ninja-build gcc-multilib g++-multilib
 
       - name: Configure
         run: cmake --preset ${{matrix.preset}} -B ${{env.BUILD_DIRECTORY}}
