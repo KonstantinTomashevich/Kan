@@ -3,6 +3,7 @@
 KAN_MUTE_THIRD_PARTY_WARNINGS_BEGIN
 #include <SDL3/SDL_clipboard.h>
 #include <SDL3/SDL_events.h>
+#include <SDL3/SDL_hints.h>
 #include <SDL3/SDL_init.h>
 #include <SDL3/SDL_mouse.h>
 #include <SDL3/SDL_video.h>
@@ -188,8 +189,16 @@ kan_bool_t kan_platform_application_init (void)
 {
     ensure_sdl_allocation_adapter_installed ();
     KAN_ASSERT (!SDL_WasInit (SDL_INIT_VIDEO | SDL_INIT_EVENTS))
+    kan_bool_t initialized = SDL_InitSubSystem (SDL_INIT_VIDEO | SDL_INIT_EVENTS);
 
-    if (!SDL_InitSubSystem (SDL_INIT_VIDEO | SDL_INIT_EVENTS))
+    // If in CI environment, try again with dummy driver in order to still be able to run tests without graphics.
+    if (!initialized && getenv ("CI"))
+    {
+        SDL_SetHint (SDL_HINT_VIDEO_DRIVER, "dummy");
+        initialized = SDL_InitSubSystem (SDL_INIT_VIDEO | SDL_INIT_EVENTS);
+    }
+
+    if (!initialized)
     {
         KAN_LOG (platform_application, KAN_LOG_CRITICAL_ERROR,
                  "Failed to initialize SDL backend for application, SDL error: %s", SDL_GetError ())
