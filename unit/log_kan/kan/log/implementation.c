@@ -216,7 +216,7 @@ void kan_log_default_callback (kan_log_category_t category,
 {
     char date_time_string[18u];
     struct tm local_time;
-#if defined(WIN32)
+#if defined(_MSC_VER)
     localtime_s (&local_time, &time.tv_sec);
 #else
     localtime_r (&time.tv_sec, &local_time);
