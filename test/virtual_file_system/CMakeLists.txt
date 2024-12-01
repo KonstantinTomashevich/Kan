@@ -18,8 +18,8 @@ foreach (IMPLEMENTATION ${VIRTUAL_FILE_SYSTEM_IMPLEMENTATIONS})
 
     shared_library_include (
             SCOPE PUBLIC
-            ABSTRACT cpu_dispatch=kan cpu_profiler=none error=sdl file_system=platform_default
-            file_system_watcher=user_level hash=djb2 log=kan memory=kan memory_profiler=none platform=sdl
+            ABSTRACT cpu_dispatch=kan cpu_profiler=default error=sdl file_system=platform_default
+            file_system_watcher=user_level hash=djb2 log=kan memory=kan memory_profiler=default platform=sdl
             precise_time=sdl reflection=kan stream=kan threading=sdl virtual_file_system=${IMPLEMENTATION}
             CONCRETE container readable_data serialization testing test_virtual_file_system)
 

@@ -14,8 +14,8 @@ register_shared_library (test_render_pipeline_language_library)
 shared_library_include (
         SCOPE PUBLIC
         ABSTRACT
-        cpu_dispatch=kan cpu_profiler=none error=sdl file_system=platform_default hash=djb2 log=kan memory=kan
-        memory_profiler=none platform=sdl precise_time=sdl reflection=kan stream=kan threading=sdl
+        cpu_dispatch=kan cpu_profiler=default error=sdl file_system=platform_default hash=djb2 log=kan memory=kan
+        memory_profiler=default platform=sdl precise_time=sdl reflection=kan stream=kan threading=sdl
         CONCRETE container render_pipeline_language testing test_render_pipeline_language)
 
 shared_library_verify ()

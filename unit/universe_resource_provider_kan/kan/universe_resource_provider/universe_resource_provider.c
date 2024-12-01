@@ -1263,7 +1263,7 @@ static inline void schedule_third_party_entry_loading (
     }
 
     entry_suffix->loading_data =
-        kan_allocate_general (entry->my_allocation_group, entry->size, _Alignof (kan_memory_size_t));
+        kan_allocate_general (entry_suffix->my_allocation_group, entry->size, _Alignof (kan_memory_size_t));
     entry_suffix->loading_data_size = entry->size;
 
     KAN_UP_INDEXED_INSERT (operation, resource_provider_loading_operation_t)
@@ -1288,7 +1288,7 @@ static inline void unload_third_party_entry (struct resource_provider_state_t *s
     }
 
     update_requests (state, NULL, entry->name, KAN_TYPED_ID_32_SET_INVALID (kan_resource_container_id_t), NULL, 0u);
-    kan_free_general (entry->my_allocation_group, entry_suffix->loaded_data, entry_suffix->loaded_data_size);
+    kan_free_general (entry_suffix->my_allocation_group, entry_suffix->loaded_data, entry_suffix->loaded_data_size);
     entry_suffix->loaded_data = NULL;
 }
 
@@ -1302,7 +1302,7 @@ static inline void cancel_third_party_entry_loading (struct resource_provider_st
     }
 
     loading_operation_cancel (state, NULL, entry->name);
-    kan_free_general (entry->my_allocation_group, entry_suffix->loading_data, entry_suffix->loading_data_size);
+    kan_free_general (entry_suffix->my_allocation_group, entry_suffix->loading_data, entry_suffix->loading_data_size);
     entry_suffix->loading_data = NULL;
     entry_suffix->loading_data_size = 0u;
 }

@@ -39,8 +39,9 @@ KAN_TEST_CASE (stack)
 
 KAN_TEST_CASE (group_capture)
 {
-    kan_allocation_group_t a1 = kan_allocation_group_get_child (kan_allocation_group_root (), "A1");
-    kan_allocation_group_t a2 = kan_allocation_group_get_child (kan_allocation_group_root (), "A2");
+    kan_allocation_group_t test_root = kan_allocation_group_get_child (kan_allocation_group_root (), "test_root");
+    kan_allocation_group_t a1 = kan_allocation_group_get_child (test_root, "A1");
+    kan_allocation_group_t a2 = kan_allocation_group_get_child (test_root, "A2");
     kan_allocation_group_t b1 = kan_allocation_group_get_child (a1, "B1");
     kan_allocation_group_t b2 = kan_allocation_group_get_child (a2, "B2");
 
@@ -52,17 +53,31 @@ KAN_TEST_CASE (group_capture)
     kan_allocation_group_free (a2, 50u);
 
     struct kan_allocation_group_capture_t capture = kan_allocation_group_begin_capture ();
+    kan_captured_allocation_group_t test_root_captured = KAN_HANDLE_SET_INVALID (kan_captured_allocation_group_t);
 
-    KAN_TEST_CHECK (KAN_HANDLE_IS_EQUAL (kan_captured_allocation_group_get_source (capture.captured_root),
-                                         kan_allocation_group_root ()))
-    KAN_TEST_CHECK (kan_captured_allocation_group_get_directly_allocated (capture.captured_root) == 0u)
-    KAN_TEST_CHECK (kan_captured_allocation_group_get_total_allocated (capture.captured_root) == 1050u)
+    kan_captured_allocation_group_iterator_t root_iterator =
+        kan_captured_allocation_group_children_begin (capture.captured_root);
+
+    while (KAN_HANDLE_IS_VALID (kan_captured_allocation_group_children_get (root_iterator)))
+    {
+        kan_captured_allocation_group_t group = kan_captured_allocation_group_children_get (root_iterator);
+        if (KAN_HANDLE_IS_EQUAL (test_root, kan_captured_allocation_group_get_source (group)))
+        {
+            test_root_captured = group;
+            break;
+        }
+
+        root_iterator = kan_captured_allocation_group_children_next (root_iterator);
+    }
+
+    KAN_TEST_CHECK (kan_captured_allocation_group_get_directly_allocated (test_root_captured) == 0u)
+    KAN_TEST_CHECK (kan_captured_allocation_group_get_total_allocated (test_root_captured) == 1050u)
 
     kan_bool_t found_a1 = KAN_FALSE;
     kan_bool_t found_a2 = KAN_FALSE;
 
     for (kan_captured_allocation_group_iterator_t child_iterator =
-             kan_captured_allocation_group_children_begin (capture.captured_root);
+             kan_captured_allocation_group_children_begin (test_root_captured);
          KAN_HANDLE_IS_VALID (kan_captured_allocation_group_children_get (child_iterator));
          child_iterator = kan_captured_allocation_group_children_next (child_iterator))
     {

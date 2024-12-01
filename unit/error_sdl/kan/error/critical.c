@@ -45,6 +45,9 @@ static inline void kan_critical_error_context_ensure (void)
         kan_hash_storage_init (&critical_error_context.skipped_error_storage, KAN_ALLOCATION_GROUP_IGNORE,
                                SKIPPED_CRITICAL_ERROR_INFO_STORAGE_INITIAL_BUCKETS);
 
+        // We need to log at least once in order to initialize logging and prevent deadlock when
+        // logging is initialized from critical error that was caught inside memory profiler.
+        KAN_LOG (error, KAN_LOG_INFO, "Critical error context initialized.")
         critical_error_context_ready = KAN_TRUE;
     }
 }

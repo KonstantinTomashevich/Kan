@@ -3322,6 +3322,7 @@ KAN_REFLECTION_EXPECT_UNIT_REGISTRAR_LOCAL (application_framework_resource_build
 
 int main (int argument_count, char **argument_values)
 {
+    kan_set_critical_error_interactive (KAN_FALSE);
     if (argument_count < 3)
     {
         KAN_LOG (

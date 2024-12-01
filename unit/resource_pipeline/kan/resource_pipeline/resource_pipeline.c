@@ -1088,6 +1088,7 @@ RESOURCE_PIPELINE_API struct kan_resource_resource_type_meta_t kan_resource_impo
 
 kan_allocation_group_t kan_resource_import_rule_get_allocation_group (void)
 {
+    ensure_statics_initialized ();
     return resource_import_rule_allocation_group;
 }
 

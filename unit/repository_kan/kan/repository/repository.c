@@ -4156,7 +4156,7 @@ static void repository_migrate_internal (struct repository_t *repository,
                                                execute_migration, struct record_migration_user_data_t,
                                                {
                                                    .record_pointer = &node->record,
-                                                   .allocation_group = indexed_storage_node->allocation_group,
+                                                   .allocation_group = indexed_storage_node->records_allocation_group,
                                                    .batched_allocation = KAN_TRUE,
                                                    .migrator = migrator,
                                                    .old_type = old_type,

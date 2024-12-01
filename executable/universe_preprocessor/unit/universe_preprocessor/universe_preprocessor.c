@@ -3712,6 +3712,7 @@ static kan_bool_t perform_process_phase (void)
 
 int main (int argument_count, char **arguments_array)
 {
+    kan_set_critical_error_interactive (KAN_FALSE);
     if (argument_count != 3)
     {
         fprintf (stderr,

@@ -9,7 +9,7 @@ foreach (IMPLEMENTATION ${MEMORY_IMPLEMENTATIONS})
 
     shared_library_include (
             SCOPE PUBLIC
-            ABSTRACT error=sdl hash=djb2 log=kan memory=${IMPLEMENTATION} memory_profiler=none threading=sdl
+            ABSTRACT error=sdl hash=djb2 log=kan memory=${IMPLEMENTATION} memory_profiler=default threading=sdl
             CONCRETE container testing test_memory)
 
     shared_library_verify ()

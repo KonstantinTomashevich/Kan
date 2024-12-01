@@ -17,8 +17,8 @@ foreach (IMPLEMENTATION ${PROVIDER_IMPLEMENTATIONS})
     shared_library_include (
             SCOPE PUBLIC
             ABSTRACT
-            cpu_dispatch=kan cpu_profiler=none error=sdl file_system=platform_default file_system_watcher=user_level
-            hash=djb2 log=kan memory=kan memory_profiler=none platform=sdl precise_time=sdl reflection=kan
+            cpu_dispatch=kan cpu_profiler=default error=sdl file_system=platform_default file_system_watcher=user_level
+            hash=djb2 log=kan memory=kan memory_profiler=default platform=sdl precise_time=sdl reflection=kan
             repository=kan stream=kan threading=sdl universe_resource_provider=${IMPLEMENTATION}
             virtual_file_system=kan workflow=kan
             CONCRETE

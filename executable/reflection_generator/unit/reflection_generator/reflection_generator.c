@@ -1713,6 +1713,7 @@ void add_registrar (void)
 
 int main (int argument_count, char **arguments_array)
 {
+    kan_set_critical_error_interactive (KAN_FALSE);
     if (argument_count < 4)
     {
         fprintf (stderr,

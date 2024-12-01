@@ -69,7 +69,7 @@ THREADING_API void kan_thread_local_storage_set (kan_thread_local_storage_t *sto
                                                  void *value,
                                                  kan_thread_local_storage_destructor_t destructor)
 {
-    if (SDL_SetTLS ((SDL_TLSID *) storage, value, destructor) != 0)
+    if (!SDL_SetTLS ((SDL_TLSID *) storage, value, destructor))
     {
         KAN_LOG (threading, KAN_LOG_ERROR, "Failed to set TLS: %s.", SDL_GetError ())
     }

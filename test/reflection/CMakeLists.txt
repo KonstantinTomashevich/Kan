@@ -44,7 +44,7 @@ foreach (IMPLEMENTATION ${REFLECTION_IMPLEMENTATIONS})
     shared_library_include (
             SCOPE PUBLIC
             ABSTRACT
-            cpu_dispatch=kan cpu_profiler=none error=sdl hash=djb2 log=kan memory=kan memory_profiler=none
+            cpu_dispatch=kan cpu_profiler=default error=sdl hash=djb2 log=kan memory=kan memory_profiler=default
             platform=sdl precise_time=sdl reflection=${IMPLEMENTATION} threading=sdl
             CONCRETE
             container testing test_reflection test_reflection_section_patch_types_pre

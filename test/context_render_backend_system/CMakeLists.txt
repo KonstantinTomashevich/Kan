@@ -23,8 +23,8 @@ foreach (IMPLEMENTATION ${CONTEXT_RENDER_BACKEND_SYSTEM_IMPLEMENTATIONS})
     shared_library_include (
             SCOPE PUBLIC
             ABSTRACT
-            context_render_backend_system=${IMPLEMENTATION} cpu_dispatch=kan cpu_profiler=tracy error=sdl
-            file_system=platform_default hash=djb2 image=stb log=kan memory=kan memory_profiler=none platform=sdl
+            context_render_backend_system=${IMPLEMENTATION} cpu_dispatch=kan cpu_profiler=default error=sdl
+            file_system=platform_default hash=djb2 image=stb log=kan memory=kan memory_profiler=default platform=sdl
             precise_time=sdl reflection=kan stream=kan threading=sdl
             CONCRETE
             container context context_application_system inline_math render_pipeline_language testing

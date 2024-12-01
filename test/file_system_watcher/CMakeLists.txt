@@ -21,8 +21,8 @@ foreach (IMPLEMENTATION ${FILE_SYSTEM_WATCHER_IMPLEMENTATIONS})
 
     shared_library_include (
             SCOPE PUBLIC
-            ABSTRACT cpu_dispatch=kan cpu_profiler=none error=sdl file_system=platform_default
-            file_system_watcher=${IMPLEMENTATION} hash=djb2 log=kan memory=kan memory_profiler=none platform=sdl
+            ABSTRACT cpu_dispatch=kan cpu_profiler=default error=sdl file_system=platform_default
+            file_system_watcher=${IMPLEMENTATION} hash=djb2 log=kan memory=kan memory_profiler=default platform=sdl
             precise_time=sdl stream=kan threading=sdl
             CONCRETE container testing test_file_system_watcher)
 
