@@ -16,13 +16,6 @@ target_include_directories (qsort INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/qsort")
 # SDL3
 set (SDL_SHARED ON CACHE BOOL "We use double-set with cache to override third party project options for good.")
 set (SDL_SHARED ON)
-
-# Enable dummy audio and video on GitHub Actions as real video is not supported there.
-if (DEFINED $ENV{GITHUB_ACTION})
-    set (SDL_DUMMYAUDIO ON)
-    set (SDL_DUMMYVIDEO ON)
-endif ()
-
 add_subdirectory (SDL)
 
 # SPIRV-Headers
