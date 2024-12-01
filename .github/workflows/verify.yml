@@ -15,16 +15,16 @@ jobs:
       matrix:
         include:
           - preset: debug_linux_gcc
-            os: ubuntu-24.04
+            os: ubuntu-22.04
             build_type: Debug
           - preset: debug_linux_gcc_x32
-            os: ubuntu-24.04
+            os: ubuntu-22.04
             build_type: Debug
           - preset: debug_linux_clang
-            os: ubuntu-24.04
+            os: ubuntu-22.04
             build_type: Debug
           - preset: sanitize_linux_clang
-            os: ubuntu-24.04
+            os: ubuntu-22.04
             build_type: Debug
           - preset: debug_windows_msvc
             os: windows-2022
@@ -33,13 +33,13 @@ jobs:
             os: windows-2022
             build_type: Debug
           - preset: release_linux_gcc
-            os: ubuntu-24.04
+            os: ubuntu-22.04
             build_type: Release
           - preset: release_linux_gcc_x32
-            os: ubuntu-24.04
+            os: ubuntu-22.04
             build_type: Release
           - preset: release_linux_clang
-            os: ubuntu-24.04
+            os: ubuntu-22.04
             build_type: Release
           - preset: release_windows_msvc
             os: windows-2022
@@ -63,19 +63,16 @@ jobs:
           submodules: recursive
 
       - name: Install required libraries (Ubuntu)
-        if: matrix.os == 'ubuntu-24.04'
+        if: matrix.os == 'ubuntu-22.04'
         run: >
-          sudo apt-get update && 
-          sudo apt-get install 
-          ninja-build libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev libxi-dev libxss-dev
-          libxkbcommon-dev libdrm-dev libgbm-dev libgl1-mesa-dev libgles2-mesa-dev
-          libegl1-mesa-dev libdbus-1-dev libibus-1.0-dev libudev-dev fcitx-libs-dev
-          gcc-multilib g++-multilib
+          sudo apt-get update && sudo apt-get install ninja-build gcc-multilib g++-multilib
 
       - name: Configure
         run: cmake --preset ${{matrix.preset}} -B ${{env.BUILD_DIRECTORY}}
 
       - name: Check format
+        # We do not check format on Ubuntu as GitHub Actions has outdated clang format on Ubuntu images.
+        if: matrix.os == 'windows-2022'
         working-directory: ${{env.BUILD_DIRECTORY}}
         run: cmake --build . --target kan_clang_format_check --config ${{matrix.build_type}}
 
