@@ -10,6 +10,7 @@
       "name": "debug",
       "hidden": true,
       "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
         "KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED": "ON",
         "KAN_CONTEXT_RENDER_BACKEND_VULKAN_PROFILE_MEMORY": "ON",
         "KAN_CPU_PROFILER_ENABLE_BY_DEFAULT": "OFF",
@@ -26,6 +27,7 @@
       "name": "release",
       "hidden": true,
       "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
         "KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED": "OFF",
         "KAN_CONTEXT_RENDER_BACKEND_VULKAN_PROFILE_MEMORY": "OFF",
         "KAN_CPU_PROFILER_ENABLE_BY_DEFAULT": "OFF",
