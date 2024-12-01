@@ -26,12 +26,12 @@ set (TRACY_ON_DEMAND ON)
 add_subdirectory (tracy)
 
 # volk
-if (KAN_USE_VULKAN_API)
+if (Vulkan_FOUND)
     add_subdirectory (volk)
 endif ()
 
 # VulkanMemoryAllocator
-if (KAN_USE_VULKAN_API)
+if (Vulkan_FOUND)
     add_subdirectory (VulkanMemoryAllocator)
 endif ()
 

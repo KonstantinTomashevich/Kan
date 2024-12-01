@@ -1,4 +1,4 @@
-if (NOT KAN_USE_VULKAN_API)
+if (NOT Vulkan_FOUND)
     return ()
 endif ()
 

@@ -11,8 +11,6 @@ option (KAN_TREAT_WARNINGS_AS_ERRORS "Enables \"treat warnings as errors\" compi
 # We'd like to format everything even if its third party dependencies are not here.
 option (KAN_FOR_FORMAT_ONLY "Configure only for format check on CI." OFF)
 
-option (KAN_USE_VULKAN_API "Searches for Vulkan and enables units that are dependant on it." ON)
-
 # We can not add common compile options here, because they would affect third party libraries compilation.
 # Therefore every Kan root source directory must call this function to setup compile options locally.
 function (add_common_compile_options)
@@ -97,15 +95,8 @@ function (add_common_compile_options)
     endif ()
 endfunction ()
 
-if (KAN_USE_VULKAN_API)
-    if (NOT KAN_FOR_FORMAT_ONLY)
-        find_package (Vulkan REQUIRED)
-    else ()
-        # Empty interface to be able to format Vulkan related code without Vulkan SDK.
-        add_library (VulkanHeaders INTERFACE)
-        add_library (Vulkan::Headers ALIAS VulkanHeaders)
-    endif ()
-endif ()
+# Currently, Vulkan is our only graphics SDK, therefore we require it to be installed.
+find_package (Vulkan REQUIRED)
 
 # Position independent code should be generated when one shared library depends on another shared library.
 set (CMAKE_POSITION_INDEPENDENT_CODE ON)

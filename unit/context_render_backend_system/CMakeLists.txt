@@ -2,7 +2,7 @@ register_abstract (context_render_backend_system)
 abstract_include ("${CMAKE_CURRENT_SOURCE_DIR}")
 abstract_require (CONCRETE_INTERFACE container context context_application_system INTERFACE api_common platform)
 
-if (KAN_USE_VULKAN_API)
+if (Vulkan_FOUND)
     abstract_register_implementation (
             NAME vulkan
             PARTS context_render_backend_system_vulkan context_render_backend_system_reflection)
