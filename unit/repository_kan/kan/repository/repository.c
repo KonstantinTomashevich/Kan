@@ -4086,11 +4086,11 @@ static void repository_migrate_internal (struct repository_t *repository,
             while (space_index)
             {
                 struct space_index_t *next_space_index = space_index->next;
-                kan_instance_size_t min_size;
-                kan_instance_size_t max_size;
+                kan_instance_size_t min_size = 0u;
+                kan_instance_size_t max_size = 0u;
 
-                enum kan_reflection_archetype_t min_archetype;
-                enum kan_reflection_archetype_t max_archetype;
+                enum kan_reflection_archetype_t min_archetype = KAN_REFLECTION_ARCHETYPE_SIGNED_INT;
+                enum kan_reflection_archetype_t max_archetype = KAN_REFLECTION_ARCHETYPE_SIGNED_INT;
 
                 const kan_bool_t min_baked = indexed_field_baked_data_bake_from_reflection (
                     &space_index->baked_min, new_registry, old_type->name, space_index->source_path_min, &min_archetype,
@@ -7238,8 +7238,8 @@ static struct space_index_t *indexed_storage_find_or_create_space_index (struct 
     }
 
     struct indexed_field_baked_data_t baked_min;
-    enum kan_reflection_archetype_t baked_min_archetype;
-    kan_instance_size_t baked_min_count;
+    enum kan_reflection_archetype_t baked_min_archetype = KAN_REFLECTION_ARCHETYPE_SIGNED_INT;
+    kan_instance_size_t baked_min_count = 0u;
     struct interned_field_path_t interned_min_path;
 
     indexed_field_baked_data_init (&baked_min);
@@ -7250,8 +7250,8 @@ static struct space_index_t *indexed_storage_find_or_create_space_index (struct 
         &baked_min_count, KAN_FALSE);
 
     struct indexed_field_baked_data_t baked_max;
-    enum kan_reflection_archetype_t baked_max_archetype;
-    kan_instance_size_t baked_max_count;
+    enum kan_reflection_archetype_t baked_max_archetype = KAN_REFLECTION_ARCHETYPE_SIGNED_INT;
+    kan_instance_size_t baked_max_count = 0u;
     struct interned_field_path_t interned_max_path;
 
     indexed_field_baked_data_init (&baked_max);
