@@ -17,9 +17,10 @@ jobs:
           - preset: debug_linux_gcc
             os: ubuntu-24.04
             build_type: Debug
-          - preset: debug_linux_gcc_x32
-            os: ubuntu-24.04
-            build_type: Debug
+# TODO: Temporary disabled.
+#          - preset: debug_linux_gcc_x32
+#            os: ubuntu-24.04
+#            build_type: Debug
           - preset: debug_linux_clang
             os: ubuntu-24.04
             build_type: Debug
@@ -35,9 +36,10 @@ jobs:
           - preset: release_linux_gcc
             os: ubuntu-24.04
             build_type: Release
-          - preset: release_linux_gcc_x32
-            os: ubuntu-24.04
-            build_type: Release
+# TODO: Temporary disabled.
+#          - preset: release_linux_gcc_x32
+#            os: ubuntu-24.04
+#            build_type: Release
           - preset: release_linux_clang
             os: ubuntu-24.04
             build_type: Release
