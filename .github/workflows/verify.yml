@@ -1,0 +1,98 @@
+# Verify workflow checks that everything can be built and tested without errors.
+name: verify
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+  workflow_dispatch:
+
+jobs:
+  run_tests:
+    strategy:
+      matrix:
+        include:
+          - preset: debug_linux_gcc
+            os: ubuntu-22.04
+            build_type: Debug
+          - preset: debug_linux_gcc_x32
+            os: ubuntu-22.04
+            build_type: Debug
+          - preset: debug_linux_clang
+            os: ubuntu-22.04
+            build_type: Debug
+          - preset: sanitize_linux_clang
+            os: ubuntu-22.04
+            build_type: Debug
+          - preset: debug_windows_msvc
+            os: windows-2022
+            build_type: Debug
+          - preset: debug_windows_clang
+            os: windows-2022
+            build_type: Debug
+          - preset: release_linux_gcc
+            os: ubuntu-22.04
+            build_type: Release
+          - preset: release_linux_gcc_x32
+            os: ubuntu-22.04
+            build_type: Release
+          - preset: release_linux_clang
+            os: ubuntu-22.04
+            build_type: Release
+          - preset: release_windows_msvc
+            os: windows-2022
+            build_type: Release
+          - preset: release_windows_clang
+            os: windows-2022
+            build_type: Release
+
+    defaults:
+      run:
+        shell: pwsh
+
+    env:
+      BUILD_DIRECTORY: ${{github.workspace}}/build
+
+    runs-on: ${{matrix.os}}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Ninja (Ubuntu)
+        if: matrix.os == 'ubuntu-22.04'
+        run: sudo apt-get update && sudo apt-get install ninja-build
+
+      - name: Install Vulkan SDK (Ubuntu)
+        if: matrix.os == 'ubuntu-22.04'
+        run: sudo apt-get update && sudo apt-get install vulkan-sdk
+
+      - name: Install Vulkan SDK (Windows)
+        if: matrix.os == 'windows-2022'
+        run: choco install vulkan-sdk
+
+      - name: Configure
+        run: cmake --preset ${{matrix.preset}} -B ${{env.BUILD_DIRECTORY}}
+
+      - name: Check format
+        working-directory: ${{env.BUILD_DIRECTORY}}
+        run: cmake --build . --target kan_clang_format_check --config ${{matrix.build_type}}
+
+      - name: Build
+        working-directory: ${{env.BUILD_DIRECTORY}}
+        run: cmake --build . --target test_kan --config ${{matrix.build_type}}
+
+      - name: Test
+        working-directory: ${{env.BUILD_DIRECTORY}}
+        run: ctest --build-config ${{matrix.build_type}} --timeout 2
+
+      - name: Upload test results
+        if: ${{ success() }} || ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: test_results_${{matrix.preset}}
+          path: ${{env.BUILD_DIRECTORY}}/Testing/Temporary
