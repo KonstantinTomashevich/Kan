@@ -15,17 +15,17 @@ jobs:
       matrix:
         include:
           - preset: debug_linux_gcc
-            os: ubuntu-22.04
+            os: ubuntu-24.04
             build_type: Debug
           # TODO: x32 is temporary disabled while we're repairing the workflow.
           #- preset: debug_linux_gcc_x32
-          #  os: ubuntu-22.04
+          #  os: ubuntu-24.04
           #  build_type: Debug
           - preset: debug_linux_clang
-            os: ubuntu-22.04
+            os: ubuntu-24.04
             build_type: Debug
           - preset: sanitize_linux_clang
-            os: ubuntu-22.04
+            os: ubuntu-24.04
             build_type: Debug
           - preset: debug_windows_msvc
             os: windows-2022
@@ -34,14 +34,14 @@ jobs:
             os: windows-2022
             build_type: Debug
           - preset: release_linux_gcc
-            os: ubuntu-22.04
+            os: ubuntu-24.04
             build_type: Release
           # TODO: x32 is temporary disabled while we're repairing the workflow.
           #- preset: release_linux_gcc_x32
-          #  os: ubuntu-22.04
+          #  os: ubuntu-24.04
           #  build_type: Release
           - preset: release_linux_clang
-            os: ubuntu-22.04
+            os: ubuntu-24.04
             build_type: Release
           - preset: release_windows_msvc
             os: windows-2022
@@ -65,7 +65,7 @@ jobs:
           submodules: recursive
 
       - name: Install Ninja (Ubuntu)
-        if: matrix.os == 'ubuntu-22.04'
+        if: matrix.os == 'ubuntu-24.04'
         run: sudo apt-get update && sudo apt-get install ninja-build
 
       - name: Configure
