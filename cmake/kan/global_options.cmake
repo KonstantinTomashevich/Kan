@@ -95,8 +95,10 @@ function (add_common_compile_options)
     endif ()
 endfunction ()
 
-# Currently, Vulkan is our only graphics SDK, therefore we require it to be installed.
-find_package (Vulkan REQUIRED)
+find_package (Vulkan)
+if (NOT Vulkan_FOUND)
+    message (WARNING "Unable to find Vulkan SDK! Targets that depend on it will be skipped.")
+endif ()
 
 # Position independent code should be generated when one shared library depends on another shared library.
 set (CMAKE_POSITION_INDEPENDENT_CODE ON)
