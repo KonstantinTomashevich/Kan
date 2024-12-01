@@ -18,10 +18,10 @@ jobs:
             os: ubuntu-24.04
             build_type: Debug
             libraries_arch: x64
-#          - preset: debug_linux_gcc_x32
-#            os: ubuntu-24.04
-#            build_type: Debug
-#            libraries_arch: x32
+          - preset: debug_linux_gcc_x32
+            os: ubuntu-24.04
+            build_type: Debug
+            libraries_arch: x32
           - preset: debug_linux_clang
             os: ubuntu-24.04
             build_type: Debug
@@ -40,10 +40,10 @@ jobs:
             os: ubuntu-24.04
             build_type: Release
             libraries_arch: x64
-#          - preset: release_linux_gcc_x32
-#            os: ubuntu-24.04
-#            build_type: Release
-#            libraries_arch: x32
+          - preset: release_linux_gcc_x32
+            os: ubuntu-24.04
+            build_type: Release
+            libraries_arch: x32
           - preset: release_linux_clang
             os: ubuntu-24.04
             build_type: Release
@@ -88,10 +88,8 @@ jobs:
           sudo dpkg --add-architecture i386 &&
           sudo apt-get update && 
           sudo apt-get install 
-          libx11-dev:i386 libxext-dev:i386 libxrandr-dev:i386 libxcursor-dev:i386 libxfixes-dev:i386 libxi-dev:i386
-          libxss-dev:i386 libxkbcommon-dev:i386 libdrm-dev:i386 libgbm-dev:i386 libgl1-mesa-dev:i386 
-          libgles2-mesa-dev:i386 libegl1-mesa-dev:i386 libdbus-1-dev:i386 libibus-1.0-dev:i386 libudev-dev:i386
-          fcitx-libs-dev:i386
+          libx11-dev:i386 libxext-dev:i386 libxrandr-dev:i386 libxcursor-dev:i386 libxfixes-dev:i386 libxi-dev:i386 
+          libxss-dev:i386 libxkbcommon-dev:i386
 
       - name: Configure
         run: cmake --preset ${{matrix.preset}} -B ${{env.BUILD_DIRECTORY}}
