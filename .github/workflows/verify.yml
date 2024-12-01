@@ -18,10 +18,10 @@ jobs:
             os: ubuntu-24.04
             build_type: Debug
             libraries_arch: x64
-          - preset: debug_linux_gcc_x32
-            os: ubuntu-24.04
-            build_type: Debug
-            libraries_arch: x32
+#          - preset: debug_linux_gcc_x32
+#            os: ubuntu-24.04
+#            build_type: Debug
+#            libraries_arch: x32
           - preset: debug_linux_clang
             os: ubuntu-24.04
             build_type: Debug
@@ -40,10 +40,10 @@ jobs:
             os: ubuntu-24.04
             build_type: Release
             libraries_arch: x64
-          - preset: release_linux_gcc_x32
-            os: ubuntu-24.04
-            build_type: Release
-            libraries_arch: x32
+#          - preset: release_linux_gcc_x32
+#            os: ubuntu-24.04
+#            build_type: Release
+#            libraries_arch: x32
           - preset: release_linux_clang
             os: ubuntu-24.04
             build_type: Release
@@ -80,9 +80,7 @@ jobs:
         run: >
           sudo apt-get update && 
           sudo apt-get install 
-          libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev libxi-dev libxss-dev
-          libxkbcommon-dev libdrm-dev libgbm-dev libgl1-mesa-dev libgles2-mesa-dev
-          libegl1-mesa-dev libdbus-1-dev libibus-1.0-dev libudev-dev fcitx-libs-dev
+          libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev libxi-dev libxss-dev libxkbcommon-dev
 
       - name: Install x32 required libraries (Ubuntu)
         if: matrix.os == 'ubuntu-24.04' && matrix.libraries_arch == 'x32'
