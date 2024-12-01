@@ -36,5 +36,5 @@ foreach (IMPLEMENTATION ${CONTEXT_RENDER_BACKEND_SYSTEM_IMPLEMENTATIONS})
 
     kan_setup_tests (TEST_UNIT test_context_render_backend_system TEST_SHARED_LIBRARY "${SHARED_NAME}"
             # We need more timeout due to initialization/shutdown times.
-            PROPERTIES TIMEOUT 5)
+            PROPERTIES TIMEOUT 5 LABELS GRAPHICS)
 endforeach ()
