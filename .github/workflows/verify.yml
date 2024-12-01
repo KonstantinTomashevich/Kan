@@ -10,7 +10,7 @@ on:
       - master
 
 jobs:
-  run_tests:
+  verify:
     strategy:
       matrix:
         include:
@@ -64,7 +64,11 @@ jobs:
 
       - name: Install required libraries (Ubuntu)
         if: matrix.os == 'ubuntu-24.04'
-        run: sudo apt-get update && sudo apt-get install ninja-build libx11-dev gcc-multilib g++-multilib
+        run: >
+          sudo apt-get update && 
+          sudo apt-get install 
+          ninja-build libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev libxi-dev libxss-dev 
+          gcc-multilib g++-multilib
 
       - name: Configure
         run: cmake --preset ${{matrix.preset}} -B ${{env.BUILD_DIRECTORY}}
