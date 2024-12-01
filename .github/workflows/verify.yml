@@ -86,11 +86,11 @@ jobs:
 
       - name: Build
         working-directory: ${{env.BUILD_DIRECTORY}}
-        run: cmake --build . --target test_kan --config ${{matrix.build_type}}
+        run: cmake --build . --target test_kan --config ${{matrix.build_type}} --parallel 4
 
       - name: Test
         working-directory: ${{env.BUILD_DIRECTORY}}
-        run: ctest --build-config ${{matrix.build_type}} --timeout 2 -LE GRAPHICS
+        run: ctest --build-config ${{matrix.build_type}} --parallel 4 --timeout 2 -LE GRAPHICS
 
       - name: Upload test results
         if: ${{ success() }} || ${{ failure() }}
