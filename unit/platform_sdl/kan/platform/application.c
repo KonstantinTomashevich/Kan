@@ -191,7 +191,8 @@ kan_bool_t kan_platform_application_init (void)
 
     if (!SDL_InitSubSystem (SDL_INIT_VIDEO | SDL_INIT_EVENTS))
     {
-        KAN_LOG (platform_application, KAN_LOG_CRITICAL_ERROR, "Failed to initialize SDL backend for application.")
+        KAN_LOG (platform_application, KAN_LOG_CRITICAL_ERROR,
+                 "Failed to initialize SDL backend for application, SDL error: %s", SDL_GetError ())
         return KAN_FALSE;
     }
 
