@@ -3982,15 +3982,15 @@ static void migrator_adapt_numeric (kan_instance_size_t source_size,
             switch (target_size)
             {
             case sizeof (int16_t):
-                *(int16_t *) located_output = (int16_t) *(const int8_t *) located_input;
+                *(int16_t *) located_output = (int16_t) * (const int8_t *) located_input;
                 return;
 
             case sizeof (int32_t):
-                *(int32_t *) located_output = (int32_t) *(const int8_t *) located_input;
+                *(int32_t *) located_output = (int32_t) * (const int8_t *) located_input;
                 return;
 
             case sizeof (int64_t):
-                *(int64_t *) located_output = (int64_t) *(const int8_t *) located_input;
+                *(int64_t *) located_output = (int64_t) * (const int8_t *) located_input;
                 return;
             }
 
@@ -4000,15 +4000,15 @@ static void migrator_adapt_numeric (kan_instance_size_t source_size,
             switch (target_size)
             {
             case sizeof (int8_t):
-                *(int8_t *) located_output = (int8_t) *(const int16_t *) located_input;
+                *(int8_t *) located_output = (int8_t) * (const int16_t *) located_input;
                 return;
 
             case sizeof (int32_t):
-                *(int32_t *) located_output = (int32_t) *(const int16_t *) located_input;
+                *(int32_t *) located_output = (int32_t) * (const int16_t *) located_input;
                 return;
 
             case sizeof (int64_t):
-                *(int64_t *) located_output = (int64_t) *(const int16_t *) located_input;
+                *(int64_t *) located_output = (int64_t) * (const int16_t *) located_input;
                 return;
             }
 
@@ -4018,15 +4018,15 @@ static void migrator_adapt_numeric (kan_instance_size_t source_size,
             switch (target_size)
             {
             case sizeof (int8_t):
-                *(int8_t *) located_output = (int8_t) *(const int32_t *) located_input;
+                *(int8_t *) located_output = (int8_t) * (const int32_t *) located_input;
                 return;
 
             case sizeof (int16_t):
-                *(int16_t *) located_output = (int16_t) *(const int32_t *) located_input;
+                *(int16_t *) located_output = (int16_t) * (const int32_t *) located_input;
                 return;
 
             case sizeof (int64_t):
-                *(int64_t *) located_output = (int64_t) *(const int32_t *) located_input;
+                *(int64_t *) located_output = (int64_t) * (const int32_t *) located_input;
                 return;
             }
 
@@ -4036,15 +4036,15 @@ static void migrator_adapt_numeric (kan_instance_size_t source_size,
             switch (target_size)
             {
             case sizeof (int8_t):
-                *(int8_t *) located_output = (int8_t) *(const int64_t *) located_input;
+                *(int8_t *) located_output = (int8_t) * (const int64_t *) located_input;
                 return;
 
             case sizeof (int16_t):
-                *(int16_t *) located_output = (int16_t) *(const int64_t *) located_input;
+                *(int16_t *) located_output = (int16_t) * (const int64_t *) located_input;
                 return;
 
             case sizeof (int32_t):
-                *(int32_t *) located_output = (int32_t) *(const int64_t *) located_input;
+                *(int32_t *) located_output = (int32_t) * (const int64_t *) located_input;
                 return;
             }
 
@@ -4060,15 +4060,15 @@ static void migrator_adapt_numeric (kan_instance_size_t source_size,
             switch (target_size)
             {
             case sizeof (uint16_t):
-                *(uint16_t *) located_output = (uint16_t) *(const uint8_t *) located_input;
+                *(uint16_t *) located_output = (uint16_t) * (const uint8_t *) located_input;
                 return;
 
             case sizeof (uint32_t):
-                *(uint32_t *) located_output = (uint32_t) *(const uint8_t *) located_input;
+                *(uint32_t *) located_output = (uint32_t) * (const uint8_t *) located_input;
                 return;
 
             case sizeof (uint64_t):
-                *(uint64_t *) located_output = (uint64_t) *(const uint8_t *) located_input;
+                *(uint64_t *) located_output = (uint64_t) * (const uint8_t *) located_input;
                 return;
             }
 
@@ -4078,15 +4078,15 @@ static void migrator_adapt_numeric (kan_instance_size_t source_size,
             switch (target_size)
             {
             case sizeof (uint8_t):
-                *(uint8_t *) located_output = (uint8_t) *(const uint16_t *) located_input;
+                *(uint8_t *) located_output = (uint8_t) * (const uint16_t *) located_input;
                 return;
 
             case sizeof (uint32_t):
-                *(uint32_t *) located_output = (uint32_t) *(const uint16_t *) located_input;
+                *(uint32_t *) located_output = (uint32_t) * (const uint16_t *) located_input;
                 return;
 
             case sizeof (uint64_t):
-                *(uint64_t *) located_output = (uint64_t) *(const uint16_t *) located_input;
+                *(uint64_t *) located_output = (uint64_t) * (const uint16_t *) located_input;
                 return;
             }
 
@@ -4096,15 +4096,15 @@ static void migrator_adapt_numeric (kan_instance_size_t source_size,
             switch (target_size)
             {
             case sizeof (uint8_t):
-                *(uint8_t *) located_output = (uint8_t) *(const uint32_t *) located_input;
+                *(uint8_t *) located_output = (uint8_t) * (const uint32_t *) located_input;
                 return;
 
             case sizeof (uint16_t):
-                *(uint16_t *) located_output = (uint16_t) *(const uint32_t *) located_input;
+                *(uint16_t *) located_output = (uint16_t) * (const uint32_t *) located_input;
                 return;
 
             case sizeof (uint64_t):
-                *(uint64_t *) located_output = (uint64_t) *(const uint32_t *) located_input;
+                *(uint64_t *) located_output = (uint64_t) * (const uint32_t *) located_input;
                 return;
             }
 
@@ -4114,15 +4114,15 @@ static void migrator_adapt_numeric (kan_instance_size_t source_size,
             switch (target_size)
             {
             case sizeof (uint8_t):
-                *(uint8_t *) located_output = (uint8_t) *(const uint64_t *) located_input;
+                *(uint8_t *) located_output = (uint8_t) * (const uint64_t *) located_input;
                 return;
 
             case sizeof (uint16_t):
-                *(uint16_t *) located_output = (uint16_t) *(const uint64_t *) located_input;
+                *(uint16_t *) located_output = (uint16_t) * (const uint64_t *) located_input;
                 return;
 
             case sizeof (uint32_t):
-                *(uint32_t *) located_output = (uint32_t) *(const uint64_t *) located_input;
+                *(uint32_t *) located_output = (uint32_t) * (const uint64_t *) located_input;
                 return;
             }
 
