@@ -17,9 +17,10 @@ jobs:
           - preset: debug_linux_gcc
             os: ubuntu-22.04
             build_type: Debug
-          - preset: debug_linux_gcc_x32
-            os: ubuntu-22.04
-            build_type: Debug
+          # TODO: x32 is temporary disabled while we're repairing the workflow.
+          #- preset: debug_linux_gcc_x32
+          #  os: ubuntu-22.04
+          #  build_type: Debug
           - preset: debug_linux_clang
             os: ubuntu-22.04
             build_type: Debug
@@ -35,9 +36,10 @@ jobs:
           - preset: release_linux_gcc
             os: ubuntu-22.04
             build_type: Release
-          - preset: release_linux_gcc_x32
-            os: ubuntu-22.04
-            build_type: Release
+          # TODO: x32 is temporary disabled while we're repairing the workflow.
+          #- preset: release_linux_gcc_x32
+          #  os: ubuntu-22.04
+          #  build_type: Release
           - preset: release_linux_clang
             os: ubuntu-22.04
             build_type: Release
