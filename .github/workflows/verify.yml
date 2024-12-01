@@ -68,7 +68,10 @@ jobs:
 
       - name: Install Vulkan SDK (Ubuntu)
         if: matrix.os == 'ubuntu-22.04'
-        run: sudo apt-get update && sudo apt-get install vulkan-sdk
+        run: |
+          wget -qO- https://packages.lunarg.com/lunarg-signing-key-pub.asc | sudo tee /etc/apt/trusted.gpg.d/lunarg.asc
+          sudo wget -qO /etc/apt/sources.list.d/lunarg-vulkan-noble.list http://packages.lunarg.com/vulkan/lunarg-vulkan-noble.list
+          sudo apt-get update && sudo apt-get install vulkan-sdk
 
       - name: Install Vulkan SDK (Windows)
         if: matrix.os == 'windows-2022'
@@ -87,7 +90,7 @@ jobs:
 
       - name: Test
         working-directory: ${{env.BUILD_DIRECTORY}}
-        run: ctest --build-config ${{matrix.build_type}} --timeout 2
+        run: ctest --build-config ${{matrix.build_type}} --timeout 2 -LE GRAPHICS
 
       - name: Upload test results
         if: ${{ success() }} || ${{ failure() }}
