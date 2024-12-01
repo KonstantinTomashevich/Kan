@@ -106,6 +106,7 @@
       "name": "gcc_x32",
       "hidden": true,
       "cacheVariables": {
+        "KAN_CORE_TYPES_PRESET": "x32",
         "CMAKE_C_FLAGS": "-m32",
         "CMAKE_CXX_FLAGS": "-m32"
       }

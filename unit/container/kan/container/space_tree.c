@@ -1149,7 +1149,8 @@ static kan_bool_t is_node_empty (struct kan_space_tree_t *tree, struct kan_space
     return KAN_TRUE;
 }
 
-static inline void kan_space_tree_node_shutdown_empty (struct kan_space_tree_t *tree, struct kan_space_tree_node_t *node)
+static inline void kan_space_tree_node_shutdown_empty (struct kan_space_tree_t *tree,
+                                                       struct kan_space_tree_node_t *node)
 {
     if (node->sub_nodes)
     {
@@ -1184,7 +1185,7 @@ void kan_space_tree_delete (struct kan_space_tree_t *tree, struct kan_space_tree
     if (node->sub_nodes_count > 0u)
     {
         // Do not bother with empty nodes as we'll just delete them.
-        if (node->sub_nodes_capacity - node->sub_nodes_count >= 2u * KAN_CONTAINER_SPACE_TREE_SUB_NODE_SLICE)
+        if (node->sub_nodes_capacity - node->sub_nodes_count >= (uint16_t) 2u * KAN_CONTAINER_SPACE_TREE_SUB_NODE_SLICE)
         {
             kan_space_tree_node_reallocate_sub_nodes (
                 tree, node, node->sub_nodes_capacity - KAN_CONTAINER_SPACE_TREE_SUB_NODE_SLICE);
