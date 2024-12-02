@@ -208,7 +208,7 @@ kan_hash_t kan_reflection_hash_struct (kan_reflection_registry_t registry,
         break;                                                                                                         \
                                                                                                                        \
     case KAN_REFLECTION_ARCHETYPE_INTERNED_STRING:                                                                     \
-        APPEND_HASH (*(kan_interned_string_t *) (ADDRESS));                                                            \
+        APPEND_HASH (KAN_HASH_OBJECT_POINTER (*(kan_interned_string_t *) (ADDRESS)));                                  \
         break;                                                                                                         \
                                                                                                                        \
     case KAN_REFLECTION_ARCHETYPE_ENUM:                                                                                \

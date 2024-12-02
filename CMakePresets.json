@@ -1,0 +1,278 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 25,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "debug",
+      "description": "Mixin with configuration with debug features enabled for development.",
+      "hidden": true,
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "KAN_APPLICATION_GENERATE_CODE_HOT_RELOAD_TEST": "ON",
+        "KAN_CONTEXT_HOT_RELOAD_COORDINATION_ENABLE_BY_DEFAULT": "ON",
+        "KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED": "ON",
+        "KAN_CONTEXT_RENDER_BACKEND_VULKAN_PROFILE_MEMORY": "ON",
+        "KAN_CPU_PROFILER_ENABLE_BY_DEFAULT": "OFF",
+        "KAN_ASSERT_ENABLED": "ON",
+        "KAN_IMAGE_STB_PROFILE_MEMORY": "ON",
+        "KAN_MEMORY_PROFILER_ENABLE_BY_DEFAULT": "ON",
+        "KAN_REFLECTION_VALIDATION_ENABLED": "ON",
+        "KAN_REPOSITORY_SAFEGUARDS_ENABLED": "ON",
+        "KAN_REPOSITORY_VALIDATION_ENABLED": "ON",
+        "KAN_WORKFLOW_VERIFY": "ON"
+      }
+    },
+    {
+      "name": "release",
+      "description": "Mixin with configuration with everything unnecessary for release disabled.",
+      "hidden": true,
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "KAN_APPLICATION_GENERATE_CODE_HOT_RELOAD_TEST": "OFF",
+        "KAN_CONTEXT_HOT_RELOAD_COORDINATION_ENABLE_BY_DEFAULT": "OFF",
+        "KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED": "OFF",
+        "KAN_CONTEXT_RENDER_BACKEND_VULKAN_PROFILE_MEMORY": "OFF",
+        "KAN_CPU_PROFILER_ENABLE_BY_DEFAULT": "OFF",
+        "KAN_ASSERT_ENABLED": "OFF",
+        "KAN_IMAGE_STB_PROFILE_MEMORY": "OFF",
+        "KAN_MEMORY_PROFILER_ENABLE_BY_DEFAULT": "OFF",
+        "KAN_REFLECTION_VALIDATION_ENABLED": "OFF",
+        "KAN_REPOSITORY_SAFEGUARDS_ENABLED": "OFF",
+        "KAN_REPOSITORY_VALIDATION_ENABLED": "OFF",
+        "KAN_WORKFLOW_VERIFY": "OFF"
+      }
+    },
+    {
+      "name": "linux",
+      "description": "Mixin with common configuration for linux builds.",
+      "hidden": true,
+      "generator": "Ninja Multi-Config",
+      "binaryDir": "${sourceDir}/build/${presetName}"
+    },
+    {
+      "name": "windows",
+      "description": "Mixin with common configuration for windows builds.",
+      "hidden": true,
+      "generator": "Visual Studio 17 2022",
+      "binaryDir": "${sourceDir}/build/${presetName}"
+    },
+    {
+      "name": "linux_gcc",
+      "description": "Mixin with common configuration for linux builds using gcc.",
+      "inherits": [
+        "linux"
+      ],
+      "hidden": true,
+      "cacheVariables": {
+        "CMAKE_C_COMPILER": "gcc",
+        "CMAKE_CXX_COMPILER": "g++"
+      }
+    },
+    {
+      "name": "linux_clang",
+      "description": "Mixin with common configuration for linux builds using clang.",
+      "inherits": [
+        "linux"
+      ],
+      "hidden": true,
+      "cacheVariables": {
+        "CMAKE_C_COMPILER": "clang",
+        "CMAKE_CXX_COMPILER": "clang"
+      }
+    },
+    {
+      "name": "windows_msvc",
+      "description": "Mixin with common configuration for windows builds using msvc.",
+      "inherits": [
+        "windows"
+      ],
+      "hidden": true,
+      "architecture": {
+        "value": "x64",
+        "strategy": "set"
+      },
+      "toolset": {
+        "value": "v143",
+        "strategy": "set"
+      }
+    },
+    {
+      "name": "windows_clang",
+      "description": "Mixin with common configuration for windows builds using clang-cl.",
+      "inherits": [
+        "windows"
+      ],
+      "hidden": true,
+      "architecture": {
+        "value": "x64",
+        "strategy": "set"
+      },
+      "toolset": {
+        "value": "clangcl",
+        "strategy": "set"
+      }
+    },
+    {
+      "name": "gcc_x32",
+      "description": "Mixin that enforces x32 compilation on linux using gcc.",
+      "hidden": true,
+      "cacheVariables": {
+        "KAN_CORE_TYPES_PRESET": "x32",
+        "CMAKE_C_FLAGS": "-m32",
+        "CMAKE_CXX_FLAGS": "-m32"
+      }
+    },
+    {
+      "name": "debug_linux_gcc",
+      "inherits": [
+        "debug",
+        "linux_gcc"
+      ],
+      "description": "Full configuration for debug build on linux using gcc.",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      }
+    },
+    {
+      "name": "debug_linux_gcc_x32",
+      "description": "Full configuration for debug build on linux using gcc in x32 mode.",
+      "inherits": [
+        "debug",
+        "linux_gcc",
+        "gcc_x32"
+      ],
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      }
+    },
+    {
+      "name": "debug_linux_clang",
+      "description": "Full configuration for debug build on linux using clang.",
+      "inherits": [
+        "debug",
+        "linux_clang"
+      ],
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      }
+    },
+    {
+      "name": "sanitize_linux_clang",
+      "description": "Full configuration for debug build on linux using clang with address sanitizer.",
+      "inherits": [
+        "debug",
+        "linux_clang"
+      ],
+      "cacheVariables": {
+        "KAN_ENABLE_ADDRESS_SANITIZER": "ON"
+      },
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      }
+    },
+    {
+      "name": "debug_windows_msvc",
+      "description": "Full configuration for debug build on windows using msvc.",
+      "inherits": [
+        "debug",
+        "windows_msvc"
+      ],
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      }
+    },
+    {
+      "name": "debug_windows_clang",
+      "description": "Full configuration for debug build on windows using clang-cl.",
+      "inherits": [
+        "debug",
+        "windows_clang"
+      ],
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      }
+    },
+    {
+      "name": "release_linux_gcc",
+      "description": "Full configuration for release build on linux using gcc.",
+      "inherits": [
+        "release",
+        "linux_gcc"
+      ],
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      }
+    },
+    {
+      "name": "release_linux_gcc_x32",
+      "description": "Full configuration for release build on linux using gcc in x32 mode.",
+      "inherits": [
+        "release",
+        "linux_gcc",
+        "gcc_x32"
+      ],
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      }
+    },
+    {
+      "name": "release_linux_clang",
+      "description": "Full configuration for release build on linux using clang.",
+      "inherits": [
+        "release",
+        "linux_clang"
+      ],
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      }
+    },
+    {
+      "name": "release_windows_msvc",
+      "description": "Full configuration for release build on windows using msvc.",
+      "inherits": [
+        "release",
+        "windows_msvc"
+      ],
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      }
+    },
+    {
+      "name": "release_windows_clang",
+      "description": "Full configuration for release build on windows using clang-cl.",
+      "inherits": [
+        "release",
+        "windows_clang"
+      ],
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      }
+    }
+  ]
+}

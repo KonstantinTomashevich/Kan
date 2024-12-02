@@ -4,12 +4,13 @@
 
 #include <kan/api_common/alignment.h>
 #include <kan/container/hash_storage.h>
+#include <kan/context/all_system_names.h>
 #include <kan/context/plugin_system.h>
 #include <kan/context/reflection_system.h>
 #include <kan/context/virtual_file_system.h>
 #include <kan/log/logging.h>
 #include <kan/platform/hardware.h>
-#include <kan/platform/precise_time.h>
+#include <kan/precise_time/precise_time.h>
 #include <kan/resource_pipeline/resource_pipeline.h>
 #include <kan/serialization/binary.h>
 #include <kan/stream/random_access_stream_buffer.h>
@@ -807,7 +808,7 @@ static void execute_shared_serve (kan_functor_user_data_t user_data)
         // 10-20ms hitches can be okay in most cases when searching references in editor (at least it is considered
         // okay in UE5). Therefore, I've decided to simplify implementation and avoid asynchronous IO here.
 
-        if (kan_platform_get_elapsed_nanoseconds () > state->execution_shared_state.end_time_ns)
+        if (kan_precise_time_get_elapsed_nanoseconds () > state->execution_shared_state.end_time_ns)
         {
             break;
         }
@@ -876,7 +877,7 @@ static void execute_shared_serve (kan_functor_user_data_t user_data)
 UNIVERSE_RESOURCE_REFERENCE_KAN_API void mutator_template_execute_resource_reference_manager (
     kan_cpu_job_t job, struct resource_reference_manager_state_t *state)
 {
-    const kan_time_size_t begin_time = kan_platform_get_elapsed_nanoseconds ();
+    const kan_time_size_t begin_time = kan_precise_time_get_elapsed_nanoseconds ();
     if (state->need_to_cancel_old_operations)
     {
         delete_all_ongoing_operations (state);
@@ -946,7 +947,7 @@ UNIVERSE_RESOURCE_REFERENCE_KAN_API void mutator_template_execute_resource_refer
     // Process operations.
 
     kan_stack_group_allocator_reset (&state->temporary_allocator);
-    const kan_instance_size_t cpu_count = kan_platform_get_cpu_count ();
+    const kan_instance_size_t cpu_count = kan_platform_get_cpu_logical_core_count ();
     struct kan_cpu_task_list_node_t *task_list_node = NULL;
 
     state->execution_shared_state.workers_left = kan_atomic_int_init ((int) cpu_count);

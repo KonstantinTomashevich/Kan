@@ -31,7 +31,7 @@ register_unit_reflection ()
 reflection_generator_get_output_file_path (REFLECTION_GENERATOR_OUTPUT_FILE_PATH)
 concrete_sources_direct ("${REFLECTION_GENERATOR_OUTPUT_FILE_PATH}")
 
-set (KAN_RPL_BUILTIN_HASH_STORAGE_BUCKETS "256" CACHE STRING
+set (KAN_RPL_BUILTIN_HASH_STORAGE_BUCKETS "269" CACHE STRING
         "Fixed count of buckets for compiler builtin functions hash storage.")
 set (KAN_RPL_PARSER_STACK_GROUP_SIZE "1048576 " CACHE STRING
         "Size of a stack group allocator to store all parser allocations.")

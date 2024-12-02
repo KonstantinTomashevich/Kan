@@ -34,6 +34,7 @@ struct window_info_holder_t
     struct window_info_holder_t *previous;
     struct window_info_holder_t *next;
     struct kan_application_system_window_info_t info;
+    kan_instance_size_t text_input_listeners;
     struct window_resource_t *first_resource;
 };
 
@@ -62,6 +63,8 @@ enum operation_type_t
     OPERATION_TYPE_WINDOW_SET_FOCUSABLE,
     OPERATION_TYPE_WINDOW_ADD_RESOURCE,
     OPERATION_TYPE_WINDOW_REMOVE_RESOURCE,
+    OPERATION_TYPE_WINDOW_ADD_TEXT_LISTENER,
+    OPERATION_TYPE_WINDOW_REMOVE_TEXT_LISTENER,
     OPERATION_TYPE_WINDOW_DESTROY,
     OPERATION_TYPE_WARP_MOUSE_GLOBAL,
     OPERATION_TYPE_WARP_MOUSE_TO_WINDOW,
@@ -98,7 +101,7 @@ struct window_set_textual_parameter_suffix_t
 struct window_set_icon_suffix_t
 {
     kan_application_system_window_t window_handle;
-    kan_pixel_format_t pixel_format;
+    enum kan_platform_pixel_format_t pixel_format;
     kan_platform_visual_size_t width;
     kan_platform_visual_size_t height;
     const void *data;
@@ -382,6 +385,10 @@ static inline void flush_operations (struct application_system_t *system)
                 operation->window_create_suffix.title, operation->window_create_suffix.width,
                 operation->window_create_suffix.height, operation->window_create_suffix.flags);
 
+            // Text input can be enabled by default on desktop platforms as it only affects events.
+            // We'd like to have similar debuggable behavior on desktop and other platforms, so we disable it.
+            kan_platform_application_window_set_text_input_enabled (holder->info.id, KAN_FALSE);
+
             // Technically, there is no way for resources to be attached before window creation.
             KAN_ASSERT (!holder->first_resource)
             break;
@@ -582,6 +589,33 @@ static inline void flush_operations (struct application_system_t *system)
             break;
         }
 
+        case OPERATION_TYPE_WINDOW_ADD_TEXT_LISTENER:
+        {
+            struct window_info_holder_t *holder = KAN_HANDLE_GET (operation->window_parameterless_suffix.window_handle);
+            ++holder->text_input_listeners;
+
+            if (holder->text_input_listeners == 1u)
+            {
+                kan_platform_application_window_set_text_input_enabled (holder->info.id, KAN_TRUE);
+            }
+
+            break;
+        }
+
+        case OPERATION_TYPE_WINDOW_REMOVE_TEXT_LISTENER:
+        {
+            struct window_info_holder_t *holder = KAN_HANDLE_GET (operation->window_parameterless_suffix.window_handle);
+            KAN_ASSERT (holder->text_input_listeners > 0u)
+            --holder->text_input_listeners;
+
+            if (holder->text_input_listeners == 0u)
+            {
+                kan_platform_application_window_set_text_input_enabled (holder->info.id, KAN_FALSE);
+            }
+
+            break;
+        }
+
         case OPERATION_TYPE_WINDOW_ADD_RESOURCE:
         {
             struct window_info_holder_t *holder = KAN_HANDLE_GET (operation->window_add_resource_suffix.window_handle);
@@ -713,7 +747,6 @@ static inline void clean_and_pull_events (struct application_system_t *system, k
     while (kan_platform_application_fetch_next_event (&event))
     {
         struct event_node_t *node = (struct event_node_t *) kan_event_queue_submit_begin (&system->event_queue);
-
         if (node)
         {
             kan_platform_application_event_move (&event, &node->event);
@@ -1027,6 +1060,7 @@ kan_application_system_window_t kan_application_system_window_create (kan_contex
 
     window_info_holder->info.handle = KAN_HANDLE_SET (kan_application_system_window_t, window_info_holder);
     window_info_holder->info.id = KAN_TYPED_ID_32_SET_INVALID (kan_platform_window_id_t);
+    window_info_holder->text_input_listeners = 0u;
     window_info_holder->first_resource = NULL;
     window_info_holder->previous = NULL;
     window_info_holder->next = system->first_window_info;
@@ -1107,7 +1141,7 @@ void kan_application_system_window_set_title (kan_context_system_t system_handle
 
 void kan_application_system_window_set_icon (kan_context_system_t system_handle,
                                              kan_application_system_window_t window_handle,
-                                             kan_pixel_format_t pixel_format,
+                                             enum kan_platform_pixel_format_t pixel_format,
                                              kan_platform_visual_size_t width,
                                              kan_platform_visual_size_t height,
                                              const void *data)
@@ -1387,6 +1421,36 @@ void kan_application_window_set_focusable (kan_context_system_t system_handle,
     operation->type = OPERATION_TYPE_WINDOW_SET_FOCUSABLE;
     operation->window_set_boolean_parameter_suffix.window_handle = window_handle;
     operation->window_set_boolean_parameter_suffix.value = focusable;
+
+    insert_operation (system, operation);
+    kan_atomic_int_unlock (&system->operation_submission_lock);
+}
+
+void kan_application_window_add_text_listener (kan_context_system_t system_handle,
+                                               kan_application_system_window_t window_handle)
+{
+    struct application_system_t *system = KAN_HANDLE_GET (system_handle);
+    kan_atomic_int_lock (&system->operation_submission_lock);
+    struct operation_t *operation = kan_stack_group_allocator_allocate (
+        &system->operation_temporary_allocator, sizeof (struct operation_t), _Alignof (struct operation_t));
+
+    operation->type = OPERATION_TYPE_WINDOW_ADD_TEXT_LISTENER;
+    operation->window_parameterless_suffix.window_handle = window_handle;
+
+    insert_operation (system, operation);
+    kan_atomic_int_unlock (&system->operation_submission_lock);
+}
+
+void kan_application_window_remove_text_listener (kan_context_system_t system_handle,
+                                                  kan_application_system_window_t window_handle)
+{
+    struct application_system_t *system = KAN_HANDLE_GET (system_handle);
+    kan_atomic_int_lock (&system->operation_submission_lock);
+    struct operation_t *operation = kan_stack_group_allocator_allocate (
+        &system->operation_temporary_allocator, sizeof (struct operation_t), _Alignof (struct operation_t));
+
+    operation->type = OPERATION_TYPE_WINDOW_REMOVE_TEXT_LISTENER;
+    operation->window_parameterless_suffix.window_handle = window_handle;
 
     insert_operation (system, operation);
     kan_atomic_int_unlock (&system->operation_submission_lock);

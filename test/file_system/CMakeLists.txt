@@ -9,8 +9,8 @@ foreach (IMPLEMENTATION ${FILE_SYSTEM_IMPLEMENTATIONS})
 
     shared_library_include (
             SCOPE PUBLIC
-            ABSTRACT error=sdl file_system=${IMPLEMENTATION} hash=djb2 log=kan memory=kan memory_profiler=none
-            platform=sdl stream=kan threading=sdl
+            ABSTRACT error=sdl file_system=${IMPLEMENTATION} hash=djb2 log=kan memory=kan memory_profiler=default
+            precise_time=sdl stream=kan threading=sdl
             CONCRETE container testing test_file_system)
 
     shared_library_verify ()

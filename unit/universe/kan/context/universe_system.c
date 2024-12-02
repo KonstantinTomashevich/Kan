@@ -1,6 +1,7 @@
 #include <stddef.h>
 #include <string.h>
 
+#include <kan/context/all_system_names.h>
 #include <kan/context/reflection_system.h>
 #include <kan/context/universe_system.h>
 #include <kan/context/update_system.h>
@@ -107,7 +108,15 @@ void universe_system_connect (kan_context_system_t handle, kan_context_t context
     kan_context_system_t update_system = kan_context_query (context, KAN_CONTEXT_UPDATE_SYSTEM_NAME);
     if (KAN_HANDLE_IS_VALID (update_system))
     {
-        kan_update_system_connect_on_run (update_system, handle, on_update_run, 0u, NULL);
+        kan_context_system_t dependencies[] = {
+            // Universe mutators might do hot reload, therefore we need a dependency.
+            kan_context_query_no_connect (context, KAN_CONTEXT_HOT_RELOAD_COORDINATION_SYSTEM_NAME),
+            // Universe content state depends on loaded plugins.
+            kan_context_query_no_connect (context, KAN_CONTEXT_PLUGIN_SYSTEM_NAME),
+        };
+
+        kan_update_system_connect_on_run (update_system, handle, on_update_run,
+                                          sizeof (dependencies) / sizeof (dependencies[0u]), dependencies, 0u, NULL);
     }
 }
 

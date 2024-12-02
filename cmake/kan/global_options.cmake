@@ -11,8 +11,6 @@ option (KAN_TREAT_WARNINGS_AS_ERRORS "Enables \"treat warnings as errors\" compi
 # We'd like to format everything even if its third party dependencies are not here.
 option (KAN_FOR_FORMAT_ONLY "Configure only for format check on CI." OFF)
 
-option (KAN_USE_VULKAN_API "Searches for Vulkan and enables units that are dependant on it." ON)
-
 # We can not add common compile options here, because they would affect third party libraries compilation.
 # Therefore every Kan root source directory must call this function to setup compile options locally.
 function (add_common_compile_options)
@@ -92,19 +90,18 @@ function (add_common_compile_options)
                     # to silence them manually for every compiler.
                     -Wno-unused-parameter
                     # Zero length arrays greatly increase readability for classes and structs with dynamic sizes.
-                    -Wno-zero-length-array)
+                    -Wno-zero-length-array
+                    # For some reason gcc just ignores when this warnings are muted through pragma macro,
+                    # therefore we're forced to disable it globally.
+                    -Wno-unused-variable
+                    -Wno-unused-but-set-variable)
         endif ()
     endif ()
 endfunction ()
 
-if (KAN_USE_VULKAN_API)
-    if (NOT KAN_FOR_FORMAT_ONLY)
-        find_package (Vulkan REQUIRED)
-    else ()
-        # Empty interface to be able to format Vulkan related code without Vulkan SDK.
-        add_library (VulkanHeaders INTERFACE)
-        add_library (Vulkan::Headers ALIAS VulkanHeaders)
-    endif ()
+find_package (Vulkan)
+if (NOT Vulkan_FOUND)
+    message (WARNING "Unable to find Vulkan SDK! Targets that depend on it will be skipped.")
 endif ()
 
 # Position independent code should be generated when one shared library depends on another shared library.

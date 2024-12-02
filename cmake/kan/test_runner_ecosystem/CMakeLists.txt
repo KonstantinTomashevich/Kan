@@ -25,7 +25,8 @@ foreach (TEST_SOURCE ${TEST_SOURCES})
             # We use cmake directly to avoid overcomplicating tests with CMakeUnitFramework executables.
 
             add_executable ("${TEST_RUNNER_TARGET}" "${TEST_RUNNER_FILE}")
-            target_link_libraries ("${TEST_RUNNER_TARGET}" PUBLIC "${SETUP_TEST_SHARED_LIBRARY}" SDL3::SDL3)
+            target_link_libraries ("${TEST_RUNNER_TARGET}"
+                    PUBLIC "${SETUP_TEST_SHARED_LIBRARY}" error SDL3::SDL3)
             set_target_properties ("${TEST_RUNNER_TARGET}" PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${TEST_BINARY_DIR}")
 
             set (TEST_WORKSPACE "${WORKSPACE_DIRECTORY}/${TEST_NAME}")

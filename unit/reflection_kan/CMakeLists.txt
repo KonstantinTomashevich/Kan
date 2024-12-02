@@ -4,20 +4,20 @@ concrete_sources ("*.c")
 concrete_require (SCOPE PRIVATE ABSTRACT cpu_dispatch error hash log memory THIRD_PARTY qsort)
 concrete_implements_abstract (reflection)
 
-set (KAN_REFLECTION_ENUM_INITIAL_BUCKETS "64" CACHE STRING "Initial count of buckets for enum hash storage.")
-set (KAN_REFLECTION_STRUCT_INITIAL_BUCKETS "64" CACHE STRING "Initial count of buckets for struct hash storage.")
-set (KAN_REFLECTION_FUNCTION_INITIAL_BUCKETS "64" CACHE STRING "Initial count of buckets for function hash storage.")
-set (KAN_REFLECTION_ENUM_META_INITIAL_BUCKETS "64" CACHE STRING "Initial count of buckets for enum meta hash storage.")
+set (KAN_REFLECTION_ENUM_INITIAL_BUCKETS "67" CACHE STRING "Initial count of buckets for enum hash storage.")
+set (KAN_REFLECTION_STRUCT_INITIAL_BUCKETS "67" CACHE STRING "Initial count of buckets for struct hash storage.")
+set (KAN_REFLECTION_FUNCTION_INITIAL_BUCKETS "67" CACHE STRING "Initial count of buckets for function hash storage.")
+set (KAN_REFLECTION_ENUM_META_INITIAL_BUCKETS "67" CACHE STRING "Initial count of buckets for enum meta hash storage.")
 
-set (KAN_REFLECTION_ENUM_VALUE_META_INITIAL_BUCKETS "64" CACHE STRING
+set (KAN_REFLECTION_ENUM_VALUE_META_INITIAL_BUCKETS "67" CACHE STRING
         "Initial count of buckets for enum value meta hash storage.")
-set (KAN_REFLECTION_STRUCT_META_INITIAL_BUCKETS "64" CACHE STRING
+set (KAN_REFLECTION_STRUCT_META_INITIAL_BUCKETS "67" CACHE STRING
         "Initial count of buckets for struct meta hash storage.")
-set (KAN_REFLECTION_STRUCT_FIELD_META_INITIAL_BUCKETS "64" CACHE STRING
+set (KAN_REFLECTION_STRUCT_FIELD_META_INITIAL_BUCKETS "67" CACHE STRING
         "Initial count of buckets for struct field meta hash storage.")
-set (KAN_REFLECTION_FUNCTION_META_INITIAL_BUCKETS "64" CACHE STRING
+set (KAN_REFLECTION_FUNCTION_META_INITIAL_BUCKETS "67" CACHE STRING
         "Initial count of buckets for function meta hash storage.")
-set (KAN_REFLECTION_FUNCTION_ARGUMENT_META_INITIAL_BUCKETS "64" CACHE STRING
+set (KAN_REFLECTION_FUNCTION_ARGUMENT_META_INITIAL_BUCKETS "67" CACHE STRING
         "Initial count of buckets for function argument meta hash storage.")
 
 set (KAN_REFLECTION_PATCH_BUILDER_STACK_SIZE "1048576" CACHE STRING "Size of patch builder algorithm stack group item.")
@@ -25,9 +25,9 @@ set (KAN_REFLECTION_PATCH_MAX_SECTION_DEPTH "8" CACHE STRING "Max depth of compi
 set (KAN_REFLECTION_PATCH_ARRAY_APPEND_BASE_COUNT "8" CACHE STRING
         "Minimum capacity for capacity resize operation when array append section fails to get the spot for the item.")
 
-set (KAN_REFLECTION_MIGRATION_ENUM_SEED_INITIAL_BUCKETS "64" CACHE STRING
+set (KAN_REFLECTION_MIGRATION_ENUM_SEED_INITIAL_BUCKETS "67" CACHE STRING
         "Initial count of buckets for migration enum seed hash storage.")
-set (KAN_REFLECTION_MIGRATION_STRUCT_SEED_INITIAL_BUCKETS "64" CACHE STRING
+set (KAN_REFLECTION_MIGRATION_STRUCT_SEED_INITIAL_BUCKETS "67" CACHE STRING
         "Initial count of buckets for migration struct seed hash storage.")
 set (KAN_REFLECTION_MIGRATOR_BUILD_STACK "16777216" CACHE STRING
         "Maximum memory stack size for migrator building algorithm.")

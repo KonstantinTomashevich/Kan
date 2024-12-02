@@ -372,7 +372,7 @@ static void optional_includable_object_finish (void)
     }
 
     interface_file.optional_includable_object = kan_allocate_general (
-        KAN_ALLOCATION_GROUP_IGNORE, optional_includable_object_buffer.size + 1u, _Alignof (char));
+        kan_c_interface_allocation_group (), optional_includable_object_buffer.size + 1u, _Alignof (char));
     strncpy (interface_file.optional_includable_object, optional_includable_object_buffer.buffer,
              optional_includable_object_buffer.size);
 
@@ -960,6 +960,7 @@ static kan_bool_t parse_input (void)
 
 int main (int argument_count, char **arguments_array)
 {
+    kan_set_critical_error_interactive (KAN_FALSE);
     if (argument_count != 4)
     {
         fprintf (stderr,

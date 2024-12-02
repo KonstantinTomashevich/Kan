@@ -16,6 +16,14 @@ target_include_directories (qsort INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/qsort")
 # SDL3
 set (SDL_SHARED ON CACHE BOOL "We use double-set with cache to override third party project options for good.")
 set (SDL_SHARED ON)
+
+if (DEFINED ENV{GITHUB_ACTIONS})
+    # Somehow SDL sees <gameinput.h>, but then build fails with <gameinput.h> missing.
+    message (STATUS "Disabling SDL joystick on GitHub Actions as there is something strange with their runner.")
+    set (SDL_JOYSTICK OFF)
+    set (SDL_HAPTIC OFF)
+endif()
+
 add_subdirectory (SDL)
 
 # SPIRV-Headers
@@ -26,12 +34,12 @@ set (TRACY_ON_DEMAND ON)
 add_subdirectory (tracy)
 
 # volk
-if (KAN_USE_VULKAN_API)
+if (Vulkan_FOUND)
     add_subdirectory (volk)
 endif ()
 
 # VulkanMemoryAllocator
-if (KAN_USE_VULKAN_API)
+if (Vulkan_FOUND)
     add_subdirectory (VulkanMemoryAllocator)
 endif ()
 

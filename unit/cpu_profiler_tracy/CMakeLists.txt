@@ -5,7 +5,7 @@ concrete_require (SCOPE PRIVATE ABSTRACT threading CONCRETE_INTERFACE container 
 concrete_implements_abstract (cpu_profiler)
 c_interface_scanner_setup (GLOB "*.c" "*.h")
 
-set (KAN_CPU_PROFILER_TRACY_INITIAL_SECTION_BUCKETS "64" CACHE STRING
+set (KAN_CPU_PROFILER_TRACY_INITIAL_SECTION_BUCKETS "67" CACHE STRING
         "Initial number of buckets for CPU profiling sections.")
 
 concrete_compile_definitions (

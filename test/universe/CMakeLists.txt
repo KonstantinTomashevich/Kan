@@ -1,7 +1,7 @@
 register_concrete (test_universe)
 concrete_include (PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 universe_concrete_setup_sources (DIRECT "test_universe.c")
-register_context_system (migration_reflection_population_system_t)
+register_context_system (NAME migration_reflection_population_system_t PRIVATE)
 concrete_require (SCOPE PUBLIC CONCRETE_INTERFACE context_reflection_system context_update_system testing universe)
 
 register_concrete (test_universe_pre_migration)
@@ -18,8 +18,8 @@ register_shared_library (test_universe_library)
 shared_library_include (
         SCOPE PUBLIC
         ABSTRACT
-        cpu_dispatch=kan cpu_profiler=none error=sdl hash=djb2 log=kan memory=kan memory_profiler=none platform=sdl
-        reflection=kan repository=kan threading=sdl workflow=kan
+        cpu_dispatch=kan cpu_profiler=default error=sdl hash=djb2 log=kan memory=kan memory_profiler=default
+        platform=sdl precise_time=sdl reflection=kan repository=kan threading=sdl workflow=kan
         CONCRETE
         container context context_reflection_system context_update_system testing test_universe
         test_universe_post_migration test_universe_pre_migration universe)

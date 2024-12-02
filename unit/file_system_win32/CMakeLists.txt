@@ -5,7 +5,7 @@ endif ()
 register_concrete (file_system_win32)
 concrete_include (PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
 concrete_sources ("*.c")
-concrete_require (SCOPE PRIVATE ABSTRACT error log memory platform)
+concrete_require (SCOPE PRIVATE ABSTRACT error log memory precise_time)
 concrete_implements_abstract (file_system)
 
 set (KAN_FILE_SYSTEM_WIN32_LOCK_FILE_WAIT_NS "500000000" CACHE STRING

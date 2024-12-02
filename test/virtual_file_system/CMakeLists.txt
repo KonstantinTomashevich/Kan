@@ -1,6 +1,6 @@
 register_concrete (test_virtual_file_system)
 concrete_sources ("*.c")
-concrete_require (SCOPE PUBLIC ABSTRACT platform virtual_file_system CONCRETE_INTERFACE testing)
+concrete_require (SCOPE PUBLIC ABSTRACT platform precise_time virtual_file_system CONCRETE_INTERFACE testing)
 
 # Unfortunately, running all tests at once makes NTFS behavior a little bit less predictable making tests fail.
 # It is kind of difficult to modify tests to take everything that NTFS might throw at us into account.
@@ -18,9 +18,9 @@ foreach (IMPLEMENTATION ${VIRTUAL_FILE_SYSTEM_IMPLEMENTATIONS})
 
     shared_library_include (
             SCOPE PUBLIC
-            ABSTRACT cpu_dispatch=kan cpu_profiler=none error=sdl file_system=platform_default
-            file_system_watcher=user_level hash=djb2 log=kan memory=kan memory_profiler=none platform=sdl reflection=kan
-            stream=kan threading=sdl virtual_file_system=${IMPLEMENTATION}
+            ABSTRACT cpu_dispatch=kan cpu_profiler=default error=sdl file_system=platform_default
+            file_system_watcher=user_level hash=djb2 log=kan memory=kan memory_profiler=default platform=sdl
+            precise_time=sdl reflection=kan stream=kan threading=sdl virtual_file_system=${IMPLEMENTATION}
             CONCRETE container readable_data serialization testing test_virtual_file_system)
 
     shared_library_verify ()

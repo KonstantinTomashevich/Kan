@@ -367,7 +367,8 @@ void kan_rpl_compiler_ensure_statics_initialized (void)
                                                                                                                        \
     struct kan_rpl_compiler_builtin_node_t *node_##NAME = kan_allocate_batched (                                       \
         STATICS.rpl_compiler_builtin_hash_allocation_group, sizeof (struct kan_rpl_compiler_builtin_node_t));          \
-    node_##NAME->node.hash = (kan_hash_t) STATICS.builtin_##NAME.name;                                                 \
+    node_##NAME->node.hash = KAN_HASH_OBJECT_POINTER (STATICS.builtin_##NAME.name);                                    \
+    node_##NAME->name = STATICS.builtin_##NAME.name;                                                                   \
     node_##NAME->builtin = &STATICS.builtin_##NAME;                                                                    \
     kan_hash_storage_add (&STATICS.builtin_hash_storage, &node_##NAME->node)
 

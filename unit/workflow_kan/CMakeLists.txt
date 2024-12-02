@@ -5,11 +5,11 @@ concrete_require (SCOPE PRIVATE ABSTRACT error log memory threading CONCRETE_INT
 concrete_implements_abstract (workflow)
 c_interface_scanner_setup (GLOB "*.c" "*.h")
 
-set (KAN_WORKFLOW_GRAPH_NODES_INITIAL_BUCKETS "64" CACHE STRING
+set (KAN_WORKFLOW_GRAPH_NODES_INITIAL_BUCKETS "67" CACHE STRING
         "Initial count of buckets for storing workflow graph nodes during build process.")
 set (KAN_WORKFLOW_GRAPH_NODE_INFO_ARRAY_INITIAL_CAPACITY "8" CACHE STRING
         "Initial capacity of arrays inside node that store accesses and dependencies.")
-set (KAN_WORKFLOW_RESOURCE_INITIAL_BUCKETS "64" CACHE STRING
+set (KAN_WORKFLOW_RESOURCE_INITIAL_BUCKETS "67" CACHE STRING
         "Initial count of buckets for storing registered resources during verification.")
 set (KAN_WORKFLOW_VERIFICATION_STACK_SIZE "524288" CACHE STRING
         "Size of one stack for verification algorithm stack group allocator.")

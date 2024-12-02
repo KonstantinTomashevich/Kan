@@ -1,6 +1,9 @@
 register_concrete (test_file_system_watcher)
 concrete_sources ("*.c")
-concrete_require (SCOPE PUBLIC ABSTRACT file_system file_system_watcher platform CONCRETE_INTERFACE testing)
+concrete_require (
+        SCOPE PUBLIC
+        ABSTRACT file_system file_system_watcher platform precise_time
+        CONCRETE_INTERFACE testing)
 
 # Unfortunately, running all tests at once makes NTFS behavior a little bit less predictable making tests fail.
 # It is kind of difficult to modify tests to take everything that NTFS might throw at us into account.
@@ -18,9 +21,10 @@ foreach (IMPLEMENTATION ${FILE_SYSTEM_WATCHER_IMPLEMENTATIONS})
 
     shared_library_include (
             SCOPE PUBLIC
-            ABSTRACT cpu_dispatch=kan cpu_profiler=none error=sdl file_system=platform_default
-            file_system_watcher=${IMPLEMENTATION} hash=djb2 log=kan memory=kan memory_profiler=none platform=sdl
-            stream=kan threading=sdl
+            ABSTRACT
+            cpu_dispatch=kan cpu_profiler=default error=sdl file_system=platform_default
+            file_system_watcher=${IMPLEMENTATION} hash=djb2 log=kan memory=kan memory_profiler=default platform=sdl
+            precise_time=sdl reflection=kan stream=kan threading=sdl
             CONCRETE container testing test_file_system_watcher)
 
     shared_library_verify ()

@@ -90,8 +90,7 @@ void kan_allocation_group_marker (kan_allocation_group_t group, const char *name
 
 #define KAN_ALLOCATION_GROUP_STACK_SIZE 32u
 
-static struct kan_atomic_int_t thread_local_storage_initialization_lock;
-static kan_thread_local_storage_t thread_local_storage = KAN_TYPED_ID_32_INITIALIZE_INVALID;
+static kan_thread_local_storage_t thread_local_storage = KAN_HANDLE_INITIALIZE_INVALID;
 
 struct thread_local_storage_stack_t
 {
@@ -116,24 +115,13 @@ static void free_thread_local_storage_stack (void *memory)
 
 static struct thread_local_storage_stack_t *ensure_thread_local_storage (void)
 {
-    if (!KAN_TYPED_ID_32_IS_VALID (thread_local_storage))
+    if (!kan_thread_local_storage_get (&thread_local_storage))
     {
-        kan_atomic_int_lock (&thread_local_storage_initialization_lock);
-        if (!KAN_TYPED_ID_32_IS_VALID (thread_local_storage))
-        {
-            thread_local_storage = kan_thread_local_storage_create ();
-        }
-
-        kan_atomic_int_unlock (&thread_local_storage_initialization_lock);
-    }
-
-    if (!kan_thread_local_storage_get (thread_local_storage))
-    {
-        kan_thread_local_storage_set (thread_local_storage, allocate_thread_local_storage_stack (),
+        kan_thread_local_storage_set (&thread_local_storage, allocate_thread_local_storage_stack (),
                                       free_thread_local_storage_stack);
     }
 
-    return kan_thread_local_storage_get (thread_local_storage);
+    return kan_thread_local_storage_get (&thread_local_storage);
 }
 
 kan_allocation_group_t kan_allocation_group_stack_get (void)

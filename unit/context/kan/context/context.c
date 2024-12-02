@@ -84,7 +84,7 @@ static struct system_instance_node_t *context_query_system (struct context_t *co
                                                             kan_interned_string_t system_name)
 {
     const struct kan_hash_storage_bucket_t *bucket =
-        kan_hash_storage_query (&context->systems, (kan_hash_t) system_name);
+        kan_hash_storage_query (&context->systems, KAN_HASH_OBJECT_POINTER (system_name));
     struct system_instance_node_t *node = (struct system_instance_node_t *) bucket->first;
     const struct system_instance_node_t *node_end =
         (struct system_instance_node_t *) (bucket->last ? bucket->last->next : NULL);
@@ -224,7 +224,7 @@ kan_bool_t kan_context_request_system (kan_context_t handle, const char *system_
     }
 
     struct system_instance_node_t *node = kan_allocate_batched (context->group, sizeof (struct system_instance_node_t));
-    node->node.hash = (kan_hash_t) interned_system_name;
+    node->node.hash = KAN_HASH_OBJECT_POINTER (interned_system_name);
     node->name = interned_system_name;
     node->instance = KAN_HANDLE_SET_INVALID (kan_context_system_t);
     node->api = api;
@@ -363,6 +363,16 @@ kan_context_system_t kan_context_query (kan_context_t handle, const char *system
 
     KAN_ASSERT (KAN_FALSE)
     return KAN_HANDLE_SET_INVALID (kan_context_system_t);
+}
+
+kan_context_system_t kan_context_query_no_connect (kan_context_t handle, const char *system_name)
+{
+    struct context_t *context = KAN_HANDLE_GET (handle);
+    KAN_ASSERT (context->state == CONTEXT_STATE_CONNECTION)
+
+    const kan_interned_string_t interned_system_name = kan_string_intern (system_name);
+    struct system_instance_node_t *node = context_query_system (context, interned_system_name);
+    return node ? node->instance : KAN_HANDLE_SET_INVALID (kan_context_system_t);
 }
 
 void kan_context_destroy (kan_context_t handle)

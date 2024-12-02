@@ -2,6 +2,7 @@
 #include <kan/application_framework_resource_tool/context.h>
 #include <kan/application_framework_resource_tool/project.h>
 #include <kan/checksum/checksum.h>
+#include <kan/context/all_system_names.h>
 #include <kan/context/context.h>
 #include <kan/context/plugin_system.h>
 #include <kan/context/reflection_system.h>
@@ -1090,6 +1091,7 @@ static void serve_finish_request (kan_functor_user_data_t user_data)
 
 int main (int argument_count, char **argument_values)
 {
+    kan_set_critical_error_interactive (KAN_FALSE);
     if (argument_count < 2)
     {
         KAN_LOG (application_framework_resource_importer, KAN_LOG_ERROR,
@@ -1209,9 +1211,6 @@ int main (int argument_count, char **argument_values)
     global.rule_registration_lock = kan_atomic_int_init (0);
 
     kan_context_t context = kan_application_create_resource_tool_context (&global.project, argument_values[0u]);
-    kan_context_system_t plugin_system = kan_context_query (context, KAN_CONTEXT_PLUGIN_SYSTEM_NAME);
-    KAN_ASSERT (KAN_HANDLE_IS_VALID (plugin_system))
-
     kan_context_system_t reflection_system = kan_context_query (context, KAN_CONTEXT_REFLECTION_SYSTEM_NAME);
     KAN_ASSERT (KAN_HANDLE_IS_VALID (reflection_system))
 
@@ -1286,7 +1285,7 @@ int main (int argument_count, char **argument_values)
         }
 
         // We need to limit count of max requests in serving in order to avoid using too much memory.
-        const kan_instance_size_t max_requests_in_serving = kan_platform_get_cpu_count ();
+        const kan_instance_size_t max_requests_in_serving = kan_platform_get_cpu_logical_core_count ();
         kan_mutex_lock (global.request_management_mutex);
 
         const kan_interned_string_t task_start = kan_string_intern ("rule_start");

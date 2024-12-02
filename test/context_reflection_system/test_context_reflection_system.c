@@ -2,6 +2,7 @@
 
 #include <stddef.h>
 
+#include <kan/context/all_system_names.h>
 #include <kan/context/reflection_system.h>
 #include <kan/memory/allocation.h>
 #include <kan/testing/testing.h>

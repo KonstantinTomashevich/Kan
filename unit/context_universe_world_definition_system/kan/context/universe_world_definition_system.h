@@ -12,8 +12,8 @@
 /// \par Definition
 /// \parblock
 /// Universe world definition system automatically loads universe world definitions from virtual file system
-/// and provides access to them. If it is requested, this system is also able to observe changes and reload
-/// world definitions when needed.
+/// and provides access to them. If hot reload is requested, this system is also able to observe changes and reload
+/// world definitions.
 /// \endparblock
 ///
 /// \par Definition naming
@@ -29,9 +29,6 @@
 
 KAN_C_HEADER_BEGIN
 
-/// \brief System name for requirements and queries.
-#define KAN_CONTEXT_UNIVERSE_WORLD_DEFINITION_SYSTEM_NAME "universe_world_definition_system_t"
-
 /// \brief Describes configuration for universe world definition system.
 struct kan_universe_world_definition_system_config_t
 {
@@ -39,13 +36,6 @@ struct kan_universe_world_definition_system_config_t
     /// \invariant All files under this path must be world definitions, other types are not permitted.
     ///            Interned string in order to be supported in patches.
     kan_interned_string_t definitions_mount_path;
-
-    /// \brief Whether system should observe definitions directory for changes and reload definitions.
-    kan_bool_t observe_definitions;
-
-    /// \brief Time between last change to definition file and definition reload.
-    /// \details Needed to correctly reload in case of subsequent changes to file.
-    kan_time_offset_t observation_rescan_delay_ns;
 };
 
 CONTEXT_UNIVERSE_WORLD_DEFINITION_SYSTEM_API void kan_universe_world_definition_system_config_init (

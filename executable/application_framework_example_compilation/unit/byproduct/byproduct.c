@@ -4,6 +4,7 @@
 
 #include <kan/api_common/alignment.h>
 #include <kan/container/dynamic_array.h>
+#include <kan/context/all_system_names.h>
 #include <kan/context/application_framework_system.h>
 #include <kan/hash/hash.h>
 #include <kan/log/logging.h>

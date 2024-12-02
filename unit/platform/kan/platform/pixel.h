@@ -11,19 +11,13 @@
 
 KAN_C_HEADER_BEGIN
 
-typedef uint32_t kan_pixel_format_t;
-
-#define KAN_INVALID_PIXEL_FORMAT 0u
-
-/// \brief Contains values for well known pixel formats on this platform.
-struct kan_platform_pixel_format_table_t
+/// \brief Enumerates pixel formats that can be known to platform.
+enum kan_platform_pixel_format_t
 {
-    kan_pixel_format_t rgba_32;
-    kan_pixel_format_t abgr_32;
-    kan_pixel_format_t argb_32;
+    KAN_PLATFORM_PIXEL_FORMAT_UNKNOWN = 0u,
+    KAN_PLATFORM_PIXEL_FORMAT_RGBA32,
+    KAN_PLATFORM_PIXEL_FORMAT_ABGR32,
+    KAN_PLATFORM_PIXEL_FORMAT_ARGB32,
 };
-
-/// \brief Returns pixel format value table.
-PLATFORM_API const struct kan_platform_pixel_format_table_t *kan_platform_get_pixel_format_table (void);
 
 KAN_C_HEADER_END

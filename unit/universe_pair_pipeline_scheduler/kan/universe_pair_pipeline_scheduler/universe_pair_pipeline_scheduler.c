@@ -1,4 +1,4 @@
-#include <kan/platform/precise_time.h>
+#include <kan/precise_time/precise_time.h>
 #include <kan/universe/preprocessor_markup.h>
 #include <kan/universe/universe.h>
 #include <kan/universe_pair_pipeline_scheduler/universe_pair_pipeline_scheduler.h>
@@ -25,7 +25,7 @@ UNIVERSE_PAIR_PIPELINE_SCHEDULER_API void universe_pair_pipeline_scheduler_state
 UNIVERSE_PAIR_PIPELINE_SCHEDULER_API void kan_universe_scheduler_execute_pair_pipeline (
     kan_universe_scheduler_interface_t interface, struct universe_pair_pipeline_scheduler_state_t *state)
 {
-    const kan_time_size_t current_time = kan_platform_get_elapsed_nanoseconds ();
+    const kan_time_size_t current_time = kan_precise_time_get_elapsed_nanoseconds ();
     // First update is intentionally zero.
     const kan_time_offset_t delta_ns =
         state->last_update_time_ns == UINT64_MAX ? 0u : (kan_time_offset_t) (current_time - state->last_update_time_ns);
@@ -57,7 +57,7 @@ UNIVERSE_PAIR_PIPELINE_SCHEDULER_API void kan_universe_scheduler_execute_pair_pi
 
     // Advance logical time until logical time is ahead.
 
-    const kan_time_size_t logical_advance_begin_ns = kan_platform_get_elapsed_nanoseconds ();
+    const kan_time_size_t logical_advance_begin_ns = kan_precise_time_get_elapsed_nanoseconds ();
     kan_bool_t run_logical = KAN_FALSE;
 
     do
@@ -66,7 +66,7 @@ UNIVERSE_PAIR_PIPELINE_SCHEDULER_API void kan_universe_scheduler_execute_pair_pi
         KAN_UP_SINGLETON_WRITE (time, kan_time_singleton_t)
         {
             const kan_time_offset_t advance_time_spent =
-                (kan_time_offset_t) (kan_platform_get_elapsed_nanoseconds () - logical_advance_begin_ns);
+                (kan_time_offset_t) (kan_precise_time_get_elapsed_nanoseconds () - logical_advance_begin_ns);
 
             // Critical case: unable to advance properly due to not performant enough hardware.
             // Slow down to avoid death spiral.

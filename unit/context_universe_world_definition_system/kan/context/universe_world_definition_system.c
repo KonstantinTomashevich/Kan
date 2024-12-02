@@ -1,4 +1,6 @@
 #include <kan/container/hash_storage.h>
+#include <kan/context/all_system_names.h>
+#include <kan/context/hot_reload_coordination_system.h>
 #include <kan/context/reflection_system.h>
 #include <kan/context/universe_world_definition_system.h>
 #include <kan/context/update_system.h>
@@ -6,7 +8,7 @@
 #include <kan/cpu_profiler/markup.h>
 #include <kan/log/logging.h>
 #include <kan/memory/allocation.h>
-#include <kan/platform/precise_time.h>
+#include <kan/precise_time/precise_time.h>
 #include <kan/serialization/binary.h>
 #include <kan/serialization/readable_data.h>
 #include <kan/stream/random_access_stream_buffer.h>
@@ -36,8 +38,6 @@ struct universe_world_definition_system_t
 
     kan_interned_string_t definitions_mount_path;
     kan_instance_size_t definitions_mount_path_length;
-    kan_bool_t observe_definitions;
-    kan_time_offset_t observation_rescan_delay_ns;
 
     kan_reflection_registry_t registry;
     kan_serialization_binary_script_storage_t binary_script_storage;
@@ -47,7 +47,6 @@ struct universe_world_definition_system_t
     kan_virtual_file_system_watcher_t file_system_watcher;
     kan_virtual_file_system_watcher_iterator_t file_system_watcher_iterator;
     struct rescan_stack_node_t *first_rescan_node;
-    kan_cpu_section_t update_section;
 };
 
 kan_context_system_t universe_world_definition_system_create (kan_allocation_group_t group, void *user_config)
@@ -66,13 +65,11 @@ kan_context_system_t universe_world_definition_system_create (kan_allocation_gro
 
         system->definitions_mount_path = config->definitions_mount_path;
         system->definitions_mount_path_length = (kan_instance_size_t) strlen (system->definitions_mount_path);
-        system->observe_definitions = config->observe_definitions;
-        system->observation_rescan_delay_ns = config->observation_rescan_delay_ns;
     }
     else
     {
         system->definitions_mount_path = NULL;
-        system->observe_definitions = KAN_FALSE;
+        system->definitions_mount_path_length = 0u;
     }
 
     kan_hash_storage_init (&system->stored_world_definitions, group, KAN_UNIVERSE_WORLD_DEFINITION_SYSTEM_BUCKETS);
@@ -80,7 +77,6 @@ kan_context_system_t universe_world_definition_system_create (kan_allocation_gro
 
     system->file_system_watcher = KAN_HANDLE_SET_INVALID (kan_virtual_file_system_watcher_t);
     system->first_rescan_node = NULL;
-    system->update_section = kan_cpu_section_get ("context_universe_world_definition_system_update");
     return KAN_HANDLE_SET (kan_context_system_t, system);
 }
 
@@ -152,7 +148,7 @@ static void scan_file (struct universe_world_definition_system_t *system,
     stream = kan_random_access_stream_buffer_open_for_read (stream, KAN_UNIVERSE_WORLD_DEFINITION_SYSTEM_IO_BUFFER);
     struct world_definition_node_t *node =
         kan_allocate_batched (system->group, sizeof (struct world_definition_node_t));
-    node->node.hash = (kan_hash_t) name;
+    node->node.hash = KAN_HASH_OBJECT_POINTER (name);
     node->name = name;
 
     kan_allocation_group_stack_push (system->group);
@@ -323,7 +319,12 @@ static void universe_world_definition_system_on_reflection_generated (kan_contex
     scan_directory (system, volume, &scan_path_container);
     kan_virtual_file_system_close_context_read_access (virtual_file_system);
 
-    if (system->observe_definitions)
+    kan_context_system_t hot_reload_system =
+        kan_context_query (system->context, KAN_CONTEXT_HOT_RELOAD_COORDINATION_SYSTEM_NAME);
+
+    if (KAN_HANDLE_IS_VALID (hot_reload_system) &&
+        kan_hot_reload_coordination_system_get_current_mode (hot_reload_system) != KAN_HOT_RELOAD_MODE_DISABLED &&
+        !KAN_HANDLE_IS_VALID (system->file_system_watcher))
     {
         volume = kan_virtual_file_system_get_context_volume_for_write (virtual_file_system);
         system->file_system_watcher = kan_virtual_file_system_watcher_create (volume, system->definitions_mount_path);
@@ -357,7 +358,7 @@ static void remove_definition_by_name (struct universe_world_definition_system_t
                                        kan_interned_string_t definition_name)
 {
     const struct kan_hash_storage_bucket_t *bucket =
-        kan_hash_storage_query (&system->stored_world_definitions, (kan_hash_t) definition_name);
+        kan_hash_storage_query (&system->stored_world_definitions, KAN_HASH_OBJECT_POINTER (definition_name));
     struct world_definition_node_t *node = (struct world_definition_node_t *) bucket->first;
     const struct world_definition_node_t *node_end =
         (struct world_definition_node_t *) (bucket->last ? bucket->last->next : NULL);
@@ -376,6 +377,7 @@ static void remove_definition_by_name (struct universe_world_definition_system_t
 }
 
 static void add_to_rescan_stack (struct universe_world_definition_system_t *system,
+                                 struct kan_hot_reload_automatic_config_t *automatic_config,
                                  kan_interned_string_t definition_name,
                                  kan_bool_t is_binary)
 {
@@ -400,13 +402,19 @@ static void add_to_rescan_stack (struct universe_world_definition_system_t *syst
         node->is_binary = is_binary;
     }
 
-    node->after_ns = kan_platform_get_elapsed_nanoseconds () + (kan_time_size_t) system->observation_rescan_delay_ns;
+    node->after_ns =
+        kan_precise_time_get_elapsed_nanoseconds () + (kan_time_size_t) automatic_config->change_wait_time_ns;
 }
 
 static void universe_world_definition_system_update (kan_context_system_t handle)
 {
     struct universe_world_definition_system_t *system = KAN_HANDLE_GET (handle);
-    KAN_ASSERT (system->observe_definitions)
+    kan_context_system_t hot_reload_system =
+        kan_context_query (system->context, KAN_CONTEXT_HOT_RELOAD_COORDINATION_SYSTEM_NAME);
+    KAN_ASSERT (KAN_HANDLE_IS_VALID (hot_reload_system))
+
+    struct kan_hot_reload_automatic_config_t *automatic_config =
+        kan_hot_reload_coordination_system_get_automatic_config (hot_reload_system);
     const struct kan_virtual_file_system_watcher_event_t *event;
 
     while ((event = kan_virtual_file_system_watcher_iterator_get (system->file_system_watcher,
@@ -424,7 +432,7 @@ static void universe_world_definition_system_update (kan_context_system_t handle
                 {
                 case KAN_VIRTUAL_FILE_SYSTEM_EVENT_TYPE_ADDED:
                 case KAN_VIRTUAL_FILE_SYSTEM_EVENT_TYPE_MODIFIED:
-                    add_to_rescan_stack (system, name, is_binary);
+                    add_to_rescan_stack (system, automatic_config, name, is_binary);
                     break;
 
                 case KAN_VIRTUAL_FILE_SYSTEM_EVENT_TYPE_REMOVED:
@@ -447,7 +455,7 @@ static void universe_world_definition_system_update (kan_context_system_t handle
     struct rescan_stack_node_t *previous_node = NULL;
     struct rescan_stack_node_t *current_node = system->first_rescan_node;
 
-    const kan_time_size_t elapsed_ns = kan_platform_get_elapsed_nanoseconds ();
+    const kan_time_size_t elapsed_ns = kan_precise_time_get_elapsed_nanoseconds ();
     struct kan_file_system_path_container_t path_container;
     kan_file_system_path_container_copy_string (&path_container, system->definitions_mount_path);
     kan_context_system_t virtual_file_system =
@@ -456,7 +464,23 @@ static void universe_world_definition_system_update (kan_context_system_t handle
     while (current_node)
     {
         struct rescan_stack_node_t *next_node = current_node->next;
-        if (current_node->after_ns < elapsed_ns)
+        kan_bool_t do_hot_reload = KAN_FALSE;
+        switch (kan_hot_reload_coordination_system_get_current_mode (hot_reload_system))
+        {
+        case KAN_HOT_RELOAD_MODE_DISABLED:
+            KAN_ASSERT (KAN_FALSE)
+            break;
+
+        case KAN_HOT_RELOAD_MODE_AUTOMATIC_INDEPENDENT:
+            do_hot_reload = elapsed_ns >= current_node->after_ns;
+            break;
+
+        case KAN_HOT_RELOAD_MODE_ON_REQUEST:
+            do_hot_reload = kan_hot_reload_coordination_system_is_hot_swap (hot_reload_system);
+            break;
+        }
+
+        if (do_hot_reload)
         {
             remove_definition_by_name (system, current_node->to_rescan);
             kan_file_system_path_container_append (&path_container, current_node->to_rescan);
@@ -511,12 +535,20 @@ void universe_world_definition_system_connect (kan_context_system_t handle, kan_
                                                        universe_world_definition_system_on_reflection_pre_shutdown);
     }
 
-    if (system->observe_definitions)
+    kan_context_system_t hot_reload_system =
+        kan_context_query_no_connect (system->context, KAN_CONTEXT_HOT_RELOAD_COORDINATION_SYSTEM_NAME);
+
+    if (KAN_HANDLE_IS_VALID (hot_reload_system) &&
+        kan_hot_reload_coordination_system_get_current_mode (hot_reload_system) != KAN_HOT_RELOAD_MODE_DISABLED)
     {
         kan_context_system_t update_system = kan_context_query (system->context, KAN_CONTEXT_UPDATE_SYSTEM_NAME);
         if (KAN_HANDLE_IS_VALID (update_system))
         {
-            kan_update_system_connect_on_run (update_system, handle, universe_world_definition_system_update, 0u, NULL);
+            kan_context_system_t universe_system =
+                kan_context_query_no_connect (system->context, KAN_CONTEXT_UNIVERSE_SYSTEM_NAME);
+
+            kan_update_system_connect_on_run (update_system, handle, universe_world_definition_system_update, 1u,
+                                              &hot_reload_system, 1u, &universe_system);
         }
     }
 }
@@ -547,7 +579,11 @@ void universe_world_definition_system_disconnect (kan_context_system_t handle)
         kan_reflection_system_disconnect_on_pre_shutdown (reflection_system, handle);
     }
 
-    if (system->observe_definitions)
+    kan_context_system_t hot_reload_system =
+        kan_context_query (system->context, KAN_CONTEXT_HOT_RELOAD_COORDINATION_SYSTEM_NAME);
+
+    if (KAN_HANDLE_IS_VALID (hot_reload_system) &&
+        kan_hot_reload_coordination_system_get_current_mode (hot_reload_system) != KAN_HOT_RELOAD_MODE_DISABLED)
     {
         kan_context_system_t update_system = kan_context_query (system->context, KAN_CONTEXT_UPDATE_SYSTEM_NAME);
         if (KAN_HANDLE_IS_VALID (update_system))
@@ -584,8 +620,6 @@ CONTEXT_UNIVERSE_WORLD_DEFINITION_SYSTEM_API struct kan_context_system_api_t KAN
 void kan_universe_world_definition_system_config_init (struct kan_universe_world_definition_system_config_t *instance)
 {
     instance->definitions_mount_path = NULL;
-    instance->observe_definitions = KAN_FALSE;
-    instance->observation_rescan_delay_ns = 300000000u;
 }
 
 const struct kan_universe_world_definition_t *kan_universe_world_definition_system_query (
@@ -593,7 +627,7 @@ const struct kan_universe_world_definition_t *kan_universe_world_definition_syst
 {
     struct universe_world_definition_system_t *system = KAN_HANDLE_GET (universe_world_definition_system);
     const struct kan_hash_storage_bucket_t *bucket =
-        kan_hash_storage_query (&system->stored_world_definitions, (kan_hash_t) definition_name);
+        kan_hash_storage_query (&system->stored_world_definitions, KAN_HASH_OBJECT_POINTER (definition_name));
     struct world_definition_node_t *node = (struct world_definition_node_t *) bucket->first;
     const struct world_definition_node_t *node_end =
         (struct world_definition_node_t *) (bucket->last ? bucket->last->next : NULL);

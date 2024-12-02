@@ -5,11 +5,13 @@
 
 #include <kan/api_common/alignment.h>
 #include <kan/api_common/min_max.h>
+#include <kan/context/all_system_names.h>
+#include <kan/context/hot_reload_coordination_system.h>
 #include <kan/context/reflection_system.h>
 #include <kan/context/virtual_file_system.h>
 #include <kan/log/logging.h>
 #include <kan/platform/hardware.h>
-#include <kan/platform/precise_time.h>
+#include <kan/precise_time/precise_time.h>
 #include <kan/resource_index/resource_index.h>
 #include <kan/resource_pipeline/resource_pipeline.h>
 #include <kan/serialization/binary.h>
@@ -215,6 +217,9 @@ struct resource_provider_loading_operation_third_party_data_t
     uint8_t *data;
 };
 
+/// \brief Hardcoded priority for handling on request hot swaps.
+#define PRIORITY_HOT_SWAP KAN_INT_MAX (kan_instance_size_t)
+
 struct resource_provider_loading_operation_t
 {
     kan_instance_size_t priority;
@@ -270,15 +275,13 @@ struct resource_provider_state_t
     kan_allocation_group_t my_allocation_group;
     kan_time_offset_t scan_budget_ns;
     kan_time_offset_t load_budget_ns;
-    kan_time_offset_t add_wait_time_ns;
-    kan_time_offset_t modify_wait_time_ns;
     kan_bool_t use_load_only_string_registry;
-    kan_bool_t observe_file_system;
     kan_interned_string_t resource_directory_path;
 
     kan_reflection_registry_t reflection_registry;
     kan_serialization_binary_script_storage_t shared_script_storage;
     kan_context_system_t virtual_file_system;
+    kan_context_system_t hot_reload_system;
 
     /// \meta reflection_ignore_struct_field
     struct kan_stack_group_allocator_t temporary_allocator;
@@ -499,17 +502,18 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void mutator_template_deploy_resource_provide
 
     state->scan_budget_ns = configuration->scan_budget_ns;
     state->load_budget_ns = configuration->load_budget_ns;
-    state->add_wait_time_ns = configuration->add_wait_time_ns;
-    state->modify_wait_time_ns = configuration->modify_wait_time_ns;
     state->use_load_only_string_registry = configuration->use_load_only_string_registry;
-    state->observe_file_system = configuration->observe_file_system;
     state->resource_directory_path = configuration->resource_directory_path;
 
     state->reflection_registry = kan_universe_get_reflection_registry (universe);
     state->shared_script_storage = kan_serialization_binary_script_storage_create (state->reflection_registry);
+
     state->virtual_file_system =
         kan_context_query (kan_universe_get_context (universe), KAN_CONTEXT_VIRTUAL_FILE_SYSTEM_NAME);
     KAN_ASSERT (KAN_HANDLE_IS_VALID (state->virtual_file_system))
+
+    state->hot_reload_system =
+        kan_context_query (kan_universe_get_context (universe), KAN_CONTEXT_HOT_RELOAD_COORDINATION_SYSTEM_NAME);
 
     state->serialized_index_stream = NULL;
     state->serialized_index_reader = KAN_HANDLE_SET_INVALID (kan_serialization_binary_reader_t);
@@ -1007,6 +1011,8 @@ static inline kan_instance_size_t gather_request_priority (struct resource_provi
     {
         if (request->type == type)
         {
+            // Assert that user didn't enter hot swap priority by mistake.
+            KAN_ASSERT (priority != PRIORITY_HOT_SWAP)
             priority = KAN_MAX (priority, request->priority);
         }
     }
@@ -1137,7 +1143,8 @@ static inline kan_bool_t skip_type_header (struct kan_stream_t *stream,
 static inline void schedule_native_entry_loading (struct resource_provider_state_t *state,
                                                   struct resource_provider_private_singleton_t *private,
                                                   struct kan_resource_native_entry_t *entry,
-                                                  struct resource_provider_native_entry_suffix_t *entry_suffix)
+                                                  struct resource_provider_native_entry_suffix_t *entry_suffix,
+                                                  kan_bool_t from_hot_reload)
 {
     if (KAN_TYPED_ID_32_IS_VALID (entry_suffix->loading_container_id))
     {
@@ -1183,7 +1190,11 @@ static inline void schedule_native_entry_loading (struct resource_provider_state
     entry_suffix->loading_container_id = container_view->container_id;
     KAN_UP_INDEXED_INSERT (operation, resource_provider_loading_operation_t)
     {
-        operation->priority = gather_request_priority (state, entry->type, entry->name);
+        operation->priority =
+            from_hot_reload && kan_hot_reload_coordination_system_is_hot_swap (state->hot_reload_system) ?
+                PRIORITY_HOT_SWAP :
+                gather_request_priority (state, entry->type, entry->name);
+
         operation->target_type = entry->type;
         operation->target_name = entry->name;
         operation->stream = stream;
@@ -1240,7 +1251,8 @@ static inline void cancel_native_entry_loading (struct resource_provider_state_t
 static inline void schedule_third_party_entry_loading (
     struct resource_provider_state_t *state,
     struct kan_resource_third_party_entry_t *entry,
-    struct resource_provider_third_party_entry_suffix_t *entry_suffix)
+    struct resource_provider_third_party_entry_suffix_t *entry_suffix,
+    kan_bool_t from_hot_reload)
 {
     if (entry_suffix->loading_data)
     {
@@ -1262,12 +1274,16 @@ static inline void schedule_third_party_entry_loading (
     }
 
     entry_suffix->loading_data =
-        kan_allocate_general (entry->my_allocation_group, entry->size, _Alignof (kan_memory_size_t));
+        kan_allocate_general (entry_suffix->my_allocation_group, entry->size, _Alignof (kan_memory_size_t));
     entry_suffix->loading_data_size = entry->size;
 
     KAN_UP_INDEXED_INSERT (operation, resource_provider_loading_operation_t)
     {
-        operation->priority = gather_request_priority (state, NULL, entry->name);
+        operation->priority =
+            from_hot_reload && kan_hot_reload_coordination_system_is_hot_swap (state->hot_reload_system) ?
+                PRIORITY_HOT_SWAP :
+                gather_request_priority (state, NULL, entry->name);
+
         operation->target_type = NULL;
         operation->target_name = entry->name;
         operation->stream = stream;
@@ -1287,7 +1303,7 @@ static inline void unload_third_party_entry (struct resource_provider_state_t *s
     }
 
     update_requests (state, NULL, entry->name, KAN_TYPED_ID_32_SET_INVALID (kan_resource_container_id_t), NULL, 0u);
-    kan_free_general (entry->my_allocation_group, entry_suffix->loaded_data, entry_suffix->loaded_data_size);
+    kan_free_general (entry_suffix->my_allocation_group, entry_suffix->loaded_data, entry_suffix->loaded_data_size);
     entry_suffix->loaded_data = NULL;
 }
 
@@ -1301,7 +1317,7 @@ static inline void cancel_third_party_entry_loading (struct resource_provider_st
     }
 
     loading_operation_cancel (state, NULL, entry->name);
-    kan_free_general (entry->my_allocation_group, entry_suffix->loading_data, entry_suffix->loading_data_size);
+    kan_free_general (entry_suffix->my_allocation_group, entry_suffix->loading_data, entry_suffix->loading_data_size);
     entry_suffix->loading_data = NULL;
     entry_suffix->loading_data_size = 0u;
 }
@@ -1328,7 +1344,7 @@ static inline void add_native_entry_reference (struct resource_provider_state_t 
                 }
                 else if (!KAN_TYPED_ID_32_IS_VALID (suffix->loading_container_id))
                 {
-                    schedule_native_entry_loading (state, private, entry, suffix);
+                    schedule_native_entry_loading (state, private, entry, suffix, KAN_FALSE);
                 }
 
                 KAN_UP_QUERY_RETURN_VOID;
@@ -1364,7 +1380,7 @@ static inline void add_third_party_entry_reference (struct resource_provider_sta
             }
             else if (!suffix->loading_data)
             {
-                schedule_third_party_entry_loading (state, entry, suffix);
+                schedule_third_party_entry_loading (state, entry, suffix, KAN_FALSE);
             }
 
             KAN_UP_QUERY_RETURN_VOID;
@@ -1447,6 +1463,9 @@ static inline void on_file_added (struct resource_provider_state_t *state,
         ++path;
     }
 
+    struct kan_hot_reload_automatic_config_t *automatic_config =
+        kan_hot_reload_coordination_system_get_automatic_config (state->hot_reload_system);
+
     KAN_UP_INDEXED_INSERT (addition, resource_provider_delayed_file_addition_t)
     {
         const kan_instance_size_t path_length = (kan_instance_size_t) strlen (path);
@@ -1457,7 +1476,9 @@ static inline void on_file_added (struct resource_provider_state_t *state,
         kan_resource_index_extract_info_from_path (path, &info_from_path);
 
         addition->name_for_search = info_from_path.name;
-        const kan_time_size_t investigate_after_ns = kan_platform_get_elapsed_nanoseconds () + state->add_wait_time_ns;
+        const kan_time_size_t investigate_after_ns =
+            kan_precise_time_get_elapsed_nanoseconds () + automatic_config->change_wait_time_ns;
+
         KAN_ASSERT (KAN_PACKED_TIMER_IS_SAFE_TO_SET (investigate_after_ns))
         addition->investigate_after_timer = KAN_PACKED_TIMER_SET (investigate_after_ns);
     }
@@ -1485,8 +1506,11 @@ static inline void on_file_modified (struct resource_provider_state_t *state,
             {
                 if (suffix->request_count > 0u)
                 {
+                    struct kan_hot_reload_automatic_config_t *automatic_config =
+                        kan_hot_reload_coordination_system_get_automatic_config (state->hot_reload_system);
+
                     const kan_time_size_t reload_after_ns =
-                        kan_platform_get_elapsed_nanoseconds () + state->modify_wait_time_ns;
+                        kan_precise_time_get_elapsed_nanoseconds () + automatic_config->change_wait_time_ns;
                     KAN_ASSERT (KAN_PACKED_TIMER_IS_SAFE_TO_SET (reload_after_ns))
                     suffix->reload_after_real_time_timer = KAN_PACKED_TIMER_SET (reload_after_ns);
                 }
@@ -1505,8 +1529,11 @@ static inline void on_file_modified (struct resource_provider_state_t *state,
             {
                 if (suffix->request_count > 0u)
                 {
+                    struct kan_hot_reload_automatic_config_t *automatic_config =
+                        kan_hot_reload_coordination_system_get_automatic_config (state->hot_reload_system);
+
                     const kan_time_size_t reload_after_ns =
-                        kan_platform_get_elapsed_nanoseconds () + state->modify_wait_time_ns;
+                        kan_precise_time_get_elapsed_nanoseconds () + automatic_config->change_wait_time_ns;
                     KAN_ASSERT (KAN_PACKED_TIMER_IS_SAFE_TO_SET (reload_after_ns))
                     suffix->reload_after_real_time_timer = KAN_PACKED_TIMER_SET (reload_after_ns);
                 }
@@ -1521,8 +1548,11 @@ static inline void on_file_modified (struct resource_provider_state_t *state,
     {
         if (strcmp (path, addition->path) == 0)
         {
+            struct kan_hot_reload_automatic_config_t *automatic_config =
+                kan_hot_reload_coordination_system_get_automatic_config (state->hot_reload_system);
+
             const kan_time_size_t investigate_after_ns =
-                kan_platform_get_elapsed_nanoseconds () + state->add_wait_time_ns;
+                kan_precise_time_get_elapsed_nanoseconds () + automatic_config->change_wait_time_ns;
             KAN_ASSERT (KAN_PACKED_TIMER_IS_SAFE_TO_SET (investigate_after_ns))
             addition->investigate_after_timer = KAN_PACKED_TIMER_SET (investigate_after_ns);
             KAN_UP_QUERY_RETURN_VOID;
@@ -1694,7 +1724,7 @@ static inline void process_file_addition (struct resource_provider_state_t *stat
                         KAN_ASSERT (!KAN_TYPED_ID_32_IS_VALID (suffix->loaded_container_id) &&
                                     !KAN_TYPED_ID_32_IS_VALID (suffix->loading_container_id))
 
-                        schedule_native_entry_loading (state, private, entry, suffix);
+                        schedule_native_entry_loading (state, private, entry, suffix, KAN_TRUE);
                         KAN_UP_QUERY_RETURN_VOID;
                     }
                 }
@@ -1710,7 +1740,7 @@ static inline void process_file_addition (struct resource_provider_state_t *stat
                     suffix->request_count = request_count;
                     KAN_ASSERT (suffix->loaded_data == NULL && suffix->loading_data == NULL)
 
-                    schedule_third_party_entry_loading (state, entry, suffix);
+                    schedule_third_party_entry_loading (state, entry, suffix, KAN_TRUE);
                     KAN_UP_QUERY_RETURN_VOID;
                 }
             }
@@ -1721,8 +1751,17 @@ static inline void process_file_addition (struct resource_provider_state_t *stat
 static inline void process_delayed_addition (struct resource_provider_state_t *state,
                                              struct resource_provider_private_singleton_t *private)
 {
-    KAN_ASSERT (KAN_PACKED_TIMER_IS_SAFE_TO_SET (kan_platform_get_elapsed_nanoseconds ()))
-    const kan_packed_timer_t current_timer = KAN_PACKED_TIMER_SET (kan_platform_get_elapsed_nanoseconds ());
+    if (kan_hot_reload_coordination_system_get_current_mode (state->hot_reload_system) !=
+            KAN_HOT_RELOAD_MODE_AUTOMATIC_INDEPENDENT &&
+        !kan_hot_reload_coordination_system_is_hot_swap (state->hot_reload_system))
+    {
+        return;
+    }
+
+    KAN_ASSERT (KAN_PACKED_TIMER_IS_SAFE_TO_SET (kan_precise_time_get_elapsed_nanoseconds ()))
+    const kan_packed_timer_t current_timer = kan_hot_reload_coordination_system_is_hot_swap (state->hot_reload_system) ?
+                                                 KAN_PACKED_TIMER_MAX :
+                                                 KAN_PACKED_TIMER_SET (kan_precise_time_get_elapsed_nanoseconds ());
 
     KAN_UP_INTERVAL_ASCENDING_WRITE (delayed_addition, resource_provider_delayed_file_addition_t,
                                      investigate_after_timer, NULL, &current_timer)
@@ -1735,8 +1774,17 @@ static inline void process_delayed_addition (struct resource_provider_state_t *s
 static inline void process_delayed_reload (struct resource_provider_state_t *state,
                                            struct resource_provider_private_singleton_t *private)
 {
-    KAN_ASSERT (KAN_PACKED_TIMER_IS_SAFE_TO_SET (kan_platform_get_elapsed_nanoseconds ()))
-    const kan_packed_timer_t current_timer = KAN_PACKED_TIMER_SET (kan_platform_get_elapsed_nanoseconds ());
+    if (kan_hot_reload_coordination_system_get_current_mode (state->hot_reload_system) !=
+            KAN_HOT_RELOAD_MODE_AUTOMATIC_INDEPENDENT &&
+        !kan_hot_reload_coordination_system_is_hot_swap (state->hot_reload_system))
+    {
+        return;
+    }
+
+    KAN_ASSERT (KAN_PACKED_TIMER_IS_SAFE_TO_SET (kan_precise_time_get_elapsed_nanoseconds ()))
+    const kan_packed_timer_t current_timer = kan_hot_reload_coordination_system_is_hot_swap (state->hot_reload_system) ?
+                                                 KAN_PACKED_TIMER_MAX :
+                                                 KAN_PACKED_TIMER_SET (kan_precise_time_get_elapsed_nanoseconds ());
 
     KAN_UP_INTERVAL_ASCENDING_UPDATE (native_suffix, resource_provider_native_entry_suffix_t,
                                       reload_after_real_time_timer, NULL, &current_timer)
@@ -1775,7 +1823,7 @@ static inline void process_delayed_reload (struct resource_provider_state_t *sta
                              entry->name, entry->type, entry->path)
                 }
 
-                schedule_native_entry_loading (state, private, entry, native_suffix);
+                schedule_native_entry_loading (state, private, entry, native_suffix, KAN_TRUE);
             }
 
             native_suffix->reload_after_real_time_timer = KAN_PACKED_TIMER_NEVER;
@@ -1809,7 +1857,7 @@ static inline void process_delayed_reload (struct resource_provider_state_t *sta
                 }
 
                 kan_virtual_file_system_close_context_read_access (state->virtual_file_system);
-                schedule_third_party_entry_loading (state, entry, third_party_suffix);
+                schedule_third_party_entry_loading (state, entry, third_party_suffix, KAN_TRUE);
             }
 
             third_party_suffix->reload_after_real_time_timer = KAN_PACKED_TIMER_NEVER;
@@ -1823,18 +1871,6 @@ static void execute_shared_serve (kan_functor_user_data_t user_data)
     struct resource_provider_state_t *state = (struct resource_provider_state_t *) user_data;
     while (KAN_TRUE)
     {
-        if (kan_platform_get_elapsed_nanoseconds () > state->execution_shared_state.end_time_ns)
-        {
-            // Shutdown: no more time.
-            if (kan_atomic_int_add (&state->execution_shared_state.workers_left, -1) == 1)
-            {
-                kan_repository_indexed_interval_descending_write_cursor_close (
-                    &state->execution_shared_state.loading_operation_cursor);
-            }
-
-            return;
-        }
-
         // Retrieve loading operation.
         kan_atomic_int_lock (&state->execution_shared_state.concurrency_lock);
         struct kan_repository_indexed_interval_write_access_t loading_operation_access =
@@ -1849,6 +1885,21 @@ static void execute_shared_serve (kan_functor_user_data_t user_data)
         if (!loading_operation)
         {
             // Shutdown: no loading operations.
+            if (kan_atomic_int_add (&state->execution_shared_state.workers_left, -1) == 1)
+            {
+                kan_repository_indexed_interval_descending_write_cursor_close (
+                    &state->execution_shared_state.loading_operation_cursor);
+            }
+
+            return;
+        }
+
+        if (loading_operation->priority != PRIORITY_HOT_SWAP &&
+            kan_precise_time_get_elapsed_nanoseconds () > state->execution_shared_state.end_time_ns)
+        {
+            // Shutdown: no more time.
+            kan_repository_indexed_interval_write_access_close (&loading_operation_access);
+
             if (kan_atomic_int_add (&state->execution_shared_state.workers_left, -1) == 1)
             {
                 kan_repository_indexed_interval_descending_write_cursor_close (
@@ -1969,7 +2020,8 @@ static void execute_shared_serve (kan_functor_user_data_t user_data)
                 while ((serialization_state = kan_serialization_binary_reader_step (
                             loading_operation->native.binary_reader)) == KAN_SERIALIZATION_IN_PROGRESS)
                 {
-                    if (kan_platform_get_elapsed_nanoseconds () > state->execution_shared_state.end_time_ns)
+                    if (loading_operation->priority != PRIORITY_HOT_SWAP &&
+                        kan_precise_time_get_elapsed_nanoseconds () > state->execution_shared_state.end_time_ns)
                     {
                         // Shutdown: no more time.
                         kan_repository_indexed_interval_write_access_close (&loading_operation_access);
@@ -1991,7 +2043,8 @@ static void execute_shared_serve (kan_functor_user_data_t user_data)
                 while ((serialization_state = kan_serialization_rd_reader_step (
                             loading_operation->native.readable_data_reader)) == KAN_SERIALIZATION_IN_PROGRESS)
                 {
-                    if (kan_platform_get_elapsed_nanoseconds () > state->execution_shared_state.end_time_ns)
+                    if (loading_operation->priority != PRIORITY_HOT_SWAP &&
+                        kan_precise_time_get_elapsed_nanoseconds () > state->execution_shared_state.end_time_ns)
                     {
                         // Shutdown: no more time.
                         kan_repository_indexed_interval_write_access_close (&loading_operation_access);
@@ -2039,7 +2092,8 @@ static void execute_shared_serve (kan_functor_user_data_t user_data)
                     serialization_state = KAN_SERIALIZATION_FINISHED;
                 }
 
-                if (kan_platform_get_elapsed_nanoseconds () > state->execution_shared_state.end_time_ns)
+                if (loading_operation->priority != PRIORITY_HOT_SWAP &&
+                    kan_precise_time_get_elapsed_nanoseconds () > state->execution_shared_state.end_time_ns)
                 {
                     // Shutdown: no more time.
                     kan_repository_indexed_interval_write_access_close (&loading_operation_access);
@@ -2183,7 +2237,7 @@ static void execute_shared_serve (kan_functor_user_data_t user_data)
 UNIVERSE_RESOURCE_PROVIDER_KAN_API void mutator_template_execute_resource_provider (
     kan_cpu_job_t job, struct resource_provider_state_t *state)
 {
-    const kan_time_size_t begin_time = kan_platform_get_elapsed_nanoseconds ();
+    const kan_time_size_t begin_time = kan_precise_time_get_elapsed_nanoseconds ();
     KAN_UP_SINGLETON_WRITE (public, kan_resource_provider_singleton_t)
     KAN_UP_SINGLETON_WRITE (private, resource_provider_private_singleton_t)
     {
@@ -2217,13 +2271,13 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void mutator_template_execute_resource_provid
         }
 
         if (private->status == RESOURCE_PROVIDER_STATUS_SCANNING &&
-            begin_time + state->scan_budget_ns > kan_platform_get_elapsed_nanoseconds ())
+            begin_time + state->scan_budget_ns > kan_precise_time_get_elapsed_nanoseconds ())
         {
             kan_virtual_file_system_volume_t volume =
                 kan_virtual_file_system_get_context_volume_for_read (state->virtual_file_system);
 
             while (private->scan_item_stack.size > 0u &&
-                   begin_time + state->scan_budget_ns > kan_platform_get_elapsed_nanoseconds ())
+                   begin_time + state->scan_budget_ns > kan_precise_time_get_elapsed_nanoseconds ())
             {
                 if (state->string_registry_stream)
                 {
@@ -2367,7 +2421,9 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void mutator_template_execute_resource_provid
                 kan_dynamic_array_set_capacity (&private->loaded_string_registries,
                                                 private->loaded_string_registries.size);
 
-                if (state->observe_file_system)
+                if (KAN_HANDLE_IS_VALID (state->hot_reload_system) &&
+                    kan_hot_reload_coordination_system_get_current_mode (state->hot_reload_system) !=
+                        KAN_HOT_RELOAD_MODE_DISABLED)
                 {
                     volume = kan_virtual_file_system_get_context_volume_for_write (state->virtual_file_system);
                     private->resource_watcher =
@@ -2383,7 +2439,7 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void mutator_template_execute_resource_provid
         }
 
         if (private->status == RESOURCE_PROVIDER_STATUS_SERVING &&
-            begin_time + state->load_budget_ns > kan_platform_get_elapsed_nanoseconds ())
+            begin_time + state->load_budget_ns > kan_precise_time_get_elapsed_nanoseconds ())
         {
             // Events need to be always processed in order to keep everything up to date.
             // Therefore, load budget does not affect event processing.
@@ -2425,11 +2481,15 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void mutator_template_execute_resource_provid
             process_request_on_insert (state, private);
             process_request_on_change (state, private);
             process_request_on_delete (state);
-            process_delayed_addition (state, private);
-            process_delayed_reload (state, private);
+
+            if (KAN_HANDLE_IS_VALID (private->resource_watcher))
+            {
+                process_delayed_addition (state, private);
+                process_delayed_reload (state, private);
+            }
 
             kan_stack_group_allocator_reset (&state->temporary_allocator);
-            const kan_instance_size_t cpu_count = kan_platform_get_cpu_count ();
+            const kan_instance_size_t cpu_count = kan_platform_get_cpu_logical_core_count ();
             struct kan_cpu_task_list_node_t *task_list_node = NULL;
 
             state->execution_shared_state.workers_left = kan_atomic_int_init ((int) cpu_count);

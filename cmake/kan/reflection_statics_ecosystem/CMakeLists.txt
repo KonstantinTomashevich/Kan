@@ -5,7 +5,13 @@ set (REFLECTION_STATICS_FILE "${CMAKE_BINARY_DIR}/generated/${ARTEFACT_NAME}/ref
 message (STATUS "    Save reflection statics as \"${REFLECTION_STATICS_FILE}\".")
 configure_file ("${CMAKE_CURRENT_SOURCE_DIR}/reflection_statics.c" "${REFLECTION_STATICS_FILE}")
 
-register_concrete ("${ARTEFACT_NAME}_reflection_statics")
+set (SUFFIX "reflection_statics")
+if (WIN32)
+    # Shorten suffixes for win32 paths.
+    set (SUFFIX "refstat")
+endif ()
+
+register_concrete ("${ARTEFACT_NAME}_${SUFFIX}")
 concrete_sources_direct ("${REFLECTION_STATICS_FILE}")
 concrete_require (SCOPE PRIVATE ABSTRACT reflection)
-shared_library_include (SCOPE PUBLIC CONCRETE "${ARTEFACT_NAME}_reflection_statics")
+shared_library_include (SCOPE PUBLIC CONCRETE "${ARTEFACT_NAME}_${SUFFIX}")

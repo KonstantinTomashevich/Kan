@@ -2,9 +2,9 @@
 
 #include <kan/platform/hardware.h>
 
-kan_instance_size_t kan_platform_get_cpu_count (void)
+kan_instance_size_t kan_platform_get_cpu_logical_core_count (void)
 {
-    return (uint64_t) SDL_GetCPUCount ();
+    return (uint64_t) SDL_GetNumLogicalCPUCores ();
 }
 
 kan_memory_size_t kan_platform_get_random_access_memory (void)

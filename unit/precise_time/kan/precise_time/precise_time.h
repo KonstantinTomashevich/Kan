@@ -1,6 +1,6 @@
 #pragma once
 
-#include <platform_api.h>
+#include <precise_time_api.h>
 
 #include <stdint.h>
 
@@ -13,12 +13,12 @@
 KAN_C_HEADER_BEGIN
 
 /// \brief Returns count of nanoseconds since precise time initialization (initialization may happen during this call).
-PLATFORM_API kan_time_size_t kan_platform_get_elapsed_nanoseconds (void);
+PRECISE_TIME_API kan_time_size_t kan_precise_time_get_elapsed_nanoseconds (void);
 
 /// \brief Returns count of nanoseconds since Unix epoch in nanoseconds in UTC zone.
-PLATFORM_API kan_time_size_t kan_platform_get_epoch_nanoseconds_utc (void);
+PRECISE_TIME_API kan_time_size_t kan_precise_time_get_epoch_nanoseconds_utc (void);
 
 /// \brief Transfers current thread to sleeping state for given amount of nanoseconds.
-PLATFORM_API void kan_platform_sleep (kan_time_offset_t nanoseconds);
+PRECISE_TIME_API void kan_precise_time_sleep (kan_time_offset_t nanoseconds);
 
 KAN_C_HEADER_END

@@ -5,15 +5,15 @@ concrete_require (SCOPE PUBLIC ABSTRACT reflection INTERFACE stream)
 concrete_require (SCOPE PRIVATE ABSTRACT error log memory threading CONCRETE_INTERFACE container readable_data)
 c_interface_scanner_setup (GLOB "*.c" "*.h")
 
-set (KAN_SERIALIZATION_BINARY_SCRIPT_INITIAL_BUCKETS "16" CACHE STRING
+set (KAN_SERIALIZATION_BINARY_SCRIPT_INITIAL_BUCKETS "17" CACHE STRING
         "Initial buckets count for binary serialization script storage.")
 set (KAN_SERIALIZATION_BINARY_GENERATION_INITIAL_STACK "65536" CACHE STRING
         "Initial stack size for binary serialization script generation algorithm.")
-set (KAN_SERIALIZATION_BINARY_INTERNED_STRING_BUCKETS "16" CACHE STRING
+set (KAN_SERIALIZATION_BINARY_INTERNED_STRING_BUCKETS "17" CACHE STRING
         "Initial buckets count for binary serialization interned string lookup storage.")
 set (KAN_SERIALIZATION_BINARY_INTERNED_STRING_CAPACITY "16" CACHE STRING
         "Initial capacity for interned string lookup generation temporary dynamic array.")
-set (KAN_SERIALIZATION_BINARY_INTERNED_REGISTRY_BUCKETS "128" CACHE STRING
+set (KAN_SERIALIZATION_BINARY_INTERNED_REGISTRY_BUCKETS "131" CACHE STRING
         "Initial buckets count for binary serialization interned string registry value to index map.")
 set (KAN_SERIALIZATION_RD_MAX_PARTS_IN_OUTPUT_TARGET "16" CACHE STRING
         "Serializer supports up to this count of parts in readable data output target identifier.")

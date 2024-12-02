@@ -15,7 +15,7 @@ KAN_MUTE_THIRD_PARTY_WARNINGS_END
 #include <kan/memory/allocation.h>
 #include <kan/threading/mutex.h>
 
-KAN_LOG_DEFINE_CATEGORY (error);
+KAN_LOG_DEFINE_CATEGORY (error_reporting);
 
 struct critical_error_context_t
 {
@@ -45,6 +45,9 @@ static inline void kan_critical_error_context_ensure (void)
         kan_hash_storage_init (&critical_error_context.skipped_error_storage, KAN_ALLOCATION_GROUP_IGNORE,
                                SKIPPED_CRITICAL_ERROR_INFO_STORAGE_INITIAL_BUCKETS);
 
+        // We need to log at least once in order to initialize logging and prevent deadlock when
+        // logging is initialized from critical error that was caught inside memory profiler.
+        KAN_LOG (error_reporting, KAN_LOG_INFO, "Critical error context initialized.")
         critical_error_context_ready = KAN_TRUE;
     }
 }
@@ -63,7 +66,8 @@ void kan_set_critical_error_interactive (kan_bool_t is_interactive)
 void kan_critical_error (const char *message, const char *file, int line)
 {
     kan_critical_error_context_ensure ();
-    KAN_LOG (error, KAN_LOG_CRITICAL_ERROR, "Critical error: \"%s\". File: \"%s\". Line: \"%d\".", message, file, line)
+    KAN_LOG (error_reporting, KAN_LOG_CRITICAL_ERROR, "Critical error: \"%s\". File: \"%s\". Line: \"%d\".", message,
+             file, line)
     // TODO: Perhaps add stacktrace in future.
 
     if (critical_error_context.is_interactive)
@@ -113,7 +117,7 @@ void kan_critical_error (const char *message, const char *file, int line)
 
         if (message_box_return_code < 0)
         {
-            KAN_LOG (error, KAN_LOG_CRITICAL_ERROR, "Failed to create interactive assert message box: %s.",
+            KAN_LOG (error_reporting, KAN_LOG_CRITICAL_ERROR, "Failed to create interactive assert message box: %s.",
                      SDL_GetError ())
             kan_mutex_unlock (critical_error_context.interactive_mutex);
             abort ();
@@ -158,7 +162,8 @@ void kan_critical_error (const char *message, const char *file, int line)
             abort ();
         }
 
-        KAN_LOG (error, KAN_LOG_CRITICAL_ERROR, "Received unknown button from interactive assert message box.")
+        KAN_LOG (error_reporting, KAN_LOG_CRITICAL_ERROR,
+                 "Received unknown button from interactive assert message box.")
         abort ();
     }
     else

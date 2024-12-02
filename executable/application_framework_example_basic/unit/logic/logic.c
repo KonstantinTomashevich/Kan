@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include <kan/context/all_system_names.h>
 #include <kan/context/application_framework_system.h>
 #include <kan/context/application_system.h>
 #include <kan/log/logging.h>

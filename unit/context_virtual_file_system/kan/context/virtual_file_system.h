@@ -27,9 +27,6 @@
 
 KAN_C_HEADER_BEGIN
 
-/// \brief System name for requirements and queries.
-#define KAN_CONTEXT_VIRTUAL_FILE_SYSTEM_NAME "virtual_file_system_t"
-
 /// \brief Configuration item for mounting real path.
 struct kan_virtual_file_system_config_mount_real_t
 {

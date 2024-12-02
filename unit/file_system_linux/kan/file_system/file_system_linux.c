@@ -8,7 +8,7 @@
 #include <kan/file_system/entry.h>
 #include <kan/file_system/path_container.h>
 #include <kan/log/logging.h>
-#include <kan/platform/precise_time.h>
+#include <kan/precise_time/precise_time.h>
 
 KAN_LOG_DEFINE_CATEGORY (file_system_linux);
 
@@ -196,7 +196,7 @@ kan_bool_t kan_file_system_lock_file_create (const char *directory_path, kan_boo
 
         KAN_LOG (file_system_linux, KAN_LOG_INFO,
                  "Failed to lock directory \"%s\" using lock file, waiting for another chance...", directory_path)
-        kan_platform_sleep (KAN_FILE_SYSTEM_LINUX_LOCK_FILE_WAIT_NS);
+        kan_precise_time_sleep (KAN_FILE_SYSTEM_LINUX_LOCK_FILE_WAIT_NS);
     }
 
     return KAN_FALSE;

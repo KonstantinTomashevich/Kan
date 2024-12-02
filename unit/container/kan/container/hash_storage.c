@@ -23,6 +23,7 @@ void kan_hash_storage_init (struct kan_hash_storage_t *storage,
     }
 
     kan_bd_list_init (&storage->items);
+    storage->balance_since_last_resize = 0u;
 }
 
 void kan_hash_storage_add (struct kan_hash_storage_t *storage, struct kan_hash_storage_node_t *node)
@@ -36,6 +37,8 @@ void kan_hash_storage_add (struct kan_hash_storage_t *storage, struct kan_hash_s
         bucket->last = &node->list_node;
         --storage->empty_buckets;
     }
+
+    ++storage->balance_since_last_resize;
 }
 
 void kan_hash_storage_remove (struct kan_hash_storage_t *storage, struct kan_hash_storage_node_t *node)
@@ -59,6 +62,7 @@ void kan_hash_storage_remove (struct kan_hash_storage_t *storage, struct kan_has
     }
 
     kan_bd_list_remove (&storage->items, &node->list_node);
+    --storage->balance_since_last_resize;
 }
 
 const struct kan_hash_storage_bucket_t *kan_hash_storage_query (struct kan_hash_storage_t *storage, kan_hash_t hash)

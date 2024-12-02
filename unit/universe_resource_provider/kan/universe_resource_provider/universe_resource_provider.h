@@ -17,8 +17,8 @@
 ///
 /// - It scans resource directory for resources and registers found resources. Resources indices and accompanying
 ///   string registries are taken into account when found.
-/// - If requested, it continues to monitor resource directory for changes and updates internal data according to
-///   file system changes. Modified resources are automatically reloaded.
+/// - If hot reload is enabled, it continues to monitor resource directory for changes and updates internal data
+///   according to file system changes. Modified resources are automatically reloaded if it is allowed.
 /// - It manages resource loading and unloading through requests system. Requests are automatically updated with the
 ///   newest possible data.
 ///
@@ -198,22 +198,9 @@ struct kan_resource_provider_configuration_t
     /// \brief How much time in nanoseconds should be spent loading resources during update.
     kan_time_offset_t load_budget_ns;
 
-    /// \brief How much time in nanoseconds to wait after file addition in order to scan it.
-    /// \details Used to prevent situations when file is added and then modified, but program tries to read it before
-    ///          modification.
-    kan_time_offset_t add_wait_time_ns;
-
-    /// \brief How much time in nanoseconds to wait after file modification in order to scan it.
-    /// \details Used to prevent situations when file is modified several, but program tries to read it before
-    ///          all modifications are done.
-    kan_time_offset_t modify_wait_time_ns;
-
     /// \brief Whether string registries should be loaded in load-only mode.
     /// \details Generally, should always be true as resource provider does not save assets at the moment.
     kan_bool_t use_load_only_string_registry;
-
-    /// \brief Whether file system observation should be turned on.
-    kan_bool_t observe_file_system;
 
     /// \brief Path to virtual directory with resources, that is used as resource root directory.
     kan_interned_string_t resource_directory_path;

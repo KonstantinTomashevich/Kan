@@ -17,17 +17,20 @@ kan_conditional_variable_t kan_conditional_variable_create (void)
 
 kan_bool_t kan_conditional_variable_wait (kan_conditional_variable_t handle, kan_mutex_t associated_mutex)
 {
-    return SDL_WaitCondition (KAN_HANDLE_GET (handle), KAN_HANDLE_GET (associated_mutex)) == 0;
+    SDL_WaitCondition (KAN_HANDLE_GET (handle), KAN_HANDLE_GET (associated_mutex));
+    return KAN_TRUE;
 }
 
 kan_bool_t kan_conditional_variable_signal_one (kan_conditional_variable_t handle)
 {
-    return SDL_SignalCondition (KAN_HANDLE_GET (handle)) == 0;
+    SDL_SignalCondition (KAN_HANDLE_GET (handle));
+    return KAN_TRUE;
 }
 
 kan_bool_t kan_conditional_variable_signal_all (kan_conditional_variable_t handle)
 {
-    return SDL_BroadcastCondition (KAN_HANDLE_GET (handle)) == 0;
+    SDL_BroadcastCondition (KAN_HANDLE_GET (handle));
+    return KAN_TRUE;
 }
 
 void kan_conditional_variable_destroy (kan_conditional_variable_t handle)

@@ -52,9 +52,6 @@
 
 KAN_C_HEADER_BEGIN
 
-/// \brief System name for requirements and queries.
-#define KAN_CONTEXT_APPLICATION_SYSTEM_NAME "application_system_t"
-
 KAN_HANDLE_DEFINE (kan_application_system_event_iterator_t);
 
 /// \brief Contains buffered information about available display.
@@ -87,7 +84,7 @@ struct kan_application_system_window_info_t
     float display_scale;
     float opacity;
 
-    kan_pixel_format_t pixel_format;
+    enum kan_platform_pixel_format_t pixel_format;
     enum kan_platform_window_flag_t flags;
     struct kan_platform_integer_bounds_t bounds;
 
@@ -213,7 +210,7 @@ CONTEXT_APPLICATION_SYSTEM_API void kan_application_system_window_set_title (
 CONTEXT_APPLICATION_SYSTEM_API void kan_application_system_window_set_icon (
     kan_context_system_t system_handle,
     kan_application_system_window_t window_handle,
-    kan_pixel_format_t pixel_format,
+    enum kan_platform_pixel_format_t pixel_format,
     kan_platform_visual_size_t width,
     kan_platform_visual_size_t height,
     const void *data);
@@ -291,6 +288,16 @@ CONTEXT_APPLICATION_SYSTEM_API void kan_application_system_window_set_opacity (
 CONTEXT_APPLICATION_SYSTEM_API void kan_application_window_set_focusable (kan_context_system_t system_handle,
                                                                           kan_application_system_window_t window_handle,
                                                                           kan_bool_t focusable);
+
+/// \brief Informs system that there is a logical component that expects text input in given window.
+/// \details If it is the only listener, causes on screen keyboard to show up on systems that need it.
+CONTEXT_APPLICATION_SYSTEM_API void kan_application_window_add_text_listener (
+    kan_context_system_t system_handle, kan_application_system_window_t window_handle);
+
+/// \brief Informs system that logical component that expected text input in given window is no longer expecting it.
+/// \details If it is the only listener, causes on screen keyboard to hide on systems that use it.
+CONTEXT_APPLICATION_SYSTEM_API void kan_application_window_remove_text_listener (
+    kan_context_system_t system_handle, kan_application_system_window_t window_handle);
 
 /// \brief Attaches new resource to given window and returns this resource id.
 CONTEXT_APPLICATION_SYSTEM_API kan_application_system_window_resource_id_t

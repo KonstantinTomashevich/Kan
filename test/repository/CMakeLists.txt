@@ -17,9 +17,8 @@ foreach (IMPLEMENTATION ${REPOSITORY_IMPLEMENTATIONS})
     shared_library_include (
             SCOPE PUBLIC
             ABSTRACT
-            cpu_dispatch=kan cpu_profiler=none error=sdl hash=djb2 log=kan memory=kan memory_profiler=none
-            platform=sdl reflection=kan repository=${IMPLEMENTATION} threading=sdl
-
+            cpu_dispatch=kan cpu_profiler=default error=sdl hash=djb2 log=kan memory=kan memory_profiler=default
+            platform=sdl precise_time=sdl reflection=kan repository=${IMPLEMENTATION} threading=sdl
             CONCRETE container testing test_repository)
 
     shared_library_verify ()

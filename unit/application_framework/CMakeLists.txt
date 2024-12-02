@@ -4,11 +4,11 @@ concrete_sources ("*.c")
 concrete_require (SCOPE PUBLIC CONCRETE_INTERFACE container universe)
 concrete_require (
         SCOPE PRIVATE
-        ABSTRACT cpu_profiler error file_system log memory platform reflection
+        ABSTRACT cpu_profiler error file_system log memory platform precise_time reflection
         CONCRETE_INTERFACE
         context context_application_system context_plugin_system context_reflection_system
         context_universe_world_definition_system context_update_system context_virtual_file_system serialization)
-register_context_system (application_framework_system_t)
+register_context_system (NAME application_framework_system_t)
 
 c_interface_scanner_setup (GLOB "*.c" "*.h")
 reflection_generator_setup (GLOB "*.h")

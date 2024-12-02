@@ -49,7 +49,7 @@ static kan_serialized_size_t encode_interned_string (struct string_encoding_cont
                                                      kan_interned_string_t string)
 {
     const struct kan_hash_storage_bucket_t *bucket =
-        kan_hash_storage_query (&context->hash_storage, (kan_hash_t) string);
+        kan_hash_storage_query (&context->hash_storage, KAN_HASH_OBJECT_POINTER (string));
     struct string_encoding_node_t *node = (struct string_encoding_node_t *) bucket->first;
     const struct string_encoding_node_t *end =
         (struct string_encoding_node_t *) (bucket->last ? bucket->last->next : NULL);
@@ -66,7 +66,7 @@ static kan_serialized_size_t encode_interned_string (struct string_encoding_cont
 
     KAN_ASSERT (!context->serialized)
     struct string_encoding_node_t *new_node = string_encoding_node_create ();
-    new_node->node.hash = (kan_hash_t) string;
+    new_node->node.hash = KAN_HASH_OBJECT_POINTER (string);
     new_node->string = string;
     new_node->value = context->order.size;
 

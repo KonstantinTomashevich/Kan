@@ -11,11 +11,11 @@ concrete_require (
 concrete_implements_abstract (repository)
 c_interface_scanner_setup (GLOB "*.c" "*.h")
 
-set (KAN_REPOSITORY_SINGLETON_STORAGE_INITIAL_BUCKETS "64" CACHE STRING
+set (KAN_REPOSITORY_SINGLETON_STORAGE_INITIAL_BUCKETS "67" CACHE STRING
         "Initial count of buckets for storage of singleton storages.")
-set (KAN_REPOSITORY_INDEXED_STORAGE_INITIAL_BUCKETS "64" CACHE STRING
+set (KAN_REPOSITORY_INDEXED_STORAGE_INITIAL_BUCKETS "67" CACHE STRING
         "Initial count of buckets for storage of indexed storages.")
-set (KAN_REPOSITORY_EVENT_STORAGE_INITIAL_BUCKETS "64" CACHE STRING
+set (KAN_REPOSITORY_EVENT_STORAGE_INITIAL_BUCKETS "67" CACHE STRING
         "Initial count of buckets for storage of event storages.")
 set (KAN_REPOSITORY_MIGRATION_STACK_INITIAL_SIZE "1048576" CACHE STRING
         "Initial size for stack group allocator used for repository migration.")
@@ -23,14 +23,10 @@ set (KAN_REPOSITORY_SWITCH_TO_SERVING_STACK_INITIAL_SIZE "65536" CACHE STRING
         "Initial size for stack group allocator used for repository switch to serving mode algorithm.")
 set (KAN_REPOSITORY_INDEXED_STORAGE_STACK_INITIAL_SIZE "8192" CACHE STRING
         "Initial size for stack group allocator used for temporary allocations for indexed storage algorithms.")
-set (KAN_REPOSITORY_VALUE_INDEX_INITIAL_BUCKETS "64" CACHE STRING
+set (KAN_REPOSITORY_VALUE_INDEX_INITIAL_BUCKETS "67" CACHE STRING
         "Initial count of buckets for value index values hash storage.")
-set (KAN_REPOSITORY_UNIQUENESS_WATCHER_INITIAL_BUCKETS "16" CACHE STRING
-        "Initial count of buckets for uniqueness watcher for indices without duplication-prevention structure.")
-set (KAN_REPOSITORY_UNIQUENESS_WATCHER_LOAD_FACTOR "4" CACHE STRING
-        "Target count of records in uniqueness watcher bucket.")
-set (KAN_REPOSITORY_UNIQUENESS_WATCHER_SIMPLICITY_LIMIT "8" CACHE STRING
-        "Maximum amount of unique records after which uniqueness watcher will switch to hash storage.")
+set (KAN_REPOSITORY_RETURN_UNIQUENESS_MAX_CURSORS "8" CACHE STRING
+        "Max count of cursors with uniqueness watcher support per one index.")
 
 concrete_compile_definitions (
         PRIVATE
@@ -43,8 +39,7 @@ concrete_compile_definitions (
         KAN_REPOSITORY_VALUE_INDEX_INITIAL_BUCKETS=${KAN_REPOSITORY_VALUE_INDEX_INITIAL_BUCKETS}
         KAN_REPOSITORY_VALUE_INDEX_UNIQUE_HASH_INITIAL_BUCKETS=${KAN_REPOSITORY_VALUE_INDEX_UNIQUE_HASH_INITIAL_BUCKETS}
         KAN_REPOSITORY_VALUE_INDEX_UNIQUE_HASH_USE_FACTOR=${KAN_REPOSITORY_VALUE_INDEX_UNIQUE_HASH_USE_FACTOR}
-        KAN_REPOSITORY_UNIQUENESS_WATCHER_INITIAL_BUCKETS=${KAN_REPOSITORY_UNIQUENESS_WATCHER_INITIAL_BUCKETS}
-        KAN_REPOSITORY_UNIQUENESS_WATCHER_SIMPLICITY_LIMIT=${KAN_REPOSITORY_UNIQUENESS_WATCHER_SIMPLICITY_LIMIT})
+        KAN_REPOSITORY_RETURN_UNIQUENESS_MAX_CURSORS=${KAN_REPOSITORY_RETURN_UNIQUENESS_MAX_CURSORS})
 
 option (KAN_REPOSITORY_SAFEGUARDS_ENABLED "Whether safeguard logic for repository multi threaded access is enabled." ON)
 if (KAN_REPOSITORY_SAFEGUARDS_ENABLED)

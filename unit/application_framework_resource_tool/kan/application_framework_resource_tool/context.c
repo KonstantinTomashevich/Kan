@@ -1,4 +1,5 @@
 #include <kan/application_framework_resource_tool/context.h>
+#include <kan/context/all_system_names.h>
 #include <kan/context/plugin_system.h>
 #include <kan/context/reflection_system.h>
 #include <kan/error/critical.h>
@@ -16,7 +17,6 @@ kan_context_t kan_application_create_resource_tool_context (const struct kan_app
 
     struct kan_plugin_system_config_t plugin_system_config;
     kan_plugin_system_config_init (&plugin_system_config);
-    plugin_system_config.enable_hot_reload = KAN_FALSE;
 
     struct kan_file_system_path_container_t path_container;
     kan_file_system_path_container_copy_string (&path_container, executable_path);

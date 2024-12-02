@@ -8,7 +8,7 @@
 #include <kan/error/critical.h>
 #include <kan/memory/allocation.h>
 #include <kan/platform/hardware.h>
-#include <kan/platform/precise_time.h>
+#include <kan/precise_time/precise_time.h>
 #include <kan/threading/atomic.h>
 #include <kan/threading/conditional_variable.h>
 #include <kan/threading/mutex.h>
@@ -196,7 +196,7 @@ static void ensure_global_task_dispatcher_ready (void)
             global_task_dispatcher.execution_section = kan_cpu_section_get ("cpu_dispatch_task");
 
             global_task_dispatcher.shutting_down = kan_atomic_int_init (0);
-            global_task_dispatcher.threads_count = kan_platform_get_cpu_count ();
+            global_task_dispatcher.threads_count = kan_platform_get_cpu_logical_core_count ();
 
             global_task_dispatcher.threads = kan_allocate_general (
                 global_task_dispatcher.allocation_group, sizeof (kan_thread_t) * global_task_dispatcher.threads_count,
@@ -403,7 +403,7 @@ static void job_report_task_finished (struct job_t *job)
                     KAN_ASSERT (kan_atomic_int_compare_and_set (&job->status, new_status_bits,
                                                                 JOB_STATE_COMPLETED << JOB_STATUS_TASK_COUNT_BITS))
 #else
-                    kan_atomic_int_set (&job->status, JOB_STATE_COMPLETED << JOB_STATUS_TASK_COUNT_BITS)
+                    kan_atomic_int_set (&job->status, JOB_STATE_COMPLETED << JOB_STATUS_TASK_COUNT_BITS);
 #endif
                 }
             }
@@ -554,6 +554,6 @@ void kan_cpu_job_wait (kan_cpu_job_t job)
         // - But for the most jobs we don't need the await routine.
         // - And the jobs that use it can safely wait a little bit more.
         // Therefore, correct await routine would only harm here.
-        kan_platform_sleep (KAN_CPU_DISPATCHER_WAIT_CHECK_DELAY_NS);
+        kan_precise_time_sleep (KAN_CPU_DISPATCHER_WAIT_CHECK_DELAY_NS);
     }
 }

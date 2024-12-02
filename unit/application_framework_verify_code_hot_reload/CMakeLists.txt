@@ -1,7 +1,7 @@
 register_concrete (application_framework_verify_code_hot_reload)
 concrete_require (
         SCOPE PUBLIC
-        ABSTRACT log
+        ABSTRACT log precise_time
         CONCRETE_INTERFACE application_framework context_application_system universe)
 
 if (NOT KAN_APPLICATION_FRAMEWORK_CHRV_SECOND_PASS)

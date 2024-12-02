@@ -16,34 +16,20 @@
 /// \par Definition
 /// \parblock
 /// Space tree is a tree that subdivides multi-dimensional limited space and provides API for faster search of
-/// intersections through subdivision. This implementation is oriented to be as open as possible: it manages nodes
-/// of space tree without requiring user to explicitly add coordinates to sub nodes. Therefore, it's API only covers
-/// search of nodes where intersections are possible and user is responsible to search intersections in these nodes.
-/// This policy makes space tree as lightweight as possible and makes it possible to avoid data duplication.
-/// But, of course, makes space tree usage a bit less convenient.
-/// \endparblock
-///
-/// \par Allocation policy
-/// \parblock
-/// Space tree manages allocation and deallocation of its nodes, but does not manage allocation and deallocation
-/// of user-provided sub nodes. Therefore, user must care about sub nodes lifetime. This makes it possible to implement
-/// space tree as sub node type agnostic data structure, but passes some responsibility to the user side.
+/// intersections through subdivision. This implementation is oriented to be as open as possible without compromising
+/// cache coherency: it only knows about user sub node type size and alignment, but knows nothing about user sub node
+/// structure. Therefore, it's API only covers search of nodes where intersections are possible and user is responsible
+/// to search intersections in these nodes. This policy makes space tree as lightweight as possible and makes it
+/// possible to avoid data duplication. But, of course, makes space tree usage a bit less convenient.
 /// \endparblock
 ///
 /// \par Usage
 /// \parblock
 /// Tree can be allocated everywhere as `kan_space_tree_t` and then initialized using 'kan_space_tree_init'.
 ///
-/// User data is contained inside tree as sub nodes. User should take care of allocation and deallocation of sub nodes.
-/// Every user sub node must start with kan_space_tree_sub_node_t structure, for example:
-///
-/// ```c
-/// struct my_node_t
-/// {
-///     struct kan_space_tree_sub_node_t node;
-///     // User fields go after this line.
-/// };
-/// ```
+/// User data is contained inside tree as sub nodes. User should take care of init and shutdown of sub nodes,
+/// but allocation is done by octree logic to make cache optimization available. There is no requirements for sub nodes,
+/// user only needs to pass their size and alignment to octree and octree will take care of allocations.
 ///
 /// To insert sub nodes into tree insertion iteration should be used. For example:
 ///
@@ -57,9 +43,8 @@
 /// // required axis aligned bounding shape in a correct and optimized way. Therefore, we need this cycle.
 /// while (!kan_space_tree_insertion_is_finished (&iterator))
 /// {
-///     // Allocate and create sub node here.
-///     // Then insert it and move iterator.
-///     kan_space_tree_insertion_insert_and_move (space_tree, &iterator, &sub_node->node);
+///     void *sub_node_allocation = kan_space_tree_insertion_insert_and_move (space_tree, &iterator);
+///     // We've received newly allocated sub node. It can be now filled by user with appropriate data.
 /// }
 /// ```
 ///
@@ -76,10 +61,11 @@
 /// while (!kan_space_tree_shape_is_finished (&iterator))
 /// {
 ///     struct kan_space_tree_node_t *node = iterator.current_node;
-///     struct kan_space_tree_sub_node_t *sub_node = node->first_sub_node;
+///     struct my_sub_node_type_t *sub_nodes = node->sub_nodes;
 ///
-///     while (sub_node)
+///     for (kan_loop_size_t node_index = 0u; node_index < node->sub_nodes_count; ++node_index)
 ///     {
+///         struct my_sub_node_type_t *sub_node = &sub_nodes[node_index];
 ///         const kan_space_tree_floating_t node_min[] = {/* Fill min coordinates. */};
 ///         const kan_space_tree_floating_t node_max[] = {/* Fill max coordinates. */};
 ///
@@ -87,8 +73,6 @@
 ///         {
 ///             // Hooray, we found intersection!
 ///         }
-///
-///         sub_node = sub_node->next;
 ///     }
 ///
 ///     kan_space_tree_shape_move_to_next_node (space_tree, &iterator);
@@ -109,10 +93,11 @@
 /// while (!kan_space_tree_ray_is_finished (&iterator))
 /// {
 ///     struct kan_space_tree_node_t *node = iterator.current_node;
-///     struct kan_space_tree_sub_node_t *sub_node = node->first_sub_node;
+///     struct my_sub_node_type_t *sub_nodes = node->sub_nodes;
 ///
-///     while (sub_node)
+///     for (kan_loop_size_t node_index = 0u; node_index < node->sub_nodes_count; ++node_index)
 ///     {
+///         struct my_sub_node_type_t *sub_node = &sub_nodes[node_index];
 ///         const kan_space_tree_floating_t node_min[] = {/* Fill min coordinates. */};
 ///         const kan_space_tree_floating_t node_max[] = {/* Fill max coordinates. */};
 ///
@@ -123,8 +108,6 @@
 ///         {
 ///             // Hooray, we found intersection!
 ///         }
-///
-///         sub_node = sub_node->next;
 ///     }
 ///
 ///     kan_space_tree_ray_move_to_next_node (space_tree, &iterator);
@@ -135,7 +118,7 @@
 /// modifies tree structure and therefore breaks tree iterators.
 ///
 /// To delete tree and free its resources, use `kan_space_tree_shutdown` function. But keep in mind that tree does
-/// not control sub node allocation and therefore sub nodes must be deallocated prior to tree destruction.
+/// not know anything about sub node shutdown, therefore it must be done manually if needed.
 /// \endparblock
 ///
 /// \par Thread safety
@@ -183,34 +166,44 @@ struct kan_space_tree_quantized_path_t
     };
 };
 
-/// \brief Base structure for space tree sub nodes.
-struct kan_space_tree_sub_node_t
-{
-    struct kan_space_tree_sub_node_t *next;
-    struct kan_space_tree_sub_node_t *previous;
-};
-
 /// \brief Describes space tree node structure.
 struct kan_space_tree_node_t
 {
-    struct kan_space_tree_node_t *parent;
     uint8_t height;
-    struct kan_space_tree_sub_node_t *first_sub_node;
 
-    /// \brief Array of children, size depends on dimension count of tree.
-    /// \warning Nodes with last level height of the tree do not have this array at all!
-    struct kan_space_tree_node_t *children[];
+    /// \details Index in `kan_space_tree_node_children_allocation_t` of parent.
+    uint8_t index_in_array;
+
+    // We don't use dynamic array for sub nodes in order to reduce memory footprint of nodes,
+    // because dynamic arrays are relatively big and a bit of overkill for our needs here.
+
+    uint16_t sub_nodes_capacity;
+    uint16_t sub_nodes_count;
+    void *sub_nodes;
+
+    /// \brief Pointer to allocation that is used to store all children at once for cache coherency.
+    struct kan_space_tree_node_children_allocation_t *children_allocation;
+};
+
+/// \brief Structure that stores all `kan_space_tree_node_t` as one allocation for better cache coherency.
+struct kan_space_tree_node_children_allocation_t
+{
+    struct kan_space_tree_node_t *parent;
+    struct kan_space_tree_node_t children[];
 };
 
 /// \brief Root structure of space tree implementation.
 struct kan_space_tree_t
 {
-    struct kan_space_tree_node_t *root;
-    kan_allocation_group_t allocation_group;
     uint8_t dimension_count;
     uint8_t last_level_height;
+    uint16_t sub_node_size;
+    uint16_t sub_node_alignment;
+    struct kan_space_tree_node_t root;
     kan_space_tree_floating_t global_min;
     kan_space_tree_floating_t global_max;
+    kan_allocation_group_t nodes_allocation_group;
+    kan_allocation_group_t sub_nodes_allocation_group;
 };
 
 /// \brief Structure of iterator used for querying intersections with axis aligned bounding shapes.
@@ -222,6 +215,9 @@ struct kan_space_tree_shape_iterator_t
 
     /// \brief Current node from which user can take sub nodes for further querying.
     struct kan_space_tree_node_t *current_node;
+
+    /// \brief True when current node is fully inside query bounds and therefore bounds checks can be skipped.
+    kan_bool_t is_inner_node;
 };
 
 /// \brief Structure of iterator used for insertion of axis aligned bounding shapes.
@@ -237,6 +233,9 @@ struct kan_space_tree_ray_iterator_t
     struct kan_space_tree_quantized_path_t current_path;
     struct kan_space_tree_quantized_path_t next_path;
 
+    kan_bool_t has_previous_path_on_level;
+    struct kan_space_tree_quantized_path_t previous_path_on_level;
+
     /// \brief Current node from which user can take sub nodes for further querying.
     struct kan_space_tree_node_t *current_node;
 
@@ -251,6 +250,8 @@ struct kan_space_tree_ray_iterator_t
 /// \param tree Pointer for tree to initialize.
 /// \param allocation_group Allocation group for tree internal allocations.
 /// \param dimension_count Count of space dimensions. Must not be higher that KAN_CONTAINER_SPACE_TREE_MAX_DIMENSIONS.
+/// \param sub_node_size Size of user sub node struct type. Must fit into uint16_t!
+/// \param sub_node_alignment Alignment of user sub node struct type. Must fit into uint16_t!
 /// \param global_min Global minimum limit for all dimensions.
 /// \param global_max Global maximum limit for all dimensions.
 /// \param target_leaf_cell_size Target size of a leaf node.
@@ -258,6 +259,8 @@ struct kan_space_tree_ray_iterator_t
 CONTAINER_API void kan_space_tree_init (struct kan_space_tree_t *tree,
                                         kan_allocation_group_t allocation_group,
                                         kan_instance_size_t dimension_count,
+                                        kan_instance_size_t sub_node_size,
+                                        kan_instance_size_t sub_node_alignment,
                                         kan_space_tree_floating_t global_min,
                                         kan_space_tree_floating_t global_max,
                                         kan_space_tree_floating_t target_leaf_cell_size);
@@ -271,9 +274,8 @@ CONTAINER_API struct kan_space_tree_insertion_iterator_t kan_space_tree_insertio
 
 /// \brief Inserts given sub node into tree and moves to the next node for the insertion.
 /// \invariant kan_space_tree_insertion_is_finished is KAN_FALSE.
-CONTAINER_API void kan_space_tree_insertion_insert_and_move (struct kan_space_tree_t *tree,
-                                                             struct kan_space_tree_insertion_iterator_t *iterator,
-                                                             struct kan_space_tree_sub_node_t *sub_node);
+CONTAINER_API void *kan_space_tree_insertion_insert_and_move (struct kan_space_tree_t *tree,
+                                                              struct kan_space_tree_insertion_iterator_t *iterator);
 
 /// \brief Whether given insertion iteration is finished.
 static inline kan_bool_t kan_space_tree_insertion_is_finished (struct kan_space_tree_insertion_iterator_t *iterator)
@@ -290,6 +292,12 @@ CONTAINER_API struct kan_space_tree_shape_iterator_t kan_space_tree_shape_start 
 /// \brief Moves shape iterator to the next node that may contain intersections.
 CONTAINER_API void kan_space_tree_shape_move_to_next_node (struct kan_space_tree_t *tree,
                                                            struct kan_space_tree_shape_iterator_t *iterator);
+
+/// \brief Uses space tree invariants to check whether
+///        occurrence of object in current node is the first in this iteration.
+CONTAINER_API kan_bool_t kan_space_tree_shape_is_first_occurrence (struct kan_space_tree_t *tree,
+                                                                   struct kan_space_tree_quantized_path_t object_min,
+                                                                   struct kan_space_tree_shape_iterator_t *iterator);
 
 /// \brief Whether given shape iteration is finished.
 static inline kan_bool_t kan_space_tree_shape_is_finished (struct kan_space_tree_shape_iterator_t *iterator)
@@ -308,6 +316,13 @@ CONTAINER_API struct kan_space_tree_ray_iterator_t kan_space_tree_ray_start (
 /// \brief Moves ray iterator to the next node that may contain intersections.
 CONTAINER_API void kan_space_tree_ray_move_to_next_node (struct kan_space_tree_t *tree,
                                                          struct kan_space_tree_ray_iterator_t *iterator);
+
+/// \brief Uses space tree invariants to check whether
+///        occurrence of object in current node is the first in this iteration.
+CONTAINER_API kan_bool_t kan_space_tree_ray_is_first_occurrence (struct kan_space_tree_t *tree,
+                                                                 struct kan_space_tree_quantized_path_t object_min,
+                                                                 struct kan_space_tree_quantized_path_t object_max,
+                                                                 struct kan_space_tree_ray_iterator_t *iterator);
 
 /// \brief Whether given ray iteration is finished.
 static inline kan_bool_t kan_space_tree_ray_is_finished (struct kan_space_tree_ray_iterator_t *iterator)
@@ -332,7 +347,7 @@ CONTAINER_API kan_bool_t kan_space_tree_is_contained_in_one_sub_node (struct kan
 /// \warning Breaks iterators!
 CONTAINER_API void kan_space_tree_delete (struct kan_space_tree_t *tree,
                                           struct kan_space_tree_node_t *node,
-                                          struct kan_space_tree_sub_node_t *sub_node);
+                                          void *sub_node);
 
 /// \brief Shuts down given space tree and frees its resources.
 /// \invariant User must free sub nodes manually before executing this operation.

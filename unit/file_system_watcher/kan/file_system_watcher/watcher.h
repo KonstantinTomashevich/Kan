@@ -4,6 +4,7 @@
 
 #include <kan/api_common/c_header.h>
 #include <kan/api_common/core_types.h>
+#include <kan/file_system/entry.h>
 #include <kan/file_system/path_container.h>
 
 /// \file
@@ -71,5 +72,9 @@ FILE_SYSTEM_WATCHER_API kan_file_system_watcher_iterator_t kan_file_system_watch
 /// \brief Destroys given iterator for given watcher.
 FILE_SYSTEM_WATCHER_API void kan_file_system_watcher_iterator_destroy (kan_file_system_watcher_t watcher,
                                                                        kan_file_system_watcher_iterator_t iterator);
+
+/// \brief Blocks current thread until all file system watchers are guaranteed to be up to date.
+/// \details Mostly needed for development routines like scheduled hot reload.
+FILE_SYSTEM_WATCHER_API void kan_file_system_watcher_ensure_all_watchers_are_up_to_date (void);
 
 KAN_C_HEADER_END

@@ -5,7 +5,7 @@
 #include <kan/cpu_dispatch/job.h>
 #include <kan/cpu_dispatch/task.h>
 #include <kan/memory/allocation.h>
-#include <kan/platform/precise_time.h>
+#include <kan/precise_time/precise_time.h>
 #include <kan/testing/testing.h>
 #include <kan/threading/atomic.h>
 
@@ -17,9 +17,9 @@ struct test_task_user_data_t
 static void test_task_function (kan_functor_user_data_t user_data)
 {
     // Simulate some work.
-    const kan_time_size_t start = kan_platform_get_elapsed_nanoseconds ();
+    const kan_time_size_t start = kan_precise_time_get_elapsed_nanoseconds ();
 
-    while (kan_platform_get_elapsed_nanoseconds () - start < 1000000u)
+    while (kan_precise_time_get_elapsed_nanoseconds () - start < 1000000u)
     {
         kan_memory_size_t stub[1000u];
         stub[0u] = 1u;

@@ -11,313 +11,290 @@
 
 KAN_C_HEADER_BEGIN
 
-/// \brief Scan code describes physical key on keyboard.
-typedef uint32_t kan_scan_code_t;
-
-/// \brief Key code describes logical key on keyboard.
-typedef uint32_t kan_key_code_t;
-
-/// \brief Describes mask of pressed modifier key.
-typedef uint16_t kan_key_modifier_mask_t;
-
-/// \brief Table that lists scan codes for all keys. Key names are based on standard QWERTY layout.
-struct kan_scan_code_table_t
+/// \brief Enumerates keyboard button scancodes that can be known to platform.
+/// \details Scan code describes physical key on keyboard independently of layout selected by system.
+enum kan_platform_scan_code_t
 {
-    kan_scan_code_t a;
-    kan_scan_code_t b;
-    kan_scan_code_t c;
-    kan_scan_code_t d;
-    kan_scan_code_t e;
-    kan_scan_code_t f;
-    kan_scan_code_t g;
-    kan_scan_code_t h;
-    kan_scan_code_t i;
-    kan_scan_code_t j;
-    kan_scan_code_t k;
-    kan_scan_code_t l;
-    kan_scan_code_t m;
-    kan_scan_code_t n;
-    kan_scan_code_t o;
-    kan_scan_code_t p;
-    kan_scan_code_t q;
-    kan_scan_code_t r;
-    kan_scan_code_t s;
-    kan_scan_code_t t;
-    kan_scan_code_t u;
-    kan_scan_code_t v;
-    kan_scan_code_t w;
-    kan_scan_code_t x;
-    kan_scan_code_t y;
-    kan_scan_code_t z;
+    KAN_PLATFORM_SCAN_CODE_UNKNOWN = 0u,
 
-    kan_scan_code_t _1;
-    kan_scan_code_t _2;
-    kan_scan_code_t _3;
-    kan_scan_code_t _4;
-    kan_scan_code_t _5;
-    kan_scan_code_t _6;
-    kan_scan_code_t _7;
-    kan_scan_code_t _8;
-    kan_scan_code_t _9;
-    kan_scan_code_t _0;
+    KAN_PLATFORM_SCAN_CODE_A,
+    KAN_PLATFORM_SCAN_CODE_B,
+    KAN_PLATFORM_SCAN_CODE_C,
+    KAN_PLATFORM_SCAN_CODE_D,
+    KAN_PLATFORM_SCAN_CODE_E,
+    KAN_PLATFORM_SCAN_CODE_F,
+    KAN_PLATFORM_SCAN_CODE_G,
+    KAN_PLATFORM_SCAN_CODE_H,
+    KAN_PLATFORM_SCAN_CODE_I,
+    KAN_PLATFORM_SCAN_CODE_J,
+    KAN_PLATFORM_SCAN_CODE_K,
+    KAN_PLATFORM_SCAN_CODE_L,
+    KAN_PLATFORM_SCAN_CODE_M,
+    KAN_PLATFORM_SCAN_CODE_N,
+    KAN_PLATFORM_SCAN_CODE_O,
+    KAN_PLATFORM_SCAN_CODE_P,
+    KAN_PLATFORM_SCAN_CODE_Q,
+    KAN_PLATFORM_SCAN_CODE_R,
+    KAN_PLATFORM_SCAN_CODE_S,
+    KAN_PLATFORM_SCAN_CODE_T,
+    KAN_PLATFORM_SCAN_CODE_U,
+    KAN_PLATFORM_SCAN_CODE_V,
+    KAN_PLATFORM_SCAN_CODE_W,
+    KAN_PLATFORM_SCAN_CODE_X,
+    KAN_PLATFORM_SCAN_CODE_Y,
+    KAN_PLATFORM_SCAN_CODE_Z,
 
-    kan_scan_code_t enter;
-    kan_scan_code_t escape;
-    kan_scan_code_t backspace;
-    kan_scan_code_t tab;
-    kan_scan_code_t space;
+    KAN_PLATFORM_SCAN_CODE_1,
+    KAN_PLATFORM_SCAN_CODE_2,
+    KAN_PLATFORM_SCAN_CODE_3,
+    KAN_PLATFORM_SCAN_CODE_4,
+    KAN_PLATFORM_SCAN_CODE_5,
+    KAN_PLATFORM_SCAN_CODE_6,
+    KAN_PLATFORM_SCAN_CODE_7,
+    KAN_PLATFORM_SCAN_CODE_8,
+    KAN_PLATFORM_SCAN_CODE_9,
+    KAN_PLATFORM_SCAN_CODE_0,
 
-    kan_scan_code_t minus;
-    kan_scan_code_t equal;
-    kan_scan_code_t left_bracket;
-    kan_scan_code_t right_bracket;
-    kan_scan_code_t backslash;
-    kan_scan_code_t nonus_hash;
-    kan_scan_code_t semicolon;
-    kan_scan_code_t apostrophe;
-    kan_scan_code_t grave;
-    kan_scan_code_t comma;
-    kan_scan_code_t period;
-    kan_scan_code_t slash;
+    KAN_PLATFORM_SCAN_CODE_ENTER,
+    KAN_PLATFORM_SCAN_CODE_ESCAPE,
+    KAN_PLATFORM_SCAN_CODE_BACKSPACE,
+    KAN_PLATFORM_SCAN_CODE_TAB,
+    KAN_PLATFORM_SCAN_CODE_SPACE,
 
-    kan_scan_code_t capslock;
+    KAN_PLATFORM_SCAN_CODE_MINUS,
+    KAN_PLATFORM_SCAN_CODE_EQUAL,
+    KAN_PLATFORM_SCAN_CODE_LEFT_BRACKET,
+    KAN_PLATFORM_SCAN_CODE_RIGHT_BRACKET,
+    KAN_PLATFORM_SCAN_CODE_BACKSLASH,
+    KAN_PLATFORM_SCAN_CODE_NONUS_HASH,
+    KAN_PLATFORM_SCAN_CODE_SEMICOLON,
+    KAN_PLATFORM_SCAN_CODE_APOSTROPHE,
+    KAN_PLATFORM_SCAN_CODE_GRAVE,
+    KAN_PLATFORM_SCAN_CODE_COMMA,
+    KAN_PLATFORM_SCAN_CODE_PERIOD,
+    KAN_PLATFORM_SCAN_CODE_SLASH,
 
-    kan_scan_code_t f1;
-    kan_scan_code_t f2;
-    kan_scan_code_t f3;
-    kan_scan_code_t f4;
-    kan_scan_code_t f5;
-    kan_scan_code_t f6;
-    kan_scan_code_t f7;
-    kan_scan_code_t f8;
-    kan_scan_code_t f9;
-    kan_scan_code_t f10;
-    kan_scan_code_t f11;
-    kan_scan_code_t f12;
+    KAN_PLATFORM_SCAN_CODE_CAPSLOCK,
 
-    kan_scan_code_t print_screen;
-    kan_scan_code_t scroll_lock;
-    kan_scan_code_t pause;
-    kan_scan_code_t insert;
-    kan_scan_code_t home;
-    kan_scan_code_t page_up;
-    kan_scan_code_t delete;
-    kan_scan_code_t end;
-    kan_scan_code_t page_down;
-    kan_scan_code_t right;
-    kan_scan_code_t left;
-    kan_scan_code_t down;
-    kan_scan_code_t up;
+    KAN_PLATFORM_SCAN_CODE_F1,
+    KAN_PLATFORM_SCAN_CODE_F2,
+    KAN_PLATFORM_SCAN_CODE_F3,
+    KAN_PLATFORM_SCAN_CODE_F4,
+    KAN_PLATFORM_SCAN_CODE_F5,
+    KAN_PLATFORM_SCAN_CODE_F6,
+    KAN_PLATFORM_SCAN_CODE_F7,
+    KAN_PLATFORM_SCAN_CODE_F8,
+    KAN_PLATFORM_SCAN_CODE_F9,
+    KAN_PLATFORM_SCAN_CODE_F10,
+    KAN_PLATFORM_SCAN_CODE_F11,
+    KAN_PLATFORM_SCAN_CODE_F12,
 
-    kan_scan_code_t num_lock;
-    kan_scan_code_t key_pad_divide;
-    kan_scan_code_t key_pad_multiply;
-    kan_scan_code_t key_pad_minus;
-    kan_scan_code_t key_pad_plus;
-    kan_scan_code_t key_pad_enter;
+    KAN_PLATFORM_SCAN_CODE_PRINT_SCREEN,
+    KAN_PLATFORM_SCAN_CODE_SCROLL_LOCK,
+    KAN_PLATFORM_SCAN_CODE_PAUSE,
+    KAN_PLATFORM_SCAN_CODE_INSERT,
+    KAN_PLATFORM_SCAN_CODE_HOME,
+    KAN_PLATFORM_SCAN_CODE_PAGE_UP,
+    KAN_PLATFORM_SCAN_CODE_DELETE,
+    KAN_PLATFORM_SCAN_CODE_END,
+    KAN_PLATFORM_SCAN_CODE_PAGE_DOWN,
+    KAN_PLATFORM_SCAN_CODE_RIGHT,
+    KAN_PLATFORM_SCAN_CODE_LEFT,
+    KAN_PLATFORM_SCAN_CODE_DOWN,
+    KAN_PLATFORM_SCAN_CODE_UP,
 
-    kan_scan_code_t key_pad_1;
-    kan_scan_code_t key_pad_2;
-    kan_scan_code_t key_pad_3;
-    kan_scan_code_t key_pad_4;
-    kan_scan_code_t key_pad_5;
-    kan_scan_code_t key_pad_6;
-    kan_scan_code_t key_pad_7;
-    kan_scan_code_t key_pad_8;
-    kan_scan_code_t key_pad_9;
-    kan_scan_code_t key_pad_0;
-    kan_scan_code_t key_pad_period;
+    KAN_PLATFORM_SCAN_CODE_NUM_LOCK,
+    KAN_PLATFORM_SCAN_CODE_KEY_PAD_DIVIDE,
+    KAN_PLATFORM_SCAN_CODE_KEY_PAD_MULTIPLY,
+    KAN_PLATFORM_SCAN_CODE_KEY_PAD_MINUS,
+    KAN_PLATFORM_SCAN_CODE_KEY_PAD_PLUS,
+    KAN_PLATFORM_SCAN_CODE_KEY_PAD_ENTER,
 
-    kan_scan_code_t nonus_backslash;
-    kan_scan_code_t application;
-    kan_scan_code_t power;
-    kan_scan_code_t key_pad_equals;
-    kan_scan_code_t f13;
-    kan_scan_code_t f14;
-    kan_scan_code_t f15;
-    kan_scan_code_t f16;
-    kan_scan_code_t f17;
-    kan_scan_code_t f18;
-    kan_scan_code_t f19;
-    kan_scan_code_t f20;
-    kan_scan_code_t f21;
-    kan_scan_code_t f22;
-    kan_scan_code_t f23;
-    kan_scan_code_t f24;
-    kan_scan_code_t execute;
-    kan_scan_code_t help;
-    kan_scan_code_t menu;
-    kan_scan_code_t select;
-    kan_scan_code_t stop;
-    kan_scan_code_t again;
-    kan_scan_code_t undo;
-    kan_scan_code_t cut;
-    kan_scan_code_t copy;
-    kan_scan_code_t paste;
-    kan_scan_code_t find;
-    kan_scan_code_t mute;
-    kan_scan_code_t volume_up;
-    kan_scan_code_t volume_down;
-    kan_scan_code_t key_pad_comma;
-    kan_scan_code_t key_pad_equals_as400;
+    KAN_PLATFORM_SCAN_CODE_KEY_PAD_1,
+    KAN_PLATFORM_SCAN_CODE_KEY_PAD_2,
+    KAN_PLATFORM_SCAN_CODE_KEY_PAD_3,
+    KAN_PLATFORM_SCAN_CODE_KEY_PAD_4,
+    KAN_PLATFORM_SCAN_CODE_KEY_PAD_5,
+    KAN_PLATFORM_SCAN_CODE_KEY_PAD_6,
+    KAN_PLATFORM_SCAN_CODE_KEY_PAD_7,
+    KAN_PLATFORM_SCAN_CODE_KEY_PAD_8,
+    KAN_PLATFORM_SCAN_CODE_KEY_PAD_9,
+    KAN_PLATFORM_SCAN_CODE_KEY_PAD_0,
+    KAN_PLATFORM_SCAN_CODE_KEY_PAD_PERIOD,
 
-    kan_scan_code_t international_1;
-    kan_scan_code_t international_2;
-    kan_scan_code_t international_3;
-    kan_scan_code_t international_4;
-    kan_scan_code_t international_5;
-    kan_scan_code_t international_6;
-    kan_scan_code_t international_7;
-    kan_scan_code_t international_8;
-    kan_scan_code_t international_9;
+    KAN_PLATFORM_SCAN_CODE_NONUS_BACKSLASH,
+    KAN_PLATFORM_SCAN_CODE_APPLICATION,
+    KAN_PLATFORM_SCAN_CODE_POWER,
+    KAN_PLATFORM_SCAN_CODE_KEY_PAD_EQUALS,
+    KAN_PLATFORM_SCAN_CODE_F13,
+    KAN_PLATFORM_SCAN_CODE_F14,
+    KAN_PLATFORM_SCAN_CODE_F15,
+    KAN_PLATFORM_SCAN_CODE_F16,
+    KAN_PLATFORM_SCAN_CODE_F17,
+    KAN_PLATFORM_SCAN_CODE_F18,
+    KAN_PLATFORM_SCAN_CODE_F19,
+    KAN_PLATFORM_SCAN_CODE_F20,
+    KAN_PLATFORM_SCAN_CODE_F21,
+    KAN_PLATFORM_SCAN_CODE_F22,
+    KAN_PLATFORM_SCAN_CODE_F23,
+    KAN_PLATFORM_SCAN_CODE_F24,
+    KAN_PLATFORM_SCAN_CODE_EXECUTE,
+    KAN_PLATFORM_SCAN_CODE_HELP,
+    KAN_PLATFORM_SCAN_CODE_MENU,
+    KAN_PLATFORM_SCAN_CODE_SELECT,
+    KAN_PLATFORM_SCAN_CODE_STOP,
+    KAN_PLATFORM_SCAN_CODE_AGAIN,
+    KAN_PLATFORM_SCAN_CODE_UNDO,
+    KAN_PLATFORM_SCAN_CODE_CUT,
+    KAN_PLATFORM_SCAN_CODE_COPY,
+    KAN_PLATFORM_SCAN_CODE_PASTE,
+    KAN_PLATFORM_SCAN_CODE_FIND,
+    KAN_PLATFORM_SCAN_CODE_MUTE,
+    KAN_PLATFORM_SCAN_CODE_VOLUME_UP,
+    KAN_PLATFORM_SCAN_CODE_VOLUME_DOWN,
+    KAN_PLATFORM_SCAN_CODE_KEY_PAD_COMMA,
+    KAN_PLATFORM_SCAN_CODE_KEY_PAD_EQUALS_AS400,
 
-    kan_scan_code_t lang_1;
-    kan_scan_code_t lang_2;
-    kan_scan_code_t lang_3;
-    kan_scan_code_t lang_4;
-    kan_scan_code_t lang_5;
-    kan_scan_code_t lang_6;
-    kan_scan_code_t lang_7;
-    kan_scan_code_t lang_8;
-    kan_scan_code_t lang_9;
+    KAN_PLATFORM_SCAN_CODE_INTERNATIONAL_1,
+    KAN_PLATFORM_SCAN_CODE_INTERNATIONAL_2,
+    KAN_PLATFORM_SCAN_CODE_INTERNATIONAL_3,
+    KAN_PLATFORM_SCAN_CODE_INTERNATIONAL_4,
+    KAN_PLATFORM_SCAN_CODE_INTERNATIONAL_5,
+    KAN_PLATFORM_SCAN_CODE_INTERNATIONAL_6,
+    KAN_PLATFORM_SCAN_CODE_INTERNATIONAL_7,
+    KAN_PLATFORM_SCAN_CODE_INTERNATIONAL_8,
+    KAN_PLATFORM_SCAN_CODE_INTERNATIONAL_9,
 
-    kan_scan_code_t alt_erase;
-    kan_scan_code_t sys_req;
-    kan_scan_code_t cancel;
-    kan_scan_code_t clear;
-    kan_scan_code_t prior;
-    kan_scan_code_t return_2;
-    kan_scan_code_t separator;
-    kan_scan_code_t out;
-    kan_scan_code_t oper;
-    kan_scan_code_t clear_again;
+    KAN_PLATFORM_SCAN_CODE_LANG_1,
+    KAN_PLATFORM_SCAN_CODE_LANG_2,
+    KAN_PLATFORM_SCAN_CODE_LANG_3,
+    KAN_PLATFORM_SCAN_CODE_LANG_4,
+    KAN_PLATFORM_SCAN_CODE_LANG_5,
+    KAN_PLATFORM_SCAN_CODE_LANG_6,
+    KAN_PLATFORM_SCAN_CODE_LANG_7,
+    KAN_PLATFORM_SCAN_CODE_LANG_8,
+    KAN_PLATFORM_SCAN_CODE_LANG_9,
 
-    kan_scan_code_t cr_sel;
-    kan_scan_code_t ex_sel;
+    KAN_PLATFORM_SCAN_CODE_ALT_ERASE,
+    KAN_PLATFORM_SCAN_CODE_SYS_REQ,
+    KAN_PLATFORM_SCAN_CODE_CANCEL,
+    KAN_PLATFORM_SCAN_CODE_CLEAR,
+    KAN_PLATFORM_SCAN_CODE_PRIOR,
+    KAN_PLATFORM_SCAN_CODE_RETURN_2,
+    KAN_PLATFORM_SCAN_CODE_SEPARATOR,
+    KAN_PLATFORM_SCAN_CODE_OUT,
+    KAN_PLATFORM_SCAN_CODE_OPER,
+    KAN_PLATFORM_SCAN_CODE_CLEAR_AGAIN,
 
-    kan_scan_code_t key_pad_00;
-    kan_scan_code_t key_pad_000;
-    kan_scan_code_t thousands_separator;
-    kan_scan_code_t decimal_separator;
-    kan_scan_code_t currency_unit;
-    kan_scan_code_t currency_subunit;
-    kan_scan_code_t key_pad_left_paren;
-    kan_scan_code_t key_pad_right_paren;
-    kan_scan_code_t key_pad_left_brace;
-    kan_scan_code_t key_pad_right_brace;
-    kan_scan_code_t key_pad_tab;
-    kan_scan_code_t key_pad_backspace;
-    kan_scan_code_t key_pad_a;
-    kan_scan_code_t key_pad_b;
-    kan_scan_code_t key_pad_c;
-    kan_scan_code_t key_pad_d;
-    kan_scan_code_t key_pad_e;
-    kan_scan_code_t key_pad_f;
+    KAN_PLATFORM_SCAN_CODE_CR_SEL,
+    KAN_PLATFORM_SCAN_CODE_EX_SEL,
 
-    kan_scan_code_t key_pad_xor;
-    kan_scan_code_t key_pad_power;
-    kan_scan_code_t key_pad_percent;
-    kan_scan_code_t key_pad_less;
-    kan_scan_code_t key_pad_greater;
-    kan_scan_code_t key_pad_ampersand;
-    kan_scan_code_t key_pad_double_ampersand;
-    kan_scan_code_t key_pad_vertical_bar;
-    kan_scan_code_t key_pad_double_vertical_bar;
-    kan_scan_code_t key_pad_colon;
-    kan_scan_code_t key_pad_hash;
-    kan_scan_code_t key_pad_space;
-    kan_scan_code_t key_pad_at;
-    kan_scan_code_t key_pad_exclamation;
-    kan_scan_code_t key_pad_mem_store;
-    kan_scan_code_t key_pad_mem_recall;
-    kan_scan_code_t key_pad_mem_clear;
-    kan_scan_code_t key_pad_mem_add;
-    kan_scan_code_t key_pad_mem_subtract;
-    kan_scan_code_t key_pad_mem_multiply;
-    kan_scan_code_t key_pad_mem_divide;
-    kan_scan_code_t key_pad_plus_minus;
-    kan_scan_code_t key_pad_clear;
-    kan_scan_code_t key_pad_clear_entry;
-    kan_scan_code_t key_pad_binary;
-    kan_scan_code_t key_pad_octal;
-    kan_scan_code_t key_pad_decimal;
-    kan_scan_code_t key_pad_hexadecimal;
+    KAN_PLATFORM_SCAN_CODE_KEY_PAD_00,
+    KAN_PLATFORM_SCAN_CODE_KEY_PAD_000,
+    KAN_PLATFORM_SCAN_CODE_THOUSANDS_SEPARATOR,
+    KAN_PLATFORM_SCAN_CODE_DECIMAL_SEPARATOR,
+    KAN_PLATFORM_SCAN_CODE_CURRENCY_UNIT,
+    KAN_PLATFORM_SCAN_CODE_CURRENCY_SUBUNIT,
+    KAN_PLATFORM_SCAN_CODE_KEY_PAD_LEFT_PAREN,
+    KAN_PLATFORM_SCAN_CODE_KEY_PAD_RIGHT_PAREN,
+    KAN_PLATFORM_SCAN_CODE_KEY_PAD_LEFT_BRACE,
+    KAN_PLATFORM_SCAN_CODE_KEY_PAD_RIGHT_BRACE,
+    KAN_PLATFORM_SCAN_CODE_KEY_PAD_TAB,
+    KAN_PLATFORM_SCAN_CODE_KEY_PAD_BACKSPACE,
+    KAN_PLATFORM_SCAN_CODE_KEY_PAD_A,
+    KAN_PLATFORM_SCAN_CODE_KEY_PAD_B,
+    KAN_PLATFORM_SCAN_CODE_KEY_PAD_C,
+    KAN_PLATFORM_SCAN_CODE_KEY_PAD_D,
+    KAN_PLATFORM_SCAN_CODE_KEY_PAD_E,
+    KAN_PLATFORM_SCAN_CODE_KEY_PAD_F,
 
-    kan_scan_code_t left_control;
-    kan_scan_code_t left_shift;
-    kan_scan_code_t left_alt;
-    kan_scan_code_t left_gui;
-    kan_scan_code_t right_control;
-    kan_scan_code_t right_shift;
-    kan_scan_code_t right_alt;
-    kan_scan_code_t right_gui;
+    KAN_PLATFORM_SCAN_CODE_KEY_PAD_XOR,
+    KAN_PLATFORM_SCAN_CODE_KEY_PAD_POWER,
+    KAN_PLATFORM_SCAN_CODE_KEY_PAD_PERCENT,
+    KAN_PLATFORM_SCAN_CODE_KEY_PAD_LESS,
+    KAN_PLATFORM_SCAN_CODE_KEY_PAD_GREATER,
+    KAN_PLATFORM_SCAN_CODE_KEY_PAD_AMPERSAND,
+    KAN_PLATFORM_SCAN_CODE_KEY_PAD_DOUBLE_AMPERSAND,
+    KAN_PLATFORM_SCAN_CODE_KEY_PAD_VERTICAL_BAR,
+    KAN_PLATFORM_SCAN_CODE_KEY_PAD_DOUBLE_VERTICAL_BAR,
+    KAN_PLATFORM_SCAN_CODE_KEY_PAD_COLON,
+    KAN_PLATFORM_SCAN_CODE_KEY_PAD_HASH,
+    KAN_PLATFORM_SCAN_CODE_KEY_PAD_SPACE,
+    KAN_PLATFORM_SCAN_CODE_KEY_PAD_AT,
+    KAN_PLATFORM_SCAN_CODE_KEY_PAD_EXCLAMATION,
+    KAN_PLATFORM_SCAN_CODE_KEY_PAD_MEM_STORE,
+    KAN_PLATFORM_SCAN_CODE_KEY_PAD_MEM_RECALL,
+    KAN_PLATFORM_SCAN_CODE_KEY_PAD_MEM_CLEAR,
+    KAN_PLATFORM_SCAN_CODE_KEY_PAD_MEM_ADD,
+    KAN_PLATFORM_SCAN_CODE_KEY_PAD_MEM_SUBTRACT,
+    KAN_PLATFORM_SCAN_CODE_KEY_PAD_MEM_MULTIPLY,
+    KAN_PLATFORM_SCAN_CODE_KEY_PAD_MEM_DIVIDE,
+    KAN_PLATFORM_SCAN_CODE_KEY_PAD_PLUS_MINUS,
+    KAN_PLATFORM_SCAN_CODE_KEY_PAD_CLEAR,
+    KAN_PLATFORM_SCAN_CODE_KEY_PAD_CLEAR_ENTRY,
+    KAN_PLATFORM_SCAN_CODE_KEY_PAD_BINARY,
+    KAN_PLATFORM_SCAN_CODE_KEY_PAD_OCTAL,
+    KAN_PLATFORM_SCAN_CODE_KEY_PAD_DECIMAL,
+    KAN_PLATFORM_SCAN_CODE_KEY_PAD_HEXADECIMAL,
 
-    kan_scan_code_t mode;
+    KAN_PLATFORM_SCAN_CODE_LEFT_CONTROL,
+    KAN_PLATFORM_SCAN_CODE_LEFT_SHIFT,
+    KAN_PLATFORM_SCAN_CODE_LEFT_ALT,
+    KAN_PLATFORM_SCAN_CODE_LEFT_GUI,
+    KAN_PLATFORM_SCAN_CODE_RIGHT_CONTROL,
+    KAN_PLATFORM_SCAN_CODE_RIGHT_SHIFT,
+    KAN_PLATFORM_SCAN_CODE_RIGHT_ALT,
+    KAN_PLATFORM_SCAN_CODE_RIGHT_GUI,
 
-    kan_scan_code_t audio_next;
-    kan_scan_code_t audio_previous;
-    kan_scan_code_t audio_stop;
-    kan_scan_code_t audio_play;
-    kan_scan_code_t audio_mute;
-    kan_scan_code_t media_select;
-    kan_scan_code_t www;
-    kan_scan_code_t mail;
-    kan_scan_code_t calculator;
-    kan_scan_code_t computer;
+    KAN_PLATFORM_SCAN_CODE_MODE,
 
-    kan_scan_code_t ac_search;
-    kan_scan_code_t ac_home;
-    kan_scan_code_t ac_back;
-    kan_scan_code_t ac_forward;
-    kan_scan_code_t ac_stop;
-    kan_scan_code_t ac_refresh;
-    kan_scan_code_t ac_bookmarks;
+    KAN_PLATFORM_SCAN_CODE_MEDIA_NEXT,
+    KAN_PLATFORM_SCAN_CODE_MEDIA_PREVIOUS,
+    KAN_PLATFORM_SCAN_CODE_MEDIA_STOP,
+    KAN_PLATFORM_SCAN_CODE_MEDIA_PLAY,
+    KAN_PLATFORM_SCAN_CODE_MEDIA_SELECT,
 
-    kan_scan_code_t brightness_down;
-    kan_scan_code_t brightness_up;
-    kan_scan_code_t display_switch;
+    KAN_PLATFORM_SCAN_CODE_AC_SEARCH,
+    KAN_PLATFORM_SCAN_CODE_AC_HOME,
+    KAN_PLATFORM_SCAN_CODE_AC_BACK,
+    KAN_PLATFORM_SCAN_CODE_AC_FORWARD,
+    KAN_PLATFORM_SCAN_CODE_AC_STOP,
+    KAN_PLATFORM_SCAN_CODE_AC_REFRESH,
+    KAN_PLATFORM_SCAN_CODE_AC_BOOKMARKS,
 
-    kan_scan_code_t keyboard_illumination_toggle;
-    kan_scan_code_t keyboard_illumination_down;
-    kan_scan_code_t keyboard_illumination_up;
+    KAN_PLATFORM_SCAN_CODE_EJECT,
+    KAN_PLATFORM_SCAN_CODE_SLEEP,
 
-    kan_scan_code_t eject;
-    kan_scan_code_t sleep;
+    KAN_PLATFORM_SCAN_CODE_MEDIA_REWIND,
+    KAN_PLATFORM_SCAN_CODE_MEDIA_FAST_FORWARD,
 
-    kan_scan_code_t app_1;
-    kan_scan_code_t app_2;
+    KAN_PLATFORM_SCAN_CODE_SOFT_LEFT,
+    KAN_PLATFORM_SCAN_CODE_SOFT_RIGHT,
 
-    kan_scan_code_t audio_rewind;
-    kan_scan_code_t audio_fast_forward;
-
-    kan_scan_code_t soft_left;
-    kan_scan_code_t soft_right;
-
-    kan_scan_code_t call;
-    kan_scan_code_t end_call;
+    KAN_PLATFORM_SCAN_CODE_CALL,
+    KAN_PLATFORM_SCAN_CODE_END_CALL,
 };
 
-/// \brief Table the lists codes for modifier keys on this platform.
-struct kan_key_modifiers_table_t
+/// \brief Type for storing key code value in Unicode format.
+/// \details Key codes depend on layout selected for the keyboard by the system.
+typedef uint32_t kan_platform_key_code_t;
+
+/// \brief Table that lists modifier keys as flags that can be known to platform.
+/// \meta reflection_flags
+enum kan_platform_modifier_mask_t
 {
-    kan_key_modifier_mask_t left_shift;
-    kan_key_modifier_mask_t right_shift;
-    kan_key_modifier_mask_t left_control;
-    kan_key_modifier_mask_t right_control;
-    kan_key_modifier_mask_t left_alt;
-    kan_key_modifier_mask_t right_alt;
-    kan_key_modifier_mask_t left_gui;
-    kan_key_modifier_mask_t right_gui;
-    kan_key_modifier_mask_t num_lock;
-    kan_key_modifier_mask_t caps_lock;
-    kan_key_modifier_mask_t mode;
-    kan_key_modifier_mask_t scroll_lock;
+    KAN_PLATFORM_MODIFIER_MASK_LEFT_SHIFT = 1u << 0u,
+    KAN_PLATFORM_MODIFIER_MASK_RIGHT_SHIFT = 1u << 1u,
+    KAN_PLATFORM_MODIFIER_MASK_LEFT_CONTROL = 1u << 2u,
+    KAN_PLATFORM_MODIFIER_MASK_RIGHT_CONTROL = 1u << 3u,
+    KAN_PLATFORM_MODIFIER_MASK_LEFT_ALT = 1u << 4u,
+    KAN_PLATFORM_MODIFIER_MASK_RIGHT_ALT = 1u << 5u,
+    KAN_PLATFORM_MODIFIER_MASK_LEFT_GUI = 1u << 6u,
+    KAN_PLATFORM_MODIFIER_MASK_RIGHT_GUI = 1u << 7u,
+    KAN_PLATFORM_MODIFIER_MASK_NUM_LOCK = 1u << 8u,
+    KAN_PLATFORM_MODIFIER_MASK_CAPS_LOCK = 1u << 9u,
+    KAN_PLATFORM_MODIFIER_MASK_MODE = 1u << 10u,
+    KAN_PLATFORM_MODIFIER_MASK_SCROLL_LOCK = 1u << 11u,
 };
-
-/// \brief Returns scan codes table for this platform.
-PLATFORM_API const struct kan_scan_code_table_t *kan_platform_get_scan_code_table (void);
-
-/// \brief Returns modifier code table for this platform.
-PLATFORM_API const struct kan_key_modifiers_table_t *kan_platform_get_key_modifiers_table (void);
 
 KAN_C_HEADER_END

@@ -2,7 +2,7 @@
 #include <string.h>
 
 #include <kan/memory/allocation.h>
-#include <kan/platform/precise_time.h>
+#include <kan/precise_time/precise_time.h>
 #include <kan/testing/testing.h>
 #include <kan/threading/atomic.h>
 #include <kan/workflow/workflow.h>
@@ -209,7 +209,7 @@ static void single_threaded_node_function (kan_cpu_job_t job, kan_functor_user_d
     kan_cpu_job_release (job);
 
     // Spend some time by sleeping.
-    kan_platform_sleep (1000000u);
+    kan_precise_time_sleep (1000000u);
 
     finish_node (user_data);
 }
@@ -227,7 +227,7 @@ static void multi_threaded_sub_task (kan_functor_user_data_t user_data)
     struct multi_threaded_node_state_t *state = (struct multi_threaded_node_state_t *) user_data;
 
     // Spend some time by sleeping.
-    kan_platform_sleep (1000000u);
+    kan_precise_time_sleep (1000000u);
 
     if (kan_atomic_int_add (&state->executions_left, -1) == 1)
     {
@@ -254,7 +254,7 @@ static void multi_threaded_node_function (kan_cpu_job_t job, kan_functor_user_da
                                         });
 
         // Spend some time by sleeping.
-        kan_platform_sleep (1000u);
+        kan_precise_time_sleep (1000u);
     }
 
     kan_cpu_job_release (job);

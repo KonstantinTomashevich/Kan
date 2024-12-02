@@ -1,4 +1,4 @@
-if (NOT KAN_USE_VULKAN_API)
+if (NOT Vulkan_FOUND)
     return ()
 endif ()
 
@@ -8,7 +8,7 @@ concrete_sources ("*.c" "*.cpp")
 
 concrete_require (
         SCOPE PRIVATE
-        ABSTRACT cpu_profiler error log memory threading
+        ABSTRACT cpu_profiler error log memory precise_time threading
         THIRD_PARTY volk Vulkan::Headers VulkanMemoryAllocator)
 
 # stdc++ is required by VulkanMemoryAllocator and is not provided by default on non-MSVC compilers.
@@ -17,7 +17,7 @@ if (NOT MSVC)
 endif ()
 
 concrete_implements_abstract (context_render_backend_system)
-register_context_system (render_backend_system_t)
+register_context_system (NAME render_backend_system_t)
 c_interface_scanner_setup (GLOB "*.c" "*.h")
 
 option (KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED "Whether Vulkan debug utilities are enabled." ON)

@@ -556,7 +556,7 @@ function (private_generate_code_hot_reload_test)
             ARGUMENTS
             "${CMAKE_COMMAND}" "${CMAKE_BINARY_DIR}" "${APPLICATION_NAME}_dev_all_plugins" "$<CONFIG>"
             # We need big timeout due to slow machines on GitHub Actions.
-            PROPERTIES RUN_SERIAL ON TIMEOUT 60 LABELS SLOW)
+            PROPERTIES RUN_SERIAL ON TIMEOUT 60 LABELS VERIFY_HOT_RELOAD)
 
     foreach (PLUGIN_GROUP ${PLUGIN_GROUPS})
         application_program_use_plugin_group ("${PLUGIN_GROUP}")
@@ -584,12 +584,6 @@ function (private_core_configurator_common_content)
         message (FATAL_ERROR "Incorrect function arguments!")
     endif ()
 
-    if (ARG_HOT_RELOAD)
-        set (HOT_RELOAD "1")
-    else ()
-        set (HOT_RELOAD "0")
-    endif ()
-
     set (PREFIX "string (APPEND ENABLED_SYSTEMS \"")
     string (APPEND CORE_CONFIGURATOR_CONTENT "${PREFIX}+enabled_systems { name = application_system_t }\\n\\n\")\n")
     string (APPEND CORE_CONFIGURATOR_CONTENT "${PREFIX}+enabled_systems {\\n\")\n")
@@ -608,8 +602,6 @@ function (private_core_configurator_common_content)
         math (EXPR INDEX "${INDEX} + 1")
     endforeach ()
 
-    string (APPEND CORE_CONFIGURATOR_CONTENT "${PREFIX}        enable_hot_reload = ${HOT_RELOAD}\\n\")\n")
-    string (APPEND CORE_CONFIGURATOR_CONTENT "${PREFIX}        hot_reload_update_delay_ns = 200000000\\n\")\n")
     string (APPEND CORE_CONFIGURATOR_CONTENT "${PREFIX}    }\\n\")\n")
     string (APPEND CORE_CONFIGURATOR_CONTENT "${PREFIX}}\\n\\n\")\n")
     string (APPEND CORE_CONFIGURATOR_CONTENT "${PREFIX}+enabled_systems { name = reflection_system_t }\\n\\n\")\n")
@@ -637,17 +629,27 @@ function (private_core_configurator_common_content)
             "${PREFIX}        __type = kan_universe_world_definition_system_config_t\\n\")\n")
     string (APPEND CORE_CONFIGURATOR_CONTENT
             "${PREFIX}        definitions_mount_path = \\\"universe_world_definitions\\\"\\n\")\n")
-    string (APPEND CORE_CONFIGURATOR_CONTENT "${PREFIX}        observe_definitions = ${HOT_RELOAD}\\n\")\n")
-    string (APPEND CORE_CONFIGURATOR_CONTENT "${PREFIX}        observation_rescan_delay_ns = 100000000\\n\")\n")
     string (APPEND CORE_CONFIGURATOR_CONTENT "${PREFIX}    }\\n\")\n")
     string (APPEND CORE_CONFIGURATOR_CONTENT "${PREFIX}}\\n\\n\")\n")
     string (APPEND CORE_CONFIGURATOR_CONTENT "${PREFIX}+enabled_systems { name = update_system_t }\\n\\n\")\n")
+
+    if (ARG_HOT_RELOAD)
+        string (APPEND CORE_CONFIGURATOR_CONTENT "${PREFIX}+enabled_systems {\\n\")\n")
+        string (APPEND CORE_CONFIGURATOR_CONTENT "${PREFIX}    name = hot_reload_coordination_system_t\\n\")\n")
+        string (APPEND CORE_CONFIGURATOR_CONTENT "${PREFIX}    configuration {\\n\")\n")
+        string (APPEND CORE_CONFIGURATOR_CONTENT
+                "${PREFIX}        __type = kan_hot_reload_coordination_system_config_t\\n\")\n")
+        string (APPEND CORE_CONFIGURATOR_CONTENT
+                "${PREFIX}        initial_mode = KAN_HOT_RELOAD_MODE_AUTOMATIC_INDEPENDENT\\n\")\n")
+        string (APPEND CORE_CONFIGURATOR_CONTENT "${PREFIX}    }\\n\")\n")
+        string (APPEND CORE_CONFIGURATOR_CONTENT "${PREFIX}}\\n\\n\")\n")
+    endif ()
 
     if (ARG_AUTO_BUILD )
         string (APPEND CORE_CONFIGURATOR_CONTENT "string (APPEND AUTO_BUILD_SUFFIX \"enable_auto_build = 1\\n\")\n")
         string (APPEND CORE_CONFIGURATOR_CONTENT "string (APPEND AUTO_BUILD_SUFFIX \"auto_build_command = \\\"")
         string (APPEND CORE_CONFIGURATOR_CONTENT "${CMAKE_COMMAND} ")
-        string (APPEND CORE_CONFIGURATOR_CONTENT "--build \\\\\\\"${CMAKE_BINARY_DIR}>\\\\\\\" ")
+        string (APPEND CORE_CONFIGURATOR_CONTENT "--build \\\\\\\"${CMAKE_BINARY_DIR}\\\\\\\" ")
         string (APPEND CORE_CONFIGURATOR_CONTENT "--target \\\\\\\"${APPLICATION_NAME}_dev_all_plugins\\\\\\\" ")
         string (APPEND CORE_CONFIGURATOR_CONTENT "--config $<CONFIG>\\\"\")\n")
     endif ()
