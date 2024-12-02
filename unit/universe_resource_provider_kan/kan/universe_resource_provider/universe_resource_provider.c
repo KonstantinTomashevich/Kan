@@ -1478,6 +1478,12 @@ static inline void on_file_added (struct resource_provider_state_t *state,
         addition->name_for_search = info_from_path.name;
         const kan_time_size_t investigate_after_ns =
             kan_precise_time_get_elapsed_nanoseconds () + automatic_config->change_wait_time_ns;
+
+        KAN_LOG (universe_resource_provider, KAN_LOG_ERROR, "XTEMP Investigate addition after %llu",
+                 (unsigned long long) investigate_after_ns)
+        KAN_LOG (universe_resource_provider, KAN_LOG_ERROR, "XTEMP Current time %llu",
+                 (unsigned long long) kan_precise_time_get_elapsed_nanoseconds ())
+
         KAN_ASSERT (KAN_PACKED_TIMER_IS_SAFE_TO_SET (investigate_after_ns))
         addition->investigate_after_timer = KAN_PACKED_TIMER_SET (investigate_after_ns);
     }
@@ -1757,6 +1763,8 @@ static inline void process_delayed_addition (struct resource_provider_state_t *s
         return;
     }
 
+    KAN_LOG (universe_resource_provider, KAN_LOG_ERROR, "XTEMP Check delayed addition")
+
     KAN_ASSERT (KAN_PACKED_TIMER_IS_SAFE_TO_SET (kan_precise_time_get_elapsed_nanoseconds ()))
     const kan_packed_timer_t current_timer = kan_hot_reload_coordination_system_is_hot_swap (state->hot_reload_system) ?
                                                  KAN_PACKED_TIMER_MAX :
@@ -1765,6 +1773,7 @@ static inline void process_delayed_addition (struct resource_provider_state_t *s
     KAN_UP_INTERVAL_ASCENDING_WRITE (delayed_addition, resource_provider_delayed_file_addition_t,
                                      investigate_after_timer, NULL, &current_timer)
     {
+        KAN_LOG (universe_resource_provider, KAN_LOG_ERROR, "XTEMP Check delayed addition of %s", delayed_addition->path)
         process_file_addition (state, private, delayed_addition->path);
         KAN_UP_ACCESS_DELETE (delayed_addition);
     }
@@ -2425,9 +2434,6 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void mutator_template_execute_resource_provid
                         KAN_HOT_RELOAD_MODE_DISABLED)
                 {
                     volume = kan_virtual_file_system_get_context_volume_for_write (state->virtual_file_system);
-
-                    KAN_LOG (universe_resource_provider, KAN_LOG_ERROR, "CREATING RESOURCE WATCHER");
-
                     private->resource_watcher =
                         kan_virtual_file_system_watcher_create (volume, state->resource_directory_path);
                     private->resource_watcher_iterator =

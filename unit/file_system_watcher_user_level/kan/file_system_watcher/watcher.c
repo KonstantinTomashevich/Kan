@@ -487,18 +487,12 @@ static void verification_poll_at_directory_recursive (struct watcher_t *watcher,
 
                     if (file_node)
                     {
-                        KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, file_system_watcher, KAN_LOG_ERROR,
-                                             "FOUND FILE \"%s\".", watcher->path_container.path)
-
                         if (file_node->last_modification_time_ns != status.last_modification_time_ns ||
                             file_node->size != status.size)
                         {
                             send_file_modified_event (watcher);
                             file_node->last_modification_time_ns = status.last_modification_time_ns;
                             file_node->size = status.size;
-
-                            KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, file_system_watcher,
-                                                 KAN_LOG_ERROR, "MODIFIED FILE \"%s\".", watcher->path_container.path)
                         }
 
                         file_node->mark_found = KAN_TRUE;
@@ -507,9 +501,6 @@ static void verification_poll_at_directory_recursive (struct watcher_t *watcher,
                     {
                         directory_node_append_file (directory, entry_name, &status);
                         send_file_added_event (watcher);
-
-                        KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, file_system_watcher, KAN_LOG_ERROR,
-                                             "NEW FILE \"%s\".", watcher->path_container.path)
                     }
 
                     break;
@@ -683,8 +674,6 @@ static int server_thread (void *user_data)
         while (watcher)
         {
             KAN_ASSERT (watcher->root_directory)
-            KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, file_system_watcher, KAN_LOG_ERROR,
-                                 "Running file system watcher at \"%s\".", watcher->path_container.path)
             verification_poll_at_directory_recursive (watcher, watcher->root_directory);
             watcher = watcher->next_watcher;
         }
