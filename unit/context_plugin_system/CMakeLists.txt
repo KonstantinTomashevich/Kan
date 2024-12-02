@@ -5,7 +5,8 @@ concrete_require (SCOPE PUBLIC CONCRETE_INTERFACE context)
 
 concrete_require (
         SCOPE PRIVATE
-        ABSTRACT error file_system file_system_watcher log memory platform precise_time
+        ABSTRACT
+        context_hot_reload_coordination_system error file_system file_system_watcher log memory platform precise_time
         CONCRETE_INTERFACE context_reflection_system context_update_system)
 
 register_context_system (NAME plugin_system_t)

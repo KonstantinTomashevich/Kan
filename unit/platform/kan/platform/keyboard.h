@@ -280,6 +280,7 @@ enum kan_platform_scan_code_t
 typedef uint32_t kan_platform_key_code_t;
 
 /// \brief Table that lists modifier keys as flags that can be known to platform.
+/// \meta reflection_flags
 enum kan_platform_modifier_mask_t
 {
     KAN_PLATFORM_MODIFIER_MASK_LEFT_SHIFT = 1u << 0u,

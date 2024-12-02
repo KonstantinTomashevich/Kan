@@ -11,7 +11,8 @@ register_shared_library (test_context_library)
 shared_library_include (
         SCOPE PUBLIC
         ABSTRACT
-        error=sdl hash=djb2 log=kan memory=kan memory_profiler=default platform=sdl threading=sdl
+        cpu_dispatch=kan cpu_profiler=default error=sdl hash=djb2 log=kan memory=kan memory_profiler=default
+        platform=sdl precise_time=sdl reflection=kan threading=sdl
         CONCRETE container context testing test_context)
 
 generate_artefact_context_data ()

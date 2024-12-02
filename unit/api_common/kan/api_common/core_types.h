@@ -99,6 +99,7 @@ typedef uint64_t kan_time_offset_t;
 
 typedef uint64_t kan_packed_timer_t;
 #    define KAN_PACKED_TIMER_NEVER UINT64_MAX
+#    define KAN_PACKED_TIMER_MAX (UINT64_MAX - 1u)
 #    define KAN_PACKED_TIMER_SET(TIME_SIZE) ((TIME_SIZE))
 #    define KAN_PACKED_TIMER_IS_SAFE_TO_SET(TIME_SIZE) ((TIME_SIZE) != UINT64_MAX)
 
@@ -121,6 +122,7 @@ typedef uint32_t kan_time_offset_t;
 
 typedef uint32_t kan_packed_timer_t;
 #    define KAN_PACKED_TIMER_NEVER 0xFFFFFFFF
+#    define KAN_PACKED_TIMER_MAX (0xFFFFFFFF - 1u)
 #    define KAN_PACKED_TIMER_SET(TIME_SIZE) ((kan_packed_timer_t) ((TIME_SIZE) & 0x0007FFFFFFF00000) >> 20u)
 #    define KAN_PACKED_TIMER_IS_SAFE_TO_SET(TIME_SIZE) (((TIME_SIZE) & 0xFFF8000000000000) == 0u)
 

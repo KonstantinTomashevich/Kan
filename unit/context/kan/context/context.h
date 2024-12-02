@@ -125,6 +125,15 @@ CONTEXT_API void kan_context_assembly (kan_context_t handle);
 /// \brief Queries for system with given name. Should not be called before `kan_context_assembly`.
 CONTEXT_API kan_context_system_t kan_context_query (kan_context_t handle, const char *system_name);
 
+/// \brief Special version of `kan_context_query` for connection phase where we don't want to connect, but only to
+///        check system existence or configuration or refer to it as dependency for some connection.
+/// \details It is mostly used to avoid circular dependencies and stack overflow later during init, as requesting
+///          system to which we can be connected in init causes stack overflow as both systems would want each other
+///          to be initialized due to potential connection. If connection can never happen, we should use
+///          this function and there will be no stack overflow due to absence of potential connection.
+/// \invariant If system was received through this function, its connect functions should not be called!
+CONTEXT_API kan_context_system_t kan_context_query_no_connect (kan_context_t handle, const char *system_name);
+
 /// \brief Destroys given context along with all its systems.
 CONTEXT_API void kan_context_destroy (kan_context_t handle);
 

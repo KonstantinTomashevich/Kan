@@ -5,6 +5,7 @@
 #include <stddef.h>
 
 #include <kan/context/all_system_names.h>
+#include <kan/context/hot_reload_coordination_system.h>
 #include <kan/context/reflection_system.h>
 #include <kan/context/universe_system.h>
 #include <kan/context/update_system.h>
@@ -28,6 +29,7 @@
 #define WORKSPACE_REFERENCE_CACHE_SUB_DIRECTORY "workspace_reference_cache"
 #define WORKSPACE_REFERENCE_CACHE_MOUNT_PATH "resource_reference_cache"
 
+static kan_bool_t global_test_request_hot_reload = KAN_FALSE;
 static kan_bool_t global_test_finished = KAN_FALSE;
 
 struct resource_prototype_t
@@ -696,7 +698,6 @@ struct outer_reference_caching_test_state_t
 
     // Test internal state is saved in mutator for simplicity as we're not planning hot reloading in tests.
     enum outer_reference_caching_test_stage_t stage;
-    kan_time_size_t wait_for_change_detection_unti_ns;
 };
 
 TEST_UNIVERSE_RESOURCE_REFERENCE_API void kan_universe_mutator_deploy_outer_reference_caching_test (
@@ -709,7 +710,6 @@ TEST_UNIVERSE_RESOURCE_REFERENCE_API void kan_universe_mutator_deploy_outer_refe
     kan_workflow_graph_node_depend_on (workflow_node, KAN_RESOURCE_REFERENCE_END_CHECKPOINT);
     state->registry = kan_universe_get_reflection_registry (universe);
     state->stage = OUTER_REFERENCE_CACHING_TEST_STAGE_INIT;
-    state->wait_for_change_detection_unti_ns = 0u;
 }
 
 TEST_UNIVERSE_RESOURCE_REFERENCE_API void kan_universe_mutator_execute_outer_reference_caching_test (
@@ -753,25 +753,20 @@ TEST_UNIVERSE_RESOURCE_REFERENCE_API void kan_universe_mutator_execute_outer_ref
         kan_precise_time_sleep (1000000u);
 
         save_prototype_2 (state->registry, WORKSPACE_RESOURCES_SUB_DIRECTORY "/prototype_1.rd");
-        state->wait_for_change_detection_unti_ns = kan_precise_time_get_elapsed_nanoseconds () + 300000000u;
+        global_test_request_hot_reload = KAN_TRUE;
         state->stage = OUTER_REFERENCE_CACHING_TEST_STAGE_CHANGED_WAITING_FOR_CHANGE_DETECTION;
         break;
     }
 
     case OUTER_REFERENCE_CACHING_TEST_STAGE_CHANGED_WAITING_FOR_CHANGE_DETECTION:
     {
-        // We need to give internal logic enough time to safely detect file change.
-        if (kan_precise_time_get_elapsed_nanoseconds () > state->wait_for_change_detection_unti_ns)
+        KAN_UP_EVENT_INSERT (event, kan_resource_update_outer_references_request_event_t)
         {
-            KAN_UP_EVENT_INSERT (event, kan_resource_update_outer_references_request_event_t)
-            {
-                event->type = kan_string_intern ("resource_prototype_t");
-                event->name = kan_string_intern ("prototype_1");
-            }
-
-            state->stage = OUTER_REFERENCE_CACHING_TEST_STAGE_CHANGED_SCAN_REQUESTED;
+            event->type = kan_string_intern ("resource_prototype_t");
+            event->name = kan_string_intern ("prototype_1");
         }
 
+        state->stage = OUTER_REFERENCE_CACHING_TEST_STAGE_CHANGED_SCAN_REQUESTED;
         break;
     }
 
@@ -871,6 +866,14 @@ static kan_context_t setup_context (void)
 {
     kan_context_t context =
         kan_context_create (kan_allocation_group_get_child (kan_allocation_group_root (), "context"));
+
+    struct kan_hot_reload_coordination_system_config_t hot_reload_config;
+    kan_hot_reload_coordination_system_config_init (&hot_reload_config);
+    hot_reload_config.initial_mode = KAN_HOT_RELOAD_MODE_ON_REQUEST;
+
+    KAN_TEST_CHECK (
+        kan_context_request_system (context, KAN_CONTEXT_HOT_RELOAD_COORDINATION_SYSTEM_NAME, &hot_reload_config))
+
     KAN_TEST_CHECK (kan_context_request_system (context, KAN_CONTEXT_REFLECTION_SYSTEM_NAME, NULL))
     KAN_TEST_CHECK (kan_context_request_system (context, KAN_CONTEXT_UNIVERSE_SYSTEM_NAME, NULL))
     KAN_TEST_CHECK (kan_context_request_system (context, KAN_CONTEXT_UPDATE_SYSTEM_NAME, NULL))
@@ -912,6 +915,10 @@ TEST_UNIVERSE_RESOURCE_REFERENCE_API void kan_universe_scheduler_execute_run_upd
 
 static void run_test (kan_context_t context, kan_interned_string_t test_mutator)
 {
+    kan_context_system_t hot_reload_system_handle =
+        kan_context_query (context, KAN_CONTEXT_HOT_RELOAD_COORDINATION_SYSTEM_NAME);
+    KAN_TEST_ASSERT (KAN_HANDLE_IS_VALID (hot_reload_system_handle))
+
     kan_context_system_t universe_system_handle = kan_context_query (context, KAN_CONTEXT_UNIVERSE_SYSTEM_NAME);
     KAN_TEST_ASSERT (KAN_HANDLE_IS_VALID (universe_system_handle))
 
@@ -934,10 +941,7 @@ static void run_test (kan_context_t context, kan_interned_string_t test_mutator)
     struct kan_resource_provider_configuration_t resource_provider_configuration = {
         .scan_budget_ns = 2000000u,
         .load_budget_ns = 2000000u,
-        .add_wait_time_ns = 100000000u,
-        .modify_wait_time_ns = 100000000u,
         .use_load_only_string_registry = KAN_TRUE,
-        .observe_file_system = KAN_TRUE,
         .resource_directory_path = kan_string_intern (WORKSPACE_RESOURCES_MOUNT_PATH),
     };
 
@@ -1005,6 +1009,12 @@ static void run_test (kan_context_t context, kan_interned_string_t test_mutator)
 
     while (!global_test_finished)
     {
+        if (global_test_request_hot_reload)
+        {
+            kan_hot_reload_coordination_system_request_hot_swap (hot_reload_system_handle);
+            global_test_request_hot_reload = KAN_FALSE;
+        }
+
         kan_update_system_run (update_system);
     }
 }

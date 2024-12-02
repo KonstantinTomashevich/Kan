@@ -829,7 +829,8 @@ void render_backend_system_destroy (kan_context_system_t handle)
     kan_free_general (system->main_allocation_group, system, sizeof (struct render_backend_system_t));
 }
 
-struct kan_context_system_api_t KAN_CONTEXT_SYSTEM_API_NAME (render_backend_system_t) = {
+CONTEXT_RENDER_BACKEND_SYSTEM_API struct kan_context_system_api_t KAN_CONTEXT_SYSTEM_API_NAME (
+    render_backend_system_t) = {
     .name = KAN_CONTEXT_RENDER_BACKEND_SYSTEM_NAME,
     .create = render_backend_system_create,
     .connect = render_backend_system_connect,

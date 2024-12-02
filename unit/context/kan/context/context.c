@@ -365,6 +365,16 @@ kan_context_system_t kan_context_query (kan_context_t handle, const char *system
     return KAN_HANDLE_SET_INVALID (kan_context_system_t);
 }
 
+kan_context_system_t kan_context_query_no_connect (kan_context_t handle, const char *system_name)
+{
+    struct context_t *context = KAN_HANDLE_GET (handle);
+    KAN_ASSERT (context->state == CONTEXT_STATE_CONNECTION)
+
+    const kan_interned_string_t interned_system_name = kan_string_intern (system_name);
+    struct system_instance_node_t *node = context_query_system (context, interned_system_name);
+    return node ? node->instance : KAN_HANDLE_SET_INVALID (kan_context_system_t);
+}
+
 void kan_context_destroy (kan_context_t handle)
 {
     struct context_t *context = KAN_HANDLE_GET (handle);

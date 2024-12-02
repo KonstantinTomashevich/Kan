@@ -4,7 +4,7 @@ concrete_sources ("*.c")
 concrete_require (SCOPE PUBLIC CONCRETE_INTERFACE context universe)
 concrete_require (
         SCOPE PRIVATE
-        ABSTRACT cpu_profiler error log memory precise_time
+        ABSTRACT context_hot_reload_coordination_system cpu_profiler error log memory precise_time
         CONCRETE_INTERFACE context_reflection_system context_update_system context_virtual_file_system serialization)
 
 register_context_system (NAME universe_world_definition_system_t)

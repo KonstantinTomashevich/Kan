@@ -1,5 +1,15 @@
 register_abstract (platform)
 abstract_include ("${CMAKE_CURRENT_SOURCE_DIR}")
 abstract_require (INTERFACE api_common)
-abstract_register_implementation (NAME sdl PARTS platform_sdl)
+abstract_register_implementation (NAME sdl PARTS platform_reflection platform_sdl)
+
 c_interface_scanner_setup (GLOB "*.h")
+reflection_generator_setup (GLOB "*.h")
+reflection_generator_get_output_file_path (REFLECTION_GENERATOR_OUTPUT_FILE_PATH)
+
+register_concrete (platform_reflection)
+concrete_include (PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
+concrete_sources_direct ("${REFLECTION_GENERATOR_OUTPUT_FILE_PATH}")
+concrete_require (SCOPE PUBLIC ABSTRACT platform reflection)
+concrete_require (SCOPE PRIVATE ABSTRACT error CONCRETE_INTERFACE container)
+register_unit_reflection_with_name (platform)

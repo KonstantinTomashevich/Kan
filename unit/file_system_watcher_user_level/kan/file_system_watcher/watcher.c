@@ -53,6 +53,12 @@ struct watcher_t
     struct kan_file_system_path_container_t path_container;
 };
 
+struct wait_up_to_date_queue_item_t
+{
+    struct wait_up_to_date_queue_item_t *next;
+    struct kan_atomic_int_t is_everything_up_to_date;
+};
+
 static kan_bool_t statics_initialized = KAN_FALSE;
 static struct kan_atomic_int_t statics_initialization_lock = {.value = 0};
 
@@ -63,6 +69,7 @@ static kan_allocation_group_t event_allocation_group;
 static struct kan_atomic_int_t server_thread_access_lock;
 static kan_bool_t server_thread_running = KAN_FALSE;
 struct watcher_t *serve_queue = NULL;
+struct wait_up_to_date_queue_item_t *wait_up_to_date_queue = NULL;
 
 static void ensure_statics_initialized (void)
 {
@@ -657,7 +664,7 @@ static int server_thread (void *user_data)
         kan_atomic_int_unlock (&server_thread_access_lock);
 
         // We've captured serve queue value in watcher and there is no one who changes next pointers.
-        // Therefore we can safely iterate and serve watchers.
+        // Therefore, we can safely iterate and serve watchers.
 
         const kan_time_size_t serve_start = kan_precise_time_get_elapsed_nanoseconds ();
         while (watcher)
@@ -667,6 +674,17 @@ static int server_thread (void *user_data)
             watcher = watcher->next_watcher;
         }
 
+        kan_atomic_int_lock (&server_thread_access_lock);
+        struct wait_up_to_date_queue_item_t *wait_item = wait_up_to_date_queue;
+        wait_up_to_date_queue = NULL;
+
+        while (wait_item)
+        {
+            kan_atomic_int_set (&wait_item->is_everything_up_to_date, 1);
+            wait_item = wait_item->next;
+        }
+
+        kan_atomic_int_unlock (&server_thread_access_lock);
         const kan_time_size_t serve_end = kan_precise_time_get_elapsed_nanoseconds ();
         const kan_time_offset_t serve_time = (kan_time_offset_t) (serve_end - serve_start);
 
@@ -777,4 +795,22 @@ void kan_file_system_watcher_iterator_destroy (kan_file_system_watcher_t watcher
 
     watcher_cleanup_events (watcher_data);
     kan_atomic_int_unlock (&watcher_data->event_queue_lock);
+}
+
+void kan_file_system_watcher_ensure_all_watchers_are_up_to_date (void)
+{
+    struct wait_up_to_date_queue_item_t item = {
+        .next = NULL,
+        .is_everything_up_to_date = kan_atomic_int_init (0),
+    };
+
+    kan_atomic_int_lock (&server_thread_access_lock);
+    item.next = wait_up_to_date_queue;
+    wait_up_to_date_queue = &item;
+    kan_atomic_int_unlock (&server_thread_access_lock);
+
+    while (kan_atomic_int_get (&item.is_everything_up_to_date) == 0)
+    {
+        kan_precise_time_sleep (KAN_FILE_SYSTEM_WATCHER_UL_WAKE_UP_DELTA_NS);
+    }
 }

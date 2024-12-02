@@ -17,7 +17,6 @@ kan_context_t kan_application_create_resource_tool_context (const struct kan_app
 
     struct kan_plugin_system_config_t plugin_system_config;
     kan_plugin_system_config_init (&plugin_system_config);
-    plugin_system_config.enable_hot_reload = KAN_FALSE;
 
     struct kan_file_system_path_container_t path_container;
     kan_file_system_path_container_copy_string (&path_container, executable_path);

@@ -12,7 +12,7 @@ foreach (IMPLEMENTATION ${MEMORY_IMPLEMENTATIONS})
             SCOPE PUBLIC
             ABSTRACT
             cpu_dispatch=${IMPLEMENTATION} cpu_profiler=default error=sdl hash=djb2 log=kan memory=kan
-            memory_profiler=default
+            memory_profiler=default reflection=kan
             platform=sdl precise_time=sdl threading=sdl
 
             CONCRETE container testing test_cpu_dispatch)

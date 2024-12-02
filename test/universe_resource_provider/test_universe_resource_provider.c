@@ -6,6 +6,7 @@
 #include <stdio.h>
 
 #include <kan/context/all_system_names.h>
+#include <kan/context/hot_reload_coordination_system.h>
 #include <kan/context/reflection_system.h>
 #include <kan/context/universe_system.h>
 #include <kan/context/update_system.h>
@@ -964,10 +965,21 @@ TEST_UNIVERSE_RESOURCE_PROVIDER_API void kan_universe_mutator_execute_indexed_st
     KAN_UP_MUTATOR_RETURN;
 }
 
-static kan_context_t setup_context (void)
+static kan_context_t setup_context (kan_bool_t with_hot_reload)
 {
     kan_context_t context =
         kan_context_create (kan_allocation_group_get_child (kan_allocation_group_root (), "context"));
+
+    if (with_hot_reload)
+    {
+        struct kan_hot_reload_coordination_system_config_t hot_reload_config;
+        kan_hot_reload_coordination_system_config_init (&hot_reload_config);
+        hot_reload_config.initial_mode = KAN_HOT_RELOAD_MODE_AUTOMATIC_INDEPENDENT;
+
+        KAN_TEST_CHECK (
+            kan_context_request_system (context, KAN_CONTEXT_HOT_RELOAD_COORDINATION_SYSTEM_NAME, &hot_reload_config))
+    }
+
     KAN_TEST_CHECK (kan_context_request_system (context, KAN_CONTEXT_REFLECTION_SYSTEM_NAME, NULL))
     KAN_TEST_CHECK (kan_context_request_system (context, KAN_CONTEXT_UNIVERSE_SYSTEM_NAME, NULL))
     KAN_TEST_CHECK (kan_context_request_system (context, KAN_CONTEXT_UPDATE_SYSTEM_NAME, NULL))
@@ -1012,10 +1024,7 @@ static void run_request_resources_and_check_test (kan_context_t context)
     struct kan_resource_provider_configuration_t resource_provider_configuration = {
         .scan_budget_ns = 2000000u,
         .load_budget_ns = 2000000u,
-        .add_wait_time_ns = 100000000u,
-        .modify_wait_time_ns = 100000000u,
         .use_load_only_string_registry = KAN_TRUE,
-        .observe_file_system = KAN_FALSE,
         .resource_directory_path = kan_string_intern (WORKSPACE_MOUNT_PATH),
     };
 
@@ -1065,7 +1074,7 @@ static void run_request_resources_and_check_test (kan_context_t context)
 KAN_TEST_CASE (binary)
 {
     kan_file_system_remove_directory_with_content (WORKSPACE_SUB_DIRECTORY);
-    kan_context_t context = setup_context ();
+    kan_context_t context = setup_context (KAN_FALSE);
     kan_context_system_t reflection_system = kan_context_query (context, KAN_CONTEXT_REFLECTION_SYSTEM_NAME);
     KAN_TEST_ASSERT (KAN_HANDLE_IS_VALID (reflection_system))
 
@@ -1077,7 +1086,7 @@ KAN_TEST_CASE (binary)
 KAN_TEST_CASE (binary_with_index)
 {
     kan_file_system_remove_directory_with_content (WORKSPACE_SUB_DIRECTORY);
-    kan_context_t context = setup_context ();
+    kan_context_t context = setup_context (KAN_FALSE);
     kan_context_system_t reflection_system = kan_context_query (context, KAN_CONTEXT_REFLECTION_SYSTEM_NAME);
     KAN_TEST_ASSERT (KAN_HANDLE_IS_VALID (reflection_system))
 
@@ -1089,7 +1098,7 @@ KAN_TEST_CASE (binary_with_index)
 KAN_TEST_CASE (binary_with_index_and_string_registry)
 {
     kan_file_system_remove_directory_with_content (WORKSPACE_SUB_DIRECTORY);
-    kan_context_t context = setup_context ();
+    kan_context_t context = setup_context (KAN_FALSE);
     kan_context_system_t reflection_system = kan_context_query (context, KAN_CONTEXT_REFLECTION_SYSTEM_NAME);
     KAN_TEST_ASSERT (KAN_HANDLE_IS_VALID (reflection_system))
 
@@ -1101,7 +1110,7 @@ KAN_TEST_CASE (binary_with_index_and_string_registry)
 KAN_TEST_CASE (readable_data)
 {
     kan_file_system_remove_directory_with_content (WORKSPACE_SUB_DIRECTORY);
-    kan_context_t context = setup_context ();
+    kan_context_t context = setup_context (KAN_FALSE);
     kan_context_system_t reflection_system = kan_context_query (context, KAN_CONTEXT_REFLECTION_SYSTEM_NAME);
     KAN_TEST_ASSERT (KAN_HANDLE_IS_VALID (reflection_system))
 
@@ -1113,7 +1122,7 @@ KAN_TEST_CASE (readable_data)
 KAN_TEST_CASE (readable_data_with_index)
 {
     kan_file_system_remove_directory_with_content (WORKSPACE_SUB_DIRECTORY);
-    kan_context_t context = setup_context ();
+    kan_context_t context = setup_context (KAN_FALSE);
     kan_context_system_t reflection_system = kan_context_query (context, KAN_CONTEXT_REFLECTION_SYSTEM_NAME);
     KAN_TEST_ASSERT (KAN_HANDLE_IS_VALID (reflection_system))
 
@@ -1127,7 +1136,7 @@ KAN_TEST_CASE (file_system_observation)
     initialize_resources ();
     kan_file_system_remove_directory_with_content (WORKSPACE_SUB_DIRECTORY);
     kan_file_system_make_directory (WORKSPACE_SUB_DIRECTORY);
-    kan_context_t context = setup_context ();
+    kan_context_t context = setup_context (KAN_TRUE);
 
     kan_context_system_t reflection_system = kan_context_query (context, KAN_CONTEXT_REFLECTION_SYSTEM_NAME);
     KAN_TEST_ASSERT (KAN_HANDLE_IS_VALID (reflection_system))
@@ -1150,10 +1159,7 @@ KAN_TEST_CASE (file_system_observation)
     struct kan_resource_provider_configuration_t resource_provider_configuration = {
         .scan_budget_ns = 2000000u,
         .load_budget_ns = 2000000u,
-        .add_wait_time_ns = 100000000u,
-        .modify_wait_time_ns = 100000000u,
         .use_load_only_string_registry = KAN_TRUE,
-        .observe_file_system = KAN_TRUE,
         .resource_directory_path = kan_string_intern (WORKSPACE_MOUNT_PATH),
     };
 
@@ -1207,7 +1213,7 @@ KAN_TEST_CASE (indexing_stress_test)
     initialize_resources ();
     kan_file_system_remove_directory_with_content (WORKSPACE_SUB_DIRECTORY);
     kan_file_system_make_directory (WORKSPACE_SUB_DIRECTORY);
-    kan_context_t context = setup_context ();
+    kan_context_t context = setup_context (KAN_FALSE);
 
     kan_context_system_t reflection_system = kan_context_query (context, KAN_CONTEXT_REFLECTION_SYSTEM_NAME);
     KAN_TEST_ASSERT (KAN_HANDLE_IS_VALID (reflection_system))
@@ -1231,10 +1237,7 @@ KAN_TEST_CASE (indexing_stress_test)
     struct kan_resource_provider_configuration_t resource_provider_configuration = {
         .scan_budget_ns = 2000000u,
         .load_budget_ns = 2000000u,
-        .add_wait_time_ns = 100000000u,
-        .modify_wait_time_ns = 100000000u,
         .use_load_only_string_registry = KAN_TRUE,
-        .observe_file_system = KAN_TRUE,
         .resource_directory_path = kan_string_intern (WORKSPACE_MOUNT_PATH),
     };
 
