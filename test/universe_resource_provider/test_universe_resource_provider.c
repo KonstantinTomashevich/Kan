@@ -453,8 +453,13 @@ static void setup_binary_workspace (kan_reflection_registry_t registry,
     kan_serialization_binary_script_storage_destroy (storage);
 }
 
+// TODO: Temp for debug on CI.
+#include <stdio.h>
+
 static void save_rd (const char *path, void *instance, kan_interned_string_t type, kan_reflection_registry_t registry)
 {
+    fprintf (stderr, "SAVING RD %s", path);
+
     struct kan_stream_t *stream = kan_direct_file_stream_open_for_write (path, KAN_TRUE);
     KAN_TEST_ASSERT (stream)
     KAN_TEST_ASSERT (kan_serialization_rd_write_type_header (stream, type))
