@@ -749,9 +749,6 @@ TEST_UNIVERSE_RESOURCE_REFERENCE_API void kan_universe_mutator_execute_outer_ref
     case OUTER_REFERENCE_CACHING_TEST_STAGE_SECOND_SCAN_DONE:
     {
         // Overwrite prototype to change file and expect cache to be invalidated.
-        // One ms sleeps are added to make sure that there is no error due to missed cache invalidation.
-        kan_precise_time_sleep (1000000u);
-
         save_prototype_2 (state->registry, WORKSPACE_RESOURCES_SUB_DIRECTORY "/prototype_1.rd");
         global_test_request_hot_reload = KAN_TRUE;
         state->stage = OUTER_REFERENCE_CACHING_TEST_STAGE_CHANGED_WAITING_FOR_CHANGE_DETECTION;
