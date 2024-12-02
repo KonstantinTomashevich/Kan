@@ -55,8 +55,6 @@ jobs:
             os: windows-2022
             build_type: Release
 
-# TODO: Do not forget to add descriptors to cmake preset file.
-
     defaults:
       run:
         shell: pwsh

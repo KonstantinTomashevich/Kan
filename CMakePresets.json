@@ -8,6 +8,7 @@
   "configurePresets": [
     {
       "name": "debug",
+      "description": "Mixin with configuration with debug features enabled for development.",
       "hidden": true,
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
@@ -27,6 +28,7 @@
     },
     {
       "name": "release",
+      "description": "Mixin with configuration with everything unnecessary for release disabled.",
       "hidden": true,
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
@@ -46,18 +48,21 @@
     },
     {
       "name": "linux",
+      "description": "Mixin with common configuration for linux builds.",
       "hidden": true,
       "generator": "Ninja Multi-Config",
       "binaryDir": "${sourceDir}/build/${presetName}"
     },
     {
       "name": "windows",
+      "description": "Mixin with common configuration for windows builds.",
       "hidden": true,
       "generator": "Visual Studio 17 2022",
       "binaryDir": "${sourceDir}/build/${presetName}"
     },
     {
       "name": "linux_gcc",
+      "description": "Mixin with common configuration for linux builds using gcc.",
       "inherits": [
         "linux"
       ],
@@ -69,6 +74,7 @@
     },
     {
       "name": "linux_clang",
+      "description": "Mixin with common configuration for linux builds using clang.",
       "inherits": [
         "linux"
       ],
@@ -80,6 +86,7 @@
     },
     {
       "name": "windows_msvc",
+      "description": "Mixin with common configuration for windows builds using msvc.",
       "inherits": [
         "windows"
       ],
@@ -95,6 +102,7 @@
     },
     {
       "name": "windows_clang",
+      "description": "Mixin with common configuration for windows builds using clang-cl.",
       "inherits": [
         "windows"
       ],
@@ -110,6 +118,7 @@
     },
     {
       "name": "gcc_x32",
+      "description": "Mixin that enforces x32 compilation on linux using gcc.",
       "hidden": true,
       "cacheVariables": {
         "KAN_CORE_TYPES_PRESET": "x32",
@@ -123,6 +132,7 @@
         "debug",
         "linux_gcc"
       ],
+      "description": "Full configuration for debug build on linux using gcc.",
       "condition": {
         "type": "equals",
         "lhs": "${hostSystemName}",
@@ -131,6 +141,7 @@
     },
     {
       "name": "debug_linux_gcc_x32",
+      "description": "Full configuration for debug build on linux using gcc in x32 mode.",
       "inherits": [
         "debug",
         "linux_gcc",
@@ -144,6 +155,7 @@
     },
     {
       "name": "debug_linux_clang",
+      "description": "Full configuration for debug build on linux using clang.",
       "inherits": [
         "debug",
         "linux_clang"
@@ -156,6 +168,7 @@
     },
     {
       "name": "sanitize_linux_clang",
+      "description": "Full configuration for debug build on linux using clang with address sanitizer.",
       "inherits": [
         "debug",
         "linux_clang"
@@ -171,6 +184,7 @@
     },
     {
       "name": "debug_windows_msvc",
+      "description": "Full configuration for debug build on windows using msvc.",
       "inherits": [
         "debug",
         "windows_msvc"
@@ -183,6 +197,7 @@
     },
     {
       "name": "debug_windows_clang",
+      "description": "Full configuration for debug build on windows using clang-cl.",
       "inherits": [
         "debug",
         "windows_clang"
@@ -195,6 +210,7 @@
     },
     {
       "name": "release_linux_gcc",
+      "description": "Full configuration for release build on linux using gcc.",
       "inherits": [
         "release",
         "linux_gcc"
@@ -207,6 +223,7 @@
     },
     {
       "name": "release_linux_gcc_x32",
+      "description": "Full configuration for release build on linux using gcc in x32 mode.",
       "inherits": [
         "release",
         "linux_gcc",
@@ -220,6 +237,7 @@
     },
     {
       "name": "release_linux_clang",
+      "description": "Full configuration for release build on linux using clang.",
       "inherits": [
         "release",
         "linux_clang"
@@ -232,6 +250,7 @@
     },
     {
       "name": "release_windows_msvc",
+      "description": "Full configuration for release build on windows using msvc.",
       "inherits": [
         "release",
         "windows_msvc"
@@ -244,6 +263,7 @@
     },
     {
       "name": "release_windows_clang",
+      "description": "Full configuration for release build on windows using clang-cl.",
       "inherits": [
         "release",
         "windows_clang"
