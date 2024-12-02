@@ -458,7 +458,7 @@ static void setup_binary_workspace (kan_reflection_registry_t registry,
 
 static void save_rd (const char *path, void *instance, kan_interned_string_t type, kan_reflection_registry_t registry)
 {
-    fprintf (stderr, "SAVING RD %s", path);
+    fprintf (stderr, "SAVING RD %s\n", path);
 
     struct kan_stream_t *stream = kan_direct_file_stream_open_for_write (path, KAN_TRUE);
     KAN_TEST_ASSERT (stream)
