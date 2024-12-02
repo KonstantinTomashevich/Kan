@@ -725,9 +725,6 @@ TEST_UNIVERSE_RESOURCE_PROVIDER_API void kan_universe_mutator_execute_check_obse
                         }
 
                         KAN_TEST_CHECK (container_found)
-                        // One ms sleeps are added to make sure that there is no error due to missed file change.
-                        kan_precise_time_sleep (1000000u);
-
                         // Then we can rewrite alpha and wait for reload.
                         save_rd (WORKSPACE_SUB_DIRECTORY "/alpha.rd", &resource_beta,
                                  kan_string_intern ("first_resource_type_t"), state->current_registry);
@@ -765,9 +762,6 @@ TEST_UNIVERSE_RESOURCE_PROVIDER_API void kan_universe_mutator_execute_check_obse
                         }
 
                         KAN_TEST_CHECK (container_found)
-                        // One ms sleeps are added to make sure that there is no error due to missed file change.
-                        kan_precise_time_sleep (1000000u);
-
                         // Then we can rewrite alpha and wait for reload again.
                         save_rd (WORKSPACE_SUB_DIRECTORY "/alpha.rd", &resource_characters,
                                  kan_string_intern ("second_resource_type_t"), state->current_registry);
@@ -809,9 +803,6 @@ TEST_UNIVERSE_RESOURCE_PROVIDER_API void kan_universe_mutator_execute_check_obse
                             }
 
                             KAN_TEST_CHECK (container_found)
-                            // One ms sleeps are added to make sure that there is no error due to missed file change.
-                            kan_precise_time_sleep (1000000u);
-
                             // Then we can remove alpha.
                             kan_file_system_remove_file (WORKSPACE_SUB_DIRECTORY "/alpha.rd");
 
@@ -861,9 +852,6 @@ TEST_UNIVERSE_RESOURCE_PROVIDER_API void kan_universe_mutator_execute_check_obse
                                                 sizeof (resource_test_third_party)) == 0)
 
                         singleton->stage = CHECK_OBSERVATION_AND_RELOAD_STAGE_CHANGE_THIRD_PARTY;
-                        // One ms sleeps are added to make sure that there is no error due to missed file change.
-                        kan_precise_time_sleep (1000000u);
-
                         save_third_party (WORKSPACE_SUB_DIRECTORY "/test_third_party.data",
                                           (uint8_t *) resource_test_third_party_changed,
                                           sizeof (resource_test_third_party_changed));
@@ -984,12 +972,12 @@ static kan_context_t setup_context (kan_bool_t with_hot_reload)
     kan_context_t context =
         kan_context_create (kan_allocation_group_get_child (kan_allocation_group_root (), "context"));
 
+    struct kan_hot_reload_coordination_system_config_t hot_reload_config;
+    kan_hot_reload_coordination_system_config_init (&hot_reload_config);
+    hot_reload_config.initial_mode = KAN_HOT_RELOAD_MODE_AUTOMATIC_INDEPENDENT;
+
     if (with_hot_reload)
     {
-        struct kan_hot_reload_coordination_system_config_t hot_reload_config;
-        kan_hot_reload_coordination_system_config_init (&hot_reload_config);
-        hot_reload_config.initial_mode = KAN_HOT_RELOAD_MODE_AUTOMATIC_INDEPENDENT;
-
         KAN_TEST_CHECK (
             kan_context_request_system (context, KAN_CONTEXT_HOT_RELOAD_COORDINATION_SYSTEM_NAME, &hot_reload_config))
     }

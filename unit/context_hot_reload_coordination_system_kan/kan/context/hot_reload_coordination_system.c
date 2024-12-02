@@ -27,21 +27,18 @@ kan_context_system_t hot_reload_coordination_system_create (kan_allocation_group
         group, sizeof (struct hot_reload_coordination_system_t), _Alignof (struct hot_reload_coordination_system_t));
     system->group = group;
 
-    if (user_config)
+    struct kan_hot_reload_coordination_system_config_t default_config;
+    struct kan_hot_reload_coordination_system_config_t *config = user_config;
+
+    if (!config)
     {
-        struct kan_hot_reload_coordination_system_config_t *config = user_config;
-        system->current_mode = config->initial_mode;
-        system->automatic_config = config->automatic_independent;
-        system->on_request_config = config->on_request;
-    }
-    else
-    {
-        struct kan_hot_reload_coordination_system_config_t default_config;
         kan_hot_reload_coordination_system_config_init (&default_config);
-        system->current_mode = default_config.initial_mode;
-        system->automatic_config = default_config.automatic_independent;
-        system->on_request_config = default_config.on_request;
+        config = &default_config;
     }
+
+    system->current_mode = config->initial_mode;
+    system->automatic_config = config->automatic_independent;
+    system->on_request_config = config->on_request;
 
     system->hot_swap_requested = KAN_FALSE;
     system->hot_swap = KAN_FALSE;
