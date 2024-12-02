@@ -675,8 +675,7 @@ static int server_thread (void *user_data)
         {
             KAN_ASSERT (watcher->root_directory)
             KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, file_system_watcher, KAN_LOG_ERROR,
-                                 "Running file system watcher at \"%s\".",
-                                 watcher->path_container.path)
+                                 "Running file system watcher at \"%s\".", watcher->path_container.path)
             verification_poll_at_directory_recursive (watcher, watcher->root_directory);
             watcher = watcher->next_watcher;
         }
