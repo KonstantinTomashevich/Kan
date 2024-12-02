@@ -1716,6 +1716,7 @@ static inline void process_file_addition (struct resource_provider_state_t *stat
 
     if (request_count > 0u)
     {
+        // TODO: Seems wrong, need to insert instead of update?
         if (scan_result.type)
         {
             KAN_UP_VALUE_UPDATE (entry, kan_resource_native_entry_t, name, &scan_result.name)
@@ -2462,6 +2463,9 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void mutator_template_execute_resource_provid
                 while ((event = kan_virtual_file_system_watcher_iterator_get (private->resource_watcher,
                                                                               private->resource_watcher_iterator)))
                 {
+                    KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, universe_resource_provider,
+                                         KAN_LOG_ERROR, "XTEMP Checking even %s", event->path_container.path)
+
                     if (event->entry_type == KAN_VIRTUAL_FILE_SYSTEM_ENTRY_TYPE_FILE)
                     {
                         switch (event->event_type)
