@@ -2425,6 +2425,9 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void mutator_template_execute_resource_provid
                         KAN_HOT_RELOAD_MODE_DISABLED)
                 {
                     volume = kan_virtual_file_system_get_context_volume_for_write (state->virtual_file_system);
+
+                    KAN_LOG (universe_resource_provider, KAN_LOG_ERROR, "CREATING RESOURCE WATCHER");
+
                     private->resource_watcher =
                         kan_virtual_file_system_watcher_create (volume, state->resource_directory_path);
                     private->resource_watcher_iterator =
