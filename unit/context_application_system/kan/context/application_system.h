@@ -289,7 +289,7 @@ CONTEXT_APPLICATION_SYSTEM_API void kan_application_window_set_focusable (kan_co
                                                                           kan_application_system_window_t window_handle,
                                                                           kan_bool_t focusable);
 
-/// \brief Informs system that there is logical component that expects text input in given window.
+/// \brief Informs system that there is a logical component that expects text input in given window.
 /// \details If it is the only listener, causes on screen keyboard to show up on systems that need it.
 CONTEXT_APPLICATION_SYSTEM_API void kan_application_window_add_text_listener (
     kan_context_system_t system_handle, kan_application_system_window_t window_handle);

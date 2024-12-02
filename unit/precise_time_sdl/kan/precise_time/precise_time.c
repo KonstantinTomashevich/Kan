@@ -15,7 +15,7 @@ kan_time_size_t kan_precise_time_get_elapsed_nanoseconds (void)
 kan_time_size_t kan_precise_time_get_epoch_nanoseconds_utc (void)
 {
     SDL_Time output;
-    if (SDL_GetCurrentTime (&output) == 0)
+    if (SDL_GetCurrentTime (&output))
     {
         return (kan_time_size_t) output;
     }

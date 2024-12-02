@@ -18,7 +18,7 @@
 /// - It scans resource directory for resources and registers found resources. Resources indices and accompanying
 ///   string registries are taken into account when found.
 /// - If hot reload is enabled, it continues to monitor resource directory for changes and updates internal data
-///   according to file system changes. Modified resources are automatically reloaded.
+///   according to file system changes. Modified resources are automatically reloaded if it is allowed.
 /// - It manages resource loading and unloading through requests system. Requests are automatically updated with the
 ///   newest possible data.
 ///

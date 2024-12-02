@@ -18,7 +18,7 @@ define_property (TARGET PROPERTY CONTEXT_SYSTEMS
 # Informs build system that current unit exports system with given name to the context.
 # Arguments:
 # - NAME: System name for the registration.
-# - PRIVATE: Flag, when it is passed system is excluded from all system names header generation.
+# - PRIVATE: Flag that excludes system from all system names header generation when passed.
 function (register_context_system)
     cmake_parse_arguments (ARG "PRIVATE" "NAME" "" ${ARGV})
     if (DEFINED ARG_UNPARSED_ARGUMENTS OR NOT DEFINED ARG_NAME)

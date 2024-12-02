@@ -433,7 +433,7 @@ PLATFORM_API void kan_platform_application_window_set_focusable (kan_platform_wi
 
 /// \brief Sets whether window has text input enabled and receives text input events.
 /// \details On desktop, it only changes whether text input events are received.
-///          On mobile and console, it also controls on screen keyboard.
+///          On mobile and console, it also controls onscreen keyboard.
 PLATFORM_API kan_bool_t kan_platform_application_window_set_text_input_enabled (kan_platform_window_id_t window_id,
                                                                                 kan_bool_t enabled);
 

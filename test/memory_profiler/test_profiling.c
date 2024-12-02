@@ -70,6 +70,7 @@ KAN_TEST_CASE (group_capture)
         root_iterator = kan_captured_allocation_group_children_next (root_iterator);
     }
 
+    KAN_TEST_ASSERT (KAN_HANDLE_IS_VALID (test_root_captured))
     KAN_TEST_CHECK (kan_captured_allocation_group_get_directly_allocated (test_root_captured) == 0u)
     KAN_TEST_CHECK (kan_captured_allocation_group_get_total_allocated (test_root_captured) == 1050u)
 

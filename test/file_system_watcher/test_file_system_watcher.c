@@ -20,11 +20,6 @@ static kan_bool_t write_text_file (const char *file, const char *content)
     return result;
 }
 
-static void give_some_time_for_poll (void)
-{
-    kan_precise_time_sleep (300000000u); // 300ms
-}
-
 KAN_TEST_CASE (add_file)
 {
     KAN_TEST_ASSERT (kan_file_system_make_directory ("test_directory"))
@@ -35,11 +30,11 @@ KAN_TEST_CASE (add_file)
 
     kan_file_system_watcher_t watcher = kan_file_system_watcher_create ("test_directory/watched");
     kan_file_system_watcher_iterator_t iterator = kan_file_system_watcher_iterator_create (watcher);
-    give_some_time_for_poll ();
+    kan_file_system_watcher_ensure_all_watchers_are_up_to_date ();
 
     KAN_TEST_ASSERT (write_text_file ("test_directory/watched/test3.txt", "New file"))
     KAN_TEST_ASSERT (write_text_file ("test_directory/test3.txt", "Should be ignored"))
-    give_some_time_for_poll ();
+    kan_file_system_watcher_ensure_all_watchers_are_up_to_date ();
 
     const struct kan_file_system_watcher_event_t *event = kan_file_system_watcher_iterator_get (watcher, iterator);
     KAN_TEST_ASSERT (event)
@@ -74,11 +69,11 @@ KAN_TEST_CASE (modify_file)
 
     kan_file_system_watcher_t watcher = kan_file_system_watcher_create ("test_directory/watched");
     kan_file_system_watcher_iterator_t iterator = kan_file_system_watcher_iterator_create (watcher);
-    give_some_time_for_poll ();
+    kan_file_system_watcher_ensure_all_watchers_are_up_to_date ();
 
     KAN_TEST_ASSERT (write_text_file ("test_directory/watched/test2.txt", "New content"))
     KAN_TEST_ASSERT (write_text_file ("test_directory/test3.txt", "Should be ignored"))
-    give_some_time_for_poll ();
+    kan_file_system_watcher_ensure_all_watchers_are_up_to_date ();
 
     const struct kan_file_system_watcher_event_t *event = kan_file_system_watcher_iterator_get (watcher, iterator);
     KAN_TEST_ASSERT (event)
@@ -113,11 +108,11 @@ KAN_TEST_CASE (delete_file)
 
     kan_file_system_watcher_t watcher = kan_file_system_watcher_create ("test_directory/watched");
     kan_file_system_watcher_iterator_t iterator = kan_file_system_watcher_iterator_create (watcher);
-    give_some_time_for_poll ();
+    kan_file_system_watcher_ensure_all_watchers_are_up_to_date ();
 
     KAN_TEST_ASSERT (kan_file_system_remove_file ("test_directory/watched/test2.txt"))
     KAN_TEST_ASSERT (write_text_file ("test_directory/test3.txt", "Should be ignored"))
-    give_some_time_for_poll ();
+    kan_file_system_watcher_ensure_all_watchers_are_up_to_date ();
 
     const struct kan_file_system_watcher_event_t *event = kan_file_system_watcher_iterator_get (watcher, iterator);
     KAN_TEST_ASSERT (event)
@@ -143,12 +138,12 @@ KAN_TEST_CASE (add_directory)
 
     kan_file_system_watcher_t watcher = kan_file_system_watcher_create ("test_directory/watched");
     kan_file_system_watcher_iterator_t iterator = kan_file_system_watcher_iterator_create (watcher);
-    give_some_time_for_poll ();
+    kan_file_system_watcher_ensure_all_watchers_are_up_to_date ();
 
     KAN_TEST_ASSERT (kan_file_system_make_directory ("test_directory/watched/sub"))
     KAN_TEST_ASSERT (write_text_file ("test_directory/watched/sub/1.txt", "Hello, world!"))
     KAN_TEST_ASSERT (write_text_file ("test_directory/watched/sub/2.txt", "Hello, world!"))
-    give_some_time_for_poll ();
+    kan_file_system_watcher_ensure_all_watchers_are_up_to_date ();
 
     kan_bool_t add_sub_found = KAN_FALSE;
     kan_bool_t add_sub_1_found = KAN_FALSE;
@@ -225,10 +220,10 @@ KAN_TEST_CASE (remove_directory)
 
     kan_file_system_watcher_t watcher = kan_file_system_watcher_create ("test_directory/watched");
     kan_file_system_watcher_iterator_t iterator = kan_file_system_watcher_iterator_create (watcher);
-    give_some_time_for_poll ();
+    kan_file_system_watcher_ensure_all_watchers_are_up_to_date ();
 
     KAN_TEST_ASSERT (kan_file_system_remove_directory_with_content ("test_directory/watched/sub"))
-    give_some_time_for_poll ();
+    kan_file_system_watcher_ensure_all_watchers_are_up_to_date ();
 
     kan_bool_t remove_sub_found = KAN_FALSE;
     kan_bool_t remove_sub_1_found = KAN_FALSE;

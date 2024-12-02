@@ -456,7 +456,7 @@ struct ray_target_t
     kan_bool_t out_of_bounds;
 };
 
-#define FUNCTION_GET_RAT_TARGET_IN_DIMENSION(DIRECTION_NAME, DIRECTION_SIGN)                                           \
+#define FUNCTION_GET_RAY_TARGET_IN_DIMENSION(DIRECTION_NAME, DIRECTION_SIGN)                                           \
     static inline struct ray_target_t get_ray_##DIRECTION_NAME##_in_dimension (                                        \
         struct kan_space_tree_ray_iterator_t *iterator, kan_space_tree_road_t dimension_index,                         \
         kan_space_tree_road_t height_mask, kan_space_tree_road_t height_to_root_mask)                                  \
@@ -513,9 +513,9 @@ struct ray_target_t
         return result;                                                                                                 \
     }
 
-FUNCTION_GET_RAT_TARGET_IN_DIMENSION (next, +)
-FUNCTION_GET_RAT_TARGET_IN_DIMENSION (previous, -)
-#undef FUNCTION_GET_RAT_TARGET_IN_DIMENSION
+FUNCTION_GET_RAY_TARGET_IN_DIMENSION (next, +)
+FUNCTION_GET_RAY_TARGET_IN_DIMENSION (previous, -)
+#undef FUNCTION_GET_RAY_TARGET_IN_DIMENSION
 
 struct ray_target_and_dimension_t
 {

@@ -23,7 +23,7 @@
 ///   coordination system, but do not need hot reload. For release, it is advised to select "none" implementation in
 ///   order to delete hot reload coordination entirely from code base.
 /// - Automatic independent mode allows logical components to hot reload independently whenever they want. It is the
-///   default behavior for most cases.
+///   default behavior for most cases as it is usually very convenient.
 /// - On request mode trigger hot swap on hotkey or on request by code. Hot swap is a special type of hot reload that
 ///   is done by every logical component one after another in one frame, which guarantees absence of incorrect
 ///   intermediate states.
@@ -54,7 +54,7 @@ enum kan_hot_reload_mode_t
 /// \details Enable hotkey is used to switch into this mode.
 struct kan_hot_reload_automatic_config_t
 {
-    /// \brief Safe delay between receiving info about file changes and executing hot reload.
+    /// \brief Safety delay between receiving info about file changes and executing hot reload.
     kan_time_offset_t change_wait_time_ns;
 
     enum kan_platform_scan_code_t enable_hot_key;

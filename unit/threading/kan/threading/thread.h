@@ -53,13 +53,13 @@ KAN_HANDLE_DEFINE (kan_thread_local_storage_t);
 typedef void (*kan_thread_local_storage_destructor_t) (void *);
 
 /// \brief Sets value of thread local storage slot for current thread only. Destructor is executed on thread exit.
-/// \details If storage handle is invalid, then new thread local storage is created.
+/// \details If storage handle is invalid, then new thread local storage is created and handle will point to it.
 THREADING_API void kan_thread_local_storage_set (kan_thread_local_storage_t *storage,
                                                  void *value,
                                                  kan_thread_local_storage_destructor_t destructor);
 
 /// \brief Returns value of thread local storage slot for current thread.
-/// \details If storage handle is invalid, then new thread local storage is created.
+/// \details If storage handle is invalid, then new thread local storage is created and handle will point to it.
 THREADING_API void *kan_thread_local_storage_get (kan_thread_local_storage_t *storage);
 
 KAN_C_HEADER_END

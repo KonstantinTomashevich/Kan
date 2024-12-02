@@ -91,7 +91,7 @@ function (add_common_compile_options)
                     -Wno-unused-parameter
                     # Zero length arrays greatly increase readability for classes and structs with dynamic sizes.
                     -Wno-zero-length-array
-                    # For some reason gcc just ignores these mute from pragma macro,
+                    # For some reason gcc just ignores when this warnings are muted through pragma macro,
                     # therefore we're forced to disable it globally.
                     -Wno-unused-variable
                     -Wno-unused-but-set-variable)
