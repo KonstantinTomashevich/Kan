@@ -1773,7 +1773,8 @@ static inline void process_delayed_addition (struct resource_provider_state_t *s
     KAN_UP_INTERVAL_ASCENDING_WRITE (delayed_addition, resource_provider_delayed_file_addition_t,
                                      investigate_after_timer, NULL, &current_timer)
     {
-        KAN_LOG (universe_resource_provider, KAN_LOG_ERROR, "XTEMP Check delayed addition of %s", delayed_addition->path)
+        KAN_LOG (universe_resource_provider, KAN_LOG_ERROR, "XTEMP Check delayed addition of %s",
+                 delayed_addition->path)
         process_file_addition (state, private, delayed_addition->path);
         KAN_UP_ACCESS_DELETE (delayed_addition);
     }
