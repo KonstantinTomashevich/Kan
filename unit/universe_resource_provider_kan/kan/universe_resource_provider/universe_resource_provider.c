@@ -1894,7 +1894,7 @@ static void execute_shared_serve (kan_functor_user_data_t user_data)
         }
 
         if (loading_operation->priority != PRIORITY_HOT_SWAP &&
-             kan_precise_time_get_elapsed_nanoseconds () > state->execution_shared_state.end_time_ns)
+            kan_precise_time_get_elapsed_nanoseconds () > state->execution_shared_state.end_time_ns)
         {
             // Shutdown: no more time.
             kan_repository_indexed_interval_write_access_close (&loading_operation_access);
