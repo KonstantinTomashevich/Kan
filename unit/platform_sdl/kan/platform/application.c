@@ -1,3 +1,4 @@
+#define _CRT_SECURE_NO_WARNINGS
 #include <kan/api_common/mute_warnings.h>
 
 KAN_MUTE_THIRD_PARTY_WARNINGS_BEGIN
@@ -805,8 +806,8 @@ kan_bool_t kan_platform_application_window_enter_fullscreen (kan_platform_window
         return KAN_FALSE;
     }
 
-    if ((uint32_t) closest_mode.format != display_mode->pixel_format || closest_mode.w != (int) display_mode->width ||
-        closest_mode.h != (int) display_mode->height ||
+    if (to_kan_pixel_format (closest_mode.format) != display_mode->pixel_format ||
+        closest_mode.w != (int) display_mode->width || closest_mode.h != (int) display_mode->height ||
         fabs (closest_mode.refresh_rate - display_mode->refresh_rate) > 0.01f ||
         fabs (closest_mode.pixel_density - display_mode->pixel_density) > 0.01f)
     {
