@@ -19,7 +19,9 @@ executable_include (
 
 executable_link_shared_libraries ("${APPLICATION_NAME}_core_library")
 executable_verify ()
-executable_copy_linked_artefacts ()
+# We skip copy step for application launchers as everything should be already copied for core library.
+# Also, copy step for launcher might sometimes conflict we resource builder execution steps,
+# which is another reason to disable unnecessary copy operation here.
 
 set_target_properties ("${PROGRAM}_launcher" PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${LAUNCHER_BINARY_DIRECTORY}")
 

@@ -906,7 +906,7 @@ function (application_generate)
 
     executable_link_shared_libraries ("${APPLICATION_NAME}_core_library")
     executable_verify ()
-    executable_copy_linked_artefacts ()
+    # We skip unnecessary shared library copy step as everything needed should be already copied for core library.
 
     foreach (PLUGIN ${PLUGINS})
         add_dependencies ("${TARGET_NAME}" "${PLUGIN}_dev_copy")
@@ -922,7 +922,7 @@ function (application_generate)
 
     executable_link_shared_libraries ("${APPLICATION_NAME}_core_library")
     executable_verify ()
-    executable_copy_linked_artefacts ()
+    # We skip unnecessary shared library copy step as everything needed should be already copied for core library.
 
     foreach (PLUGIN ${PLUGINS})
         add_dependencies ("${TARGET_NAME}" "${PLUGIN}_dev_copy")
