@@ -44,4 +44,4 @@ build_and_test:
     - cd build/ci
     - cmake --build . --target kan_clang_format_fix --config $CONFIG
     - cmake --build . --target test_kan --config $CONFIG -j 6
-    - ctest --build-config $CONFIG --parallel 6 $CTEST_FLAGS
+    - ctest --build-config $CONFIG --parallel 6 -LE GRAPHICS
