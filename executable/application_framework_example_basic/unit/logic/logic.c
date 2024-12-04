@@ -93,9 +93,9 @@ APPLICATION_FRAMEWORK_EXAMPLE_BASIC_LOGIC_API void kan_universe_mutator_execute_
     {
         if (!KAN_HANDLE_IS_VALID (singleton->window_handle))
         {
-            singleton->window_handle = kan_application_system_window_create (
-                state->application_system_handle, "Title placeholder", 600u, 400u,
-                KAN_PLATFORM_WINDOW_FLAG_SUPPORTS_VULKAN | KAN_PLATFORM_WINDOW_FLAG_RESIZABLE);
+            singleton->window_handle =
+                kan_application_system_window_create (state->application_system_handle, "Title placeholder", 600u, 400u,
+                                                      KAN_PLATFORM_WINDOW_FLAG_SUPPORTS_VULKAN);
             kan_application_system_window_raise (state->application_system_handle, singleton->window_handle);
         }
 
