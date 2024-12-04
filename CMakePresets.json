@@ -115,7 +115,7 @@
       "hidden": true,
       "cacheVariables": {
         "CMAKE_C_COMPILER": "clang-cl",
-        "CMAKE_CXX_COMPILER": "clang-c;"
+        "CMAKE_CXX_COMPILER": "clang-cl"
       }
     },
     {
