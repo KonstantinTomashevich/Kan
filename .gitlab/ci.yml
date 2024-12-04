@@ -18,7 +18,8 @@ build_and_test:
       - PRESET: sanitize_linux_clang
         SYSTEM_TAG: linux
         CONFIG: Debug
-        CTEST_FLAGS: -LE GRAPHICS
+        CTEST_FLAG_0: -LE
+        CTEST_FLAG_1: GRAPHICS
       - PRESET:
           - release_linux_gcc
           - release_linux_gcc_x32
@@ -30,13 +31,15 @@ build_and_test:
           - debug_windows_ninja_clang
         SYSTEM_TAG: windows
         CONFIG: Debug
-        CTEST_FLAGS: -LE GRAPHICS
+        CTEST_FLAG_0: -LE
+        CTEST_FLAG_1: GRAPHICS
       - PRESET:
           - release_windows_ninja_msvc
           - release_windows_ninja_clang
         SYSTEM_TAG: windows
         CONFIG: Release
-        CTEST_FLAGS: -LE GRAPHICS
+        CTEST_FLAG_0: -LE
+        CTEST_FLAG_1: GRAPHICS
   tags:
     - $SYSTEM_TAG
   script:
@@ -44,4 +47,4 @@ build_and_test:
     - cd build/ci
     - cmake --build . --target kan_clang_format_fix --config $CONFIG
     - cmake --build . --target test_kan --config $CONFIG -j 5
-    - ctest --build-config $CONFIG --parallel 5 -LE GRAPHICS
+    - ctest --build-config $CONFIG --parallel 5 --output-on-failure $CTEST_FLAG_0 $CTEST_FLAG_1
