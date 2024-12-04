@@ -25,10 +25,21 @@ build_and_test:
           - release_linux_clang
         SYSTEM_TAG: linux
         CONFIG: Release
+      - PRESET:
+          - debug_windows_ninja_msvc
+          - debug_windows_ninja_clang
+        SYSTEM_TAG: windows
+        CONFIG: Debug
+      - PRESET:
+          - release_windows_ninja_msvc
+          - release_windows_ninja_clang
+        SYSTEM_TAG: windows
+        CONFIG: Release
   tags:
     - $SYSTEM_TAG
   script:
     - cmake --preset $PRESET -B build/ci
     - cd build/ci
+    - cmake --build . --target kan_clang_format_fix --config $CONFIG
     - cmake --build . --target test_kan --config $CONFIG -j 6
     - ctest --build-config $CONFIG --parallel 6 $CTEST_FLAGS

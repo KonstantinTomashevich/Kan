@@ -7,8 +7,17 @@
   },
   "configurePresets": [
     {
+      "name": "base",
+      "description": "Base configuration that is inherited everywhere.",
+      "hidden": true,
+      "binaryDir": "${sourceDir}/build/${presetName}"
+    },
+    {
       "name": "debug",
       "description": "Mixin with configuration with debug features enabled for development.",
+      "inherits": [
+        "base"
+      ],
       "hidden": true,
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
@@ -29,6 +38,9 @@
     {
       "name": "release",
       "description": "Mixin with configuration with everything unnecessary for release disabled.",
+      "inherits": [
+        "base"
+      ],
       "hidden": true,
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
@@ -47,24 +59,22 @@
       }
     },
     {
-      "name": "linux",
-      "description": "Mixin with common configuration for linux builds.",
+      "name": "ninja",
+      "description": "Mixin with common configuration for builds using ninja multi config.",
       "hidden": true,
-      "generator": "Ninja Multi-Config",
-      "binaryDir": "${sourceDir}/build/${presetName}"
+      "generator": "Ninja Multi-Config"
     },
     {
-      "name": "windows",
-      "description": "Mixin with common configuration for windows builds.",
+      "name": "visual_studio",
+      "description": "Mixin with common configuration for builds using visual studio.",
       "hidden": true,
-      "generator": "Visual Studio 17 2022",
-      "binaryDir": "${sourceDir}/build/${presetName}"
+      "generator": "Visual Studio 17 2022"
     },
     {
-      "name": "linux_gcc",
-      "description": "Mixin with common configuration for linux builds using gcc.",
+      "name": "ninja_gcc",
+      "description": "Mixin with common configuration for selecting gcc under ninja.",
       "inherits": [
-        "linux"
+        "ninja"
       ],
       "hidden": true,
       "cacheVariables": {
@@ -73,10 +83,10 @@
       }
     },
     {
-      "name": "linux_clang",
-      "description": "Mixin with common configuration for linux builds using clang.",
+      "name": "ninja_clang",
+      "description": "Mixin with common configuration for selecting clang under ninja.",
       "inherits": [
-        "linux"
+        "ninja"
       ],
       "hidden": true,
       "cacheVariables": {
@@ -85,10 +95,34 @@
       }
     },
     {
-      "name": "windows_msvc",
-      "description": "Mixin with common configuration for windows builds using msvc.",
+      "name": "ninja_msvc",
+      "description": "Mixin with common configuration for selecting msvc under ninja. Requires cl in path!",
       "inherits": [
-        "windows"
+        "ninja"
+      ],
+      "hidden": true,
+      "cacheVariables": {
+        "CMAKE_C_COMPILER": "cl",
+        "CMAKE_CXX_COMPILER": "cl"
+      }
+    },
+    {
+      "name": "ninja_clang_cl",
+      "description": "Mixin with common configuration for selecting clang-cl under ninja. Requires clang-cl in path!",
+      "inherits": [
+        "ninja"
+      ],
+      "hidden": true,
+      "cacheVariables": {
+        "CMAKE_C_COMPILER": "clang-cl",
+        "CMAKE_CXX_COMPILER": "clang-c;"
+      }
+    },
+    {
+      "name": "visual_studio_msvc",
+      "description": "Mixin with common configuration for selecting msvc under visual studio generator.",
+      "inherits": [
+        "visual_studio"
       ],
       "hidden": true,
       "architecture": {
@@ -101,10 +135,10 @@
       }
     },
     {
-      "name": "windows_clang",
-      "description": "Mixin with common configuration for windows builds using clang-cl.",
+      "name": "visual_studio_clang",
+      "description": "Mixin with common configuration for selecting clang-cl under visual studio generator.",
       "inherits": [
-        "windows"
+        "visual_studio"
       ],
       "hidden": true,
       "architecture": {
@@ -130,7 +164,7 @@
       "name": "debug_linux_gcc",
       "inherits": [
         "debug",
-        "linux_gcc"
+        "ninja_gcc"
       ],
       "description": "Full configuration for debug build on linux using gcc.",
       "condition": {
@@ -144,7 +178,7 @@
       "description": "Full configuration for debug build on linux using gcc in x32 mode.",
       "inherits": [
         "debug",
-        "linux_gcc",
+        "ninja_gcc",
         "gcc_x32"
       ],
       "condition": {
@@ -158,7 +192,7 @@
       "description": "Full configuration for debug build on linux using clang.",
       "inherits": [
         "debug",
-        "linux_clang"
+        "ninja_clang"
       ],
       "condition": {
         "type": "equals",
@@ -171,7 +205,7 @@
       "description": "Full configuration for debug build on linux using clang with address sanitizer.",
       "inherits": [
         "debug",
-        "linux_clang"
+        "ninja_clang"
       ],
       "cacheVariables": {
         "KAN_ENABLE_ADDRESS_SANITIZER": "ON"
@@ -183,11 +217,11 @@
       }
     },
     {
-      "name": "debug_windows_msvc",
-      "description": "Full configuration for debug build on windows using msvc.",
+      "name": "debug_windows_ninja_msvc",
+      "description": "Full configuration for debug build on windows using msvc with visual studio.",
       "inherits": [
         "debug",
-        "windows_msvc"
+        "ninja_msvc"
       ],
       "condition": {
         "type": "equals",
@@ -196,11 +230,37 @@
       }
     },
     {
-      "name": "debug_windows_clang",
-      "description": "Full configuration for debug build on windows using clang-cl.",
+      "name": "debug_windows_ninja_clang",
+      "description": "Full configuration for debug build on windows using clang-cl with visual studio.",
       "inherits": [
         "debug",
-        "windows_clang"
+        "ninja_clang_cl"
+      ],
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      }
+    },
+    {
+      "name": "debug_windows_visual_studio_msvc",
+      "description": "Full configuration for debug build on windows using msvc with visual studio.",
+      "inherits": [
+        "debug",
+        "visual_studio_msvc"
+      ],
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      }
+    },
+    {
+      "name": "debug_windows_visual_studio_clang",
+      "description": "Full configuration for debug build on windows using clang-cl with visual studio.",
+      "inherits": [
+        "debug",
+        "visual_studio_clang"
       ],
       "condition": {
         "type": "equals",
@@ -213,7 +273,7 @@
       "description": "Full configuration for release build on linux using gcc.",
       "inherits": [
         "release",
-        "linux_gcc"
+        "ninja_gcc"
       ],
       "condition": {
         "type": "equals",
@@ -226,7 +286,7 @@
       "description": "Full configuration for release build on linux using gcc in x32 mode.",
       "inherits": [
         "release",
-        "linux_gcc",
+        "ninja_gcc",
         "gcc_x32"
       ],
       "condition": {
@@ -240,7 +300,7 @@
       "description": "Full configuration for release build on linux using clang.",
       "inherits": [
         "release",
-        "linux_clang"
+        "ninja_clang"
       ],
       "condition": {
         "type": "equals",
@@ -249,11 +309,11 @@
       }
     },
     {
-      "name": "release_windows_msvc",
-      "description": "Full configuration for release build on windows using msvc.",
+      "name": "release_windows_visual_studio_msvc",
+      "description": "Full configuration for release build on windows using msvc with visual studio.",
       "inherits": [
         "release",
-        "windows_msvc"
+        "visual_studio_msvc"
       ],
       "condition": {
         "type": "equals",
@@ -262,11 +322,37 @@
       }
     },
     {
-      "name": "release_windows_clang",
-      "description": "Full configuration for release build on windows using clang-cl.",
+      "name": "release_windows_visual_studio_clang",
+      "description": "Full configuration for release build on windows using clang-cl with visual studio.",
       "inherits": [
         "release",
-        "windows_clang"
+        "visual_studio_clang"
+      ],
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      }
+    },
+    {
+      "name": "release_windows_ninja_msvc",
+      "description": "Full configuration for release build on windows using msvc with visual studio.",
+      "inherits": [
+        "release",
+        "ninja_msvc"
+      ],
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      }
+    },
+    {
+      "name": "release_windows_ninja_clang",
+      "description": "Full configuration for release build on windows using clang-cl with visual studio.",
+      "inherits": [
+        "release",
+        "ninja_clang_cl"
       ],
       "condition": {
         "type": "equals",
