@@ -7,6 +7,14 @@ stages:
 
 build_and_test:
   stage: verify
+  rules:
+    - if: >
+        $CI_PIPELINE_SOURCE == "web" || 
+        $CI_PIPELINE_SOURCE == "api" || 
+        $CI_PIPELINE_SOURCE == "merge_request_event" ||
+        $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: always
+    - when: never
   parallel:
     matrix:
       - PRESET:
