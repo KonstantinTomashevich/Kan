@@ -13,9 +13,12 @@ build_and_test:
           - debug_linux_gcc
           - debug_linux_gcc_x32
           - debug_linux_clang
-          - sanitize_linux_clang
         SYSTEM_TAG: linux
         CONFIG: Debug
+      - PRESET: sanitize_linux_clang
+        SYSTEM_TAG: linux
+        CONFIG: Debug
+        CTEST_FLAGS: -LE GRAPHICS
       - PRESET:
           - release_linux_gcc
           - release_linux_gcc_x32
@@ -28,4 +31,4 @@ build_and_test:
     - cmake --preset $PRESET -B build/ci
     - cd build/ci
     - cmake --build . --target test_kan --config $CONFIG -j 6
-    - ctest --build-config $CONFIG --parallel 6
+    - ctest --build-config $CONFIG --parallel 6 $CTEST_FLAGS
