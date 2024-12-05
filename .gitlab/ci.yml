@@ -11,7 +11,8 @@
 # For this workflow, windows runner should have:
 # - cmake, git and python installed (through choco).
 # - VS2022 with clang included installed.
-# - Vulkan SDK installed (but GPU is not required, we don't GPU tests on Windows as of now).
+# - cl x64 and clang-cl x64 must be in path (for example, runner could be executed from x64 developer cmd).
+# - Vulkan SDK installed (but GPU is not required, we don't do GPU tests on Windows as of now).
 
 variables:
   GIT_SUBMODULE_STRATEGY: recursive

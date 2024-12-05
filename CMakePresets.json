@@ -218,7 +218,7 @@
     },
     {
       "name": "debug_windows_ninja_msvc",
-      "description": "Full configuration for debug build on windows using msvc with visual studio.",
+      "description": "Full configuration for debug build on windows using msvc with ninja.",
       "inherits": [
         "debug",
         "ninja_msvc"
@@ -231,7 +231,7 @@
     },
     {
       "name": "debug_windows_ninja_clang",
-      "description": "Full configuration for debug build on windows using clang-cl with visual studio.",
+      "description": "Full configuration for debug build on windows using clang-cl with ninja.",
       "inherits": [
         "debug",
         "ninja_clang_cl"
@@ -336,7 +336,7 @@
     },
     {
       "name": "release_windows_ninja_msvc",
-      "description": "Full configuration for release build on windows using msvc with visual studio.",
+      "description": "Full configuration for release build on windows using msvc with ninja.",
       "inherits": [
         "release",
         "ninja_msvc"
@@ -349,7 +349,7 @@
     },
     {
       "name": "release_windows_ninja_clang",
-      "description": "Full configuration for release build on windows using clang-cl with visual studio.",
+      "description": "Full configuration for release build on windows using clang-cl with ninja.",
       "inherits": [
         "release",
         "ninja_clang_cl"
