@@ -198,7 +198,12 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API struct kan_repository_meta_automatic_on_delet
         },
 };
 
-struct resource_provider_loading_operation_native_data_t
+enum resource_provider_operation_type_t
+{
+    RESOURCE_PROVIDER_OPERATION_TYPE_LOAD = 0u,
+};
+
+struct resource_provider_operation_load_native_data_t
 {
     kan_reflection_registry_t used_registry;
     enum kan_resource_index_native_item_format_t format_cache;
@@ -210,27 +215,44 @@ struct resource_provider_loading_operation_native_data_t
     };
 };
 
-struct resource_provider_loading_operation_third_party_data_t
+struct resource_provider_operation_load_third_party_data_t
 {
     kan_memory_size_t offset;
     kan_memory_size_t size;
     uint8_t *data;
 };
 
-/// \brief Hardcoded priority for handling on request hot swaps.
-#define PRIORITY_HOT_SWAP KAN_INT_MAX (kan_instance_size_t)
+struct resource_provider_operation_load_t
+{
+    struct kan_stream_t *stream;
+    union
+    {
+        struct resource_provider_operation_load_native_data_t native;
+        struct resource_provider_operation_load_third_party_data_t third_party;
+    };
+};
 
-struct resource_provider_loading_operation_t
+/// \brief First internal priority.
+#define PRIORITY_INTERNAL_BEGIN KAN_RESOURCE_PROVIDER_USER_PRIORITY_MAX + 1u
+
+/// \brief Requests since that priority indicate serve-all-at-once frame which is used for special occasions.
+#define PRIORITY_SERVE_ALL_AT_ONCE_SINCE PRIORITY_INTERNAL_BEGIN
+
+/// \brief Priority for hot swap frame resources.
+#define PRIORITY_HOT_SWAP PRIORITY_SERVE_ALL_AT_ONCE_SINCE
+
+struct resource_provider_operation_t
 {
     kan_instance_size_t priority;
     kan_interned_string_t target_type;
     kan_interned_string_t target_name;
-    struct kan_stream_t *stream;
+    enum resource_provider_operation_type_t operation_type;
 
     union
     {
-        struct resource_provider_loading_operation_native_data_t native;
-        struct resource_provider_loading_operation_third_party_data_t third_party;
+        /// \meta reflection_visibility_condition_field = operation_type
+        /// \meta reflection_visibility_condition_values = "RESOURCE_PROVIDER_OPERATION_TYPE_LOAD"
+        struct resource_provider_operation_load_t load;
     };
 };
 
@@ -253,7 +275,9 @@ struct resource_provider_execution_shared_state_t
     //// \meta reflection_ignore_struct_field
     struct kan_repository_indexed_interval_descending_write_cursor_t loading_operation_cursor;
 
+    kan_instance_size_t min_priority;
     kan_time_size_t end_time_ns;
+    kan_cpu_job_t job;
 };
 
 struct resource_provider_native_container_type_data_t
@@ -307,7 +331,8 @@ struct resource_provider_state_t
     KAN_UP_GENERATE_STATE_QUERIES (resource_provider)
     KAN_UP_BIND_STATE (resource_provider, state)
 
-    struct kan_repository_indexed_interval_write_query_t write_interval__resource_provider_loading_operation__priority;
+    struct kan_repository_indexed_interval_read_query_t read_interval__resource_provider_operation__priority;
+    struct kan_repository_indexed_interval_write_query_t write_interval__resource_provider_operation__priority;
 
     /// \meta reflection_ignore_struct_field
     struct resource_provider_execution_shared_state_t execution_shared_state;
@@ -432,33 +457,38 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void resource_provider_third_party_entry_suff
     }
 }
 
-static inline void resource_provider_loading_operation_destroy_native (
-    struct resource_provider_loading_operation_t *instance)
+static inline void resource_provider_operation_destroy_native (struct resource_provider_operation_t *instance)
 {
+    KAN_ASSERT (instance->operation_type == RESOURCE_PROVIDER_OPERATION_TYPE_LOAD)
     if (instance->target_type)
     {
-        switch (instance->native.format_cache)
+        switch (instance->load.native.format_cache)
         {
         case KAN_RESOURCE_INDEX_NATIVE_ITEM_FORMAT_BINARY:
-            kan_serialization_binary_reader_destroy (instance->native.binary_reader);
+            kan_serialization_binary_reader_destroy (instance->load.native.binary_reader);
             break;
 
         case KAN_RESOURCE_INDEX_NATIVE_ITEM_FORMAT_READABLE_DATA:
-            kan_serialization_rd_reader_destroy (instance->native.readable_data_reader);
+            kan_serialization_rd_reader_destroy (instance->load.native.readable_data_reader);
             break;
         }
     }
 }
 
-UNIVERSE_RESOURCE_PROVIDER_KAN_API void resource_provider_loading_operation_shutdown (
-    struct resource_provider_loading_operation_t *instance)
+UNIVERSE_RESOURCE_PROVIDER_KAN_API void resource_provider_operation_shutdown (
+    struct resource_provider_operation_t *instance)
 {
-    if (instance->stream)
+    switch (instance->operation_type)
     {
-        instance->stream->operations->close (instance->stream);
-    }
+    case RESOURCE_PROVIDER_OPERATION_TYPE_LOAD:
+        if (instance->load.stream)
+        {
+            instance->load.stream->operations->close (instance->load.stream);
+        }
 
-    resource_provider_loading_operation_destroy_native (instance);
+        resource_provider_operation_destroy_native (instance);
+        break;
+    }
 }
 
 UNIVERSE_RESOURCE_PROVIDER_KAN_API void resource_provider_delayed_file_addition_init (
@@ -1076,7 +1106,7 @@ static inline void loading_operation_cancel (struct resource_provider_state_t *s
                                              kan_interned_string_t type,
                                              kan_interned_string_t name)
 {
-    KAN_UP_VALUE_DELETE (operation, resource_provider_loading_operation_t, target_name, &name)
+    KAN_UP_VALUE_DELETE (operation, resource_provider_operation_t, target_name, &name)
     {
         if (operation->target_type == type)
         {
@@ -1188,7 +1218,7 @@ static inline void schedule_native_entry_loading (struct resource_provider_state
     }
 
     entry_suffix->loading_container_id = container_view->container_id;
-    KAN_UP_INDEXED_INSERT (operation, resource_provider_loading_operation_t)
+    KAN_UP_INDEXED_INSERT (operation, resource_provider_operation_t)
     {
         operation->priority =
             from_hot_reload && kan_hot_reload_coordination_system_is_hot_swap (state->hot_reload_system) ?
@@ -1197,20 +1227,21 @@ static inline void schedule_native_entry_loading (struct resource_provider_state
 
         operation->target_type = entry->type;
         operation->target_name = entry->name;
-        operation->stream = stream;
-        operation->native.format_cache = entry_suffix->format;
-        operation->native.used_registry = state->reflection_registry;
+        operation->operation_type = RESOURCE_PROVIDER_OPERATION_TYPE_LOAD;
+        operation->load.stream = stream;
+        operation->load.native.format_cache = entry_suffix->format;
+        operation->load.native.used_registry = state->reflection_registry;
 
         switch (entry_suffix->format)
         {
         case KAN_RESOURCE_INDEX_NATIVE_ITEM_FORMAT_BINARY:
-            operation->native.binary_reader = kan_serialization_binary_reader_create (
+            operation->load.native.binary_reader = kan_serialization_binary_reader_create (
                 stream, data_begin, entry->type, state->shared_script_storage, entry_suffix->string_registry,
                 container_view->my_allocation_group);
             break;
 
         case KAN_RESOURCE_INDEX_NATIVE_ITEM_FORMAT_READABLE_DATA:
-            operation->native.readable_data_reader = kan_serialization_rd_reader_create (
+            operation->load.native.readable_data_reader = kan_serialization_rd_reader_create (
                 stream, data_begin, entry->type, state->reflection_registry, container_view->my_allocation_group);
             break;
         }
@@ -1277,7 +1308,7 @@ static inline void schedule_third_party_entry_loading (
         kan_allocate_general (entry_suffix->my_allocation_group, entry->size, _Alignof (kan_memory_size_t));
     entry_suffix->loading_data_size = entry->size;
 
-    KAN_UP_INDEXED_INSERT (operation, resource_provider_loading_operation_t)
+    KAN_UP_INDEXED_INSERT (operation, resource_provider_operation_t)
     {
         operation->priority =
             from_hot_reload && kan_hot_reload_coordination_system_is_hot_swap (state->hot_reload_system) ?
@@ -1286,10 +1317,11 @@ static inline void schedule_third_party_entry_loading (
 
         operation->target_type = NULL;
         operation->target_name = entry->name;
-        operation->stream = stream;
-        operation->third_party.offset = 0u;
-        operation->third_party.size = entry->size;
-        operation->third_party.data = entry_suffix->loading_data;
+        operation->operation_type = RESOURCE_PROVIDER_OPERATION_TYPE_LOAD;
+        operation->load.stream = stream;
+        operation->load.third_party.offset = 0u;
+        operation->load.third_party.size = entry->size;
+        operation->load.third_party.data = entry_suffix->loading_data;
     }
 }
 
@@ -1866,11 +1898,321 @@ static inline void process_delayed_reload (struct resource_provider_state_t *sta
     }
 }
 
+enum resource_provider_serve_operation_status_t
+{
+    RESOURCE_PROVIDER_SERVE_OPERATION_STATUS_IN_PROGRESS,
+    RESOURCE_PROVIDER_SERVE_OPERATION_STATUS_DONE,
+};
+
+static enum resource_provider_serve_operation_status_t execute_shared_serve_load (
+    struct resource_provider_state_t *state, struct resource_provider_operation_t *loading_operation)
+{
+    KAN_ASSERT (loading_operation->priority >= state->execution_shared_state.min_priority)
+    if (kan_precise_time_get_elapsed_nanoseconds () > state->execution_shared_state.end_time_ns)
+    {
+        return RESOURCE_PROVIDER_SERVE_OPERATION_STATUS_IN_PROGRESS;
+    }
+
+    // Restart loading for native type if reflection has changed.
+    if (loading_operation->target_type &&
+        !KAN_HANDLE_IS_EQUAL (loading_operation->load.native.used_registry, state->reflection_registry))
+    {
+        resource_provider_operation_destroy_native (loading_operation);
+        loading_operation->load.stream->operations->close (loading_operation->load.stream);
+
+        kan_bool_t entry_found = KAN_FALSE;
+        kan_bool_t other_error = KAN_FALSE;
+
+        KAN_UP_VALUE_READ (entry, kan_resource_native_entry_t, name, &loading_operation->target_name)
+        {
+            if (entry->type == loading_operation->target_type)
+            {
+                entry_found = KAN_TRUE;
+                kan_virtual_file_system_volume_t volume =
+                    kan_virtual_file_system_get_context_volume_for_read (state->virtual_file_system);
+
+                loading_operation->load.stream = kan_virtual_file_stream_open_for_read (volume, entry->path);
+                kan_virtual_file_system_close_context_read_access (state->virtual_file_system);
+
+                if (!loading_operation->load.stream)
+                {
+                    KAN_LOG (universe_resource_provider, KAN_LOG_ERROR,
+                             "Unable to restart loading of \"%s\" of type \"%s\" as stream can no longer be opened. "
+                             "Internal handling error?",
+                             loading_operation->target_name, loading_operation->target_type)
+
+                    other_error = KAN_TRUE;
+                    KAN_UP_QUERY_BREAK;
+                }
+
+                loading_operation->load.stream = kan_random_access_stream_buffer_open_for_read (
+                    loading_operation->load.stream, KAN_UNIVERSE_RESOURCE_PROVIDER_READ_BUFFER);
+
+                KAN_UP_VALUE_UPDATE (suffix, resource_provider_native_entry_suffix_t, attachment_id,
+                                     &entry->attachment_id)
+                {
+                    if (!skip_type_header (loading_operation->load.stream, entry, suffix))
+                    {
+                        other_error = KAN_TRUE;
+                        KAN_UP_QUERY_BREAK;
+                    }
+
+                    struct kan_repository_indexed_value_update_access_t container_view_access;
+                    uint8_t *container_data_begin;
+                    struct kan_resource_container_view_t *container_view =
+                        native_container_update (state, entry->type, suffix->loading_container_id,
+                                                 &container_view_access, &container_data_begin);
+
+                    if (!container_view)
+                    {
+                        KAN_LOG (universe_resource_provider, KAN_LOG_ERROR,
+                                 "Unable to restart loading of \"%s\" of type \"%s\" as loading container is absent. "
+                                 "Internal handling error?",
+                                 loading_operation->target_name, loading_operation->target_type)
+
+                        other_error = KAN_TRUE;
+                        KAN_UP_QUERY_BREAK;
+                    }
+
+                    switch (suffix->format)
+                    {
+                    case KAN_RESOURCE_INDEX_NATIVE_ITEM_FORMAT_BINARY:
+                        loading_operation->load.native.binary_reader = kan_serialization_binary_reader_create (
+                            loading_operation->load.stream, container_data_begin, entry->type,
+                            state->shared_script_storage, suffix->string_registry, container_view->my_allocation_group);
+                        break;
+
+                    case KAN_RESOURCE_INDEX_NATIVE_ITEM_FORMAT_READABLE_DATA:
+                        loading_operation->load.native.readable_data_reader = kan_serialization_rd_reader_create (
+                            loading_operation->load.stream, container_data_begin, entry->type,
+                            state->reflection_registry, container_view->my_allocation_group);
+                        break;
+                    }
+                }
+
+                KAN_UP_QUERY_BREAK;
+            }
+        }
+
+        if (!entry_found)
+        {
+            KAN_LOG (universe_resource_provider, KAN_LOG_ERROR,
+                     "Unable to restart loading of \"%s\" of type \"%s\" as native entry no longer exists. "
+                     "Internal handling error?",
+                     loading_operation->target_name, loading_operation->target_type)
+        }
+
+        if (!entry_found || other_error)
+        {
+            return RESOURCE_PROVIDER_SERVE_OPERATION_STATUS_DONE;
+        }
+    }
+
+    // Process serialization.
+    enum kan_serialization_state_t serialization_state = KAN_SERIALIZATION_FINISHED;
+
+    if (loading_operation->target_type)
+    {
+        switch (loading_operation->load.native.format_cache)
+        {
+        case KAN_RESOURCE_INDEX_NATIVE_ITEM_FORMAT_BINARY:
+        {
+            while ((serialization_state = kan_serialization_binary_reader_step (
+                        loading_operation->load.native.binary_reader)) == KAN_SERIALIZATION_IN_PROGRESS)
+            {
+                if (kan_precise_time_get_elapsed_nanoseconds () > state->execution_shared_state.end_time_ns)
+                {
+                    return RESOURCE_PROVIDER_SERVE_OPERATION_STATUS_IN_PROGRESS;
+                }
+            }
+
+            break;
+        }
+
+        case KAN_RESOURCE_INDEX_NATIVE_ITEM_FORMAT_READABLE_DATA:
+            while ((serialization_state = kan_serialization_rd_reader_step (
+                        loading_operation->load.native.readable_data_reader)) == KAN_SERIALIZATION_IN_PROGRESS)
+            {
+                if (kan_precise_time_get_elapsed_nanoseconds () > state->execution_shared_state.end_time_ns)
+                {
+                    return RESOURCE_PROVIDER_SERVE_OPERATION_STATUS_IN_PROGRESS;
+                }
+            }
+
+            break;
+        }
+    }
+    else
+    {
+        while (KAN_TRUE)
+        {
+            kan_memory_size_t to_read =
+                KAN_MIN (KAN_UNIVERSE_RESOURCE_PROVIDER_TPL_CHUNK,
+                         loading_operation->load.third_party.size - loading_operation->load.third_party.offset);
+
+            if (to_read > 0u)
+            {
+                if (loading_operation->load.stream->operations->read (
+                        loading_operation->load.stream, to_read,
+                        loading_operation->load.third_party.data + loading_operation->load.third_party.offset) ==
+                    to_read)
+                {
+                    loading_operation->load.third_party.offset += to_read;
+                    serialization_state =
+                        loading_operation->load.third_party.offset == loading_operation->load.third_party.size ?
+                            KAN_SERIALIZATION_FINISHED :
+                            KAN_SERIALIZATION_IN_PROGRESS;
+                }
+                else
+                {
+                    serialization_state = KAN_SERIALIZATION_FAILED;
+                }
+            }
+            else
+            {
+                serialization_state = KAN_SERIALIZATION_FINISHED;
+            }
+
+            if (kan_precise_time_get_elapsed_nanoseconds () > state->execution_shared_state.end_time_ns)
+            {
+                return RESOURCE_PROVIDER_SERVE_OPERATION_STATUS_IN_PROGRESS;
+            }
+
+            if (serialization_state != KAN_SERIALIZATION_IN_PROGRESS)
+            {
+                break;
+            }
+        }
+    }
+
+    kan_atomic_int_lock (&state->execution_shared_state.concurrency_lock);
+    switch (serialization_state)
+    {
+    case KAN_SERIALIZATION_IN_PROGRESS:
+        KAN_ASSERT (KAN_FALSE)
+        break;
+
+    case KAN_SERIALIZATION_FINISHED:
+        if (loading_operation->target_type)
+        {
+            KAN_LOG (universe_resource_provider, KAN_LOG_DEBUG, "Loaded native resource \"%s\" of type \"%s\".",
+                     loading_operation->target_name, loading_operation->target_type)
+
+            KAN_UP_VALUE_READ (entry, kan_resource_native_entry_t, name, &loading_operation->target_name)
+            {
+                if (entry->type == loading_operation->target_type)
+                {
+                    KAN_UP_VALUE_UPDATE (suffix, resource_provider_native_entry_suffix_t, attachment_id,
+                                         &entry->attachment_id)
+                    {
+                        native_container_delete (state, entry->type, suffix->loaded_container_id);
+                        suffix->loaded_container_id = suffix->loading_container_id;
+                        suffix->loading_container_id = KAN_TYPED_ID_32_SET_INVALID (kan_resource_container_id_t);
+                        update_requests (state, entry->type, entry->name, suffix->loaded_container_id, NULL, 0u);
+                    }
+
+                    KAN_UP_QUERY_BREAK;
+                }
+            }
+        }
+        else
+        {
+            KAN_LOG (universe_resource_provider, KAN_LOG_DEBUG, "Loaded third party resource \"%s\".",
+                     loading_operation->target_name)
+
+            KAN_UP_VALUE_READ (entry, kan_resource_third_party_entry_t, name, &loading_operation->target_name)
+            {
+                KAN_UP_VALUE_UPDATE (suffix, resource_provider_third_party_entry_suffix_t, attachment_id,
+                                     &entry->attachment_id)
+                {
+                    if (suffix->loaded_data)
+                    {
+                        kan_free_general (suffix->my_allocation_group, suffix->loaded_data, suffix->loaded_data_size);
+                    }
+
+                    suffix->loaded_data = suffix->loading_data;
+                    suffix->loaded_data_size = suffix->loading_data_size;
+                    suffix->loading_data = NULL;
+                    suffix->loading_data_size = 0u;
+
+                    update_requests (state, NULL, entry->name,
+                                     KAN_TYPED_ID_32_SET_INVALID (kan_resource_container_id_t), suffix->loaded_data,
+                                     suffix->loaded_data_size);
+                }
+
+                KAN_UP_QUERY_BREAK;
+            }
+        }
+
+        break;
+
+    case KAN_SERIALIZATION_FAILED:
+    {
+        if (loading_operation->target_type)
+        {
+            KAN_LOG (universe_resource_provider, KAN_LOG_ERROR,
+                     "Failed to load native resource \"%s\" of type \"%s\": serialization error.",
+                     loading_operation->target_name, loading_operation->target_type)
+
+            KAN_UP_VALUE_READ (entry, kan_resource_native_entry_t, name, &loading_operation->target_name)
+            {
+                if (entry->type == loading_operation->target_type)
+                {
+                    KAN_UP_VALUE_UPDATE (suffix, resource_provider_native_entry_suffix_t, attachment_id,
+                                         &entry->attachment_id)
+                    {
+                        native_container_delete (state, entry->type, suffix->loading_container_id);
+                        suffix->loading_container_id = KAN_TYPED_ID_32_SET_INVALID (kan_resource_container_id_t);
+                    }
+
+                    KAN_UP_QUERY_BREAK;
+                }
+            }
+        }
+        else
+        {
+            KAN_LOG (universe_resource_provider, KAN_LOG_ERROR,
+                     "Failed to load third party resource \"%s\": serialization error.", loading_operation->target_name)
+
+            KAN_UP_VALUE_READ (entry, kan_resource_third_party_entry_t, name, &loading_operation->target_name)
+            {
+                KAN_UP_VALUE_UPDATE (suffix, resource_provider_third_party_entry_suffix_t, attachment_id,
+                                     &entry->attachment_id)
+                {
+                    if (suffix->loading_data)
+                    {
+                        kan_free_general (suffix->my_allocation_group, suffix->loading_data, suffix->loading_data_size);
+                    }
+
+                    suffix->loading_data = NULL;
+                    suffix->loading_data_size = 0u;
+                }
+
+                KAN_UP_QUERY_BREAK;
+            }
+        }
+
+        break;
+    }
+    }
+
+    kan_atomic_int_unlock (&state->execution_shared_state.concurrency_lock);
+    return RESOURCE_PROVIDER_SERVE_OPERATION_STATUS_DONE;
+}
+
+static void dispatch_shared_serve (struct resource_provider_state_t *state);
+
 static void execute_shared_serve (kan_functor_user_data_t user_data)
 {
     struct resource_provider_state_t *state = (struct resource_provider_state_t *) user_data;
     while (KAN_TRUE)
     {
+        if (kan_precise_time_get_elapsed_nanoseconds () > state->execution_shared_state.end_time_ns)
+        {
+            // Exit: no more time.
+            break;
+        }
+
         // Retrieve loading operation.
         kan_atomic_int_lock (&state->execution_shared_state.concurrency_lock);
         struct kan_repository_indexed_interval_write_access_t loading_operation_access =
@@ -1878,360 +2220,92 @@ static void execute_shared_serve (kan_functor_user_data_t user_data)
                 &state->execution_shared_state.loading_operation_cursor);
         kan_atomic_int_unlock (&state->execution_shared_state.concurrency_lock);
 
-        struct resource_provider_loading_operation_t *loading_operation =
-            (struct resource_provider_loading_operation_t *) kan_repository_indexed_interval_write_access_resolve (
-                &loading_operation_access);
+        struct resource_provider_operation_t *operation =
+            kan_repository_indexed_interval_write_access_resolve (&loading_operation_access);
 
-        if (!loading_operation)
+        if (!operation)
         {
-            // Shutdown: no loading operations.
-            if (kan_atomic_int_add (&state->execution_shared_state.workers_left, -1) == 1)
-            {
-                kan_repository_indexed_interval_descending_write_cursor_close (
-                    &state->execution_shared_state.loading_operation_cursor);
-            }
-
-            return;
+            // Exit: No more items.
+            break;
         }
 
-        if (loading_operation->priority != PRIORITY_HOT_SWAP &&
-            kan_precise_time_get_elapsed_nanoseconds () > state->execution_shared_state.end_time_ns)
+        enum resource_provider_serve_operation_status_t status = RESOURCE_PROVIDER_SERVE_OPERATION_STATUS_IN_PROGRESS;
+        switch (operation->operation_type)
         {
-            // Shutdown: no more time.
+        case RESOURCE_PROVIDER_OPERATION_TYPE_LOAD:
+            status = execute_shared_serve_load (state, operation);
+            break;
+        }
+
+        switch (status)
+        {
+        case RESOURCE_PROVIDER_SERVE_OPERATION_STATUS_IN_PROGRESS:
             kan_repository_indexed_interval_write_access_close (&loading_operation_access);
-
-            if (kan_atomic_int_add (&state->execution_shared_state.workers_left, -1) == 1)
-            {
-                kan_repository_indexed_interval_descending_write_cursor_close (
-                    &state->execution_shared_state.loading_operation_cursor);
-            }
-
-            return;
-        }
-
-        // Restart loading for native type if reflection has changed.
-        if (loading_operation->target_type &&
-            !KAN_HANDLE_IS_EQUAL (loading_operation->native.used_registry, state->reflection_registry))
-        {
-            resource_provider_loading_operation_destroy_native (loading_operation);
-            loading_operation->stream->operations->close (loading_operation->stream);
-
-            kan_bool_t entry_found = KAN_FALSE;
-            kan_bool_t other_error = KAN_FALSE;
-
-            KAN_UP_VALUE_READ (entry, kan_resource_native_entry_t, name, &loading_operation->target_name)
-            {
-                if (entry->type == loading_operation->target_type)
-                {
-                    entry_found = KAN_TRUE;
-                    kan_virtual_file_system_volume_t volume =
-                        kan_virtual_file_system_get_context_volume_for_read (state->virtual_file_system);
-
-                    loading_operation->stream = kan_virtual_file_stream_open_for_read (volume, entry->path);
-                    kan_virtual_file_system_close_context_read_access (state->virtual_file_system);
-
-                    if (!loading_operation->stream)
-                    {
-                        KAN_LOG (
-                            universe_resource_provider, KAN_LOG_ERROR,
-                            "Unable to restart loading of \"%s\" of type \"%s\" as stream can no longer be opened. "
-                            "Internal handling error?",
-                            loading_operation->target_name, loading_operation->target_type)
-
-                        other_error = KAN_TRUE;
-                        KAN_UP_QUERY_BREAK;
-                    }
-
-                    loading_operation->stream = kan_random_access_stream_buffer_open_for_read (
-                        loading_operation->stream, KAN_UNIVERSE_RESOURCE_PROVIDER_READ_BUFFER);
-
-                    KAN_UP_VALUE_UPDATE (suffix, resource_provider_native_entry_suffix_t, attachment_id,
-                                         &entry->attachment_id)
-                    {
-                        if (!skip_type_header (loading_operation->stream, entry, suffix))
-                        {
-                            other_error = KAN_TRUE;
-                            KAN_UP_QUERY_BREAK;
-                        }
-
-                        struct kan_repository_indexed_value_update_access_t container_view_access;
-                        uint8_t *container_data_begin;
-                        struct kan_resource_container_view_t *container_view =
-                            native_container_update (state, entry->type, suffix->loading_container_id,
-                                                     &container_view_access, &container_data_begin);
-
-                        if (!container_view)
-                        {
-                            KAN_LOG (
-                                universe_resource_provider, KAN_LOG_ERROR,
-                                "Unable to restart loading of \"%s\" of type \"%s\" as loading container is absent. "
-                                "Internal handling error?",
-                                loading_operation->target_name, loading_operation->target_type)
-
-                            other_error = KAN_TRUE;
-                            KAN_UP_QUERY_BREAK;
-                        }
-
-                        switch (suffix->format)
-                        {
-                        case KAN_RESOURCE_INDEX_NATIVE_ITEM_FORMAT_BINARY:
-                            loading_operation->native.binary_reader = kan_serialization_binary_reader_create (
-                                loading_operation->stream, container_data_begin, entry->type,
-                                state->shared_script_storage, suffix->string_registry,
-                                container_view->my_allocation_group);
-                            break;
-
-                        case KAN_RESOURCE_INDEX_NATIVE_ITEM_FORMAT_READABLE_DATA:
-                            loading_operation->native.readable_data_reader = kan_serialization_rd_reader_create (
-                                loading_operation->stream, container_data_begin, entry->type,
-                                state->reflection_registry, container_view->my_allocation_group);
-                            break;
-                        }
-                    }
-
-                    KAN_UP_QUERY_BREAK;
-                }
-            }
-
-            if (!entry_found)
-            {
-                KAN_LOG (universe_resource_provider, KAN_LOG_ERROR,
-                         "Unable to restart loading of \"%s\" of type \"%s\" as native entry no longer exists. "
-                         "Internal handling error?",
-                         loading_operation->target_name, loading_operation->target_type)
-            }
-
-            if (!entry_found || other_error)
-            {
-                kan_repository_indexed_interval_write_access_delete (&loading_operation_access);
-                continue;
-            }
-        }
-
-        // Process serialization.
-        enum kan_serialization_state_t serialization_state = KAN_SERIALIZATION_FINISHED;
-
-        if (loading_operation->target_type)
-        {
-            switch (loading_operation->native.format_cache)
-            {
-            case KAN_RESOURCE_INDEX_NATIVE_ITEM_FORMAT_BINARY:
-            {
-                while ((serialization_state = kan_serialization_binary_reader_step (
-                            loading_operation->native.binary_reader)) == KAN_SERIALIZATION_IN_PROGRESS)
-                {
-                    if (loading_operation->priority != PRIORITY_HOT_SWAP &&
-                        kan_precise_time_get_elapsed_nanoseconds () > state->execution_shared_state.end_time_ns)
-                    {
-                        // Shutdown: no more time.
-                        kan_repository_indexed_interval_write_access_close (&loading_operation_access);
-
-                        if (kan_atomic_int_add (&state->execution_shared_state.workers_left, -1) == 1)
-                        {
-                            kan_repository_indexed_interval_descending_write_cursor_close (
-                                &state->execution_shared_state.loading_operation_cursor);
-                        }
-
-                        return;
-                    }
-                }
-
-                break;
-            }
-
-            case KAN_RESOURCE_INDEX_NATIVE_ITEM_FORMAT_READABLE_DATA:
-                while ((serialization_state = kan_serialization_rd_reader_step (
-                            loading_operation->native.readable_data_reader)) == KAN_SERIALIZATION_IN_PROGRESS)
-                {
-                    if (loading_operation->priority != PRIORITY_HOT_SWAP &&
-                        kan_precise_time_get_elapsed_nanoseconds () > state->execution_shared_state.end_time_ns)
-                    {
-                        // Shutdown: no more time.
-                        kan_repository_indexed_interval_write_access_close (&loading_operation_access);
-
-                        if (kan_atomic_int_add (&state->execution_shared_state.workers_left, -1) == 1)
-                        {
-                            kan_repository_indexed_interval_descending_write_cursor_close (
-                                &state->execution_shared_state.loading_operation_cursor);
-                        }
-
-                        return;
-                    }
-                }
-
-                break;
-            }
-        }
-        else
-        {
-            while (KAN_TRUE)
-            {
-                kan_memory_size_t to_read =
-                    KAN_MIN (KAN_UNIVERSE_RESOURCE_PROVIDER_TPL_CHUNK,
-                             loading_operation->third_party.size - loading_operation->third_party.offset);
-
-                if (to_read > 0u)
-                {
-                    if (loading_operation->stream->operations->read (
-                            loading_operation->stream, to_read,
-                            loading_operation->third_party.data + loading_operation->third_party.offset) == to_read)
-                    {
-                        loading_operation->third_party.offset += to_read;
-                        serialization_state =
-                            loading_operation->third_party.offset == loading_operation->third_party.size ?
-                                KAN_SERIALIZATION_FINISHED :
-                                KAN_SERIALIZATION_IN_PROGRESS;
-                    }
-                    else
-                    {
-                        serialization_state = KAN_SERIALIZATION_FAILED;
-                    }
-                }
-                else
-                {
-                    serialization_state = KAN_SERIALIZATION_FINISHED;
-                }
-
-                if (loading_operation->priority != PRIORITY_HOT_SWAP &&
-                    kan_precise_time_get_elapsed_nanoseconds () > state->execution_shared_state.end_time_ns)
-                {
-                    // Shutdown: no more time.
-                    kan_repository_indexed_interval_write_access_close (&loading_operation_access);
-
-                    if (kan_atomic_int_add (&state->execution_shared_state.workers_left, -1) == 1)
-                    {
-                        kan_repository_indexed_interval_descending_write_cursor_close (
-                            &state->execution_shared_state.loading_operation_cursor);
-                    }
-
-                    return;
-                }
-
-                if (serialization_state != KAN_SERIALIZATION_IN_PROGRESS)
-                {
-                    break;
-                }
-            }
-        }
-
-        kan_atomic_int_lock (&state->execution_shared_state.concurrency_lock);
-        switch (serialization_state)
-        {
-        case KAN_SERIALIZATION_IN_PROGRESS:
-            KAN_ASSERT (KAN_FALSE)
             break;
 
-        case KAN_SERIALIZATION_FINISHED:
-            if (loading_operation->target_type)
-            {
-                KAN_LOG (universe_resource_provider, KAN_LOG_DEBUG, "Loaded native resource \"%s\" of type \"%s\".",
-                         loading_operation->target_name, loading_operation->target_type)
-
-                KAN_UP_VALUE_READ (entry, kan_resource_native_entry_t, name, &loading_operation->target_name)
-                {
-                    if (entry->type == loading_operation->target_type)
-                    {
-                        KAN_UP_VALUE_UPDATE (suffix, resource_provider_native_entry_suffix_t, attachment_id,
-                                             &entry->attachment_id)
-                        {
-                            native_container_delete (state, entry->type, suffix->loaded_container_id);
-                            suffix->loaded_container_id = suffix->loading_container_id;
-                            suffix->loading_container_id = KAN_TYPED_ID_32_SET_INVALID (kan_resource_container_id_t);
-                            update_requests (state, entry->type, entry->name, suffix->loaded_container_id, NULL, 0u);
-                        }
-
-                        KAN_UP_QUERY_BREAK;
-                    }
-                }
-            }
-            else
-            {
-                KAN_LOG (universe_resource_provider, KAN_LOG_DEBUG, "Loaded third party resource \"%s\".",
-                         loading_operation->target_name)
-
-                KAN_UP_VALUE_READ (entry, kan_resource_third_party_entry_t, name, &loading_operation->target_name)
-                {
-                    KAN_UP_VALUE_UPDATE (suffix, resource_provider_third_party_entry_suffix_t, attachment_id,
-                                         &entry->attachment_id)
-                    {
-                        if (suffix->loaded_data)
-                        {
-                            kan_free_general (suffix->my_allocation_group, suffix->loaded_data,
-                                              suffix->loaded_data_size);
-                        }
-
-                        suffix->loaded_data = suffix->loading_data;
-                        suffix->loaded_data_size = suffix->loading_data_size;
-                        suffix->loading_data = NULL;
-                        suffix->loading_data_size = 0u;
-
-                        update_requests (state, NULL, entry->name,
-                                         KAN_TYPED_ID_32_SET_INVALID (kan_resource_container_id_t), suffix->loaded_data,
-                                         suffix->loaded_data_size);
-                    }
-
-                    KAN_UP_QUERY_BREAK;
-                }
-            }
-
-            kan_repository_indexed_interval_write_access_delete (&loading_operation_access);
-            break;
-
-        case KAN_SERIALIZATION_FAILED:
-        {
-            if (loading_operation->target_type)
-            {
-                KAN_LOG (universe_resource_provider, KAN_LOG_ERROR,
-                         "Failed to load native resource \"%s\" of type \"%s\": serialization error.",
-                         loading_operation->target_name, loading_operation->target_type)
-
-                KAN_UP_VALUE_READ (entry, kan_resource_native_entry_t, name, &loading_operation->target_name)
-                {
-                    if (entry->type == loading_operation->target_type)
-                    {
-                        KAN_UP_VALUE_UPDATE (suffix, resource_provider_native_entry_suffix_t, attachment_id,
-                                             &entry->attachment_id)
-                        {
-                            native_container_delete (state, entry->type, suffix->loading_container_id);
-                            suffix->loading_container_id = KAN_TYPED_ID_32_SET_INVALID (kan_resource_container_id_t);
-                        }
-
-                        KAN_UP_QUERY_BREAK;
-                    }
-                }
-            }
-            else
-            {
-                KAN_LOG (universe_resource_provider, KAN_LOG_ERROR,
-                         "Failed to load third party resource \"%s\": serialization error.",
-                         loading_operation->target_name)
-
-                KAN_UP_VALUE_READ (entry, kan_resource_third_party_entry_t, name, &loading_operation->target_name)
-                {
-                    KAN_UP_VALUE_UPDATE (suffix, resource_provider_third_party_entry_suffix_t, attachment_id,
-                                         &entry->attachment_id)
-                    {
-                        if (suffix->loading_data)
-                        {
-                            kan_free_general (suffix->my_allocation_group, suffix->loading_data,
-                                              suffix->loading_data_size);
-                        }
-
-                        suffix->loading_data = NULL;
-                        suffix->loading_data_size = 0u;
-                    }
-
-                    KAN_UP_QUERY_BREAK;
-                }
-            }
-
+        case RESOURCE_PROVIDER_SERVE_OPERATION_STATUS_DONE:
             kan_repository_indexed_interval_write_access_delete (&loading_operation_access);
             break;
         }
-        }
-
-        kan_atomic_int_unlock (&state->execution_shared_state.concurrency_lock);
     }
+
+    if (kan_atomic_int_add (&state->execution_shared_state.workers_left, -1) == 1)
+    {
+        kan_repository_indexed_interval_descending_write_cursor_close (
+            &state->execution_shared_state.loading_operation_cursor);
+
+        // New operations might've been spawned and if we're using serve all at once,
+        // then some of these operations might be interesting for us.
+        // When using serve all at once and there are some new operations, we need to process them recursively too.
+        if (state->execution_shared_state.min_priority >= PRIORITY_SERVE_ALL_AT_ONCE_SINCE)
+        {
+            KAN_ASSERT (state->execution_shared_state.end_time_ns == KAN_INT_MAX (kan_time_size_t))
+
+            kan_bool_t should_run_again = KAN_FALSE;
+            struct kan_repository_indexed_interval_descending_read_cursor_t check_cursor =
+                kan_repository_indexed_interval_read_query_execute_descending (
+                    &state->read_interval__resource_provider_operation__priority,
+                    &state->execution_shared_state.min_priority, NULL);
+
+            struct kan_repository_indexed_interval_read_access_t check_access =
+                kan_repository_indexed_interval_descending_read_cursor_next (&check_cursor);
+
+            if (kan_repository_indexed_interval_read_access_resolve (&check_access))
+            {
+                should_run_again = KAN_TRUE;
+                kan_repository_indexed_interval_read_access_close (&check_access);
+            }
+
+            kan_repository_indexed_interval_descending_read_cursor_close (&check_cursor);
+            if (should_run_again)
+            {
+                dispatch_shared_serve (state);
+            }
+        }
+    }
+}
+
+static void dispatch_shared_serve (struct resource_provider_state_t *state)
+{
+    kan_stack_group_allocator_reset (&state->temporary_allocator);
+    const kan_instance_size_t cpu_count = kan_platform_get_cpu_logical_core_count ();
+    struct kan_cpu_task_list_node_t *task_list_node = NULL;
+
+    state->execution_shared_state.workers_left = kan_atomic_int_init ((int) cpu_count);
+    state->execution_shared_state.concurrency_lock = kan_atomic_int_init (0);
+
+    state->execution_shared_state.loading_operation_cursor =
+        kan_repository_indexed_interval_write_query_execute_descending (
+            &state->write_interval__resource_provider_operation__priority, &state->execution_shared_state.min_priority,
+            NULL);
+
+    for (kan_loop_size_t worker_index = 0u; worker_index < cpu_count; ++worker_index)
+    {
+        KAN_CPU_TASK_LIST_USER_VALUE (&task_list_node, &state->temporary_allocator,
+                                      state->interned_resource_provider_server, execute_shared_serve, state)
+    }
+
+    kan_cpu_job_dispatch_and_detach_task_list (state->execution_shared_state.job, task_list_node);
 }
 
 UNIVERSE_RESOURCE_PROVIDER_KAN_API void mutator_template_execute_resource_provider (
@@ -2488,24 +2562,20 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void mutator_template_execute_resource_provid
                 process_delayed_reload (state, private);
             }
 
-            kan_stack_group_allocator_reset (&state->temporary_allocator);
-            const kan_instance_size_t cpu_count = kan_platform_get_cpu_logical_core_count ();
-            struct kan_cpu_task_list_node_t *task_list_node = NULL;
-
-            state->execution_shared_state.workers_left = kan_atomic_int_init ((int) cpu_count);
-            state->execution_shared_state.concurrency_lock = kan_atomic_int_init (0);
-            state->execution_shared_state.loading_operation_cursor =
-                kan_repository_indexed_interval_write_query_execute_descending (
-                    &state->write_interval__resource_provider_loading_operation__priority, NULL, NULL);
-            state->execution_shared_state.end_time_ns = begin_time + state->load_budget_ns;
-
-            for (kan_loop_size_t worker_index = 0u; worker_index < cpu_count; ++worker_index)
+            state->execution_shared_state.job = job;
+            if (KAN_HANDLE_IS_VALID (state->hot_reload_system) &&
+                kan_hot_reload_coordination_system_is_hot_swap (state->hot_reload_system))
             {
-                KAN_CPU_TASK_LIST_USER_VALUE (&task_list_node, &state->temporary_allocator,
-                                              state->interned_resource_provider_server, execute_shared_serve, state)
+                state->execution_shared_state.min_priority = PRIORITY_HOT_SWAP;
+                state->execution_shared_state.end_time_ns = KAN_INT_MAX (kan_time_size_t);
+            }
+            else
+            {
+                state->execution_shared_state.min_priority = 0u;
+                state->execution_shared_state.end_time_ns = begin_time + state->load_budget_ns;
             }
 
-            kan_cpu_job_dispatch_and_detach_task_list (job, task_list_node);
+            dispatch_shared_serve (state);
         }
     }
 
@@ -2784,6 +2854,7 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void kan_reflection_generator_universe_resour
 
 void kan_resource_request_init (struct kan_resource_request_t *instance)
 {
+    instance->priority = KAN_RESOURCE_PROVIDER_USER_PRIORITY_MIN;
     instance->provided_container_id = KAN_TYPED_ID_32_SET_INVALID (kan_resource_container_id_t);
     instance->provided_third_party.data = NULL;
     instance->provided_third_party.size = 0u;

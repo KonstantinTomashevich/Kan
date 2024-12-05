@@ -113,6 +113,14 @@ struct kan_resource_third_party_data_t
     kan_memory_size_t size;
 };
 
+/// \brief Minimum valid priority for resource requests.
+/// \details Values outside min-max limits are used internally.
+#define KAN_RESOURCE_PROVIDER_USER_PRIORITY_MIN 0u
+
+/// \brief Maximum valid priority for resource requests.
+/// \details Values outside min-max limits are used internally.
+#define KAN_RESOURCE_PROVIDER_USER_PRIORITY_MAX (KAN_INT_MAX (kan_instance_size_t) / 2u)
+
 /// \brief Instance of resource request, used to communicate with resource provider.
 struct kan_resource_request_t
 {
