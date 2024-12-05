@@ -30,10 +30,10 @@ jobs:
             os: ubuntu-24.04
             build_type: Debug
             libraries_arch: x64
-          - preset: debug_windows_msvc
+          - preset: debug_windows_visual_studio_msvc
             os: windows-2022
             build_type: Debug
-          - preset: debug_windows_clang
+          - preset: debug_windows_visual_studio_clang
             os: windows-2022
             build_type: Debug
           - preset: release_linux_gcc
@@ -48,10 +48,10 @@ jobs:
             os: ubuntu-24.04
             build_type: Release
             libraries_arch: x64
-          - preset: release_windows_msvc
+          - preset: release_windows_visual_studio_msvc
             os: windows-2022
             build_type: Release
-          - preset: release_windows_clang
+          - preset: release_windows_visual_studio_clang
             os: windows-2022
             build_type: Release
 

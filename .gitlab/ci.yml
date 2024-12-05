@@ -1,0 +1,88 @@
+# This config is used on self-hosted GitLab instance for CI runs on local PC.
+# It is better suited for quick iterations of fixing CI than GitHub Actions as local PC is just faster right now.
+#
+# For this workflow, linux runner should have:
+# - cmake, git and python installed.
+# - gcc and clang installed.
+# - gcc x32 libs installed.
+# - X11 dev libs installed both in x64 and x32 modes.
+# - Vulkan SDK installed and Vulkan-capable GPU for graphics tests.
+#
+# For this workflow, windows runner should have:
+# - cmake, git and python installed (through choco).
+# - VS2022 with clang included installed.
+# - cl x64 and clang-cl x64 must be in path (for example, runner could be executed from x64 developer cmd).
+# - Vulkan SDK installed (but GPU is not required, we don't do GPU tests on Windows as of now).
+
+variables:
+  GIT_SUBMODULE_STRATEGY: recursive
+  GIT_SUBMODULE_DEPTH: 4
+
+stages:
+  - verify
+
+# Unified job for configuring, building and testing.
+build_and_test:
+  stage: verify
+  # We run this job only on merge requests, merges to master and manual requests.
+  rules:
+    - if: >
+        $CI_PIPELINE_SOURCE == "web" || 
+        $CI_PIPELINE_SOURCE == "api" || 
+        $CI_PIPELINE_SOURCE == "merge_request_event" ||
+        $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: always
+    - when: never
+  parallel:
+    matrix:
+      - PRESET:
+          - debug_linux_gcc
+          - debug_linux_gcc_x32
+          - debug_linux_clang
+        SYSTEM_TAG: linux
+        CONFIG: Debug
+      - PRESET: sanitize_linux_clang
+        SYSTEM_TAG: linux
+        CONFIG: Debug
+        # We use _INDEX variables as we weren't able to find a better way around one variable one arguments restriction
+        # when running commands in powershell on Windows.
+        CTEST_FLAG_0: -LE
+        CTEST_FLAG_1: GRAPHICS
+      - PRESET:
+          - release_linux_gcc
+          - release_linux_gcc_x32
+          - release_linux_clang
+        SYSTEM_TAG: linux
+        CONFIG: Release
+      - PRESET:
+          - debug_windows_ninja_msvc
+          - debug_windows_ninja_clang
+        SYSTEM_TAG: windows
+        CONFIG: Debug
+        # We use _INDEX variables as we weren't able to find a better way around one variable one arguments restriction
+        # when running commands in powershell on Windows.
+        CTEST_FLAG_0: -LE
+        CTEST_FLAG_1: GRAPHICS
+      - PRESET:
+          - release_windows_ninja_msvc
+          - release_windows_ninja_clang
+        SYSTEM_TAG: windows
+        CONFIG: Release
+        # We use _INDEX variables as we weren't able to find a better way around one variable one arguments restriction
+        # when running commands in powershell on Windows.
+        CTEST_FLAG_0: -LE
+        CTEST_FLAG_1: GRAPHICS
+  tags:
+    - $SYSTEM_TAG
+  script:
+    - cmake --preset $PRESET -B build/ci
+    - cd build/ci
+    - cmake --build . --target kan_clang_format_fix --config $CONFIG
+    - cmake --build . --target test_kan --config $CONFIG -j 5
+    - ctest --build-config $CONFIG --parallel 5 --output-on-failure $CTEST_FLAG_0 $CTEST_FLAG_1
+  artifacts:
+    name: test_logs_$PRESET
+    expire_in: 1 week
+    when: on_failure
+    paths:
+      - build/ci/Testing/Temporary
