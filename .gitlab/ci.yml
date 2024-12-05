@@ -56,3 +56,8 @@ build_and_test:
     - cmake --build . --target kan_clang_format_fix --config $CONFIG
     - cmake --build . --target test_kan --config $CONFIG -j 5
     - ctest --build-config $CONFIG --parallel 5 --output-on-failure $CTEST_FLAG_0 $CTEST_FLAG_1
+  artifacts:
+    name: test_logs_$PRESET
+    expire_in: 1 week
+    paths:
+      - build/ci/Testing/Temporary
