@@ -189,7 +189,6 @@ KAN_HANDLE_DEFINE (kan_render_read_back_status_t);
 /// \brief Contains render backend system configuration data.
 struct kan_render_backend_system_config_t
 {
-    kan_bool_t prefer_vsync;
     kan_interned_string_t application_info_name;
     kan_render_size_t version_major;
     kan_render_size_t version_minor;
@@ -351,6 +350,21 @@ kan_render_backend_system_get_render_context (kan_context_system_t render_backen
 CONTEXT_RENDER_BACKEND_SYSTEM_API kan_bool_t
 kan_render_backend_system_next_frame (kan_context_system_t render_backend_system);
 
+/// \brief Enumerates known present formats.
+enum kan_render_surface_present_mode_t
+{
+    /// \brief Special value that indicates that there is no more present modes in requested present queue.
+    KAN_RENDER_SURFACE_PRESENT_MODE_INVALID = 0u,
+
+    KAN_RENDER_SURFACE_PRESENT_MODE_IMMEDIATE,
+    KAN_RENDER_SURFACE_PRESENT_MODE_MAILBOX,
+    KAN_RENDER_SURFACE_PRESENT_MODE_FIFO,
+    KAN_RENDER_SURFACE_PRESENT_MODE_FIFO_RELAXED,
+
+    /// \brief Special value used to get count of known present modes.
+    KAN_RENDER_SURFACE_PRESENT_MODE_COUNT,
+};
+
 /// \brief Utility structure for integer regions.
 struct kan_render_integer_region_t
 {
@@ -362,9 +376,14 @@ struct kan_render_integer_region_t
 
 /// \brief Requests new render surface to be created. Surface will be created and initialized when
 ///        given application window becomes available.
+/// \details Present mode queue is an array of kan_render_surface_present_mode_t of size
+///          KAN_RENDER_SURFACE_PRESENT_MODE_COUNT. We check present modes in queue from first to last for their
+///          availability and select the first available. If array iterator reaches
+///          KAN_RENDER_SURFACE_PRESENT_MODE_INVALID value, then surface creation fails.
 CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_surface_t
 kan_render_backend_system_create_surface (kan_context_system_t render_backend_system,
                                           kan_application_system_window_t window,
+                                          enum kan_render_surface_present_mode_t *present_mode_queue,
                                           kan_interned_string_t tracking_name);
 
 /// \brief Blits given image onto given surface at the end of the frame.
@@ -373,6 +392,12 @@ CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_backend_system_present_image_o
     kan_render_image_t image,
     struct kan_render_integer_region_t image_region,
     struct kan_render_integer_region_t surface_region);
+
+/// \brief Recreates surface using new present mode queue (the same format as for creation).
+/// \details Surface will be recreated and initialized during next application system sync.
+CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_backend_system_change_surface_present_mode (
+    kan_render_surface_t surface,
+    enum kan_render_surface_present_mode_t *present_mode_queue);
 
 /// \brief Requests given surface to be destroyed when possible.
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_backend_system_destroy_surface (

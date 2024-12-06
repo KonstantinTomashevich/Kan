@@ -4,7 +4,6 @@ KAN_LOG_DEFINE_CATEGORY (render_backend_system_vulkan);
 
 void kan_render_backend_system_config_init (struct kan_render_backend_system_config_t *instance)
 {
-    instance->prefer_vsync = KAN_FALSE;
     instance->version_major = 1u;
     instance->version_minor = 0u;
     instance->version_patch = 0u;
@@ -164,7 +163,6 @@ kan_context_system_t render_backend_system_create (kan_allocation_group_t group,
     if (user_config)
     {
         struct kan_render_backend_system_config_t *config = user_config;
-        system->prefer_vsync = config->prefer_vsync;
         system->application_info_name = config->application_info_name;
         system->version_major = config->version_major;
         system->version_minor = config->version_minor;
@@ -172,7 +170,6 @@ kan_context_system_t render_backend_system_create (kan_allocation_group_t group,
     }
     else
     {
-        system->prefer_vsync = KAN_FALSE;
         system->application_info_name = kan_string_intern ("unnamed_application");
         system->version_major = 1u;
         system->version_minor = 0u;
@@ -3589,13 +3586,54 @@ static void render_backend_surface_create_swap_chain (struct render_backend_surf
     kan_bool_t present_mode_found = KAN_FALSE;
     VkPresentModeKHR surface_present_mode = VK_PRESENT_MODE_IMMEDIATE_KHR;
 
-    for (vulkan_size_t index = 0u; index < present_modes_count; ++index)
+    for (kan_loop_size_t queue_index = 0u; queue_index < (kan_loop_size_t) KAN_RENDER_SURFACE_PRESENT_MODE_COUNT;
+         ++queue_index)
     {
-        if ((surface->system->prefer_vsync && present_modes[index] == VK_PRESENT_MODE_FIFO_KHR) ||
-            present_modes[index] == VK_PRESENT_MODE_IMMEDIATE_KHR)
+        VkPresentModeKHR requested_mode = VK_PRESENT_MODE_MAX_ENUM_KHR;
+        switch (surface->present_modes_queue[queue_index])
         {
-            present_mode_found = KAN_TRUE;
-            surface_present_mode = present_modes[index];
+        case KAN_RENDER_SURFACE_PRESENT_MODE_INVALID:
+            break;
+
+        case KAN_RENDER_SURFACE_PRESENT_MODE_IMMEDIATE:
+            requested_mode = VK_PRESENT_MODE_IMMEDIATE_KHR;
+            break;
+
+        case KAN_RENDER_SURFACE_PRESENT_MODE_MAILBOX:
+            requested_mode = VK_PRESENT_MODE_MAILBOX_KHR;
+            break;
+
+        case KAN_RENDER_SURFACE_PRESENT_MODE_FIFO:
+            requested_mode = VK_PRESENT_MODE_FIFO_KHR;
+            break;
+
+        case KAN_RENDER_SURFACE_PRESENT_MODE_FIFO_RELAXED:
+            requested_mode = VK_PRESENT_MODE_FIFO_RELAXED_KHR;
+            break;
+
+        case KAN_RENDER_SURFACE_PRESENT_MODE_COUNT:
+            KAN_ASSERT (KAN_FALSE)
+            break;
+        }
+
+        if (requested_mode == VK_PRESENT_MODE_MAX_ENUM_KHR)
+        {
+            break;
+        }
+
+        for (kan_loop_size_t supported_index = 0u; supported_index < (kan_loop_size_t) present_modes_count;
+             ++supported_index)
+        {
+            if (present_modes[supported_index] == requested_mode)
+            {
+                present_mode_found = KAN_TRUE;
+                surface_present_mode = requested_mode;
+                break;
+            }
+        }
+
+        if (present_mode_found)
+        {
             break;
         }
     }
@@ -3796,7 +3834,12 @@ static kan_bool_t render_backend_system_acquire_images (struct render_backend_sy
         const struct kan_application_system_window_info_t *window_info =
             kan_application_system_get_window_info_from_handle (application_system, surface->window_handle);
 
-        if (surface->swap_chain == VK_NULL_HANDLE)
+        if (surface->needs_recreation)
+        {
+            acquired_all_images = KAN_FALSE;
+            any_swap_chain_outdated = KAN_TRUE;
+        }
+        else if (surface->swap_chain == VK_NULL_HANDLE)
         {
             KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR,
                      "Failed to acquire image for surface \"%s\" as its swap chain is not yet created.",
@@ -4221,9 +4264,11 @@ static void render_backend_surface_shutdown_with_window (void *user_data,
     kan_cpu_section_execution_shutdown (&execution);
 }
 
-kan_render_surface_t kan_render_backend_system_create_surface (kan_context_system_t render_backend_system,
-                                                               kan_application_system_window_t window,
-                                                               kan_interned_string_t tracking_name)
+kan_render_surface_t kan_render_backend_system_create_surface (
+    kan_context_system_t render_backend_system,
+    kan_application_system_window_t window,
+    enum kan_render_surface_present_mode_t *present_mode_queue,
+    kan_interned_string_t tracking_name)
 {
     struct render_backend_system_t *system = KAN_HANDLE_GET (render_backend_system);
     struct kan_cpu_section_execution_t execution;
@@ -4252,6 +4297,9 @@ kan_render_surface_t kan_render_backend_system_create_surface (kan_context_syste
     new_surface->blit_request_lock = kan_atomic_int_init (0);
     new_surface->first_blit_request = NULL;
     new_surface->first_frame_buffer_attachment = NULL;
+
+    memcpy (new_surface->present_modes_queue, present_mode_queue,
+            sizeof (enum kan_render_surface_present_mode_t) * KAN_RENDER_SURFACE_PRESENT_MODE_COUNT);
 
     kan_atomic_int_lock (&system->resource_registration_lock);
     kan_bd_list_add (&system->surfaces, NULL, &new_surface->list_node);
@@ -4301,6 +4349,15 @@ void kan_render_backend_system_present_image_on_surface (kan_render_surface_t su
     }
 
     kan_atomic_int_unlock (&data->blit_request_lock);
+}
+
+void kan_render_backend_system_change_surface_present_mode (kan_render_surface_t surface,
+                                                            enum kan_render_surface_present_mode_t *present_mode_queue)
+{
+    struct render_backend_surface_t *data = KAN_HANDLE_GET (surface);
+    memcpy (data->present_modes_queue, present_mode_queue,
+            sizeof (enum kan_render_surface_present_mode_t) * KAN_RENDER_SURFACE_PRESENT_MODE_COUNT);
+    data->needs_recreation = KAN_TRUE;
 }
 
 void kan_render_backend_system_destroy_surface (kan_context_system_t render_backend_system,

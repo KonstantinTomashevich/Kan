@@ -104,6 +104,8 @@ struct render_backend_surface_t
 
     kan_application_system_window_t window_handle;
     kan_application_system_window_resource_id_t resource_id;
+
+    enum kan_render_surface_present_mode_t present_modes_queue[KAN_RENDER_SURFACE_PRESENT_MODE_COUNT];
 };
 
 /// \details We have fully separate command state with pools and buffers for every frame in flight index,
@@ -966,8 +968,6 @@ struct render_backend_system_t
 #if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_PROFILE_MEMORY)
     struct memory_profiling_t memory_profiling;
 #endif
-
-    kan_bool_t prefer_vsync;
 
     kan_interned_string_t application_info_name;
     vulkan_size_t version_major;

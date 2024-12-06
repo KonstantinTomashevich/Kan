@@ -691,7 +691,6 @@ KAN_TEST_CASE (render_and_capture)
         kan_context_create (kan_allocation_group_get_child (kan_allocation_group_root (), "context"));
 
     struct kan_render_backend_system_config_t render_backend_config = {
-        .prefer_vsync = KAN_FALSE,
         .application_info_name = kan_string_intern ("Kan autotest"),
         .version_major = 1u,
         .version_minor = 0u,
@@ -746,14 +745,20 @@ KAN_TEST_CASE (render_and_capture)
     kan_application_system_window_t window_handle = kan_application_system_window_create (
         application_system, "Kan context_render_backend test window", fixed_window_size, fixed_window_size,
         // Not having KAN_PLATFORM_WINDOW_FLAG_RESIZABLE results in severe FPS drop on some NVIDIA drivers.
-        // It is okay for automatic test, but beware in real applications.
+        // It is okay for automatic test, but beware of it in real applications.
         flags);
 
     const struct kan_application_system_window_info_t *window_info =
         kan_application_system_get_window_info_from_handle (application_system, window_handle);
 
-    kan_render_surface_t test_surface =
-        kan_render_backend_system_create_surface (render_backend_system, window_handle, kan_string_intern ("test"));
+    enum kan_render_surface_present_mode_t present_mode_queue[KAN_RENDER_SURFACE_PRESENT_MODE_COUNT] = {
+        KAN_RENDER_SURFACE_PRESENT_MODE_MAILBOX, KAN_RENDER_SURFACE_PRESENT_MODE_IMMEDIATE,
+        KAN_RENDER_SURFACE_PRESENT_MODE_INVALID, KAN_RENDER_SURFACE_PRESENT_MODE_INVALID,
+        KAN_RENDER_SURFACE_PRESENT_MODE_INVALID,
+    };
+
+    kan_render_surface_t test_surface = kan_render_backend_system_create_surface (
+        render_backend_system, window_handle, present_mode_queue, kan_string_intern ("test"));
 
     kan_render_pass_t render_image_pass = create_render_image_pass (render_context);
     KAN_TEST_ASSERT (KAN_HANDLE_IS_VALID (render_image_pass))
