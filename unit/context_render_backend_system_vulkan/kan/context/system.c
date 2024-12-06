@@ -4144,6 +4144,10 @@ kan_bool_t kan_render_backend_system_next_frame (kan_context_system_t render_bac
             (struct render_backend_frame_lifetime_allocator_t *) frame_lifetime_allocator->list_node.next;
     }
 
+    struct render_backend_command_state_t *command_state =
+        &system->command_states[system->current_frame_in_flight_index];
+    command_state->secondary_command_buffers_used = 0u;
+
     kan_cpu_section_execution_shutdown (&next_frame_execution);
     return KAN_TRUE;
 }
