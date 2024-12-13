@@ -1020,8 +1020,9 @@ static void run_request_resources_and_check_test (kan_context_t context)
 
     struct kan_resource_provider_configuration_t resource_provider_configuration = {
         .scan_budget_ns = 2000000u,
-        .load_budget_ns = 2000000u,
+        .serve_budget_ns = 2000000u,
         .use_load_only_string_registry = KAN_TRUE,
+        .enable_runtime_compilation = KAN_FALSE,
         .resource_directory_path = kan_string_intern (WORKSPACE_MOUNT_PATH),
     };
 
@@ -1155,8 +1156,9 @@ KAN_TEST_CASE (file_system_observation)
 
     struct kan_resource_provider_configuration_t resource_provider_configuration = {
         .scan_budget_ns = 2000000u,
-        .load_budget_ns = 2000000u,
+        .serve_budget_ns = 2000000u,
         .use_load_only_string_registry = KAN_TRUE,
+        .enable_runtime_compilation = KAN_FALSE,
         .resource_directory_path = kan_string_intern (WORKSPACE_MOUNT_PATH),
     };
 
@@ -1233,8 +1235,9 @@ KAN_TEST_CASE (indexing_stress_test)
 
     struct kan_resource_provider_configuration_t resource_provider_configuration = {
         .scan_budget_ns = 2000000u,
-        .load_budget_ns = 2000000u,
+        .serve_budget_ns = 2000000u,
         .use_load_only_string_registry = KAN_TRUE,
+        .enable_runtime_compilation = KAN_FALSE,
         .resource_directory_path = kan_string_intern (WORKSPACE_MOUNT_PATH),
     };
 

@@ -226,7 +226,7 @@ UNIVERSE_RESOURCE_REFERENCE_KAN_API void mutator_template_deploy_resource_refere
 
     kan_resource_reference_type_info_storage_build (
         &state->info_storage, kan_universe_get_reflection_registry (universe),
-        kan_allocation_group_get_child (state->my_allocation_group, "scanned"));
+        kan_allocation_group_get_child (state->my_allocation_group, "reference_type_info_storage"));
 
     kan_stack_group_allocator_init (&state->temporary_allocator, state->my_allocation_group,
                                     KAN_UNIVERSE_RESOURCE_REFERENCE_TEMPORARY_STACK);
@@ -1019,6 +1019,8 @@ UNIVERSE_RESOURCE_REFERENCE_KAN_API void kan_reflection_generator_universe_resou
     kan_reflection_system_generation_iterator_t iterator,
     kan_loop_size_t iteration_index)
 {
+    // Resource reference scan is only needed for resources that are visible to the user on source tree.
+    // Therefore, we do not care about compilation, states and byproducts here.
     KAN_UNIVERSE_REFLECTION_GENERATOR_ITERATE_TYPES_WITH_META (
         struct kan_resource_resource_type_meta_t, instance->interned_kan_resource_resource_type_meta_t,
         reflection_generation_iteration_check_type, struct universe_resource_reference_type_node_t, first_resource_type,

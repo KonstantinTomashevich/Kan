@@ -176,9 +176,9 @@ struct kan_resource_provider_singleton_t
     /// \meta reflection_ignore_struct_field
     struct kan_atomic_int_t request_id_counter;
 
-    /// \brief When set to true, resource provider will stop serving, unload all the data and start rescan from scratch.
-    /// \details Automatically reset to false when rescanning is started.
-    kan_bool_t request_rescan;
+    /// \brief When set to true, resource provider will stop serving, unload all the data and start scan from scratch.
+    /// \details Automatically reset to false when scanning is started.
+    kan_bool_t request_reset;
 
     /// \brief Whether resource provider finished scanning for resources and is able to provide full list of entries.
     kan_bool_t scan_done;
@@ -204,11 +204,17 @@ struct kan_resource_provider_configuration_t
     kan_time_offset_t scan_budget_ns;
 
     /// \brief How much time in nanoseconds should be spent loading resources during update.
-    kan_time_offset_t load_budget_ns;
+    /// \details Or compiling if runtime compilation is enabled..
+    kan_time_offset_t serve_budget_ns;
 
     /// \brief Whether string registries should be loaded in load-only mode.
     /// \details Generally, should always be true as resource provider does not save assets at the moment.
     kan_bool_t use_load_only_string_registry;
+
+    /// \brief Whether compilation of raw resources in runtime should be enabled.
+    /// \details When it is enabled, when resource of compiled type is requested and it is absent, resource provider
+    ///          will try to execute full compilation routine in order to get this resource temporarily.
+    kan_bool_t enable_runtime_compilation;
 
     /// \brief Path to virtual directory with resources, that is used as resource root directory.
     kan_interned_string_t resource_directory_path;
@@ -247,5 +253,19 @@ UNIVERSE_RESOURCE_PROVIDER_API void kan_resource_third_party_entry_init (
 
 UNIVERSE_RESOURCE_PROVIDER_API void kan_resource_third_party_entry_shutdown (
     struct kan_resource_third_party_entry_t *instance);
+
+/// \brief Event that is send when known resource entry is changed or removed.
+/// \details Resource entry can have no requests, but this event will still be sent if resource entry is known to
+///          provider. When runtime compilation is enabled, it is also sent for compiled resources, that were produced
+///          at least once and therefore are known to the resource provider.
+/// \warning This event does not mean that data in requests is updated. Its goal is to inform about change of
+///          potentially outdated resources. For request updates, use `kan_resource_request_updated_event_t`.
+struct kan_resource_entry_changed_event_t
+{
+    /// \details NULL for third party entries.
+    kan_interned_string_t type;
+
+    kan_interned_string_t name;
+};
 
 KAN_C_HEADER_END

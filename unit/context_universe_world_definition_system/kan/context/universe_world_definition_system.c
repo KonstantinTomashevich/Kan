@@ -218,8 +218,10 @@ static void scan_file (struct universe_world_definition_system_t *system,
                                  scan_path_container->path)
             deserialized = KAN_FALSE;
         }
-
-        KAN_ASSERT (state == KAN_SERIALIZATION_FINISHED)
+        else
+        {
+            KAN_ASSERT (state == KAN_SERIALIZATION_FINISHED)
+        }
     }
 
     stream->operations->close (stream);

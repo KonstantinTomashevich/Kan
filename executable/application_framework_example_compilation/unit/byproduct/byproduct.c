@@ -158,7 +158,7 @@ APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API struct kan_resource_refe
 // As mentioned above, shader object compilation translates third party source links into byproducts.
 static enum kan_resource_compile_result_t shader_object_compile (struct kan_resource_compile_state_t *state)
 {
-    struct shader_object_t *input = state->input_instance;
+    const struct shader_object_t *input = state->input_instance;
     struct shader_object_t *output = state->output_instance;
 
     kan_dynamic_array_set_capacity (&output->sources, input->sources.size);
@@ -394,8 +394,12 @@ APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API struct kan_resource_refe
 
 static enum kan_resource_compile_result_t material_compile (struct kan_resource_compile_state_t *state)
 {
-    struct material_t *source = state->input_instance;
+    const struct material_t *source = state->input_instance;
     struct material_compiled_t *target = state->output_instance;
+
+    // TODO: We can make compilation even cooler by getting rid of shader object.
+    //       Material would have list of sources like shader object.
+    //       Material would produce byproduct with sorted list of sources which will logically replace shader object.
 
     // We only expect one dependency -- compiled shader object.
     KAN_ASSERT (state->dependencies_count == 1u)

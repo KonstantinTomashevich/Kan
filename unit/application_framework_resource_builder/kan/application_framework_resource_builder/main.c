@@ -723,6 +723,9 @@ static void third_party_entry_node_destroy (struct third_party_entry_node_t *nod
 
 static void load_platform_configuration (struct kan_file_system_path_container_t *path)
 {
+    // TODO: Move platform configuration to special context system so we would use the same logic for loading it for
+    //       resource builder and for runtime compilation.
+
     const struct kan_reflection_struct_t *file_type =
         kan_reflection_registry_query_struct (global.registry, interned_kan_resource_platform_configuration_t);
     KAN_ASSERT (file_type)
@@ -2306,6 +2309,7 @@ static void process_native_node_compilation (kan_functor_user_data_t user_data)
         struct kan_file_system_path_container_t path_container;
         form_references_cache_item_path (node, &path_container);
 
+        // TODO: Check platform configuration time, it might require new compilation.
         const kan_time_size_t source_time_ns = get_file_last_modification_time_ns (node->source_path);
         const kan_time_size_t reference_cache_time_ns = get_file_last_modification_time_ns (path_container.path);
         node->loaded_references_from_cache = KAN_FALSE;
@@ -2603,6 +2607,7 @@ static void process_native_node_compilation (kan_functor_user_data_t user_data)
                         KAN_ASSERT (dependency)
                         KAN_ASSERT (dependency->data)
                         dependency_array[dependency_index].data = dependency->data;
+                        dependency_array[dependency_index].data_size_if_third_party = dependency->size;
                     }
 
                     ++dependency_index;

@@ -125,7 +125,7 @@ static void kan_reflection_set_inline_array_size (const struct kan_reflection_fi
 
 kan_hash_t kan_reflection_hash_struct (kan_reflection_registry_t registry,
                                        const struct kan_reflection_struct_t *type,
-                                       void *instance)
+                                       const void *instance)
 {
     KAN_ASSERT (type)
     kan_bool_t first_hash = KAN_TRUE;
@@ -300,8 +300,8 @@ kan_hash_t kan_reflection_hash_struct (kan_reflection_registry_t registry,
 
 kan_bool_t kan_reflection_are_structs_equal (kan_reflection_registry_t registry,
                                              const struct kan_reflection_struct_t *type,
-                                             void *first,
-                                             void *second)
+                                             const void *first,
+                                             const void *second)
 {
     struct kan_reflection_visibility_iterator_t first_iterator;
     kan_reflection_visibility_iterator_init (&first_iterator, type, first);

@@ -77,7 +77,7 @@ APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_STATE_API struct kan_resource_resource
 
 static enum kan_resource_compile_result_t numbers_compile (struct kan_resource_compile_state_t *state)
 {
-    struct numbers_t *input = state->input_instance;
+    const struct numbers_t *input = state->input_instance;
     struct numbers_compiled_t *output = state->output_instance;
     struct numbers_compilation_state_t *user_state = state->user_state;
 

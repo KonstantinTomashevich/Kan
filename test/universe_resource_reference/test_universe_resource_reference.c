@@ -937,8 +937,9 @@ static void run_test (kan_context_t context, kan_interned_string_t test_mutator)
     kan_reflection_patch_builder_t patch_builder = kan_reflection_patch_builder_create ();
     struct kan_resource_provider_configuration_t resource_provider_configuration = {
         .scan_budget_ns = 2000000u,
-        .load_budget_ns = 2000000u,
+        .serve_budget_ns = 2000000u,
         .use_load_only_string_registry = KAN_TRUE,
+        .enable_runtime_compilation = KAN_FALSE,
         .resource_directory_path = kan_string_intern (WORKSPACE_RESOURCES_MOUNT_PATH),
     };
 
