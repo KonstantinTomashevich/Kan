@@ -161,7 +161,7 @@ KAN_C_HEADER_BEGIN
 /// \brief Header for singleton read query.
 #define KAN_UP_SINGLETON_READ(NAME, TYPE)                                                                              \
     /* Highlight-autocomplete replacement. */                                                                          \
-    struct TYPE *NAME = NULL;
+    const struct TYPE *NAME = NULL;
 
 /// \brief Header for singleton write query.
 #define KAN_UP_SINGLETON_WRITE(NAME, TYPE)                                                                             \

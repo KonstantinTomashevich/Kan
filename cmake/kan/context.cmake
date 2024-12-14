@@ -15,6 +15,9 @@ define_property (TARGET PROPERTY CONTEXT_SYSTEMS
         BRIEF_DOCS "Names of context systems that are exported by this target."
         FULL_DOCS "This list is used to autogenerate context statics.")
 
+# Custom target for storing property that contains content for all system names header.
+add_custom_target (context_generation_properties)
+
 # Informs build system that current unit exports system with given name to the context.
 # Arguments:
 # - NAME: System name for the registration.
@@ -34,18 +37,20 @@ function (register_context_system)
     set_target_properties ("${UNIT_NAME}" PROPERTIES CONTEXT_SYSTEMS "${CONTEXT_SYSTEMS}")
 
     if (NOT ARG_PRIVATE)
-        get_property (CONTENT GLOBAL PROPERTY INTERNAL_CONTEXT_ALL_SYSTEM_NAMES_CONTENT)
+        get_target_property (CONTENT context_generation_properties INTERNAL_CONTEXT_ALL_SYSTEM_NAMES_CONTENT)
         if (NOT CONTENT)
             set (CONTENT "#pragma once\n")
-            cumulative_file_generation_register (
-                    PATH "${KAN_CONTEXT_ALL_SYSTEM_NAMES_FILE}" PROPERTY INTERNAL_CONTEXT_ALL_SYSTEM_NAMES_CONTENT)
+            file (GENERATE OUTPUT "${KAN_CONTEXT_ALL_SYSTEM_NAMES_FILE}"
+                    CONTENT
+                    "$<TARGET_PROPERTY:context_generation_properties,INTERNAL_CONTEXT_ALL_SYSTEM_NAMES_CONTENT>")
         endif ()
 
         string (REGEX REPLACE "_t$" "" SYSTEM_NAME_DEFINE "${ARG_NAME}")
         string (TOUPPER "${SYSTEM_NAME_DEFINE}" SYSTEM_NAME_DEFINE)
         string (APPEND CONTENT "#define KAN_CONTEXT_${SYSTEM_NAME_DEFINE}_NAME \"${ARG_NAME}\"\n")
 
-        set_property (GLOBAL PROPERTY INTERNAL_CONTEXT_ALL_SYSTEM_NAMES_CONTENT "${CONTENT}")
+        set_target_properties (context_generation_properties PROPERTIES
+                INTERNAL_CONTEXT_ALL_SYSTEM_NAMES_CONTENT "${CONTENT}")
     endif ()
 endfunction ()
 

@@ -1,6 +1,6 @@
 //! material_t
 
-shader = shader_object_1
+shader_sources = "shader_source_1.rpl", "shader_source_2.rpl"
 
 +passes {
     name = "visible_world"

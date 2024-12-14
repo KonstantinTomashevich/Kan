@@ -77,7 +77,7 @@ APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_STATE_API struct kan_resource_resource
 
 static enum kan_resource_compile_result_t numbers_compile (struct kan_resource_compile_state_t *state)
 {
-    struct numbers_t *input = state->input_instance;
+    const struct numbers_t *input = state->input_instance;
     struct numbers_compiled_t *output = state->output_instance;
     struct numbers_compilation_state_t *user_state = state->user_state;
 
@@ -95,7 +95,6 @@ static enum kan_resource_compile_result_t numbers_compile (struct kan_resource_c
 
 struct state_test_singleton_t
 {
-    kan_bool_t checked_entries;
     kan_bool_t requested_loaded_data;
     kan_bool_t loaded_test_data;
     kan_resource_request_id_t test_request_id;
@@ -104,7 +103,6 @@ struct state_test_singleton_t
 APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_STATE_API void state_test_singleton_init (
     struct state_test_singleton_t *instance)
 {
-    instance->checked_entries = KAN_FALSE;
     instance->requested_loaded_data = KAN_FALSE;
     instance->loaded_test_data = KAN_FALSE;
 }
@@ -129,21 +127,6 @@ APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_STATE_API void kan_universe_mutator_de
         kan_context_query (context, KAN_CONTEXT_APPLICATION_FRAMEWORK_SYSTEM_NAME);
 }
 
-static kan_bool_t is_entry_exists (struct state_mutator_state_t *state,
-                                   kan_interned_string_t type,
-                                   kan_interned_string_t name)
-{
-    KAN_UP_VALUE_READ (entry, kan_resource_native_entry_t, name, &name)
-    {
-        if (entry->type == type)
-        {
-            KAN_UP_QUERY_RETURN_VALUE (kan_bool_t, KAN_TRUE);
-        }
-    }
-
-    return KAN_FALSE;
-}
-
 APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_STATE_API void kan_universe_mutator_execute_state_mutator (
     kan_cpu_job_t job, struct state_mutator_state_t *state)
 {
@@ -155,24 +138,7 @@ APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_STATE_API void kan_universe_mutator_ex
             KAN_UP_MUTATOR_RETURN;
         }
 
-        if (!test_singleton->checked_entries)
-        {
-            if (!is_entry_exists (state, kan_string_intern ("numbers_compiled_t"), kan_string_intern ("data")))
-            {
-                // We're in development mode and there is no runtime compilation as of now. Just exit, then.
-                if (KAN_HANDLE_IS_VALID (state->application_framework_system_handle))
-                {
-                    kan_application_framework_system_request_exit (state->application_framework_system_handle, 0);
-                }
-
-                KAN_UP_MUTATOR_RETURN;
-            }
-
-            test_singleton->checked_entries = KAN_TRUE;
-        }
-
-        if (test_singleton->checked_entries && !test_singleton->loaded_test_data &&
-            !test_singleton->requested_loaded_data)
+        if (!test_singleton->loaded_test_data && !test_singleton->requested_loaded_data)
         {
             KAN_UP_INDEXED_INSERT (request, kan_resource_request_t)
             {
@@ -186,8 +152,7 @@ APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_STATE_API void kan_universe_mutator_ex
             test_singleton->requested_loaded_data = KAN_TRUE;
         }
 
-        if (test_singleton->checked_entries && !test_singleton->loaded_test_data &&
-            test_singleton->requested_loaded_data)
+        if (!test_singleton->loaded_test_data && test_singleton->requested_loaded_data)
         {
             KAN_UP_VALUE_READ (request, kan_resource_request_t, request_id, &test_singleton->test_request_id)
             {
@@ -219,8 +184,7 @@ APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_STATE_API void kan_universe_mutator_ex
             }
         }
 
-        if (test_singleton->checked_entries && test_singleton->loaded_test_data &&
-            KAN_HANDLE_IS_VALID (state->application_framework_system_handle))
+        if (test_singleton->loaded_test_data && KAN_HANDLE_IS_VALID (state->application_framework_system_handle))
         {
             kan_application_framework_system_request_exit (state->application_framework_system_handle, 0);
         }

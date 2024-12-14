@@ -34,7 +34,7 @@
 /// \parblock
 /// Resources can be marked as compilable using `kan_resource_compilable_meta_t` meta, which contains
 /// essential data for resource compilation. When resource is compilable, it means that it would be replaced by
-/// other, more optimized and ready for use, resource of specified type during resource building process. When
+/// other, more optimized and ready for use, resource of other type during resource building process. When
 /// resource isn't compilable, it is just converted to binary format (with strings interned if specified by user).
 ///
 /// Compilation is a process of transforming data to a more optimized and ready to use format, that is done through
@@ -80,6 +80,7 @@ struct kan_resource_compilation_dependency_t
     kan_interned_string_t type;
     kan_interned_string_t name;
     const void *data;
+    kan_memory_size_t data_size_if_third_party;
 };
 
 /// \brief Defines interface of byproduct registration functor. Returns registered byproduct resource name.
@@ -94,13 +95,13 @@ typedef kan_interned_string_t (*kan_resource_compilation_register_byproduct_func
 struct kan_resource_compile_state_t
 {
     /// \brief Pointer to the raw instance of compilable type.
-    void *input_instance;
+    const void *input_instance;
 
     /// \brief Pointer to the pre-initialized instance of compilation output type.
     void *output_instance;
 
     /// \brief Pointer to platform configuration if required for compilation.
-    void *platform_configuration;
+    const void *platform_configuration;
 
     /// \brief Time in `kan_precise_time_get_elapsed_nanoseconds` format after which compilation should return.
     /// \details If compilation isn't finished and needs another run, return KAN_RESOURCE_PIPELINE_COMPILE_IN_PROGRESS.
@@ -146,7 +147,7 @@ typedef enum kan_resource_compile_result_t (*kan_resource_compile_functor_t) (
 /// \brief Meta that should be added to resource and byproduct types that can be compiled.
 struct kan_resource_compilable_meta_t
 {
-    /// \brief Name of the compilation output type.
+    /// \brief Name of the compilation output type. Should not be equal to the input type.
     const char *output_type_name;
 
     /// \brief Name of the platform configuration type. Optional, leave NULL if no configuration needed.

@@ -7,12 +7,12 @@
 #include <kan/context/all_system_names.h>
 #include <kan/context/hot_reload_coordination_system.h>
 #include <kan/context/reflection_system.h>
+#include <kan/context/resource_pipeline_system.h>
 #include <kan/context/universe_system.h>
 #include <kan/context/update_system.h>
 #include <kan/context/virtual_file_system.h>
 #include <kan/file_system/entry.h>
 #include <kan/file_system/stream.h>
-#include <kan/precise_time/precise_time.h>
 #include <kan/reflection/generated_reflection.h>
 #include <kan/reflection/patch.h>
 #include <kan/resource_pipeline/resource_pipeline.h>
@@ -875,6 +875,13 @@ static kan_context_t setup_context (void)
     KAN_TEST_CHECK (kan_context_request_system (context, KAN_CONTEXT_UNIVERSE_SYSTEM_NAME, NULL))
     KAN_TEST_CHECK (kan_context_request_system (context, KAN_CONTEXT_UPDATE_SYSTEM_NAME, NULL))
 
+    struct kan_resource_pipeline_system_config_t resource_pipeline_config;
+    kan_resource_pipeline_system_config_init (&resource_pipeline_config);
+    resource_pipeline_config.build_reference_type_info_storage = KAN_TRUE;
+
+    KAN_TEST_CHECK (
+        kan_context_request_system (context, KAN_CONTEXT_RESOURCE_PIPELINE_SYSTEM_NAME, &resource_pipeline_config))
+
     struct kan_virtual_file_system_config_t virtual_file_system_config;
     kan_virtual_file_system_config_init (&virtual_file_system_config);
     kan_dynamic_array_set_capacity (&virtual_file_system_config.mount_real, 2u);
@@ -937,7 +944,7 @@ static void run_test (kan_context_t context, kan_interned_string_t test_mutator)
     kan_reflection_patch_builder_t patch_builder = kan_reflection_patch_builder_create ();
     struct kan_resource_provider_configuration_t resource_provider_configuration = {
         .scan_budget_ns = 2000000u,
-        .load_budget_ns = 2000000u,
+        .serve_budget_ns = 2000000u,
         .use_load_only_string_registry = KAN_TRUE,
         .resource_directory_path = kan_string_intern (WORKSPACE_RESOURCES_MOUNT_PATH),
     };

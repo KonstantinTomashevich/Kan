@@ -6,172 +6,71 @@
 #include <kan/container/dynamic_array.h>
 #include <kan/context/all_system_names.h>
 #include <kan/context/application_framework_system.h>
-#include <kan/hash/hash.h>
 #include <kan/log/logging.h>
 #include <kan/resource_pipeline/resource_pipeline.h>
 #include <kan/universe/preprocessor_markup.h>
 #include <kan/universe/universe.h>
 #include <kan/universe_resource_provider/universe_resource_provider.h>
 
+#include <common/platform_configuration.h>
+
 // \c_interface_scanner_disable
 KAN_LOG_DEFINE_CATEGORY (application_framework_example_compilation_byproduct);
 // \c_interface_scanner_enable
 
-// Raw shader object just stores plain names of shader code sources.
-
-struct shader_object_t
-{
-    /// \meta reflection_dynamic_array_type = "kan_interned_string_t"
-    struct kan_dynamic_array_t sources;
-};
-
-APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API void shader_object_init (struct shader_object_t *instance)
-{
-    kan_dynamic_array_init (&instance->sources, 0u, sizeof (kan_interned_string_t), _Alignof (kan_interned_string_t),
-                            kan_allocation_group_stack_get ());
-}
-
-APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API void shader_object_shutdown (struct shader_object_t *instance)
-{
-    kan_dynamic_array_shutdown (&instance->sources);
-}
-
-// \meta reflection_struct_meta = "shader_object_t"
-APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API struct kan_resource_resource_type_meta_t
-    shader_object_resource_type_meta = {
-        .root = KAN_FALSE,
-};
-
-static enum kan_resource_compile_result_t shader_object_compile (struct kan_resource_compile_state_t *state);
-
-// \meta reflection_struct_meta = "shader_object_t"
-APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API struct kan_resource_compilable_meta_t
-    shader_object_compilable_meta = {
-        .output_type_name = "shader_object_compiled_t",
-        .configuration_type_name = NULL,
-        .state_type_name = NULL,
-        .functor = shader_object_compile,
-};
-
-// \meta reflection_struct_field_meta = "shader_object_t.sources"
-APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API struct kan_resource_reference_meta_t
-    shader_object_sources_reference_meta = {
-        .type = NULL, // Null means third party.
-        .compilation_usage = KAN_RESOURCE_REFERENCE_COMPILATION_USAGE_TYPE_NEEDED_RAW,
-};
-
-// Shader object byproducts are created for every source separately.
+// Shader source byproducts are created for every source separately.
 // We don't want to parse one shader code several times, therefore we use byproducts to merge everything.
 
-struct shader_object_source_byproduct_t
+struct shader_source_byproduct_t
 {
     kan_interned_string_t source;
 };
 
-// \meta reflection_struct_meta = "shader_object_source_byproduct_t"
+// \meta reflection_struct_meta = "shader_source_byproduct_t"
 APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API struct kan_resource_byproduct_type_meta_t
-    shader_object_source_byproduct_byproduct_type_meta = {
+    shader_source_byproduct_byproduct_type_meta = {
         .hash = NULL,
         .is_equal = NULL,
         .move = NULL,
         .reset = NULL,
 };
 
-static enum kan_resource_compile_result_t shader_object_source_byproduct_compile (
-    struct kan_resource_compile_state_t *state);
+static enum kan_resource_compile_result_t shader_source_byproduct_compile (struct kan_resource_compile_state_t *state);
 
-// \meta reflection_struct_meta = "shader_object_source_byproduct_t"
+// \meta reflection_struct_meta = "shader_source_byproduct_t"
 APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API struct kan_resource_compilable_meta_t
-    shader_object_source_byproduct_compilable_meta = {
-        .output_type_name = "shader_object_source_byproduct_compiled_t",
+    shader_source_byproduct_compilable_meta = {
+        .output_type_name = "shader_source_byproduct_compiled_t",
         .configuration_type_name = NULL,
         .state_type_name = NULL,
-        .functor = shader_object_source_byproduct_compile,
+        .functor = shader_source_byproduct_compile,
 };
 
-// \meta reflection_struct_field_meta = "shader_object_source_byproduct_t.source"
+// \meta reflection_struct_field_meta = "shader_source_byproduct_t.source"
 APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API struct kan_resource_reference_meta_t
-    shader_object_source_byproduct_source_meta = {
+    shader_source_byproduct_source_meta = {
         .type = NULL, // Null means third party.
         .compilation_usage = KAN_RESOURCE_REFERENCE_COMPILATION_USAGE_TYPE_NEEDED_RAW,
 };
 
-// Compiled shader object source byproduct contains data parsed from individual sources.
+// Compiled shader source byproduct contains data parsed from individual sources.
 // It would be empty in the example for simplicity.
 
-struct shader_object_source_byproduct_compiled_t
+struct shader_source_byproduct_compiled_t
 {
     kan_memory_size_t stub;
 };
 
-// \meta reflection_struct_meta = "shader_object_source_byproduct_compiled_t"
+// \meta reflection_struct_meta = "shader_source_byproduct_compiled_t"
 APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API struct kan_resource_resource_type_meta_t
-    shader_object_source_byproduct_compiled_meta = {
+    shader_source_byproduct_compiled_meta = {
         .root = KAN_FALSE,
 };
 
-static enum kan_resource_compile_result_t shader_object_source_byproduct_compile (
-    struct kan_resource_compile_state_t *state)
+static enum kan_resource_compile_result_t shader_source_byproduct_compile (struct kan_resource_compile_state_t *state)
 {
     // As this is only an example, not real material compiler, we just fill the stub here.
-    ((struct shader_object_source_byproduct_compiled_t *) state->output_instance)->stub = 0u;
-    return KAN_RESOURCE_PIPELINE_COMPILE_FINISHED;
-}
-
-// Compiled shader object is almost the same as regular shader object,
-// but it references byproducts instead of code sources.
-
-struct shader_object_compiled_t
-{
-    /// \meta reflection_dynamic_array_type = "kan_interned_string_t"
-    struct kan_dynamic_array_t sources;
-};
-
-_Static_assert (_Alignof (struct shader_object_compiled_t) <= _Alignof (kan_memory_size_t),
-                "Alignment has expected value.");
-
-APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API void shader_object_compiled_init (
-    struct shader_object_compiled_t *instance)
-{
-    kan_dynamic_array_init (&instance->sources, 0u, sizeof (kan_interned_string_t), _Alignof (kan_interned_string_t),
-                            kan_allocation_group_stack_get ());
-}
-
-APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API void shader_object_compiled_shutdown (
-    struct shader_object_compiled_t *instance)
-{
-    kan_dynamic_array_shutdown (&instance->sources);
-}
-
-// \meta reflection_struct_meta = "shader_object_compiled_t"
-APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API struct kan_resource_resource_type_meta_t
-    shader_object_compiled_resource_type_meta = {
-        .root = KAN_FALSE,
-};
-
-// \meta reflection_struct_field_meta = "shader_object_compiled_t.sources"
-APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API struct kan_resource_reference_meta_t
-    shader_object_compiled_sources_reference_meta = {
-        .type = "shader_object_source_byproduct_t",
-        .compilation_usage = KAN_RESOURCE_REFERENCE_COMPILATION_USAGE_TYPE_NOT_NEEDED};
-
-// As mentioned above, shader object compilation translates third party source links into byproducts.
-static enum kan_resource_compile_result_t shader_object_compile (struct kan_resource_compile_state_t *state)
-{
-    struct shader_object_t *input = state->input_instance;
-    struct shader_object_t *output = state->output_instance;
-
-    kan_dynamic_array_set_capacity (&output->sources, input->sources.size);
-    struct shader_object_source_byproduct_t byproduct;
-    const kan_interned_string_t byproduct_type_name = kan_string_intern ("shader_object_source_byproduct_t");
-
-    for (kan_loop_size_t index = 0u; index < input->sources.size; ++index)
-    {
-        byproduct.source = ((kan_interned_string_t *) input->sources.data)[index];
-        *(kan_interned_string_t *) kan_dynamic_array_add_last (&output->sources) =
-            state->register_byproduct (state->interface_user_data, byproduct_type_name, &byproduct);
-    }
-
+    ((struct shader_source_byproduct_compiled_t *) state->output_instance)->stub = 0u;
     return KAN_RESOURCE_PIPELINE_COMPILE_FINISHED;
 }
 
@@ -204,7 +103,8 @@ APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API void material_pass_shutd
 
 struct material_t
 {
-    kan_interned_string_t shader;
+    /// \meta reflection_dynamic_array_type = "kan_interned_string_t"
+    struct kan_dynamic_array_t shader_sources;
 
     /// \meta reflection_dynamic_array_type = "struct material_pass_t"
     struct kan_dynamic_array_t passes;
@@ -212,6 +112,8 @@ struct material_t
 
 APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API void material_init (struct material_t *instance)
 {
+    kan_dynamic_array_init (&instance->shader_sources, 0u, sizeof (kan_interned_string_t),
+                            _Alignof (kan_interned_string_t), kan_allocation_group_stack_get ());
     kan_dynamic_array_init (&instance->passes, 0u, sizeof (struct material_pass_t), _Alignof (struct material_pass_t),
                             kan_allocation_group_stack_get ());
 }
@@ -223,6 +125,7 @@ APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API void material_shutdown (
         material_pass_shutdown (&((struct material_pass_t *) instance->passes.data)[index]);
     }
 
+    kan_dynamic_array_shutdown (&instance->shader_sources);
     kan_dynamic_array_shutdown (&instance->passes);
 }
 
@@ -241,13 +144,6 @@ APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API struct kan_resource_comp
         .configuration_type_name = NULL,
         .state_type_name = NULL,
         .functor = material_compile,
-};
-
-// \meta reflection_struct_field_meta = "material_t.shader"
-APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API struct kan_resource_reference_meta_t
-    material_sources_reference_meta = {
-        .type = "shader_object_t",
-        .compilation_usage = KAN_RESOURCE_REFERENCE_COMPILATION_USAGE_TYPE_NEEDED_COMPILED,
 };
 
 // Pipeline instance byproduct contains all the information required to compile render pipeline:
@@ -302,29 +198,9 @@ APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API struct kan_resource_comp
 // \meta reflection_struct_field_meta = "pipeline_instance_byproduct_t.sources"
 APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API struct kan_resource_reference_meta_t
     pipeline_instance_byproduct_source_meta = {
-        .type = "shader_object_source_byproduct_t",
+        .type = "shader_source_byproduct_t",
         .compilation_usage = KAN_RESOURCE_REFERENCE_COMPILATION_USAGE_TYPE_NEEDED_COMPILED,
 };
-
-// Pipeline instance compilation configuration.
-// As it is only example stub, we just use simple enum.
-
-enum pipeline_instance_platform_format_t
-{
-    PIPELINE_INSTANCE_PLATFORM_FORMAT_UNKNOWN = 0u,
-    PIPELINE_INSTANCE_PLATFORM_FORMAT_SPIRV,
-};
-
-struct pipeline_instance_platform_configuration_t
-{
-    enum pipeline_instance_platform_format_t format;
-};
-
-APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API void pipeline_instance_platform_configuration_init (
-    struct pipeline_instance_platform_configuration_t *instance)
-{
-    instance->format = PIPELINE_INSTANCE_PLATFORM_FORMAT_UNKNOWN;
-}
 
 // Compiled pipeline instance byproduct contains pipeline compiled code.
 // It would be empty in the example for simplicity.
@@ -344,7 +220,7 @@ static enum kan_resource_compile_result_t pipeline_instance_byproduct_compile (
     struct kan_resource_compile_state_t *state)
 {
     KAN_ASSERT (state->platform_configuration)
-    struct pipeline_instance_platform_configuration_t *configuration = state->platform_configuration;
+    const struct pipeline_instance_platform_configuration_t *configuration = state->platform_configuration;
 
     // As this is only an example, not real material compiler, we just fill the stub here.
     ((struct pipeline_instance_byproduct_compiled_t *) state->output_instance)->format = configuration->format;
@@ -394,35 +270,36 @@ APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API struct kan_resource_refe
 
 static enum kan_resource_compile_result_t material_compile (struct kan_resource_compile_state_t *state)
 {
-    struct material_t *source = state->input_instance;
+    const struct material_t *source = state->input_instance;
     struct material_compiled_t *target = state->output_instance;
-
-    // We only expect one dependency -- compiled shader object.
-    KAN_ASSERT (state->dependencies_count == 1u)
-    const struct shader_object_compiled_t *shader_object = state->dependencies[0u].data;
 
     kan_allocation_group_t temporary_allocation_group =
         kan_allocation_group_get_child (kan_allocation_group_root (), "material_compilation");
-    struct kan_dynamic_array_t sorted_sources;
 
-    kan_dynamic_array_init (&sorted_sources, shader_object->sources.size, sizeof (kan_interned_string_t),
+    struct kan_dynamic_array_t sources;
+    kan_dynamic_array_init (&sources, source->shader_sources.size, sizeof (kan_interned_string_t),
                             _Alignof (kan_interned_string_t), temporary_allocation_group);
 
-    for (kan_loop_size_t copy_index = 0u; copy_index < shader_object->sources.size; ++copy_index)
+    struct shader_source_byproduct_t shader_source;
+    const kan_interned_string_t shader_source_type_name = kan_string_intern ("shader_source_byproduct_t");
+
+    for (kan_loop_size_t index = 0u; index < source->shader_sources.size; ++index)
     {
-        *(kan_interned_string_t *) kan_dynamic_array_add_last (&sorted_sources) =
-            ((kan_interned_string_t *) shader_object->sources.data)[copy_index];
+        shader_source.source = ((kan_interned_string_t *) source->shader_sources.data)[index];
+        *(kan_interned_string_t *) kan_dynamic_array_add_last (&sources) =
+            state->register_byproduct (state->interface_user_data, shader_source_type_name, &shader_source);
     }
 
+    // Sort shader sources to ensure stable order of sources for pipeline instance.
     {
         kan_interned_string_t temporary;
 
-#define AT_INDEX(INDEX) (((kan_interned_string_t *) sorted_sources.data)[INDEX])
+#define AT_INDEX(INDEX) (((kan_interned_string_t *) sources.data)[INDEX])
 #define LESS(first_index, second_index) AT_INDEX (first_index) < AT_INDEX (second_index)
 #define SWAP(first_index, second_index)                                                                                \
     temporary = AT_INDEX (first_index), AT_INDEX (first_index) = AT_INDEX (second_index),                              \
     AT_INDEX (second_index) = temporary
-        QSORT (sorted_sources.size, LESS, SWAP);
+        QSORT (sources.size, LESS, SWAP);
 #undef LESS
 #undef SWAP
 #undef AT_INDEX
@@ -439,11 +316,11 @@ static enum kan_resource_compile_result_t material_compile (struct kan_resource_
         struct material_pass_compiled_t *target_pass = kan_dynamic_array_add_last (&target->passes);
         target_pass->name = source_pass->name;
 
-        kan_dynamic_array_set_capacity (&pipeline_instance.sources, sorted_sources.size);
-        for (kan_loop_size_t copy_index = 0u; copy_index < sorted_sources.size; ++copy_index)
+        kan_dynamic_array_set_capacity (&pipeline_instance.sources, sources.size);
+        for (kan_loop_size_t copy_index = 0u; copy_index < sources.size; ++copy_index)
         {
             *(kan_interned_string_t *) kan_dynamic_array_add_last (&pipeline_instance.sources) =
-                ((kan_interned_string_t *) sorted_sources.data)[copy_index];
+                ((kan_interned_string_t *) sources.data)[copy_index];
         }
 
         kan_dynamic_array_set_capacity (&pipeline_instance.options, source_pass->options.size);
@@ -471,7 +348,7 @@ static enum kan_resource_compile_result_t material_compile (struct kan_resource_
             state->register_byproduct (state->interface_user_data, pipeline_instance_type_name, &pipeline_instance);
     }
 
-    kan_dynamic_array_shutdown (&sorted_sources);
+    kan_dynamic_array_shutdown (&sources);
     pipeline_instance_byproduct_shutdown (&pipeline_instance);
     return KAN_RESOURCE_PIPELINE_COMPILE_FINISHED;
 }
@@ -552,10 +429,10 @@ static void check_entries (struct byproduct_mutator_state_t *state, struct bypro
     const kan_bool_t in_compiled_mode =
         is_entry_exists (state, kan_string_intern ("material_compiled_t"), kan_string_intern ("material_1"));
 
-    if (is_any_entry_exists (state, kan_string_intern ("shader_object_source_byproduct_compiled_t")))
+    if (is_any_entry_exists (state, kan_string_intern ("shader_source_byproduct_compiled_t")))
     {
         KAN_LOG (application_framework_example_compilation_byproduct, KAN_LOG_ERROR,
-                 "Found \"shader_object_source_byproduct_compiled_t\" which are unexpected!")
+                 "Found \"shader_source_byproduct_compiled_t\" which are unexpected!")
         everything_ok = KAN_FALSE;
     }
 
@@ -568,13 +445,6 @@ static void check_entries (struct byproduct_mutator_state_t *state, struct bypro
 
     if (in_compiled_mode)
     {
-        if (is_any_entry_exists (state, kan_string_intern ("shader_object_t")))
-        {
-            KAN_LOG (application_framework_example_compilation_byproduct, KAN_LOG_ERROR,
-                     "Found \"shader_object_t\" which are unexpected!")
-            everything_ok = KAN_FALSE;
-        }
-
         if (!is_any_entry_exists (state, kan_string_intern ("pipeline_instance_byproduct_compiled_t")))
         {
             KAN_LOG (application_framework_example_compilation_byproduct, KAN_LOG_ERROR,
@@ -622,7 +492,7 @@ static void check_entries (struct byproduct_mutator_state_t *state, struct bypro
         if (is_any_entry_exists (state, kan_string_intern ("pipeline_instance_byproduct_compiled_t")))
         {
             KAN_LOG (application_framework_example_compilation_byproduct, KAN_LOG_ERROR,
-                     "Found \"shader_object_source_byproduct_compiled_t\" which are unexpected!")
+                     "Found \"shader_source_byproduct_compiled_t\" which are unexpected!")
             everything_ok = KAN_FALSE;
         }
 
@@ -659,13 +529,6 @@ static void check_entries (struct byproduct_mutator_state_t *state, struct bypro
             KAN_LOG (application_framework_example_compilation_byproduct, KAN_LOG_ERROR,
                      "Unable to find \"material_4\" of type \"material_t\"!")
             everything_ok = KAN_FALSE;
-        }
-
-        // There is no runtime compilation yet, we have nothing to do after this check.
-        if (everything_ok && KAN_HANDLE_IS_VALID (state->application_framework_system_handle))
-        {
-            kan_application_framework_system_request_exit (state->application_framework_system_handle, 0);
-            return;
         }
     }
 
