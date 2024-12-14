@@ -198,12 +198,14 @@ static void resource_pipeline_system_load_platform_configuration_recursive (
     {
         KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, resource_pipeline_system, KAN_LOG_ERROR,
                              "Failed to read type header of \"%s\".", path->path)
+        input_stream->operations->close (input_stream);
         return;
     }
     else if (type_name != file_type->name)
     {
         KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, resource_pipeline_system, KAN_LOG_ERROR,
                              "Expected type \"%s\" at \"%s\", but got \"%s\".", file_type->name, path->path, type_name)
+        input_stream->operations->close (input_stream);
         return;
     }
     else
@@ -223,6 +225,8 @@ static void resource_pipeline_system_load_platform_configuration_recursive (
         }
 
         kan_serialization_rd_reader_destroy (reader);
+        input_stream->operations->close (input_stream);
+
         if (serialization_state == KAN_SERIALIZATION_FAILED)
         {
             KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, resource_pipeline_system, KAN_LOG_ERROR,
