@@ -3245,6 +3245,10 @@ static kan_interned_string_t compilation_interface_register_byproduct (kan_funct
         meta->hash ? meta->hash (byproduct_data) :
                      kan_reflection_hash_struct (state->reflection_registry, byproduct_type, byproduct_data);
 
+    // We need to save name and use it everywhere as we can't safely use locking with universe preprocessor:
+    // with preprocessor we have no way to close queries before lock is unlocked.
+    kan_interned_string_t byproduct_name = NULL;
+
     // Byproducts need to be registered under lock in order to avoid excessive byproduct creation.
     kan_atomic_int_lock (&state->execution_shared_state.byproduct_lock);
 
@@ -3284,11 +3288,17 @@ static kan_interned_string_t compilation_interface_register_byproduct (kan_funct
                         production->compilation_index = data->pending_compilation_index;
                     }
 
-                    kan_atomic_int_unlock (&state->execution_shared_state.byproduct_lock);
-                    KAN_UP_QUERY_RETURN_VALUE (kan_interned_string_t, byproduct->name);
+                    byproduct_name = byproduct->name;
+                    KAN_UP_QUERY_BREAK;
                 }
             }
         }
+    }
+
+    if (byproduct_name)
+    {
+        kan_atomic_int_unlock (&state->execution_shared_state.byproduct_lock);
+        return byproduct_name;
     }
 
     KAN_UP_INDEXED_INSERT (new_byproduct, resource_provider_raw_byproduct_entry_t)
@@ -3338,16 +3348,13 @@ static kan_interned_string_t compilation_interface_register_byproduct (kan_funct
                 production->compilation_index = data->pending_compilation_index;
             }
 
+            byproduct_name = new_byproduct->name;
             kan_repository_indexed_insertion_package_submit (&container_package);
-            kan_atomic_int_unlock (&state->execution_shared_state.byproduct_lock);
-            KAN_UP_QUERY_RETURN_VALUE (kan_interned_string_t, new_byproduct->name);
         }
     }
 
     kan_atomic_int_unlock (&state->execution_shared_state.byproduct_lock);
-    // Should never reach here. Insertion above should always succeed.
-    KAN_ASSERT (KAN_FALSE)
-    return NULL;
+    return byproduct_name;
 }
 
 static enum resource_provider_serve_operation_status_t execute_shared_serve_compile (
