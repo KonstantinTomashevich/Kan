@@ -204,7 +204,7 @@ struct kan_resource_provider_configuration_t
     kan_time_offset_t scan_budget_ns;
 
     /// \brief How much time in nanoseconds should be spent loading resources during update.
-    /// \details Or compiling if runtime compilation is enabled..
+    /// \details Or compiling if runtime compilation is enabled.
     kan_time_offset_t serve_budget_ns;
 
     /// \brief Whether string registries should be loaded in load-only mode.

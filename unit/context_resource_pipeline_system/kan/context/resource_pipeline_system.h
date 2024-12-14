@@ -73,7 +73,7 @@ CONTEXT_RESOURCE_PIPELINE_SYSTEM_API void kan_resource_pipeline_system_remove_pl
 CONTEXT_RESOURCE_PIPELINE_SYSTEM_API kan_bool_t
 kan_resource_pipeline_system_is_runtime_compilation_enabled (kan_context_system_t system);
 
-/// \brief Returns reference type info storage which is built for this execution (if any).
+/// \brief Returns reference type info storage which is built for this execution or NULL if not enabled.
 CONTEXT_RESOURCE_PIPELINE_SYSTEM_API struct kan_resource_reference_type_info_storage_t *
 kan_resource_pipeline_system_get_reference_type_info_storage (kan_context_system_t system);
 

@@ -13,7 +13,10 @@ KAN_C_HEADER_BEGIN
 /// \brief Additional optional capabilities for application tool context.
 enum kan_application_tool_context_capability_t
 {
+    /// \brief Enables platform configuration loading.
     KAN_APPLICATION_TOOL_CONTEXT_CAPABILITY_PLATFORM_CONFIGURATION = 1u << 0u,
+
+    /// \brief Enables reference type info storage building.
     KAN_APPLICATION_TOOL_CONTEXT_CAPABILITY_REFERENCE_TYPE_INFO_STORAGE = 1u << 1u,
 };
 

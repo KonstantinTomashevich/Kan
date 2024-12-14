@@ -7,6 +7,7 @@
 KAN_C_HEADER_BEGIN
 
 // Pipeline instance compilation configuration for byproduct test.
+// Part of the common because everything that is in the platform configuration must be common.
 // As it is only example stub, we just use simple enum.
 
 enum pipeline_instance_platform_format_t
