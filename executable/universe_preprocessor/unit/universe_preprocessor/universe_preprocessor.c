@@ -1107,7 +1107,7 @@ static inline enum parse_response_t process_generate_state_queries (const char *
         struct scanned_signal_query_t *query =
             &((struct scanned_signal_query_t *) state->indexed_signal_read_queries.data)[index];
 
-        if (!output_string ("struct kan_repository_indexed_signal_read_query_t read_value__") ||
+        if (!output_string ("struct kan_repository_indexed_signal_read_query_t read_signal__") ||
             !output_string (query->type) || !output_string ("__") || !output_field_path (query->field_path) ||
             !output_string ("__") || !output_string (query->signal_value) || !output_string (";\n"))
         {
@@ -1121,7 +1121,7 @@ static inline enum parse_response_t process_generate_state_queries (const char *
         struct scanned_signal_query_t *query =
             &((struct scanned_signal_query_t *) state->indexed_signal_update_queries.data)[index];
 
-        if (!output_string ("struct kan_repository_indexed_signal_update_query_t update_value__") ||
+        if (!output_string ("struct kan_repository_indexed_signal_update_query_t update_signal__") ||
             !output_string (query->type) || !output_string ("__") || !output_field_path (query->field_path) ||
             !output_string ("__") || !output_string (query->signal_value) || !output_string (";\n"))
         {
@@ -1135,7 +1135,7 @@ static inline enum parse_response_t process_generate_state_queries (const char *
         struct scanned_signal_query_t *query =
             &((struct scanned_signal_query_t *) state->indexed_signal_delete_queries.data)[index];
 
-        if (!output_string ("struct kan_repository_indexed_signal_delete_query_t delete_value__") ||
+        if (!output_string ("struct kan_repository_indexed_signal_delete_query_t delete_signal__") ||
             !output_string (query->type) || !output_string ("__") || !output_field_path (query->field_path) ||
             !output_string ("__") || !output_string (query->signal_value) || !output_string (";\n"))
         {
@@ -1149,7 +1149,7 @@ static inline enum parse_response_t process_generate_state_queries (const char *
         struct scanned_signal_query_t *query =
             &((struct scanned_signal_query_t *) state->indexed_signal_write_queries.data)[index];
 
-        if (!output_string ("struct kan_repository_indexed_signal_write_query_t write_value__") ||
+        if (!output_string ("struct kan_repository_indexed_signal_write_query_t write_signal__") ||
             !output_string (query->type) || !output_string ("__") || !output_field_path (query->field_path) ||
             !output_string ("__") || !output_string (query->signal_value) || !output_string (";\n"))
         {
