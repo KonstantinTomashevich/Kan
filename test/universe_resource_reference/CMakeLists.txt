@@ -8,7 +8,8 @@ concrete_require (
         context_hot_reload_coordination_system file_system platform precise_time universe_resource_provider
         universe_resource_reference
         CONCRETE_INTERFACE
-        context_reflection_system context_update_system context_virtual_file_system serialization testing universe)
+        context_reflection_system context_resource_pipeline_system context_update_system context_virtual_file_system
+        serialization testing universe)
 
 abstract_get_implementations (ABSTRACT universe_resource_reference OUTPUT PROVIDER_IMPLEMENTATIONS)
 foreach (IMPLEMENTATION ${PROVIDER_IMPLEMENTATIONS})
@@ -25,8 +26,9 @@ foreach (IMPLEMENTATION ${PROVIDER_IMPLEMENTATIONS})
             workflow=kan
             CONCRETE
             container context context_application_system context_plugin_system context_reflection_system
-            context_update_system context_virtual_file_system reflection_helpers resource_index resource_pipeline
-            readable_data serialization testing test_universe_resource_reference universe)
+            context_resource_pipeline_system context_update_system context_virtual_file_system reflection_helpers
+            resource_index resource_pipeline readable_data serialization testing test_universe_resource_reference
+            universe)
 
     generate_artefact_context_data ()
     generate_artefact_reflection_data ()

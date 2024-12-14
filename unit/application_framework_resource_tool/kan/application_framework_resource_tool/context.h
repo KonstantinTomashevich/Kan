@@ -10,8 +10,17 @@
 
 KAN_C_HEADER_BEGIN
 
-/// \brief Creates and assembles minimalistic context with plugins and reflection, which is enough for most tools.
-APPLICATION_FRAMEWORK_RESOURCE_TOOL_API kan_context_t kan_application_create_resource_tool_context (
-    const struct kan_application_resource_project_t *project, const char *executable_path);
+/// \brief Additional optional capabilities for application tool context.
+enum kan_application_tool_context_capability_t
+{
+    KAN_APPLICATION_TOOL_CONTEXT_CAPABILITY_PLATFORM_CONFIGURATION = 1u << 0u,
+    KAN_APPLICATION_TOOL_CONTEXT_CAPABILITY_REFERENCE_TYPE_INFO_STORAGE = 1u << 1u,
+};
+
+/// \brief Creates and assembles minimalistic context with plugins, reflection and specified capabilities if any.
+APPLICATION_FRAMEWORK_RESOURCE_TOOL_API kan_context_t
+kan_application_create_resource_tool_context (const struct kan_application_resource_project_t *project,
+                                              const char *executable_path,
+                                              enum kan_application_tool_context_capability_t capability_flags);
 
 KAN_C_HEADER_END

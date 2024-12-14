@@ -6,12 +6,13 @@
 #include <kan/container/dynamic_array.h>
 #include <kan/context/all_system_names.h>
 #include <kan/context/application_framework_system.h>
-#include <kan/hash/hash.h>
 #include <kan/log/logging.h>
 #include <kan/resource_pipeline/resource_pipeline.h>
 #include <kan/universe/preprocessor_markup.h>
 #include <kan/universe/universe.h>
 #include <kan/universe_resource_provider/universe_resource_provider.h>
+
+#include <common/platform_configuration.h>
 
 // \c_interface_scanner_disable
 KAN_LOG_DEFINE_CATEGORY (application_framework_example_compilation_byproduct);
@@ -306,26 +307,6 @@ APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API struct kan_resource_refe
         .compilation_usage = KAN_RESOURCE_REFERENCE_COMPILATION_USAGE_TYPE_NEEDED_COMPILED,
 };
 
-// Pipeline instance compilation configuration.
-// As it is only example stub, we just use simple enum.
-
-enum pipeline_instance_platform_format_t
-{
-    PIPELINE_INSTANCE_PLATFORM_FORMAT_UNKNOWN = 0u,
-    PIPELINE_INSTANCE_PLATFORM_FORMAT_SPIRV,
-};
-
-struct pipeline_instance_platform_configuration_t
-{
-    enum pipeline_instance_platform_format_t format;
-};
-
-APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API void pipeline_instance_platform_configuration_init (
-    struct pipeline_instance_platform_configuration_t *instance)
-{
-    instance->format = PIPELINE_INSTANCE_PLATFORM_FORMAT_UNKNOWN;
-}
-
 // Compiled pipeline instance byproduct contains pipeline compiled code.
 // It would be empty in the example for simplicity.
 
@@ -344,7 +325,7 @@ static enum kan_resource_compile_result_t pipeline_instance_byproduct_compile (
     struct kan_resource_compile_state_t *state)
 {
     KAN_ASSERT (state->platform_configuration)
-    struct pipeline_instance_platform_configuration_t *configuration = state->platform_configuration;
+    const struct pipeline_instance_platform_configuration_t *configuration = state->platform_configuration;
 
     // As this is only an example, not real material compiler, we just fill the stub here.
     ((struct pipeline_instance_byproduct_compiled_t *) state->output_instance)->format = configuration->format;
@@ -663,13 +644,6 @@ static void check_entries (struct byproduct_mutator_state_t *state, struct bypro
             KAN_LOG (application_framework_example_compilation_byproduct, KAN_LOG_ERROR,
                      "Unable to find \"material_4\" of type \"material_t\"!")
             everything_ok = KAN_FALSE;
-        }
-
-        // There is no runtime compilation yet, we have nothing to do after this check.
-        if (everything_ok && KAN_HANDLE_IS_VALID (state->application_framework_system_handle))
-        {
-            kan_application_framework_system_request_exit (state->application_framework_system_handle, 0);
-            return;
         }
     }
 

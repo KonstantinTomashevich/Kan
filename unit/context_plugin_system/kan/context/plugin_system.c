@@ -40,6 +40,7 @@ struct plugin_system_t
     kan_time_size_t newest_loaded_plugin_last_modification_file_time_ns;
 
     kan_time_size_t hot_reload_after_ns;
+    kan_time_size_t last_hot_reload_time_ns;
     kan_file_system_watcher_t watcher;
     kan_file_system_watcher_iterator_t watcher_iterator;
 };
@@ -91,6 +92,7 @@ kan_context_system_t plugin_system_create (kan_allocation_group_t group, void *u
     system->newest_loaded_plugin_last_modification_file_time_ns = 0u;
     system->hot_reload_directory_id = 0u;
     system->hot_reload_after_ns = KAN_INT_MAX (kan_time_size_t);
+    system->last_hot_reload_time_ns = 0u;
     system->watcher = KAN_HANDLE_SET_INVALID (kan_file_system_watcher_t);
     return KAN_HANDLE_SET (kan_context_system_t, system);
 }
@@ -358,12 +360,14 @@ void plugin_system_on_update (kan_context_system_t handle)
         break;
 
     case KAN_HOT_RELOAD_MODE_ON_REQUEST:
-        do_hot_reload = kan_hot_reload_coordination_system_is_hot_swap (hot_reload_system);
+        do_hot_reload = kan_hot_reload_coordination_system_is_hot_swap (hot_reload_system) &&
+                        system->last_hot_reload_time_ns < system->hot_reload_after_ns;
         break;
     }
 
     if (do_hot_reload)
     {
+        system->last_hot_reload_time_ns = system->hot_reload_after_ns;
         const kan_instance_size_t old_directory_id = system->hot_reload_directory_id;
         update_hot_reload_id (system);
         init_hot_reload_directory (system);

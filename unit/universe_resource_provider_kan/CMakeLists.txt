@@ -8,8 +8,8 @@ concrete_require (
         ABSTRACT
         context_hot_reload_coordination_system log platform precise_time universe_resource_provider virtual_file_system
         CONCRETE_INTERFACE
-        context_reflection_system context_virtual_file_system resource_index serialization
-        universe_resource_provider_reflection
+        context_reflection_system context_resource_pipeline_system context_virtual_file_system resource_index
+        serialization universe_resource_provider_reflection
         THIRD_PARTY qsort)
 
 set (KAN_UNIVERSE_RESOURCE_PROVIDER_TEMPORARY_CHUNK_SIZE "4096" CACHE STRING

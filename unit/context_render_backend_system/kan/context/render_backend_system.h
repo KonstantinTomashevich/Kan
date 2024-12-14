@@ -396,8 +396,7 @@ CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_backend_system_present_image_o
 /// \brief Recreates surface using new present mode queue (the same format as for creation).
 /// \details Surface will be recreated and initialized during next application system sync.
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_backend_system_change_surface_present_mode (
-    kan_render_surface_t surface,
-    enum kan_render_surface_present_mode_t *present_mode_queue);
+    kan_render_surface_t surface, enum kan_render_surface_present_mode_t *present_mode_queue);
 
 /// \brief Requests given surface to be destroyed when possible.
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_backend_system_destroy_surface (

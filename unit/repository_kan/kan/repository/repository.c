@@ -3827,7 +3827,7 @@ static void repository_enter_planning_mode_internal (struct repository_t *reposi
         {
             KAN_LOG (repository_safeguards, KAN_LOG_ERROR,
                      "Unsafe switch to planning mode. Events \"%s\" are still accessed.",
-                     singleton_storage_node->type->name)
+                     event_storage_node->type->name)
         }
 
         event_storage_node = (struct event_storage_node_t *) event_storage_node->node.list_node.next;

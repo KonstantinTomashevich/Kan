@@ -570,14 +570,16 @@ endfunction ()
 # Arguments:
 # - OUTPUT: output variable name.
 # - HOT_RELOAD: whether to enable hot reload and world observation in configuration.
+# - RESOURCE_PIPELINE: whether to add resource pipeline system with all its features.
 # - AUTO_BUILD: whether to enable auto build in configuration.
 # - PLUGINS: multi value argument for core plugins.
 # - TAGS: multi value argument for list of environment tags for this configuration.
 function (private_core_configurator_common_content)
-    cmake_parse_arguments (ARG "" "OUTPUT;HOT_RELOAD;AUTO_BUILD" "PLUGINS;TAGS" ${ARGV})
+    cmake_parse_arguments (ARG "" "OUTPUT;HOT_RELOAD;RESOURCE_PIPELINE;AUTO_BUILD" "PLUGINS;TAGS" ${ARGV})
     if (DEFINED ARG_UNPARSED_ARGUMENTS OR
             NOT DEFINED ARG_OUTPUT OR
             NOT DEFINED ARG_HOT_RELOAD OR
+            NOT DEFINED ARG_RESOURCE_PIPELINE OR
             NOT DEFINED ARG_AUTO_BUILD OR
             NOT DEFINED ARG_PLUGINS OR
             NOT DEFINED ARG_TAGS)
@@ -645,7 +647,24 @@ function (private_core_configurator_common_content)
         string (APPEND CORE_CONFIGURATOR_CONTENT "${PREFIX}}\\n\\n\")\n")
     endif ()
 
-    if (ARG_AUTO_BUILD )
+    if (ARG_RESOURCE_PIPELINE)
+        string (APPEND CORE_CONFIGURATOR_CONTENT "${PREFIX}+enabled_systems {\\n\")\n")
+        string (APPEND CORE_CONFIGURATOR_CONTENT "${PREFIX}    name = resource_pipeline_system_t\\n\")\n")
+        string (APPEND CORE_CONFIGURATOR_CONTENT "${PREFIX}    configuration {\\n\")\n")
+        string (APPEND CORE_CONFIGURATOR_CONTENT
+                "${PREFIX}        __type = kan_resource_pipeline_system_config_t\\n\")\n")
+
+        get_target_property (PLATFORM_CONFIGURATION_PATH "${APPLICATION_NAME}" APPLICATION_PLATFORM_CONFIGURATION)
+        string (APPEND CORE_CONFIGURATOR_CONTENT
+                "${PREFIX}        platform_configuration_path = \\\"${PLATFORM_CONFIGURATION_PATH}\\\"\\n\")\n")
+
+        string (APPEND CORE_CONFIGURATOR_CONTENT "${PREFIX}        enable_runtime_compilation = 1 \\n\")\n")
+        string (APPEND CORE_CONFIGURATOR_CONTENT "${PREFIX}        build_reference_type_info_storage = 1 \\n\")\n")
+        string (APPEND CORE_CONFIGURATOR_CONTENT "${PREFIX}    }\\n\")\n")
+        string (APPEND CORE_CONFIGURATOR_CONTENT "${PREFIX}}\\n\\n\")\n")
+    endif ()
+
+    if (ARG_AUTO_BUILD)
         string (APPEND CORE_CONFIGURATOR_CONTENT "string (APPEND AUTO_BUILD_SUFFIX \"enable_auto_build = 1\\n\")\n")
         string (APPEND CORE_CONFIGURATOR_CONTENT "string (APPEND AUTO_BUILD_SUFFIX \"auto_build_command = \\\"")
         string (APPEND CORE_CONFIGURATOR_CONTENT "${CMAKE_COMMAND} ")
@@ -864,6 +883,7 @@ function (application_generate)
     private_core_configurator_common_content (
             OUTPUT DEV_CORE_CONFIGURATOR_CONTENT
             HOT_RELOAD ON
+            RESOURCE_PIPELINE ON
             AUTO_BUILD ${KAN_APPLICATION_ENABLE_AUTO_BUILD}
             PLUGINS ${CORE_PLUGINS}
             TAGS ${DEVELOPMENT_TAGS})
@@ -911,7 +931,7 @@ function (application_generate)
     foreach (PLUGIN ${PLUGINS})
         add_dependencies ("${TARGET_NAME}" "${PLUGIN}_dev_copy")
     endforeach ()
-    
+
     # Generate resource importer executable.
 
     application_get_resource_importer_target_name (TARGET_NAME)
@@ -927,7 +947,7 @@ function (application_generate)
     foreach (PLUGIN ${PLUGINS})
         add_dependencies ("${TARGET_NAME}" "${PLUGIN}_dev_copy")
     endforeach ()
-    
+
     # Generate programs.
 
     get_target_property (PROGRAMS "${APPLICATION_NAME}" APPLICATION_PROGRAMS)
@@ -1227,6 +1247,7 @@ function (application_generate)
         private_core_configurator_common_content (
                 OUTPUT PACK_CORE_CONFIGURATOR_CONTENT
                 HOT_RELOAD ${KAN_APPLICATION_ENABLE_CODE_HOT_RELOAD_IN_PACKAGED}
+                RESOURCE_PIPELINE OFF
                 AUTO_BUILD OFF
                 PLUGINS ${CORE_PLUGINS}
                 TAGS ${TAGS})
@@ -1235,7 +1256,7 @@ function (application_generate)
         string (APPEND PACK_CORE_CONFIGURATOR_CONTENT "${PREFIX}    name = virtual_file_system_t\\n\")\n")
         string (APPEND PACK_CORE_CONFIGURATOR_CONTENT "${PREFIX}    configuration {\\n\")\n")
         string (APPEND PACK_CORE_CONFIGURATOR_CONTENT "${PREFIX}        __type = kan_virtual_file_system_config_t\\n\")\n")
-        
+
         if (KAN_APPLICATION_PACK_WITH_RAW_RESOURCES)
             set (USED_MOUNT_NAMES)
             foreach (RESOURCE_DIRECTORY ${CORE_RESOURCE_DIRECTORIES})
@@ -1301,7 +1322,7 @@ function (application_generate)
             string (APPEND PACK_PROGRAM_CONFIGURATOR_CONTENT "${PREFIX}+enabled_systems {\\n\")\n")
             string (APPEND PACK_PROGRAM_CONFIGURATOR_CONTENT "${PREFIX}    name = plugin_system_t\\n\")\n")
             string (APPEND PACK_PROGRAM_CONFIGURATOR_CONTENT "${PREFIX}    configuration {\\n\")\n")
-            string (APPEND PACK_PROGRAM_CONFIGURATOR_CONTENT 
+            string (APPEND PACK_PROGRAM_CONFIGURATOR_CONTENT
                     "${PREFIX}        __type = kan_plugin_system_config_t\\n\")\n")
             list (LENGTH CORE_PLUGINS INDEX)
 
@@ -1318,7 +1339,7 @@ function (application_generate)
             string (APPEND PACK_PROGRAM_CONFIGURATOR_CONTENT "${PREFIX}+enabled_systems {\\n\")\n")
             string (APPEND PACK_PROGRAM_CONFIGURATOR_CONTENT "${PREFIX}    name = virtual_file_system_t\\n\")\n")
             string (APPEND PACK_PROGRAM_CONFIGURATOR_CONTENT "${PREFIX}    configuration {\\n\")\n")
-            string (APPEND PACK_PROGRAM_CONFIGURATOR_CONTENT 
+            string (APPEND PACK_PROGRAM_CONFIGURATOR_CONTENT
                     "${PREFIX}        __type = kan_virtual_file_system_config_t\\n\")\n")
 
             if (KAN_APPLICATION_PACK_WITH_RAW_RESOURCES)

@@ -8,6 +8,7 @@
 #include <kan/context/all_system_names.h>
 #include <kan/context/hot_reload_coordination_system.h>
 #include <kan/context/reflection_system.h>
+#include <kan/context/resource_pipeline_system.h>
 #include <kan/context/virtual_file_system.h>
 #include <kan/log/logging.h>
 #include <kan/platform/hardware.h>
@@ -409,8 +410,10 @@ struct resource_provider_state_t
 
     kan_reflection_registry_t reflection_registry;
     kan_serialization_binary_script_storage_t shared_script_storage;
-    kan_context_system_t virtual_file_system;
     kan_context_system_t hot_reload_system;
+    kan_context_system_t resource_pipeline_system;
+    kan_resource_pipeline_system_platform_configuration_listener platform_configuration_change_listener;
+    kan_context_system_t virtual_file_system;
 
     /// \meta reflection_ignore_struct_field
     struct kan_stack_group_allocator_t temporary_allocator;
@@ -446,9 +449,6 @@ struct resource_provider_state_t
 
     /// \meta reflection_ignore_struct_field
     struct resource_provider_execution_shared_state_t execution_shared_state;
-
-    /// \meta reflection_ignore_struct_field
-    struct kan_resource_reference_type_info_storage_t info_storage; // TODO: Move to common context system.
 
     kan_time_size_t frame_begin_time_ns;
 
@@ -666,6 +666,7 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void resource_provider_state_init (struct res
     data->interned_kan_resource_index_t = kan_string_intern ("kan_resource_index_t");
     data->interned_resource_provider_server = kan_string_intern ("resource_provider_server");
     data->interned_kan_resource_compilable_meta_t = kan_string_intern ("kan_resource_compilable_meta_t");
+    data->interned_kan_resource_byproduct_type_meta_t = kan_string_intern ("kan_resource_byproduct_type_meta_t");
 }
 
 UNIVERSE_RESOURCE_PROVIDER_KAN_API void mutator_template_deploy_resource_provider (
@@ -683,18 +684,27 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void mutator_template_deploy_resource_provide
     state->scan_budget_ns = configuration->scan_budget_ns;
     state->serve_budget_ns = configuration->serve_budget_ns;
     state->use_load_only_string_registry = configuration->use_load_only_string_registry;
-    state->enable_runtime_compilation = configuration->enable_runtime_compilation;
+    state->enable_runtime_compilation = KAN_FALSE;
     state->resource_directory_path = configuration->resource_directory_path;
 
     state->reflection_registry = kan_universe_get_reflection_registry (universe);
     state->shared_script_storage = kan_serialization_binary_script_storage_create (state->reflection_registry);
 
+    state->hot_reload_system =
+        kan_context_query (kan_universe_get_context (universe), KAN_CONTEXT_HOT_RELOAD_COORDINATION_SYSTEM_NAME);
+
+    state->resource_pipeline_system =
+        kan_context_query (kan_universe_get_context (universe), KAN_CONTEXT_RESOURCE_PIPELINE_SYSTEM_NAME);
+
+    if (KAN_HANDLE_IS_VALID (state->resource_pipeline_system) &&
+        kan_resource_pipeline_system_is_runtime_compilation_enabled (state->resource_pipeline_system))
+    {
+        state->enable_runtime_compilation = KAN_TRUE;
+    }
+
     state->virtual_file_system =
         kan_context_query (kan_universe_get_context (universe), KAN_CONTEXT_VIRTUAL_FILE_SYSTEM_NAME);
     KAN_ASSERT (KAN_HANDLE_IS_VALID (state->virtual_file_system))
-
-    state->hot_reload_system =
-        kan_context_query (kan_universe_get_context (universe), KAN_CONTEXT_HOT_RELOAD_COORDINATION_SYSTEM_NAME);
 
     state->serialized_index_stream = NULL;
     state->serialized_index_reader = KAN_HANDLE_SET_INVALID (kan_serialization_binary_reader_t);
@@ -715,9 +725,8 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void mutator_template_deploy_resource_provide
         kan_repository_event_fetch_query_init (&state->fetch_resource_changed_events_for_runtime_compilation,
                                                resource_event_storage);
 
-        kan_resource_reference_type_info_storage_build (
-            &state->info_storage, kan_universe_get_reflection_registry (universe),
-            kan_allocation_group_get_child (state->my_allocation_group, "reference_type_info_storage"));
+        state->platform_configuration_change_listener =
+            kan_resource_pipeline_system_add_platform_configuration_change_listener (state->resource_pipeline_system);
     }
 
     state->need_to_restart_runtime_compilation = KAN_TRUE;
@@ -1603,7 +1612,7 @@ static inline void bootstrap_pending_compilation (struct resource_provider_state
                                                   struct resource_provider_compiled_resource_entry_t *entry,
                                                   kan_instance_size_t min_priority)
 {
-    KAN_UP_EVENT_INSERT (request, kan_resource_request_t)
+    KAN_UP_INDEXED_INSERT (request, kan_resource_request_t)
     {
         request->request_id = kan_next_resource_request_id (public);
         request->type = entry->source_type;
@@ -1647,7 +1656,7 @@ static inline void add_compilation_dependency (struct resource_provider_state_t 
 {
     KAN_UP_INDEXED_INSERT (dependency, resource_provider_compilation_dependency_t)
     {
-        KAN_UP_EVENT_INSERT (request, kan_resource_request_t)
+        KAN_UP_INDEXED_INSERT (request, kan_resource_request_t)
         {
             request->request_id = kan_next_resource_request_id (public);
             request->type = dependency_type;
@@ -1684,7 +1693,7 @@ static inline void schedule_compilation (struct resource_provider_state_t *state
     }
 
     struct kan_reflection_struct_meta_iterator_t meta_iterator = kan_reflection_registry_query_struct_meta (
-        state->reflection_registry, entry->type, state->interned_kan_resource_compilable_meta_t);
+        state->reflection_registry, entry->source_type, state->interned_kan_resource_compilable_meta_t);
 
     const struct kan_resource_compilable_meta_t *meta = kan_reflection_struct_meta_iterator_get (&meta_iterator);
     // If we somehow ended up here, then resource must be compilable.
@@ -1698,7 +1707,7 @@ static inline void schedule_compilation (struct resource_provider_state_t *state
         struct kan_repository_indexed_insertion_package_t state_container_package;
         uint8_t *state_data_begin;
         struct kan_resource_container_view_t *state_container_view =
-            native_container_create (state, private, state_type_name, &container_package, &state_data_begin);
+            native_container_create (state, private, state_type_name, &state_container_package, &state_data_begin);
 
         if (!container_view)
         {
@@ -1788,7 +1797,12 @@ static inline void transition_compiled_entry_state (struct resource_provider_sta
 
         struct kan_resource_detected_reference_container_t reference_container;
         kan_resource_detected_reference_container_init (&reference_container);
-        kan_resource_detect_references (&state->info_storage, entry->source_type, data, &reference_container);
+
+        struct kan_resource_reference_type_info_storage_t *info_storage =
+            kan_resource_pipeline_system_get_reference_type_info_storage (state->resource_pipeline_system);
+        KAN_ASSERT (info_storage)
+
+        kan_resource_detect_references (info_storage, entry->source_type, data, &reference_container);
         kan_repository_indexed_value_read_access_close (&access);
 
         for (kan_loop_size_t index = 0u; index < reference_container.detected_references.size; ++index)
@@ -1830,8 +1844,16 @@ static inline void transition_compiled_entry_state (struct resource_provider_sta
             }
         }
 
+        const kan_bool_t no_dependencies = reference_container.detected_references.size == 0u;
         kan_resource_detected_reference_container_shutdown (&reference_container);
         entry->compilation_state = RESOURCE_PROVIDER_COMPILATION_STATE_WAITING_FOR_DEPENDENCIES;
+
+        if (no_dependencies)
+        {
+            // If there were no dependencies, we need to transition right away.
+            transition_compiled_entry_state (state, public, private, entry, min_priority);
+        }
+
         break;
     }
 
@@ -1952,9 +1974,24 @@ struct resource_provider_type_name_pair_t
     kan_interned_string_t name;
 };
 
-static void dynamic_array_add_resource_provider_type_name_pair_unique (struct kan_dynamic_array_t *array,
+static inline void dynamic_array_add_resource_provider_type_name_pair (struct kan_dynamic_array_t *array,
                                                                        kan_interned_string_t type,
                                                                        kan_interned_string_t name)
+{
+    struct resource_provider_type_name_pair_t *pair = kan_dynamic_array_add_last (array);
+    if (!pair)
+    {
+        kan_dynamic_array_set_capacity (array, array->size * 2u);
+        pair = kan_dynamic_array_add_last (array);
+    }
+
+    pair->type = type;
+    pair->name = name;
+}
+
+static inline void dynamic_array_add_resource_provider_type_name_pair_unique (struct kan_dynamic_array_t *array,
+                                                                              kan_interned_string_t type,
+                                                                              kan_interned_string_t name)
 {
     for (kan_loop_size_t index = 0u; index < array->size; ++index)
     {
@@ -1967,15 +2004,7 @@ static void dynamic_array_add_resource_provider_type_name_pair_unique (struct ka
         }
     }
 
-    struct resource_provider_type_name_pair_t *pair = kan_dynamic_array_add_last (array);
-    if (!pair)
-    {
-        kan_dynamic_array_set_capacity (array, array->size * 2u);
-        pair = kan_dynamic_array_add_last (array);
-    }
-
-    pair->type = type;
-    pair->name = name;
+    dynamic_array_add_resource_provider_type_name_pair (array, type, name);
 }
 
 static inline void remove_references_to_byproducts (struct resource_provider_state_t *state,
@@ -2534,15 +2563,56 @@ static inline void process_request_on_insert (struct resource_provider_state_t *
                                               const struct kan_resource_provider_singleton_t *public,
                                               struct resource_provider_private_singleton_t *private)
 {
-    KAN_UP_EVENT_FETCH (event, resource_request_on_insert_event_t)
+    if (state->enable_runtime_compilation)
     {
-        if (event->type)
+        // When using runtime compilation, we need to separate event fetch and event processing because
+        // native entry reference creation can result in compilation start which creates requests.
+
+        struct kan_dynamic_array_t native_events;
+        kan_dynamic_array_init (&native_events, KAN_UNIVERSE_RESOURCE_PROVIDER_RC_INITIAL_SIZE,
+                                sizeof (struct resource_request_on_insert_event_t),
+                                _Alignof (struct resource_request_on_insert_event_t), state->my_allocation_group);
+
+        KAN_UP_EVENT_FETCH (event, resource_request_on_insert_event_t)
         {
-            add_native_entry_reference (state, public, private, event->request_id, event->type, event->name);
+            if (event->type)
+            {
+                struct resource_request_on_insert_event_t *cached = kan_dynamic_array_add_last (&native_events);
+                if (!cached)
+                {
+                    kan_dynamic_array_set_capacity (&native_events, native_events.size * 2u);
+                    cached = kan_dynamic_array_add_last (&native_events);
+                }
+
+                *cached = *event;
+            }
+            else
+            {
+                add_third_party_entry_reference (state, event->request_id, event->name);
+            }
         }
-        else
+
+        for (kan_loop_size_t index = 0u; index < native_events.size; ++index)
         {
-            add_third_party_entry_reference (state, event->request_id, event->name);
+            struct resource_request_on_insert_event_t *cached =
+                &((struct resource_request_on_insert_event_t *) native_events.data)[index];
+            add_native_entry_reference (state, public, private, cached->request_id, cached->type, cached->name);
+        }
+
+        kan_dynamic_array_shutdown (&native_events);
+    }
+    else
+    {
+        KAN_UP_EVENT_FETCH (event, resource_request_on_insert_event_t)
+        {
+            if (event->type)
+            {
+                add_native_entry_reference (state, public, private, event->request_id, event->type, event->name);
+            }
+            else
+            {
+                add_third_party_entry_reference (state, event->request_id, event->name);
+            }
         }
     }
 }
@@ -3214,6 +3284,9 @@ static kan_interned_string_t compilation_interface_register_byproduct (kan_funct
         meta->hash ? meta->hash (byproduct_data) :
                      kan_reflection_hash_struct (state->reflection_registry, byproduct_type, byproduct_data);
 
+    // Byproducts need to be registered under lock in order to avoid excessive byproduct creation.
+    kan_atomic_int_lock (&state->execution_shared_state.concurrency_lock);
+
     KAN_UP_VALUE_READ (byproduct, resource_provider_raw_byproduct_entry_t, hash, &byproduct_hash)
     {
         if (byproduct->hash == byproduct_hash && byproduct->type == byproduct_type_name)
@@ -3250,6 +3323,7 @@ static kan_interned_string_t compilation_interface_register_byproduct (kan_funct
                         production->compilation_index = data->pending_compilation_index;
                     }
 
+                    kan_atomic_int_unlock (&state->execution_shared_state.concurrency_lock);
                     KAN_UP_QUERY_RETURN_VALUE (kan_interned_string_t, byproduct->name);
                 }
             }
@@ -3304,10 +3378,12 @@ static kan_interned_string_t compilation_interface_register_byproduct (kan_funct
             }
 
             kan_repository_indexed_insertion_package_submit (&container_package);
+            kan_atomic_int_unlock (&state->execution_shared_state.concurrency_lock);
             KAN_UP_QUERY_RETURN_VALUE (kan_interned_string_t, new_byproduct->name);
         }
     }
 
+    kan_atomic_int_unlock (&state->execution_shared_state.concurrency_lock);
     // Should never reach here. Insertion above should always succeed.
     KAN_ASSERT (KAN_FALSE)
     return NULL;
@@ -3432,8 +3508,28 @@ static enum resource_provider_serve_operation_status_t execute_shared_serve_comp
         }
     }
 
+    struct kan_reflection_struct_meta_iterator_t meta_iterator = kan_reflection_registry_query_struct_meta (
+        state->reflection_registry, source_type, state->interned_kan_resource_compilable_meta_t);
+
+    const struct kan_resource_compilable_meta_t *meta = kan_reflection_struct_meta_iterator_get (&meta_iterator);
+    KAN_ASSERT (meta)
+    const void *platform_configuration = NULL;
+
+    if (meta->configuration_type_name)
+    {
+        platform_configuration = kan_resource_pipeline_system_query_platform_configuration (
+            state->resource_pipeline_system, kan_string_intern (meta->configuration_type_name));
+
+        if (!platform_configuration)
+        {
+            KAN_LOG (universe_resource_provider, KAN_LOG_ERROR, "Unable to find platform configuration of type \"%s\".",
+                     meta->configuration_type_name)
+        }
+    }
+
     if (!input_data || !output_data ||
-        (KAN_TYPED_ID_32_IS_VALID (compile_operation->compile.state_container_id) && !state_data))
+        (KAN_TYPED_ID_32_IS_VALID (compile_operation->compile.state_container_id) && !state_data) ||
+        (meta->configuration_type_name && !platform_configuration))
     {
         KAN_LOG (universe_resource_provider, KAN_LOG_ERROR,
                  "Internal error, failed to retrieve data for compilation state to compile \"%s\" of type \"%s\".",
@@ -3484,7 +3580,7 @@ static enum resource_provider_serve_operation_status_t execute_shared_serve_comp
     struct kan_resource_compile_state_t compilation_state = {
         .input_instance = input_data,
         .output_instance = output_data,
-        .platform_configuration = NULL, // TODO: PLATFORM CONFIGURATION. How? Special context system?
+        .platform_configuration = platform_configuration,
         .deadline = state->execution_shared_state.end_time_ns,
         .user_state = state_data,
         .runtime_compilation = KAN_TRUE,
@@ -3493,12 +3589,6 @@ static enum resource_provider_serve_operation_status_t execute_shared_serve_comp
         .interface_user_data = (kan_functor_user_data_t) &interface_user_data,
         .register_byproduct = compilation_interface_register_byproduct,
     };
-
-    struct kan_reflection_struct_meta_iterator_t meta_iterator = kan_reflection_registry_query_struct_meta (
-        state->reflection_registry, source_type, state->interned_kan_resource_compilable_meta_t);
-
-    const struct kan_resource_compilable_meta_t *meta = kan_reflection_struct_meta_iterator_get (&meta_iterator);
-    KAN_ASSERT (meta)
 
     enum kan_resource_compile_result_t compile_result = meta->functor (&compilation_state);
     kan_repository_indexed_value_read_access_close (&input_access);
@@ -3628,15 +3718,17 @@ static inline void update_runtime_compilation_states_on_request_events (
                 dynamic_array_add_resource_provider_type_name_pair_unique (
                     &compiled_entries_to_update, dependency->compiled_type, dependency->compiled_name);
             }
+
+            kan_repository_event_read_access_close (&access);
         }
 
         while (KAN_TRUE)
         {
             // We use plain query instead of autogenerated one because otherwise we would need to fetch events
             // even when runtime compilation is disabled.
+
             struct kan_repository_event_read_access_t access =
                 kan_repository_event_fetch_query_next (&state->fetch_resource_changed_events_for_runtime_compilation);
-
             const struct kan_resource_entry_changed_event_t *event = kan_repository_event_read_access_resolve (&access);
 
             if (!event)
@@ -3661,6 +3753,8 @@ static inline void update_runtime_compilation_states_on_request_events (
                         &compiled_entries_to_update, dependency->compiled_type, dependency->compiled_name);
                 }
             }
+
+            kan_repository_event_read_access_close (&access);
         }
 
         for (kan_loop_size_t index = 0u; index < compiled_entries_to_update.size; ++index)
@@ -3680,6 +3774,7 @@ static inline void update_runtime_compilation_states_on_request_events (
 
                     transition_compiled_entry_state (state, public, private, compiled_entry,
                                                      state->execution_shared_state.min_priority);
+
                     any_updates = KAN_TRUE;
                 }
             }
@@ -4038,36 +4133,50 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void mutator_template_execute_resource_provid
         if (private->status == RESOURCE_PROVIDER_STATUS_SERVING &&
             state->frame_begin_time_ns + state->serve_budget_ns > kan_precise_time_get_elapsed_nanoseconds ())
         {
-            if (state->enable_runtime_compilation && state->need_to_restart_runtime_compilation)
+            if (state->enable_runtime_compilation)
             {
-                // Reset every active compilation on reflection frame. We have to do it as reflection might've been
-                // changed and therefore dependencies and compilation functors might've been changed too.
+                const kan_bool_t platform_configuration_changed =
+                    kan_resource_pipeline_system_platform_configuration_listener_consume (
+                        state->platform_configuration_change_listener);
 
-                const kan_instance_size_t min_priority =
-                    KAN_HANDLE_IS_VALID (state->hot_reload_system) &&
-                            kan_hot_reload_coordination_system_is_hot_swap (state->hot_reload_system) ?
-                        PRIORITY_HOT_SWAP :
-                        0u;
-
-                KAN_UP_SEQUENCE_UPDATE (compiled_entry, resource_provider_compiled_resource_entry_t)
+                if (state->need_to_restart_runtime_compilation || platform_configuration_changed)
                 {
-                    switch (compiled_entry->compilation_state)
+                    // Reset every active compilation on reflection frame. We have to do it as reflection might've been
+                    // changed and therefore dependencies and compilation functors might've been changed too.
+
+                    const kan_instance_size_t min_priority =
+                        KAN_HANDLE_IS_VALID (state->hot_reload_system) &&
+                                kan_hot_reload_coordination_system_is_hot_swap (state->hot_reload_system) ?
+                            PRIORITY_HOT_SWAP :
+                            0u;
+
+                    KAN_UP_SEQUENCE_UPDATE (compiled_entry, resource_provider_compiled_resource_entry_t)
                     {
-                    case RESOURCE_PROVIDER_COMPILATION_STATE_NOT_PENDING:
-                    case RESOURCE_PROVIDER_COMPILATION_STATE_PENDING:
-                    case RESOURCE_PROVIDER_COMPILATION_STATE_WAITING_FOR_SOURCE:
-                    case RESOURCE_PROVIDER_COMPILATION_STATE_DONE:
-                        break;
+                        switch (compiled_entry->compilation_state)
+                        {
+                        case RESOURCE_PROVIDER_COMPILATION_STATE_NOT_PENDING:
+                        case RESOURCE_PROVIDER_COMPILATION_STATE_PENDING:
+                        case RESOURCE_PROVIDER_COMPILATION_STATE_WAITING_FOR_SOURCE:
+                            break;
 
-                    case RESOURCE_PROVIDER_COMPILATION_STATE_WAITING_FOR_DEPENDENCIES:
-                    case RESOURCE_PROVIDER_COMPILATION_STATE_COMPILING:
-                        cancel_runtime_compilation (state, compiled_entry);
-                        bootstrap_pending_compilation (state, public, compiled_entry, min_priority);
-                        break;
+                        case RESOURCE_PROVIDER_COMPILATION_STATE_WAITING_FOR_DEPENDENCIES:
+                        case RESOURCE_PROVIDER_COMPILATION_STATE_COMPILING:
+                            cancel_runtime_compilation (state, compiled_entry);
+                            bootstrap_pending_compilation (state, public, compiled_entry, min_priority);
+                            break;
+
+                        case RESOURCE_PROVIDER_COMPILATION_STATE_DONE:
+                            if (platform_configuration_changed)
+                            {
+                                bootstrap_pending_compilation (state, public, compiled_entry, min_priority);
+                            }
+
+                            break;
+                        }
                     }
-                }
 
-                state->need_to_restart_runtime_compilation = KAN_FALSE;
+                    state->need_to_restart_runtime_compilation = KAN_FALSE;
+                }
             }
 
             // Events need to be always processed in order to keep everything up to date.
@@ -4179,9 +4288,10 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void mutator_template_undeploy_resource_provi
 
     if (state->enable_runtime_compilation)
     {
-        kan_resource_reference_type_info_storage_shutdown (&state->info_storage);
         kan_repository_event_fetch_query_shutdown (&state->fetch_request_updated_events_for_runtime_compilation);
         kan_repository_event_fetch_query_shutdown (&state->fetch_resource_changed_events_for_runtime_compilation);
+        kan_resource_pipeline_system_remove_platform_configuration_change_listener (
+            state->resource_pipeline_system, state->platform_configuration_change_listener);
     }
 
     kan_stack_group_allocator_reset (&state->temporary_allocator);

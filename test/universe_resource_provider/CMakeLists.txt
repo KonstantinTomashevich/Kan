@@ -22,9 +22,9 @@ foreach (IMPLEMENTATION ${PROVIDER_IMPLEMENTATIONS})
             memory_profiler=default platform=sdl precise_time=sdl reflection=kan repository=kan stream=kan
             threading=sdl universe_resource_provider=${IMPLEMENTATION} virtual_file_system=kan workflow=kan
             CONCRETE
-            container context context_application_system context_reflection_system context_update_system
-            context_virtual_file_system reflection_helpers resource_index resource_pipeline readable_data serialization
-            testing test_universe_resource_provider universe)
+            container context context_application_system context_reflection_system context_resource_pipeline_system
+            context_update_system context_virtual_file_system reflection_helpers resource_index resource_pipeline
+            readable_data serialization testing test_universe_resource_provider universe)
 
     generate_artefact_context_data ()
     generate_artefact_reflection_data ()

@@ -7,6 +7,7 @@
 #include <kan/context/all_system_names.h>
 #include <kan/context/plugin_system.h>
 #include <kan/context/reflection_system.h>
+#include <kan/context/resource_pipeline_system.h>
 #include <kan/context/virtual_file_system.h>
 #include <kan/log/logging.h>
 #include <kan/platform/hardware.h>
@@ -129,13 +130,11 @@ struct resource_reference_manager_state_t
 
     kan_serialization_binary_script_storage_t binary_script_storage;
     kan_context_system_t plugin_system;
+    kan_context_system_t resource_pipeline_system;
     kan_context_system_t virtual_file_system;
 
     kan_bool_t need_to_cancel_old_operations;
     kan_allocation_group_t my_allocation_group;
-
-    /// \meta reflection_ignore_struct_field
-    struct kan_resource_reference_type_info_storage_t info_storage;
 
     /// \meta reflection_ignore_struct_field
     struct kan_stack_group_allocator_t temporary_allocator;
@@ -219,14 +218,15 @@ UNIVERSE_RESOURCE_REFERENCE_KAN_API void mutator_template_deploy_resource_refere
         kan_serialization_binary_script_storage_create (kan_universe_get_reflection_registry (universe));
 
     state->plugin_system = kan_context_query (kan_universe_get_context (universe), KAN_CONTEXT_PLUGIN_SYSTEM_NAME);
+    state->resource_pipeline_system =
+        kan_context_query (kan_universe_get_context (universe), KAN_CONTEXT_RESOURCE_PIPELINE_SYSTEM_NAME);
+    KAN_ASSERT (KAN_HANDLE_IS_VALID (state->resource_pipeline_system))
+    KAN_ASSERT (kan_resource_pipeline_system_get_reference_type_info_storage (state->resource_pipeline_system))
+
     state->virtual_file_system =
         kan_context_query (kan_universe_get_context (universe), KAN_CONTEXT_VIRTUAL_FILE_SYSTEM_NAME);
     KAN_ASSERT (KAN_HANDLE_IS_VALID (state->virtual_file_system))
     state->need_to_cancel_old_operations = KAN_TRUE;
-
-    kan_resource_reference_type_info_storage_build (
-        &state->info_storage, kan_universe_get_reflection_registry (universe),
-        kan_allocation_group_get_child (state->my_allocation_group, "reference_type_info_storage"));
 
     kan_stack_group_allocator_init (&state->temporary_allocator, state->my_allocation_group,
                                     KAN_UNIVERSE_RESOURCE_REFERENCE_TEMPORARY_STACK);
@@ -369,8 +369,10 @@ static inline void add_all_references_to_type (struct resource_reference_manager
 
     if (type)
     {
+        struct kan_resource_reference_type_info_storage_t *info_storage =
+            kan_resource_pipeline_system_get_reference_type_info_storage (state->resource_pipeline_system);
         const struct kan_resource_reference_type_info_node_t *type_node =
-            kan_resource_reference_type_info_storage_query (&state->info_storage, type);
+            kan_resource_reference_type_info_storage_query (info_storage, type);
 
         if (type_node)
         {
@@ -387,10 +389,13 @@ static inline void add_all_references_to_type (struct resource_reference_manager
     }
     else
     {
-        for (kan_loop_size_t index = 0u; index < state->info_storage.third_party_referencers.size; ++index)
+        struct kan_resource_reference_type_info_storage_t *info_storage =
+            kan_resource_pipeline_system_get_reference_type_info_storage (state->resource_pipeline_system);
+
+        for (kan_loop_size_t index = 0u; index < info_storage->third_party_referencers.size; ++index)
         {
             kan_interned_string_t referencer_type =
-                ((kan_interned_string_t *) state->info_storage.third_party_referencers.data)[index];
+                ((kan_interned_string_t *) info_storage->third_party_referencers.data)[index];
             KAN_UP_VALUE_READ (entry, kan_resource_native_entry_t, type, &referencer_type)
             {
                 add_outer_references_operation_for_entry (state, entry, type);
@@ -769,7 +774,10 @@ static void process_outer_reference_operation_in_waiting_resource_state (
 
             struct kan_resource_detected_reference_container_t reference_container;
             kan_resource_detected_reference_container_init (&reference_container);
-            kan_resource_detect_references (&state->info_storage, operation->type, instance_data, &reference_container);
+
+            struct kan_resource_reference_type_info_storage_t *info_storage =
+                kan_resource_pipeline_system_get_reference_type_info_storage (state->resource_pipeline_system);
+            kan_resource_detect_references (info_storage, operation->type, instance_data, &reference_container);
 
             const kan_time_size_t cache_file_time = write_references_to_cache (state, operation, &reference_container);
             publish_references (state, entry, &reference_container, cache_file_time);
@@ -971,7 +979,6 @@ UNIVERSE_RESOURCE_REFERENCE_KAN_API void mutator_template_undeploy_resource_refe
     struct resource_reference_manager_state_t *state)
 {
     kan_serialization_binary_script_storage_destroy (state->binary_script_storage);
-    kan_resource_reference_type_info_storage_shutdown (&state->info_storage);
     kan_stack_group_allocator_shutdown (&state->temporary_allocator);
 }
 

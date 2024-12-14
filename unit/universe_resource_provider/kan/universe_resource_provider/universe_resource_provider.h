@@ -211,11 +211,6 @@ struct kan_resource_provider_configuration_t
     /// \details Generally, should always be true as resource provider does not save assets at the moment.
     kan_bool_t use_load_only_string_registry;
 
-    /// \brief Whether compilation of raw resources in runtime should be enabled.
-    /// \details When it is enabled, when resource of compiled type is requested and it is absent, resource provider
-    ///          will try to execute full compilation routine in order to get this resource temporarily.
-    kan_bool_t enable_runtime_compilation;
-
     /// \brief Path to virtual directory with resources, that is used as resource root directory.
     kan_interned_string_t resource_directory_path;
 };

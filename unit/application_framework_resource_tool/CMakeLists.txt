@@ -5,7 +5,8 @@ concrete_require (SCOPE PUBLIC ABSTRACT memory reflection CONCRETE_INTERFACE con
 concrete_require (
         SCOPE PRIVATE
         ABSTRACT file_system log
-        CONCRETE_INTERFACE context_plugin_system context_reflection_system serialization)
+        CONCRETE_INTERFACE context_plugin_system context_reflection_system context_resource_pipeline_system
+        serialization)
 
 c_interface_scanner_setup (GLOB "*.h")
 reflection_generator_setup (GLOB "*.h")

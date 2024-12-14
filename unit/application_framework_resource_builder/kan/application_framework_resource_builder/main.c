@@ -8,6 +8,7 @@
 #include <kan/context/context.h>
 #include <kan/context/plugin_system.h>
 #include <kan/context/reflection_system.h>
+#include <kan/context/resource_pipeline_system.h>
 #include <kan/cpu_dispatch/job.h>
 #include <kan/cpu_dispatch/task.h>
 #include <kan/error/critical.h>
@@ -52,7 +53,6 @@
 KAN_LOG_DEFINE_CATEGORY (application_framework_resource_builder);
 
 static kan_allocation_group_t reference_type_info_storage_allocation_group;
-static kan_allocation_group_t platform_configuration_allocation_group;
 static kan_allocation_group_t targets_allocation_group;
 static kan_allocation_group_t nodes_allocation_group;
 static kan_allocation_group_t loaded_native_entries_allocation_group;
@@ -63,7 +63,6 @@ static kan_allocation_group_t temporary_allocation_group;
 static kan_interned_string_t interned_kan_resource_resource_type_meta_t;
 static kan_interned_string_t interned_kan_resource_compilable_meta_t;
 static kan_interned_string_t interned_kan_resource_byproduct_type_meta_t;
-static kan_interned_string_t interned_kan_resource_platform_configuration_t;
 static kan_interned_string_t interned_kan_resource_target_byproduct_state_t;
 
 static struct
@@ -74,10 +73,9 @@ static struct
 
     kan_reflection_registry_t registry;
     kan_serialization_binary_script_storage_t binary_script_storage;
-    struct kan_resource_reference_type_info_storage_t reference_type_info_storage;
+    kan_context_system_t resource_pipeline_system;
 
     struct kan_application_resource_project_t project;
-    struct platform_configuration_t *platform_configurations;
 
     /// \meta reflection_dynamic_array_type = "struct target_t"
     struct kan_dynamic_array_t targets;
@@ -95,19 +93,11 @@ static struct
 
 } global = {
     .registry = KAN_HANDLE_INITIALIZE_INVALID,
-    .platform_configurations = NULL,
     .compilation_passive_queue_first = NULL,
     .compilation_passive_queue_last = NULL,
     .compilation_active_queue = NULL,
     .resource_management_native_queue = NULL,
     .resource_management_third_party_queue = NULL,
-};
-
-struct platform_configuration_t
-{
-    struct platform_configuration_t *next;
-    const struct kan_reflection_struct_t *type;
-    void *data;
 };
 
 struct byproduct_production_source_t
@@ -503,26 +493,6 @@ static inline void *load_native_data (const struct kan_reflection_struct_t *type
     return data;
 }
 
-static inline void *load_native_data_from_real_file_system (
-    const struct kan_reflection_struct_t *type,
-    const char *path,
-    kan_serialization_interned_string_registry_t interned_string_registry)
-{
-    struct kan_stream_t *input_stream = kan_direct_file_stream_open_for_read (path, KAN_TRUE);
-    if (!input_stream)
-    {
-        KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, application_framework_resource_builder,
-                             KAN_LOG_ERROR, "Failed to open resource at path \"%s\".", path)
-        kan_atomic_int_add (&global.errors_count, 1);
-        return NULL;
-    }
-
-    input_stream = kan_random_access_stream_buffer_open_for_read (input_stream, KAN_RESOURCE_BUILDER_IO_BUFFER);
-    void *data = load_native_data_into_new_allocation (type, path, interned_string_registry, input_stream);
-    input_stream->operations->close (input_stream);
-    return data;
-}
-
 static inline kan_bool_t load_native_data_into_existent_allocation (
     const struct kan_reflection_struct_t *type,
     const char *path,
@@ -719,94 +689,6 @@ static void third_party_entry_node_destroy (struct third_party_entry_node_t *nod
     }
 
     third_party_entry_node_unload (node);
-}
-
-static void load_platform_configuration (struct kan_file_system_path_container_t *path)
-{
-    // TODO: Move platform configuration to special context system so we would use the same logic for loading it for
-    //       resource builder and for runtime compilation.
-
-    const struct kan_reflection_struct_t *file_type =
-        kan_reflection_registry_query_struct (global.registry, interned_kan_resource_platform_configuration_t);
-    KAN_ASSERT (file_type)
-
-    struct kan_resource_platform_configuration_t *configuration = load_native_data_from_real_file_system (
-        file_type, path->path, KAN_HANDLE_SET_INVALID (kan_serialization_interned_string_registry_t));
-
-    if (!configuration)
-    {
-        KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, application_framework_resource_builder,
-                             KAN_LOG_ERROR, "Failed to read platform configuration at \"%s\".", path->path)
-        kan_atomic_int_add (&global.errors_count, 1);
-        return;
-    }
-
-    if (configuration->parent)
-    {
-        // Step back to the directory level.
-        const char *last_separator = strrchr (path->path, '/');
-
-        if (last_separator)
-        {
-            kan_file_system_path_container_reset_length (path, (kan_instance_size_t) (last_separator - path->path));
-        }
-        else
-        {
-            kan_file_system_path_container_reset_length (path, 0u);
-        }
-
-        kan_file_system_path_container_append (path, configuration->parent);
-        load_platform_configuration (path);
-    }
-
-    for (kan_loop_size_t index = 0u; index < configuration->configuration.size; ++index)
-    {
-        kan_reflection_patch_t patch = ((kan_reflection_patch_t *) configuration->configuration.data)[index];
-        const struct kan_reflection_struct_t *patch_type = kan_reflection_patch_get_type (patch);
-
-        if (!patch_type)
-        {
-            KAN_LOG_WITH_BUFFER (
-                KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, application_framework_resource_builder, KAN_LOG_ERROR,
-                "Platform configuration at \"%s\" contains patches with unknown or broken types.", path->path)
-            kan_atomic_int_add (&global.errors_count, 1);
-            break;
-        }
-
-        struct platform_configuration_t *instance = global.platform_configurations;
-        while (instance)
-        {
-            if (instance->type == patch_type)
-            {
-                break;
-            }
-
-            instance = instance->next;
-        }
-
-        if (!instance)
-        {
-            instance = kan_allocate_batched (platform_configuration_allocation_group,
-                                             sizeof (struct platform_configuration_t));
-            instance->next = global.platform_configurations;
-            global.platform_configurations = instance;
-
-            instance->type = patch_type;
-            instance->data =
-                kan_allocate_general (platform_configuration_allocation_group, patch_type->size, patch_type->alignment);
-
-            if (patch_type->init)
-            {
-                patch_type->init (patch_type->functor_user_data, instance->data);
-            }
-        }
-
-        kan_reflection_patch_apply (patch, instance->data);
-    }
-
-    kan_resource_platform_configuration_shutdown (configuration);
-    kan_free_general (loaded_native_entries_allocation_group, configuration,
-                      sizeof (struct kan_resource_platform_configuration_t));
 }
 
 static void byproduct_node_init (struct byproduct_node_t *instance)
@@ -1991,7 +1873,9 @@ static inline kan_bool_t request_raw_dependencies (struct native_entry_node_t *n
 static kan_bool_t is_compiled_data_newer_than_dependencies (struct native_entry_node_t *node)
 {
     const kan_time_size_t compiled_time = get_file_last_modification_time_ns (node->compiled_path);
-    if (compiled_time < global.newest_loaded_plugin_last_modification_file_time_ns)
+    if (compiled_time < global.newest_loaded_plugin_last_modification_file_time_ns ||
+        compiled_time <
+            kan_resource_pipeline_system_get_platform_configuration_file_time_ns (global.resource_pipeline_system))
     {
         return KAN_FALSE;
     }
@@ -2309,7 +2193,6 @@ static void process_native_node_compilation (kan_functor_user_data_t user_data)
         struct kan_file_system_path_container_t path_container;
         form_references_cache_item_path (node, &path_container);
 
-        // TODO: Check platform configuration time, it might require new compilation.
         const kan_time_size_t source_time_ns = get_file_last_modification_time_ns (node->source_path);
         const kan_time_size_t reference_cache_time_ns = get_file_last_modification_time_ns (path_container.path);
         node->loaded_references_from_cache = KAN_FALSE;
@@ -2359,7 +2242,9 @@ static void process_native_node_compilation (kan_functor_user_data_t user_data)
                  "[Target \"%s\"] Detecting reference of native resource \"%s\" of type \"%s\".", node->target->name,
                  node->name, node->source_type->name)
 
-        kan_resource_detect_references (&global.reference_type_info_storage, node->source_type->name, node->source_data,
+        struct kan_resource_reference_type_info_storage_t *type_info_storage =
+            kan_resource_pipeline_system_get_reference_type_info_storage (global.resource_pipeline_system);
+        kan_resource_detect_references (type_info_storage, node->source_type->name, node->source_data,
                                         &node->source_detected_references);
         save_references_to_cache (node, KAN_FALSE);
 
@@ -2656,17 +2541,11 @@ static void process_native_node_compilation (kan_functor_user_data_t user_data)
             enum kan_resource_compile_result_t compile_result = KAN_RESOURCE_PIPELINE_COMPILE_IN_PROGRESS;
             if (node->compilable_meta->configuration_type_name)
             {
-                struct platform_configuration_t *configuration = global.platform_configurations;
-                while (configuration)
-                {
-                    if (strcmp (configuration->type->name, node->compilable_meta->configuration_type_name) == 0)
-                    {
-                        state.platform_configuration = configuration->data;
-                        break;
-                    }
-                }
+                state.platform_configuration = kan_resource_pipeline_system_query_platform_configuration (
+                    global.resource_pipeline_system,
+                    kan_string_intern (node->compilable_meta->configuration_type_name));
 
-                if (!configuration)
+                if (!state.platform_configuration)
                 {
                     KAN_LOG (
                         application_framework_resource_builder, KAN_LOG_ERROR,
@@ -2751,8 +2630,10 @@ static void process_native_node_compilation (kan_functor_user_data_t user_data)
                     return;
                 }
 
-                kan_resource_detect_references (&global.reference_type_info_storage, node->compiled_type->name,
-                                                node->compiled_data, &node->compiled_detected_references);
+                struct kan_resource_reference_type_info_storage_t *type_info_storage =
+                    kan_resource_pipeline_system_get_reference_type_info_storage (global.resource_pipeline_system);
+                kan_resource_detect_references (type_info_storage, node->compiled_type->name, node->compiled_data,
+                                                &node->compiled_detected_references);
 
                 save_references_to_cache (node, KAN_TRUE);
                 node->pending_compilation_status = COMPILATION_STATUS_FINISHED;
@@ -2784,8 +2665,10 @@ static void process_native_node_compilation (kan_functor_user_data_t user_data)
                 return;
             }
 
-            kan_resource_detect_references (&global.reference_type_info_storage, node->source_type->name,
-                                            node->source_data, &node->compiled_detected_references);
+            struct kan_resource_reference_type_info_storage_t *type_info_storage =
+                kan_resource_pipeline_system_get_reference_type_info_storage (global.resource_pipeline_system);
+            kan_resource_detect_references (type_info_storage, node->source_type->name, node->source_data,
+                                            &node->compiled_detected_references);
 
             save_references_to_cache (node, KAN_TRUE);
             node->pending_compilation_status = COMPILATION_STATUS_FINISHED;
@@ -3338,8 +3221,6 @@ int main (int argument_count, char **argument_values)
 
     reference_type_info_storage_allocation_group =
         kan_allocation_group_get_child (kan_allocation_group_root (), "reference_type_info_storage");
-    platform_configuration_allocation_group =
-        kan_allocation_group_get_child (kan_allocation_group_root (), "platform_configuration");
     targets_allocation_group = kan_allocation_group_get_child (kan_allocation_group_root (), "targets");
     nodes_allocation_group = kan_allocation_group_get_child (targets_allocation_group, "nodes");
     loaded_native_entries_allocation_group = kan_allocation_group_get_child (nodes_allocation_group, "loaded_native");
@@ -3352,7 +3233,6 @@ int main (int argument_count, char **argument_values)
     interned_kan_resource_resource_type_meta_t = kan_string_intern ("kan_resource_resource_type_meta_t");
     interned_kan_resource_compilable_meta_t = kan_string_intern ("kan_resource_compilable_meta_t");
     interned_kan_resource_byproduct_type_meta_t = kan_string_intern ("kan_resource_byproduct_type_meta_t");
-    interned_kan_resource_platform_configuration_t = kan_string_intern ("kan_resource_platform_configuration_t");
     interned_kan_resource_target_byproduct_state_t = kan_string_intern ("kan_resource_target_byproduct_state_t");
 
     KAN_LOG (application_framework_resource_builder, KAN_LOG_INFO, "Reading project...")
@@ -3412,7 +3292,10 @@ int main (int argument_count, char **argument_values)
 
     if (result == 0)
     {
-        kan_context_t context = kan_application_create_resource_tool_context (&global.project, argument_values[0u]);
+        kan_context_t context = kan_application_create_resource_tool_context (
+            &global.project, argument_values[0u],
+            KAN_APPLICATION_TOOL_CONTEXT_CAPABILITY_PLATFORM_CONFIGURATION |
+                KAN_APPLICATION_TOOL_CONTEXT_CAPABILITY_REFERENCE_TYPE_INFO_STORAGE);
         kan_stack_group_allocator_init (&global.temporary_allocator, temporary_allocation_group,
                                         KAN_RESOURCE_BUILDER_TEMPORARY_STACK);
 
@@ -3431,24 +3314,8 @@ int main (int argument_count, char **argument_values)
 
         // Not the best way to inject reflection, but totally safe in tools context as there is no hot reload here.
         KAN_REFLECTION_UNIT_REGISTRAR_NAME (application_framework_resource_builder) (global.registry);
-
         global.binary_script_storage = kan_serialization_binary_script_storage_create (global.registry);
-        kan_resource_reference_type_info_storage_build (&global.reference_type_info_storage, global.registry,
-                                                        reference_type_info_storage_allocation_group);
-
-        {
-            KAN_LOG (application_framework_resource_builder, KAN_LOG_INFO, "Loading platform configuration...")
-            struct kan_file_system_path_container_t configuration_path;
-            kan_file_system_path_container_copy_string (&configuration_path, global.project.platform_configuration);
-            load_platform_configuration (&configuration_path);
-
-            if (kan_atomic_int_get (&global.errors_count) > 0)
-            {
-                KAN_LOG (application_framework_resource_builder, KAN_LOG_ERROR,
-                         "Failed to load platform configuration.")
-                result = ERROR_CODE_FAILED_TO_LOAD_PLATFORM_CONFIGURATION;
-            }
-        }
+        global.resource_pipeline_system = kan_context_query (context, KAN_CONTEXT_RESOURCE_PIPELINE_SYSTEM_NAME);
 
         KAN_LOG (application_framework_resource_builder, KAN_LOG_INFO, "Setting up target structure...")
         kan_dynamic_array_init (&global.targets, global.project.targets.size, sizeof (struct target_t),
@@ -3761,24 +3628,6 @@ int main (int argument_count, char **argument_values)
             kan_stack_group_allocator_reset (&global.temporary_allocator);
         }
 
-        struct platform_configuration_t *platform_configuration = global.platform_configurations;
-        global.platform_configurations = NULL;
-
-        while (platform_configuration)
-        {
-            struct platform_configuration_t *next = platform_configuration->next;
-            if (platform_configuration->type->shutdown)
-            {
-                platform_configuration->type->shutdown (platform_configuration->type->functor_user_data,
-                                                        platform_configuration->data);
-            }
-
-            kan_free_general (platform_configuration_allocation_group, platform_configuration->data,
-                              platform_configuration->type->size);
-            kan_free_batched (platform_configuration_allocation_group, platform_configuration);
-            platform_configuration = next;
-        }
-
         for (kan_loop_size_t target_index = 0u; target_index < global.project.targets.size; ++target_index)
         {
             target_shutdown (&((struct target_t *) global.targets.data)[target_index]);
@@ -3787,7 +3636,6 @@ int main (int argument_count, char **argument_values)
         kan_dynamic_array_shutdown (&global.targets);
         kan_stack_group_allocator_shutdown (&global.temporary_allocator);
         kan_serialization_binary_script_storage_destroy (global.binary_script_storage);
-        kan_resource_reference_type_info_storage_shutdown (&global.reference_type_info_storage);
         kan_context_destroy (context);
     }
 

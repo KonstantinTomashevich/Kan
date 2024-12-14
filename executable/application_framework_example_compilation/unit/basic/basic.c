@@ -274,9 +274,6 @@ APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BASIC_API void kan_universe_mutator_ex
             }
             else
             {
-                // We only do loading check in compiled mode.
-                test_singleton->loaded_test_data = KAN_TRUE;
-
                 if (!is_entry_exists (state, kan_string_intern ("record_t"), kan_string_intern ("record_1")))
                 {
                     KAN_LOG (application_framework_example_compilation_basic, KAN_LOG_ERROR, "\"record_1\" not found!")

@@ -101,7 +101,7 @@ struct kan_resource_compile_state_t
     void *output_instance;
 
     /// \brief Pointer to platform configuration if required for compilation.
-    void *platform_configuration;
+    const void *platform_configuration;
 
     /// \brief Time in `kan_precise_time_get_elapsed_nanoseconds` format after which compilation should return.
     /// \details If compilation isn't finished and needs another run, return KAN_RESOURCE_PIPELINE_COMPILE_IN_PROGRESS.
