@@ -2131,7 +2131,6 @@ static inline void add_compiled_entry_and_start_compilation (struct resource_pro
         new_entry->source_type = source_type;
         new_entry->request_count = request_count;
         new_entry->compilation_state = RESOURCE_PROVIDER_COMPILATION_STATE_PENDING;
-        transition_compiled_entry_state (state, public, private, new_entry, 0u);
     }
 }
 
@@ -2194,7 +2193,6 @@ static inline void add_native_entry_reference (struct resource_provider_state_t 
                 else if (compiled_entry->compilation_state == RESOURCE_PROVIDER_COMPILATION_STATE_NOT_PENDING)
                 {
                     compiled_entry->compilation_state = RESOURCE_PROVIDER_COMPILATION_STATE_PENDING;
-                    transition_compiled_entry_state (state, public, private, compiled_entry, 0u);
                 }
 
                 KAN_UP_QUERY_RETURN_VOID;
@@ -2567,56 +2565,15 @@ static inline void process_request_on_insert (struct resource_provider_state_t *
                                               const struct kan_resource_provider_singleton_t *public,
                                               struct resource_provider_private_singleton_t *private)
 {
-    if (state->enable_runtime_compilation)
+    KAN_UP_EVENT_FETCH (event, resource_request_on_insert_event_t)
     {
-        // When using runtime compilation, we need to separate event fetch and event processing because
-        // native entry reference creation can result in compilation start which creates requests.
-
-        struct kan_dynamic_array_t native_events;
-        kan_dynamic_array_init (&native_events, KAN_UNIVERSE_RESOURCE_PROVIDER_RC_INITIAL_SIZE,
-                                sizeof (struct resource_request_on_insert_event_t),
-                                _Alignof (struct resource_request_on_insert_event_t), state->my_allocation_group);
-
-        KAN_UP_EVENT_FETCH (event, resource_request_on_insert_event_t)
+        if (event->type)
         {
-            if (event->type)
-            {
-                struct resource_request_on_insert_event_t *cached = kan_dynamic_array_add_last (&native_events);
-                if (!cached)
-                {
-                    kan_dynamic_array_set_capacity (&native_events, native_events.size * 2u);
-                    cached = kan_dynamic_array_add_last (&native_events);
-                }
-
-                *cached = *event;
-            }
-            else
-            {
-                add_third_party_entry_reference (state, event->request_id, event->name);
-            }
+            add_native_entry_reference (state, public, private, event->request_id, event->type, event->name);
         }
-
-        for (kan_loop_size_t index = 0u; index < native_events.size; ++index)
+        else
         {
-            struct resource_request_on_insert_event_t *cached =
-                &((struct resource_request_on_insert_event_t *) native_events.data)[index];
-            add_native_entry_reference (state, public, private, cached->request_id, cached->type, cached->name);
-        }
-
-        kan_dynamic_array_shutdown (&native_events);
-    }
-    else
-    {
-        KAN_UP_EVENT_FETCH (event, resource_request_on_insert_event_t)
-        {
-            if (event->type)
-            {
-                add_native_entry_reference (state, public, private, event->request_id, event->type, event->name);
-            }
-            else
-            {
-                add_third_party_entry_reference (state, event->request_id, event->name);
-            }
+            add_third_party_entry_reference (state, event->request_id, event->name);
         }
     }
 }
@@ -3782,6 +3739,15 @@ static inline void update_runtime_compilation_states_on_request_events (
                     any_updates = KAN_TRUE;
                 }
             }
+        }
+
+        _Static_assert (RESOURCE_PROVIDER_COMPILATION_STATE_PENDING == 1,
+                        "Compilation state has expected signal value.");
+
+        KAN_UP_SIGNAL_UPDATE (compiled_entry, resource_provider_compiled_resource_entry_t, compilation_state, 1)
+        {
+            transition_compiled_entry_state (state, public, private, compiled_entry,
+                                             state->execution_shared_state.min_priority);
         }
 
         // Update requests after possible compiled entry state changed so we might get new transitions.
