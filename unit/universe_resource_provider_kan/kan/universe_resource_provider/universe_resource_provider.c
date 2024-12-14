@@ -366,6 +366,10 @@ struct resource_provider_execution_shared_state_t
     /// \meta reflection_ignore_struct_field
     struct kan_atomic_int_t concurrency_lock;
 
+    /// \brief Special lock for producing byproducts during runtime compilation.
+    /// \meta reflection_ignore_struct_field
+    struct kan_atomic_int_t byproduct_lock;
+
     //// \meta reflection_ignore_struct_field
     struct kan_repository_indexed_interval_descending_write_cursor_t operation_cursor;
 
@@ -3285,7 +3289,7 @@ static kan_interned_string_t compilation_interface_register_byproduct (kan_funct
                      kan_reflection_hash_struct (state->reflection_registry, byproduct_type, byproduct_data);
 
     // Byproducts need to be registered under lock in order to avoid excessive byproduct creation.
-    kan_atomic_int_lock (&state->execution_shared_state.concurrency_lock);
+    kan_atomic_int_lock (&state->execution_shared_state.byproduct_lock);
 
     KAN_UP_VALUE_READ (byproduct, resource_provider_raw_byproduct_entry_t, hash, &byproduct_hash)
     {
@@ -3323,7 +3327,7 @@ static kan_interned_string_t compilation_interface_register_byproduct (kan_funct
                         production->compilation_index = data->pending_compilation_index;
                     }
 
-                    kan_atomic_int_unlock (&state->execution_shared_state.concurrency_lock);
+                    kan_atomic_int_unlock (&state->execution_shared_state.byproduct_lock);
                     KAN_UP_QUERY_RETURN_VALUE (kan_interned_string_t, byproduct->name);
                 }
             }
@@ -3378,12 +3382,12 @@ static kan_interned_string_t compilation_interface_register_byproduct (kan_funct
             }
 
             kan_repository_indexed_insertion_package_submit (&container_package);
-            kan_atomic_int_unlock (&state->execution_shared_state.concurrency_lock);
+            kan_atomic_int_unlock (&state->execution_shared_state.byproduct_lock);
             KAN_UP_QUERY_RETURN_VALUE (kan_interned_string_t, new_byproduct->name);
         }
     }
 
-    kan_atomic_int_unlock (&state->execution_shared_state.concurrency_lock);
+    kan_atomic_int_unlock (&state->execution_shared_state.byproduct_lock);
     // Should never reach here. Insertion above should always succeed.
     KAN_ASSERT (KAN_FALSE)
     return NULL;
@@ -3910,6 +3914,7 @@ static void dispatch_shared_serve (struct resource_provider_state_t *state)
 
     state->execution_shared_state.workers_left = kan_atomic_int_init ((int) cpu_count);
     state->execution_shared_state.concurrency_lock = kan_atomic_int_init (0);
+    state->execution_shared_state.byproduct_lock = kan_atomic_int_init (0);
 
     state->execution_shared_state.operation_cursor = kan_repository_indexed_interval_write_query_execute_descending (
         &state->write_interval__resource_provider_operation__priority, &state->execution_shared_state.min_priority,
