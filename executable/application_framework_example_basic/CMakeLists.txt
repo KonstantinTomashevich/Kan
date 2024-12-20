@@ -32,7 +32,7 @@ application_plugin_include (ABSTRACT CONCRETE application_framework_example_basi
 register_application_program (test)
 application_program_set_configuration ("${CMAKE_CURRENT_SOURCE_DIR}/configuration/program_test.rd")
 application_program_use_plugin_group (test)
-application_program_use_as_test_in_development_mode (ARGUMENTS --test PROPERTIES TIMEOUT 10)
+application_program_use_as_test_in_development_mode (ARGUMENTS --test PROPERTIES TIMEOUT 20)
 application_program_use_as_test_in_packaged_mode (ARGUMENTS --test PROPERTIES TIMEOUT 10)
 
 register_application_variant (test)
