@@ -7,9 +7,6 @@ concrete_require (
         ABSTRACT image log reflection
         CONCRETE_INTERFACE application_framework_example_import_icon container resource_pipeline)
 
-c_interface_scanner_setup (GLOB "*.c")
-reflection_generator_setup (GLOB "*.c")
+concrete_preprocessing_queue_step_preprocess ()
+reflection_preprocessor_setup_step (GLOB "*.c")
 register_unit_reflection ()
-
-reflection_generator_get_output_file_path (REFLECTION_GENERATOR_OUTPUT_FILE_PATH)
-concrete_sources_direct ("${REFLECTION_GENERATOR_OUTPUT_FILE_PATH}")

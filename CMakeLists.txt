@@ -28,6 +28,8 @@ include ("${CMAKE_CURRENT_SOURCE_DIR}/cmake/kan/clang_format.cmake")
 include ("${CMAKE_CURRENT_SOURCE_DIR}/cmake/kan/context.cmake")
 include ("${CMAKE_CURRENT_SOURCE_DIR}/cmake/kan/global_options.cmake")
 include ("${CMAKE_CURRENT_SOURCE_DIR}/cmake/kan/reflection_generator.cmake")
+include ("${CMAKE_CURRENT_SOURCE_DIR}/cmake/kan/reflection_helpers.cmake")
+include ("${CMAKE_CURRENT_SOURCE_DIR}/cmake/kan/reflection_preprocessor.cmake")
 include ("${CMAKE_CURRENT_SOURCE_DIR}/cmake/kan/reflection_statics.cmake")
 include ("${CMAKE_CURRENT_SOURCE_DIR}/cmake/kan/testing.cmake")
 include ("${CMAKE_CURRENT_SOURCE_DIR}/cmake/kan/universe.cmake")
@@ -39,3 +41,6 @@ add_subdirectory (third_party)
 add_subdirectory (unit)
 add_subdirectory (test)
 add_subdirectory (executable)
+
+# TODO: It was observed that our solution of using binary dir as root for generated sources might sometimes make
+#       resulting object paths even longer, not shorter. It should be investigated again.

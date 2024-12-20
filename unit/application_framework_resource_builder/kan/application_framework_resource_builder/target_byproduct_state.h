@@ -6,6 +6,7 @@
 #include <kan/container/dynamic_array.h>
 #include <kan/container/interned_string.h>
 #include <kan/hash/hash.h>
+#include <kan/reflection/markup.h>
 
 /// \brief Contains information about one byproduct production event.
 struct kan_resource_target_byproduct_production_t
@@ -23,7 +24,7 @@ struct kan_resource_target_byproduct_state_t
     /// \brief Generator integer value that is used to generate byproduct indices.
     kan_instance_size_t byproduct_index_generator;
 
-    /// \meta reflection_dynamic_array_type = "struct kan_resource_target_byproduct_production_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_resource_target_byproduct_production_t)
     struct kan_dynamic_array_t production;
 };
 

@@ -69,13 +69,13 @@ struct pipeline_t
         kan_workflow_graph_t graph;
     };
 
-    /// \meta reflection_dynamic_array_type = "struct mutator_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct mutator_t)
     struct kan_dynamic_array_t mutators;
 
-    /// \meta reflection_dynamic_array_type = "kan_interned_string"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (kan_interned_string)
     struct kan_dynamic_array_t used_groups;
 
-    /// \meta reflection_dynamic_array_type = "struct kan_universe_world_checkpoint_dependency_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_universe_world_checkpoint_dependency_t)
     struct kan_dynamic_array_t checkpoint_dependencies;
 };
 
@@ -97,13 +97,13 @@ struct world_t
     void *scheduler_state;
     kan_allocation_group_t scheduler_state_allocation_group;
 
-    /// \meta reflection_dynamic_array_type = "struct pipeline_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct pipeline_t)
     struct kan_dynamic_array_t pipelines;
 
-    /// \meta reflection_dynamic_array_type = "struct world_configuration_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct world_configuration_t)
     struct kan_dynamic_array_t configuration;
 
-    /// \meta reflection_dynamic_array_type = "struct world_t *"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct world_t *)
     struct kan_dynamic_array_t children;
 };
 

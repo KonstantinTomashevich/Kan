@@ -24,7 +24,9 @@ function (kan_setup_tests)
 
     if (NOT DEFINED SETUP_TEST_SOURCES)
         message (STATUS "Setting up tests from \"${SETUP_TEST_UNIT}\" using \"${SETUP_TEST_SHARED_LIBRARY}\" library.")
-        get_target_property (TEST_SOURCES "${SETUP_TEST_UNIT}" SOURCES)
+        # We access highlight sources instead of real sources as real sources are not known until generation phase due
+        # to preprocessing queue usage for concrete units.
+        get_target_property (TEST_SOURCES "${SETUP_TEST_UNIT}Highlight" SOURCES)
     else ()
         message (STATUS "Setting up tests using \"${SETUP_TEST_SHARED_LIBRARY}\" library.")
         set (TEST_SOURCES ${SETUP_TEST_SOURCES})

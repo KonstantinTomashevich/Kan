@@ -6,10 +6,8 @@ concrete_require (SCOPE PRIVATE
         CONCRETE_INTERFACE container serialization)
 concrete_implements_abstract (virtual_file_system)
 
-c_interface_scanner_setup (GLOB "*.c" "*.h")
-reflection_generator_setup (GLOB "*.c" "*.h")
-reflection_generator_get_output_file_path (REFLECTION_GENERATOR_OUTPUT_FILE_PATH)
-concrete_sources_direct ("${REFLECTION_GENERATOR_OUTPUT_FILE_PATH}")
+concrete_preprocessing_queue_step_preprocess ()
+reflection_preprocessor_setup_step (GLOB "*.c" "*.h")
 # We do not register reflection as it is used only privately.
 
 set (KAN_VIRTUAL_FILE_SYSTEM_ROPACKH_INITIAL_ITEMS "64" CACHE STRING

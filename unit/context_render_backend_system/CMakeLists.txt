@@ -8,13 +8,7 @@ if (Vulkan_FOUND)
             PARTS context_render_backend_system_vulkan context_render_backend_system_reflection)
 endif ()
 
-c_interface_scanner_setup (GLOB "*.h")
-reflection_generator_setup (GLOB "*.h")
-reflection_generator_get_output_file_path (REFLECTION_GENERATOR_OUTPUT_FILE_PATH)
-
-register_concrete (context_render_backend_system_reflection)
-concrete_include (PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
-concrete_sources_direct ("${REFLECTION_GENERATOR_OUTPUT_FILE_PATH}")
-concrete_require (SCOPE PUBLIC ABSTRACT context_render_backend_system)
-concrete_require (SCOPE PRIVATE ABSTRACT reflection)
-register_unit_reflection_with_name (context_render_backend_system)
+create_accompanying_reflection_unit (
+        FOR_ABSTRACT context_render_backend_system
+        NAME context_render_backend_system_reflection
+        GLOB "*.h")

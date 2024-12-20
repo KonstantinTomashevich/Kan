@@ -5,12 +5,9 @@ concrete_sources ("*.c")
 concrete_require (SCOPE PUBLIC ABSTRACT reflection stream CONCRETE_INTERFACE container reflection_helpers)
 concrete_require (SCOPE PRIVATE ABSTRACT error log)
 
-c_interface_scanner_setup (GLOB "*.c" "*.h")
-reflection_generator_setup (GLOB "*.c" "*.h")
+concrete_preprocessing_queue_step_preprocess ()
+reflection_preprocessor_setup_step (GLOB "*.c" "*.h")
 register_unit_reflection ()
-
-reflection_generator_get_output_file_path (REFLECTION_GENERATOR_OUTPUT_FILE_PATH)
-concrete_sources_direct ("${REFLECTION_GENERATOR_OUTPUT_FILE_PATH}")
 
 set (KAN_RESOURCE_PIPELINE_SCAN_BUCKETS "67" CACHE STRING
         "Initial count of buckets for scanned information about resource types and references in them.")

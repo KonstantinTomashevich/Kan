@@ -35,7 +35,7 @@ struct plugin_system_t
     kan_interned_string_t plugins_directory_path;
     kan_instance_size_t hot_reload_directory_id;
 
-    /// \meta reflection_dynamic_array_type = "struct plugin_data_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct plugin_data_t)
     struct kan_dynamic_array_t plugins;
     kan_time_size_t newest_loaded_plugin_last_modification_file_time_ns;
 

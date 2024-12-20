@@ -16,12 +16,7 @@ else ()
     abstract_alias_implementation (ALIAS default SOURCE none)
 endif ()
 
-c_interface_scanner_setup (GLOB "*.h")
-reflection_generator_setup (GLOB "*.h")
-reflection_generator_get_output_file_path (REFLECTION_GENERATOR_OUTPUT_FILE_PATH)
-
-register_concrete (context_hot_reload_coordination_system_reflection)
-concrete_sources_direct ("${REFLECTION_GENERATOR_OUTPUT_FILE_PATH}")
-concrete_require (SCOPE PUBLIC ABSTRACT context_hot_reload_coordination_system)
-concrete_require (SCOPE PRIVATE ABSTRACT error reflection)
-register_unit_reflection_with_name (context_hot_reload_coordination_system)
+create_accompanying_reflection_unit (
+        FOR_ABSTRACT context_hot_reload_coordination_system
+        NAME context_hot_reload_coordination_system_reflection
+        GLOB "*.h")

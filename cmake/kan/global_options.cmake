@@ -55,6 +55,12 @@ function (add_common_compile_options)
                     # Actually, field with flexible array extension can be last field in a struct,
                     # but clang ignores this fact and treats it as errors.
                     -Wno-flexible-array-extensions
+                    # We're using GNU-like preprocessor, therefore this warning is going to show up.
+                    -Wno-gnu-line-marker
+                    # As we're using preprocessing stack, parentheses from macro will trigger this warning.
+                    -Wno-parentheses-equality
+                    # We use our custom pragmas for code preprocessing.
+                    -Wno-unknown-pragmas
                     # We silence unused parameter warnings, because it is troublesome
                     # to silence them manually for every compiler.
                     -Wno-unused-parameter
@@ -65,6 +71,8 @@ function (add_common_compile_options)
             add_compile_options (
                     /W4
                     /WX
+                    # We use our custom pragmas for code preprocessing.
+                    /wd4068
                     # We silence unused parameter warnings, because it is troublesome
                     # to silence them manually for every compiler.
                     /wd4100
@@ -89,12 +97,14 @@ function (add_common_compile_options)
                     # We silence unused parameter warnings, because it is troublesome
                     # to silence them manually for every compiler.
                     -Wno-unused-parameter
-                    # Zero length arrays greatly increase readability for classes and structs with dynamic sizes.
-                    -Wno-zero-length-array
+                    # We use our custom pragmas for code preprocessing.
+                    -Wno-unknown-pragmas
                     # For some reason gcc just ignores when this warnings are muted through pragma macro,
                     # therefore we're forced to disable it globally.
                     -Wno-unused-variable
-                    -Wno-unused-but-set-variable)
+                    -Wno-unused-but-set-variable
+                    # Zero length arrays greatly increase readability for classes and structs with dynamic sizes.
+                    -Wno-zero-length-array)
         endif ()
     endif ()
 endfunction ()
@@ -106,3 +116,6 @@ endif ()
 
 # Position independent code should be generated when one shared library depends on another shared library.
 set (CMAKE_POSITION_INDEPENDENT_CODE ON)
+
+# We use custom export pragma in order to detect exported symbols during preprocessing.
+set (UNIT_FRAMEWORK_API_MACRO_EXPORT_PREFIX "_Pragma (\"kan_export\")")

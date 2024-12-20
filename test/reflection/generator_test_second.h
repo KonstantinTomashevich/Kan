@@ -7,6 +7,7 @@
 #include <kan/api_common/c_header.h>
 #include <kan/container/dynamic_array.h>
 #include <kan/container/interned_string.h>
+#include <kan/reflection/markup.h>
 #include <kan/reflection/patch.h>
 
 #include <generator_test_first.h>
@@ -33,14 +34,14 @@ TEST_REFLECTION_API void second_component_init (struct second_component_t *insta
 
 TEST_REFLECTION_API void second_component_shutdown (struct second_component_t *instance);
 
-// \meta reflection_ignore_struct
+KAN_REFLECTION_IGNORE
 struct ignored_t
 {
     struct vector3_t velocity;
     struct vector3_t acceleration;
 };
 
-// \meta reflection_ignore_enum
+KAN_REFLECTION_IGNORE
 enum ignored_enum_t
 {
     IGNORED_ENUM_VALUE_1 = 0,
@@ -51,16 +52,14 @@ enum some_enum_t
 {
     SOME_ENUM_VALUE_1 = 0,
 
-    // \meta reflection_ignore_enum_value
-    SOME_ENUM_HIDDEN,
+    KAN_REFLECTION_IGNORE SOME_ENUM_HIDDEN,
 
     SOME_ENUM_VALUE_2,
 
-    // \meta reflection_ignore_enum_value
-    SOME_ENUM_COUNT,
+    KAN_REFLECTION_IGNORE SOME_ENUM_COUNT,
 };
 
-// \meta reflection_flags
+KAN_REFLECTION_FLAGS
 enum some_flags_t
 {
     FLAG_1 = 1u << 0u,
@@ -77,19 +76,20 @@ struct a_bit_of_everything_t
 
     kan_instance_size_t count;
 
-    // \meta reflection_size_field = count
+    KAN_REFLECTION_SIZE_FIELD (count)
     int8_t bytes[128u];
 
     uint64_t selector;
 
     union
     {
-        // \meta reflection_visibility_condition_field = selector
-        // \meta reflection_visibility_condition_values = "0, 2"
+        KAN_REFLECTION_VISIBILITY_CONDITION_FIELD (selector)
+        KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (0)
+        KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (2)
         uint32_t first_selection[8u];
 
-        // \meta reflection_visibility_condition_field = selector
-        // \meta reflection_visibility_condition_values = 1
+        KAN_REFLECTION_VISIBILITY_CONDITION_FIELD (selector)
+        KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (1)
         int64_t second_selection[4u];
     };
 
@@ -100,13 +100,13 @@ struct a_bit_of_everything_t
     void *first_external_pointer;
     struct first_component_t *struct_pointer;
 
-    /// \meta reflection_external_pointer
+    KAN_REFLECTION_EXTERNAL_POINTER
     struct first_component_t *second_external_pointer;
 
-    /// \meta reflection_ignore_struct_field
+    KAN_REFLECTION_IGNORE
     struct kan_dynamic_array_t ignored_dynamic_array;
 
-    /// \meta reflection_dynamic_array_type = "struct second_component_t *"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct second_component_t *)
     struct kan_dynamic_array_t dynamic_array;
 };
 

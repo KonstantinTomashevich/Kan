@@ -120,7 +120,7 @@ struct render_backend_command_state_t
     ///          therefore we need global lock for command submission.
     struct kan_atomic_int_t command_operation_lock;
 
-    /// \meta reflection_dynamic_array_type = "struct mutator_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct mutator_t)
     struct kan_dynamic_array_t secondary_command_buffers;
 
     kan_instance_size_t secondary_command_buffers_used;

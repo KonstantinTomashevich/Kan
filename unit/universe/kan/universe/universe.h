@@ -8,6 +8,7 @@
 #include <kan/container/dynamic_array.h>
 #include <kan/container/interned_string.h>
 #include <kan/context/context.h>
+#include <kan/reflection/markup.h>
 #include <kan/reflection/migration.h>
 #include <kan/reflection/patch.h>
 #include <kan/repository/repository.h>
@@ -307,7 +308,7 @@ KAN_C_HEADER_BEGIN
 /// \brief Describes one variant of world configuration.
 struct kan_universe_world_configuration_variant_t
 {
-    /// \meta reflection_dynamic_array_type = "kan_interned_string_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (kan_interned_string_t)
     struct kan_dynamic_array_t required_tags;
 
     kan_reflection_patch_t data;
@@ -324,7 +325,7 @@ struct kan_universe_world_configuration_t
 {
     kan_interned_string_t name;
 
-    /// \meta reflection_dynamic_array_type = "struct kan_universe_world_configuration_variant_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_universe_world_configuration_variant_t)
     struct kan_dynamic_array_t variants;
 };
 
@@ -344,14 +345,14 @@ struct kan_universe_world_pipeline_definition_t
 {
     kan_interned_string_t name;
 
-    /// \meta reflection_dynamic_array_type = "kan_interned_string_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (kan_interned_string_t)
     struct kan_dynamic_array_t mutators;
 
-    /// \meta reflection_dynamic_array_type = "kan_interned_string_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (kan_interned_string_t)
     /// \brief See `kan_universe_mutator_group_meta_t`.
     struct kan_dynamic_array_t mutator_groups;
 
-    /// \meta reflection_dynamic_array_type = "struct kan_universe_world_checkpoint_dependency_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_universe_world_checkpoint_dependency_t)
     struct kan_dynamic_array_t checkpoint_dependencies;
 };
 
@@ -367,18 +368,18 @@ struct kan_universe_world_definition_t
     kan_interned_string_t world_name;
 
     /// \brief Array of configuration for this world deployment.
-    /// \meta reflection_dynamic_array_type = "struct kan_universe_world_configuration_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_universe_world_configuration_t)
     struct kan_dynamic_array_t configuration;
 
     /// \brief Name of scheduler to be used with this world.
     kan_interned_string_t scheduler_name;
 
     /// \brief Array of pipelines for this world.
-    /// \meta reflection_dynamic_array_type = "struct kan_universe_world_pipeline_definition_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_universe_world_pipeline_definition_t)
     struct kan_dynamic_array_t pipelines;
 
     /// \brief Array of child worlds definitions if any.
-    /// \meta reflection_dynamic_array_type = "struct kan_universe_world_definition_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_universe_world_definition_t)
     struct kan_dynamic_array_t children;
 };
 

@@ -62,7 +62,7 @@ struct kan_application_system_display_info_t
     enum kan_platform_display_orientation_t orientation;
     float content_scale;
 
-    /// \meta reflection_dynamic_array_type = "struct kan_platform_display_mode_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_platform_display_mode_t)
     struct kan_dynamic_array_t fullscreen_modes;
 
     struct kan_platform_display_mode_t current_mode;

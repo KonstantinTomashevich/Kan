@@ -9,6 +9,7 @@
 #include <kan/error/critical.h>
 #include <kan/log/logging.h>
 #include <kan/memory/allocation.h>
+#include <kan/reflection/markup.h>
 #include <kan/threading/atomic.h>
 #include <kan/threading/conditional_variable.h>
 #include <kan/threading/mutex.h>
@@ -34,19 +35,19 @@ struct building_graph_node_t
     kan_workflow_function_t function;
     kan_functor_user_data_t user_data;
 
-    /// \meta reflection_dynamic_array_type = "kan_interned_string_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (kan_interned_string_t)
     struct kan_dynamic_array_t depends_on;
 
-    /// \meta reflection_dynamic_array_type = "kan_interned_string_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (kan_interned_string_t)
     struct kan_dynamic_array_t dependency_of;
 
-    /// \meta reflection_dynamic_array_type = "kan_interned_string_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (kan_interned_string_t)
     struct kan_dynamic_array_t resource_insert_access;
 
-    /// \meta reflection_dynamic_array_type = "kan_interned_string_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (kan_interned_string_t)
     struct kan_dynamic_array_t resource_write_access;
 
-    /// \meta reflection_dynamic_array_type = "kan_interned_string_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (kan_interned_string_t)
     struct kan_dynamic_array_t resource_read_access;
 
     struct graph_builder_t *builder;
@@ -54,10 +55,10 @@ struct building_graph_node_t
     kan_instance_size_t intermediate_node_id;
     kan_instance_size_t intermediate_references_count;
 
-    /// \meta reflection_dynamic_array_type = "kan_instance_size_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (kan_instance_size_t)
     struct kan_dynamic_array_t intermediate_incomes;
 
-    /// \meta reflection_dynamic_array_type = "kan_instance_size_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (kan_instance_size_t)
     struct kan_dynamic_array_t intermediate_outcomes;
 
 #if defined(KAN_WORKFLOW_VERIFY)

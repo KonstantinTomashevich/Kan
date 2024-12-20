@@ -5,6 +5,7 @@
 #include <kan/api_common/c_header.h>
 #include <kan/container/dynamic_array.h>
 #include <kan/container/interned_string.h>
+#include <kan/reflection/markup.h>
 
 /// \file
 /// \brief Contains project format declaration for application framework tools.
@@ -23,13 +24,13 @@ struct kan_application_resource_target_t
     kan_interned_string_t name;
 
     /// \brief Directories to look for resources of this target. Absolute.
-    /// \meta reflection_dynamic_array_type = "char *"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (char *)
     struct kan_dynamic_array_t directories;
 
     /// \brief List of target names which resources are visible for resources of this target.
     /// \details Visibility is used to make sure that dependencies between resources of different targets are handle
     ///          properly. It is purely verification mechanism.
-    /// \meta reflection_dynamic_array_type = "kan_interned_string_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (kan_interned_string_t)
     struct kan_dynamic_array_t visible_targets;
 };
 
@@ -46,11 +47,11 @@ struct kan_application_resource_project_t
     char *plugin_relative_directory;
 
     /// \brief List of plugin names to be loaded.
-    /// \meta reflection_dynamic_array_type = "kan_interned_string_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (kan_interned_string_t)
     struct kan_dynamic_array_t plugins;
 
     /// \brief List of resource building targets.
-    /// \meta reflection_dynamic_array_type = "struct kan_application_resource_target_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_application_resource_target_t)
     struct kan_dynamic_array_t targets;
 
     /// \brief Path to directory that is used as shared reference cache (might be shared with editors). Absolute.

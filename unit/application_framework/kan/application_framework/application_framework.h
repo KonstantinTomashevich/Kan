@@ -5,6 +5,7 @@
 #include <kan/api_common/c_header.h>
 #include <kan/container/dynamic_array.h>
 #include <kan/container/interned_string.h>
+#include <kan/reflection/markup.h>
 #include <kan/universe/universe.h>
 
 /// \file
@@ -121,7 +122,7 @@ APPLICATION_FRAMEWORK_API void kan_application_framework_system_configuration_sh
 struct kan_application_framework_core_configuration_t
 {
     /// \brief List of enabled systems with their configurations.
-    /// \meta reflection_dynamic_array_type = "struct kan_application_framework_system_configuration_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_application_framework_system_configuration_t)
     struct kan_dynamic_array_t enabled_systems;
 
     /// \brief Name of the definition of the universe shared root world.
@@ -149,7 +150,7 @@ struct kan_application_framework_program_configuration_t
     /// \brief List of enabled systems with their configuration.
     /// \details If system is listed both in core configuration and in program configuration,
     ///          then configurations are merged and program configuration is applied on top of core configuration.
-    /// \meta reflection_dynamic_array_type = "struct kan_application_framework_system_configuration_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_application_framework_system_configuration_t)
     struct kan_dynamic_array_t enabled_systems;
 
     /// \brief Name of the definition of the program-specific universe child world.

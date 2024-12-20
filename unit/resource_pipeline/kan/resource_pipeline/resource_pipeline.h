@@ -7,6 +7,7 @@
 #include <kan/container/dynamic_array.h>
 #include <kan/container/hash_storage.h>
 #include <kan/container/interned_string.h>
+#include <kan/reflection/markup.h>
 #include <kan/reflection/patch.h>
 #include <kan/reflection/registry.h>
 #include <kan/stream/stream.h>
@@ -210,7 +211,7 @@ struct kan_resource_platform_configuration_t
 
     /// \brief List of patches that define different types of platform configurations.
     /// \details Should not contain duplicate types as it may result in non-obvious overrides.
-    /// \meta reflection_dynamic_array_type = "kan_reflection_patch_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (kan_reflection_patch_t)
     struct kan_dynamic_array_t configuration;
 };
 
@@ -258,17 +259,17 @@ struct kan_resource_reference_field_info_t
 /// \brief Contains information needed for `kan_resource_detect_references` for a particular type.
 struct kan_resource_reference_type_info_node_t
 {
-    /// \meta reflection_ignore_struct_field
+    KAN_REFLECTION_IGNORE
     struct kan_hash_storage_node_t node;
 
     kan_interned_string_t type_name;
 
     /// \brief Lists fields that may contain references (including structs that may contain references in their fields).
-    /// \meta reflection_dynamic_array_type = "struct kan_resource_reference_field_info_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_resource_reference_field_info_t)
     struct kan_dynamic_array_t fields_to_check;
 
     /// \brief List of resource types that are able to reference resources of this type.
-    /// \meta reflection_dynamic_array_type = "kan_interned_string_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (kan_interned_string_t)
     struct kan_dynamic_array_t referencer_types;
 
     kan_bool_t is_resource_type;
@@ -278,11 +279,11 @@ struct kan_resource_reference_type_info_node_t
 /// \brief Contains processed reflection data for reference detection.
 struct kan_resource_reference_type_info_storage_t
 {
-    /// \meta reflection_ignore_struct_field
+    KAN_REFLECTION_IGNORE
     struct kan_hash_storage_t scanned_types;
 
     /// \brief Contains list of resource type names that can reference third party resources.
-    /// \meta reflection_dynamic_array_type = "kan_interned_string_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (kan_interned_string_t)
     struct kan_dynamic_array_t third_party_referencers;
 
     kan_reflection_registry_t registry;
@@ -316,7 +317,7 @@ struct kan_resource_detected_reference_t
 /// \brief Container for detected references.
 struct kan_resource_detected_reference_container_t
 {
-    /// \meta reflection_dynamic_array_type = "struct kan_resource_detected_reference_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_resource_detected_reference_t)
     struct kan_dynamic_array_t detected_references;
 };
 
@@ -385,13 +386,12 @@ struct kan_resource_import_input_t
         /// \brief Checksum is used to detected whether source file was changed.
         struct kan_resource_import_serializable_checksum_t serializable_checksum;
 
-        // \c_interface_scanner_disable
+        KAN_REFLECTION_IGNORE
         kan_file_size_t checksum;
-        // \c_interface_scanner_enable
     };
 
     /// \brief Relative (to the rule) paths of outputs that were produced during last import execution.
-    /// \meta reflection_dynamic_array_type = "char *"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (char *)
     struct kan_dynamic_array_t outputs;
 };
 
@@ -415,7 +415,7 @@ struct kan_resource_import_rule_t
     kan_reflection_patch_t configuration;
 
     /// \brief Describes inputs and outputs during last import procedure.
-    /// \meta reflection_dynamic_array_type = "struct kan_resource_import_input_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_resource_import_input_t)
     struct kan_dynamic_array_t last_import;
 };
 

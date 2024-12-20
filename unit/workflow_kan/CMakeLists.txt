@@ -1,7 +1,7 @@
 register_concrete (workflow_kan)
 concrete_include (PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
 concrete_sources ("*.c")
-concrete_require (SCOPE PRIVATE ABSTRACT error log memory threading CONCRETE_INTERFACE container)
+concrete_require (SCOPE PRIVATE ABSTRACT error log memory reflection threading CONCRETE_INTERFACE container)
 concrete_implements_abstract (workflow)
 c_interface_scanner_setup (GLOB "*.c" "*.h")
 

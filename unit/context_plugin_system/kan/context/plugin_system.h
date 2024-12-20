@@ -6,6 +6,7 @@
 #include <kan/container/dynamic_array.h>
 #include <kan/container/interned_string.h>
 #include <kan/context/context.h>
+#include <kan/reflection/markup.h>
 
 /// \file
 /// \brief Contains API for context plugin system -- system for loading reflection-driven plugins.
@@ -41,7 +42,7 @@ struct kan_plugin_system_config_t
     /// \details Interned string in order to make it usable inside patches.
     kan_interned_string_t plugin_directory_path;
 
-    /// \meta reflection_dynamic_array_type = "kan_interned_string_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (kan_interned_string_t)
     struct kan_dynamic_array_t plugins;
 };
 

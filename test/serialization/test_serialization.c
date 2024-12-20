@@ -6,6 +6,7 @@
 #include <kan/container/dynamic_array.h>
 #include <kan/file_system/stream.h>
 #include <kan/reflection/generated_reflection.h>
+#include <kan/reflection/markup.h>
 #include <kan/reflection/patch.h>
 #include <kan/serialization/binary.h>
 #include <kan/serialization/readable_data.h>
@@ -52,7 +53,7 @@ struct map_object_t
 
     kan_interned_string_t object_prototype;
 
-    /// \meta reflection_dynamic_array_type = "kan_reflection_patch_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (kan_reflection_patch_t)
     struct kan_dynamic_array_t components;
 };
 
@@ -115,10 +116,10 @@ struct compound_component_pass_t
 {
     kan_interned_string_t id;
 
-    /// \meta reflection_dynamic_array_type = "kan_interned_string_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (kan_interned_string_t)
     struct kan_dynamic_array_t tags;
 
-    /// \meta reflection_dynamic_array_type = "struct compound_component_pass_inner_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct compound_component_pass_inner_t)
     struct kan_dynamic_array_t inner_data;
 };
 
@@ -141,7 +142,7 @@ struct compound_component_t
 {
     kan_interned_string_t id;
 
-    /// \meta reflection_dynamic_array_type = "struct compound_component_pass_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct compound_component_pass_t)
     struct kan_dynamic_array_t passes;
 };
 
@@ -165,7 +166,7 @@ struct map_t
 {
     kan_interned_string_t name;
 
-    /// \meta reflection_dynamic_array_type = "struct map_object_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct map_object_t)
     struct kan_dynamic_array_t objects;
 };
 

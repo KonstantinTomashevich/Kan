@@ -70,7 +70,7 @@ static kan_bool_t icon_import_functor (struct kan_stream_t *input_stream,
     return result;
 }
 
-// \meta reflection_struct_meta = "icon_import_configuration_t"
+KAN_REFLECTION_STRUCT_META (icon_import_configuration_t)
 APPLICATION_FRAMEWORK_EXAMPLE_IMPORT_ICON_IMPORT_API struct kan_resource_import_configuration_type_meta_t meta = {
     .functor = icon_import_functor,
     .allow_checksum = KAN_TRUE,

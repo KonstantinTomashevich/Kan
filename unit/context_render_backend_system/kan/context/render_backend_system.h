@@ -324,9 +324,8 @@ struct kan_render_supported_device_info_t
 struct kan_render_supported_devices_t
 {
     kan_instance_size_t supported_device_count;
-    // \c_interface_scanner_disable
+    KAN_REFLECTION_IGNORE
     struct kan_render_supported_device_info_t devices[];
-    // \c_interface_scanner_enable
 };
 
 /// \brief Returns cached information about all found supported devices.

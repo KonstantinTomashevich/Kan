@@ -6,6 +6,7 @@
 #include <kan/api_common/core_types.h>
 #include <kan/container/dynamic_array.h>
 #include <kan/container/interned_string.h>
+#include <kan/reflection/markup.h>
 
 /// \file
 /// \brief Contains declarations for parse step of render pipeline language and intermediate format declaration.
@@ -47,12 +48,12 @@ struct kan_rpl_option_t
 
     union
     {
-        /// \meta reflection_visibility_condition_field = "type"
-        /// \meta reflection_visibility_condition_values = "KAN_RPL_OPTION_TYPE_FLAG"
+        KAN_REFLECTION_VISIBILITY_CONDITION_FIELD (type)
+        KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (KAN_RPL_OPTION_TYPE_FLAG)
         kan_bool_t flag_default_value;
 
-        /// \meta reflection_visibility_condition_field = "type"
-        /// \meta reflection_visibility_condition_values = "KAN_RPL_OPTION_TYPE_COUNT"
+        KAN_REFLECTION_VISIBILITY_CONDITION_FIELD (type)
+        KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (KAN_RPL_OPTION_TYPE_COUNT)
         kan_rpl_unsigned_int_literal_t count_default_value;
     };
 };
@@ -209,64 +210,64 @@ struct kan_rpl_expression_t
     enum kan_rpl_expression_type_t type;
     union
     {
-        /// \meta reflection_visibility_condition_field = "type"
-        /// \meta reflection_visibility_condition_values = "KAN_RPL_EXPRESSION_NODE_TYPE_IDENTIFIER"
+        KAN_REFLECTION_VISIBILITY_CONDITION_FIELD (type)
+        KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (KAN_RPL_EXPRESSION_NODE_TYPE_IDENTIFIER)
         kan_interned_string_t identifier;
 
-        /// \meta reflection_visibility_condition_field = "type"
-        /// \meta reflection_visibility_condition_values = "KAN_RPL_EXPRESSION_NODE_TYPE_INTEGER_LITERAL"
+        KAN_REFLECTION_VISIBILITY_CONDITION_FIELD (type)
+        KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (KAN_RPL_EXPRESSION_NODE_TYPE_INTEGER_LITERAL)
         kan_rpl_signed_int_literal_t integer_literal;
 
-        /// \meta reflection_visibility_condition_field = "type"
-        /// \meta reflection_visibility_condition_values = "KAN_RPL_EXPRESSION_NODE_TYPE_FLOATING_LITERAL"
+        KAN_REFLECTION_VISIBILITY_CONDITION_FIELD (type)
+        KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (KAN_RPL_EXPRESSION_NODE_TYPE_FLOATING_LITERAL)
         kan_rpl_floating_t floating_literal;
 
-        /// \meta reflection_visibility_condition_field = "type"
-        /// \meta reflection_visibility_condition_values = "KAN_RPL_EXPRESSION_NODE_TYPE_VARIABLE_DECLARATION"
+        KAN_REFLECTION_VISIBILITY_CONDITION_FIELD (type)
+        KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (KAN_RPL_EXPRESSION_NODE_TYPE_VARIABLE_DECLARATION)
         struct kan_rpl_variable_declaration_data_t variable_declaration;
 
-        /// \meta reflection_visibility_condition_field = "type"
-        /// \meta reflection_visibility_condition_values = "KAN_RPL_EXPRESSION_NODE_TYPE_BINARY_OPERATION"
+        KAN_REFLECTION_VISIBILITY_CONDITION_FIELD (type)
+        KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (KAN_RPL_EXPRESSION_NODE_TYPE_BINARY_OPERATION)
         struct kan_rpl_binary_operation_data_t binary_operation;
 
-        /// \meta reflection_visibility_condition_field = "type"
-        /// \meta reflection_visibility_condition_values = "KAN_RPL_EXPRESSION_NODE_TYPE_UNARY_OPERATION"
+        KAN_REFLECTION_VISIBILITY_CONDITION_FIELD (type)
+        KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (KAN_RPL_EXPRESSION_NODE_TYPE_UNARY_OPERATION)
         struct kan_rpl_unary_operation_data_t unary_operation;
 
-        /// \meta reflection_visibility_condition_field = "type"
-        /// \meta reflection_visibility_condition_values = "KAN_RPL_EXPRESSION_NODE_TYPE_SCOPE"
+        KAN_REFLECTION_VISIBILITY_CONDITION_FIELD (type)
+        KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (KAN_RPL_EXPRESSION_NODE_TYPE_SCOPE)
         struct kan_rpl_scope_data_t scope;
 
-        /// \meta reflection_visibility_condition_field = "type"
-        /// \meta reflection_visibility_condition_values = "KAN_RPL_EXPRESSION_NODE_TYPE_FUNCTION_CALL"
+        KAN_REFLECTION_VISIBILITY_CONDITION_FIELD (type)
+        KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (KAN_RPL_EXPRESSION_NODE_TYPE_FUNCTION_CALL)
         struct kan_rpl_function_call_data_t function_call;
 
-        /// \meta reflection_visibility_condition_field = "type"
-        /// \meta reflection_visibility_condition_values = "KAN_RPL_EXPRESSION_NODE_TYPE_CONSTRUCTOR"
+        KAN_REFLECTION_VISIBILITY_CONDITION_FIELD (type)
+        KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (KAN_RPL_EXPRESSION_NODE_TYPE_CONSTRUCTOR)
         struct kan_rpl_constructor_data_t constructor;
 
-        /// \meta reflection_visibility_condition_field = "type"
-        /// \meta reflection_visibility_condition_values = "KAN_RPL_EXPRESSION_NODE_TYPE_IF"
+        KAN_REFLECTION_VISIBILITY_CONDITION_FIELD (type)
+        KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (KAN_RPL_EXPRESSION_NODE_TYPE_IF)
         struct kan_rpl_if_data_t if_;
 
-        /// \meta reflection_visibility_condition_field = "type"
-        /// \meta reflection_visibility_condition_values = "KAN_RPL_EXPRESSION_NODE_TYPE_FOR"
+        KAN_REFLECTION_VISIBILITY_CONDITION_FIELD (type)
+        KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (KAN_RPL_EXPRESSION_NODE_TYPE_FOR)
         struct kan_rpl_for_data_t for_;
 
-        /// \meta reflection_visibility_condition_field = "type"
-        /// \meta reflection_visibility_condition_values = "KAN_RPL_EXPRESSION_NODE_TYPE_WHILE"
+        KAN_REFLECTION_VISIBILITY_CONDITION_FIELD (type)
+        KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (KAN_RPL_EXPRESSION_NODE_TYPE_WHILE)
         struct kan_rpl_while_data_t while_;
 
-        /// \meta reflection_visibility_condition_field = "type"
-        /// \meta reflection_visibility_condition_values = "KAN_RPL_EXPRESSION_NODE_TYPE_CONDITIONAL_SCOPE"
+        KAN_REFLECTION_VISIBILITY_CONDITION_FIELD (type)
+        KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (KAN_RPL_EXPRESSION_NODE_TYPE_CONDITIONAL_SCOPE)
         struct kan_rpl_conditional_scope_data_t conditional_scope;
 
-        /// \meta reflection_visibility_condition_field = "type"
-        /// \meta reflection_visibility_condition_values = "KAN_RPL_EXPRESSION_NODE_TYPE_CONDITIONAL_ALIAS"
+        KAN_REFLECTION_VISIBILITY_CONDITION_FIELD (type)
+        KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (KAN_RPL_EXPRESSION_NODE_TYPE_CONDITIONAL_ALIAS)
         struct kan_rpl_conditional_alias_data_t conditional_alias;
 
-        /// \meta reflection_visibility_condition_field = "type"
-        /// \meta reflection_visibility_condition_values = "KAN_RPL_EXPRESSION_NODE_TYPE_RETURN"
+        KAN_REFLECTION_VISIBILITY_CONDITION_FIELD (type)
+        KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (KAN_RPL_EXPRESSION_NODE_TYPE_RETURN)
         kan_rpl_size_t return_index;
     };
 
@@ -294,20 +295,20 @@ struct kan_rpl_setting_t
 
     union
     {
-        /// \meta reflection_visibility_condition_field = "type"
-        /// \meta reflection_visibility_condition_values = "KAN_RPL_SETTING_TYPE_FLAG"
+        KAN_REFLECTION_VISIBILITY_CONDITION_FIELD (type)
+        KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (KAN_RPL_SETTING_TYPE_FLAG)
         kan_bool_t flag;
 
-        /// \meta reflection_visibility_condition_field = "type"
-        /// \meta reflection_visibility_condition_values = "KAN_RPL_SETTING_TYPE_INTEGER"
+        KAN_REFLECTION_VISIBILITY_CONDITION_FIELD (type)
+        KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (KAN_RPL_SETTING_TYPE_INTEGER)
         kan_rpl_signed_int_literal_t integer;
 
-        /// \meta reflection_visibility_condition_field = "type"
-        /// \meta reflection_visibility_condition_values = "KAN_RPL_SETTING_TYPE_FLOATING"
+        KAN_REFLECTION_VISIBILITY_CONDITION_FIELD (type)
+        KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (KAN_RPL_SETTING_TYPE_FLOATING)
         kan_rpl_floating_t floating;
 
-        /// \meta reflection_visibility_condition_field = "type"
-        /// \meta reflection_visibility_condition_values = "KAN_RPL_SETTING_TYPE_STRING"
+        KAN_REFLECTION_VISIBILITY_CONDITION_FIELD (type)
+        KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (KAN_RPL_SETTING_TYPE_STRING)
         kan_interned_string_t string;
     };
 
@@ -345,7 +346,7 @@ struct kan_rpl_struct_t
 {
     kan_interned_string_t name;
 
-    /// \meta reflection_dynamic_array_type = "struct kan_rpl_declaration_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_declaration_t)
     struct kan_dynamic_array_t fields;
 
     /// \details Conditional expression if it is not KAN_RPL_EXPRESSION_NODE_TYPE_NOPE.
@@ -403,7 +404,7 @@ struct kan_rpl_buffer_t
     enum kan_rpl_set_t set;
     enum kan_rpl_buffer_type_t type;
 
-    /// \meta reflection_dynamic_array_type = "struct kan_rpl_declaration_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_declaration_t)
     struct kan_dynamic_array_t fields;
 
     /// \details Conditional expression if it is not KAN_RPL_EXPRESSION_NODE_TYPE_NOPE.
@@ -430,7 +431,7 @@ struct kan_rpl_sampler_t
     enum kan_rpl_set_t set;
     enum kan_rpl_sampler_type_t type;
 
-    /// \meta reflection_dynamic_array_type = "struct kan_rpl_setting_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_setting_t)
     struct kan_dynamic_array_t settings;
 
     /// \details Conditional expression if it is not KAN_RPL_EXPRESSION_NODE_TYPE_NOPE.
@@ -450,7 +451,7 @@ struct kan_rpl_function_t
     kan_interned_string_t return_type_name;
     kan_interned_string_t name;
 
-    /// \meta reflection_dynamic_array_type = "struct kan_rpl_declaration_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_declaration_t)
     struct kan_dynamic_array_t arguments;
 
     kan_rpl_size_t body_index;
@@ -479,43 +480,43 @@ struct kan_rpl_intermediate_t
     kan_interned_string_t log_name;
 
     /// \brief Array of parsed options.
-    /// \meta reflection_dynamic_array_type = "struct kan_rpl_option_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_option_t)
     struct kan_dynamic_array_t options;
 
     /// \brief Array of parsed settings.
-    /// \meta reflection_dynamic_array_type = "struct kan_rpl_setting_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_setting_t)
     struct kan_dynamic_array_t settings;
 
     /// \brief Array of parsed structs.
-    /// \meta reflection_dynamic_array_type = "struct kan_rpl_struct_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_struct_t)
     struct kan_dynamic_array_t structs;
 
     /// \brief Array of parsed buffers.
-    /// \meta reflection_dynamic_array_type = "struct kan_rpl_buffer_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_buffer_t)
     struct kan_dynamic_array_t buffers;
 
     /// \brief Array of parsed samplers.
-    /// \meta reflection_dynamic_array_type = "struct kan_rpl_sampler_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_sampler_t)
     struct kan_dynamic_array_t samplers;
 
     /// \brief Array of parsed functions.
-    /// \meta reflection_dynamic_array_type = "struct kan_rpl_function_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_function_t)
     struct kan_dynamic_array_t functions;
 
     /// \brief Array of parsed expressions.
     /// \details Expression are stored in special array for better performance
     ///          through better utilization of memory caching techniques.
-    /// \meta reflection_dynamic_array_type = "struct kan_rpl_expression_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_expression_t)
     struct kan_dynamic_array_t expression_storage;
 
     /// \brief Array that is used to store expression indices for expression lists.
     /// \details For the same reason as expressions, lists of expression indices are stored in one continuous array.
-    /// \meta reflection_dynamic_array_type = "kan_rpl_size_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (kan_rpl_size_t)
     struct kan_dynamic_array_t expression_lists_storage;
 
     /// \brief Array that is used to store all meta tags for declarations.
     /// \details For the same reason as expressions, lists of meta tags are stored in one continuous array.
-    /// \meta reflection_dynamic_array_type = "kan_interned_string_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (kan_interned_string_t)
     struct kan_dynamic_array_t meta_lists_storage;
 };
 

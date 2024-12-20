@@ -77,7 +77,7 @@ static struct
 
     struct kan_application_resource_project_t project;
 
-    /// \meta reflection_dynamic_array_type = "struct target_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct target_t)
     struct kan_dynamic_array_t targets;
 
     struct kan_atomic_int_t compilation_queue_lock;
@@ -111,7 +111,7 @@ struct byproduct_node_t
     struct kan_hash_storage_node_t node;
     struct native_entry_node_t *entry;
 
-    /// \meta reflection_dynamic_array_type = "struct byproduct_production_source_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct byproduct_production_source_t)
     struct kan_dynamic_array_t produced_from;
 };
 
@@ -134,7 +134,7 @@ struct target_t
     struct kan_hash_storage_t third_party;
     kan_serialization_interned_string_registry_t interned_string_registry;
 
-    /// \meta reflection_dynamic_array_type = "struct target_t *"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct target_t *)
     struct kan_dynamic_array_t visible_targets;
 
     struct kan_atomic_int_t byproduct_index_generator;

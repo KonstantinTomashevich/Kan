@@ -11,6 +11,7 @@
 #include <kan/log/logging.h>
 #include <kan/memory/allocation.h>
 #include <kan/reflection/field_visibility_iterator.h>
+#include <kan/reflection/markup.h>
 #include <kan/reflection/patch.h>
 #include <kan/serialization/binary.h>
 #include <kan/threading/atomic.h>
@@ -114,7 +115,7 @@ struct interned_string_registry_node_t
 
 struct interned_string_registry_t
 {
-    /// \meta reflection_dynamic_array_type = "kan_interned_string_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (kan_interned_string_t)
     struct kan_dynamic_array_t index_to_value;
 
     kan_bool_t load_only;
@@ -218,7 +219,7 @@ struct serialization_common_state_t
     struct interned_string_registry_t *optional_string_registry;
     struct kan_stream_t *stream;
 
-    /// \meta reflection_dynamic_array_type = "struct script_state_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct script_state_t)
     struct kan_dynamic_array_t script_state_stack;
 
     kan_instance_size_t patch_section_map_size;
