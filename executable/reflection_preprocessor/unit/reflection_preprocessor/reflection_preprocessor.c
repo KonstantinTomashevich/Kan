@@ -2004,19 +2004,13 @@ static enum parse_status_t parse_struct_declaration (const char *declaration_nam
              // We do not require semicolon as, due to how MSVC works, it might be after line directive.
              if (parser.current_target_node->type == TARGET_FILE_TYPE_OBJECT)
              {
-                 kan_trivial_string_buffer_append_char_sequence (&global.declaration_section, parser.token,
-                     (kan_instance_size_t) (parser.cursor - parser.token));
+                 kan_trivial_string_buffer_append_string (&global.declaration_section, "};\n");
              }
 
              if (inside_union)
              {
                  inside_union = KAN_FALSE;
                  continue;
-             }
-
-             if (parser.current_target_node->type == TARGET_FILE_TYPE_OBJECT)
-             {
-                 kan_trivial_string_buffer_append_string (&global.declaration_section, ";\n");
              }
 
              finish_struct_generation (&context);
