@@ -221,10 +221,6 @@ function (application_set_world_directory DIRECTORY)
         file (COPY_FILE
                 "${PROJECT_SOURCE_DIR}/cmake/kan/verify_code_hot_reload_world.rd"
                 "${DIRECTORY}/optional/verify_code_hot_reload.rd")
-
-    else ()
-        message (STATUS "        Removing code hot reload test world.")
-        file (REMOVE "${DIRECTORY}/optional/verify_code_hot_reload.rd")
     endif ()
 endfunction ()
 
