@@ -1,6 +1,6 @@
 register_concrete (universe_resource_provider_kan)
 concrete_include (PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
-universe_concrete_setup_sources (GLOB "*.c")
+concrete_sources (GLOB "*.c")
 concrete_implements_abstract (universe_resource_provider)
 
 concrete_require (
@@ -11,6 +11,7 @@ concrete_require (
         context_reflection_system context_resource_pipeline_system context_virtual_file_system resource_index
         serialization universe_resource_provider_reflection
         THIRD_PARTY qsort)
+universe_concrete_preprocessing_queue ()
 
 set (KAN_UNIVERSE_RESOURCE_PROVIDER_TEMPORARY_CHUNK_SIZE "4096" CACHE STRING
         "Chunk size for resource provider temporary allocator.")

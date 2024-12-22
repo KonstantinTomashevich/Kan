@@ -51,13 +51,13 @@ struct kan_transform_2_component_t
     kan_bool_t visual_synced_at_least_once;
     struct kan_transform_2_t visual_local;
 
-    /// \meta reflection_ignore_struct_field
+    KAN_REFLECTION_IGNORE
     struct kan_atomic_int_t logical_global_lock;
 
     kan_bool_t logical_global_dirty;
     struct kan_transform_2_t logical_global;
 
-    /// \meta reflection_ignore_struct_field
+    KAN_REFLECTION_IGNORE
     struct kan_atomic_int_t visual_global_lock;
 
     kan_bool_t visual_global_dirty;
@@ -78,13 +78,13 @@ struct kan_transform_3_component_t
     kan_bool_t visual_synced_at_least_once;
     struct kan_transform_3_t visual_local;
 
-    /// \meta reflection_ignore_struct_field
+    KAN_REFLECTION_IGNORE
     struct kan_atomic_int_t logical_global_lock;
 
     kan_bool_t logical_global_dirty;
     struct kan_transform_3_t logical_global;
 
-    /// \meta reflection_ignore_struct_field
+    KAN_REFLECTION_IGNORE
     struct kan_atomic_int_t visual_global_lock;
 
     kan_bool_t visual_global_dirty;

@@ -25,7 +25,7 @@ struct test_data_type_t
 
 _Static_assert (_Alignof (struct test_data_type_t) <= _Alignof (kan_memory_size_t), "Alignment has expected value.");
 
-// \meta reflection_struct_meta = "test_data_type_t"
+KAN_REFLECTION_STRUCT_META (test_data_type_t)
 APPLICATION_FRAMEWORK_EXAMPLE_BASIC_LOGIC_API struct kan_resource_resource_type_meta_t test_data_type_meta = {
     .root = KAN_TRUE,
 };

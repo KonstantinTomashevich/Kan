@@ -17,7 +17,7 @@
 #define RETURN_CODE_SUCCESS 0
 #define RETURN_CODE_INVALID_ARGUMENTS (-1)
 #define RETURN_CODE_UNABLE_TO_OPEN_INPUT (-2)
-#define RETURN_CODE_PARSE_FAILED (-3)
+#define RETURN_CODE_SCAN_FAILED (-3)
 #define RETURN_CODE_BUILD_FAILED (-4)
 #define RETURN_CODE_UNABLE_TO_OPEN_OUTPUT (-5)
 #define RETURN_CODE_SERIALIZATION_FAILED (-6)
@@ -992,7 +992,7 @@ int main (int argument_count, char **arguments_array)
     {
         fprintf (stderr, "Parse failed, exiting...\n");
         io.input_stream->operations->close (io.input_stream);
-        return RETURN_CODE_PARSE_FAILED;
+        return RETURN_CODE_SCAN_FAILED;
     }
 
     io.input_stream->operations->close (io.input_stream);

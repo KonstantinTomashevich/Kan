@@ -15,7 +15,7 @@ KAN_LOG_DEFINE_CATEGORY (application_framework_example_compilation_state);
 
 struct numbers_t
 {
-    /// \meta reflection_dynamic_array_type = "kan_serialized_size_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (kan_serialized_size_t)
     struct kan_dynamic_array_t items;
 };
 
@@ -32,7 +32,7 @@ APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_STATE_API void numbers_shutdown (struc
     kan_dynamic_array_shutdown (&numbers->items);
 }
 
-// \meta reflection_struct_meta = "numbers_t"
+KAN_REFLECTION_STRUCT_META (numbers_t)
 APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_STATE_API struct kan_resource_resource_type_meta_t
     numbers_resource_type_meta = {
         .root = KAN_TRUE,
@@ -40,7 +40,7 @@ APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_STATE_API struct kan_resource_resource
 
 static enum kan_resource_compile_result_t numbers_compile (struct kan_resource_compile_state_t *state);
 
-// \meta reflection_struct_meta = "numbers_t"
+KAN_REFLECTION_STRUCT_META (numbers_t)
 APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_STATE_API struct kan_resource_compilable_meta_t numbers_compilable_meta = {
     .output_type_name = "numbers_compiled_t",
     .configuration_type_name = NULL,
@@ -69,7 +69,7 @@ APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_STATE_API void numbers_compiled_init (
     instance->sum = 0u;
 }
 
-// \meta reflection_struct_meta = "numbers_compiled_t"
+KAN_REFLECTION_STRUCT_META (numbers_compiled_t)
 APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_STATE_API struct kan_resource_resource_type_meta_t
     numbers_compiled_resource_type_meta = {
         .root = KAN_TRUE,

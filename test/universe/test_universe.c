@@ -55,7 +55,7 @@ TEST_UNIVERSE_API void object_record_init (struct object_record_t *data)
     data->data_y = 0u;
 }
 
-// \meta reflection_struct_meta = "object_record_t"
+KAN_REFLECTION_STRUCT_META (object_record_t)
 TEST_UNIVERSE_API struct kan_repository_meta_automatic_cascade_deletion_t object_record_hierarchy_cascade_deletion = {
     .parent_key_path = {.reflection_path_length = 1u, .reflection_path = (const char *[]) {"object_id"}},
     .child_type_name = "object_record_t",
@@ -80,7 +80,7 @@ TEST_UNIVERSE_API void status_record_init (struct status_record_t *data)
     data->boosted = KAN_FALSE;
 }
 
-// \meta reflection_struct_meta = "object_record_t"
+KAN_REFLECTION_STRUCT_META (object_record_t)
 TEST_UNIVERSE_API struct kan_repository_meta_automatic_cascade_deletion_t status_record_object_cascade_deletion = {
     .parent_key_path = {.reflection_path_length = 1u, .reflection_path = (const char *[]) {"object_id"}},
     .child_type_name = "status_record_t",
@@ -288,7 +288,7 @@ struct insert_from_multiple_threads_state_t
     KAN_UP_GENERATE_STATE_QUERIES (insert_from_multiple_threads)
     KAN_UP_BIND_STATE (insert_from_multiple_threads, state)
 
-    /// \meta reflection_ignore_struct_field
+    KAN_REFLECTION_IGNORE
     struct kan_stack_group_allocator_t task_data_allocator;
 
     kan_interned_string_t task_name;
@@ -326,8 +326,8 @@ static void insert_task_execute (kan_functor_user_data_t user_data)
     }
 }
 
-// \meta reflection_function_meta = "kan_universe_mutator_execute_insert_from_multiple_threads"
-// \meta reflection_function_meta = "kan_universe_mutator_execute_validate_insert_from_multiple_threads"
+KAN_REFLECTION_FUNCTION_META (kan_universe_mutator_execute_insert_from_multiple_threads)
+KAN_REFLECTION_FUNCTION_META (kan_universe_mutator_execute_validate_insert_from_multiple_threads)
 TEST_UNIVERSE_API struct kan_universe_mutator_group_meta_t multiple_threads_test_group = {
     .group_name = "multiple_threads_test",
 };
@@ -368,7 +368,7 @@ TEST_UNIVERSE_API void kan_universe_mutator_execute_validate_insert_from_multipl
     kan_cpu_job_t job, struct validate_insert_from_multiple_threads_state_t *state)
 {
     kan_instance_size_t count = 0u;
-    KAN_UP_INTERVAL_ASCENDING_READ (object, object_record_t, object_id, NULL, NULL)
+    KAN_UP_INTERVAL_ASCENDING_READ (object, object_record_t, object_id, KAN_UP_NOTHING, KAN_UP_NOTHING)
     {
         KAN_TEST_CHECK (object->object_id == count)
         KAN_TEST_CHECK (object->parent_object_id == INVALID_PARENT_OBJECT_ID)

@@ -6,6 +6,7 @@
 #include <kan/api_common/core_types.h>
 #include <kan/container/interned_string.h>
 #include <kan/memory_profiler/allocation_group.h>
+#include <kan/reflection/markup.h>
 #include <kan/threading/atomic.h>
 
 /// \file
@@ -150,12 +151,13 @@ struct kan_resource_request_t
 UNIVERSE_RESOURCE_PROVIDER_API void kan_resource_request_init (struct kan_resource_request_t *instance);
 
 /// \brief Struct that mimics data layout of native resource containers.
-/// \meta reflection_ignore_struct
+KAN_REFLECTION_IGNORE
 struct kan_resource_container_view_t
 {
     kan_resource_container_id_t container_id;
     kan_allocation_group_t my_allocation_group;
 
+    KAN_REFLECTION_IGNORE
     uint8_t data_begin[];
 };
 
@@ -173,7 +175,7 @@ struct kan_resource_request_updated_event_t
 struct kan_resource_provider_singleton_t
 {
     /// \brief Atomic counter for assigning request ids. Safe to be modified from different threads.
-    /// \meta reflection_ignore_struct_field
+    KAN_REFLECTION_IGNORE
     struct kan_atomic_int_t request_id_counter;
 
     /// \brief When set to true, resource provider will stop serving, unload all the data and start scan from scratch.

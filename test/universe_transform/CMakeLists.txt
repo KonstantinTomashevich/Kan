@@ -1,12 +1,13 @@
 register_concrete (test_universe_transform)
 concrete_include (PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
-universe_concrete_setup_sources (GLOB "*.c")
+concrete_sources (GLOB "*.c")
 
 concrete_require (
         SCOPE PUBLIC
         CONCRETE_INTERFACE
         context_reflection_system context_update_system testing universe universe_single_pipeline_scheduler
         universe_time universe_transform)
+universe_concrete_preprocessing_queue ()
 
 register_shared_library (test_universe_transform_library)
 shared_library_include (

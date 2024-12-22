@@ -1,17 +1,8 @@
-set (GENERATION_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/universe_preprocessor.c")
-set (GENERATION_OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/Generated/universe_preprocessor.c")
-
-add_custom_command (
-        OUTPUT "${GENERATION_OUTPUT}"
-        DEPENDS "${GENERATION_SOURCE}"
-        COMMENT "Generate universe_preprocessor_main code from re2c template."
-        COMMAND re2c "${GENERATION_SOURCE}" -o "${GENERATION_OUTPUT}")
-
 register_concrete (universe_preprocessor_main)
 concrete_include (PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
-concrete_highlight_direct ("${GENERATION_SOURCE}")
-concrete_sources_direct ("${GENERATION_OUTPUT}")
+concrete_sources ("*.c")
 concrete_require (SCOPE PUBLIC ABSTRACT error file_system memory CONCRETE_INTERFACE container)
+concrete_preprocessing_queue_step_apply (COMMAND re2c ARGUMENTS "$$INPUT" -o "$$OUTPUT")
 
 set (KAN_UNIVERSE_PREPROCESSOR_QUERY_INITIAL_SLOTS "4" CACHE STRING
         "Initial capacity of scanned query arrays in states.")

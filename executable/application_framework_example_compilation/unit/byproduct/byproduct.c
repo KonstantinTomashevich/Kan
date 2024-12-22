@@ -3,6 +3,7 @@
 #include <qsort.h>
 
 #include <kan/api_common/alignment.h>
+#include <kan/api_common/mute_warnings.h>
 #include <kan/container/dynamic_array.h>
 #include <kan/context/all_system_names.h>
 #include <kan/context/application_framework_system.h>
@@ -26,7 +27,7 @@ struct shader_source_byproduct_t
     kan_interned_string_t source;
 };
 
-// \meta reflection_struct_meta = "shader_source_byproduct_t"
+KAN_REFLECTION_STRUCT_META (shader_source_byproduct_t)
 APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API struct kan_resource_byproduct_type_meta_t
     shader_source_byproduct_byproduct_type_meta = {
         .hash = NULL,
@@ -37,7 +38,7 @@ APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API struct kan_resource_bypr
 
 static enum kan_resource_compile_result_t shader_source_byproduct_compile (struct kan_resource_compile_state_t *state);
 
-// \meta reflection_struct_meta = "shader_source_byproduct_t"
+KAN_REFLECTION_STRUCT_META (shader_source_byproduct_t)
 APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API struct kan_resource_compilable_meta_t
     shader_source_byproduct_compilable_meta = {
         .output_type_name = "shader_source_byproduct_compiled_t",
@@ -46,7 +47,7 @@ APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API struct kan_resource_comp
         .functor = shader_source_byproduct_compile,
 };
 
-// \meta reflection_struct_field_meta = "shader_source_byproduct_t.source"
+KAN_REFLECTION_STRUCT_FIELD_META (shader_source_byproduct_t, source)
 APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API struct kan_resource_reference_meta_t
     shader_source_byproduct_source_meta = {
         .type = NULL, // Null means third party.
@@ -61,7 +62,7 @@ struct shader_source_byproduct_compiled_t
     kan_memory_size_t stub;
 };
 
-// \meta reflection_struct_meta = "shader_source_byproduct_compiled_t"
+KAN_REFLECTION_STRUCT_META (shader_source_byproduct_compiled_t)
 APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API struct kan_resource_resource_type_meta_t
     shader_source_byproduct_compiled_meta = {
         .root = KAN_FALSE,
@@ -86,7 +87,7 @@ struct material_pass_t
 {
     kan_interned_string_t name;
 
-    /// \meta reflection_dynamic_array_type = "struct material_pass_option_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct material_pass_option_t)
     struct kan_dynamic_array_t options;
 };
 
@@ -103,10 +104,10 @@ APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API void material_pass_shutd
 
 struct material_t
 {
-    /// \meta reflection_dynamic_array_type = "kan_interned_string_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (kan_interned_string_t)
     struct kan_dynamic_array_t shader_sources;
 
-    /// \meta reflection_dynamic_array_type = "struct material_pass_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct material_pass_t)
     struct kan_dynamic_array_t passes;
 };
 
@@ -129,7 +130,7 @@ APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API void material_shutdown (
     kan_dynamic_array_shutdown (&instance->passes);
 }
 
-// \meta reflection_struct_meta = "material_t"
+KAN_REFLECTION_STRUCT_META (material_t)
 APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API struct kan_resource_resource_type_meta_t
     material_resource_type_meta = {
         .root = KAN_TRUE,
@@ -137,7 +138,7 @@ APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API struct kan_resource_reso
 
 static enum kan_resource_compile_result_t material_compile (struct kan_resource_compile_state_t *state);
 
-// \meta reflection_struct_meta = "material_t"
+KAN_REFLECTION_STRUCT_META (material_t)
 APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API struct kan_resource_compilable_meta_t material_compilable_meta =
     {
         .output_type_name = "material_compiled_t",
@@ -151,10 +152,10 @@ APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API struct kan_resource_comp
 
 struct pipeline_instance_byproduct_t
 {
-    /// \meta reflection_dynamic_array_type = "kan_interned_string_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (kan_interned_string_t)
     struct kan_dynamic_array_t sources;
 
-    /// \meta reflection_dynamic_array_type = "struct material_pass_option_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct material_pass_option_t)
     struct kan_dynamic_array_t options;
 };
 
@@ -174,7 +175,7 @@ APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API void pipeline_instance_b
     kan_dynamic_array_shutdown (&instance->options);
 }
 
-// \meta reflection_struct_meta = "pipeline_instance_byproduct_t"
+KAN_REFLECTION_STRUCT_META (pipeline_instance_byproduct_t)
 APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API struct kan_resource_byproduct_type_meta_t
     pipeline_instance_byproduct_byproduct_type_meta = {
         .hash = NULL,
@@ -186,7 +187,7 @@ APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API struct kan_resource_bypr
 static enum kan_resource_compile_result_t pipeline_instance_byproduct_compile (
     struct kan_resource_compile_state_t *state);
 
-// \meta reflection_struct_meta = "pipeline_instance_byproduct_t"
+KAN_REFLECTION_STRUCT_META (pipeline_instance_byproduct_t)
 APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API struct kan_resource_compilable_meta_t
     pipeline_instance_byproduct_compilable_meta = {
         .output_type_name = "pipeline_instance_byproduct_compiled_t",
@@ -195,7 +196,7 @@ APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API struct kan_resource_comp
         .functor = pipeline_instance_byproduct_compile,
 };
 
-// \meta reflection_struct_field_meta = "pipeline_instance_byproduct_t.sources"
+KAN_REFLECTION_STRUCT_FIELD_META (pipeline_instance_byproduct_t, sources)
 APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API struct kan_resource_reference_meta_t
     pipeline_instance_byproduct_source_meta = {
         .type = "shader_source_byproduct_t",
@@ -210,7 +211,7 @@ struct pipeline_instance_byproduct_compiled_t
     enum pipeline_instance_platform_format_t format;
 };
 
-// \meta reflection_struct_meta = "pipeline_instance_byproduct_compiled_t"
+KAN_REFLECTION_STRUCT_META (pipeline_instance_byproduct_compiled_t)
 APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API struct kan_resource_resource_type_meta_t
     pipeline_instance_byproduct_compiled_meta = {
         .root = KAN_FALSE,
@@ -238,7 +239,7 @@ struct material_pass_compiled_t
 
 struct material_compiled_t
 {
-    /// \meta reflection_dynamic_array_type = "struct material_pass_compiled_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct material_pass_compiled_t)
     struct kan_dynamic_array_t passes;
 };
 
@@ -255,13 +256,13 @@ APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API void material_compiled_s
     kan_dynamic_array_shutdown (&instance->passes);
 }
 
-// \meta reflection_struct_meta = "material_compiled_t"
+KAN_REFLECTION_STRUCT_META (material_compiled_t)
 APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API struct kan_resource_resource_type_meta_t
     material_compiled_resource_type_meta = {
         .root = KAN_TRUE,
 };
 
-// \meta reflection_struct_field_meta = "material_pass_compiled_t.pipeline_instance"
+KAN_REFLECTION_STRUCT_FIELD_META (material_pass_compiled_t, pipeline_instance)
 APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BYPRODUCT_API struct kan_resource_reference_meta_t
     material_pass_compiled_t_pipeline_instance_meta = {
         .type = "pipeline_instance_byproduct_t",
@@ -294,6 +295,7 @@ static enum kan_resource_compile_result_t material_compile (struct kan_resource_
     {
         kan_interned_string_t temporary;
 
+        KAN_MUTE_THIRD_PARTY_WARNINGS_BEGIN
 #define AT_INDEX(INDEX) (((kan_interned_string_t *) sources.data)[INDEX])
 #define LESS(first_index, second_index) AT_INDEX (first_index) < AT_INDEX (second_index)
 #define SWAP(first_index, second_index)                                                                                \
@@ -303,6 +305,7 @@ static enum kan_resource_compile_result_t material_compile (struct kan_resource_
 #undef LESS
 #undef SWAP
 #undef AT_INDEX
+        KAN_MUTE_THIRD_PARTY_WARNINGS_END
     }
 
     kan_dynamic_array_set_capacity (&target->passes, source->passes.size);
@@ -333,6 +336,7 @@ static enum kan_resource_compile_result_t material_compile (struct kan_resource_
         {
             struct material_pass_option_t temporary;
 
+            KAN_MUTE_THIRD_PARTY_WARNINGS_BEGIN
 #define AT_INDEX(INDEX) (((struct material_pass_option_t *) pipeline_instance.options.data)[INDEX])
 #define LESS(first_index, second_index) AT_INDEX (first_index).name < AT_INDEX (second_index).name
 #define SWAP(first_index, second_index)                                                                                \
@@ -342,6 +346,7 @@ static enum kan_resource_compile_result_t material_compile (struct kan_resource_
 #undef LESS
 #undef SWAP
 #undef AT_INDEX
+            KAN_MUTE_THIRD_PARTY_WARNINGS_END
         }
 
         target_pass->pipeline_instance =

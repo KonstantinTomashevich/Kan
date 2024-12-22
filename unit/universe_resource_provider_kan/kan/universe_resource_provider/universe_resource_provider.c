@@ -51,7 +51,7 @@ struct resource_provider_private_singleton_t
 
     union
     {
-        /// \meta reflection_ignore_struct_field
+        KAN_REFLECTION_IGNORE
         struct kan_atomic_int_t container_id_counter;
 
         int container_id_counter_data_for_reflection;
@@ -59,7 +59,7 @@ struct resource_provider_private_singleton_t
 
     union
     {
-        /// \meta reflection_ignore_struct_field
+        KAN_REFLECTION_IGNORE
         struct kan_atomic_int_t byproduct_id_counter;
 
         int byproduct_id_counter_data_for_reflection;
@@ -67,10 +67,10 @@ struct resource_provider_private_singleton_t
 
     kan_id_32_t attachment_id_counter;
 
-    /// \meta reflection_dynamic_array_type = "struct scan_item_task_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct scan_item_task_t)
     struct kan_dynamic_array_t scan_item_stack;
 
-    /// \meta reflection_dynamic_array_type = "kan_serialization_interned_string_registry_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (kan_serialization_interned_string_registry_t)
     struct kan_dynamic_array_t loaded_string_registries;
 
     kan_virtual_file_system_watcher_t resource_watcher;
@@ -178,7 +178,7 @@ struct resource_request_on_insert_event_t
     kan_interned_string_t name;
 };
 
-// \meta reflection_struct_meta = "kan_resource_request_t"
+KAN_REFLECTION_STRUCT_META (kan_resource_request_t)
 UNIVERSE_RESOURCE_PROVIDER_KAN_API struct kan_repository_meta_automatic_on_insert_event_t resource_request_on_insert = {
     .event_type = "resource_request_on_insert_event_t",
     .copy_outs_count = 3u,
@@ -208,7 +208,7 @@ struct resource_request_on_change_event_t
     kan_interned_string_t new_name;
 };
 
-// \meta reflection_struct_meta = "kan_resource_request_t"
+KAN_REFLECTION_STRUCT_META (kan_resource_request_t)
 UNIVERSE_RESOURCE_PROVIDER_KAN_API struct kan_repository_meta_automatic_on_change_event_t resource_request_on_change = {
     .event_type = "resource_request_on_change_event_t",
     .observed_fields_count = 2u,
@@ -254,7 +254,7 @@ struct resource_request_on_delete_event_t
     kan_interned_string_t name;
 };
 
-// \meta reflection_struct_meta = "kan_resource_request_t"
+KAN_REFLECTION_STRUCT_META (kan_resource_request_t)
 UNIVERSE_RESOURCE_PROVIDER_KAN_API struct kan_repository_meta_automatic_on_delete_event_t resource_request_on_delete = {
     .event_type = "resource_request_on_delete_event_t",
     .copy_outs_count = 3u,
@@ -334,12 +334,12 @@ struct resource_provider_operation_t
 
     union
     {
-        /// \meta reflection_visibility_condition_field = operation_type
-        /// \meta reflection_visibility_condition_values = "RESOURCE_PROVIDER_OPERATION_TYPE_LOAD"
+        KAN_REFLECTION_VISIBILITY_CONDITION_FIELD (operation_type)
+        KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (RESOURCE_PROVIDER_OPERATION_TYPE_LOAD)
         struct resource_provider_operation_load_t load;
 
-        /// \meta reflection_visibility_condition_field = operation_type
-        /// \meta reflection_visibility_condition_values = "RESOURCE_PROVIDER_OPERATION_TYPE_COMPILE"
+        KAN_REFLECTION_VISIBILITY_CONDITION_FIELD (operation_type)
+        KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (RESOURCE_PROVIDER_OPERATION_TYPE_COMPILE)
         struct resource_provider_operation_compile_t compile;
     };
 };
@@ -360,17 +360,17 @@ struct resource_provider_delayed_file_addition_t
 
 struct resource_provider_execution_shared_state_t
 {
-    /// \meta reflection_ignore_struct_field
+    KAN_REFLECTION_IGNORE
     struct kan_atomic_int_t workers_left;
 
-    /// \meta reflection_ignore_struct_field
+    KAN_REFLECTION_IGNORE
     struct kan_atomic_int_t concurrency_lock;
 
     /// \brief Special lock for producing byproducts during runtime compilation.
-    /// \meta reflection_ignore_struct_field
+    KAN_REFLECTION_IGNORE
     struct kan_atomic_int_t byproduct_lock;
 
-    //// \meta reflection_ignore_struct_field
+    KAN_REFLECTION_IGNORE
     struct kan_repository_indexed_interval_descending_write_cursor_t operation_cursor;
 
     kan_instance_size_t min_priority;
@@ -419,22 +419,22 @@ struct resource_provider_state_t
     kan_resource_pipeline_system_platform_configuration_listener platform_configuration_change_listener;
     kan_context_system_t virtual_file_system;
 
-    /// \meta reflection_ignore_struct_field
+    KAN_REFLECTION_IGNORE
     struct kan_stack_group_allocator_t temporary_allocator;
 
-    /// \meta reflection_ignore_struct_field
+    KAN_REFLECTION_IGNORE
     struct kan_stream_t *serialized_index_stream;
 
-    /// \meta reflection_ignore_struct_field
+    KAN_REFLECTION_IGNORE
     kan_serialization_binary_reader_t serialized_index_reader;
 
-    /// \meta reflection_ignore_struct_field
+    KAN_REFLECTION_IGNORE
     struct kan_resource_index_t serialized_index_read_buffer;
 
-    /// \meta reflection_ignore_struct_field
+    KAN_REFLECTION_IGNORE
     struct kan_stream_t *string_registry_stream;
 
-    /// \meta reflection_ignore_struct_field
+    KAN_REFLECTION_IGNORE
     kan_serialization_interned_string_registry_reader_t string_registry_reader;
 
     kan_interned_string_t interned_kan_resource_index_t;
@@ -451,19 +451,19 @@ struct resource_provider_state_t
     struct kan_repository_indexed_interval_read_query_t read_interval__resource_provider_operation__priority;
     struct kan_repository_indexed_interval_write_query_t write_interval__resource_provider_operation__priority;
 
-    /// \meta reflection_ignore_struct_field
+    KAN_REFLECTION_IGNORE
     struct resource_provider_execution_shared_state_t execution_shared_state;
 
     kan_time_size_t frame_begin_time_ns;
 
     /// \details Every time hot reload is happened, we need to restart active runtime compilation as reflection
     ///          including meta could have changed.
-    /// \meta reflection_ignore_struct_field
+    KAN_REFLECTION_IGNORE
     kan_bool_t need_to_restart_runtime_compilation;
 
     kan_instance_size_t trailing_data_count;
 
-    /// \meta reflection_ignore_struct_field
+    KAN_REFLECTION_IGNORE
     void *trailing_data[0u];
 };
 
@@ -475,7 +475,7 @@ struct universe_resource_provider_generated_container_type_node_t
 {
     struct universe_resource_provider_generated_container_type_node_t *next;
 
-    /// \meta reflection_ignore_struct_field
+    KAN_REFLECTION_IGNORE
     struct kan_reflection_struct_t type;
 
     const struct kan_reflection_struct_t *source_type;
@@ -491,16 +491,16 @@ struct kan_reflection_generator_universe_resource_provider_t
     struct universe_resource_provider_generated_container_type_node_t *first_container_type;
     kan_instance_size_t container_types_count;
 
-    /// \meta reflection_ignore_struct_field
+    KAN_REFLECTION_IGNORE
     struct kan_reflection_struct_t mutator_type;
 
-    /// \meta reflection_ignore_struct_field
+    KAN_REFLECTION_IGNORE
     struct kan_reflection_function_t mutator_deploy_function;
 
-    /// \meta reflection_ignore_struct_field
+    KAN_REFLECTION_IGNORE
     struct kan_reflection_function_t mutator_execute_function;
 
-    /// \meta reflection_ignore_struct_field
+    KAN_REFLECTION_IGNORE
     struct kan_reflection_function_t mutator_undeploy_function;
 
     kan_interned_string_t interned_kan_resource_resource_type_meta_t;
@@ -2791,7 +2791,7 @@ static inline void process_delayed_addition (struct resource_provider_state_t *s
                                                  KAN_PACKED_TIMER_SET (kan_precise_time_get_elapsed_nanoseconds ());
 
     KAN_UP_INTERVAL_ASCENDING_WRITE (delayed_addition, resource_provider_delayed_file_addition_t,
-                                     investigate_after_timer, NULL, &current_timer)
+                                     investigate_after_timer, KAN_UP_NOTHING, &current_timer)
     {
         process_file_addition (state, public, private, delayed_addition->path);
         KAN_UP_ACCESS_DELETE (delayed_addition);
@@ -2817,7 +2817,7 @@ static inline void process_delayed_reload (struct resource_provider_state_t *sta
                                                  KAN_PACKED_TIMER_SET (kan_precise_time_get_elapsed_nanoseconds ());
 
     KAN_UP_INTERVAL_ASCENDING_UPDATE (native_suffix, resource_provider_native_entry_suffix_t,
-                                      reload_after_real_time_timer, NULL, &current_timer)
+                                      reload_after_real_time_timer, KAN_UP_NOTHING, &current_timer)
     {
         KAN_UP_VALUE_UPDATE (entry, kan_resource_native_entry_t, attachment_id, &native_suffix->attachment_id)
         {
@@ -2863,7 +2863,7 @@ static inline void process_delayed_reload (struct resource_provider_state_t *sta
     }
 
     KAN_UP_INTERVAL_ASCENDING_UPDATE (third_party_suffix, resource_provider_third_party_entry_suffix_t,
-                                      reload_after_real_time_timer, NULL, &current_timer)
+                                      reload_after_real_time_timer, KAN_UP_NOTHING, &current_timer)
     {
         KAN_UP_VALUE_UPDATE (entry, kan_resource_third_party_entry_t, attachment_id, &third_party_suffix->attachment_id)
         {

@@ -11,7 +11,7 @@
 KAN_LOG_DEFINE_CATEGORY (universe_transform);
 // \c_interface_scanner_enable
 
-// \meta reflection_struct_meta = "kan_transform_2_component_t"
+KAN_REFLECTION_STRUCT_META (kan_transform_2_component_t)
 UNIVERSE_TRANSFORM_API struct kan_repository_meta_automatic_cascade_deletion_t
     kan_transform_2_component_hierarchy_cascade_deletion = {
         .parent_key_path = {.reflection_path_length = 1u, .reflection_path = (const char *[]) {"object_id"}},
@@ -19,7 +19,7 @@ UNIVERSE_TRANSFORM_API struct kan_repository_meta_automatic_cascade_deletion_t
         .child_key_path = {.reflection_path_length = 1u, .reflection_path = (const char *[]) {"parent_object_id"}},
 };
 
-// \meta reflection_struct_meta = "kan_transform_3_component_t"
+KAN_REFLECTION_STRUCT_META (kan_transform_3_component_t)
 UNIVERSE_TRANSFORM_API struct kan_repository_meta_automatic_cascade_deletion_t
     kan_transform_3_component_hierarchy_cascade_deletion = {
         .parent_key_path = {.reflection_path_length = 1u, .reflection_path = (const char *[]) {"object_id"}},
@@ -27,14 +27,14 @@ UNIVERSE_TRANSFORM_API struct kan_repository_meta_automatic_cascade_deletion_t
         .child_key_path = {.reflection_path_length = 1u, .reflection_path = (const char *[]) {"parent_object_id"}},
 };
 
-// \meta reflection_function_meta = "kan_universe_mutator_execute_visual_transform_sync_2_invalidate"
-// \meta reflection_function_meta = "kan_universe_mutator_execute_visual_transform_sync_2_calculate"
+KAN_REFLECTION_FUNCTION_META (kan_universe_mutator_execute_visual_transform_sync_2_invalidate)
+KAN_REFLECTION_FUNCTION_META (kan_universe_mutator_execute_visual_transform_sync_2_calculate)
 UNIVERSE_TRANSFORM_API struct kan_universe_mutator_group_meta_t visual_transform_sync_2_calculate_mutator_group = {
     .group_name = KAN_TRANSFORM_VISUAL_SYNC_2_MUTATOR_GROUP,
 };
 
-// \meta reflection_function_meta = "kan_universe_mutator_execute_visual_transform_sync_3_invalidate"
-// \meta reflection_function_meta = "kan_universe_mutator_execute_visual_transform_sync_3_calculate"
+KAN_REFLECTION_FUNCTION_META (kan_universe_mutator_execute_visual_transform_sync_3_invalidate)
+KAN_REFLECTION_FUNCTION_META (kan_universe_mutator_execute_visual_transform_sync_3_calculate)
 UNIVERSE_TRANSFORM_API struct kan_universe_mutator_group_meta_t visual_transform_sync_3_calculate_mutator_group = {
     .group_name = KAN_TRANSFORM_VISUAL_SYNC_3_MUTATOR_GROUP,
 };
@@ -420,7 +420,7 @@ struct visual_transform_sync_2_invalidate_state_t
     struct kan_repository_indexed_signal_read_query_t read_signal__kan_transform_2_component__visual_sync_needed__1;
     struct kan_transform_2_queries_t transform_queries;
 
-    /// \meta reflection_ignore_struct_field
+    KAN_REFLECTION_IGNORE
     struct kan_stack_group_allocator_t temporary_allocator;
 
     kan_allocation_group_t my_allocation_group;
@@ -514,7 +514,7 @@ struct visual_transform_sync_2_calculate_state_t
 
     struct kan_transform_2_queries_t transform_queries;
 
-    /// \meta reflection_ignore_struct_field
+    KAN_REFLECTION_IGNORE
     struct kan_stack_group_allocator_t temporary_allocator;
 
     kan_allocation_group_t my_allocation_group;
@@ -640,7 +640,7 @@ struct visual_transform_sync_3_invalidate_state_t
     struct kan_repository_indexed_signal_read_query_t read_signal__kan_transform_3_component__visual_sync_needed__1;
     struct kan_transform_3_queries_t transform_queries;
 
-    /// \meta reflection_ignore_struct_field
+    KAN_REFLECTION_IGNORE
     struct kan_stack_group_allocator_t temporary_allocator;
 
     kan_allocation_group_t my_allocation_group;
@@ -702,7 +702,7 @@ struct visual_transform_sync_3_calculate_state_t
 
     struct kan_transform_3_queries_t transform_queries;
 
-    /// \meta reflection_ignore_struct_field
+    KAN_REFLECTION_IGNORE
     struct kan_stack_group_allocator_t temporary_allocator;
 
     kan_allocation_group_t my_allocation_group;

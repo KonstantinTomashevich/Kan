@@ -1,6 +1,6 @@
 register_concrete (test_universe_resource_reference)
 concrete_include (PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
-universe_concrete_setup_sources (GLOB "*.c")
+concrete_sources (GLOB "*.c")
 
 concrete_require (
         SCOPE PUBLIC
@@ -10,6 +10,7 @@ concrete_require (
         CONCRETE_INTERFACE
         context_reflection_system context_resource_pipeline_system context_update_system context_virtual_file_system
         serialization testing universe)
+universe_concrete_preprocessing_queue ()
 
 abstract_get_implementations (ABSTRACT universe_resource_reference OUTPUT PROVIDER_IMPLEMENTATIONS)
 foreach (IMPLEMENTATION ${PROVIDER_IMPLEMENTATIONS})

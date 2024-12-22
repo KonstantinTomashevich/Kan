@@ -6,8 +6,6 @@
 #include <kan/api_common/core_types.h>
 #include <kan/universe/universe.h>
 
-KAN_C_HEADER_BEGIN
-
 /// \file
 /// \brief Provides markup macros for usage with universe preprocessor.
 ///
@@ -111,220 +109,231 @@ KAN_C_HEADER_BEGIN
 /// to work in most IDEs.
 /// \endparblock
 
+KAN_C_HEADER_BEGIN
+
+/// \brief Use this in queries instead of NULL. As some preprocessors spam line directives when encountering NULL (GCC
+///        does that for some reason), we use our own macro to make parsing of kan universe preprocessor macros easier.
+#define KAN_UP_NOTHING ((void *) 0)
+
+// Defines are only enabled for highlight. During real compilation, universe preprocessor consumes them.
+#if defined(CMAKE_UNIT_FRAMEWORK_HIGHLIGHT)
+
 /// \brief Declares state with given name and outputs list of query fields associated with this state.
-#define KAN_UP_GENERATE_STATE_QUERIES(STATE_NAME)                                                                      \
-    /* Highlight-autocomplete replacement. */                                                                          \
-    kan_memory_size_t STATE_NAME##_fake_placeholder_field;
+#    define KAN_UP_GENERATE_STATE_QUERIES(STATE_NAME)                                                                  \
+        /* Highlight-autocomplete replacement. */                                                                      \
+        kan_memory_size_t STATE_NAME##_fake_placeholder_field;
 
 /// \brief Binds state by name with given path for all queries below (until another bind overrides it).
-#define KAN_UP_BIND_STATE(STATE_NAME, STATE_PATH) /* No highlight-time replacement. */
+#    define KAN_UP_BIND_STATE(STATE_NAME, STATE_PATH) /* No highlight-time replacement. */
 
 /// \brief Closes current query access and cursor and then emits break keyword.
-#define KAN_UP_QUERY_BREAK                                                                                             \
-    /* Highlight-autocomplete replacement. */                                                                          \
-    break
+#    define KAN_UP_QUERY_BREAK                                                                                         \
+        /* Highlight-autocomplete replacement. */                                                                      \
+        break
 
 /// \brief Closes current query access and cursor and then emits continue keyword.
-#define KAN_UP_QUERY_CONTINUE                                                                                          \
-    /* Highlight-autocomplete replacement. */                                                                          \
-    continue
+#    define KAN_UP_QUERY_CONTINUE                                                                                      \
+        /* Highlight-autocomplete replacement. */                                                                      \
+        continue
 
 /// \brief Clothes all accesses and cursors and then returns from the function.
-#define KAN_UP_QUERY_RETURN_VOID                                                                                       \
-    /* Highlight-autocomplete replacement. */                                                                          \
-    return
+#    define KAN_UP_QUERY_RETURN_VOID                                                                                   \
+        /* Highlight-autocomplete replacement. */                                                                      \
+        return
 
 /// \brief Clothes all accesses and cursors, releases mutator job and then returns from the mutator execute function.
-#define KAN_UP_MUTATOR_RETURN                                                                                          \
-    /* Highlight-autocomplete replacement. */                                                                          \
-    kan_cpu_job_release (job);                                                                                         \
-    return
+#    define KAN_UP_MUTATOR_RETURN                                                                                      \
+        /* Highlight-autocomplete replacement. */                                                                      \
+        kan_cpu_job_release (job);                                                                                     \
+        return
 
 /// \brief Calculates return value of given type using given expression, then closes all accesses and cursors and
 ///        returns calculated value from the function.
-#define KAN_UP_QUERY_RETURN_VALUE(TYPE, ...)                                                                           \
-    /* Highlight-autocomplete replacement. */                                                                          \
-    TYPE return_value = __VA_ARGS__;                                                                                   \
-    return return_value
+#    define KAN_UP_QUERY_RETURN_VALUE(TYPE, ...)                                                                       \
+        /* Highlight-autocomplete replacement. */                                                                      \
+        TYPE return_value = __VA_ARGS__;                                                                               \
+        return return_value
 
 /// \brief Copies current access of query with given name to given target expression and marks access as escaped
 ///        (will not be closed).
-#define KAN_UP_ACCESS_ESCAPE(TARGET, NAME)                                                                             \
-    /* Highlight-autocomplete replacement. */                                                                          \
-    TARGET = NAME##_access
+#    define KAN_UP_ACCESS_ESCAPE(TARGET, NAME)                                                                         \
+        /* Highlight-autocomplete replacement. */                                                                      \
+        TARGET = NAME##_access
 
 /// \brief Deletes data under current access of query with given name and marks access as deleted (will not be closed).
-#define KAN_UP_ACCESS_DELETE(NAME)                                                                                     \
-    /* Highlight-autocomplete replacement. */                                                                          \
-    NAME = NULL
+#    define KAN_UP_ACCESS_DELETE(NAME)                                                                                 \
+        /* Highlight-autocomplete replacement. */                                                                      \
+        NAME = NULL
 
 /// \brief Header for singleton read query.
-#define KAN_UP_SINGLETON_READ(NAME, TYPE)                                                                              \
-    /* Highlight-autocomplete replacement. */                                                                          \
-    const struct TYPE *NAME = NULL;
+#    define KAN_UP_SINGLETON_READ(NAME, TYPE)                                                                          \
+        /* Highlight-autocomplete replacement. */                                                                      \
+        const struct TYPE *NAME = NULL;
 
 /// \brief Header for singleton write query.
-#define KAN_UP_SINGLETON_WRITE(NAME, TYPE)                                                                             \
-    /* Highlight-autocomplete replacement. */                                                                          \
-    struct TYPE *NAME = NULL;
+#    define KAN_UP_SINGLETON_WRITE(NAME, TYPE)                                                                         \
+        /* Highlight-autocomplete replacement. */                                                                      \
+        struct TYPE *NAME = NULL;
 
 /// \brief Header for indexed insert query.
-#define KAN_UP_INDEXED_INSERT(NAME, TYPE)                                                                              \
-    /* Highlight-autocomplete replacement. */                                                                          \
-    struct TYPE *NAME = NULL;                                                                                          \
-    for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
+#    define KAN_UP_INDEXED_INSERT(NAME, TYPE)                                                                          \
+        /* Highlight-autocomplete replacement. */                                                                      \
+        struct TYPE *NAME = NULL;                                                                                      \
+        for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
 
 /// \brief Header for indexed sequence read query.
-#define KAN_UP_SEQUENCE_READ(NAME, TYPE)                                                                               \
-    /* Highlight-autocomplete replacement. */                                                                          \
-    const struct TYPE *NAME = NULL;                                                                                    \
-    for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
+#    define KAN_UP_SEQUENCE_READ(NAME, TYPE)                                                                           \
+        /* Highlight-autocomplete replacement. */                                                                      \
+        const struct TYPE *NAME = NULL;                                                                                \
+        for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
 
 /// \brief Header for indexed sequence update query.
-#define KAN_UP_SEQUENCE_UPDATE(NAME, TYPE)                                                                             \
-    /* Highlight-autocomplete replacement. */                                                                          \
-    struct TYPE *NAME = NULL;                                                                                          \
-    for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
+#    define KAN_UP_SEQUENCE_UPDATE(NAME, TYPE)                                                                         \
+        /* Highlight-autocomplete replacement. */                                                                      \
+        struct TYPE *NAME = NULL;                                                                                      \
+        for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
 
 /// \brief Header for indexed sequence delete query.
-#define KAN_UP_SEQUENCE_DELETE(NAME, TYPE)                                                                             \
-    /* Highlight-autocomplete replacement. */                                                                          \
-    const struct TYPE *NAME = NULL;                                                                                    \
-    for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
+#    define KAN_UP_SEQUENCE_DELETE(NAME, TYPE)                                                                         \
+        /* Highlight-autocomplete replacement. */                                                                      \
+        const struct TYPE *NAME = NULL;                                                                                \
+        for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
 
 /// \brief Header for indexed sequence write query.
-#define KAN_UP_SEQUENCE_WRITE(NAME, TYPE)                                                                              \
-    /* Highlight-autocomplete replacement. */                                                                          \
-    struct TYPE *NAME = NULL;                                                                                          \
-    for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
+#    define KAN_UP_SEQUENCE_WRITE(NAME, TYPE)                                                                          \
+        /* Highlight-autocomplete replacement. */                                                                      \
+        struct TYPE *NAME = NULL;                                                                                      \
+        for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
 
 /// \brief Header for indexed value read query.
-#define KAN_UP_VALUE_READ(NAME, TYPE, FIELD, ARGUMENT_POINTER)                                                         \
-    /* Highlight-autocomplete replacement. */                                                                          \
-    const struct TYPE *NAME = NULL;                                                                                    \
-    const void *NAME##_argument_user = ARGUMENT_POINTER;                                                               \
-    for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
+#    define KAN_UP_VALUE_READ(NAME, TYPE, FIELD, ARGUMENT_POINTER)                                                     \
+        /* Highlight-autocomplete replacement. */                                                                      \
+        const struct TYPE *NAME = NULL;                                                                                \
+        const void *NAME##_argument_user = ARGUMENT_POINTER;                                                           \
+        for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
 
 /// \brief Header for indexed value update query.
-#define KAN_UP_VALUE_UPDATE(NAME, TYPE, FIELD, ARGUMENT_POINTER)                                                       \
-    /* Highlight-autocomplete replacement. */                                                                          \
-    struct TYPE *NAME = NULL;                                                                                          \
-    const void *NAME##_argument_user = ARGUMENT_POINTER;                                                               \
-    for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
+#    define KAN_UP_VALUE_UPDATE(NAME, TYPE, FIELD, ARGUMENT_POINTER)                                                   \
+        /* Highlight-autocomplete replacement. */                                                                      \
+        struct TYPE *NAME = NULL;                                                                                      \
+        const void *NAME##_argument_user = ARGUMENT_POINTER;                                                           \
+        for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
 
 /// \brief Header for indexed value delete query.
-#define KAN_UP_VALUE_DELETE(NAME, TYPE, FIELD, ARGUMENT_POINTER)                                                       \
-    /* Highlight-autocomplete replacement. */                                                                          \
-    const struct TYPE *NAME = NULL;                                                                                    \
-    const void *NAME##_argument_user = ARGUMENT_POINTER;                                                               \
-    for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
+#    define KAN_UP_VALUE_DELETE(NAME, TYPE, FIELD, ARGUMENT_POINTER)                                                   \
+        /* Highlight-autocomplete replacement. */                                                                      \
+        const struct TYPE *NAME = NULL;                                                                                \
+        const void *NAME##_argument_user = ARGUMENT_POINTER;                                                           \
+        for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
 
 /// \brief Header for indexed value write query.
-#define KAN_UP_VALUE_WRITE(NAME, TYPE, FIELD, ARGUMENT_POINTER)                                                        \
-    /* Highlight-autocomplete replacement. */                                                                          \
-    struct TYPE *NAME = NULL;                                                                                          \
-    const void *NAME##_argument_user = ARGUMENT_POINTER;                                                               \
-    for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
+#    define KAN_UP_VALUE_WRITE(NAME, TYPE, FIELD, ARGUMENT_POINTER)                                                    \
+        /* Highlight-autocomplete replacement. */                                                                      \
+        struct TYPE *NAME = NULL;                                                                                      \
+        const void *NAME##_argument_user = ARGUMENT_POINTER;                                                           \
+        for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
 
 /// \brief Header for indexed signal read query.
-#define KAN_UP_SIGNAL_READ(NAME, TYPE, FIELD, NUMERIC_CONSTANT)                                                        \
-    /* Highlight-autocomplete replacement. */                                                                          \
-    const struct TYPE *NAME = NULL;                                                                                    \
-    for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
+#    define KAN_UP_SIGNAL_READ(NAME, TYPE, FIELD, NUMERIC_CONSTANT)                                                    \
+        /* Highlight-autocomplete replacement. */                                                                      \
+        const struct TYPE *NAME = NULL;                                                                                \
+        for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
 
 /// \brief Header for indexed signal update query.
-#define KAN_UP_SIGNAL_UPDATE(NAME, TYPE, FIELD, NUMERIC_CONSTANT)                                                      \
-    /* Highlight-autocomplete replacement. */                                                                          \
-    struct TYPE *NAME = NULL;                                                                                          \
-    for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
+#    define KAN_UP_SIGNAL_UPDATE(NAME, TYPE, FIELD, NUMERIC_CONSTANT)                                                  \
+        /* Highlight-autocomplete replacement. */                                                                      \
+        struct TYPE *NAME = NULL;                                                                                      \
+        for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
 
 /// \brief Header for indexed signal delete query.
-#define KAN_UP_SIGNAL_DELETE(NAME, TYPE, FIELD, NUMERIC_CONSTANT)                                                      \
-    /* Highlight-autocomplete replacement. */                                                                          \
-    const struct TYPE *NAME = NULL;                                                                                    \
-    for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
+#    define KAN_UP_SIGNAL_DELETE(NAME, TYPE, FIELD, NUMERIC_CONSTANT)                                                  \
+        /* Highlight-autocomplete replacement. */                                                                      \
+        const struct TYPE *NAME = NULL;                                                                                \
+        for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
 
 /// \brief Header for indexed signal write query.
-#define KAN_UP_SIGNAL_WRITE(NAME, TYPE, FIELD, NUMERIC_CONSTANT)                                                       \
-    /* Highlight-autocomplete replacement. */                                                                          \
-    struct TYPE *NAME = NULL;                                                                                          \
-    for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
+#    define KAN_UP_SIGNAL_WRITE(NAME, TYPE, FIELD, NUMERIC_CONSTANT)                                                   \
+        /* Highlight-autocomplete replacement. */                                                                      \
+        struct TYPE *NAME = NULL;                                                                                      \
+        for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
 
 /// \brief Header for indexed interval ascending read query.
-#define KAN_UP_INTERVAL_ASCENDING_READ(NAME, TYPE, FIELD, ARGUMENT_MIN_POINTER, ARGUMENT_MAX_POINTER)                  \
-    /* Highlight-autocomplete replacement. */                                                                          \
-    const struct TYPE *NAME = NULL;                                                                                    \
-    const void *NAME##_argument_min_user = ARGUMENT_MIN_POINTER;                                                       \
-    const void *NAME##_argument_max_user = ARGUMENT_MAX_POINTER;                                                       \
-    for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
+#    define KAN_UP_INTERVAL_ASCENDING_READ(NAME, TYPE, FIELD, ARGUMENT_MIN_POINTER, ARGUMENT_MAX_POINTER)              \
+        /* Highlight-autocomplete replacement. */                                                                      \
+        const struct TYPE *NAME = NULL;                                                                                \
+        const void *NAME##_argument_min_user = ARGUMENT_MIN_POINTER;                                                   \
+        const void *NAME##_argument_max_user = ARGUMENT_MAX_POINTER;                                                   \
+        for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
 
 /// \brief Header for indexed interval ascending update query.
-#define KAN_UP_INTERVAL_ASCENDING_UPDATE(NAME, TYPE, FIELD, ARGUMENT_MIN_POINTER, ARGUMENT_MAX_POINTER)                \
-    /* Highlight-autocomplete replacement. */                                                                          \
-    struct TYPE *NAME = NULL;                                                                                          \
-    const void *NAME##_argument_min_user = ARGUMENT_MIN_POINTER;                                                       \
-    const void *NAME##_argument_max_user = ARGUMENT_MAX_POINTER;                                                       \
-    for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
+#    define KAN_UP_INTERVAL_ASCENDING_UPDATE(NAME, TYPE, FIELD, ARGUMENT_MIN_POINTER, ARGUMENT_MAX_POINTER)            \
+        /* Highlight-autocomplete replacement. */                                                                      \
+        struct TYPE *NAME = NULL;                                                                                      \
+        const void *NAME##_argument_min_user = ARGUMENT_MIN_POINTER;                                                   \
+        const void *NAME##_argument_max_user = ARGUMENT_MAX_POINTER;                                                   \
+        for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
 
 /// \brief Header for indexed interval ascending delete query.
-#define KAN_UP_INTERVAL_ASCENDING_DELETE(NAME, TYPE, FIELD, ARGUMENT_MIN_POINTER, ARGUMENT_MAX_POINTER)                \
-    /* Highlight-autocomplete replacement. */                                                                          \
-    const struct TYPE *NAME = NULL;                                                                                    \
-    const void *NAME##_argument_min_user = ARGUMENT_MIN_POINTER;                                                       \
-    const void *NAME##_argument_max_user = ARGUMENT_MAX_POINTER;                                                       \
-    for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
+#    define KAN_UP_INTERVAL_ASCENDING_DELETE(NAME, TYPE, FIELD, ARGUMENT_MIN_POINTER, ARGUMENT_MAX_POINTER)            \
+        /* Highlight-autocomplete replacement. */                                                                      \
+        const struct TYPE *NAME = NULL;                                                                                \
+        const void *NAME##_argument_min_user = ARGUMENT_MIN_POINTER;                                                   \
+        const void *NAME##_argument_max_user = ARGUMENT_MAX_POINTER;                                                   \
+        for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
 
 /// \brief Header for indexed interval ascending write query.
-#define KAN_UP_INTERVAL_ASCENDING_WRITE(NAME, TYPE, FIELD, ARGUMENT_MIN_POINTER, ARGUMENT_MAX_POINTER)                 \
-    /* Highlight-autocomplete replacement. */                                                                          \
-    struct TYPE *NAME = NULL;                                                                                          \
-    const void *NAME##_argument_min_user = ARGUMENT_MIN_POINTER;                                                       \
-    const void *NAME##_argument_max_user = ARGUMENT_MAX_POINTER;                                                       \
-    for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
+#    define KAN_UP_INTERVAL_ASCENDING_WRITE(NAME, TYPE, FIELD, ARGUMENT_MIN_POINTER, ARGUMENT_MAX_POINTER)             \
+        /* Highlight-autocomplete replacement. */                                                                      \
+        struct TYPE *NAME = NULL;                                                                                      \
+        const void *NAME##_argument_min_user = ARGUMENT_MIN_POINTER;                                                   \
+        const void *NAME##_argument_max_user = ARGUMENT_MAX_POINTER;                                                   \
+        for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
 
 /// \brief Header for indexed interval descending read query.
-#define KAN_UP_INTERVAL_DESCENDING_READ(NAME, TYPE, FIELD, ARGUMENT_MIN_POINTER, ARGUMENT_MAX_POINTER)                 \
-    /* Highlight-autocomplete replacement. */                                                                          \
-    const struct TYPE *NAME = NULL;                                                                                    \
-    const void *NAME##_argument_min_user = ARGUMENT_MIN_POINTER;                                                       \
-    const void *NAME##_argument_max_user = ARGUMENT_MAX_POINTER;                                                       \
-    for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
+#    define KAN_UP_INTERVAL_DESCENDING_READ(NAME, TYPE, FIELD, ARGUMENT_MIN_POINTER, ARGUMENT_MAX_POINTER)             \
+        /* Highlight-autocomplete replacement. */                                                                      \
+        const struct TYPE *NAME = NULL;                                                                                \
+        const void *NAME##_argument_min_user = ARGUMENT_MIN_POINTER;                                                   \
+        const void *NAME##_argument_max_user = ARGUMENT_MAX_POINTER;                                                   \
+        for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
 
 /// \brief Header for indexed interval descending update query
-#define KAN_UP_INTERVAL_DESCENDING_UPDATE(NAME, TYPE, FIELD, ARGUMENT_MIN_POINTER, ARGUMENT_MAX_POINTER)               \
-    /* Highlight-autocomplete replacement. */                                                                          \
-    struct TYPE *NAME = NULL;                                                                                          \
-    const void *NAME##_argument_min_user = ARGUMENT_MIN_POINTER;                                                       \
-    const void *NAME##_argument_max_user = ARGUMENT_MAX_POINTER;                                                       \
-    for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
+#    define KAN_UP_INTERVAL_DESCENDING_UPDATE(NAME, TYPE, FIELD, ARGUMENT_MIN_POINTER, ARGUMENT_MAX_POINTER)           \
+        /* Highlight-autocomplete replacement. */                                                                      \
+        struct TYPE *NAME = NULL;                                                                                      \
+        const void *NAME##_argument_min_user = ARGUMENT_MIN_POINTER;                                                   \
+        const void *NAME##_argument_max_user = ARGUMENT_MAX_POINTER;                                                   \
+        for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
 
 /// \brief Header for indexed interval descending delete query
-#define KAN_UP_INTERVAL_DESCENDING_DELETE(NAME, TYPE, FIELD, ARGUMENT_MIN_POINTER, ARGUMENT_MAX_POINTER)               \
-    /* Highlight-autocomplete replacement. */                                                                          \
-    const struct TYPE *NAME = NULL;                                                                                    \
-    const void *NAME##_argument_min_user = ARGUMENT_MIN_POINTER;                                                       \
-    const void *NAME##_argument_max_user = ARGUMENT_MAX_POINTER;                                                       \
-    for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
+#    define KAN_UP_INTERVAL_DESCENDING_DELETE(NAME, TYPE, FIELD, ARGUMENT_MIN_POINTER, ARGUMENT_MAX_POINTER)           \
+        /* Highlight-autocomplete replacement. */                                                                      \
+        const struct TYPE *NAME = NULL;                                                                                \
+        const void *NAME##_argument_min_user = ARGUMENT_MIN_POINTER;                                                   \
+        const void *NAME##_argument_max_user = ARGUMENT_MAX_POINTER;                                                   \
+        for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
 
 /// \brief Header for indexed interval descending write query
-#define KAN_UP_INTERVAL_DESCENDING_WRITE(NAME, TYPE, FIELD, ARGUMENT_MIN_POINTER, ARGUMENT_MAX_POINTER)                \
-    /* Highlight-autocomplete replacement. */                                                                          \
-    struct TYPE *NAME = NULL;                                                                                          \
-    const void *NAME##_argument_min_user = ARGUMENT_MIN_POINTER;                                                       \
-    const void *NAME##_argument_max_user = ARGUMENT_MAX_POINTER;                                                       \
-    for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
+#    define KAN_UP_INTERVAL_DESCENDING_WRITE(NAME, TYPE, FIELD, ARGUMENT_MIN_POINTER, ARGUMENT_MAX_POINTER)            \
+        /* Highlight-autocomplete replacement. */                                                                      \
+        struct TYPE *NAME = NULL;                                                                                      \
+        const void *NAME##_argument_min_user = ARGUMENT_MIN_POINTER;                                                   \
+        const void *NAME##_argument_max_user = ARGUMENT_MAX_POINTER;                                                   \
+        for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
 
 /// \brief Header for event insert query.
 /// \warning Query block is not executed if event insertion package is empty (that means that there is no readers).
-#define KAN_UP_EVENT_INSERT(NAME, TYPE)                                                                                \
-    /* Highlight-autocomplete replacement. */                                                                          \
-    struct TYPE *NAME = NULL;                                                                                          \
-    for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
+#    define KAN_UP_EVENT_INSERT(NAME, TYPE)                                                                            \
+        /* Highlight-autocomplete replacement. */                                                                      \
+        struct TYPE *NAME = NULL;                                                                                      \
+        for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
 
 /// \brief Header for event fetch query.
-#define KAN_UP_EVENT_FETCH(NAME, TYPE)                                                                                 \
-    /* Highlight-autocomplete replacement. */                                                                          \
-    struct TYPE *NAME = NULL;                                                                                          \
-    for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
+#    define KAN_UP_EVENT_FETCH(NAME, TYPE)                                                                             \
+        /* Highlight-autocomplete replacement. */                                                                      \
+        struct TYPE *NAME = NULL;                                                                                      \
+        for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
+
+#endif
 
 KAN_C_HEADER_END

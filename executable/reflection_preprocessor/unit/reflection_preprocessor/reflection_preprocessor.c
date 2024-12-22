@@ -161,6 +161,7 @@ static struct
     size_t cursor_symbol;
     size_t marker_line;
     size_t marker_symbol;
+    size_t marker_current_target_line;
 
     struct target_file_node_t *current_target_node;
     size_t current_target_line;
@@ -547,6 +548,7 @@ static inline void re2c_yybackup (void)
     parser.marker = parser.cursor;
     parser.marker_line = parser.cursor_line;
     parser.marker_symbol = parser.cursor_symbol;
+    parser.marker_current_target_line = parser.current_target_line;
 }
 
 static inline void re2c_yyrestore (void)
@@ -554,6 +556,7 @@ static inline void re2c_yyrestore (void)
     parser.cursor = parser.marker;
     parser.cursor_line = parser.marker_line;
     parser.cursor_symbol = parser.marker_symbol;
+    parser.current_target_line = parser.marker_current_target_line;
 }
 
 /*!re2c
