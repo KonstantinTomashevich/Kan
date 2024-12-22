@@ -156,8 +156,8 @@ APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_STATE_API void kan_universe_mutator_ex
             {
                 if (KAN_TYPED_ID_32_IS_VALID (request->provided_container_id))
                 {
-                    KAN_UP_VALUE_READ (view, KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (numbers_compiled_t), container_id,
-                                       &request->provided_container_id)
+                    KAN_UP_VALUE_READ (view, KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (numbers_compiled_t),
+                                       container_id, &request->provided_container_id)
                     {
                         struct numbers_compiled_t *loaded_resource =
                             (struct numbers_compiled_t *) ((struct kan_resource_container_view_t *) view)->data_begin;

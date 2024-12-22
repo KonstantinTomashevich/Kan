@@ -223,8 +223,8 @@ TEST_UNIVERSE_RESOURCE_PROVIDER_API void kan_universe_mutator_execute_request_re
                 if (KAN_TYPED_ID_32_IS_VALID (request->provided_container_id))
                 {
                     singleton->alpha_ready = KAN_TRUE;
-                    KAN_UP_VALUE_READ (view, KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (first_resource_type_t), container_id,
-                                       &request->provided_container_id)
+                    KAN_UP_VALUE_READ (view, KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (first_resource_type_t),
+                                       container_id, &request->provided_container_id)
                     {
                         const struct first_resource_type_t *loaded_resource =
                             (const void *) ((struct kan_resource_container_view_t *) view)->data_begin;
@@ -245,8 +245,8 @@ TEST_UNIVERSE_RESOURCE_PROVIDER_API void kan_universe_mutator_execute_request_re
                 if (KAN_TYPED_ID_32_IS_VALID (request->provided_container_id))
                 {
                     singleton->beta_ready = KAN_TRUE;
-                    KAN_UP_VALUE_READ (view, KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (first_resource_type_t), container_id,
-                                       &request->provided_container_id)
+                    KAN_UP_VALUE_READ (view, KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (first_resource_type_t),
+                                       container_id, &request->provided_container_id)
                     {
                         const struct first_resource_type_t *loaded_resource =
                             (const void *) ((struct kan_resource_container_view_t *) view)->data_begin;
@@ -274,8 +274,8 @@ TEST_UNIVERSE_RESOURCE_PROVIDER_API void kan_universe_mutator_execute_request_re
                 if (KAN_TYPED_ID_32_IS_VALID (request->provided_container_id))
                 {
                     singleton->players_ready = KAN_TRUE;
-                    KAN_UP_VALUE_READ (view, KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (second_resource_type_t), container_id,
-                                       &request->provided_container_id)
+                    KAN_UP_VALUE_READ (view, KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (second_resource_type_t),
+                                       container_id, &request->provided_container_id)
                     {
                         const struct second_resource_type_t *loaded_resource =
                             (const void *) ((struct kan_resource_container_view_t *) view)->data_begin;
@@ -293,8 +293,8 @@ TEST_UNIVERSE_RESOURCE_PROVIDER_API void kan_universe_mutator_execute_request_re
                 if (KAN_TYPED_ID_32_IS_VALID (request->provided_container_id))
                 {
                     singleton->characters_ready = KAN_TRUE;
-                    KAN_UP_VALUE_READ (view, KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (second_resource_type_t), container_id,
-                                       &request->provided_container_id)
+                    KAN_UP_VALUE_READ (view, KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (second_resource_type_t),
+                                       container_id, &request->provided_container_id)
                     {
                         const struct second_resource_type_t *loaded_resource =
                             (const void *) ((struct kan_resource_container_view_t *) view)->data_begin;
@@ -706,8 +706,8 @@ TEST_UNIVERSE_RESOURCE_PROVIDER_API void kan_universe_mutator_execute_check_obse
                         KAN_TEST_ASSERT (KAN_TYPED_ID_32_IS_VALID (request->provided_container_id))
                         kan_bool_t container_found = KAN_FALSE;
 
-                        KAN_UP_VALUE_READ (view, KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (first_resource_type_t), container_id,
-                                           &request->provided_container_id)
+                        KAN_UP_VALUE_READ (view, KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (first_resource_type_t),
+                                           container_id, &request->provided_container_id)
                         {
                             const struct first_resource_type_t *loaded_resource =
                                 (const void *) ((struct kan_resource_container_view_t *) view)->data_begin;
@@ -743,8 +743,8 @@ TEST_UNIVERSE_RESOURCE_PROVIDER_API void kan_universe_mutator_execute_check_obse
                         KAN_TEST_ASSERT (KAN_TYPED_ID_32_IS_VALID (request->provided_container_id))
                         kan_bool_t container_found = KAN_FALSE;
 
-                        KAN_UP_VALUE_READ (view, KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (first_resource_type_t), container_id,
-                                           &request->provided_container_id)
+                        KAN_UP_VALUE_READ (view, KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (first_resource_type_t),
+                                           container_id, &request->provided_container_id)
                         {
                             const struct first_resource_type_t *loaded_resource =
                                 (const void *) ((struct kan_resource_container_view_t *) view)->data_begin;
@@ -787,8 +787,8 @@ TEST_UNIVERSE_RESOURCE_PROVIDER_API void kan_universe_mutator_execute_check_obse
                             KAN_TEST_ASSERT (request->type == kan_string_intern ("second_resource_type_t"))
                             kan_bool_t container_found = KAN_FALSE;
 
-                            KAN_UP_VALUE_READ (view, KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (second_resource_type_t), container_id,
-                                               &request->provided_container_id)
+                            KAN_UP_VALUE_READ (view, KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (second_resource_type_t),
+                                               container_id, &request->provided_container_id)
                             {
                                 const struct second_resource_type_t *loaded_resource =
                                     (const void *) ((struct kan_resource_container_view_t *) view)->data_begin;

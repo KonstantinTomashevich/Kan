@@ -1037,8 +1037,7 @@ static inline void generated_mutator_init_node (
     struct universe_resource_reference_type_node_t *generated_node)
 {
     char type_name_buffer[256u];
-    snprintf (type_name_buffer, 256u, KAN_RESOURCE_PROVIDER_CONTAINER_TYPE_FORMAT,
-              generated_node->resource_type->name);
+    snprintf (type_name_buffer, 256u, KAN_RESOURCE_PROVIDER_CONTAINER_TYPE_FORMAT, generated_node->resource_type->name);
     mutator_node->contained_type_name = generated_node->resource_type->name;
     mutator_node->container_type_name = kan_string_intern (type_name_buffer);
     mutator_node->contained_type_alignment = generated_node->resource_type->alignment;
