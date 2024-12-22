@@ -3,7 +3,6 @@ concrete_include (PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
 concrete_require (SCOPE PRIVATE ABSTRACT error memory THIRD_PARTY stb)
 concrete_sources ("*.c")
 concrete_implements_abstract (image)
-c_interface_scanner_setup (GLOB "*.c" "*.h")
 
 option (KAN_IMAGE_STB_PROFILE_MEMORY "Whether memory profiling is enabled for lodepng library." ON)
 if (KAN_IMAGE_STB_PROFILE_MEMORY)

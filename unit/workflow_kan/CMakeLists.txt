@@ -3,7 +3,6 @@ concrete_include (PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
 concrete_sources ("*.c")
 concrete_require (SCOPE PRIVATE ABSTRACT error log memory reflection threading CONCRETE_INTERFACE container)
 concrete_implements_abstract (workflow)
-c_interface_scanner_setup (GLOB "*.c" "*.h")
 
 set (KAN_WORKFLOW_GRAPH_NODES_INITIAL_BUCKETS "67" CACHE STRING
         "Initial count of buckets for storing workflow graph nodes during build process.")

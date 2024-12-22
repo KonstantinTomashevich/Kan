@@ -22,11 +22,10 @@
 ///
 /// In addition to this, any runtime meta can be added to any reflection entry: enums, enum values, structs, struct
 /// fields, functions and function arguments. Meta is basically a pair of `meta_type_name` interned string and an
-/// arbitrary pointer, and you can attach several metas of one type to one entry. Keep in mind, that reflection meta is
-/// not the same as `c_interface` meta: `c_interface` meta is designed to add info about interface during declaration,
-/// while reflection meta aims to be registrable from outside. For example, transform structure should not specify
-/// network details in its declaration as it is a common module that can be used in different projects with different
-/// network settings, instead it should be added from outside in every project that uses transform and network modules.
+/// arbitrary pointer, and you can attach several metas of one type to one entry. Reflection meta aims to be registrable
+/// from outside. For example, transform structure should not specify network details in its declaration as it is a
+/// common module that can be used in different projects with different network settings, instead it should be added
+/// from outside in every project that uses transform and network modules.
 /// \endparblock
 ///
 /// \par Registry

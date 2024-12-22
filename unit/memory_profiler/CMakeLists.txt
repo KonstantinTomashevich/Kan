@@ -11,5 +11,3 @@ if (KAN_MEMORY_PROFILER_ENABLE_BY_DEFAULT)
 else ()
     abstract_alias_implementation (ALIAS default SOURCE none)
 endif ()
-
-c_interface_scanner_setup (GLOB "*.h")

@@ -18,7 +18,6 @@ endif ()
 
 concrete_implements_abstract (context_render_backend_system)
 register_context_system (NAME render_backend_system_t)
-c_interface_scanner_setup (GLOB "*.c" "*.h")
 
 option (KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED "Whether Vulkan debug utilities are enabled." ON)
 if (KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED)

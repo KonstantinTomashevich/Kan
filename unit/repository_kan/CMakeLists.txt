@@ -9,7 +9,6 @@ concrete_require (
         THIRD_PARTY qsort)
 
 concrete_implements_abstract (repository)
-c_interface_scanner_setup (GLOB "*.c" "*.h")
 
 set (KAN_REPOSITORY_SINGLETON_STORAGE_INITIAL_BUCKETS "67" CACHE STRING
         "Initial count of buckets for storage of singleton storages.")
