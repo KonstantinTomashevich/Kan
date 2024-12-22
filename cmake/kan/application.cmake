@@ -951,7 +951,7 @@ function (application_generate)
         message (FATAL_ERROR "There is no programs for application \"${APPLICATION_NAME}\"!")
     endif ()
 
-    set (GENERATED_DIRECTORY "${CMAKE_BINARY_DIR}/generated/${APPLICATION_NAME}/")
+    set (GENERATED_DIRECTORY "${CMAKE_BINARY_DIR}/Generated/${APPLICATION_NAME}/")
     file (MAKE_DIRECTORY "${GENERATED_DIRECTORY}")
 
     foreach (PROGRAM ${PROGRAMS})

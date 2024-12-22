@@ -5,7 +5,7 @@ foreach (TEST_SOURCE ${TEST_SOURCES})
         set (TEST_SOURCE "${TEST_SOURCE_DIR}/${TEST_SOURCE}")
     endif ()
 
-    if (NOT EXISTS "${TEST_SOURCE}" OR "${TEST_SOURCE}" MATCHES ".*/generated/.*")
+    if (NOT EXISTS "${TEST_SOURCE}" OR "${TEST_SOURCE}" MATCHES ".*/Generated/.*")
         continue ()
     endif ()
 
