@@ -8,6 +8,7 @@
 #include <kan/error/critical.h>
 #include <kan/log/logging.h>
 #include <kan/memory/allocation.h>
+#include <kan/reflection/markup.h>
 
 KAN_LOG_DEFINE_CATEGORY (context);
 
@@ -34,10 +35,10 @@ struct system_instance_node_t
     kan_instance_size_t connection_references_to_others;
     kan_instance_size_t initialization_references_to_me;
 
-    /// \meta reflection_dynamic_array_type = "struct system_instance_node_t *"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct system_instance_node_t *)
     struct kan_dynamic_array_t initialization_references_to_others;
 
-    /// \meta reflection_dynamic_array_type = "struct system_instance_node_t *"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct system_instance_node_t *)
     struct kan_dynamic_array_t connection_references_to_me;
 };
 

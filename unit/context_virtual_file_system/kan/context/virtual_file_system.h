@@ -6,6 +6,7 @@
 #include <kan/container/dynamic_array.h>
 #include <kan/container/interned_string.h>
 #include <kan/context/context.h>
+#include <kan/reflection/markup.h>
 #include <kan/virtual_file_system/virtual_file_system.h>
 
 /// \file
@@ -44,10 +45,10 @@ struct kan_virtual_file_system_config_mount_read_only_pack_t
 /// \brief Configuration type for context virtual file system.
 struct kan_virtual_file_system_config_t
 {
-    /// \meta reflection_dynamic_array_type = "struct kan_virtual_file_system_config_mount_real_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_virtual_file_system_config_mount_real_t)
     struct kan_dynamic_array_t mount_real;
 
-    /// \meta reflection_dynamic_array_type = "struct kan_virtual_file_system_config_mount_read_only_pack_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_virtual_file_system_config_mount_read_only_pack_t)
     struct kan_dynamic_array_t mount_read_only_pack;
 };
 

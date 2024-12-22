@@ -44,10 +44,10 @@ struct rpl_compiler_context_t
     enum kan_rpl_pipeline_type_t pipeline_type;
     kan_interned_string_t log_name;
 
-    /// \meta reflection_dynamic_array_type = "struct rpl_compiler_context_option_value_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct rpl_compiler_context_option_value_t)
     struct kan_dynamic_array_t option_values;
 
-    /// \meta reflection_dynamic_array_type = "struct kan_rpl_intermediate_t *"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_intermediate_t *)
     struct kan_dynamic_array_t modules;
 
     struct kan_stack_group_allocator_t resolve_allocator;

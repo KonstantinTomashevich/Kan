@@ -10,9 +10,7 @@
 #include <kan/universe/universe.h>
 #include <kan/universe_resource_provider/universe_resource_provider.h>
 
-// \c_interface_scanner_disable
 KAN_LOG_DEFINE_CATEGORY (application_framework_example_compilation_basic);
-// \c_interface_scanner_enable
 
 struct root_config_t
 {
@@ -21,13 +19,13 @@ struct root_config_t
 
 _Static_assert (_Alignof (struct root_config_t) <= _Alignof (kan_memory_size_t), "Alignment has expected value.");
 
-// \meta reflection_struct_meta = "root_config_t"
+KAN_REFLECTION_STRUCT_META (root_config_t)
 APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BASIC_API struct kan_resource_resource_type_meta_t
     root_config_resource_type_meta = {
         .root = KAN_TRUE,
 };
 
-// \meta reflection_struct_field_meta = "root_config_t.required_sum"
+KAN_REFLECTION_STRUCT_FIELD_META (root_config_t, required_sum)
 APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BASIC_API struct kan_resource_reference_meta_t
     root_config_required_sum_reference_meta = {
         .type = "sum_t",
@@ -41,7 +39,7 @@ struct sum_compiled_t
 
 _Static_assert (_Alignof (struct sum_compiled_t) <= _Alignof (kan_memory_size_t), "Alignment has expected value.");
 
-// \meta reflection_struct_meta = "sum_compiled_t"
+KAN_REFLECTION_STRUCT_META (sum_compiled_t)
 APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BASIC_API struct kan_resource_resource_type_meta_t
     sum_compiled_resource_type_meta = {
         .root = KAN_FALSE,
@@ -49,10 +47,10 @@ APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BASIC_API struct kan_resource_resource
 
 struct sum_t
 {
-    /// \meta reflection_dynamic_array_type = "kan_interned_string_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (kan_interned_string_t)
     struct kan_dynamic_array_t records;
 
-    /// \meta reflection_dynamic_array_type = "kan_interned_string_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (kan_interned_string_t)
     struct kan_dynamic_array_t sums;
 };
 
@@ -74,12 +72,12 @@ APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BASIC_API void sum_shutdown (struct su
 
 static enum kan_resource_compile_result_t sum_compile (struct kan_resource_compile_state_t *state);
 
-// \meta reflection_struct_meta = "sum_t"
+KAN_REFLECTION_STRUCT_META (sum_t)
 APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BASIC_API struct kan_resource_resource_type_meta_t sum_resource_type_meta = {
     .root = KAN_FALSE,
 };
 
-// \meta reflection_struct_meta = "sum_t"
+KAN_REFLECTION_STRUCT_META (sum_t)
 APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BASIC_API struct kan_resource_compilable_meta_t sum_compilable_meta = {
     .output_type_name = "sum_compiled_t",
     .configuration_type_name = NULL,
@@ -87,13 +85,13 @@ APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BASIC_API struct kan_resource_compilab
     .functor = sum_compile,
 };
 
-// \meta reflection_struct_field_meta = "sum_t.records"
+KAN_REFLECTION_STRUCT_FIELD_META (sum_t, records)
 APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BASIC_API struct kan_resource_reference_meta_t sum_records_reference_meta = {
     .type = "record_t",
     .compilation_usage = KAN_RESOURCE_REFERENCE_COMPILATION_USAGE_TYPE_NEEDED_RAW,
 };
 
-// \meta reflection_struct_field_meta = "sum_t.sums"
+KAN_REFLECTION_STRUCT_FIELD_META (sum_t, sums)
 APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BASIC_API struct kan_resource_reference_meta_t
     sum_required_sum_reference_meta = {
         .type = "sum_t",
@@ -107,7 +105,7 @@ struct record_t
 
 _Static_assert (_Alignof (struct record_t) <= _Alignof (kan_memory_size_t), "Alignment has expected value.");
 
-// \meta reflection_struct_meta = "record_t"
+KAN_REFLECTION_STRUCT_META (record_t)
 APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BASIC_API struct kan_resource_resource_type_meta_t record_resource_type_meta =
     {
         .root = KAN_FALSE,
@@ -349,7 +347,7 @@ APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BASIC_API void kan_universe_mutator_ex
             {
                 if (KAN_TYPED_ID_32_IS_VALID (request->provided_container_id))
                 {
-                    KAN_UP_VALUE_READ (view, resource_provider_container_sum_compiled_t, container_id,
+                    KAN_UP_VALUE_READ (view, KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (sum_compiled_t), container_id,
                                        &request->provided_container_id)
                     {
                         struct sum_compiled_t *loaded_resource =

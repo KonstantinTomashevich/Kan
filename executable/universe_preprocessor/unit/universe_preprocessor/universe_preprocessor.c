@@ -11,6 +11,7 @@
 #include <kan/container/interned_string.h>
 #include <kan/container/trivial_string_buffer.h>
 #include <kan/error/critical.h>
+#include <kan/file_system/path_container.h>
 #include <kan/file_system/stream.h>
 #include <kan/memory/allocation.h>
 #include <kan/stream/random_access_stream_buffer.h>
@@ -18,8 +19,8 @@
 #define RETURN_CODE_SUCCESS 0
 #define RETURN_CODE_INVALID_ARGUMENTS (-1)
 #define RETURN_CODE_UNABLE_TO_OPEN_INPUT (-2)
-#define RETURN_CODE_PARSE_FAILED (-3)
-#define RETURN_CODE_PROCESS_FAILED (-4)
+#define RETURN_CODE_SCAN_FAILED (-3)
+#define RETURN_CODE_OUTPUT_FAILED (-4)
 #define RETURN_CODE_UNABLE_TO_OPEN_OUTPUT (-5)
 
 #define INPUT_ERROR_REFIL_AFTER_END_OF_FILE 1
@@ -51,6 +52,10 @@ static struct
     struct kan_stream_t *input_stream;
     struct kan_stream_t *output_stream;
 
+    kan_bool_t is_output_phase;
+    kan_bool_t scan_expects_new_block_for_query;
+    char output_last_char;
+
     char input_buffer[INPUT_BUFFER_SIZE];
     char *limit;
     char *cursor;
@@ -62,21 +67,30 @@ static struct
     size_t cursor_symbol;
     size_t marker_line;
     size_t marker_symbol;
+    size_t marker_current_file_line;
 
     struct tags_t tags;
-} io = {
-    .input_stream = NULL,
-    .input_buffer = {0},
-    .limit = io.input_buffer + INPUT_BUFFER_SIZE - 1u,
-    .cursor = io.input_buffer + INPUT_BUFFER_SIZE - 1u,
-    .marker = io.input_buffer + INPUT_BUFFER_SIZE - 1u,
-    .token = io.input_buffer + INPUT_BUFFER_SIZE - 1u,
-    .end_of_input_reached = KAN_FALSE,
-    .cursor_line = 1u,
-    .cursor_symbol = 1u,
-    .marker_line = 1u,
-    .marker_symbol = 1u,
-};
+
+    size_t current_file_line;
+    struct kan_file_system_path_container_t current_file_path;
+
+} io = {.input_stream = NULL,
+        .output_last_char = '\0',
+        .input_buffer = {0},
+        .limit = io.input_buffer + INPUT_BUFFER_SIZE - 1u,
+        .cursor = io.input_buffer + INPUT_BUFFER_SIZE - 1u,
+        .marker = io.input_buffer + INPUT_BUFFER_SIZE - 1u,
+        .token = io.input_buffer + INPUT_BUFFER_SIZE - 1u,
+        .end_of_input_reached = KAN_FALSE,
+        .cursor_line = 1u,
+        .cursor_symbol = 1u,
+        .marker_line = 1u,
+        .marker_symbol = 1u,
+        .current_file_line = 1u,
+        .current_file_path = {
+            .length = 0u,
+            .path = {0},
+        }};
 
 enum singleton_access_type_t
 {
@@ -109,67 +123,26 @@ struct scanned_state_t
 {
     kan_interned_string_t name;
 
-    /// \meta reflection_dynamic_array_type = "kan_interned_string"
     struct kan_dynamic_array_t singleton_read_queries;
-
-    /// \meta reflection_dynamic_array_type = "kan_interned_string"
     struct kan_dynamic_array_t singleton_write_queries;
-
-    /// \meta reflection_dynamic_array_type = "kan_interned_string"
     struct kan_dynamic_array_t indexed_insert_queries;
-
-    /// \meta reflection_dynamic_array_type = "kan_interned_string"
     struct kan_dynamic_array_t indexed_sequence_read_queries;
-
-    /// \meta reflection_dynamic_array_type = "kan_interned_string"
     struct kan_dynamic_array_t indexed_sequence_update_queries;
-
-    /// \meta reflection_dynamic_array_type = "kan_interned_string"
     struct kan_dynamic_array_t indexed_sequence_delete_queries;
-
-    /// \meta reflection_dynamic_array_type = "kan_interned_string"
     struct kan_dynamic_array_t indexed_sequence_write_queries;
-
-    /// \meta reflection_dynamic_array_type = "struct scanned_indexed_field_query_t"
     struct kan_dynamic_array_t indexed_value_read_queries;
-
-    /// \meta reflection_dynamic_array_type = "struct scanned_indexed_field_query_t"
     struct kan_dynamic_array_t indexed_value_update_queries;
-
-    /// \meta reflection_dynamic_array_type = "struct scanned_indexed_field_query_t"
     struct kan_dynamic_array_t indexed_value_delete_queries;
-
-    /// \meta reflection_dynamic_array_type = "struct scanned_indexed_field_query_t"
     struct kan_dynamic_array_t indexed_value_write_queries;
-
-    /// \meta reflection_dynamic_array_type = "struct scanned_signal_query_t"
     struct kan_dynamic_array_t indexed_signal_read_queries;
-
-    /// \meta reflection_dynamic_array_type = "struct scanned_signal_query_t"
     struct kan_dynamic_array_t indexed_signal_update_queries;
-
-    /// \meta reflection_dynamic_array_type = "struct scanned_signal_query_t"
     struct kan_dynamic_array_t indexed_signal_delete_queries;
-
-    /// \meta reflection_dynamic_array_type = "struct scanned_signal_query_t"
     struct kan_dynamic_array_t indexed_signal_write_queries;
-
-    /// \meta reflection_dynamic_array_type = "struct scanned_indexed_field_query_t"
     struct kan_dynamic_array_t indexed_interval_read_queries;
-
-    /// \meta reflection_dynamic_array_type = "struct scanned_indexed_field_query_t"
     struct kan_dynamic_array_t indexed_interval_update_queries;
-
-    /// \meta reflection_dynamic_array_type = "struct scanned_indexed_field_query_t"
     struct kan_dynamic_array_t indexed_interval_delete_queries;
-
-    /// \meta reflection_dynamic_array_type = "struct scanned_indexed_field_query_t"
     struct kan_dynamic_array_t indexed_interval_write_queries;
-
-    /// \meta reflection_dynamic_array_type = "kan_interned_string"
     struct kan_dynamic_array_t event_insert_queries;
-
-    /// \meta reflection_dynamic_array_type = "kan_interned_string"
     struct kan_dynamic_array_t event_fetch_queries;
 };
 
@@ -177,46 +150,44 @@ struct
 {
     kan_allocation_group_t allocation_group;
     kan_instance_size_t scan_bound_state_index;
-
-    /// \meta reflection_dynamic_array_type = "struct scanned_state_t"
     struct kan_dynamic_array_t states;
 } scan;
 
-enum process_query_type_t
+enum query_type_t
 {
-    PROCESS_QUERY_TYPE_SINGLETON_READ = 0u,
-    PROCESS_QUERY_TYPE_SINGLETON_WRITE,
-    PROCESS_QUERY_TYPE_INDEXED_INSERT,
-    PROCESS_QUERY_TYPE_SEQUENCE_READ,
-    PROCESS_QUERY_TYPE_SEQUENCE_UPDATE,
-    PROCESS_QUERY_TYPE_SEQUENCE_DELETE,
-    PROCESS_QUERY_TYPE_SEQUENCE_WRITE,
-    PROCESS_QUERY_TYPE_VALUE_READ,
-    PROCESS_QUERY_TYPE_VALUE_UPDATE,
-    PROCESS_QUERY_TYPE_VALUE_DELETE,
-    PROCESS_QUERY_TYPE_VALUE_WRITE,
-    PROCESS_QUERY_TYPE_SIGNAL_READ,
-    PROCESS_QUERY_TYPE_SIGNAL_UPDATE,
-    PROCESS_QUERY_TYPE_SIGNAL_DELETE,
-    PROCESS_QUERY_TYPE_SIGNAL_WRITE,
-    PROCESS_QUERY_TYPE_INTERVAL_ASCENDING_READ,
-    PROCESS_QUERY_TYPE_INTERVAL_ASCENDING_UPDATE,
-    PROCESS_QUERY_TYPE_INTERVAL_ASCENDING_DELETE,
-    PROCESS_QUERY_TYPE_INTERVAL_ASCENDING_WRITE,
-    PROCESS_QUERY_TYPE_INTERVAL_DESCENDING_READ,
-    PROCESS_QUERY_TYPE_INTERVAL_DESCENDING_UPDATE,
-    PROCESS_QUERY_TYPE_INTERVAL_DESCENDING_DELETE,
-    PROCESS_QUERY_TYPE_INTERVAL_DESCENDING_WRITE,
-    PROCESS_QUERY_TYPE_EVENT_INSERT,
-    PROCESS_QUERY_TYPE_EVENT_FETCH,
+    QUERY_TYPE_SINGLETON_READ = 0u,
+    QUERY_TYPE_SINGLETON_WRITE,
+    QUERY_TYPE_INDEXED_INSERT,
+    QUERY_TYPE_SEQUENCE_READ,
+    QUERY_TYPE_SEQUENCE_UPDATE,
+    QUERY_TYPE_SEQUENCE_DELETE,
+    QUERY_TYPE_SEQUENCE_WRITE,
+    QUERY_TYPE_VALUE_READ,
+    QUERY_TYPE_VALUE_UPDATE,
+    QUERY_TYPE_VALUE_DELETE,
+    QUERY_TYPE_VALUE_WRITE,
+    QUERY_TYPE_SIGNAL_READ,
+    QUERY_TYPE_SIGNAL_UPDATE,
+    QUERY_TYPE_SIGNAL_DELETE,
+    QUERY_TYPE_SIGNAL_WRITE,
+    QUERY_TYPE_INTERVAL_ASCENDING_READ,
+    QUERY_TYPE_INTERVAL_ASCENDING_UPDATE,
+    QUERY_TYPE_INTERVAL_ASCENDING_DELETE,
+    QUERY_TYPE_INTERVAL_ASCENDING_WRITE,
+    QUERY_TYPE_INTERVAL_DESCENDING_READ,
+    QUERY_TYPE_INTERVAL_DESCENDING_UPDATE,
+    QUERY_TYPE_INTERVAL_DESCENDING_DELETE,
+    QUERY_TYPE_INTERVAL_DESCENDING_WRITE,
+    QUERY_TYPE_EVENT_INSERT,
+    QUERY_TYPE_EVENT_FETCH,
 };
 
-struct process_query_stack_node_t
+struct query_stack_node_t
 {
-    struct process_query_stack_node_t *previous;
+    struct query_stack_node_t *previous;
     kan_instance_size_t blocks;
     kan_interned_string_t name;
-    enum process_query_type_t query_type;
+    enum query_type_t query_type;
 };
 
 struct
@@ -228,7 +199,7 @@ struct
     char bound_state_path[KAN_UNIVERSE_PREPROCESSOR_STATE_PATH_MAX_LENGTH];
 
     kan_instance_size_t blocks;
-    struct process_query_stack_node_t *stack_top;
+    struct query_stack_node_t *stack_top;
 
 } process = {
     .output_file_line = 1u,
@@ -413,8 +384,9 @@ static inline kan_bool_t scan_generate_state_queries (const char *name_begin, co
         if (state->name == name)
         {
             fprintf (stderr,
-                     "Error. [%ld:%ld]: Caught attempt to generate state \"%s\" queries in two different places.\n",
-                     (long) io.cursor_line, (long) io.cursor_symbol, name);
+                     "[%s:%ld:%ld]: Caught attempt to generate state \"%s\" queries while queries are either already "
+                     "generated or state uses pre-filled queries.\n",
+                     io.current_file_path.path, (long) io.current_file_line, (long) io.cursor_symbol, name);
             return KAN_FALSE;
         }
     }
@@ -448,11 +420,19 @@ static inline kan_bool_t scan_bind_state (const char *name_begin,
         }
     }
 
-    fprintf (stderr,
-             "Error. [%ld:%ld]: Caught attempt to bind state \"%s\" which is not previously declared through "
-             "KAN_UP_GENERATE_STATE_QUERIES.\n",
-             (long) io.cursor_line, (long) io.cursor_symbol, name);
-    return KAN_FALSE;
+    // State with pre-filled queries.
+    struct scanned_state_t *new_state = kan_dynamic_array_add_last (&scan.states);
+    if (!new_state)
+    {
+        kan_dynamic_array_set_capacity (&scan.states, KAN_MAX (1u, scan.states.size * 2u));
+        new_state = kan_dynamic_array_add_last (&scan.states);
+        KAN_ASSERT (new_state)
+    }
+
+    scanned_state_init (new_state);
+    new_state->name = name;
+    scan.scan_bound_state_index = scan.states.size - 1u;
+    return KAN_TRUE;
 }
 
 static inline kan_bool_t scan_ensure_state_bound (void)
@@ -460,9 +440,9 @@ static inline kan_bool_t scan_ensure_state_bound (void)
     if (scan.scan_bound_state_index >= scan.states.size)
     {
         fprintf (stderr,
-                 "Error. [%ld:%ld]: Caught attempt to use query without previously binding state through "
+                 "[%s:%ld:%ld]: Caught attempt to use query without previously binding state through "
                  "KAN_UP_BIND_STATE.\n",
-                 (long) io.cursor_line, (long) io.cursor_symbol);
+                 io.current_file_path.path, (long) io.current_file_line, (long) io.cursor_symbol);
         return KAN_FALSE;
     }
 
@@ -492,13 +472,27 @@ static inline void insert_unique_interned_string_into_array (struct kan_dynamic_
     *(kan_interned_string_t *) spot = value;
 }
 
+static inline kan_bool_t ensure_block_requirements_are_met (void)
+{
+    if (io.scan_expects_new_block_for_query)
+    {
+        fprintf (stderr,
+                 "[%s:%ld:%ld]: Caught query right after next query without opening a block. This is only allowed "
+                 "for singleton queries.\n",
+                 io.current_file_path.path, (long) io.current_file_line, (long) io.cursor_symbol);
+        return KAN_FALSE;
+    }
+
+    return KAN_TRUE;
+}
+
 static inline kan_bool_t scan_singleton (const char *name_begin,
                                          const char *name_end,
                                          enum singleton_access_type_t access,
                                          const char *type_begin,
                                          const char *type_end)
 {
-    if (!scan_ensure_state_bound ())
+    if (!scan_ensure_state_bound () || !ensure_block_requirements_are_met ())
     {
         return KAN_FALSE;
     }
@@ -526,7 +520,7 @@ static inline kan_bool_t scan_indexed_insert (const char *name_begin,
                                               const char *type_begin,
                                               const char *type_end)
 {
-    if (!scan_ensure_state_bound ())
+    if (!scan_ensure_state_bound () || !ensure_block_requirements_are_met ())
     {
         return KAN_FALSE;
     }
@@ -534,6 +528,7 @@ static inline kan_bool_t scan_indexed_insert (const char *name_begin,
     struct scanned_state_t *state = &((struct scanned_state_t *) scan.states.data)[scan.scan_bound_state_index];
     insert_unique_interned_string_into_array (&state->indexed_insert_queries,
                                               kan_char_sequence_intern (type_begin, type_end));
+    io.scan_expects_new_block_for_query = KAN_TRUE;
     return KAN_TRUE;
 }
 
@@ -543,7 +538,7 @@ static inline kan_bool_t scan_sequence (const char *name_begin,
                                         const char *type_begin,
                                         const char *type_end)
 {
-    if (!scan_ensure_state_bound ())
+    if (!scan_ensure_state_bound () || !ensure_block_requirements_are_met ())
     {
         return KAN_FALSE;
     }
@@ -571,6 +566,7 @@ static inline kan_bool_t scan_sequence (const char *name_begin,
     }
 
     insert_unique_interned_string_into_array (target_array, kan_char_sequence_intern (type_begin, type_end));
+    io.scan_expects_new_block_for_query = KAN_TRUE;
     return KAN_TRUE;
 }
 
@@ -582,8 +578,9 @@ static inline kan_bool_t insert_unique_scanned_indexed_field_query_into_array (s
     const kan_instance_size_t field_length = (kan_instance_size_t) (field_end - field_begin);
     if (field_length > KAN_UNIVERSE_PREPROCESSOR_TARGET_PATH_MAX_LENGTH - 1u)
     {
-        fprintf (stderr, "Error. [%ld:%ld]: Found field path \"%s\" that is longer than maximum %d.\n",
-                 (long) io.cursor_line, (long) io.cursor_symbol, kan_char_sequence_intern (field_begin, field_end),
+        fprintf (stderr, "[%s:%ld:%ld]: Found field path \"%s\" that is longer than maximum %d.\n",
+                 io.current_file_path.path, (long) io.current_file_line, (long) io.cursor_symbol,
+                 kan_char_sequence_intern (field_begin, field_end),
                  (int) (KAN_UNIVERSE_PREPROCESSOR_TARGET_PATH_MAX_LENGTH - 1u));
         return KAN_FALSE;
     }
@@ -622,7 +619,7 @@ static inline kan_bool_t scan_value (const char *name_begin,
                                      const char *argument_begin,
                                      const char *argument_end)
 {
-    if (!scan_ensure_state_bound ())
+    if (!scan_ensure_state_bound () || !ensure_block_requirements_are_met ())
     {
         return KAN_FALSE;
     }
@@ -651,6 +648,7 @@ static inline kan_bool_t scan_value (const char *name_begin,
 
     insert_unique_scanned_indexed_field_query_into_array (target_array, kan_char_sequence_intern (type_begin, type_end),
                                                           field_begin, field_end);
+    io.scan_expects_new_block_for_query = KAN_TRUE;
     return KAN_TRUE;
 }
 
@@ -664,8 +662,9 @@ static inline kan_bool_t insert_unique_scanned_signal_query_into_array (struct k
     const kan_instance_size_t field_length = (kan_instance_size_t) (field_end - field_begin);
     if (field_length > KAN_UNIVERSE_PREPROCESSOR_TARGET_PATH_MAX_LENGTH - 1u)
     {
-        fprintf (stderr, "Error. [%ld:%ld]: Found field path \"%s\" that is longer than maximum %d.\n",
-                 (long) io.cursor_line, (long) io.cursor_symbol, kan_char_sequence_intern (field_begin, field_end),
+        fprintf (stderr, "[%s:%ld:%ld]: Found field path \"%s\" that is longer than maximum %d.\n",
+                 io.current_file_path.path, (long) io.current_file_line, (long) io.cursor_symbol,
+                 kan_char_sequence_intern (field_begin, field_end),
                  (int) (KAN_UNIVERSE_PREPROCESSOR_TARGET_PATH_MAX_LENGTH - 1u));
         return KAN_FALSE;
     }
@@ -673,8 +672,9 @@ static inline kan_bool_t insert_unique_scanned_signal_query_into_array (struct k
     const kan_instance_size_t value_length = (kan_instance_size_t) (value_end - value_begin);
     if (value_length > KAN_UNIVERSE_PREPROCESSOR_SIGNAL_VALUE_MAX_LENGTH - 1u)
     {
-        fprintf (stderr, "Error. [%ld:%ld]: Found signal value literal \"%s\" that is longer than maximum %d.\n",
-                 (long) io.cursor_line, (long) io.cursor_symbol, kan_char_sequence_intern (value_begin, value_end),
+        fprintf (stderr, "[%s:%ld:%ld]: Found signal value literal \"%s\" that is longer than maximum %d.\n",
+                 io.current_file_path.path, (long) io.current_file_line, (long) io.cursor_symbol,
+                 kan_char_sequence_intern (value_begin, value_end),
                  (int) (KAN_UNIVERSE_PREPROCESSOR_TARGET_PATH_MAX_LENGTH - 1u));
         return KAN_FALSE;
     }
@@ -716,7 +716,7 @@ static inline kan_bool_t scan_signal (const char *name_begin,
                                       const char *value_begin,
                                       const char *value_end)
 {
-    if (!scan_ensure_state_bound ())
+    if (!scan_ensure_state_bound () || !ensure_block_requirements_are_met ())
     {
         return KAN_FALSE;
     }
@@ -745,6 +745,7 @@ static inline kan_bool_t scan_signal (const char *name_begin,
 
     insert_unique_scanned_signal_query_into_array (target_array, kan_char_sequence_intern (type_begin, type_end),
                                                    field_begin, field_end, value_begin, value_end);
+    io.scan_expects_new_block_for_query = KAN_TRUE;
     return KAN_TRUE;
 }
 
@@ -760,7 +761,7 @@ static inline kan_bool_t scan_interval (const char *name_begin,
                                         const char *argument_max_begin,
                                         const char *argument_max_end)
 {
-    if (!scan_ensure_state_bound ())
+    if (!scan_ensure_state_bound () || !ensure_block_requirements_are_met ())
     {
         return KAN_FALSE;
     }
@@ -789,6 +790,7 @@ static inline kan_bool_t scan_interval (const char *name_begin,
 
     insert_unique_scanned_indexed_field_query_into_array (target_array, kan_char_sequence_intern (type_begin, type_end),
                                                           field_begin, field_end);
+    io.scan_expects_new_block_for_query = KAN_TRUE;
     return KAN_TRUE;
 }
 
@@ -797,7 +799,7 @@ static kan_bool_t scan_event_insert (const char *name_begin,
                                      const char *type_begin,
                                      const char *type_end)
 {
-    if (!scan_ensure_state_bound ())
+    if (!scan_ensure_state_bound () || !ensure_block_requirements_are_met ())
     {
         return KAN_FALSE;
     }
@@ -805,6 +807,7 @@ static kan_bool_t scan_event_insert (const char *name_begin,
     struct scanned_state_t *state = &((struct scanned_state_t *) scan.states.data)[scan.scan_bound_state_index];
     insert_unique_interned_string_into_array (&state->event_insert_queries,
                                               kan_char_sequence_intern (type_begin, type_end));
+    io.scan_expects_new_block_for_query = KAN_TRUE;
     return KAN_TRUE;
 }
 
@@ -813,7 +816,7 @@ static kan_bool_t scan_event_fetch (const char *name_begin,
                                     const char *type_begin,
                                     const char *type_end)
 {
-    if (!scan_ensure_state_bound ())
+    if (!scan_ensure_state_bound () || !ensure_block_requirements_are_met ())
     {
         return KAN_FALSE;
     }
@@ -821,10 +824,11 @@ static kan_bool_t scan_event_fetch (const char *name_begin,
     struct scanned_state_t *state = &((struct scanned_state_t *) scan.states.data)[scan.scan_bound_state_index];
     insert_unique_interned_string_into_array (&state->event_fetch_queries,
                                               kan_char_sequence_intern (type_begin, type_end));
+    io.scan_expects_new_block_for_query = KAN_TRUE;
     return KAN_TRUE;
 }
 
-// Process phase functions.
+// Output phase functions.
 
 static inline kan_bool_t output_string (const char *string)
 {
@@ -834,6 +838,7 @@ static inline kan_bool_t output_string (const char *string)
         return KAN_TRUE;
     }
 
+    io.output_last_char = string[string_length - 1u];
     for (kan_loop_size_t index = 0u; index < string_length; ++index)
     {
         if (string[index] == '\n')
@@ -853,6 +858,7 @@ static inline kan_bool_t output_sequence (const char *begin, const char *end)
         return KAN_TRUE;
     }
 
+    io.output_last_char = *(end - 1u);
     for (kan_loop_size_t index = 0u; index < string_length; ++index)
     {
         if (begin[index] == '\n')
@@ -864,33 +870,21 @@ static inline kan_bool_t output_sequence (const char *begin, const char *end)
     return io.output_stream->operations->write (io.output_stream, string_length, begin) == string_length;
 }
 
-static inline kan_bool_t output_use_source_line (void)
+static inline kan_bool_t output_use_current_file_line (void)
 {
     char number_buffer[32u];
-    snprintf (number_buffer, 32u, "%lu", (unsigned long) io.cursor_line);
-    return output_string ("#line ") && output_string (number_buffer) && output_string (" \"") &&
-           output_string (arguments.input_file_path) && output_string ("\"\n");
-}
+    snprintf (number_buffer, 32u, "%lu", (unsigned long) io.current_file_line - 1);
 
-static inline kan_bool_t output_use_output_line (void)
-{
-    char number_buffer[32u];
-    snprintf (number_buffer, 32u, "%lu", (unsigned long) process.output_file_line + 1u);
-    return output_string ("#line ") && output_string (number_buffer) && output_string (" \"") &&
-           output_string (arguments.output_file_path) && output_string ("\"\n");
-}
+    if (io.output_last_char != '\n')
+    {
+        if (!output_string ("\n"))
+        {
+            return KAN_FALSE;
+        }
+    }
 
-static inline kan_bool_t output_markup_macro_comment (void)
-{
-    KAN_ASSERT (io.cursor - 1u > io.token)
-    if (*(io.cursor - 1u) == '\n')
-    {
-        return output_string ("/* ") && output_sequence (io.token, io.cursor - 1u) && output_string (" */\n");
-    }
-    else
-    {
-        return output_string ("/* ") && output_sequence (io.token, io.cursor) && output_string (" */");
-    }
+    return output_string ("#line ") && output_string (number_buffer) && output_string (" \"") &&
+           output_string (io.current_file_path.path) && output_string ("\"\n");
 }
 
 static inline kan_bool_t output_field_path (const char *field_path)
@@ -941,7 +935,7 @@ static inline kan_bool_t output_field_path_sequence (const char *field_path_begi
     return part_begin == field_path_begin || output_sequence (part_begin, field_path_begin);
 }
 
-static inline enum parse_response_t process_generate_state_queries (const char *name_begin, const char *name_end)
+static inline enum parse_response_t output_generate_state_queries (const char *name_begin, const char *name_end)
 {
     kan_interned_string_t name = kan_char_sequence_intern (name_begin, name_end);
     struct scanned_state_t *state = NULL;
@@ -963,7 +957,7 @@ static inline enum parse_response_t process_generate_state_queries (const char *
         return PARSE_RESPONSE_FAILED;
     }
 
-    if (!output_markup_macro_comment () || !output_use_output_line ())
+    if (!output_use_current_file_line ())
     {
         fprintf (stderr, "Failure during output.\n");
         return PARSE_RESPONSE_FAILED;
@@ -973,7 +967,7 @@ static inline enum parse_response_t process_generate_state_queries (const char *
     {
         if (!output_string ("struct kan_repository_singleton_read_query_t read__") ||
             !output_string (((kan_interned_string_t *) state->singleton_read_queries.data)[index]) ||
-            !output_string (";\n"))
+            !output_string (";\n") || !output_use_current_file_line ())
         {
             fprintf (stderr, "Failure during output.\n");
             return PARSE_RESPONSE_FAILED;
@@ -984,7 +978,7 @@ static inline enum parse_response_t process_generate_state_queries (const char *
     {
         if (!output_string ("struct kan_repository_singleton_write_query_t write__") ||
             !output_string (((kan_interned_string_t *) state->singleton_write_queries.data)[index]) ||
-            !output_string (";\n"))
+            !output_string (";\n") || !output_use_current_file_line ())
         {
             fprintf (stderr, "Failure during output.\n");
             return PARSE_RESPONSE_FAILED;
@@ -995,7 +989,7 @@ static inline enum parse_response_t process_generate_state_queries (const char *
     {
         if (!output_string ("struct kan_repository_indexed_insert_query_t insert__") ||
             !output_string (((kan_interned_string_t *) state->indexed_insert_queries.data)[index]) ||
-            !output_string (";\n"))
+            !output_string (";\n") || !output_use_current_file_line ())
         {
             fprintf (stderr, "Failure during output.\n");
             return PARSE_RESPONSE_FAILED;
@@ -1006,7 +1000,7 @@ static inline enum parse_response_t process_generate_state_queries (const char *
     {
         if (!output_string ("struct kan_repository_indexed_sequence_read_query_t read_sequence__") ||
             !output_string (((kan_interned_string_t *) state->indexed_sequence_read_queries.data)[index]) ||
-            !output_string (";\n"))
+            !output_string (";\n") || !output_use_current_file_line ())
         {
             fprintf (stderr, "Failure during output.\n");
             return PARSE_RESPONSE_FAILED;
@@ -1017,7 +1011,7 @@ static inline enum parse_response_t process_generate_state_queries (const char *
     {
         if (!output_string ("struct kan_repository_indexed_sequence_update_query_t update_sequence__") ||
             !output_string (((kan_interned_string_t *) state->indexed_sequence_update_queries.data)[index]) ||
-            !output_string (";\n"))
+            !output_string (";\n") || !output_use_current_file_line ())
         {
             fprintf (stderr, "Failure during output.\n");
             return PARSE_RESPONSE_FAILED;
@@ -1028,7 +1022,7 @@ static inline enum parse_response_t process_generate_state_queries (const char *
     {
         if (!output_string ("struct kan_repository_indexed_sequence_delete_query_t delete_sequence__") ||
             !output_string (((kan_interned_string_t *) state->indexed_sequence_delete_queries.data)[index]) ||
-            !output_string (";\n"))
+            !output_string (";\n") || !output_use_current_file_line ())
         {
             fprintf (stderr, "Failure during output.\n");
             return PARSE_RESPONSE_FAILED;
@@ -1039,7 +1033,7 @@ static inline enum parse_response_t process_generate_state_queries (const char *
     {
         if (!output_string ("struct kan_repository_indexed_sequence_write_query_t write_sequence__") ||
             !output_string (((kan_interned_string_t *) state->indexed_sequence_write_queries.data)[index]) ||
-            !output_string (";\n"))
+            !output_string (";\n") || !output_use_current_file_line ())
         {
             fprintf (stderr, "Failure during output.\n");
             return PARSE_RESPONSE_FAILED;
@@ -1053,7 +1047,7 @@ static inline enum parse_response_t process_generate_state_queries (const char *
 
         if (!output_string ("struct kan_repository_indexed_value_read_query_t read_value__") ||
             !output_string (query->type) || !output_string ("__") || !output_field_path (query->field_path) ||
-            !output_string (";\n"))
+            !output_string (";\n") || !output_use_current_file_line ())
         {
             fprintf (stderr, "Failure during output.\n");
             return PARSE_RESPONSE_FAILED;
@@ -1067,7 +1061,7 @@ static inline enum parse_response_t process_generate_state_queries (const char *
 
         if (!output_string ("struct kan_repository_indexed_value_update_query_t update_value__") ||
             !output_string (query->type) || !output_string ("__") || !output_field_path (query->field_path) ||
-            !output_string (";\n"))
+            !output_string (";\n") || !output_use_current_file_line ())
         {
             fprintf (stderr, "Failure during output.\n");
             return PARSE_RESPONSE_FAILED;
@@ -1081,7 +1075,7 @@ static inline enum parse_response_t process_generate_state_queries (const char *
 
         if (!output_string ("struct kan_repository_indexed_value_delete_query_t delete_value__") ||
             !output_string (query->type) || !output_string ("__") || !output_field_path (query->field_path) ||
-            !output_string (";\n"))
+            !output_string (";\n") || !output_use_current_file_line ())
         {
             fprintf (stderr, "Failure during output.\n");
             return PARSE_RESPONSE_FAILED;
@@ -1095,7 +1089,7 @@ static inline enum parse_response_t process_generate_state_queries (const char *
 
         if (!output_string ("struct kan_repository_indexed_value_write_query_t write_value__") ||
             !output_string (query->type) || !output_string ("__") || !output_field_path (query->field_path) ||
-            !output_string (";\n"))
+            !output_string (";\n") || !output_use_current_file_line ())
         {
             fprintf (stderr, "Failure during output.\n");
             return PARSE_RESPONSE_FAILED;
@@ -1109,7 +1103,8 @@ static inline enum parse_response_t process_generate_state_queries (const char *
 
         if (!output_string ("struct kan_repository_indexed_signal_read_query_t read_signal__") ||
             !output_string (query->type) || !output_string ("__") || !output_field_path (query->field_path) ||
-            !output_string ("__") || !output_string (query->signal_value) || !output_string (";\n"))
+            !output_string ("__") || !output_string (query->signal_value) || !output_string (";\n") ||
+            !output_use_current_file_line ())
         {
             fprintf (stderr, "Failure during output.\n");
             return PARSE_RESPONSE_FAILED;
@@ -1123,7 +1118,8 @@ static inline enum parse_response_t process_generate_state_queries (const char *
 
         if (!output_string ("struct kan_repository_indexed_signal_update_query_t update_signal__") ||
             !output_string (query->type) || !output_string ("__") || !output_field_path (query->field_path) ||
-            !output_string ("__") || !output_string (query->signal_value) || !output_string (";\n"))
+            !output_string ("__") || !output_string (query->signal_value) || !output_string (";\n") ||
+            !output_use_current_file_line ())
         {
             fprintf (stderr, "Failure during output.\n");
             return PARSE_RESPONSE_FAILED;
@@ -1137,7 +1133,8 @@ static inline enum parse_response_t process_generate_state_queries (const char *
 
         if (!output_string ("struct kan_repository_indexed_signal_delete_query_t delete_signal__") ||
             !output_string (query->type) || !output_string ("__") || !output_field_path (query->field_path) ||
-            !output_string ("__") || !output_string (query->signal_value) || !output_string (";\n"))
+            !output_string ("__") || !output_string (query->signal_value) || !output_string (";\n") ||
+            !output_use_current_file_line ())
         {
             fprintf (stderr, "Failure during output.\n");
             return PARSE_RESPONSE_FAILED;
@@ -1151,7 +1148,8 @@ static inline enum parse_response_t process_generate_state_queries (const char *
 
         if (!output_string ("struct kan_repository_indexed_signal_write_query_t write_signal__") ||
             !output_string (query->type) || !output_string ("__") || !output_field_path (query->field_path) ||
-            !output_string ("__") || !output_string (query->signal_value) || !output_string (";\n"))
+            !output_string ("__") || !output_string (query->signal_value) || !output_string (";\n") ||
+            !output_use_current_file_line ())
         {
             fprintf (stderr, "Failure during output.\n");
             return PARSE_RESPONSE_FAILED;
@@ -1165,7 +1163,7 @@ static inline enum parse_response_t process_generate_state_queries (const char *
 
         if (!output_string ("struct kan_repository_indexed_interval_read_query_t read_interval__") ||
             !output_string (query->type) || !output_string ("__") || !output_field_path (query->field_path) ||
-            !output_string (";\n"))
+            !output_string (";\n") || !output_use_current_file_line ())
         {
             fprintf (stderr, "Failure during output.\n");
             return PARSE_RESPONSE_FAILED;
@@ -1179,7 +1177,7 @@ static inline enum parse_response_t process_generate_state_queries (const char *
 
         if (!output_string ("struct kan_repository_indexed_interval_update_query_t update_interval__") ||
             !output_string (query->type) || !output_string ("__") || !output_field_path (query->field_path) ||
-            !output_string (";\n"))
+            !output_string (";\n") || !output_use_current_file_line ())
         {
             fprintf (stderr, "Failure during output.\n");
             return PARSE_RESPONSE_FAILED;
@@ -1193,7 +1191,7 @@ static inline enum parse_response_t process_generate_state_queries (const char *
 
         if (!output_string ("struct kan_repository_indexed_interval_delete_query_t delete_interval__") ||
             !output_string (query->type) || !output_string ("__") || !output_field_path (query->field_path) ||
-            !output_string (";\n"))
+            !output_string (";\n") || !output_use_current_file_line ())
         {
             fprintf (stderr, "Failure during output.\n");
             return PARSE_RESPONSE_FAILED;
@@ -1207,7 +1205,7 @@ static inline enum parse_response_t process_generate_state_queries (const char *
 
         if (!output_string ("struct kan_repository_indexed_interval_write_query_t write_interval__") ||
             !output_string (query->type) || !output_string ("__") || !output_field_path (query->field_path) ||
-            !output_string (";\n"))
+            !output_string (";\n") || !output_use_current_file_line ())
         {
             fprintf (stderr, "Failure during output.\n");
             return PARSE_RESPONSE_FAILED;
@@ -1218,7 +1216,7 @@ static inline enum parse_response_t process_generate_state_queries (const char *
     {
         if (!output_string ("struct kan_repository_event_insert_query_t insert__") ||
             !output_string (((kan_interned_string_t *) state->event_insert_queries.data)[index]) ||
-            !output_string (";\n"))
+            !output_string (";\n") || !output_use_current_file_line ())
         {
             fprintf (stderr, "Failure during output.\n");
             return PARSE_RESPONSE_FAILED;
@@ -1229,33 +1227,21 @@ static inline enum parse_response_t process_generate_state_queries (const char *
     {
         if (!output_string ("struct kan_repository_event_fetch_query_t fetch__") ||
             !output_string (((kan_interned_string_t *) state->event_fetch_queries.data)[index]) ||
-            !output_string (";\n"))
+            !output_string (";\n") || !output_use_current_file_line ())
         {
             fprintf (stderr, "Failure during output.\n");
             return PARSE_RESPONSE_FAILED;
         }
     }
 
-    if (!output_use_source_line ())
-    {
-        fprintf (stderr, "Failure during output.\n");
-        return PARSE_RESPONSE_FAILED;
-    }
-
     return PARSE_RESPONSE_BLOCK_PROCESSED;
 }
 
-static inline enum parse_response_t process_bind_state (const char *name_begin,
-                                                        const char *name_end,
-                                                        const char *path_begin,
-                                                        const char *path_end)
+static inline enum parse_response_t output_bind_state (const char *name_begin,
+                                                       const char *name_end,
+                                                       const char *path_begin,
+                                                       const char *path_end)
 {
-    if (!output_markup_macro_comment ())
-    {
-        fprintf (stderr, "Failure during output.\n");
-        return PARSE_RESPONSE_FAILED;
-    }
-
     kan_interned_string_t name = kan_char_sequence_intern (name_begin, name_end);
     process.bound_state = NULL;
 
@@ -1281,10 +1267,10 @@ static inline enum parse_response_t process_bind_state (const char *name_begin,
     return PARSE_RESPONSE_BLOCK_PROCESSED;
 }
 
-static inline void push_query_stack_node (kan_interned_string_t name, enum process_query_type_t query_type)
+static inline void push_query_stack_node (kan_interned_string_t name, enum query_type_t query_type)
 {
-    struct process_query_stack_node_t *node =
-        kan_allocate_batched (process.allocation_group, sizeof (struct process_query_stack_node_t));
+    struct query_stack_node_t *node =
+        kan_allocate_batched (process.allocation_group, sizeof (struct query_stack_node_t));
     node->previous = process.stack_top;
     process.stack_top = node;
     node->blocks = process.blocks;
@@ -1292,37 +1278,40 @@ static inline void push_query_stack_node (kan_interned_string_t name, enum proce
     node->query_type = query_type;
 }
 
+#define OUTPUT_TRUE_LITERAL 1
+#define OUTPUT_TRUE "1"
+_Static_assert (OUTPUT_TRUE_LITERAL == KAN_TRUE, "Output literal matches expectation.");
+
+#define OUTPUT_FALSE_LITERAL 0
+#define OUTPUT_FALSE "0"
+_Static_assert (OUTPUT_FALSE_LITERAL == KAN_FALSE, "Output literal matches expectation.");
+
 static inline kan_bool_t output_singleton_begin (
     kan_interned_string_t name, const char *type_begin, const char *type_end, const char *if_const, const char *access)
 {
     // Should be ensured by previous pass.
     KAN_ASSERT (process.bound_state)
 
-    return output_use_output_line () && output_string ("struct kan_repository_singleton_") && output_string (access) &&
-           output_string ("_access_t ") && output_string (name) &&
+    return output_use_current_file_line () && output_string ("struct kan_repository_singleton_") &&
+           output_string (access) && output_string ("_access_t ") && output_string (name) &&
            output_string ("_access = kan_repository_singleton_") && output_string (access) &&
            output_string ("_query_execute (&(") && output_string (process.bound_state_path) && output_string (")->") &&
            output_string (access) && output_string ("__") && output_sequence (type_begin, type_end) &&
-           output_string (");\n") && output_string (if_const) && output_string ("struct ") &&
-           output_sequence (type_begin, type_end) && output_string (" *") && output_string (name) &&
-           output_string (" = kan_repository_singleton_") && output_string (access) &&
-           output_string ("_access_resolve (&") && output_string (name) && output_string ("_access);\nkan_bool_t ") &&
-           output_string (name) && output_string ("_access_expired = KAN_FALSE;\n") && output_use_source_line ();
+           output_string (");\n") && output_use_current_file_line () && output_string (if_const) &&
+           output_string ("struct ") && output_sequence (type_begin, type_end) && output_string (" *") &&
+           output_string (name) && output_string (" = kan_repository_singleton_") && output_string (access) &&
+           output_string ("_access_resolve (&") && output_string (name) && output_string ("_access);\n") &&
+           output_use_current_file_line () && output_string ("kan_bool_t ") && output_string (name) &&
+           output_string ("_access_expired = " OUTPUT_FALSE ";\n");
 }
 
-static inline enum parse_response_t process_singleton_read (const char *name_begin,
-                                                            const char *name_end,
-                                                            const char *type_begin,
-                                                            const char *type_end)
+static inline enum parse_response_t output_singleton_read (const char *name_begin,
+                                                           const char *name_end,
+                                                           const char *type_begin,
+                                                           const char *type_end)
 {
-    if (!output_markup_macro_comment ())
-    {
-        fprintf (stderr, "Failure during output.\n");
-        return PARSE_RESPONSE_FAILED;
-    }
-
     kan_interned_string_t name = kan_char_sequence_intern (name_begin, name_end);
-    push_query_stack_node (name, PROCESS_QUERY_TYPE_SINGLETON_READ);
+    push_query_stack_node (name, QUERY_TYPE_SINGLETON_READ);
 
     if (!output_singleton_begin (name, type_begin, type_end, "const ", "read"))
     {
@@ -1333,19 +1322,13 @@ static inline enum parse_response_t process_singleton_read (const char *name_beg
     return PARSE_RESPONSE_BLOCK_PROCESSED;
 }
 
-static inline enum parse_response_t process_singleton_write (const char *name_begin,
-                                                             const char *name_end,
-                                                             const char *type_begin,
-                                                             const char *type_end)
+static inline enum parse_response_t output_singleton_write (const char *name_begin,
+                                                            const char *name_end,
+                                                            const char *type_begin,
+                                                            const char *type_end)
 {
-    if (!output_markup_macro_comment ())
-    {
-        fprintf (stderr, "Failure during output.\n");
-        return PARSE_RESPONSE_FAILED;
-    }
-
     kan_interned_string_t name = kan_char_sequence_intern (name_begin, name_end);
-    push_query_stack_node (name, PROCESS_QUERY_TYPE_SINGLETON_WRITE);
+    push_query_stack_node (name, QUERY_TYPE_SINGLETON_WRITE);
 
     if (!output_singleton_begin (name, type_begin, type_end, "", "write"))
     {
@@ -1356,28 +1339,22 @@ static inline enum parse_response_t process_singleton_write (const char *name_be
     return PARSE_RESPONSE_BLOCK_PROCESSED;
 }
 
-static inline enum parse_response_t process_indexed_insert (const char *name_begin,
-                                                            const char *name_end,
-                                                            const char *type_begin,
-                                                            const char *type_end)
+static inline enum parse_response_t output_indexed_insert (const char *name_begin,
+                                                           const char *name_end,
+                                                           const char *type_begin,
+                                                           const char *type_end)
 {
-    if (!output_markup_macro_comment ())
-    {
-        fprintf (stderr, "Failure during output.\n");
-        return PARSE_RESPONSE_FAILED;
-    }
-
     kan_interned_string_t name = kan_char_sequence_intern (name_begin, name_end);
-    push_query_stack_node (name, PROCESS_QUERY_TYPE_INDEXED_INSERT);
+    push_query_stack_node (name, QUERY_TYPE_INDEXED_INSERT);
 
     kan_bool_t output =
-        output_use_output_line () && output_string ("struct kan_repository_indexed_insertion_package_t ") &&
+        output_use_current_file_line () && output_string ("struct kan_repository_indexed_insertion_package_t ") &&
         output_string (name) && output_string ("_package = kan_repository_indexed_insert_query_execute (&(") &&
         output_string (process.bound_state_path) && output_string (")->") && output_string ("insert__") &&
-        output_sequence (type_begin, type_end) && output_string (");\n") && output_string ("struct ") &&
-        output_sequence (type_begin, type_end) && output_string (" *") && output_string (name) &&
-        output_string (" = kan_repository_indexed_insertion_package_get (&") && output_string (name) &&
-        output_string ("_package);\n") && output_use_source_line ();
+        output_sequence (type_begin, type_end) && output_string (");\n") && output_use_current_file_line () &&
+        output_string ("struct ") && output_sequence (type_begin, type_end) && output_string (" *") &&
+        output_string (name) && output_string (" = kan_repository_indexed_insertion_package_get (&") &&
+        output_string (name) && output_string ("_package);\n");
 
     if (!output)
     {
@@ -1394,36 +1371,33 @@ static inline kan_bool_t output_sequence_begin (
     // Should be ensured by previous pass.
     KAN_ASSERT (process.bound_state)
 
-    return output_use_output_line () && output_string ("struct kan_repository_indexed_sequence_") &&
+    return output_use_current_file_line () && output_string ("struct kan_repository_indexed_sequence_") &&
            output_string (access) && output_string ("_cursor_t ") && output_string (name) &&
            output_string ("_cursor = kan_repository_indexed_sequence_") && output_string (access) &&
            output_string ("_query_execute (&(") && output_string (process.bound_state_path) && output_string (")->") &&
            output_string (access) && output_string ("_sequence__") && output_sequence (type_begin, type_end) &&
-           output_string (");\nwhile (KAN_TRUE)\n{\n    struct kan_repository_indexed_sequence_") &&
-           output_string (access) && output_string ("_access_t ") && output_string (name) &&
+           output_string (");\n") && output_use_current_file_line () && output_string ("while (" OUTPUT_TRUE ")\n") &&
+           output_use_current_file_line () && output_string ("{\n") && output_use_current_file_line () &&
+           output_string ("    struct kan_repository_indexed_sequence_") && output_string (access) &&
+           output_string ("_access_t ") && output_string (name) &&
            output_string ("_access = kan_repository_indexed_sequence_") && output_string (access) &&
-           output_string ("_cursor_next (&") && output_string (name) && output_string ("_cursor);\n    ") &&
-           output_string (if_const) && output_string ("struct ") && output_sequence (type_begin, type_end) &&
-           output_string (" *") && output_string (name) && output_string (" = kan_repository_indexed_sequence_") &&
-           output_string (access) && output_string ("_access_resolve (&") && output_string (name) &&
-           output_string ("_access);\n    kan_bool_t ") && output_string (name) &&
-           output_string ("_access_expired = KAN_FALSE;\n    if (") && output_string (name) && output_string (")\n") &&
-           output_use_source_line ();
+           output_string ("_cursor_next (&") && output_string (name) && output_string ("_cursor);\n") &&
+           output_use_current_file_line () && output_string ("    ") && output_string (if_const) &&
+           output_string ("struct ") && output_sequence (type_begin, type_end) && output_string (" *") &&
+           output_string (name) && output_string (" = kan_repository_indexed_sequence_") && output_string (access) &&
+           output_string ("_access_resolve (&") && output_string (name) && output_string ("_access);\n") &&
+           output_use_current_file_line () && output_string ("    kan_bool_t ") && output_string (name) &&
+           output_string ("_access_expired = " OUTPUT_FALSE ";\n") && output_use_current_file_line () &&
+           output_string ("    if (") && output_string (name) && output_string (")\n");
 }
 
-static inline enum parse_response_t process_sequence_read (const char *name_begin,
-                                                           const char *name_end,
-                                                           const char *type_begin,
-                                                           const char *type_end)
+static inline enum parse_response_t output_sequence_read (const char *name_begin,
+                                                          const char *name_end,
+                                                          const char *type_begin,
+                                                          const char *type_end)
 {
-    if (!output_markup_macro_comment ())
-    {
-        fprintf (stderr, "Failure during output.\n");
-        return PARSE_RESPONSE_FAILED;
-    }
-
     kan_interned_string_t name = kan_char_sequence_intern (name_begin, name_end);
-    push_query_stack_node (name, PROCESS_QUERY_TYPE_SEQUENCE_READ);
+    push_query_stack_node (name, QUERY_TYPE_SEQUENCE_READ);
 
     if (!output_sequence_begin (name, type_begin, type_end, "const ", "read"))
     {
@@ -1434,19 +1408,13 @@ static inline enum parse_response_t process_sequence_read (const char *name_begi
     return PARSE_RESPONSE_BLOCK_PROCESSED;
 }
 
-static inline enum parse_response_t process_sequence_update (const char *name_begin,
-                                                             const char *name_end,
-                                                             const char *type_begin,
-                                                             const char *type_end)
+static inline enum parse_response_t output_sequence_update (const char *name_begin,
+                                                            const char *name_end,
+                                                            const char *type_begin,
+                                                            const char *type_end)
 {
-    if (!output_markup_macro_comment ())
-    {
-        fprintf (stderr, "Failure during output.\n");
-        return PARSE_RESPONSE_FAILED;
-    }
-
     kan_interned_string_t name = kan_char_sequence_intern (name_begin, name_end);
-    push_query_stack_node (name, PROCESS_QUERY_TYPE_SEQUENCE_UPDATE);
+    push_query_stack_node (name, QUERY_TYPE_SEQUENCE_UPDATE);
 
     if (!output_sequence_begin (name, type_begin, type_end, "", "update"))
     {
@@ -1457,19 +1425,13 @@ static inline enum parse_response_t process_sequence_update (const char *name_be
     return PARSE_RESPONSE_BLOCK_PROCESSED;
 }
 
-static inline enum parse_response_t process_sequence_delete (const char *name_begin,
-                                                             const char *name_end,
-                                                             const char *type_begin,
-                                                             const char *type_end)
+static inline enum parse_response_t output_sequence_delete (const char *name_begin,
+                                                            const char *name_end,
+                                                            const char *type_begin,
+                                                            const char *type_end)
 {
-    if (!output_markup_macro_comment ())
-    {
-        fprintf (stderr, "Failure during output.\n");
-        return PARSE_RESPONSE_FAILED;
-    }
-
     kan_interned_string_t name = kan_char_sequence_intern (name_begin, name_end);
-    push_query_stack_node (name, PROCESS_QUERY_TYPE_SEQUENCE_DELETE);
+    push_query_stack_node (name, QUERY_TYPE_SEQUENCE_DELETE);
 
     if (!output_sequence_begin (name, type_begin, type_end, "const ", "delete"))
     {
@@ -1480,19 +1442,13 @@ static inline enum parse_response_t process_sequence_delete (const char *name_be
     return PARSE_RESPONSE_BLOCK_PROCESSED;
 }
 
-static inline enum parse_response_t process_sequence_write (const char *name_begin,
-                                                            const char *name_end,
-                                                            const char *type_begin,
-                                                            const char *type_end)
+static inline enum parse_response_t output_sequence_write (const char *name_begin,
+                                                           const char *name_end,
+                                                           const char *type_begin,
+                                                           const char *type_end)
 {
-    if (!output_markup_macro_comment ())
-    {
-        fprintf (stderr, "Failure during output.\n");
-        return PARSE_RESPONSE_FAILED;
-    }
-
     kan_interned_string_t name = kan_char_sequence_intern (name_begin, name_end);
-    push_query_stack_node (name, PROCESS_QUERY_TYPE_SEQUENCE_WRITE);
+    push_query_stack_node (name, QUERY_TYPE_SEQUENCE_WRITE);
 
     if (!output_sequence_begin (name, type_begin, type_end, "", "write"))
     {
@@ -1516,42 +1472,39 @@ static inline kan_bool_t output_value_begin (kan_interned_string_t name,
     // Should be ensured by previous pass.
     KAN_ASSERT (process.bound_state)
 
-    return output_use_output_line () && output_string ("struct kan_repository_indexed_value_") &&
+    return output_use_current_file_line () && output_string ("struct kan_repository_indexed_value_") &&
            output_string (access) && output_string ("_cursor_t ") && output_string (name) &&
            output_string ("_cursor = kan_repository_indexed_value_") && output_string (access) &&
            output_string ("_query_execute (&(") && output_string (process.bound_state_path) && output_string (")->") &&
            output_string (access) && output_string ("_value__") && output_sequence (type_begin, type_end) &&
            output_string ("__") && output_field_path_sequence (field_begin, field_end) && output_string (", ") &&
-           output_sequence (argument_begin, argument_end) &&
-           output_string (");\nwhile (KAN_TRUE)\n{\n    struct kan_repository_indexed_value_") &&
-           output_string (access) && output_string ("_access_t ") && output_string (name) &&
+           output_sequence (argument_begin, argument_end) && output_string (");\n") &&
+           output_use_current_file_line () && output_string ("while (" OUTPUT_TRUE ")\n") &&
+           output_use_current_file_line () && output_string ("{\n") && output_use_current_file_line () &&
+           output_string ("    struct kan_repository_indexed_value_") && output_string (access) &&
+           output_string ("_access_t ") && output_string (name) &&
            output_string ("_access = kan_repository_indexed_value_") && output_string (access) &&
-           output_string ("_cursor_next (&") && output_string (name) && output_string ("_cursor);\n    ") &&
-           output_string (if_const) && output_string ("struct ") && output_sequence (type_begin, type_end) &&
-           output_string (" *") && output_string (name) && output_string (" = kan_repository_indexed_value_") &&
-           output_string (access) && output_string ("_access_resolve (&") && output_string (name) &&
-           output_string ("_access);\n    kan_bool_t ") && output_string (name) &&
-           output_string ("_access_expired = KAN_FALSE;\n    if (") && output_string (name) && output_string (")\n") &&
-           output_use_source_line ();
+           output_string ("_cursor_next (&") && output_string (name) && output_string ("_cursor);\n") &&
+           output_use_current_file_line () && output_string ("    ") && output_string (if_const) &&
+           output_string ("struct ") && output_sequence (type_begin, type_end) && output_string (" *") &&
+           output_string (name) && output_string (" = kan_repository_indexed_value_") && output_string (access) &&
+           output_string ("_access_resolve (&") && output_string (name) && output_string ("_access);\n") &&
+           output_use_current_file_line () && output_string ("    kan_bool_t ") && output_string (name) &&
+           output_string ("_access_expired = " OUTPUT_FALSE ";\n") && output_use_current_file_line () &&
+           output_string ("    if (") && output_string (name) && output_string (")\n");
 }
 
-static inline enum parse_response_t process_value_read (const char *name_begin,
-                                                        const char *name_end,
-                                                        const char *type_begin,
-                                                        const char *type_end,
-                                                        const char *field_begin,
-                                                        const char *field_end,
-                                                        const char *argument_begin,
-                                                        const char *argument_end)
+static inline enum parse_response_t output_value_read (const char *name_begin,
+                                                       const char *name_end,
+                                                       const char *type_begin,
+                                                       const char *type_end,
+                                                       const char *field_begin,
+                                                       const char *field_end,
+                                                       const char *argument_begin,
+                                                       const char *argument_end)
 {
-    if (!output_markup_macro_comment ())
-    {
-        fprintf (stderr, "Failure during output.\n");
-        return PARSE_RESPONSE_FAILED;
-    }
-
     kan_interned_string_t name = kan_char_sequence_intern (name_begin, name_end);
-    push_query_stack_node (name, PROCESS_QUERY_TYPE_VALUE_READ);
+    push_query_stack_node (name, QUERY_TYPE_VALUE_READ);
 
     if (!output_value_begin (name, type_begin, type_end, "const ", "read", field_begin, field_end, argument_begin,
                              argument_end))
@@ -1563,23 +1516,17 @@ static inline enum parse_response_t process_value_read (const char *name_begin,
     return PARSE_RESPONSE_BLOCK_PROCESSED;
 }
 
-static inline enum parse_response_t process_value_update (const char *name_begin,
-                                                          const char *name_end,
-                                                          const char *type_begin,
-                                                          const char *type_end,
-                                                          const char *field_begin,
-                                                          const char *field_end,
-                                                          const char *argument_begin,
-                                                          const char *argument_end)
+static inline enum parse_response_t output_value_update (const char *name_begin,
+                                                         const char *name_end,
+                                                         const char *type_begin,
+                                                         const char *type_end,
+                                                         const char *field_begin,
+                                                         const char *field_end,
+                                                         const char *argument_begin,
+                                                         const char *argument_end)
 {
-    if (!output_markup_macro_comment ())
-    {
-        fprintf (stderr, "Failure during output.\n");
-        return PARSE_RESPONSE_FAILED;
-    }
-
     kan_interned_string_t name = kan_char_sequence_intern (name_begin, name_end);
-    push_query_stack_node (name, PROCESS_QUERY_TYPE_VALUE_UPDATE);
+    push_query_stack_node (name, QUERY_TYPE_VALUE_UPDATE);
 
     if (!output_value_begin (name, type_begin, type_end, "", "update", field_begin, field_end, argument_begin,
                              argument_end))
@@ -1591,23 +1538,17 @@ static inline enum parse_response_t process_value_update (const char *name_begin
     return PARSE_RESPONSE_BLOCK_PROCESSED;
 }
 
-static inline enum parse_response_t process_value_delete (const char *name_begin,
-                                                          const char *name_end,
-                                                          const char *type_begin,
-                                                          const char *type_end,
-                                                          const char *field_begin,
-                                                          const char *field_end,
-                                                          const char *argument_begin,
-                                                          const char *argument_end)
+static inline enum parse_response_t output_value_delete (const char *name_begin,
+                                                         const char *name_end,
+                                                         const char *type_begin,
+                                                         const char *type_end,
+                                                         const char *field_begin,
+                                                         const char *field_end,
+                                                         const char *argument_begin,
+                                                         const char *argument_end)
 {
-    if (!output_markup_macro_comment ())
-    {
-        fprintf (stderr, "Failure during output.\n");
-        return PARSE_RESPONSE_FAILED;
-    }
-
     kan_interned_string_t name = kan_char_sequence_intern (name_begin, name_end);
-    push_query_stack_node (name, PROCESS_QUERY_TYPE_VALUE_DELETE);
+    push_query_stack_node (name, QUERY_TYPE_VALUE_DELETE);
 
     if (!output_value_begin (name, type_begin, type_end, "const ", "delete", field_begin, field_end, argument_begin,
                              argument_end))
@@ -1619,23 +1560,17 @@ static inline enum parse_response_t process_value_delete (const char *name_begin
     return PARSE_RESPONSE_BLOCK_PROCESSED;
 }
 
-static inline enum parse_response_t process_value_write (const char *name_begin,
-                                                         const char *name_end,
-                                                         const char *type_begin,
-                                                         const char *type_end,
-                                                         const char *field_begin,
-                                                         const char *field_end,
-                                                         const char *argument_begin,
-                                                         const char *argument_end)
+static inline enum parse_response_t output_value_write (const char *name_begin,
+                                                        const char *name_end,
+                                                        const char *type_begin,
+                                                        const char *type_end,
+                                                        const char *field_begin,
+                                                        const char *field_end,
+                                                        const char *argument_begin,
+                                                        const char *argument_end)
 {
-    if (!output_markup_macro_comment ())
-    {
-        fprintf (stderr, "Failure during output.\n");
-        return PARSE_RESPONSE_FAILED;
-    }
-
     kan_interned_string_t name = kan_char_sequence_intern (name_begin, name_end);
-    push_query_stack_node (name, PROCESS_QUERY_TYPE_VALUE_WRITE);
+    push_query_stack_node (name, QUERY_TYPE_VALUE_WRITE);
 
     if (!output_value_begin (name, type_begin, type_end, "", "write", field_begin, field_end, argument_begin,
                              argument_end))
@@ -1660,42 +1595,39 @@ static inline kan_bool_t output_signal_begin (kan_interned_string_t name,
     // Should be ensured by previous pass.
     KAN_ASSERT (process.bound_state)
 
-    return output_use_output_line () && output_string ("struct kan_repository_indexed_signal_") &&
+    return output_use_current_file_line () && output_string ("struct kan_repository_indexed_signal_") &&
            output_string (access) && output_string ("_cursor_t ") && output_string (name) &&
            output_string ("_cursor = kan_repository_indexed_signal_") && output_string (access) &&
            output_string ("_query_execute (&(") && output_string (process.bound_state_path) && output_string (")->") &&
            output_string (access) && output_string ("_signal__") && output_sequence (type_begin, type_end) &&
            output_string ("__") && output_field_path_sequence (field_begin, field_end) && output_string ("__") &&
-           output_sequence (signal_value_begin, signal_value_end) &&
-           output_string (");\nwhile (KAN_TRUE)\n{\n    struct kan_repository_indexed_signal_") &&
-           output_string (access) && output_string ("_access_t ") && output_string (name) &&
+           output_sequence (signal_value_begin, signal_value_end) && output_string (");\n") &&
+           output_use_current_file_line () && output_string ("while (" OUTPUT_TRUE ")\n") &&
+           output_use_current_file_line () && output_string ("{\n") && output_use_current_file_line () &&
+           output_string ("    struct kan_repository_indexed_signal_") && output_string (access) &&
+           output_string ("_access_t ") && output_string (name) &&
            output_string ("_access = kan_repository_indexed_signal_") && output_string (access) &&
-           output_string ("_cursor_next (&") && output_string (name) && output_string ("_cursor);\n    ") &&
-           output_string (if_const) && output_string ("struct ") && output_sequence (type_begin, type_end) &&
-           output_string (" *") && output_string (name) && output_string (" = kan_repository_indexed_signal_") &&
-           output_string (access) && output_string ("_access_resolve (&") && output_string (name) &&
-           output_string ("_access);\n    kan_bool_t ") && output_string (name) &&
-           output_string ("_access_expired = KAN_FALSE;\n    if (") && output_string (name) && output_string (")\n") &&
-           output_use_source_line ();
+           output_string ("_cursor_next (&") && output_string (name) && output_string ("_cursor);\n") &&
+           output_use_current_file_line () && output_string ("    ") && output_string (if_const) &&
+           output_string ("struct ") && output_sequence (type_begin, type_end) && output_string (" *") &&
+           output_string (name) && output_string (" = kan_repository_indexed_signal_") && output_string (access) &&
+           output_string ("_access_resolve (&") && output_string (name) && output_string ("_access);\n") &&
+           output_use_current_file_line () && output_string ("    kan_bool_t ") && output_string (name) &&
+           output_string ("_access_expired = " OUTPUT_FALSE ";\n") && output_use_current_file_line () &&
+           output_string ("    if (") && output_string (name) && output_string (")\n");
 }
 
-static inline enum parse_response_t process_signal_read (const char *name_begin,
-                                                         const char *name_end,
-                                                         const char *type_begin,
-                                                         const char *type_end,
-                                                         const char *field_begin,
-                                                         const char *field_end,
-                                                         const char *signal_value_begin,
-                                                         const char *signal_value_end)
+static inline enum parse_response_t output_signal_read (const char *name_begin,
+                                                        const char *name_end,
+                                                        const char *type_begin,
+                                                        const char *type_end,
+                                                        const char *field_begin,
+                                                        const char *field_end,
+                                                        const char *signal_value_begin,
+                                                        const char *signal_value_end)
 {
-    if (!output_markup_macro_comment ())
-    {
-        fprintf (stderr, "Failure during output.\n");
-        return PARSE_RESPONSE_FAILED;
-    }
-
     kan_interned_string_t name = kan_char_sequence_intern (name_begin, name_end);
-    push_query_stack_node (name, PROCESS_QUERY_TYPE_SIGNAL_READ);
+    push_query_stack_node (name, QUERY_TYPE_SIGNAL_READ);
 
     if (!output_signal_begin (name, type_begin, type_end, "const ", "read", field_begin, field_end, signal_value_begin,
                               signal_value_end))
@@ -1707,23 +1639,17 @@ static inline enum parse_response_t process_signal_read (const char *name_begin,
     return PARSE_RESPONSE_BLOCK_PROCESSED;
 }
 
-static inline enum parse_response_t process_signal_update (const char *name_begin,
-                                                           const char *name_end,
-                                                           const char *type_begin,
-                                                           const char *type_end,
-                                                           const char *field_begin,
-                                                           const char *field_end,
-                                                           const char *signal_value_begin,
-                                                           const char *signal_value_end)
+static inline enum parse_response_t output_signal_update (const char *name_begin,
+                                                          const char *name_end,
+                                                          const char *type_begin,
+                                                          const char *type_end,
+                                                          const char *field_begin,
+                                                          const char *field_end,
+                                                          const char *signal_value_begin,
+                                                          const char *signal_value_end)
 {
-    if (!output_markup_macro_comment ())
-    {
-        fprintf (stderr, "Failure during output.\n");
-        return PARSE_RESPONSE_FAILED;
-    }
-
     kan_interned_string_t name = kan_char_sequence_intern (name_begin, name_end);
-    push_query_stack_node (name, PROCESS_QUERY_TYPE_SIGNAL_UPDATE);
+    push_query_stack_node (name, QUERY_TYPE_SIGNAL_UPDATE);
 
     if (!output_signal_begin (name, type_begin, type_end, "", "update", field_begin, field_end, signal_value_begin,
                               signal_value_end))
@@ -1735,23 +1661,17 @@ static inline enum parse_response_t process_signal_update (const char *name_begi
     return PARSE_RESPONSE_BLOCK_PROCESSED;
 }
 
-static inline enum parse_response_t process_signal_delete (const char *name_begin,
-                                                           const char *name_end,
-                                                           const char *type_begin,
-                                                           const char *type_end,
-                                                           const char *field_begin,
-                                                           const char *field_end,
-                                                           const char *signal_value_begin,
-                                                           const char *signal_value_end)
+static inline enum parse_response_t output_signal_delete (const char *name_begin,
+                                                          const char *name_end,
+                                                          const char *type_begin,
+                                                          const char *type_end,
+                                                          const char *field_begin,
+                                                          const char *field_end,
+                                                          const char *signal_value_begin,
+                                                          const char *signal_value_end)
 {
-    if (!output_markup_macro_comment ())
-    {
-        fprintf (stderr, "Failure during output.\n");
-        return PARSE_RESPONSE_FAILED;
-    }
-
     kan_interned_string_t name = kan_char_sequence_intern (name_begin, name_end);
-    push_query_stack_node (name, PROCESS_QUERY_TYPE_SIGNAL_DELETE);
+    push_query_stack_node (name, QUERY_TYPE_SIGNAL_DELETE);
 
     if (!output_signal_begin (name, type_begin, type_end, "const ", "delete", field_begin, field_end,
                               signal_value_begin, signal_value_end))
@@ -1763,23 +1683,17 @@ static inline enum parse_response_t process_signal_delete (const char *name_begi
     return PARSE_RESPONSE_BLOCK_PROCESSED;
 }
 
-static inline enum parse_response_t process_signal_write (const char *name_begin,
-                                                          const char *name_end,
-                                                          const char *type_begin,
-                                                          const char *type_end,
-                                                          const char *field_begin,
-                                                          const char *field_end,
-                                                          const char *signal_value_begin,
-                                                          const char *signal_value_end)
+static inline enum parse_response_t output_signal_write (const char *name_begin,
+                                                         const char *name_end,
+                                                         const char *type_begin,
+                                                         const char *type_end,
+                                                         const char *field_begin,
+                                                         const char *field_end,
+                                                         const char *signal_value_begin,
+                                                         const char *signal_value_end)
 {
-    if (!output_markup_macro_comment ())
-    {
-        fprintf (stderr, "Failure during output.\n");
-        return PARSE_RESPONSE_FAILED;
-    }
-
     kan_interned_string_t name = kan_char_sequence_intern (name_begin, name_end);
-    push_query_stack_node (name, PROCESS_QUERY_TYPE_SIGNAL_WRITE);
+    push_query_stack_node (name, QUERY_TYPE_SIGNAL_WRITE);
 
     if (!output_signal_begin (name, type_begin, type_end, "", "write", field_begin, field_end, signal_value_begin,
                               signal_value_end))
@@ -1807,7 +1721,7 @@ static inline kan_bool_t output_interval_begin (kan_interned_string_t name,
     // Should be ensured by previous pass.
     KAN_ASSERT (process.bound_state)
 
-    return output_use_output_line () && output_string ("struct kan_repository_indexed_interval_") &&
+    return output_use_current_file_line () && output_string ("struct kan_repository_indexed_interval_") &&
            output_string (direction) && output_string ("_") && output_string (access) && output_string ("_cursor_t ") &&
            output_string (name) && output_string ("_cursor = kan_repository_indexed_interval_") &&
            output_string (access) && output_string ("_query_execute_") && output_string (direction) &&
@@ -1815,41 +1729,37 @@ static inline kan_bool_t output_interval_begin (kan_interned_string_t name,
            output_string (access) && output_string ("_interval__") && output_sequence (type_begin, type_end) &&
            output_string ("__") && output_field_path_sequence (field_begin, field_end) && output_string (", ") &&
            output_sequence (argument_min_begin, argument_min_end) && output_string (", ") &&
-           output_sequence (argument_max_begin, argument_max_end) &&
-           output_string (");\nwhile (KAN_TRUE)\n{\n    struct kan_repository_indexed_interval_") &&
-           output_string (access) && output_string ("_access_t ") && output_string (name) &&
+           output_sequence (argument_max_begin, argument_max_end) && output_string (");\n") &&
+           output_use_current_file_line () && output_string ("while (" OUTPUT_TRUE ")\n") &&
+           output_use_current_file_line () && output_string ("{\n") && output_use_current_file_line () &&
+           output_string ("    struct kan_repository_indexed_interval_") && output_string (access) &&
+           output_string ("_access_t ") && output_string (name) &&
            output_string ("_access = kan_repository_indexed_interval_") && output_string (direction) &&
            output_string ("_") && output_string (access) && output_string ("_cursor_next (&") && output_string (name) &&
-           output_string ("_cursor);\n    ") && output_string (if_const) && output_string ("struct ") &&
-           output_sequence (type_begin, type_end) && output_string (" *") && output_string (name) &&
-           output_string (" = kan_repository_indexed_interval_") && output_string (access) &&
-           output_string ("_access_resolve (&") && output_string (name) &&
-           output_string ("_access);\n    kan_bool_t ") && output_string (name) &&
-           output_string ("_access_expired = KAN_FALSE;\n    if (") && output_string (name) && output_string (")\n") &&
-           output_use_source_line ();
+           output_string ("_cursor);\n") && output_use_current_file_line () && output_string ("    ") &&
+           output_string (if_const) && output_string ("struct ") && output_sequence (type_begin, type_end) &&
+           output_string (" *") && output_string (name) && output_string (" = kan_repository_indexed_interval_") &&
+           output_string (access) && output_string ("_access_resolve (&") && output_string (name) &&
+           output_string ("_access);\n") && output_use_current_file_line () && output_string ("    kan_bool_t ") &&
+           output_string (name) && output_string ("_access_expired = " OUTPUT_FALSE ";\n") &&
+           output_use_current_file_line () && output_string ("    if (") && output_string (name) &&
+           output_string (")\n");
 }
 
-static inline enum parse_response_t process_interval_read (const char *name_begin,
-                                                           const char *name_end,
-                                                           const char *type_begin,
-                                                           const char *type_end,
-                                                           const char *field_begin,
-                                                           const char *field_end,
-                                                           kan_bool_t ascending,
-                                                           const char *argument_min_begin,
-                                                           const char *argument_min_end,
-                                                           const char *argument_max_begin,
-                                                           const char *argument_max_end)
+static inline enum parse_response_t output_interval_read (const char *name_begin,
+                                                          const char *name_end,
+                                                          const char *type_begin,
+                                                          const char *type_end,
+                                                          const char *field_begin,
+                                                          const char *field_end,
+                                                          kan_bool_t ascending,
+                                                          const char *argument_min_begin,
+                                                          const char *argument_min_end,
+                                                          const char *argument_max_begin,
+                                                          const char *argument_max_end)
 {
-    if (!output_markup_macro_comment ())
-    {
-        fprintf (stderr, "Failure during output.\n");
-        return PARSE_RESPONSE_FAILED;
-    }
-
     kan_interned_string_t name = kan_char_sequence_intern (name_begin, name_end);
-    push_query_stack_node (
-        name, ascending ? PROCESS_QUERY_TYPE_INTERVAL_ASCENDING_READ : PROCESS_QUERY_TYPE_INTERVAL_DESCENDING_READ);
+    push_query_stack_node (name, ascending ? QUERY_TYPE_INTERVAL_ASCENDING_READ : QUERY_TYPE_INTERVAL_DESCENDING_READ);
 
     if (!output_interval_begin (name, type_begin, type_end, "const ", "read", ascending ? "ascending" : "descending",
                                 field_begin, field_end, argument_min_begin, argument_min_end, argument_max_begin,
@@ -1862,27 +1772,21 @@ static inline enum parse_response_t process_interval_read (const char *name_begi
     return PARSE_RESPONSE_BLOCK_PROCESSED;
 }
 
-static inline enum parse_response_t process_interval_update (const char *name_begin,
-                                                             const char *name_end,
-                                                             const char *type_begin,
-                                                             const char *type_end,
-                                                             const char *field_begin,
-                                                             const char *field_end,
-                                                             kan_bool_t ascending,
-                                                             const char *argument_min_begin,
-                                                             const char *argument_min_end,
-                                                             const char *argument_max_begin,
-                                                             const char *argument_max_end)
+static inline enum parse_response_t output_interval_update (const char *name_begin,
+                                                            const char *name_end,
+                                                            const char *type_begin,
+                                                            const char *type_end,
+                                                            const char *field_begin,
+                                                            const char *field_end,
+                                                            kan_bool_t ascending,
+                                                            const char *argument_min_begin,
+                                                            const char *argument_min_end,
+                                                            const char *argument_max_begin,
+                                                            const char *argument_max_end)
 {
-    if (!output_markup_macro_comment ())
-    {
-        fprintf (stderr, "Failure during output.\n");
-        return PARSE_RESPONSE_FAILED;
-    }
-
     kan_interned_string_t name = kan_char_sequence_intern (name_begin, name_end);
-    push_query_stack_node (
-        name, ascending ? PROCESS_QUERY_TYPE_INTERVAL_ASCENDING_UPDATE : PROCESS_QUERY_TYPE_INTERVAL_DESCENDING_UPDATE);
+    push_query_stack_node (name,
+                           ascending ? QUERY_TYPE_INTERVAL_ASCENDING_UPDATE : QUERY_TYPE_INTERVAL_DESCENDING_UPDATE);
 
     if (!output_interval_begin (name, type_begin, type_end, "", "update", ascending ? "ascending" : "descending",
                                 field_begin, field_end, argument_min_begin, argument_min_end, argument_max_begin,
@@ -1895,27 +1799,21 @@ static inline enum parse_response_t process_interval_update (const char *name_be
     return PARSE_RESPONSE_BLOCK_PROCESSED;
 }
 
-static inline enum parse_response_t process_interval_delete (const char *name_begin,
-                                                             const char *name_end,
-                                                             const char *type_begin,
-                                                             const char *type_end,
-                                                             const char *field_begin,
-                                                             const char *field_end,
-                                                             kan_bool_t ascending,
-                                                             const char *argument_min_begin,
-                                                             const char *argument_min_end,
-                                                             const char *argument_max_begin,
-                                                             const char *argument_max_end)
+static inline enum parse_response_t output_interval_delete (const char *name_begin,
+                                                            const char *name_end,
+                                                            const char *type_begin,
+                                                            const char *type_end,
+                                                            const char *field_begin,
+                                                            const char *field_end,
+                                                            kan_bool_t ascending,
+                                                            const char *argument_min_begin,
+                                                            const char *argument_min_end,
+                                                            const char *argument_max_begin,
+                                                            const char *argument_max_end)
 {
-    if (!output_markup_macro_comment ())
-    {
-        fprintf (stderr, "Failure during output.\n");
-        return PARSE_RESPONSE_FAILED;
-    }
-
     kan_interned_string_t name = kan_char_sequence_intern (name_begin, name_end);
-    push_query_stack_node (
-        name, ascending ? PROCESS_QUERY_TYPE_INTERVAL_ASCENDING_DELETE : PROCESS_QUERY_TYPE_INTERVAL_DESCENDING_DELETE);
+    push_query_stack_node (name,
+                           ascending ? QUERY_TYPE_INTERVAL_ASCENDING_DELETE : QUERY_TYPE_INTERVAL_DESCENDING_DELETE);
 
     if (!output_interval_begin (name, type_begin, type_end, "const ", "delete", ascending ? "ascending" : "descending",
                                 field_begin, field_end, argument_min_begin, argument_min_end, argument_max_begin,
@@ -1928,27 +1826,21 @@ static inline enum parse_response_t process_interval_delete (const char *name_be
     return PARSE_RESPONSE_BLOCK_PROCESSED;
 }
 
-static inline enum parse_response_t process_interval_write (const char *name_begin,
-                                                            const char *name_end,
-                                                            const char *type_begin,
-                                                            const char *type_end,
-                                                            const char *field_begin,
-                                                            const char *field_end,
-                                                            kan_bool_t ascending,
-                                                            const char *argument_min_begin,
-                                                            const char *argument_min_end,
-                                                            const char *argument_max_begin,
-                                                            const char *argument_max_end)
+static inline enum parse_response_t output_interval_write (const char *name_begin,
+                                                           const char *name_end,
+                                                           const char *type_begin,
+                                                           const char *type_end,
+                                                           const char *field_begin,
+                                                           const char *field_end,
+                                                           kan_bool_t ascending,
+                                                           const char *argument_min_begin,
+                                                           const char *argument_min_end,
+                                                           const char *argument_max_begin,
+                                                           const char *argument_max_end)
 {
-    if (!output_markup_macro_comment ())
-    {
-        fprintf (stderr, "Failure during output.\n");
-        return PARSE_RESPONSE_FAILED;
-    }
-
     kan_interned_string_t name = kan_char_sequence_intern (name_begin, name_end);
-    push_query_stack_node (
-        name, ascending ? PROCESS_QUERY_TYPE_INTERVAL_ASCENDING_WRITE : PROCESS_QUERY_TYPE_INTERVAL_DESCENDING_WRITE);
+    push_query_stack_node (name,
+                           ascending ? QUERY_TYPE_INTERVAL_ASCENDING_WRITE : QUERY_TYPE_INTERVAL_DESCENDING_WRITE);
 
     if (!output_interval_begin (name, type_begin, type_end, "", "write", ascending ? "ascending" : "descending",
                                 field_begin, field_end, argument_min_begin, argument_min_end, argument_max_begin,
@@ -1961,64 +1853,23 @@ static inline enum parse_response_t process_interval_write (const char *name_beg
     return PARSE_RESPONSE_BLOCK_PROCESSED;
 }
 
-static inline enum parse_response_t process_event_insert (const char *name_begin,
-                                                          const char *name_end,
-                                                          const char *type_begin,
-                                                          const char *type_end)
-{
-    if (!output_markup_macro_comment ())
-    {
-        fprintf (stderr, "Failure during output.\n");
-        return PARSE_RESPONSE_FAILED;
-    }
-
-    kan_interned_string_t name = kan_char_sequence_intern (name_begin, name_end);
-    push_query_stack_node (name, PROCESS_QUERY_TYPE_EVENT_INSERT);
-
-    kan_bool_t output =
-        output_use_output_line () && output_string ("struct kan_repository_event_insertion_package_t ") &&
-        output_string (name) && output_string ("_package = kan_repository_event_insert_query_execute (&(") &&
-        output_string (process.bound_state_path) && output_string (")->") && output_string ("insert__") &&
-        output_sequence (type_begin, type_end) && output_string (");\n") && output_string ("struct ") &&
-        output_sequence (type_begin, type_end) && output_string (" *") && output_string (name) &&
-        output_string (" = kan_repository_event_insertion_package_get (&") && output_string (name) &&
-        output_string ("_package);\nif (") && output_string (name) && output_string (")\n") &&
-        output_use_source_line ();
-
-    if (!output)
-    {
-        fprintf (stderr, "Failure during output.\n");
-        return PARSE_RESPONSE_FAILED;
-    }
-
-    return PARSE_RESPONSE_BLOCK_PROCESSED;
-}
-
-static inline enum parse_response_t process_event_fetch (const char *name_begin,
+static inline enum parse_response_t output_event_insert (const char *name_begin,
                                                          const char *name_end,
                                                          const char *type_begin,
                                                          const char *type_end)
 {
-    if (!output_markup_macro_comment ())
-    {
-        fprintf (stderr, "Failure during output.\n");
-        return PARSE_RESPONSE_FAILED;
-    }
-
     kan_interned_string_t name = kan_char_sequence_intern (name_begin, name_end);
-    push_query_stack_node (name, PROCESS_QUERY_TYPE_EVENT_FETCH);
+    push_query_stack_node (name, QUERY_TYPE_EVENT_INSERT);
 
-    kan_bool_t output = output_use_output_line () &&
-                        output_string ("while (KAN_TRUE)\n{\n    struct kan_repository_event_read_access_t ") &&
-                        output_string (name) && output_string ("_access = kan_repository_event_fetch_query_next (&(") &&
-                        output_string (process.bound_state_path) && output_string (")->") &&
-                        output_string ("fetch__") && output_sequence (type_begin, type_end) && output_string (");\n") &&
-                        output_string ("    const struct ") && output_sequence (type_begin, type_end) &&
-                        output_string (" *") && output_string (name) &&
-                        output_string (" = kan_repository_event_read_access_resolve (&") && output_string (name) &&
-                        output_string ("_access);\n    kan_bool_t ") && output_string (name) &&
-                        output_string ("_access_expired = KAN_FALSE;\n    if (") && output_string (name) &&
-                        output_string (")\n") && output_use_source_line ();
+    kan_bool_t output =
+        output_use_current_file_line () && output_string ("struct kan_repository_event_insertion_package_t ") &&
+        output_string (name) && output_string ("_package = kan_repository_event_insert_query_execute (&(") &&
+        output_string (process.bound_state_path) && output_string (")->") && output_string ("insert__") &&
+        output_sequence (type_begin, type_end) && output_string (");\n") && output_use_current_file_line () &&
+        output_string ("struct ") && output_sequence (type_begin, type_end) && output_string (" *") &&
+        output_string (name) && output_string (" = kan_repository_event_insertion_package_get (&") &&
+        output_string (name) && output_string ("_package);\n") && output_use_current_file_line () &&
+        output_string ("if (") && output_string (name) && output_string (")\n");
 
     if (!output)
     {
@@ -2029,7 +1880,38 @@ static inline enum parse_response_t process_event_fetch (const char *name_begin,
     return PARSE_RESPONSE_BLOCK_PROCESSED;
 }
 
-static inline enum parse_response_t process_block_enter (void)
+static inline enum parse_response_t output_event_fetch (const char *name_begin,
+                                                        const char *name_end,
+                                                        const char *type_begin,
+                                                        const char *type_end)
+{
+    kan_interned_string_t name = kan_char_sequence_intern (name_begin, name_end);
+    push_query_stack_node (name, QUERY_TYPE_EVENT_FETCH);
+
+    kan_bool_t output = output_use_current_file_line () && output_string ("while (" OUTPUT_TRUE ")\n") &&
+                        output_use_current_file_line () && output_string ("{\n") && output_use_current_file_line () &&
+                        output_string ("    struct kan_repository_event_read_access_t ") && output_string (name) &&
+                        output_string ("_access = kan_repository_event_fetch_query_next (&(") &&
+                        output_string (process.bound_state_path) && output_string (")->") &&
+                        output_string ("fetch__") && output_sequence (type_begin, type_end) && output_string (");\n") &&
+                        output_use_current_file_line () && output_string ("    const struct ") &&
+                        output_sequence (type_begin, type_end) && output_string (" *") && output_string (name) &&
+                        output_string (" = kan_repository_event_read_access_resolve (&") && output_string (name) &&
+                        output_string ("_access);\n") && output_use_current_file_line () &&
+                        output_string ("    kan_bool_t ") && output_string (name) &&
+                        output_string ("_access_expired = " OUTPUT_FALSE ";\n") && output_use_current_file_line () &&
+                        output_string ("    if (") && output_string (name) && output_string (")\n");
+
+    if (!output)
+    {
+        fprintf (stderr, "Failure during output.\n");
+        return PARSE_RESPONSE_FAILED;
+    }
+
+    return PARSE_RESPONSE_BLOCK_PROCESSED;
+}
+
+static inline enum parse_response_t output_block_enter (void)
 {
     ++process.blocks;
     if (!output_string ("{"))
@@ -2043,25 +1925,29 @@ static inline enum parse_response_t process_block_enter (void)
 
 static inline kan_bool_t output_singleton_close_access_unguarded (kan_interned_string_t name, const char *access)
 {
-    return output_string ("if (!") && output_string (name) &&
-           output_string ("_access_expired)\n{\n    kan_repository_singleton_") && output_string (access) &&
-           output_string ("_access_close (&") && output_string (name) && output_string ("_access);\n}\n");
+    return output_use_current_file_line () && output_string ("if (!") && output_string (name) &&
+           output_string ("_access_expired)\n") && output_use_current_file_line () && output_string ("{\n") &&
+           output_use_current_file_line () && output_string ("    kan_repository_singleton_") &&
+           output_string (access) && output_string ("_access_close (&") && output_string (name) &&
+           output_string ("_access);\n") && output_use_current_file_line () && output_string ("}\n");
 }
 
 static inline kan_bool_t output_indexed_insert_submit_unguarded (kan_interned_string_t name)
 {
-    return output_string ("kan_repository_indexed_insertion_package_submit (&") && output_string (name) &&
-           output_string ("_package);\n");
+    return output_use_current_file_line () && output_string ("kan_repository_indexed_insertion_package_submit (&") &&
+           output_string (name) && output_string ("_package);\n");
 }
 
 static inline kan_bool_t output_indexed_close_access_unguarded (kan_interned_string_t name,
                                                                 const char *query_type,
                                                                 const char *access)
 {
-    return output_string ("        if (!") && output_string (name) &&
-           output_string ("_access_expired)\n        {\n            kan_repository_indexed_") &&
+    return output_use_current_file_line () && output_string ("        if (!") && output_string (name) &&
+           output_string ("_access_expired)\n") && output_use_current_file_line () && output_string ("        {\n") &&
+           output_use_current_file_line () && output_string ("            kan_repository_indexed_") &&
            output_string (query_type) && output_string ("_") && output_string (access) &&
-           output_string ("_access_close (&") && output_string (name) && output_string ("_access);\n        }\n");
+           output_string ("_access_close (&") && output_string (name) && output_string ("_access);\n") &&
+           output_use_current_file_line () && output_string ("        }\n");
 }
 
 static inline kan_bool_t output_indexed_close_cursor_unguarded (kan_interned_string_t name,
@@ -2069,7 +1955,8 @@ static inline kan_bool_t output_indexed_close_cursor_unguarded (kan_interned_str
                                                                 const char *direction_drop_in,
                                                                 const char *access)
 {
-    return output_string ("        kan_repository_indexed_") && output_string (query_type) && output_string ("_") &&
+    return output_use_current_file_line () && output_use_current_file_line () &&
+           output_string ("        kan_repository_indexed_") && output_string (query_type) && output_string ("_") &&
            output_string (direction_drop_in) && output_string (access) && output_string ("_cursor_close (&") &&
            output_string (name) && output_string ("_cursor);\n");
 }
@@ -2079,39 +1966,46 @@ static inline kan_bool_t output_indexed_end (kan_interned_string_t name,
                                              const char *direction_drop_in,
                                              const char *access)
 {
-    return output_use_output_line () && output_string ("    else\n    {\n") &&
+    return output_use_current_file_line () && output_string ("    else\n") && output_use_current_file_line () &&
+           output_string ("    {\n") && output_use_current_file_line () &&
            output_indexed_close_cursor_unguarded (name, query_type, direction_drop_in, access) &&
-           output_string ("        break;\n    }\n}\n") && output_use_source_line ();
+           output_string ("        break;\n") && output_use_current_file_line () && output_string ("    }\n") &&
+           output_use_current_file_line () && output_string ("}\n");
 }
 
 static inline kan_bool_t output_event_insert_submit_unguarded (kan_interned_string_t name)
 {
-    return output_use_output_line () && output_string ("        kan_repository_event_insertion_package_submit (&") &&
-           output_string (name) && output_string ("_package);\n") && output_use_source_line ();
+    return output_use_current_file_line () &&
+           output_string ("        kan_repository_event_insertion_package_submit (&") && output_string (name) &&
+           output_string ("_package);\n");
 }
 
 static inline kan_bool_t output_event_close_access_unguarded (kan_interned_string_t name)
 {
-    return output_string ("        if (!") && output_string (name) &&
-           output_string ("_access_expired)\n        {\n            kan_repository_event_read_access_close (&") &&
-           output_string (name) && output_string ("_access);\n        }\n");
+    return output_use_current_file_line () && output_string ("        if (!") && output_string (name) &&
+           output_string ("_access_expired)\n") && output_use_current_file_line () && output_string ("        {\n") &&
+           output_use_current_file_line () && output_string ("            kan_repository_event_read_access_close (&") &&
+           output_string (name) && output_string ("_access);\n") && output_use_current_file_line () &&
+           output_string ("        }\n");
 }
 
 static inline kan_bool_t output_event_end (void)
 {
-    return output_use_output_line () && output_string ("    else\n    {\n        break;\n    }\n}\n") &&
-           output_use_source_line ();
+    return output_use_current_file_line () && output_string ("    else\n") && output_use_current_file_line () &&
+           output_string ("    {\n") && output_use_current_file_line () && output_string ("        break;\n") &&
+           output_use_current_file_line () && output_string ("    }\n") && output_use_current_file_line () &&
+           output_string ("}\n");
 }
 
-static inline enum parse_response_t process_block_exit (void)
+static inline enum parse_response_t output_block_exit (void)
 {
     --process.blocks;
     if (process.stack_top && process.stack_top->blocks > process.blocks)
     {
         fprintf (stderr,
-                 "Error. [%ld:%ld]: Caught blocks exit without block enter after query declaration. Queries should be "
+                 "[%s:%ld:%ld]: Caught blocks exit without block enter after query declaration. Queries should be "
                  "followed by { ... } blocks.\n",
-                 (long) io.cursor_line, (long) io.cursor_symbol);
+                 io.current_file_path.path, (long) io.current_file_line, (long) io.cursor_symbol);
         return PARSE_RESPONSE_FAILED;
     }
 
@@ -2119,27 +2013,26 @@ static inline enum parse_response_t process_block_exit (void)
     while (process.stack_top && process.stack_top->blocks == process.blocks)
     {
         any_queries = KAN_TRUE;
-        struct process_query_stack_node_t *previous = process.stack_top->previous;
+        struct query_stack_node_t *previous = process.stack_top->previous;
         const kan_bool_t shared_block = previous && previous->blocks == process.blocks;
 
-        if (shared_block && ((previous->query_type != PROCESS_QUERY_TYPE_SINGLETON_READ &&
-                              previous->query_type != PROCESS_QUERY_TYPE_SINGLETON_WRITE) ||
-                             (process.stack_top->query_type != PROCESS_QUERY_TYPE_SINGLETON_READ &&
-                              process.stack_top->query_type != PROCESS_QUERY_TYPE_SINGLETON_WRITE)))
+        if (shared_block && ((previous->query_type != QUERY_TYPE_SINGLETON_READ &&
+                              previous->query_type != QUERY_TYPE_SINGLETON_WRITE) ||
+                             (process.stack_top->query_type != QUERY_TYPE_SINGLETON_READ &&
+                              process.stack_top->query_type != QUERY_TYPE_SINGLETON_WRITE)))
         {
             fprintf (stderr,
-                     "Error. [%ld:%ld]: Caught multiple queries that are not singletons at block exit. Only singleton "
+                     "[%s:%ld:%ld]: Caught multiple queries that are not singletons at block exit. Only singleton "
                      "queries are allowed to share block.\n",
-                     (long) io.cursor_line, (long) io.cursor_symbol);
+                     io.current_file_path.path, (long) io.current_file_line, (long) io.cursor_symbol);
             return PARSE_RESPONSE_FAILED;
         }
 
         switch (process.stack_top->query_type)
         {
-        case PROCESS_QUERY_TYPE_SINGLETON_READ:
-            if (!output_use_output_line () ||
-                !output_singleton_close_access_unguarded (process.stack_top->name, "read") ||
-                !output_use_source_line () || (!shared_block && !output_sequence (io.token, io.cursor)))
+        case QUERY_TYPE_SINGLETON_READ:
+            if (!output_singleton_close_access_unguarded (process.stack_top->name, "read") ||
+                (!shared_block && !output_sequence (io.token, io.cursor)))
             {
                 fprintf (stderr, "Failure during output.\n");
                 return PARSE_RESPONSE_FAILED;
@@ -2147,10 +2040,9 @@ static inline enum parse_response_t process_block_exit (void)
 
             break;
 
-        case PROCESS_QUERY_TYPE_SINGLETON_WRITE:
-            if (!output_use_output_line () ||
-                !output_singleton_close_access_unguarded (process.stack_top->name, "write") ||
-                !output_use_source_line () || (!shared_block && !output_sequence (io.token, io.cursor)))
+        case QUERY_TYPE_SINGLETON_WRITE:
+            if (!output_singleton_close_access_unguarded (process.stack_top->name, "write") ||
+                (!shared_block && !output_sequence (io.token, io.cursor)))
             {
                 fprintf (stderr, "Failure during output.\n");
                 return PARSE_RESPONSE_FAILED;
@@ -2158,9 +2050,9 @@ static inline enum parse_response_t process_block_exit (void)
 
             break;
 
-        case PROCESS_QUERY_TYPE_INDEXED_INSERT:
-            if (!output_use_output_line () || !output_indexed_insert_submit_unguarded (process.stack_top->name) ||
-                !output_use_source_line () || !output_sequence (io.token, io.cursor))
+        case QUERY_TYPE_INDEXED_INSERT:
+            if (!output_indexed_insert_submit_unguarded (process.stack_top->name) ||
+                !output_sequence (io.token, io.cursor))
             {
                 fprintf (stderr, "Failure during output.\n");
                 return PARSE_RESPONSE_FAILED;
@@ -2168,10 +2060,9 @@ static inline enum parse_response_t process_block_exit (void)
 
             break;
 
-        case PROCESS_QUERY_TYPE_SEQUENCE_READ:
-            if (!output_use_output_line () ||
-                !output_indexed_close_access_unguarded (process.stack_top->name, "sequence", "read") ||
-                !output_use_source_line () || !output_sequence (io.token, io.cursor) ||
+        case QUERY_TYPE_SEQUENCE_READ:
+            if (!output_indexed_close_access_unguarded (process.stack_top->name, "sequence", "read") ||
+                !output_sequence (io.token, io.cursor) ||
                 !output_indexed_end (process.stack_top->name, "sequence", "", "read"))
             {
                 fprintf (stderr, "Failure during output.\n");
@@ -2180,10 +2071,9 @@ static inline enum parse_response_t process_block_exit (void)
 
             break;
 
-        case PROCESS_QUERY_TYPE_SEQUENCE_UPDATE:
-            if (!output_use_output_line () ||
-                !output_indexed_close_access_unguarded (process.stack_top->name, "sequence", "update") ||
-                !output_use_source_line () || !output_sequence (io.token, io.cursor) ||
+        case QUERY_TYPE_SEQUENCE_UPDATE:
+            if (!output_indexed_close_access_unguarded (process.stack_top->name, "sequence", "update") ||
+                !output_sequence (io.token, io.cursor) ||
                 !output_indexed_end (process.stack_top->name, "sequence", "", "update"))
             {
                 fprintf (stderr, "Failure during output.\n");
@@ -2192,10 +2082,9 @@ static inline enum parse_response_t process_block_exit (void)
 
             break;
 
-        case PROCESS_QUERY_TYPE_SEQUENCE_DELETE:
-            if (!output_use_output_line () ||
-                !output_indexed_close_access_unguarded (process.stack_top->name, "sequence", "delete") ||
-                !output_use_source_line () || !output_sequence (io.token, io.cursor) ||
+        case QUERY_TYPE_SEQUENCE_DELETE:
+            if (!output_indexed_close_access_unguarded (process.stack_top->name, "sequence", "delete") ||
+                !output_sequence (io.token, io.cursor) ||
                 !output_indexed_end (process.stack_top->name, "sequence", "", "delete"))
             {
                 fprintf (stderr, "Failure during output.\n");
@@ -2204,10 +2093,9 @@ static inline enum parse_response_t process_block_exit (void)
 
             break;
 
-        case PROCESS_QUERY_TYPE_SEQUENCE_WRITE:
-            if (!output_use_output_line () ||
-                !output_indexed_close_access_unguarded (process.stack_top->name, "sequence", "write") ||
-                !output_use_source_line () || !output_sequence (io.token, io.cursor) ||
+        case QUERY_TYPE_SEQUENCE_WRITE:
+            if (!output_indexed_close_access_unguarded (process.stack_top->name, "sequence", "write") ||
+                !output_sequence (io.token, io.cursor) ||
                 !output_indexed_end (process.stack_top->name, "sequence", "", "write"))
             {
                 fprintf (stderr, "Failure during output.\n");
@@ -2216,10 +2104,9 @@ static inline enum parse_response_t process_block_exit (void)
 
             break;
 
-        case PROCESS_QUERY_TYPE_VALUE_READ:
-            if (!output_use_output_line () ||
-                !output_indexed_close_access_unguarded (process.stack_top->name, "value", "read") ||
-                !output_use_source_line () || !output_sequence (io.token, io.cursor) ||
+        case QUERY_TYPE_VALUE_READ:
+            if (!output_indexed_close_access_unguarded (process.stack_top->name, "value", "read") ||
+                !output_sequence (io.token, io.cursor) ||
                 !output_indexed_end (process.stack_top->name, "value", "", "read"))
             {
                 fprintf (stderr, "Failure during output.\n");
@@ -2228,10 +2115,9 @@ static inline enum parse_response_t process_block_exit (void)
 
             break;
 
-        case PROCESS_QUERY_TYPE_VALUE_UPDATE:
-            if (!output_use_output_line () ||
-                !output_indexed_close_access_unguarded (process.stack_top->name, "value", "update") ||
-                !output_use_source_line () || !output_sequence (io.token, io.cursor) ||
+        case QUERY_TYPE_VALUE_UPDATE:
+            if (!output_indexed_close_access_unguarded (process.stack_top->name, "value", "update") ||
+                !output_sequence (io.token, io.cursor) ||
                 !output_indexed_end (process.stack_top->name, "value", "", "update"))
             {
                 fprintf (stderr, "Failure during output.\n");
@@ -2240,10 +2126,9 @@ static inline enum parse_response_t process_block_exit (void)
 
             break;
 
-        case PROCESS_QUERY_TYPE_VALUE_DELETE:
-            if (!output_use_output_line () ||
-                !output_indexed_close_access_unguarded (process.stack_top->name, "value", "delete") ||
-                !output_use_source_line () || !output_sequence (io.token, io.cursor) ||
+        case QUERY_TYPE_VALUE_DELETE:
+            if (!output_indexed_close_access_unguarded (process.stack_top->name, "value", "delete") ||
+                !output_sequence (io.token, io.cursor) ||
                 !output_indexed_end (process.stack_top->name, "value", "", "delete"))
             {
                 fprintf (stderr, "Failure during output.\n");
@@ -2252,10 +2137,9 @@ static inline enum parse_response_t process_block_exit (void)
 
             break;
 
-        case PROCESS_QUERY_TYPE_VALUE_WRITE:
-            if (!output_use_output_line () ||
-                !output_indexed_close_access_unguarded (process.stack_top->name, "value", "write") ||
-                !output_use_source_line () || !output_sequence (io.token, io.cursor) ||
+        case QUERY_TYPE_VALUE_WRITE:
+            if (!output_indexed_close_access_unguarded (process.stack_top->name, "value", "write") ||
+                !output_sequence (io.token, io.cursor) ||
                 !output_indexed_end (process.stack_top->name, "value", "", "write"))
             {
                 fprintf (stderr, "Failure during output.\n");
@@ -2264,10 +2148,9 @@ static inline enum parse_response_t process_block_exit (void)
 
             break;
 
-        case PROCESS_QUERY_TYPE_SIGNAL_READ:
-            if (!output_use_output_line () ||
-                !output_indexed_close_access_unguarded (process.stack_top->name, "signal", "read") ||
-                !output_use_source_line () || !output_sequence (io.token, io.cursor) ||
+        case QUERY_TYPE_SIGNAL_READ:
+            if (!output_indexed_close_access_unguarded (process.stack_top->name, "signal", "read") ||
+                !output_sequence (io.token, io.cursor) ||
                 !output_indexed_end (process.stack_top->name, "signal", "", "read"))
             {
                 fprintf (stderr, "Failure during output.\n");
@@ -2276,10 +2159,9 @@ static inline enum parse_response_t process_block_exit (void)
 
             break;
 
-        case PROCESS_QUERY_TYPE_SIGNAL_UPDATE:
-            if (!output_use_output_line () ||
-                !output_indexed_close_access_unguarded (process.stack_top->name, "signal", "update") ||
-                !output_use_source_line () || !output_sequence (io.token, io.cursor) ||
+        case QUERY_TYPE_SIGNAL_UPDATE:
+            if (!output_indexed_close_access_unguarded (process.stack_top->name, "signal", "update") ||
+                !output_sequence (io.token, io.cursor) ||
                 !output_indexed_end (process.stack_top->name, "signal", "", "update"))
             {
                 fprintf (stderr, "Failure during output.\n");
@@ -2288,10 +2170,9 @@ static inline enum parse_response_t process_block_exit (void)
 
             break;
 
-        case PROCESS_QUERY_TYPE_SIGNAL_DELETE:
-            if (!output_use_output_line () ||
-                !output_indexed_close_access_unguarded (process.stack_top->name, "signal", "delete") ||
-                !output_use_source_line () || !output_sequence (io.token, io.cursor) ||
+        case QUERY_TYPE_SIGNAL_DELETE:
+            if (!output_indexed_close_access_unguarded (process.stack_top->name, "signal", "delete") ||
+                !output_sequence (io.token, io.cursor) ||
                 !output_indexed_end (process.stack_top->name, "signal", "", "delete"))
             {
                 fprintf (stderr, "Failure during output.\n");
@@ -2300,10 +2181,9 @@ static inline enum parse_response_t process_block_exit (void)
 
             break;
 
-        case PROCESS_QUERY_TYPE_SIGNAL_WRITE:
-            if (!output_use_output_line () ||
-                !output_indexed_close_access_unguarded (process.stack_top->name, "signal", "write") ||
-                !output_use_source_line () || !output_sequence (io.token, io.cursor) ||
+        case QUERY_TYPE_SIGNAL_WRITE:
+            if (!output_indexed_close_access_unguarded (process.stack_top->name, "signal", "write") ||
+                !output_sequence (io.token, io.cursor) ||
                 !output_indexed_end (process.stack_top->name, "signal", "", "write"))
             {
                 fprintf (stderr, "Failure during output.\n");
@@ -2312,10 +2192,9 @@ static inline enum parse_response_t process_block_exit (void)
 
             break;
 
-        case PROCESS_QUERY_TYPE_INTERVAL_ASCENDING_READ:
-            if (!output_use_output_line () ||
-                !output_indexed_close_access_unguarded (process.stack_top->name, "interval", "read") ||
-                !output_use_source_line () || !output_sequence (io.token, io.cursor) ||
+        case QUERY_TYPE_INTERVAL_ASCENDING_READ:
+            if (!output_indexed_close_access_unguarded (process.stack_top->name, "interval", "read") ||
+                !output_sequence (io.token, io.cursor) ||
                 !output_indexed_end (process.stack_top->name, "interval", "ascending_", "read"))
             {
                 fprintf (stderr, "Failure during output.\n");
@@ -2324,10 +2203,9 @@ static inline enum parse_response_t process_block_exit (void)
 
             break;
 
-        case PROCESS_QUERY_TYPE_INTERVAL_ASCENDING_UPDATE:
-            if (!output_use_output_line () ||
-                !output_indexed_close_access_unguarded (process.stack_top->name, "interval", "update") ||
-                !output_use_source_line () || !output_sequence (io.token, io.cursor) ||
+        case QUERY_TYPE_INTERVAL_ASCENDING_UPDATE:
+            if (!output_indexed_close_access_unguarded (process.stack_top->name, "interval", "update") ||
+                !output_sequence (io.token, io.cursor) ||
                 !output_indexed_end (process.stack_top->name, "interval", "ascending_", "update"))
             {
                 fprintf (stderr, "Failure during output.\n");
@@ -2336,10 +2214,9 @@ static inline enum parse_response_t process_block_exit (void)
 
             break;
 
-        case PROCESS_QUERY_TYPE_INTERVAL_ASCENDING_DELETE:
-            if (!output_use_output_line () ||
-                !output_indexed_close_access_unguarded (process.stack_top->name, "interval", "delete") ||
-                !output_use_source_line () || !output_sequence (io.token, io.cursor) ||
+        case QUERY_TYPE_INTERVAL_ASCENDING_DELETE:
+            if (!output_indexed_close_access_unguarded (process.stack_top->name, "interval", "delete") ||
+                !output_sequence (io.token, io.cursor) ||
                 !output_indexed_end (process.stack_top->name, "interval", "ascending_", "delete"))
             {
                 fprintf (stderr, "Failure during output.\n");
@@ -2348,10 +2225,9 @@ static inline enum parse_response_t process_block_exit (void)
 
             break;
 
-        case PROCESS_QUERY_TYPE_INTERVAL_ASCENDING_WRITE:
-            if (!output_use_output_line () ||
-                !output_indexed_close_access_unguarded (process.stack_top->name, "interval", "write") ||
-                !output_use_source_line () || !output_sequence (io.token, io.cursor) ||
+        case QUERY_TYPE_INTERVAL_ASCENDING_WRITE:
+            if (!output_indexed_close_access_unguarded (process.stack_top->name, "interval", "write") ||
+                !output_sequence (io.token, io.cursor) ||
                 !output_indexed_end (process.stack_top->name, "interval", "ascending_", "write"))
             {
                 fprintf (stderr, "Failure during output.\n");
@@ -2360,10 +2236,9 @@ static inline enum parse_response_t process_block_exit (void)
 
             break;
 
-        case PROCESS_QUERY_TYPE_INTERVAL_DESCENDING_READ:
-            if (!output_use_output_line () ||
-                !output_indexed_close_access_unguarded (process.stack_top->name, "interval", "read") ||
-                !output_use_source_line () || !output_sequence (io.token, io.cursor) ||
+        case QUERY_TYPE_INTERVAL_DESCENDING_READ:
+            if (!output_indexed_close_access_unguarded (process.stack_top->name, "interval", "read") ||
+                !output_sequence (io.token, io.cursor) ||
                 !output_indexed_end (process.stack_top->name, "interval", "descending_", "read"))
             {
                 fprintf (stderr, "Failure during output.\n");
@@ -2372,10 +2247,9 @@ static inline enum parse_response_t process_block_exit (void)
 
             break;
 
-        case PROCESS_QUERY_TYPE_INTERVAL_DESCENDING_UPDATE:
-            if (!output_use_output_line () ||
-                !output_indexed_close_access_unguarded (process.stack_top->name, "interval", "update") ||
-                !output_use_source_line () || !output_sequence (io.token, io.cursor) ||
+        case QUERY_TYPE_INTERVAL_DESCENDING_UPDATE:
+            if (!output_indexed_close_access_unguarded (process.stack_top->name, "interval", "update") ||
+                !output_sequence (io.token, io.cursor) ||
                 !output_indexed_end (process.stack_top->name, "interval", "descending_", "update"))
             {
                 fprintf (stderr, "Failure during output.\n");
@@ -2384,10 +2258,9 @@ static inline enum parse_response_t process_block_exit (void)
 
             break;
 
-        case PROCESS_QUERY_TYPE_INTERVAL_DESCENDING_DELETE:
-            if (!output_use_output_line () ||
-                !output_indexed_close_access_unguarded (process.stack_top->name, "interval", "delete") ||
-                !output_use_source_line () || !output_sequence (io.token, io.cursor) ||
+        case QUERY_TYPE_INTERVAL_DESCENDING_DELETE:
+            if (!output_indexed_close_access_unguarded (process.stack_top->name, "interval", "delete") ||
+                !output_sequence (io.token, io.cursor) ||
                 !output_indexed_end (process.stack_top->name, "interval", "descending_", "delete"))
             {
                 fprintf (stderr, "Failure during output.\n");
@@ -2396,10 +2269,9 @@ static inline enum parse_response_t process_block_exit (void)
 
             break;
 
-        case PROCESS_QUERY_TYPE_INTERVAL_DESCENDING_WRITE:
-            if (!output_use_output_line () ||
-                !output_indexed_close_access_unguarded (process.stack_top->name, "interval", "write") ||
-                !output_use_source_line () || !output_sequence (io.token, io.cursor) ||
+        case QUERY_TYPE_INTERVAL_DESCENDING_WRITE:
+            if (!output_indexed_close_access_unguarded (process.stack_top->name, "interval", "write") ||
+                !output_sequence (io.token, io.cursor) ||
                 !output_indexed_end (process.stack_top->name, "interval", "descending_", "write"))
             {
                 fprintf (stderr, "Failure during output.\n");
@@ -2408,9 +2280,9 @@ static inline enum parse_response_t process_block_exit (void)
 
             break;
 
-        case PROCESS_QUERY_TYPE_EVENT_INSERT:
-            if (!output_use_output_line () || !output_event_insert_submit_unguarded (process.stack_top->name) ||
-                !output_use_source_line () || !output_sequence (io.token, io.cursor))
+        case QUERY_TYPE_EVENT_INSERT:
+            if (!output_event_insert_submit_unguarded (process.stack_top->name) ||
+                !output_sequence (io.token, io.cursor))
             {
                 fprintf (stderr, "Failure during output.\n");
                 return PARSE_RESPONSE_FAILED;
@@ -2418,9 +2290,9 @@ static inline enum parse_response_t process_block_exit (void)
 
             break;
 
-        case PROCESS_QUERY_TYPE_EVENT_FETCH:
-            if (!output_use_output_line () || !output_event_close_access_unguarded (process.stack_top->name) ||
-                !output_use_source_line () || !output_sequence (io.token, io.cursor) || !output_event_end ())
+        case QUERY_TYPE_EVENT_FETCH:
+            if (!output_event_close_access_unguarded (process.stack_top->name) ||
+                !output_sequence (io.token, io.cursor) || !output_event_end ())
             {
                 fprintf (stderr, "Failure during output.\n");
                 return PARSE_RESPONSE_FAILED;
@@ -2442,75 +2314,75 @@ static inline enum parse_response_t process_block_exit (void)
     return PARSE_RESPONSE_BLOCK_PROCESSED;
 }
 
-static inline kan_bool_t output_query_access_close_unguarded (struct process_query_stack_node_t *query_node)
+static inline kan_bool_t output_query_access_close_unguarded (struct query_stack_node_t *query_node)
 {
     switch (query_node->query_type)
     {
-    case PROCESS_QUERY_TYPE_SINGLETON_READ:
+    case QUERY_TYPE_SINGLETON_READ:
         return output_singleton_close_access_unguarded (query_node->name, "read");
 
-    case PROCESS_QUERY_TYPE_SINGLETON_WRITE:
+    case QUERY_TYPE_SINGLETON_WRITE:
         return output_singleton_close_access_unguarded (query_node->name, "write");
 
-    case PROCESS_QUERY_TYPE_INDEXED_INSERT:
+    case QUERY_TYPE_INDEXED_INSERT:
         return output_indexed_insert_submit_unguarded (query_node->name);
 
-    case PROCESS_QUERY_TYPE_SEQUENCE_READ:
+    case QUERY_TYPE_SEQUENCE_READ:
         return output_indexed_close_access_unguarded (query_node->name, "sequence", "read");
 
-    case PROCESS_QUERY_TYPE_SEQUENCE_UPDATE:
+    case QUERY_TYPE_SEQUENCE_UPDATE:
         return output_indexed_close_access_unguarded (query_node->name, "sequence", "update");
 
-    case PROCESS_QUERY_TYPE_SEQUENCE_DELETE:
+    case QUERY_TYPE_SEQUENCE_DELETE:
         return output_indexed_close_access_unguarded (query_node->name, "sequence", "delete");
 
-    case PROCESS_QUERY_TYPE_SEQUENCE_WRITE:
+    case QUERY_TYPE_SEQUENCE_WRITE:
         return output_indexed_close_access_unguarded (query_node->name, "sequence", "write");
 
-    case PROCESS_QUERY_TYPE_VALUE_READ:
+    case QUERY_TYPE_VALUE_READ:
         return output_indexed_close_access_unguarded (query_node->name, "value", "read");
 
-    case PROCESS_QUERY_TYPE_VALUE_UPDATE:
+    case QUERY_TYPE_VALUE_UPDATE:
         return output_indexed_close_access_unguarded (query_node->name, "value", "update");
 
-    case PROCESS_QUERY_TYPE_VALUE_DELETE:
+    case QUERY_TYPE_VALUE_DELETE:
         return output_indexed_close_access_unguarded (query_node->name, "value", "delete");
 
-    case PROCESS_QUERY_TYPE_VALUE_WRITE:
+    case QUERY_TYPE_VALUE_WRITE:
         return output_indexed_close_access_unguarded (query_node->name, "value", "write");
 
-    case PROCESS_QUERY_TYPE_SIGNAL_READ:
+    case QUERY_TYPE_SIGNAL_READ:
         return output_indexed_close_access_unguarded (query_node->name, "signal", "read");
 
-    case PROCESS_QUERY_TYPE_SIGNAL_UPDATE:
+    case QUERY_TYPE_SIGNAL_UPDATE:
         return output_indexed_close_access_unguarded (query_node->name, "signal", "update");
 
-    case PROCESS_QUERY_TYPE_SIGNAL_DELETE:
+    case QUERY_TYPE_SIGNAL_DELETE:
         return output_indexed_close_access_unguarded (query_node->name, "signal", "delete");
 
-    case PROCESS_QUERY_TYPE_SIGNAL_WRITE:
+    case QUERY_TYPE_SIGNAL_WRITE:
         return output_indexed_close_access_unguarded (query_node->name, "signal", "write");
 
-    case PROCESS_QUERY_TYPE_INTERVAL_ASCENDING_READ:
-    case PROCESS_QUERY_TYPE_INTERVAL_DESCENDING_READ:
+    case QUERY_TYPE_INTERVAL_ASCENDING_READ:
+    case QUERY_TYPE_INTERVAL_DESCENDING_READ:
         return output_indexed_close_access_unguarded (query_node->name, "interval", "read");
 
-    case PROCESS_QUERY_TYPE_INTERVAL_ASCENDING_UPDATE:
-    case PROCESS_QUERY_TYPE_INTERVAL_DESCENDING_UPDATE:
+    case QUERY_TYPE_INTERVAL_ASCENDING_UPDATE:
+    case QUERY_TYPE_INTERVAL_DESCENDING_UPDATE:
         return output_indexed_close_access_unguarded (query_node->name, "interval", "update");
 
-    case PROCESS_QUERY_TYPE_INTERVAL_ASCENDING_DELETE:
-    case PROCESS_QUERY_TYPE_INTERVAL_DESCENDING_DELETE:
+    case QUERY_TYPE_INTERVAL_ASCENDING_DELETE:
+    case QUERY_TYPE_INTERVAL_DESCENDING_DELETE:
         return output_indexed_close_access_unguarded (query_node->name, "interval", "delete");
 
-    case PROCESS_QUERY_TYPE_INTERVAL_ASCENDING_WRITE:
-    case PROCESS_QUERY_TYPE_INTERVAL_DESCENDING_WRITE:
+    case QUERY_TYPE_INTERVAL_ASCENDING_WRITE:
+    case QUERY_TYPE_INTERVAL_DESCENDING_WRITE:
         return output_indexed_close_access_unguarded (query_node->name, "interval", "write");
 
-    case PROCESS_QUERY_TYPE_EVENT_INSERT:
+    case QUERY_TYPE_EVENT_INSERT:
         return output_event_insert_submit_unguarded (query_node->name);
 
-    case PROCESS_QUERY_TYPE_EVENT_FETCH:
+    case QUERY_TYPE_EVENT_FETCH:
         return output_event_close_access_unguarded (query_node->name);
     }
 
@@ -2518,75 +2390,75 @@ static inline kan_bool_t output_query_access_close_unguarded (struct process_que
     return KAN_FALSE;
 }
 
-static inline kan_bool_t output_query_cursor_close_unguarded (struct process_query_stack_node_t *query_node)
+static inline kan_bool_t output_query_cursor_close_unguarded (struct query_stack_node_t *query_node)
 {
     switch (query_node->query_type)
     {
-    case PROCESS_QUERY_TYPE_SINGLETON_READ:
-    case PROCESS_QUERY_TYPE_SINGLETON_WRITE:
-    case PROCESS_QUERY_TYPE_INDEXED_INSERT:
-    case PROCESS_QUERY_TYPE_EVENT_INSERT:
-    case PROCESS_QUERY_TYPE_EVENT_FETCH:
+    case QUERY_TYPE_SINGLETON_READ:
+    case QUERY_TYPE_SINGLETON_WRITE:
+    case QUERY_TYPE_INDEXED_INSERT:
+    case QUERY_TYPE_EVENT_INSERT:
+    case QUERY_TYPE_EVENT_FETCH:
         return KAN_TRUE;
 
-    case PROCESS_QUERY_TYPE_SEQUENCE_READ:
+    case QUERY_TYPE_SEQUENCE_READ:
         return output_indexed_close_cursor_unguarded (query_node->name, "sequence", "", "read");
 
-    case PROCESS_QUERY_TYPE_SEQUENCE_UPDATE:
+    case QUERY_TYPE_SEQUENCE_UPDATE:
         return output_indexed_close_cursor_unguarded (query_node->name, "sequence", "", "update");
 
-    case PROCESS_QUERY_TYPE_SEQUENCE_DELETE:
+    case QUERY_TYPE_SEQUENCE_DELETE:
         return output_indexed_close_cursor_unguarded (query_node->name, "sequence", "", "delete");
 
-    case PROCESS_QUERY_TYPE_SEQUENCE_WRITE:
+    case QUERY_TYPE_SEQUENCE_WRITE:
         return output_indexed_close_cursor_unguarded (query_node->name, "sequence", "", "write");
 
-    case PROCESS_QUERY_TYPE_VALUE_READ:
+    case QUERY_TYPE_VALUE_READ:
         return output_indexed_close_cursor_unguarded (query_node->name, "value", "", "read");
 
-    case PROCESS_QUERY_TYPE_VALUE_UPDATE:
+    case QUERY_TYPE_VALUE_UPDATE:
         return output_indexed_close_cursor_unguarded (query_node->name, "value", "", "update");
 
-    case PROCESS_QUERY_TYPE_VALUE_DELETE:
+    case QUERY_TYPE_VALUE_DELETE:
         return output_indexed_close_cursor_unguarded (query_node->name, "value", "", "delete");
 
-    case PROCESS_QUERY_TYPE_VALUE_WRITE:
+    case QUERY_TYPE_VALUE_WRITE:
         return output_indexed_close_cursor_unguarded (query_node->name, "value", "", "write");
 
-    case PROCESS_QUERY_TYPE_SIGNAL_READ:
+    case QUERY_TYPE_SIGNAL_READ:
         return output_indexed_close_cursor_unguarded (query_node->name, "signal", "", "read");
 
-    case PROCESS_QUERY_TYPE_SIGNAL_UPDATE:
+    case QUERY_TYPE_SIGNAL_UPDATE:
         return output_indexed_close_cursor_unguarded (query_node->name, "signal", "", "update");
 
-    case PROCESS_QUERY_TYPE_SIGNAL_DELETE:
+    case QUERY_TYPE_SIGNAL_DELETE:
         return output_indexed_close_cursor_unguarded (query_node->name, "signal", "", "delete");
 
-    case PROCESS_QUERY_TYPE_SIGNAL_WRITE:
+    case QUERY_TYPE_SIGNAL_WRITE:
         return output_indexed_close_cursor_unguarded (query_node->name, "signal", "", "write");
 
-    case PROCESS_QUERY_TYPE_INTERVAL_ASCENDING_READ:
+    case QUERY_TYPE_INTERVAL_ASCENDING_READ:
         return output_indexed_close_cursor_unguarded (query_node->name, "interval", "ascending_", "read");
 
-    case PROCESS_QUERY_TYPE_INTERVAL_ASCENDING_UPDATE:
+    case QUERY_TYPE_INTERVAL_ASCENDING_UPDATE:
         return output_indexed_close_cursor_unguarded (query_node->name, "interval", "ascending_", "update");
 
-    case PROCESS_QUERY_TYPE_INTERVAL_ASCENDING_DELETE:
+    case QUERY_TYPE_INTERVAL_ASCENDING_DELETE:
         return output_indexed_close_cursor_unguarded (query_node->name, "interval", "ascending_", "delete");
 
-    case PROCESS_QUERY_TYPE_INTERVAL_ASCENDING_WRITE:
+    case QUERY_TYPE_INTERVAL_ASCENDING_WRITE:
         return output_indexed_close_cursor_unguarded (query_node->name, "interval", "ascending_", "write");
 
-    case PROCESS_QUERY_TYPE_INTERVAL_DESCENDING_READ:
+    case QUERY_TYPE_INTERVAL_DESCENDING_READ:
         return output_indexed_close_cursor_unguarded (query_node->name, "interval", "descending_", "read");
 
-    case PROCESS_QUERY_TYPE_INTERVAL_DESCENDING_UPDATE:
+    case QUERY_TYPE_INTERVAL_DESCENDING_UPDATE:
         return output_indexed_close_cursor_unguarded (query_node->name, "interval", "descending_", "update");
 
-    case PROCESS_QUERY_TYPE_INTERVAL_DESCENDING_DELETE:
+    case QUERY_TYPE_INTERVAL_DESCENDING_DELETE:
         return output_indexed_close_cursor_unguarded (query_node->name, "interval", "descending_", "delete");
 
-    case PROCESS_QUERY_TYPE_INTERVAL_DESCENDING_WRITE:
+    case QUERY_TYPE_INTERVAL_DESCENDING_WRITE:
         return output_indexed_close_cursor_unguarded (query_node->name, "interval", "descending_", "write");
     }
 
@@ -2594,33 +2466,26 @@ static inline kan_bool_t output_query_cursor_close_unguarded (struct process_que
     return KAN_FALSE;
 }
 
-static inline enum parse_response_t process_query_break (void)
+static inline enum parse_response_t output_query_break (void)
 {
-    if (!output_markup_macro_comment () || !output_use_output_line ())
-    {
-        fprintf (stderr, "Failure during output.\n");
-        return PARSE_RESPONSE_FAILED;
-    }
-
     if (process.stack_top)
     {
-        if (process.stack_top->query_type == PROCESS_QUERY_TYPE_SINGLETON_READ ||
-            process.stack_top->query_type == PROCESS_QUERY_TYPE_SINGLETON_WRITE)
+        if (process.stack_top->query_type == QUERY_TYPE_SINGLETON_READ ||
+            process.stack_top->query_type == QUERY_TYPE_SINGLETON_WRITE)
         {
             fprintf (
                 stderr,
-                "Error. [%ld:%ld]: Caught attempt to use break while top query is singleton, which is not supported.\n",
-                (long) io.cursor_line, (long) io.cursor_symbol);
+                "[%s:%ld:%ld]: Caught attempt to use break while top query is singleton, which is not supported.\n",
+                io.current_file_path.path, (long) io.current_file_line, (long) io.cursor_symbol);
             return PARSE_RESPONSE_FAILED;
         }
 
-        if (process.stack_top->query_type == PROCESS_QUERY_TYPE_INDEXED_INSERT ||
-            process.stack_top->query_type == PROCESS_QUERY_TYPE_EVENT_INSERT)
+        if (process.stack_top->query_type == QUERY_TYPE_INDEXED_INSERT ||
+            process.stack_top->query_type == QUERY_TYPE_EVENT_INSERT)
         {
-            fprintf (
-                stderr,
-                "Error. [%ld:%ld]: Caught attempt to use break while top query is insert, which is not supported.\n",
-                (long) io.cursor_line, (long) io.cursor_symbol);
+            fprintf (stderr,
+                     "[%s:%ld:%ld]: Caught attempt to use break while top query is insert, which is not supported.\n",
+                     io.current_file_path.path, (long) io.current_file_line, (long) io.cursor_symbol);
             return PARSE_RESPONSE_FAILED;
         }
 
@@ -2632,7 +2497,7 @@ static inline enum parse_response_t process_query_break (void)
         }
     }
 
-    if (!output_string ("        break;\n") || !output_use_source_line ())
+    if (!output_use_current_file_line () || !output_string ("        break;\n"))
     {
         fprintf (stderr, "Failure during output.\n");
         return PARSE_RESPONSE_FAILED;
@@ -2641,33 +2506,27 @@ static inline enum parse_response_t process_query_break (void)
     return PARSE_RESPONSE_BLOCK_PROCESSED;
 }
 
-static inline enum parse_response_t process_query_continue (void)
+static inline enum parse_response_t output_query_continue (void)
 {
-    if (!output_markup_macro_comment () || !output_use_output_line ())
-    {
-        fprintf (stderr, "Failure during output.\n");
-        return PARSE_RESPONSE_FAILED;
-    }
-
     if (process.stack_top)
     {
-        if (process.stack_top->query_type == PROCESS_QUERY_TYPE_SINGLETON_READ ||
-            process.stack_top->query_type == PROCESS_QUERY_TYPE_SINGLETON_WRITE)
+        if (process.stack_top->query_type == QUERY_TYPE_SINGLETON_READ ||
+            process.stack_top->query_type == QUERY_TYPE_SINGLETON_WRITE)
         {
             fprintf (stderr,
-                     "Error. [%ld:%ld]: Caught attempt to use continue while top query is singleton, which is not "
+                     "[%s:%ld:%ld]: Caught attempt to use continue while top query is singleton, which is not "
                      "supported.\n",
-                     (long) io.cursor_line, (long) io.cursor_symbol);
+                     io.current_file_path.path, (long) io.current_file_line, (long) io.cursor_symbol);
             return PARSE_RESPONSE_FAILED;
         }
 
-        if (process.stack_top->query_type == PROCESS_QUERY_TYPE_INDEXED_INSERT ||
-            process.stack_top->query_type == PROCESS_QUERY_TYPE_EVENT_INSERT)
+        if (process.stack_top->query_type == QUERY_TYPE_INDEXED_INSERT ||
+            process.stack_top->query_type == QUERY_TYPE_EVENT_INSERT)
         {
             fprintf (
                 stderr,
-                "Error. [%ld:%ld]: Caught attempt to use continue while top query is insert, which is not supported.\n",
-                (long) io.cursor_line, (long) io.cursor_symbol);
+                "[%s:%ld:%ld]: Caught attempt to use continue while top query is insert, which is not supported.\n",
+                io.current_file_path.path, (long) io.current_file_line, (long) io.cursor_symbol);
             return PARSE_RESPONSE_FAILED;
         }
 
@@ -2679,7 +2538,7 @@ static inline enum parse_response_t process_query_continue (void)
         }
     }
 
-    if (!output_string ("        continue;\n") || !output_use_source_line ())
+    if (!output_use_current_file_line () || !output_string ("        continue;\n"))
     {
         fprintf (stderr, "Failure during output.\n");
         return PARSE_RESPONSE_FAILED;
@@ -2690,7 +2549,7 @@ static inline enum parse_response_t process_query_continue (void)
 
 static inline kan_bool_t output_close_stack_unguarded (void)
 {
-    struct process_query_stack_node_t *node = process.stack_top;
+    struct query_stack_node_t *node = process.stack_top;
     while (node)
     {
         if (!output_query_access_close_unguarded (node) || !output_query_cursor_close_unguarded (node))
@@ -2704,10 +2563,9 @@ static inline kan_bool_t output_close_stack_unguarded (void)
     return KAN_TRUE;
 }
 
-static inline enum parse_response_t process_query_return_void (void)
+static inline enum parse_response_t output_query_return_void (void)
 {
-    if (!output_markup_macro_comment () || !output_use_output_line () || !output_close_stack_unguarded () ||
-        !output_string ("        return;\n") || !output_use_source_line ())
+    if (!output_close_stack_unguarded () || !output_use_current_file_line () || !output_string ("        return;\n"))
     {
         fprintf (stderr, "Failure during output.\n");
         return PARSE_RESPONSE_FAILED;
@@ -2716,10 +2574,11 @@ static inline enum parse_response_t process_query_return_void (void)
     return PARSE_RESPONSE_BLOCK_PROCESSED;
 }
 
-static inline enum parse_response_t process_mutator_return (void)
+static inline enum parse_response_t output_mutator_return (void)
 {
-    if (!output_markup_macro_comment () || !output_use_output_line () || !output_close_stack_unguarded () ||
-        !output_string ("        kan_cpu_job_release (job);\n        return;\n") || !output_use_source_line ())
+    if (!output_close_stack_unguarded () || !output_use_current_file_line () ||
+        !output_string ("        kan_cpu_job_release (job);\n") || !output_use_current_file_line () ||
+        !output_string ("        return;\n"))
     {
         fprintf (stderr, "Failure during output.\n");
         return PARSE_RESPONSE_FAILED;
@@ -2728,15 +2587,15 @@ static inline enum parse_response_t process_mutator_return (void)
     return PARSE_RESPONSE_BLOCK_PROCESSED;
 }
 
-static inline enum parse_response_t process_query_return_value (const char *type_begin,
-                                                                const char *type_end,
-                                                                const char *argument_begin,
-                                                                const char *argument_end)
+static inline enum parse_response_t output_query_return_value (const char *type_begin,
+                                                               const char *type_end,
+                                                               const char *argument_begin,
+                                                               const char *argument_end)
 {
-    if (!output_markup_macro_comment () || !output_use_output_line () || !output_string ("        ") ||
-        !output_sequence (type_begin, type_end) || !output_string (" query_return_value = ") ||
-        !output_sequence (argument_begin, argument_end) || !output_string (";\n") || !output_close_stack_unguarded () ||
-        !output_string ("        return query_return_value;\n") || !output_use_source_line ())
+    if (!output_use_current_file_line () || !output_string ("        ") || !output_sequence (type_begin, type_end) ||
+        !output_string (" query_return_value = ") || !output_sequence (argument_begin, argument_end) ||
+        !output_string (";\n") || !output_close_stack_unguarded () || !output_use_current_file_line () ||
+        !output_string ("        return query_return_value;\n"))
     {
         fprintf (stderr, "Failure during output.\n");
         return PARSE_RESPONSE_FAILED;
@@ -2745,16 +2604,16 @@ static inline enum parse_response_t process_query_return_value (const char *type
     return PARSE_RESPONSE_BLOCK_PROCESSED;
 }
 
-static inline enum parse_response_t process_access_escape (const char *argument_begin,
-                                                           const char *argument_end,
-                                                           const char *name_begin,
-                                                           const char *name_end)
+static inline enum parse_response_t output_access_escape (const char *argument_begin,
+                                                          const char *argument_end,
+                                                          const char *name_begin,
+                                                          const char *name_end)
 {
-    if (!output_markup_macro_comment () || !output_use_output_line () || !output_string ("        ") ||
+    if (!output_use_current_file_line () || !output_string ("        ") ||
         !output_sequence (argument_begin, argument_end) || !output_string (" = ") ||
-        !output_sequence (name_begin, name_end) || !output_string ("_access;\n        ") ||
-        !output_sequence (name_begin, name_end) || !output_string ("_access_expired = KAN_TRUE;\n") ||
-        !output_use_source_line ())
+        !output_sequence (name_begin, name_end) || !output_string ("_access;\n") || !output_use_current_file_line () ||
+        !output_string ("        ") || !output_sequence (name_begin, name_end) ||
+        !output_string ("_access_expired = " OUTPUT_TRUE ";\n"))
     {
         fprintf (stderr, "Failure during output.\n");
         return PARSE_RESPONSE_FAILED;
@@ -2763,16 +2622,16 @@ static inline enum parse_response_t process_access_escape (const char *argument_
     return PARSE_RESPONSE_BLOCK_PROCESSED;
 }
 
-static inline enum parse_response_t process_access_delete (const char *name_begin, const char *name_end)
+static inline enum parse_response_t output_access_delete (const char *name_begin, const char *name_end)
 {
-    if (!output_markup_macro_comment () || !output_use_output_line () || !output_string ("        "))
+    if (!output_use_current_file_line () || !output_string ("        "))
     {
         fprintf (stderr, "Failure during output.\n");
         return PARSE_RESPONSE_FAILED;
     }
 
     kan_interned_string_t name = kan_char_sequence_intern (name_begin, name_end);
-    struct process_query_stack_node_t *node = process.stack_top;
+    struct query_stack_node_t *node = process.stack_top;
 
     while (node)
     {
@@ -2786,37 +2645,36 @@ static inline enum parse_response_t process_access_delete (const char *name_begi
 
     if (!node)
     {
-        fprintf (
-            stderr,
-            "Error. [%ld:%ld]: Caught attempt to delete access for query \"%s\", but it cannot be found on stack.\n",
-            (long) io.cursor_line, (long) io.cursor_symbol, name);
+        fprintf (stderr,
+                 "[%s:%ld:%ld]: Caught attempt to delete access for query \"%s\", but it cannot be found on stack.\n",
+                 io.current_file_path.path, (long) io.current_file_line, (long) io.cursor_symbol, name);
         return PARSE_RESPONSE_FAILED;
     }
 
     switch (node->query_type)
     {
-    case PROCESS_QUERY_TYPE_SINGLETON_READ:
-    case PROCESS_QUERY_TYPE_SINGLETON_WRITE:
-    case PROCESS_QUERY_TYPE_INDEXED_INSERT:
-    case PROCESS_QUERY_TYPE_SEQUENCE_READ:
-    case PROCESS_QUERY_TYPE_SEQUENCE_UPDATE:
-    case PROCESS_QUERY_TYPE_VALUE_READ:
-    case PROCESS_QUERY_TYPE_VALUE_UPDATE:
-    case PROCESS_QUERY_TYPE_SIGNAL_READ:
-    case PROCESS_QUERY_TYPE_SIGNAL_UPDATE:
-    case PROCESS_QUERY_TYPE_INTERVAL_ASCENDING_READ:
-    case PROCESS_QUERY_TYPE_INTERVAL_ASCENDING_UPDATE:
-    case PROCESS_QUERY_TYPE_INTERVAL_DESCENDING_READ:
-    case PROCESS_QUERY_TYPE_INTERVAL_DESCENDING_UPDATE:
-    case PROCESS_QUERY_TYPE_EVENT_INSERT:
-    case PROCESS_QUERY_TYPE_EVENT_FETCH:
+    case QUERY_TYPE_SINGLETON_READ:
+    case QUERY_TYPE_SINGLETON_WRITE:
+    case QUERY_TYPE_INDEXED_INSERT:
+    case QUERY_TYPE_SEQUENCE_READ:
+    case QUERY_TYPE_SEQUENCE_UPDATE:
+    case QUERY_TYPE_VALUE_READ:
+    case QUERY_TYPE_VALUE_UPDATE:
+    case QUERY_TYPE_SIGNAL_READ:
+    case QUERY_TYPE_SIGNAL_UPDATE:
+    case QUERY_TYPE_INTERVAL_ASCENDING_READ:
+    case QUERY_TYPE_INTERVAL_ASCENDING_UPDATE:
+    case QUERY_TYPE_INTERVAL_DESCENDING_READ:
+    case QUERY_TYPE_INTERVAL_DESCENDING_UPDATE:
+    case QUERY_TYPE_EVENT_INSERT:
+    case QUERY_TYPE_EVENT_FETCH:
         fprintf (stderr,
-                 "Error. [%ld:%ld]: Caught attempt to delete access for query \"%s\", but query type does not support "
+                 "[%s:%ld:%ld]: Caught attempt to delete access for query \"%s\", but query type does not support "
                  "deletion.\n",
-                 (long) io.cursor_line, (long) io.cursor_symbol, name);
+                 io.current_file_path.path, (long) io.current_file_line, (long) io.cursor_symbol, name);
         return PARSE_RESPONSE_FAILED;
 
-    case PROCESS_QUERY_TYPE_SEQUENCE_DELETE:
+    case QUERY_TYPE_SEQUENCE_DELETE:
         if (!output_string ("kan_repository_indexed_sequence_delete_access_delete (&") || !output_string (name) ||
             !output_string ("_access);\n"))
         {
@@ -2826,7 +2684,7 @@ static inline enum parse_response_t process_access_delete (const char *name_begi
 
         break;
 
-    case PROCESS_QUERY_TYPE_SEQUENCE_WRITE:
+    case QUERY_TYPE_SEQUENCE_WRITE:
         if (!output_string ("kan_repository_indexed_sequence_write_access_delete (&") || !output_string (name) ||
             !output_string ("_access);\n"))
         {
@@ -2836,7 +2694,7 @@ static inline enum parse_response_t process_access_delete (const char *name_begi
 
         break;
 
-    case PROCESS_QUERY_TYPE_VALUE_DELETE:
+    case QUERY_TYPE_VALUE_DELETE:
         if (!output_string ("kan_repository_indexed_value_delete_access_delete (&") || !output_string (name) ||
             !output_string ("_access);\n"))
         {
@@ -2846,7 +2704,7 @@ static inline enum parse_response_t process_access_delete (const char *name_begi
 
         break;
 
-    case PROCESS_QUERY_TYPE_VALUE_WRITE:
+    case QUERY_TYPE_VALUE_WRITE:
         if (!output_string ("kan_repository_indexed_value_write_access_delete (&") || !output_string (name) ||
             !output_string ("_access);\n"))
         {
@@ -2856,7 +2714,7 @@ static inline enum parse_response_t process_access_delete (const char *name_begi
 
         break;
 
-    case PROCESS_QUERY_TYPE_SIGNAL_DELETE:
+    case QUERY_TYPE_SIGNAL_DELETE:
         if (!output_string ("kan_repository_indexed_signal_delete_access_delete (&") || !output_string (name) ||
             !output_string ("_access);\n"))
         {
@@ -2866,7 +2724,7 @@ static inline enum parse_response_t process_access_delete (const char *name_begi
 
         break;
 
-    case PROCESS_QUERY_TYPE_SIGNAL_WRITE:
+    case QUERY_TYPE_SIGNAL_WRITE:
         if (!output_string ("kan_repository_indexed_signal_write_access_delete (&") || !output_string (name) ||
             !output_string ("_access);\n"))
         {
@@ -2876,8 +2734,8 @@ static inline enum parse_response_t process_access_delete (const char *name_begi
 
         break;
 
-    case PROCESS_QUERY_TYPE_INTERVAL_ASCENDING_DELETE:
-    case PROCESS_QUERY_TYPE_INTERVAL_DESCENDING_DELETE:
+    case QUERY_TYPE_INTERVAL_ASCENDING_DELETE:
+    case QUERY_TYPE_INTERVAL_DESCENDING_DELETE:
         if (!output_string ("kan_repository_indexed_interval_delete_access_delete (&") || !output_string (name) ||
             !output_string ("_access);\n"))
         {
@@ -2887,8 +2745,8 @@ static inline enum parse_response_t process_access_delete (const char *name_begi
 
         break;
 
-    case PROCESS_QUERY_TYPE_INTERVAL_ASCENDING_WRITE:
-    case PROCESS_QUERY_TYPE_INTERVAL_DESCENDING_WRITE:
+    case QUERY_TYPE_INTERVAL_ASCENDING_WRITE:
+    case QUERY_TYPE_INTERVAL_DESCENDING_WRITE:
         if (!output_string ("kan_repository_indexed_interval_write_access_delete (&") || !output_string (name) ||
             !output_string ("_access);\n"))
         {
@@ -2899,8 +2757,8 @@ static inline enum parse_response_t process_access_delete (const char *name_begi
         break;
     }
 
-    if (!output_string ("        ") || !output_sequence (name_begin, name_end) ||
-        !output_string ("_access_expired = KAN_TRUE;\n") || !output_use_source_line ())
+    if (!output_use_current_file_line () || !output_string ("        ") || !output_sequence (name_begin, name_end) ||
+        !output_string ("_access_expired = " OUTPUT_TRUE ";\n"))
     {
         fprintf (stderr, "Failure during output.\n");
         return PARSE_RESPONSE_FAILED;
@@ -2917,6 +2775,7 @@ static void re2c_yyskip (void)
     if (*io.cursor == '\n')
     {
         ++io.cursor_line;
+        ++io.current_file_line;
         io.cursor_symbol = 0u;
     }
 
@@ -2929,6 +2788,7 @@ static void re2c_yybackup (void)
     io.marker = io.cursor;
     io.marker_line = io.cursor_line;
     io.marker_symbol = io.cursor_symbol;
+    io.marker_current_file_line = io.current_file_line;
 }
 
 static void re2c_yyrestore (void)
@@ -2936,6 +2796,7 @@ static void re2c_yyrestore (void)
     io.cursor = io.marker;
     io.cursor_line = io.marker_line;
     io.cursor_symbol = io.marker_symbol;
+    io.current_file_line = io.marker_current_file_line;
 }
 
 // Define re2c api.
@@ -2961,91 +2822,185 @@ static void re2c_yyrestore (void)
 // Define common matches.
 /*!re2c
  separator = [\x20\x0c\x0a\x0d\x09\x0b];
+ separator_no_nl = [\x20\x0c\x0d\x09\x0b];
+ separators_till_nl = [\x20\x0c\x0d\x09\x0b]* [\x0a];
  any_preprocessor = "#" ((.+) | (.*"\\\n") | (.*"\\\r\n"))*;
- comments = ("//".+) | ("/""*" (((. \ [\x2a]) | "\n")+ "*" (. \ [\x2f]))* ((. \ [\x2a]) | "\n")+ "*""/");
  */
 
 // Define common rules.
 /*!rules:re2c:error_on_unknown
  *
  {
-     fprintf (stderr, "Error. [%ld:%ld]: Unable to parse next token. Parser: %s. Symbol code: 0x%x.\n",
-              (long) io.cursor_line, (long) io.cursor_symbol, __func__, (int) *io.cursor);
-     return PARSE_RESPONSE_FAILED;
+     fprintf (stderr, "[%s:%ld:%ld]: Unable to parse next token. Parser: %s. Symbol code: 0x%x.\n",
+              io.current_file_path.path, (long) io.current_file_line, (long) io.cursor_symbol, __func__, (int)
+ *io.cursor); return PARSE_RESPONSE_FAILED;
  }
 */
 
-// Scan phase.
+// Input processor. Works for both scan and output phases.
 
-static enum parse_response_t scan_phase_main (void);
-static enum parse_response_t scan_phase_generate_state_queries (void);
-static enum parse_response_t scan_phase_bind_state (void);
-static enum parse_response_t scan_phase_singleton (enum singleton_access_type_t access_type);
-static enum parse_response_t scan_phase_indexed_insert (void);
-static enum parse_response_t scan_phase_sequence (enum indexed_access_type_t access_type);
-static enum parse_response_t scan_phase_value (enum indexed_access_type_t access_type);
-static enum parse_response_t scan_phase_signal (enum indexed_access_type_t access_type);
-static enum parse_response_t scan_phase_interval (enum indexed_access_type_t access_type);
-static enum parse_response_t scan_phase_event_insert (void);
-static enum parse_response_t scan_phase_event_fetch (void);
+static enum parse_response_t process_input_main (void);
+static void process_input_enter_file (const char *file_begin,
+                                      const char *file_end,
+                                      const char *line_begin,
+                                      const char *line_end);
+static enum parse_response_t process_input_generate_state_queries (void);
+static enum parse_response_t process_input_bind_state (void);
+static enum parse_response_t process_input_singleton (enum singleton_access_type_t access_type);
+static enum parse_response_t process_input_indexed_insert (void);
+static enum parse_response_t process_input_sequence (enum indexed_access_type_t access_type);
+static enum parse_response_t process_input_value (enum indexed_access_type_t access_type);
+static enum parse_response_t process_input_signal (enum indexed_access_type_t access_type);
+static enum parse_response_t process_input_interval (enum indexed_access_type_t access_type, kan_bool_t ascending);
+static enum parse_response_t process_input_event_insert (void);
+static enum parse_response_t process_input_event_fetch (void);
+static enum parse_response_t process_input_block_enter (void);
+static enum parse_response_t process_input_block_exit (void);
+static enum parse_response_t process_input_query_break (void);
+static enum parse_response_t process_input_query_continue (void);
+static enum parse_response_t process_input_return_void (void);
+static enum parse_response_t process_input_mutator_return (void);
+static enum parse_response_t process_input_return_value (void);
+static enum parse_response_t process_input_access_escape (void);
+static enum parse_response_t process_input_access_delete (void);
 
-static enum parse_response_t scan_phase_main (void)
+static enum parse_response_t process_input_main (void)
 {
     while (KAN_TRUE)
     {
         io.token = io.cursor;
-        /*!re2c
-         "KAN_UP_GENERATE_STATE_QUERIES" separator* "(" { return scan_phase_generate_state_queries (); }
-         "KAN_UP_BIND_STATE" separator* "(" { return scan_phase_bind_state (); }
-         "KAN_UP_SINGLETON_READ" separator* "(" { return scan_phase_singleton (SINGLETON_ACCESS_TYPE_READ); }
-         "KAN_UP_SINGLETON_WRITE" separator* "(" { return scan_phase_singleton (SINGLETON_ACCESS_TYPE_WRITE); }
-         "KAN_UP_INDEXED_INSERT" separator* "(" { return scan_phase_indexed_insert (); }
-         "KAN_UP_SEQUENCE_READ" separator* "(" { return scan_phase_sequence (INDEXED_ACCESS_TYPE_READ); }
-         "KAN_UP_SEQUENCE_UPDATE" separator* "(" { return scan_phase_sequence (INDEXED_ACCESS_TYPE_UPDATE); }
-         "KAN_UP_SEQUENCE_DELETE" separator* "(" { return scan_phase_sequence (INDEXED_ACCESS_TYPE_DELETE); }
-         "KAN_UP_SEQUENCE_WRITE" separator* "(" { return scan_phase_sequence (INDEXED_ACCESS_TYPE_WRITE); }
-         "KAN_UP_VALUE_READ" separator* "(" { return scan_phase_value (INDEXED_ACCESS_TYPE_READ); }
-         "KAN_UP_VALUE_UPDATE" separator* "(" { return scan_phase_value (INDEXED_ACCESS_TYPE_UPDATE); }
-         "KAN_UP_VALUE_DELETE" separator* "(" { return scan_phase_value (INDEXED_ACCESS_TYPE_DELETE); }
-         "KAN_UP_VALUE_WRITE" separator* "(" { return scan_phase_value (INDEXED_ACCESS_TYPE_WRITE); }
-         "KAN_UP_SIGNAL_READ" separator* "(" { return scan_phase_signal (INDEXED_ACCESS_TYPE_READ); }
-         "KAN_UP_SIGNAL_UPDATE" separator* "(" { return scan_phase_signal (INDEXED_ACCESS_TYPE_UPDATE); }
-         "KAN_UP_SIGNAL_DELETE" separator* "(" { return scan_phase_signal (INDEXED_ACCESS_TYPE_DELETE); }
-         "KAN_UP_SIGNAL_WRITE" separator* "(" { return scan_phase_signal (INDEXED_ACCESS_TYPE_WRITE); }
-         "KAN_UP_INTERVAL_ASCENDING_READ" separator* "(" { return scan_phase_interval (INDEXED_ACCESS_TYPE_READ); }
-         "KAN_UP_INTERVAL_ASCENDING_UPDATE" separator* "(" { return scan_phase_interval (INDEXED_ACCESS_TYPE_UPDATE); }
-         "KAN_UP_INTERVAL_ASCENDING_DELETE" separator* "(" { return scan_phase_interval (INDEXED_ACCESS_TYPE_DELETE); }
-         "KAN_UP_INTERVAL_ASCENDING_WRITE" separator* "(" { return scan_phase_interval (INDEXED_ACCESS_TYPE_WRITE); }
-         "KAN_UP_INTERVAL_DESCENDING_READ" separator* "(" { return scan_phase_interval (INDEXED_ACCESS_TYPE_READ); }
-         "KAN_UP_INTERVAL_DESCENDING_UPDATE" separator* "(" { return scan_phase_interval (INDEXED_ACCESS_TYPE_UPDATE); }
-         "KAN_UP_INTERVAL_DESCENDING_DELETE" separator* "(" { return scan_phase_interval (INDEXED_ACCESS_TYPE_DELETE); }
-         "KAN_UP_INTERVAL_DESCENDING_WRITE" separator* "(" { return scan_phase_interval (INDEXED_ACCESS_TYPE_WRITE); }
-         "KAN_UP_EVENT_INSERT" separator* "(" { return scan_phase_event_insert (); }
-         "KAN_UP_EVENT_FETCH" separator* "(" { return scan_phase_event_fetch (); }
+        const char *line_begin;
+        const char *line_end;
+        const char *file_begin;
+        const char *file_end;
 
-         "KAN_UP_QUERY_BREAK" { continue; }
-         "KAN_UP_QUERY_CONTINUE" { continue; }
-         "KAN_UP_QUERY_RETURN_VOID" { continue; }
-         "KAN_UP_MUTATOR_RETURN" { continue; }
-         "KAN_UP_QUERY_RETURN_VALUE" { continue; }
-         "KAN_UP_ACCESS_ESCAPE" { continue; }
-         "KAN_UP_ACCESS_DELETE" { continue; }
+        /*!re2c
+         "#" separator* "line"? separator_no_nl+ @line_begin [0-9]+ @line_end separator_no_nl+
+         "\"" @file_begin (. \ [\x22])+ @file_end "\"" ((separator_no_nl+ [1-4])+)? separators_till_nl
+         {
+             if (io.is_output_phase)
+             {
+                 output_sequence (io.token, io.cursor);
+             }
+
+             process_input_enter_file (file_begin, file_end, line_begin, line_end);
+             continue;
+         }
+
+         "KAN_UP_GENERATE_STATE_QUERIES" separator* "(" { return process_input_generate_state_queries (); }
+
+         "KAN_UP_BIND_STATE" separator* "(" { return process_input_bind_state (); }
+
+         "KAN_UP_SINGLETON_READ" separator* "(" { return process_input_singleton (SINGLETON_ACCESS_TYPE_READ); }
+
+         "KAN_UP_SINGLETON_WRITE" separator* "(" { return process_input_singleton (SINGLETON_ACCESS_TYPE_WRITE); }
+
+         "KAN_UP_INDEXED_INSERT" separator* "(" { return process_input_indexed_insert (); }
+
+         "KAN_UP_SEQUENCE_READ" separator* "(" { return process_input_sequence (INDEXED_ACCESS_TYPE_READ); }
+
+         "KAN_UP_SEQUENCE_UPDATE" separator* "(" { return process_input_sequence (INDEXED_ACCESS_TYPE_UPDATE); }
+
+         "KAN_UP_SEQUENCE_DELETE" separator* "(" { return process_input_sequence (INDEXED_ACCESS_TYPE_DELETE); }
+
+         "KAN_UP_SEQUENCE_WRITE" separator* "(" { return process_input_sequence (INDEXED_ACCESS_TYPE_WRITE); }
+
+         "KAN_UP_VALUE_READ" separator* "(" { return process_input_value (INDEXED_ACCESS_TYPE_READ); }
+
+         "KAN_UP_VALUE_UPDATE" separator* "(" { return process_input_value (INDEXED_ACCESS_TYPE_UPDATE); }
+
+         "KAN_UP_VALUE_DELETE" separator* "(" { return process_input_value (INDEXED_ACCESS_TYPE_DELETE); }
+
+         "KAN_UP_VALUE_WRITE" separator* "(" { return process_input_value (INDEXED_ACCESS_TYPE_WRITE); }
+
+         "KAN_UP_SIGNAL_READ" separator* "(" { return process_input_signal (INDEXED_ACCESS_TYPE_READ); }
+
+         "KAN_UP_SIGNAL_UPDATE" separator* "(" { return process_input_signal (INDEXED_ACCESS_TYPE_UPDATE); }
+
+         "KAN_UP_SIGNAL_DELETE" separator* "(" { return process_input_signal (INDEXED_ACCESS_TYPE_DELETE); }
+
+         "KAN_UP_SIGNAL_WRITE" separator* "(" { return process_input_signal (INDEXED_ACCESS_TYPE_WRITE); }
+
+         "KAN_UP_INTERVAL_ASCENDING_READ" separator* "("
+         { return process_input_interval (INDEXED_ACCESS_TYPE_READ, KAN_TRUE); }
+
+         "KAN_UP_INTERVAL_ASCENDING_UPDATE" separator* "("
+         { return process_input_interval (INDEXED_ACCESS_TYPE_UPDATE, KAN_TRUE); }
+
+         "KAN_UP_INTERVAL_ASCENDING_DELETE" separator* "("
+         { return process_input_interval (INDEXED_ACCESS_TYPE_DELETE, KAN_TRUE); }
+
+         "KAN_UP_INTERVAL_ASCENDING_WRITE" separator* "("
+         { return process_input_interval (INDEXED_ACCESS_TYPE_WRITE, KAN_TRUE); }
+
+         "KAN_UP_INTERVAL_DESCENDING_READ" separator* "("
+         { return process_input_interval (INDEXED_ACCESS_TYPE_READ, KAN_FALSE); }
+
+         "KAN_UP_INTERVAL_DESCENDING_UPDATE" separator* "("
+         { return process_input_interval (INDEXED_ACCESS_TYPE_UPDATE, KAN_FALSE); }
+
+         "KAN_UP_INTERVAL_DESCENDING_DELETE" separator* "("
+         { return process_input_interval (INDEXED_ACCESS_TYPE_DELETE, KAN_FALSE); }
+
+         "KAN_UP_INTERVAL_DESCENDING_WRITE" separator* "("
+         { return process_input_interval (INDEXED_ACCESS_TYPE_WRITE, KAN_FALSE); }
+
+         "KAN_UP_EVENT_INSERT" separator* "(" { return process_input_event_insert (); }
+
+         "KAN_UP_EVENT_FETCH" separator* "(" { return process_input_event_fetch (); }
+
+         "{" { return process_input_block_enter (); }
+
+         " "* "}" (" "* "\n")? { return process_input_block_exit (); }
+
+         "KAN_UP_QUERY_BREAK" separator* ("(" separator* ")")? ";" (" "* "\n")?
+         { return process_input_query_break (); }
+
+         "KAN_UP_QUERY_CONTINUE" separator* ("(" separator* ")")? ";" (" "* "\n")?
+         { return process_input_query_continue (); }
+
+         "KAN_UP_QUERY_RETURN_VOID" separator* ("(" separator* ")")? ";" (" "* "\n")?
+         { return process_input_return_void (); }
+
+         "KAN_UP_MUTATOR_RETURN" separator* ("(" separator* ")")? ";" (" "* "\n")?
+         { return process_input_mutator_return (); }
+
+         "KAN_UP_QUERY_RETURN_VALUE" separator* "(" { return process_input_return_value (); }
+
+         "KAN_UP_ACCESS_ESCAPE" separator* "(" { return process_input_access_escape (); }
+
+         "KAN_UP_ACCESS_DELETE" separator* "(" { return process_input_access_delete (); }
 
          "KAN_UP_" [A-Za-z_]+
          {
-             fprintf (stderr, "Error. [%ld:%ld]: Unknown preprocessor macro \"%s\".\n",
-                 (long) io.cursor_line, (long) io.cursor_symbol, kan_char_sequence_intern (io.token, io.cursor));
+             fprintf (stderr, "[%s:%ld:%ld]: Unknown universe preprocessor macro \"%s\".\n",
+                 io.current_file_path.path, (long) io.current_file_line, (long) io.cursor_symbol,
+                 kan_char_sequence_intern (io.token, io.cursor));
              return PARSE_RESPONSE_FAILED;
          }
 
-         comments { continue; }
-         * { continue; }
+         * { if (io.is_output_phase) { output_sequence (io.token, io.cursor); } continue; }
          $ { return PARSE_RESPONSE_FINISHED; }
          */
     }
 }
 
-static enum parse_response_t scan_phase_generate_state_queries (void)
+static void process_input_enter_file (const char *file_begin,
+                                      const char *file_end,
+                                      const char *line_begin,
+                                      const char *line_end)
+{
+    kan_file_system_path_container_copy_char_sequence (&io.current_file_path, file_begin, file_end);
+    io.current_file_line = 0u;
+    while (line_begin < line_end)
+    {
+        KAN_ASSERT (*line_begin >= '0' && *line_begin <= '9')
+        io.current_file_line = io.current_file_line * 10u + *line_begin - '0';
+        ++line_begin;
+    }
+}
+
+static enum parse_response_t process_input_generate_state_queries (void)
 {
     while (KAN_TRUE)
     {
@@ -3057,9 +3012,17 @@ static enum parse_response_t scan_phase_generate_state_queries (void)
          !use:error_on_unknown;
 
          separator* @name_begin [A-Za-z_][A-Za-z0-9_]* @name_end separator* ")"
+         (" "* "\n")?
          {
-             return scan_generate_state_queries (name_begin, name_end) ?
-                 PARSE_RESPONSE_BLOCK_PROCESSED : PARSE_RESPONSE_FAILED;
+             if (!io.is_output_phase)
+             {
+                 return scan_generate_state_queries (name_begin, name_end) ?
+                     PARSE_RESPONSE_BLOCK_PROCESSED : PARSE_RESPONSE_FAILED;
+             }
+             else
+             {
+                 return output_generate_state_queries (name_begin, name_end);
+             }
          }
 
          $
@@ -3071,7 +3034,7 @@ static enum parse_response_t scan_phase_generate_state_queries (void)
     }
 }
 
-static enum parse_response_t scan_phase_bind_state (void)
+static enum parse_response_t process_input_bind_state (void)
 {
     while (KAN_TRUE)
     {
@@ -3086,9 +3049,17 @@ static enum parse_response_t scan_phase_bind_state (void)
 
          separator* @name_begin [A-Za-z_][A-Za-z0-9_]* @name_end separator* ","
          separator* @path_begin ("&" | "*" | [A-Za-z0-9_] | "->" | ".")+ @path_end separator* ")"
+         (" "* "\n")?
          {
-             return scan_bind_state (name_begin, name_end, path_begin, path_end) ?
-                 PARSE_RESPONSE_BLOCK_PROCESSED : PARSE_RESPONSE_FAILED;
+             if (!io.is_output_phase)
+             {
+                 return scan_bind_state (name_begin, name_end, path_begin, path_end) ?
+                     PARSE_RESPONSE_BLOCK_PROCESSED : PARSE_RESPONSE_FAILED;
+             }
+             else
+             {
+                 return output_bind_state (name_begin, name_end, path_begin, path_end);
+             }
          }
 
          $
@@ -3100,7 +3071,7 @@ static enum parse_response_t scan_phase_bind_state (void)
     }
 }
 
-static enum parse_response_t scan_phase_singleton (enum singleton_access_type_t access_type)
+static enum parse_response_t process_input_singleton (enum singleton_access_type_t access_type)
 {
     while (KAN_TRUE)
     {
@@ -3115,9 +3086,27 @@ static enum parse_response_t scan_phase_singleton (enum singleton_access_type_t 
 
          separator* @name_begin [A-Za-z_][A-Za-z0-9_]* @name_end separator* ","
          separator* @type_begin [A-Za-z_][A-Za-z0-9_]* @type_end separator* ")"
+         (" "* "\n")?
          {
-             return scan_singleton (name_begin, name_end, access_type, type_begin, type_end) ?
-                 PARSE_RESPONSE_BLOCK_PROCESSED : PARSE_RESPONSE_FAILED;
+             if (!io.is_output_phase)
+             {
+                 return scan_singleton (name_begin, name_end, access_type, type_begin, type_end) ?
+                     PARSE_RESPONSE_BLOCK_PROCESSED : PARSE_RESPONSE_FAILED;
+             }
+             else
+             {
+                 switch (access_type)
+                 {
+                 case SINGLETON_ACCESS_TYPE_READ:
+                     return output_singleton_read (name_begin, name_end, type_begin, type_end);
+
+                 case SINGLETON_ACCESS_TYPE_WRITE:
+                     return output_singleton_write (name_begin, name_end, type_begin, type_end);
+                 }
+
+                 KAN_ASSERT (KAN_FALSE)
+                 return PARSE_RESPONSE_FAILED;
+             }
          }
 
          $
@@ -3129,7 +3118,7 @@ static enum parse_response_t scan_phase_singleton (enum singleton_access_type_t 
     }
 }
 
-static enum parse_response_t scan_phase_indexed_insert (void)
+static enum parse_response_t process_input_indexed_insert (void)
 {
     while (KAN_TRUE)
     {
@@ -3142,24 +3131,31 @@ static enum parse_response_t scan_phase_indexed_insert (void)
         /*!re2c
          !use:error_on_unknown;
 
-        separator* @name_begin [A-Za-z_][A-Za-z0-9_]* @name_end separator* ","
-        separator* @type_begin [A-Za-z_][A-Za-z0-9_]* @type_end separator* ")"
-        separator* "{"
-        {
-            return scan_indexed_insert (name_begin, name_end, type_begin, type_end) ?
-                       PARSE_RESPONSE_BLOCK_PROCESSED : PARSE_RESPONSE_FAILED;
-        }
+         separator* @name_begin [A-Za-z_][A-Za-z0-9_]* @name_end separator* ","
+         separator* @type_begin [A-Za-z_][A-Za-z0-9_]* @type_end separator* ")"
+         (" "* "\n")?
+         {
+             if (!io.is_output_phase)
+             {
+                 return scan_indexed_insert (name_begin, name_end, type_begin, type_end) ?
+                     PARSE_RESPONSE_BLOCK_PROCESSED : PARSE_RESPONSE_FAILED;
+             }
+             else
+             {
+                 return output_indexed_insert (name_begin, name_end, type_begin, type_end);
+             }
+         }
 
-        $
-        {
-            fprintf (stderr, "Error. Reached end of file while scanning indexed insert macro.");
-            return PARSE_RESPONSE_FAILED;
-        }
-        */
+         $
+         {
+             fprintf (stderr, "Error. Reached end of file while scanning indexed insert macro.");
+             return PARSE_RESPONSE_FAILED;
+         }
+         */
     }
 }
 
-static enum parse_response_t scan_phase_sequence (enum indexed_access_type_t access_type)
+static enum parse_response_t process_input_sequence (enum indexed_access_type_t access_type)
 {
     while (KAN_TRUE)
     {
@@ -3174,10 +3170,33 @@ static enum parse_response_t scan_phase_sequence (enum indexed_access_type_t acc
 
          separator* @name_begin [A-Za-z_][A-Za-z0-9_]* @name_end separator* ","
          separator* @type_begin [A-Za-z_][A-Za-z0-9_]* @type_end separator* separator* ")"
-         separator* "{"
+         (" "* "\n")?
          {
-             return scan_sequence (name_begin, name_end, access_type, type_begin, type_end) ?
-                 PARSE_RESPONSE_BLOCK_PROCESSED : PARSE_RESPONSE_FAILED;
+             if (!io.is_output_phase)
+             {
+                 return scan_sequence (name_begin, name_end, access_type, type_begin, type_end) ?
+                     PARSE_RESPONSE_BLOCK_PROCESSED : PARSE_RESPONSE_FAILED;
+             }
+             else
+             {
+                 switch (access_type)
+                 {
+                 case INDEXED_ACCESS_TYPE_READ:
+                     return output_sequence_read (name_begin, name_end, type_begin, type_end);
+
+                 case INDEXED_ACCESS_TYPE_UPDATE:
+                     return output_sequence_update (name_begin, name_end, type_begin, type_end);
+
+                 case INDEXED_ACCESS_TYPE_DELETE:
+                     return output_sequence_delete (name_begin, name_end, type_begin, type_end);
+
+                 case INDEXED_ACCESS_TYPE_WRITE:
+                     return output_sequence_write (name_begin, name_end, type_begin, type_end);
+                 }
+
+                 KAN_ASSERT (KAN_FALSE)
+                 return PARSE_RESPONSE_FAILED;
+             }
          }
 
          $
@@ -3189,7 +3208,7 @@ static enum parse_response_t scan_phase_sequence (enum indexed_access_type_t acc
     }
 }
 
-static enum parse_response_t scan_phase_value (enum indexed_access_type_t access_type)
+static enum parse_response_t process_input_value (enum indexed_access_type_t access_type)
 {
     while (KAN_TRUE)
     {
@@ -3210,11 +3229,38 @@ static enum parse_response_t scan_phase_value (enum indexed_access_type_t access
          separator* @type_begin [A-Za-z_][A-Za-z0-9_]* @type_end separator* ","
          separator* @field_begin ([A-Za-z0-9_] | ".")+ @field_end separator* ","
          separator* @argument_begin ("&" | "*" | [A-Za-z0-9_] | "->" | ".")+ @argument_end separator* ")"
-         separator* "{"
+         (" "* "\n")?
          {
-             return scan_value (name_begin, name_end, access_type, type_begin, type_end, field_begin, field_end,
-                 argument_begin, argument_end) ?
-                 PARSE_RESPONSE_BLOCK_PROCESSED : PARSE_RESPONSE_FAILED;
+             if (!io.is_output_phase)
+             {
+                 return scan_value (name_begin, name_end, access_type, type_begin, type_end, field_begin, field_end,
+                     argument_begin, argument_end) ?
+                     PARSE_RESPONSE_BLOCK_PROCESSED : PARSE_RESPONSE_FAILED;
+             }
+             else
+             {
+                 switch (access_type)
+                 {
+                 case INDEXED_ACCESS_TYPE_READ:
+                     return output_value_read (name_begin, name_end, type_begin, type_end, field_begin, field_end,
+                                               argument_begin, argument_end);
+
+                 case INDEXED_ACCESS_TYPE_UPDATE:
+                     return output_value_update (name_begin, name_end, type_begin, type_end, field_begin, field_end,
+                                                 argument_begin, argument_end);
+
+                 case INDEXED_ACCESS_TYPE_DELETE:
+                     return output_value_delete (name_begin, name_end, type_begin, type_end, field_begin, field_end,
+                                                 argument_begin, argument_end);
+
+                 case INDEXED_ACCESS_TYPE_WRITE:
+                     return output_value_write (name_begin, name_end, type_begin, type_end, field_begin, field_end,
+                                                argument_begin, argument_end);
+                 }
+
+                 KAN_ASSERT (KAN_FALSE)
+                 return PARSE_RESPONSE_FAILED;
+             }
          }
 
          $
@@ -3226,7 +3272,7 @@ static enum parse_response_t scan_phase_value (enum indexed_access_type_t access
     }
 }
 
-static enum parse_response_t scan_phase_signal (enum indexed_access_type_t access_type)
+static enum parse_response_t process_input_signal (enum indexed_access_type_t access_type)
 {
     while (KAN_TRUE)
     {
@@ -3247,11 +3293,38 @@ static enum parse_response_t scan_phase_signal (enum indexed_access_type_t acces
          separator* @type_begin [A-Za-z_][A-Za-z0-9_]* @type_end separator* ","
          separator* @field_begin ([A-Za-z0-9_] | ".")+ @field_end separator* ","
          separator* @value_begin [0-9]+ @value_end separator* ")"
-         separator* "{"
+         (" "* "\n")?
          {
-             return scan_signal (name_begin, name_end, access_type, type_begin, type_end, field_begin, field_end,
-                 value_begin, value_end) ?
-                 PARSE_RESPONSE_BLOCK_PROCESSED : PARSE_RESPONSE_FAILED;
+             if (!io.is_output_phase)
+             {
+                 return scan_signal (name_begin, name_end, access_type, type_begin, type_end, field_begin, field_end,
+                     value_begin, value_end) ?
+                     PARSE_RESPONSE_BLOCK_PROCESSED : PARSE_RESPONSE_FAILED;
+             }
+             else
+             {
+                 switch (access_type)
+                 {
+                 case INDEXED_ACCESS_TYPE_READ:
+                     return output_signal_read (name_begin, name_end, type_begin, type_end, field_begin, field_end,
+                                                value_begin, value_end);
+
+                 case INDEXED_ACCESS_TYPE_UPDATE:
+                     return output_signal_update (name_begin, name_end, type_begin, type_end, field_begin, field_end,
+                                                  value_begin, value_end);
+
+                 case INDEXED_ACCESS_TYPE_DELETE:
+                     return output_signal_delete (name_begin, name_end, type_begin, type_end, field_begin, field_end,
+                                                  value_begin, value_end);
+
+                 case INDEXED_ACCESS_TYPE_WRITE:
+                     return output_signal_write (name_begin, name_end, type_begin, type_end, field_begin, field_end,
+                                                 value_begin, value_end);
+                 }
+
+                 KAN_ASSERT (KAN_FALSE)
+                 return PARSE_RESPONSE_FAILED;
+             }
          }
 
          $
@@ -3263,7 +3336,7 @@ static enum parse_response_t scan_phase_signal (enum indexed_access_type_t acces
     }
 }
 
-static enum parse_response_t scan_phase_interval (enum indexed_access_type_t access_type)
+static enum parse_response_t process_input_interval (enum indexed_access_type_t access_type, kan_bool_t ascending)
 {
     while (KAN_TRUE)
     {
@@ -3285,13 +3358,46 @@ static enum parse_response_t scan_phase_interval (enum indexed_access_type_t acc
          separator* @name_begin [A-Za-z_][A-Za-z0-9_]* @name_end separator* ","
          separator* @type_begin [A-Za-z_][A-Za-z0-9_]* @type_end separator* ","
          separator* @field_begin ([A-Za-z0-9_] | ".")+ @field_end separator* ","
-         separator* @argument_min_begin ("&" | "*" | [A-Za-z0-9_] | "->" | ".")+ @argument_min_end separator* ","
-         separator* @argument_max_begin ("&" | "*" | [A-Za-z0-9_] | "->" | ".")+ @argument_max_end separator* ")"
-         separator* "{"
+         separator* @argument_min_begin ("&" | "*" | [A-Za-z0-9_] | "->" | "." | "((void *) 0)")+ @argument_min_end
+         separator* ","
+         separator* @argument_max_begin ("&" | "*" | [A-Za-z0-9_] | "->" | "." | "((void *) 0)")+ @argument_max_end
+         separator* ")"
+         (" "* "\n")?
          {
-             return scan_interval (name_begin, name_end, access_type, type_begin, type_end, field_begin, field_end,
-                 argument_min_begin, argument_min_end, argument_max_begin, argument_max_end) ?
-                 PARSE_RESPONSE_BLOCK_PROCESSED : PARSE_RESPONSE_FAILED;
+             if (!io.is_output_phase)
+             {
+                 return scan_interval (name_begin, name_end, access_type, type_begin, type_end, field_begin, field_end,
+                     argument_min_begin, argument_min_end, argument_max_begin, argument_max_end) ?
+                     PARSE_RESPONSE_BLOCK_PROCESSED : PARSE_RESPONSE_FAILED;
+             }
+             else
+             {
+                 switch (access_type)
+                 {
+                 case INDEXED_ACCESS_TYPE_READ:
+                     return output_interval_read (name_begin, name_end, type_begin, type_end, field_begin, field_end,
+                                                  ascending, argument_min_begin, argument_min_end, argument_max_begin,
+                                                  argument_max_end);
+
+                 case INDEXED_ACCESS_TYPE_UPDATE:
+                     return output_interval_update (name_begin, name_end, type_begin, type_end, field_begin, field_end,
+                                                    ascending, argument_min_begin, argument_min_end, argument_max_begin,
+                                                    argument_max_end);
+
+                 case INDEXED_ACCESS_TYPE_DELETE:
+                     return output_interval_delete (name_begin, name_end, type_begin, type_end, field_begin, field_end,
+                                                    ascending, argument_min_begin, argument_min_end, argument_max_begin,
+                                                    argument_max_end);
+
+                 case INDEXED_ACCESS_TYPE_WRITE:
+                     return output_interval_write (name_begin, name_end, type_begin, type_end, field_begin, field_end,
+                                                   ascending, argument_min_begin, argument_min_end, argument_max_begin,
+                                                   argument_max_end);
+                 }
+
+                 KAN_ASSERT (KAN_FALSE)
+                 return PARSE_RESPONSE_FAILED;
+             }
          }
 
          $
@@ -3303,7 +3409,7 @@ static enum parse_response_t scan_phase_interval (enum indexed_access_type_t acc
     }
 }
 
-static enum parse_response_t scan_phase_event_insert (void)
+static enum parse_response_t process_input_event_insert (void)
 {
     while (KAN_TRUE)
     {
@@ -3318,10 +3424,17 @@ static enum parse_response_t scan_phase_event_insert (void)
 
          separator* @name_begin [A-Za-z_][A-Za-z0-9_]* @name_end separator* ","
          separator* @type_begin [A-Za-z_][A-Za-z0-9_]* @type_end separator* ")"
-         separator* "{"
+         (" "* "\n")?
          {
-             return scan_event_insert (name_begin, name_end, type_begin, type_end) ?
-                 PARSE_RESPONSE_BLOCK_PROCESSED : PARSE_RESPONSE_FAILED;
+             if (!io.is_output_phase)
+             {
+                 return scan_event_insert (name_begin, name_end, type_begin, type_end) ?
+                     PARSE_RESPONSE_BLOCK_PROCESSED : PARSE_RESPONSE_FAILED;
+             }
+             else
+             {
+                 return output_event_insert (name_begin, name_end, type_begin, type_end);
+             }
          }
 
          $
@@ -3333,7 +3446,7 @@ static enum parse_response_t scan_phase_event_insert (void)
     }
 }
 
-static enum parse_response_t scan_phase_event_fetch (void)
+static enum parse_response_t process_input_event_fetch (void)
 {
     while (KAN_TRUE)
     {
@@ -3346,337 +3459,193 @@ static enum parse_response_t scan_phase_event_fetch (void)
         /*!re2c
          !use:error_on_unknown;
 
-        separator* @name_begin [A-Za-z_][A-Za-z0-9_]* @name_end separator* ","
-        separator* @type_begin [A-Za-z_][A-Za-z0-9_]* @type_end separator* ")"
-        separator* "{"
-        {
-            return scan_event_fetch (name_begin, name_end, type_begin, type_end) ?
-                       PARSE_RESPONSE_BLOCK_PROCESSED : PARSE_RESPONSE_FAILED;
-        }
+         separator* @name_begin [A-Za-z_][A-Za-z0-9_]* @name_end separator* ","
+         separator* @type_begin [A-Za-z_][A-Za-z0-9_]* @type_end separator* ")"
+         (" "* "\n")?
+         {
+             if (!io.is_output_phase)
+             {
+                 return scan_event_fetch (name_begin, name_end, type_begin, type_end) ?
+                     PARSE_RESPONSE_BLOCK_PROCESSED : PARSE_RESPONSE_FAILED;
+             }
+             else
+             {
+                 return output_event_fetch (name_begin, name_end, type_begin, type_end);
+             }
+         }
 
-        $
-        {
-            fprintf (stderr, "Error. Reached end of file while scanning event insert macro.");
-            return PARSE_RESPONSE_FAILED;
-        }
-        */
+         $
+         {
+             fprintf (stderr, "Error. Reached end of file while scanning event insert macro.");
+             return PARSE_RESPONSE_FAILED;
+         }
+         */
     }
 }
 
-// Process phase.
-
-static enum parse_response_t process_phase_main (void);
-
-static enum parse_response_t process_phase_main (void)
+static enum parse_response_t process_input_block_enter (void)
 {
-    // We can be a little bit more lazy here with error handling as
-    // scan pass already happened and it has checked syntax,
+    if (!io.is_output_phase)
+    {
+        // No need to worry anymore, new block is found.
+        io.scan_expects_new_block_for_query = KAN_FALSE;
+        return PARSE_RESPONSE_BLOCK_PROCESSED;
+    }
 
+    return output_block_enter ();
+}
+
+static enum parse_response_t process_input_block_exit (void)
+{
+    if (!io.is_output_phase)
+    {
+        return PARSE_RESPONSE_BLOCK_PROCESSED;
+    }
+
+    return output_block_exit ();
+}
+
+static enum parse_response_t process_input_query_break (void)
+{
+    if (!io.is_output_phase)
+    {
+        return PARSE_RESPONSE_BLOCK_PROCESSED;
+    }
+
+    return output_query_break ();
+}
+
+static enum parse_response_t process_input_query_continue (void)
+{
+    if (!io.is_output_phase)
+    {
+        return PARSE_RESPONSE_BLOCK_PROCESSED;
+    }
+
+    return output_query_continue ();
+}
+
+static enum parse_response_t process_input_return_void (void)
+{
+    if (!io.is_output_phase)
+    {
+        return PARSE_RESPONSE_BLOCK_PROCESSED;
+    }
+
+    return output_query_return_void ();
+}
+
+static enum parse_response_t process_input_mutator_return (void)
+{
+    if (!io.is_output_phase)
+    {
+        return PARSE_RESPONSE_BLOCK_PROCESSED;
+    }
+
+    return output_mutator_return ();
+}
+
+static enum parse_response_t process_input_return_value (void)
+{
+    while (KAN_TRUE)
+    {
+        const char *type_begin;
+        const char *type_end;
+        const char *argument_begin;
+        const char *argument_end;
+
+        io.token = io.cursor;
+        /*!re2c
+         !use:error_on_unknown;
+
+         separator* @type_begin (("enum" | "struct") separator+)? [A-Za-z_][A-Za-z0-9_]* @type_end separator* ","
+         separator* @argument_begin ("&" | "*" | [A-Za-z0-9_+-/] | "->" | "." | "," | "(" | ")")+ @argument_end
+         separator* ");" (" "* "\n")?
+         {
+             if (!io.is_output_phase)
+             {
+                 return PARSE_RESPONSE_BLOCK_PROCESSED;
+             }
+             else
+             {
+                 return output_query_return_value (type_begin, type_end, argument_begin, argument_end);
+             }
+         }
+
+         $
+         {
+             fprintf (stderr, "Error. Reached end of file while scanning event insert macro.");
+             return PARSE_RESPONSE_FAILED;
+         }
+         */
+    }
+}
+
+static enum parse_response_t process_input_access_escape (void)
+{
+    while (KAN_TRUE)
+    {
+        const char *argument_begin;
+        const char *argument_end;
+        const char *name_begin;
+        const char *name_end;
+
+        io.token = io.cursor;
+        /*!re2c
+         !use:error_on_unknown;
+
+         separator* @argument_begin ("&" | "*" | [A-Za-z0-9_] | "->" | ".")+ @argument_end separator* ","
+         separator* @name_begin [A-Za-z_][A-Za-z0-9_]* @name_end separator* ");"
+         (" "* "\n")?
+         {
+             if (!io.is_output_phase)
+             {
+                 return PARSE_RESPONSE_BLOCK_PROCESSED;
+             }
+             else
+             {
+                 return output_access_escape (argument_begin, argument_end, name_begin, name_end);
+             }
+         }
+
+         $
+         {
+             fprintf (stderr, "Error. Reached end of file while scanning event insert macro.");
+             return PARSE_RESPONSE_FAILED;
+         }
+         */
+    }
+}
+
+static enum parse_response_t process_input_access_delete (void)
+{
     while (KAN_TRUE)
     {
         const char *name_begin;
         const char *name_end;
-        const char *path_begin;
-        const char *path_end;
-        const char *type_begin;
-        const char *type_end;
-        const char *field_begin;
-        const char *field_end;
-        const char *argument_begin;
-        const char *argument_end;
-        const char *argument_min_begin;
-        const char *argument_min_end;
-        const char *argument_max_begin;
-        const char *argument_max_end;
 
         io.token = io.cursor;
         /*!re2c
-         "KAN_UP_GENERATE_STATE_QUERIES" separator* "("
-         separator* @name_begin [A-Za-z_][A-Za-z0-9_]* @name_end separator* ")"
-         (" "* "\n")?
-         { return process_generate_state_queries (name_begin, name_end); }
+         !use:error_on_unknown;
 
-         "KAN_UP_BIND_STATE" separator* "("
-         separator* @name_begin [A-Za-z_][A-Za-z0-9_]* @name_end separator* ","
-         separator* @path_begin ("&" | "*" | [A-Za-z0-9_] | "->" | ".")+ @path_end separator* ")"
-         (" "* "\n")?
-         { return process_bind_state (name_begin, name_end, path_begin, path_end); }
-
-         "KAN_UP_SINGLETON_READ" separator* "("
-         separator* @name_begin [A-Za-z_][A-Za-z0-9_]* @name_end separator* ","
-         separator* @type_begin [A-Za-z_][A-Za-z0-9_]* @type_end separator* ")"
-         (" "* "\n")?
-         { return process_singleton_read (name_begin, name_end, type_begin, type_end); }
-
-         "KAN_UP_SINGLETON_WRITE" separator* "("
-         separator* @name_begin [A-Za-z_][A-Za-z0-9_]* @name_end separator* ","
-         separator* @type_begin [A-Za-z_][A-Za-z0-9_]* @type_end separator* ")"
-         (" "* "\n")?
-         { return process_singleton_write (name_begin, name_end, type_begin, type_end); }
-
-         "KAN_UP_INDEXED_INSERT" separator* "("
-         separator* @name_begin [A-Za-z_][A-Za-z0-9_]* @name_end separator* ","
-         separator* @type_begin [A-Za-z_][A-Za-z0-9_]* @type_end separator* ")"
-         (" "* "\n")?
-         { return process_indexed_insert (name_begin, name_end, type_begin, type_end); }
-
-         "KAN_UP_SEQUENCE_READ" separator* "("
-         separator* @name_begin [A-Za-z_][A-Za-z0-9_]* @name_end separator* ","
-         separator* @type_begin [A-Za-z_][A-Za-z0-9_]* @type_end separator* separator* ")"
-         (" "* "\n")?
-         { return process_sequence_read (name_begin, name_end, type_begin, type_end); }
-
-         "KAN_UP_SEQUENCE_UPDATE" separator* "("
-         separator* @name_begin [A-Za-z_][A-Za-z0-9_]* @name_end separator* ","
-         separator* @type_begin [A-Za-z_][A-Za-z0-9_]* @type_end separator* separator* ")"
-         (" "* "\n")?
-         { return process_sequence_update (name_begin, name_end, type_begin, type_end); }
-
-         "KAN_UP_SEQUENCE_DELETE" separator* "("
-         separator* @name_begin [A-Za-z_][A-Za-z0-9_]* @name_end separator* ","
-         separator* @type_begin [A-Za-z_][A-Za-z0-9_]* @type_end separator* separator* ")"
-         (" "* "\n")?
-         { return process_sequence_delete (name_begin, name_end, type_begin, type_end); }
-
-         "KAN_UP_SEQUENCE_WRITE" separator* "("
-         separator* @name_begin [A-Za-z_][A-Za-z0-9_]* @name_end separator* ","
-         separator* @type_begin [A-Za-z_][A-Za-z0-9_]* @type_end separator* separator* ")"
-         (" "* "\n")?
-         { return process_sequence_write (name_begin, name_end, type_begin, type_end); }
-
-         "KAN_UP_VALUE_READ" separator* "("
-         separator* @name_begin [A-Za-z_][A-Za-z0-9_]* @name_end separator* ","
-         separator* @type_begin [A-Za-z_][A-Za-z0-9_]* @type_end separator* ","
-         separator* @field_begin ([A-Za-z0-9_] | ".")+ @field_end separator* ","
-         separator* @argument_begin ("&" | "*" | [A-Za-z0-9_] | "->" | ".")+ @argument_end separator* ")"
-         (" "* "\n")?
-         {
-             return process_value_read (name_begin, name_end, type_begin, type_end, field_begin, field_end,
-                 argument_begin, argument_end);
-         }
-
-         "KAN_UP_VALUE_UPDATE" separator* "("
-         separator* @name_begin [A-Za-z_][A-Za-z0-9_]* @name_end separator* ","
-         separator* @type_begin [A-Za-z_][A-Za-z0-9_]* @type_end separator* ","
-         separator* @field_begin ([A-Za-z0-9_] | ".")+ @field_end separator* ","
-         separator* @argument_begin ("&" | "*" | [A-Za-z0-9_] | "->" | ".")+ @argument_end separator* ")"
-         (" "* "\n")?
-         {
-             return process_value_update (name_begin, name_end, type_begin, type_end, field_begin, field_end,
-                 argument_begin, argument_end);
-         }
-
-         "KAN_UP_VALUE_DELETE" separator* "("
-         separator* @name_begin [A-Za-z_][A-Za-z0-9_]* @name_end separator* ","
-         separator* @type_begin [A-Za-z_][A-Za-z0-9_]* @type_end separator* ","
-         separator* @field_begin ([A-Za-z0-9_] | ".")+ @field_end separator* ","
-         separator* @argument_begin ("&" | "*" | [A-Za-z0-9_] | "->" | ".")+ @argument_end separator* ")"
-         (" "* "\n")?
-         {
-             return process_value_delete (name_begin, name_end, type_begin, type_end, field_begin, field_end,
-                 argument_begin, argument_end);
-         }
-
-         "KAN_UP_VALUE_WRITE" separator* "("
-         separator* @name_begin [A-Za-z_][A-Za-z0-9_]* @name_end separator* ","
-         separator* @type_begin [A-Za-z_][A-Za-z0-9_]* @type_end separator* ","
-         separator* @field_begin ([A-Za-z0-9_] | ".")+ @field_end separator* ","
-         separator* @argument_begin ("&" | "*" | [A-Za-z0-9_] | "->" | ".")+ @argument_end separator* ")"
-         (" "* "\n")?
-         {
-             return process_value_write (name_begin, name_end, type_begin, type_end, field_begin, field_end,
-                 argument_begin, argument_end);
-         }
-
-         "KAN_UP_SIGNAL_READ" separator* "("
-         separator* @name_begin [A-Za-z_][A-Za-z0-9_]* @name_end separator* ","
-         separator* @type_begin [A-Za-z_][A-Za-z0-9_]* @type_end separator* ","
-         separator* @field_begin ([A-Za-z0-9_] | ".")+ @field_end separator* ","
-         separator* @argument_begin [0-9]+ @argument_end separator* ")"
-         (" "* "\n")?
-         {
-             return process_signal_read (name_begin, name_end, type_begin, type_end, field_begin, field_end,
-                 argument_begin, argument_end);
-         }
-
-         "KAN_UP_SIGNAL_UPDATE" separator* "("
-         separator* @name_begin [A-Za-z_][A-Za-z0-9_]* @name_end separator* ","
-         separator* @type_begin [A-Za-z_][A-Za-z0-9_]* @type_end separator* ","
-         separator* @field_begin ([A-Za-z0-9_] | ".")+ @field_end separator* ","
-         separator* @argument_begin [0-9]+ @argument_end separator* ")"
-         (" "* "\n")?
-         {
-             return process_signal_update (name_begin, name_end, type_begin, type_end, field_begin, field_end,
-                 argument_begin, argument_end);
-         }
-
-         "KAN_UP_SIGNAL_DELETE" separator* "("
-         separator* @name_begin [A-Za-z_][A-Za-z0-9_]* @name_end separator* ","
-         separator* @type_begin [A-Za-z_][A-Za-z0-9_]* @type_end separator* ","
-         separator* @field_begin ([A-Za-z0-9_] | ".")+ @field_end separator* ","
-         separator* @argument_begin [0-9]+ @argument_end separator* ")"
-         (" "* "\n")?
-         {
-             return process_signal_delete (name_begin, name_end, type_begin, type_end, field_begin, field_end,
-                 argument_begin, argument_end);
-         }
-
-         "KAN_UP_SIGNAL_WRITE" separator* "("
-         separator* @name_begin [A-Za-z_][A-Za-z0-9_]* @name_end separator* ","
-         separator* @type_begin [A-Za-z_][A-Za-z0-9_]* @type_end separator* ","
-         separator* @field_begin ([A-Za-z0-9_] | ".")+ @field_end separator* ","
-         separator* @argument_begin [0-9]+ @argument_end separator* ")"
-         (" "* "\n")?
-         {
-             return process_signal_write (name_begin, name_end, type_begin, type_end, field_begin, field_end,
-                 argument_begin, argument_end);
-         }
-
-         "KAN_UP_INTERVAL_ASCENDING_READ" separator* "("
-         separator* @name_begin [A-Za-z_][A-Za-z0-9_]* @name_end separator* ","
-         separator* @type_begin [A-Za-z_][A-Za-z0-9_]* @type_end separator* ","
-         separator* @field_begin ([A-Za-z0-9_] | ".")+ @field_end separator* ","
-         separator* @argument_min_begin ("&" | "*" | [A-Za-z0-9_] | "->" | ".")+ @argument_min_end separator* ","
-         separator* @argument_max_begin ("&" | "*" | [A-Za-z0-9_] | "->" | ".")+ @argument_max_end separator* ")"
-         (" "* "\n")?
-         {
-             return process_interval_read (name_begin, name_end, type_begin, type_end, field_begin, field_end,
-                 KAN_TRUE, argument_min_begin, argument_min_end, argument_max_begin, argument_max_end);
-         }
-
-         "KAN_UP_INTERVAL_ASCENDING_UPDATE" separator* "("
-         separator* @name_begin [A-Za-z_][A-Za-z0-9_]* @name_end separator* ","
-         separator* @type_begin [A-Za-z_][A-Za-z0-9_]* @type_end separator* ","
-         separator* @field_begin ([A-Za-z0-9_] | ".")+ @field_end separator* ","
-         separator* @argument_min_begin ("&" | "*" | [A-Za-z0-9_] | "->" | ".")+ @argument_min_end separator* ","
-         separator* @argument_max_begin ("&" | "*" | [A-Za-z0-9_] | "->" | ".")+ @argument_max_end separator* ")"
-         (" "* "\n")?
-         {
-             return process_interval_update (name_begin, name_end, type_begin, type_end, field_begin, field_end,
-                 KAN_TRUE, argument_min_begin, argument_min_end, argument_max_begin, argument_max_end);
-         }
-
-         "KAN_UP_INTERVAL_ASCENDING_DELETE" separator* "("
-         separator* @name_begin [A-Za-z_][A-Za-z0-9_]* @name_end separator* ","
-         separator* @type_begin [A-Za-z_][A-Za-z0-9_]* @type_end separator* ","
-         separator* @field_begin ([A-Za-z0-9_] | ".")+ @field_end separator* ","
-         separator* @argument_min_begin ("&" | "*" | [A-Za-z0-9_] | "->" | ".")+ @argument_min_end separator* ","
-         separator* @argument_max_begin ("&" | "*" | [A-Za-z0-9_] | "->" | ".")+ @argument_max_end separator* ")"
-         (" "* "\n")?
-         {
-             return process_interval_delete (name_begin, name_end, type_begin, type_end, field_begin, field_end,
-                 KAN_TRUE, argument_min_begin, argument_min_end, argument_max_begin, argument_max_end);
-         }
-
-         "KAN_UP_INTERVAL_ASCENDING_WRITE" separator* "("
-         separator* @name_begin [A-Za-z_][A-Za-z0-9_]* @name_end separator* ","
-         separator* @type_begin [A-Za-z_][A-Za-z0-9_]* @type_end separator* ","
-         separator* @field_begin ([A-Za-z0-9_] | ".")+ @field_end separator* ","
-         separator* @argument_min_begin ("&" | "*" | [A-Za-z0-9_] | "->" | ".")+ @argument_min_end separator* ","
-         separator* @argument_max_begin ("&" | "*" | [A-Za-z0-9_] | "->" | ".")+ @argument_max_end separator* ")"
-         (" "* "\n")?
-         {
-             return process_interval_write (name_begin, name_end, type_begin, type_end, field_begin, field_end,
-                 KAN_TRUE, argument_min_begin, argument_min_end, argument_max_begin, argument_max_end);
-         }
-
-         "KAN_UP_INTERVAL_DESCENDING_READ" separator* "("
-         separator* @name_begin [A-Za-z_][A-Za-z0-9_]* @name_end separator* ","
-         separator* @type_begin [A-Za-z_][A-Za-z0-9_]* @type_end separator* ","
-         separator* @field_begin ([A-Za-z0-9_] | ".")+ @field_end separator* ","
-         separator* @argument_min_begin ("&" | "*" | [A-Za-z0-9_] | "->" | ".")+ @argument_min_end separator* ","
-         separator* @argument_max_begin ("&" | "*" | [A-Za-z0-9_] | "->" | ".")+ @argument_max_end separator* ")"
-         (" "* "\n")?
-         {
-             return process_interval_read (name_begin, name_end, type_begin, type_end, field_begin, field_end,
-                 KAN_FALSE, argument_min_begin, argument_min_end, argument_max_begin, argument_max_end);
-         }
-
-         "KAN_UP_INTERVAL_DESCENDING_UPDATE" separator* "("
-         separator* @name_begin [A-Za-z_][A-Za-z0-9_]* @name_end separator* ","
-         separator* @type_begin [A-Za-z_][A-Za-z0-9_]* @type_end separator* ","
-         separator* @field_begin ([A-Za-z0-9_] | ".")+ @field_end separator* ","
-         separator* @argument_min_begin ("&" | "*" | [A-Za-z0-9_] | "->" | ".")+ @argument_min_end separator* ","
-         separator* @argument_max_begin ("&" | "*" | [A-Za-z0-9_] | "->" | ".")+ @argument_max_end separator* ")"
-         (" "* "\n")?
-         {
-             return process_interval_update (name_begin, name_end, type_begin, type_end, field_begin, field_end,
-                 KAN_FALSE, argument_min_begin, argument_min_end, argument_max_begin, argument_max_end);
-         }
-
-         "KAN_UP_INTERVAL_DESCENDING_DELETE" separator* "("
-         separator* @name_begin [A-Za-z_][A-Za-z0-9_]* @name_end separator* ","
-         separator* @type_begin [A-Za-z_][A-Za-z0-9_]* @type_end separator* ","
-         separator* @field_begin ([A-Za-z0-9_] | ".")+ @field_end separator* ","
-         separator* @argument_min_begin ("&" | "*" | [A-Za-z0-9_] | "->" | ".")+ @argument_min_end separator* ","
-         separator* @argument_max_begin ("&" | "*" | [A-Za-z0-9_] | "->" | ".")+ @argument_max_end separator* ")"
-         (" "* "\n")?
-         {
-             return process_interval_delete (name_begin, name_end, type_begin, type_end, field_begin, field_end,
-                 KAN_FALSE, argument_min_begin, argument_min_end, argument_max_begin, argument_max_end);
-         }
-
-         "KAN_UP_INTERVAL_DESCENDING_WRITE" separator* "("
-         separator* @name_begin [A-Za-z_][A-Za-z0-9_]* @name_end separator* ","
-         separator* @type_begin [A-Za-z_][A-Za-z0-9_]* @type_end separator* ","
-         separator* @field_begin ([A-Za-z0-9_] | ".")+ @field_end separator* ","
-         separator* @argument_min_begin ("&" | "*" | [A-Za-z0-9_] | "->" | ".")+ @argument_min_end separator* ","
-         separator* @argument_max_begin ("&" | "*" | [A-Za-z0-9_] | "->" | ".")+ @argument_max_end separator* ")"
-         (" "* "\n")?
-         {
-             return process_interval_write (name_begin, name_end, type_begin, type_end, field_begin, field_end,
-                 KAN_FALSE, argument_min_begin, argument_min_end, argument_max_begin, argument_max_end);
-         }
-
-         "KAN_UP_EVENT_INSERT" separator* "("
-         separator* @name_begin [A-Za-z_][A-Za-z0-9_]* @name_end separator* ","
-         separator* @type_begin [A-Za-z_][A-Za-z0-9_]* @type_end separator* separator* ")"
-         (" "* "\n")?
-         { return process_event_insert (name_begin, name_end, type_begin, type_end); }
-
-         "KAN_UP_EVENT_FETCH" separator* "("
-         separator* @name_begin [A-Za-z_][A-Za-z0-9_]* @name_end separator* ","
-         separator* @type_begin [A-Za-z_][A-Za-z0-9_]* @type_end separator* separator* ")"
-         (" "* "\n")?
-         { return process_event_fetch (name_begin, name_end, type_begin, type_end); }
-
-         "{"
-         { return process_block_enter (); }
-
-         " "* "}" (" "* "\n")?
-         { return process_block_exit (); }
-
-         "KAN_UP_QUERY_BREAK" separator* ("(" separator* ")")? ";" (" "* "\n")?
-         { return process_query_break (); }
-
-         "KAN_UP_QUERY_CONTINUE" separator* ("(" separator* ")")? ";" (" "* "\n")?
-         { return process_query_continue (); }
-
-         "KAN_UP_QUERY_RETURN_VOID" separator* ("(" separator* ")")? ";" (" "* "\n")?
-         { return process_query_return_void (); }
-
-         "KAN_UP_MUTATOR_RETURN" separator* ("(" separator* ")")? ";" (" "* "\n")?
-         { return process_mutator_return (); }
-
-         "KAN_UP_QUERY_RETURN_VALUE" separator* "("
-         separator* @type_begin [A-Za-z_][A-Za-z0-9_]* @type_end separator* ","
-         separator* @argument_begin ("&" | "*" | [A-Za-z0-9_+-/] | "->" | "." | "," | "(" | ")")+ @argument_end
-         separator* ");" (" "* "\n")?
-         { return process_query_return_value (type_begin, type_end, argument_begin, argument_end); }
-
-         "KAN_UP_ACCESS_ESCAPE" separator* "("
-         separator* @argument_begin ("&" | "*" | [A-Za-z0-9_] | "->" | ".")+ @argument_end separator* ","
          separator* @name_begin [A-Za-z_][A-Za-z0-9_]* @name_end separator* ");"
          (" "* "\n")?
-         { return process_access_escape (argument_begin, argument_end, name_begin, name_end); }
+         {
+             if (!io.is_output_phase)
+             {
+                 return PARSE_RESPONSE_BLOCK_PROCESSED;
+             }
+             else
+             {
+                 return output_access_delete (name_begin, name_end);
+             }
+         }
 
-         "KAN_UP_ACCESS_DELETE" separator* "("
-         separator* @name_begin [A-Za-z_][A-Za-z0-9_]* @name_end separator* ");"
-         (" "* "\n")?
-         { return process_access_delete (name_begin, name_end); }
-
-         * { output_sequence (io.token, io.cursor); continue; }
-         $ { return PARSE_RESPONSE_FINISHED; }
+         $
+         {
+             fprintf (stderr, "Error. Reached end of file while scanning event insert macro.");
+             return PARSE_RESPONSE_FAILED;
+         }
          */
     }
 }
@@ -3686,24 +3655,24 @@ static enum parse_response_t process_phase_main (void)
 static kan_bool_t perform_scan_phase (void)
 {
     enum parse_response_t response;
+    io.is_output_phase = KAN_FALSE;
+    io.scan_expects_new_block_for_query = KAN_FALSE;
 
-    while ((response = scan_phase_main ()) == PARSE_RESPONSE_BLOCK_PROCESSED)
+    while ((response = process_input_main ()) == PARSE_RESPONSE_BLOCK_PROCESSED)
     {
     }
 
     return response == PARSE_RESPONSE_FINISHED;
 }
 
-static kan_bool_t perform_process_phase (void)
+static kan_bool_t perform_output_phase (void)
 {
     process.allocation_group = kan_allocation_group_get_child (kan_allocation_group_root (), "process");
-    if (!output_string ("#include <kan/api_common/mute_warnings.h>\n\n") || !output_use_source_line ())
-    {
-        return KAN_FALSE;
-    }
-
+    io.is_output_phase = KAN_TRUE;
+    io.scan_expects_new_block_for_query = KAN_FALSE;
     enum parse_response_t response;
-    while ((response = process_phase_main ()) == PARSE_RESPONSE_BLOCK_PROCESSED)
+
+    while ((response = process_input_main ()) == PARSE_RESPONSE_BLOCK_PROCESSED)
     {
     }
 
@@ -3735,10 +3704,11 @@ int main (int argument_count, char **arguments_array)
     scan_init ();
     if (!perform_scan_phase ())
     {
-        fprintf (stderr, "Scan phase failed, exiting...\n");
+        fprintf (stderr, "Scan phase failed, parser stopped at [%s:%ld:%ld].\n", arguments.input_file_path,
+                 (long) io.cursor_line, (long) io.cursor_symbol);
         io.input_stream->operations->close (io.input_stream);
         scan_shutdown ();
-        return RETURN_CODE_PARSE_FAILED;
+        return RETURN_CODE_SCAN_FAILED;
     }
 
     io.input_stream->operations->seek (io.input_stream, KAN_STREAM_SEEK_START, 0u);
@@ -3755,13 +3725,14 @@ int main (int argument_count, char **arguments_array)
     io.output_stream =
         kan_random_access_stream_buffer_open_for_write (io.output_stream, KAN_UNIVERSE_PREPROCESSOR_OUTPUT_BUFFER_SIZE);
 
-    if (!perform_process_phase ())
+    if (!perform_output_phase ())
     {
-        fprintf (stderr, "Process phase failed, exiting...\n");
+        fprintf (stderr, "Output phase failed, parser stopped at [%s:%ld:%ld].\n", arguments.input_file_path,
+                 (long) io.cursor_line, (long) io.cursor_symbol);
         io.input_stream->operations->close (io.input_stream);
         io.output_stream->operations->close (io.output_stream);
         scan_shutdown ();
-        return RETURN_CODE_PROCESS_FAILED;
+        return RETURN_CODE_OUTPUT_FAILED;
     }
 
     io.input_stream->operations->close (io.input_stream);

@@ -9,3 +9,6 @@ build
 
 # Code hot reload test world.
 **/optional/verify_code_hot_reload.rd
+
+# Generated source files that are generated as inputs for preprocessing queue and therefore must be in source tree.
+*.generated.c

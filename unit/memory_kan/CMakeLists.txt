@@ -6,4 +6,3 @@ concrete_implements_abstract (memory)
 
 set (KAN_MEMORY_PAGED_ALLOCATOR_PAGE_SIZE "262144" CACHE STRING "Fixed size of a page for paged allocators.")
 concrete_compile_definitions (PRIVATE KAN_MEMORY_PAGED_ALLOCATOR_PAGE_SIZE=${KAN_MEMORY_PAGED_ALLOCATOR_PAGE_SIZE})
-c_interface_scanner_setup (GLOB "*.c" "*.h")

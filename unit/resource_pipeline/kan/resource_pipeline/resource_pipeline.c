@@ -9,9 +9,7 @@
 #include <kan/reflection/struct_helpers.h>
 #include <kan/resource_pipeline/resource_pipeline.h>
 
-// \c_interface_scanner_disable
 KAN_LOG_DEFINE_CATEGORY (resource_reference);
-// \c_interface_scanner_enable
 
 static kan_allocation_group_t detected_references_container_allocation_group;
 static kan_allocation_group_t platform_configuration_allocation_group;
@@ -656,7 +654,7 @@ static void kan_resource_detect_inside_data_chunk_for_struct_instance (
     }
 }
 
-// \c_interface_scanner_disable
+KAN_REFLECTION_IGNORE
 struct patch_section_stack_item_t
 {
     kan_reflection_patch_serializable_section_id_t id;
@@ -665,12 +663,12 @@ struct patch_section_stack_item_t
     const struct kan_reflection_field_t *source_field;
 };
 
+KAN_REFLECTION_IGNORE
 struct patch_section_stack_t
 {
     struct patch_section_stack_item_t *stack_end;
     struct patch_section_stack_item_t stack[KAN_RESOURCE_PIPELINE_PATCH_SECTION_STACK_SIZE];
 };
-// \c_interface_scanner_enable
 
 static inline void kan_resource_detect_inside_patch (
     struct kan_resource_reference_type_info_storage_t *storage,
@@ -1081,7 +1079,7 @@ void kan_resource_detect_references (struct kan_resource_reference_type_info_sto
 }
 
 /// \brief We need to make import rule resource type as it resides in resource directories.
-/// \meta reflection_struct_meta = "kan_resource_import_rule_t"
+KAN_REFLECTION_STRUCT_META (kan_resource_import_rule_t)
 RESOURCE_PIPELINE_API struct kan_resource_resource_type_meta_t kan_resource_import_rule_resource_type = {
     .root = KAN_FALSE,
 };

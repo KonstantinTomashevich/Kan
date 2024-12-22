@@ -14,9 +14,7 @@
 #include <kan/stream/random_access_stream_buffer.h>
 #include <kan/threading/atomic.h>
 
-// \c_interface_scanner_disable
 KAN_LOG_DEFINE_CATEGORY (resource_pipeline_system);
-// \c_interface_scanner_enable
 
 struct platform_configuration_t
 {
@@ -34,20 +32,20 @@ struct resource_pipeline_system_t
 {
     kan_context_t context;
 
-    /// \meta reflection_dynamic_array_type = "struct platform_configuration_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct platform_configuration_t)
     struct kan_dynamic_array_t platform_configurations;
 
-    /// \meta reflection_dynamic_array_type = "char *"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (char *)
     struct kan_dynamic_array_t platform_configuration_paths;
 
     kan_time_size_t latest_platform_configuration_modification_time_ns;
     kan_time_size_t reload_platform_configuration_after_ns;
     kan_time_size_t last_platform_configuration_reload_time_ns;
 
-    /// \meta reflection_ignore_struct_field
+    KAN_REFLECTION_IGNORE
     struct kan_atomic_int_t platform_configuration_change_listeners_lock;
 
-    /// \meta reflection_ignore_struct_field
+    KAN_REFLECTION_IGNORE
     struct kan_bd_list_t platform_configuration_change_listeners;
 
     kan_reflection_registry_t last_reflection_registry;

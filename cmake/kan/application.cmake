@@ -221,10 +221,6 @@ function (application_set_world_directory DIRECTORY)
         file (COPY_FILE
                 "${PROJECT_SOURCE_DIR}/cmake/kan/verify_code_hot_reload_world.rd"
                 "${DIRECTORY}/optional/verify_code_hot_reload.rd")
-
-    else ()
-        message (STATUS "        Removing code hot reload test world.")
-        file (REMOVE "${DIRECTORY}/optional/verify_code_hot_reload.rd")
     endif ()
 endfunction ()
 
@@ -955,7 +951,7 @@ function (application_generate)
         message (FATAL_ERROR "There is no programs for application \"${APPLICATION_NAME}\"!")
     endif ()
 
-    set (GENERATED_DIRECTORY "${CMAKE_BINARY_DIR}/generated/${APPLICATION_NAME}/")
+    set (GENERATED_DIRECTORY "${CMAKE_BINARY_DIR}/Generated/${APPLICATION_NAME}/")
     file (MAKE_DIRECTORY "${GENERATED_DIRECTORY}")
 
     foreach (PROGRAM ${PROGRAMS})

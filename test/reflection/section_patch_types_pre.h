@@ -4,46 +4,33 @@
 
 #include <kan/api_common/c_header.h>
 #include <kan/container/dynamic_array.h>
+#include <kan/reflection/markup.h>
 
 KAN_C_HEADER_BEGIN
 
-// Don't care what other include might've defined.
-#undef enum_to_adapt_t
-#undef ENUM_TO_ADAPT_ONE
-#undef ENUM_TO_ADAPT_TWO
-#undef ENUM_TO_ADAPT_THREE
+// When including for test root file, we would like to have all the declarations from both pre and post stages
+// with appropriate suffixes, so we can test both conveniently.
+#if defined(INCLUDING_FOR_TEST_ROOT)
+#    undef enum_to_adapt_t
+#    undef ENUM_TO_ADAPT_ONE
+#    undef ENUM_TO_ADAPT_TWO
+#    undef ENUM_TO_ADAPT_THREE
 
-#undef most_inner_type_t
-#undef most_inner_type_init
+#    undef most_inner_type_t
+#    undef type_to_delete_t
+#    undef middle_type_t
+#    undef root_type_t
 
-#undef type_to_delete_t
+#    define enum_to_adapt_t enum_to_adapt_pre_t
+#    define ENUM_TO_ADAPT_ONE ENUM_TO_ADAPT_ONE_PRE
+#    define ENUM_TO_ADAPT_TWO ENUM_TO_ADAPT_TWO_PRE
+#    define ENUM_TO_ADAPT_THREE ENUM_TO_ADAPT_THREE_PRE
 
-#undef middle_type_t
-#undef middle_type_init
-#undef middle_type_shutdown
-
-#undef root_type_t
-#undef root_type_init
-#undef root_type_shutdown
-
-// Defines to trick c_interface_scanner while keeping both files includeable.
-#define enum_to_adapt_t enum_to_adapt_pre_t
-#define ENUM_TO_ADAPT_ONE ENUM_TO_ADAPT_ONE_PRE
-#define ENUM_TO_ADAPT_TWO ENUM_TO_ADAPT_TWO_PRE
-#define ENUM_TO_ADAPT_THREE ENUM_TO_ADAPT_THREE_PRE
-
-#define most_inner_type_t most_inner_type_pre_t
-#define most_inner_type_init most_inner_type_pre_init
-
-#define type_to_delete_t type_to_delete_pre_t
-
-#define middle_type_t middle_type_pre_t
-#define middle_type_init middle_type_pre_init
-#define middle_type_shutdown middle_type_pre_shutdown
-
-#define root_type_t root_type_pre_t
-#define root_type_init root_type_pre_init
-#define root_type_shutdown root_type_pre_shutdown
+#    define most_inner_type_t most_inner_type_pre_t
+#    define type_to_delete_t type_to_delete_pre_t
+#    define middle_type_t middle_type_pre_t
+#    define root_type_t root_type_pre_t
+#endif
 
 enum enum_to_adapt_t
 {
@@ -52,6 +39,7 @@ enum enum_to_adapt_t
     ENUM_TO_ADAPT_THREE,
 };
 
+KAN_REFLECTION_EXPLICIT_INIT_FUNCTOR (most_inner_type_pre_init)
 struct most_inner_type_t
 {
     kan_instance_size_t x;
@@ -59,7 +47,7 @@ struct most_inner_type_t
     kan_instance_size_t z;
 };
 
-TEST_REFLECTION_SECTION_PATCH_TYPES_PRE_API void most_inner_type_init (struct most_inner_type_t *instance);
+TEST_REFLECTION_SECTION_PATCH_TYPES_PRE_API void most_inner_type_pre_init (struct most_inner_type_t *instance);
 
 struct type_to_delete_t
 {
@@ -67,34 +55,38 @@ struct type_to_delete_t
     kan_instance_size_t some_other_data;
 };
 
+KAN_REFLECTION_EXPLICIT_INIT_FUNCTOR (middle_type_pre_init)
+KAN_REFLECTION_EXPLICIT_SHUTDOWN_FUNCTOR (middle_type_pre_shutdown)
 struct middle_type_t
 {
-    /// \meta reflection_dynamic_array_type = "struct most_inner_type_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct most_inner_type_t)
     struct kan_dynamic_array_t inner_structs;
 
-    /// \meta reflection_dynamic_array_type = "struct type_to_delete_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct type_to_delete_t)
     struct kan_dynamic_array_t structs_to_delete;
 
-    /// \meta reflection_dynamic_array_type = "enum enum_to_adapt_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (enum enum_to_adapt_t)
     struct kan_dynamic_array_t enums;
 };
 
-TEST_REFLECTION_SECTION_PATCH_TYPES_PRE_API void middle_type_init (struct middle_type_t *instance);
+TEST_REFLECTION_SECTION_PATCH_TYPES_PRE_API void middle_type_pre_init (struct middle_type_t *instance);
 
-TEST_REFLECTION_SECTION_PATCH_TYPES_PRE_API void middle_type_shutdown (struct middle_type_t *instance);
+TEST_REFLECTION_SECTION_PATCH_TYPES_PRE_API void middle_type_pre_shutdown (struct middle_type_t *instance);
 
+KAN_REFLECTION_EXPLICIT_INIT_FUNCTOR (root_type_pre_init)
+KAN_REFLECTION_EXPLICIT_SHUTDOWN_FUNCTOR (root_type_pre_shutdown)
 struct root_type_t
 {
     kan_instance_size_t data_before;
 
-    /// \meta reflection_dynamic_array_type = "struct middle_type_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct middle_type_t)
     struct kan_dynamic_array_t middle_structs;
 
     kan_instance_size_t data_after;
 };
 
-TEST_REFLECTION_SECTION_PATCH_TYPES_PRE_API void root_type_init (struct root_type_t *instance);
+TEST_REFLECTION_SECTION_PATCH_TYPES_PRE_API void root_type_pre_init (struct root_type_t *instance);
 
-TEST_REFLECTION_SECTION_PATCH_TYPES_PRE_API void root_type_shutdown (struct root_type_t *instance);
+TEST_REFLECTION_SECTION_PATCH_TYPES_PRE_API void root_type_pre_shutdown (struct root_type_t *instance);
 
 KAN_C_HEADER_END

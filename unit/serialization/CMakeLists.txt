@@ -3,7 +3,6 @@ concrete_include (PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 concrete_sources ("*.c")
 concrete_require (SCOPE PUBLIC ABSTRACT reflection INTERFACE stream)
 concrete_require (SCOPE PRIVATE ABSTRACT error log memory threading CONCRETE_INTERFACE container readable_data)
-c_interface_scanner_setup (GLOB "*.c" "*.h")
 
 set (KAN_SERIALIZATION_BINARY_SCRIPT_INITIAL_BUCKETS "17" CACHE STRING
         "Initial buckets count for binary serialization script storage.")

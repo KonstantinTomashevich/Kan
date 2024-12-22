@@ -1,6 +1,5 @@
 register_interface (api_common)
 interface_include ("${CMAKE_CURRENT_SOURCE_DIR}")
-c_interface_scanner_setup (GLOB "*.h")
 
 set (KAN_CORE_TYPES_PRESET "x64" CACHE STRING "Preset for core types. Supported presets: x64, x32.")
 if (KAN_CORE_TYPES_PRESET STREQUAL "x64")

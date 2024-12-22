@@ -14,7 +14,6 @@ concrete_highlight_direct ("${GENERATION_SOURCE}")
 concrete_sources_direct ("${GENERATION_OUTPUT}")
 concrete_require (SCOPE PUBLIC INTERFACE stream)
 concrete_require (SCOPE PRIVATE ABSTRACT error log memory CONCRETE_INTERFACE container)
-c_interface_scanner_setup (GLOB "*.c" "*.h")
 
 set (KAN_READABLE_DATA_PARSE_INPUT_BUFFER_SIZE "16384" CACHE STRING
         "Size of an input buffer for readable data parser.")

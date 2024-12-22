@@ -2,7 +2,7 @@
 
 #include <example_import/icon.h>
 
-/// \meta reflection_struct_meta = "icon_t"
+KAN_REFLECTION_STRUCT_META (icon_t)
 APPLICATION_FRAMEWORK_EXAMPLE_IMPORT_ICON_API struct kan_resource_resource_type_meta_t icon_resource_type = {
     .root = KAN_TRUE,
 };

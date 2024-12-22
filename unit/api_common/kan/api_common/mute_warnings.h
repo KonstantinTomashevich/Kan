@@ -15,6 +15,7 @@
         _Pragma ("GCC diagnostic ignored \"-Wmissing-field-initializers\"")                                            \
         _Pragma ("GCC diagnostic ignored \"-Wnullability-completeness\"")                                              \
         _Pragma ("GCC diagnostic ignored \"-Wpedantic\"")                                                              \
+        _Pragma ("GCC diagnostic ignored \"-Wself-assign\"")                                                           \
         _Pragma ("GCC diagnostic ignored \"-Wignored-attributes\"")                                                    \
         _Pragma ("GCC diagnostic ignored \"-Wunused-function\"")                                                       \
         _Pragma ("GCC diagnostic ignored \"-Wunused-private-field\"")                                                  \

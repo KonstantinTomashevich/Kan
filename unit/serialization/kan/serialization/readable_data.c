@@ -9,6 +9,7 @@
 #include <kan/memory/allocation.h>
 #include <kan/readable_data/readable_data.h>
 #include <kan/reflection/field_visibility_iterator.h>
+#include <kan/reflection/markup.h>
 #include <kan/reflection/patch.h>
 #include <kan/serialization/readable_data.h>
 #include <kan/threading/atomic.h>
@@ -68,7 +69,7 @@ struct reader_state_t
     kan_reflection_patch_builder_t patch_builder;
     kan_allocation_group_t child_allocation_group;
 
-    /// \meta reflection_dynamic_array_type = "struct reader_block_state_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct reader_block_state_t)
     struct kan_dynamic_array_t block_state_stack;
 };
 
@@ -136,7 +137,7 @@ struct writer_state_t
     kan_readable_data_emitter_t emitter;
     kan_reflection_registry_t registry;
 
-    /// \meta reflection_dynamic_array_type = "struct writer_block_state_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct writer_block_state_t)
     struct kan_dynamic_array_t block_state_stack;
 };
 

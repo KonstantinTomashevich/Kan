@@ -3,6 +3,7 @@
 #include <qsort.h>
 
 #include <kan/api_common/c_header.h>
+#include <kan/api_common/mute_warnings.h>
 #include <kan/reflection/registry.h>
 
 /// \file
@@ -135,8 +136,10 @@ KAN_C_HEADER_BEGIN
         node = node->next;                                                                                             \
     }                                                                                                                  \
                                                                                                                        \
+    KAN_MUTE_THIRD_PARTY_WARNINGS_BEGIN                                                                                \
     QSORT ((unsigned long) COUNT, KAN_UNIVERSE_REFLECTION_GENERATOR_SORT_TYPE_NODES_LESS,                              \
            KAN_UNIVERSE_REFLECTION_GENERATOR_SORT_TYPE_NODES_SWAP);                                                    \
+    KAN_MUTE_THIRD_PARTY_WARNINGS_END                                                                                  \
                                                                                                                        \
     for (kan_loop_size_t node_index = 0u; node_index < COUNT; ++node_index)                                            \
     {                                                                                                                  \

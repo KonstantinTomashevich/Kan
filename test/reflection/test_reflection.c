@@ -14,6 +14,8 @@
 
 #include <generator_test_first.h>
 #include <generator_test_second.h>
+
+#define INCLUDING_FOR_TEST_ROOT
 #include <section_patch_types_post.h>
 #include <section_patch_types_pre.h>
 
@@ -1962,8 +1964,18 @@ KAN_TEST_CASE (generated_reflection)
     KAN_TEST_CHECK (a_bit_of_everything_data->fields[7u].visibility_condition_field ==
                     &a_bit_of_everything_data->fields[6u])
     KAN_TEST_CHECK (a_bit_of_everything_data->fields[7u].visibility_condition_values_count == 2u)
-    KAN_TEST_CHECK (a_bit_of_everything_data->fields[7u].visibility_condition_values[0u] == 0)
-    KAN_TEST_CHECK (a_bit_of_everything_data->fields[7u].visibility_condition_values[1u] == 2)
+
+    const kan_bool_t has_visibility_condition_0 =
+        a_bit_of_everything_data->fields[7u].visibility_condition_values[0u] == 0 ||
+        a_bit_of_everything_data->fields[7u].visibility_condition_values[1u] == 0;
+
+    const kan_bool_t has_visibility_condition_2 =
+        a_bit_of_everything_data->fields[7u].visibility_condition_values[0u] == 2 ||
+        a_bit_of_everything_data->fields[7u].visibility_condition_values[1u] == 2;
+
+    KAN_TEST_CHECK (has_visibility_condition_0)
+    KAN_TEST_CHECK (has_visibility_condition_2)
+
     KAN_TEST_CHECK (a_bit_of_everything_data->fields[8u].name == kan_string_intern ("second_selection"))
     KAN_TEST_CHECK (a_bit_of_everything_data->fields[8u].visibility_condition_field ==
                     &a_bit_of_everything_data->fields[6u])
@@ -2151,13 +2163,17 @@ KAN_TEST_CASE (patch_with_sections)
     kan_reflection_patch_builder_add_chunk (patch_builder, append_1_enum_0_3_section, 0u, sizeof (pre_enums),
                                             pre_enums);
 
-    kan_reflection_patch_t patch = kan_reflection_patch_builder_build (
-        patch_builder, source_registry,
-        kan_reflection_registry_query_struct (source_registry, kan_string_intern ("root_type_t")));
+    const struct kan_reflection_struct_t *pre_root_type =
+        kan_reflection_registry_query_struct (source_registry, kan_string_intern ("root_type_t"));
+    KAN_TEST_ASSERT (pre_root_type)
+    KAN_TEST_ASSERT (pre_root_type->init)
+    KAN_TEST_ASSERT (pre_root_type->shutdown)
+
+    kan_reflection_patch_t patch = kan_reflection_patch_builder_build (patch_builder, source_registry, pre_root_type);
     kan_reflection_patch_builder_destroy (patch_builder);
 
     struct root_type_pre_t root_pre;
-    root_type_pre_init (&root_pre);
+    pre_root_type->init (pre_root_type->functor_user_data, &root_pre);
     kan_reflection_patch_apply (patch, &root_pre);
 
     KAN_TEST_CHECK (root_pre.data_before == 3u)
@@ -2199,7 +2215,7 @@ KAN_TEST_CASE (patch_with_sections)
     KAN_TEST_CHECK (((enum enum_to_adapt_pre_t *) second_middle_pre->enums.data)[1u] == pre_enums[1u])
     KAN_TEST_CHECK (((enum enum_to_adapt_pre_t *) second_middle_pre->enums.data)[2u] == pre_enums[2u])
     KAN_TEST_CHECK (((enum enum_to_adapt_pre_t *) second_middle_pre->enums.data)[3u] == pre_enums[3u])
-    root_type_pre_shutdown (&root_pre);
+    pre_root_type->shutdown (pre_root_type->functor_user_data, &root_pre);
 
     kan_reflection_migration_seed_t source_to_target_migration_seed =
         kan_reflection_migration_seed_build (source_registry, target_registry);
@@ -2210,8 +2226,15 @@ KAN_TEST_CASE (patch_with_sections)
     kan_reflection_struct_migrator_destroy (source_to_target_migrator);
     kan_reflection_migration_seed_destroy (source_to_target_migration_seed);
 
+    const struct kan_reflection_struct_t *post_root_type =
+        kan_reflection_registry_query_struct (target_registry, kan_string_intern ("root_type_t"));
+    KAN_TEST_ASSERT (post_root_type)
+    KAN_TEST_ASSERT (post_root_type->init)
+    KAN_TEST_ASSERT (post_root_type->shutdown)
+
     struct root_type_post_t root_post;
-    root_type_post_init (&root_post);
+    post_root_type->init (post_root_type->functor_user_data, &root_post);
+    KAN_TEST_ASSERT (kan_reflection_patch_get_type (patch) == post_root_type)
     kan_reflection_patch_apply (patch, &root_post);
 
     KAN_TEST_CHECK (root_pre.data_before == 3u)
@@ -2243,7 +2266,7 @@ KAN_TEST_CASE (patch_with_sections)
     KAN_TEST_CHECK (((enum enum_to_adapt_post_t *) second_middle_post->enums.data)[1u] == ENUM_TO_ADAPT_ONE_POST)
     KAN_TEST_CHECK (((enum enum_to_adapt_post_t *) second_middle_post->enums.data)[2u] == ENUM_TO_ADAPT_THREE_POST)
     KAN_TEST_CHECK (((enum enum_to_adapt_post_t *) second_middle_post->enums.data)[3u] == ENUM_TO_ADAPT_THREE_POST)
-    root_type_post_shutdown (&root_post);
+    post_root_type->shutdown (post_root_type->functor_user_data, &root_post);
 
     kan_reflection_registry_destroy (source_registry);
     kan_reflection_registry_destroy (target_registry);

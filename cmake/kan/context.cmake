@@ -5,7 +5,7 @@
 set (KAN_CONTEXT_STATICS_ECOSYSTEM "${PROJECT_SOURCE_DIR}/cmake/kan/context_statics_ecosystem")
 
 # Directory with generated files that should be added to context unit includes.
-set (KAN_CONTEXT_ALL_SYSTEM_NAMES_INCLUDE_BASE "${CMAKE_BINARY_DIR}/generated/context/all_systems")
+set (KAN_CONTEXT_ALL_SYSTEM_NAMES_INCLUDE_BASE "${CMAKE_BINARY_DIR}/Generated/context/all_systems")
 
 # Path at which include with all system names will be generated.
 set (KAN_CONTEXT_ALL_SYSTEM_NAMES_FILE "${KAN_CONTEXT_ALL_SYSTEM_NAMES_INCLUDE_BASE}/kan/context/all_system_names.h")

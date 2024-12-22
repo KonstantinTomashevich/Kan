@@ -13,9 +13,7 @@
 #include <kan/universe_resource_provider/universe_resource_provider.h>
 #include <kan/universe_time/universe_time.h>
 
-// \c_interface_scanner_disable
 KAN_LOG_DEFINE_CATEGORY (application_framework_example_basic_logic_test_mode);
-// \c_interface_scanner_enable
 
 struct test_data_type_t
 {
@@ -25,7 +23,7 @@ struct test_data_type_t
 
 _Static_assert (_Alignof (struct test_data_type_t) <= _Alignof (kan_memory_size_t), "Alignment has expected value.");
 
-// \meta reflection_struct_meta = "test_data_type_t"
+KAN_REFLECTION_STRUCT_META (test_data_type_t)
 APPLICATION_FRAMEWORK_EXAMPLE_BASIC_LOGIC_API struct kan_resource_resource_type_meta_t test_data_type_meta = {
     .root = KAN_TRUE,
 };
@@ -124,7 +122,7 @@ APPLICATION_FRAMEWORK_EXAMPLE_BASIC_LOGIC_API void kan_universe_mutator_execute_
             if (KAN_TYPED_ID_32_IS_VALID (request->provided_container_id))
             {
                 state->test_asset_loaded = KAN_TRUE;
-                KAN_UP_VALUE_READ (view, resource_provider_container_test_data_type_t, container_id,
+                KAN_UP_VALUE_READ (view, KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (test_data_type_t), container_id,
                                    &request->provided_container_id)
                 {
                     struct test_data_type_t *loaded_resource =

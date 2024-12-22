@@ -6,6 +6,7 @@
 #include <kan/api_common/core_types.h>
 #include <kan/container/interned_string.h>
 #include <kan/memory_profiler/allocation_group.h>
+#include <kan/reflection/markup.h>
 #include <kan/threading/atomic.h>
 
 /// \file
@@ -47,9 +48,9 @@
 /// \par Containers
 /// \parblock
 /// Loaded native resources are stored in special container types. Container types are automatically generated and are
-/// named according to pattern "resource_provider_container_<native_type_name>". Structure of container is represented
-/// by `kan_resource_container_view_t`. Keep in mind that if resource type requires alignment that is higher than
-/// `offsetof (kan_resource_container_view_t, data_begin)`, its data won't start at `data_begin`, but at
+/// named according to pattern specified in KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE. Structure of container is
+/// represented by `kan_resource_container_view_t`. Keep in mind that if resource type requires alignment that is higher
+/// than `offsetof (kan_resource_container_view_t, data_begin)`, its data won't start at `data_begin`, but at
 /// `data_begin + (alignment - offsetof (kan_resource_container_view_t, data_begin))` (in order to align it properly).
 /// \endparblock
 ///
@@ -91,8 +92,11 @@ KAN_C_HEADER_BEGIN
 /// \brief Name for resource provider configuration object in universe world.
 #define KAN_RESOURCE_PROVIDER_CONFIGURATION "resource_provider"
 
-/// \brief Prefix for resource provider container type names.
-#define KAN_RESOURCE_PROVIDER_CONTAINER_TYPE_PREFIX "resource_provider_container_"
+/// \brief Convenience macro for making resource container types from their resource types.
+#define KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE(RESOURCE_TYPE) resource_provider_container_##RESOURCE_TYPE
+
+/// \brief Macro that provides formatting string used to create resource provider container type names.
+#define KAN_RESOURCE_PROVIDER_CONTAINER_TYPE_FORMAT "resource_provider_container_%s"
 
 /// \brief Checkpoint, after which resource provider mutators are executed.
 #define KAN_RESOURCE_PROVIDER_BEGIN_CHECKPOINT "resource_provider_begin"
@@ -150,12 +154,13 @@ struct kan_resource_request_t
 UNIVERSE_RESOURCE_PROVIDER_API void kan_resource_request_init (struct kan_resource_request_t *instance);
 
 /// \brief Struct that mimics data layout of native resource containers.
-/// \meta reflection_ignore_struct
+KAN_REFLECTION_IGNORE
 struct kan_resource_container_view_t
 {
     kan_resource_container_id_t container_id;
     kan_allocation_group_t my_allocation_group;
 
+    KAN_REFLECTION_IGNORE
     uint8_t data_begin[];
 };
 
@@ -173,7 +178,7 @@ struct kan_resource_request_updated_event_t
 struct kan_resource_provider_singleton_t
 {
     /// \brief Atomic counter for assigning request ids. Safe to be modified from different threads.
-    /// \meta reflection_ignore_struct_field
+    KAN_REFLECTION_IGNORE
     struct kan_atomic_int_t request_id_counter;
 
     /// \brief When set to true, resource provider will stop serving, unload all the data and start scan from scratch.

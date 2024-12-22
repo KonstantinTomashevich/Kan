@@ -6,6 +6,7 @@
 #include <kan/api_common/core_types.h>
 #include <kan/container/dynamic_array.h>
 #include <kan/container/interned_string.h>
+#include <kan/reflection/markup.h>
 #include <kan/render_pipeline_language/parser.h>
 
 /// \file
@@ -156,7 +157,7 @@ struct kan_rpl_meta_parameter_t
     /// \brief Total item count -- 1 for single parameter, multiplication of every dimension for arrays.
     kan_rpl_size_t total_item_count;
 
-    /// \meta reflection_dynamic_array_type = "kan_interned_string_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (kan_interned_string_t)
     struct kan_dynamic_array_t meta;
 };
 
@@ -183,11 +184,11 @@ struct kan_rpl_meta_buffer_t
 
     /// \brief Attributes provided by this buffer, needed for pipeline setup.
     /// \details Only provided for attribute buffers.
-    /// \meta reflection_dynamic_array_type = "struct kan_rpl_meta_attribute_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_meta_attribute_t)
     struct kan_dynamic_array_t attributes;
 
     /// \brief Parameters provided by this buffer, useful for things like materials.
-    /// \meta reflection_dynamic_array_type = "struct kan_rpl_meta_parameter_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_meta_parameter_t)
     struct kan_dynamic_array_t parameters;
 };
 
@@ -254,10 +255,10 @@ struct kan_rpl_meta_sampler_t
 /// \brief Stores information about buffer and sampler bindings for concrete descriptor set.
 struct kan_rpl_meta_set_bindings_t
 {
-    /// \meta reflection_dynamic_array_type = "struct kan_rpl_meta_buffer_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_meta_buffer_t)
     struct kan_dynamic_array_t buffers;
 
-    /// \meta reflection_dynamic_array_type = "struct kan_rpl_meta_sampler_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_meta_sampler_t)
     struct kan_dynamic_array_t samplers;
 };
 
@@ -337,12 +338,12 @@ struct kan_rpl_meta_t
 
     union
     {
-        /// \meta reflection_visibility_condition_field = "pipeline_type"
-        /// \meta reflection_visibility_condition_values = "KAN_RPL_PIPELINE_TYPE_GRAPHICS_CLASSIC"
+        KAN_REFLECTION_VISIBILITY_CONDITION_FIELD (pipeline_type)
+        KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (KAN_RPL_PIPELINE_TYPE_GRAPHICS_CLASSIC)
         struct kan_rpl_graphics_classic_pipeline_settings_t graphics_classic_settings;
     };
 
-    /// \meta reflection_dynamic_array_type = "struct kan_rpl_meta_buffer_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_meta_buffer_t)
     struct kan_dynamic_array_t attribute_buffers;
 
     struct kan_rpl_meta_set_bindings_t set_pass;
@@ -351,7 +352,7 @@ struct kan_rpl_meta_t
     struct kan_rpl_meta_set_bindings_t set_unstable;
 
     /// \brief Contains information about pipeline color outputs if any.
-    /// \meta reflection_dynamic_array_type = "struct kan_rpl_meta_color_output_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_meta_color_output_t)
     struct kan_dynamic_array_t color_outputs;
 
     float color_blend_constant_r;

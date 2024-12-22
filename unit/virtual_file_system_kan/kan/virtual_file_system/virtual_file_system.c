@@ -14,13 +14,12 @@
 #include <kan/log/logging.h>
 #include <kan/memory/allocation.h>
 #include <kan/reflection/generated_reflection.h>
+#include <kan/reflection/markup.h>
 #include <kan/serialization/binary.h>
 #include <kan/threading/atomic.h>
 #include <kan/virtual_file_system/virtual_file_system.h>
 
-// \c_interface_scanner_disable
 KAN_LOG_DEFINE_CATEGORY (virtual_file_system);
-// \c_interface_scanner_enable
 
 KAN_REFLECTION_EXPECT_UNIT_REGISTRAR_LOCAL (virtual_file_system_kan);
 
@@ -97,7 +96,7 @@ struct read_only_pack_registry_item_t
 
 struct read_only_pack_registry_t
 {
-    /// \meta reflection_dynamic_array_type = "struct read_only_pack_registry_item_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct read_only_pack_registry_item_t)
     struct kan_dynamic_array_t items;
 };
 
@@ -204,7 +203,7 @@ struct file_system_watcher_t
 
     struct virtual_directory_t *attached_to_virtual_directory;
 
-    /// \meta reflection_dynamic_array_type = "struct real_file_system_watcher_attachment_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct real_file_system_watcher_attachment_t)
     struct kan_dynamic_array_t real_file_system_attachments;
 
     struct kan_atomic_int_t event_queue_lock;

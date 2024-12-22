@@ -72,11 +72,9 @@ _Static_assert (sizeof (struct kan_float_vector_3_t) == sizeof (vec3), "Size val
 _Static_assert (_Alignof (struct kan_float_vector_3_t) == _Alignof (vec3), "Alignment validation.");
 
 /// \brief 4 dimensional floating point vector type.
-// \c_interface_scanner_disable
 #if defined(_MSC_VER)
 CGLM_ALIGN (16)
 #endif
-// \c_interface_scanner_enable
 struct kan_float_vector_4_t
 {
     float x;
@@ -85,9 +83,7 @@ struct kan_float_vector_4_t
     float w;
 }
 #if !defined(_MSC_VER)
-// \c_interface_scanner_disable
 CGLM_ALIGN (16)
-// \c_interface_scanner_enable
 #endif
     ;
 
@@ -128,20 +124,16 @@ _Static_assert (sizeof (struct kan_float_matrix_3x4_t) == sizeof (mat3x4), "Size
 _Static_assert (_Alignof (struct kan_float_matrix_3x4_t) == _Alignof (mat3x4), "Alignment validation.");
 
 /// \brief 2x2 floating point matrix type.
-// \c_interface_scanner_disable
 #if defined(_MSC_VER)
 CGLM_ALIGN (16)
 #endif
-// \c_interface_scanner_enable
 struct kan_float_matrix_2x2_t
 {
     struct kan_float_vector_2_t row_0;
     struct kan_float_vector_2_t row_1;
 }
 #if !defined(_MSC_VER)
-// \c_interface_scanner_disable
 CGLM_ALIGN (16)
-// \c_interface_scanner_enable
 #endif
     ;
 
@@ -169,11 +161,9 @@ _Static_assert (sizeof (struct kan_float_matrix_2x4_t) == sizeof (mat2x4), "Size
 _Static_assert (_Alignof (struct kan_float_matrix_2x4_t) == _Alignof (mat2x4), "Alignment validation.");
 
 /// \brief 4x4 floating point matrix type.
-// \c_interface_scanner_disable
 #if defined(_MSC_VER)
 CGLM_ALIGN_MAT
 #endif
-// \c_interface_scanner_enable
 struct kan_float_matrix_4x4_t
 {
     struct kan_float_vector_4_t row_0;
@@ -182,9 +172,7 @@ struct kan_float_matrix_4x4_t
     struct kan_float_vector_4_t row_3;
 }
 #if !defined(_MSC_VER)
-// \c_interface_scanner_disable
 CGLM_ALIGN (16)
-// \c_interface_scanner_enable
 #endif
     ;
 

@@ -21,7 +21,7 @@ KAN_C_HEADER_BEGIN
 struct kan_universe_system_config_t
 {
     /// \brief List of environment tags that will be passed to the universe.
-    /// \meta reflection_dynamic_array_type = "kan_interned_string_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (kan_interned_string_t)
     struct kan_dynamic_array_t environment_tags;
 };
 

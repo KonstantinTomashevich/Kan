@@ -132,7 +132,6 @@ TEST_CONTEXT_REFLECTION_SYSTEM_API void check_generated_system_destroy (kan_cont
     kan_free_general (system->group, system, sizeof (struct check_generated_system_t));
 }
 
-// \c_interface_scanner_disable
 TEST_CONTEXT_REFLECTION_SYSTEM_API struct kan_context_system_api_t KAN_CONTEXT_SYSTEM_API_NAME (
     check_generated_system_t) = {
     .name = "check_generated_system_t",
@@ -143,7 +142,6 @@ TEST_CONTEXT_REFLECTION_SYSTEM_API struct kan_context_system_api_t KAN_CONTEXT_S
     .disconnect = check_generated_system_disconnect,
     .destroy = check_generated_system_destroy,
 };
-// \c_interface_scanner_enable
 
 struct check_populate_system_t
 {
@@ -248,7 +246,6 @@ TEST_CONTEXT_REFLECTION_SYSTEM_API void check_populate_system_destroy (kan_conte
     kan_free_general (system->group, system, sizeof (struct check_populate_system_t));
 }
 
-// \c_interface_scanner_disable
 TEST_CONTEXT_REFLECTION_SYSTEM_API struct kan_context_system_api_t KAN_CONTEXT_SYSTEM_API_NAME (
     check_populate_system_t) = {
     .name = "check_populate_system_t",
@@ -259,7 +256,6 @@ TEST_CONTEXT_REFLECTION_SYSTEM_API struct kan_context_system_api_t KAN_CONTEXT_S
     .disconnect = check_populate_system_disconnect,
     .destroy = check_populate_system_destroy,
 };
-// \c_interface_scanner_enable
 
 struct check_generation_iterate_system_t
 {
@@ -386,7 +382,6 @@ TEST_CONTEXT_REFLECTION_SYSTEM_API void check_generation_iterate_system_destroy 
     kan_free_general (system->group, system, sizeof (struct check_generation_iterate_system_t));
 }
 
-// \c_interface_scanner_disable
 TEST_CONTEXT_REFLECTION_SYSTEM_API struct kan_context_system_api_t KAN_CONTEXT_SYSTEM_API_NAME (
     check_generation_iterate_system_t) = {
     .name = "check_generation_iterate_system_t",
@@ -397,7 +392,6 @@ TEST_CONTEXT_REFLECTION_SYSTEM_API struct kan_context_system_api_t KAN_CONTEXT_S
     .disconnect = check_generation_iterate_system_disconnect,
     .destroy = check_generation_iterate_system_destroy,
 };
-// \c_interface_scanner_enable
 
 struct kan_reflection_generator_test_t
 {

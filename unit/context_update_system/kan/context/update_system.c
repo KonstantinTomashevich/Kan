@@ -11,6 +11,7 @@
 #include <kan/error/critical.h>
 #include <kan/log/logging.h>
 #include <kan/memory/allocation.h>
+#include <kan/reflection/markup.h>
 
 KAN_LOG_DEFINE_CATEGORY (update_system);
 
@@ -24,7 +25,7 @@ struct update_connection_request_t
     kan_bool_t proxy;
     kan_instance_size_t dependencies_left;
 
-    /// \meta reflection_dynamic_array_type = "kan_context_system_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (kan_context_system_t)
     struct kan_dynamic_array_t dependencies;
 };
 
@@ -39,7 +40,7 @@ struct update_system_t
     kan_context_t context;
     kan_allocation_group_t group;
 
-    /// \meta reflection_dynamic_array_type = "struct update_callable_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct update_callable_t)
     struct kan_dynamic_array_t update_sequence;
 
     kan_instance_size_t connection_request_count;

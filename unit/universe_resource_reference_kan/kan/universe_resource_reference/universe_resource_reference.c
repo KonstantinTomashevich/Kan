@@ -22,16 +22,14 @@
 #include <kan/universe_resource_reference/universe_resource_reference.h>
 #include <kan/virtual_file_system/virtual_file_system.h>
 
-// \c_interface_scanner_disable
 KAN_LOG_DEFINE_CATEGORY (universe_resource_reference);
-// \c_interface_scanner_enable
 
-// \meta reflection_function_meta = "kan_universe_mutator_execute_resource_reference_manager"
+KAN_REFLECTION_FUNCTION_META (kan_universe_mutator_execute_resource_reference_manager)
 UNIVERSE_RESOURCE_REFERENCE_KAN_API struct kan_universe_mutator_group_meta_t resource_reference_mutator_group = {
     .group_name = KAN_RESOURCE_REFERENCE_MUTATOR_GROUP,
 };
 
-// \meta reflection_struct_meta = "kan_resource_native_entry_t"
+KAN_REFLECTION_STRUCT_META (kan_resource_native_entry_t)
 UNIVERSE_RESOURCE_REFERENCE_KAN_API struct kan_repository_meta_automatic_cascade_deletion_t
     kan_resource_native_entry_outer_reference_cascade_deletion = {
         .parent_key_path = {.reflection_path_length = 1u, .reflection_path = (const char *[]) {"attachment_id"}},
@@ -45,7 +43,7 @@ struct resource_outer_reference_update_state_t
     kan_time_size_t last_update_file_time_ns;
 };
 
-// \meta reflection_struct_meta = "kan_resource_native_entry_t"
+KAN_REFLECTION_STRUCT_META (kan_resource_native_entry_t)
 UNIVERSE_RESOURCE_REFERENCE_KAN_API struct kan_repository_meta_automatic_cascade_deletion_t
     resource_outer_reference_update_state_cascade_deletion = {
         .parent_key_path = {.reflection_path_length = 1u, .reflection_path = (const char *[]) {"attachment_id"}},
@@ -84,7 +82,7 @@ struct resource_outer_references_operation_binding_t
     kan_interned_string_t all_references_to_type;
 };
 
-// \meta reflection_struct_meta = "resource_outer_references_operation_t"
+KAN_REFLECTION_STRUCT_META (resource_outer_references_operation_t)
 UNIVERSE_RESOURCE_REFERENCE_KAN_API struct kan_repository_meta_automatic_cascade_deletion_t
     resource_outer_references_operation_binding_cascade_deletion = {
         .parent_key_path = {.reflection_path_length = 1u, .reflection_path = (const char *[]) {"entry_attachment_id"}},
@@ -106,13 +104,13 @@ _Static_assert (_Alignof (struct resource_reference_manager_native_container_typ
 
 struct resource_reference_manager_execution_shared_state_t
 {
-    /// \meta reflection_ignore_struct_field
+    KAN_REFLECTION_IGNORE
     struct kan_atomic_int_t workers_left;
 
-    /// \meta reflection_ignore_struct_field
+    KAN_REFLECTION_IGNORE
     struct kan_atomic_int_t concurrency_lock;
 
-    //// \meta reflection_ignore_struct_field
+    KAN_REFLECTION_IGNORE
     struct kan_repository_indexed_sequence_write_cursor_t outer_reference_operation_cursor;
 
     kan_time_size_t end_time_ns;
@@ -136,17 +134,17 @@ struct resource_reference_manager_state_t
     kan_bool_t need_to_cancel_old_operations;
     kan_allocation_group_t my_allocation_group;
 
-    /// \meta reflection_ignore_struct_field
+    KAN_REFLECTION_IGNORE
     struct kan_stack_group_allocator_t temporary_allocator;
 
-    /// \meta reflection_ignore_struct_field
+    KAN_REFLECTION_IGNORE
     struct resource_reference_manager_execution_shared_state_t execution_shared_state;
 
     kan_interned_string_t interned_resource_reference_manager_server;
 
     kan_instance_size_t trailing_data_count;
 
-    /// \meta reflection_ignore_struct_field
+    KAN_REFLECTION_IGNORE
     void *trailing_data[0u];
 };
 
@@ -167,16 +165,16 @@ struct kan_reflection_generator_universe_resource_reference_t
     struct universe_resource_reference_type_node_t *first_resource_type;
     kan_instance_size_t resource_types_count;
 
-    /// \meta reflection_ignore_struct_field
+    KAN_REFLECTION_IGNORE
     struct kan_reflection_struct_t mutator_type;
 
-    /// \meta reflection_ignore_struct_field
+    KAN_REFLECTION_IGNORE
     struct kan_reflection_function_t mutator_deploy_function;
 
-    /// \meta reflection_ignore_struct_field
+    KAN_REFLECTION_IGNORE
     struct kan_reflection_function_t mutator_execute_function;
 
-    /// \meta reflection_ignore_struct_field
+    KAN_REFLECTION_IGNORE
     struct kan_reflection_function_t mutator_undeploy_function;
 
     kan_interned_string_t interned_kan_resource_resource_type_meta_t;
@@ -1039,8 +1037,7 @@ static inline void generated_mutator_init_node (
     struct universe_resource_reference_type_node_t *generated_node)
 {
     char type_name_buffer[256u];
-    snprintf (type_name_buffer, 256u, "%s%s", KAN_RESOURCE_PROVIDER_CONTAINER_TYPE_PREFIX,
-              generated_node->resource_type->name);
+    snprintf (type_name_buffer, 256u, KAN_RESOURCE_PROVIDER_CONTAINER_TYPE_FORMAT, generated_node->resource_type->name);
     mutator_node->contained_type_name = generated_node->resource_type->name;
     mutator_node->container_type_name = kan_string_intern (type_name_buffer);
     mutator_node->contained_type_alignment = generated_node->resource_type->alignment;
@@ -1072,7 +1069,6 @@ static inline void generated_mutator_shutdown_node (
 {
 }
 
-// \c_interface_scanner_disable
 KAN_UNIVERSE_REFLECTION_GENERATOR_MUTATOR_FUNCTIONS (generated_mutator,
                                                      struct kan_reflection_generator_universe_resource_reference_t,
                                                      struct universe_resource_reference_type_node_t,
@@ -1085,7 +1081,6 @@ KAN_UNIVERSE_REFLECTION_GENERATOR_MUTATOR_FUNCTIONS (generated_mutator,
                                                      mutator_template_execute_resource_reference_manager,
                                                      mutator_template_undeploy_resource_reference_manager,
                                                      resource_reference_manager_state_shutdown)
-// \c_interface_scanner_enable
 
 UNIVERSE_RESOURCE_REFERENCE_KAN_API void kan_reflection_generator_universe_resource_reference_finalize (
     struct kan_reflection_generator_universe_resource_reference_t *instance, kan_reflection_registry_t registry)

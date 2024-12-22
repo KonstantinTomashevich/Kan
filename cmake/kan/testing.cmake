@@ -24,13 +24,15 @@ function (kan_setup_tests)
 
     if (NOT DEFINED SETUP_TEST_SOURCES)
         message (STATUS "Setting up tests from \"${SETUP_TEST_UNIT}\" using \"${SETUP_TEST_SHARED_LIBRARY}\" library.")
-        get_target_property (TEST_SOURCES "${SETUP_TEST_UNIT}" SOURCES)
+        # We access highlight sources instead of real sources as real sources are not known until generation phase due
+        # to preprocessing queue usage for concrete units.
+        get_target_property (TEST_SOURCES "${SETUP_TEST_UNIT}Highlight" SOURCES)
     else ()
         message (STATUS "Setting up tests using \"${SETUP_TEST_SHARED_LIBRARY}\" library.")
         set (TEST_SOURCES ${SETUP_TEST_SOURCES})
     endif ()
 
-    set (GENERATED_DIRECTORY "${CMAKE_BINARY_DIR}/generated/${SETUP_TEST_SHARED_LIBRARY}")
+    set (GENERATED_DIRECTORY "${CMAKE_BINARY_DIR}/Generated/${SETUP_TEST_SHARED_LIBRARY}")
     file (MAKE_DIRECTORY "${GENERATED_DIRECTORY}")
 
     set (WORKSPACE_DIRECTORY "${CMAKE_BINARY_DIR}/workspace/${SETUP_TEST_SHARED_LIBRARY}/")

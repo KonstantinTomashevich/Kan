@@ -9,13 +9,11 @@
 #include <kan/universe/universe.h>
 #include <kan/universe_resource_provider/universe_resource_provider.h>
 
-// \c_interface_scanner_disable
 KAN_LOG_DEFINE_CATEGORY (application_framework_example_compilation_state);
-// \c_interface_scanner_enable
 
 struct numbers_t
 {
-    /// \meta reflection_dynamic_array_type = "kan_serialized_size_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (kan_serialized_size_t)
     struct kan_dynamic_array_t items;
 };
 
@@ -32,7 +30,7 @@ APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_STATE_API void numbers_shutdown (struc
     kan_dynamic_array_shutdown (&numbers->items);
 }
 
-// \meta reflection_struct_meta = "numbers_t"
+KAN_REFLECTION_STRUCT_META (numbers_t)
 APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_STATE_API struct kan_resource_resource_type_meta_t
     numbers_resource_type_meta = {
         .root = KAN_TRUE,
@@ -40,7 +38,7 @@ APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_STATE_API struct kan_resource_resource
 
 static enum kan_resource_compile_result_t numbers_compile (struct kan_resource_compile_state_t *state);
 
-// \meta reflection_struct_meta = "numbers_t"
+KAN_REFLECTION_STRUCT_META (numbers_t)
 APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_STATE_API struct kan_resource_compilable_meta_t numbers_compilable_meta = {
     .output_type_name = "numbers_compiled_t",
     .configuration_type_name = NULL,
@@ -69,7 +67,7 @@ APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_STATE_API void numbers_compiled_init (
     instance->sum = 0u;
 }
 
-// \meta reflection_struct_meta = "numbers_compiled_t"
+KAN_REFLECTION_STRUCT_META (numbers_compiled_t)
 APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_STATE_API struct kan_resource_resource_type_meta_t
     numbers_compiled_resource_type_meta = {
         .root = KAN_TRUE,
@@ -158,8 +156,8 @@ APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_STATE_API void kan_universe_mutator_ex
             {
                 if (KAN_TYPED_ID_32_IS_VALID (request->provided_container_id))
                 {
-                    KAN_UP_VALUE_READ (view, resource_provider_container_numbers_compiled_t, container_id,
-                                       &request->provided_container_id)
+                    KAN_UP_VALUE_READ (view, KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (numbers_compiled_t),
+                                       container_id, &request->provided_container_id)
                     {
                         struct numbers_compiled_t *loaded_resource =
                             (struct numbers_compiled_t *) ((struct kan_resource_container_view_t *) view)->data_begin;

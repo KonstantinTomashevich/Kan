@@ -5,6 +5,7 @@
 #include <stdint.h>
 
 #include <kan/api_common/c_header.h>
+#include <kan/reflection/markup.h>
 
 /// \file
 /// \brief Provides basic API for platform-specific keyboard data.
@@ -280,7 +281,7 @@ enum kan_platform_scan_code_t
 typedef uint32_t kan_platform_key_code_t;
 
 /// \brief Table that lists modifier keys as flags that can be known to platform.
-/// \meta reflection_flags
+KAN_REFLECTION_FLAGS
 enum kan_platform_modifier_mask_t
 {
     KAN_PLATFORM_MODIFIER_MASK_LEFT_SHIFT = 1u << 0u,

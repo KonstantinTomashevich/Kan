@@ -5,13 +5,12 @@
 #include <kan/container/stack_group_allocator.h>
 #include <kan/cpu_dispatch/job.h>
 #include <kan/reflection/generated_reflection.h>
+#include <kan/reflection/markup.h>
 #include <kan/repository/repository.h>
 #include <kan/testing/testing.h>
 
-// \c_interface_scanner_disable
 KAN_REFLECTION_EXPECT_UNIT_REGISTRAR (repository);
 KAN_REFLECTION_EXPECT_UNIT_REGISTRAR (test_repository);
-// \c_interface_scanner_enable
 
 struct manual_event_t
 {
@@ -54,7 +53,7 @@ struct first_singleton_z_changed_event_t
     uint32_t new_z;
 };
 
-// \meta reflection_struct_meta = "first_singleton_t"
+KAN_REFLECTION_STRUCT_META (first_singleton_t)
 TEST_REPOSITORY_API struct kan_repository_meta_automatic_on_change_event_t first_singleton_z_changed_event = {
     .event_type = "first_singleton_z_changed_event_t",
     .observed_fields_count = 1u,
@@ -88,7 +87,7 @@ struct first_singleton_a_b_changed_event_t
     float new_b;
 };
 
-// \meta reflection_struct_meta = "first_singleton_t"
+KAN_REFLECTION_STRUCT_META (first_singleton_t)
 TEST_REPOSITORY_API struct kan_repository_meta_automatic_on_change_event_t first_singleton_a_b_changed_event = {
     .event_type = "first_singleton_a_b_changed_event_t",
     .observed_fields_count = 2u,
@@ -153,7 +152,7 @@ TEST_REPOSITORY_API void object_record_init (struct object_record_t *data)
     data->data_y = 0u;
 }
 
-// \meta reflection_struct_meta = "object_record_t"
+KAN_REFLECTION_STRUCT_META (object_record_t)
 TEST_REPOSITORY_API struct kan_repository_meta_automatic_cascade_deletion_t object_record_hierarchy_cascade_deletion = {
     .parent_key_path = {.reflection_path_length = 1u, .reflection_path = (const char *[]) {"object_id"}},
     .child_type_name = "object_record_t",
@@ -178,7 +177,7 @@ TEST_REPOSITORY_API void status_record_init (struct status_record_t *data)
     data->observable_boosted = KAN_FALSE;
 }
 
-// \meta reflection_struct_meta = "object_record_t"
+KAN_REFLECTION_STRUCT_META (object_record_t)
 TEST_REPOSITORY_API struct kan_repository_meta_automatic_cascade_deletion_t status_record_object_cascade_deletion = {
     .parent_key_path = {.reflection_path_length = 1u, .reflection_path = (const char *[]) {"object_id"}},
     .child_type_name = "status_record_t",
@@ -191,7 +190,7 @@ struct status_record_on_insert_event_t
     kan_bool_t initially_alive;
 };
 
-// \meta reflection_struct_meta = "status_record_t"
+KAN_REFLECTION_STRUCT_META (status_record_t)
 TEST_REPOSITORY_API struct kan_repository_meta_automatic_on_insert_event_t status_record_on_insert = {
     .event_type = "status_record_on_insert_event_t",
     .copy_outs_count = 2u,
@@ -221,7 +220,7 @@ struct status_record_on_change_event_t
     kan_bool_t now_boosted;
 };
 
-// \meta reflection_struct_meta = "status_record_t"
+KAN_REFLECTION_STRUCT_META (status_record_t)
 TEST_REPOSITORY_API struct kan_repository_meta_automatic_on_change_event_t status_record_on_change = {
     .event_type = "status_record_on_change_event_t",
     .observed_fields_count = 4u,
@@ -290,7 +289,7 @@ struct status_record_on_delete_event_t
     kan_bool_t was_alive;
 };
 
-// \meta reflection_struct_meta = "status_record_t"
+KAN_REFLECTION_STRUCT_META (status_record_t)
 TEST_REPOSITORY_API struct kan_repository_meta_automatic_on_delete_event_t status_record_on_delete = {
     .event_type = "status_record_on_delete_event_t",
     .copy_outs_count = 2u,
@@ -319,7 +318,7 @@ TEST_REPOSITORY_API void multi_component_record_init (struct multi_component_rec
     data->some_data = 0u;
 }
 
-// \meta reflection_struct_meta = "object_record_t"
+KAN_REFLECTION_STRUCT_META (object_record_t)
 TEST_REPOSITORY_API struct kan_repository_meta_automatic_cascade_deletion_t
     multi_component_record_object_cascade_deletion = {
         .parent_key_path = {.reflection_path_length = 1u, .reflection_path = (const char *[]) {"object_id"}},
@@ -334,7 +333,7 @@ struct bounding_box_component_record_t
     float max[3u];
 };
 
-// \meta reflection_struct_meta = "object_record_t"
+KAN_REFLECTION_STRUCT_META (object_record_t)
 TEST_REPOSITORY_API struct kan_repository_meta_automatic_cascade_deletion_t
     bounding_box_component_record_object_cascade_deletion = {
         .parent_key_path = {.reflection_path_length = 1u, .reflection_path = (const char *[]) {"object_id"}},

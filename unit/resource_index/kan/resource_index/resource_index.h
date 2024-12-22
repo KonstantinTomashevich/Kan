@@ -5,6 +5,7 @@
 #include <kan/api_common/c_header.h>
 #include <kan/container/dynamic_array.h>
 #include <kan/container/interned_string.h>
+#include <kan/reflection/markup.h>
 
 /// \file
 /// \brief Contains serializable data structure that works as resource index.
@@ -44,7 +45,7 @@ struct kan_resource_index_native_container_t
 {
     kan_interned_string_t type;
 
-    /// \meta reflection_dynamic_array_type = "struct kan_resource_index_native_item_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_resource_index_native_item_t)
     struct kan_dynamic_array_t items;
 };
 
@@ -70,10 +71,10 @@ RESOURCE_INDEX_API void kan_resource_index_third_party_item_shutdown (
 /// \brief Serializable structure for serializing and deserializing resource indices.
 struct kan_resource_index_t
 {
-    /// \meta reflection_dynamic_array_type = "struct kan_resource_index_native_container_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_resource_index_native_container_t)
     struct kan_dynamic_array_t native;
 
-    /// \meta reflection_dynamic_array_type = "struct kan_resource_index_third_party_item_t"
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_resource_index_third_party_item_t)
     struct kan_dynamic_array_t third_party;
 };
 
