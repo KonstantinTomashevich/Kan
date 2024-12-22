@@ -43,7 +43,7 @@ function (reflection_preprocessor_setup_step)
 
     list (JOIN INPUTS "\n" INPUTS_LIST_CONTENT)
     set (LIST_FILE_NAME "${CMAKE_CURRENT_BINARY_DIR}/${CURRENT_UNIT_NAME}.reflection.list")
-    file (WRITE "${LIST_FILE_NAME}" "${INPUTS_LIST_CONTENT}")
+    file_write_if_not_equal ("${LIST_FILE_NAME}" "${INPUTS_LIST_CONTENT}")
 
     concrete_preprocessing_queue_step_gather (
             COMMAND reflection_preprocessor
