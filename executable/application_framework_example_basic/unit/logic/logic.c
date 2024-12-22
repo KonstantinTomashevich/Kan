@@ -13,9 +13,7 @@
 #include <kan/universe_resource_provider/universe_resource_provider.h>
 #include <kan/universe_time/universe_time.h>
 
-// \c_interface_scanner_disable
 KAN_LOG_DEFINE_CATEGORY (application_framework_example_basic_logic_test_mode);
-// \c_interface_scanner_enable
 
 struct test_data_type_t
 {

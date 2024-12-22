@@ -14,9 +14,7 @@
 
 #include <example_import/icon.h>
 
-// \c_interface_scanner_disable
 KAN_LOG_DEFINE_CATEGORY (application_framework_example_basic_logic_test_mode);
-// \c_interface_scanner_enable
 
 struct test_singleton_t
 {

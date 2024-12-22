@@ -7,9 +7,7 @@
 // We're not using universe preprocessor here as we're utilizing macros to write the same logic for 2d and 3d.
 // However, the might be changed in the future.
 
-// \c_interface_scanner_disable
 KAN_LOG_DEFINE_CATEGORY (universe_transform);
-// \c_interface_scanner_enable
 
 KAN_REFLECTION_STRUCT_META (kan_transform_2_component_t)
 UNIVERSE_TRANSFORM_API struct kan_repository_meta_automatic_cascade_deletion_t

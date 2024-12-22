@@ -9,10 +9,8 @@
 #include <kan/repository/repository.h>
 #include <kan/testing/testing.h>
 
-// \c_interface_scanner_disable
 KAN_REFLECTION_EXPECT_UNIT_REGISTRAR (repository);
 KAN_REFLECTION_EXPECT_UNIT_REGISTRAR (test_repository);
-// \c_interface_scanner_enable
 
 struct manual_event_t
 {

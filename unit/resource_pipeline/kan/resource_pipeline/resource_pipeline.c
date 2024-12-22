@@ -9,9 +9,7 @@
 #include <kan/reflection/struct_helpers.h>
 #include <kan/resource_pipeline/resource_pipeline.h>
 
-// \c_interface_scanner_disable
 KAN_LOG_DEFINE_CATEGORY (resource_reference);
-// \c_interface_scanner_enable
 
 static kan_allocation_group_t detected_references_container_allocation_group;
 static kan_allocation_group_t platform_configuration_allocation_group;

@@ -19,9 +19,7 @@
 #include <kan/threading/atomic.h>
 #include <kan/virtual_file_system/virtual_file_system.h>
 
-// \c_interface_scanner_disable
 KAN_LOG_DEFINE_CATEGORY (virtual_file_system);
-// \c_interface_scanner_enable
 
 KAN_REFLECTION_EXPECT_UNIT_REGISTRAR_LOCAL (virtual_file_system_kan);
 

@@ -642,9 +642,7 @@ static void load_map_rd (struct map_t *map, kan_reflection_registry_t registry)
     buffered_file_stream->operations->close (buffered_file_stream);
 }
 
-// \c_interface_scanner_disable
 KAN_REFLECTION_EXPECT_UNIT_REGISTRAR (test_serialization);
-// \c_interface_scanner_enable
 
 KAN_TEST_CASE (binary_no_interned_string_registry)
 {

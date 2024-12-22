@@ -9,9 +9,7 @@
 #include <kan/universe/universe.h>
 #include <kan/universe_resource_provider/universe_resource_provider.h>
 
-// \c_interface_scanner_disable
 KAN_LOG_DEFINE_CATEGORY (application_framework_example_compilation_state);
-// \c_interface_scanner_enable
 
 struct numbers_t
 {

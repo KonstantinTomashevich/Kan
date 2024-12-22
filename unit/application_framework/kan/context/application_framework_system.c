@@ -10,9 +10,7 @@
 #include <kan/log/logging.h>
 #include <kan/memory/allocation.h>
 
-// \c_interface_scanner_disable
 KAN_LOG_DEFINE_CATEGORY (context_application_framework_system);
-// \c_interface_scanner_enable
 
 struct application_framework_system_t
 {

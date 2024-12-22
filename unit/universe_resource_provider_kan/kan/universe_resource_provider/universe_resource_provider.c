@@ -25,9 +25,7 @@
 #include <kan/universe_resource_provider/universe_resource_provider.h>
 #include <kan/virtual_file_system/virtual_file_system.h>
 
-// \c_interface_scanner_disable
 KAN_LOG_DEFINE_CATEGORY (universe_resource_provider);
-// \c_interface_scanner_enable
 
 UNIVERSE_RESOURCE_PROVIDER_KAN_API struct kan_universe_mutator_group_meta_t resource_provider_group_meta = {
     .group_name = KAN_RESOURCE_PROVIDER_MUTATOR_GROUP,
@@ -4591,7 +4589,6 @@ static inline void generated_mutator_shutdown_node (struct resource_provider_nat
 {
 }
 
-// \c_interface_scanner_disable
 KAN_UNIVERSE_REFLECTION_GENERATOR_MUTATOR_FUNCTIONS (generated_mutator,
                                                      struct kan_reflection_generator_universe_resource_provider_t,
                                                      struct universe_resource_provider_generated_container_type_node_t,
@@ -4604,7 +4601,6 @@ KAN_UNIVERSE_REFLECTION_GENERATOR_MUTATOR_FUNCTIONS (generated_mutator,
                                                      mutator_template_execute_resource_provider,
                                                      mutator_template_undeploy_resource_provider,
                                                      resource_provider_state_shutdown)
-// \c_interface_scanner_enable
 
 UNIVERSE_RESOURCE_PROVIDER_KAN_API void kan_reflection_generator_universe_resource_provider_finalize (
     struct kan_reflection_generator_universe_resource_provider_t *instance, kan_reflection_registry_t registry)

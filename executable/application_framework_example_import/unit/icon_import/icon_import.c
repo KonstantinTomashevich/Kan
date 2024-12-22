@@ -9,9 +9,7 @@
 
 #include <example_import/icon.h>
 
-// \c_interface_scanner_disable
 KAN_LOG_DEFINE_CATEGORY (icon_import);
-// \c_interface_scanner_enable
 
 struct icon_import_configuration_t
 {

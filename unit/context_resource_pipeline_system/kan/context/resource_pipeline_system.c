@@ -14,9 +14,7 @@
 #include <kan/stream/random_access_stream_buffer.h>
 #include <kan/threading/atomic.h>
 
-// \c_interface_scanner_disable
 KAN_LOG_DEFINE_CATEGORY (resource_pipeline_system);
-// \c_interface_scanner_enable
 
 struct platform_configuration_t
 {

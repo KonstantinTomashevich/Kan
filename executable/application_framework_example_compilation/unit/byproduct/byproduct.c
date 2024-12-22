@@ -15,9 +15,7 @@
 
 #include <common/platform_configuration.h>
 
-// \c_interface_scanner_disable
 KAN_LOG_DEFINE_CATEGORY (application_framework_example_compilation_byproduct);
-// \c_interface_scanner_enable
 
 // Shader source byproducts are created for every source separately.
 // We don't want to parse one shader code several times, therefore we use byproducts to merge everything.

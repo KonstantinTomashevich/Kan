@@ -8,9 +8,7 @@
 #include <kan/precise_time/precise_time.h>
 #include <kan/universe/universe.h>
 
-// \c_interface_scanner_disable
 KAN_LOG_DEFINE_CATEGORY (application_framework_verify_code_hot_reload);
-// \c_interface_scanner_enable
 
 struct verify_code_hot_reload_scheduler_state_t
 {

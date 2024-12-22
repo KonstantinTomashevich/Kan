@@ -504,7 +504,6 @@ void migration_reflection_population_system_destroy (kan_context_system_t handle
     kan_free_general (system->group, system, sizeof (struct migration_reflection_population_system_t));
 }
 
-// \c_interface_scanner_disable
 TEST_UNIVERSE_API struct kan_context_system_api_t KAN_CONTEXT_SYSTEM_API_NAME (
     migration_reflection_population_system_t) = {
     .name = "migration_reflection_population_system_t",
@@ -515,7 +514,6 @@ TEST_UNIVERSE_API struct kan_context_system_api_t KAN_CONTEXT_SYSTEM_API_NAME (
     .disconnect = migration_reflection_population_system_disconnect,
     .destroy = migration_reflection_population_system_destroy,
 };
-// \c_interface_scanner_enable
 
 KAN_TEST_CASE (update_only)
 {
