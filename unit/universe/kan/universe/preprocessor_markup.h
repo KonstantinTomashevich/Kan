@@ -50,6 +50,10 @@
 /// };
 /// ```
 ///
+/// Alternatively, there can be states with pre-filled queries (queries created manually, not through preprocessor).
+/// State is declared pre-filled when its binding is found before KAN_UP_GENERATE_STATE_QUERIES with this name.
+/// In this case, KAN_UP_GENERATE_STATE_QUERIES should never be called for this state.
+///
 /// State name argument is later used for binding states.
 ///
 /// Binding state means that all queries below (until another binding) are working with the state that has given name
@@ -124,6 +128,8 @@ KAN_C_HEADER_BEGIN
         kan_memory_size_t STATE_NAME##_fake_placeholder_field;
 
 /// \brief Binds state by name with given path for all queries below (until another bind overrides it).
+/// \details If state is not declared yet, declares it, making it a pre-filled queries state.
+///          KAN_UP_GENERATE_STATE_QUERIES can no longer be called for such state.
 #    define KAN_UP_BIND_STATE(STATE_NAME, STATE_PATH) /* No highlight-time replacement. */
 
 /// \brief Closes current query access and cursor and then emits break keyword.
@@ -185,24 +191,28 @@ KAN_C_HEADER_BEGIN
 #    define KAN_UP_SEQUENCE_READ(NAME, TYPE)                                                                           \
         /* Highlight-autocomplete replacement. */                                                                      \
         const struct TYPE *NAME = NULL;                                                                                \
+        struct kan_repository_indexed_sequence_read_access_t NAME##_access = {0};                                      \
         for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
 
 /// \brief Header for indexed sequence update query.
 #    define KAN_UP_SEQUENCE_UPDATE(NAME, TYPE)                                                                         \
         /* Highlight-autocomplete replacement. */                                                                      \
         struct TYPE *NAME = NULL;                                                                                      \
+        struct kan_repository_indexed_sequence_update_access_t NAME##_access = {0};                                    \
         for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
 
 /// \brief Header for indexed sequence delete query.
 #    define KAN_UP_SEQUENCE_DELETE(NAME, TYPE)                                                                         \
         /* Highlight-autocomplete replacement. */                                                                      \
         const struct TYPE *NAME = NULL;                                                                                \
+        struct kan_repository_indexed_sequence_delete_access_t NAME##_access = {0};                                    \
         for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
 
 /// \brief Header for indexed sequence write query.
 #    define KAN_UP_SEQUENCE_WRITE(NAME, TYPE)                                                                          \
         /* Highlight-autocomplete replacement. */                                                                      \
         struct TYPE *NAME = NULL;                                                                                      \
+        struct kan_repository_indexed_sequence_write_access_t NAME##_access = {0};                                     \
         for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
 
 /// \brief Header for indexed value read query.
@@ -210,6 +220,7 @@ KAN_C_HEADER_BEGIN
         /* Highlight-autocomplete replacement. */                                                                      \
         const struct TYPE *NAME = NULL;                                                                                \
         const void *NAME##_argument_user = ARGUMENT_POINTER;                                                           \
+        struct kan_repository_indexed_value_read_access_t NAME##_access = {0};                                         \
         for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
 
 /// \brief Header for indexed value update query.
@@ -217,6 +228,7 @@ KAN_C_HEADER_BEGIN
         /* Highlight-autocomplete replacement. */                                                                      \
         struct TYPE *NAME = NULL;                                                                                      \
         const void *NAME##_argument_user = ARGUMENT_POINTER;                                                           \
+        struct kan_repository_indexed_value_update_access_t NAME##_access = {0};                                       \
         for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
 
 /// \brief Header for indexed value delete query.
@@ -224,6 +236,7 @@ KAN_C_HEADER_BEGIN
         /* Highlight-autocomplete replacement. */                                                                      \
         const struct TYPE *NAME = NULL;                                                                                \
         const void *NAME##_argument_user = ARGUMENT_POINTER;                                                           \
+        struct kan_repository_indexed_value_delete_access_t NAME##_access = {0};                                       \
         for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
 
 /// \brief Header for indexed value write query.
@@ -231,30 +244,35 @@ KAN_C_HEADER_BEGIN
         /* Highlight-autocomplete replacement. */                                                                      \
         struct TYPE *NAME = NULL;                                                                                      \
         const void *NAME##_argument_user = ARGUMENT_POINTER;                                                           \
+        struct kan_repository_indexed_value_write_access_t NAME##_access = {0};                                        \
         for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
 
 /// \brief Header for indexed signal read query.
 #    define KAN_UP_SIGNAL_READ(NAME, TYPE, FIELD, NUMERIC_CONSTANT)                                                    \
         /* Highlight-autocomplete replacement. */                                                                      \
         const struct TYPE *NAME = NULL;                                                                                \
+        struct kan_repository_indexed_signal_read_access_t NAME##_access = {0};                                        \
         for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
 
 /// \brief Header for indexed signal update query.
 #    define KAN_UP_SIGNAL_UPDATE(NAME, TYPE, FIELD, NUMERIC_CONSTANT)                                                  \
         /* Highlight-autocomplete replacement. */                                                                      \
         struct TYPE *NAME = NULL;                                                                                      \
+        struct kan_repository_indexed_signal_update_access_t NAME##_access = {0};                                      \
         for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
 
 /// \brief Header for indexed signal delete query.
 #    define KAN_UP_SIGNAL_DELETE(NAME, TYPE, FIELD, NUMERIC_CONSTANT)                                                  \
         /* Highlight-autocomplete replacement. */                                                                      \
         const struct TYPE *NAME = NULL;                                                                                \
+        struct kan_repository_indexed_signal_delete_access_t NAME##_access = {0};                                      \
         for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
 
 /// \brief Header for indexed signal write query.
 #    define KAN_UP_SIGNAL_WRITE(NAME, TYPE, FIELD, NUMERIC_CONSTANT)                                                   \
         /* Highlight-autocomplete replacement. */                                                                      \
         struct TYPE *NAME = NULL;                                                                                      \
+        struct kan_repository_indexed_signal_write_access_t NAME##_access = {0};                                       \
         for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
 
 /// \brief Header for indexed interval ascending read query.
@@ -263,6 +281,7 @@ KAN_C_HEADER_BEGIN
         const struct TYPE *NAME = NULL;                                                                                \
         const void *NAME##_argument_min_user = ARGUMENT_MIN_POINTER;                                                   \
         const void *NAME##_argument_max_user = ARGUMENT_MAX_POINTER;                                                   \
+        struct kan_repository_indexed_interval_read_access_t NAME##_access = {0};                                      \
         for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
 
 /// \brief Header for indexed interval ascending update query.
@@ -271,6 +290,7 @@ KAN_C_HEADER_BEGIN
         struct TYPE *NAME = NULL;                                                                                      \
         const void *NAME##_argument_min_user = ARGUMENT_MIN_POINTER;                                                   \
         const void *NAME##_argument_max_user = ARGUMENT_MAX_POINTER;                                                   \
+        struct kan_repository_indexed_interval_update_access_t NAME##_access = {0};                                    \
         for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
 
 /// \brief Header for indexed interval ascending delete query.
@@ -279,6 +299,7 @@ KAN_C_HEADER_BEGIN
         const struct TYPE *NAME = NULL;                                                                                \
         const void *NAME##_argument_min_user = ARGUMENT_MIN_POINTER;                                                   \
         const void *NAME##_argument_max_user = ARGUMENT_MAX_POINTER;                                                   \
+        struct kan_repository_indexed_interval_delete_access_t NAME##_access = {0};                                    \
         for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
 
 /// \brief Header for indexed interval ascending write query.
@@ -287,6 +308,7 @@ KAN_C_HEADER_BEGIN
         struct TYPE *NAME = NULL;                                                                                      \
         const void *NAME##_argument_min_user = ARGUMENT_MIN_POINTER;                                                   \
         const void *NAME##_argument_max_user = ARGUMENT_MAX_POINTER;                                                   \
+        struct kan_repository_indexed_interval_write_access_t NAME##_access = {0};                                     \
         for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
 
 /// \brief Header for indexed interval descending read query.
@@ -295,6 +317,7 @@ KAN_C_HEADER_BEGIN
         const struct TYPE *NAME = NULL;                                                                                \
         const void *NAME##_argument_min_user = ARGUMENT_MIN_POINTER;                                                   \
         const void *NAME##_argument_max_user = ARGUMENT_MAX_POINTER;                                                   \
+        struct kan_repository_indexed_interval_read_access_t NAME##_access = {0};                                      \
         for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
 
 /// \brief Header for indexed interval descending update query
@@ -303,6 +326,7 @@ KAN_C_HEADER_BEGIN
         struct TYPE *NAME = NULL;                                                                                      \
         const void *NAME##_argument_min_user = ARGUMENT_MIN_POINTER;                                                   \
         const void *NAME##_argument_max_user = ARGUMENT_MAX_POINTER;                                                   \
+        struct kan_repository_indexed_interval_update_access_t NAME##_access = {0};                                    \
         for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
 
 /// \brief Header for indexed interval descending delete query
@@ -311,6 +335,7 @@ KAN_C_HEADER_BEGIN
         const struct TYPE *NAME = NULL;                                                                                \
         const void *NAME##_argument_min_user = ARGUMENT_MIN_POINTER;                                                   \
         const void *NAME##_argument_max_user = ARGUMENT_MAX_POINTER;                                                   \
+        struct kan_repository_indexed_interval_delete_access_t NAME##_access = {0};                                    \
         for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
 
 /// \brief Header for indexed interval descending write query
@@ -319,6 +344,7 @@ KAN_C_HEADER_BEGIN
         struct TYPE *NAME = NULL;                                                                                      \
         const void *NAME##_argument_min_user = ARGUMENT_MIN_POINTER;                                                   \
         const void *NAME##_argument_max_user = ARGUMENT_MAX_POINTER;                                                   \
+        struct kan_repository_indexed_interval_write_access_t NAME##_access = {0};                                     \
         for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
 
 /// \brief Header for event insert query.

@@ -54,6 +54,7 @@ static struct
 
     kan_bool_t is_output_phase;
     kan_bool_t scan_expects_new_block_for_query;
+    char output_last_char;
 
     char input_buffer[INPUT_BUFFER_SIZE];
     char *limit;
@@ -74,6 +75,7 @@ static struct
     struct kan_file_system_path_container_t current_file_path;
 
 } io = {.input_stream = NULL,
+        .output_last_char = '\0',
         .input_buffer = {0},
         .limit = io.input_buffer + INPUT_BUFFER_SIZE - 1u,
         .cursor = io.input_buffer + INPUT_BUFFER_SIZE - 1u,
@@ -381,7 +383,9 @@ static inline kan_bool_t scan_generate_state_queries (const char *name_begin, co
         struct scanned_state_t *state = &((struct scanned_state_t *) scan.states.data)[index];
         if (state->name == name)
         {
-            fprintf (stderr, "[%s:%ld:%ld]: Caught attempt to generate state \"%s\" queries in two different places.\n",
+            fprintf (stderr,
+                     "[%s:%ld:%ld]: Caught attempt to generate state \"%s\" queries while queries are either already "
+                     "generated or state uses pre-filled queries.\n",
                      io.current_file_path.path, (long) io.current_file_line, (long) io.cursor_symbol, name);
             return KAN_FALSE;
         }
@@ -416,11 +420,19 @@ static inline kan_bool_t scan_bind_state (const char *name_begin,
         }
     }
 
-    fprintf (stderr,
-             "[%s:%ld:%ld]: Caught attempt to bind state \"%s\" which is not previously declared through "
-             "KAN_UP_GENERATE_STATE_QUERIES.\n",
-             io.current_file_path.path, (long) io.current_file_line, (long) io.cursor_symbol, name);
-    return KAN_FALSE;
+    // State with pre-filled queries.
+    struct scanned_state_t *new_state = kan_dynamic_array_add_last (&scan.states);
+    if (!new_state)
+    {
+        kan_dynamic_array_set_capacity (&scan.states, KAN_MAX (1u, scan.states.size * 2u));
+        new_state = kan_dynamic_array_add_last (&scan.states);
+        KAN_ASSERT (new_state)
+    }
+
+    scanned_state_init (new_state);
+    new_state->name = name;
+    scan.scan_bound_state_index = scan.states.size - 1u;
+    return KAN_TRUE;
 }
 
 static inline kan_bool_t scan_ensure_state_bound (void)
@@ -826,6 +838,7 @@ static inline kan_bool_t output_string (const char *string)
         return KAN_TRUE;
     }
 
+    io.output_last_char = string[string_length - 1u];
     for (kan_loop_size_t index = 0u; index < string_length; ++index)
     {
         if (string[index] == '\n')
@@ -845,6 +858,7 @@ static inline kan_bool_t output_sequence (const char *begin, const char *end)
         return KAN_TRUE;
     }
 
+    io.output_last_char = *(end - 1u);
     for (kan_loop_size_t index = 0u; index < string_length; ++index)
     {
         if (begin[index] == '\n')
@@ -860,6 +874,15 @@ static inline kan_bool_t output_use_current_file_line (void)
 {
     char number_buffer[32u];
     snprintf (number_buffer, 32u, "%lu", (unsigned long) io.current_file_line - 1);
+
+    if (io.output_last_char != '\n')
+    {
+        if (!output_string ("\n"))
+        {
+            return KAN_FALSE;
+        }
+    }
+
     return output_string ("#line ") && output_string (number_buffer) && output_string (" \"") &&
            output_string (io.current_file_path.path) && output_string ("\"\n");
 }
