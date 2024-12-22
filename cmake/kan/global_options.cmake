@@ -48,7 +48,6 @@ function (add_common_compile_options)
             if (MSVC)
                 add_compile_options (/W4 /WX)
 
-                # TODO: Can we move all preprocessor-related options somewhere to preprocessing stack only?
                 # Path is non-portable due to how MSVC preprocessor behaves.
                 add_compile_options (-Wno-nonportable-include-path)
             else ()
