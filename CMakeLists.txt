@@ -39,6 +39,3 @@ add_subdirectory (third_party)
 add_subdirectory (unit)
 add_subdirectory (test)
 add_subdirectory (executable)
-
-# TODO: It was observed that our solution of using binary dir as root for generated sources might sometimes make
-#       resulting object paths even longer, not shorter. It should be investigated again.
