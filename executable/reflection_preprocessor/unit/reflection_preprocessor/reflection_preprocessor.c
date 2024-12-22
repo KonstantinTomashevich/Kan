@@ -131,6 +131,7 @@ struct meta_storage_t
 
     kan_interned_string_t explicit_init_functor;
     kan_interned_string_t explicit_shutdown_functor;
+    kan_interned_string_t explicit_registration_name;
 
     struct type_info_t dynamic_array_type;
     kan_interned_string_t size_field;
@@ -329,6 +330,7 @@ static void meta_storage_init (struct meta_storage_t *storage)
 
     storage->explicit_init_functor = NULL;
     storage->explicit_shutdown_functor = NULL;
+    storage->explicit_registration_name = NULL;
 
     storage->size_field = NULL;
     storage->visibility_condition_field = NULL;
@@ -347,7 +349,8 @@ static void meta_storage_init (struct meta_storage_t *storage)
 static kan_bool_t meta_storage_is_empty (struct meta_storage_t *storage)
 {
     return !storage->export && !storage->flags && !storage->ignore && !storage->external_pointer &&
-           !storage->has_dynamic_array_type && !storage->size_field && !storage->visibility_condition_field &&
+           !storage->has_dynamic_array_type && !storage->explicit_init_functor && !storage->explicit_shutdown_functor &&
+           !storage->explicit_registration_name && !storage->size_field && !storage->visibility_condition_field &&
            !storage->first_visibility_condition_value && !storage->first_enum_meta && !storage->first_enum_value_meta &&
            !storage->first_struct_meta && !storage->first_struct_field_meta && !storage->first_function_meta &&
            !storage->first_function_argument_meta;
@@ -882,6 +885,21 @@ static inline enum parse_status_t continue_into_potential_pragma (kan_bool_t all
          return PARSE_STATUS_IN_PROGRESS;
      }
 
+     ("pragma" separator_no_nl+)? "kan_reflection_explicit_registration_name" separator_no_nl+
+     @name_begin identifier @name_end (")" | separators_till_nl)
+     {
+         if (parser.current_meta_storage.explicit_registration_name)
+         {
+             fprintf (stderr, "[%s:%lu:%lu] Encountered duplicate explicit registration name meta.\n",
+                 parser.current_target_node ? parser.current_target_node->path : "<unknown>",
+                 (unsigned long) parser.current_target_line - 1u, (unsigned long) parser.cursor_symbol - 1u);
+             return PARSE_STATUS_FAILED;
+         }
+
+         parser.current_meta_storage.explicit_registration_name = kan_char_sequence_intern (name_begin, name_end);
+         return PARSE_STATUS_IN_PROGRESS;
+     }
+
      "warning (push, " [0-9]+ "))" { return PARSE_STATUS_IN_PROGRESS; }
 
      "warning (pop))" { return PARSE_STATUS_IN_PROGRESS; }
@@ -1089,6 +1107,7 @@ struct enum_reflection_context_t
     kan_bool_t flags;
     kan_instance_size_t reflected_values_count;
     char *name;
+    kan_interned_string_t explicit_registration_name;
 };
 
 static inline void finish_enum_generation (struct enum_reflection_context_t *context)
@@ -1115,7 +1134,9 @@ static inline void finish_enum_generation (struct enum_reflection_context_t *con
     kan_trivial_string_buffer_append_string (&global.bootstrap_section, context->name);
     kan_trivial_string_buffer_append_string (&global.bootstrap_section, "_data = (struct kan_reflection_enum_t) {\n");
     kan_trivial_string_buffer_append_string (&global.bootstrap_section, "        .name = kan_string_intern (\"");
-    kan_trivial_string_buffer_append_string (&global.bootstrap_section, context->name);
+    kan_trivial_string_buffer_append_string (&global.bootstrap_section, context->explicit_registration_name ?
+                                                                            context->explicit_registration_name :
+                                                                            context->name);
     kan_trivial_string_buffer_append_string (&global.bootstrap_section, "\"),\n");
     kan_trivial_string_buffer_append_string (&global.bootstrap_section, "        .flags = ");
     kan_trivial_string_buffer_append_string (&global.bootstrap_section, context->flags ? "KAN_TRUE" : "KAN_FALSE");
@@ -1147,6 +1168,8 @@ static inline enum parse_status_t process_enum_value (struct enum_reflection_con
     INCOMPATIBLE_WITH_META (parser.current_meta_storage.explicit_init_functor, "Enum values", "explicit init functor")
     INCOMPATIBLE_WITH_META (parser.current_meta_storage.explicit_shutdown_functor, "Enum values",
                             "explicit shutdown functor")
+    INCOMPATIBLE_WITH_META (parser.current_meta_storage.explicit_registration_name, "Enum values",
+                            "explicit registration name")
     INCOMPATIBLE_WITH_META (parser.current_meta_storage.size_field, "Enum values", "size field")
     INCOMPATIBLE_WITH_META (parser.current_meta_storage.visibility_condition_field, "Enum values",
                             "visibility condition field")
@@ -1206,6 +1229,7 @@ static enum parse_status_t parse_enum_declaration (const char *declaration_name_
         .flags = parser.current_meta_storage.flags,
         .reflected_values_count = 0u,
         .name = NULL,
+        .explicit_registration_name = parser.current_meta_storage.explicit_registration_name,
     };
 
     if (context.reflected)
@@ -1321,6 +1345,7 @@ struct struct_reflection_context_t
     kan_bool_t reflected;
     kan_instance_size_t reflected_fields_count;
     char *name;
+    kan_interned_string_t explicit_registration_name;
 };
 
 static inline void finish_struct_generation (struct struct_reflection_context_t *context)
@@ -1348,7 +1373,9 @@ static inline void finish_struct_generation (struct struct_reflection_context_t 
     kan_trivial_string_buffer_append_string (&global.bootstrap_section, "_data = (struct kan_reflection_struct_t) {\n");
 
     kan_trivial_string_buffer_append_string (&global.bootstrap_section, "        .name = kan_string_intern (\"");
-    kan_trivial_string_buffer_append_string (&global.bootstrap_section, context->name);
+    kan_trivial_string_buffer_append_string (&global.bootstrap_section, context->explicit_registration_name ?
+                                                                            context->explicit_registration_name :
+                                                                            context->name);
     kan_trivial_string_buffer_append_string (&global.bootstrap_section, "\"),\n");
 
     kan_trivial_string_buffer_append_string (&global.bootstrap_section, "        .size = sizeof (struct ");
@@ -1525,6 +1552,8 @@ static inline enum parse_status_t process_struct_field (struct struct_reflection
     INCOMPATIBLE_WITH_META (parser.current_meta_storage.explicit_init_functor, "Struct fields", "explicit init functor")
     INCOMPATIBLE_WITH_META (parser.current_meta_storage.explicit_shutdown_functor, "Struct fields",
                             "explicit shutdown functor")
+    INCOMPATIBLE_WITH_META (parser.current_meta_storage.explicit_registration_name, "Struct fields",
+                            "explicit registration name")
     INCOMPATIBLE_WITH_META (parser.current_meta_storage.first_enum_meta, "Struct fields", "enum meta attachment")
     INCOMPATIBLE_WITH_META (parser.current_meta_storage.first_enum_value_meta, "Struct fields",
                             "enum value meta attachment")
@@ -1842,6 +1871,7 @@ static enum parse_status_t parse_struct_declaration (const char *declaration_nam
         .reflected = !parser.current_meta_storage.ignore,
         .reflected_fields_count = 0u,
         .name = NULL,
+        .explicit_registration_name = parser.current_meta_storage.explicit_registration_name,
     };
 
     if (context.reflected)
@@ -2045,6 +2075,7 @@ struct function_reflection_context_t
     kan_instance_size_t reflected_arguments_count;
     char *name;
     struct type_info_t first_argument_type;
+    kan_interned_string_t explicit_registration_name;
 };
 
 static inline kan_bool_t is_lifetime_functor (struct function_reflection_context_t *context)
@@ -2265,7 +2296,9 @@ static inline void finish_function_generation (struct function_reflection_contex
     kan_trivial_string_buffer_append_string (&global.bootstrap_section,
                                              "_data = (struct kan_reflection_function_t) {\n");
     kan_trivial_string_buffer_append_string (&global.bootstrap_section, "        .name = kan_string_intern (\"");
-    kan_trivial_string_buffer_append_string (&global.bootstrap_section, context->name);
+    kan_trivial_string_buffer_append_string (&global.bootstrap_section, context->explicit_registration_name ?
+                                                                            context->explicit_registration_name :
+                                                                            context->name);
     kan_trivial_string_buffer_append_string (&global.bootstrap_section, "\"),\n");
 
     kan_trivial_string_buffer_append_string (&global.bootstrap_section, "        .call = call_functor_");
@@ -2333,6 +2366,8 @@ static inline enum parse_status_t process_function_argument (struct function_ref
                             "explicit init functor")
     INCOMPATIBLE_WITH_META (parser.current_meta_storage.explicit_shutdown_functor, "Function arguments",
                             "explicit shutdown functor")
+    INCOMPATIBLE_WITH_META (parser.current_meta_storage.explicit_registration_name, "Function arguments",
+                            "explicit registration name")
     INCOMPATIBLE_WITH_META (parser.current_meta_storage.size_field, "Function arguments", "size field")
     INCOMPATIBLE_WITH_META (parser.current_meta_storage.visibility_condition_field, "Function arguments",
                             "visibility condition field")
@@ -2412,6 +2447,7 @@ static enum parse_status_t parse_function_declaration (struct type_info_t *retur
         .reflected = parser.current_meta_storage.export,
         .reflected_arguments_count = 0u,
         .name = NULL,
+        .explicit_registration_name = parser.current_meta_storage.explicit_registration_name,
     };
 
     if (context.reflected)
@@ -2601,6 +2637,8 @@ static enum parse_status_t process_parsed_symbol (const char *declaration_name_b
     INCOMPATIBLE_WITH_META (parser.current_meta_storage.explicit_init_functor, "Symbols", "explicit init functor")
     INCOMPATIBLE_WITH_META (parser.current_meta_storage.explicit_shutdown_functor, "Symbols",
                             "explicit shutdown functor")
+    INCOMPATIBLE_WITH_META (parser.current_meta_storage.explicit_registration_name, "Symbols",
+                            "explicit registration name")
     INCOMPATIBLE_WITH_META (parser.current_meta_storage.size_field, "Symbols", "size field")
     INCOMPATIBLE_WITH_META (parser.current_meta_storage.visibility_condition_field, "Symbols",
                             "visibility condition field")

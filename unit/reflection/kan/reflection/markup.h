@@ -59,3 +59,9 @@
 /// \brief Marks next symbol as meta for given function argument of given function.
 #define KAN_REFLECTION_FUNCTION_ARGUMENT_META(FUNCTION_NAME, FUNCTION_ARGUMENT_NAME)                                   \
     KAN_MAKE_PRAGMA (kan_reflection_function_argument_meta FUNCTION_NAME FUNCTION_ARGUMENT_NAME)
+
+/// \brief Allows to explicitly override registered enum/struct/function name.
+/// \details It is only aimed for specific cases in tests and should not be used in real projects.
+///          As it is only changes registration name and nothing else, most implicit features do not apply.
+///          But meta should use new explicit name instead of the real one.
+#define KAN_REFLECTION_EXPLICIT_REGISTRATION_NAME(NAME) KAN_MAKE_PRAGMA (kan_reflection_explicit_registration_name NAME)

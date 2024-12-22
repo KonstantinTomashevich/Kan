@@ -4,11 +4,7 @@
 #include <kan/universe/preprocessor_markup.h>
 #include <kan/universe/universe.h>
 
-// We need those defines to trick the reflection generator and generate reflection with the fake equal names.
-#define migration_counters_singleton_init migration_counters_singleton_init_1
-#define kan_universe_scheduler_execute_migration_scheduler kan_universe_scheduler_execute_migration_scheduler_1
-#define kan_universe_mutator_execute_migration_mutator kan_universe_mutator_execute_migration_mutator_1
-
+KAN_REFLECTION_EXPLICIT_INIT_FUNCTOR (migration_counters_singleton_init_migrated)
 struct migration_counters_singleton_t
 {
     kan_instance_size_t pre_migration_scheduler_counter;
@@ -17,7 +13,8 @@ struct migration_counters_singleton_t
     kan_instance_size_t post_migration_mutator_counter;
 };
 
-TEST_UNIVERSE_POST_MIGRATION_API void migration_counters_singleton_init (struct migration_counters_singleton_t *data)
+TEST_UNIVERSE_POST_MIGRATION_API void migration_counters_singleton_init_migrated (
+    struct migration_counters_singleton_t *data)
 {
     data->pre_migration_scheduler_counter = 0u;
     data->pre_migration_mutator_counter = 0u;
@@ -31,7 +28,8 @@ struct migration_scheduler_state_t
     KAN_UP_BIND_STATE (migration_scheduler, state)
 };
 
-TEST_UNIVERSE_POST_MIGRATION_API void kan_universe_scheduler_execute_migration_scheduler (
+KAN_REFLECTION_EXPLICIT_REGISTRATION_NAME (kan_universe_scheduler_execute_migration_scheduler)
+TEST_UNIVERSE_POST_MIGRATION_API void kan_universe_scheduler_execute_migration_scheduler_migrated (
     kan_universe_scheduler_interface_t interface, struct migration_scheduler_state_t *state)
 {
     {
@@ -61,7 +59,8 @@ struct migration_mutator_state_t
     KAN_UP_BIND_STATE (migration_mutator, state)
 };
 
-TEST_UNIVERSE_POST_MIGRATION_API void kan_universe_mutator_execute_migration_mutator (
+KAN_REFLECTION_EXPLICIT_REGISTRATION_NAME (kan_universe_mutator_execute_migration_mutator)
+TEST_UNIVERSE_POST_MIGRATION_API void kan_universe_mutator_execute_migration_mutator_migrated (
     kan_cpu_job_t job, struct migration_mutator_state_t *state)
 {
     KAN_UP_SINGLETON_WRITE (counters, migration_counters_singleton_t)
