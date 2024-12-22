@@ -111,7 +111,7 @@ APPLICATION_FRAMEWORK_EXAMPLE_IMPORT_LOGIC_API void kan_universe_mutator_execute
                     KAN_ASSERT (KAN_TYPED_ID_32_IS_VALID (request->provided_container_id))
                     singleton->test_asset_loaded = KAN_TRUE;
 
-                    KAN_UP_VALUE_READ (view, resource_provider_container_icon_t, container_id,
+                    KAN_UP_VALUE_READ (view, KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (icon_t), container_id,
                                        &request->provided_container_id)
                     {
                         struct icon_t *icon =

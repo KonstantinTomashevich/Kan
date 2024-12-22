@@ -48,9 +48,9 @@
 /// \par Containers
 /// \parblock
 /// Loaded native resources are stored in special container types. Container types are automatically generated and are
-/// named according to pattern "resource_provider_container_<native_type_name>". Structure of container is represented
-/// by `kan_resource_container_view_t`. Keep in mind that if resource type requires alignment that is higher than
-/// `offsetof (kan_resource_container_view_t, data_begin)`, its data won't start at `data_begin`, but at
+/// named according to pattern specified in KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE. Structure of container is
+/// represented by `kan_resource_container_view_t`. Keep in mind that if resource type requires alignment that is higher
+/// than `offsetof (kan_resource_container_view_t, data_begin)`, its data won't start at `data_begin`, but at
 /// `data_begin + (alignment - offsetof (kan_resource_container_view_t, data_begin))` (in order to align it properly).
 /// \endparblock
 ///
@@ -92,8 +92,11 @@ KAN_C_HEADER_BEGIN
 /// \brief Name for resource provider configuration object in universe world.
 #define KAN_RESOURCE_PROVIDER_CONFIGURATION "resource_provider"
 
-/// \brief Prefix for resource provider container type names.
-#define KAN_RESOURCE_PROVIDER_CONTAINER_TYPE_PREFIX "resource_provider_container_"
+/// \brief Convenience macro for making resource container types from their resource types.
+#define KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE(RESOURCE_TYPE) resource_provider_container_##RESOURCE_TYPE
+
+/// \brief Macro that provides formatting string used to create resource provider container type names.
+#define KAN_RESOURCE_PROVIDER_CONTAINER_TYPE_FORMAT "resource_provider_container_%s"
 
 /// \brief Checkpoint, after which resource provider mutators are executed.
 #define KAN_RESOURCE_PROVIDER_BEGIN_CHECKPOINT "resource_provider_begin"

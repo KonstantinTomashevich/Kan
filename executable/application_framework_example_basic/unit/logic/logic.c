@@ -122,7 +122,7 @@ APPLICATION_FRAMEWORK_EXAMPLE_BASIC_LOGIC_API void kan_universe_mutator_execute_
             if (KAN_TYPED_ID_32_IS_VALID (request->provided_container_id))
             {
                 state->test_asset_loaded = KAN_TRUE;
-                KAN_UP_VALUE_READ (view, resource_provider_container_test_data_type_t, container_id,
+                KAN_UP_VALUE_READ (view, KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (test_data_type_t), container_id,
                                    &request->provided_container_id)
                 {
                     struct test_data_type_t *loaded_resource =

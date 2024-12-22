@@ -654,7 +654,7 @@ static void validate_material (struct byproduct_mutator_state_t *state,
 {
     KAN_UP_VALUE_READ (request, kan_resource_request_t, request_id, &request_id)
     {
-        KAN_UP_VALUE_READ (view, resource_provider_container_material_compiled_t, container_id,
+        KAN_UP_VALUE_READ (view, KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (material_compiled_t), container_id,
                            &request->provided_container_id)
         {
             kan_memory_size_t offset = offsetof (struct kan_resource_container_view_t, data_begin);
@@ -777,7 +777,7 @@ static void validate_loaded_data (struct byproduct_mutator_state_t *state,
     // Check random pipeline instance that it was compiled with expected format from configuration.
     KAN_UP_VALUE_READ (request, kan_resource_request_t, request_id, &test_singleton->any_pipeline_request_id)
     {
-        KAN_UP_VALUE_READ (view, resource_provider_container_pipeline_instance_byproduct_compiled_t, container_id,
+        KAN_UP_VALUE_READ (view, KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (byproduct_compiled_t), container_id,
                            &request->provided_container_id)
         {
             kan_memory_size_t offset = offsetof (struct kan_resource_container_view_t, data_begin);

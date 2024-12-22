@@ -4349,7 +4349,7 @@ static inline void reflection_generation_iteration_add_container_for_type (
 
 #define MAX_GENERATED_NAME_LENGTH 256u
     char buffer[MAX_GENERATED_NAME_LENGTH];
-    snprintf (buffer, MAX_GENERATED_NAME_LENGTH, KAN_RESOURCE_PROVIDER_CONTAINER_TYPE_PREFIX "%s", type->name);
+    snprintf (buffer, MAX_GENERATED_NAME_LENGTH, KAN_RESOURCE_PROVIDER_CONTAINER_TYPE_FORMAT, type->name);
     node->type.name = kan_string_intern (buffer);
 #undef MAX_GENERATED_NAME_LENGTH
 
