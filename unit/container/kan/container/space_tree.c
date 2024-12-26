@@ -804,23 +804,23 @@ static inline uint8_t calculate_insertion_target_height (struct kan_space_tree_t
                                                          const kan_space_tree_floating_t *min_sequence,
                                                          const kan_space_tree_floating_t *max_sequence)
 {
-    kan_space_tree_floating_t max_dimension_size = 0.0;
+    kan_space_tree_floating_t average_dimension_size = 0.0;
     switch (tree->dimension_count)
     {
     case 4u:
-        max_dimension_size = KAN_MAX (max_dimension_size, max_sequence[3u] - min_sequence[3u]);
+        average_dimension_size += (max_sequence[3u] - min_sequence[3u]) / (kan_floating_t) tree->dimension_count;
     case 3u:
-        max_dimension_size = KAN_MAX (max_dimension_size, max_sequence[2u] - min_sequence[2u]);
+        average_dimension_size += (max_sequence[2u] - min_sequence[2u]) / (kan_floating_t) tree->dimension_count;
     case 2u:
-        max_dimension_size = KAN_MAX (max_dimension_size, max_sequence[1u] - min_sequence[1u]);
+        average_dimension_size += (max_sequence[1u] - min_sequence[1u]) / (kan_floating_t) tree->dimension_count;
     case 1u:
-        max_dimension_size = KAN_MAX (max_dimension_size, max_sequence[0u] - min_sequence[0u]);
+        average_dimension_size += (max_sequence[0u] - min_sequence[0u]) / (kan_floating_t) tree->dimension_count;
     }
 
     kan_space_tree_floating_t child_node_size = 0.125 * (tree->global_max - tree->global_min);
     uint8_t target_height = 1u;
 
-    while (max_dimension_size < child_node_size && target_height < tree->last_level_height)
+    while (average_dimension_size < child_node_size && target_height < tree->last_level_height)
     {
         ++target_height;
         child_node_size *= 0.5;
@@ -1009,6 +1009,12 @@ kan_bool_t kan_space_tree_ray_is_first_occurrence (struct kan_space_tree_t *tree
     if (!iterator->has_previous_path_on_level)
     {
         // There was nothing before, so it is always a first occurrence.
+        return KAN_TRUE;
+    }
+
+    if (object_min.combined == object_max.combined)
+    {
+        // Object is stored inside one node, therefore we can safely say it is unique.
         return KAN_TRUE;
     }
 
