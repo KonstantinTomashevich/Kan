@@ -8,8 +8,6 @@ KAN_MUTE_THIRD_PARTY_WARNINGS_BEGIN
 #include <SDL3/SDL_messagebox.h>
 KAN_MUTE_THIRD_PARTY_WARNINGS_END
 
-#include <signal.h>
-
 #include <kan/container/hash_storage.h>
 #include <kan/error/context.h>
 #include <kan/error/critical.h>
