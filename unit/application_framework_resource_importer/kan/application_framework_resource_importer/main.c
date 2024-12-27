@@ -8,6 +8,7 @@
 #include <kan/context/reflection_system.h>
 #include <kan/cpu_dispatch/job.h>
 #include <kan/cpu_dispatch/task.h>
+#include <kan/error/context.h>
 #include <kan/error/critical.h>
 #include <kan/file_system/entry.h>
 #include <kan/file_system/path_container.h>
@@ -1091,7 +1092,7 @@ static void serve_finish_request (kan_functor_user_data_t user_data)
 
 int main (int argument_count, char **argument_values)
 {
-    kan_set_critical_error_interactive (KAN_FALSE);
+    kan_error_initialize ();
     if (argument_count < 2)
     {
         KAN_LOG (application_framework_resource_importer, KAN_LOG_ERROR,

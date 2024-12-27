@@ -10,6 +10,7 @@
 #include <kan/container/dynamic_array.h>
 #include <kan/container/interned_string.h>
 #include <kan/container/trivial_string_buffer.h>
+#include <kan/error/context.h>
 #include <kan/error/critical.h>
 #include <kan/file_system/path_container.h>
 #include <kan/file_system/stream.h>
@@ -3681,7 +3682,7 @@ static kan_bool_t perform_output_phase (void)
 
 int main (int argument_count, char **arguments_array)
 {
-    kan_set_critical_error_interactive (KAN_FALSE);
+    kan_error_initialize ();
     if (argument_count != 3)
     {
         fprintf (stderr,

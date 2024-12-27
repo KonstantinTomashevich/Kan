@@ -2,8 +2,6 @@
 
 #include <error_api.h>
 
-#include <stdint.h>
-
 #include <kan/api_common/c_header.h>
 #include <kan/api_common/core_types.h>
 
@@ -33,16 +31,16 @@
 KAN_C_HEADER_BEGIN
 
 /// \brief Selects whether interactive critical error reporting is enabled.
-ERROR_API void kan_set_critical_error_interactive (kan_bool_t is_interactive);
+ERROR_API void kan_error_set_critical_interactive (kan_bool_t is_interactive);
 
 /// \brief Reports that critical error has happened.
-ERROR_API void kan_critical_error (const char *message, const char *file, int line);
+ERROR_API void kan_error_critical (const char *message, const char *file, int line);
 
 #if defined(KAN_WITH_ASSERT)
 #    define KAN_ASSERT(...)                                                                                            \
         if (!(__VA_ARGS__))                                                                                            \
         {                                                                                                              \
-            kan_critical_error (#__VA_ARGS__, __FILE__, __LINE__);                                                     \
+            kan_error_critical (#__VA_ARGS__, __FILE__, __LINE__);                                                     \
         }
 #else
 #    define KAN_ASSERT(...)

@@ -241,7 +241,7 @@ kan_render_buffer_t kan_render_buffer_create (kan_render_context_t context,
 
             if (vmaMapMemory (system->gpu_memory_allocator, buffer->allocation, &memory) != VK_SUCCESS)
             {
-                kan_critical_error ("Unexpected failure while mapping buffer memory, unable to continue properly.",
+                kan_error_critical ("Unexpected failure while mapping buffer memory, unable to continue properly.",
                                     __FILE__, __LINE__);
             }
 
@@ -250,7 +250,7 @@ kan_render_buffer_t kan_render_buffer_create (kan_render_context_t context,
 
             if (vmaFlushAllocation (system->gpu_memory_allocator, buffer->allocation, 0u, full_size) != VK_SUCCESS)
             {
-                kan_critical_error (
+                kan_error_critical (
                     "Unexpected failure while flushing buffer initial data, unable to continue properly.", __FILE__,
                     __LINE__);
             }
@@ -295,7 +295,7 @@ void *kan_render_buffer_patch (kan_render_buffer_t buffer, vulkan_size_t slice_o
         if (vmaMapMemory (data->system->gpu_memory_allocator, staging_allocation.buffer->allocation, &memory) !=
             VK_SUCCESS)
         {
-            kan_critical_error ("Unexpected failure while mapping staging buffer memory, unable to continue properly.",
+            kan_error_critical ("Unexpected failure while mapping staging buffer memory, unable to continue properly.",
                                 __FILE__, __LINE__);
         }
 
@@ -328,7 +328,7 @@ void *kan_render_buffer_patch (kan_render_buffer_t buffer, vulkan_size_t slice_o
 
         if (vmaMapMemory (data->system->gpu_memory_allocator, data->allocation, &memory) != VK_SUCCESS)
         {
-            kan_critical_error ("Unexpected failure while mapping buffer memory, unable to continue properly.",
+            kan_error_critical ("Unexpected failure while mapping buffer memory, unable to continue properly.",
                                 __FILE__, __LINE__);
         }
 
@@ -359,7 +359,7 @@ void *kan_render_buffer_begin_access (kan_render_buffer_t buffer)
 
     if (vmaMapMemory (data->system->gpu_memory_allocator, data->allocation, &memory) != VK_SUCCESS)
     {
-        kan_critical_error ("Unexpected failure while mapping buffer memory, unable to continue properly.", __FILE__,
+        kan_error_critical ("Unexpected failure while mapping buffer memory, unable to continue properly.", __FILE__,
                             __LINE__);
     }
 

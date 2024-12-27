@@ -171,6 +171,13 @@ void kan_submit_log (kan_log_category_t category, enum kan_log_verbosity_t verbo
     kan_atomic_int_unlock (&logging_context_lock);
 }
 
+void kan_log_ensure_initialized (void)
+{
+    kan_atomic_int_lock (&logging_context_lock);
+    ensure_logging_context_initialized ();
+    kan_atomic_int_unlock (&logging_context_lock);
+}
+
 void kan_log_callback_add (kan_log_callback_t callback, kan_functor_user_data_t user_data)
 {
     kan_atomic_int_lock (&logging_context_lock);

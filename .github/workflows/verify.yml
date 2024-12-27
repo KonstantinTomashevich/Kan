@@ -105,7 +105,8 @@ jobs:
         run: ctest --build-config ${{matrix.build_type}} --parallel 4 --timeout 2 -LE GRAPHICS
 
       - name: Upload test results
-        if: ${{ success() }} || ${{ failure() }}
+        # We upload test results only on failure to avoid clogging everything with them.
+        if: ${{ failure() }}
         uses: actions/upload-artifact@v4
         with:
           name: test_results_${{matrix.preset}}

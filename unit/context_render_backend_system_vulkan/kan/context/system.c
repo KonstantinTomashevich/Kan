@@ -391,7 +391,7 @@ void render_backend_system_init (kan_context_system_t handle)
     struct render_backend_system_t *system = KAN_HANDLE_GET (handle);
     if (!kan_platform_application_register_vulkan_library_usage ())
     {
-        kan_critical_error ("Failed to register vulkan library usage, unable to continue properly.", __FILE__,
+        kan_error_critical ("Failed to register vulkan library usage, unable to continue properly.", __FILE__,
                             __LINE__);
     }
 
@@ -492,7 +492,7 @@ void render_backend_system_init (kan_context_system_t handle)
 
     if (vkCreateInstance (&instance_create_info, VULKAN_ALLOCATION_CALLBACKS (system), &system->instance) != VK_SUCCESS)
     {
-        kan_critical_error ("Failed to create Vulkan instance.", __FILE__, __LINE__);
+        kan_error_critical ("Failed to create Vulkan instance.", __FILE__, __LINE__);
     }
 
     volkLoadInstance (system->instance);
@@ -1326,7 +1326,7 @@ static void render_backend_system_begin_command_submission (struct render_backen
     if (vkBeginCommandBuffer (system->command_states[system->current_frame_in_flight_index].primary_command_buffer,
                               &buffer_begin_info) != VK_SUCCESS)
     {
-        kan_critical_error ("Failed to start recording primary buffer.", __FILE__, __LINE__);
+        kan_error_critical ("Failed to start recording primary buffer.", __FILE__, __LINE__);
     }
 }
 
@@ -1350,7 +1350,7 @@ static void render_backend_system_submit_transfer (struct render_backend_system_
                                 buffer_unmap_flush_transfer->source_offset,
                                 buffer_unmap_flush_transfer->size) != VK_SUCCESS)
         {
-            kan_critical_error ("Unexpected failure while flushing buffer data, unable to continue properly.", __FILE__,
+            kan_error_critical ("Unexpected failure while flushing buffer data, unable to continue properly.", __FILE__,
                                 __LINE__);
         }
 
@@ -1426,7 +1426,7 @@ static void render_backend_system_submit_transfer (struct render_backend_system_
         if (vmaFlushAllocation (system->gpu_memory_allocator, buffer_unmap_flush->buffer->allocation,
                                 buffer_unmap_flush->offset, buffer_unmap_flush->size) != VK_SUCCESS)
         {
-            kan_critical_error ("Unexpected failure while flushing buffer data, unable to continue properly.", __FILE__,
+            kan_error_critical ("Unexpected failure while flushing buffer data, unable to continue properly.", __FILE__,
                                 __LINE__);
         }
 
@@ -2998,7 +2998,7 @@ static void render_backend_system_finish_command_submission (struct render_backe
 
     if (vkEndCommandBuffer (state->primary_command_buffer) != VK_SUCCESS)
     {
-        kan_critical_error ("Failed to end recording primary buffer.", __FILE__, __LINE__);
+        kan_error_critical ("Failed to end recording primary buffer.", __FILE__, __LINE__);
     }
 
     vulkan_size_t semaphores_to_wait = 0u;
@@ -3078,7 +3078,7 @@ static void render_backend_system_finish_command_submission (struct render_backe
     if (vkQueueSubmit (system->device_queue, 1u, &submit_info,
                        system->in_flight_fences[system->current_frame_in_flight_index]) != VK_SUCCESS)
     {
-        kan_critical_error ("Failed to submit work to merged queue.", __FILE__, __LINE__);
+        kan_error_critical ("Failed to submit work to merged queue.", __FILE__, __LINE__);
     }
 
 #if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED)
@@ -3162,7 +3162,7 @@ static void render_backend_system_submit_present (struct render_backend_system_t
     if (present_result != VK_SUCCESS && present_result != VK_SUBOPTIMAL_KHR &&
         present_result != VK_ERROR_OUT_OF_DATE_KHR)
     {
-        kan_critical_error ("Failed to request present operations.", __FILE__, __LINE__);
+        kan_error_critical ("Failed to request present operations.", __FILE__, __LINE__);
     }
 
     if (swap_chains != static_swap_chains)
@@ -3970,7 +3970,7 @@ kan_bool_t kan_render_backend_system_next_frame (kan_context_system_t render_bac
     if (vkResetCommandPool (system->device, system->command_states[system->current_frame_in_flight_index].command_pool,
                             0u) != VK_SUCCESS)
     {
-        kan_critical_error ("Unexpected failure when resetting graphics command pool.", __FILE__, __LINE__);
+        kan_error_critical ("Unexpected failure when resetting graphics command pool.", __FILE__, __LINE__);
     }
 
     kan_cpu_section_execution_shutdown (&command_pool_reset_execution);
