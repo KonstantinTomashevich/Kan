@@ -183,8 +183,7 @@ KAN_TEST_CASE (generic)
     KAN_TEST_CHECK (parameter_meta->total_item_count == 1u)
     KAN_TEST_ASSERT (parameter_meta->meta.size == 0u)
 
-    parameter_meta =
-        &((struct kan_rpl_meta_parameter_t *) buffer_meta->main_parameters.data)[1u];
+    parameter_meta = &((struct kan_rpl_meta_parameter_t *) buffer_meta->main_parameters.data)[1u];
     KAN_TEST_CHECK (strcmp (parameter_meta->name, "model_space") == 0)
     KAN_TEST_CHECK (parameter_meta->type == KAN_RPL_META_VARIABLE_TYPE_F4X4)
     KAN_TEST_CHECK (parameter_meta->offset == 16u)
@@ -193,8 +192,7 @@ KAN_TEST_CASE (generic)
     KAN_TEST_CHECK (strcmp (((kan_interned_string_t *) parameter_meta->meta.data)[0u], "model_space_matrix") == 0)
     KAN_TEST_CHECK (strcmp (((kan_interned_string_t *) parameter_meta->meta.data)[1u], "hidden") == 0)
 
-    parameter_meta =
-        &((struct kan_rpl_meta_parameter_t *) buffer_meta->main_parameters.data)[2u];
+    parameter_meta = &((struct kan_rpl_meta_parameter_t *) buffer_meta->main_parameters.data)[2u];
     KAN_TEST_CHECK (strcmp (parameter_meta->name, "joint_offset") == 0)
     KAN_TEST_CHECK (parameter_meta->type == KAN_RPL_META_VARIABLE_TYPE_I1)
     KAN_TEST_CHECK (parameter_meta->offset == 80u)

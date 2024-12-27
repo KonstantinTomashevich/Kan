@@ -660,7 +660,7 @@ void kan_render_pass_instance_attributes (kan_render_pass_instance_t pass_instan
         buffer_handles = kan_allocate_general (instance->system->utility_allocation_group,
                                                sizeof (VkBuffer) * buffers_count, _Alignof (VkBuffer));
         vulkan_buffer_offsets = kan_allocate_general (instance->system->utility_allocation_group,
-                                               sizeof (VkDeviceSize) * buffers_count, _Alignof (VkDeviceSize));
+                                                      sizeof (VkDeviceSize) * buffers_count, _Alignof (VkDeviceSize));
     }
 
     for (kan_loop_size_t index = 0u; index < buffers_count; ++index)
