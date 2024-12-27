@@ -205,9 +205,9 @@ Buffer is a group variables that serve the same purpose and usually stored in on
 There are several types of buffers:
 
 - `vertex_attribute_buffer` represents buffer of vertex attributes. Fields of this buffer are the attributes of one
-  vertex. Do not support runtime sized arrays.
+  vertex. Does not support runtime sized arrays.
 - `instanced_attribute_buffer` represents buffer of per-instance attributes. Fields of this buffer are the attributes
-  of one instanced geometry. Do not support runtime sized arrays.
+  of one instanced geometry. Does not support runtime sized arrays.
 - `uniform_buffer` represents a classic uniform buffer object with `std140` memory layout. Requires `set_prefix`.
 - `read_only_storage_buffer` represents a classic storage buffer which is read-only and has `std430` memory layout.
   Requires `set_prefix`.
@@ -266,9 +266,9 @@ conditional (support_instancing && enable_skinning) set_unstable read_only_stora
 Buffers are exposed in metadata (excluding `vertex_stage_output` and `fragment_stage_output` ones). Depending on buffer
 type, its fields can be exposed as named parameters, attributes or both. For parameter generation, buffer flattening
 is used. It means that buffer data is represented as tree and then only tree leaves are exposed as parameters, where
-parameter name is equal to path from tree root to parameter leaf. Runtime sized arrays never participate in parameter
-generation due to their varying size. Also, arrays of structs currently do not participate in parameter generation
-either for simplification as it is not needed at the moment.
+parameter name is equal to path from tree root to parameter leaf. Runtime sized array generate tail parameters if their 
+item type is structure. Also, arrays of structs currently do not participate in parameter generation for simplification 
+as it is not needed at the moment.
 
 ## Samplers
 
