@@ -37,6 +37,7 @@ kan_context_system_t render_backend_system_create (kan_allocation_group_t group,
     system->image_wrapper_allocation_group = kan_allocation_group_get_child (group, "descriptor_set_wrapper");
     system->descriptor_set_wrapper_allocation_group = kan_allocation_group_get_child (group, "descriptor_set_wrapper");
     system->read_back_status_allocation_group = kan_allocation_group_get_child (group, "read_back_status");
+    system->cached_samplers_allocation_group = kan_allocation_group_get_child (group, "cached_samplers");
 
     system->section_create_surface = kan_cpu_section_get ("render_backend_create_surface");
     system->section_create_frame_buffer = kan_cpu_section_get ("render_backend_create_frame_buffer");
@@ -144,6 +145,9 @@ kan_context_system_t render_backend_system_create (kan_allocation_group_t group,
 
     system->staging_frame_lifetime_allocator = NULL;
     system->supported_devices = NULL;
+
+    system->sampler_cache_lock = kan_atomic_int_init (0);
+    system->first_cached_sampler = NULL;
 
     system->compiler_state.state_transition_mutex = kan_mutex_create ();
     system->compiler_state.has_more_work = kan_conditional_variable_create ();
@@ -784,6 +788,15 @@ void render_backend_system_shutdown (kan_context_system_t handle)
         struct render_backend_image_t *next = (struct render_backend_image_t *) image->list_node.next;
         render_backend_system_destroy_image (system, image);
         image = next;
+    }
+
+    struct render_backend_cached_sampler_t *cached_sampler = system->first_cached_sampler;
+    while (cached_sampler)
+    {
+        struct render_backend_cached_sampler_t *next = cached_sampler->next;
+        vkDestroySampler (system->device, cached_sampler->sampler, VULKAN_ALLOCATION_CALLBACKS (system));
+        kan_free_batched (system->cached_samplers_allocation_group, cached_sampler);
+        cached_sampler = next;
     }
 
     if (system->device != VK_NULL_HANDLE)

@@ -438,11 +438,6 @@ struct render_backend_layout_binding_t
 {
     enum kan_render_parameter_binding_type_t type;
     vulkan_size_t used_stage_mask;
-
-    union
-    {
-        VkSampler sampler;
-    };
 };
 
 struct render_backend_descriptor_set_layout_t
@@ -822,6 +817,16 @@ void render_backend_apply_descriptor_set_mutation (struct render_backend_pipelin
                                                    kan_instance_size_t bindings_count,
                                                    struct kan_render_parameter_update_description_t *bindings);
 
+struct render_backend_cached_sampler_t
+{
+    struct render_backend_cached_sampler_t *next;
+    VkSampler sampler;
+    struct kan_render_sampler_t description;
+};
+
+VkSampler render_backend_resolve_cached_sampler (struct render_backend_system_t *system,
+                                                 struct kan_render_sampler_t *sampler);
+
 struct render_backend_system_t
 {
     kan_context_t context;
@@ -869,6 +874,9 @@ struct render_backend_system_t
     /// \details Still listed in frame lifetime allocator list above, but referenced here too for usability.
     struct render_backend_frame_lifetime_allocator_t *staging_frame_lifetime_allocator;
 
+    struct kan_atomic_int_t sampler_cache_lock;
+    struct render_backend_cached_sampler_t *first_cached_sampler;
+
     struct render_backend_pipeline_compiler_state_t compiler_state;
     struct render_backend_descriptor_set_allocator_t descriptor_set_allocator;
 
@@ -898,6 +906,7 @@ struct render_backend_system_t
     kan_allocation_group_t image_wrapper_allocation_group;
     kan_allocation_group_t descriptor_set_wrapper_allocation_group;
     kan_allocation_group_t read_back_status_allocation_group;
+    kan_allocation_group_t cached_samplers_allocation_group;
 
     kan_cpu_section_t section_create_surface;
     kan_cpu_section_t section_create_frame_buffer;
