@@ -60,17 +60,10 @@ static inline kan_hash_t hash_error (const char *file, int line)
     return kan_hash_combine (kan_string_hash (file), (kan_hash_t) line);
 }
 
-static void crash_signal_handler (int signal);
-
 void kan_error_initialize_context (void)
 {
     kan_error_context_ensure_initialized ();
-    signal (SIGABRT, crash_signal_handler);
-    signal (SIGFPE, crash_signal_handler);
-    signal (SIGILL, crash_signal_handler);
-    signal (SIGINT, crash_signal_handler);
-    signal (SIGSEGV, crash_signal_handler);
-    signal (SIGTERM, crash_signal_handler);
+    // We do not have crash handling yet, but it should be initialized here in the future.
 }
 
 void kan_set_critical_error_interactive (kan_bool_t is_interactive)
@@ -187,40 +180,4 @@ void kan_critical_error (const char *message, const char *file, int line)
         // No interactive: just crash.
         abort ();
     }
-}
-
-static void crash_signal_handler (int signal)
-{
-    const char *signal_type = "<unknown>";
-    switch (signal)
-    {
-    case SIGABRT:
-        signal_type = "abort";
-        break;
-    case SIGFPE:
-        signal_type = "floating point exception";
-        break;
-    case SIGILL:
-        signal_type = "invalid instruct";
-        break;
-    case SIGINT:
-        signal_type = "external interrupt";
-        break;
-    case SIGSEGV:
-        signal_type = "segmentation fault";
-        break;
-    case SIGTERM:
-        signal_type = "termination";
-        break;
-    }
-
-    KAN_LOG (error_reporting, KAN_LOG_CRITICAL_ERROR, "Received interrupt: %s.", signal_type)
-
-    // TODO: Print stacktrace?
-
-    // Flush outputs just in case.
-    fflush (stdout);
-    fflush (stderr);
-
-    // TODO: Api for flushing non standard logs?
 }
