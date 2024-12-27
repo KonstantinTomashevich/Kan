@@ -606,7 +606,8 @@ void render_backend_apply_descriptor_set_mutation (struct render_backend_pipelin
                 this_image_info->sampler = VK_NULL_HANDLE;
                 this_image_info->imageView = VK_NULL_HANDLE;
                 this_image_info->imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-                this_image_info->sampler = set_context->layout->bindings[update_bindings[index].binding].sampler;
+                this_image_info->sampler = render_backend_resolve_cached_sampler (
+                    set_context->system, &update_bindings[index].image_binding.sampler);
 
                 if (set_context->bound_image_views[update_bindings[index].binding] != VK_NULL_HANDLE)
                 {

@@ -12,7 +12,7 @@ Currently, it is in early prototype stage.
   context. Having all the information in pipeline file is one of the solutions to PSO hiccup issue.
 
 - To provide enough usable information to build outer high-level objects like materials. For example, pipeline should
-  provide information about all instancing-driven and uniform-driven parameters that can be specified through material.
+  provide information about all attribute-driven and uniform-driven parameters that can be specified through material.
 
 - To reduce amount of hardcode between CPU code and GPU code: there should be no hardcoded locations and bindings.
   Instead, CPU code should rely on provided metadata including parameter tags.
@@ -141,9 +141,11 @@ There is list of currently supported inbuilt types:
 
 ## Type usage syntax
 
-Type can be specified using syntax: `type_name (\[ array_dimension_expression \])*` with type_name being inbuilt type
-name or structure name and array_dimension_expression being a compile-time expression that selects size of
-array dimension. If type is used for structures or buffers, only `global` options can be used inside expression.
+Type can be specified using syntax: `type_name ((\[ array_dimension_expression \])+ | ...)?` with type_name being 
+inbuilt type name or structure name and array_dimension_expression being a compile-time expression that selects size of
+array dimension. `...` can be used instead of array suffix in order to declare runtime-sized array. But keep in mind
+that runtime sized arrays are only supported in structures and buffers and always should be the last field.
+If type is used for structures or buffers, only `global` options can be used inside expression.
 Otherwise, `instance` options are allowed.
 
 Below are the examples of types:
@@ -152,6 +154,7 @@ Below are the examples of types:
 f3
 joint_data_t
 f4x4[max_joints]
+f4x4...
 ```
 
 ## Structs
@@ -187,7 +190,8 @@ There are several inbuilt descriptor sets that correspond to the common usage pa
 - `set_object` is advised for data unique for scene object, but when binding is rarely changed. For example, object may
   store its data in its own uniform buffer and update this buffer without changing descriptor set.
 - `set_unstable` is advised for data that is unique for every scene object and which binding changing every frame.
-  For example, instanced parameter buffers might technically change every frame.
+  For example, data that is being sent from CPU to GPU every frame and has varying size can be passed through
+  unstable sets with the help of frame lifetime allocators.
 
 Any set keyword inside declaration syntax is called `set_prefix` below.
 
@@ -201,18 +205,12 @@ Buffer is a group variables that serve the same purpose and usually stored in on
 There are several types of buffers:
 
 - `vertex_attribute_buffer` represents buffer of vertex attributes. Fields of this buffer are the attributes of one
-  vertex.
+  vertex. Does not support runtime sized arrays.
 - `instanced_attribute_buffer` represents buffer of per-instance attributes. Fields of this buffer are the attributes
-  of one instanced geometry.
+  of one instanced geometry. Does not support runtime sized arrays.
 - `uniform_buffer` represents a classic uniform buffer object with `std140` memory layout. Requires `set_prefix`.
 - `read_only_storage_buffer` represents a classic storage buffer which is read-only and has `std430` memory layout.
   Requires `set_prefix`.
-- `instanced_uniform_buffer` represents a uniform buffer which is used to store per-instance data. 
-  Requires `set_prefix`. Instancing is automatically applied, therefore there is no need for explicit runtime arrays 
-  and instance indices.
-- `instanced_read_only_storage_buffer` represents a read only storage buffer which is used to store per-instance data.
-  Requires `set_prefix`. Instancing is automatically applied, therefore there is no need for explicit runtime arrays and 
-  instance indices.
 - `vertex_stage_output` is an abstract buffer which is technically not a buffer and used for sharing vertex stage
   data with other pipeline stages.
 - `fragment_stage_output` is an abstract buffer which is technically not a buffer and used for fragment stage output.
@@ -242,27 +240,35 @@ vertex_attribute_buffer vertex
     conditional (enable_skinning && skinning_4_weights) f4 joint_weights;
 };
 
-conditional (support_instancing && !enable_skinning) instanced_attribute_buffer instance_vertex
+conditional (support_instancing) instanced_attribute_buffer instance_vertex
 {
     f4 color_multiplier;
 
     meta (hidden, model_space_matrix)
     f4x4 model_space;
-};
-
-conditional (support_instancing && enable_skinning) instanced_read_only_storage_buffer instance_storage
-{
-    f4 color_multiplier;
 
     conditional (enable_skinning)
-    joint_data_t joint_data;
+    meta (hidden, joint_offset_index)
+    i1 joint_offset;
+};
+
+conditional (!support_instancing) set_material uniform_buffer material
+{
+    f4 color_multiplier;
+};
+
+conditional (support_instancing && enable_skinning) set_unstable read_only_storage_buffer joints
+{
+    f4x4... transforms;
 };
 ```
 
 Buffers are exposed in metadata (excluding `vertex_stage_output` and `fragment_stage_output` ones). Depending on buffer
 type, its fields can be exposed as named parameters, attributes or both. For parameter generation, buffer flattening
 is used. It means that buffer data is represented as tree and then only tree leaves are exposed as parameters, where
-parameter name is equal to path from tree root to parameter leaf.
+parameter name is equal to path from tree root to parameter leaf. Runtime sized array generate tail parameters if their 
+item type is structure. Also, arrays of structs currently do not participate in parameter generation for simplification 
+as it is not needed at the moment.
 
 ## Samplers
 
@@ -271,26 +277,13 @@ Currently, there is only one supported sampler type: `sampler2d`. More types wil
 Samples declaration syntax is:
 
 ```
-conditional_prefix? set_prefix sampler_type <sampler_name>
-{
-    (sampler_setting ;)+
-};
+conditional_prefix set_prefix sampler_type <sampler_name>;
 ```
-
-Syntax for defining sampler settings is the same as for pipeline settings.
 
 Sampler declaration example:
 
 ```
-sampler_2d diffuse_color
-{
-    setting mag_filter "nearest";
-    setting min_filter "nearest";
-    setting mip_map_mode "nearest";
-    setting address_mode_u "repeat";
-    setting address_mode_v "repeat";
-    setting address_mode_w "repeat";
-};
+set_material sampler_2d diffuse_color;
 ```
 
 To sample data from sampler, sampler should be called like a function. Below are arguments for different sampler types:

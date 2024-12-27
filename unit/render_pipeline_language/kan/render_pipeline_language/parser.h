@@ -325,6 +325,9 @@ struct kan_rpl_declaration_t
     kan_interned_string_t type_name;
     kan_interned_string_t name;
 
+    /// \brief If true, field is a runtime sized array and other array size expressions should be ignored.
+    kan_bool_t array_size_runtime;
+
     /// \details Array size expressions list count if declaring array.
     kan_rpl_size_t array_size_expression_list_size;
 
@@ -387,8 +390,6 @@ enum kan_rpl_buffer_type_t
     KAN_RPL_BUFFER_TYPE_UNIFORM,
     KAN_RPL_BUFFER_TYPE_READ_ONLY_STORAGE,
     KAN_RPL_BUFFER_TYPE_INSTANCED_ATTRIBUTE,
-    KAN_RPL_BUFFER_TYPE_INSTANCED_UNIFORM,
-    KAN_RPL_BUFFER_TYPE_INSTANCED_READ_ONLY_STORAGE,
 
     /// \details Not really a buffer, but uses buffer semantics.
     KAN_RPL_BUFFER_TYPE_VERTEX_STAGE_OUTPUT,
@@ -431,9 +432,6 @@ struct kan_rpl_sampler_t
     enum kan_rpl_set_t set;
     enum kan_rpl_sampler_type_t type;
 
-    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_setting_t)
-    struct kan_dynamic_array_t settings;
-
     /// \details Conditional expression if it is not KAN_RPL_EXPRESSION_NODE_TYPE_NOPE.
     kan_rpl_size_t conditional_index;
 
@@ -442,8 +440,6 @@ struct kan_rpl_sampler_t
 };
 
 RENDER_PIPELINE_LANGUAGE_API void kan_rpl_sampler_init (struct kan_rpl_sampler_t *instance);
-
-RENDER_PIPELINE_LANGUAGE_API void kan_rpl_sampler_shutdown (struct kan_rpl_sampler_t *instance);
 
 /// \brief Defines structure that holds function data.
 struct kan_rpl_function_t

@@ -67,55 +67,11 @@ set_material uniform_buffer material
     f4 emissive;
 };
 
-set_material sampler_2d texture_base_color
-{
-    setting mag_filter "nearest";
-    setting min_filter "nearest";
-    setting mip_map_mode "nearest";
-    setting address_mode_u "repeat";
-    setting address_mode_v "repeat";
-    setting address_mode_w "repeat";
-};
-
-set_material sampler_2d texture_metallic_roughness
-{
-    setting mag_filter "nearest";
-    setting min_filter "nearest";
-    setting mip_map_mode "nearest";
-    setting address_mode_u "repeat";
-    setting address_mode_v "repeat";
-    setting address_mode_w "repeat";
-};
-
-set_material sampler_2d texture_normal
-{
-    setting mag_filter "nearest";
-    setting min_filter "nearest";
-    setting mip_map_mode "nearest";
-    setting address_mode_u "repeat";
-    setting address_mode_v "repeat";
-    setting address_mode_w "repeat";
-};
-
-set_material sampler_2d texture_occlusion
-{
-    setting mag_filter "nearest";
-    setting min_filter "nearest";
-    setting mip_map_mode "nearest";
-    setting address_mode_u "repeat";
-    setting address_mode_v "repeat";
-    setting address_mode_w "repeat";
-};
-
-set_material sampler_2d texture_emissive
-{
-    setting mag_filter "nearest";
-    setting min_filter "nearest";
-    setting mip_map_mode "nearest";
-    setting address_mode_u "repeat";
-    setting address_mode_v "repeat";
-    setting address_mode_w "repeat";
-};
+set_material sampler_2d texture_base_color;
+set_material sampler_2d texture_metallic_roughness;
+set_material sampler_2d texture_normal;
+set_material sampler_2d texture_occlusion;
+set_material sampler_2d texture_emissive;
 
 fragment_stage_output fragment_output
 {

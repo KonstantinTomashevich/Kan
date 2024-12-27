@@ -573,10 +573,12 @@ CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_instance_pipeline_paramet
     kan_render_pipeline_parameter_set_t *parameter_sets);
 
 /// \brief Submits attributes to the render pass.
+/// \details `buffer_offsets` is an optional array of offsets for passed buffers.
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_instance_attributes (kan_render_pass_instance_t pass_instance,
                                                                             kan_render_size_t start_at_binding,
                                                                             kan_instance_size_t buffers_count,
-                                                                            kan_render_buffer_t *buffers);
+                                                                            kan_render_buffer_t *buffers,
+                                                                            kan_instance_size_t *buffer_offsets);
 
 /// \brief Submits indices to the render pass.
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_instance_indices (kan_render_pass_instance_t pass_instance,
@@ -680,28 +682,12 @@ enum kan_render_address_mode_t
     KAN_RENDER_ADDRESS_MODE_CLAMP_TO_BORDER,
 };
 
-/// \brief Describes sampler setup for parameter binding.
-struct kan_render_sampler_description_t
-{
-    enum kan_render_filter_mode_t mag_filter;
-    enum kan_render_filter_mode_t min_filter;
-    enum kan_render_mip_map_mode_t mip_map_mode;
-    enum kan_render_address_mode_t address_mode_u;
-    enum kan_render_address_mode_t address_mode_v;
-    enum kan_render_address_mode_t address_mode_w;
-};
-
 /// \brief Describes parameter that can be bound to the pipeline.
 struct kan_render_parameter_binding_description_t
 {
     kan_render_size_t binding;
     enum kan_render_parameter_binding_type_t type;
     kan_render_mask_t used_stage_mask;
-
-    union
-    {
-        struct kan_render_sampler_description_t combined_image_sampler;
-    };
 };
 
 /// \brief Describes set of parameters that can be bound.
@@ -955,10 +941,22 @@ struct kan_render_parameter_update_description_buffer_t
     kan_render_size_t range;
 };
 
+/// \brief Contains image sampling parameters.
+struct kan_render_sampler_t
+{
+    enum kan_render_filter_mode_t mag_filter;
+    enum kan_render_filter_mode_t min_filter;
+    enum kan_render_mip_map_mode_t mip_map_mode;
+    enum kan_render_address_mode_t address_mode_u;
+    enum kan_render_address_mode_t address_mode_v;
+    enum kan_render_address_mode_t address_mode_w;
+};
+
 /// \brief Contains information for image binding update.
 struct kan_render_parameter_update_description_image_t
 {
     kan_render_image_t image;
+    struct kan_render_sampler_t sampler;
 };
 
 /// \brief Contains information on how to update one parameter binding.
@@ -1067,6 +1065,8 @@ kan_render_frame_lifetime_buffer_allocator_create (kan_render_context_t context,
 
 /// \brief Requests given amount of memory with given alignment from frame lifetime allocator.
 /// \details Allocated memory is automatically freed when we're sure that it is no longer used.
+///          This function is explicitly thread safe, therefore it is allowed to allocate from multiple threads
+///          simultaneously using the same allocator.
 CONTEXT_RENDER_BACKEND_SYSTEM_API struct kan_render_allocated_slice_t
 kan_render_frame_lifetime_buffer_allocator_allocate (kan_render_frame_lifetime_buffer_allocator_t allocator,
                                                      kan_render_size_t size,

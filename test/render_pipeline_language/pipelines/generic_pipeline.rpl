@@ -3,7 +3,6 @@
 global flag enable_skinning on;
 global flag skinning_2_weights on;
 global flag skinning_4_weights off;
-global count max_joints 256;
 global flag support_instancing on;
 
 instance flag wireframe off;
@@ -37,12 +36,16 @@ vertex_attribute_buffer vertex
     conditional (enable_skinning && skinning_4_weights) f4 joint_weights;
 };
 
-conditional (support_instancing && !enable_skinning) instanced_attribute_buffer instance_vertex
+conditional (support_instancing) instanced_attribute_buffer instance_vertex
 {
     f4 color_multiplier;
 
     meta (hidden, model_space_matrix)
     f4x4 model_space;
+
+    conditional (enable_skinning)
+    meta (hidden, joint_offset_index)
+    i1 joint_offset;
 };
 
 set_pass uniform_buffer pass
@@ -63,15 +66,12 @@ conditional (!support_instancing) set_object uniform_buffer object
     f4x4 model_space;
 
     conditional (enable_skinning)
-    joint_data_t joint_data;
+    f4x4... joint_transforms;
 };
 
-conditional (support_instancing && enable_skinning) set_unstable instanced_read_only_storage_buffer instance_storage
+conditional (support_instancing && enable_skinning) set_unstable read_only_storage_buffer joints
 {
-    f4 color_multiplier;
-
-    conditional (enable_skinning)
-    joint_data_t joint_data;
+    f4x4... transforms;
 };
 
 vertex_stage_output vertex_output
@@ -82,37 +82,32 @@ vertex_stage_output vertex_output
 
 void vertex_main (void)
 {
-
     vertex_output.uv = vertex.uv;
-
-    conditional (support_instancing && enable_skinning) alias (color_multiplier,
-            instance_storage.color_multiplier)
-    conditional (support_instancing && !enable_skinning) alias (color_multiplier,
-            instance_vertex.color_multiplier)
+    conditional (support_instancing) alias (color_multiplier, instance_vertex.color_multiplier)
     conditional (!support_instancing) alias (color_multiplier, material.color_multiplier)
     vertex_output.color_multiplier = color_multiplier;
 
     f4 position4 = f4 {vertex.position._0, vertex.position._1, vertex.position._2, 1.0};
     conditional (enable_skinning)
     {
-        conditional (support_instancing) alias (joints, instance_storage.joint_data.model_joints)
-        conditional (!support_instancing) alias (joints, object.joint_data.model_joints)
+        conditional (support_instancing) alias (transforms, joints.transforms)
+        conditional (!support_instancing) alias (transforms, object.joint_transforms)
         f4x4 global_joint_transform;
 
         conditional (skinning_2_weights)
         {
             global_joint_transform =
-                joints[vertex.joint_indices._0] * vertex.joint_weights._0 +
-                joints[vertex.joint_indices._1] * vertex.joint_weights._1;
+                transforms[instance_vertex.joint_offset + vertex.joint_indices._0] * vertex.joint_weights._0 +
+                transforms[instance_vertex.joint_offset + vertex.joint_indices._1] * vertex.joint_weights._1;
         }
 
         conditional (skinning_4_weights)
         {
             global_joint_transform =
-                joints[vertex.joint_indices._0] * vertex.joint_weights._0 +
-                joints[vertex.joint_indices._1] * vertex.joint_weights._1 +
-                joints[vertex.joint_indices._2] * vertex.joint_weights._2 +
-                joints[vertex.joint_indices._3] * vertex.joint_weights._3;
+                transforms[instance_vertex.joint_offset + vertex.joint_indices._0] * vertex.joint_weights._0 +
+                transforms[instance_vertex.joint_offset + vertex.joint_indices._1] * vertex.joint_weights._1 +
+                transforms[instance_vertex.joint_offset + vertex.joint_indices._2] * vertex.joint_weights._2 +
+                transforms[instance_vertex.joint_offset + vertex.joint_indices._3] * vertex.joint_weights._3;
         }
 
         position4 = global_joint_transform * position4;
@@ -127,15 +122,7 @@ void vertex_main (void)
     vertex_stage_output_position (pass.projection_mul_view * position4);
 }
 
-set_material sampler_2d diffuse_color
-{
-    setting mag_filter "nearest";
-    setting min_filter "nearest";
-    setting mip_map_mode "nearest";
-    setting address_mode_u "repeat";
-    setting address_mode_v "repeat";
-    setting address_mode_w "repeat";
-};
+set_material sampler_2d diffuse_color;
 
 fragment_stage_output fragment_output
 {

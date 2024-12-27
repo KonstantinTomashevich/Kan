@@ -523,123 +523,6 @@ static kan_bool_t emit_meta_settings (struct rpl_compiler_instance_t *instance, 
     return valid;
 }
 
-static kan_bool_t emit_meta_sampler_settings (struct rpl_compiler_instance_t *instance,
-                                              struct compiler_instance_sampler_node_t *sampler,
-                                              struct kan_rpl_meta_sampler_settings_t *settings_output)
-{
-    kan_bool_t valid = KAN_TRUE;
-    *settings_output = kan_rpl_meta_sampler_settings_default ();
-    struct compiler_instance_setting_node_t *setting = sampler->first_setting;
-
-    while (setting)
-    {
-        if (setting->name == STATICS.interned_mag_filter)
-        {
-            SETTING_REQUIRE_TYPE (KAN_RPL_SETTING_TYPE_STRING, "string")
-            {
-                SETTING_STRING_VALUE (STATICS.interned_nearest, KAN_RPL_META_SAMPLER_FILTER_NEAREST,
-                                      settings_output->mag_filter)
-                SETTING_STRING_VALUE (STATICS.interned_linear, KAN_RPL_META_SAMPLER_FILTER_LINEAR,
-                                      settings_output->mag_filter)
-                SETTING_STRING_NO_MORE_VALUES
-            }
-        }
-        else if (setting->name == STATICS.interned_min_filter)
-        {
-            SETTING_REQUIRE_TYPE (KAN_RPL_SETTING_TYPE_STRING, "string")
-            {
-                SETTING_STRING_VALUE (STATICS.interned_nearest, KAN_RPL_META_SAMPLER_FILTER_NEAREST,
-                                      settings_output->min_filter)
-                SETTING_STRING_VALUE (STATICS.interned_linear, KAN_RPL_META_SAMPLER_FILTER_LINEAR,
-                                      settings_output->min_filter)
-                SETTING_STRING_NO_MORE_VALUES
-            }
-        }
-        else if (setting->name == STATICS.interned_mip_map_mode)
-        {
-            SETTING_REQUIRE_TYPE (KAN_RPL_SETTING_TYPE_STRING, "string")
-            {
-                SETTING_STRING_VALUE (STATICS.interned_nearest, KAN_RPL_META_SAMPLER_MIP_MAP_MODE_NEAREST,
-                                      settings_output->mip_map_mode)
-                SETTING_STRING_VALUE (STATICS.interned_linear, KAN_RPL_META_SAMPLER_MIP_MAP_MODE_LINEAR,
-                                      settings_output->mip_map_mode)
-                SETTING_STRING_NO_MORE_VALUES
-            }
-        }
-        else if (setting->name == STATICS.interned_address_mode_u)
-        {
-            SETTING_REQUIRE_TYPE (KAN_RPL_SETTING_TYPE_STRING, "string")
-            {
-                SETTING_STRING_VALUE (STATICS.interned_repeat, KAN_RPL_META_SAMPLER_ADDRESS_MODE_REPEAT,
-                                      settings_output->address_mode_u)
-                SETTING_STRING_VALUE (STATICS.interned_mirrored_repeat,
-                                      KAN_RPL_META_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT,
-                                      settings_output->address_mode_u)
-                SETTING_STRING_VALUE (STATICS.interned_clamp_to_edge, KAN_RPL_META_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-                                      settings_output->address_mode_u)
-                SETTING_STRING_VALUE (STATICS.interned_clamp_to_border,
-                                      KAN_RPL_META_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER,
-                                      settings_output->address_mode_u)
-                SETTING_STRING_VALUE (STATICS.interned_mirror_clamp_to_edge,
-                                      KAN_RPL_META_SAMPLER_ADDRESS_MODE_MIRROR_CLAMP_TO_EDGE,
-                                      settings_output->address_mode_u)
-                SETTING_STRING_NO_MORE_VALUES
-            }
-        }
-        else if (setting->name == STATICS.interned_address_mode_v)
-        {
-            SETTING_REQUIRE_TYPE (KAN_RPL_SETTING_TYPE_STRING, "string")
-            {
-                SETTING_STRING_VALUE (STATICS.interned_repeat, KAN_RPL_META_SAMPLER_ADDRESS_MODE_REPEAT,
-                                      settings_output->address_mode_v)
-                SETTING_STRING_VALUE (STATICS.interned_mirrored_repeat,
-                                      KAN_RPL_META_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT,
-                                      settings_output->address_mode_v)
-                SETTING_STRING_VALUE (STATICS.interned_clamp_to_edge, KAN_RPL_META_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-                                      settings_output->address_mode_v)
-                SETTING_STRING_VALUE (STATICS.interned_clamp_to_border,
-                                      KAN_RPL_META_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER,
-                                      settings_output->address_mode_v)
-                SETTING_STRING_VALUE (STATICS.interned_mirror_clamp_to_edge,
-                                      KAN_RPL_META_SAMPLER_ADDRESS_MODE_MIRROR_CLAMP_TO_EDGE,
-                                      settings_output->address_mode_v)
-                SETTING_STRING_NO_MORE_VALUES
-            }
-        }
-        else if (setting->name == STATICS.interned_address_mode_w)
-        {
-            SETTING_REQUIRE_TYPE (KAN_RPL_SETTING_TYPE_STRING, "string")
-            {
-                SETTING_STRING_VALUE (STATICS.interned_repeat, KAN_RPL_META_SAMPLER_ADDRESS_MODE_REPEAT,
-                                      settings_output->address_mode_w)
-                SETTING_STRING_VALUE (STATICS.interned_mirrored_repeat,
-                                      KAN_RPL_META_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT,
-                                      settings_output->address_mode_w)
-                SETTING_STRING_VALUE (STATICS.interned_clamp_to_edge, KAN_RPL_META_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-                                      settings_output->address_mode_w)
-                SETTING_STRING_VALUE (STATICS.interned_clamp_to_border,
-                                      KAN_RPL_META_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER,
-                                      settings_output->address_mode_w)
-                SETTING_STRING_VALUE (STATICS.interned_mirror_clamp_to_edge,
-                                      KAN_RPL_META_SAMPLER_ADDRESS_MODE_MIRROR_CLAMP_TO_EDGE,
-                                      settings_output->address_mode_w)
-                SETTING_STRING_NO_MORE_VALUES
-            }
-        }
-        else
-        {
-            KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR, "[%s:%s:%s:%ld] Unknown sampler settings \"%s\".",
-                     instance->context_log_name, setting->module_name, setting->source_name,
-                     (long) setting->source_line, setting->name)
-            valid = KAN_FALSE;
-        }
-
-        setting = setting->next;
-    }
-
-    return valid;
-}
-
 #undef SETTING_REQUIRE_TYPE
 #undef SETTING_STRING_VALUE
 #undef SETTING_STRING_NO_MORE_VALUES
@@ -708,14 +591,16 @@ static kan_bool_t emit_meta_gather_parameters_process_field (
     kan_instance_size_t base_offset,
     struct compiler_instance_declaration_node_t *first_declaration,
     struct kan_rpl_meta_buffer_t *meta_output,
-    struct kan_trivial_string_buffer_t *name_generation_buffer);
+    struct kan_trivial_string_buffer_t *name_generation_buffer,
+    kan_bool_t tail);
 
 static kan_bool_t emit_meta_gather_parameters_process_field_list (
     struct rpl_compiler_instance_t *instance,
     kan_instance_size_t base_offset,
     struct compiler_instance_declaration_node_t *first_declaration,
     struct kan_rpl_meta_buffer_t *meta_output,
-    struct kan_trivial_string_buffer_t *name_generation_buffer)
+    struct kan_trivial_string_buffer_t *name_generation_buffer,
+    kan_bool_t tail)
 {
     kan_bool_t valid = KAN_TRUE;
     struct compiler_instance_declaration_node_t *field = first_declaration;
@@ -730,7 +615,7 @@ static kan_bool_t emit_meta_gather_parameters_process_field_list (
 
         kan_trivial_string_buffer_append_string (name_generation_buffer, field->variable.name);
         if (!emit_meta_gather_parameters_process_field (instance, base_offset, field, meta_output,
-                                                        name_generation_buffer))
+                                                        name_generation_buffer, tail))
         {
             valid = KAN_FALSE;
         }
@@ -746,17 +631,27 @@ static kan_bool_t emit_meta_gather_parameters_process_field (struct rpl_compiler
                                                              kan_instance_size_t base_offset,
                                                              struct compiler_instance_declaration_node_t *field,
                                                              struct kan_rpl_meta_buffer_t *meta_output,
-                                                             struct kan_trivial_string_buffer_t *name_generation_buffer)
+                                                             struct kan_trivial_string_buffer_t *name_generation_buffer,
+                                                             kan_bool_t tail)
 {
     if (field->variable.type.if_vector || field->variable.type.if_matrix)
     {
+        if (field->variable.type.array_size_runtime)
+        {
+            // We do not export parameters from non-structured tails.
+            return KAN_TRUE;
+        }
+
         kan_bool_t valid = KAN_TRUE;
-        struct kan_rpl_meta_parameter_t *parameter = kan_dynamic_array_add_last (&meta_output->parameters);
+        struct kan_dynamic_array_t *parameters =
+            tail ? &meta_output->tail_item_parameters : &meta_output->main_parameters;
+
+        struct kan_rpl_meta_parameter_t *parameter = kan_dynamic_array_add_last (parameters);
 
         if (!parameter)
         {
-            kan_dynamic_array_set_capacity (&meta_output->parameters, KAN_MAX (1u, meta_output->parameters.size * 2u));
-            parameter = kan_dynamic_array_add_last (&meta_output->parameters);
+            kan_dynamic_array_set_capacity (parameters, KAN_MAX (1u, parameters->size * 2u));
+            parameter = kan_dynamic_array_add_last (parameters);
             KAN_ASSERT (parameter)
         }
 
@@ -789,9 +684,24 @@ static kan_bool_t emit_meta_gather_parameters_process_field (struct rpl_compiler
     }
     else if (field->variable.type.if_struct)
     {
-        return emit_meta_gather_parameters_process_field_list (instance, base_offset + field->offset,
-                                                               field->variable.type.if_struct->first_field, meta_output,
-                                                               name_generation_buffer);
+        if (field->variable.type.array_size_runtime)
+        {
+            // Should be guaranteed by resolve stage.
+            KAN_ASSERT (!tail)
+            meta_output->tail_name = field->variable.name;
+
+            return emit_meta_gather_parameters_process_field_list (instance, 0u,
+                                                                   field->variable.type.if_struct->first_field,
+                                                                   meta_output, name_generation_buffer, KAN_TRUE);
+        }
+        // Currently we only generate parameters for non-array structs as parameters from arrays of structs sound
+        // like a strange and not entirely useful idea.
+        else if (field->variable.type.array_dimensions_count == 0u)
+        {
+            return emit_meta_gather_parameters_process_field_list (instance, base_offset + field->offset,
+                                                                   field->variable.type.if_struct->first_field,
+                                                                   meta_output, name_generation_buffer, tail);
+        }
     }
 
     return KAN_TRUE;
@@ -827,8 +737,6 @@ kan_bool_t kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t comp
 
         case KAN_RPL_BUFFER_TYPE_UNIFORM:
         case KAN_RPL_BUFFER_TYPE_READ_ONLY_STORAGE:
-        case KAN_RPL_BUFFER_TYPE_INSTANCED_UNIFORM:
-        case KAN_RPL_BUFFER_TYPE_INSTANCED_READ_ONLY_STORAGE:
             switch (buffer->set)
             {
             case KAN_RPL_SET_PASS:
@@ -901,8 +809,6 @@ kan_bool_t kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t comp
 
         case KAN_RPL_BUFFER_TYPE_UNIFORM:
         case KAN_RPL_BUFFER_TYPE_READ_ONLY_STORAGE:
-        case KAN_RPL_BUFFER_TYPE_INSTANCED_UNIFORM:
-        case KAN_RPL_BUFFER_TYPE_INSTANCED_READ_ONLY_STORAGE:
             switch (buffer->set)
             {
             case KAN_RPL_SET_PASS:
@@ -962,7 +868,8 @@ kan_bool_t kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t comp
         meta_buffer->name = buffer->name;
         meta_buffer->binding = buffer->binding;
         meta_buffer->type = buffer->type;
-        meta_buffer->size = buffer->size;
+        meta_buffer->main_size = buffer->main_size;
+        meta_buffer->tail_item_size = buffer->tail_item_size;
 
         if (buffer->type == KAN_RPL_BUFFER_TYPE_VERTEX_ATTRIBUTE ||
             buffer->type == KAN_RPL_BUFFER_TYPE_INSTANCED_ATTRIBUTE)
@@ -1000,17 +907,15 @@ kan_bool_t kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t comp
         }
 
         if (buffer->type == KAN_RPL_BUFFER_TYPE_UNIFORM || buffer->type == KAN_RPL_BUFFER_TYPE_READ_ONLY_STORAGE ||
-            buffer->type == KAN_RPL_BUFFER_TYPE_INSTANCED_ATTRIBUTE ||
-            buffer->type == KAN_RPL_BUFFER_TYPE_INSTANCED_UNIFORM ||
-            buffer->type == KAN_RPL_BUFFER_TYPE_INSTANCED_READ_ONLY_STORAGE)
+            buffer->type == KAN_RPL_BUFFER_TYPE_INSTANCED_ATTRIBUTE)
         {
             if (!emit_meta_gather_parameters_process_field_list (instance, 0u, buffer->first_field, meta_buffer,
-                                                                 &name_generation_buffer))
+                                                                 &name_generation_buffer, KAN_FALSE))
             {
                 valid = KAN_FALSE;
             }
 
-            kan_dynamic_array_set_capacity (&meta_buffer->parameters, meta_buffer->parameters.size);
+            kan_dynamic_array_set_capacity (&meta_buffer->main_parameters, meta_buffer->main_parameters.size);
         }
 
         buffer = buffer->next;
@@ -1080,12 +985,6 @@ kan_bool_t kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t comp
         meta_sampler->name = sampler->name;
         meta_sampler->binding = sampler->binding;
         meta_sampler->type = sampler->type;
-
-        if (!emit_meta_sampler_settings (instance, sampler, &meta_sampler->settings))
-        {
-            valid = KAN_FALSE;
-        }
-
         sampler = sampler->next;
     }
 

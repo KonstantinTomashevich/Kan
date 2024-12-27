@@ -178,18 +178,27 @@ struct kan_rpl_meta_buffer_t
     /// \details Stage outputs are not listed in meta buffers.
     enum kan_rpl_buffer_type_t type;
 
-    /// \brief Buffer size.
-    /// \details Item size for instanced and vertex attribute buffers and full size for other buffers.
-    kan_rpl_size_t size;
+    /// \brief Buffer main part size (without runtime sized array tail).
+    kan_rpl_size_t main_size;
+
+    /// \brief Size of a tail item of runtime sized array if any (if none, then zero).
+    kan_rpl_size_t tail_item_size;
 
     /// \brief Attributes provided by this buffer, needed for pipeline setup.
     /// \details Only provided for attribute buffers.
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_meta_attribute_t)
     struct kan_dynamic_array_t attributes;
 
-    /// \brief Parameters provided by this buffer, useful for things like materials.
+    /// \brief Parameters provided by this buffer main part, useful for things like materials.
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_meta_parameter_t)
-    struct kan_dynamic_array_t parameters;
+    struct kan_dynamic_array_t main_parameters;
+
+    /// \brief Name of the buffer tail if it has any.
+    kan_interned_string_t tail_name;
+
+    /// \brief Parameters for every tail item in coordinates local to tail item, useful for things like materials.
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_meta_parameter_t)
+    struct kan_dynamic_array_t tail_item_parameters;
 };
 
 RENDER_PIPELINE_LANGUAGE_API void kan_rpl_meta_buffer_init (struct kan_rpl_meta_buffer_t *instance);
@@ -220,36 +229,12 @@ enum kan_rpl_meta_sampler_address_mode_t
     KAN_RPL_META_SAMPLER_ADDRESS_MODE_MIRROR_CLAMP_TO_EDGE,
 };
 
-/// \brief Stores information about sampler settings.
-struct kan_rpl_meta_sampler_settings_t
-{
-    enum kan_rpl_meta_sampler_filter_t mag_filter;
-    enum kan_rpl_meta_sampler_filter_t min_filter;
-    enum kan_rpl_meta_sampler_mip_map_mode_t mip_map_mode;
-    enum kan_rpl_meta_sampler_address_mode_t address_mode_u;
-    enum kan_rpl_meta_sampler_address_mode_t address_mode_v;
-    enum kan_rpl_meta_sampler_address_mode_t address_mode_w;
-};
-
-static inline struct kan_rpl_meta_sampler_settings_t kan_rpl_meta_sampler_settings_default (void)
-{
-    return (struct kan_rpl_meta_sampler_settings_t) {
-        .mag_filter = KAN_RPL_META_SAMPLER_FILTER_NEAREST,
-        .min_filter = KAN_RPL_META_SAMPLER_FILTER_NEAREST,
-        .mip_map_mode = KAN_RPL_META_SAMPLER_MIP_MAP_MODE_NEAREST,
-        .address_mode_u = KAN_RPL_META_SAMPLER_ADDRESS_MODE_REPEAT,
-        .address_mode_v = KAN_RPL_META_SAMPLER_ADDRESS_MODE_REPEAT,
-        .address_mode_w = KAN_RPL_META_SAMPLER_ADDRESS_MODE_REPEAT,
-    };
-}
-
 /// \brief Stores information about sampler exposed to metadata.
 struct kan_rpl_meta_sampler_t
 {
     kan_interned_string_t name;
     kan_rpl_size_t binding;
     enum kan_rpl_sampler_type_t type;
-    struct kan_rpl_meta_sampler_settings_t settings;
 };
 
 /// \brief Stores information about buffer and sampler bindings for concrete descriptor set.
