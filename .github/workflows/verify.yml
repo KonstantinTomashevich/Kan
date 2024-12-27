@@ -102,8 +102,7 @@ jobs:
 
       - name: Test
         working-directory: ${{env.BUILD_DIRECTORY}}
-        # TODO: Extra verbose is added for temporary testing.
-        run: ctest --build-config ${{matrix.build_type}} --parallel 4 --verbose --timeout 2 -LE GRAPHICS
+        run: ctest --build-config ${{matrix.build_type}} --parallel 4 --timeout 2 -LE GRAPHICS
 
       - name: Upload test results
         # We upload test results only on failure to avoid clogging everything with them.
