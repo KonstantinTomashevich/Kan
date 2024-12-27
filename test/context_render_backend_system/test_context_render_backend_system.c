@@ -363,15 +363,7 @@ static const char *cube_shader =
     "        pass.projection_view * instanced.model * expand_f3_to_f4 (vertex.position, 1.0));\n"
     "}\n"
     "\n"
-    "set_material sampler_2d diffuse_color\n"
-    "{\n"
-    "    setting mag_filter \"nearest\";\n"
-    "    setting min_filter \"nearest\";\n"
-    "    setting mip_map_mode \"nearest\";\n"
-    "    setting address_mode_u \"repeat\";\n"
-    "    setting address_mode_v \"repeat\";\n"
-    "    setting address_mode_w \"repeat\";\n"
-    "};\n"
+    "set_material sampler_2d diffuse_color;\n"
     "\n"
     "fragment_stage_output fragment_output\n"
     "{\n"
@@ -529,15 +521,6 @@ static kan_render_graphics_pipeline_t create_cube_pipeline (kan_render_context_t
     material_parameter_set_bindings[0u].type = KAN_RENDER_PARAMETER_BINDING_TYPE_COMBINED_IMAGE_SAMPLER;
     material_parameter_set_bindings[0u].used_stage_mask =
         (1u << KAN_RENDER_STAGE_GRAPHICS_VERTEX) | (1u << KAN_RENDER_STAGE_GRAPHICS_FRAGMENT);
-
-    material_parameter_set_bindings[0u].combined_image_sampler = (struct kan_render_sampler_description_t) {
-        .mag_filter = KAN_RENDER_FILTER_MODE_NEAREST,
-        .min_filter = KAN_RENDER_FILTER_MODE_NEAREST,
-        .mip_map_mode = KAN_RENDER_MIP_MAP_MODE_NEAREST,
-        .address_mode_u = KAN_RENDER_ADDRESS_MODE_REPEAT,
-        .address_mode_v = KAN_RENDER_ADDRESS_MODE_REPEAT,
-        .address_mode_w = KAN_RENDER_ADDRESS_MODE_REPEAT,
-    };
 
     struct kan_render_graphics_pipeline_family_description_t pipeline_family_description = {
         .topology = KAN_RENDER_GRAPHICS_TOPOLOGY_TRIANGLE_LIST,
@@ -975,6 +958,15 @@ KAN_TEST_CASE (render_and_capture)
             .image_binding =
                 {
                     .image = render_target_image,
+                    .sampler =
+                        {
+                            .mag_filter = KAN_RENDER_FILTER_MODE_NEAREST,
+                            .min_filter = KAN_RENDER_FILTER_MODE_NEAREST,
+                            .mip_map_mode = KAN_RENDER_MIP_MAP_MODE_NEAREST,
+                            .address_mode_u = KAN_RENDER_ADDRESS_MODE_REPEAT,
+                            .address_mode_v = KAN_RENDER_ADDRESS_MODE_REPEAT,
+                            .address_mode_w = KAN_RENDER_ADDRESS_MODE_REPEAT,
+                        },
                 },
         },
     };

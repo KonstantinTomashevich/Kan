@@ -223,8 +223,6 @@ struct parser_sampler_t
     kan_interned_string_t name;
     enum kan_rpl_set_t set;
     enum kan_rpl_sampler_type_t type;
-    struct parser_setting_list_item_t *first_setting;
-    struct parser_setting_list_item_t *last_setting;
 
     struct parser_expression_tree_node_t *conditional;
     kan_interned_string_t source_log_name;
@@ -550,8 +548,6 @@ static inline struct parser_sampler_t *parser_sampler_new (struct rpl_parser_t *
     instance->name = name;
     instance->set = set;
     instance->type = type;
-    instance->first_setting = NULL;
-    instance->last_setting = NULL;
     instance->conditional = NULL;
     instance->source_log_name = source_log_name;
     instance->source_line = source_line;
@@ -1353,7 +1349,7 @@ static kan_bool_t parse_main (struct rpl_parser_t *parser, struct dynamic_parser
                      parser, state, KAN_RPL_SET_PASS, KAN_RPL_BUFFER_TYPE_FRAGMENT_STAGE_OUTPUT, name_begin, name_end))
          }
 
-         set_prefix separator+ "sampler_2d" separator+ @name_begin identifier @name_end separator* "{"
+         set_prefix separator+ "sampler_2d" separator+ @name_begin identifier @name_end separator* ";"
          {
              DETECT_SET
              CHECKED (parse_main_sampler (parser, state, detected_set, KAN_RPL_SAMPLER_TYPE_2D, name_begin, name_end))
@@ -2561,286 +2557,6 @@ static struct parser_declaration_t *parse_declarations (struct rpl_parser_t *par
     }
 }
 
-static inline kan_bool_t parse_sampler_setting_flag (struct rpl_parser_t *parser,
-                                                     struct dynamic_parser_state_t *state,
-                                                     struct parser_sampler_t *sampler,
-                                                     const char *name_begin,
-                                                     const char *name_end,
-                                                     kan_bool_t value,
-                                                     const char *block_begin,
-                                                     const char *block_end)
-{
-    kan_interned_string_t name = kan_char_sequence_intern (name_begin, name_end);
-    struct parser_setting_list_item_t *item =
-        KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&parser->allocator, struct parser_setting_list_item_t);
-
-    item->setting.name = name;
-    item->setting.block =
-        block_begin ? parse_unsigned_integer_value (parser, state, block_begin, block_end) : KAN_RPL_SETTING_BLOCK_NONE;
-    item->setting.type = KAN_RPL_SETTING_TYPE_FLAG;
-    item->setting.flag = value;
-
-    item->setting.conditional = state->detached_conditional;
-    state->detached_conditional = NULL;
-
-    item->setting.source_log_name = state->source_log_name;
-    item->setting.source_line = state->cursor_line;
-
-    item->next = NULL;
-    if (sampler->last_setting)
-    {
-        sampler->last_setting->next = item;
-    }
-    else
-    {
-        sampler->first_setting = item;
-    }
-
-    sampler->last_setting = item;
-    return KAN_TRUE;
-}
-
-static inline kan_bool_t parse_sampler_setting_integer (struct rpl_parser_t *parser,
-                                                        struct dynamic_parser_state_t *state,
-                                                        struct parser_sampler_t *sampler,
-                                                        const char *name_begin,
-                                                        const char *name_end,
-                                                        const char *literal_begin,
-                                                        const char *literal_end,
-                                                        const char *block_begin,
-                                                        const char *block_end)
-{
-    kan_interned_string_t name = kan_char_sequence_intern (name_begin, name_end);
-    struct parser_setting_list_item_t *item =
-        KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&parser->allocator, struct parser_setting_list_item_t);
-
-    item->setting.name = name;
-    item->setting.block =
-        block_begin ? parse_unsigned_integer_value (parser, state, block_begin, block_end) : KAN_RPL_SETTING_BLOCK_NONE;
-    item->setting.type = KAN_RPL_SETTING_TYPE_INTEGER;
-
-    const kan_bool_t negative = *literal_begin == '-';
-    if (negative)
-    {
-        ++literal_begin;
-    }
-
-    const kan_rpl_unsigned_int_literal_t unsigned_value =
-        parse_unsigned_integer_value (parser, state, literal_begin, literal_end);
-    if (unsigned_value > KAN_INT_MAX (kan_rpl_signed_int_literal_t))
-    {
-        KAN_LOG (rpl_parser, KAN_LOG_WARNING, "[%s:%s] [%ld:%ld]: Setting \"%s\" integer value is too big.",
-                 parser->log_name, state->source_log_name, (long) state->cursor_line, (long) state->cursor_symbol, name)
-        return KAN_FALSE;
-    }
-
-    item->setting.integer = (kan_rpl_signed_int_literal_t) unsigned_value;
-    if (negative)
-    {
-        item->setting.integer = -item->setting.integer;
-    }
-
-    item->setting.conditional = state->detached_conditional;
-    state->detached_conditional = NULL;
-
-    item->setting.source_log_name = state->source_log_name;
-    item->setting.source_line = state->cursor_line;
-
-    item->next = NULL;
-    if (sampler->last_setting)
-    {
-        sampler->last_setting->next = item;
-    }
-    else
-    {
-        sampler->first_setting = item;
-    }
-
-    sampler->last_setting = item;
-    return KAN_TRUE;
-}
-
-static inline kan_bool_t parse_sampler_setting_floating (struct rpl_parser_t *parser,
-                                                         struct dynamic_parser_state_t *state,
-                                                         struct parser_sampler_t *sampler,
-                                                         const char *name_begin,
-                                                         const char *name_end,
-                                                         const char *literal_begin,
-                                                         const char *literal_end,
-                                                         const char *block_begin,
-                                                         const char *block_end)
-{
-    kan_interned_string_t name = kan_char_sequence_intern (name_begin, name_end);
-    struct parser_setting_list_item_t *item =
-        KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&parser->allocator, struct parser_setting_list_item_t);
-
-    item->setting.name = name;
-    item->setting.block =
-        block_begin ? parse_unsigned_integer_value (parser, state, block_begin, block_end) : KAN_RPL_SETTING_BLOCK_NONE;
-    item->setting.type = KAN_RPL_SETTING_TYPE_FLOATING;
-
-    const kan_bool_t negative = *literal_begin == '-';
-    if (negative)
-    {
-        ++literal_begin;
-    }
-
-    const float unsigned_value = parse_unsigned_floating_value (parser, state, literal_begin, literal_end);
-    item->setting.floating = unsigned_value;
-
-    if (negative)
-    {
-        item->setting.floating = -item->setting.floating;
-    }
-
-    item->setting.conditional = state->detached_conditional;
-    state->detached_conditional = NULL;
-
-    item->setting.source_log_name = state->source_log_name;
-    item->setting.source_line = state->cursor_line;
-
-    item->next = NULL;
-    if (sampler->last_setting)
-    {
-        sampler->last_setting->next = item;
-    }
-    else
-    {
-        sampler->first_setting = item;
-    }
-
-    sampler->last_setting = item;
-    return KAN_TRUE;
-}
-
-static inline kan_bool_t parse_sampler_setting_string (struct rpl_parser_t *parser,
-                                                       struct dynamic_parser_state_t *state,
-                                                       struct parser_sampler_t *sampler,
-                                                       const char *name_begin,
-                                                       const char *name_end,
-                                                       const char *literal_begin,
-                                                       const char *literal_end,
-                                                       const char *block_begin,
-                                                       const char *block_end)
-{
-    kan_interned_string_t name = kan_char_sequence_intern (name_begin, name_end);
-    struct parser_setting_list_item_t *item =
-        KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&parser->allocator, struct parser_setting_list_item_t);
-
-    item->setting.name = name;
-    item->setting.block =
-        block_begin ? parse_unsigned_integer_value (parser, state, block_begin, block_end) : KAN_RPL_SETTING_BLOCK_NONE;
-    item->setting.type = KAN_RPL_SETTING_TYPE_STRING;
-    item->setting.string = kan_char_sequence_intern (literal_begin, literal_end);
-
-    item->setting.conditional = state->detached_conditional;
-    state->detached_conditional = NULL;
-
-    item->setting.source_log_name = state->source_log_name;
-    item->setting.source_line = state->cursor_line;
-
-    item->next = NULL;
-    if (sampler->last_setting)
-    {
-        sampler->last_setting->next = item;
-    }
-    else
-    {
-        sampler->first_setting = item;
-    }
-
-    sampler->last_setting = item;
-    return KAN_TRUE;
-}
-
-static inline kan_bool_t parse_sampler_settings (struct rpl_parser_t *parser,
-                                                 struct dynamic_parser_state_t *state,
-                                                 struct parser_sampler_t *sampler)
-{
-    while (KAN_TRUE)
-    {
-        state->token = state->cursor;
-        const char *name_begin;
-        const char *name_end;
-        const char *literal_begin;
-        const char *literal_end;
-        const char *block_begin;
-        const char *block_end;
-
-#define CHECKED(...)                                                                                                   \
-    if (!(__VA_ARGS__))                                                                                                \
-    {                                                                                                                  \
-        return KAN_FALSE;                                                                                              \
-    }                                                                                                                  \
-    continue;
-
-        /*!re2c
-         "conditional" separator* "("
-         {
-             state->detached_conditional = parse_detached_conditional (parser, state);
-             if (!state->detached_conditional)
-             {
-                 return KAN_FALSE;
-             }
-
-             continue;
-         }
-
-         setting_flag_on
-         {
-             CHECKED (parse_sampler_setting_flag (parser, state, sampler, name_begin, name_end, KAN_TRUE,
-                                                  block_begin, block_end))
-         }
-
-         setting_flag_off
-         {
-             CHECKED (parse_sampler_setting_flag (parser, state, sampler, name_begin, name_end, KAN_FALSE,
-                                                  block_begin, block_end))
-         }
-
-         setting_integer
-         {
-             CHECKED (parse_sampler_setting_integer (parser, state, sampler, name_begin, name_end,
-                                                     literal_begin, literal_end, block_begin, block_end))
-         }
-
-         setting_floating
-         {
-             CHECKED (parse_sampler_setting_floating (parser, state, sampler, name_begin, name_end,
-                                                      literal_begin, literal_end, block_begin, block_end))
-         }
-
-         setting_string
-         {
-             CHECKED (parse_sampler_setting_string (parser, state, sampler, name_begin, name_end,
-                                                    literal_begin, literal_end, block_begin, block_end))
-         }
-
-         "}" separator* ";" { return KAN_TRUE; }
-
-         separator+ { continue; }
-         comment+ { continue; }
-
-         *
-         {
-             KAN_LOG (rpl_parser, KAN_LOG_ERROR,
-                      "[%s:%s] [%ld:%ld]: Encountered unknown expression while reading sampler settings.",
-                      parser->log_name, state->source_log_name, (long) state->cursor_line, (long) state->cursor_symbol)
-             return KAN_FALSE;
-         }
-         $
-         {
-             KAN_LOG (rpl_parser, KAN_LOG_ERROR,
-                      "[%s:%s] [%ld:%ld]: Encountered end of file while reading sampler settings.",
-                      parser->log_name, state->source_log_name, (long) state->cursor_line, (long) state->cursor_symbol)
-             return KAN_FALSE;
-         }
-         */
-
-#undef CHECKED
-    }
-}
-
 static kan_bool_t parse_main_sampler (struct rpl_parser_t *parser,
                                       struct dynamic_parser_state_t *state,
                                       enum kan_rpl_set_t set,
@@ -2852,25 +2568,20 @@ static kan_bool_t parse_main_sampler (struct rpl_parser_t *parser,
                                                            type, state->source_log_name, state->cursor_line);
     sampler->conditional = state->detached_conditional;
     state->detached_conditional = NULL;
+    sampler->next = NULL;
 
-    if (parse_sampler_settings (parser, state, sampler))
+    if (parser->processing_data.last_sampler)
     {
-        sampler->next = NULL;
-        if (parser->processing_data.last_sampler)
-        {
-            parser->processing_data.last_sampler->next = sampler;
-        }
-        else
-        {
-            parser->processing_data.first_sampler = sampler;
-        }
-
-        parser->processing_data.last_sampler = sampler;
-        ++parser->processing_data.sampler_count;
-        return KAN_TRUE;
+        parser->processing_data.last_sampler->next = sampler;
+    }
+    else
+    {
+        parser->processing_data.first_sampler = sampler;
     }
 
-    return KAN_FALSE;
+    parser->processing_data.last_sampler = sampler;
+    ++parser->processing_data.sampler_count;
+    return KAN_TRUE;
 }
 
 static struct parser_expression_tree_node_t *parse_scope (struct rpl_parser_t *parser,
@@ -3525,16 +3236,9 @@ void kan_rpl_sampler_init (struct kan_rpl_sampler_t *instance)
 {
     instance->name = NULL;
     instance->type = KAN_RPL_SAMPLER_TYPE_2D;
-    kan_dynamic_array_init (&instance->settings, 0u, sizeof (struct kan_rpl_setting_t),
-                            _Alignof (struct kan_rpl_setting_t), rpl_intermediate_allocation_group);
     instance->conditional_index = KAN_RPL_EXPRESSION_INDEX_NONE;
     instance->source_name = NULL;
     instance->source_line = 0u;
-}
-
-void kan_rpl_sampler_shutdown (struct kan_rpl_sampler_t *instance)
-{
-    kan_dynamic_array_shutdown (&instance->settings);
 }
 
 void kan_rpl_function_init (struct kan_rpl_function_t *instance)
@@ -3587,11 +3291,6 @@ void kan_rpl_intermediate_shutdown (struct kan_rpl_intermediate_t *instance)
     for (kan_loop_size_t index = 0u; index < instance->buffers.size; ++index)
     {
         kan_rpl_buffer_shutdown (&((struct kan_rpl_buffer_t *) instance->buffers.data)[index]);
-    }
-
-    for (kan_loop_size_t index = 0u; index < instance->samplers.size; ++index)
-    {
-        kan_rpl_sampler_shutdown (&((struct kan_rpl_sampler_t *) instance->samplers.data)[index]);
     }
 
     for (kan_loop_size_t index = 0u; index < instance->functions.size; ++index)
@@ -4138,31 +3837,6 @@ static kan_bool_t build_intermediate_samplers (struct rpl_parser_t *instance, st
         target_sampler->type = source_sampler->type;
         target_sampler->source_name = source_sampler->source_log_name;
         target_sampler->source_line = (kan_rpl_size_t) source_sampler->source_line;
-
-        kan_loop_size_t settings_count = 0u;
-        struct parser_setting_list_item_t *setting = source_sampler->first_setting;
-
-        while (setting)
-        {
-            ++settings_count;
-            setting = setting->next;
-        }
-
-        kan_dynamic_array_set_capacity (&target_sampler->settings, (kan_instance_size_t) settings_count);
-        setting = source_sampler->first_setting;
-
-        while (setting)
-        {
-            struct kan_rpl_setting_t *new_setting = kan_dynamic_array_add_last (&target_sampler->settings);
-            KAN_ASSERT (new_setting)
-
-            if (!build_intermediate_setting (instance, output, &setting->setting, new_setting))
-            {
-                result = KAN_FALSE;
-            }
-
-            setting = setting->next;
-        }
 
         if (source_sampler->conditional &&
             !build_intermediate_expression (instance, output, source_sampler->conditional,

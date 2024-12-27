@@ -23,15 +23,7 @@ void vertex_main (void)
     vertex_stage_output_position (pass.model_view_projection * position4);
 }
 
-set_material sampler_2d diffuse_color
-{
-    setting mag_filter "nearest";
-    setting min_filter "nearest";
-    setting mip_map_mode "nearest";
-    setting address_mode_u "repeat";
-    setting address_mode_v "repeat";
-    setting address_mode_w "repeat";
-};
+set_material sampler_2d diffuse_color;
 
 fragment_stage_output fragment_output
 {

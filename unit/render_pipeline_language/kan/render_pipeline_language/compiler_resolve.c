@@ -1501,16 +1501,6 @@ static kan_bool_t resolve_samplers (struct rpl_compiler_context_t *context,
                 break;
             }
 
-            struct compiler_instance_setting_node_t *first_setting = NULL;
-            struct compiler_instance_setting_node_t *last_setting = NULL;
-
-            if (!resolve_settings (context, instance, intermediate, &source_sampler->settings, KAN_FALSE,
-                                   &first_setting, &last_setting))
-            {
-                result = KAN_FALSE;
-            }
-
-            target_sampler->first_setting = first_setting;
             target_sampler->module_name = intermediate->log_name;
             target_sampler->source_name = source_sampler->source_name;
             target_sampler->source_line = source_sampler->source_line;

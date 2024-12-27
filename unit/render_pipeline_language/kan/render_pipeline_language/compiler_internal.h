@@ -196,7 +196,6 @@ struct compiler_instance_sampler_node_t
     kan_bool_t used;
 
     kan_instance_size_t binding;
-    struct compiler_instance_setting_node_t *first_setting;
 
     spirv_size_t variable_spirv_id;
 

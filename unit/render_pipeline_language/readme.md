@@ -277,26 +277,13 @@ Currently, there is only one supported sampler type: `sampler2d`. More types wil
 Samples declaration syntax is:
 
 ```
-conditional_prefix? set_prefix sampler_type <sampler_name>
-{
-    (sampler_setting ;)+
-};
+conditional_prefix set_prefix sampler_type <sampler_name>;
 ```
-
-Syntax for defining sampler settings is the same as for pipeline settings.
 
 Sampler declaration example:
 
 ```
-sampler_2d diffuse_color
-{
-    setting mag_filter "nearest";
-    setting min_filter "nearest";
-    setting mip_map_mode "nearest";
-    setting address_mode_u "repeat";
-    setting address_mode_v "repeat";
-    setting address_mode_w "repeat";
-};
+set_material sampler_2d diffuse_color;
 ```
 
 To sample data from sampler, sampler should be called like a function. Below are arguments for different sampler types:

@@ -432,9 +432,6 @@ struct kan_rpl_sampler_t
     enum kan_rpl_set_t set;
     enum kan_rpl_sampler_type_t type;
 
-    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_setting_t)
-    struct kan_dynamic_array_t settings;
-
     /// \details Conditional expression if it is not KAN_RPL_EXPRESSION_NODE_TYPE_NOPE.
     kan_rpl_size_t conditional_index;
 
@@ -443,8 +440,6 @@ struct kan_rpl_sampler_t
 };
 
 RENDER_PIPELINE_LANGUAGE_API void kan_rpl_sampler_init (struct kan_rpl_sampler_t *instance);
-
-RENDER_PIPELINE_LANGUAGE_API void kan_rpl_sampler_shutdown (struct kan_rpl_sampler_t *instance);
 
 /// \brief Defines structure that holds function data.
 struct kan_rpl_function_t

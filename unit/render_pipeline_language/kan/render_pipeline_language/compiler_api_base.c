@@ -28,20 +28,31 @@ void kan_rpl_meta_buffer_init (struct kan_rpl_meta_buffer_t *instance)
     instance->tail_item_size = 0u;
     kan_dynamic_array_init (&instance->attributes, 0u, sizeof (struct kan_rpl_meta_attribute_t),
                             _Alignof (struct kan_rpl_meta_attribute_t), STATICS.rpl_meta_allocation_group);
-    kan_dynamic_array_init (&instance->parameters, 0u, sizeof (struct kan_rpl_meta_parameter_t),
+    kan_dynamic_array_init (&instance->main_parameters, 0u, sizeof (struct kan_rpl_meta_parameter_t),
+                            _Alignof (struct kan_rpl_meta_parameter_t), STATICS.rpl_meta_allocation_group);
+
+    instance->tail_name = NULL;
+    kan_dynamic_array_init (&instance->tail_item_parameters, 0u, sizeof (struct kan_rpl_meta_parameter_t),
                             _Alignof (struct kan_rpl_meta_parameter_t), STATICS.rpl_meta_allocation_group);
 }
 
 void kan_rpl_meta_buffer_shutdown (struct kan_rpl_meta_buffer_t *instance)
 {
-    for (kan_loop_size_t parameter_index = 0u; parameter_index < instance->parameters.size; ++parameter_index)
+    for (kan_loop_size_t parameter_index = 0u; parameter_index < instance->main_parameters.size; ++parameter_index)
     {
         kan_rpl_meta_parameter_shutdown (
-            &((struct kan_rpl_meta_parameter_t *) instance->parameters.data)[parameter_index]);
+            &((struct kan_rpl_meta_parameter_t *) instance->main_parameters.data)[parameter_index]);
+    }
+
+    for (kan_loop_size_t parameter_index = 0u; parameter_index < instance->tail_item_parameters.size; ++parameter_index)
+    {
+        kan_rpl_meta_parameter_shutdown (
+            &((struct kan_rpl_meta_parameter_t *) instance->tail_item_parameters.data)[parameter_index]);
     }
 
     kan_dynamic_array_shutdown (&instance->attributes);
-    kan_dynamic_array_shutdown (&instance->parameters);
+    kan_dynamic_array_shutdown (&instance->main_parameters);
+    kan_dynamic_array_shutdown (&instance->tail_item_parameters);
 }
 
 void kan_rpl_meta_set_bindings_init (struct kan_rpl_meta_set_bindings_t *instance)
