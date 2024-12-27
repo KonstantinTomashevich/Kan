@@ -178,9 +178,11 @@ struct kan_rpl_meta_buffer_t
     /// \details Stage outputs are not listed in meta buffers.
     enum kan_rpl_buffer_type_t type;
 
-    /// \brief Buffer size.
-    /// \details Item size for instanced and vertex attribute buffers and full size for other buffers.
-    kan_rpl_size_t size;
+    /// \brief Buffer main part size (without runtime sized array tail).
+    kan_rpl_size_t main_size;
+
+    /// \brief Size of a tail item of runtime sized array if any (if none, then zero).
+    kan_rpl_size_t tail_item_size;
 
     /// \brief Attributes provided by this buffer, needed for pipeline setup.
     /// \details Only provided for attribute buffers.
@@ -190,6 +192,8 @@ struct kan_rpl_meta_buffer_t
     /// \brief Parameters provided by this buffer, useful for things like materials.
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_meta_parameter_t)
     struct kan_dynamic_array_t parameters;
+
+    // TODO: Tail parameters, useful for cases when we'd like to generate several tail variants.
 };
 
 RENDER_PIPELINE_LANGUAGE_API void kan_rpl_meta_buffer_init (struct kan_rpl_meta_buffer_t *instance);

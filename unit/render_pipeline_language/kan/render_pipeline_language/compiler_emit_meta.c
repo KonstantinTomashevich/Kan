@@ -748,6 +748,12 @@ static kan_bool_t emit_meta_gather_parameters_process_field (struct rpl_compiler
                                                              struct kan_rpl_meta_buffer_t *meta_output,
                                                              struct kan_trivial_string_buffer_t *name_generation_buffer)
 {
+    if (field->variable.type.array_size_runtime)
+    {
+        // Parts of runtime sized arrays are not passed as parameters.
+        return KAN_TRUE;
+    }
+
     if (field->variable.type.if_vector || field->variable.type.if_matrix)
     {
         kan_bool_t valid = KAN_TRUE;
@@ -789,9 +795,14 @@ static kan_bool_t emit_meta_gather_parameters_process_field (struct rpl_compiler
     }
     else if (field->variable.type.if_struct)
     {
-        return emit_meta_gather_parameters_process_field_list (instance, base_offset + field->offset,
-                                                               field->variable.type.if_struct->first_field, meta_output,
-                                                               name_generation_buffer);
+        // Currently we only generate parameters for non-array structs as parameters from arrays of structs sound
+        // like a strange and not entirely useful idea.
+        if (field->variable.type.array_dimensions_count == 0u)
+        {
+            return emit_meta_gather_parameters_process_field_list (instance, base_offset + field->offset,
+                                                                   field->variable.type.if_struct->first_field,
+                                                                   meta_output, name_generation_buffer);
+        }
     }
 
     return KAN_TRUE;
@@ -827,8 +838,6 @@ kan_bool_t kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t comp
 
         case KAN_RPL_BUFFER_TYPE_UNIFORM:
         case KAN_RPL_BUFFER_TYPE_READ_ONLY_STORAGE:
-        case KAN_RPL_BUFFER_TYPE_INSTANCED_UNIFORM:
-        case KAN_RPL_BUFFER_TYPE_INSTANCED_READ_ONLY_STORAGE:
             switch (buffer->set)
             {
             case KAN_RPL_SET_PASS:
@@ -901,8 +910,6 @@ kan_bool_t kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t comp
 
         case KAN_RPL_BUFFER_TYPE_UNIFORM:
         case KAN_RPL_BUFFER_TYPE_READ_ONLY_STORAGE:
-        case KAN_RPL_BUFFER_TYPE_INSTANCED_UNIFORM:
-        case KAN_RPL_BUFFER_TYPE_INSTANCED_READ_ONLY_STORAGE:
             switch (buffer->set)
             {
             case KAN_RPL_SET_PASS:
@@ -962,7 +969,8 @@ kan_bool_t kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t comp
         meta_buffer->name = buffer->name;
         meta_buffer->binding = buffer->binding;
         meta_buffer->type = buffer->type;
-        meta_buffer->size = buffer->size;
+        meta_buffer->main_size = buffer->main_size;
+        meta_buffer->tail_item_size = buffer->tail_item_size;
 
         if (buffer->type == KAN_RPL_BUFFER_TYPE_VERTEX_ATTRIBUTE ||
             buffer->type == KAN_RPL_BUFFER_TYPE_INSTANCED_ATTRIBUTE)
@@ -1000,9 +1008,7 @@ kan_bool_t kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t comp
         }
 
         if (buffer->type == KAN_RPL_BUFFER_TYPE_UNIFORM || buffer->type == KAN_RPL_BUFFER_TYPE_READ_ONLY_STORAGE ||
-            buffer->type == KAN_RPL_BUFFER_TYPE_INSTANCED_ATTRIBUTE ||
-            buffer->type == KAN_RPL_BUFFER_TYPE_INSTANCED_UNIFORM ||
-            buffer->type == KAN_RPL_BUFFER_TYPE_INSTANCED_READ_ONLY_STORAGE)
+            buffer->type == KAN_RPL_BUFFER_TYPE_INSTANCED_ATTRIBUTE)
         {
             if (!emit_meta_gather_parameters_process_field_list (instance, 0u, buffer->first_field, meta_buffer,
                                                                  &name_generation_buffer))

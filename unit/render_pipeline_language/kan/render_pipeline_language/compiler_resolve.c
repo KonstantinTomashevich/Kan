@@ -655,15 +655,20 @@ static inline kan_bool_t resolve_array_dimensions (struct rpl_compiler_context_t
                                                    struct rpl_compiler_instance_t *instance,
                                                    struct kan_rpl_intermediate_t *intermediate,
                                                    struct compiler_instance_variable_t *variable,
+                                                   kan_bool_t array_size_runtime,
                                                    kan_rpl_size_t dimensions_list_size,
                                                    kan_rpl_size_t dimensions_list_index,
                                                    kan_bool_t instance_options_allowed)
 {
     kan_bool_t result = KAN_TRUE;
+    variable->type.array_size_runtime = array_size_runtime;
     variable->type.array_dimensions_count = dimensions_list_size;
 
     if (variable->type.array_dimensions_count > 0u)
     {
+        // Should not be allowed by parser.
+        KAN_ASSERT (!array_size_runtime)
+
         variable->type.array_dimensions = kan_stack_group_allocator_allocate (
             &instance->resolve_allocator, sizeof (kan_instance_size_t) * variable->type.array_dimensions_count,
             _Alignof (kan_instance_size_t));
@@ -794,10 +799,10 @@ static kan_bool_t resolve_declarations (struct rpl_compiler_context_t *context,
                 result = KAN_FALSE;
             }
 
-            if (!resolve_array_dimensions (context, instance, intermediate, &target_declaration->variable,
-                                           source_declaration->array_size_expression_list_size,
-                                           source_declaration->array_size_expression_list_index,
-                                           instance_options_allowed))
+            if (!resolve_array_dimensions (
+                    context, instance, intermediate, &target_declaration->variable,
+                    source_declaration->array_size_runtime, source_declaration->array_size_expression_list_size,
+                    source_declaration->array_size_expression_list_index, instance_options_allowed))
             {
                 result = KAN_FALSE;
             }
@@ -970,8 +975,6 @@ static kan_bool_t flatten_buffer_process_field (struct rpl_compiler_context_t *c
 
         case KAN_RPL_BUFFER_TYPE_UNIFORM:
         case KAN_RPL_BUFFER_TYPE_READ_ONLY_STORAGE:
-        case KAN_RPL_BUFFER_TYPE_INSTANCED_UNIFORM:
-        case KAN_RPL_BUFFER_TYPE_INSTANCED_READ_ONLY_STORAGE:
             KAN_ASSERT (KAN_FALSE)
             break;
 
@@ -1085,6 +1088,57 @@ static kan_bool_t resolve_buffers_validate_uniform_internals_alignment (
     return valid;
 }
 
+static kan_bool_t resolve_buffers_validate_buffer_tail_if_any (
+    struct rpl_compiler_context_t *context,
+    struct compiler_instance_buffer_node_t *buffer,
+    struct compiler_instance_declaration_node_t *first_declaration,
+    kan_bool_t *has_tail_output)
+{
+    kan_bool_t valid = KAN_TRUE;
+    struct compiler_instance_declaration_node_t *declaration = first_declaration;
+
+    while (declaration)
+    {
+        if (declaration->variable.type.array_size_runtime)
+        {
+            buffer->tail_item_size = declaration->size;
+            *has_tail_output = KAN_TRUE;
+            valid = !declaration->next;
+
+            if (!valid)
+            {
+                KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
+                         "[%s:%s:%s:%ld] Runtime size array declaration \"%s\" is found inside buffer \"%s\", but its "
+                         "not the last field.",
+                         context->log_name, declaration->module_name, declaration->source_name,
+                         (long) declaration->source_line, declaration->variable.name, buffer->name)
+            }
+        }
+        else if (declaration->variable.type.if_struct)
+        {
+            if (!resolve_buffers_validate_buffer_tail_if_any (
+                    context, buffer, declaration->variable.type.if_struct->first_field, has_tail_output))
+            {
+                valid = KAN_FALSE;
+            }
+
+            if (*has_tail_output && declaration->next)
+            {
+                KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
+                         "[%s:%s:%s:%ld] Runtime size array found inside field \"%s\" declaration inside buffer "
+                         "\"%s\", but its not the last field.",
+                         context->log_name, declaration->module_name, declaration->source_name,
+                         (long) declaration->source_line, declaration->variable.name, buffer->name)
+                valid = KAN_FALSE;
+            }
+        }
+
+        declaration = declaration->next;
+    }
+
+    return valid;
+}
+
 static kan_bool_t is_global_name_occupied (struct rpl_compiler_context_t *context,
                                            struct rpl_compiler_instance_t *instance,
                                            kan_interned_string_t name)
@@ -1158,7 +1212,11 @@ static inline void calculate_size_and_alignment_from_declarations (
 
     while (declaration)
     {
-        *size_output = declaration->offset + declaration->size;
+        if (!declaration->variable.type.array_size_runtime)
+        {
+            *size_output = declaration->offset + declaration->size;
+        }
+
         *alignment_output = KAN_MAX (*alignment_output, declaration->alignment);
         declaration = declaration->next;
     }
@@ -1226,34 +1284,42 @@ static kan_bool_t resolve_buffers (struct rpl_compiler_context_t *context,
             case KAN_RPL_BUFFER_TYPE_INSTANCED_ATTRIBUTE:
                 target_buffer->binding = assignment_counter->next_attribute_buffer_binding;
                 ++assignment_counter->next_attribute_buffer_binding;
-                target_buffer->stable_binding = KAN_TRUE;
                 break;
 
             case KAN_RPL_BUFFER_TYPE_UNIFORM:
             case KAN_RPL_BUFFER_TYPE_READ_ONLY_STORAGE:
-                target_buffer->binding = assignment_counter->next_arbitrary_stable_buffer_binding;
-                ++assignment_counter->next_arbitrary_stable_buffer_binding;
-                target_buffer->stable_binding = KAN_TRUE;
-                break;
+                switch (target_buffer->set)
+                {
+                case KAN_RPL_SET_PASS:
+                    target_buffer->binding = assignment_counter->next_pass_set_binding++;
+                    break;
 
-            case KAN_RPL_BUFFER_TYPE_INSTANCED_UNIFORM:
-            case KAN_RPL_BUFFER_TYPE_INSTANCED_READ_ONLY_STORAGE:
-                target_buffer->binding = assignment_counter->next_arbitrary_unstable_buffer_binding;
-                ++assignment_counter->next_arbitrary_unstable_buffer_binding;
-                target_buffer->stable_binding = KAN_FALSE;
+                case KAN_RPL_SET_MATERIAL:
+                    target_buffer->binding = assignment_counter->next_material_set_binding++;
+                    break;
+
+                case KAN_RPL_SET_OBJECT:
+                    target_buffer->binding = assignment_counter->next_object_set_binding++;
+                    break;
+
+                case KAN_RPL_SET_UNSTABLE:
+                    target_buffer->binding = assignment_counter->next_unstable_set_binding++;
+                    break;
+                }
+
                 break;
 
             case KAN_RPL_BUFFER_TYPE_VERTEX_STAGE_OUTPUT:
             case KAN_RPL_BUFFER_TYPE_FRAGMENT_STAGE_OUTPUT:
                 // Not an external buffers, so no binding.
                 target_buffer->binding = INVALID_BINDING;
-                target_buffer->stable_binding = KAN_FALSE;
                 break;
             }
 
             target_buffer->flattening_graph_base = NULL;
             target_buffer->first_flattened_declaration = NULL;
             target_buffer->last_flattened_declaration = NULL;
+            target_buffer->tail_item_size = 0u;
 
             if (result)
             {
@@ -1268,7 +1334,8 @@ static kan_bool_t resolve_buffers (struct rpl_compiler_context_t *context,
 
                     while (declaration)
                     {
-                        if (declaration->source_declaration->variable.type.array_dimensions_count > 0u)
+                        if (declaration->source_declaration->variable.type.array_size_runtime ||
+                            declaration->source_declaration->variable.type.array_dimensions_count > 0u)
                         {
                             KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
                                      "[%s:%s:%s:%ld] Attributes should not be arrays, but flattened declaration \"%s\" "
@@ -1286,18 +1353,34 @@ static kan_bool_t resolve_buffers (struct rpl_compiler_context_t *context,
                 }
 
                 case KAN_RPL_BUFFER_TYPE_UNIFORM:
-                case KAN_RPL_BUFFER_TYPE_INSTANCED_UNIFORM:
+                {
                     if (!resolve_buffers_validate_uniform_internals_alignment (context, target_buffer,
                                                                                target_buffer->first_field))
                     {
                         result = KAN_FALSE;
                     }
 
+                    kan_bool_t has_tail = KAN_FALSE;
+                    if (!resolve_buffers_validate_buffer_tail_if_any (context, target_buffer,
+                                                                      target_buffer->first_field, &has_tail))
+                    {
+                        result = KAN_FALSE;
+                    }
+
                     break;
+                }
 
                 case KAN_RPL_BUFFER_TYPE_READ_ONLY_STORAGE:
-                case KAN_RPL_BUFFER_TYPE_INSTANCED_READ_ONLY_STORAGE:
+                {
+                    kan_bool_t has_tail = KAN_FALSE;
+                    if (!resolve_buffers_validate_buffer_tail_if_any (context, target_buffer,
+                                                                      target_buffer->first_field, &has_tail))
+                    {
+                        result = KAN_FALSE;
+                    }
+
                     break;
+                }
 
                 case KAN_RPL_BUFFER_TYPE_VERTEX_STAGE_OUTPUT:
                     flatten_buffer (context, instance, target_buffer, assignment_counter);
@@ -1330,7 +1413,7 @@ static kan_bool_t resolve_buffers (struct rpl_compiler_context_t *context,
                 }
             }
 
-            calculate_size_and_alignment_from_declarations (target_buffer->first_field, &target_buffer->size,
+            calculate_size_and_alignment_from_declarations (target_buffer->first_field, &target_buffer->main_size,
                                                             &target_buffer->alignment);
 
             target_buffer->module_name = intermediate->log_name;
@@ -1398,8 +1481,25 @@ static kan_bool_t resolve_samplers (struct rpl_compiler_context_t *context,
 
             target_sampler->used = KAN_FALSE;
             target_sampler->set = source_sampler->set;
-            target_sampler->binding = assignment_counter->next_arbitrary_stable_buffer_binding;
-            ++assignment_counter->next_arbitrary_stable_buffer_binding;
+
+            switch (target_sampler->set)
+            {
+            case KAN_RPL_SET_PASS:
+                target_sampler->binding = assignment_counter->next_pass_set_binding++;
+                break;
+
+            case KAN_RPL_SET_MATERIAL:
+                target_sampler->binding = assignment_counter->next_material_set_binding++;
+                break;
+
+            case KAN_RPL_SET_OBJECT:
+                target_sampler->binding = assignment_counter->next_object_set_binding++;
+                break;
+
+            case KAN_RPL_SET_UNSTABLE:
+                target_sampler->binding = assignment_counter->next_unstable_set_binding++;
+                break;
+            }
 
             struct compiler_instance_setting_node_t *first_setting = NULL;
             struct compiler_instance_setting_node_t *last_setting = NULL;
@@ -1524,8 +1624,6 @@ static kan_bool_t is_buffer_can_be_accessed_from_stage (struct compiler_instance
     {
     case KAN_RPL_BUFFER_TYPE_VERTEX_ATTRIBUTE:
     case KAN_RPL_BUFFER_TYPE_INSTANCED_ATTRIBUTE:
-    case KAN_RPL_BUFFER_TYPE_INSTANCED_UNIFORM:
-    case KAN_RPL_BUFFER_TYPE_INSTANCED_READ_ONLY_STORAGE:
         *output_unique_stage_binding = KAN_TRUE;
         return stage == KAN_RPL_PIPELINE_STAGE_GRAPHICS_CLASSIC_VERTEX;
 
@@ -1869,6 +1967,7 @@ static inline kan_bool_t resolve_match_signature_at_index (struct rpl_compiler_c
                                                 signature->variable.type.if_struct))
             return KAN_FALSE;
         }
+        // Runtime arrays should not matter here as they should be disallowed on parser level.
         else if (signature->variable.type.array_dimensions_count != expression->output.type.array_dimensions_count)
         {
             KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
@@ -1883,6 +1982,7 @@ static inline kan_bool_t resolve_match_signature_at_index (struct rpl_compiler_c
         }
         else
         {
+            // Runtime arrays should not matter here as they should be disallowed on parser level.
             for (kan_loop_size_t array_dimension_index = 0u;
                  array_dimension_index < signature->variable.type.array_dimensions_count; ++array_dimension_index)
             {
@@ -2065,8 +2165,6 @@ static kan_bool_t is_buffer_writable_for_stage (struct compiler_instance_buffer_
     case KAN_RPL_BUFFER_TYPE_UNIFORM:
     case KAN_RPL_BUFFER_TYPE_READ_ONLY_STORAGE:
     case KAN_RPL_BUFFER_TYPE_INSTANCED_ATTRIBUTE:
-    case KAN_RPL_BUFFER_TYPE_INSTANCED_UNIFORM:
-    case KAN_RPL_BUFFER_TYPE_INSTANCED_READ_ONLY_STORAGE:
         return KAN_FALSE;
 
     case KAN_RPL_BUFFER_TYPE_VERTEX_STAGE_OUTPUT:
@@ -2151,7 +2249,7 @@ static inline kan_bool_t resolve_field_access_structured (struct rpl_compiler_co
                                                           kan_instance_size_t chain_length,
                                                           struct compiler_instance_expression_node_t *result_expression)
 {
-    if (input_node->output.type.array_dimensions_count > 0u)
+    if (input_node->output.type.array_size_runtime || input_node->output.type.array_dimensions_count > 0u)
     {
         KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
                  "[%s:%s:%s:%ld] Failed to resolve structured access: attempted to use \".\" on array.",
@@ -2179,6 +2277,7 @@ static inline kan_bool_t resolve_field_access_structured (struct rpl_compiler_co
     result_expression->output.type.if_vector = input_node->output.type.if_vector;
     result_expression->output.type.if_matrix = input_node->output.type.if_matrix;
     result_expression->output.type.if_struct = input_node->output.type.if_struct;
+    result_expression->output.type.array_size_runtime = KAN_FALSE;
     result_expression->output.type.array_dimensions_count = 0u;
     result_expression->output.type.array_dimensions = NULL;
     result_expression->output.boolean = KAN_FALSE;
@@ -2194,7 +2293,8 @@ static inline kan_bool_t resolve_field_access_structured (struct rpl_compiler_co
     while (chain_current)
     {
         kan_bool_t found = KAN_FALSE;
-        if (result_expression->output.type.array_dimensions_count > 0u)
+        if (result_expression->output.type.array_size_runtime ||
+            result_expression->output.type.array_dimensions_count > 0u)
         {
             KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
                      "[%s:%s:%s:%ld] Failed to resolve structured access: attempted to use \".\" on array.",
@@ -2315,6 +2415,7 @@ static inline kan_bool_t resolve_field_access_structured (struct rpl_compiler_co
             result_expression->output.type.if_vector = declaration->variable.type.if_vector;                           \
             result_expression->output.type.if_matrix = declaration->variable.type.if_matrix;                           \
             result_expression->output.type.if_struct = declaration->variable.type.if_struct;                           \
+            result_expression->output.type.array_size_runtime = declaration->variable.type.array_size_runtime;         \
             result_expression->output.type.array_dimensions_count = declaration->variable.type.array_dimensions_count; \
             result_expression->output.type.array_dimensions = declaration->variable.type.array_dimensions;             \
             break;                                                                                                     \
@@ -2418,6 +2519,8 @@ static inline kan_bool_t resolve_binary_operation (struct rpl_compiler_context_t
                                 flattened_declaration->source_declaration->variable.type.if_matrix;
                             chain_input_expression->output.type.if_struct =
                                 flattened_declaration->source_declaration->variable.type.if_struct;
+                            chain_input_expression->output.type.array_size_runtime =
+                                flattened_declaration->source_declaration->variable.type.array_size_runtime;
                             chain_input_expression->output.type.array_dimensions_count =
                                 flattened_declaration->source_declaration->variable.type.array_dimensions_count;
                             chain_input_expression->output.type.array_dimensions =
@@ -2442,6 +2545,8 @@ static inline kan_bool_t resolve_binary_operation (struct rpl_compiler_context_t
                                 flattened_declaration->source_declaration->variable.type.if_matrix;
                             result_expression->output.type.if_struct =
                                 flattened_declaration->source_declaration->variable.type.if_struct;
+                            result_expression->output.type.array_size_runtime =
+                                flattened_declaration->source_declaration->variable.type.array_size_runtime;
                             result_expression->output.type.array_dimensions_count =
                                 flattened_declaration->source_declaration->variable.type.array_dimensions_count;
                             result_expression->output.type.array_dimensions =
@@ -2506,7 +2611,7 @@ static inline kan_bool_t resolve_binary_operation (struct rpl_compiler_context_t
 
     case KAN_RPL_BINARY_OPERATION_ARRAY_ACCESS:
         result_expression->type = COMPILER_INSTANCE_EXPRESSION_TYPE_OPERATION_ARRAY_INDEX;
-        if (left->output.type.array_dimensions_count == 0u)
+        if (!left->output.type.array_size_runtime && left->output.type.array_dimensions_count == 0u)
         {
             KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
                      "[%s:%s:%s:%ld] Cannot execute array access as left operand in not an array.", context->log_name,
@@ -2531,12 +2636,14 @@ static inline kan_bool_t resolve_binary_operation (struct rpl_compiler_context_t
         result_expression->output.type.if_struct = left->output.type.if_struct;
         result_expression->output.boolean = left->output.boolean;
         result_expression->output.writable = left->output.writable;
-        result_expression->output.type.array_dimensions_count = left->output.type.array_dimensions_count - 1u;
+        result_expression->output.type.array_dimensions_count =
+            left->output.type.array_size_runtime ? 0u : left->output.type.array_dimensions_count - 1u;
         result_expression->output.type.array_dimensions = left->output.type.array_dimensions + 1u;
         return KAN_TRUE;
 
 #define CANNOT_EXECUTE_ON_ARRAYS(OPERATOR_STRING)                                                                      \
-    if (left->output.type.array_dimensions_count != 0u || right->output.type.array_dimensions_count != 0u)             \
+    if (left->output.type.array_size_runtime || left->output.type.array_dimensions_count != 0u ||                      \
+        right->output.type.array_size_runtime || right->output.type.array_dimensions_count != 0u)                      \
     {                                                                                                                  \
         KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,                                                                  \
                  "[%s:%s:%s:%ld] Cannot execute \"" OPERATOR_STRING "\" operation on arrays.", context->log_name,      \
@@ -2908,7 +3015,7 @@ static inline kan_bool_t resolve_unary_operation (struct rpl_compiler_context_t 
     }
 
     struct compiler_instance_expression_node_t *operand = result_expression->unary_operation.operand;
-    if (operand->output.type.array_dimensions_count > 0u)
+    if (operand->output.type.array_size_runtime || operand->output.type.array_dimensions_count > 0u)
     {
         KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR, "[%s:%s:%s:%ld] Cannot execute unary operations on arrays.",
                  context->log_name, resolve_scope->function->module_name, input_expression->source_name,
@@ -3065,6 +3172,7 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
     new_expression->output.type.if_vector = NULL;
     new_expression->output.type.if_matrix = NULL;
     new_expression->output.type.if_struct = NULL;
+    new_expression->output.type.array_size_runtime = KAN_FALSE;
     new_expression->output.type.array_dimensions_count = 0u;
     new_expression->output.type.array_dimensions = NULL;
     new_expression->output.boolean = KAN_FALSE;
@@ -3122,6 +3230,7 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
             new_expression->output.type.if_vector = variable->variable->type.if_vector;
             new_expression->output.type.if_matrix = variable->variable->type.if_matrix;
             new_expression->output.type.if_struct = variable->variable->type.if_struct;
+            new_expression->output.type.array_size_runtime = variable->variable->type.array_size_runtime;
             new_expression->output.type.array_dimensions_count = variable->variable->type.array_dimensions_count;
             new_expression->output.type.array_dimensions = variable->variable->type.array_dimensions;
             new_expression->output.boolean = KAN_FALSE;
@@ -3197,6 +3306,7 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
         }
 
         new_expression->variable_declaration.variable.name = expression->variable_declaration.variable_name;
+        new_expression->variable_declaration.variable.type.array_size_runtime = KAN_FALSE;
         new_expression->variable_declaration.variable.type.array_dimensions_count =
             expression->variable_declaration.array_size_expression_list_size;
 
@@ -3209,7 +3319,7 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
         }
 
         if (!resolve_array_dimensions (context, instance, intermediate, &new_expression->variable_declaration.variable,
-                                       expression->variable_declaration.array_size_expression_list_size,
+                                       KAN_FALSE, expression->variable_declaration.array_size_expression_list_size,
                                        expression->variable_declaration.array_size_expression_list_index, KAN_TRUE))
         {
             resolved = KAN_FALSE;
@@ -3249,6 +3359,7 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
             new_expression->output.type.if_vector = new_expression->variable_declaration.variable.type.if_vector;
             new_expression->output.type.if_matrix = new_expression->variable_declaration.variable.type.if_matrix;
             new_expression->output.type.if_struct = new_expression->variable_declaration.variable.type.if_struct;
+            new_expression->output.type.array_size_runtime = KAN_FALSE;
             new_expression->output.type.array_dimensions_count =
                 new_expression->variable_declaration.variable.type.array_dimensions_count;
             new_expression->output.type.array_dimensions =
@@ -3788,7 +3899,8 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
                     resolved = KAN_FALSE;
                 }
 
-                if (new_expression->return_expression->output.type.array_dimensions_count > 0u)
+                if (new_expression->return_expression->output.type.array_size_runtime ||
+                    new_expression->return_expression->output.type.array_dimensions_count > 0u)
                 {
                     KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
                              "[%s:%s:%s:%ld] Caught return of array from function \"%s\" which is not supported.",
@@ -4010,8 +4122,6 @@ static inline kan_bool_t resolve_function_check_usability (struct rpl_compiler_c
             {
             case KAN_RPL_BUFFER_TYPE_VERTEX_ATTRIBUTE:
             case KAN_RPL_BUFFER_TYPE_INSTANCED_ATTRIBUTE:
-            case KAN_RPL_BUFFER_TYPE_INSTANCED_UNIFORM:
-            case KAN_RPL_BUFFER_TYPE_INSTANCED_READ_ONLY_STORAGE:
             case KAN_RPL_BUFFER_TYPE_VERTEX_STAGE_OUTPUT:
             case KAN_RPL_BUFFER_TYPE_FRAGMENT_STAGE_OUTPUT:
                 KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
@@ -4178,8 +4288,10 @@ kan_rpl_compiler_instance_t kan_rpl_compiler_context_resolve (kan_rpl_compiler_c
     kan_bool_t successfully_resolved = KAN_TRUE;
     struct binding_location_assignment_counter_t assignment_counter = {
         .next_attribute_buffer_binding = 0u,
-        .next_arbitrary_stable_buffer_binding = 0u,
-        .next_arbitrary_unstable_buffer_binding = 0u,
+        .next_pass_set_binding = 0u,
+        .next_material_set_binding = 0u,
+        .next_object_set_binding = 0u,
+        .next_unstable_set_binding = 0u,
         .next_attribute_location = 0u,
         .next_vertex_output_location = 0u,
         .next_fragment_output_location = 0u,

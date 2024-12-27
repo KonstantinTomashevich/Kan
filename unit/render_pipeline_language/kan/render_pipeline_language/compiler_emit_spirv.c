@@ -26,6 +26,7 @@ struct spirv_generation_array_type_t
     struct inbuilt_vector_type_t *base_type_if_vector;
     struct inbuilt_matrix_type_t *base_type_if_matrix;
     struct compiler_instance_struct_node_t *base_type_if_struct;
+    kan_bool_t runtime_size;
     kan_instance_size_t dimensions_count;
     kan_rpl_size_t *dimensions;
 };
@@ -622,10 +623,6 @@ static inline kan_bool_t spirv_is_buffer_shared_across_invocations (struct compi
 
     case KAN_RPL_BUFFER_TYPE_UNIFORM:
     case KAN_RPL_BUFFER_TYPE_READ_ONLY_STORAGE:
-        // Instanced uniforms and storage can only be used by vertex stage, but they're technically shared across
-        // invocations by SPIRV standard.
-    case KAN_RPL_BUFFER_TYPE_INSTANCED_UNIFORM:
-    case KAN_RPL_BUFFER_TYPE_INSTANCED_READ_ONLY_STORAGE:
         return KAN_TRUE;
     }
 
@@ -933,7 +930,8 @@ static spirv_size_t spirv_find_or_generate_variable_type (struct spirv_generatio
                                                           struct compiler_instance_full_type_definition_t *type,
                                                           kan_loop_size_t start_dimension_index)
 {
-    if (start_dimension_index == type->array_dimensions_count)
+    if ((!type->array_size_runtime && start_dimension_index == type->array_dimensions_count) ||
+        (type->array_size_runtime && start_dimension_index == 1u))
     {
         if (type->if_vector)
         {
@@ -956,6 +954,7 @@ static spirv_size_t spirv_find_or_generate_variable_type (struct spirv_generatio
     {
         if (array_type->base_type_if_vector == type->if_vector && array_type->base_type_if_matrix == type->if_matrix &&
             array_type->base_type_if_struct == type->if_struct &&
+            array_type->runtime_size == type->array_size_runtime &&
             array_type->dimensions_count == type->array_dimensions_count - start_dimension_index &&
             memcmp (array_type->dimensions, &type->array_dimensions[start_dimension_index],
                     array_type->dimensions_count * sizeof (kan_rpl_size_t)) == 0)
@@ -967,17 +966,27 @@ static spirv_size_t spirv_find_or_generate_variable_type (struct spirv_generatio
     }
 
     const spirv_size_t base_type_id = spirv_find_or_generate_variable_type (context, type, start_dimension_index + 1u);
-    const spirv_size_t constant_id =
-        spirv_request_i1_constant (context, (spirv_size_t) type->array_dimensions[start_dimension_index]);
-
     spirv_size_t array_type_id = context->current_bound;
     ++context->current_bound;
 
-    spirv_size_t *dimension_type_code = spirv_new_instruction (context, &context->higher_type_section, 4u);
-    dimension_type_code[0u] |= SpvOpCodeMask & SpvOpTypeArray;
-    dimension_type_code[1u] = array_type_id;
-    dimension_type_code[2u] = base_type_id;
-    dimension_type_code[3u] = constant_id;
+    if (type->array_size_runtime)
+    {
+        spirv_size_t *runtime_array_code = spirv_new_instruction (context, &context->higher_type_section, 3u);
+        runtime_array_code[0u] |= SpvOpCodeMask & SpvOpTypeRuntimeArray;
+        runtime_array_code[1u] = array_type_id;
+        runtime_array_code[2u] = base_type_id;
+    }
+    else
+    {
+        const spirv_size_t constant_id =
+            spirv_request_i1_constant (context, (spirv_size_t) type->array_dimensions[start_dimension_index]);
+
+        spirv_size_t *dimension_type_code = spirv_new_instruction (context, &context->higher_type_section, 4u);
+        dimension_type_code[0u] |= SpvOpCodeMask & SpvOpTypeArray;
+        dimension_type_code[1u] = array_type_id;
+        dimension_type_code[2u] = base_type_id;
+        dimension_type_code[3u] = constant_id;
+    }
 
     kan_instance_size_t base_size = 0u;
     kan_instance_size_t base_alignment = 0u;
@@ -998,6 +1007,7 @@ static spirv_size_t spirv_find_or_generate_variable_type (struct spirv_generatio
     new_array_type->base_type_if_vector = type->if_vector;
     new_array_type->base_type_if_matrix = type->if_matrix;
     new_array_type->base_type_if_struct = type->if_struct;
+    new_array_type->runtime_size = type->array_size_runtime;
     new_array_type->dimensions_count = type->array_dimensions_count - start_dimension_index;
     new_array_type->dimensions = &type->array_dimensions[start_dimension_index];
 
@@ -1464,10 +1474,6 @@ static kan_instance_size_t spirv_count_access_chain_elements (
         case KAN_RPL_BUFFER_TYPE_VERTEX_STAGE_OUTPUT:
         case KAN_RPL_BUFFER_TYPE_FRAGMENT_STAGE_OUTPUT:
             return 0u;
-
-        case KAN_RPL_BUFFER_TYPE_INSTANCED_UNIFORM:
-        case KAN_RPL_BUFFER_TYPE_INSTANCED_READ_ONLY_STORAGE:
-            return 2u;
         }
     }
 
@@ -1528,21 +1534,6 @@ static spirv_size_t *spirv_fill_access_chain_elements (struct spirv_generation_c
         case KAN_RPL_BUFFER_TYPE_VERTEX_STAGE_OUTPUT:
         case KAN_RPL_BUFFER_TYPE_FRAGMENT_STAGE_OUTPUT:
             return output;
-
-        case KAN_RPL_BUFFER_TYPE_INSTANCED_UNIFORM:
-        case KAN_RPL_BUFFER_TYPE_INSTANCED_READ_ONLY_STORAGE:
-        {
-            *output = spirv_request_i1_constant (context, 0);
-            ++output;
-
-            spirv_size_t builtin_id =
-                spirv_request_builtin (context, function, SpvBuiltInInstanceIndex, SpvStorageClassInput,
-                                       STATICS.type_i1.spirv_id_input_pointer);
-
-            *output = spirv_request_load (context, *current_block, STATICS.type_i1.spirv_id, builtin_id, KAN_TRUE);
-            ++output;
-            return output;
-        }
         }
     }
 
@@ -1561,11 +1552,9 @@ static inline SpvStorageClass spirv_get_structured_buffer_storage_class (struct 
         return (SpvStorageClass) SPIRV_FIXED_ID_INVALID;
 
     case KAN_RPL_BUFFER_TYPE_UNIFORM:
-    case KAN_RPL_BUFFER_TYPE_INSTANCED_UNIFORM:
         return SpvStorageClassUniform;
 
     case KAN_RPL_BUFFER_TYPE_READ_ONLY_STORAGE:
-    case KAN_RPL_BUFFER_TYPE_INSTANCED_READ_ONLY_STORAGE:
         return SpvStorageClassStorageBuffer;
     }
 
@@ -1580,6 +1569,7 @@ static spirv_size_t spirv_use_temporary_variable (struct spirv_generation_contex
     // We do not expect temporary variables to be arrays or booleans.
     // If they are, then something is wrong with the resolve.
     KAN_ASSERT (required_type->type.array_dimensions_count == 0u)
+    KAN_ASSERT (!required_type->type.array_size_runtime)
     KAN_ASSERT (!required_type->boolean)
 
     spirv_size_t required_type_id;
@@ -3260,8 +3250,6 @@ static inline void spirv_emit_function (struct spirv_generation_context_t *conte
         case KAN_RPL_BUFFER_TYPE_UNIFORM:
         case KAN_RPL_BUFFER_TYPE_READ_ONLY_STORAGE:
         case KAN_RPL_BUFFER_TYPE_INSTANCED_ATTRIBUTE:
-        case KAN_RPL_BUFFER_TYPE_INSTANCED_UNIFORM:
-        case KAN_RPL_BUFFER_TYPE_INSTANCED_READ_ONLY_STORAGE:
             break;
 
         case KAN_RPL_BUFFER_TYPE_VERTEX_STAGE_OUTPUT:
@@ -3376,8 +3364,6 @@ kan_bool_t kan_rpl_compiler_instance_emit_spirv (kan_rpl_compiler_instance_t com
 
                 case KAN_RPL_BUFFER_TYPE_UNIFORM:
                 case KAN_RPL_BUFFER_TYPE_READ_ONLY_STORAGE:
-                case KAN_RPL_BUFFER_TYPE_INSTANCED_UNIFORM:
-                case KAN_RPL_BUFFER_TYPE_INSTANCED_READ_ONLY_STORAGE:
                     KAN_ASSERT (KAN_FALSE)
                     break;
 
@@ -3415,49 +3401,6 @@ kan_bool_t kan_rpl_compiler_instance_emit_spirv (kan_rpl_compiler_instance_t com
                 block_decorate_code[0u] |= SpvOpCodeMask & SpvOpDecorate;
                 block_decorate_code[1u] = buffer_struct_id;
                 block_decorate_code[2u] = SpvDecorationBlock;
-                break;
-            }
-
-            case KAN_RPL_BUFFER_TYPE_INSTANCED_UNIFORM:
-            case KAN_RPL_BUFFER_TYPE_INSTANCED_READ_ONLY_STORAGE:
-            {
-                spirv_size_t runtime_array_id = context.current_bound;
-                ++context.current_bound;
-
-                spirv_size_t *runtime_array_code = spirv_new_instruction (&context, &context.higher_type_section, 3u);
-                runtime_array_code[0u] |= SpvOpCodeMask & SpvOpTypeRuntimeArray;
-                runtime_array_code[1u] = runtime_array_id;
-                runtime_array_code[2u] = buffer_struct_id;
-
-                spirv_size_t real_buffer_struct_id = context.current_bound;
-                ++context.current_bound;
-
-                spirv_size_t *wrapper_struct_code = spirv_new_instruction (&context, &context.higher_type_section, 3u);
-                wrapper_struct_code[0u] |= SpvOpCodeMask & SpvOpTypeStruct;
-                wrapper_struct_code[1u] = real_buffer_struct_id;
-                wrapper_struct_code[2u] = runtime_array_id;
-
-                spirv_size_t *block_decorate_code = spirv_new_instruction (&context, &context.decoration_section, 3u);
-                block_decorate_code[0u] |= SpvOpCodeMask & SpvOpDecorate;
-                block_decorate_code[1u] = real_buffer_struct_id;
-                block_decorate_code[2u] = SpvDecorationBlock;
-
-                spirv_size_t *offset_decorate_code = spirv_new_instruction (&context, &context.decoration_section, 5u);
-                offset_decorate_code[0u] |= SpvOpCodeMask & SpvOpMemberDecorate;
-                offset_decorate_code[1u] = real_buffer_struct_id;
-                offset_decorate_code[2u] = 0u;
-                offset_decorate_code[3u] = SpvDecorationOffset;
-                offset_decorate_code[4u] = 0u;
-
-                spirv_size_t *array_stride_code = spirv_new_instruction (&context, &context.decoration_section, 4u);
-                array_stride_code[0u] |= SpvOpCodeMask & SpvOpDecorate;
-                array_stride_code[1u] = runtime_array_id;
-                array_stride_code[2u] = SpvDecorationArrayStride;
-                array_stride_code[3u] = (spirv_size_t) buffer->size;
-
-                spirv_generate_op_name (&context, real_buffer_struct_id, buffer->name);
-                spirv_generate_op_member_name (&context, real_buffer_struct_id, 0u, "instanced_data");
-                buffer_struct_id = real_buffer_struct_id;
                 break;
             }
             }

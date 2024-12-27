@@ -35,6 +35,7 @@ struct parser_declaration_data_t
 {
     kan_interned_string_t type;
     kan_interned_string_t name;
+    kan_bool_t array_size_runtime;
     struct parser_expression_list_item_t *array_size_list;
 };
 
@@ -418,6 +419,7 @@ static inline struct parser_expression_tree_node_t *parser_expression_tree_node_
     case KAN_RPL_EXPRESSION_NODE_TYPE_VARIABLE_DECLARATION:
         node->variable_declaration.type = NULL;
         node->variable_declaration.name = NULL;
+        node->variable_declaration.array_size_runtime = KAN_FALSE;
         node->variable_declaration.array_size_list = NULL;
         break;
 
@@ -492,6 +494,7 @@ static inline struct parser_declaration_t *parser_declaration_new (struct rpl_pa
     declaration->next = NULL;
     declaration->declaration.name = NULL;
     declaration->declaration.type = NULL;
+    declaration->declaration.array_size_runtime = KAN_FALSE;
     declaration->declaration.array_size_list = NULL;
     declaration->first_meta = NULL;
     declaration->conditional = NULL;
@@ -1186,8 +1189,6 @@ static kan_bool_t parse_main (struct rpl_parser_t *parser, struct dynamic_parser
 
         const char *marker_buffer_uniform;
         const char *marker_buffer_read_only_storage;
-        const char *marker_buffer_instanced_uniform;
-        const char *marker_buffer_instanced_read_only_storage;
 
         enum kan_rpl_set_t detected_set;
 #define DETECT_SET                                                                                                     \
@@ -1223,14 +1224,6 @@ static kan_bool_t parse_main (struct rpl_parser_t *parser, struct dynamic_parser
     {                                                                                                                  \
         detected_buffer_type = KAN_RPL_BUFFER_TYPE_READ_ONLY_STORAGE;                                                  \
     }                                                                                                                  \
-    else if (marker_buffer_instanced_uniform)                                                                          \
-    {                                                                                                                  \
-        detected_buffer_type = KAN_RPL_BUFFER_TYPE_INSTANCED_UNIFORM;                                                  \
-    }                                                                                                                  \
-    else if (marker_buffer_instanced_read_only_storage)                                                                \
-    {                                                                                                                  \
-        detected_buffer_type = KAN_RPL_BUFFER_TYPE_INSTANCED_READ_ONLY_STORAGE;                                        \
-    }                                                                                                                  \
     else                                                                                                               \
     {                                                                                                                  \
         detected_buffer_type = KAN_RPL_BUFFER_TYPE_VERTEX_ATTRIBUTE;                                                   \
@@ -1252,9 +1245,7 @@ static kan_bool_t parse_main (struct rpl_parser_t *parser, struct dynamic_parser
 
          external_buffer_type_prefix =
              ("uniform_buffer" @marker_buffer_uniform) |
-             ("read_only_storage_buffer" @marker_buffer_read_only_storage) |
-             ("instanced_uniform_buffer" @marker_buffer_instanced_uniform) |
-             ("instanced_read_only_storage_buffer" @marker_buffer_instanced_read_only_storage);
+             ("read_only_storage_buffer" @marker_buffer_read_only_storage);
 
          "global" separator+ "flag" separator+ @name_begin identifier @name_end separator+ "on" separator* ";"
          {
@@ -2200,7 +2191,8 @@ static kan_bool_t parse_call_arguments (struct rpl_parser_t *parser,
 
 static kan_bool_t parse_declarations_finish_item (struct rpl_parser_t *parser,
                                                   struct dynamic_parser_state_t *state,
-                                                  struct parser_declaration_data_t *declaration)
+                                                  struct parser_declaration_data_t *declaration,
+                                                  kan_bool_t array_size_runtime_allowed)
 {
     struct parser_expression_list_item_t *array_size_list_last = NULL;
     while (KAN_TRUE)
@@ -2212,6 +2204,15 @@ static kan_bool_t parse_declarations_finish_item (struct rpl_parser_t *parser,
         /*!re2c
          "["
          {
+             if (declaration->array_size_runtime)
+             {
+                 KAN_LOG (rpl_parser, KAN_LOG_ERROR,
+                          "[%s:%s] [%ld:%ld]: Encountered array size expression after runtime size is used.",
+                          parser->log_name, state->source_log_name, (long) state->cursor_line,
+                          (long) state->cursor_symbol)
+                 return KAN_FALSE;
+             }
+
              struct parser_expression_tree_node_t *array_size_expression = parse_expression (parser, state);
              if (!array_size_expression)
              {
@@ -2244,6 +2245,39 @@ static kan_bool_t parse_declarations_finish_item (struct rpl_parser_t *parser,
              }
 
              ++state->cursor;
+             continue;
+         }
+
+         "..."
+         {
+             if (declaration->array_size_runtime)
+             {
+                 KAN_LOG (rpl_parser, KAN_LOG_ERROR,
+                          "[%s:%s] [%ld:%ld]: Encountered array size runtime selector twice.",
+                          parser->log_name, state->source_log_name, (long) state->cursor_line,
+                          (long) state->cursor_symbol)
+                 return KAN_FALSE;
+             }
+
+             if (array_size_list_last)
+             {
+                 KAN_LOG (rpl_parser, KAN_LOG_ERROR,
+                          "[%s:%s] [%ld:%ld]: Encountered array size runtime selector after array size expression.",
+                          parser->log_name, state->source_log_name, (long) state->cursor_line,
+                          (long) state->cursor_symbol)
+                 return KAN_FALSE;
+             }
+
+             if (!array_size_runtime_allowed)
+             {
+                 KAN_LOG (rpl_parser, KAN_LOG_ERROR,
+                          "[%s:%s] [%ld:%ld]: Encountered array size runtime selector in unsupported context.",
+                          parser->log_name, state->source_log_name, (long) state->cursor_line,
+                          (long) state->cursor_symbol)
+                 return KAN_FALSE;
+             }
+
+             declaration->array_size_runtime = KAN_TRUE;
              continue;
          }
 
@@ -2402,7 +2436,8 @@ static struct parser_declaration_t *parse_declarations (struct rpl_parser_t *par
              new_declaration->conditional = state->detached_conditional;
              state->detached_conditional = NULL;
 
-             if (!parse_declarations_finish_item (parser, state, &new_declaration->declaration))
+             if (!parse_declarations_finish_item (parser, state, &new_declaration->declaration,
+                 list_type == PARSER_DECLARATION_LIST_TYPE_FIELDS))
              {
                  return NULL;
              }
@@ -2916,7 +2951,7 @@ static struct parser_expression_tree_node_t *expect_variable_declaration (struct
         parser, KAN_RPL_EXPRESSION_NODE_TYPE_VARIABLE_DECLARATION, state->source_log_name, state->saved_line);
     variable_declaration->variable_declaration.type = type_name;
 
-    if (!parse_declarations_finish_item (parser, state, &variable_declaration->variable_declaration))
+    if (!parse_declarations_finish_item (parser, state, &variable_declaration->variable_declaration, KAN_FALSE))
     {
         return NULL;
     }
@@ -3952,6 +3987,7 @@ static kan_bool_t build_intermediate_declarations (struct rpl_parser_t *instance
             array_size = array_size->next;
         }
 
+        new_declaration->array_size_runtime = declaration->declaration.array_size_runtime;
         new_declaration->array_size_expression_list_size = (kan_rpl_size_t) array_sizes_count;
         new_declaration->array_size_expression_list_index = intermediate->expression_lists_storage.size;
 

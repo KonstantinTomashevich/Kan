@@ -83,6 +83,7 @@ struct compiler_instance_full_type_definition_t
     struct inbuilt_matrix_type_t *if_matrix;
     struct compiler_instance_struct_node_t *if_struct;
 
+    kan_bool_t array_size_runtime;
     kan_instance_size_t array_dimensions_count;
     kan_rpl_size_t *array_dimensions;
 };
@@ -133,8 +134,10 @@ struct compiler_instance_struct_node_t
 struct binding_location_assignment_counter_t
 {
     kan_rpl_size_t next_attribute_buffer_binding;
-    kan_rpl_size_t next_arbitrary_stable_buffer_binding;
-    kan_rpl_size_t next_arbitrary_unstable_buffer_binding;
+    kan_rpl_size_t next_pass_set_binding;
+    kan_rpl_size_t next_material_set_binding;
+    kan_rpl_size_t next_object_set_binding;
+    kan_rpl_size_t next_unstable_set_binding;
     kan_rpl_size_t next_attribute_location;
     kan_rpl_size_t next_vertex_output_location;
     kan_rpl_size_t next_fragment_output_location;
@@ -167,12 +170,11 @@ struct compiler_instance_buffer_node_t
     enum kan_rpl_buffer_type_t type;
     kan_bool_t used;
 
-    kan_instance_size_t size;
+    kan_instance_size_t main_size;
+    kan_instance_size_t tail_item_size;
     kan_instance_size_t alignment;
     struct compiler_instance_declaration_node_t *first_field;
-
     kan_instance_size_t binding;
-    kan_bool_t stable_binding;
 
     struct compiler_instance_buffer_flattening_graph_node_t *flattening_graph_base;
     struct compiler_instance_buffer_flattened_declaration_t *first_flattened_declaration;

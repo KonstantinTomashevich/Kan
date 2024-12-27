@@ -642,23 +642,24 @@ void kan_render_pass_instance_pipeline_parameter_sets (kan_render_pass_instance_
 void kan_render_pass_instance_attributes (kan_render_pass_instance_t pass_instance,
                                           vulkan_size_t start_at_binding,
                                           kan_instance_size_t buffers_count,
-                                          kan_render_buffer_t *buffers)
+                                          kan_render_buffer_t *buffers,
+                                          kan_instance_size_t *buffer_offsets)
 {
     struct render_backend_pass_instance_t *instance = KAN_HANDLE_GET (pass_instance);
     struct render_backend_command_state_t *command_state =
         &instance->system->command_states[instance->system->current_frame_in_flight_index];
 
     VkBuffer buffer_handles_static[KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_INLINE_HANDLES];
-    VkDeviceSize buffer_offsets_static[KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_INLINE_HANDLES];
+    VkDeviceSize vulkan_buffer_offsets_static[KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_INLINE_HANDLES];
 
     VkBuffer *buffer_handles = buffer_handles_static;
-    VkDeviceSize *buffer_offsets = buffer_offsets_static;
+    VkDeviceSize *vulkan_buffer_offsets = vulkan_buffer_offsets_static;
 
     if (buffers_count > KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_INLINE_HANDLES)
     {
         buffer_handles = kan_allocate_general (instance->system->utility_allocation_group,
                                                sizeof (VkBuffer) * buffers_count, _Alignof (VkBuffer));
-        buffer_offsets = kan_allocate_general (instance->system->utility_allocation_group,
+        vulkan_buffer_offsets = kan_allocate_general (instance->system->utility_allocation_group,
                                                sizeof (VkDeviceSize) * buffers_count, _Alignof (VkDeviceSize));
     }
 
@@ -667,19 +668,19 @@ void kan_render_pass_instance_attributes (kan_render_pass_instance_t pass_instan
         struct render_backend_buffer_t *buffer = KAN_HANDLE_GET (buffers[index]);
         KAN_ASSERT (buffer->type == KAN_RENDER_BUFFER_TYPE_ATTRIBUTE)
         buffer_handles[index] = buffer->buffer;
-        buffer_offsets[index] = 0u;
+        vulkan_buffer_offsets[index] = buffer_offsets ? buffer_offsets[index] : 0u;
     }
 
     kan_atomic_int_lock (&command_state->command_operation_lock);
     vkCmdBindVertexBuffers (instance->command_buffer, (vulkan_size_t) start_at_binding, (vulkan_size_t) buffers_count,
-                            buffer_handles, buffer_offsets);
+                            buffer_handles, vulkan_buffer_offsets);
     kan_atomic_int_unlock (&command_state->command_operation_lock);
 
     if (buffer_handles != buffer_handles_static)
     {
         kan_free_general (instance->system->utility_allocation_group, buffer_handles,
                           sizeof (VkBuffer) * buffers_count);
-        kan_free_general (instance->system->utility_allocation_group, buffer_offsets,
+        kan_free_general (instance->system->utility_allocation_group, vulkan_buffer_offsets,
                           sizeof (VkDeviceSize) * buffers_count);
     }
 }

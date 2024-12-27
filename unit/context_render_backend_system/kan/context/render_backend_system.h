@@ -573,10 +573,12 @@ CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_instance_pipeline_paramet
     kan_render_pipeline_parameter_set_t *parameter_sets);
 
 /// \brief Submits attributes to the render pass.
+/// \details `buffer_offsets` is an optional array of offsets for passed buffers.
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_instance_attributes (kan_render_pass_instance_t pass_instance,
                                                                             kan_render_size_t start_at_binding,
                                                                             kan_instance_size_t buffers_count,
-                                                                            kan_render_buffer_t *buffers);
+                                                                            kan_render_buffer_t *buffers,
+                                                                            kan_instance_size_t *buffer_offsets);
 
 /// \brief Submits indices to the render pass.
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_instance_indices (kan_render_pass_instance_t pass_instance,
@@ -1067,6 +1069,8 @@ kan_render_frame_lifetime_buffer_allocator_create (kan_render_context_t context,
 
 /// \brief Requests given amount of memory with given alignment from frame lifetime allocator.
 /// \details Allocated memory is automatically freed when we're sure that it is no longer used.
+///          This function is explicitly thread safe, therefore it is allowed to allocate from multiple threads
+///          simultaneously using the same allocator.
 CONTEXT_RENDER_BACKEND_SYSTEM_API struct kan_render_allocated_slice_t
 kan_render_frame_lifetime_buffer_allocator_allocate (kan_render_frame_lifetime_buffer_allocator_t allocator,
                                                      kan_render_size_t size,
