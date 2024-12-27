@@ -2,8 +2,6 @@
 
 #include <error_api.h>
 
-#include <stdint.h>
-
 #include <kan/api_common/c_header.h>
 #include <kan/api_common/core_types.h>
 

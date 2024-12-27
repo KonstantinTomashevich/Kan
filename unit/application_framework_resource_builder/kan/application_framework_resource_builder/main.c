@@ -11,6 +11,7 @@
 #include <kan/context/resource_pipeline_system.h>
 #include <kan/cpu_dispatch/job.h>
 #include <kan/cpu_dispatch/task.h>
+#include <kan/error/context.h>
 #include <kan/error/critical.h>
 #include <kan/file_system/entry.h>
 #include <kan/file_system/path_container.h>
@@ -3210,7 +3211,7 @@ KAN_REFLECTION_EXPECT_UNIT_REGISTRAR_LOCAL (application_framework_resource_build
 
 int main (int argument_count, char **argument_values)
 {
-    kan_set_critical_error_interactive (KAN_FALSE);
+    kan_error_initialize_context ();
     if (argument_count < 3)
     {
         KAN_LOG (

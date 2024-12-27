@@ -8,7 +8,10 @@ KAN_MUTE_THIRD_PARTY_WARNINGS_BEGIN
 #include <SDL3/SDL_messagebox.h>
 KAN_MUTE_THIRD_PARTY_WARNINGS_END
 
+#include <signal.h>
+
 #include <kan/container/hash_storage.h>
+#include <kan/error/context.h>
 #include <kan/error/critical.h>
 #include <kan/hash/hash.h>
 #include <kan/log/logging.h>
@@ -31,14 +34,14 @@ struct skipped_error_node_t
     int line;
 };
 
-static kan_bool_t critical_error_context_ready = KAN_FALSE;
+static kan_bool_t error_context_ready = KAN_FALSE;
 static struct critical_error_context_t critical_error_context;
 
 #define SKIPPED_CRITICAL_ERROR_INFO_STORAGE_INITIAL_BUCKETS 8u
 
-static inline void kan_critical_error_context_ensure (void)
+static inline void kan_error_context_ensure_initialized (void)
 {
-    if (!critical_error_context_ready)
+    if (!error_context_ready)
     {
         critical_error_context.is_interactive = KAN_FALSE;
         critical_error_context.interactive_mutex = kan_mutex_create ();
@@ -47,8 +50,8 @@ static inline void kan_critical_error_context_ensure (void)
 
         // We need to log at least once in order to initialize logging and prevent deadlock when
         // logging is initialized from critical error that was caught inside memory profiler.
-        KAN_LOG (error_reporting, KAN_LOG_INFO, "Critical error context initialized.")
-        critical_error_context_ready = KAN_TRUE;
+        kan_ensure_log_initialized ();
+        error_context_ready = KAN_TRUE;
     }
 }
 
@@ -57,15 +60,28 @@ static inline kan_hash_t hash_error (const char *file, int line)
     return kan_hash_combine (kan_string_hash (file), (kan_hash_t) line);
 }
 
+static void crash_signal_handler (int signal);
+
+void kan_error_initialize_context (void)
+{
+    kan_error_context_ensure_initialized ();
+    signal (SIGABRT, crash_signal_handler);
+    signal (SIGFPE, crash_signal_handler);
+    signal (SIGILL, crash_signal_handler);
+    signal (SIGINT, crash_signal_handler);
+    signal (SIGSEGV, crash_signal_handler);
+    signal (SIGTERM, crash_signal_handler);
+}
+
 void kan_set_critical_error_interactive (kan_bool_t is_interactive)
 {
-    kan_critical_error_context_ensure ();
+    kan_error_context_ensure_initialized ();
     critical_error_context.is_interactive = is_interactive;
 }
 
 void kan_critical_error (const char *message, const char *file, int line)
 {
-    kan_critical_error_context_ensure ();
+    kan_error_context_ensure_initialized ();
     KAN_LOG (error_reporting, KAN_LOG_CRITICAL_ERROR, "Critical error: \"%s\". File: \"%s\". Line: \"%d\".", message,
              file, line)
     // TODO: Perhaps add stacktrace in future.
@@ -171,4 +187,40 @@ void kan_critical_error (const char *message, const char *file, int line)
         // No interactive: just crash.
         abort ();
     }
+}
+
+static void crash_signal_handler (int signal)
+{
+    const char *signal_type = "<unknown>";
+    switch (signal)
+    {
+    case SIGABRT:
+        signal_type = "abort";
+        break;
+    case SIGFPE:
+        signal_type = "floating point exception";
+        break;
+    case SIGILL:
+        signal_type = "invalid instruct";
+        break;
+    case SIGINT:
+        signal_type = "external interrupt";
+        break;
+    case SIGSEGV:
+        signal_type = "segmentation fault";
+        break;
+    case SIGTERM:
+        signal_type = "termination";
+        break;
+    }
+
+    KAN_LOG (error_reporting, KAN_LOG_CRITICAL_ERROR, "Received interrupt: %s.", signal_type)
+
+    // TODO: Print stacktrace?
+
+    // Flush outputs just in case.
+    fflush (stdout);
+    fflush (stderr);
+
+    // TODO: Api for flushing non standard logs?
 }

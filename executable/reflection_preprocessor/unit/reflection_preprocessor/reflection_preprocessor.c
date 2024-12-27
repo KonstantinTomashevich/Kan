@@ -9,6 +9,7 @@
 #include <kan/container/interned_string.h>
 #include <kan/container/stack_group_allocator.h>
 #include <kan/container/trivial_string_buffer.h>
+#include <kan/error/context.h>
 #include <kan/file_system/entry.h>
 #include <kan/file_system/path_container.h>
 #include <kan/file_system/stream.h>
@@ -2842,6 +2843,7 @@ static inline void remove_trailing_special_characters (char *buffer)
 
 int main (int arguments_count, char **argument_values)
 {
+    kan_error_initialize_context ();
     if (arguments_count != 5)
     {
         print_arguments_help ();

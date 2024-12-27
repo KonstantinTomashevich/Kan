@@ -141,6 +141,13 @@ static void ensure_logging_context_initialized (void)
     }
 }
 
+void kan_ensure_log_initialized (void)
+{
+    kan_atomic_int_lock (&logging_context_lock);
+    ensure_logging_context_initialized ();
+    kan_atomic_int_unlock (&logging_context_lock);
+}
+
 void kan_submit_log (kan_log_category_t category, enum kan_log_verbosity_t verbosity, const char *message)
 {
     kan_atomic_int_lock (&logging_context_lock);
