@@ -3682,7 +3682,7 @@ static kan_bool_t perform_output_phase (void)
 
 int main (int argument_count, char **arguments_array)
 {
-    kan_error_initialize_context ();
+    kan_error_initialize ();
     if (argument_count != 3)
     {
         fprintf (stderr,

@@ -1092,7 +1092,7 @@ static void serve_finish_request (kan_functor_user_data_t user_data)
 
 int main (int argument_count, char **argument_values)
 {
-    kan_error_initialize_context ();
+    kan_error_initialize ();
     if (argument_count < 2)
     {
         KAN_LOG (application_framework_resource_importer, KAN_LOG_ERROR,

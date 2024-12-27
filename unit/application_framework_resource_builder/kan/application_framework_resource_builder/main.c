@@ -3211,7 +3211,7 @@ KAN_REFLECTION_EXPECT_UNIT_REGISTRAR_LOCAL (application_framework_resource_build
 
 int main (int argument_count, char **argument_values)
 {
-    kan_error_initialize_context ();
+    kan_error_initialize ();
     if (argument_count < 3)
     {
         KAN_LOG (

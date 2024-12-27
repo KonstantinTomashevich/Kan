@@ -43,7 +43,7 @@ KAN_C_HEADER_BEGIN
 #define KAN_TEST_ASSERT(...)                                                                                           \
     if (!(__VA_ARGS__))                                                                                                \
     {                                                                                                                  \
-        kan_critical_error (#__VA_ARGS__, __FILE__, __LINE__);                                                         \
+        kan_error_critical (#__VA_ARGS__, __FILE__, __LINE__);                                                         \
     }
 
 TESTING_API void kan_test_check_failed (const char *message, const char *file, int line);

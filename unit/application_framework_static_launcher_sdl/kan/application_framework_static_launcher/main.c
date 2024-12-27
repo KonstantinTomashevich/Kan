@@ -15,7 +15,7 @@ const char *__asan_default_options (void)
 
 int main (int argc, char *argv[])
 {
-    kan_error_initialize_context ();
+    kan_error_initialize ();
     return kan_application_framework_run (core_configuration_path, program_configuration_path,
                                           (kan_instance_size_t) argc, argv);
 }

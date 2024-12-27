@@ -10,7 +10,7 @@
 
 KAN_C_HEADER_BEGIN
 
-/// \brief Initializes error context with default settings. Setups crash handling.
-ERROR_API void kan_error_initialize_context (void);
+/// \brief Initializes error context with default settings.
+ERROR_API void kan_error_initialize (void);
 
 KAN_C_HEADER_END

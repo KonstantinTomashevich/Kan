@@ -94,12 +94,12 @@ LOG_API kan_interned_string_t kan_log_category_get_name (kan_log_category_t cate
         }                                                                                                              \
     }
 
+/// \brief Internal function for `KAN_LOG`, should never be called directly.
+LOG_API void kan_submit_log (kan_log_category_t category, enum kan_log_verbosity_t verbosity, const char *message);
+
 /// \brief Ensures that logging is initialized and ready to use.
 /// \details Should not be called normally as initialization is automatic.
 ///          Only needed for specific cases for error handling in order to avoid deadlock on crash.
-LOG_API void kan_ensure_log_initialized (void);
-
-/// \brief Internal function for `KAN_LOG`, should never be called directly.
-LOG_API void kan_submit_log (kan_log_category_t category, enum kan_log_verbosity_t verbosity, const char *message);
+LOG_API void kan_log_ensure_initialized (void);
 
 KAN_C_HEADER_END

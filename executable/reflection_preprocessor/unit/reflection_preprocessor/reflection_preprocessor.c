@@ -2843,7 +2843,7 @@ static inline void remove_trailing_special_characters (char *buffer)
 
 int main (int arguments_count, char **argument_values)
 {
-    kan_error_initialize_context ();
+    kan_error_initialize ();
     if (arguments_count != 5)
     {
         print_arguments_help ();

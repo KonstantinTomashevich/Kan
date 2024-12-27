@@ -48,7 +48,7 @@ static inline void kan_error_context_ensure_initialized (void)
 
         // We need to log at least once in order to initialize logging and prevent deadlock when
         // logging is initialized from critical error that was caught inside memory profiler.
-        kan_ensure_log_initialized ();
+        kan_log_ensure_initialized ();
         error_context_ready = KAN_TRUE;
     }
 }
@@ -58,19 +58,19 @@ static inline kan_hash_t hash_error (const char *file, int line)
     return kan_hash_combine (kan_string_hash (file), (kan_hash_t) line);
 }
 
-void kan_error_initialize_context (void)
+void kan_error_initialize (void)
 {
     kan_error_context_ensure_initialized ();
     // We do not have crash handling yet, but it should be initialized here in the future.
 }
 
-void kan_set_critical_error_interactive (kan_bool_t is_interactive)
+void kan_error_set_critical_interactive (kan_bool_t is_interactive)
 {
     kan_error_context_ensure_initialized ();
     critical_error_context.is_interactive = is_interactive;
 }
 
-void kan_critical_error (const char *message, const char *file, int line)
+void kan_error_critical (const char *message, const char *file, int line)
 {
     kan_error_context_ensure_initialized ();
     KAN_LOG (error_reporting, KAN_LOG_CRITICAL_ERROR, "Critical error: \"%s\". File: \"%s\". Line: \"%d\".", message,
