@@ -102,8 +102,8 @@ jobs:
 
       - name: Test
         working-directory: ${{env.BUILD_DIRECTORY}}
-        # TODO: Parallel is temporary disabled with extra verbose in order to understand why crash outputs are missing.
-        run: ctest --build-config ${{matrix.build_type}} --extra-verbose --timeout 2 -LE GRAPHICS
+        # TODO: Extra verbose is added for temporary testing.
+        run: ctest --build-config ${{matrix.build_type}} --parallel 4 --extra-verbose --timeout 2 -LE GRAPHICS
 
       - name: Upload test results
         # We upload test results only on failure to avoid clogging everything with them.
