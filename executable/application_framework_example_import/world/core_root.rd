@@ -5,7 +5,7 @@ scheduler_name = "single_pipeline_no_time"
 
 +configuration {
     name = "resource_provider"
-    +variants {
+    +layers {
         data {
             __type = kan_resource_provider_configuration_t
             scan_budget_ns = 2000000
