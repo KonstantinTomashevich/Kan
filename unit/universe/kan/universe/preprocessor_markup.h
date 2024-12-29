@@ -4,6 +4,7 @@
 
 #include <kan/api_common/c_header.h>
 #include <kan/api_common/core_types.h>
+#include <kan/api_common/highlight.h>
 #include <kan/universe/universe.h>
 
 /// \file
@@ -219,6 +220,7 @@ KAN_C_HEADER_BEGIN
 #    define KAN_UP_VALUE_READ(NAME, TYPE, FIELD, ARGUMENT_POINTER)                                                     \
         /* Highlight-autocomplete replacement. */                                                                      \
         const struct TYPE *NAME = NULL;                                                                                \
+        KAN_HIGHLIGHT_STRUCT_FIELD (TYPE, FIELD)                                                                       \
         const void *NAME##_argument_user = ARGUMENT_POINTER;                                                           \
         struct kan_repository_indexed_value_read_access_t NAME##_access = {0};                                         \
         for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
@@ -227,6 +229,7 @@ KAN_C_HEADER_BEGIN
 #    define KAN_UP_VALUE_UPDATE(NAME, TYPE, FIELD, ARGUMENT_POINTER)                                                   \
         /* Highlight-autocomplete replacement. */                                                                      \
         struct TYPE *NAME = NULL;                                                                                      \
+        KAN_HIGHLIGHT_STRUCT_FIELD (TYPE, FIELD)                                                                       \
         const void *NAME##_argument_user = ARGUMENT_POINTER;                                                           \
         struct kan_repository_indexed_value_update_access_t NAME##_access = {0};                                       \
         for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
@@ -235,6 +238,7 @@ KAN_C_HEADER_BEGIN
 #    define KAN_UP_VALUE_DELETE(NAME, TYPE, FIELD, ARGUMENT_POINTER)                                                   \
         /* Highlight-autocomplete replacement. */                                                                      \
         const struct TYPE *NAME = NULL;                                                                                \
+        KAN_HIGHLIGHT_STRUCT_FIELD (TYPE, FIELD)                                                                       \
         const void *NAME##_argument_user = ARGUMENT_POINTER;                                                           \
         struct kan_repository_indexed_value_delete_access_t NAME##_access = {0};                                       \
         for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
@@ -243,6 +247,7 @@ KAN_C_HEADER_BEGIN
 #    define KAN_UP_VALUE_WRITE(NAME, TYPE, FIELD, ARGUMENT_POINTER)                                                    \
         /* Highlight-autocomplete replacement. */                                                                      \
         struct TYPE *NAME = NULL;                                                                                      \
+        KAN_HIGHLIGHT_STRUCT_FIELD (TYPE, FIELD)                                                                       \
         const void *NAME##_argument_user = ARGUMENT_POINTER;                                                           \
         struct kan_repository_indexed_value_write_access_t NAME##_access = {0};                                        \
         for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
@@ -251,6 +256,7 @@ KAN_C_HEADER_BEGIN
 #    define KAN_UP_SIGNAL_READ(NAME, TYPE, FIELD, NUMERIC_CONSTANT)                                                    \
         /* Highlight-autocomplete replacement. */                                                                      \
         const struct TYPE *NAME = NULL;                                                                                \
+        KAN_HIGHLIGHT_STRUCT_FIELD (TYPE, FIELD)                                                                       \
         struct kan_repository_indexed_signal_read_access_t NAME##_access = {0};                                        \
         for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
 
@@ -258,6 +264,7 @@ KAN_C_HEADER_BEGIN
 #    define KAN_UP_SIGNAL_UPDATE(NAME, TYPE, FIELD, NUMERIC_CONSTANT)                                                  \
         /* Highlight-autocomplete replacement. */                                                                      \
         struct TYPE *NAME = NULL;                                                                                      \
+        KAN_HIGHLIGHT_STRUCT_FIELD (TYPE, FIELD)                                                                       \
         struct kan_repository_indexed_signal_update_access_t NAME##_access = {0};                                      \
         for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
 
@@ -265,6 +272,7 @@ KAN_C_HEADER_BEGIN
 #    define KAN_UP_SIGNAL_DELETE(NAME, TYPE, FIELD, NUMERIC_CONSTANT)                                                  \
         /* Highlight-autocomplete replacement. */                                                                      \
         const struct TYPE *NAME = NULL;                                                                                \
+        KAN_HIGHLIGHT_STRUCT_FIELD (TYPE, FIELD)                                                                       \
         struct kan_repository_indexed_signal_delete_access_t NAME##_access = {0};                                      \
         for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
 
@@ -272,6 +280,7 @@ KAN_C_HEADER_BEGIN
 #    define KAN_UP_SIGNAL_WRITE(NAME, TYPE, FIELD, NUMERIC_CONSTANT)                                                   \
         /* Highlight-autocomplete replacement. */                                                                      \
         struct TYPE *NAME = NULL;                                                                                      \
+        KAN_HIGHLIGHT_STRUCT_FIELD (TYPE, FIELD)                                                                       \
         struct kan_repository_indexed_signal_write_access_t NAME##_access = {0};                                       \
         for (kan_loop_size_t NAME##_fake_index = 0u; NAME##_fake_index < 1u; ++NAME##_fake_index)
 
@@ -279,6 +288,7 @@ KAN_C_HEADER_BEGIN
 #    define KAN_UP_INTERVAL_ASCENDING_READ(NAME, TYPE, FIELD, ARGUMENT_MIN_POINTER, ARGUMENT_MAX_POINTER)              \
         /* Highlight-autocomplete replacement. */                                                                      \
         const struct TYPE *NAME = NULL;                                                                                \
+        KAN_HIGHLIGHT_STRUCT_FIELD (TYPE, FIELD)                                                                       \
         const void *NAME##_argument_min_user = ARGUMENT_MIN_POINTER;                                                   \
         const void *NAME##_argument_max_user = ARGUMENT_MAX_POINTER;                                                   \
         struct kan_repository_indexed_interval_read_access_t NAME##_access = {0};                                      \
@@ -288,6 +298,7 @@ KAN_C_HEADER_BEGIN
 #    define KAN_UP_INTERVAL_ASCENDING_UPDATE(NAME, TYPE, FIELD, ARGUMENT_MIN_POINTER, ARGUMENT_MAX_POINTER)            \
         /* Highlight-autocomplete replacement. */                                                                      \
         struct TYPE *NAME = NULL;                                                                                      \
+        KAN_HIGHLIGHT_STRUCT_FIELD (TYPE, FIELD)                                                                       \
         const void *NAME##_argument_min_user = ARGUMENT_MIN_POINTER;                                                   \
         const void *NAME##_argument_max_user = ARGUMENT_MAX_POINTER;                                                   \
         struct kan_repository_indexed_interval_update_access_t NAME##_access = {0};                                    \
@@ -297,6 +308,7 @@ KAN_C_HEADER_BEGIN
 #    define KAN_UP_INTERVAL_ASCENDING_DELETE(NAME, TYPE, FIELD, ARGUMENT_MIN_POINTER, ARGUMENT_MAX_POINTER)            \
         /* Highlight-autocomplete replacement. */                                                                      \
         const struct TYPE *NAME = NULL;                                                                                \
+        KAN_HIGHLIGHT_STRUCT_FIELD (TYPE, FIELD)                                                                       \
         const void *NAME##_argument_min_user = ARGUMENT_MIN_POINTER;                                                   \
         const void *NAME##_argument_max_user = ARGUMENT_MAX_POINTER;                                                   \
         struct kan_repository_indexed_interval_delete_access_t NAME##_access = {0};                                    \
@@ -306,6 +318,7 @@ KAN_C_HEADER_BEGIN
 #    define KAN_UP_INTERVAL_ASCENDING_WRITE(NAME, TYPE, FIELD, ARGUMENT_MIN_POINTER, ARGUMENT_MAX_POINTER)             \
         /* Highlight-autocomplete replacement. */                                                                      \
         struct TYPE *NAME = NULL;                                                                                      \
+        KAN_HIGHLIGHT_STRUCT_FIELD (TYPE, FIELD)                                                                       \
         const void *NAME##_argument_min_user = ARGUMENT_MIN_POINTER;                                                   \
         const void *NAME##_argument_max_user = ARGUMENT_MAX_POINTER;                                                   \
         struct kan_repository_indexed_interval_write_access_t NAME##_access = {0};                                     \
@@ -315,6 +328,7 @@ KAN_C_HEADER_BEGIN
 #    define KAN_UP_INTERVAL_DESCENDING_READ(NAME, TYPE, FIELD, ARGUMENT_MIN_POINTER, ARGUMENT_MAX_POINTER)             \
         /* Highlight-autocomplete replacement. */                                                                      \
         const struct TYPE *NAME = NULL;                                                                                \
+        KAN_HIGHLIGHT_STRUCT_FIELD (TYPE, FIELD)                                                                       \
         const void *NAME##_argument_min_user = ARGUMENT_MIN_POINTER;                                                   \
         const void *NAME##_argument_max_user = ARGUMENT_MAX_POINTER;                                                   \
         struct kan_repository_indexed_interval_read_access_t NAME##_access = {0};                                      \
@@ -324,6 +338,7 @@ KAN_C_HEADER_BEGIN
 #    define KAN_UP_INTERVAL_DESCENDING_UPDATE(NAME, TYPE, FIELD, ARGUMENT_MIN_POINTER, ARGUMENT_MAX_POINTER)           \
         /* Highlight-autocomplete replacement. */                                                                      \
         struct TYPE *NAME = NULL;                                                                                      \
+        KAN_HIGHLIGHT_STRUCT_FIELD (TYPE, FIELD)                                                                       \
         const void *NAME##_argument_min_user = ARGUMENT_MIN_POINTER;                                                   \
         const void *NAME##_argument_max_user = ARGUMENT_MAX_POINTER;                                                   \
         struct kan_repository_indexed_interval_update_access_t NAME##_access = {0};                                    \
@@ -333,6 +348,7 @@ KAN_C_HEADER_BEGIN
 #    define KAN_UP_INTERVAL_DESCENDING_DELETE(NAME, TYPE, FIELD, ARGUMENT_MIN_POINTER, ARGUMENT_MAX_POINTER)           \
         /* Highlight-autocomplete replacement. */                                                                      \
         const struct TYPE *NAME = NULL;                                                                                \
+        KAN_HIGHLIGHT_STRUCT_FIELD (TYPE, FIELD)                                                                       \
         const void *NAME##_argument_min_user = ARGUMENT_MIN_POINTER;                                                   \
         const void *NAME##_argument_max_user = ARGUMENT_MAX_POINTER;                                                   \
         struct kan_repository_indexed_interval_delete_access_t NAME##_access = {0};                                    \
@@ -342,6 +358,7 @@ KAN_C_HEADER_BEGIN
 #    define KAN_UP_INTERVAL_DESCENDING_WRITE(NAME, TYPE, FIELD, ARGUMENT_MIN_POINTER, ARGUMENT_MAX_POINTER)            \
         /* Highlight-autocomplete replacement. */                                                                      \
         struct TYPE *NAME = NULL;                                                                                      \
+        KAN_HIGHLIGHT_STRUCT_FIELD (TYPE, FIELD)                                                                       \
         const void *NAME##_argument_min_user = ARGUMENT_MIN_POINTER;                                                   \
         const void *NAME##_argument_max_user = ARGUMENT_MAX_POINTER;                                                   \
         struct kan_repository_indexed_interval_write_access_t NAME##_access = {0};                                     \

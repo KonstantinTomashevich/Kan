@@ -3090,11 +3090,13 @@ static void fill_world_from_definition (struct universe_t *universe,
 
                     output->name = input->name;
                     output->type = kan_reflection_patch_get_type (layer->data);
-
                     output->data = kan_allocate_batched (universe->configuration_allocation_group, output->type->size);
+
                     if (output->type->init)
                     {
+                        kan_allocation_group_stack_push (universe->configuration_allocation_group);
                         output->type->init (output->type->functor_user_data, output->data);
+                        kan_allocation_group_stack_pop ();
                     }
                 }
 
