@@ -61,8 +61,7 @@
     KAN_MAKE_PRAGMA (kan_reflection_struct_field_meta STRUCT_NAME STRUCT_FIELD_NAME)
 
 /// \brief Marks next symbol as meta for function with given name.
-#define KAN_REFLECTION_FUNCTION_META(FUNCTION_NAME)                                                                    \
-    KAN_HIGHLIGHT_SIZEOF_POSSIBLE (FUNCTION_NAME) KAN_MAKE_PRAGMA (kan_reflection_function_meta FUNCTION_NAME)
+#define KAN_REFLECTION_FUNCTION_META(FUNCTION_NAME) KAN_MAKE_PRAGMA (kan_reflection_function_meta FUNCTION_NAME)
 
 /// \brief Marks next symbol as meta for given function argument of given function.
 #define KAN_REFLECTION_FUNCTION_ARGUMENT_META(FUNCTION_NAME, FUNCTION_ARGUMENT_NAME)                                   \
