@@ -72,7 +72,7 @@ struct pipeline_t
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct mutator_t)
     struct kan_dynamic_array_t mutators;
 
-    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (kan_interned_string)
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (kan_interned_string_t)
     struct kan_dynamic_array_t used_groups;
 
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_universe_world_checkpoint_dependency_t)
