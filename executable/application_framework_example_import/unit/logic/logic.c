@@ -114,9 +114,7 @@ APPLICATION_FRAMEWORK_EXAMPLE_IMPORT_LOGIC_API void kan_universe_mutator_execute
                     KAN_UP_VALUE_READ (view, KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (icon_t), container_id,
                                        &request->provided_container_id)
                     {
-                        struct icon_t *icon =
-                            (struct icon_t *) ((struct kan_resource_container_view_t *) view)->data_begin;
-
+                        const struct icon_t *icon = KAN_RESOURCE_PROVIDER_CONTAINER_GET (icon_t, view);
                         kan_application_system_window_set_icon (
                             state->application_system_handle, singleton->window_handle,
                             KAN_PLATFORM_PIXEL_FORMAT_RGBA32, (kan_platform_visual_size_t) icon->width,

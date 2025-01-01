@@ -17,8 +17,6 @@ struct numbers_t
     struct kan_dynamic_array_t items;
 };
 
-_Static_assert (_Alignof (struct numbers_t) <= _Alignof (kan_memory_size_t), "Alignment has expected value.");
-
 APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_STATE_API void numbers_init (struct numbers_t *numbers)
 {
     kan_dynamic_array_init (&numbers->items, 0u, sizeof (kan_serialized_size_t), _Alignof (kan_serialized_size_t),
@@ -159,8 +157,8 @@ APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_STATE_API void kan_universe_mutator_ex
                     KAN_UP_VALUE_READ (view, KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (numbers_compiled_t),
                                        container_id, &request->provided_container_id)
                     {
-                        struct numbers_compiled_t *loaded_resource =
-                            (struct numbers_compiled_t *) ((struct kan_resource_container_view_t *) view)->data_begin;
+                        const struct numbers_compiled_t *loaded_resource =
+                            KAN_RESOURCE_PROVIDER_CONTAINER_GET (numbers_compiled_t, view);
 
                         if (loaded_resource->sum == 55u)
                         {

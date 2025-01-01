@@ -657,10 +657,8 @@ static void validate_material (struct byproduct_mutator_state_t *state,
         KAN_UP_VALUE_READ (view, KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (material_compiled_t), container_id,
                            &request->provided_container_id)
         {
-            kan_memory_size_t offset = offsetof (struct kan_resource_container_view_t, data_begin);
-            offset = kan_apply_alignment (offset, _Alignof (struct material_compiled_t));
-            struct material_compiled_t *material = (struct material_compiled_t *) (((uint8_t *) view) + offset);
-
+            const struct material_compiled_t *material =
+                KAN_RESOURCE_PROVIDER_CONTAINER_GET (material_compiled_t, view);
             if (material->passes.size != 2u)
             {
                 KAN_LOG (application_framework_example_compilation_byproduct, KAN_LOG_ERROR,
@@ -780,10 +778,8 @@ static void validate_loaded_data (struct byproduct_mutator_state_t *state,
         KAN_UP_VALUE_READ (view, KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (byproduct_compiled_t), container_id,
                            &request->provided_container_id)
         {
-            kan_memory_size_t offset = offsetof (struct kan_resource_container_view_t, data_begin);
-            offset = kan_apply_alignment (offset, _Alignof (struct pipeline_instance_byproduct_compiled_t));
-            struct pipeline_instance_byproduct_compiled_t *pipeline =
-                (struct pipeline_instance_byproduct_compiled_t *) (((uint8_t *) view) + offset);
+            const struct pipeline_instance_byproduct_compiled_t *pipeline =
+                KAN_RESOURCE_PROVIDER_CONTAINER_GET (pipeline_instance_byproduct_compiled_t, view);
 
             if (pipeline->format != PIPELINE_INSTANCE_PLATFORM_FORMAT_SPIRV)
             {

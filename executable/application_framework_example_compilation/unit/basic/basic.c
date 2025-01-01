@@ -17,8 +17,6 @@ struct root_config_t
     kan_interned_string_t required_sum;
 };
 
-_Static_assert (_Alignof (struct root_config_t) <= _Alignof (kan_memory_size_t), "Alignment has expected value.");
-
 KAN_REFLECTION_STRUCT_META (root_config_t)
 APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BASIC_API struct kan_resource_resource_type_meta_t
     root_config_resource_type_meta = {
@@ -37,8 +35,6 @@ struct sum_compiled_t
     kan_serialized_size_t value;
 };
 
-_Static_assert (_Alignof (struct sum_compiled_t) <= _Alignof (kan_memory_size_t), "Alignment has expected value.");
-
 KAN_REFLECTION_STRUCT_META (sum_compiled_t)
 APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BASIC_API struct kan_resource_resource_type_meta_t
     sum_compiled_resource_type_meta = {
@@ -53,8 +49,6 @@ struct sum_t
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (kan_interned_string_t)
     struct kan_dynamic_array_t sums;
 };
-
-_Static_assert (_Alignof (struct sum_t) == _Alignof (kan_memory_size_t), "Alignment has expected value.");
 
 APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BASIC_API void sum_init (struct sum_t *sum)
 {
@@ -102,8 +96,6 @@ struct record_t
 {
     kan_serialized_size_t value;
 };
-
-_Static_assert (_Alignof (struct record_t) <= _Alignof (kan_memory_size_t), "Alignment has expected value.");
 
 KAN_REFLECTION_STRUCT_META (record_t)
 APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BASIC_API struct kan_resource_resource_type_meta_t record_resource_type_meta =
@@ -350,8 +342,8 @@ APPLICATION_FRAMEWORK_EXAMPLE_COMPILATION_BASIC_API void kan_universe_mutator_ex
                     KAN_UP_VALUE_READ (view, KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (sum_compiled_t), container_id,
                                        &request->provided_container_id)
                     {
-                        struct sum_compiled_t *loaded_resource =
-                            (struct sum_compiled_t *) ((struct kan_resource_container_view_t *) view)->data_begin;
+                        const struct sum_compiled_t *loaded_resource =
+                            KAN_RESOURCE_PROVIDER_CONTAINER_GET (sum_compiled_t, view);
 
                         if (loaded_resource->value == 111u)
                         {

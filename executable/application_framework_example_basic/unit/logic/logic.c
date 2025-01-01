@@ -21,8 +21,6 @@ struct test_data_type_t
     kan_serialized_size_t y;
 };
 
-_Static_assert (_Alignof (struct test_data_type_t) <= _Alignof (kan_memory_size_t), "Alignment has expected value.");
-
 KAN_REFLECTION_STRUCT_META (test_data_type_t)
 APPLICATION_FRAMEWORK_EXAMPLE_BASIC_LOGIC_API struct kan_resource_resource_type_meta_t test_data_type_meta = {
     .root = KAN_TRUE,
@@ -125,8 +123,8 @@ APPLICATION_FRAMEWORK_EXAMPLE_BASIC_LOGIC_API void kan_universe_mutator_execute_
                 KAN_UP_VALUE_READ (view, KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (test_data_type_t), container_id,
                                    &request->provided_container_id)
                 {
-                    struct test_data_type_t *loaded_resource =
-                        (struct test_data_type_t *) ((struct kan_resource_container_view_t *) view)->data_begin;
+                    const struct test_data_type_t *loaded_resource =
+                        KAN_RESOURCE_PROVIDER_CONTAINER_GET (test_data_type_t, view);
 
                     x = loaded_resource->x;
                     y = loaded_resource->y;

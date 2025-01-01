@@ -38,9 +38,6 @@ struct first_resource_type_t
     kan_bool_t flag_4;
 };
 
-_Static_assert (_Alignof (struct first_resource_type_t) == _Alignof (uint64_t),
-                "Alignment does not require additional offset calculations.");
-
 KAN_REFLECTION_STRUCT_META (first_resource_type_t)
 TEST_UNIVERSE_RESOURCE_PROVIDER_API struct kan_resource_resource_type_meta_t first_resource_type_meta = {
     .root = KAN_TRUE,
@@ -51,9 +48,6 @@ struct second_resource_type_t
     kan_interned_string_t first_id;
     kan_interned_string_t second_id;
 };
-
-_Static_assert (_Alignof (struct second_resource_type_t) == _Alignof (uint64_t),
-                "Alignment does not require additional offset calculations.");
 
 KAN_REFLECTION_STRUCT_META (second_resource_type_t)
 TEST_UNIVERSE_RESOURCE_PROVIDER_API struct kan_resource_resource_type_meta_t second_resource_type_meta = {
@@ -227,7 +221,7 @@ TEST_UNIVERSE_RESOURCE_PROVIDER_API void kan_universe_mutator_execute_request_re
                                        container_id, &request->provided_container_id)
                     {
                         const struct first_resource_type_t *loaded_resource =
-                            (const void *) ((struct kan_resource_container_view_t *) view)->data_begin;
+                            KAN_RESOURCE_PROVIDER_CONTAINER_GET (first_resource_type_t, view);
                         KAN_TEST_CHECK (loaded_resource->some_integer == resource_alpha.some_integer)
                         KAN_TEST_CHECK (loaded_resource->flag_1 == resource_alpha.flag_1)
                         KAN_TEST_CHECK (loaded_resource->flag_2 == resource_alpha.flag_2)
@@ -249,7 +243,7 @@ TEST_UNIVERSE_RESOURCE_PROVIDER_API void kan_universe_mutator_execute_request_re
                                        container_id, &request->provided_container_id)
                     {
                         const struct first_resource_type_t *loaded_resource =
-                            (const void *) ((struct kan_resource_container_view_t *) view)->data_begin;
+                            KAN_RESOURCE_PROVIDER_CONTAINER_GET (first_resource_type_t, view);
                         KAN_TEST_CHECK (loaded_resource->some_integer == resource_beta.some_integer)
                         KAN_TEST_CHECK (loaded_resource->flag_1 == resource_beta.flag_1)
                         KAN_TEST_CHECK (loaded_resource->flag_2 == resource_beta.flag_2)
@@ -278,7 +272,7 @@ TEST_UNIVERSE_RESOURCE_PROVIDER_API void kan_universe_mutator_execute_request_re
                                        container_id, &request->provided_container_id)
                     {
                         const struct second_resource_type_t *loaded_resource =
-                            (const void *) ((struct kan_resource_container_view_t *) view)->data_begin;
+                            KAN_RESOURCE_PROVIDER_CONTAINER_GET (second_resource_type_t, view);
                         KAN_TEST_CHECK (loaded_resource->first_id == resource_players.first_id)
                         KAN_TEST_CHECK (loaded_resource->second_id == resource_players.second_id)
                     }
@@ -297,7 +291,7 @@ TEST_UNIVERSE_RESOURCE_PROVIDER_API void kan_universe_mutator_execute_request_re
                                        container_id, &request->provided_container_id)
                     {
                         const struct second_resource_type_t *loaded_resource =
-                            (const void *) ((struct kan_resource_container_view_t *) view)->data_begin;
+                            KAN_RESOURCE_PROVIDER_CONTAINER_GET (second_resource_type_t, view);
                         KAN_TEST_CHECK (loaded_resource->first_id == resource_characters.first_id)
                         KAN_TEST_CHECK (loaded_resource->second_id == resource_characters.second_id)
                     }
@@ -710,7 +704,7 @@ TEST_UNIVERSE_RESOURCE_PROVIDER_API void kan_universe_mutator_execute_check_obse
                                            container_id, &request->provided_container_id)
                         {
                             const struct first_resource_type_t *loaded_resource =
-                                (const void *) ((struct kan_resource_container_view_t *) view)->data_begin;
+                                KAN_RESOURCE_PROVIDER_CONTAINER_GET (first_resource_type_t, view);
                             KAN_TEST_CHECK (loaded_resource->some_integer == resource_alpha.some_integer)
                             KAN_TEST_CHECK (loaded_resource->flag_1 == resource_alpha.flag_1)
                             KAN_TEST_CHECK (loaded_resource->flag_2 == resource_alpha.flag_2)
@@ -747,7 +741,7 @@ TEST_UNIVERSE_RESOURCE_PROVIDER_API void kan_universe_mutator_execute_check_obse
                                            container_id, &request->provided_container_id)
                         {
                             const struct first_resource_type_t *loaded_resource =
-                                (const void *) ((struct kan_resource_container_view_t *) view)->data_begin;
+                                KAN_RESOURCE_PROVIDER_CONTAINER_GET (first_resource_type_t, view);
                             KAN_TEST_CHECK (loaded_resource->some_integer == resource_beta.some_integer)
                             KAN_TEST_CHECK (loaded_resource->flag_1 == resource_beta.flag_1)
                             KAN_TEST_CHECK (loaded_resource->flag_2 == resource_beta.flag_2)
@@ -791,7 +785,7 @@ TEST_UNIVERSE_RESOURCE_PROVIDER_API void kan_universe_mutator_execute_check_obse
                                                container_id, &request->provided_container_id)
                             {
                                 const struct second_resource_type_t *loaded_resource =
-                                    (const void *) ((struct kan_resource_container_view_t *) view)->data_begin;
+                                    KAN_RESOURCE_PROVIDER_CONTAINER_GET (second_resource_type_t, view);
                                 KAN_TEST_CHECK (loaded_resource->first_id == resource_characters.first_id)
                                 KAN_TEST_CHECK (loaded_resource->second_id == resource_characters.second_id)
                                 container_found = KAN_TRUE;

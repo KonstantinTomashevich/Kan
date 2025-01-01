@@ -826,78 +826,6 @@ static void add_third_party_entry (struct resource_provider_state_t *state,
     }
 }
 
-static inline void unload_native_entry (struct resource_provider_state_t *state,
-                                        struct kan_resource_native_entry_t *entry,
-                                        struct resource_provider_native_entry_suffix_t *entry_suffix);
-
-static inline void cancel_native_entry_loading (struct resource_provider_state_t *state,
-                                                struct kan_resource_native_entry_t *entry,
-                                                struct resource_provider_native_entry_suffix_t *entry_suffix);
-
-static inline void unload_third_party_entry (struct resource_provider_state_t *state,
-                                             struct kan_resource_third_party_entry_t *entry,
-                                             struct resource_provider_third_party_entry_suffix_t *entry_suffix);
-
-static inline void cancel_third_party_entry_loading (struct resource_provider_state_t *state,
-                                                     struct kan_resource_third_party_entry_t *entry,
-                                                     struct resource_provider_third_party_entry_suffix_t *entry_suffix);
-
-static inline void unload_compiled_entry (struct resource_provider_state_t *state,
-                                          struct resource_provider_compiled_resource_entry_t *entry);
-
-static inline void cancel_runtime_compilation (struct resource_provider_state_t *state,
-                                               struct resource_provider_compiled_resource_entry_t *entry);
-
-static inline void native_container_delete (struct resource_provider_state_t *state,
-                                            kan_interned_string_t type,
-                                            kan_resource_container_id_t container_id);
-
-static inline void compiled_entry_remove_dependencies (struct resource_provider_state_t *state,
-                                                       struct resource_provider_compiled_resource_entry_t *entry);
-
-static void clear_entries (struct resource_provider_state_t *state)
-{
-    KAN_UP_SEQUENCE_WRITE (native_entry, kan_resource_native_entry_t)
-    {
-        KAN_UP_VALUE_WRITE (suffix, resource_provider_native_entry_suffix_t, attachment_id,
-                            &native_entry->attachment_id)
-        {
-            unload_native_entry (state, native_entry, suffix);
-            cancel_native_entry_loading (state, native_entry, suffix);
-            KAN_UP_ACCESS_DELETE (suffix);
-        }
-
-        KAN_UP_ACCESS_DELETE (native_entry);
-    }
-
-    KAN_UP_SEQUENCE_WRITE (third_party_entry, kan_resource_third_party_entry_t)
-    {
-        KAN_UP_VALUE_WRITE (suffix, resource_provider_third_party_entry_suffix_t, attachment_id,
-                            &third_party_entry->attachment_id)
-        {
-            unload_third_party_entry (state, third_party_entry, suffix);
-            cancel_third_party_entry_loading (state, third_party_entry, suffix);
-            KAN_UP_ACCESS_DELETE (suffix);
-        }
-
-        KAN_UP_ACCESS_DELETE (third_party_entry);
-    }
-
-    KAN_UP_SEQUENCE_WRITE (compiled_entry, resource_provider_compiled_resource_entry_t)
-    {
-        unload_compiled_entry (state, compiled_entry);
-        cancel_runtime_compilation (state, compiled_entry);
-        compiled_entry_remove_dependencies (state, compiled_entry);
-        KAN_UP_ACCESS_DELETE (compiled_entry);
-    }
-
-    KAN_UP_SEQUENCE_WRITE (byproduct_entry, resource_provider_raw_byproduct_entry_t)
-    {
-        native_container_delete (state, byproduct_entry->type, byproduct_entry->container_id);
-        KAN_UP_ACCESS_DELETE (byproduct_entry);
-    }
-}
-
 struct file_scan_result_t
 {
     kan_interned_string_t type;
@@ -1752,6 +1680,9 @@ static inline void schedule_compilation (struct resource_provider_state_t *state
     kan_repository_indexed_insertion_package_submit (&container_package);
 }
 
+static inline void cancel_runtime_compilation (struct resource_provider_state_t *state,
+                                               struct resource_provider_compiled_resource_entry_t *entry);
+
 static inline void transition_compiled_entry_state (struct resource_provider_state_t *state,
                                                     const struct kan_resource_provider_singleton_t *public,
                                                     struct resource_provider_private_singleton_t *private,
@@ -1916,6 +1847,9 @@ static inline kan_bool_t resource_provider_raw_byproduct_entry_has_producers (st
 
     return KAN_FALSE;
 }
+
+static inline void unload_compiled_entry (struct resource_provider_state_t *state,
+                                          struct resource_provider_compiled_resource_entry_t *entry);
 
 static inline kan_bool_t resource_provider_raw_byproduct_entry_update_reference_status (
     struct resource_provider_state_t *state,
@@ -3915,29 +3849,6 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void mutator_template_execute_resource_provid
             private->status = RESOURCE_PROVIDER_STATUS_SCANNING;
         }
 
-        if (private->status == RESOURCE_PROVIDER_STATUS_SERVING && public->request_reset)
-        {
-            clear_entries (state);
-            for (kan_loop_size_t index = 0u; index < private->loaded_string_registries.size; ++index)
-            {
-                kan_serialization_interned_string_registry_destroy (
-                    ((kan_serialization_interned_string_registry_t *) private->loaded_string_registries.data)[index]);
-            }
-
-            kan_dynamic_array_reset (&private->loaded_string_registries);
-            if (KAN_HANDLE_IS_VALID (private->resource_watcher))
-            {
-                kan_virtual_file_system_watcher_iterator_destroy (private->resource_watcher,
-                                                                  private->resource_watcher_iterator);
-                kan_virtual_file_system_watcher_destroy (private->resource_watcher);
-            }
-
-            prepare_for_scanning (state, private);
-            private->status = RESOURCE_PROVIDER_STATUS_SCANNING;
-            public->request_reset = KAN_FALSE;
-            public->scan_done = KAN_FALSE;
-        }
-
         if (private->status == RESOURCE_PROVIDER_STATUS_SCANNING &&
             state->frame_begin_time_ns + state->scan_budget_ns > kan_precise_time_get_elapsed_nanoseconds ())
         {
@@ -4190,6 +4101,14 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void mutator_template_execute_resource_provid
                 }
 
                 kan_virtual_file_system_close_context_read_access (state->virtual_file_system);
+            }
+
+            KAN_UP_EVENT_FETCH (outdated_event, kan_resource_request_defer_delete_event_t)
+            {
+                KAN_UP_VALUE_DELETE (request, kan_resource_request_t, request_id, &outdated_event->request_id)
+                {
+                    KAN_UP_ACCESS_DELETE (request);
+                }
             }
 
             process_request_on_insert (state, public, private);
@@ -4694,7 +4613,6 @@ void kan_resource_request_init (struct kan_resource_request_t *instance)
 void kan_resource_provider_singleton_init (struct kan_resource_provider_singleton_t *instance)
 {
     instance->request_id_counter = kan_atomic_int_init (1);
-    instance->request_reset = KAN_FALSE;
     instance->scan_done = KAN_FALSE;
 }
 

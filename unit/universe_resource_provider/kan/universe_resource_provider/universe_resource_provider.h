@@ -2,6 +2,7 @@
 
 #include <universe_resource_provider_api.h>
 
+#include <kan/api_common/alignment.h>
 #include <kan/api_common/c_header.h>
 #include <kan/api_common/core_types.h>
 #include <kan/container/interned_string.h>
@@ -153,6 +154,16 @@ struct kan_resource_request_t
 
 UNIVERSE_RESOURCE_PROVIDER_API void kan_resource_request_init (struct kan_resource_request_t *instance);
 
+/// \brief Event for resource provider users that makes it possible to
+///        defer resource request deletion to resource provider.
+/// \details In most cases, we'd like to execute specific resource loaders in parallel without explicit dependencies,
+///          but resource request deletion introduces conflicting access to resource requests. Therefore, it was made
+///          possible to defer this deletion and do it inside resource provider.
+struct kan_resource_request_defer_delete_event_t
+{
+    kan_resource_request_id_t request_id;
+};
+
 /// \brief Struct that mimics data layout of native resource containers.
 KAN_REFLECTION_IGNORE
 struct kan_resource_container_view_t
@@ -163,6 +174,13 @@ struct kan_resource_container_view_t
     KAN_REFLECTION_IGNORE
     uint8_t data_begin[];
 };
+
+/// \brief Helper macro for extracting container data with proper alignment.
+#define KAN_RESOURCE_PROVIDER_CONTAINER_GET(TYPE_NAME, CONTAINER)                                                      \
+    ((const struct TYPE_NAME *) ((uint8_t *) CONTAINER +                                                               \
+                                 kan_apply_alignment (                                                                 \
+                                     (kan_memory_size_t) offsetof (struct kan_resource_container_view_t, data_begin),  \
+                                     _Alignof (struct TYPE_NAME))))
 
 /// \brief Event that is send when resource request is updated.
 struct kan_resource_request_updated_event_t
@@ -180,10 +198,6 @@ struct kan_resource_provider_singleton_t
     /// \brief Atomic counter for assigning request ids. Safe to be modified from different threads.
     KAN_REFLECTION_IGNORE
     struct kan_atomic_int_t request_id_counter;
-
-    /// \brief When set to true, resource provider will stop serving, unload all the data and start scan from scratch.
-    /// \details Automatically reset to false when scanning is started.
-    kan_bool_t request_reset;
 
     /// \brief Whether resource provider finished scanning for resources and is able to provide full list of entries.
     kan_bool_t scan_done;
@@ -254,12 +268,14 @@ UNIVERSE_RESOURCE_PROVIDER_API void kan_resource_third_party_entry_init (
 UNIVERSE_RESOURCE_PROVIDER_API void kan_resource_third_party_entry_shutdown (
     struct kan_resource_third_party_entry_t *instance);
 
-/// \brief Event that is send when known resource entry is changed or removed.
+/// \brief Event that is send when known resource entry is changed, added or removed based on file system information.
 /// \details Resource entry can have no requests, but this event will still be sent if resource entry is known to
 ///          provider. When runtime compilation is enabled, it is also sent for compiled resources, that were produced
 ///          at least once and therefore are known to the resource provider.
 /// \warning This event does not mean that data in requests is updated. Its goal is to inform about change of
 ///          potentially outdated resources. For request updates, use `kan_resource_request_updated_event_t`.
+/// \warning When entries are added/removed due to resource scan (that can be repeated through
+///          kan_resource_provider_singleton_t::request_reset), these events are not sent.
 struct kan_resource_entry_changed_event_t
 {
     /// \details NULL for third party entries.
