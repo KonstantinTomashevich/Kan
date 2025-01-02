@@ -40,7 +40,7 @@
 
 /// \brief Adds value that enables visibility of the next field for visibility condition feature.
 #define KAN_REFLECTION_VISIBILITY_CONDITION_VALUE(VALUE)                                                               \
-    KAN_HIGHLIGHT_SIZEOF_POSSIBLE (FUNCTION_NAME) KAN_MAKE_PRAGMA (kan_reflection_visibility_condition_value VALUE)
+    KAN_HIGHLIGHT_SIZEOF_POSSIBLE (VALUE) KAN_MAKE_PRAGMA (kan_reflection_visibility_condition_value VALUE)
 
 /// \brief Marks next symbol as meta for enum with given name.
 #define KAN_REFLECTION_ENUM_META(ENUM_NAME)                                                                            \
