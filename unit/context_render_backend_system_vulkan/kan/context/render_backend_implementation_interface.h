@@ -973,6 +973,7 @@ struct render_backend_system_t
     kan_cpu_section_t section_present;
 
     struct kan_render_supported_devices_t *supported_devices;
+    struct kan_render_supported_device_info_t *selected_device_info;
 
 #if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_PROFILE_MEMORY)
     struct memory_profiling_t memory_profiling;

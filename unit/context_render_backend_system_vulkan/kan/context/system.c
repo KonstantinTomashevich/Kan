@@ -145,6 +145,7 @@ kan_context_system_t render_backend_system_create (kan_allocation_group_t group,
 
     system->staging_frame_lifetime_allocator = NULL;
     system->supported_devices = NULL;
+    system->selected_device_info = NULL;
 
     system->sampler_cache_lock = kan_atomic_int_init (0);
     system->first_cached_sampler = NULL;
@@ -870,6 +871,24 @@ kan_bool_t kan_render_backend_system_select_device (kan_context_system_t render_
         return KAN_FALSE;
     }
 
+    struct kan_render_supported_device_info_t *device_info = NULL;
+    for (kan_loop_size_t index = 0u; index < (kan_loop_size_t) system->supported_devices->supported_device_count;
+         ++index)
+    {
+        if (KAN_HANDLE_IS_EQUAL (system->supported_devices->devices[index].id, device))
+        {
+            device_info = &system->supported_devices->devices[index];
+            break;
+        }
+    }
+
+    if (!device_info)
+    {
+        KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR,
+                 "Caught attempt to select device which is not listed in supported devices list!")
+        return KAN_FALSE;
+    }
+
     kan_instance_size_t properties_count;
     if (vkEnumerateDeviceExtensionProperties (physical_device, NULL, &properties_count, NULL) != VK_SUCCESS)
     {
@@ -1305,7 +1324,16 @@ kan_bool_t kan_render_backend_system_select_device (kan_context_system_t render_
         // Buffer type does not matter anything for staging.
         KAN_RENDER_BUFFER_TYPE_STORAGE, KAN_CONTEXT_RENDER_BACKEND_VULKAN_STAGING_PAGE_SIZE,
         kan_string_intern ("default_staging_buffer"));
+
+    system->selected_device_info = device_info;
     return KAN_TRUE;
+}
+
+struct kan_render_supported_device_info_t *kan_render_backend_system_get_selected_device_info (
+    kan_context_system_t render_backend_system)
+{
+    struct render_backend_system_t *system = KAN_HANDLE_GET (render_backend_system);
+    return system->selected_device_info;
 }
 
 kan_render_context_t kan_render_backend_system_get_render_context (kan_context_system_t render_backend_system)

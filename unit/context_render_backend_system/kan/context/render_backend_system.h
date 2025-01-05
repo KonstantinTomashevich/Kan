@@ -337,6 +337,10 @@ CONTEXT_RENDER_BACKEND_SYSTEM_API struct kan_render_supported_devices_t *kan_ren
 CONTEXT_RENDER_BACKEND_SYSTEM_API kan_bool_t
 kan_render_backend_system_select_device (kan_context_system_t render_backend_system, kan_render_device_t device);
 
+/// \brief Returns selected device info if any device was selected.
+CONTEXT_RENDER_BACKEND_SYSTEM_API struct kan_render_supported_device_info_t *
+kan_render_backend_system_get_selected_device_info (kan_context_system_t render_backend_system);
+
 /// \brief Returns render context that is used with most other render backend functions.
 CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_context_t
 kan_render_backend_system_get_render_context (kan_context_system_t render_backend_system);
