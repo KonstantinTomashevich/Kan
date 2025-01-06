@@ -1,0 +1,5 @@
+register_concrete (application_framework_examples_platform_configuration)
+concrete_include (PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
+concrete_sources (GLOB "*.c")
+concrete_require (SCOPE PUBLIC ABSTRACT reflection)
+universe_concrete_preprocessing_queue ()
