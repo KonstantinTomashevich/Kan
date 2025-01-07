@@ -324,10 +324,6 @@ kan_render_pass_instance_t kan_render_pass_instantiate (kan_render_pass_t pass,
     struct kan_cpu_section_execution_t execution;
     kan_cpu_section_execution_init (&execution, pass_data->system->section_create_pass_instance);
 
-    VkFramebuffer selected_frame_buffer = frame_buffer_data->instance_array ?
-                                              frame_buffer_data->instance_array[frame_buffer_data->instance_index] :
-                                              frame_buffer_data->instance;
-
     // We intentionally skip frame buffer check as frame buffer might be created during frame end before submission.
     if (!pass_data->system->frame_started)
     {
@@ -382,7 +378,10 @@ kan_render_pass_instance_t kan_render_pass_instantiate (kan_render_pass_t pass,
             .pNext = NULL,
             .renderPass = pass_data->pass,
             .subpass = 0u,
-            .framebuffer = selected_frame_buffer,
+            // Currently, we do not know which images would be acquired during recording (as frame buffer might
+            // technically be created during submission which is being done after recording). Therefore, we can only
+            // provide frame buffer inheritance when frame buffer is not surface-dependant.
+            .framebuffer = frame_buffer_data->instance_array ? VK_NULL_HANDLE : frame_buffer_data->instance,
             .occlusionQueryEnable = VK_FALSE,
             .queryFlags = 0u,
             .pipelineStatistics = 0u,
@@ -475,7 +474,7 @@ kan_render_pass_instance_t kan_render_pass_instantiate (kan_render_pass_t pass,
         .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
         .pNext = NULL,
         .renderPass = pass_data->pass,
-        .framebuffer = selected_frame_buffer,
+        .framebuffer = VK_NULL_HANDLE,
         .renderArea =
             {
                 .offset =

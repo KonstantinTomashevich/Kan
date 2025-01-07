@@ -1990,7 +1990,9 @@ static inline void process_frame_buffer_create_requests (struct render_backend_s
 
         if (surface_index != KAN_INT_MAX (kan_instance_size_t))
         {
+            struct render_backend_surface_t *surface = frame_buffer->attachments[surface_index].surface;
             frame_buffer->image_views[surface_index] = VK_NULL_HANDLE;
+            frame_buffer->instance_index = surface->acquired_image_index;
         }
 
         if (!created)
@@ -2432,22 +2434,15 @@ static void render_backend_system_submit_pass_instance (struct render_backend_sy
     kan_cpu_section_execution_init (&execution, system->section_submit_pass_instance);
     vkEndCommandBuffer (pass_instance->command_buffer);
 
-    if (pass_instance->render_pass_begin_info.framebuffer == VK_NULL_HANDLE)
+    if (pass_instance->frame_buffer->instance_array)
     {
-        if (pass_instance->frame_buffer->instance_array)
-        {
-            // If buffer uses surface and it was created after starting frame, then its images are not yet acquired
-            // and therefore this buffer can not be used yet.
-            if (pass_instance->frame_buffer->instance_index < pass_instance->frame_buffer->instance_array_size)
-            {
-                pass_instance->render_pass_begin_info.framebuffer =
-                    pass_instance->frame_buffer->instance_array[pass_instance->frame_buffer->instance_index];
-            }
-        }
-        else
-        {
-            pass_instance->render_pass_begin_info.framebuffer = pass_instance->frame_buffer->instance;
-        }
+        KAN_ASSERT (pass_instance->frame_buffer->instance_index < pass_instance->frame_buffer->instance_array_size)
+        pass_instance->render_pass_begin_info.framebuffer =
+            pass_instance->frame_buffer->instance_array[pass_instance->frame_buffer->instance_index];
+    }
+    else
+    {
+        pass_instance->render_pass_begin_info.framebuffer = pass_instance->frame_buffer->instance;
     }
 
     if (pass_instance->render_pass_begin_info.framebuffer != VK_NULL_HANDLE)
@@ -3049,7 +3044,7 @@ static void render_backend_system_finish_command_submission (struct render_backe
 
     while (surface)
     {
-        if (surface->surface != VK_NULL_HANDLE)
+        if (surface->surface != VK_NULL_HANDLE && surface->acquired_image_frame != UINT32_MAX)
         {
             if (semaphores_to_wait < KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_INLINE_HANDLES)
             {
@@ -3078,7 +3073,7 @@ static void render_backend_system_finish_command_submission (struct render_backe
 
         while (surface)
         {
-            if (surface->surface != VK_NULL_HANDLE)
+            if (surface->surface != VK_NULL_HANDLE && surface->acquired_image_frame != UINT32_MAX)
             {
                 wait_semaphores[semaphores_to_wait] =
                     surface->image_available_semaphores[system->current_frame_in_flight_index];
@@ -3879,13 +3874,6 @@ static kan_bool_t render_backend_system_acquire_images (struct render_backend_sy
     kan_bool_t any_swap_chain_outdated = KAN_FALSE;
     struct render_backend_surface_t *surface = (struct render_backend_surface_t *) system->surfaces.first;
 
-    // Unable to start frame when there is no surfaces at all.
-    if (!surface)
-    {
-        kan_cpu_section_execution_shutdown (&execution);
-        return KAN_FALSE;
-    }
-
     while (surface)
     {
         const struct kan_application_system_window_info_t *window_info =
@@ -3972,6 +3960,13 @@ kan_bool_t kan_render_backend_system_next_frame (kan_context_system_t render_bac
     struct kan_cpu_section_execution_t next_frame_execution;
     kan_cpu_section_execution_init (&next_frame_execution, system->section_next_frame);
 
+    if (!render_backend_system_acquire_images (system))
+    {
+        KAN_LOG (render_backend_system_vulkan, KAN_LOG_INFO, "Skipping frame as swap chain images are not ready.")
+        kan_cpu_section_execution_shutdown (&next_frame_execution);
+        return KAN_FALSE;
+    }
+
     render_backend_system_submit_previous_frame (system);
 
     struct kan_cpu_section_execution_t synchronization_execution;
@@ -3991,14 +3986,6 @@ kan_bool_t kan_render_backend_system_next_frame (kan_context_system_t render_bac
     else if (fence_wait_result != VK_SUCCESS)
     {
         KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR, "Failed waiting for in flight fence.")
-        kan_cpu_section_execution_shutdown (&synchronization_execution);
-        kan_cpu_section_execution_shutdown (&next_frame_execution);
-        return KAN_FALSE;
-    }
-
-    if (!render_backend_system_acquire_images (system))
-    {
-        KAN_LOG (render_backend_system_vulkan, KAN_LOG_INFO, "Skipping frame as swap chain images are not ready.")
         kan_cpu_section_execution_shutdown (&synchronization_execution);
         kan_cpu_section_execution_shutdown (&next_frame_execution);
         return KAN_FALSE;
