@@ -30,7 +30,11 @@ application_plugin_include (
         ABSTRACT universe_resource_provider=kan
         CONCRETE
         application_framework_examples_icon_resource application_framework_examples_platform_configuration
-        universe_object universe_render_foundation universe_single_pipeline_scheduler universe_time)
+        universe_object universe_single_pipeline_scheduler universe_time)
+
+if (Vulkan_FOUND)
+    application_plugin_include (CONCRETE universe_render_foundation)
+endif ()
 
 # Plugin with import-only logic.
 
