@@ -4161,20 +4161,30 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void mutator_template_execute_resource_provid
                     kan_hot_reload_coordination_system_get_current_mode (state->hot_reload_system) !=
                         KAN_HOT_RELOAD_MODE_DISABLED)
                 {
+                    kan_interned_string_t type_to_remove_request = NULL;
+                    kan_interned_string_t name_to_remove_request = NULL;
+
                     KAN_UP_VALUE_UPDATE (request, kan_resource_request_t, request_id, &sleep_event->request_id)
                     {
                         // Sleeping only makes sense when there is no pending operation already.
                         if (!is_entry_has_pending_operation (state, request->type, request->name))
                         {
                             request->sleeping = KAN_TRUE;
-                            if (request->type)
-                            {
-                                remove_native_entry_reference (state, request->type, request->name);
-                            }
-                            else
-                            {
-                                remove_third_party_entry_reference (state, request->name);
-                            }
+                            // Cannot do it inside request update access as reference removal accesses requests.
+                            type_to_remove_request = request->type;
+                            name_to_remove_request = request->name;
+                        }
+                    }
+
+                    if (name_to_remove_request)
+                    {
+                        if (type_to_remove_request)
+                        {
+                            remove_native_entry_reference (state, type_to_remove_request, name_to_remove_request);
+                        }
+                        else
+                        {
+                            remove_third_party_entry_reference (state, name_to_remove_request);
                         }
                     }
                 }
