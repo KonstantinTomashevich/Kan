@@ -145,6 +145,7 @@ kan_context_system_t render_backend_system_create (kan_allocation_group_t group,
 
     system->staging_frame_lifetime_allocator = NULL;
     system->supported_devices = NULL;
+    system->selected_device_info = NULL;
 
     system->sampler_cache_lock = kan_atomic_int_init (0);
     system->first_cached_sampler = NULL;
@@ -584,6 +585,14 @@ static void render_backend_system_destroy_synchronization_objects (struct render
 
 void render_backend_system_shutdown (kan_context_system_t handle)
 {
+}
+
+void render_backend_system_disconnect (kan_context_system_t handle)
+{
+}
+
+void render_backend_system_destroy (kan_context_system_t handle)
+{
     struct render_backend_system_t *system = KAN_HANDLE_GET (handle);
     vkDeviceWaitIdle (system->device);
     // All surfaces should've been automatically destroyed during application system shutdown.
@@ -827,15 +836,6 @@ void render_backend_system_shutdown (kan_context_system_t handle)
     vkDestroyInstance (system->instance, VULKAN_ALLOCATION_CALLBACKS (system));
     kan_stack_group_allocator_shutdown (&system->pass_instance_allocator);
     kan_platform_application_unregister_vulkan_library_usage ();
-}
-
-void render_backend_system_disconnect (kan_context_system_t handle)
-{
-}
-
-void render_backend_system_destroy (kan_context_system_t handle)
-{
-    struct render_backend_system_t *system = KAN_HANDLE_GET (handle);
     kan_free_general (system->main_allocation_group, system, sizeof (struct render_backend_system_t));
 }
 
@@ -867,6 +867,24 @@ kan_bool_t kan_render_backend_system_select_device (kan_context_system_t render_
     {
         KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR,
                  "Caught attempt to select device after device was already sucessfully selected!")
+        return KAN_FALSE;
+    }
+
+    struct kan_render_supported_device_info_t *device_info = NULL;
+    for (kan_loop_size_t index = 0u; index < (kan_loop_size_t) system->supported_devices->supported_device_count;
+         ++index)
+    {
+        if (KAN_HANDLE_IS_EQUAL (system->supported_devices->devices[index].id, device))
+        {
+            device_info = &system->supported_devices->devices[index];
+            break;
+        }
+    }
+
+    if (!device_info)
+    {
+        KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR,
+                 "Caught attempt to select device which is not listed in supported devices list!")
         return KAN_FALSE;
     }
 
@@ -1305,7 +1323,16 @@ kan_bool_t kan_render_backend_system_select_device (kan_context_system_t render_
         // Buffer type does not matter anything for staging.
         KAN_RENDER_BUFFER_TYPE_STORAGE, KAN_CONTEXT_RENDER_BACKEND_VULKAN_STAGING_PAGE_SIZE,
         kan_string_intern ("default_staging_buffer"));
+
+    system->selected_device_info = device_info;
     return KAN_TRUE;
+}
+
+struct kan_render_supported_device_info_t *kan_render_backend_system_get_selected_device_info (
+    kan_context_system_t render_backend_system)
+{
+    struct render_backend_system_t *system = KAN_HANDLE_GET (render_backend_system);
+    return system->selected_device_info;
 }
 
 kan_render_context_t kan_render_backend_system_get_render_context (kan_context_system_t render_backend_system)
@@ -1962,7 +1989,9 @@ static inline void process_frame_buffer_create_requests (struct render_backend_s
 
         if (surface_index != KAN_INT_MAX (kan_instance_size_t))
         {
+            struct render_backend_surface_t *surface = frame_buffer->attachments[surface_index].surface;
             frame_buffer->image_views[surface_index] = VK_NULL_HANDLE;
+            frame_buffer->instance_index = surface->acquired_image_index;
         }
 
         if (!created)
@@ -2404,12 +2433,15 @@ static void render_backend_system_submit_pass_instance (struct render_backend_sy
     kan_cpu_section_execution_init (&execution, system->section_submit_pass_instance);
     vkEndCommandBuffer (pass_instance->command_buffer);
 
-    if (pass_instance->render_pass_begin_info.framebuffer == VK_NULL_HANDLE)
+    if (pass_instance->frame_buffer->instance_array)
     {
+        KAN_ASSERT (pass_instance->frame_buffer->instance_index < pass_instance->frame_buffer->instance_array_size)
         pass_instance->render_pass_begin_info.framebuffer =
-            pass_instance->frame_buffer->instance_array ?
-                pass_instance->frame_buffer->instance_array[pass_instance->frame_buffer->instance_index] :
-                pass_instance->frame_buffer->instance;
+            pass_instance->frame_buffer->instance_array[pass_instance->frame_buffer->instance_index];
+    }
+    else
+    {
+        pass_instance->render_pass_begin_info.framebuffer = pass_instance->frame_buffer->instance;
     }
 
     if (pass_instance->render_pass_begin_info.framebuffer != VK_NULL_HANDLE)
@@ -3011,7 +3043,7 @@ static void render_backend_system_finish_command_submission (struct render_backe
 
     while (surface)
     {
-        if (surface->surface != VK_NULL_HANDLE)
+        if (surface->surface != VK_NULL_HANDLE && surface->acquired_image_frame != UINT32_MAX)
         {
             if (semaphores_to_wait < KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_INLINE_HANDLES)
             {
@@ -3040,7 +3072,7 @@ static void render_backend_system_finish_command_submission (struct render_backe
 
         while (surface)
         {
-            if (surface->surface != VK_NULL_HANDLE)
+            if (surface->surface != VK_NULL_HANDLE && surface->acquired_image_frame != UINT32_MAX)
             {
                 wait_semaphores[semaphores_to_wait] =
                     surface->image_available_semaphores[system->current_frame_in_flight_index];
@@ -3835,7 +3867,6 @@ static kan_bool_t render_backend_system_acquire_images (struct render_backend_sy
 {
     struct kan_cpu_section_execution_t execution;
     kan_cpu_section_execution_init (&execution, system->section_next_frame_acquire_images);
-
     kan_context_system_t application_system = kan_context_query (system->context, KAN_CONTEXT_APPLICATION_SYSTEM_NAME);
 
     kan_bool_t acquired_all_images = KAN_TRUE;
@@ -3928,6 +3959,13 @@ kan_bool_t kan_render_backend_system_next_frame (kan_context_system_t render_bac
     struct kan_cpu_section_execution_t next_frame_execution;
     kan_cpu_section_execution_init (&next_frame_execution, system->section_next_frame);
 
+    if (!render_backend_system_acquire_images (system))
+    {
+        KAN_LOG (render_backend_system_vulkan, KAN_LOG_INFO, "Skipping frame as swap chain images are not ready.")
+        kan_cpu_section_execution_shutdown (&next_frame_execution);
+        return KAN_FALSE;
+    }
+
     render_backend_system_submit_previous_frame (system);
 
     struct kan_cpu_section_execution_t synchronization_execution;
@@ -3947,14 +3985,6 @@ kan_bool_t kan_render_backend_system_next_frame (kan_context_system_t render_bac
     else if (fence_wait_result != VK_SUCCESS)
     {
         KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR, "Failed waiting for in flight fence.")
-        kan_cpu_section_execution_shutdown (&synchronization_execution);
-        kan_cpu_section_execution_shutdown (&next_frame_execution);
-        return KAN_FALSE;
-    }
-
-    if (!render_backend_system_acquire_images (system))
-    {
-        KAN_LOG (render_backend_system_vulkan, KAN_LOG_INFO, "Skipping frame as swap chain images are not ready.")
         kan_cpu_section_execution_shutdown (&synchronization_execution);
         kan_cpu_section_execution_shutdown (&next_frame_execution);
         return KAN_FALSE;
@@ -4310,9 +4340,23 @@ kan_render_surface_t kan_render_backend_system_create_surface (
     new_surface->blit_request_lock = kan_atomic_int_init (0);
     new_surface->first_blit_request = NULL;
     new_surface->first_frame_buffer_attachment = NULL;
+    kan_bool_t encountered_invalid_present_mode = KAN_FALSE;
 
-    memcpy (new_surface->present_modes_queue, present_mode_queue,
-            sizeof (enum kan_render_surface_present_mode_t) * KAN_RENDER_SURFACE_PRESENT_MODE_COUNT);
+    for (kan_loop_size_t index = 0u; index < (kan_loop_size_t) KAN_RENDER_SURFACE_PRESENT_MODE_COUNT; ++index)
+    {
+        if (encountered_invalid_present_mode)
+        {
+            new_surface->present_modes_queue[index] = KAN_RENDER_SURFACE_PRESENT_MODE_INVALID;
+        }
+        else
+        {
+            new_surface->present_modes_queue[index] = present_mode_queue[index];
+            if (present_mode_queue[index] == KAN_RENDER_SURFACE_PRESENT_MODE_INVALID)
+            {
+                encountered_invalid_present_mode = KAN_TRUE;
+            }
+        }
+    }
 
     kan_atomic_int_lock (&system->resource_registration_lock);
     kan_bd_list_add (&system->surfaces, NULL, &new_surface->list_node);

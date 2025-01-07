@@ -3560,8 +3560,8 @@ static enum parse_response_t process_input_return_value (void)
          !use:error_on_unknown;
 
          separator* @type_begin (("enum" | "struct") separator+)? [A-Za-z_][A-Za-z0-9_]* @type_end separator* ","
-         separator* @argument_begin ("&" | "*" | [A-Za-z0-9_+-/] | "->" | "." | "," | "(" | ")")+ @argument_end
-         separator* ");" (" "* "\n")?
+         separator* @argument_begin ("&" | "*" | [A-Za-z0-9_+-/!=] | "->" | "." | "," | "(" | ")" | separator)+
+         @argument_end separator* ");" (" "* "\n")?
          {
              if (!io.is_output_phase)
              {

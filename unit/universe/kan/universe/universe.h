@@ -30,8 +30,9 @@
 /// - Pipelines -- instances of workflow graphs built from mutators.
 /// - Scheduler -- logical object that decides which pipelines to execute during update.
 /// - Configuration -- arbitrary configuration, specified during world deployment, that is used to initialize
-///   scheduler and pipelines. Configuration data is selected as first suitable variant. Variant is suitable if
-///   universe has all required environment tags for this variant.
+///   scheduler and pipelines. Configuration data is build from patch layers where every suitable patch is applied
+///   (in the order specified in world configuration). Layer is suitable if universe has all required environment tags
+///   for this layers. Also, all layers of one configuration must have the same type of patches.
 ///
 /// Worlds are organized in tree-like hierarchy: there is a root world for every universe and every non-root world
 /// is a child of other world. Repository hierarchy mimics world hierarchy: repositories of child worlds are children
@@ -305,8 +306,8 @@
 
 KAN_C_HEADER_BEGIN
 
-/// \brief Describes one variant of world configuration.
-struct kan_universe_world_configuration_variant_t
+/// \brief Describes one layer of world configuration.
+struct kan_universe_world_configuration_layer_t
 {
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (kan_interned_string_t)
     struct kan_dynamic_array_t required_tags;
@@ -314,19 +315,18 @@ struct kan_universe_world_configuration_variant_t
     kan_reflection_patch_t data;
 };
 
-UNIVERSE_API void kan_universe_world_configuration_variant_init (
-    struct kan_universe_world_configuration_variant_t *data);
+UNIVERSE_API void kan_universe_world_configuration_layer_init (struct kan_universe_world_configuration_layer_t *data);
 
-UNIVERSE_API void kan_universe_world_configuration_variant_shutdown (
-    struct kan_universe_world_configuration_variant_t *data);
+UNIVERSE_API void kan_universe_world_configuration_layer_shutdown (
+    struct kan_universe_world_configuration_layer_t *data);
 
-/// \brief Contains world configuration name and this configuration variants.
+/// \brief Contains world configuration name and this configuration layers.
 struct kan_universe_world_configuration_t
 {
     kan_interned_string_t name;
 
-    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_universe_world_configuration_variant_t)
-    struct kan_dynamic_array_t variants;
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_universe_world_configuration_layer_t)
+    struct kan_dynamic_array_t layers;
 };
 
 UNIVERSE_API void kan_universe_world_configuration_init (struct kan_universe_world_configuration_t *data);
