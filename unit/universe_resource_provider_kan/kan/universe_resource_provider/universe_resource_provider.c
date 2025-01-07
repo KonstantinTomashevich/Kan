@@ -2410,17 +2410,13 @@ static inline void on_file_modified (struct resource_provider_state_t *state,
             KAN_UP_VALUE_UPDATE (suffix, resource_provider_native_entry_suffix_t, attachment_id,
                                  &native_entry->attachment_id)
             {
-                if (suffix->request_count > 0u)
-                {
-                    struct kan_hot_reload_automatic_config_t *automatic_config =
-                        kan_hot_reload_coordination_system_get_automatic_config (state->hot_reload_system);
+                struct kan_hot_reload_automatic_config_t *automatic_config =
+                    kan_hot_reload_coordination_system_get_automatic_config (state->hot_reload_system);
 
-                    const kan_time_size_t reload_after_ns =
-                        kan_precise_time_get_elapsed_nanoseconds () + automatic_config->change_wait_time_ns;
-                    KAN_ASSERT (KAN_PACKED_TIMER_IS_SAFE_TO_SET (reload_after_ns))
-                    suffix->reload_after_real_time_timer = KAN_PACKED_TIMER_SET (reload_after_ns);
-                }
-
+                const kan_time_size_t reload_after_ns =
+                    kan_precise_time_get_elapsed_nanoseconds () + automatic_config->change_wait_time_ns;
+                KAN_ASSERT (KAN_PACKED_TIMER_IS_SAFE_TO_SET (reload_after_ns))
+                suffix->reload_after_real_time_timer = KAN_PACKED_TIMER_SET (reload_after_ns);
                 KAN_UP_QUERY_RETURN_VOID;
             }
         }
@@ -2433,17 +2429,13 @@ static inline void on_file_modified (struct resource_provider_state_t *state,
             KAN_UP_VALUE_UPDATE (suffix, resource_provider_third_party_entry_suffix_t, attachment_id,
                                  &third_party_entry->attachment_id)
             {
-                if (suffix->request_count > 0u)
-                {
-                    struct kan_hot_reload_automatic_config_t *automatic_config =
-                        kan_hot_reload_coordination_system_get_automatic_config (state->hot_reload_system);
+                struct kan_hot_reload_automatic_config_t *automatic_config =
+                    kan_hot_reload_coordination_system_get_automatic_config (state->hot_reload_system);
 
-                    const kan_time_size_t reload_after_ns =
-                        kan_precise_time_get_elapsed_nanoseconds () + automatic_config->change_wait_time_ns;
-                    KAN_ASSERT (KAN_PACKED_TIMER_IS_SAFE_TO_SET (reload_after_ns))
-                    suffix->reload_after_real_time_timer = KAN_PACKED_TIMER_SET (reload_after_ns);
-                }
-
+                const kan_time_size_t reload_after_ns =
+                    kan_precise_time_get_elapsed_nanoseconds () + automatic_config->change_wait_time_ns;
+                KAN_ASSERT (KAN_PACKED_TIMER_IS_SAFE_TO_SET (reload_after_ns))
+                suffix->reload_after_real_time_timer = KAN_PACKED_TIMER_SET (reload_after_ns);
                 KAN_UP_QUERY_RETURN_VOID;
             }
         }
