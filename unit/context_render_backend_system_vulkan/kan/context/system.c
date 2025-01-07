@@ -2434,10 +2434,20 @@ static void render_backend_system_submit_pass_instance (struct render_backend_sy
 
     if (pass_instance->render_pass_begin_info.framebuffer == VK_NULL_HANDLE)
     {
-        pass_instance->render_pass_begin_info.framebuffer =
-            pass_instance->frame_buffer->instance_array ?
-                pass_instance->frame_buffer->instance_array[pass_instance->frame_buffer->instance_index] :
-                pass_instance->frame_buffer->instance;
+        if (pass_instance->frame_buffer->instance_array)
+        {
+            // If buffer uses surface and it was created after starting frame, then its images are not yet acquired
+            // and therefore this buffer can not be used yet.
+            if (pass_instance->frame_buffer->instance_index < pass_instance->frame_buffer->instance_array_size)
+            {
+                pass_instance->render_pass_begin_info.framebuffer =
+                    pass_instance->frame_buffer->instance_array[pass_instance->frame_buffer->instance_index];
+            }
+        }
+        else
+        {
+            pass_instance->render_pass_begin_info.framebuffer = pass_instance->frame_buffer->instance;
+        }
     }
 
     if (pass_instance->render_pass_begin_info.framebuffer != VK_NULL_HANDLE)
@@ -3863,12 +3873,18 @@ static kan_bool_t render_backend_system_acquire_images (struct render_backend_sy
 {
     struct kan_cpu_section_execution_t execution;
     kan_cpu_section_execution_init (&execution, system->section_next_frame_acquire_images);
-
     kan_context_system_t application_system = kan_context_query (system->context, KAN_CONTEXT_APPLICATION_SYSTEM_NAME);
 
     kan_bool_t acquired_all_images = KAN_TRUE;
     kan_bool_t any_swap_chain_outdated = KAN_FALSE;
     struct render_backend_surface_t *surface = (struct render_backend_surface_t *) system->surfaces.first;
+
+    // Unable to start frame when there is no surfaces at all.
+    if (!surface)
+    {
+        kan_cpu_section_execution_shutdown (&execution);
+        return KAN_FALSE;
+    }
 
     while (surface)
     {
@@ -4338,9 +4354,23 @@ kan_render_surface_t kan_render_backend_system_create_surface (
     new_surface->blit_request_lock = kan_atomic_int_init (0);
     new_surface->first_blit_request = NULL;
     new_surface->first_frame_buffer_attachment = NULL;
+    kan_bool_t encountered_invalid_present_mode = KAN_FALSE;
 
-    memcpy (new_surface->present_modes_queue, present_mode_queue,
-            sizeof (enum kan_render_surface_present_mode_t) * KAN_RENDER_SURFACE_PRESENT_MODE_COUNT);
+    for (kan_loop_size_t index = 0u; index < (kan_loop_size_t) KAN_RENDER_SURFACE_PRESENT_MODE_COUNT; ++index)
+    {
+        if (encountered_invalid_present_mode)
+        {
+            new_surface->present_modes_queue[index] = KAN_RENDER_SURFACE_PRESENT_MODE_INVALID;
+        }
+        else
+        {
+            new_surface->present_modes_queue[index] = present_mode_queue[index];
+            if (present_mode_queue[index] == KAN_RENDER_SURFACE_PRESENT_MODE_INVALID)
+            {
+                encountered_invalid_present_mode = KAN_TRUE;
+            }
+        }
+    }
 
     kan_atomic_int_lock (&system->resource_registration_lock);
     kan_bd_list_add (&system->surfaces, NULL, &new_surface->list_node);
