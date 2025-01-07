@@ -116,8 +116,8 @@ application_plugin_include (ABSTRACT CONCRETE application_framework_examples_tes
 register_application_program (example_test_render_graph)
 application_program_set_configuration ("${CMAKE_CURRENT_SOURCE_DIR}/configuration/example_test_render_graph.rd")
 application_program_use_plugin_group (example_test_render_graph)
-application_program_use_as_test_in_development_mode (ARGUMENTS --test PROPERTIES TIMEOUT 20)
-application_program_use_as_test_in_packaged_mode (ARGUMENTS --test PROPERTIES TIMEOUT 10)
+application_program_use_as_test_in_development_mode (ARGUMENTS --test PROPERTIES TIMEOUT 20 LABELS GRAPHICS)
+application_program_use_as_test_in_packaged_mode (ARGUMENTS --test PROPERTIES TIMEOUT 10 LABELS GRAPHICS)
 
 register_application_variant (example_test_render_graph)
 application_variant_add_program (example_test_render_graph)
