@@ -89,15 +89,15 @@ static enum kan_resource_compile_result_t numbers_compile (struct kan_resource_c
     return KAN_RESOURCE_PIPELINE_COMPILE_IN_PROGRESS;
 }
 
-struct compilation_state_singleton_t
+struct example_compilation_state_singleton_t
 {
     kan_bool_t requested_loaded_data;
     kan_bool_t loaded_test_data;
     kan_resource_request_id_t test_request_id;
 };
 
-APPLICATION_FRAMEWORK_EXAMPLES_COMPILATION_STATE_API void compilation_state_singleton_init (
-    struct compilation_state_singleton_t *instance)
+APPLICATION_FRAMEWORK_EXAMPLES_COMPILATION_STATE_API void example_compilation_state_singleton_init (
+    struct example_compilation_state_singleton_t *instance)
 {
     instance->requested_loaded_data = KAN_FALSE;
     instance->loaded_test_data = KAN_FALSE;
@@ -127,7 +127,7 @@ APPLICATION_FRAMEWORK_EXAMPLES_COMPILATION_STATE_API void kan_universe_mutator_e
     kan_cpu_job_t job, struct compilation_state_state_t *state)
 {
     KAN_UP_SINGLETON_READ (provider_singleton, kan_resource_provider_singleton_t)
-    KAN_UP_SINGLETON_WRITE (singleton, compilation_state_singleton_t)
+    KAN_UP_SINGLETON_WRITE (singleton, example_compilation_state_singleton_t)
     {
         if (!provider_singleton->scan_done)
         {

@@ -356,7 +356,7 @@ static enum kan_resource_compile_result_t material_compile (struct kan_resource_
     return KAN_RESOURCE_PIPELINE_COMPILE_FINISHED;
 }
 
-struct compilation_byproduct_singleton_t
+struct example_compilation_byproduct_singleton_t
 {
     kan_bool_t checked_entries;
     kan_bool_t loaded_data;
@@ -368,8 +368,8 @@ struct compilation_byproduct_singleton_t
     kan_resource_request_id_t any_pipeline_request_id;
 };
 
-APPLICATION_FRAMEWORK_EXAMPLES_COMPILATION_BYPRODUCT_API void compilation_byproduct_singleton_init (
-    struct compilation_byproduct_singleton_t *instance)
+APPLICATION_FRAMEWORK_EXAMPLES_COMPILATION_BYPRODUCT_API void example_compilation_byproduct_singleton_init (
+    struct example_compilation_byproduct_singleton_t *instance)
 {
     instance->checked_entries = KAN_FALSE;
     instance->loaded_data = KAN_FALSE;
@@ -427,7 +427,7 @@ static kan_bool_t is_any_entry_exists (struct compilation_byproduct_state_t *sta
 }
 
 static void check_entries (struct compilation_byproduct_state_t *state,
-                           struct compilation_byproduct_singleton_t *singleton)
+                           struct example_compilation_byproduct_singleton_t *singleton)
 {
     kan_bool_t everything_ok = KAN_TRUE;
     const kan_bool_t in_compiled_mode =
@@ -547,7 +547,7 @@ static void check_entries (struct compilation_byproduct_state_t *state,
 }
 
 static void insert_missing_requests (struct compilation_byproduct_state_t *state,
-                                     struct compilation_byproduct_singleton_t *singleton,
+                                     struct example_compilation_byproduct_singleton_t *singleton,
                                      const struct kan_resource_provider_singleton_t *provider_singleton)
 {
     if (!KAN_TYPED_ID_32_IS_VALID (singleton->material_1_request_id))
@@ -618,7 +618,7 @@ static void insert_missing_requests (struct compilation_byproduct_state_t *state
 }
 
 static void check_if_requests_are_loaded (struct compilation_byproduct_state_t *state,
-                                          struct compilation_byproduct_singleton_t *singleton)
+                                          struct example_compilation_byproduct_singleton_t *singleton)
 {
     singleton->loaded_data = KAN_TRUE;
     KAN_UP_VALUE_READ (request_1, kan_resource_request_t, request_id, &singleton->material_1_request_id)
@@ -648,7 +648,7 @@ static void check_if_requests_are_loaded (struct compilation_byproduct_state_t *
 }
 
 static void validate_material (struct compilation_byproduct_state_t *state,
-                               struct compilation_byproduct_singleton_t *singleton,
+                               struct example_compilation_byproduct_singleton_t *singleton,
                                kan_resource_request_id_t request_id,
                                kan_interned_string_t *output_visible_world_pipeline,
                                kan_interned_string_t *output_shadow_pipeline)
@@ -707,7 +707,7 @@ static void validate_material (struct compilation_byproduct_state_t *state,
 }
 
 static void validate_loaded_data (struct compilation_byproduct_state_t *state,
-                                  struct compilation_byproduct_singleton_t *singleton)
+                                  struct example_compilation_byproduct_singleton_t *singleton)
 {
     singleton->data_valid = KAN_TRUE;
     kan_interned_string_t material_1_visible_world_pipeline = NULL;
@@ -798,7 +798,7 @@ APPLICATION_FRAMEWORK_EXAMPLES_COMPILATION_BYPRODUCT_API void kan_universe_mutat
     kan_cpu_job_t job, struct compilation_byproduct_state_t *state)
 {
     KAN_UP_SINGLETON_READ (provider_singleton, kan_resource_provider_singleton_t)
-    KAN_UP_SINGLETON_WRITE (singleton, compilation_byproduct_singleton_t)
+    KAN_UP_SINGLETON_WRITE (singleton, example_compilation_byproduct_singleton_t)
     {
         if (!provider_singleton->scan_done)
         {

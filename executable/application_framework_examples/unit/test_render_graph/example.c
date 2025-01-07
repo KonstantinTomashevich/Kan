@@ -19,7 +19,7 @@
 
 KAN_LOG_DEFINE_CATEGORY (application_framework_example_test_render_graph);
 
-struct test_render_graph_singleton_t
+struct example_test_render_graph_singleton_t
 {
     kan_application_system_window_t window_handle;
     kan_render_surface_t window_surface;
@@ -27,8 +27,8 @@ struct test_render_graph_singleton_t
     kan_bool_t frame_checked;
 };
 
-APPLICATION_FRAMEWORK_EXAMPLES_TEST_RENDER_GRAPH_API void test_render_graph_singleton_init (
-    struct test_render_graph_singleton_t *instance)
+APPLICATION_FRAMEWORK_EXAMPLES_TEST_RENDER_GRAPH_API void example_test_render_graph_singleton_init (
+    struct example_test_render_graph_singleton_t *instance)
 {
     instance->window_handle = KAN_HANDLE_SET_INVALID (kan_application_system_window_t);
     instance->window_surface = KAN_HANDLE_SET_INVALID (kan_render_surface_t);
@@ -84,7 +84,7 @@ APPLICATION_FRAMEWORK_EXAMPLES_TEST_RENDER_GRAPH_API void kan_universe_mutator_e
 {
     KAN_UP_SINGLETON_READ (render_context, kan_render_context_singleton_t)
     KAN_UP_SINGLETON_WRITE (render_graph, kan_render_graph_resource_management_singleton_t)
-    KAN_UP_SINGLETON_WRITE (singleton, test_render_graph_singleton_t)
+    KAN_UP_SINGLETON_WRITE (singleton, example_test_render_graph_singleton_t)
     {
         if (!KAN_HANDLE_IS_VALID (singleton->window_handle))
         {

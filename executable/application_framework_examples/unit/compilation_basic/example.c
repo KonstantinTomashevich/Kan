@@ -136,7 +136,7 @@ static enum kan_resource_compile_result_t sum_compile (struct kan_resource_compi
     return KAN_RESOURCE_PIPELINE_COMPILE_FINISHED;
 }
 
-struct compilation_basic_singleton_t
+struct example_compilation_basic_singleton_t
 {
     kan_bool_t checked_entries;
     kan_bool_t requested_loaded_data;
@@ -144,8 +144,8 @@ struct compilation_basic_singleton_t
     kan_resource_request_id_t test_request_id;
 };
 
-APPLICATION_FRAMEWORK_EXAMPLES_COMPILATION_BASIC_API void compilation_basic_singleton_init (
-    struct compilation_basic_singleton_t *instance)
+APPLICATION_FRAMEWORK_EXAMPLES_COMPILATION_BASIC_API void example_compilation_basic_singleton_init (
+    struct example_compilation_basic_singleton_t *instance)
 {
     instance->checked_entries = KAN_FALSE;
     instance->requested_loaded_data = KAN_FALSE;
@@ -191,7 +191,7 @@ APPLICATION_FRAMEWORK_EXAMPLES_COMPILATION_BASIC_API void kan_universe_mutator_e
     kan_cpu_job_t job, struct compilation_basic_state_t *state)
 {
     KAN_UP_SINGLETON_READ (provider_singleton, kan_resource_provider_singleton_t)
-    KAN_UP_SINGLETON_WRITE (singleton, compilation_basic_singleton_t)
+    KAN_UP_SINGLETON_WRITE (singleton, example_compilation_basic_singleton_t)
     {
         if (!provider_singleton->scan_done)
         {

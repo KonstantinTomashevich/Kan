@@ -26,14 +26,14 @@ APPLICATION_FRAMEWORK_EXAMPLES_BASIC_API struct kan_resource_resource_type_meta_
     .root = KAN_TRUE,
 };
 
-struct basic_singleton_t
+struct example_basic_singleton_t
 {
     kan_application_system_window_t window_handle;
     kan_bool_t test_request_added;
     kan_resource_request_id_t test_request_id;
 };
 
-APPLICATION_FRAMEWORK_EXAMPLES_BASIC_API void basic_singleton_init (struct basic_singleton_t *instance)
+APPLICATION_FRAMEWORK_EXAMPLES_BASIC_API void example_basic_singleton_init (struct example_basic_singleton_t *instance)
 {
     instance->window_handle = KAN_HANDLE_SET_INVALID (kan_application_system_window_t);
     instance->test_request_added = KAN_FALSE;
@@ -85,7 +85,7 @@ APPLICATION_FRAMEWORK_EXAMPLES_BASIC_API void kan_universe_mutator_deploy_exampl
 APPLICATION_FRAMEWORK_EXAMPLES_BASIC_API void kan_universe_mutator_execute_example_basic (
     kan_cpu_job_t job, struct example_basic_state_t *state)
 {
-    KAN_UP_SINGLETON_WRITE (singleton, basic_singleton_t)
+    KAN_UP_SINGLETON_WRITE (singleton, example_basic_singleton_t)
     {
         if (!KAN_HANDLE_IS_VALID (singleton->window_handle))
         {

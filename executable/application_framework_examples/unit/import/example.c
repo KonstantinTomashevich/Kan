@@ -16,7 +16,7 @@
 
 KAN_LOG_DEFINE_CATEGORY (application_framework_examples_import);
 
-struct import_singleton_t
+struct example_import_singleton_t
 {
     kan_application_system_window_t window_handle;
     kan_bool_t test_request_added;
@@ -24,7 +24,8 @@ struct import_singleton_t
     kan_bool_t test_asset_loaded;
 };
 
-APPLICATION_FRAMEWORK_EXAMPLES_IMPORT_API void import_singleton_init (struct import_singleton_t *instance)
+APPLICATION_FRAMEWORK_EXAMPLES_IMPORT_API void example_import_singleton_init (
+    struct example_import_singleton_t *instance)
 {
     instance->window_handle = KAN_HANDLE_SET_INVALID (kan_application_system_window_t);
     instance->test_request_added = KAN_FALSE;
@@ -75,7 +76,7 @@ APPLICATION_FRAMEWORK_EXAMPLES_IMPORT_API void kan_universe_mutator_deploy_impor
 APPLICATION_FRAMEWORK_EXAMPLES_IMPORT_API void kan_universe_mutator_execute_import (kan_cpu_job_t job,
                                                                                     struct import_state_t *state)
 {
-    KAN_UP_SINGLETON_WRITE (singleton, import_singleton_t)
+    KAN_UP_SINGLETON_WRITE (singleton, example_import_singleton_t)
     {
         if (!KAN_HANDLE_IS_VALID (singleton->window_handle))
         {
