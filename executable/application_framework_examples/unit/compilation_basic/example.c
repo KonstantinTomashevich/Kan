@@ -9,7 +9,7 @@
 #include <kan/universe/universe.h>
 #include <kan/universe_resource_provider/universe_resource_provider.h>
 
-KAN_LOG_DEFINE_CATEGORY (application_framework_example_compilation_basic);
+KAN_LOG_DEFINE_CATEGORY (application_framework_examples_compilation_basic);
 
 struct root_config_t
 {
@@ -127,7 +127,7 @@ static enum kan_resource_compile_result_t sum_compile (struct kan_resource_compi
         }
         else
         {
-            KAN_LOG (application_framework_example_compilation_basic, KAN_LOG_ERROR,
+            KAN_LOG (application_framework_examples_compilation_basic, KAN_LOG_ERROR,
                      "Compilation error: unknown dependency type \"%s\".", dependency->type)
             return KAN_RESOURCE_PIPELINE_COMPILE_FAILED;
         }
@@ -203,7 +203,7 @@ APPLICATION_FRAMEWORK_EXAMPLES_COMPILATION_BASIC_API void kan_universe_mutator_e
             kan_bool_t everything_ok = KAN_TRUE;
             if (!is_entry_exists (state, kan_string_intern ("root_config_t"), kan_string_intern ("root_config")))
             {
-                KAN_LOG (application_framework_example_compilation_basic, KAN_LOG_ERROR, "\"root_config\" not found!")
+                KAN_LOG (application_framework_examples_compilation_basic, KAN_LOG_ERROR, "\"root_config\" not found!")
                 everything_ok = KAN_FALSE;
             }
 
@@ -214,49 +214,49 @@ APPLICATION_FRAMEWORK_EXAMPLES_COMPILATION_BASIC_API void kan_universe_mutator_e
             {
                 if (is_entry_exists (state, kan_string_intern ("record_t"), kan_string_intern ("record_1")))
                 {
-                    KAN_LOG (application_framework_example_compilation_basic, KAN_LOG_ERROR,
+                    KAN_LOG (application_framework_examples_compilation_basic, KAN_LOG_ERROR,
                              "\"record_1\" found in compiled mode!")
                     everything_ok = KAN_FALSE;
                 }
 
                 if (is_entry_exists (state, kan_string_intern ("record_t"), kan_string_intern ("record_2")))
                 {
-                    KAN_LOG (application_framework_example_compilation_basic, KAN_LOG_ERROR,
+                    KAN_LOG (application_framework_examples_compilation_basic, KAN_LOG_ERROR,
                              "\"record_2\" found in compiled mode!")
                     everything_ok = KAN_FALSE;
                 }
 
                 if (is_entry_exists (state, kan_string_intern ("record_t"), kan_string_intern ("record_3")))
                 {
-                    KAN_LOG (application_framework_example_compilation_basic, KAN_LOG_ERROR,
+                    KAN_LOG (application_framework_examples_compilation_basic, KAN_LOG_ERROR,
                              "\"record_3\" found in compiled mode!")
                     everything_ok = KAN_FALSE;
                 }
 
                 if (is_entry_exists (state, kan_string_intern ("sum_t"), kan_string_intern ("sum_1_2")))
                 {
-                    KAN_LOG (application_framework_example_compilation_basic, KAN_LOG_ERROR,
+                    KAN_LOG (application_framework_examples_compilation_basic, KAN_LOG_ERROR,
                              "\"sum_1_2\" found in compiled mode!")
                     everything_ok = KAN_FALSE;
                 }
 
                 if (is_entry_exists (state, kan_string_intern ("sum_t"), kan_string_intern ("sum_1_2_3")))
                 {
-                    KAN_LOG (application_framework_example_compilation_basic, KAN_LOG_ERROR,
+                    KAN_LOG (application_framework_examples_compilation_basic, KAN_LOG_ERROR,
                              "\"sum_1_2_3\" found in compiled mode!")
                     everything_ok = KAN_FALSE;
                 }
 
                 if (is_entry_exists (state, kan_string_intern ("sum_t"), kan_string_intern ("sum_1_3")))
                 {
-                    KAN_LOG (application_framework_example_compilation_basic, KAN_LOG_ERROR,
+                    KAN_LOG (application_framework_examples_compilation_basic, KAN_LOG_ERROR,
                              "\"sum_1_3\" found in compiled mode!")
                     everything_ok = KAN_FALSE;
                 }
 
                 if (is_entry_exists (state, kan_string_intern ("sum_t"), kan_string_intern ("sum_2_3")))
                 {
-                    KAN_LOG (application_framework_example_compilation_basic, KAN_LOG_ERROR,
+                    KAN_LOG (application_framework_examples_compilation_basic, KAN_LOG_ERROR,
                              "\"sum_2_3\" found in compiled mode!")
                     everything_ok = KAN_FALSE;
                 }
@@ -265,43 +265,44 @@ APPLICATION_FRAMEWORK_EXAMPLES_COMPILATION_BASIC_API void kan_universe_mutator_e
             {
                 if (!is_entry_exists (state, kan_string_intern ("record_t"), kan_string_intern ("record_1")))
                 {
-                    KAN_LOG (application_framework_example_compilation_basic, KAN_LOG_ERROR, "\"record_1\" not found!")
+                    KAN_LOG (application_framework_examples_compilation_basic, KAN_LOG_ERROR, "\"record_1\" not found!")
                     everything_ok = KAN_FALSE;
                 }
 
                 if (!is_entry_exists (state, kan_string_intern ("record_t"), kan_string_intern ("record_2")))
                 {
-                    KAN_LOG (application_framework_example_compilation_basic, KAN_LOG_ERROR, "\"record_2\" not found!")
+                    KAN_LOG (application_framework_examples_compilation_basic, KAN_LOG_ERROR, "\"record_2\" not found!")
                     everything_ok = KAN_FALSE;
                 }
 
                 if (!is_entry_exists (state, kan_string_intern ("record_t"), kan_string_intern ("record_3")))
                 {
-                    KAN_LOG (application_framework_example_compilation_basic, KAN_LOG_ERROR, "\"record_3\" not found!")
+                    KAN_LOG (application_framework_examples_compilation_basic, KAN_LOG_ERROR, "\"record_3\" not found!")
                     everything_ok = KAN_FALSE;
                 }
 
                 if (!is_entry_exists (state, kan_string_intern ("sum_t"), kan_string_intern ("sum_1_2")))
                 {
-                    KAN_LOG (application_framework_example_compilation_basic, KAN_LOG_ERROR, "\"sum_1_2\" not found!")
+                    KAN_LOG (application_framework_examples_compilation_basic, KAN_LOG_ERROR, "\"sum_1_2\" not found!")
                     everything_ok = KAN_FALSE;
                 }
 
                 if (!is_entry_exists (state, kan_string_intern ("sum_t"), kan_string_intern ("sum_1_2_3")))
                 {
-                    KAN_LOG (application_framework_example_compilation_basic, KAN_LOG_ERROR, "\"sum_1_2_3\" not found!")
+                    KAN_LOG (application_framework_examples_compilation_basic, KAN_LOG_ERROR,
+                             "\"sum_1_2_3\" not found!")
                     everything_ok = KAN_FALSE;
                 }
 
                 if (!is_entry_exists (state, kan_string_intern ("sum_t"), kan_string_intern ("sum_1_3")))
                 {
-                    KAN_LOG (application_framework_example_compilation_basic, KAN_LOG_ERROR, "\"sum_1_3\" not found!")
+                    KAN_LOG (application_framework_examples_compilation_basic, KAN_LOG_ERROR, "\"sum_1_3\" not found!")
                     everything_ok = KAN_FALSE;
                 }
 
                 if (!is_entry_exists (state, kan_string_intern ("sum_t"), kan_string_intern ("sum_2_3")))
                 {
-                    KAN_LOG (application_framework_example_compilation_basic, KAN_LOG_ERROR, "\"sum_2_3\" not found!")
+                    KAN_LOG (application_framework_examples_compilation_basic, KAN_LOG_ERROR, "\"sum_2_3\" not found!")
                     everything_ok = KAN_FALSE;
                 }
             }
@@ -348,7 +349,7 @@ APPLICATION_FRAMEWORK_EXAMPLES_COMPILATION_BASIC_API void kan_universe_mutator_e
                         }
                         else
                         {
-                            KAN_LOG (application_framework_example_compilation_basic, KAN_LOG_ERROR,
+                            KAN_LOG (application_framework_examples_compilation_basic, KAN_LOG_ERROR,
                                      "\"sum_1_2_3\" has incorrect data %llu.",
                                      (unsigned long long) loaded_resource->value)
 

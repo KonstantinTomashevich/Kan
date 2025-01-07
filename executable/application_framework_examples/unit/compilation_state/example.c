@@ -9,7 +9,7 @@
 #include <kan/universe/universe.h>
 #include <kan/universe_resource_provider/universe_resource_provider.h>
 
-KAN_LOG_DEFINE_CATEGORY (application_framework_example_compilation_state);
+KAN_LOG_DEFINE_CATEGORY (application_framework_examples_compilation_state);
 
 struct numbers_t
 {
@@ -166,7 +166,7 @@ APPLICATION_FRAMEWORK_EXAMPLES_COMPILATION_STATE_API void kan_universe_mutator_e
                         }
                         else
                         {
-                            KAN_LOG (application_framework_example_compilation_state, KAN_LOG_ERROR,
+                            KAN_LOG (application_framework_examples_compilation_state, KAN_LOG_ERROR,
                                      "\"data\" has incorrect data %llu.", (unsigned long long) loaded_resource->sum)
 
                             if (KAN_HANDLE_IS_VALID (state->application_framework_system_handle))

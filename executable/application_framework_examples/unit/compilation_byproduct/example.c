@@ -15,7 +15,7 @@
 
 #include <examples/platform_configuration.h>
 
-KAN_LOG_DEFINE_CATEGORY (application_framework_example_compilation_byproduct);
+KAN_LOG_DEFINE_CATEGORY (application_framework_examples_compilation_byproduct);
 
 // Shader source byproducts are created for every source separately.
 // We don't want to parse one shader code several times, therefore we use byproducts to merge everything.
@@ -435,14 +435,14 @@ static void check_entries (struct compilation_byproduct_state_t *state,
 
     if (is_any_entry_exists (state, kan_string_intern ("shader_source_byproduct_compiled_t")))
     {
-        KAN_LOG (application_framework_example_compilation_byproduct, KAN_LOG_ERROR,
+        KAN_LOG (application_framework_examples_compilation_byproduct, KAN_LOG_ERROR,
                  "Found \"shader_source_byproduct_compiled_t\" which are unexpected!")
         everything_ok = KAN_FALSE;
     }
 
     if (is_any_entry_exists (state, kan_string_intern ("shader_object_compiled_t")))
     {
-        KAN_LOG (application_framework_example_compilation_byproduct, KAN_LOG_ERROR,
+        KAN_LOG (application_framework_examples_compilation_byproduct, KAN_LOG_ERROR,
                  "Found \"shader_object_compiled_t\" which are unexpected!")
         everything_ok = KAN_FALSE;
     }
@@ -451,42 +451,42 @@ static void check_entries (struct compilation_byproduct_state_t *state,
     {
         if (!is_any_entry_exists (state, kan_string_intern ("pipeline_instance_byproduct_compiled_t")))
         {
-            KAN_LOG (application_framework_example_compilation_byproduct, KAN_LOG_ERROR,
+            KAN_LOG (application_framework_examples_compilation_byproduct, KAN_LOG_ERROR,
                      "Not found any \"pipeline_instance_byproduct_compiled_t\" which are expected!")
             everything_ok = KAN_FALSE;
         }
 
         if (is_any_entry_exists (state, kan_string_intern ("material_t")))
         {
-            KAN_LOG (application_framework_example_compilation_byproduct, KAN_LOG_ERROR,
+            KAN_LOG (application_framework_examples_compilation_byproduct, KAN_LOG_ERROR,
                      "Found \"material_t\" which are unexpected!")
             everything_ok = KAN_FALSE;
         }
 
         if (!is_entry_exists (state, kan_string_intern ("material_compiled_t"), kan_string_intern ("material_1")))
         {
-            KAN_LOG (application_framework_example_compilation_byproduct, KAN_LOG_ERROR,
+            KAN_LOG (application_framework_examples_compilation_byproduct, KAN_LOG_ERROR,
                      "Unable to find \"material_1\" of type \"material_compiled_t\"!")
             everything_ok = KAN_FALSE;
         }
 
         if (!is_entry_exists (state, kan_string_intern ("material_compiled_t"), kan_string_intern ("material_2")))
         {
-            KAN_LOG (application_framework_example_compilation_byproduct, KAN_LOG_ERROR,
+            KAN_LOG (application_framework_examples_compilation_byproduct, KAN_LOG_ERROR,
                      "Unable to find \"material_2\" of type \"material_compiled_t\"!")
             everything_ok = KAN_FALSE;
         }
 
         if (!is_entry_exists (state, kan_string_intern ("material_compiled_t"), kan_string_intern ("material_3")))
         {
-            KAN_LOG (application_framework_example_compilation_byproduct, KAN_LOG_ERROR,
+            KAN_LOG (application_framework_examples_compilation_byproduct, KAN_LOG_ERROR,
                      "Unable to find \"material_3\" of type \"material_compiled_t\"!")
             everything_ok = KAN_FALSE;
         }
 
         if (!is_entry_exists (state, kan_string_intern ("material_compiled_t"), kan_string_intern ("material_4")))
         {
-            KAN_LOG (application_framework_example_compilation_byproduct, KAN_LOG_ERROR,
+            KAN_LOG (application_framework_examples_compilation_byproduct, KAN_LOG_ERROR,
                      "Unable to find \"material_4\" of type \"material_compiled_t\"!")
             everything_ok = KAN_FALSE;
         }
@@ -495,42 +495,42 @@ static void check_entries (struct compilation_byproduct_state_t *state,
     {
         if (is_any_entry_exists (state, kan_string_intern ("pipeline_instance_byproduct_compiled_t")))
         {
-            KAN_LOG (application_framework_example_compilation_byproduct, KAN_LOG_ERROR,
+            KAN_LOG (application_framework_examples_compilation_byproduct, KAN_LOG_ERROR,
                      "Found \"shader_source_byproduct_compiled_t\" which are unexpected!")
             everything_ok = KAN_FALSE;
         }
 
         if (is_any_entry_exists (state, kan_string_intern ("material_compiled_t")))
         {
-            KAN_LOG (application_framework_example_compilation_byproduct, KAN_LOG_ERROR,
+            KAN_LOG (application_framework_examples_compilation_byproduct, KAN_LOG_ERROR,
                      "Found \"material_compiled_t\" which are unexpected!")
             everything_ok = KAN_FALSE;
         }
 
         if (!is_entry_exists (state, kan_string_intern ("material_t"), kan_string_intern ("material_1")))
         {
-            KAN_LOG (application_framework_example_compilation_byproduct, KAN_LOG_ERROR,
+            KAN_LOG (application_framework_examples_compilation_byproduct, KAN_LOG_ERROR,
                      "Unable to find \"material_1\" of type \"material_t\"!")
             everything_ok = KAN_FALSE;
         }
 
         if (!is_entry_exists (state, kan_string_intern ("material_t"), kan_string_intern ("material_2")))
         {
-            KAN_LOG (application_framework_example_compilation_byproduct, KAN_LOG_ERROR,
+            KAN_LOG (application_framework_examples_compilation_byproduct, KAN_LOG_ERROR,
                      "Unable to find \"material_2\" of type \"material_t\"!")
             everything_ok = KAN_FALSE;
         }
 
         if (!is_entry_exists (state, kan_string_intern ("material_t"), kan_string_intern ("material_3")))
         {
-            KAN_LOG (application_framework_example_compilation_byproduct, KAN_LOG_ERROR,
+            KAN_LOG (application_framework_examples_compilation_byproduct, KAN_LOG_ERROR,
                      "Unable to find \"material_3\" of type \"material_t\"!")
             everything_ok = KAN_FALSE;
         }
 
         if (!is_entry_exists (state, kan_string_intern ("material_t"), kan_string_intern ("material_4")))
         {
-            KAN_LOG (application_framework_example_compilation_byproduct, KAN_LOG_ERROR,
+            KAN_LOG (application_framework_examples_compilation_byproduct, KAN_LOG_ERROR,
                      "Unable to find \"material_4\" of type \"material_t\"!")
             everything_ok = KAN_FALSE;
         }
@@ -662,7 +662,7 @@ static void validate_material (struct compilation_byproduct_state_t *state,
                 KAN_RESOURCE_PROVIDER_CONTAINER_GET (material_compiled_t, view);
             if (material->passes.size != 2u)
             {
-                KAN_LOG (application_framework_example_compilation_byproduct, KAN_LOG_ERROR,
+                KAN_LOG (application_framework_examples_compilation_byproduct, KAN_LOG_ERROR,
                          "Expected 2 passes in material \"%s\", but got %lu!", request->name,
                          (unsigned long) material->passes.size)
                 singleton->data_valid = KAN_FALSE;
@@ -674,7 +674,7 @@ static void validate_material (struct compilation_byproduct_state_t *state,
 
             if (first_pass->name != kan_string_intern ("visible_world"))
             {
-                KAN_LOG (application_framework_example_compilation_byproduct, KAN_LOG_ERROR,
+                KAN_LOG (application_framework_examples_compilation_byproduct, KAN_LOG_ERROR,
                          "Expected pass 0 of material \"%s\" to be named \"visible world\", but got \"%s\".",
                          request->name, first_pass->name)
                 singleton->data_valid = KAN_FALSE;
@@ -686,7 +686,7 @@ static void validate_material (struct compilation_byproduct_state_t *state,
 
             if (second_pass->name != kan_string_intern ("shadow"))
             {
-                KAN_LOG (application_framework_example_compilation_byproduct, KAN_LOG_ERROR,
+                KAN_LOG (application_framework_examples_compilation_byproduct, KAN_LOG_ERROR,
                          "Expected pass 0 of material \"%s\" to be named \"shadow\", but got \"%s\".", request->name,
                          second_pass->name)
                 singleton->data_valid = KAN_FALSE;
@@ -698,7 +698,7 @@ static void validate_material (struct compilation_byproduct_state_t *state,
 
             if (*output_visible_world_pipeline == *output_shadow_pipeline)
             {
-                KAN_LOG (application_framework_example_compilation_byproduct, KAN_LOG_ERROR,
+                KAN_LOG (application_framework_examples_compilation_byproduct, KAN_LOG_ERROR,
                          "Pass 0 and pass 1 pipelines of \"%s\" are equal, but must be different.", request->name)
                 singleton->data_valid = KAN_FALSE;
             }
@@ -733,42 +733,42 @@ static void validate_loaded_data (struct compilation_byproduct_state_t *state,
 
     if (material_1_visible_world_pipeline == material_2_visible_world_pipeline)
     {
-        KAN_LOG (application_framework_example_compilation_byproduct, KAN_LOG_ERROR,
+        KAN_LOG (application_framework_examples_compilation_byproduct, KAN_LOG_ERROR,
                  "\"material_1\" and \"material_2\" visible world pipelines are equal, but shouldn't.")
         singleton->data_valid = KAN_FALSE;
     }
 
     if (material_1_visible_world_pipeline == material_3_visible_world_pipeline)
     {
-        KAN_LOG (application_framework_example_compilation_byproduct, KAN_LOG_ERROR,
+        KAN_LOG (application_framework_examples_compilation_byproduct, KAN_LOG_ERROR,
                  "\"material_1\" and \"material_3\" visible world pipelines are equal, but shouldn't.")
         singleton->data_valid = KAN_FALSE;
     }
 
     if (material_1_shadow_pipeline != material_2_shadow_pipeline)
     {
-        KAN_LOG (application_framework_example_compilation_byproduct, KAN_LOG_ERROR,
+        KAN_LOG (application_framework_examples_compilation_byproduct, KAN_LOG_ERROR,
                  "\"material_1\" and \"material_2\" shadow pipelines are not equal, but should.")
         singleton->data_valid = KAN_FALSE;
     }
 
     if (material_3_visible_world_pipeline != material_4_visible_world_pipeline)
     {
-        KAN_LOG (application_framework_example_compilation_byproduct, KAN_LOG_ERROR,
+        KAN_LOG (application_framework_examples_compilation_byproduct, KAN_LOG_ERROR,
                  "\"material_3\" and \"material_4\" visible world pipelines are not equal, but should.")
         singleton->data_valid = KAN_FALSE;
     }
 
     if (material_3_shadow_pipeline == material_4_shadow_pipeline)
     {
-        KAN_LOG (application_framework_example_compilation_byproduct, KAN_LOG_ERROR,
+        KAN_LOG (application_framework_examples_compilation_byproduct, KAN_LOG_ERROR,
                  "\"material_3\" and \"material_4\" shadow pipelines are equal, but shouldn't.")
         singleton->data_valid = KAN_FALSE;
     }
 
     if (material_1_shadow_pipeline == material_3_shadow_pipeline)
     {
-        KAN_LOG (application_framework_example_compilation_byproduct, KAN_LOG_ERROR,
+        KAN_LOG (application_framework_examples_compilation_byproduct, KAN_LOG_ERROR,
                  "\"material_1\" and \"material_3\" shadow pipelines are equal, but shouldn't.")
         singleton->data_valid = KAN_FALSE;
     }
@@ -784,7 +784,7 @@ static void validate_loaded_data (struct compilation_byproduct_state_t *state,
 
             if (pipeline->format != PIPELINE_INSTANCE_PLATFORM_FORMAT_SPIRV)
             {
-                KAN_LOG (application_framework_example_compilation_byproduct, KAN_LOG_ERROR,
+                KAN_LOG (application_framework_examples_compilation_byproduct, KAN_LOG_ERROR,
                          "Expected any pipeline to have format from default configuration, but pipeline \"%s\" "
                          "received format %lu!",
                          request->name, (unsigned long) pipeline->format)

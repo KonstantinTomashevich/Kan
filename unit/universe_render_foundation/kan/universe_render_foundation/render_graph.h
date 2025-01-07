@@ -110,7 +110,7 @@ struct kan_render_graph_pass_instance_request_attachment_info_t
 struct kan_render_graph_pass_instance_request_t
 {
     kan_render_context_t context;
-    struct kan_render_graph_pass_t *pass;
+    const struct kan_render_graph_pass_t *pass;
 
     kan_render_size_t frame_buffer_width;
     kan_render_size_t frame_buffer_height;

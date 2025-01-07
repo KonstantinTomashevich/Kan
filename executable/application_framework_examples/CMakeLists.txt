@@ -3,14 +3,14 @@ add_subdirectory (unit)
 register_application (application_framework_examples)
 application_core_include (
         ABSTRACT
-        context_hot_reload_coordination_system=default cpu_dispatch=kan cpu_profiler=default error=sdl
-        file_system=platform_default file_system_watcher=user_level hash=djb2 log=kan memory=kan memory_profiler=default
-        platform=sdl precise_time=sdl reflection=kan repository=kan stream=kan threading=sdl virtual_file_system=kan
-        workflow=kan
+        context_hot_reload_coordination_system=default context_render_backend_system=vulkan cpu_dispatch=kan
+        cpu_profiler=default error=sdl file_system=platform_default file_system_watcher=user_level hash=djb2 log=kan
+        memory=kan memory_profiler=default platform=sdl precise_time=sdl reflection=kan repository=kan stream=kan
+        threading=sdl virtual_file_system=kan workflow=kan
         CONCRETE
         application_framework container context context_application_system context_plugin_system
         context_reflection_system context_resource_pipeline_system context_universe_world_definition_system
-        context_update_system context_virtual_file_system readable_data reflection_helpers resource_index
+        context_update_system context_virtual_file_system inline_math readable_data reflection_helpers resource_index
         resource_pipeline serialization universe)
 
 application_core_set_configuration ("${CMAKE_CURRENT_SOURCE_DIR}/configuration/core.rd")
@@ -26,7 +26,7 @@ application_plugin_include (
         ABSTRACT universe_resource_provider=kan
         CONCRETE
         application_framework_examples_icon_resource application_framework_examples_platform_configuration
-        universe_single_pipeline_scheduler universe_time)
+        universe_object universe_render_foundation universe_single_pipeline_scheduler universe_time)
 
 # Plugin with import-only logic.
 
@@ -106,6 +106,21 @@ application_program_use_as_test_in_packaged_mode (ARGUMENTS --test PROPERTIES TI
 
 register_application_variant (example_import)
 application_variant_add_program (example_import)
+application_variant_add_environment_tag (packaged)
+
+# Test render graph example.
+
+register_application_plugin (NAME example_test_render_graph GROUP example_test_render_graph)
+application_plugin_include (ABSTRACT CONCRETE application_framework_examples_test_render_graph)
+
+register_application_program (example_test_render_graph)
+application_program_set_configuration ("${CMAKE_CURRENT_SOURCE_DIR}/configuration/example_test_render_graph.rd")
+application_program_use_plugin_group (example_test_render_graph)
+application_program_use_as_test_in_development_mode (ARGUMENTS --test PROPERTIES TIMEOUT 20)
+application_program_use_as_test_in_packaged_mode (ARGUMENTS --test PROPERTIES TIMEOUT 10)
+
+register_application_variant (example_test_render_graph)
+application_variant_add_program (example_test_render_graph)
 application_variant_add_environment_tag (packaged)
 
 application_generate ()

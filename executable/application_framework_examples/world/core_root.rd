@@ -19,5 +19,6 @@ scheduler_name = "single_pipeline_no_time"
 +pipelines {
     name = "update"
     mutator_groups =
-        resource_provider
+        resource_provider,
+        render_foundation_root_routine
 }

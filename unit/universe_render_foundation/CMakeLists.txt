@@ -10,7 +10,7 @@ concrete_require (
 concrete_require (
         SCOPE PRIVATE
         ABSTRACT universe_resource_provider
-        CONCRETE_INTERFACE resources_pipeline)
+        CONCRETE_INTERFACE resource_pipeline)
 
 concrete_require (SCOPE PRIVATE ABSTRACT log CONCRETE_INTERFACE universe_time)
 universe_concrete_preprocessing_queue ()

@@ -14,7 +14,7 @@
 
 #include <examples/icon.h>
 
-KAN_LOG_DEFINE_CATEGORY (application_framework_example_basic_logic_test_mode);
+KAN_LOG_DEFINE_CATEGORY (application_framework_examples_import);
 
 struct import_singleton_t
 {
@@ -128,12 +128,11 @@ APPLICATION_FRAMEWORK_EXAMPLES_IMPORT_API void kan_universe_mutator_execute_impo
         {
             if (30u < ++state->test_frames_count)
             {
-                KAN_LOG (application_framework_example_basic_logic_test_mode, KAN_LOG_INFO, "Shutting down...")
+                KAN_LOG (application_framework_examples_import, KAN_LOG_INFO, "Shutting down...")
                 if (!singleton->test_asset_loaded)
                 {
                     state->test_passed = KAN_FALSE;
-                    KAN_LOG (application_framework_example_basic_logic_test_mode, KAN_LOG_ERROR,
-                             "Failed to load asset.")
+                    KAN_LOG (application_framework_examples_import, KAN_LOG_ERROR, "Failed to load asset.")
                 }
 
                 KAN_ASSERT (KAN_HANDLE_IS_VALID (state->application_framework_system_handle))

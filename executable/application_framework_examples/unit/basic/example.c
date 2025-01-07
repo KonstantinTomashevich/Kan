@@ -13,7 +13,7 @@
 #include <kan/universe_resource_provider/universe_resource_provider.h>
 #include <kan/universe_time/universe_time.h>
 
-KAN_LOG_DEFINE_CATEGORY (application_framework_example_basic_test_mode);
+KAN_LOG_DEFINE_CATEGORY (application_framework_examples_basic);
 
 struct basic_data_type_t
 {
@@ -132,7 +132,7 @@ APPLICATION_FRAMEWORK_EXAMPLES_BASIC_API void kan_universe_mutator_execute_examp
                     if (x != 3u || y != 5u)
                     {
                         state->test_passed = KAN_FALSE;
-                        KAN_LOG (application_framework_example_basic_test_mode, KAN_LOG_INFO, "Unexpected x or y.")
+                        KAN_LOG (application_framework_examples_basic, KAN_LOG_INFO, "Unexpected x or y.")
                     }
                 }
             }
@@ -156,11 +156,11 @@ APPLICATION_FRAMEWORK_EXAMPLES_BASIC_API void kan_universe_mutator_execute_examp
         {
             if (30u < ++state->test_frames_count)
             {
-                KAN_LOG (application_framework_example_basic_test_mode, KAN_LOG_INFO, "Shutting down...")
+                KAN_LOG (application_framework_examples_basic, KAN_LOG_INFO, "Shutting down...")
                 if (!state->test_asset_loaded)
                 {
                     state->test_passed = KAN_FALSE;
-                    KAN_LOG (application_framework_example_basic_test_mode, KAN_LOG_ERROR, "Failed to load asset.")
+                    KAN_LOG (application_framework_examples_basic, KAN_LOG_ERROR, "Failed to load asset.")
                 }
 
                 KAN_ASSERT (KAN_HANDLE_IS_VALID (state->application_framework_system_handle))

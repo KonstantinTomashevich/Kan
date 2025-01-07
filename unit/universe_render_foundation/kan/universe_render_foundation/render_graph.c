@@ -44,16 +44,16 @@ UNIVERSE_RENDER_FOUNDATION_API struct kan_repository_meta_automatic_cascade_dele
         .child_key_path = {.reflection_path_length = 1u, .reflection_path = (const char *[]) {"name"}},
 };
 
+KAN_REFLECTION_IGNORE
 struct render_foundation_graph_image_usage_t
 {
     struct render_foundation_graph_image_usage_t *next;
     kan_render_pass_instance_t producer_pass;
     kan_instance_size_t user_passes_count;
-
-    KAN_REFLECTION_IGNORE
     kan_render_pass_instance_t user_passes[];
 };
 
+KAN_REFLECTION_IGNORE
 struct render_foundation_graph_image_cache_node_t
 {
     struct kan_hash_storage_node_t node;
@@ -122,6 +122,7 @@ static void render_foundation_graph_image_cache_node_destroy (
     kan_free_batched (singleton->cache_group, instance);
 }
 
+KAN_REFLECTION_IGNORE
 struct render_foundation_graph_frame_buffer_cache_node_t
 {
     struct kan_hash_storage_node_t node;
@@ -226,6 +227,7 @@ UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_deploy_render_foundatio
 {
     kan_workflow_graph_node_depend_on (workflow_node, KAN_RENDER_FOUNDATION_PASS_MANAGEMENT_BEGIN_CHECKPOINT);
     kan_workflow_graph_node_make_dependency_of (workflow_node, KAN_RESOURCE_PROVIDER_BEGIN_CHECKPOINT);
+    kan_workflow_graph_node_make_dependency_of (workflow_node, KAN_RENDER_FOUNDATION_FRAME_BEGIN);
 }
 
 UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_execute_render_foundation_pass_management_planning (
@@ -448,7 +450,7 @@ UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_execute_render_foundati
 {
     if (!KAN_HANDLE_IS_VALID (state->render_backend_system))
     {
-        return;
+        KAN_UP_MUTATOR_RETURN;
     }
 
     KAN_UP_SINGLETON_WRITE (render_context, kan_render_context_singleton_t)
@@ -544,6 +546,8 @@ UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_execute_render_foundati
         kan_stack_group_allocator_shrink (&render_graph->temporary_allocator);
         kan_stack_group_allocator_reset (&render_graph->temporary_allocator);
     }
+
+    KAN_UP_MUTATOR_RETURN;
 }
 
 void kan_render_graph_pass_resource_init (struct kan_render_graph_pass_resource_t *instance)
@@ -610,9 +614,10 @@ kan_bool_t kan_render_graph_resource_management_singleton_request_pass (
     struct kan_render_graph_resource_management_singleton_t *mutable_instance =
         (struct kan_render_graph_resource_management_singleton_t *) instance;
 
-    struct kan_render_frame_buffer_attachment_description_t *attachment_descriptions =
-        kan_allocate_general (instance->cache_group, sizeof (struct kan_render_frame_buffer_attachment_description_t),
-                              _Alignof (struct kan_render_frame_buffer_attachment_description_t));
+    struct kan_render_frame_buffer_attachment_description_t *attachment_descriptions = kan_allocate_general (
+        instance->cache_group,
+        sizeof (struct kan_render_frame_buffer_attachment_description_t) * request->pass->attachments.size,
+        _Alignof (struct kan_render_frame_buffer_attachment_description_t));
 
     struct render_foundation_graph_image_cache_node_t
         *images_static[KAN_UNIVERSE_RENDER_FOUNDATION_ATTACHMENTS_MAX_STATIC];
