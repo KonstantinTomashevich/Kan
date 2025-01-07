@@ -585,6 +585,14 @@ static void render_backend_system_destroy_synchronization_objects (struct render
 
 void render_backend_system_shutdown (kan_context_system_t handle)
 {
+}
+
+void render_backend_system_disconnect (kan_context_system_t handle)
+{
+}
+
+void render_backend_system_destroy (kan_context_system_t handle)
+{
     struct render_backend_system_t *system = KAN_HANDLE_GET (handle);
     vkDeviceWaitIdle (system->device);
     // All surfaces should've been automatically destroyed during application system shutdown.
@@ -828,15 +836,6 @@ void render_backend_system_shutdown (kan_context_system_t handle)
     vkDestroyInstance (system->instance, VULKAN_ALLOCATION_CALLBACKS (system));
     kan_stack_group_allocator_shutdown (&system->pass_instance_allocator);
     kan_platform_application_unregister_vulkan_library_usage ();
-}
-
-void render_backend_system_disconnect (kan_context_system_t handle)
-{
-}
-
-void render_backend_system_destroy (kan_context_system_t handle)
-{
-    struct render_backend_system_t *system = KAN_HANDLE_GET (handle);
     kan_free_general (system->main_allocation_group, system, sizeof (struct render_backend_system_t));
 }
 
