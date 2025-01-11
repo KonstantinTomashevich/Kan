@@ -3567,6 +3567,7 @@ static enum resource_provider_serve_operation_status_t execute_shared_serve_comp
         .dependencies = (struct kan_resource_compilation_dependency_t *) dependencies.data,
         .interface_user_data = (kan_functor_user_data_t) &interface_user_data,
         .register_byproduct = compilation_interface_register_byproduct,
+        .name = compile_operation->target_name,
     };
 
     enum kan_resource_compile_result_t compile_result = meta->functor (&compilation_state);

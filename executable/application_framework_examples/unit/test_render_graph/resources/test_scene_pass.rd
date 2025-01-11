@@ -1,4 +1,4 @@
-//! kan_render_graph_pass_resource_t
+//! kan_resource_render_graph_pass_t
 type = KAN_RENDER_PASS_GRAPHICS
 
 +attachments {
