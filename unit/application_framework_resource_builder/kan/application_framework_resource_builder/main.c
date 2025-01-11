@@ -2537,6 +2537,7 @@ static void process_native_node_compilation (kan_functor_user_data_t user_data)
                 .dependencies = dependency_array,
                 .interface_user_data = (kan_functor_user_data_t) node,
                 .register_byproduct = interface_register_byproduct,
+                .name = node->name,
             };
 
             enum kan_resource_compile_result_t compile_result = KAN_RESOURCE_PIPELINE_COMPILE_IN_PROGRESS;

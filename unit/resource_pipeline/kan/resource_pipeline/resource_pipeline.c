@@ -36,6 +36,16 @@ static void ensure_statics_initialized (void)
     }
 }
 
+ kan_hash_t kan_resource_byproduct_hash_unique (void *byproduct)
+ {
+     return (kan_hash_t) byproduct;
+ }
+
+kan_bool_t kan_resource_byproduct_is_equal_unique (const void *first, const void *second)
+{
+    return KAN_FALSE;
+}
+
 void kan_resource_platform_configuration_init (struct kan_resource_platform_configuration_t *instance)
 {
     ensure_statics_initialized ();
