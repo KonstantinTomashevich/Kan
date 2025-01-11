@@ -259,6 +259,49 @@ void kan_render_image_request_mip_generation (kan_render_image_t image, uint8_t 
     kan_atomic_int_unlock (&schedule->schedule_lock);
 }
 
+void kan_render_image_copy_data (kan_render_image_t from_image,
+                                 uint8_t from_mip,
+                                 kan_render_image_t to_image,
+                                 uint8_t to_mip)
+{
+    struct render_backend_image_t *source_data = KAN_HANDLE_GET (from_image);
+    KAN_ASSERT (!source_data->description.render_target)
+
+    struct render_backend_image_t *target_data = KAN_HANDLE_GET (to_image);
+    KAN_ASSERT (!target_data->description.render_target)
+
+    struct render_backend_schedule_state_t *schedule =
+        render_backend_system_get_schedule_for_memory (source_data->system);
+    kan_atomic_int_lock (&schedule->schedule_lock);
+
+    struct scheduled_image_copy_data_t *item =
+        KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&schedule->item_allocator, struct scheduled_image_copy_data_t);
+
+    // Image copies actually might one on another, but there should be too many of them.
+    struct scheduled_image_copy_data_t *last_item = schedule->first_scheduled_image_copy_data;
+
+    while (last_item && last_item->next)
+    {
+        last_item = last_item->next;
+    }
+
+    item->next = NULL;
+    if (last_item)
+    {
+        last_item->next = item;
+    }
+    else
+    {
+        schedule->first_scheduled_image_copy_data = item;
+    }
+
+    item->from_image = source_data;
+    item->to_image = target_data;
+    item->from_mip = from_mip;
+    item->to_mip = to_mip;
+    kan_atomic_int_unlock (&schedule->schedule_lock);
+}
+
 void kan_render_image_resize_render_target (kan_render_image_t image,
                                             vulkan_size_t new_width,
                                             vulkan_size_t new_height,

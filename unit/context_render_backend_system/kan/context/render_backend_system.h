@@ -1114,6 +1114,14 @@ CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_image_request_mip_generation (
                                                                                 uint8_t first,
                                                                                 uint8_t last);
 
+/// \brief Schedules data copy from one mip of one image to another mip of another image.
+/// \invariant User must guarantee that images are compatible and that sizes at given mips are equal.
+/// \invariant For thread safety, both images should not be modified by other functions during this call.
+CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_image_copy_data (kan_render_image_t from_image,
+                                                                   uint8_t from_mip,
+                                                                   kan_render_image_t to_image,
+                                                                   uint8_t to_mip);
+
 /// \brief Requests render target to be resized without breaking the attachments.
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_image_resize_render_target (kan_render_image_t image,
                                                                               kan_render_size_t new_width,
