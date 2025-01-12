@@ -451,7 +451,8 @@ static void parser_enter_file (const char *file_name_begin,
     struct target_file_node_t *new_file = find_target_file_node (file_name_begin, file_name_end);
     struct target_file_node_t *previous_file = parser.current_target_node;
 
-    if (new_file && !previous_file && new_file->type == TARGET_FILE_TYPE_HEADER)
+    if (new_file && (!previous_file || previous_file->type == TARGET_FILE_TYPE_OBJECT) &&
+        new_file->type == TARGET_FILE_TYPE_HEADER)
     {
         include_file (file_name_begin, file_name_end);
     }
