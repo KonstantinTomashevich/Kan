@@ -102,7 +102,7 @@ static kan_bool_t resource_texture_import_functor (struct kan_stream_t *input_st
 }
 
 KAN_REFLECTION_STRUCT_META (kan_resource_texture_import_config_t)
-RESOURCE_TEXTURE_IMPORT_API struct kan_resource_import_configuration_type_meta_t meta = {
+RESOURCE_TEXTURE_IMPORT_API struct kan_resource_import_configuration_type_meta_t resource_texture_import_meta = {
     .functor = resource_texture_import_functor,
     .allow_checksum = KAN_TRUE,
 };

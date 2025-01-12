@@ -3233,9 +3233,10 @@ struct resource_provider_compilation_interface_user_data_t
     kan_instance_size_t pending_compilation_index;
 };
 
-static kan_interned_string_t compilation_interface_register_byproduct (kan_functor_user_data_t interface_user_data,
-                                                                       kan_interned_string_t byproduct_type_name,
-                                                                       void *byproduct_data)
+static inline kan_interned_string_t register_byproduct_internal (kan_functor_user_data_t interface_user_data,
+                                                                 kan_interned_string_t byproduct_type_name,
+                                                                 kan_interned_string_t byproduct_name,
+                                                                 void *byproduct_data)
 {
     struct resource_provider_compilation_interface_user_data_t *data =
         (struct resource_provider_compilation_interface_user_data_t *) interface_user_data;
@@ -3252,78 +3253,111 @@ static kan_interned_string_t compilation_interface_register_byproduct (kan_funct
     // Byproducts are required to have byproduct meta.
     KAN_ASSERT (meta)
 
-    const kan_hash_t byproduct_hash =
-        meta->hash ? meta->hash (byproduct_data) :
-                     kan_reflection_hash_struct (state->reflection_registry, byproduct_type, byproduct_data);
-
-    // We need to save name and use it everywhere as we can't safely use locking with universe preprocessor:
-    // with preprocessor we have no way to close queries before lock is unlocked.
-    kan_interned_string_t byproduct_name = NULL;
+#define BYPRODUCT_UNIQUE_HASH KAN_INT_MAX (kan_hash_t)
+    kan_hash_t byproduct_hash = BYPRODUCT_UNIQUE_HASH;
 
     // Byproducts need to be registered under lock in order to avoid excessive byproduct creation.
     kan_atomic_int_lock (&state->execution_shared_state.byproduct_lock);
 
-    KAN_UP_VALUE_READ (byproduct, resource_provider_raw_byproduct_entry_t, hash, &byproduct_hash)
+    if (!byproduct_name)
     {
-        if (byproduct->hash == byproduct_hash && byproduct->type == byproduct_type_name)
+        // Non unique byproduct, search for available replacements.
+        byproduct_hash = meta->hash ?
+                             meta->hash (byproduct_data) :
+                             kan_reflection_hash_struct (state->reflection_registry, byproduct_type, byproduct_data);
+
+        if (byproduct_hash == BYPRODUCT_UNIQUE_HASH)
         {
-            struct kan_repository_indexed_value_read_access_t container_access;
-            const uint8_t *container_data;
+            --byproduct_hash;
+        }
 
-            if (native_container_read (state, byproduct_type_name, byproduct->container_id, &container_access,
-                                       &container_data))
+        KAN_UP_VALUE_READ (byproduct, resource_provider_raw_byproduct_entry_t, hash, &byproduct_hash)
+        {
+            if (byproduct->hash == byproduct_hash && byproduct->type == byproduct_type_name)
             {
-                kan_bool_t equal =
-                    (meta->is_equal ? meta->is_equal (container_data, byproduct_data) :
-                                      kan_reflection_are_structs_equal (state->reflection_registry, byproduct_type,
-                                                                        container_data, byproduct_data));
-                kan_repository_indexed_value_read_access_close (&container_access);
+                struct kan_repository_indexed_value_read_access_t container_access;
+                const uint8_t *container_data;
 
-                if (equal)
+                if (native_container_read (state, byproduct_type_name, byproduct->container_id, &container_access,
+                                           &container_data))
                 {
-                    if (meta->reset)
-                    {
-                        meta->reset (byproduct_data);
-                    }
-                    else
-                    {
-                        kan_reflection_reset_struct (state->reflection_registry, byproduct_type, byproduct_data);
-                    }
+                    kan_bool_t equal =
+                        (meta->is_equal ? meta->is_equal (container_data, byproduct_data) :
+                                          kan_reflection_are_structs_equal (state->reflection_registry, byproduct_type,
+                                                                            container_data, byproduct_data));
+                    kan_repository_indexed_value_read_access_close (&container_access);
 
-                    KAN_UP_INDEXED_INSERT (production, resource_provider_byproduct_production_t)
+                    if (equal)
                     {
-                        production->compiled_type = data->compiled_entry_type;
-                        production->compiled_name = data->compiled_entry_name;
-                        production->byproduct_type = byproduct_type_name;
-                        production->byproduct_name = byproduct->name;
-                        production->compilation_index = data->pending_compilation_index;
-                    }
+                        if (meta->reset)
+                        {
+                            meta->reset (byproduct_data);
+                        }
+                        else
+                        {
+                            kan_reflection_reset_struct (state->reflection_registry, byproduct_type, byproduct_data);
+                        }
 
-                    byproduct_name = byproduct->name;
-                    KAN_UP_QUERY_BREAK;
+                        KAN_UP_INDEXED_INSERT (production, resource_provider_byproduct_production_t)
+                        {
+                            production->compiled_type = data->compiled_entry_type;
+                            production->compiled_name = data->compiled_entry_name;
+                            production->byproduct_type = byproduct_type_name;
+                            production->byproduct_name = byproduct->name;
+                            production->compilation_index = data->pending_compilation_index;
+                        }
+
+                        byproduct_name = byproduct->name;
+                        KAN_UP_QUERY_BREAK;
+                    }
                 }
             }
         }
     }
 
-    if (byproduct_name)
+    if (byproduct_name && byproduct_hash != BYPRODUCT_UNIQUE_HASH)
     {
+        // Replaced by the same byproduct, no need for insertion.
         kan_atomic_int_unlock (&state->execution_shared_state.byproduct_lock);
         return byproduct_name;
+    }
+#undef BYPRODUCT_UNIQUE_HASH
+
+    if (byproduct_name)
+    {
+        kan_bool_t name_is_already_used = KAN_FALSE;
+        KAN_UP_VALUE_READ (byproduct, resource_provider_raw_byproduct_entry_t, name, &byproduct_name)
+        {
+            name_is_already_used = KAN_TRUE;
+        }
+
+        if (name_is_already_used)
+        {
+            KAN_LOG (
+                universe_resource_provider, KAN_LOG_ERROR,
+                "Failed to register unique byproduct of type \"%s\" with name \"%s\" as its name is already occupied",
+                byproduct_type_name, byproduct_name)
+            kan_atomic_int_unlock (&state->execution_shared_state.byproduct_lock);
+            return NULL;
+        }
     }
 
     KAN_UP_INDEXED_INSERT (new_byproduct, resource_provider_raw_byproduct_entry_t)
     {
         KAN_UP_SINGLETON_READ (private, resource_provider_private_singleton_t)
         {
-            int new_byproduct_name_id =
-                kan_atomic_int_add ((struct kan_atomic_int_t *) &private->byproduct_id_counter, 1);
-            char name_buffer[KAN_UNIVERSE_RESOURCE_PROVIDER_RB_MAX_NAME_LENGTH];
-            snprintf (name_buffer, KAN_UNIVERSE_RESOURCE_PROVIDER_RB_MAX_NAME_LENGTH, "byproduct_%s_%lu",
-                      byproduct_type_name, (unsigned long) new_byproduct_name_id);
+            if (!byproduct_name)
+            {
+                int new_byproduct_name_id =
+                    kan_atomic_int_add ((struct kan_atomic_int_t *) &private->byproduct_id_counter, 1);
+                char name_buffer[KAN_UNIVERSE_RESOURCE_PROVIDER_RB_MAX_NAME_LENGTH];
+                snprintf (name_buffer, KAN_UNIVERSE_RESOURCE_PROVIDER_RB_MAX_NAME_LENGTH, "byproduct_%s_%lu",
+                          byproduct_type_name, (unsigned long) new_byproduct_name_id);
+                byproduct_name = kan_string_intern (name_buffer);
+            }
 
             new_byproduct->type = byproduct_type_name;
-            new_byproduct->name = kan_string_intern (name_buffer);
+            new_byproduct->name = byproduct_name;
             new_byproduct->hash = byproduct_hash;
             new_byproduct->request_count = 0u;
 
@@ -3359,13 +3393,28 @@ static kan_interned_string_t compilation_interface_register_byproduct (kan_funct
                 production->compilation_index = data->pending_compilation_index;
             }
 
-            byproduct_name = new_byproduct->name;
             kan_repository_indexed_insertion_package_submit (&container_package);
         }
     }
 
     kan_atomic_int_unlock (&state->execution_shared_state.byproduct_lock);
     return byproduct_name;
+}
+
+static kan_interned_string_t compilation_interface_register_byproduct (kan_functor_user_data_t interface_user_data,
+                                                                       kan_interned_string_t byproduct_type_name,
+                                                                       void *byproduct_data)
+{
+    return register_byproduct_internal (interface_user_data, byproduct_type_name, NULL, byproduct_data);
+}
+
+static kan_bool_t compilation_interface_register_unique_byproduct (kan_functor_user_data_t interface_user_data,
+                                                                   kan_interned_string_t byproduct_type_name,
+                                                                   kan_interned_string_t byproduct_name,
+                                                                   void *byproduct_data)
+{
+    return register_byproduct_internal (interface_user_data, byproduct_type_name, byproduct_name, byproduct_data) ==
+           byproduct_name;
 }
 
 static enum resource_provider_serve_operation_status_t execute_shared_serve_compile (
@@ -3567,6 +3616,7 @@ static enum resource_provider_serve_operation_status_t execute_shared_serve_comp
         .dependencies = (struct kan_resource_compilation_dependency_t *) dependencies.data,
         .interface_user_data = (kan_functor_user_data_t) &interface_user_data,
         .register_byproduct = compilation_interface_register_byproduct,
+        .register_unique_byproduct = compilation_interface_register_unique_byproduct,
         .name = compile_operation->target_name,
     };
 

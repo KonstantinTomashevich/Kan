@@ -92,6 +92,16 @@ struct kan_resource_compilation_dependency_t
 typedef kan_interned_string_t (*kan_resource_compilation_register_byproduct_functor_t) (
     kan_functor_user_data_t interface_user_data, kan_interned_string_t byproduct_type_name, void *byproduct_data);
 
+/// \brief Register byproduct that is considered to be unique and should have unique readable name.
+/// \details Functionally, almost the same as `kan_resource_compilation_register_byproduct_functor_t`, but it never
+///          searches the compatible byproduct through hashing and equality check. Instead, it attempts to create
+///          new byproduct with given name right away. If name is already occupied, function returns KAN_FALSE.
+typedef kan_bool_t (*kan_resource_compilation_register_unique_byproduct_functor_t) (
+    kan_functor_user_data_t interface_user_data,
+    kan_interned_string_t byproduct_type_name,
+    kan_interned_string_t byproduct_name,
+    void *byproduct_data);
+
 /// \brief Defines whole state of compilation routine.
 struct kan_resource_compile_state_t
 {
@@ -126,6 +136,9 @@ struct kan_resource_compile_state_t
 
     /// \brief Function for registering byproducts. Returns registered byproduct resource name.
     kan_resource_compilation_register_byproduct_functor_t register_byproduct;
+
+    /// \brief Function for registering byproducts that have unique name and should not be replaced by other byproduct.
+    kan_resource_compilation_register_unique_byproduct_functor_t register_unique_byproduct;
 
     /// \brief Resource name for logging errors.
     kan_interned_string_t name;
@@ -202,12 +215,6 @@ struct kan_resource_byproduct_type_meta_t
     ///          exists. Leave NULL to use kan_reflection_reset_struct.
     kan_resource_byproduct_reset_functor_t reset;
 };
-
-/// \brief Hash function for byproducts that should never replace it each other.
-RESOURCE_PIPELINE_API kan_hash_t kan_resource_byproduct_hash_unique (void *byproduct);
-
-/// \brief Hash function for byproducts that should never replace it each other.
-RESOURCE_PIPELINE_API kan_bool_t kan_resource_byproduct_is_equal_unique (const void *first, const void *second);
 
 /// \brief Defines format of platform configuration file.
 struct kan_resource_platform_configuration_t

@@ -48,8 +48,8 @@ RESOURCE_TEXTURE_API struct kan_resource_reference_meta_t kan_resource_texture_c
 KAN_REFLECTION_STRUCT_META (kan_resource_texture_compiled_data_t)
 RESOURCE_TEXTURE_API struct kan_resource_byproduct_type_meta_t kan_resource_texture_compiled_data_byproduct_type_meta =
     {
-        .hash = kan_resource_byproduct_hash_unique,
-        .is_equal = kan_resource_byproduct_is_equal_unique,
+        .hash = NULL,
+        .is_equal = NULL,
         .move = NULL,
         .reset = NULL,
 };
@@ -325,6 +325,7 @@ static enum kan_resource_compile_result_t kan_resource_texture_compile (struct k
                 const kan_instance_size_t width = output->width > 1u ? (output->width >> mip) : 1u;
                 const kan_instance_size_t height = output->height > 1u ? (output->height >> mip) : 1u;
                 const kan_instance_size_t depth = output->depth > 1u ? (output->depth >> mip) : 1u;
+                const char *target_format_name = NULL;
 
 #define COPY_CHANNELS_SAME_COUNT(CHANNEL_TYPE, CHANNELS)                                                               \
     {                                                                                                                  \
@@ -359,6 +360,7 @@ static enum kan_resource_compile_result_t kan_resource_texture_compile (struct k
                 switch (format)
                 {
                 case KAN_RESOURCE_TEXTURE_COMPILED_FORMAT_UNCOMPRESSED_R8:
+                    target_format_name = "r8";
                     switch (raw_data->format)
                     {
                     case KAN_RESOURCE_TEXTURE_RAW_FORMAT_R8:
@@ -388,6 +390,7 @@ static enum kan_resource_compile_result_t kan_resource_texture_compile (struct k
                     break;
 
                 case KAN_RESOURCE_TEXTURE_COMPILED_FORMAT_UNCOMPRESSED_RG16:
+                    target_format_name = "rg16";
                     switch (raw_data->format)
                     {
                     case KAN_RESOURCE_TEXTURE_RAW_FORMAT_R8:
@@ -421,6 +424,7 @@ static enum kan_resource_compile_result_t kan_resource_texture_compile (struct k
                     break;
 
                 case KAN_RESOURCE_TEXTURE_COMPILED_FORMAT_UNCOMPRESSED_RGB24:
+                    target_format_name = "rgb24";
                     switch (raw_data->format)
                     {
                     case KAN_RESOURCE_TEXTURE_RAW_FORMAT_R8:
@@ -458,6 +462,7 @@ static enum kan_resource_compile_result_t kan_resource_texture_compile (struct k
                     break;
 
                 case KAN_RESOURCE_TEXTURE_COMPILED_FORMAT_UNCOMPRESSED_RGBA32:
+                    target_format_name = "rgba32";
                     switch (raw_data->format)
                     {
                     case KAN_RESOURCE_TEXTURE_RAW_FORMAT_R8:
@@ -499,6 +504,7 @@ static enum kan_resource_compile_result_t kan_resource_texture_compile (struct k
                     break;
 
                 case KAN_RESOURCE_TEXTURE_COMPILED_FORMAT_UNCOMPRESSED_D16:
+                    target_format_name = "d16";
                     switch (raw_data->format)
                     {
                     case KAN_RESOURCE_TEXTURE_RAW_FORMAT_R8:
@@ -539,6 +545,7 @@ static enum kan_resource_compile_result_t kan_resource_texture_compile (struct k
                     break;
 
                 case KAN_RESOURCE_TEXTURE_COMPILED_FORMAT_UNCOMPRESSED_D32:
+                    target_format_name = "d32";
                     switch (raw_data->format)
                     {
                     case KAN_RESOURCE_TEXTURE_RAW_FORMAT_R8:
@@ -570,10 +577,23 @@ static enum kan_resource_compile_result_t kan_resource_texture_compile (struct k
 
                 if (successful)
                 {
-                    kan_interned_string_t *spot = kan_dynamic_array_add_last (&item->compiled_data_per_mip);
-                    KAN_ASSERT (spot)
-                    *spot = state->register_byproduct (state->interface_user_data,
-                                                       interned_kan_resource_texture_compiled_data_t, &compiled_data);
+                    char name_buffer[KAN_RESOURCE_TEXTURE_BYPRODUCT_MAX_NAME_LENGTH];
+                    snprintf (name_buffer, KAN_RESOURCE_TEXTURE_BYPRODUCT_MAX_NAME_LENGTH, "%s_%s_mip_%u", state->name,
+                              target_format_name, (unsigned int) mip);
+                    kan_interned_string_t byproduct_name = kan_string_intern (name_buffer);
+
+                    if (state->register_unique_byproduct (state->interface_user_data,
+                                                          interned_kan_resource_texture_compiled_data_t, byproduct_name,
+                                                          &compiled_data))
+                    {
+                        kan_interned_string_t *spot = kan_dynamic_array_add_last (&item->compiled_data_per_mip);
+                        KAN_ASSERT (spot)
+                        *spot = byproduct_name;
+                    }
+                    else
+                    {
+                        successful = KAN_FALSE;
+                    }
                 }
             }
         }
