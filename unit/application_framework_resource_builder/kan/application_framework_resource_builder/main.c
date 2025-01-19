@@ -2047,7 +2047,14 @@ static inline kan_interned_string_t register_byproduct_internal (kan_functor_use
 
         if (byproduct_name)
         {
-            if (target_query_global_native_by_source_type (source_node->target, byproduct_type_name, byproduct_name))
+            // Check if there is a conflicting byproduct.
+            // Keep in mind that this byproduct can be loaded from byproduct cache,
+            // therefore we could find a byproduct node, but it would have zero producers.
+            struct native_entry_node_t *conflict_node =
+                target_query_global_native_by_source_type (source_node->target, byproduct_type_name, byproduct_name);
+
+            if (conflict_node &&
+                (!conflict_node->linked_byproduct || conflict_node->linked_byproduct->produced_from.size > 0u))
             {
                 KAN_LOG (application_framework_resource_builder, KAN_LOG_ERROR,
                          "[Target \"%s\"] Failed to register unique byproduct of type \"%s\" with name \"%s\" as its "
@@ -2080,8 +2087,8 @@ static inline kan_interned_string_t register_byproduct_internal (kan_functor_use
         kan_file_system_path_container_append (&path_container, byproduct_name);
         kan_file_system_path_container_add_suffix (&path_container, ".bin");
 
-        node->entry = native_entry_node_create (source_node->target, byproduct_type_name, byproduct_name,
-                                                path_container.path);
+        node->entry =
+            native_entry_node_create (source_node->target, byproduct_type_name, byproduct_name, path_container.path);
 
         if (!node->entry)
         {
