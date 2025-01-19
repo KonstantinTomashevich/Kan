@@ -317,9 +317,10 @@ static enum kan_resource_compile_result_t kan_resource_texture_compile (struct k
                 kan_dynamic_array_add_last (&output->compiled_formats);
             KAN_ASSERT (item)
             item->format = format;
-            kan_dynamic_array_set_capacity (&item->compiled_data_per_mip, output->mips);
+            kan_dynamic_array_init (&item->compiled_data_per_mip, output->mips, sizeof (kan_interned_string_t),
+                                    _Alignof (kan_interned_string_t), output->compiled_formats.allocation_group);
 
-            for (kan_loop_size_t mip = 0u; mip < (kan_loop_size_t) output->mips; ++mip)
+            for (kan_loop_size_t mip = 0u; mip < (kan_loop_size_t) output->mips && successful; ++mip)
             {
                 const uint8_t *compression_input = mip > 0u ? generated_mips_data[mip - 1u] : raw_data->data.data;
                 const kan_instance_size_t width = output->width > 1u ? (output->width >> mip) : 1u;
@@ -330,7 +331,7 @@ static enum kan_resource_compile_result_t kan_resource_texture_compile (struct k
 #define COPY_CHANNELS_SAME_COUNT(CHANNEL_TYPE, CHANNELS)                                                               \
     {                                                                                                                  \
         const kan_instance_size_t pixel_count = width * height * depth;                                                \
-        kan_dynamic_array_set_capacity (&compiled_data.data, pixel_count * CHANNELS * sizeof (CHANNEL_TYPE));          \
+        kan_dynamic_array_set_capacity (&compiled_data.data, pixel_count *CHANNELS * sizeof (CHANNEL_TYPE));           \
         compiled_data.data.size = compiled_data.data.capacity;                                                         \
         uint8_t *compression_output = (uint8_t *) compiled_data.data.data;                                             \
         memcpy (compression_output, compression_input, compiled_data.data.size);                                       \
@@ -339,7 +340,7 @@ static enum kan_resource_compile_result_t kan_resource_texture_compile (struct k
 #define COPY_CHANNELS_DIFFERENT_COUNT(CHANNEL_TYPE, INPUT_CHANNELS, OUTPUT_CHANNELS)                                   \
     {                                                                                                                  \
         const kan_instance_size_t pixel_count = width * height * depth;                                                \
-        kan_dynamic_array_set_capacity (&compiled_data.data, pixel_count * OUTPUT_CHANNELS * sizeof (CHANNEL_TYPE));   \
+        kan_dynamic_array_set_capacity (&compiled_data.data, pixel_count *OUTPUT_CHANNELS * sizeof (CHANNEL_TYPE));    \
         compiled_data.data.size = pixel_count * compiled_data.data.capacity;                                           \
         uint8_t *compression_output = (uint8_t *) compiled_data.data.data;                                             \
                                                                                                                        \

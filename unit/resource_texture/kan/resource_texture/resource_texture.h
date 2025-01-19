@@ -5,9 +5,9 @@
 #include <kan/api_common/core_types.h>
 #include <kan/container/dynamic_array.h>
 #include <kan/container/interned_string.h>
-#include <kan/reflection/markup.h>
-#include <kan/memory/allocation.h>
 #include <kan/error/critical.h>
+#include <kan/memory/allocation.h>
+#include <kan/reflection/markup.h>
 
 // TODO: Docs.
 
