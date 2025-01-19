@@ -36,6 +36,7 @@ static kan_bool_t resource_texture_import_functor (struct kan_stream_t *input_st
     kan_resource_import_extract_file_name (input_path, &file_name_begin, &file_name_end);
     kan_trivial_string_buffer_append_char_sequence (&relative_path_buffer, file_name_begin,
                                                     (kan_instance_size_t) (file_name_end - file_name_begin));
+    kan_trivial_string_buffer_append_string (&relative_path_buffer, ".bin");
 
     kan_bool_t successful = KAN_TRUE;
     struct kan_resource_texture_raw_data_t raw_data;
@@ -48,7 +49,7 @@ static kan_bool_t resource_texture_import_functor (struct kan_stream_t *input_st
 
 #define COPY_WITH_STRIPPING_CHANNELS(CHANNELS)                                                                         \
     {                                                                                                                  \
-        kan_dynamic_array_set_capacity (&raw_data.data, raw_data.width * raw_data.height * CHANNELS);                  \
+        kan_dynamic_array_set_capacity (&raw_data.data, raw_data.width *raw_data.height *CHANNELS);                    \
         raw_data.data.size = raw_data.data.capacity;                                                                   \
         const uint8_t *input_data = (const uint8_t *) image_data.data;                                                 \
         uint8_t *output_data = raw_data.data.data;                                                                     \
@@ -94,6 +95,13 @@ static kan_bool_t resource_texture_import_functor (struct kan_stream_t *input_st
     }
 
 #undef COPY_WITH_STRIPPING_CHANNELS
+
+    if (!interface->produce (interface->user_data, relative_path_buffer.buffer,
+                             kan_string_intern ("kan_resource_texture_raw_data_t"), &raw_data))
+    {
+        KAN_LOG (resource_texture_import, KAN_LOG_ERROR, "Failed to produce raw texture data resource.")
+        successful = KAN_FALSE;
+    }
 
     kan_resource_texture_raw_data_shutdown (&raw_data);
     kan_trivial_string_buffer_shutdown (&relative_path_buffer);
