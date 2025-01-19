@@ -393,8 +393,8 @@ kan_render_backend_system_create_surface (kan_context_system_t render_backend_sy
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_backend_system_present_image_on_surface (
     kan_render_surface_t surface,
     kan_render_image_t image,
-    struct kan_render_integer_region_t image_region,
-    struct kan_render_integer_region_t surface_region);
+    struct kan_render_integer_region_t surface_region,
+    struct kan_render_integer_region_t image_region);
 
 /// \brief Recreates surface using new present mode queue (the same format as for creation).
 /// \details Surface will be recreated and initialized during next application system sync.
