@@ -20,5 +20,6 @@ scheduler_name = "single_pipeline_no_time"
     name = "update"
     mutator_groups =
         resource_provider,
-        render_foundation_root_routine
+        render_foundation_root_routine,
+        render_foundation_texture_management
 }

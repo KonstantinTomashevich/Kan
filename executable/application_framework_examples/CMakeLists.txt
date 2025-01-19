@@ -30,7 +30,7 @@ application_plugin_include (
         ABSTRACT universe_resource_provider=kan
         CONCRETE
         application_framework_examples_icon_resource application_framework_examples_platform_configuration
-        universe_object universe_single_pipeline_scheduler universe_time)
+        resource_texture universe_object universe_single_pipeline_scheduler universe_time)
 
 if (Vulkan_FOUND)
     application_plugin_include (CONCRETE universe_render_foundation)
@@ -39,7 +39,9 @@ endif ()
 # Plugin with import-only logic.
 
 register_application_plugin (NAME import GROUP import)
-application_plugin_include (ABSTRACT image=stb CONCRETE application_framework_examples_icon_import)
+application_plugin_include (
+        ABSTRACT image=stb
+        CONCRETE application_framework_examples_icon_import resource_texture_import)
 
 # Basic example.
 
@@ -116,7 +118,7 @@ register_application_variant (example_import)
 application_variant_add_program (example_import)
 application_variant_add_environment_tag (packaged)
 
-# Test render graph example.
+# Test render foundation temporary examples.
 if (Vulkan_FOUND)
     register_application_plugin (NAME example_test_render_graph GROUP example_test_render_graph)
     application_plugin_include (ABSTRACT CONCRETE application_framework_examples_test_render_graph)
@@ -130,12 +132,22 @@ if (Vulkan_FOUND)
     register_application_variant (example_test_render_graph)
     application_variant_add_program (example_test_render_graph)
     application_variant_add_environment_tag (packaged)
+
+    register_application_plugin (NAME example_test_render_texture GROUP example_test_render_texture)
+    application_plugin_include (ABSTRACT CONCRETE application_framework_examples_test_render_texture)
+
+    register_application_program (example_test_render_texture)
+    application_program_set_configuration ("${CMAKE_CURRENT_SOURCE_DIR}/configuration/example_test_render_texture.rd")
+    application_program_use_plugin_group (example_test_render_texture)
+    application_program_use_as_test_in_development_mode (ARGUMENTS --test PROPERTIES TIMEOUT 20 LABELS GRAPHICS)
+    application_program_use_as_test_in_packaged_mode (ARGUMENTS --test PROPERTIES TIMEOUT 10 LABELS GRAPHICS)
+
+    register_application_variant (example_test_render_texture)
+    application_variant_add_program (example_test_render_texture)
+    application_variant_add_environment_tag (packaged)
 endif ()
 
 application_generate ()
-
-# Make import always required as dependency of resource build.
-# IT IS NOT RECOMMENDED. It is just for the sake of testing.
 
 application_get_resource_importer_target_name (RESOURCE_IMPORTER)
 application_get_resource_project_path (RESOURCE_PROJECT)
@@ -145,6 +157,15 @@ add_custom_target (
         COMMAND ${RESOURCE_IMPORTER} "${RESOURCE_PROJECT}" "--rule" "import_icons"
         COMMENT "Run resource import for application_framework_examples_import.")
 
+if (Vulkan_FOUND)
+    add_custom_target (
+            application_framework_examples_test_render_texture_import
+            COMMAND ${RESOURCE_IMPORTER} "${RESOURCE_PROJECT}" "--rule" "import_render_test_textures"
+            COMMENT "Run resource import for application_framework_examples_test_render_texture.")
+endif ()
+
+# Make import always required as dependency of resource build.
+# IT IS NOT RECOMMENDED. It is just for the sake of testing.
 # Variant naming is not public in application framework as variants shouldn't be addressed like that.
 # But here we're doing it for testing in order to always execute resource importer as part of tests here.
 add_dependencies (
