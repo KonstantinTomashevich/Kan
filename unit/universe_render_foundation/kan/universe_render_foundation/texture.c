@@ -564,6 +564,8 @@ static void inspect_texture_usages_internal (struct render_foundation_texture_ma
 
                 usage_state->loaded_best_mip = usage_state->requested_best_mip;
                 usage_state->loaded_worst_mip = usage_state->requested_worst_mip;
+                kan_render_image_destroy (loaded->image);
+                loaded->image = new_image;
             }
             else
             {
@@ -648,6 +650,7 @@ static inline enum kan_render_image_format_t raw_texture_format_to_render_format
 }
 
 static void raw_texture_load (struct render_foundation_texture_management_execution_state_t *state,
+                              struct kan_render_supported_device_info_t *device_info,
                               struct render_foundation_texture_usage_state_t *usage_state,
                               const struct kan_resource_texture_t *loaded_texture,
                               const struct kan_resource_texture_raw_data_t *raw_data)
@@ -663,6 +666,17 @@ static void raw_texture_load (struct render_foundation_texture_management_execut
         .supports_sampling = KAN_TRUE,
         .tracking_name = usage_state->name,
     };
+
+    const uint8_t required_flags =
+        KAN_RENDER_IMAGE_FORMAT_SUPPORT_FLAG_TRANSFER | KAN_RENDER_IMAGE_FORMAT_SUPPORT_FLAG_SAMPLED;
+
+    if ((device_info->image_format_support[description.format] & required_flags) != required_flags)
+    {
+        KAN_LOG (render_foundation_texture, KAN_LOG_ERROR,
+                 "Failed to load raw data for texture \"%s\" as its raw format is not supported by GPU itself.",
+                 usage_state->name)
+        return;
+    }
 
     kan_render_image_t new_image = kan_render_image_create (
         kan_render_backend_system_get_render_context (state->render_backend_system), &description);
@@ -696,6 +710,7 @@ static void raw_texture_load (struct render_foundation_texture_management_execut
 }
 
 static void on_raw_texture_data_request_updated (struct render_foundation_texture_management_execution_state_t *state,
+                                                 struct kan_render_supported_device_info_t *device_info,
                                                  const struct kan_resource_request_updated_event_t *updated_event)
 {
     KAN_UP_VALUE_UPDATE (raw_data_usage, render_foundation_texture_raw_data_usage_t, request_id,
@@ -712,8 +727,8 @@ static void on_raw_texture_data_request_updated (struct render_foundation_textur
                     const struct kan_resource_texture_raw_data_t *raw_data =
                         KAN_RESOURCE_PROVIDER_CONTAINER_GET (kan_resource_texture_raw_data_t, raw_data_container);
 
-                    KAN_UP_VALUE_UPDATE (usage_state, render_foundation_texture_usage_state_t, texture_request_id,
-                                         &updated_event->request_id)
+                    KAN_UP_VALUE_UPDATE (usage_state, render_foundation_texture_usage_state_t, name,
+                                         &raw_data_usage->texture_name)
                     {
                         KAN_UP_VALUE_READ (request, kan_resource_request_t, request_id,
                                            &usage_state->texture_request_id)
@@ -727,7 +742,7 @@ static void on_raw_texture_data_request_updated (struct render_foundation_textur
                                     const struct kan_resource_texture_t *loaded_texture =
                                         KAN_RESOURCE_PROVIDER_CONTAINER_GET (kan_resource_texture_t, texture_container);
 
-                                    raw_texture_load (state, usage_state, loaded_texture, raw_data);
+                                    raw_texture_load (state, device_info, usage_state, loaded_texture, raw_data);
                                     KAN_UP_EVENT_INSERT (event, kan_resource_request_defer_sleep_event_t)
                                     {
                                         // Raw data is loaded and uploaded, put request to sleep now.
@@ -867,8 +882,8 @@ static void compiled_texture_load_mips (struct render_foundation_texture_managem
                             KAN_RESOURCE_PROVIDER_CONTAINER_GET (kan_resource_texture_compiled_data_t,
                                                                  compiled_data_container);
 
-                        kan_render_image_upload_data (new_image, data_usage->mip, compiled_data->data.size,
-                                                      compiled_data->data.data);
+                        kan_render_image_upload_data (new_image, data_usage->mip - usage_state->requested_best_mip,
+                                                      compiled_data->data.size, compiled_data->data.data);
                     }
 
                     KAN_UP_EVENT_INSERT (event, kan_resource_request_defer_sleep_event_t)
@@ -1034,7 +1049,7 @@ UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_execute_render_foundati
         {
             if (updated_event->type == state->interned_kan_resource_texture_raw_data_t)
             {
-                on_raw_texture_data_request_updated (state, updated_event);
+                on_raw_texture_data_request_updated (state, device_info, updated_event);
             }
             else if (updated_event->type == state->interned_kan_resource_texture_t)
             {
