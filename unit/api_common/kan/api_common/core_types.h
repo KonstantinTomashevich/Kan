@@ -235,13 +235,13 @@ typedef uint32_t kan_id_32_t;
 /// \brief Creates typed id with invalid value.
 #define KAN_TYPED_ID_32_SET_INVALID(TYPE)                                                                              \
     ((TYPE) {                                                                                                          \
-        .typed_id_32_internals = KAN_TYPED_ID_32_INVALID_LITERAL,                                                                                   \
+        .typed_id_32_internals = KAN_TYPED_ID_32_INVALID_LITERAL,                                                      \
     })
 
 /// \brief Used for initialization, compatible with static variables. Sets typed id value to invalid state.
 #define KAN_TYPED_ID_32_INITIALIZE_INVALID                                                                             \
     {                                                                                                                  \
-        KAN_TYPED_ID_32_INVALID_LITERAL,                                                                                                            \
+        KAN_TYPED_ID_32_INVALID_LITERAL,                                                                               \
     }
 
 KAN_C_HEADER_END
