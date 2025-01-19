@@ -4,6 +4,7 @@
 
 #include <kan/api_common/c_header.h>
 #include <kan/api_common/core_types.h>
+#include <kan/container/hash_storage.h>
 #include <kan/context/render_backend_system.h>
 #include <kan/inline_math/inline_math.h>
 #include <kan/threading/atomic.h>

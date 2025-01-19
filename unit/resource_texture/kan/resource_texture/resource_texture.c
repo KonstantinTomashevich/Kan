@@ -531,7 +531,7 @@ static enum kan_resource_compile_result_t kan_resource_texture_compile (struct k
                              ++pixel_index)
                         {
                             float *pixel_input = (float *) (compression_input + pixel_index * sizeof (float));
-                            const float normalized_input = KAN_MIN (KAN_MAX (*pixel_input, 0.0f), 1.0f);
+                            const float normalized_input = KAN_CLAMP (*pixel_input, 0.0f, 1.0f);
 
                             uint16_t *pixel_output =
                                 (uint16_t *) (compression_output + pixel_index * sizeof (uint16_t));

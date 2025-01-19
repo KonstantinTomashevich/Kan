@@ -214,8 +214,11 @@ typedef uint32_t kan_id_32_t;
     };                                                                                                                 \
     typedef struct typed_id_32_struct_for_##NAME NAME
 
+/// \brief Literal value that is used to mark invalid typed id 32 instances.
+#define KAN_TYPED_ID_32_INVALID_LITERAL 0u
+
 /// \brief Checks whether given id is valid. Zero ids are considered invalid.
-#define KAN_TYPED_ID_32_IS_VALID(ID) ((ID).typed_id_32_internals != 0u)
+#define KAN_TYPED_ID_32_IS_VALID(ID) ((ID).typed_id_32_internals != KAN_TYPED_ID_32_INVALID_LITERAL)
 
 /// \brief Checks whether two given ids are equal.
 #define KAN_TYPED_ID_32_IS_EQUAL(FIRST, SECOND) ((FIRST).typed_id_32_internals == (SECOND).typed_id_32_internals)
@@ -232,13 +235,13 @@ typedef uint32_t kan_id_32_t;
 /// \brief Creates typed id with invalid value.
 #define KAN_TYPED_ID_32_SET_INVALID(TYPE)                                                                              \
     ((TYPE) {                                                                                                          \
-        .typed_id_32_internals = 0u,                                                                                   \
+        .typed_id_32_internals = KAN_TYPED_ID_32_INVALID_LITERAL,                                                                                   \
     })
 
 /// \brief Used for initialization, compatible with static variables. Sets typed id value to invalid state.
 #define KAN_TYPED_ID_32_INITIALIZE_INVALID                                                                             \
     {                                                                                                                  \
-        0u,                                                                                                            \
+        KAN_TYPED_ID_32_INVALID_LITERAL,                                                                                                            \
     }
 
 KAN_C_HEADER_END

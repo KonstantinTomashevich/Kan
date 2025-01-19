@@ -30,14 +30,6 @@ struct render_foundation_pass_loading_state_t
 
 KAN_REFLECTION_STRUCT_META (render_foundation_pass_loading_state_t)
 UNIVERSE_RENDER_FOUNDATION_API struct kan_repository_meta_automatic_cascade_deletion_t
-    resource_request_pass_loading_cascade_deletion = {
-        .parent_key_path = {.reflection_path_length = 1u, .reflection_path = (const char *[]) {"request_id"}},
-        .child_type_name = "kan_resource_request_t",
-        .child_key_path = {.reflection_path_length = 1u, .reflection_path = (const char *[]) {"request_id"}},
-};
-
-KAN_REFLECTION_STRUCT_META (render_foundation_pass_loading_state_t)
-UNIVERSE_RENDER_FOUNDATION_API struct kan_repository_meta_automatic_cascade_deletion_t
     render_graph_pass_pass_loading_cascade_deletion = {
         .parent_key_path = {.reflection_path_length = 1u, .reflection_path = (const char *[]) {"name"}},
         .child_type_name = "kan_render_graph_pass_t",
@@ -227,7 +219,6 @@ UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_deploy_render_foundatio
 {
     kan_workflow_graph_node_depend_on (workflow_node, KAN_RENDER_FOUNDATION_PASS_MANAGEMENT_BEGIN_CHECKPOINT);
     kan_workflow_graph_node_make_dependency_of (workflow_node, KAN_RESOURCE_PROVIDER_BEGIN_CHECKPOINT);
-    kan_workflow_graph_node_make_dependency_of (workflow_node, KAN_RENDER_FOUNDATION_FRAME_BEGIN);
 }
 
 UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_execute_render_foundation_pass_management_planning (
@@ -284,6 +275,14 @@ UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_execute_render_foundati
                             }
 
                             frame_buffer = next;
+                        }
+                    }
+
+                    if (KAN_TYPED_ID_32_IS_VALID (loading->request_id))
+                    {
+                        KAN_UP_EVENT_INSERT (event, kan_resource_request_defer_delete_event_t)
+                        {
+                            event->request_id = loading->request_id;
                         }
                     }
 
