@@ -392,7 +392,7 @@ void kan_rpl_compiler_ensure_statics_initialized (void)
         .source_name = source_functions,                                                                               \
         .source_line = 0u,                                                                                             \
     }
-// clang-format on
+        // clang-format on
 
 #define BUILTIN_0(NAME, RETURN_IF_VECTOR, RETURN_IF_MATRIX, IS_STAGE_SPECIFIC, REQUIRED_STAGE, SPIRV_EXTERNAL_LIBRARY, \
                   SPIRV_EXTERNAL_INSTRUCTION)                                                                          \
