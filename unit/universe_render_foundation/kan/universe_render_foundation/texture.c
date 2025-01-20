@@ -660,7 +660,7 @@ static void raw_texture_load (struct render_foundation_texture_management_execut
         .width = raw_data->width,
         .height = raw_data->height,
         .depth = raw_data->depth,
-        .mips = loaded_texture->mips,
+        .mips = (uint8_t) loaded_texture->mips,
 
         .render_target = KAN_FALSE,
         .supports_sampling = KAN_TRUE,
