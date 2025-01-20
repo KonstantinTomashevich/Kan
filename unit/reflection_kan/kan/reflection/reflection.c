@@ -3972,6 +3972,8 @@ static void migrator_adapt_numeric (kan_instance_size_t source_size,
                                     const void *located_input,
                                     void *located_output)
 {
+    // Due to the differences between clang format 18 and 19, we need to disable formatting here.
+    // clang-format off
     KAN_ASSERT (source_size != target_size)
     switch (archetype)
     {
@@ -4161,6 +4163,7 @@ static void migrator_adapt_numeric (kan_instance_size_t source_size,
     }
 
     KAN_ASSERT (KAN_FALSE)
+    // clang-format on
 }
 
 static void migrator_adapt_enum_with_migration_node (const struct migrator_t *migrator,

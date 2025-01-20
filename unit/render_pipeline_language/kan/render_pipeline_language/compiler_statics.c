@@ -372,6 +372,8 @@ void kan_rpl_compiler_ensure_statics_initialized (void)
     node_##NAME->builtin = &STATICS.builtin_##NAME;                                                                    \
     kan_hash_storage_add (&STATICS.builtin_hash_storage, &node_##NAME->node)
 
+// Due to the differences between clang format 18 and 19, we need to disable formatting here.
+// clang-format off
 #define BUILTIN_ARGUMENT(BULTIN, INDEX, NEXT, NAME, IF_VECTOR, IF_MATRIX)                                              \
     STATICS.builtin_##BULTIN##_arguments[INDEX] = (struct compiler_instance_declaration_node_t) {                      \
         .next = NEXT,                                                                                                  \
@@ -390,6 +392,7 @@ void kan_rpl_compiler_ensure_statics_initialized (void)
         .source_name = source_functions,                                                                               \
         .source_line = 0u,                                                                                             \
     }
+// clang-format on
 
 #define BUILTIN_0(NAME, RETURN_IF_VECTOR, RETURN_IF_MATRIX, IS_STAGE_SPECIFIC, REQUIRED_STAGE, SPIRV_EXTERNAL_LIBRARY, \
                   SPIRV_EXTERNAL_INSTRUCTION)                                                                          \
