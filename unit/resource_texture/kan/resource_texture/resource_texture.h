@@ -27,7 +27,7 @@
 /// - `kan_resource_texture_compiled_t` is a result of compiling `kan_resource_texture_t` and contains common
 ///   information about the texture. Texture can be compiled into several formats and mips will be automatically
 ///   generated.
-/// - `kan_resource_texture_compiled_data_t` contains texture data in particular format for particular mips. Separating
+/// - `kan_resource_texture_compiled_data_t` contains texture data in particular format for particular mip. Separating
 ///   texture data blocks makes it possible to load mips independently.
 /// \endparblock
 ///

@@ -3378,7 +3378,7 @@ static void render_backend_system_clean_current_schedule_if_safe (struct render_
 
     if (!schedule->first_scheduled_buffer_unmap_flush_transfer && !schedule->first_scheduled_buffer_unmap_flush &&
         !schedule->first_scheduled_image_upload && !schedule->first_scheduled_frame_buffer_create &&
-        !schedule->first_scheduled_image_mip_generation && !schedule->first_scheduled_image_mip_generation &&
+        !schedule->first_scheduled_image_mip_generation && !schedule->first_scheduled_image_copy_data &&
         !schedule->first_scheduled_surface_read_back && !schedule->first_scheduled_buffer_read_back &&
         !schedule->first_scheduled_image_read_back && !schedule->first_scheduled_frame_buffer_destroy &&
         !schedule->first_scheduled_detached_frame_buffer_destroy && !schedule->first_scheduled_pass_destroy &&

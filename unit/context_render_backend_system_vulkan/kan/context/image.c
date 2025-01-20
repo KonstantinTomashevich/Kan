@@ -284,7 +284,7 @@ void kan_render_image_copy_data (kan_render_image_t from_image,
     struct scheduled_image_copy_data_t *item =
         KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&schedule->item_allocator, struct scheduled_image_copy_data_t);
 
-    // Image copies actually might one on another, but there should be too many of them.
+    // Image copies actually might one on another, but there should not be too many of them.
     struct scheduled_image_copy_data_t *last_item = schedule->first_scheduled_image_copy_data;
 
     while (last_item && last_item->next)

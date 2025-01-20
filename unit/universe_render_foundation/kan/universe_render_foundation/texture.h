@@ -15,9 +15,9 @@
 /// \parblock
 /// Render foundation texture management automatically loads and unloads textures based on `kan_render_texture_usage_t`
 /// instances. Render foundation checks all usages and loads only the mip intervals that are advised by at least one
-/// usages. When texture is loaded, `kan_render_texture_loaded_t` instance is created with appropriate render image.
-/// When there is no more usages, `kan_render_texture_loaded_t` is automatically deleted.
-/// In development, hot reload is supported and `kan_render_texture_loaded_t` render image is updated when needed.
+/// usage. When texture is loaded, `kan_render_texture_loaded_t` instance is created with appropriate render image.
+/// When there is no more usages, `kan_render_texture_loaded_t` is automatically deleted. When mip requirements change
+/// or texture data changes (due to hot reload, for example), `kan_render_texture_loaded_t` is automatically updated.
 /// \endparblock
 
 KAN_C_HEADER_BEGIN
