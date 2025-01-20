@@ -4,6 +4,7 @@
 
 #include <kan/api_common/c_header.h>
 #include <kan/api_common/core_types.h>
+#include <kan/container/hash_storage.h>
 #include <kan/context/render_backend_system.h>
 #include <kan/inline_math/inline_math.h>
 #include <kan/threading/atomic.h>
@@ -67,7 +68,7 @@ KAN_C_HEADER_BEGIN
 #define KAN_RENDER_FOUNDATION_FRAME_END "render_foundation_frame_end"
 
 /// \brief Represents data structure of resource that describes render pass.
-struct kan_render_graph_pass_resource_t
+struct kan_resource_render_graph_pass_t
 {
     /// \brief Render pass type.
     enum kan_render_pass_type_t type;
@@ -77,11 +78,11 @@ struct kan_render_graph_pass_resource_t
     struct kan_dynamic_array_t attachments;
 };
 
-UNIVERSE_RENDER_FOUNDATION_API void kan_render_graph_pass_resource_init (
-    struct kan_render_graph_pass_resource_t *instance);
+UNIVERSE_RENDER_FOUNDATION_API void kan_resource_render_graph_pass_init (
+    struct kan_resource_render_graph_pass_t *instance);
 
-UNIVERSE_RENDER_FOUNDATION_API void kan_render_graph_pass_resource_shutdown (
-    struct kan_render_graph_pass_resource_t *instance);
+UNIVERSE_RENDER_FOUNDATION_API void kan_resource_render_graph_pass_shutdown (
+    struct kan_resource_render_graph_pass_t *instance);
 
 /// \brief Stores information about pass attachment that could be useful for outer users.
 struct kan_render_graph_pass_attachment_t

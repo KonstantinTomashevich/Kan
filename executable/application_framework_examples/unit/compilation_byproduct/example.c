@@ -776,8 +776,8 @@ static void validate_loaded_data (struct compilation_byproduct_state_t *state,
     // Check random pipeline instance that it was compiled with expected format from configuration.
     KAN_UP_VALUE_READ (request, kan_resource_request_t, request_id, &singleton->any_pipeline_request_id)
     {
-        KAN_UP_VALUE_READ (view, KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (byproduct_compiled_t), container_id,
-                           &request->provided_container_id)
+        KAN_UP_VALUE_READ (view, KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (pipeline_instance_byproduct_compiled_t),
+                           container_id, &request->provided_container_id)
         {
             const struct pipeline_instance_byproduct_compiled_t *pipeline =
                 KAN_RESOURCE_PROVIDER_CONTAINER_GET (pipeline_instance_byproduct_compiled_t, view);

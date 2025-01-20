@@ -207,10 +207,16 @@ void kan_render_image_upload_data (kan_render_image_t image, uint8_t mip, vulkan
         return;
     }
 
-    void *output = kan_render_buffer_patch (KAN_HANDLE_SET (kan_render_buffer_t, staging_allocation.buffer),
-                                            staging_allocation.offset, allocation_size);
+    void *staging_memory;
+    if (vmaMapMemory (image_data->system->gpu_memory_allocator, staging_allocation.buffer->allocation,
+                      &staging_memory) != VK_SUCCESS)
+    {
+        kan_error_critical (
+            "Unexpected failure while mapping staging buffer memory for image upload, unable to continue properly.",
+            __FILE__, __LINE__);
+    }
 
-    if (!output)
+    if (!staging_memory)
     {
         KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR,
                  "Failed to upload image \"%s\" mip %lu: unable to patch acquired staging memory.",
@@ -219,7 +225,7 @@ void kan_render_image_upload_data (kan_render_image_t image, uint8_t mip, vulkan
         return;
     }
 
-    memcpy (output, data, allocation_size);
+    memcpy (((uint8_t *) staging_memory) + staging_allocation.offset, data, allocation_size);
     struct render_backend_schedule_state_t *schedule =
         render_backend_system_get_schedule_for_memory (image_data->system);
     kan_atomic_int_lock (&schedule->schedule_lock);
@@ -234,6 +240,7 @@ void kan_render_image_upload_data (kan_render_image_t image, uint8_t mip, vulkan
     item->mip = mip;
     item->staging_buffer = staging_allocation.buffer;
     item->staging_buffer_offset = staging_allocation.offset;
+    item->staging_buffer_size = allocation_size;
     kan_atomic_int_unlock (&schedule->schedule_lock);
 
     kan_cpu_section_execution_shutdown (&execution);
@@ -256,6 +263,49 @@ void kan_render_image_request_mip_generation (kan_render_image_t image, uint8_t 
     item->image = data;
     item->first = first;
     item->last = last;
+    kan_atomic_int_unlock (&schedule->schedule_lock);
+}
+
+void kan_render_image_copy_data (kan_render_image_t from_image,
+                                 uint8_t from_mip,
+                                 kan_render_image_t to_image,
+                                 uint8_t to_mip)
+{
+    struct render_backend_image_t *source_data = KAN_HANDLE_GET (from_image);
+    KAN_ASSERT (!source_data->description.render_target)
+
+    struct render_backend_image_t *target_data = KAN_HANDLE_GET (to_image);
+    KAN_ASSERT (!target_data->description.render_target)
+
+    struct render_backend_schedule_state_t *schedule =
+        render_backend_system_get_schedule_for_memory (source_data->system);
+    kan_atomic_int_lock (&schedule->schedule_lock);
+
+    struct scheduled_image_copy_data_t *item =
+        KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&schedule->item_allocator, struct scheduled_image_copy_data_t);
+
+    // Image copies actually might one on another, but there should not be too many of them.
+    struct scheduled_image_copy_data_t *last_item = schedule->first_scheduled_image_copy_data;
+
+    while (last_item && last_item->next)
+    {
+        last_item = last_item->next;
+    }
+
+    item->next = NULL;
+    if (last_item)
+    {
+        last_item->next = item;
+    }
+    else
+    {
+        schedule->first_scheduled_image_copy_data = item;
+    }
+
+    item->from_image = source_data;
+    item->to_image = target_data;
+    item->from_mip = from_mip;
+    item->to_mip = to_mip;
     kan_atomic_int_unlock (&schedule->schedule_lock);
 }
 

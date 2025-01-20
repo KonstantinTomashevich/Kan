@@ -92,6 +92,16 @@ struct kan_resource_compilation_dependency_t
 typedef kan_interned_string_t (*kan_resource_compilation_register_byproduct_functor_t) (
     kan_functor_user_data_t interface_user_data, kan_interned_string_t byproduct_type_name, void *byproduct_data);
 
+/// \brief Register byproduct that is considered to be unique and should have unique readable name.
+/// \details Functionally, almost the same as `kan_resource_compilation_register_byproduct_functor_t`, but it never
+///          searches the compatible byproduct through hashing and equality check. Instead, it attempts to create
+///          new byproduct with given name right away. If name is already occupied, function returns KAN_FALSE.
+typedef kan_bool_t (*kan_resource_compilation_register_unique_byproduct_functor_t) (
+    kan_functor_user_data_t interface_user_data,
+    kan_interned_string_t byproduct_type_name,
+    kan_interned_string_t byproduct_name,
+    void *byproduct_data);
+
 /// \brief Defines whole state of compilation routine.
 struct kan_resource_compile_state_t
 {
@@ -126,6 +136,12 @@ struct kan_resource_compile_state_t
 
     /// \brief Function for registering byproducts. Returns registered byproduct resource name.
     kan_resource_compilation_register_byproduct_functor_t register_byproduct;
+
+    /// \brief Function for registering byproducts that have unique name and should not be replaced by other byproduct.
+    kan_resource_compilation_register_unique_byproduct_functor_t register_unique_byproduct;
+
+    /// \brief Resource name for logging errors.
+    kan_interned_string_t name;
 };
 
 /// \brief Results of compilation functor execution.
@@ -454,5 +470,32 @@ struct kan_resource_import_configuration_type_meta_t
     /// \brief True if source files can be compared using checksum.
     kan_bool_t allow_checksum;
 };
+
+/// \brief Utility function for extracting file names from input paths provided to import functor.
+static inline void kan_resource_import_extract_file_name (const char *input_path,
+                                                          const char **file_name_begin_output,
+                                                          const char **file_name_end_output)
+{
+    const char *input_path_begin = input_path;
+    const char *last_separator = NULL;
+    const char *last_dot = NULL;
+
+    while (*input_path)
+    {
+        if (*input_path == '/')
+        {
+            last_separator = input_path;
+        }
+        else if (*input_path == '.')
+        {
+            last_dot = input_path;
+        }
+
+        ++input_path;
+    }
+
+    *file_name_begin_output = last_separator ? last_separator + 1u : input_path_begin;
+    *file_name_end_output = last_dot && (!last_separator || last_dot != last_separator + 1u) ? last_dot : input_path;
+}
 
 KAN_C_HEADER_END

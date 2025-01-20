@@ -393,8 +393,8 @@ kan_render_backend_system_create_surface (kan_context_system_t render_backend_sy
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_backend_system_present_image_on_surface (
     kan_render_surface_t surface,
     kan_render_image_t image,
-    struct kan_render_integer_region_t image_region,
-    struct kan_render_integer_region_t surface_region);
+    struct kan_render_integer_region_t surface_region,
+    struct kan_render_integer_region_t image_region);
 
 /// \brief Recreates surface using new present mode queue (the same format as for creation).
 /// \details Surface will be recreated and initialized during next application system sync.
@@ -1113,6 +1113,14 @@ CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_image_upload_data (kan_render_
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_image_request_mip_generation (kan_render_image_t image,
                                                                                 uint8_t first,
                                                                                 uint8_t last);
+
+/// \brief Schedules data copy from one mip of one image to another mip of another image.
+/// \invariant User must guarantee that images are compatible and that sizes at given mips are equal.
+/// \invariant For thread safety, both images should not be modified by other functions during this call.
+CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_image_copy_data (kan_render_image_t from_image,
+                                                                   uint8_t from_mip,
+                                                                   kan_render_image_t to_image,
+                                                                   uint8_t to_mip);
 
 /// \brief Requests render target to be resized without breaking the attachments.
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_image_resize_render_target (kan_render_image_t image,

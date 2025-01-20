@@ -1297,6 +1297,7 @@ kan_bool_t kan_render_backend_system_select_device (kan_context_system_t render_
         state->first_scheduled_image_upload = NULL;
         state->first_scheduled_frame_buffer_create = NULL;
         state->first_scheduled_image_mip_generation = NULL;
+        state->first_scheduled_image_copy_data = NULL;
         state->first_scheduled_surface_read_back = NULL;
         state->first_scheduled_buffer_read_back = NULL;
         state->first_scheduled_image_read_back = NULL;
@@ -1481,7 +1482,7 @@ static void render_backend_system_submit_transfer (struct render_backend_system_
             .pNext = NULL,
             .srcAccessMask = 0u,
             .dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
-            .oldLayout = image_upload->image->last_command_layout,
+            .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
             .newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
             .srcQueueFamilyIndex = system->device_queue_family_index,
             .dstQueueFamilyIndex = system->device_queue_family_index,
@@ -1525,6 +1526,15 @@ static void render_backend_system_submit_transfer (struct render_backend_system_
                 },
         };
 
+        vmaUnmapMemory (system->gpu_memory_allocator, image_upload->staging_buffer->allocation);
+        if (vmaFlushAllocation (system->gpu_memory_allocator, image_upload->staging_buffer->allocation,
+                                image_upload->staging_buffer_offset, image_upload->staging_buffer_size) != VK_SUCCESS)
+        {
+            kan_error_critical (
+                "Unexpected failure while flushing buffer data for image upload, unable to continue properly.",
+                __FILE__, __LINE__);
+        }
+
         vkCmdCopyBufferToImage (state->primary_command_buffer, image_upload->staging_buffer->buffer,
                                 image_upload->image->image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1u, &copy_region);
 
@@ -1554,6 +1564,157 @@ static void render_backend_system_submit_transfer (struct render_backend_system_
 
         image_upload->image->last_command_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         image_upload = image_upload->next;
+    }
+
+    struct scheduled_image_copy_data_t *image_copy = schedule->first_scheduled_image_copy_data;
+    schedule->first_scheduled_image_copy_data = NULL;
+
+    while (image_copy)
+    {
+        VkImageAspectFlags image_aspect = get_image_aspects (&image_copy->from_image->description);
+
+        vulkan_size_t width;
+        vulkan_size_t height;
+        vulkan_size_t depth;
+        kan_render_image_description_calculate_size_at_mip (&image_copy->from_image->description, image_copy->from_mip,
+                                                            &width, &height, &depth);
+
+        VkImageMemoryBarrier prepare_transfer_barriers[] = {
+            {
+                .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+                .pNext = NULL,
+                .srcAccessMask = 0u,
+                .dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
+                .oldLayout = image_copy->from_image->last_command_layout,
+                .newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                .srcQueueFamilyIndex = system->device_queue_family_index,
+                .dstQueueFamilyIndex = system->device_queue_family_index,
+                .image = image_copy->from_image->image,
+                .subresourceRange =
+                    {
+                        .aspectMask = image_aspect,
+                        .baseMipLevel = (vulkan_size_t) image_copy->from_mip,
+                        .levelCount = 1u,
+                        .baseArrayLayer = 0u,
+                        .layerCount = 1u,
+                    },
+            },
+            {
+                .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+                .pNext = NULL,
+                .srcAccessMask = 0u,
+                .dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
+                .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+                .newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                .srcQueueFamilyIndex = system->device_queue_family_index,
+                .dstQueueFamilyIndex = system->device_queue_family_index,
+                .image = image_copy->to_image->image,
+                .subresourceRange =
+                    {
+                        .aspectMask = image_aspect,
+                        .baseMipLevel = (vulkan_size_t) image_copy->to_mip,
+                        .levelCount = 1u,
+                        .baseArrayLayer = 0u,
+                        .layerCount = 1u,
+                    },
+            },
+        };
+
+        vkCmdPipelineBarrier (state->primary_command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                              VK_PIPELINE_STAGE_TRANSFER_BIT, 0u, 0u, NULL, 0u, NULL,
+                              sizeof (prepare_transfer_barriers) / sizeof (prepare_transfer_barriers[0u]),
+                              prepare_transfer_barriers);
+        image_copy->from_image->last_command_layout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+        image_copy->to_image->last_command_layout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+
+        VkImageCopy copy_region = {
+            .srcSubresource =
+                {
+                    .aspectMask = image_aspect,
+                    .mipLevel = (vulkan_size_t) image_copy->from_mip,
+                    .baseArrayLayer = 0u,
+                    .layerCount = 1u,
+                },
+            .srcOffset =
+                {
+                    .x = 0u,
+                    .y = 0u,
+                    .z = 0u,
+                },
+            .dstSubresource =
+                {
+                    .aspectMask = image_aspect,
+                    .mipLevel = (vulkan_size_t) image_copy->to_mip,
+                    .baseArrayLayer = 0u,
+                    .layerCount = 1u,
+                },
+            .dstOffset =
+                {
+                    .x = 0u,
+                    .y = 0u,
+                    .z = 0u,
+                },
+            .extent =
+                {
+                    .width = (vulkan_size_t) width,
+                    .height = (vulkan_size_t) height,
+                    .depth = (vulkan_size_t) depth,
+                },
+        };
+
+        vkCmdCopyImage (state->primary_command_buffer, image_copy->from_image->image,
+                        VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, image_copy->to_image->image,
+                        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1u, &copy_region);
+
+        VkImageMemoryBarrier finish_transfer_barriers[] = {
+            {
+                .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+                .pNext = NULL,
+                .srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
+                .dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
+                .oldLayout = image_copy->from_image->last_command_layout,
+                .newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                .srcQueueFamilyIndex = system->device_queue_family_index,
+                .dstQueueFamilyIndex = system->device_queue_family_index,
+                .image = image_copy->from_image->image,
+                .subresourceRange =
+                    {
+                        .aspectMask = image_aspect,
+                        .baseMipLevel = (vulkan_size_t) image_copy->from_mip,
+                        .levelCount = 1u,
+                        .baseArrayLayer = 0u,
+                        .layerCount = 1u,
+                    },
+            },
+            {
+                .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+                .pNext = NULL,
+                .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
+                .dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
+                .oldLayout = image_copy->to_image->last_command_layout,
+                .newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                .srcQueueFamilyIndex = system->device_queue_family_index,
+                .dstQueueFamilyIndex = system->device_queue_family_index,
+                .image = image_copy->to_image->image,
+                .subresourceRange =
+                    {
+                        .aspectMask = image_aspect,
+                        .baseMipLevel = (vulkan_size_t) image_copy->to_mip,
+                        .levelCount = 1u,
+                        .baseArrayLayer = 0u,
+                        .layerCount = 1u,
+                    },
+            },
+        };
+
+        vkCmdPipelineBarrier (state->primary_command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                              VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT, 0u, 0u, NULL, 0u,
+                              NULL, sizeof (finish_transfer_barriers) / sizeof (finish_transfer_barriers[0u]),
+                              finish_transfer_barriers);
+
+        image_copy->from_image->last_command_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        image_copy->to_image->last_command_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        image_copy = image_copy->next;
     }
 
     DEBUG_LABEL_SCOPE_END (state->primary_command_buffer)
@@ -3217,10 +3378,11 @@ static void render_backend_system_clean_current_schedule_if_safe (struct render_
 
     if (!schedule->first_scheduled_buffer_unmap_flush_transfer && !schedule->first_scheduled_buffer_unmap_flush &&
         !schedule->first_scheduled_image_upload && !schedule->first_scheduled_frame_buffer_create &&
-        !schedule->first_scheduled_image_mip_generation && !schedule->first_scheduled_surface_read_back &&
-        !schedule->first_scheduled_buffer_read_back && !schedule->first_scheduled_image_read_back &&
-        !schedule->first_scheduled_frame_buffer_destroy && !schedule->first_scheduled_detached_frame_buffer_destroy &&
-        !schedule->first_scheduled_pass_destroy && !schedule->first_scheduled_pipeline_parameter_set_destroy &&
+        !schedule->first_scheduled_image_mip_generation && !schedule->first_scheduled_image_copy_data &&
+        !schedule->first_scheduled_surface_read_back && !schedule->first_scheduled_buffer_read_back &&
+        !schedule->first_scheduled_image_read_back && !schedule->first_scheduled_frame_buffer_destroy &&
+        !schedule->first_scheduled_detached_frame_buffer_destroy && !schedule->first_scheduled_pass_destroy &&
+        !schedule->first_scheduled_pipeline_parameter_set_destroy &&
         !schedule->first_scheduled_detached_descriptor_set_destroy && !schedule->first_scheduled_code_module_destroy &&
         !schedule->first_scheduled_graphics_pipeline_destroy &&
         !schedule->first_scheduled_graphics_pipeline_family_destroy && !schedule->first_scheduled_buffer_destroy &&
@@ -4376,8 +4538,8 @@ kan_render_surface_t kan_render_backend_system_create_surface (
 
 void kan_render_backend_system_present_image_on_surface (kan_render_surface_t surface,
                                                          kan_render_image_t image,
-                                                         struct kan_render_integer_region_t image_region,
-                                                         struct kan_render_integer_region_t surface_region)
+                                                         struct kan_render_integer_region_t surface_region,
+                                                         struct kan_render_integer_region_t image_region)
 {
     struct render_backend_surface_t *data = KAN_HANDLE_GET (surface);
     struct surface_blit_request_t *request =
@@ -4389,7 +4551,7 @@ void kan_render_backend_system_present_image_on_surface (kan_render_surface_t su
     request->surface_region = surface_region;
 
     kan_atomic_int_lock (&data->blit_request_lock);
-    if (data->first_blit_request)
+    if (!data->first_blit_request)
     {
         data->first_blit_request = request;
     }

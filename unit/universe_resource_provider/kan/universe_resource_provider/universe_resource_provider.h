@@ -223,7 +223,7 @@ struct kan_resource_provider_singleton_t
 UNIVERSE_RESOURCE_PROVIDER_API void kan_resource_provider_singleton_init (
     struct kan_resource_provider_singleton_t *instance);
 
-/// \brief Inline helper for generation resource request ids.
+/// \brief Inline helper for generation of resource request ids.
 static inline kan_resource_request_id_t kan_next_resource_request_id (
     const struct kan_resource_provider_singleton_t *resource_provider)
 {

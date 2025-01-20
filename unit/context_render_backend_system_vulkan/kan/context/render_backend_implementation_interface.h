@@ -157,6 +157,7 @@ struct scheduled_image_upload_t
     uint8_t mip;
     struct render_backend_buffer_t *staging_buffer;
     vulkan_size_t staging_buffer_offset;
+    vulkan_size_t staging_buffer_size;
 };
 
 struct scheduled_frame_buffer_create_t
@@ -171,6 +172,15 @@ struct scheduled_image_mip_generation_t
     struct render_backend_image_t *image;
     uint8_t first;
     uint8_t last;
+};
+
+struct scheduled_image_copy_data_t
+{
+    struct scheduled_image_copy_data_t *next;
+    struct render_backend_image_t *from_image;
+    struct render_backend_image_t *to_image;
+    uint8_t from_mip;
+    uint8_t to_mip;
 };
 
 struct scheduled_surface_read_back_t
@@ -311,6 +321,7 @@ struct render_backend_schedule_state_t
     struct scheduled_image_upload_t *first_scheduled_image_upload;
     struct scheduled_frame_buffer_create_t *first_scheduled_frame_buffer_create;
     struct scheduled_image_mip_generation_t *first_scheduled_image_mip_generation;
+    struct scheduled_image_copy_data_t *first_scheduled_image_copy_data;
     struct scheduled_surface_read_back_t *first_scheduled_surface_read_back;
     struct scheduled_buffer_read_back_t *first_scheduled_buffer_read_back;
     struct scheduled_image_read_back_t *first_scheduled_image_read_back;
