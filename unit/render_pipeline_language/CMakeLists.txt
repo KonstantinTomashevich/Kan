@@ -40,3 +40,4 @@ concrete_preprocessing_queue_step_apply (COMMAND re2c ARGUMENTS "$$INPUT" -o "$$
 concrete_preprocessing_queue_step_preprocess ()
 reflection_preprocessor_setup_step (
         DIRECT "kan/render_pipeline_language/compiler.h" "kan/render_pipeline_language/parser.h")
+register_unit_reflection ()
