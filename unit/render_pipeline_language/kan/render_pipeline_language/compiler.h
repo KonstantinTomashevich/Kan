@@ -356,7 +356,7 @@ kan_rpl_compiler_context_create (enum kan_rpl_pipeline_type_t pipeline_type, kan
 
 /// \brief Adds given module to resolution scope. Does not copy and does not transfer ownership.
 RENDER_PIPELINE_LANGUAGE_API kan_bool_t kan_rpl_compiler_context_use_module (
-    kan_rpl_compiler_context_t compiler_context, struct kan_rpl_intermediate_t *intermediate_reference);
+    kan_rpl_compiler_context_t compiler_context, const struct kan_rpl_intermediate_t *intermediate_reference);
 
 /// \brief Attempts to set flag option value.
 RENDER_PIPELINE_LANGUAGE_API kan_bool_t kan_rpl_compiler_context_set_option_flag (

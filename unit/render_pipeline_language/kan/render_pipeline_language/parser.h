@@ -536,6 +536,12 @@ RENDER_PIPELINE_LANGUAGE_API kan_bool_t kan_rpl_parser_add_source (kan_rpl_parse
                                                                    const char *source,
                                                                    kan_interned_string_t log_name);
 
+/// \brief Parses given char sequence as source and appends it to previous parsed data if any.
+RENDER_PIPELINE_LANGUAGE_API kan_bool_t kan_rpl_parser_add_source_char_sequence (kan_rpl_parser_t parser,
+                                                                                 const char *source_begin,
+                                                                                 const char *source_end,
+                                                                                 kan_interned_string_t log_name);
+
 /// \brief Builds intermediate structure from parsed data.
 RENDER_PIPELINE_LANGUAGE_API kan_bool_t kan_rpl_parser_build_intermediate (kan_rpl_parser_t parser,
                                                                            struct kan_rpl_intermediate_t *output);

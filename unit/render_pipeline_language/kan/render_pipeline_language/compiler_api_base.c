@@ -136,7 +136,7 @@ kan_rpl_compiler_context_t kan_rpl_compiler_context_create (enum kan_rpl_pipelin
 }
 
 kan_bool_t kan_rpl_compiler_context_use_module (kan_rpl_compiler_context_t compiler_context,
-                                                struct kan_rpl_intermediate_t *intermediate_reference)
+                                                const struct kan_rpl_intermediate_t *intermediate_reference)
 {
     struct rpl_compiler_context_t *instance = KAN_HANDLE_GET (compiler_context);
     for (kan_loop_size_t module_index = 0u; module_index < instance->modules.size; ++module_index)
@@ -171,7 +171,7 @@ kan_bool_t kan_rpl_compiler_context_use_module (kan_rpl_compiler_context_t compi
         }
     }
 
-    struct kan_rpl_intermediate_t **spot = kan_dynamic_array_add_last (&instance->modules);
+    const struct kan_rpl_intermediate_t **spot = kan_dynamic_array_add_last (&instance->modules);
     if (!spot)
     {
         kan_dynamic_array_set_capacity (&instance->modules, KAN_MAX (1u, instance->modules.size * 2u));
