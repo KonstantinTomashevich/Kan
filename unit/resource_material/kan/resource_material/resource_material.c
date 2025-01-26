@@ -46,8 +46,8 @@ RESOURCE_MATERIAL_API struct kan_resource_resource_type_meta_t
 };
 
 KAN_REFLECTION_STRUCT_FIELD_META (kan_resource_material_pass_compiled_t, pipeline)
-RESOURCE_MATERIAL_API struct kan_resource_reference_meta_t
-    kan_resource_material_pass_compiled_pipeline_reference_meta = {
+RESOURCE_MATERIAL_API struct kan_resource_reference_meta_t kan_resource_material_pass_compiled_pipeline_reference_meta =
+    {
         .type = "kan_resource_material_pipeline_compiled_t",
         .compilation_usage = KAN_RESOURCE_REFERENCE_COMPILATION_USAGE_TYPE_NOT_NEEDED,
 };
@@ -190,12 +190,11 @@ struct kan_resource_material_pipeline_t
 };
 
 KAN_REFLECTION_STRUCT_META (kan_resource_material_pipeline_t)
-RESOURCE_MATERIAL_API struct kan_resource_byproduct_type_meta_t
-    kan_resource_material_pipeline_byproduct_type_meta = {
-        .hash = NULL,
-        .is_equal = NULL,
-        .move = NULL,
-        .reset = NULL,
+RESOURCE_MATERIAL_API struct kan_resource_byproduct_type_meta_t kan_resource_material_pipeline_byproduct_type_meta = {
+    .hash = NULL,
+    .is_equal = NULL,
+    .move = NULL,
+    .reset = NULL,
 };
 
 static enum kan_resource_compile_result_t kan_resource_material_pipeline_compile (
@@ -211,14 +210,12 @@ RESOURCE_MATERIAL_API struct kan_resource_compilable_meta_t kan_resource_materia
 };
 
 KAN_REFLECTION_STRUCT_FIELD_META (kan_resource_material_pipeline_t, sources)
-RESOURCE_MATERIAL_API struct kan_resource_reference_meta_t kan_resource_material_pipeline_sources_reference_meta =
-    {
-        .type = "kan_resource_material_shader_source_t",
-        .compilation_usage = KAN_RESOURCE_REFERENCE_COMPILATION_USAGE_TYPE_NEEDED_COMPILED,
+RESOURCE_MATERIAL_API struct kan_resource_reference_meta_t kan_resource_material_pipeline_sources_reference_meta = {
+    .type = "kan_resource_material_shader_source_t",
+    .compilation_usage = KAN_RESOURCE_REFERENCE_COMPILATION_USAGE_TYPE_NEEDED_COMPILED,
 };
 
-RESOURCE_MATERIAL_API void kan_resource_material_pipeline_init (
-    struct kan_resource_material_pipeline_t *instance)
+RESOURCE_MATERIAL_API void kan_resource_material_pipeline_init (struct kan_resource_material_pipeline_t *instance)
 {
     kan_dynamic_array_init (&instance->entry_points, 0u, sizeof (struct kan_rpl_entry_point_t),
                             _Alignof (struct kan_rpl_entry_point_t), kan_allocation_group_stack_get ());
@@ -229,8 +226,7 @@ RESOURCE_MATERIAL_API void kan_resource_material_pipeline_init (
     instance->source_pass = NULL;
 }
 
-RESOURCE_MATERIAL_API void kan_resource_material_pipeline_shutdown (
-    struct kan_resource_material_pipeline_t *instance)
+RESOURCE_MATERIAL_API void kan_resource_material_pipeline_shutdown (struct kan_resource_material_pipeline_t *instance)
 {
     kan_dynamic_array_shutdown (&instance->entry_points);
     kan_dynamic_array_shutdown (&instance->sources);
@@ -327,6 +323,13 @@ static enum kan_resource_compile_result_t kan_resource_material_compile (struct 
 {
     const struct kan_resource_material_t *input = state->input_instance;
     struct kan_resource_material_compiled_t *output = state->output_instance;
+
+    if (input->sources.size == 0u)
+    {
+        KAN_LOG (resource_material_compilation, KAN_LOG_ERROR,
+                 "Failed to compile material \"%s\" as it has no sources.", state->name)
+        return KAN_RESOURCE_PIPELINE_COMPILE_FAILED;
+    }
 
     kan_allocation_group_t main_allocation_group =
         kan_allocation_group_get_child (kan_allocation_group_root (), "material_compilation");
@@ -706,6 +709,7 @@ static enum kan_resource_compile_result_t kan_resource_material_pipeline_compile
 
         if (emit_result)
         {
+            KAN_ASSERT (spirv_code.size > 0u)
             kan_dynamic_array_set_capacity (&output->code, spirv_code.size * spirv_code.item_size);
             output->code.size = output->code.capacity;
             memcpy (output->code.data, spirv_code.data, output->code.size);
@@ -794,8 +798,7 @@ void kan_resource_material_pipeline_compiled_init (struct kan_resource_material_
                             kan_allocation_group_stack_get ());
 }
 
-void kan_resource_material_pipeline_compiled_shutdown (
-    struct kan_resource_material_pipeline_compiled_t *instance)
+void kan_resource_material_pipeline_compiled_shutdown (struct kan_resource_material_pipeline_compiled_t *instance)
 {
     kan_dynamic_array_shutdown (&instance->entry_points);
     kan_dynamic_array_shutdown (&instance->code);

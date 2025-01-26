@@ -4,7 +4,7 @@ concrete_sources ("*.c")
 
 concrete_require (SCOPE PUBLIC
         ABSTRACT context_render_backend_system
-        CONCRETE_INTERFACE container render_pipeline_language
+        CONCRETE_INTERFACE container inline_math render_pipeline_language
         THIRD_PARTY qsort)
 concrete_require (SCOPE PRIVATE ABSTRACT error log CONCRETE_INTERFACE resource_pipeline)
 
