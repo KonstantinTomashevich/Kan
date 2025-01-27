@@ -205,30 +205,6 @@ RENDER_PIPELINE_LANGUAGE_API void kan_rpl_meta_buffer_init (struct kan_rpl_meta_
 
 RENDER_PIPELINE_LANGUAGE_API void kan_rpl_meta_buffer_shutdown (struct kan_rpl_meta_buffer_t *instance);
 
-/// \brief Enumerates supported sampler filter modes.
-enum kan_rpl_meta_sampler_filter_t
-{
-    KAN_RPL_META_SAMPLER_FILTER_NEAREST = 0u,
-    KAN_RPL_META_SAMPLER_FILTER_LINEAR,
-};
-
-/// \brief Enumerates supported sampler mip map modes.
-enum kan_rpl_meta_sampler_mip_map_mode_t
-{
-    KAN_RPL_META_SAMPLER_MIP_MAP_MODE_NEAREST = 0u,
-    KAN_RPL_META_SAMPLER_MIP_MAP_MODE_LINEAR,
-};
-
-/// \brief Enumerates supported sampler address modes.
-enum kan_rpl_meta_sampler_address_mode_t
-{
-    KAN_RPL_META_SAMPLER_ADDRESS_MODE_REPEAT = 0u,
-    KAN_RPL_META_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT,
-    KAN_RPL_META_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-    KAN_RPL_META_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER,
-    KAN_RPL_META_SAMPLER_ADDRESS_MODE_MIRROR_CLAMP_TO_EDGE,
-};
-
 /// \brief Stores information about sampler exposed to metadata.
 struct kan_rpl_meta_sampler_t
 {

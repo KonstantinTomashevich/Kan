@@ -37,6 +37,12 @@ RESOURCE_MATERIAL_API struct kan_resource_reference_meta_t kan_resource_material
     .compilation_usage = KAN_RESOURCE_REFERENCE_COMPILATION_USAGE_TYPE_NEEDED_COMPILED,
 };
 
+KAN_REFLECTION_STRUCT_FIELD_META (kan_resource_material_image_t, texture)
+RESOURCE_MATERIAL_API struct kan_resource_reference_meta_t kan_resource_material_image_texture_reference_meta = {
+    .type = "kan_resource_texture_t",
+    .compilation_usage = KAN_RESOURCE_REFERENCE_COMPILATION_USAGE_TYPE_NOT_NEEDED,
+};
+
 KAN_REFLECTION_STRUCT_META (kan_resource_material_instance_static_compiled_t)
 RESOURCE_MATERIAL_API struct kan_resource_resource_type_meta_t
     kan_resource_material_instance_static_compiled_resource_type_meta = {
@@ -409,6 +415,42 @@ static enum kan_resource_compile_result_t kan_resource_material_instance_static_
                                  &((struct kan_resource_material_tail_append_t *) append_raw->tail_append.data)[index]);
     }
 
+    kan_dynamic_array_set_capacity (&output->images, (base ? base->images.size : 0u) + append_raw->images.size);
+    if (base && base->images.size > 0u)
+    {
+        output->images.size = base->images.size;
+        memcpy (output->images.data, base->images.data,
+                sizeof (struct kan_resource_material_image_t) * base->images.size);
+    }
+
+    for (kan_loop_size_t append_index = 0u; append_index < append_raw->images.size; ++append_index)
+    {
+        kan_bool_t overridden = KAN_FALSE;
+        struct kan_resource_material_image_t *to_append =
+            &((struct kan_resource_material_image_t *) append_raw->images.data)[append_index];
+
+        for (kan_loop_size_t existent_index = 0u; existent_index < output->images.size; ++existent_index)
+        {
+            struct kan_resource_material_image_t *existent =
+                &((struct kan_resource_material_image_t *) output->images.data)[existent_index];
+
+            if (to_append->name == existent->name)
+            {
+                existent->texture = to_append->texture;
+                existent->sampler = to_append->sampler;
+                overridden = KAN_TRUE;
+                break;
+            }
+        }
+
+        if (!overridden)
+        {
+            void *spot = kan_dynamic_array_add_last (&output->images);
+            KAN_ASSERT (spot);
+            memcpy (spot, to_append, sizeof (struct kan_resource_material_image_t));
+        }
+    }
+
     return KAN_RESOURCE_PIPELINE_COMPILE_FINISHED;
 }
 
@@ -449,6 +491,8 @@ void kan_resource_material_instance_init (struct kan_resource_material_instance_
                             _Alignof (struct kan_resource_material_tail_set_t), kan_allocation_group_stack_get ());
     kan_dynamic_array_init (&instance->tail_append, 0u, sizeof (struct kan_resource_material_tail_append_t),
                             _Alignof (struct kan_resource_material_tail_append_t), kan_allocation_group_stack_get ());
+    kan_dynamic_array_init (&instance->images, 0u, sizeof (struct kan_resource_material_image_t),
+                            _Alignof (struct kan_resource_material_image_t), kan_allocation_group_stack_get ());
 }
 
 void kan_resource_material_instance_shutdown (struct kan_resource_material_instance_t *instance)
@@ -469,6 +513,7 @@ void kan_resource_material_instance_shutdown (struct kan_resource_material_insta
     kan_dynamic_array_shutdown (&instance->parameters);
     kan_dynamic_array_shutdown (&instance->tail_set);
     kan_dynamic_array_shutdown (&instance->tail_append);
+    kan_dynamic_array_shutdown (&instance->images);
 }
 
 void kan_resource_material_instance_static_compiled_init (
@@ -480,6 +525,8 @@ void kan_resource_material_instance_static_compiled_init (
                             _Alignof (struct kan_resource_material_tail_set_t), kan_allocation_group_stack_get ());
     kan_dynamic_array_init (&instance->tail_append, 0u, sizeof (struct kan_resource_material_tail_append_t),
                             _Alignof (struct kan_resource_material_tail_append_t), kan_allocation_group_stack_get ());
+    kan_dynamic_array_init (&instance->images, 0u, sizeof (struct kan_resource_material_image_t),
+                            _Alignof (struct kan_resource_material_image_t), kan_allocation_group_stack_get ());
 }
 
 void kan_resource_material_instance_static_compiled_shutdown (
@@ -500,6 +547,7 @@ void kan_resource_material_instance_static_compiled_shutdown (
     kan_dynamic_array_shutdown (&instance->parameters);
     kan_dynamic_array_shutdown (&instance->tail_set);
     kan_dynamic_array_shutdown (&instance->tail_append);
+    kan_dynamic_array_shutdown (&instance->images);
 }
 
 void kan_resource_material_instance_compiled_init (struct kan_resource_material_instance_compiled_t *instance)

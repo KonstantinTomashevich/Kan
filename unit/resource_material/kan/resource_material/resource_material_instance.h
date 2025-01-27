@@ -5,6 +5,7 @@
 #include <kan/api_common/core_types.h>
 #include <kan/container/dynamic_array.h>
 #include <kan/container/interned_string.h>
+#include <kan/context/render_backend_system.h>
 #include <kan/error/critical.h>
 #include <kan/inline_math/inline_math.h>
 #include <kan/reflection/markup.h>
@@ -90,6 +91,13 @@ RESOURCE_MATERIAL_API void kan_resource_material_tail_append_init (
 RESOURCE_MATERIAL_API void kan_resource_material_tail_append_shutdown (
     struct kan_resource_material_tail_append_t *instance);
 
+struct kan_resource_material_image_t
+{
+    kan_interned_string_t name;
+    kan_interned_string_t texture;
+    struct kan_render_sampler_t sampler;
+};
+
 struct kan_resource_material_instance_t
 {
     kan_interned_string_t material;
@@ -106,6 +114,9 @@ struct kan_resource_material_instance_t
 
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_resource_material_tail_append_t)
     struct kan_dynamic_array_t tail_append;
+
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_resource_material_image_t)
+    struct kan_dynamic_array_t images;
 };
 
 RESOURCE_MATERIAL_API void kan_resource_material_instance_init (struct kan_resource_material_instance_t *instance);
@@ -122,6 +133,9 @@ struct kan_resource_material_instance_static_compiled_t
 
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_resource_material_tail_append_t)
     struct kan_dynamic_array_t tail_append;
+
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_resource_material_image_t)
+    struct kan_dynamic_array_t images;
 };
 
 RESOURCE_MATERIAL_API void kan_resource_material_instance_static_compiled_init (
