@@ -377,11 +377,19 @@ void render_backend_compiler_state_request_graphics (struct render_backend_pipel
                               sizeof (VkPipelineShaderStageCreateInfo) * request->shader_stages_count,
                               _Alignof (VkPipelineShaderStageCreateInfo));
 
+    request->linked_code_modules_count = description->code_modules_count;
+    request->linked_code_modules =
+        kan_allocate_general (pipeline->system->pipeline_wrapper_allocation_group,
+                              sizeof (struct render_backend_code_module_t *) * description->code_modules_count,
+                              _Alignof (struct render_backend_code_module_t *));
+
     VkPipelineShaderStageCreateInfo *output_stage = request->shader_stages;
     for (kan_loop_size_t module_index = 0u; module_index < description->code_modules_count; ++module_index)
     {
         struct render_backend_code_module_t *code_module =
             KAN_HANDLE_GET (description->code_modules[module_index].code_module);
+        request->linked_code_modules[module_index] = code_module;
+        kan_atomic_int_add (&code_module->links, 1);
         VkShaderModule module = code_module->module;
 
         for (kan_loop_size_t entry_point_index = 0u;
@@ -568,11 +576,18 @@ void render_backend_compiler_state_request_graphics (struct render_backend_pipel
 
 void render_backend_compiler_state_destroy_graphics_request (struct graphics_pipeline_compilation_request_t *request)
 {
+    for (kan_loop_size_t module_index = 0u; module_index < request->linked_code_modules_count; ++module_index)
+    {
+        render_backend_system_unlink_code_module (request->linked_code_modules[module_index]);
+    }
+
     kan_allocation_group_t allocation_group = request->pipeline->system->pipeline_wrapper_allocation_group;
     kan_free_general (allocation_group, request->shader_stages,
                       sizeof (VkPipelineShaderStageCreateInfo) * request->shader_stages_count);
     kan_free_general (allocation_group, request->color_blending_attachments,
                       sizeof (VkPipelineColorBlendAttachmentState) * request->color_blending_attachments_count);
+    kan_free_general (allocation_group, request->linked_code_modules,
+                      sizeof (struct render_backend_code_module_t *) * request->linked_code_modules_count);
     kan_free_batched (allocation_group, request);
 }
 

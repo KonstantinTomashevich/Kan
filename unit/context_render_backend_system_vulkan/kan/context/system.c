@@ -1307,7 +1307,6 @@ kan_bool_t kan_render_backend_system_select_device (kan_context_system_t render_
         state->first_scheduled_pass_destroy = NULL;
         state->first_scheduled_pipeline_parameter_set_destroy = NULL;
         state->first_scheduled_detached_descriptor_set_destroy = NULL;
-        state->first_scheduled_code_module_destroy = NULL;
         state->first_scheduled_graphics_pipeline_destroy = NULL;
         state->first_scheduled_graphics_pipeline_family_destroy = NULL;
         state->first_scheduled_buffer_destroy = NULL;
@@ -3383,7 +3382,7 @@ static void render_backend_system_clean_current_schedule_if_safe (struct render_
         !schedule->first_scheduled_image_read_back && !schedule->first_scheduled_frame_buffer_destroy &&
         !schedule->first_scheduled_detached_frame_buffer_destroy && !schedule->first_scheduled_pass_destroy &&
         !schedule->first_scheduled_pipeline_parameter_set_destroy &&
-        !schedule->first_scheduled_detached_descriptor_set_destroy && !schedule->first_scheduled_code_module_destroy &&
+        !schedule->first_scheduled_detached_descriptor_set_destroy &&
         !schedule->first_scheduled_graphics_pipeline_destroy &&
         !schedule->first_scheduled_graphics_pipeline_family_destroy && !schedule->first_scheduled_buffer_destroy &&
         !schedule->first_scheduled_frame_lifetime_allocator_destroy &&
@@ -4190,16 +4189,6 @@ kan_bool_t kan_render_backend_system_next_frame (kan_context_system_t render_bac
         render_backend_descriptor_set_allocator_free (system, &system->descriptor_set_allocator,
                                                       &detached_descriptor_set_destroy->allocation);
         detached_descriptor_set_destroy = detached_descriptor_set_destroy->next;
-    }
-
-    struct scheduled_code_module_destroy_t *code_module_destroy = schedule->first_scheduled_code_module_destroy;
-    schedule->first_scheduled_code_module_destroy = NULL;
-
-    while (code_module_destroy)
-    {
-        kan_bd_list_remove (&system->code_modules, &code_module_destroy->module->list_node);
-        render_backend_system_destroy_code_module (system, code_module_destroy->module);
-        code_module_destroy = code_module_destroy->next;
     }
 
     struct scheduled_graphics_pipeline_destroy_t *graphics_pipeline_destroy =

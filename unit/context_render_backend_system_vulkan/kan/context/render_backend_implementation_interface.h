@@ -241,12 +241,6 @@ struct scheduled_pipeline_parameter_set_destroy_t
     struct render_backend_pipeline_parameter_set_t *set;
 };
 
-struct scheduled_code_module_destroy_t
-{
-    struct scheduled_code_module_destroy_t *next;
-    struct render_backend_code_module_t *module;
-};
-
 struct scheduled_graphics_pipeline_destroy_t
 {
     struct scheduled_graphics_pipeline_destroy_t *next;
@@ -331,7 +325,6 @@ struct render_backend_schedule_state_t
     struct scheduled_pass_destroy_t *first_scheduled_pass_destroy;
     struct scheduled_pipeline_parameter_set_destroy_t *first_scheduled_pipeline_parameter_set_destroy;
     struct scheduled_detached_descriptor_set_destroy_t *first_scheduled_detached_descriptor_set_destroy;
-    struct scheduled_code_module_destroy_t *first_scheduled_code_module_destroy;
     struct scheduled_graphics_pipeline_destroy_t *first_scheduled_graphics_pipeline_destroy;
     struct scheduled_graphics_pipeline_family_destroy_t *first_scheduled_graphics_pipeline_family_destroy;
     struct scheduled_buffer_destroy_t *first_scheduled_buffer_destroy;
@@ -495,6 +488,7 @@ struct render_backend_code_module_t
     struct kan_bd_list_node_t list_node;
     struct render_backend_system_t *system;
     VkShaderModule module;
+    struct kan_atomic_int_t links;
     kan_interned_string_t tracking_name;
 };
 
@@ -502,6 +496,8 @@ struct render_backend_code_module_t *render_backend_system_create_code_module (s
                                                                                vulkan_size_t code_length,
                                                                                void *code,
                                                                                kan_interned_string_t tracking_name);
+
+void render_backend_system_unlink_code_module (struct render_backend_code_module_t *code_module);
 
 void render_backend_system_destroy_code_module (struct render_backend_system_t *system,
                                                 struct render_backend_code_module_t *code_module);
@@ -758,6 +754,9 @@ struct graphics_pipeline_compilation_request_t
 
     kan_instance_size_t color_blending_attachments_count;
     VkPipelineColorBlendAttachmentState *color_blending_attachments;
+
+    kan_instance_size_t linked_code_modules_count;
+    struct render_backend_code_module_t **linked_code_modules;
 };
 
 /// \details We use one separate thread for compiling pipelines instead of several threads, because some drivers are

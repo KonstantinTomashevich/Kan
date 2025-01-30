@@ -311,6 +311,7 @@ static kan_render_graphics_pipeline_t create_render_image_pipeline (
 
     kan_render_graphics_pipeline_t pipeline = kan_render_graphics_pipeline_create (
         render_context, &pipeline_description, KAN_RENDER_PIPELINE_COMPILATION_PRIORITY_ACTIVE);
+    kan_render_code_module_destroy (code_module);
 
     kan_rpl_meta_shutdown (&meta);
     kan_dynamic_array_shutdown (&code);
@@ -622,6 +623,7 @@ static kan_render_graphics_pipeline_t create_cube_pipeline (kan_render_context_t
 
     kan_render_graphics_pipeline_t pipeline = kan_render_graphics_pipeline_create (
         render_context, &pipeline_description, KAN_RENDER_PIPELINE_COMPILATION_PRIORITY_ACTIVE);
+    kan_render_code_module_destroy (code_module);
 
     kan_rpl_meta_shutdown (&meta);
     kan_dynamic_array_shutdown (&code);

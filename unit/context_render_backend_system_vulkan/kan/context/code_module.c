@@ -48,11 +48,23 @@ struct render_backend_code_module_t *render_backend_system_create_code_module (s
     kan_atomic_int_unlock (&system->resource_registration_lock);
 
     module->system = system;
+    module->links = kan_atomic_int_init (1);
     module->module = shader_module;
     module->tracking_name = tracking_name;
 
     kan_cpu_section_execution_shutdown (&execution);
     return module;
+}
+
+void render_backend_system_unlink_code_module (struct render_backend_code_module_t *code_module)
+{
+    if (kan_atomic_int_add (&code_module->links, -1) == 1)
+    {
+        kan_atomic_int_lock (&code_module->system->resource_registration_lock);
+        kan_bd_list_remove (&code_module->system->code_modules, &code_module->list_node);
+        kan_atomic_int_unlock (&code_module->system->resource_registration_lock);
+        render_backend_system_destroy_code_module (code_module->system, code_module);
+    }
 }
 
 void render_backend_system_destroy_code_module (struct render_backend_system_t *system,
@@ -79,15 +91,5 @@ kan_render_code_module_t kan_render_code_module_create (kan_render_context_t con
 
 void kan_render_code_module_destroy (kan_render_code_module_t code_module)
 {
-    struct render_backend_code_module_t *data = KAN_HANDLE_GET (code_module);
-    struct render_backend_schedule_state_t *schedule = render_backend_system_get_schedule_for_destroy (data->system);
-    kan_atomic_int_lock (&schedule->schedule_lock);
-
-    struct scheduled_code_module_destroy_t *item =
-        KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&schedule->item_allocator, struct scheduled_code_module_destroy_t);
-
-    item->next = schedule->first_scheduled_code_module_destroy;
-    schedule->first_scheduled_code_module_destroy = item;
-    item->module = data;
-    kan_atomic_int_unlock (&schedule->schedule_lock);
+    render_backend_system_unlink_code_module (KAN_HANDLE_GET (code_module));
 }
