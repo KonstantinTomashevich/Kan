@@ -1528,6 +1528,18 @@ function (application_generate)
 
     endforeach ()
 
+    # If we're not using raw resources, add target for cleaning resource builder workspace.
+    if (NOT KAN_APPLICATION_PACK_WITH_RAW_RESOURCES)
+        application_get_resource_builder_target_name (RESOURCE_BUILDER)
+        add_custom_target ("${RESOURCE_BUILDER}_clean"
+                COMMAND "${CMAKE_COMMAND}" -E rm -rf "${RBW_DIRECTORY}"
+                COMMAND "${CMAKE_COMMAND}" -E make_directory "${RBW_DIRECTORY}"
+                JOB_POOL "${APPLICATION_NAME}_resource_builder_pool"
+                COMMENT "Cleaning resource builder directory for \"${APPLICATION_NAME}\"."
+                COMMAND_EXPAND_LISTS
+                VERBATIM)
+    endif ()
+
     message (STATUS "Application \"${APPLICATION_NAME}\" generation done.")
 endfunction ()
 
