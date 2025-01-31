@@ -76,16 +76,16 @@ struct kan_resource_material_platform_configuration_t
 RESOURCE_MATERIAL_API void kan_resource_material_platform_configuration_init (
     struct kan_resource_material_platform_configuration_t *instance);
 
-struct kan_resource_material_meta_compiled_t
+struct kan_resource_material_pipeline_family_compiled_t
 {
     struct kan_rpl_meta_t meta;
 };
 
-RESOURCE_MATERIAL_API void kan_resource_material_meta_compiled_init (
-    struct kan_resource_material_meta_compiled_t *instance);
+RESOURCE_MATERIAL_API void kan_resource_material_pipeline_family_compiled_init (
+    struct kan_resource_material_pipeline_family_compiled_t *instance);
 
-RESOURCE_MATERIAL_API void kan_resource_material_meta_compiled_shutdown (
-    struct kan_resource_material_meta_compiled_t *instance);
+RESOURCE_MATERIAL_API void kan_resource_material_pipeline_family_compiled_shutdown (
+    struct kan_resource_material_pipeline_family_compiled_t *instance);
 
 struct kan_resource_material_pipeline_compiled_t
 {
@@ -93,6 +93,10 @@ struct kan_resource_material_pipeline_compiled_t
     struct kan_dynamic_array_t entry_points;
 
     enum kan_render_code_format_t code_format;
+
+    /// \details Attribute buffers and pipeline parameter sets are excluded as
+    ///          they should be the same for the whole material.
+    struct kan_rpl_meta_t meta;
 
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (uint8_t)
     struct kan_dynamic_array_t code;
@@ -112,7 +116,7 @@ struct kan_resource_material_pass_compiled_t
 
 struct kan_resource_material_compiled_t
 {
-    kan_interned_string_t meta;
+    kan_interned_string_t pipeline_family;
 
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_resource_material_pass_compiled_t)
     struct kan_dynamic_array_t passes;
