@@ -213,6 +213,7 @@ kan_bool_t kan_rpl_compiler_context_use_module (kan_rpl_compiler_context_t compi
 }
 
 kan_bool_t kan_rpl_compiler_context_set_option_flag (kan_rpl_compiler_context_t compiler_context,
+                                                     kan_bool_t must_be_instanced,
                                                      kan_interned_string_t name,
                                                      kan_bool_t value)
 {
@@ -231,6 +232,13 @@ kan_bool_t kan_rpl_compiler_context_set_option_flag (kan_rpl_compiler_context_t 
                 return KAN_FALSE;
             }
 
+            if (must_be_instanced && option->scope != KAN_RPL_OPTION_SCOPE_INSTANCE)
+            {
+                KAN_LOG (rpl_compiler_context, KAN_LOG_WARNING, "[%s] Option \"%s\" is not in instance scope.",
+                         instance->log_name, name)
+                return KAN_FALSE;
+            }
+
             option->flag_value = value;
             return KAN_TRUE;
         }
@@ -241,6 +249,7 @@ kan_bool_t kan_rpl_compiler_context_set_option_flag (kan_rpl_compiler_context_t 
 }
 
 kan_bool_t kan_rpl_compiler_context_set_option_count (kan_rpl_compiler_context_t compiler_context,
+                                                      kan_bool_t only_instance_scope,
                                                       kan_interned_string_t name,
                                                       kan_rpl_unsigned_int_literal_t value)
 {
@@ -255,6 +264,13 @@ kan_bool_t kan_rpl_compiler_context_set_option_count (kan_rpl_compiler_context_t
             if (option->type != KAN_RPL_OPTION_TYPE_COUNT)
             {
                 KAN_LOG (rpl_compiler_context, KAN_LOG_WARNING, "[%s] Option \"%s\" is not a count.",
+                         instance->log_name, name)
+                return KAN_FALSE;
+            }
+
+            if (only_instance_scope && option->scope != KAN_RPL_OPTION_SCOPE_INSTANCE)
+            {
+                KAN_LOG (rpl_compiler_context, KAN_LOG_WARNING, "[%s] Option \"%s\" is not in instance scope.",
                          instance->log_name, name)
                 return KAN_FALSE;
             }

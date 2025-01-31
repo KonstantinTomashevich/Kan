@@ -708,7 +708,8 @@ static kan_bool_t emit_meta_gather_parameters_process_field (struct rpl_compiler
 }
 
 kan_bool_t kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t compiler_instance,
-                                                struct kan_rpl_meta_t *meta)
+                                                struct kan_rpl_meta_t *meta,
+                                                enum kan_rpl_meta_emission_flags_t flags)
 {
     struct rpl_compiler_instance_t *instance = KAN_HANDLE_GET (compiler_instance);
     meta->pipeline_type = instance->pipeline_type;
@@ -781,12 +782,19 @@ kan_bool_t kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t comp
         buffer = buffer->next;
     }
 
-    kan_dynamic_array_set_capacity (&meta->attribute_buffers, attribute_buffer_count);
-    kan_dynamic_array_set_capacity (&meta->set_pass.buffers, pass_buffer_count);
-    kan_dynamic_array_set_capacity (&meta->set_material.buffers, material_buffer_count);
-    kan_dynamic_array_set_capacity (&meta->set_object.buffers, object_buffer_count);
-    kan_dynamic_array_set_capacity (&meta->set_unstable.buffers, unstable_buffer_count);
-    kan_dynamic_array_set_capacity (&meta->color_outputs, color_outputs);
+    if ((flags & KAN_RPL_META_EMISSION_SKIP_ATTRIBUTE_BUFFERS) == 0u)
+    {
+        kan_dynamic_array_set_capacity (&meta->attribute_buffers, attribute_buffer_count);
+    }
+
+    if ((flags & KAN_RPL_META_EMISSION_SKIP_SETS) == 0u)
+    {
+        kan_dynamic_array_set_capacity (&meta->set_pass.buffers, pass_buffer_count);
+        kan_dynamic_array_set_capacity (&meta->set_material.buffers, material_buffer_count);
+        kan_dynamic_array_set_capacity (&meta->set_object.buffers, object_buffer_count);
+        kan_dynamic_array_set_capacity (&meta->set_unstable.buffers, unstable_buffer_count);
+        kan_dynamic_array_set_capacity (&meta->color_outputs, color_outputs);
+    }
 
     for (kan_loop_size_t output_index = 0u; output_index < color_outputs; ++output_index)
     {
@@ -800,11 +808,14 @@ kan_bool_t kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t comp
     while (buffer)
     {
         struct kan_dynamic_array_t *buffer_array = NULL;
+        kan_bool_t skip = KAN_FALSE;
+
         switch (buffer->type)
         {
         case KAN_RPL_BUFFER_TYPE_VERTEX_ATTRIBUTE:
         case KAN_RPL_BUFFER_TYPE_INSTANCED_ATTRIBUTE:
             buffer_array = &meta->attribute_buffers;
+            skip = (flags & KAN_RPL_META_EMISSION_SKIP_ATTRIBUTE_BUFFERS) != 0u;
             break;
 
         case KAN_RPL_BUFFER_TYPE_UNIFORM:
@@ -828,6 +839,7 @@ kan_bool_t kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t comp
                 break;
             }
 
+            skip = (flags & KAN_RPL_META_EMISSION_SKIP_SETS) != 0u;
             break;
 
         case KAN_RPL_BUFFER_TYPE_VERTEX_STAGE_OUTPUT:
@@ -855,7 +867,7 @@ kan_bool_t kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t comp
             break;
         }
 
-        if (!buffer_array)
+        if (skip || !buffer_array)
         {
             buffer = buffer->next;
             continue;
@@ -921,71 +933,74 @@ kan_bool_t kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t comp
         buffer = buffer->next;
     }
 
-    kan_loop_size_t pass_sampler_count = 0u;
-    kan_loop_size_t material_sampler_count = 0u;
-    kan_loop_size_t object_sampler_count = 0u;
-    kan_loop_size_t unstable_sampler_count = 0u;
-    struct compiler_instance_sampler_node_t *sampler = instance->first_sampler;
-
-    while (sampler)
+    if ((flags & KAN_RPL_META_EMISSION_SKIP_SETS) == 0u)
     {
-        switch (sampler->set)
+        kan_loop_size_t pass_sampler_count = 0u;
+        kan_loop_size_t material_sampler_count = 0u;
+        kan_loop_size_t object_sampler_count = 0u;
+        kan_loop_size_t unstable_sampler_count = 0u;
+        struct compiler_instance_sampler_node_t *sampler = instance->first_sampler;
+
+        while (sampler)
         {
-        case KAN_RPL_SET_PASS:
-            ++pass_sampler_count;
-            break;
+            switch (sampler->set)
+            {
+            case KAN_RPL_SET_PASS:
+                ++pass_sampler_count;
+                break;
 
-        case KAN_RPL_SET_MATERIAL:
-            ++material_sampler_count;
-            break;
+            case KAN_RPL_SET_MATERIAL:
+                ++material_sampler_count;
+                break;
 
-        case KAN_RPL_SET_OBJECT:
-            ++object_sampler_count;
-            break;
+            case KAN_RPL_SET_OBJECT:
+                ++object_sampler_count;
+                break;
 
-        case KAN_RPL_SET_UNSTABLE:
-            ++unstable_sampler_count;
-            break;
+            case KAN_RPL_SET_UNSTABLE:
+                ++unstable_sampler_count;
+                break;
+            }
+
+            sampler = sampler->next;
         }
 
-        sampler = sampler->next;
-    }
+        kan_dynamic_array_set_capacity (&meta->set_pass.samplers, pass_sampler_count);
+        kan_dynamic_array_set_capacity (&meta->set_material.samplers, material_sampler_count);
+        kan_dynamic_array_set_capacity (&meta->set_object.samplers, object_sampler_count);
+        kan_dynamic_array_set_capacity (&meta->set_unstable.samplers, unstable_sampler_count);
 
-    kan_dynamic_array_set_capacity (&meta->set_pass.samplers, pass_sampler_count);
-    kan_dynamic_array_set_capacity (&meta->set_material.samplers, material_sampler_count);
-    kan_dynamic_array_set_capacity (&meta->set_object.samplers, object_sampler_count);
-    kan_dynamic_array_set_capacity (&meta->set_unstable.samplers, unstable_sampler_count);
-    sampler = instance->first_sampler;
-
-    while (sampler)
-    {
-        struct kan_dynamic_array_t *sampler_array = NULL;
-        switch (sampler->set)
+        sampler = instance->first_sampler;
+        while (sampler)
         {
-        case KAN_RPL_SET_PASS:
-            sampler_array = &meta->set_pass.samplers;
-            break;
+            struct kan_dynamic_array_t *sampler_array = NULL;
+            switch (sampler->set)
+            {
+            case KAN_RPL_SET_PASS:
+                sampler_array = &meta->set_pass.samplers;
+                break;
 
-        case KAN_RPL_SET_MATERIAL:
-            sampler_array = &meta->set_material.samplers;
-            break;
+            case KAN_RPL_SET_MATERIAL:
+                sampler_array = &meta->set_material.samplers;
+                break;
 
-        case KAN_RPL_SET_OBJECT:
-            sampler_array = &meta->set_object.samplers;
-            break;
+            case KAN_RPL_SET_OBJECT:
+                sampler_array = &meta->set_object.samplers;
+                break;
 
-        case KAN_RPL_SET_UNSTABLE:
-            sampler_array = &meta->set_unstable.samplers;
-            break;
+            case KAN_RPL_SET_UNSTABLE:
+                sampler_array = &meta->set_unstable.samplers;
+                break;
+            }
+
+            struct kan_rpl_meta_sampler_t *meta_sampler = kan_dynamic_array_add_last (sampler_array);
+            KAN_ASSERT (meta_sampler)
+
+            meta_sampler->name = sampler->name;
+            meta_sampler->binding = sampler->binding;
+            meta_sampler->type = sampler->type;
+            sampler = sampler->next;
         }
-
-        struct kan_rpl_meta_sampler_t *meta_sampler = kan_dynamic_array_add_last (sampler_array);
-        KAN_ASSERT (meta_sampler)
-
-        meta_sampler->name = sampler->name;
-        meta_sampler->binding = sampler->binding;
-        meta_sampler->type = sampler->type;
-        sampler = sampler->next;
     }
 
     if (!emit_meta_settings (instance, meta))

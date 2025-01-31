@@ -322,6 +322,20 @@ struct kan_rpl_meta_t
     float color_blend_constant_a;
 };
 
+/// \brief Meta emission flags that make it possible to skip generation of some parts of meta.
+KAN_REFLECTION_FLAGS
+enum kan_rpl_meta_emission_flags_t
+{
+    /// \brief Constant that indicates that nothing is skipped.
+    KAN_RPL_META_EMISSION_FULL = 0u,
+
+    /// \brief Flag that tells compiler to skip generation of attribute buffers meta.
+    KAN_RPL_META_EMISSION_SKIP_ATTRIBUTE_BUFFERS = 1u << 0u,
+
+    /// \brief Flags that tells compiler to skip generation of parameter sets meta.
+    KAN_RPL_META_EMISSION_SKIP_SETS = 1u << 1u,
+};
+
 RENDER_PIPELINE_LANGUAGE_API void kan_rpl_meta_init (struct kan_rpl_meta_t *instance);
 
 RENDER_PIPELINE_LANGUAGE_API void kan_rpl_meta_shutdown (struct kan_rpl_meta_t *instance);
@@ -335,12 +349,22 @@ RENDER_PIPELINE_LANGUAGE_API kan_bool_t kan_rpl_compiler_context_use_module (
     kan_rpl_compiler_context_t compiler_context, const struct kan_rpl_intermediate_t *intermediate_reference);
 
 /// \brief Attempts to set flag option value.
-RENDER_PIPELINE_LANGUAGE_API kan_bool_t kan_rpl_compiler_context_set_option_flag (
-    kan_rpl_compiler_context_t compiler_context, kan_interned_string_t name, kan_bool_t value);
+/// \details `only_instance_scope` additionally restricts operation to only instanced options, which can be required in
+///          some contexts in order to process option application with due validation.
+RENDER_PIPELINE_LANGUAGE_API kan_bool_t
+kan_rpl_compiler_context_set_option_flag (kan_rpl_compiler_context_t compiler_context,
+                                          kan_bool_t only_instance_scope,
+                                          kan_interned_string_t name,
+                                          kan_bool_t value);
 
 /// \brief Attempts to set count option value.
-RENDER_PIPELINE_LANGUAGE_API kan_bool_t kan_rpl_compiler_context_set_option_count (
-    kan_rpl_compiler_context_t compiler_context, kan_interned_string_t name, kan_rpl_unsigned_int_literal_t value);
+/// \details `only_instance_scope` additionally restricts operation to only instanced options, which can be required in
+///          some contexts in order to process option application with due validation.
+RENDER_PIPELINE_LANGUAGE_API kan_bool_t
+kan_rpl_compiler_context_set_option_count (kan_rpl_compiler_context_t compiler_context,
+                                           kan_bool_t only_instance_scope,
+                                           kan_interned_string_t name,
+                                           kan_rpl_unsigned_int_literal_t value);
 
 /// \brief Resolves context with given entry points to provide data for emit step.
 /// \details One context can be used for multiple resolves as resolves do not modify the context.
@@ -352,7 +376,9 @@ kan_rpl_compiler_context_resolve (kan_rpl_compiler_context_t compiler_context,
 
 /// \brief Emits meta using resolved instance data.
 RENDER_PIPELINE_LANGUAGE_API kan_bool_t
-kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t compiler_instance, struct kan_rpl_meta_t *meta);
+kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t compiler_instance,
+                                     struct kan_rpl_meta_t *meta,
+                                     enum kan_rpl_meta_emission_flags_t flags);
 
 /// \brief Emits SPIRV 1.3 bytecode using resolved instance data.
 /// \invariant Given output dynamic array must not be initialized.

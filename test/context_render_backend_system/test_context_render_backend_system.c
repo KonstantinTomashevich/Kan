@@ -170,7 +170,7 @@ static kan_render_graphics_pipeline_t create_render_image_pipeline (
     KAN_TEST_ASSERT (KAN_HANDLE_IS_VALID (compiler_instance))
 
     KAN_TEST_ASSERT (emit_render_code (compiler_instance, &code, KAN_ALLOCATION_GROUP_IGNORE))
-    KAN_TEST_ASSERT (kan_rpl_compiler_instance_emit_meta (compiler_instance, &meta))
+    KAN_TEST_ASSERT (kan_rpl_compiler_instance_emit_meta (compiler_instance, &meta, KAN_RPL_META_EMISSION_FULL))
     kan_rpl_compiler_instance_destroy (compiler_instance);
 
     kan_rpl_compiler_context_destroy (compiler_context);
@@ -444,7 +444,7 @@ static kan_render_graphics_pipeline_t create_cube_pipeline (kan_render_context_t
     KAN_TEST_ASSERT (KAN_HANDLE_IS_VALID (compiler_instance))
 
     KAN_TEST_ASSERT (emit_render_code (compiler_instance, &code, KAN_ALLOCATION_GROUP_IGNORE))
-    KAN_TEST_ASSERT (kan_rpl_compiler_instance_emit_meta (compiler_instance, &meta))
+    KAN_TEST_ASSERT (kan_rpl_compiler_instance_emit_meta (compiler_instance, &meta, KAN_RPL_META_EMISSION_FULL))
     kan_rpl_compiler_instance_destroy (compiler_instance);
 
     kan_rpl_compiler_context_destroy (compiler_context);
