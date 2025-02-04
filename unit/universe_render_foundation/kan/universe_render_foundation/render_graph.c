@@ -276,6 +276,11 @@ UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_execute_render_foundati
 
                             frame_buffer = next;
                         }
+
+                        KAN_UP_EVENT_INSERT (event, kan_render_graph_pass_deleted_event_t)
+                        {
+                            event->name = loading->name;
+                        }
                     }
 
                     if (KAN_TYPED_ID_32_IS_VALID (loading->request_id))
@@ -384,6 +389,11 @@ UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_execute_render_foundati
 
                                 if (KAN_HANDLE_IS_VALID (backend_pass))
                                 {
+                                    KAN_UP_EVENT_INSERT (event, kan_render_graph_pass_updated_event_t)
+                                    {
+                                        event->name = loading->name;
+                                    }
+
                                     kan_bool_t loaded = KAN_FALSE;
                                     KAN_UP_VALUE_UPDATE (pass, kan_render_graph_pass_t, name, &loading->name)
                                     {

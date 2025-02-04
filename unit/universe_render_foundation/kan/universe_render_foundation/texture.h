@@ -89,4 +89,10 @@ struct kan_render_texture_loaded_t
 
 UNIVERSE_RENDER_FOUNDATION_API void kan_render_texture_loaded_shutdown (struct kan_render_texture_loaded_t *instance);
 
+/// \brief Event that is being sent when `kan_render_texture_loaded_t` is inserted or its image is updated.
+struct kan_render_texture_updated_event_t
+{
+    kan_interned_string_t name;
+};
+
 KAN_C_HEADER_END

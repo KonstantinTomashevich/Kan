@@ -106,6 +106,18 @@ UNIVERSE_RENDER_FOUNDATION_API void kan_render_graph_pass_init (struct kan_rende
 
 UNIVERSE_RENDER_FOUNDATION_API void kan_render_graph_pass_shutdown (struct kan_render_graph_pass_t *instance);
 
+/// \brief Event that is being sent when `kan_render_graph_pass_t` is inserted or updated.
+struct kan_render_graph_pass_updated_event_t
+{
+    kan_interned_string_t name;
+};
+
+/// \brief Event that is being sent when `kan_render_graph_pass_t` is deleted.
+struct kan_render_graph_pass_deleted_event_t
+{
+    kan_interned_string_t name;
+};
+
 /// \brief Singleton that contains render context and used to manage access to it.
 /// \details Should only be opened with write access when whole render context is modified (for example when
 ///          `kan_render_backend_system_next_frame` is called). For other cases like buffer instantiation
