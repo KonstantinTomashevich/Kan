@@ -1220,6 +1220,11 @@ static inline void update_request_provided_data (struct resource_provider_state_
                                                  void *third_party_data,
                                                  kan_memory_size_t third_party_data_size)
 {
+#if defined(KAN_WITH_ASSERT)
+    const kan_bool_t expected_new_data = request->expecting_new_data;
+#endif
+    request->expecting_new_data = KAN_FALSE;
+
     if (request->sleeping)
     {
         return;
@@ -1244,6 +1249,15 @@ static inline void update_request_provided_data (struct resource_provider_state_
             changed = KAN_TRUE;
         }
     }
+
+#if defined(KAN_WITH_ASSERT)
+    if (expected_new_data)
+    {
+        // Otherwise, expectation from old to new data would go unnoticed and
+        // high level systems would be stuck in waiting state.
+        KAN_ASSERT (changed)
+    }
+#endif
 
     if (changed)
     {
@@ -1354,6 +1368,23 @@ static inline kan_bool_t skip_type_header (struct kan_stream_t *stream,
     return KAN_TRUE;
 }
 
+static inline void inform_requests_about_new_data (struct resource_provider_state_t *state,
+                                                   kan_interned_string_t type,
+                                                   kan_interned_string_t name)
+{
+    if (KAN_HANDLE_IS_VALID (state->hot_reload_system) &&
+        kan_hot_reload_coordination_system_get_current_mode (state->hot_reload_system) != KAN_HOT_RELOAD_MODE_DISABLED)
+    {
+        KAN_UP_VALUE_UPDATE (request, kan_resource_request_t, name, &name)
+        {
+            if (request->type == type)
+            {
+                request->expecting_new_data = KAN_TRUE;
+            }
+        }
+    }
+}
+
 static inline void schedule_native_entry_loading (struct resource_provider_state_t *state,
                                                   struct resource_provider_private_singleton_t *private,
                                                   struct kan_resource_native_entry_t *entry,
@@ -1401,7 +1432,9 @@ static inline void schedule_native_entry_loading (struct resource_provider_state
         return;
     }
 
+    inform_requests_about_new_data (state, entry->type, entry->name);
     entry_suffix->loading_container_id = container_view->container_id;
+
     KAN_UP_INDEXED_INSERT (operation, resource_provider_operation_t)
     {
         const kan_instance_size_t natural_priority = gather_request_priority (state, NULL, entry->name);
@@ -1486,6 +1519,7 @@ static inline void schedule_third_party_entry_loading (
         return;
     }
 
+    inform_requests_about_new_data (state, NULL, entry->name);
     entry_suffix->loading_data =
         kan_allocate_general (entry_suffix->my_allocation_group, entry->size, _Alignof (kan_memory_size_t));
     entry_suffix->loading_data_size = entry->size;
@@ -1549,6 +1583,7 @@ static inline void bootstrap_pending_compilation (struct resource_provider_state
         entry->source_resource_request_id = request->request_id;
     }
 
+    inform_requests_about_new_data (state, entry->type, entry->name);
     entry->compilation_state = RESOURCE_PROVIDER_COMPILATION_STATE_WAITING_FOR_SOURCE;
     ++entry->pending_compilation_index;
 }
@@ -3431,6 +3466,10 @@ static enum resource_provider_serve_operation_status_t execute_shared_serve_comp
     kan_instance_size_t pending_compilation_index = 0u;
     kan_resource_request_id_t source_resource_request_id;
 
+    // Below, we still need locks for request access, even despite the fact that access is done by unique id.
+    // The reason is that otherwise access to request storage may be prevented from going to maintenance due to open
+    // read accesses and it might potentially break request update logic if other compilation is finished right now.
+
     kan_atomic_int_lock (&state->execution_shared_state.concurrency_lock);
     KAN_UP_VALUE_READ (compiled_entry, resource_provider_compiled_resource_entry_t, name,
                        &compile_operation->target_name)
@@ -3445,9 +3484,9 @@ static enum resource_provider_serve_operation_status_t execute_shared_serve_comp
         }
     }
 
-    kan_atomic_int_unlock (&state->execution_shared_state.concurrency_lock);
     if (!source_type)
     {
+        kan_atomic_int_unlock (&state->execution_shared_state.concurrency_lock);
         KAN_LOG (universe_resource_provider, KAN_LOG_ERROR,
                  "Unable to find compiled entry for compile request \"%s\" of type \"%s\": internal error.",
                  compile_operation->target_name, compile_operation->target_type)
@@ -3460,6 +3499,7 @@ static enum resource_provider_serve_operation_status_t execute_shared_serve_comp
         input_container_id = input_request->provided_container_id;
     }
 
+    kan_atomic_int_unlock (&state->execution_shared_state.concurrency_lock);
     struct kan_repository_indexed_value_read_access_t input_access;
     const uint8_t *input_data = NULL;
 
@@ -3491,6 +3531,7 @@ static enum resource_provider_serve_operation_status_t execute_shared_serve_comp
                             sizeof (struct kan_repository_indexed_value_read_access_t),
                             _Alignof (struct kan_repository_indexed_value_read_access_t), state->my_allocation_group);
 
+    kan_atomic_int_lock (&state->execution_shared_state.concurrency_lock);
     KAN_UP_VALUE_READ (compilation_dependency, resource_provider_compilation_dependency_t, compiled_name,
                        &compile_operation->target_name)
     {
@@ -3536,6 +3577,7 @@ static enum resource_provider_serve_operation_status_t execute_shared_serve_comp
         }
     }
 
+    kan_atomic_int_unlock (&state->execution_shared_state.concurrency_lock);
     struct kan_reflection_struct_meta_iterator_t meta_iterator = kan_reflection_registry_query_struct_meta (
         state->reflection_registry, source_type, state->interned_kan_resource_compilable_meta_t);
 
@@ -4742,10 +4784,11 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void kan_reflection_generator_universe_resour
 void kan_resource_request_init (struct kan_resource_request_t *instance)
 {
     instance->request_id = KAN_TYPED_ID_32_SET_INVALID (kan_resource_request_id_t);
-    instance->sleeping = KAN_FALSE;
     instance->type = NULL;
     instance->name = NULL;
     instance->priority = KAN_RESOURCE_PROVIDER_USER_PRIORITY_MIN;
+    instance->expecting_new_data = KAN_FALSE;
+    instance->sleeping = KAN_FALSE;
     instance->provided_container_id = KAN_TYPED_ID_32_SET_INVALID (kan_resource_container_id_t);
     instance->provided_third_party.data = NULL;
     instance->provided_third_party.size = 0u;
