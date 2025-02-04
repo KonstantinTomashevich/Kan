@@ -131,11 +131,12 @@ struct kan_resource_material_pipeline_family_t
 };
 
 KAN_REFLECTION_STRUCT_META (kan_resource_material_pipeline_family_t)
-RESOURCE_MATERIAL_API struct kan_resource_byproduct_type_meta_t kan_resource_material_pipeline_family_byproduct_type_meta = {
-    .hash = NULL,
-    .is_equal = NULL,
-    .move = NULL,
-    .reset = NULL,
+RESOURCE_MATERIAL_API struct kan_resource_byproduct_type_meta_t
+    kan_resource_material_pipeline_family_byproduct_type_meta = {
+        .hash = NULL,
+        .is_equal = NULL,
+        .move = NULL,
+        .reset = NULL,
 };
 
 static enum kan_resource_compile_result_t kan_resource_material_pipeline_family_compile (
@@ -151,12 +152,14 @@ RESOURCE_MATERIAL_API struct kan_resource_compilable_meta_t kan_resource_materia
 };
 
 KAN_REFLECTION_STRUCT_FIELD_META (kan_resource_material_pipeline_family_t, sources)
-RESOURCE_MATERIAL_API struct kan_resource_reference_meta_t kan_resource_material_pipeline_family_sources_reference_meta = {
-    .type = "kan_resource_material_shader_source_t",
-    .compilation_usage = KAN_RESOURCE_REFERENCE_COMPILATION_USAGE_TYPE_NEEDED_COMPILED,
+RESOURCE_MATERIAL_API struct kan_resource_reference_meta_t
+    kan_resource_material_pipeline_family_sources_reference_meta = {
+        .type = "kan_resource_material_shader_source_t",
+        .compilation_usage = KAN_RESOURCE_REFERENCE_COMPILATION_USAGE_TYPE_NEEDED_COMPILED,
 };
 
-RESOURCE_MATERIAL_API void kan_resource_material_pipeline_family_init (struct kan_resource_material_pipeline_family_t *instance)
+RESOURCE_MATERIAL_API void kan_resource_material_pipeline_family_init (
+    struct kan_resource_material_pipeline_family_t *instance)
 {
     kan_dynamic_array_init (&instance->sources, 0u, sizeof (kan_interned_string_t), _Alignof (kan_interned_string_t),
                             kan_allocation_group_stack_get ());
@@ -164,7 +167,8 @@ RESOURCE_MATERIAL_API void kan_resource_material_pipeline_family_init (struct ka
     instance->source_material = NULL;
 }
 
-RESOURCE_MATERIAL_API void kan_resource_material_pipeline_family_shutdown (struct kan_resource_material_pipeline_family_t *instance)
+RESOURCE_MATERIAL_API void kan_resource_material_pipeline_family_shutdown (
+    struct kan_resource_material_pipeline_family_t *instance)
 {
     kan_dynamic_array_shutdown (&instance->sources);
     kan_resource_material_options_shutdown (&instance->options);
@@ -172,13 +176,14 @@ RESOURCE_MATERIAL_API void kan_resource_material_pipeline_family_shutdown (struc
 
 struct kan_resource_material_pipeline_t
 {
+    kan_interned_string_t family;
+
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_entry_point_t)
     struct kan_dynamic_array_t entry_points;
 
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (kan_interned_string_t)
     struct kan_dynamic_array_t sources;
 
-    struct kan_resource_material_options_t global_options;
     struct kan_resource_material_options_t instance_options;
 
     // Excluded from reflection in order to be ignored for byproduct replacement search.
@@ -210,6 +215,12 @@ RESOURCE_MATERIAL_API struct kan_resource_compilable_meta_t kan_resource_materia
     .functor = kan_resource_material_pipeline_compile,
 };
 
+KAN_REFLECTION_STRUCT_FIELD_META (kan_resource_material_pipeline_t, family)
+RESOURCE_MATERIAL_API struct kan_resource_reference_meta_t kan_resource_material_pipeline_family_reference_meta = {
+    .type = "kan_resource_material_shader_source_t",
+    .compilation_usage = KAN_RESOURCE_REFERENCE_COMPILATION_USAGE_TYPE_NEEDED_RAW,
+};
+
 KAN_REFLECTION_STRUCT_FIELD_META (kan_resource_material_pipeline_t, sources)
 RESOURCE_MATERIAL_API struct kan_resource_reference_meta_t kan_resource_material_pipeline_sources_reference_meta = {
     .type = "kan_resource_material_shader_source_t",
@@ -218,11 +229,11 @@ RESOURCE_MATERIAL_API struct kan_resource_reference_meta_t kan_resource_material
 
 RESOURCE_MATERIAL_API void kan_resource_material_pipeline_init (struct kan_resource_material_pipeline_t *instance)
 {
+    instance->family = NULL;
     kan_dynamic_array_init (&instance->entry_points, 0u, sizeof (struct kan_rpl_entry_point_t),
                             _Alignof (struct kan_rpl_entry_point_t), kan_allocation_group_stack_get ());
     kan_dynamic_array_init (&instance->sources, 0u, sizeof (kan_interned_string_t), _Alignof (kan_interned_string_t),
                             kan_allocation_group_stack_get ());
-    kan_resource_material_options_init (&instance->global_options);
     kan_resource_material_options_init (&instance->instance_options);
     instance->source_material = NULL;
     instance->source_pass = NULL;
@@ -232,7 +243,6 @@ RESOURCE_MATERIAL_API void kan_resource_material_pipeline_shutdown (struct kan_r
 {
     kan_dynamic_array_shutdown (&instance->entry_points);
     kan_dynamic_array_shutdown (&instance->sources);
-    kan_resource_material_options_shutdown (&instance->global_options);
     kan_resource_material_options_shutdown (&instance->instance_options);
 }
 
@@ -440,6 +450,7 @@ static enum kan_resource_compile_result_t kan_resource_material_compile (struct 
             KAN_ASSERT (target_pass)
             target_pass->name = source_pass->name;
 
+            pipeline_byproduct.family = output->pipeline_family;
             pipeline_byproduct.source_material = state->name;
             pipeline_byproduct.source_pass = source_pass->name;
 
@@ -468,15 +479,6 @@ static enum kan_resource_compile_result_t kan_resource_material_compile (struct 
             pipeline_byproduct.sources.size = pipeline_byproduct.sources.capacity;
             memcpy (pipeline_byproduct.sources.data, sources.data, sources.size * sizeof (kan_interned_string_t));
 
-            if (!append_options (&pipeline_byproduct.global_options, &input->global_options))
-            {
-                KAN_LOG (resource_material_compilation, KAN_LOG_ERROR,
-                         "Failed to append global options for pass byproduct for material \"%s\" for pass \"%s\".",
-                         state->name, source_pass->name)
-                successful = KAN_FALSE;
-                break;
-            }
-
             if (!append_options (&pipeline_byproduct.instance_options, &source_pass->options))
             {
                 KAN_LOG (
@@ -487,9 +489,7 @@ static enum kan_resource_compile_result_t kan_resource_material_compile (struct 
                 break;
             }
 
-            sort_options (&pipeline_byproduct.global_options);
             sort_options (&pipeline_byproduct.instance_options);
-
             target_pass->pipeline = state->register_byproduct (
                 state->interface_user_data, interned_kan_resource_material_pipeline_t, &pipeline_byproduct);
 
@@ -553,26 +553,8 @@ static enum kan_resource_compile_result_t kan_resource_material_shader_source_co
     return KAN_RESOURCE_PIPELINE_COMPILE_FINISHED;
 }
 
-static kan_bool_t add_sources_to_compiler_context (kan_rpl_compiler_context_t compiler_context,
-                                                   struct kan_resource_compile_state_t *state)
-{
-    for (kan_loop_size_t index = 0u; index < (kan_loop_size_t) state->dependencies_count; ++index)
-    {
-        struct kan_resource_compilation_dependency_t *dependency = &state->dependencies[index];
-        KAN_ASSERT (dependency->type == kan_string_intern ("kan_resource_material_shader_source_compiled_t"))
-        const struct kan_resource_material_shader_source_compiled_t *source = dependency->data;
-
-        if (!kan_rpl_compiler_context_use_module (compiler_context, &source->intermediate))
-        {
-            return KAN_FALSE;
-        }
-    }
-
-    return KAN_TRUE;
-}
-
 static kan_bool_t apply_options_to_compiler_context (kan_rpl_compiler_context_t compiler_context,
-                                                     kan_bool_t only_instance_scope,
+                                                     enum kan_rpl_option_target_scope_t target_scope,
                                                      const struct kan_resource_material_options_t *options)
 {
     for (kan_loop_size_t index = 0u; index < (kan_loop_size_t) options->flags.size; ++index)
@@ -580,8 +562,7 @@ static kan_bool_t apply_options_to_compiler_context (kan_rpl_compiler_context_t 
         struct kan_resource_material_flag_option_t *option =
             &((struct kan_resource_material_flag_option_t *) options->flags.data)[index];
 
-        if (!kan_rpl_compiler_context_set_option_flag (compiler_context, only_instance_scope, option->name,
-                                                       option->value))
+        if (!kan_rpl_compiler_context_set_option_flag (compiler_context, target_scope, option->name, option->value))
         {
             return KAN_FALSE;
         }
@@ -592,8 +573,7 @@ static kan_bool_t apply_options_to_compiler_context (kan_rpl_compiler_context_t 
         struct kan_resource_material_count_option_t *option =
             &((struct kan_resource_material_count_option_t *) options->counts.data)[index];
 
-        if (!kan_rpl_compiler_context_set_option_count (compiler_context, only_instance_scope, option->name,
-                                                        option->value))
+        if (!kan_rpl_compiler_context_set_option_count (compiler_context, target_scope, option->name, option->value))
         {
             return KAN_FALSE;
         }
@@ -612,16 +592,23 @@ static enum kan_resource_compile_result_t kan_resource_material_pipeline_family_
         // Currently, all materials use graphics pipelines.
         kan_rpl_compiler_context_create (KAN_RPL_PIPELINE_TYPE_GRAPHICS_CLASSIC, input->source_material);
 
-    if (!add_sources_to_compiler_context (compiler_context, state))
+    for (kan_loop_size_t index = 0u; index < (kan_loop_size_t) state->dependencies_count; ++index)
     {
-        kan_rpl_compiler_context_destroy (compiler_context);
-        KAN_LOG (resource_material_compilation, KAN_LOG_ERROR,
-                 "Failed to resolve meta for \"%s\" (material \"%s\"): failed to use modules.", state->name,
-                 input->source_material)
-        return KAN_RESOURCE_PIPELINE_COMPILE_FAILED;
+        struct kan_resource_compilation_dependency_t *dependency = &state->dependencies[index];
+        KAN_ASSERT (dependency->type == kan_string_intern ("kan_resource_material_shader_source_compiled_t"))
+        const struct kan_resource_material_shader_source_compiled_t *source = dependency->data;
+
+        if (!kan_rpl_compiler_context_use_module (compiler_context, &source->intermediate))
+        {
+            kan_rpl_compiler_context_destroy (compiler_context);
+            KAN_LOG (resource_material_compilation, KAN_LOG_ERROR,
+                     "Failed to resolve meta for \"%s\" (material \"%s\"): failed to use modules.", state->name,
+                     input->source_material)
+            return KAN_RESOURCE_PIPELINE_COMPILE_FAILED;
+        }
     }
 
-    if (!apply_options_to_compiler_context (compiler_context, KAN_FALSE, &input->options))
+    if (!apply_options_to_compiler_context (compiler_context, KAN_RPL_OPTION_TARGET_SCOPE_GLOBAL, &input->options))
     {
         kan_rpl_compiler_context_destroy (compiler_context);
         KAN_LOG (resource_material_compilation, KAN_LOG_ERROR,
@@ -675,16 +662,48 @@ static enum kan_resource_compile_result_t kan_resource_material_pipeline_compile
         // Currently, all materials use graphics pipelines.
         kan_rpl_compiler_context_create (KAN_RPL_PIPELINE_TYPE_GRAPHICS_CLASSIC, input->source_material);
 
-    if (!add_sources_to_compiler_context (compiler_context, state))
+    const struct kan_resource_material_pipeline_family_t *family = NULL;
+    kan_interned_string_t interned_kan_resource_material_shader_source_compiled_t =
+        kan_string_intern ("kan_resource_material_shader_source_compiled_t");
+    kan_interned_string_t interned_kan_resource_material_pipeline_family_t =
+        kan_string_intern ("kan_resource_material_pipeline_family_t");
+
+    for (kan_loop_size_t index = 0u; index < (kan_loop_size_t) state->dependencies_count; ++index)
+    {
+        struct kan_resource_compilation_dependency_t *dependency = &state->dependencies[index];
+        if (dependency->type == interned_kan_resource_material_shader_source_compiled_t)
+        {
+            const struct kan_resource_material_shader_source_compiled_t *source = dependency->data;
+
+            if (!kan_rpl_compiler_context_use_module (compiler_context, &source->intermediate))
+            {
+                kan_rpl_compiler_context_destroy (compiler_context);
+                KAN_LOG (resource_material_compilation, KAN_LOG_ERROR,
+                         "Failed to compile pipeline for \"%s\" (material \"%s\", pass \"%s\"): failed to use modules.",
+                         state->name, input->source_material, input->source_pass)
+                return KAN_RESOURCE_PIPELINE_COMPILE_FAILED;
+            }
+        }
+        else if (dependency->type == interned_kan_resource_material_pipeline_family_t)
+        {
+            family = dependency->data;
+        }
+        else
+        {
+            KAN_ASSERT (KAN_FALSE)
+        }
+    }
+
+    if (!family)
     {
         kan_rpl_compiler_context_destroy (compiler_context);
         KAN_LOG (resource_material_compilation, KAN_LOG_ERROR,
-                 "Failed to compile pipeline for \"%s\" (material \"%s\", pass \"%s\"): failed to use modules.",
+                 "Failed to compile pipeline for \"%s\" (material \"%s\", pass \"%s\"): unable to find family.",
                  state->name, input->source_material, input->source_pass)
         return KAN_RESOURCE_PIPELINE_COMPILE_FAILED;
     }
 
-    if (!apply_options_to_compiler_context (compiler_context, KAN_FALSE, &input->global_options))
+    if (!apply_options_to_compiler_context (compiler_context, KAN_RPL_OPTION_TARGET_SCOPE_GLOBAL, &family->options))
     {
         kan_rpl_compiler_context_destroy (compiler_context);
         KAN_LOG (resource_material_compilation, KAN_LOG_ERROR,
@@ -693,7 +712,8 @@ static enum kan_resource_compile_result_t kan_resource_material_pipeline_compile
         return KAN_RESOURCE_PIPELINE_COMPILE_FAILED;
     }
 
-    if (!apply_options_to_compiler_context (compiler_context, KAN_TRUE, &input->global_options))
+    if (!apply_options_to_compiler_context (compiler_context, KAN_RPL_OPTION_TARGET_SCOPE_INSTANCE,
+                                            &input->instance_options))
     {
         kan_rpl_compiler_context_destroy (compiler_context);
         KAN_LOG (
@@ -837,12 +857,14 @@ void kan_resource_material_pipeline_compiled_shutdown (struct kan_resource_mater
     kan_dynamic_array_shutdown (&instance->code);
 }
 
-void kan_resource_material_pipeline_family_compiled_init (struct kan_resource_material_pipeline_family_compiled_t *instance)
+void kan_resource_material_pipeline_family_compiled_init (
+    struct kan_resource_material_pipeline_family_compiled_t *instance)
 {
     kan_rpl_meta_init (&instance->meta);
 }
 
-void kan_resource_material_pipeline_family_compiled_shutdown (struct kan_resource_material_pipeline_family_compiled_t *instance)
+void kan_resource_material_pipeline_family_compiled_shutdown (
+    struct kan_resource_material_pipeline_family_compiled_t *instance)
 {
     kan_rpl_meta_shutdown (&instance->meta);
 }
