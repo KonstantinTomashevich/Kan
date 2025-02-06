@@ -9,8 +9,6 @@
 #include <kan/universe_render_foundation/texture.h>
 #include <kan/universe_resource_provider/universe_resource_provider.h>
 
-// TODO: Later implement material pre-caching (for PSO pre-caching).
-
 KAN_LOG_DEFINE_CATEGORY (render_foundation_material);
 
 KAN_REFLECTION_FUNCTION_META (kan_universe_mutator_execute_render_foundation_material_management_planning)
@@ -163,6 +161,9 @@ struct render_foundation_material_management_planning_state_t
     kan_interned_string_t interned_kan_resource_material_pipeline_family_compiled_t;
     kan_interned_string_t interned_kan_resource_material_pipeline_compiled_t;
     kan_interned_string_t interned_kan_resource_material_compiled_t;
+    kan_interned_string_t interned_kan_resource_material_t;
+
+    kan_bool_t preload_materials;
 };
 
 UNIVERSE_RENDER_FOUNDATION_API void render_foundation_material_management_planning_state_init (
@@ -173,6 +174,7 @@ UNIVERSE_RENDER_FOUNDATION_API void render_foundation_material_management_planni
     instance->interned_kan_resource_material_pipeline_compiled_t =
         kan_string_intern ("kan_resource_material_pipeline_compiled_t");
     instance->interned_kan_resource_material_compiled_t = kan_string_intern ("kan_resource_material_compiled_t");
+    instance->interned_kan_resource_material_t = kan_string_intern ("kan_resource_material_t");
 }
 
 UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_deploy_render_foundation_material_management_planning (
@@ -182,24 +184,25 @@ UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_deploy_render_foundatio
     kan_workflow_graph_node_t workflow_node,
     struct render_foundation_material_management_planning_state_t *state)
 {
+    const struct kan_render_material_configuration_t *configuration = kan_universe_world_query_configuration (
+        world, kan_string_intern (KAN_RENDER_FOUNDATION_MATERIAL_MANAGEMENT_CONFIGURATION));
+
+    KAN_ASSERT (configuration)
+    state->preload_materials = configuration->preload_materials;
+
     kan_workflow_graph_node_depend_on (workflow_node, KAN_RENDER_FOUNDATION_MATERIAL_MANAGEMENT_BEGIN_CHECKPOINT);
     kan_workflow_graph_node_make_dependency_of (workflow_node, KAN_RESOURCE_PROVIDER_BEGIN_CHECKPOINT);
 }
 
-static void create_new_usage_state_if_needed (struct render_foundation_material_management_planning_state_t *state,
-                                              const struct kan_resource_provider_singleton_t *resource_provider,
-                                              kan_interned_string_t material_name)
+static inline void create_material_state (struct render_foundation_material_management_planning_state_t *state,
+                                          const struct kan_resource_provider_singleton_t *resource_provider,
+                                          kan_interned_string_t material_name,
+                                          kan_instance_size_t initial_references)
 {
-    KAN_UP_VALUE_UPDATE (referencer_state, render_foundation_material_state_t, name, &material_name)
-    {
-        ++referencer_state->reference_count;
-        KAN_UP_QUERY_RETURN_VOID;
-    }
-
     KAN_UP_INDEXED_INSERT (new_state, render_foundation_material_state_t)
     {
         new_state->name = material_name;
-        new_state->reference_count = 1u;
+        new_state->reference_count = initial_references;
         new_state->pipeline_family_name = NULL;
 
         KAN_UP_INDEXED_INSERT (request, kan_resource_request_t)
@@ -212,6 +215,42 @@ static void create_new_usage_state_if_needed (struct render_foundation_material_
             request->priority = KAN_UNIVERSE_RENDER_FOUNDATION_MATERIAL_INFO_PRIORITY;
         }
     }
+}
+
+static inline void update_loaded_compilation_priority (
+    struct render_foundation_material_management_planning_state_t *state,
+    kan_interned_string_t material_name,
+    enum kan_render_pipeline_compilation_priority_t priority)
+{
+    KAN_ASSERT (state->preload_materials)
+    KAN_UP_VALUE_READ (loaded, kan_render_material_loaded_t, name, &material_name)
+    {
+        for (kan_loop_size_t index = 0u; index < loaded->pipelines.size; ++index)
+        {
+            struct kan_render_material_loaded_pipeline_t *pipeline =
+                &((struct kan_render_material_loaded_pipeline_t *) loaded->pipelines.data)[index];
+            kan_render_graphics_pipeline_change_compilation_priority (pipeline->pipeline, priority);
+        }
+    }
+}
+
+static void create_new_usage_state_if_needed (struct render_foundation_material_management_planning_state_t *state,
+                                              const struct kan_resource_provider_singleton_t *resource_provider,
+                                              kan_interned_string_t material_name)
+{
+    KAN_UP_VALUE_UPDATE (referencer_state, render_foundation_material_state_t, name, &material_name)
+    {
+        ++referencer_state->reference_count;
+        if (referencer_state->reference_count == 1u)
+        {
+            // We've switched material from preload mode to used mode. We need to update pipeline compilation priority.
+            update_loaded_compilation_priority (state, material_name, KAN_RENDER_PIPELINE_COMPILATION_PRIORITY_ACTIVE);
+        }
+
+        KAN_UP_QUERY_RETURN_VOID;
+    }
+
+    create_material_state (state, resource_provider, material_name, 1u);
 }
 
 #define MATERIAL_HELPER_DETACH_FAMILY_AND_PASSES                                                                       \
@@ -272,15 +311,38 @@ static void create_new_usage_state_if_needed (struct render_foundation_material_
         }                                                                                                              \
     }
 
-static void destroy_old_usage_state_if_not_reference (
+static void destroy_old_usage_state_if_not_referenced (
     struct render_foundation_material_management_planning_state_t *state, kan_interned_string_t material_name)
 {
     KAN_UP_VALUE_WRITE (material, render_foundation_material_state_t, name, &material_name)
     {
         KAN_ASSERT (material->reference_count > 0u)
         --material->reference_count;
+        kan_bool_t should_delete = material->reference_count == 0u;
 
-        if (material->reference_count > 0u)
+        if (state->preload_materials && should_delete)
+        {
+            kan_bool_t still_exists_as_a_resource = KAN_FALSE;
+            KAN_UP_VALUE_READ (native_entry, kan_resource_native_entry_t, name, &material_name)
+            {
+                if (native_entry->type == state->interned_kan_resource_material_compiled_t ||
+                    native_entry->type == state->interned_kan_resource_material_t)
+                {
+                    still_exists_as_a_resource = KAN_TRUE;
+                    KAN_UP_QUERY_BREAK;
+                }
+            }
+
+            should_delete = !still_exists_as_a_resource;
+            if (!should_delete)
+            {
+                // We've switched material from used mode to preload. We need to update pipeline compilation priority.
+                update_loaded_compilation_priority (state, material_name,
+                                                    KAN_RENDER_PIPELINE_COMPILATION_PRIORITY_CACHE);
+            }
+        }
+
+        if (!should_delete)
         {
             KAN_UP_QUERY_RETURN_VOID;
         }
@@ -315,6 +377,33 @@ UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_execute_render_foundati
 
         // This mutator only processes changes that result in new request insertion or in deferred request deletion.
 
+        KAN_UP_EVENT_FETCH (native_entry_event, kan_resource_native_entry_on_insert_event_t)
+        {
+            if (state->preload_materials)
+            {
+                if (native_entry_event->type == state->interned_kan_resource_material_compiled_t ||
+                    native_entry_event->type == state->interned_kan_resource_material_t)
+                {
+                    kan_bool_t already_has_state = KAN_FALSE;
+                    KAN_UP_VALUE_READ (referencer_state, render_foundation_material_state_t, name,
+                                       &native_entry_event->name)
+                    {
+                        already_has_state = KAN_TRUE;
+                    }
+
+                    if (!already_has_state)
+                    {
+                        // Zero references, as it is unreferenced preload state.
+                        create_material_state (state, resource_provider, native_entry_event->name, 0u);
+                    }
+                }
+            }
+        }
+
+        // We ignore native entry removal for several reasons:
+        // - Entry removal only happens in development and preload is designed for packaged only.
+        // - Material can be still be used somewhere and we shouldn't unload it until it is properly replaced by user.
+
         KAN_UP_EVENT_FETCH (on_insert_event, render_foundation_material_usage_on_insert_event_t)
         {
             create_new_usage_state_if_needed (state, resource_provider, on_insert_event->material_name);
@@ -325,13 +414,13 @@ UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_execute_render_foundati
             if (on_change_event->new_material_name != on_change_event->old_material_name)
             {
                 create_new_usage_state_if_needed (state, resource_provider, on_change_event->new_material_name);
-                destroy_old_usage_state_if_not_reference (state, on_change_event->old_material_name);
+                destroy_old_usage_state_if_not_referenced (state, on_change_event->old_material_name);
             }
         }
 
         KAN_UP_EVENT_FETCH (on_delete_event, render_foundation_material_usage_on_delete_event_t)
         {
-            destroy_old_usage_state_if_not_reference (state, on_delete_event->material_name);
+            destroy_old_usage_state_if_not_referenced (state, on_delete_event->material_name);
         }
 
         KAN_UP_SIGNAL_UPDATE (pipeline_family, render_foundation_pipeline_family_state_t, request_id,
@@ -374,6 +463,8 @@ struct render_foundation_material_management_execution_state_t
     kan_interned_string_t interned_kan_resource_material_pipeline_compiled_t;
     kan_interned_string_t interned_kan_resource_material_compiled_t;
 
+    kan_bool_t preload_materials;
+
     kan_allocation_group_t description_allocation_group;
 };
 
@@ -397,7 +488,15 @@ UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_deploy_render_foundatio
     kan_workflow_graph_node_t workflow_node,
     struct render_foundation_material_management_execution_state_t *state)
 {
+    const struct kan_render_material_configuration_t *configuration = kan_universe_world_query_configuration (
+        world, kan_string_intern (KAN_RENDER_FOUNDATION_MATERIAL_MANAGEMENT_CONFIGURATION));
+
+    KAN_ASSERT (configuration)
+    state->preload_materials = configuration->preload_materials;
+
     kan_workflow_graph_node_depend_on (workflow_node, KAN_RESOURCE_PROVIDER_END_CHECKPOINT);
+    kan_workflow_graph_node_depend_on (workflow_node, KAN_RENDER_FOUNDATION_PASS_MANAGEMENT_END_CHECKPOINT);
+
     kan_workflow_graph_node_make_dependency_of (workflow_node,
                                                 KAN_RENDER_FOUNDATION_MATERIAL_MANAGEMENT_END_CHECKPOINT);
     kan_workflow_graph_node_make_dependency_of (workflow_node, KAN_RENDER_FOUNDATION_FRAME_BEGIN);
@@ -1104,8 +1203,8 @@ static void recreate_family (struct render_foundation_material_management_execut
 
                         pipeline_pass->pipeline = kan_render_graphics_pipeline_create (
                             kan_render_backend_system_get_render_context (state->render_backend_system), &description,
-                            // TODO: Change priority in case of caching.
-                            KAN_RENDER_PIPELINE_COMPILATION_PRIORITY_ACTIVE);
+                            // Priority will be automatically changed to active when active material uses it.
+                            KAN_RENDER_PIPELINE_COMPILATION_PRIORITY_CACHE);
 
                         if (color_outputs && color_outputs != color_outputs_static)
                         {
@@ -1172,6 +1271,7 @@ static void reload_material_from_family (struct render_foundation_material_manag
                 {
                     struct kan_render_material_loaded_pipeline_t *spot =
                         kan_dynamic_array_add_last (&loaded->pipelines);
+
                     if (!spot)
                     {
                         kan_dynamic_array_set_capacity (&loaded->pipelines, loaded->pipelines.size * 2u);
@@ -1180,6 +1280,12 @@ static void reload_material_from_family (struct render_foundation_material_manag
 
                     spot->pass_name = material_pass->pass_name;
                     spot->pipeline = pipeline_pass->pipeline;
+
+                    if (state->preload_materials && material->reference_count > 0u)
+                    {
+                        kan_render_graphics_pipeline_change_compilation_priority (
+                            spot->pipeline, KAN_RENDER_PIPELINE_COMPILATION_PRIORITY_ACTIVE);
+                    }
                 }
 
                 KAN_UP_QUERY_BREAK;
@@ -1337,7 +1443,6 @@ static inline void on_material_updated (struct render_foundation_material_manage
                 {
                     const struct kan_resource_material_compiled_t *material_data =
                         KAN_RESOURCE_PROVIDER_CONTAINER_GET (kan_resource_material_compiled_t, container);
-                    kan_bool_t enough_data_to_fill_loaded_material = KAN_TRUE;
 
                     // We add references to existent family and pipeline passes first to
                     // avoid unloading them when unlinking old data.
@@ -1347,11 +1452,11 @@ static inline void on_material_updated (struct render_foundation_material_manage
                                          &material_data->pipeline_family)
                     {
                         ++family_to_add_reference->reference_count;
-                        enough_data_to_fill_loaded_material &= KAN_HANDLE_IS_VALID (family_to_add_reference->family);
+                        // We need to reset family meta loading as we'll need meta resource in for loaded material data.
+                        family_to_add_reference->request_id = KAN_TYPED_ID_32_SET_INVALID (kan_resource_request_id_t);
                         new_family_exists = KAN_TRUE;
                     }
 
-                    enough_data_to_fill_loaded_material &= new_family_exists;
                     for (kan_loop_size_t index = 0u; index < material_data->passes.size; ++index)
                     {
                         struct kan_resource_material_pass_compiled_t *pass_compiled =
@@ -1413,8 +1518,6 @@ static inline void on_material_updated (struct render_foundation_material_manage
                                     if (pipeline_pass->pass_name == new_material_pass->pass_name)
                                     {
                                         // No need to add reference, it was done earlier.
-                                        enough_data_to_fill_loaded_material &=
-                                            KAN_HANDLE_IS_VALID (pipeline_pass->pipeline);
                                         pipeline_pass_exists = KAN_TRUE;
                                         KAN_UP_QUERY_BREAK;
                                     }
@@ -1458,34 +1561,12 @@ static inline void on_material_updated (struct render_foundation_material_manage
                                         new_pipeline->reference_count = 1u;
                                     }
                                 }
-
-                                enough_data_to_fill_loaded_material &= pipeline_pass_exists;
                             }
                         }
                     }
 
-                    if (enough_data_to_fill_loaded_material)
-                    {
-                        KAN_UP_VALUE_UPDATE (family, render_foundation_pipeline_family_state_t, name,
-                                             &material_data->pipeline_family)
-                        {
-                            kan_bool_t updated = KAN_FALSE;
-                            KAN_UP_VALUE_UPDATE (loaded, kan_render_material_loaded_t, name, &material->name)
-                            {
-                                reload_material_from_family (state, material, family, loaded);
-                                updated = KAN_TRUE;
-                            }
-
-                            if (!updated)
-                            {
-                                KAN_UP_INDEXED_INSERT (new_loaded, kan_render_material_loaded_t)
-                                {
-                                    new_loaded->name = material->name;
-                                    reload_material_from_family (state, material, family, new_loaded);
-                                }
-                            }
-                        }
-                    }
+                    // It is never possible to update material right away, as we need to ensure that family meta
+                    // resource is loaded in order to properly update material loaded data.
                 }
             }
         }

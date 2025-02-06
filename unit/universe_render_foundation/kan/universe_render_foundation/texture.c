@@ -209,7 +209,7 @@ static void create_new_usage_state_if_needed (struct render_foundation_texture_m
     }
 }
 
-static void destroy_old_usage_state_if_not_reference (
+static void destroy_old_usage_state_if_not_referenced (
     struct render_foundation_texture_management_planning_state_t *state, kan_interned_string_t texture_name)
 {
     KAN_UP_VALUE_WRITE (usage_state, render_foundation_texture_usage_state_t, name, &texture_name)
@@ -288,13 +288,13 @@ UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_execute_render_foundati
             if (on_change_event->new_texture_name != on_change_event->old_texture_name)
             {
                 create_new_usage_state_if_needed (state, resource_provider, on_change_event->new_texture_name);
-                destroy_old_usage_state_if_not_reference (state, on_change_event->old_texture_name);
+                destroy_old_usage_state_if_not_referenced (state, on_change_event->old_texture_name);
             }
         }
 
         KAN_UP_EVENT_FETCH (on_delete_event, render_foundation_texture_usage_on_delete_event_t)
         {
-            destroy_old_usage_state_if_not_reference (state, on_delete_event->texture_name);
+            destroy_old_usage_state_if_not_referenced (state, on_delete_event->texture_name);
         }
 
         // TODO: In future, data loading priority should depend on mips and we should implement proper streaming.

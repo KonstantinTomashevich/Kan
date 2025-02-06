@@ -676,9 +676,8 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void mutator_template_deploy_resource_provide
     kan_workflow_graph_node_t workflow_node,
     struct resource_provider_state_t *state)
 {
-    struct kan_resource_provider_configuration_t *configuration =
-        (struct kan_resource_provider_configuration_t *) kan_universe_world_query_configuration (
-            world, kan_string_intern (KAN_RESOURCE_PROVIDER_CONFIGURATION));
+    const struct kan_resource_provider_configuration_t *configuration =
+        kan_universe_world_query_configuration (world, kan_string_intern (KAN_RESOURCE_PROVIDER_CONFIGURATION));
     KAN_ASSERT (configuration)
 
     state->scan_budget_ns = configuration->scan_budget_ns;

@@ -22,6 +22,9 @@ KAN_C_HEADER_BEGIN
 /// \brief Checkpoint, that is hit after all render foundation material management mutators finished execution.
 #define KAN_RENDER_FOUNDATION_MATERIAL_MANAGEMENT_END_CHECKPOINT "render_foundation_material_management_end"
 
+/// \brief Name for render foundation material management configuration object in universe world.
+#define KAN_RENDER_FOUNDATION_MATERIAL_MANAGEMENT_CONFIGURATION "render_foundation_material_management"
+
 KAN_TYPED_ID_32_DEFINE (kan_render_material_usage_id_t);
 
 /// \brief Used to inform material management that material needs to be loaded.
@@ -57,6 +60,18 @@ static inline kan_render_material_usage_id_t kan_next_material_usage_id (
         kan_render_material_usage_id_t,
         (kan_id_32_t) kan_atomic_int_add ((struct kan_atomic_int_t *) &material_singleton->usage_id_counter, 1));
 }
+
+struct kan_render_material_configuration_t
+{
+    /// \brief Attempts to load all available materials as soon as they're detected.
+    /// \details Currently, we have no other solution than to load pre-load materials with the same priority as active
+    ///          ones. We can only build their pipelines with lower priorities.
+    ///          The reason for that is the fact that there is no proper technique for modifying request priority
+    ///          without reawakening sleeping requests or causing reload. We cannot simply change the priority as
+    ///          high-level resource management mutators cannot edit requests (as it would result in access mask clash).
+    ///          TODO: In the future, we should improve resource provider and solve this issue as well.
+    kan_bool_t preload_materials;
+};
 
 struct kan_render_material_loaded_pipeline_t
 {
