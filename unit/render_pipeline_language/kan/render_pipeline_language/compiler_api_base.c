@@ -4,6 +4,45 @@
 KAN_LOG_DEFINE_CATEGORY (rpl_compiler_context);
 KAN_LOG_DEFINE_CATEGORY (rpl_compiler_instance);
 
+const char *kan_rpl_meta_variable_type_to_string (enum kan_rpl_meta_variable_type_t type)
+{
+    switch (type)
+    {
+    case KAN_RPL_META_VARIABLE_TYPE_F1:
+        return "KAN_RPL_META_VARIABLE_TYPE_F1";
+
+    case KAN_RPL_META_VARIABLE_TYPE_F2:
+        return "KAN_RPL_META_VARIABLE_TYPE_F2";
+
+    case KAN_RPL_META_VARIABLE_TYPE_F3:
+        return "KAN_RPL_META_VARIABLE_TYPE_F3";
+
+    case KAN_RPL_META_VARIABLE_TYPE_F4:
+        return "KAN_RPL_META_VARIABLE_TYPE_F4";
+
+    case KAN_RPL_META_VARIABLE_TYPE_I1:
+        return "KAN_RPL_META_VARIABLE_TYPE_I1";
+
+    case KAN_RPL_META_VARIABLE_TYPE_I2:
+        return "KAN_RPL_META_VARIABLE_TYPE_I2";
+
+    case KAN_RPL_META_VARIABLE_TYPE_I3:
+        return "KAN_RPL_META_VARIABLE_TYPE_I3";
+
+    case KAN_RPL_META_VARIABLE_TYPE_I4:
+        return "KAN_RPL_META_VARIABLE_TYPE_I4";
+
+    case KAN_RPL_META_VARIABLE_TYPE_F3X3:
+        return "KAN_RPL_META_VARIABLE_TYPE_F3X3";
+
+    case KAN_RPL_META_VARIABLE_TYPE_F4X4:
+        return "KAN_RPL_META_VARIABLE_TYPE_F4X4";
+    }
+
+    KAN_ASSERT (KAN_FALSE)
+    return "<unknown>";
+}
+
 void kan_rpl_meta_parameter_init (struct kan_rpl_meta_parameter_t *instance)
 {
     instance->name = NULL;

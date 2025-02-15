@@ -1037,6 +1037,9 @@ CONTEXT_RENDER_BACKEND_SYSTEM_API void *kan_render_buffer_patch (kan_render_buff
                                                                  kan_render_size_t slice_offset,
                                                                  kan_render_size_t slice_size);
 
+/// \brief Returns full size of a buffer specified during creation.
+CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_size_t kan_render_buffer_get_full_size (kan_render_buffer_t buffer);
+
 /// \brief Requests read access to read back buffer.
 /// \return Pointer to read back buffer data on success.
 /// \invariant Buffer type is KAN_RENDER_BUFFER_TYPE_READ_BACK_STORAGE.

@@ -148,6 +148,9 @@ enum kan_rpl_meta_variable_type_t
     KAN_RPL_META_VARIABLE_TYPE_F4X4,
 };
 
+/// \brief Helper for representing `kan_rpl_meta_variable_type_t` as strings in logs.
+RENDER_PIPELINE_LANGUAGE_API const char *kan_rpl_meta_variable_type_to_string (enum kan_rpl_meta_variable_type_t type);
+
 /// \brief Stores information about exposed buffer attribute.
 struct kan_rpl_meta_attribute_t
 {
