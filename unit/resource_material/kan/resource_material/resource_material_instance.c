@@ -49,17 +49,17 @@ RESOURCE_MATERIAL_API struct kan_resource_resource_type_meta_t
         .root = KAN_FALSE,
 };
 
+KAN_REFLECTION_STRUCT_FIELD_META (kan_resource_material_instance_static_compiled_t, material)
+RESOURCE_MATERIAL_API struct kan_resource_reference_meta_t
+    kan_resource_material_instance_static_compiled_material_reference_meta = {
+        .type = "kan_resource_material_t",
+        .compilation_usage = KAN_RESOURCE_REFERENCE_COMPILATION_USAGE_TYPE_NOT_NEEDED,
+};
+
 KAN_REFLECTION_STRUCT_META (kan_resource_material_instance_compiled_t)
 RESOURCE_MATERIAL_API struct kan_resource_resource_type_meta_t
     kan_resource_material_instance_compiled_resource_type_meta = {
         .root = KAN_FALSE,
-};
-
-KAN_REFLECTION_STRUCT_FIELD_META (kan_resource_material_instance_compiled_t, material)
-RESOURCE_MATERIAL_API struct kan_resource_reference_meta_t
-    kan_resource_material_instance_compiled_material_reference_meta = {
-        .type = "kan_resource_material_t",
-        .compilation_usage = KAN_RESOURCE_REFERENCE_COMPILATION_USAGE_TYPE_NOT_NEEDED,
 };
 
 KAN_REFLECTION_STRUCT_FIELD_META (kan_resource_material_instance_compiled_t, static_data)
@@ -225,16 +225,6 @@ static enum kan_resource_compile_result_t kan_resource_material_instance_compile
         parent = state->dependencies[0u].data;
     }
 
-    if (parent && parent->material != input->material)
-    {
-        KAN_LOG (
-            resource_material_instance_compilation, KAN_LOG_ERROR,
-            "Material instance \"%s\" uses material \"%s\" while its parent \"%s\" uses different material \"%s\".",
-            state->name, input->material, input->parent, parent->material)
-        return KAN_RESOURCE_PIPELINE_COMPILE_FAILED;
-    }
-
-    output->material = input->material;
     if (input->parameters.size > 0u || input->tail_set.size > 0u || input->tail_append.size > 0u)
     {
         // Instance has non-instanced parameters, therefore it needs new static data.
@@ -333,6 +323,15 @@ static enum kan_resource_compile_result_t kan_resource_material_instance_static_
         {
             KAN_ASSERT (KAN_FALSE)
         }
+    }
+
+    output->material = append_raw->material;
+    if (base && base->material != append_raw->material)
+    {
+        KAN_LOG (resource_material_instance_compilation, KAN_LOG_ERROR,
+                 "Material instance \"%s\" uses material \"%s\" while its parent uses different material \"%s\".",
+                 input->append_raw_instance, append_raw->material, base->material)
+        return KAN_RESOURCE_PIPELINE_COMPILE_FAILED;
     }
 
     KAN_ASSERT (append_raw)
@@ -519,6 +518,7 @@ void kan_resource_material_instance_shutdown (struct kan_resource_material_insta
 void kan_resource_material_instance_static_compiled_init (
     struct kan_resource_material_instance_static_compiled_t *instance)
 {
+    instance->material = NULL;
     kan_dynamic_array_init (&instance->parameters, 0u, sizeof (struct kan_resource_material_parameter_t),
                             _Alignof (struct kan_resource_material_parameter_t), kan_allocation_group_stack_get ());
     kan_dynamic_array_init (&instance->tail_set, 0u, sizeof (struct kan_resource_material_tail_set_t),
@@ -552,7 +552,6 @@ void kan_resource_material_instance_static_compiled_shutdown (
 
 void kan_resource_material_instance_compiled_init (struct kan_resource_material_instance_compiled_t *instance)
 {
-    instance->material = NULL;
     instance->static_data = NULL;
     kan_dynamic_array_init (&instance->instanced_parameters, 0u, sizeof (struct kan_resource_material_parameter_t),
                             _Alignof (struct kan_resource_material_parameter_t), kan_allocation_group_stack_get ());

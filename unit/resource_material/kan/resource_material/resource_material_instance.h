@@ -125,6 +125,8 @@ RESOURCE_MATERIAL_API void kan_resource_material_instance_shutdown (struct kan_r
 
 struct kan_resource_material_instance_static_compiled_t
 {
+    kan_interned_string_t material;
+
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_resource_material_parameter_t)
     struct kan_dynamic_array_t parameters;
 
@@ -146,7 +148,6 @@ RESOURCE_MATERIAL_API void kan_resource_material_instance_static_compiled_shutdo
 
 struct kan_resource_material_instance_compiled_t
 {
-    kan_interned_string_t material;
     kan_interned_string_t static_data;
 
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_resource_material_parameter_t)
