@@ -6,7 +6,6 @@
 #include <kan/universe/preprocessor_markup.h>
 #include <kan/universe_render_foundation/material.h>
 #include <kan/universe_render_foundation/render_graph.h>
-#include <kan/universe_render_foundation/texture.h>
 #include <kan/universe_resource_provider/universe_resource_provider.h>
 
 KAN_LOG_DEFINE_CATEGORY (render_foundation_material);
@@ -48,12 +47,10 @@ KAN_REFLECTION_STRUCT_META (kan_render_material_usage_t)
 UNIVERSE_RENDER_FOUNDATION_API struct kan_repository_meta_automatic_on_change_event_t
     render_foundation_material_usage_on_change_event = {
         .event_type = "render_foundation_material_usage_on_change_event_t",
-        .observed_fields_count = 3u,
+        .observed_fields_count = 1u,
         .observed_fields =
             (struct kan_repository_field_path_t[]) {
                 {.reflection_path_length = 1u, .reflection_path = (const char *[]) {"name"}},
-                {.reflection_path_length = 1u, .reflection_path = (const char *[]) {"best_advised_mip"}},
-                {.reflection_path_length = 1u, .reflection_path = (const char *[]) {"worst_advised_mip"}},
             },
         .unchanged_copy_outs_count = 1u,
         .unchanged_copy_outs =
@@ -827,25 +824,25 @@ static void recreate_family (struct render_foundation_material_management_execut
 
             if (set_pass)
             {
-                set_pass->set = 0u;
+                set_pass->set = KAN_RPL_SET_PASS;
                 set_pass->stable_binding = KAN_TRUE;
             }
 
             if (set_material)
             {
-                set_material->set = 1u;
+                set_material->set = KAN_RPL_SET_MATERIAL;
                 set_material->stable_binding = KAN_TRUE;
             }
 
             if (set_object)
             {
-                set_object->set = 2u;
+                set_object->set = KAN_RPL_SET_OBJECT;
                 set_object->stable_binding = KAN_TRUE;
             }
 
             if (set_unstable)
             {
-                set_unstable->set = 3u;
+                set_unstable->set = KAN_RPL_SET_UNSTABLE;
                 set_unstable->stable_binding = KAN_FALSE;
             }
 
