@@ -2261,6 +2261,15 @@ static inline void add_native_entry_reference (struct resource_provider_state_t 
             {
                 // Existent byproducts are always loaded, therefore there is nothing more to do with them.
                 ++byproduct->request_count;
+
+                if (KAN_TYPED_ID_32_IS_VALID (request_id))
+                {
+                    KAN_UP_VALUE_UPDATE (request, kan_resource_request_t, request_id, &request_id)
+                    {
+                        update_request_provided_data (state, request, byproduct->container_id, NULL, 0u);
+                    }
+                }
+
                 KAN_UP_QUERY_RETURN_VOID;
             }
         }
@@ -2672,8 +2681,12 @@ static kan_instance_size_t recursively_awake_requests (struct resource_provider_
         {
             if (compiled_entry->type == type)
             {
+                KAN_ASSERT (direct_request_count >= compiled_entry->request_count)
+                compiled_entry->request_count = direct_request_count;
+
                 // Changes should be able to trigger recompilation.
-                if (compiled_entry->compilation_state == RESOURCE_PROVIDER_COMPILATION_STATE_DONE)
+                if (compiled_entry->compilation_state == RESOURCE_PROVIDER_COMPILATION_STATE_DONE ||
+                    compiled_entry->compilation_state == RESOURCE_PROVIDER_COMPILATION_STATE_NOT_PENDING)
                 {
                     compiled_entry->compilation_state = RESOURCE_PROVIDER_COMPILATION_STATE_PENDING;
                 }
@@ -2685,13 +2698,19 @@ static kan_instance_size_t recursively_awake_requests (struct resource_provider_
         }
     }
 
+    kan_interned_string_t compiled_type_name = NULL;
     KAN_UP_VALUE_UPDATE (compiled_entry, resource_provider_compiled_resource_entry_t, name, &name)
     {
         if (compiled_entry->source_type == type)
         {
-            recursively_awake_requests (state, public, private, compiled_entry->type, compiled_entry->name);
+            compiled_type_name = compiled_entry->type;
             KAN_UP_QUERY_BREAK;
         }
+    }
+
+    if (compiled_type_name)
+    {
+        recursively_awake_requests (state, public, private, compiled_type_name, name);
     }
 
     KAN_UP_VALUE_READ (dependency, resource_provider_compilation_dependency_t, dependency_name, &name)
@@ -3047,6 +3066,8 @@ static enum resource_provider_serve_operation_status_t execute_shared_serve_load
                             state->reflection_registry, container_view->my_allocation_group);
                         break;
                     }
+
+                    kan_repository_indexed_value_update_access_close (&container_view_access);
                 }
 
                 KAN_UP_QUERY_BREAK;
@@ -3360,13 +3381,117 @@ static inline kan_interned_string_t register_byproduct_internal (kan_functor_use
     if (byproduct_name)
     {
         kan_bool_t name_is_already_used = KAN_FALSE;
+        kan_resource_container_id_t raw_byproduct_container_id;
+
         KAN_UP_VALUE_READ (byproduct, resource_provider_raw_byproduct_entry_t, name, &byproduct_name)
         {
-            name_is_already_used = KAN_TRUE;
+            if (byproduct->type == byproduct_type_name)
+            {
+                name_is_already_used = KAN_TRUE;
+                raw_byproduct_container_id = byproduct->container_id;
+                KAN_UP_QUERY_BREAK;
+            }
         }
 
         if (name_is_already_used)
         {
+            kan_bool_t compiled_from_the_same_resource = KAN_FALSE;
+            kan_instance_size_t production_count = 0u;
+
+            KAN_UP_VALUE_READ (production, resource_provider_byproduct_production_t, byproduct_name, &byproduct_name)
+            {
+                if (production->byproduct_type == byproduct_type_name)
+                {
+                    compiled_from_the_same_resource = production->compiled_name == data->compiled_entry_name &&
+                                                      production->compiled_type == data->compiled_entry_type;
+                    ++production_count;
+                }
+            }
+
+            if (production_count == 1u && compiled_from_the_same_resource)
+            {
+                // We're just recompiling the resource which produced this unique byproduct.
+                // Therefore, this byproduct was produced again and should be updated.
+
+                struct kan_repository_indexed_value_update_access_t container_view_access;
+                uint8_t *container_data_begin;
+                struct kan_resource_container_view_t *container_view =
+                    native_container_update (state, byproduct_type_name, raw_byproduct_container_id,
+                                             &container_view_access, &container_data_begin);
+
+                if (container_view)
+                {
+                    if (meta->move)
+                    {
+                        meta->move (container_data_begin, byproduct_data);
+                    }
+                    else
+                    {
+                        kan_reflection_move_struct (state->reflection_registry, byproduct_type, container_data_begin,
+                                                    byproduct_data);
+                    }
+
+                    kan_repository_indexed_value_update_access_close (&container_view_access);
+                    kan_atomic_int_unlock (&state->execution_shared_state.byproduct_lock);
+
+                    // We need to do request-related stuff under common concurrency lock, unfortunately.
+                    kan_atomic_int_lock (&state->execution_shared_state.concurrency_lock);
+
+                    // We need to properly inform anyone about the update.
+                    kan_instance_size_t new_request_count = 0u;
+
+                    KAN_UP_SINGLETON_READ (public, kan_resource_provider_singleton_t)
+                    KAN_UP_SINGLETON_WRITE (private, resource_provider_private_singleton_t)
+                    {
+                        new_request_count =
+                            recursively_awake_requests (state, public, private, byproduct_type_name, byproduct_name);
+                    }
+
+                    // We also need to send fake update requests:
+                    // container id didn't change, but actual data has been changed.
+
+                    KAN_UP_VALUE_UPDATE (request, kan_resource_request_t, name, &byproduct_name)
+                    {
+                        if (request->type == byproduct_type_name)
+                        {
+                            request->expecting_new_data = KAN_FALSE;
+                            KAN_UP_EVENT_INSERT (event, kan_resource_request_updated_event_t)
+                            {
+                                event->type = request->type;
+                                event->request_id = request->request_id;
+                            }
+                        }
+                    }
+
+                    kan_atomic_int_unlock (&state->execution_shared_state.concurrency_lock);
+
+                    // Finally, we need byproduct lock once again in order to update byproduct request count.
+                    kan_atomic_int_lock (&state->execution_shared_state.byproduct_lock);
+
+                    KAN_UP_VALUE_UPDATE (updated_byproduct, resource_provider_raw_byproduct_entry_t, name,
+                                         &byproduct_name)
+                    {
+                        if (updated_byproduct->type == byproduct_type_name)
+                        {
+                            updated_byproduct->request_count = new_request_count;
+                            KAN_UP_QUERY_BREAK;
+                        }
+                    }
+
+                    kan_atomic_int_unlock (&state->execution_shared_state.byproduct_lock);
+                    return byproduct_name;
+                }
+                else
+                {
+                    KAN_LOG (universe_resource_provider, KAN_LOG_ERROR,
+                             "Unable to update raw unique byproduct \"%s\" of type \"%s\" as loading container is "
+                             "absent. Internal handling error?",
+                             byproduct_name, byproduct_type_name)
+                    kan_atomic_int_unlock (&state->execution_shared_state.byproduct_lock);
+                    return NULL;
+                }
+            }
+
             KAN_LOG (
                 universe_resource_provider, KAN_LOG_ERROR,
                 "Failed to register unique byproduct of type \"%s\" with name \"%s\" as its name is already occupied",
@@ -3418,6 +3543,7 @@ static inline kan_interned_string_t register_byproduct_internal (kan_functor_use
                 kan_reflection_move_struct (state->reflection_registry, byproduct_type, container_data, byproduct_data);
             }
 
+            kan_repository_indexed_insertion_package_submit (&container_package);
             KAN_UP_INDEXED_INSERT (production, resource_provider_byproduct_production_t)
             {
                 production->compiled_type = data->compiled_entry_type;
@@ -3426,8 +3552,6 @@ static inline kan_interned_string_t register_byproduct_internal (kan_functor_use
                 production->byproduct_name = new_byproduct->name;
                 production->compilation_index = data->pending_compilation_index;
             }
-
-            kan_repository_indexed_insertion_package_submit (&container_package);
         }
     }
 
