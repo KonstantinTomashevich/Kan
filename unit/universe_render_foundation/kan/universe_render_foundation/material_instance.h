@@ -48,36 +48,11 @@ struct kan_render_material_instance_usage_t
 UNIVERSE_RENDER_FOUNDATION_API void kan_render_material_instance_usage_init (
     struct kan_render_material_instance_usage_t *instance);
 
-// TODO: We do not use cascade deletion here as we would still need to cleanup instantiation data.
-
 struct kan_render_material_instance_custom_instanced_parameter_t
 {
     kan_render_material_instance_usage_id_t usage_id;
     struct kan_resource_material_parameter_t parameter;
 };
-
-// TODO: Perhaps, it is logical to leave only custom instanced parameters for now?
-//       It is kind of reasonable not to edit the buffers in custom instances.
-//       Of course, other engines do that. But we might get away with tails and instanced parameters.
-//       And it might be more effective even.
-
-struct kan_render_material_instance_custom_parameter_t
-{
-    kan_render_material_instance_usage_id_t usage_id;
-    struct kan_resource_material_parameter_t parameter;
-};
-
-struct kan_render_material_instance_custom_image_t
-{
-    // TODO: Do we need to support custom images right now?
-    //       And are we sure that this should be the texture name, not real image object? What about runtime images?
-    kan_render_material_instance_usage_id_t usage_id;
-    struct kan_resource_material_image_t image;
-    kan_render_texture_usage_id_t allocated_texture_usage_id;
-};
-
-UNIVERSE_RENDER_FOUNDATION_API void kan_render_material_instance_custom_image_init (
-    struct kan_render_material_instance_custom_image_t *instance);
 
 /// \brief Singleton for material instance management, primary used to assign material instance usage ids.
 struct kan_render_material_instance_singleton_t
@@ -140,6 +115,10 @@ UNIVERSE_RENDER_FOUNDATION_API void kan_render_material_instance_loaded_shutdown
 struct kan_render_material_instance_custom_loaded_t
 {
     kan_render_material_instance_usage_id_t usage_id;
+
+    /// \brief Internal implementation field to avoid excessive updates.
+    kan_time_size_t last_inspection_time_ns;
+
     struct kan_render_material_instance_loaded_data_t data;
 };
 
