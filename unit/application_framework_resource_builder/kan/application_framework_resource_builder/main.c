@@ -53,6 +53,14 @@
 
 KAN_LOG_DEFINE_CATEGORY (application_framework_resource_builder);
 
+const char *__asan_default_options (void)
+{
+    // Currently, some resource compilers allocate static data and do never deallocate it, for example,
+    // render pipeline language compiler. In most cases, it makes sense to never deallocate it, but it
+    // also triggers asan. Therefore, we've decided to disable asan here. It might be changed later.
+    return "detect_leaks=0";
+}
+
 static kan_allocation_group_t reference_type_info_storage_allocation_group;
 static kan_allocation_group_t targets_allocation_group;
 static kan_allocation_group_t nodes_allocation_group;
@@ -296,6 +304,8 @@ static struct native_entry_node_t *native_entry_node_create (struct target_t *ta
 
     struct kan_file_system_path_container_t compiled_path;
     kan_file_system_path_container_copy_string (&compiled_path, VFS_OUTPUT_DIRECTORY "/" SUB_DIRECTORY_COMPILED_CACHE);
+    kan_file_system_path_container_append (&compiled_path, target->name);
+    kan_file_system_path_container_append (&compiled_path, "/");
     kan_file_system_path_container_append (&compiled_path, node->compiled_type->name);
 
     kan_virtual_file_system_make_directory (global.volume, compiled_path.path);
@@ -1654,6 +1664,8 @@ static inline void form_compiled_references_cache_directory_path (struct native_
 {
     kan_file_system_path_container_copy_string (output,
                                                 VFS_OUTPUT_DIRECTORY "/" SUB_DIRECTORY_COMPILED_REFERENCE_CACHE);
+    kan_file_system_path_container_append (output, node->target->name);
+    kan_file_system_path_container_append (output, "/");
     kan_file_system_path_container_append (output, node->source_type->name);
 }
 
@@ -1876,7 +1888,8 @@ static kan_bool_t is_compiled_data_newer_than_dependencies (struct native_entry_
     const kan_time_size_t compiled_time = get_file_last_modification_time_ns (node->compiled_path);
     if (compiled_time < global.newest_loaded_plugin_last_modification_file_time_ns ||
         compiled_time <
-            kan_resource_pipeline_system_get_platform_configuration_file_time_ns (global.resource_pipeline_system))
+            kan_resource_pipeline_system_get_platform_configuration_file_time_ns (global.resource_pipeline_system) ||
+        compiled_time < get_file_last_modification_time_ns (node->source_path))
     {
         return KAN_FALSE;
     }
