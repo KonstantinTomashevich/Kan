@@ -855,6 +855,7 @@ static void script_storage_ensure_script_generated (struct script_storage_t *sto
             if (condition_index == SCRIPT_NO_CONDITION)
             {
                 add_condition (&state, condition);
+                condition_index = state.conditions_count - 1u;
             }
         }
 
@@ -1438,6 +1439,7 @@ static inline void serialization_common_state_push_script_state (
         {
             for (script_size_t index = 0u; index < script->conditions_count; ++index)
             {
+                script_state->condition_values[index] = SERIALIZATION_CONDITION_NOT_CALCULATED;
                 calculate_condition (instance, script_state->condition_values, index,
                                      (struct script_condition_t *) script->data);
             }
