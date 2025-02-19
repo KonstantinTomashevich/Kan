@@ -225,7 +225,8 @@ static enum kan_resource_compile_result_t kan_resource_material_instance_compile
         parent = state->dependencies[0u].data;
     }
 
-    if (input->parameters.size > 0u || input->tail_set.size > 0u || input->tail_append.size > 0u)
+    if (input->parameters.size > 0u || input->tail_set.size > 0u || input->tail_append.size > 0u ||
+        input->images.size > 0u || !parent)
     {
         // Instance has non-instanced parameters, therefore it needs new static data.
         struct kan_resource_material_instance_static_t static_byproduct;
@@ -353,7 +354,6 @@ static enum kan_resource_compile_result_t kan_resource_material_instance_static_
     }
 
     kan_dynamic_array_set_capacity (&output->tail_set, (base ? base->tail_set.size : 0u) + append_raw->tail_set.size);
-
     if (base)
     {
         for (kan_loop_size_t index = 0; index < base->tail_set.size; ++index)
@@ -425,7 +425,7 @@ static enum kan_resource_compile_result_t kan_resource_material_instance_static_
     for (kan_loop_size_t append_index = 0u; append_index < append_raw->images.size; ++append_index)
     {
         kan_bool_t overridden = KAN_FALSE;
-        struct kan_resource_material_image_t *to_append =
+        const struct kan_resource_material_image_t *to_append =
             &((struct kan_resource_material_image_t *) append_raw->images.data)[append_index];
 
         for (kan_loop_size_t existent_index = 0u; existent_index < output->images.size; ++existent_index)
@@ -444,9 +444,9 @@ static enum kan_resource_compile_result_t kan_resource_material_instance_static_
 
         if (!overridden)
         {
-            void *spot = kan_dynamic_array_add_last (&output->images);
+            struct kan_resource_material_image_t *spot = kan_dynamic_array_add_last (&output->images);
             KAN_ASSERT (spot);
-            memcpy (spot, to_append, sizeof (struct kan_resource_material_image_t));
+            *spot = *to_append;
         }
     }
 
