@@ -2805,7 +2805,7 @@ static void re2c_yyrestore (void)
  re2c:api = custom;
  re2c:api:style = free-form;
  re2c:define:YYCTYPE  = char;
- re2c:define:YYLESSTHAN = "io.cursor >= io.limit";
+ re2c:define:YYLESSTHAN = "io.limit - io.cursor < @@{len}";
  re2c:define:YYPEEK = "*io.cursor";
  re2c:define:YYSKIP = "re2c_yyskip ();";
  re2c:define:YYBACKUP = "re2c_yybackup ();";
