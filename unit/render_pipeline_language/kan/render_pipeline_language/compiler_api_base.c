@@ -199,7 +199,6 @@ void kan_rpl_meta_set_bindings_shutdown (struct kan_rpl_meta_set_bindings_t *ins
 
 void kan_rpl_meta_init (struct kan_rpl_meta_t *instance)
 {
-    kan_rpl_compiler_ensure_statics_initialized ();
     instance->pipeline_type = KAN_RPL_PIPELINE_TYPE_GRAPHICS_CLASSIC;
     instance->graphics_classic_settings = kan_rpl_graphics_classic_pipeline_settings_default ();
 

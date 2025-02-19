@@ -793,9 +793,9 @@ kan_bool_t kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t comp
         kan_dynamic_array_set_capacity (&meta->set_material.buffers, material_buffer_count);
         kan_dynamic_array_set_capacity (&meta->set_object.buffers, object_buffer_count);
         kan_dynamic_array_set_capacity (&meta->set_unstable.buffers, unstable_buffer_count);
-        kan_dynamic_array_set_capacity (&meta->color_outputs, color_outputs);
     }
 
+    kan_dynamic_array_set_capacity (&meta->color_outputs, color_outputs);
     for (kan_loop_size_t output_index = 0u; output_index < color_outputs; ++output_index)
     {
         *(struct kan_rpl_meta_color_output_t *) kan_dynamic_array_add_last (&meta->color_outputs) =
