@@ -1514,8 +1514,9 @@ static const struct kan_reflection_field_t *query_field_for_automatic_event_from
     if (!field)
     {
         KAN_LOG (repository, KAN_LOG_ERROR,
-                 "Unable to query field for automatic event from path: it is either non-local or it does "
-                 "not exist. Path:")
+                 "Unable to query field from struct \"%s\" for automatic event from path: it is either non-local or it "
+                 "does not exist. Path:",
+                 struct_name)
 
         for (kan_loop_size_t path_element_index = 0u; path_element_index < path->reflection_path_length;
              ++path_element_index)

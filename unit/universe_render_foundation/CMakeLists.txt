@@ -5,12 +5,12 @@ concrete_sources (GLOB "*.c")
 concrete_require (
         SCOPE PUBLIC
         ABSTRACT context_render_backend_system
-        CONCRETE_INTERFACE inline_math universe universe_object)
+        CONCRETE_INTERFACE inline_math resource_material universe universe_object)
 
 concrete_require (
         SCOPE PRIVATE
         ABSTRACT context_hot_reload_coordination_system cpu_profiler precise_time universe_resource_provider
-        CONCRETE_INTERFACE resource_material resource_pipeline resource_texture)
+        CONCRETE_INTERFACE resource_pipeline resource_texture)
 
 concrete_require (SCOPE PRIVATE ABSTRACT log CONCRETE_INTERFACE universe_time)
 universe_concrete_preprocessing_queue ()

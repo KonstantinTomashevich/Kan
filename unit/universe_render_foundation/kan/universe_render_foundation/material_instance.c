@@ -56,8 +56,8 @@ UNIVERSE_RENDER_FOUNDATION_API struct kan_repository_meta_automatic_on_change_ev
         .observed_fields =
             (struct kan_repository_field_path_t[]) {
                 {.reflection_path_length = 1u, .reflection_path = (const char *[]) {"name"}},
-                {.reflection_path_length = 1u, .reflection_path = (const char *[]) {"best_advised_mip"}},
-                {.reflection_path_length = 1u, .reflection_path = (const char *[]) {"worst_advised_mip"}},
+                {.reflection_path_length = 1u, .reflection_path = (const char *[]) {"image_best_advised_mip"}},
+                {.reflection_path_length = 1u, .reflection_path = (const char *[]) {"image_worst_advised_mip"}},
             },
         .unchanged_copy_outs_count = 1u,
         .unchanged_copy_outs =
@@ -185,6 +185,7 @@ struct render_foundation_material_instance_static_state_t
     kan_render_material_usage_id_t current_material_usage_id;
     kan_render_material_usage_id_t kept_material_usage_id;
     kan_interned_string_t loaded_material_name;
+    kan_interned_string_t loading_material_name;
 
     kan_bool_t mip_update_needed;
     uint8_t image_best_mip;
@@ -214,6 +215,7 @@ UNIVERSE_RENDER_FOUNDATION_API void render_foundation_material_instance_static_s
     instance->current_material_usage_id = KAN_TYPED_ID_32_SET_INVALID (kan_render_material_usage_id_t);
     instance->kept_material_usage_id = KAN_TYPED_ID_32_SET_INVALID (kan_render_material_usage_id_t);
     instance->loaded_material_name = NULL;
+    instance->loading_material_name = NULL;
 
     instance->mip_update_needed = KAN_FALSE;
     instance->image_best_mip = 0u;
@@ -633,6 +635,12 @@ static inline void process_material_updates (
                 }
             }
         }
+
+        KAN_UP_VALUE_UPDATE (loading_static_state, render_foundation_material_instance_static_state_t,
+                             loading_material_name, &event->name)
+        {
+            inspect_material_instance_static (state, loading_static_state, inspection_time_ns);
+        }
     }
 }
 
@@ -809,7 +817,7 @@ static void delete_dangling_usages_from_static (
         for (kan_loop_size_t index = 0u; index < data->images.size; ++index)
         {
             const struct kan_resource_material_image_t *image =
-                &((struct kan_resource_material_image_t *) &data->images.data)[index];
+                &((struct kan_resource_material_image_t *) data->images.data)[index];
 
             if (image->texture == static_image->texture_name)
             {
@@ -1370,7 +1378,7 @@ static void update_material_instance_custom_loaded_data (
         for (kan_loop_size_t index = 0u; index < material_loaded->family_meta.attribute_buffers.size; ++index)
         {
             struct kan_rpl_meta_buffer_t *buffer =
-                &((struct kan_rpl_meta_buffer_t *) &material_loaded->family_meta.attribute_buffers.data)[index];
+                &((struct kan_rpl_meta_buffer_t *) material_loaded->family_meta.attribute_buffers.data)[index];
 
             if (buffer->type != KAN_RPL_BUFFER_TYPE_INSTANCED_ATTRIBUTE)
             {
@@ -1401,7 +1409,7 @@ static void update_material_instance_loaded_data (
     for (kan_loop_size_t index = 0u; index < material_loaded->family_meta.attribute_buffers.size; ++index)
     {
         struct kan_rpl_meta_buffer_t *buffer =
-            &((struct kan_rpl_meta_buffer_t *) &material_loaded->family_meta.attribute_buffers.data)[index];
+            &((struct kan_rpl_meta_buffer_t *) material_loaded->family_meta.attribute_buffers.data)[index];
 
         if (buffer->type == KAN_RPL_BUFFER_TYPE_INSTANCED_ATTRIBUTE)
         {
@@ -1450,7 +1458,7 @@ static void update_material_instance_loaded_data (
     for (kan_loop_size_t index = 0u; index < material_loaded->family_meta.attribute_buffers.size; ++index)
     {
         struct kan_rpl_meta_buffer_t *buffer =
-            &((struct kan_rpl_meta_buffer_t *) &material_loaded->family_meta.attribute_buffers.data)[index];
+            &((struct kan_rpl_meta_buffer_t *) material_loaded->family_meta.attribute_buffers.data)[index];
 
         if (buffer->type != KAN_RPL_BUFFER_TYPE_INSTANCED_ATTRIBUTE)
         {
@@ -1653,6 +1661,7 @@ static void inspect_material_instance_static (
                 {
                     delete_dangling_usages_from_static (state, static_state, data);
                     static_state->loaded_material_name = data->material;
+                    static_state->loading_material_name = NULL;
                     static_state->last_applied_inspection_time_ns = inspection_time_ns;
                     instantiate_material_static_data (state, static_state, data, material_loaded);
                     update_linked_material_instances (state, static_state, material_loaded);
@@ -1699,6 +1708,7 @@ static inline void on_material_instance_static_updated (
                         const struct kan_resource_material_instance_static_compiled_t *data =
                             KAN_RESOURCE_PROVIDER_CONTAINER_GET (kan_resource_material_instance_static_compiled_t,
                                                                  container);
+                        static_state->loading_material_name = data->material;
 
                         if (data->material != static_state->loaded_material_name)
                         {
@@ -1731,7 +1741,7 @@ static inline void on_material_instance_static_updated (
                         for (kan_loop_size_t index = 0u; index < data->images.size; ++index)
                         {
                             const struct kan_resource_material_image_t *image =
-                                &((struct kan_resource_material_image_t *) &data->images.data)[index];
+                                &((struct kan_resource_material_image_t *) data->images.data)[index];
                             kan_bool_t already_here = KAN_FALSE;
 
                             KAN_UP_VALUE_READ (static_image, render_foundation_material_instance_static_image_t,
