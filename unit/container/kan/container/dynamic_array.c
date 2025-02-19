@@ -28,6 +28,15 @@ void kan_dynamic_array_init (struct kan_dynamic_array_t *array,
     array->allocation_group = allocation_group;
 }
 
+void kan_dynamic_array_init_move (struct kan_dynamic_array_t *array,
+                                  struct kan_dynamic_array_t *move_from_array)
+{
+    *array = *move_from_array;
+    move_from_array->size = 0u;
+    move_from_array->capacity = 0u;
+    move_from_array->data = NULL;
+}
+
 void *kan_dynamic_array_add_last (struct kan_dynamic_array_t *array)
 {
     if (array->size == array->capacity)

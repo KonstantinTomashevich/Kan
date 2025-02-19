@@ -687,10 +687,7 @@ void kan_reflection_move_struct (kan_reflection_registry_t registry,
         {
             struct kan_dynamic_array_t *target_array = target_address;
             struct kan_dynamic_array_t *source_array = source_address;
-            *target_array = *source_array;
-            source_array->size = 0u;
-            source_array->capacity = 0u;
-            source_array->data = NULL;
+            kan_dynamic_array_init_move (target_array, source_array);
             break;
         }
         }
