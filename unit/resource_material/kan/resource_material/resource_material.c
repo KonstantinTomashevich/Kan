@@ -130,12 +130,24 @@ struct kan_resource_material_pipeline_family_t
     kan_interned_string_t source_material;
 };
 
+/// \details Custom move is needed because we're using fields ignored in reflection for compilation logs.
+static void kan_resource_material_pipeline_family_move (void *target_void, void *source_void)
+{
+    struct kan_resource_material_pipeline_family_t *target = target_void;
+    struct kan_resource_material_pipeline_family_t *source = source_void;
+
+    kan_dynamic_array_init_move (&target->sources, &source->sources);
+    kan_dynamic_array_init_move (&target->options.flags, &source->options.flags);
+    kan_dynamic_array_init_move (&target->options.counts, &source->options.counts);
+    target->source_material = source->source_material;
+}
+
 KAN_REFLECTION_STRUCT_META (kan_resource_material_pipeline_family_t)
 RESOURCE_MATERIAL_API struct kan_resource_byproduct_type_meta_t
     kan_resource_material_pipeline_family_byproduct_type_meta = {
         .hash = NULL,
         .is_equal = NULL,
-        .move = NULL,
+        .move = kan_resource_material_pipeline_family_move,
         .reset = NULL,
 };
 
@@ -195,11 +207,26 @@ struct kan_resource_material_pipeline_t
     kan_interned_string_t source_pass;
 };
 
+/// \details Custom move is needed because we're using fields ignored in reflection for compilation logs.
+static void kan_resource_material_pipeline_move (void *target_void, void *source_void)
+{
+    struct kan_resource_material_pipeline_t *target = target_void;
+    struct kan_resource_material_pipeline_t *source = source_void;
+
+    target->family = source->family;
+    kan_dynamic_array_init_move (&target->entry_points, &source->entry_points);
+    kan_dynamic_array_init_move (&target->sources, &source->sources);
+    kan_dynamic_array_init_move (&target->instance_options.flags, &source->instance_options.flags);
+    kan_dynamic_array_init_move (&target->instance_options.counts, &source->instance_options.counts);
+    target->source_material = source->source_material;
+    target->source_pass = source->source_pass;
+}
+
 KAN_REFLECTION_STRUCT_META (kan_resource_material_pipeline_t)
 RESOURCE_MATERIAL_API struct kan_resource_byproduct_type_meta_t kan_resource_material_pipeline_byproduct_type_meta = {
     .hash = NULL,
     .is_equal = NULL,
-    .move = NULL,
+    .move = kan_resource_material_pipeline_move,
     .reset = NULL,
 };
 
@@ -217,7 +244,7 @@ RESOURCE_MATERIAL_API struct kan_resource_compilable_meta_t kan_resource_materia
 
 KAN_REFLECTION_STRUCT_FIELD_META (kan_resource_material_pipeline_t, family)
 RESOURCE_MATERIAL_API struct kan_resource_reference_meta_t kan_resource_material_pipeline_family_reference_meta = {
-    .type = "kan_resource_material_shader_source_t",
+    .type = "kan_resource_material_pipeline_family_t",
     .compilation_usage = KAN_RESOURCE_REFERENCE_COMPILATION_USAGE_TYPE_NEEDED_RAW,
 };
 
@@ -528,18 +555,34 @@ static enum kan_resource_compile_result_t kan_resource_material_shader_source_co
         return KAN_RESOURCE_PIPELINE_COMPILE_FAILED;
     }
 
+    kan_allocation_group_t temporary_allocation_group =
+        kan_allocation_group_get_child (kan_allocation_group_root (), "material_shader_source_compilation");
+
+    // Unfortunately, due to how underlying parser is implemented (and how re2c parses are implemented in general),
+    // it is better for performance to process input with sentinel characters (for example, nulls in null-terminated
+    // strings). Third party data has no sentinel character in the end, as it is just an array of bytes.
+    // Therefore, we just copy it and add null terminator -- it should still be faster than checking the limit through
+    // custom API in re2c in parser implementation.
+
+    char *string_to_parse = kan_allocate_general (temporary_allocation_group,
+                                                  state->dependencies->data_size_if_third_party + 1u, _Alignof (char));
+    memcpy (string_to_parse, state->dependencies->data, state->dependencies->data_size_if_third_party);
+    string_to_parse[state->dependencies->data_size_if_third_party] = '\0';
+
     kan_rpl_parser_t parser = kan_rpl_parser_create (state->name);
-    if (!kan_rpl_parser_add_source_char_sequence (
-            parser, state->dependencies->data,
-            ((char *) state->dependencies->data) + state->dependencies->data_size_if_third_party, input->source))
+    if (!kan_rpl_parser_add_source (parser, string_to_parse, input->source))
     {
+        kan_free_general (temporary_allocation_group, string_to_parse,
+                          state->dependencies->data_size_if_third_party + 1u);
         kan_rpl_parser_destroy (parser);
+
         KAN_LOG (resource_material_compilation, KAN_LOG_ERROR,
                  "Failed to compile \"%s\" as source \"%s\" cannot be properly parsed.", state->name,
                  state->dependencies->name)
         return KAN_RESOURCE_PIPELINE_COMPILE_FAILED;
     }
 
+    kan_free_general (temporary_allocation_group, string_to_parse, state->dependencies->data_size_if_third_party + 1u);
     if (!kan_rpl_parser_build_intermediate (parser, &output->intermediate))
     {
         kan_rpl_parser_destroy (parser);
