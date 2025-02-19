@@ -531,16 +531,10 @@ KAN_HANDLE_DEFINE (kan_rpl_parser_t);
 /// \brief Creates new instance of render pipeline language parser.
 RENDER_PIPELINE_LANGUAGE_API kan_rpl_parser_t kan_rpl_parser_create (kan_interned_string_t log_name);
 
-/// \brief Parses given string as source and appends it to previous parsed data if any.
+/// \brief Parses given null-terminated string as source and appends it to previous parsed data if any.
 RENDER_PIPELINE_LANGUAGE_API kan_bool_t kan_rpl_parser_add_source (kan_rpl_parser_t parser,
                                                                    const char *source,
                                                                    kan_interned_string_t log_name);
-
-/// \brief Parses given char sequence as source and appends it to previous parsed data if any.
-RENDER_PIPELINE_LANGUAGE_API kan_bool_t kan_rpl_parser_add_source_char_sequence (kan_rpl_parser_t parser,
-                                                                                 const char *source_begin,
-                                                                                 const char *source_end,
-                                                                                 kan_interned_string_t log_name);
 
 /// \brief Builds intermediate structure from parsed data.
 RENDER_PIPELINE_LANGUAGE_API kan_bool_t kan_rpl_parser_build_intermediate (kan_rpl_parser_t parser,

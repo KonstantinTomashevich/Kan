@@ -650,7 +650,7 @@ static inline void re2c_restore_saved_cursor (struct dynamic_parser_state_t *par
  re2c:api = custom;
  re2c:api:style = free-form;
  re2c:define:YYCTYPE  = char;
- re2c:define:YYLESSTHAN = "state->cursor >= state->limit";
+ re2c:define:YYLESSTHAN = "state->limit - state->cursor < @@{len}";
  re2c:define:YYPEEK = "*state->cursor";
  re2c:define:YYSKIP = "re2c_yyskip (state);";
  re2c:define:YYBACKUP = "re2c_yybackup (state);";
@@ -3322,27 +3322,19 @@ kan_rpl_parser_t kan_rpl_parser_create (kan_interned_string_t log_name)
 
 kan_bool_t kan_rpl_parser_add_source (kan_rpl_parser_t parser, const char *source, kan_interned_string_t log_name)
 {
-    return kan_rpl_parser_add_source_char_sequence (parser, source, source + strlen (source), log_name);
-}
-
-kan_bool_t kan_rpl_parser_add_source_char_sequence (kan_rpl_parser_t parser,
-                                                    const char *source_begin,
-                                                    const char *source_end,
-                                                    kan_interned_string_t log_name)
-{
     struct rpl_parser_t *instance = KAN_HANDLE_GET (parser);
     struct dynamic_parser_state_t dynamic_state = {
         .source_log_name = log_name,
         .detached_conditional = NULL,
-        .limit = source_end,
-        .cursor = source_begin,
-        .marker = source_begin,
-        .token = source_begin,
+        .limit = source + strlen (source),
+        .cursor = source,
+        .marker = source,
+        .token = source,
         .cursor_line = 1u,
         .cursor_symbol = 0u,
         .marker_line = 1u,
         .marker_symbol = 0u,
-        .saved = source_begin,
+        .saved = source,
         .saved_line = 1u,
         .saved_symbol = 0u,
     };
