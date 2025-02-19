@@ -7,6 +7,7 @@
 #include <string.h>
 
 #include <kan/api_common/c_header.h>
+#include <kan/api_common/min_max.h>
 #include <kan/error/critical.h>
 #include <kan/memory/allocation.h>
 
@@ -43,9 +44,9 @@ static inline void kan_trivial_string_buffer_append_char_sequence (struct kan_tr
 {
     if (length > 0u)
     {
-        if (instance->size + length > instance->capacity)
+        if (instance->size + length >= instance->capacity)
         {
-            const kan_instance_size_t new_capacity = instance->capacity * 2u;
+            const kan_instance_size_t new_capacity = KAN_MAX (instance->size + length + 1u, instance->capacity * 2u);
             char *new_buffer = kan_allocate_general (instance->allocation_group, new_capacity, _Alignof (char));
 
             memcpy (new_buffer, instance->buffer, instance->size);
@@ -57,6 +58,7 @@ static inline void kan_trivial_string_buffer_append_char_sequence (struct kan_tr
 
         memcpy (instance->buffer + instance->size, begin, length);
         instance->size += length;
+        instance->buffer[instance->size] = '\0';
     }
 }
 
