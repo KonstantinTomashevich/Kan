@@ -1649,6 +1649,7 @@ static inline void form_references_cache_directory_path (struct native_entry_nod
                                                          struct kan_file_system_path_container_t *output)
 {
     kan_file_system_path_container_copy_string (output, VFS_RAW_REFERENCE_CACHE_DIRECTORY);
+    kan_file_system_path_container_append (output, node->target->name);
     kan_file_system_path_container_append (output, node->source_type->name);
 }
 
