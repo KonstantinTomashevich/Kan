@@ -9,6 +9,7 @@
 #include <kan/error/critical.h>
 #include <kan/reflection/markup.h>
 #include <kan/render_pipeline_language/compiler.h>
+#include <kan/resource_material/resource_render_pass.h>
 
 // TODO: Docs.
 
@@ -71,10 +72,20 @@ RESOURCE_MATERIAL_API void kan_resource_material_shutdown (struct kan_resource_m
 struct kan_resource_material_platform_configuration_t
 {
     enum kan_render_code_format_t code_format;
+
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (kan_interned_string_t)
+    struct kan_dynamic_array_t supported_pass_tags;
 };
 
 RESOURCE_MATERIAL_API void kan_resource_material_platform_configuration_init (
     struct kan_resource_material_platform_configuration_t *instance);
+
+RESOURCE_MATERIAL_API void kan_resource_material_platform_configuration_shutdown (
+    struct kan_resource_material_platform_configuration_t *instance);
+
+RESOURCE_MATERIAL_API kan_bool_t kan_resource_material_platform_configuration_is_pass_supported (
+    const struct kan_resource_material_platform_configuration_t *configuration,
+    const struct kan_resource_render_pass_t *pass);
 
 struct kan_resource_material_pipeline_family_compiled_t
 {

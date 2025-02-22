@@ -85,7 +85,15 @@ struct kan_render_material_loaded_pipeline_t
 struct kan_render_material_loaded_t
 {
     kan_interned_string_t name;
-    kan_render_graphics_pipeline_family_t family;
+
+    /// \details Not owned, just copied handle. Can be invalid if set layout is empty.
+    kan_render_pipeline_parameter_set_layout_t set_material;
+
+    /// \details Not owned, just copied handle. Can be invalid if set layout is empty.
+    kan_render_pipeline_parameter_set_layout_t set_object;
+
+    /// \details Not owned, just copied handle. Can be invalid if set layout is empty.
+    kan_render_pipeline_parameter_set_layout_t set_unstable;
 
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_render_material_loaded_pipeline_t)
     struct kan_dynamic_array_t pipelines;

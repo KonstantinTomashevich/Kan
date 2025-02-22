@@ -11,6 +11,12 @@
 
 KAN_LOG_DEFINE_CATEGORY (resource_material_compilation);
 
+KAN_REFLECTION_STRUCT_FIELD_META (kan_resource_material_pass_t, name)
+RESOURCE_MATERIAL_API struct kan_resource_reference_meta_t kan_resource_material_pass_name_reference_meta = {
+    .type = "kan_resource_render_pass_t",
+    .compilation_usage = KAN_RESOURCE_REFERENCE_COMPILATION_USAGE_TYPE_NEEDED_RAW,
+};
+
 KAN_REFLECTION_STRUCT_META (kan_resource_material_t)
 RESOURCE_MATERIAL_API struct kan_resource_resource_type_meta_t kan_resource_material_resource_type_meta = {
     .root = KAN_FALSE,
@@ -21,7 +27,7 @@ static enum kan_resource_compile_result_t kan_resource_material_compile (struct 
 KAN_REFLECTION_STRUCT_META (kan_resource_material_t)
 RESOURCE_MATERIAL_API struct kan_resource_compilable_meta_t kan_resource_material_compilable_meta = {
     .output_type_name = "kan_resource_material_compiled_t",
-    .configuration_type_name = NULL,
+    .configuration_type_name = "kan_resource_material_platform_configuration_t",
     // No state as material compilation just spawns byproducts that need to be compiled separately later.
     .state_type_name = NULL,
     .functor = kan_resource_material_compile,
@@ -43,6 +49,12 @@ KAN_REFLECTION_STRUCT_META (kan_resource_material_pipeline_compiled_t)
 RESOURCE_MATERIAL_API struct kan_resource_resource_type_meta_t
     kan_resource_material_pipeline_compiled_resource_type_meta = {
         .root = KAN_FALSE,
+};
+
+KAN_REFLECTION_STRUCT_FIELD_META (kan_resource_material_pass_compiled_t, name)
+RESOURCE_MATERIAL_API struct kan_resource_reference_meta_t kan_resource_material_pass_compiled_name_reference_meta = {
+    .type = "kan_resource_render_pass_compiled_t",
+    .compilation_usage = KAN_RESOURCE_REFERENCE_COMPILATION_USAGE_TYPE_NOT_NEEDED,
 };
 
 KAN_REFLECTION_STRUCT_FIELD_META (kan_resource_material_pass_compiled_t, pipeline)
@@ -363,6 +375,8 @@ static enum kan_resource_compile_result_t kan_resource_material_compile (struct 
 {
     const struct kan_resource_material_t *input = state->input_instance;
     struct kan_resource_material_compiled_t *output = state->output_instance;
+    const struct kan_resource_material_platform_configuration_t *configuration = state->platform_configuration;
+    KAN_ASSERT (configuration)
 
     if (input->sources.size == 0u)
     {
@@ -370,6 +384,10 @@ static enum kan_resource_compile_result_t kan_resource_material_compile (struct 
                  "Failed to compile material \"%s\" as it has no sources.", state->name)
         return KAN_RESOURCE_PIPELINE_COMPILE_FAILED;
     }
+
+    kan_interned_string_t interned_kan_resource_material_shader_source_t =
+        kan_string_intern ("kan_resource_material_shader_source_t");
+    kan_interned_string_t interned_kan_resource_render_pass_t = kan_string_intern ("kan_resource_render_pass_t");
 
     kan_allocation_group_t main_allocation_group =
         kan_allocation_group_get_child (kan_allocation_group_root (), "material_compilation");
@@ -380,8 +398,6 @@ static enum kan_resource_compile_result_t kan_resource_material_compile (struct 
 
     kan_dynamic_array_init (&sources, input->sources.size, sizeof (kan_interned_string_t),
                             _Alignof (kan_interned_string_t), main_allocation_group);
-    kan_interned_string_t interned_kan_resource_material_shader_source_t =
-        kan_string_intern ("kan_resource_material_shader_source_t");
     struct kan_resource_material_shader_source_t shader_source_byproduct;
 
     for (kan_loop_size_t index = 0u; index < input->sources.size && successful; ++index)
@@ -473,6 +489,33 @@ static enum kan_resource_compile_result_t kan_resource_material_compile (struct 
                 break;
             }
 
+            const struct kan_resource_render_pass_t *pass = NULL;
+            for (kan_loop_size_t dependency_index = 0u; dependency_index < state->dependencies_count;
+                 ++dependency_index)
+            {
+                if (state->dependencies[dependency_index].name == source_pass->name &&
+                    state->dependencies[dependency_index].type == interned_kan_resource_render_pass_t)
+                {
+                    pass = state->dependencies[dependency_index].data;
+                    break;
+                }
+            }
+
+            if (!pass)
+            {
+                KAN_LOG (resource_material_compilation, KAN_LOG_ERROR,
+                         "Material \"%s\" has pass \"%s\", but there is not render graph pass resource with this name.",
+                         state->name, source_pass->name)
+                successful = KAN_FALSE;
+                break;
+            }
+
+            if (!kan_resource_material_platform_configuration_is_pass_supported (configuration, pass))
+            {
+                // Pass is not supported in current compilation context, therefore we can just skip it.
+                continue;
+            }
+
             struct kan_resource_material_pass_compiled_t *target_pass = kan_dynamic_array_add_last (&output->passes);
             KAN_ASSERT (target_pass)
             target_pass->name = source_pass->name;
@@ -502,9 +545,33 @@ static enum kan_resource_compile_result_t kan_resource_material_compile (struct 
                 KAN_MUTE_THIRD_PARTY_WARNINGS_END
             }
 
-            kan_dynamic_array_set_capacity (&pipeline_byproduct.sources, sources.size);
-            pipeline_byproduct.sources.size = pipeline_byproduct.sources.capacity;
+            kan_dynamic_array_set_capacity (&pipeline_byproduct.sources, sources.size + 1u);
+            pipeline_byproduct.sources.size = sources.size;
             memcpy (pipeline_byproduct.sources.data, sources.data, sources.size * sizeof (kan_interned_string_t));
+
+            // Append pass parameter set code if it exists.
+            if (pass->pass_set_source)
+            {
+                shader_source_byproduct.source = pass->pass_set_source;
+                kan_interned_string_t pass_source_registered_name = state->register_byproduct (
+                    state->interface_user_data, interned_kan_resource_material_shader_source_t,
+                    &shader_source_byproduct);
+
+                if (!pass_source_registered_name)
+                {
+                    KAN_LOG (
+                        resource_material_compilation, KAN_LOG_ERROR,
+                        "Failed to register source byproduct for material \"%s\" for source \"%s\" (for pass \"%s\").",
+                        state->name, pass->pass_set_source, source_pass->name)
+                    successful = KAN_FALSE;
+                }
+
+                // Technically, this addition breaks sorted order of sources array.
+                // But we just need sources array to have predictable deterministic order, not exactly sorted.
+                // Therefore, always adding pass to the last place is okay.
+                *(kan_interned_string_t *) kan_dynamic_array_add_last (&pipeline_byproduct.sources) =
+                    pass_source_registered_name;
+            }
 
             if (!append_options (&pipeline_byproduct.instance_options, &source_pass->options))
             {
@@ -684,6 +751,17 @@ static enum kan_resource_compile_result_t kan_resource_material_pipeline_family_
 
     kan_rpl_compiler_instance_destroy (compiler_instance);
     kan_rpl_compiler_context_destroy (compiler_context);
+
+    if (output->meta.set_pass.buffers.size > 0u || output->meta.set_pass.samplers.size > 0u)
+    {
+        KAN_LOG (
+            resource_material_compilation, KAN_LOG_ERROR,
+            "Produced incorrect meta for \"%s\" (material \"%s\"): meta has entries in pass set, but it should've been "
+            "compiled from pass-agnostic sources. That means that source list contains pass set, but it shouldn't.",
+            state->name, input->source_material)
+        return KAN_RESOURCE_PIPELINE_COMPILE_FAILED;
+    }
+
     return KAN_RESOURCE_PIPELINE_COMPILE_FINISHED;
 }
 
@@ -881,6 +959,45 @@ void kan_resource_material_shutdown (struct kan_resource_material_t *instance)
 void kan_resource_material_platform_configuration_init (struct kan_resource_material_platform_configuration_t *instance)
 {
     instance->code_format = KAN_RENDER_CODE_FORMAT_SPIRV;
+    kan_dynamic_array_init (&instance->supported_pass_tags, 0u, sizeof (kan_interned_string_t),
+                            _Alignof (kan_interned_string_t), kan_allocation_group_stack_get ());
+}
+
+void kan_resource_material_platform_configuration_shutdown (
+    struct kan_resource_material_platform_configuration_t *instance)
+{
+    kan_dynamic_array_shutdown (&instance->supported_pass_tags);
+}
+
+kan_bool_t kan_resource_material_platform_configuration_is_pass_supported (
+    const struct kan_resource_material_platform_configuration_t *configuration,
+    const struct kan_resource_render_pass_t *pass)
+{
+    for (kan_loop_size_t required_index = 0u; required_index < pass->required_tags.size; ++required_index)
+    {
+        const kan_interned_string_t required_tag = ((kan_interned_string_t *) pass->required_tags.data)[required_index];
+        kan_bool_t found = KAN_FALSE;
+
+        for (kan_loop_size_t supported_index = 0u; supported_index < configuration->supported_pass_tags.size;
+             ++supported_index)
+        {
+            const kan_interned_string_t supported_tag =
+                ((kan_interned_string_t *) configuration->supported_pass_tags.data)[supported_index];
+
+            if (supported_tag == required_tag)
+            {
+                found = KAN_TRUE;
+                break;
+            }
+        }
+
+        if (!found)
+        {
+            return KAN_FALSE;
+        }
+    }
+
+    return KAN_TRUE;
 }
 
 void kan_resource_material_pipeline_compiled_init (struct kan_resource_material_pipeline_compiled_t *instance)

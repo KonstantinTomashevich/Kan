@@ -111,7 +111,9 @@ struct render_foundation_pipeline_family_state_t
 {
     kan_interned_string_t name;
     kan_resource_request_id_t request_id;
-    kan_render_graphics_pipeline_family_t family;
+    kan_render_pipeline_parameter_set_layout_t set_material;
+    kan_render_pipeline_parameter_set_layout_t set_object;
+    kan_render_pipeline_parameter_set_layout_t set_unstable;
     kan_instance_size_t reference_count;
     kan_time_size_t inspection_time_ns;
 };
@@ -119,9 +121,19 @@ struct render_foundation_pipeline_family_state_t
 UNIVERSE_RENDER_FOUNDATION_API void render_foundation_pipeline_family_state_shutdown (
     struct render_foundation_pipeline_family_state_t *instance)
 {
-    if (KAN_HANDLE_IS_VALID (instance->family))
+    if (KAN_HANDLE_IS_VALID (instance->set_material))
     {
-        kan_render_graphics_pipeline_family_destroy (instance->family);
+        kan_render_pipeline_parameter_set_layout_destroy (instance->set_material);
+    }
+
+    if (KAN_HANDLE_IS_VALID (instance->set_object))
+    {
+        kan_render_pipeline_parameter_set_layout_destroy (instance->set_object);
+    }
+
+    if (KAN_HANDLE_IS_VALID (instance->set_unstable))
+    {
+        kan_render_pipeline_parameter_set_layout_destroy (instance->set_unstable);
     }
 }
 
@@ -649,11 +661,33 @@ static inline enum kan_render_blend_operation_t convert_blend_operation (enum ka
 static void recreate_family (struct render_foundation_material_management_execution_state_t *state,
                              struct render_foundation_pipeline_family_state_t *family)
 {
-    if (KAN_HANDLE_IS_VALID (family->family))
+    if (KAN_HANDLE_IS_VALID (family->set_material))
     {
-        kan_render_graphics_pipeline_family_destroy (family->family);
-        family->family = KAN_HANDLE_SET_INVALID (kan_render_graphics_pipeline_family_t);
+        kan_render_pipeline_parameter_set_layout_destroy (family->set_material);
+        family->set_material = KAN_HANDLE_SET_INVALID (kan_render_pipeline_parameter_set_layout_t);
     }
+
+    if (KAN_HANDLE_IS_VALID (family->set_object))
+    {
+        kan_render_pipeline_parameter_set_layout_destroy (family->set_object);
+        family->set_object = KAN_HANDLE_SET_INVALID (kan_render_pipeline_parameter_set_layout_t);
+    }
+
+    if (KAN_HANDLE_IS_VALID (family->set_unstable))
+    {
+        kan_render_pipeline_parameter_set_layout_destroy (family->set_unstable);
+        family->set_unstable = KAN_HANDLE_SET_INVALID (kan_render_pipeline_parameter_set_layout_t);
+    }
+
+    struct kan_render_attribute_source_description_t
+        attribute_sources_static[KAN_UNIVERSE_RENDER_FOUNDATION_BINDINGS_MAX_STATIC];
+    struct kan_render_attribute_source_description_t *attribute_sources = NULL;
+    kan_instance_size_t attributes_sources_count = 0u;
+    kan_instance_size_t attributes_count = 0u;
+
+    struct kan_render_attribute_description_t attributes_static[KAN_UNIVERSE_RENDER_FOUNDATION_BINDINGS_MAX_STATIC];
+    struct kan_render_attribute_description_t *attributes = NULL;
+    kan_bool_t set_layouts_created = KAN_TRUE;
 
     KAN_UP_VALUE_READ (family_request, kan_resource_request_t, request_id, &family->request_id)
     {
@@ -668,18 +702,12 @@ static void recreate_family (struct render_foundation_material_management_execut
             // Only classic pipeline are supported by materials right now.
             KAN_ASSERT (loaded->meta.pipeline_type == KAN_RPL_PIPELINE_TYPE_GRAPHICS_CLASSIC)
 
-#define ATTRIBUTE_SOURCES_STATIC_COUNT 8u
-#define ATTRIBUTES_STATIC_COUNT 16u
-#define BINDINGS_STATIC_COUNT 16u
-
-            struct kan_render_attribute_source_description_t attribute_sources_static[ATTRIBUTE_SOURCES_STATIC_COUNT];
-            struct kan_render_attribute_source_description_t *attribute_sources = NULL;
-            kan_instance_size_t attributes_count = 0u;
-
             if (loaded->meta.attribute_buffers.size > 0u)
             {
                 attribute_sources = attribute_sources_static;
-                if (loaded->meta.attribute_buffers.size > ATTRIBUTE_SOURCES_STATIC_COUNT)
+                attributes_sources_count = loaded->meta.attribute_buffers.size;
+
+                if (loaded->meta.attribute_buffers.size > KAN_UNIVERSE_RENDER_FOUNDATION_BINDINGS_MAX_STATIC)
                 {
                     attribute_sources = kan_allocate_general (
                         state->description_allocation_group,
@@ -722,13 +750,10 @@ static void recreate_family (struct render_foundation_material_management_execut
                 }
             }
 
-            struct kan_render_attribute_description_t attributes_static[ATTRIBUTES_STATIC_COUNT];
-            struct kan_render_attribute_description_t *attributes = NULL;
-
             if (attributes_count > 0u)
             {
                 attributes = attributes_static;
-                if (attributes_count > ATTRIBUTES_STATIC_COUNT)
+                if (attributes_count > KAN_UNIVERSE_RENDER_FOUNDATION_BINDINGS_MAX_STATIC)
                 {
                     attributes =
                         kan_allocate_general (state->description_allocation_group,
@@ -803,179 +828,62 @@ static void recreate_family (struct render_foundation_material_management_execut
                 }
             }
 
-            struct kan_render_parameter_set_description_t parameter_sets[4u];
-            kan_instance_size_t parameter_set_index = 0u;
-            struct kan_render_parameter_set_description_t *set_pass = NULL;
-            struct kan_render_parameter_set_description_t *set_material = NULL;
-            struct kan_render_parameter_set_description_t *set_object = NULL;
-            struct kan_render_parameter_set_description_t *set_unstable = NULL;
-
-#define ALLOCATE_SET(SET)                                                                                              \
-    if (loaded->meta.set_##SET.buffers.size > 0u || loaded->meta.set_##SET.samplers.size > 0u)                         \
-    {                                                                                                                  \
-        set_##SET = &parameter_sets[parameter_set_index];                                                              \
-        ++parameter_set_index;                                                                                         \
-    }
-
-            ALLOCATE_SET (pass)
-            ALLOCATE_SET (material)
-            ALLOCATE_SET (object)
-            ALLOCATE_SET (unstable)
-
-            if (set_pass)
+            if (loaded->meta.set_material.buffers.size > 0u || loaded->meta.set_material.samplers.size > 0u)
             {
-                set_pass->set = KAN_RPL_SET_PASS;
-                set_pass->stable_binding = KAN_TRUE;
+                char name_buffer[KAN_UNIVERSE_RENDER_FOUNDATION_NAME_BUFFER_LENGTH];
+                snprintf (name_buffer, KAN_UNIVERSE_RENDER_FOUNDATION_NAME_BUFFER_LENGTH, "%s[set_material]",
+                          family->name);
+
+                family->set_material = kan_render_construct_parameter_set_layout_from_meta (
+                    kan_render_backend_system_get_render_context (state->render_backend_system), KAN_RPL_SET_MATERIAL,
+                    KAN_TRUE, &loaded->meta.set_material, name_buffer, state->description_allocation_group);
+
+                if (!KAN_HANDLE_IS_VALID (family->set_material))
+                {
+                    KAN_LOG (render_foundation_material, KAN_LOG_ERROR,
+                             "Failed to create material set layout for family \"%s\".", family->name)
+                    set_layouts_created = KAN_FALSE;
+                }
             }
 
-            if (set_material)
+            if (loaded->meta.set_object.buffers.size > 0u || loaded->meta.set_object.samplers.size > 0u)
             {
-                set_material->set = KAN_RPL_SET_MATERIAL;
-                set_material->stable_binding = KAN_TRUE;
+                char name_buffer[KAN_UNIVERSE_RENDER_FOUNDATION_NAME_BUFFER_LENGTH];
+                snprintf (name_buffer, KAN_UNIVERSE_RENDER_FOUNDATION_NAME_BUFFER_LENGTH, "%s[set_object]",
+                          family->name);
+
+                family->set_object = kan_render_construct_parameter_set_layout_from_meta (
+                    kan_render_backend_system_get_render_context (state->render_backend_system), KAN_RPL_SET_MATERIAL,
+                    KAN_TRUE, &loaded->meta.set_object, name_buffer, state->description_allocation_group);
+
+                if (!KAN_HANDLE_IS_VALID (family->set_object))
+                {
+                    KAN_LOG (render_foundation_material, KAN_LOG_ERROR,
+                             "Failed to create object set layout for family \"%s\".", family->name)
+                    set_layouts_created = KAN_FALSE;
+                }
             }
 
-            if (set_object)
+            if (loaded->meta.set_unstable.buffers.size > 0u || loaded->meta.set_unstable.samplers.size > 0u)
             {
-                set_object->set = KAN_RPL_SET_OBJECT;
-                set_object->stable_binding = KAN_TRUE;
+                char name_buffer[KAN_UNIVERSE_RENDER_FOUNDATION_NAME_BUFFER_LENGTH];
+                snprintf (name_buffer, KAN_UNIVERSE_RENDER_FOUNDATION_NAME_BUFFER_LENGTH, "%s[set_unstable]",
+                          family->name);
+
+                family->set_unstable = kan_render_construct_parameter_set_layout_from_meta (
+                    kan_render_backend_system_get_render_context (state->render_backend_system), KAN_RPL_SET_MATERIAL,
+                    KAN_FALSE, &loaded->meta.set_unstable, name_buffer, state->description_allocation_group);
+
+                if (!KAN_HANDLE_IS_VALID (family->set_unstable))
+                {
+                    KAN_LOG (render_foundation_material, KAN_LOG_ERROR,
+                             "Failed to create unstable set layout for family \"%s\".", family->name)
+                    set_layouts_created = KAN_FALSE;
+                }
             }
-
-            if (set_unstable)
-            {
-                set_unstable->set = KAN_RPL_SET_UNSTABLE;
-                set_unstable->stable_binding = KAN_FALSE;
-            }
-
-            struct kan_render_parameter_binding_description_t set_pass_bindings_static[BINDINGS_STATIC_COUNT];
-            struct kan_render_parameter_binding_description_t set_material_bindings_static[BINDINGS_STATIC_COUNT];
-            struct kan_render_parameter_binding_description_t set_object_bindings_static[BINDINGS_STATIC_COUNT];
-            struct kan_render_parameter_binding_description_t set_unstable_bindings_static[BINDINGS_STATIC_COUNT];
-
-#define FILL_SET_BINDINGS(SET)                                                                                         \
-    if (set_##SET)                                                                                                     \
-    {                                                                                                                  \
-        set_##SET->bindings_count = loaded->meta.set_##SET.buffers.size + loaded->meta.set_##SET.samplers.size;        \
-        set_##SET->bindings = NULL;                                                                                    \
-                                                                                                                       \
-        if (set_##SET->bindings_count > 0u)                                                                            \
-        {                                                                                                              \
-            set_##SET->bindings = set_##SET##_bindings_static;                                                         \
-            if (set_##SET->bindings_count > BINDINGS_STATIC_COUNT)                                                     \
-            {                                                                                                          \
-                set_##SET->bindings = kan_allocate_general (                                                           \
-                    state->description_allocation_group,                                                               \
-                    sizeof (struct kan_render_parameter_binding_description_t) * set_##SET->bindings_count,            \
-                    _Alignof (struct kan_render_parameter_binding_description_t));                                     \
-            }                                                                                                          \
-                                                                                                                       \
-            kan_instance_size_t binding_output_index = 0u;                                                             \
-            for (kan_loop_size_t index = 0u; index < loaded->meta.set_##SET.buffers.size;                              \
-                 ++index, ++binding_output_index)                                                                      \
-            {                                                                                                          \
-                struct kan_rpl_meta_buffer_t *buffer =                                                                 \
-                    &((struct kan_rpl_meta_buffer_t *) loaded->meta.set_##SET.buffers.data)[index];                    \
-                enum kan_render_parameter_binding_type_t binding_type =                                                \
-                    KAN_RENDER_PARAMETER_BINDING_TYPE_UNIFORM_BUFFER;                                                  \
-                                                                                                                       \
-                switch (buffer->type)                                                                                  \
-                {                                                                                                      \
-                case KAN_RPL_BUFFER_TYPE_VERTEX_ATTRIBUTE:                                                             \
-                case KAN_RPL_BUFFER_TYPE_INSTANCED_ATTRIBUTE:                                                          \
-                case KAN_RPL_BUFFER_TYPE_VERTEX_STAGE_OUTPUT:                                                          \
-                case KAN_RPL_BUFFER_TYPE_FRAGMENT_STAGE_OUTPUT:                                                        \
-                    KAN_ASSERT (KAN_FALSE)                                                                             \
-                    break;                                                                                             \
-                                                                                                                       \
-                case KAN_RPL_BUFFER_TYPE_UNIFORM:                                                                      \
-                    binding_type = KAN_RENDER_PARAMETER_BINDING_TYPE_UNIFORM_BUFFER;                                   \
-                    break;                                                                                             \
-                                                                                                                       \
-                case KAN_RPL_BUFFER_TYPE_READ_ONLY_STORAGE:                                                            \
-                    binding_type = KAN_RENDER_PARAMETER_BINDING_TYPE_STORAGE_BUFFER;                                   \
-                    break;                                                                                             \
-                }                                                                                                      \
-                                                                                                                       \
-                set_##SET->bindings[binding_output_index] = (struct kan_render_parameter_binding_description_t) {      \
-                    .binding = buffer->binding,                                                                        \
-                    .type = binding_type,                                                                              \
-                    .used_stage_mask =                                                                                 \
-                        (1u << KAN_RENDER_STAGE_GRAPHICS_VERTEX) | (1u << KAN_RENDER_STAGE_GRAPHICS_FRAGMENT),         \
-                };                                                                                                     \
-            }                                                                                                          \
-                                                                                                                       \
-            for (kan_loop_size_t index = 0u; index < loaded->meta.set_##SET.samplers.size;                             \
-                 ++index, ++binding_output_index)                                                                      \
-            {                                                                                                          \
-                struct kan_rpl_meta_sampler_t *sampler =                                                               \
-                    &((struct kan_rpl_meta_sampler_t *) loaded->meta.set_##SET.samplers.data)[index];                  \
-                                                                                                                       \
-                set_##SET->bindings[binding_output_index] = (struct kan_render_parameter_binding_description_t) {      \
-                    .binding = sampler->binding,                                                                       \
-                    .type = KAN_RENDER_PARAMETER_BINDING_TYPE_COMBINED_IMAGE_SAMPLER,                                  \
-                    .used_stage_mask =                                                                                 \
-                        (1u << KAN_RENDER_STAGE_GRAPHICS_VERTEX) | (1u << KAN_RENDER_STAGE_GRAPHICS_FRAGMENT),         \
-                };                                                                                                     \
-            }                                                                                                          \
-        }                                                                                                              \
-    }
-            FILL_SET_BINDINGS (pass)
-            FILL_SET_BINDINGS (material)
-            FILL_SET_BINDINGS (object)
-            FILL_SET_BINDINGS (unstable)
-
-            struct kan_render_graphics_pipeline_family_description_t family_description = {
-                .topology = KAN_RENDER_GRAPHICS_TOPOLOGY_TRIANGLE_LIST,
-                .attribute_sources_count = loaded->meta.attribute_buffers.size,
-                .attribute_sources = attribute_sources,
-                .attributes_count = attributes_count,
-                .attributes = attributes,
-                .parameter_sets_count = parameter_set_index,
-                .parameter_sets = parameter_sets,
-                .tracking_name = family->name,
-            };
-
-            family->family = kan_render_graphics_pipeline_family_create (
-                kan_render_backend_system_get_render_context (state->render_backend_system), &family_description);
-
-            if (attribute_sources && attribute_sources != attribute_sources_static)
-            {
-                kan_free_general (
-                    state->description_allocation_group, attribute_sources,
-                    sizeof (struct kan_render_attribute_source_description_t) * loaded->meta.attribute_buffers.size);
-            }
-
-            if (attributes && attributes != attributes_static)
-            {
-                kan_free_general (state->description_allocation_group, attributes,
-                                  sizeof (struct kan_render_attribute_description_t) * attributes_count);
-            }
-
-#define FREE_SET_BINDINGS(SET)                                                                                         \
-    if (set_##SET && set_##SET->bindings && set_##SET->bindings != set_##SET##_bindings_static)                        \
-    {                                                                                                                  \
-        kan_free_general (state->description_allocation_group, set_##SET->bindings,                                    \
-                          sizeof (struct kan_render_parameter_binding_description_t) * set_##SET->bindings_count);     \
-    }
-
-            FREE_SET_BINDINGS (pass)
-            FREE_SET_BINDINGS (material)
-            FREE_SET_BINDINGS (object)
-            FREE_SET_BINDINGS (unstable)
-
-#undef ALLOCATE_SET
-#undef FILL_SET_BINDINGS
-#undef ATTRIBUTE_SOURCES_STATIC_COUNT
-#undef ATTRIBUTES_STATIC_COUNT
-#undef BINDINGS_STATIC_COUNT
-#undef FREE_SET_BINDINGS
         }
 
         // Request will be put to sleep later after materials copy out family meta.
-    }
-
-    if (!KAN_HANDLE_IS_VALID (family->family))
-    {
-        KAN_LOG (render_foundation_material, KAN_LOG_ERROR, "Failed to create family \"%s\".", family->name)
     }
 
     KAN_UP_VALUE_READ (pipeline_state, render_foundation_pipeline_state_t, family_name, &family->name)
@@ -1021,7 +929,7 @@ static void recreate_family (struct render_foundation_material_management_execut
                         pipeline_pass->pipeline = KAN_HANDLE_SET_INVALID (kan_render_graphics_pipeline_t);
                     }
 
-                    if (!KAN_HANDLE_IS_VALID (family->family) || !KAN_HANDLE_IS_VALID (code_module))
+                    if (!set_layouts_created || !KAN_HANDLE_IS_VALID (code_module))
                     {
                         KAN_UP_QUERY_CONTINUE;
                     }
@@ -1138,9 +1046,42 @@ static void recreate_family (struct render_foundation_material_management_execut
                             }
                         }
 
+                        kan_render_pipeline_parameter_set_layout_t parameter_sets[4u];
+                        kan_instance_size_t parameter_set_index = 0u;
+
+                        if (KAN_HANDLE_IS_VALID (pass->pass_parameter_set_layout))
+                        {
+                            parameter_sets[parameter_set_index] = pass->pass_parameter_set_layout;
+                            ++parameter_set_index;
+                        }
+
+                        if (KAN_HANDLE_IS_VALID (family->set_material))
+                        {
+                            parameter_sets[parameter_set_index] = family->set_material;
+                            ++parameter_set_index;
+                        }
+
+                        if (KAN_HANDLE_IS_VALID (family->set_object))
+                        {
+                            parameter_sets[parameter_set_index] = family->set_object;
+                            ++parameter_set_index;
+                        }
+
+                        if (KAN_HANDLE_IS_VALID (family->set_unstable))
+                        {
+                            parameter_sets[parameter_set_index] = family->set_unstable;
+                            ++parameter_set_index;
+                        }
+
                         struct kan_render_graphics_pipeline_description_t description = {
                             .pass = pass->pass,
-                            .family = family->family,
+                            .topology = KAN_RENDER_GRAPHICS_TOPOLOGY_TRIANGLE_LIST,
+                            .attribute_sources_count = attributes_sources_count,
+                            .attribute_sources = attribute_sources,
+                            .attributes_count = attributes_count,
+                            .attributes = attributes,
+                            .parameter_set_layouts_count = parameter_set_index,
+                            .parameter_set_layouts = parameter_sets,
 
                             .polygon_mode = polygon_mode,
                             .cull_mode = cull_mode,
@@ -1241,6 +1182,18 @@ static void recreate_family (struct render_foundation_material_management_execut
             }
         }
     }
+
+    if (attribute_sources && attribute_sources != attribute_sources_static)
+    {
+        kan_free_general (state->description_allocation_group, attribute_sources,
+                          sizeof (struct kan_render_attribute_source_description_t) * attributes_sources_count);
+    }
+
+    if (attributes && attributes != attributes_static)
+    {
+        kan_free_general (state->description_allocation_group, attributes,
+                          sizeof (struct kan_render_attribute_description_t) * attributes_count);
+    }
 }
 
 static void reload_material_from_family (struct render_foundation_material_management_execution_state_t *state,
@@ -1253,7 +1206,9 @@ static void reload_material_from_family (struct render_foundation_material_manag
         event->name = material->name;
     }
 
-    loaded->family = family->family;
+    loaded->set_material = family->set_material;
+    loaded->set_object = family->set_object;
+    loaded->set_unstable = family->set_unstable;
     loaded->pipelines.size = 0u;
     kan_dynamic_array_set_capacity (&loaded->pipelines, KAN_UNIVERSE_RENDER_FOUNDATION_MATERIAL_PSC);
 
@@ -1488,7 +1443,12 @@ static inline void on_material_updated (struct render_foundation_material_manage
                         {
                             new_family->name = material_data->pipeline_family;
                             new_family->request_id = KAN_TYPED_ID_32_SET_INVALID (kan_resource_request_id_t);
-                            new_family->family = KAN_HANDLE_SET_INVALID (kan_render_graphics_pipeline_family_t);
+                            new_family->set_material =
+                                KAN_HANDLE_SET_INVALID (kan_render_pipeline_parameter_set_layout_t);
+                            new_family->set_object =
+                                KAN_HANDLE_SET_INVALID (kan_render_pipeline_parameter_set_layout_t);
+                            new_family->set_unstable =
+                                KAN_HANDLE_SET_INVALID (kan_render_pipeline_parameter_set_layout_t);
                             new_family->reference_count = 1u;
                             new_family->inspection_time_ns = 0u;
                         }
@@ -1625,9 +1585,16 @@ UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_execute_render_foundati
 
         KAN_UP_EVENT_FETCH (pass_updated_event, kan_render_graph_pass_updated_event_t)
         {
-            KAN_UP_VALUE_READ (pipeline_pass, render_foundation_pipeline_pass_state_t, pass_name,
-                               &pass_updated_event->name)
+            KAN_UP_VALUE_UPDATE (pipeline_pass, render_foundation_pipeline_pass_state_t, pass_name,
+                                 &pass_updated_event->name)
             {
+                // We need to also delete pipeline as it depends on pass set layout from pass.
+                if (KAN_HANDLE_IS_VALID (pipeline_pass->pipeline))
+                {
+                    kan_render_graphics_pipeline_destroy (pipeline_pass->pipeline);
+                    pipeline_pass->pipeline = KAN_HANDLE_SET_INVALID (kan_render_graphics_pipeline_t);
+                }
+
                 // Reset pipeline loading in order to recompile pipelines with new pass.
                 KAN_UP_VALUE_UPDATE (pipeline, render_foundation_pipeline_state_t, pipeline_name,
                                      &pipeline_pass->pipeline_name)
@@ -1716,7 +1683,9 @@ void kan_render_material_singleton_init (struct kan_render_material_singleton_t 
 void kan_render_material_loaded_init (struct kan_render_material_loaded_t *instance)
 {
     instance->name = NULL;
-    instance->family = KAN_HANDLE_SET_INVALID (kan_render_graphics_pipeline_family_t);
+    instance->set_material = KAN_HANDLE_SET_INVALID (kan_render_pipeline_parameter_set_layout_t);
+    instance->set_object = KAN_HANDLE_SET_INVALID (kan_render_pipeline_parameter_set_layout_t);
+    instance->set_unstable = KAN_HANDLE_SET_INVALID (kan_render_pipeline_parameter_set_layout_t);
     kan_dynamic_array_init (&instance->pipelines, 0u, sizeof (struct kan_render_material_loaded_pipeline_t),
                             _Alignof (struct kan_render_material_loaded_pipeline_t), kan_allocation_group_stack_get ());
     kan_rpl_meta_init (&instance->family_meta);

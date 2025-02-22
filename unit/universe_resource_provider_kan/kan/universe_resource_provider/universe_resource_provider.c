@@ -2910,8 +2910,7 @@ static inline void process_delayed_reload (struct resource_provider_state_t *sta
             else
             {
                 KAN_LOG (universe_resource_provider, KAN_LOG_ERROR,
-                         "Failed to query third party resource entry \"%s\" at path \"%s\".", entry->name,
-                         entry->path)
+                         "Failed to query third party resource entry \"%s\" at path \"%s\".", entry->name, entry->path)
             }
 
             kan_virtual_file_system_close_context_read_access (state->virtual_file_system);

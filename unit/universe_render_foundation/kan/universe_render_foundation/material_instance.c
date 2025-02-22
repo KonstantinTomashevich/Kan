@@ -1227,8 +1227,8 @@ static void instantiate_material_static_data (
             break;
         }
 
-        char buffer_name[KAN_UNIVERSE_RENDER_FOUNDATION_MI_BUFFER_NAME_LENGTH];
-        snprintf (buffer_name, KAN_UNIVERSE_RENDER_FOUNDATION_MI_BUFFER_NAME_LENGTH, "%s::%s", static_state->name,
+        char buffer_name[KAN_UNIVERSE_RENDER_FOUNDATION_NAME_BUFFER_LENGTH];
+        snprintf (buffer_name, KAN_UNIVERSE_RENDER_FOUNDATION_NAME_BUFFER_LENGTH, "%s::%s", static_state->name,
                   meta_buffer->name);
 
         kan_render_buffer_t buffer = kan_render_buffer_create (render_context, buffer_type, buffer_size, temporary_data,
@@ -1327,9 +1327,7 @@ static void instantiate_material_static_data (
     }
 
     struct kan_render_pipeline_parameter_set_description_t set_description = {
-        .family_type = KAN_RENDER_PIPELINE_TYPE_GRAPHICS,
-        .graphics_family = material_loaded->family,
-        .set = KAN_RPL_SET_MATERIAL,
+        .layout = material_loaded->set_material,
         .tracking_name = static_state->name,
         .initial_bindings_count = update_output_index,
         .initial_bindings = updates,
@@ -1605,7 +1603,7 @@ static void inspect_material_instance_static (
 
                 KAN_UP_VALUE_READ (material_loaded, kan_render_material_loaded_t, name, &data->material)
                 {
-                    material_ready = KAN_HANDLE_IS_VALID (material_loaded->family);
+                    material_ready = KAN_HANDLE_IS_VALID (material_loaded->set_material);
                 }
             }
         }
