@@ -81,16 +81,15 @@
 /// image management is done automatically and frame buffer automatically selects appropriate images from it.
 /// \endparblock
 ///
-/// \par Pipeline families
+/// \par Pipeline parameter set layouts
 /// \parblock
-/// Pipeline family contains data that might be shared by different pipelines. For example, vertex format, sets and
-/// bindings descriptions. We aim for one pipeline family per high level material.
+/// Pipeline parameter set layout describes bindings in one particular parameter set along with this set index.
+/// Set layouts are used for creation of pipelines and parameter sets.
 /// \endparblock
 ///
 /// \par Pipelines
 /// \parblock
-/// Pipeline describes state of the GPU pipeline that is used to execute GPU operations like draw commands. Pipelines
-/// derive from pipeline families and also define huge amount of parameters that are unique to this pipeline.
+/// Pipeline describes state of the GPU pipeline that is used to execute GPU operations like draw commands.
 ///
 /// Important subject is pipeline compilation. It takes considerable time and cannot be executed inside frame as it can
 /// take much more that frame time. Therefore, pipeline compilation is done on separate thread and it is advised to
@@ -100,8 +99,9 @@
 ///
 /// \par Pipeline parameter sets
 /// \parblock
-/// Pipeline parameter set describes data bindings to one particular set described in pipeline family. Sets are used to
-/// separate parameters that belong to different scopes: like pass data set, material data set, object data set.
+/// Pipeline parameter set describes data bindings for particular pipeline set using pipeline parameter set layout.
+/// Sets are used to separate parameters that belong to different scopes: like pass data set, material data set,
+/// object data set.
 /// \endparblock
 ///
 /// \par Buffers
@@ -177,7 +177,7 @@ KAN_HANDLE_DEFINE (kan_render_surface_t);
 KAN_HANDLE_DEFINE (kan_render_frame_buffer_t);
 KAN_HANDLE_DEFINE (kan_render_pass_t);
 KAN_HANDLE_DEFINE (kan_render_pass_instance_t);
-KAN_HANDLE_DEFINE (kan_render_graphics_pipeline_family_t);
+KAN_HANDLE_DEFINE (kan_render_pipeline_parameter_set_layout_t);
 KAN_HANDLE_DEFINE (kan_render_code_module_t);
 KAN_HANDLE_DEFINE (kan_render_graphics_pipeline_t);
 KAN_HANDLE_DEFINE (kan_render_pipeline_parameter_set_t);
@@ -606,10 +606,68 @@ CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_instance_instanced_draw (
 /// \brief Requests given render pass to be destroyed.
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_destroy (kan_render_pass_t pass);
 
-/// \brief Enumerates supported pipeline types.
-enum kan_render_pipeline_type_t
+/// \brief Enumerates supported types of parameter bindings.
+enum kan_render_parameter_binding_type_t
 {
-    KAN_RENDER_PIPELINE_TYPE_GRAPHICS,
+    KAN_RENDER_PARAMETER_BINDING_TYPE_UNIFORM_BUFFER = 0u,
+    KAN_RENDER_PARAMETER_BINDING_TYPE_STORAGE_BUFFER,
+    KAN_RENDER_PARAMETER_BINDING_TYPE_COMBINED_IMAGE_SAMPLER,
+};
+
+/// \brief Describes parameter that can be bound to the pipeline.
+struct kan_render_parameter_binding_description_t
+{
+    kan_render_size_t binding;
+    enum kan_render_parameter_binding_type_t type;
+    kan_render_mask_t used_stage_mask;
+};
+
+/// \brief Describes set of parameters that can be bound at particular set index.
+struct kan_render_pipeline_parameter_set_layout_description_t
+{
+    kan_render_size_t set;
+    kan_instance_size_t bindings_count;
+    struct kan_render_parameter_binding_description_t *bindings;
+
+    /// \brief True if bindings are rarely changed. False otherwise. Used for optimization.
+    kan_bool_t stable_binding;
+
+    kan_interned_string_t tracking_name;
+};
+
+/// \brief Creates new pipeline parameter set from given parameters.
+CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_pipeline_parameter_set_layout_t
+kan_render_pipeline_parameter_set_layout_create (
+    kan_render_context_t context, struct kan_render_pipeline_parameter_set_layout_description_t *description);
+
+/// \brief Requests given pipeline parameter set to be destroyed.
+CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pipeline_parameter_set_layout_destroy (
+    kan_render_pipeline_parameter_set_layout_t layout);
+
+/// \brief Creates new pipeline code module from given implementation-specific code.
+CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_code_module_t kan_render_code_module_create (
+    kan_render_context_t context, kan_instance_size_t code_length, void *code, kan_interned_string_t tracking_name);
+
+/// \brief Requests given code module to be destroyed.
+CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_code_module_destroy (kan_render_code_module_t code_module);
+
+/// \brief Enumerates supported topologies.
+enum kan_render_graphics_topology_t
+{
+    KAN_RENDER_GRAPHICS_TOPOLOGY_TRIANGLE_LIST = 0u,
+};
+
+/// \brief Enumerates supported polygon modes,
+enum kan_render_polygon_mode_t
+{
+    KAN_RENDER_POLYGON_MODE_FILL,
+    KAN_RENDER_POLYGON_MODE_WIREFRAME,
+};
+
+/// \brief Enumerates supported cull modes.
+enum kan_render_cull_mode_t
+{
+    KAN_RENDER_CULL_MODE_BACK = 0u,
 };
 
 /// \brief Enumerates supported render stages.
@@ -656,108 +714,6 @@ struct kan_render_attribute_description_t
     kan_render_size_t location;
     kan_render_size_t offset;
     enum kan_render_attribute_format_t format;
-};
-
-/// \brief Enumerates supported types of parameter bindings.
-enum kan_render_parameter_binding_type_t
-{
-    KAN_RENDER_PARAMETER_BINDING_TYPE_UNIFORM_BUFFER = 0u,
-    KAN_RENDER_PARAMETER_BINDING_TYPE_STORAGE_BUFFER,
-    KAN_RENDER_PARAMETER_BINDING_TYPE_COMBINED_IMAGE_SAMPLER,
-};
-
-/// \brief Enumerates supported filter modes.
-enum kan_render_filter_mode_t
-{
-    KAN_RENDER_FILTER_MODE_NEAREST = 0u,
-    KAN_RENDER_FILTER_MODE_LINEAR,
-};
-
-/// \brief Enumerates supported mip map modes.
-enum kan_render_mip_map_mode_t
-{
-    KAN_RENDER_MIP_MAP_MODE_NEAREST = 0u,
-    KAN_RENDER_MIP_MAP_MODE_LINEAR,
-};
-
-/// \brief Enumerates supported address modes.
-enum kan_render_address_mode_t
-{
-    KAN_RENDER_ADDRESS_MODE_REPEAT = 0u,
-    KAN_RENDER_ADDRESS_MODE_MIRRORED_REPEAT,
-    KAN_RENDER_ADDRESS_MODE_CLAMP_TO_EDGE,
-    KAN_RENDER_ADDRESS_MODE_MIRRORED_CLAMP_TO_EDGE,
-    KAN_RENDER_ADDRESS_MODE_CLAMP_TO_BORDER,
-};
-
-/// \brief Describes parameter that can be bound to the pipeline.
-struct kan_render_parameter_binding_description_t
-{
-    kan_render_size_t binding;
-    enum kan_render_parameter_binding_type_t type;
-    kan_render_mask_t used_stage_mask;
-};
-
-/// \brief Describes set of parameters that can be bound.
-struct kan_render_parameter_set_description_t
-{
-    kan_render_size_t set;
-    kan_instance_size_t bindings_count;
-    struct kan_render_parameter_binding_description_t *bindings;
-
-    /// \brief True if bindings are rarely changed. False otherwise. Used for optimization.
-    kan_bool_t stable_binding;
-};
-
-/// \brief Enumerates supported topologies.
-enum kan_render_graphics_topology_t
-{
-    KAN_RENDER_GRAPHICS_TOPOLOGY_TRIANGLE_LIST = 0u,
-};
-
-/// \brief Describes graphics pipeline family with its attributes and parameters.
-struct kan_render_graphics_pipeline_family_description_t
-{
-    enum kan_render_graphics_topology_t topology;
-
-    kan_instance_size_t attribute_sources_count;
-    struct kan_render_attribute_source_description_t *attribute_sources;
-
-    kan_instance_size_t attributes_count;
-    struct kan_render_attribute_description_t *attributes;
-
-    kan_instance_size_t parameter_sets_count;
-    struct kan_render_parameter_set_description_t *parameter_sets;
-
-    kan_interned_string_t tracking_name;
-};
-
-/// \brief Creates new graphics pipeline family from given parameters.
-CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_graphics_pipeline_family_t kan_render_graphics_pipeline_family_create (
-    kan_render_context_t context, struct kan_render_graphics_pipeline_family_description_t *description);
-
-/// \brief Requests given pipeline family to be destroyed.
-CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_graphics_pipeline_family_destroy (
-    kan_render_graphics_pipeline_family_t family);
-
-/// \brief Creates new pipeline code module from given implementation-specific code.
-CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_code_module_t kan_render_code_module_create (
-    kan_render_context_t context, kan_instance_size_t code_length, void *code, kan_interned_string_t tracking_name);
-
-/// \brief Requests given code module to be destroyed.
-CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_code_module_destroy (kan_render_code_module_t code_module);
-
-/// \brief Enumerates supported polygon modes,
-enum kan_render_polygon_mode_t
-{
-    KAN_RENDER_POLYGON_MODE_FILL,
-    KAN_RENDER_POLYGON_MODE_WIREFRAME,
-};
-
-/// \brief Enumerates supported cull modes.
-enum kan_render_cull_mode_t
-{
-    KAN_RENDER_CULL_MODE_BACK = 0u,
 };
 
 /// \brief Enumerates supported blend factors.
@@ -863,11 +819,19 @@ struct kan_render_pipeline_code_module_usage_t
 struct kan_render_graphics_pipeline_description_t
 {
     kan_render_pass_t pass;
-    kan_render_graphics_pipeline_family_t family;
-
+    enum kan_render_graphics_topology_t topology;
     enum kan_render_polygon_mode_t polygon_mode;
     enum kan_render_cull_mode_t cull_mode;
     kan_bool_t use_depth_clamp;
+
+    kan_instance_size_t attribute_sources_count;
+    struct kan_render_attribute_source_description_t *attribute_sources;
+
+    kan_instance_size_t attributes_count;
+    struct kan_render_attribute_description_t *attributes;
+
+    kan_instance_size_t parameter_set_layouts_count;
+    kan_render_pipeline_parameter_set_layout_t *parameter_set_layouts;
 
     kan_instance_size_t output_setups_count;
     struct kan_render_color_output_setup_description_t *output_setups;
@@ -928,13 +892,7 @@ CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_graphics_pipeline_destroy (kan
 /// \brief Contains information for pipeline parameter set creation.
 struct kan_render_pipeline_parameter_set_description_t
 {
-    enum kan_render_pipeline_type_t family_type;
-    union
-    {
-        kan_render_graphics_pipeline_family_t graphics_family;
-    };
-
-    kan_render_size_t set;
+    kan_render_pipeline_parameter_set_layout_t layout;
     kan_interned_string_t tracking_name;
 
     kan_instance_size_t initial_bindings_count;
@@ -947,6 +905,30 @@ struct kan_render_parameter_update_description_buffer_t
     kan_render_buffer_t buffer;
     kan_render_size_t offset;
     kan_render_size_t range;
+};
+
+/// \brief Enumerates supported filter modes.
+enum kan_render_filter_mode_t
+{
+    KAN_RENDER_FILTER_MODE_NEAREST = 0u,
+    KAN_RENDER_FILTER_MODE_LINEAR,
+};
+
+/// \brief Enumerates supported mip map modes.
+enum kan_render_mip_map_mode_t
+{
+    KAN_RENDER_MIP_MAP_MODE_NEAREST = 0u,
+    KAN_RENDER_MIP_MAP_MODE_LINEAR,
+};
+
+/// \brief Enumerates supported address modes.
+enum kan_render_address_mode_t
+{
+    KAN_RENDER_ADDRESS_MODE_REPEAT = 0u,
+    KAN_RENDER_ADDRESS_MODE_MIRRORED_REPEAT,
+    KAN_RENDER_ADDRESS_MODE_CLAMP_TO_EDGE,
+    KAN_RENDER_ADDRESS_MODE_MIRRORED_CLAMP_TO_EDGE,
+    KAN_RENDER_ADDRESS_MODE_CLAMP_TO_BORDER,
 };
 
 /// \brief Contains image sampling parameters.

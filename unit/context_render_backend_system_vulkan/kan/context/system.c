@@ -25,8 +25,8 @@ kan_context_system_t render_backend_system_create (kan_allocation_group_t group,
     system->frame_buffer_wrapper_allocation_group = kan_allocation_group_get_child (group, "frame_buffer_wrapper");
     system->pass_wrapper_allocation_group = kan_allocation_group_get_child (group, "pass_wrapper");
     system->pass_instance_allocation_group = kan_allocation_group_get_child (group, "pass_instance");
-    system->pipeline_family_wrapper_allocation_group =
-        kan_allocation_group_get_child (group, "pipeline_family_wrapper");
+    system->parameter_set_layout_wrapper_allocation_group =
+        kan_allocation_group_get_child (group, "parameter_set_layout_wrapper");
     system->code_module_wrapper_allocation_group = kan_allocation_group_get_child (group, "code_module_wrapper");
     system->pipeline_wrapper_allocation_group = kan_allocation_group_get_child (group, "pipeline_wrapper");
     system->pipeline_parameter_set_wrapper_allocation_group =
@@ -45,10 +45,8 @@ kan_context_system_t render_backend_system_create (kan_allocation_group_t group,
     system->section_create_pass = kan_cpu_section_get ("render_backend_create_pass");
     system->section_create_pass_internal = kan_cpu_section_get ("render_backend_create_pass_internal");
     system->section_create_pass_instance = kan_cpu_section_get ("render_backend_create_pass_instance");
-    system->section_create_graphics_pipeline_family =
-        kan_cpu_section_get ("render_backend_create_graphics_pipeline_family");
-    system->section_create_graphics_pipeline_family_internal =
-        kan_cpu_section_get ("render_backend_create_graphics_pipeline_family_internal");
+    system->section_create_pipeline_parameter_set_layout =
+        kan_cpu_section_get ("render_backend_create_pipeline_parameter_set_layout");
     system->section_create_code_module = kan_cpu_section_get ("render_backend_create_code_module");
     system->section_create_code_module_internal = kan_cpu_section_get ("render_backend_create_code_module_internal");
     system->section_create_graphics_pipeline = kan_cpu_section_get ("render_backend_create_graphics_pipeline");
@@ -135,7 +133,7 @@ kan_context_system_t render_backend_system_create (kan_allocation_group_t group,
     kan_bd_list_init (&system->passes);
     kan_bd_list_init (&system->pass_instances);
     kan_bd_list_init (&system->pass_instances_available);
-    kan_bd_list_init (&system->graphics_pipeline_families);
+    kan_bd_list_init (&system->pipeline_parameter_set_layouts);
     kan_bd_list_init (&system->code_modules);
     kan_bd_list_init (&system->graphics_pipelines);
     kan_bd_list_init (&system->pipeline_parameter_sets);
@@ -747,15 +745,15 @@ void render_backend_system_destroy (kan_context_system_t handle)
         code_module = next;
     }
 
-    struct render_backend_graphics_pipeline_family_t *family =
-        (struct render_backend_graphics_pipeline_family_t *) system->graphics_pipeline_families.first;
+    struct render_backend_pipeline_parameter_set_layout_t *parameter_set_layout =
+        (struct render_backend_pipeline_parameter_set_layout_t *) system->pipeline_parameter_set_layouts.first;
 
-    while (family)
+    while (parameter_set_layout)
     {
-        struct render_backend_graphics_pipeline_family_t *next =
-            (struct render_backend_graphics_pipeline_family_t *) family->list_node.next;
-        render_backend_system_destroy_graphics_pipeline_family (system, family);
-        family = next;
+        struct render_backend_pipeline_parameter_set_layout_t *next =
+            (struct render_backend_pipeline_parameter_set_layout_t *) parameter_set_layout->list_node.next;
+        render_backend_system_destroy_pipeline_parameter_set_layout (system, parameter_set_layout);
+        parameter_set_layout = next;
     }
 
     vkDestroyDescriptorSetLayout (system->device, system->empty_descriptor_set_layout,
@@ -1308,7 +1306,7 @@ kan_bool_t kan_render_backend_system_select_device (kan_context_system_t render_
         state->first_scheduled_pipeline_parameter_set_destroy = NULL;
         state->first_scheduled_detached_descriptor_set_destroy = NULL;
         state->first_scheduled_graphics_pipeline_destroy = NULL;
-        state->first_scheduled_graphics_pipeline_family_destroy = NULL;
+        state->first_scheduled_pipeline_parameter_set_layout_destroy = NULL;
         state->first_scheduled_buffer_destroy = NULL;
         state->first_scheduled_frame_lifetime_allocator_destroy = NULL;
         state->first_scheduled_detached_image_view_destroy = NULL;
@@ -3384,7 +3382,7 @@ static void render_backend_system_clean_current_schedule_if_safe (struct render_
         !schedule->first_scheduled_pipeline_parameter_set_destroy &&
         !schedule->first_scheduled_detached_descriptor_set_destroy &&
         !schedule->first_scheduled_graphics_pipeline_destroy &&
-        !schedule->first_scheduled_graphics_pipeline_family_destroy && !schedule->first_scheduled_buffer_destroy &&
+        !schedule->first_scheduled_pipeline_parameter_set_layout_destroy && !schedule->first_scheduled_buffer_destroy &&
         !schedule->first_scheduled_frame_lifetime_allocator_destroy &&
         !schedule->first_scheduled_detached_image_view_destroy && !schedule->first_scheduled_image_destroy &&
         !schedule->first_scheduled_detached_image_destroy)
@@ -4245,15 +4243,17 @@ kan_bool_t kan_render_backend_system_next_frame (kan_context_system_t render_bac
         graphics_pipeline_destroy = graphics_pipeline_destroy->next;
     }
 
-    struct scheduled_graphics_pipeline_family_destroy_t *graphics_pipeline_family_destroy =
-        schedule->first_scheduled_graphics_pipeline_family_destroy;
-    schedule->first_scheduled_graphics_pipeline_family_destroy = NULL;
+    struct scheduled_pipeline_parameter_set_layout_destroy_t *pipeline_parameter_set_layout_destroy =
+        schedule->first_scheduled_pipeline_parameter_set_layout_destroy;
+    schedule->first_scheduled_pipeline_parameter_set_layout_destroy = NULL;
 
-    while (graphics_pipeline_family_destroy)
+    while (pipeline_parameter_set_layout_destroy)
     {
-        kan_bd_list_remove (&system->graphics_pipeline_families, &graphics_pipeline_family_destroy->family->list_node);
-        render_backend_system_destroy_graphics_pipeline_family (system, graphics_pipeline_family_destroy->family);
-        graphics_pipeline_family_destroy = graphics_pipeline_family_destroy->next;
+        kan_bd_list_remove (&system->pipeline_parameter_set_layouts,
+                            &pipeline_parameter_set_layout_destroy->layout->list_node);
+        render_backend_system_destroy_pipeline_parameter_set_layout (system,
+                                                                     pipeline_parameter_set_layout_destroy->layout);
+        pipeline_parameter_set_layout_destroy = pipeline_parameter_set_layout_destroy->next;
     }
 
     struct scheduled_frame_buffer_destroy_t *frame_buffer_destroy = schedule->first_scheduled_frame_buffer_destroy;

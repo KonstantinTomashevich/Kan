@@ -247,10 +247,10 @@ struct scheduled_graphics_pipeline_destroy_t
     struct render_backend_graphics_pipeline_t *pipeline;
 };
 
-struct scheduled_graphics_pipeline_family_destroy_t
+struct scheduled_pipeline_parameter_set_layout_destroy_t
 {
-    struct scheduled_graphics_pipeline_family_destroy_t *next;
-    struct render_backend_graphics_pipeline_family_t *family;
+    struct scheduled_pipeline_parameter_set_layout_destroy_t *next;
+    struct render_backend_pipeline_parameter_set_layout_t *layout;
 };
 
 struct scheduled_detached_descriptor_set_destroy_t
@@ -326,7 +326,7 @@ struct render_backend_schedule_state_t
     struct scheduled_pipeline_parameter_set_destroy_t *first_scheduled_pipeline_parameter_set_destroy;
     struct scheduled_detached_descriptor_set_destroy_t *first_scheduled_detached_descriptor_set_destroy;
     struct scheduled_graphics_pipeline_destroy_t *first_scheduled_graphics_pipeline_destroy;
-    struct scheduled_graphics_pipeline_family_destroy_t *first_scheduled_graphics_pipeline_family_destroy;
+    struct scheduled_pipeline_parameter_set_layout_destroy_t *first_scheduled_pipeline_parameter_set_layout_destroy;
     struct scheduled_buffer_destroy_t *first_scheduled_buffer_destroy;
     struct scheduled_frame_lifetime_allocator_destroy_t *first_scheduled_frame_lifetime_allocator_destroy;
     struct scheduled_detached_image_view_destroy_t *first_scheduled_detached_image_view_destroy;
@@ -444,44 +444,31 @@ struct render_backend_layout_binding_t
     vulkan_size_t used_stage_mask;
 };
 
-struct render_backend_descriptor_set_layout_t
-{
-    /// \details In future, we can try to hash the layouts and share them between families whenever it is possible.
-    ///          But it is only needed if there is lots of families with similar layouts.
-    VkDescriptorSetLayout layout;
-
-    kan_bool_t stable_binding;
-    uint8_t uniform_buffers_count;
-    uint8_t storage_buffers_count;
-    uint8_t combined_image_samplers_count;
-    kan_instance_size_t bindings_count;
-    struct render_backend_layout_binding_t bindings[];
-};
-
-struct render_backend_graphics_pipeline_family_t
+struct render_backend_pipeline_parameter_set_layout_t
 {
     struct kan_bd_list_node_t list_node;
     struct render_backend_system_t *system;
 
-    VkPipelineLayout layout;
-    kan_instance_size_t descriptor_set_layouts_count;
-    struct render_backend_descriptor_set_layout_t **descriptor_set_layouts;
+    /// \details In future, we can try to hash the layouts to avoid creating lots of similar ones.
+    VkDescriptorSetLayout layout;
 
-    enum kan_render_graphics_topology_t topology;
+    kan_render_size_t set;
+    kan_bool_t stable_binding;
+
+    uint8_t uniform_buffers_count;
+    uint8_t storage_buffers_count;
+    uint8_t combined_image_samplers_count;
+
     kan_interned_string_t tracking_name;
-
-    kan_instance_size_t input_bindings_count;
-    VkVertexInputBindingDescription *input_bindings;
-
-    kan_instance_size_t attributes_count;
-    VkVertexInputAttributeDescription *attributes;
+    kan_instance_size_t bindings_count;
+    struct render_backend_layout_binding_t bindings[];
 };
 
-struct render_backend_graphics_pipeline_family_t *render_backend_system_create_graphics_pipeline_family (
-    struct render_backend_system_t *system, struct kan_render_graphics_pipeline_family_description_t *description);
+struct render_backend_pipeline_parameter_set_layout_t *render_backend_system_create_pipeline_parameter_set_layout (
+    struct render_backend_system_t *system, struct kan_render_pipeline_parameter_set_layout_description_t *description);
 
-void render_backend_system_destroy_graphics_pipeline_family (struct render_backend_system_t *system,
-                                                             struct render_backend_graphics_pipeline_family_t *family);
+void render_backend_system_destroy_pipeline_parameter_set_layout (
+    struct render_backend_system_t *system, struct render_backend_pipeline_parameter_set_layout_t *layout);
 
 struct render_backend_code_module_t
 {
@@ -516,9 +503,13 @@ struct render_backend_graphics_pipeline_t
     struct render_backend_system_t *system;
 
     VkPipeline pipeline;
-    struct render_backend_pass_t *pass;
-    struct render_backend_graphics_pipeline_family_t *family;
 
+    /// \details In future, we can try to hash the layouts and share them between pipelines whenever it is possible.
+    ///          But it is only needed if there is lots of pipelines with similar layouts, which is not guaranteed
+    ///          to be the case.
+    VkPipelineLayout layout;
+
+    struct render_backend_pass_t *pass;
     float min_depth;
     float max_depth;
 
@@ -535,7 +526,7 @@ struct render_backend_graphics_pipeline_t *render_backend_system_create_graphics
     enum kan_render_pipeline_compilation_priority_t compilation_priority);
 
 void render_backend_system_destroy_graphics_pipeline (struct render_backend_system_t *system,
-                                                      struct render_backend_graphics_pipeline_t *family);
+                                                      struct render_backend_graphics_pipeline_t *pipeline);
 
 enum render_backend_buffer_family_t
 {
@@ -578,16 +569,14 @@ struct render_backend_pipeline_parameter_set_t
     struct kan_bd_list_node_t list_node;
     struct render_backend_system_t *system;
 
-    struct render_backend_descriptor_set_layout_t *layout;
+    struct render_backend_pipeline_parameter_set_layout_t *layout;
     union
     {
         struct render_backend_stable_parameter_set_data_t stable;
         struct render_backend_unstable_parameter_set_data_t unstable;
     };
 
-    vulkan_size_t set_index;
     VkImageView *bound_image_views;
-
     struct render_backend_parameter_set_render_target_attachment_t *first_render_target_attachment;
     kan_interned_string_t tracking_name;
 };
@@ -747,6 +736,13 @@ struct graphics_pipeline_compilation_request_t
     kan_instance_size_t shader_stages_count;
     VkPipelineShaderStageCreateInfo *shader_stages;
 
+    VkPipelineInputAssemblyStateCreateInfo input_assembly;
+    kan_instance_size_t input_bindings_count;
+    VkVertexInputBindingDescription *input_bindings;
+
+    kan_instance_size_t attributes_count;
+    VkVertexInputAttributeDescription *attributes;
+
     VkPipelineRasterizationStateCreateInfo rasterization;
     VkPipelineMultisampleStateCreateInfo multisampling;
     VkPipelineDepthStencilStateCreateInfo depth_stencil;
@@ -808,7 +804,7 @@ void render_backend_descriptor_set_allocator_init (struct render_backend_descrip
 struct render_backend_descriptor_set_allocation_t render_backend_descriptor_set_allocator_allocate (
     struct render_backend_system_t *system,
     struct render_backend_descriptor_set_allocator_t *allocator,
-    struct render_backend_descriptor_set_layout_t *layout);
+    struct render_backend_pipeline_parameter_set_layout_t *layout);
 
 void render_backend_descriptor_set_allocator_free (struct render_backend_system_t *system,
                                                    struct render_backend_descriptor_set_allocator_t *allocator,
@@ -873,7 +869,7 @@ struct render_backend_system_t
     struct kan_bd_list_t passes;
     struct kan_bd_list_t pass_instances;
     struct kan_bd_list_t pass_instances_available;
-    struct kan_bd_list_t graphics_pipeline_families;
+    struct kan_bd_list_t pipeline_parameter_set_layouts;
     struct kan_bd_list_t code_modules;
     struct kan_bd_list_t graphics_pipelines;
     struct kan_bd_list_t pipeline_parameter_sets;
@@ -907,7 +903,7 @@ struct render_backend_system_t
     kan_allocation_group_t frame_buffer_wrapper_allocation_group;
     kan_allocation_group_t pass_wrapper_allocation_group;
     kan_allocation_group_t pass_instance_allocation_group;
-    kan_allocation_group_t pipeline_family_wrapper_allocation_group;
+    kan_allocation_group_t parameter_set_layout_wrapper_allocation_group;
     kan_allocation_group_t code_module_wrapper_allocation_group;
     kan_allocation_group_t pipeline_wrapper_allocation_group;
     kan_allocation_group_t pipeline_parameter_set_wrapper_allocation_group;
@@ -924,8 +920,7 @@ struct render_backend_system_t
     kan_cpu_section_t section_create_pass;
     kan_cpu_section_t section_create_pass_internal;
     kan_cpu_section_t section_create_pass_instance;
-    kan_cpu_section_t section_create_graphics_pipeline_family;
-    kan_cpu_section_t section_create_graphics_pipeline_family_internal;
+    kan_cpu_section_t section_create_pipeline_parameter_set_layout;
     kan_cpu_section_t section_create_code_module;
     kan_cpu_section_t section_create_code_module_internal;
     kan_cpu_section_t section_create_graphics_pipeline;

@@ -135,9 +135,9 @@ static kan_render_pass_t create_render_image_pass (kan_render_context_t render_c
 static kan_render_graphics_pipeline_t create_render_image_pipeline (
     kan_render_context_t render_context,
     kan_render_pass_t render_image_pass,
-    kan_render_graphics_pipeline_family_t *output_family,
     kan_render_size_t *output_attribute_binding,
-    kan_render_size_t *output_config_binding)
+    kan_render_size_t *output_config_binding,
+    kan_render_pipeline_parameter_set_layout_t *material_set_layout_output)
 {
     kan_rpl_parser_t parser = kan_rpl_parser_create (kan_string_intern ("render_image"));
     KAN_TEST_ASSERT (kan_rpl_parser_add_source (parser, render_image_shader, kan_string_intern ("render_image")))
@@ -176,10 +176,17 @@ static kan_render_graphics_pipeline_t create_render_image_pipeline (
     kan_rpl_compiler_context_destroy (compiler_context);
     kan_rpl_intermediate_shutdown (&intermediate);
 
+    struct kan_render_parameter_binding_description_t material_set_bindings[1u];
+    struct kan_render_pipeline_parameter_set_layout_description_t material_set_layout_description = {
+        .set = (kan_render_size_t) KAN_RPL_SET_MATERIAL,
+        .bindings_count = sizeof (material_set_bindings) / sizeof (material_set_bindings[0u]),
+        .bindings = material_set_bindings,
+        .stable_binding = KAN_TRUE,
+        .tracking_name = kan_string_intern ("image_material"),
+    };
+
     struct kan_render_attribute_source_description_t attribute_sources[1u];
     struct kan_render_attribute_description_t attributes[1u];
-    struct kan_render_parameter_binding_description_t parameter_set_bindings[1u];
-    struct kan_render_parameter_set_description_t parameter_sets[1u];
 
     KAN_TEST_ASSERT (meta.attribute_buffers.size == 1u)
     struct kan_rpl_meta_buffer_t *buffer = &((struct kan_rpl_meta_buffer_t *) meta.attribute_buffers.data)[0u];
@@ -199,33 +206,17 @@ static kan_render_graphics_pipeline_t create_render_image_pipeline (
 
     KAN_TEST_ASSERT (meta.set_material.buffers.size == 1u)
     buffer = &((struct kan_rpl_meta_buffer_t *) meta.set_material.buffers.data)[0u];
-    parameter_sets[0u].set = (kan_render_size_t) KAN_RPL_SET_MATERIAL;
-    parameter_sets[0u].bindings_count = sizeof (parameter_set_bindings) / sizeof (parameter_set_bindings[0u]);
-    parameter_sets[0u].bindings = parameter_set_bindings;
-    parameter_sets[0u].stable_binding = KAN_TRUE;
 
     KAN_TEST_CHECK (buffer->type == KAN_RPL_BUFFER_TYPE_READ_ONLY_STORAGE)
-    parameter_set_bindings[0u].binding = buffer->binding;
+    material_set_bindings[0u].binding = buffer->binding;
     *output_config_binding = buffer->binding;
-    parameter_set_bindings[0u].type = KAN_RENDER_PARAMETER_BINDING_TYPE_STORAGE_BUFFER;
-    parameter_set_bindings[0u].used_stage_mask =
+    material_set_bindings[0u].type = KAN_RENDER_PARAMETER_BINDING_TYPE_STORAGE_BUFFER;
+    material_set_bindings[0u].used_stage_mask =
         (1u << KAN_RENDER_STAGE_GRAPHICS_VERTEX) | (1u << KAN_RENDER_STAGE_GRAPHICS_FRAGMENT);
 
-    struct kan_render_graphics_pipeline_family_description_t pipeline_family_description = {
-        .topology = KAN_RENDER_GRAPHICS_TOPOLOGY_TRIANGLE_LIST,
-        .attribute_sources_count = sizeof (attribute_sources) / (sizeof (attribute_sources[0u])),
-        .attribute_sources = attribute_sources,
-        .attributes_count = sizeof (attributes) / (sizeof (attributes[0u])),
-        .attributes = attributes,
-        .parameter_sets_count = sizeof (parameter_sets) / sizeof (parameter_sets[0u]),
-        .parameter_sets = parameter_sets,
-        .tracking_name = kan_string_intern ("render_image"),
-    };
-
-    kan_render_graphics_pipeline_family_t family =
-        kan_render_graphics_pipeline_family_create (render_context, &pipeline_family_description);
-    KAN_TEST_ASSERT (KAN_HANDLE_IS_VALID (family))
-    *output_family = family;
+    *material_set_layout_output =
+        kan_render_pipeline_parameter_set_layout_create (render_context, &material_set_layout_description);
+    KAN_TEST_ASSERT (KAN_HANDLE_IS_VALID (*material_set_layout_output))
 
     kan_render_code_module_t code_module = kan_render_code_module_create (
         render_context, code.size * code.item_size, code.data, kan_string_intern ("render_image"));
@@ -267,10 +258,16 @@ static kan_render_graphics_pipeline_t create_render_image_pipeline (
 
     struct kan_render_graphics_pipeline_description_t pipeline_description = {
         .pass = render_image_pass,
-        .family = family,
+        .topology = KAN_RENDER_GRAPHICS_TOPOLOGY_TRIANGLE_LIST,
         .polygon_mode = KAN_RENDER_POLYGON_MODE_FILL,
         .cull_mode = KAN_RENDER_CULL_MODE_BACK,
         .use_depth_clamp = KAN_FALSE,
+        .attribute_sources_count = sizeof (attribute_sources) / (sizeof (attribute_sources[0u])),
+        .attribute_sources = attribute_sources,
+        .attributes_count = sizeof (attributes) / (sizeof (attributes[0u])),
+        .attributes = attributes,
+        .parameter_set_layouts_count = 1u,
+        .parameter_set_layouts = material_set_layout_output,
         .output_setups_count = sizeof (output_setups) / sizeof (output_setups[0u]),
         .output_setups = output_setups,
         .blend_constant_r = 0.0f,
@@ -405,13 +402,15 @@ static kan_render_pass_t create_cube_pass (kan_render_context_t render_context)
     return kan_render_pass_create (render_context, &description);
 }
 
-static kan_render_graphics_pipeline_t create_cube_pipeline (kan_render_context_t render_context,
-                                                            kan_render_pass_t cube_pass,
-                                                            kan_render_graphics_pipeline_family_t *output_family,
-                                                            kan_render_size_t *output_attribute_vertex_binding,
-                                                            kan_render_size_t *output_instanced_vertex_binding,
-                                                            kan_render_size_t *output_pass_binding,
-                                                            kan_render_size_t *output_diffuse_color_binding)
+static kan_render_graphics_pipeline_t create_cube_pipeline (
+    kan_render_context_t render_context,
+    kan_render_pass_t cube_pass,
+    kan_render_size_t *output_attribute_vertex_binding,
+    kan_render_size_t *output_instanced_vertex_binding,
+    kan_render_size_t *output_pass_binding,
+    kan_render_size_t *output_diffuse_color_binding,
+    kan_render_pipeline_parameter_set_layout_t *pass_set_layout_output,
+    kan_render_pipeline_parameter_set_layout_t *material_set_layout_output)
 {
     kan_rpl_parser_t parser = kan_rpl_parser_create (kan_string_intern ("cube"));
     KAN_TEST_ASSERT (kan_rpl_parser_add_source (parser, cube_shader, kan_string_intern ("cube")))
@@ -453,9 +452,23 @@ static kan_render_graphics_pipeline_t create_cube_pipeline (kan_render_context_t
     struct kan_render_attribute_source_description_t attribute_sources[2u];
     struct kan_render_attribute_description_t attributes[3u];
 
-    struct kan_render_parameter_binding_description_t pass_parameter_set_bindings[1u];
-    struct kan_render_parameter_binding_description_t material_parameter_set_bindings[1u];
-    struct kan_render_parameter_set_description_t parameter_sets[2u];
+    struct kan_render_parameter_binding_description_t pass_set_bindings[1u];
+    struct kan_render_pipeline_parameter_set_layout_description_t pass_set_description = {
+        .set = (kan_render_size_t) KAN_RPL_SET_PASS,
+        .bindings_count = sizeof (pass_set_bindings) / sizeof (pass_set_bindings[0u]),
+        .bindings = pass_set_bindings,
+        .stable_binding = KAN_TRUE,
+        .tracking_name = kan_string_intern ("cube_pass"),
+    };
+
+    struct kan_render_parameter_binding_description_t material_set_bindings[1u];
+    struct kan_render_pipeline_parameter_set_layout_description_t material_set_description = {
+        .set = (kan_render_size_t) KAN_RPL_SET_MATERIAL,
+        .bindings_count = sizeof (material_set_bindings) / sizeof (material_set_bindings[0u]),
+        .bindings = material_set_bindings,
+        .stable_binding = KAN_TRUE,
+        .tracking_name = kan_string_intern ("cube_material"),
+    };
 
     KAN_TEST_ASSERT (meta.attribute_buffers.size == 2u)
     struct kan_rpl_meta_buffer_t *buffer = &((struct kan_rpl_meta_buffer_t *) meta.attribute_buffers.data)[0u];
@@ -497,47 +510,29 @@ static kan_render_graphics_pipeline_t create_cube_pipeline (kan_render_context_t
 
     KAN_TEST_ASSERT (meta.set_pass.buffers.size == 1u)
     buffer = &((struct kan_rpl_meta_buffer_t *) meta.set_pass.buffers.data)[0u];
-    parameter_sets[0u].set = (kan_render_size_t) KAN_RPL_SET_PASS;
-    parameter_sets[0u].bindings_count = sizeof (pass_parameter_set_bindings) / sizeof (pass_parameter_set_bindings[0u]);
-    parameter_sets[0u].bindings = pass_parameter_set_bindings;
-    parameter_sets[0u].stable_binding = KAN_TRUE;
 
     KAN_TEST_CHECK (buffer->type == KAN_RPL_BUFFER_TYPE_UNIFORM)
-    pass_parameter_set_bindings[0u].binding = buffer->binding;
+    pass_set_bindings[0u].binding = buffer->binding;
     *output_pass_binding = buffer->binding;
-    pass_parameter_set_bindings[0u].type = KAN_RENDER_PARAMETER_BINDING_TYPE_UNIFORM_BUFFER;
-    pass_parameter_set_bindings[0u].used_stage_mask =
+    pass_set_bindings[0u].type = KAN_RENDER_PARAMETER_BINDING_TYPE_UNIFORM_BUFFER;
+    pass_set_bindings[0u].used_stage_mask =
         (1u << KAN_RENDER_STAGE_GRAPHICS_VERTEX) | (1u << KAN_RENDER_STAGE_GRAPHICS_FRAGMENT);
 
     KAN_TEST_ASSERT (meta.set_material.samplers.size == 1u)
     struct kan_rpl_meta_sampler_t *sampler = &((struct kan_rpl_meta_sampler_t *) meta.set_material.samplers.data)[0u];
-    parameter_sets[1u].set = (kan_render_size_t) KAN_RPL_SET_MATERIAL;
-    parameter_sets[1u].bindings_count =
-        sizeof (material_parameter_set_bindings) / sizeof (material_parameter_set_bindings[0u]);
-    parameter_sets[1u].bindings = material_parameter_set_bindings;
-    parameter_sets[1u].stable_binding = KAN_TRUE;
 
-    material_parameter_set_bindings[0u].binding = sampler->binding;
+    material_set_bindings[0u].binding = sampler->binding;
     *output_diffuse_color_binding = sampler->binding;
-    material_parameter_set_bindings[0u].type = KAN_RENDER_PARAMETER_BINDING_TYPE_COMBINED_IMAGE_SAMPLER;
-    material_parameter_set_bindings[0u].used_stage_mask =
+    material_set_bindings[0u].type = KAN_RENDER_PARAMETER_BINDING_TYPE_COMBINED_IMAGE_SAMPLER;
+    material_set_bindings[0u].used_stage_mask =
         (1u << KAN_RENDER_STAGE_GRAPHICS_VERTEX) | (1u << KAN_RENDER_STAGE_GRAPHICS_FRAGMENT);
 
-    struct kan_render_graphics_pipeline_family_description_t pipeline_family_description = {
-        .topology = KAN_RENDER_GRAPHICS_TOPOLOGY_TRIANGLE_LIST,
-        .attribute_sources_count = sizeof (attribute_sources) / (sizeof (attribute_sources[0u])),
-        .attribute_sources = attribute_sources,
-        .attributes_count = sizeof (attributes) / (sizeof (attributes[0u])),
-        .attributes = attributes,
-        .parameter_sets_count = sizeof (parameter_sets) / sizeof (parameter_sets[0u]),
-        .parameter_sets = parameter_sets,
-        .tracking_name = kan_string_intern ("cube_pipeline"),
-    };
+    *pass_set_layout_output = kan_render_pipeline_parameter_set_layout_create (render_context, &pass_set_description);
+    KAN_TEST_ASSERT (KAN_HANDLE_IS_VALID (*pass_set_layout_output))
 
-    kan_render_graphics_pipeline_family_t family =
-        kan_render_graphics_pipeline_family_create (render_context, &pipeline_family_description);
-    KAN_TEST_ASSERT (KAN_HANDLE_IS_VALID (family))
-    *output_family = family;
+    *material_set_layout_output =
+        kan_render_pipeline_parameter_set_layout_create (render_context, &material_set_description);
+    KAN_TEST_ASSERT (KAN_HANDLE_IS_VALID (*material_set_layout_output))
 
     kan_render_code_module_t code_module = kan_render_code_module_create (render_context, code.size * code.item_size,
                                                                           code.data, kan_string_intern ("cube"));
@@ -577,12 +572,19 @@ static kan_render_graphics_pipeline_t create_cube_pipeline (kan_render_context_t
         },
     };
 
+    kan_render_pipeline_parameter_set_layout_t set_layouts[] = {*pass_set_layout_output, *material_set_layout_output};
     struct kan_render_graphics_pipeline_description_t pipeline_description = {
         .pass = cube_pass,
-        .family = family,
+        .topology = KAN_RENDER_GRAPHICS_TOPOLOGY_TRIANGLE_LIST,
         .polygon_mode = KAN_RENDER_POLYGON_MODE_FILL,
         .cull_mode = KAN_RENDER_CULL_MODE_BACK,
         .use_depth_clamp = KAN_FALSE,
+        .attribute_sources_count = sizeof (attribute_sources) / (sizeof (attribute_sources[0u])),
+        .attribute_sources = attribute_sources,
+        .attributes_count = sizeof (attributes) / (sizeof (attributes[0u])),
+        .attributes = attributes,
+        .parameter_set_layouts_count = sizeof (set_layouts) / sizeof (set_layouts[0u]),
+        .parameter_set_layouts = set_layouts,
         .output_setups_count = sizeof (output_setups) / sizeof (output_setups[0u]),
         .output_setups = output_setups,
         .blend_constant_r = 0.0f,
@@ -753,10 +755,11 @@ KAN_TEST_CASE (render_and_capture)
     kan_render_size_t render_image_attribute_binding;
     kan_render_size_t render_image_config_binding;
 
-    kan_render_graphics_pipeline_family_t render_image_pipeline_family;
+    kan_render_pipeline_parameter_set_layout_t render_image_material_set_layout;
+
     kan_render_graphics_pipeline_t render_image_pipeline =
-        create_render_image_pipeline (render_context, render_image_pass, &render_image_pipeline_family,
-                                      &render_image_attribute_binding, &render_image_config_binding);
+        create_render_image_pipeline (render_context, render_image_pass, &render_image_attribute_binding,
+                                      &render_image_config_binding, &render_image_material_set_layout);
     KAN_TEST_ASSERT (KAN_HANDLE_IS_VALID (render_image_pipeline))
 
     kan_render_size_t cube_attribute_vertex_binding;
@@ -764,10 +767,12 @@ KAN_TEST_CASE (render_and_capture)
     kan_render_size_t cube_pass_binding;
     kan_render_size_t cube_diffuse_color_binding;
 
-    kan_render_graphics_pipeline_family_t cube_pipeline_family;
-    kan_render_graphics_pipeline_t cube_pipeline =
-        create_cube_pipeline (render_context, cube_pass, &cube_pipeline_family, &cube_attribute_vertex_binding,
-                              &cube_instanced_vertex_binding, &cube_pass_binding, &cube_diffuse_color_binding);
+    kan_render_pipeline_parameter_set_layout_t cube_pass_set_layout;
+    kan_render_pipeline_parameter_set_layout_t cube_material_set_layout;
+
+    kan_render_graphics_pipeline_t cube_pipeline = create_cube_pipeline (
+        render_context, cube_pass, &cube_attribute_vertex_binding, &cube_instanced_vertex_binding, &cube_pass_binding,
+        &cube_diffuse_color_binding, &cube_pass_set_layout, &cube_material_set_layout);
 
     const kan_render_size_t render_target_image_size = 256u;
     struct kan_render_image_description_t render_target_image_description = {
@@ -919,9 +924,7 @@ KAN_TEST_CASE (render_and_capture)
     }};
 
     struct kan_render_pipeline_parameter_set_description_t render_image_set_description = {
-        .family_type = KAN_RENDER_PIPELINE_TYPE_GRAPHICS,
-        .graphics_family = render_image_pipeline_family,
-        .set = (kan_render_size_t) KAN_RPL_SET_MATERIAL,
+        .layout = render_image_material_set_layout,
         .tracking_name = kan_string_intern ("render_image"),
         .initial_bindings_count = sizeof (render_image_parameters) / sizeof (render_image_parameters[0u]),
         .initial_bindings = render_image_parameters,
@@ -943,9 +946,7 @@ KAN_TEST_CASE (render_and_capture)
     };
 
     struct kan_render_pipeline_parameter_set_description_t cube_pass_set_description = {
-        .family_type = KAN_RENDER_PIPELINE_TYPE_GRAPHICS,
-        .graphics_family = cube_pipeline_family,
-        .set = (kan_render_size_t) KAN_RPL_SET_PASS,
+        .layout = cube_pass_set_layout,
         .tracking_name = kan_string_intern ("cube_pass"),
         .initial_bindings_count = sizeof (cube_pass_parameters) / sizeof (cube_pass_parameters[0u]),
         .initial_bindings = cube_pass_parameters,
@@ -974,9 +975,7 @@ KAN_TEST_CASE (render_and_capture)
     };
 
     struct kan_render_pipeline_parameter_set_description_t cube_material_set_description = {
-        .family_type = KAN_RENDER_PIPELINE_TYPE_GRAPHICS,
-        .graphics_family = cube_pipeline_family,
-        .set = (kan_render_size_t) KAN_RPL_SET_MATERIAL,
+        .layout = cube_material_set_layout,
         .tracking_name = kan_string_intern ("cube_material"),
         .initial_bindings_count = sizeof (cube_material_parameters) / sizeof (cube_material_parameters[0u]),
         .initial_bindings = cube_material_parameters,
