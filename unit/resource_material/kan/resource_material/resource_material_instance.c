@@ -66,7 +66,7 @@ KAN_REFLECTION_STRUCT_FIELD_META (kan_resource_material_instance_compiled_t, sta
 RESOURCE_MATERIAL_API struct kan_resource_reference_meta_t
     kan_resource_material_instance_compiled_static_data_reference_meta = {
         .type = "kan_resource_material_instance_static_t",
-        .compilation_usage = KAN_RESOURCE_REFERENCE_COMPILATION_USAGE_TYPE_NEEDED_COMPILED,
+        .compilation_usage = KAN_RESOURCE_REFERENCE_COMPILATION_USAGE_TYPE_NOT_NEEDED,
 };
 
 struct kan_resource_material_instance_static_t
