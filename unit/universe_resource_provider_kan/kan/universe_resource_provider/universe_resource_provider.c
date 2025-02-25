@@ -2184,8 +2184,7 @@ static inline void add_native_entry_reference (struct resource_provider_state_t 
                     if (KAN_TYPED_ID_32_IS_VALID (request_id) &&
                         // Special case for hot reload: there is no need to rush and update request with old data when
                         // we're already loading new data.
-                        (compiled_entry->compilation_state == RESOURCE_PROVIDER_COMPILATION_STATE_DONE ||
-                         compiled_entry->compilation_state == RESOURCE_PROVIDER_COMPILATION_STATE_NOT_PENDING))
+                        compiled_entry->compilation_state == RESOURCE_PROVIDER_COMPILATION_STATE_DONE)
                     {
                         KAN_UP_VALUE_UPDATE (request, kan_resource_request_t, request_id, &request_id)
                         {
@@ -2194,7 +2193,8 @@ static inline void add_native_entry_reference (struct resource_provider_state_t 
                         }
                     }
                 }
-                else if (compiled_entry->compilation_state == RESOURCE_PROVIDER_COMPILATION_STATE_NOT_PENDING)
+
+                if (compiled_entry->compilation_state == RESOURCE_PROVIDER_COMPILATION_STATE_NOT_PENDING)
                 {
                     compiled_entry->compilation_state = RESOURCE_PROVIDER_COMPILATION_STATE_PENDING;
                 }
@@ -2340,12 +2340,19 @@ static inline void remove_native_entry_reference (struct resource_provider_state
                 KAN_ASSERT (compiled_entry->request_count > 0u)
                 --compiled_entry->request_count;
 
-                if (compiled_entry->request_count)
+                if (compiled_entry->request_count == 0u)
                 {
                     // Cancel and unload everything, but keep the entry.
-                    unload_compiled_entry (state, compiled_entry);
-                    cancel_runtime_compilation (state, compiled_entry);
-                    compiled_entry->compilation_state = RESOURCE_PROVIDER_COMPILATION_STATE_NOT_PENDING;
+                    // TODO: Currently breaks byproducts as it may destroy byproduct that is referenced by other
+                    //       resources. For example, child material instance may reference static data produced
+                    //       from parent material instance, but parent material instance might not be referenced
+                    //       by anything except for child material instance compilation. Therefore, right after child
+                    //       material compilation, when user is still unable to reference child material instance,
+                    //       parent material instance would be deleted along with its byproduct static data as static
+                    //       data is not yet referenced by anything.
+                    // unload_compiled_entry (state, compiled_entry);
+                    // cancel_runtime_compilation (state, compiled_entry);
+                    // compiled_entry->compilation_state = RESOURCE_PROVIDER_COMPILATION_STATE_NOT_PENDING;
                 }
 
                 KAN_UP_QUERY_RETURN_VOID;
@@ -2650,35 +2657,34 @@ static kan_instance_size_t recursively_awake_requests (struct resource_provider_
         }
     }
 
-    if (direct_request_count > 0u)
+    KAN_UP_VALUE_UPDATE (compiled_entry, resource_provider_compiled_resource_entry_t, name, &name)
     {
-        KAN_UP_VALUE_UPDATE (compiled_entry, resource_provider_compiled_resource_entry_t, name, &name)
+        if (compiled_entry->type == type)
         {
-            if (compiled_entry->type == type)
+            KAN_ASSERT (direct_request_count >= compiled_entry->request_count)
+            compiled_entry->request_count = direct_request_count;
+
+            // Changes should be able to trigger recompilation, therefore we need to update its state properly.
+            if (compiled_entry->compilation_state == RESOURCE_PROVIDER_COMPILATION_STATE_DONE ||
+                compiled_entry->compilation_state == RESOURCE_PROVIDER_COMPILATION_STATE_NOT_PENDING)
             {
-                KAN_ASSERT (direct_request_count >= compiled_entry->request_count)
-                compiled_entry->request_count = direct_request_count;
-
-                // Changes should be able to trigger recompilation.
-                if (compiled_entry->compilation_state == RESOURCE_PROVIDER_COMPILATION_STATE_DONE ||
-                    compiled_entry->compilation_state == RESOURCE_PROVIDER_COMPILATION_STATE_NOT_PENDING)
-                {
-                    compiled_entry->compilation_state = RESOURCE_PROVIDER_COMPILATION_STATE_PENDING;
-                }
-
-                transition_compiled_entry_state (state, public, private, compiled_entry,
-                                                 state->execution_shared_state.min_priority);
-                KAN_UP_QUERY_BREAK;
+                compiled_entry->compilation_state = direct_request_count > 0u ?
+                                                        RESOURCE_PROVIDER_COMPILATION_STATE_PENDING :
+                                                        RESOURCE_PROVIDER_COMPILATION_STATE_NOT_PENDING;
             }
+
+            transition_compiled_entry_state (state, public, private, compiled_entry,
+                                             state->execution_shared_state.min_priority);
+            KAN_UP_QUERY_BREAK;
         }
     }
 
     kan_interned_string_t compiled_type_name = NULL;
-    KAN_UP_VALUE_UPDATE (compiled_entry, resource_provider_compiled_resource_entry_t, name, &name)
+    KAN_UP_VALUE_UPDATE (dependant_compiled_entry, resource_provider_compiled_resource_entry_t, name, &name)
     {
-        if (compiled_entry->source_type == type)
+        if (dependant_compiled_entry->source_type == type)
         {
-            compiled_type_name = compiled_entry->type;
+            compiled_type_name = dependant_compiled_entry->type;
             KAN_UP_QUERY_BREAK;
         }
     }
