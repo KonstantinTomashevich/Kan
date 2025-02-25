@@ -1604,7 +1604,7 @@ UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_execute_render_foundati
             }
 
             KAN_UP_VALUE_READ (material_pass, render_foundation_material_pass_state_t, pass_name,
-                               pass_updated_event->name)
+                               &pass_updated_event->name)
             {
                 // We do to temporary remove pipeline from loaded materials as its pass was destroyed during update.
                 remove_pass_from_loaded_material (state, material_pass->material_name, material_pass->pass_name);
