@@ -583,6 +583,23 @@ static void inspect_material_instance_static (
     struct render_foundation_material_instance_static_state_t *static_state,
     kan_time_size_t inspection_time_ns);
 
+static void remove_material_instance_loaded_data (
+    struct render_foundation_material_instance_management_execution_state_t *state, kan_interned_string_t name)
+{
+    KAN_UP_VALUE_DELETE (instance_loaded, kan_render_material_instance_loaded_t, name, &name)
+    {
+        KAN_UP_ACCESS_DELETE (instance_loaded);
+    }
+
+    KAN_UP_VALUE_READ (usage, kan_render_material_instance_usage_t, name, &name)
+    {
+        KAN_UP_VALUE_DELETE (custom_loaded, kan_render_material_instance_custom_loaded_t, usage_id, &usage->usage_id)
+        {
+            KAN_UP_ACCESS_DELETE (custom_loaded);
+        }
+    }
+}
+
 static inline void process_material_updates (
     struct render_foundation_material_instance_management_execution_state_t *state, kan_time_size_t inspection_time_ns)
 {
@@ -613,25 +630,15 @@ static inline void process_material_updates (
                     }
                 }
 
-                kan_dynamic_array_shutdown (&static_state->parameter_buffers);
-                kan_dynamic_array_shutdown (&static_state->last_load_images);
+                static_state->parameter_buffers.size = 0u;
+                kan_dynamic_array_set_capacity (&static_state->parameter_buffers, 0u);
+                static_state->last_load_images.size = 0u;
+                kan_dynamic_array_set_capacity (&static_state->last_load_images, 0u);
 
                 KAN_UP_VALUE_READ (instance, render_foundation_material_instance_state_t, static_name,
                                    &static_state->name)
                 {
-                    KAN_UP_VALUE_DELETE (instance_loaded, kan_render_material_instance_loaded_t, name, &instance->name)
-                    {
-                        KAN_UP_ACCESS_DELETE (instance_loaded);
-                    }
-
-                    KAN_UP_VALUE_READ (usage, kan_render_material_instance_usage_t, name, &instance->name)
-                    {
-                        KAN_UP_VALUE_DELETE (custom_loaded, kan_render_material_instance_custom_loaded_t, usage_id,
-                                             &usage->usage_id)
-                        {
-                            KAN_UP_ACCESS_DELETE (custom_loaded);
-                        }
-                    }
+                    remove_material_instance_loaded_data (state, instance->name);
                 }
             }
         }
@@ -735,8 +742,10 @@ static void create_or_update_material_instance_loaded_data (
 
 static void on_material_instance_updated (
     struct render_foundation_material_instance_management_execution_state_t *state,
-    kan_resource_request_id_t request_id)
+    kan_resource_request_id_t request_id,
+    kan_time_size_t inspection_time_ns)
 {
+    kan_interned_string_t new_static_name = NULL;
     KAN_UP_VALUE_UPDATE (instance, render_foundation_material_instance_state_t, request_id, &request_id)
     {
         KAN_UP_VALUE_READ (request, kan_resource_request_t, request_id, &request_id)
@@ -752,6 +761,7 @@ static void on_material_instance_updated (
 
                     const kan_interned_string_t old_static_name = instance->static_name;
                     instance->static_name = instance_data->static_data;
+                    new_static_name = instance->static_name;
                     kan_bool_t new_static_exists = KAN_FALSE;
 
                     KAN_UP_VALUE_UPDATE (static_state, render_foundation_material_instance_static_state_t, name,
@@ -762,16 +772,6 @@ static void on_material_instance_updated (
                         {
                             ++static_state->reference_count;
                             static_state->mip_update_needed = KAN_TRUE;
-                        }
-
-                        if (KAN_HANDLE_IS_VALID (static_state->parameter_set))
-                        {
-                            KAN_UP_VALUE_READ (material_loaded, kan_render_material_loaded_t, name,
-                                               &static_state->loaded_material_name)
-                            {
-                                create_or_update_material_instance_loaded_data (state, static_state, instance,
-                                                                                instance_data, material_loaded);
-                            }
                         }
                     }
 
@@ -788,10 +788,18 @@ static void on_material_instance_updated (
                     if (old_static_name != instance->static_name)
                     {
                         HELPER_UNLINK_STATIC_STATE_DATA (&old_static_name)
+                        remove_material_instance_loaded_data (state, instance->name);
                     }
                 }
             }
         }
+    }
+
+    // Material instances static state might've waited for this request to be updated.
+    // We need to do inspection in this case.
+    KAN_UP_VALUE_UPDATE (static_state, render_foundation_material_instance_static_state_t, name, &new_static_name)
+    {
+        inspect_material_instance_static (state, static_state, inspection_time_ns);
     }
 }
 
@@ -975,6 +983,7 @@ static void instantiate_material_static_data (
     if (KAN_HANDLE_IS_VALID (static_state->parameter_set))
     {
         kan_render_pipeline_parameter_set_destroy (static_state->parameter_set);
+        static_state->parameter_set = KAN_HANDLE_SET_INVALID (kan_render_pipeline_parameter_set_t);
     }
 
     for (kan_loop_size_t index = 0u; index < static_state->parameter_buffers.size; ++index)
@@ -1080,6 +1089,21 @@ static void instantiate_material_static_data (
 
             if (meta_buffer->tail_name == tail_append->tail_name)
             {
+                for (kan_loop_size_t parameter_index = 0u; parameter_index < tail_append->parameters.size;
+                     ++parameter_index)
+                {
+                    struct kan_resource_material_parameter_t *parameter =
+                        &((struct kan_resource_material_parameter_t *) tail_append->parameters.data)[parameter_index];
+
+                    if (!is_parameter_found_in_buffer (&meta_buffer->tail_item_parameters, parameter))
+                    {
+                        KAN_LOG (render_foundation_material_instance, KAN_LOG_ERROR,
+                                 "Material instance \"%s\" has parameter \"%s\" (tail \"%s\"), but there is no such "
+                                 "parameter in this tail meta.",
+                                 static_state->name, parameter->name, tail_append->tail_name)
+                    }
+                }
+
                 tail_found = KAN_TRUE;
                 break;
             }
@@ -1227,22 +1251,29 @@ static void instantiate_material_static_data (
             break;
         }
 
-        char buffer_name[KAN_UNIVERSE_RENDER_FOUNDATION_NAME_BUFFER_LENGTH];
-        snprintf (buffer_name, KAN_UNIVERSE_RENDER_FOUNDATION_NAME_BUFFER_LENGTH, "%s::%s", static_state->name,
-                  meta_buffer->name);
+        kan_render_buffer_t buffer = KAN_HANDLE_INITIALIZE_INVALID;
 
-        kan_render_buffer_t buffer = kan_render_buffer_create (render_context, buffer_type, buffer_size, temporary_data,
-                                                               kan_string_intern (buffer_name));
+        // Zero size buffers are possible for buffers with zero count of tails and empty main part.
+        if (buffer_size > 0u)
+        {
+            char buffer_name[KAN_UNIVERSE_RENDER_FOUNDATION_NAME_BUFFER_LENGTH];
+            snprintf (buffer_name, KAN_UNIVERSE_RENDER_FOUNDATION_NAME_BUFFER_LENGTH, "%s::%s", static_state->name,
+                      meta_buffer->name);
+
+            buffer = kan_render_buffer_create (render_context, buffer_type, buffer_size, temporary_data,
+                                               kan_string_intern (buffer_name));
+
+            if (!KAN_HANDLE_IS_VALID (buffer))
+            {
+                KAN_LOG (render_foundation_material_instance, KAN_LOG_ERROR,
+                         "Failed to create buffer \"%s\" of material instance \"%s\".", meta_buffer->name,
+                         static_state->name)
+            }
+        }
+
         kan_render_buffer_t *spot = kan_dynamic_array_add_last (&static_state->parameter_buffers);
         KAN_ASSERT (spot)
         *spot = buffer;
-
-        if (!KAN_HANDLE_IS_VALID (buffer))
-        {
-            KAN_LOG (render_foundation_material_instance, KAN_LOG_ERROR,
-                     "Failed to create buffer \"%s\" of material instance \"%s\".", meta_buffer->name,
-                     static_state->name)
-        }
     }
 
     if (temporary_data != temporary_data_static)
@@ -1931,7 +1962,7 @@ kan_universe_mutator_execute_render_foundation_material_instance_management_exec
         {
             if (updated_event->type == state->interned_kan_resource_material_instance_compiled_t)
             {
-                on_material_instance_updated (state, updated_event->request_id);
+                on_material_instance_updated (state, updated_event->request_id, inspection_time_ns);
             }
             else if (updated_event->type == state->interned_kan_resource_material_instance_static_compiled_t)
             {
