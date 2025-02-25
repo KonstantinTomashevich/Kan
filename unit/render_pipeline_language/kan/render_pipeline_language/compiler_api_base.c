@@ -124,7 +124,7 @@ void kan_rpl_meta_buffer_init_copy (struct kan_rpl_meta_buffer_t *instance,
     }
 
     instance->tail_name = copy_from->tail_name;
-    kan_dynamic_array_init (&instance->tail_item_parameters, instance->tail_item_parameters.size,
+    kan_dynamic_array_init (&instance->tail_item_parameters, copy_from->tail_item_parameters.size,
                             sizeof (struct kan_rpl_meta_parameter_t), _Alignof (struct kan_rpl_meta_parameter_t),
                             STATICS.rpl_meta_allocation_group);
 
