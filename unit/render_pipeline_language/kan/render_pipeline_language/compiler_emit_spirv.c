@@ -1116,7 +1116,9 @@ static inline void spirv_emit_descriptor_set (struct spirv_generation_context_t 
 }
 
 static inline void spirv_emit_flattened_input_variable (
-    struct spirv_generation_context_t *context, struct compiler_instance_buffer_flattened_declaration_t *declaration)
+    struct spirv_generation_context_t *context,
+    struct compiler_instance_buffer_flattened_declaration_t *declaration,
+    kan_bool_t context_needs_flat_decoration)
 {
     declaration->spirv_id_input = context->current_bound;
     ++context->current_bound;
@@ -1142,6 +1144,35 @@ static inline void spirv_emit_flattened_input_variable (
 
     spirv_emit_location (context, declaration->spirv_id_input, declaration->location);
     spirv_generate_op_name (context, declaration->spirv_id_input, declaration->readable_name);
+
+    if (context_needs_flat_decoration && (declaration->source_declaration->variable.type.if_vector ||
+                                          declaration->source_declaration->variable.type.if_matrix))
+    {
+        enum inbuilt_type_item_t item_type;
+        if (declaration->source_declaration->variable.type.if_vector)
+        {
+            item_type = declaration->source_declaration->variable.type.if_vector->item;
+        }
+        else
+        {
+            item_type = declaration->source_declaration->variable.type.if_matrix->item;
+        }
+
+        switch (item_type)
+        {
+        case INBUILT_TYPE_ITEM_FLOAT:
+            break;
+
+        case INBUILT_TYPE_ITEM_INTEGER:
+        {
+            spirv_size_t *decoration_code = spirv_new_instruction (context, &context->decoration_section, 3u);
+            decoration_code[0u] |= SpvOpCodeMask & SpvOpDecorate;
+            decoration_code[1u] = declaration->spirv_id_input;
+            decoration_code[2u] = SpvDecorationFlat;
+            break;
+        }
+        }
+    }
 }
 
 static inline void spirv_emit_flattened_output_variable (
@@ -3359,7 +3390,7 @@ kan_bool_t kan_rpl_compiler_instance_emit_spirv (kan_rpl_compiler_instance_t com
                 {
                 case KAN_RPL_BUFFER_TYPE_VERTEX_ATTRIBUTE:
                 case KAN_RPL_BUFFER_TYPE_INSTANCED_ATTRIBUTE:
-                    spirv_emit_flattened_input_variable (&context, declaration);
+                    spirv_emit_flattened_input_variable (&context, declaration, KAN_FALSE);
                     break;
 
                 case KAN_RPL_BUFFER_TYPE_UNIFORM:
@@ -3368,7 +3399,7 @@ kan_bool_t kan_rpl_compiler_instance_emit_spirv (kan_rpl_compiler_instance_t com
                     break;
 
                 case KAN_RPL_BUFFER_TYPE_VERTEX_STAGE_OUTPUT:
-                    spirv_emit_flattened_input_variable (&context, declaration);
+                    spirv_emit_flattened_input_variable (&context, declaration, KAN_TRUE);
                     spirv_emit_flattened_output_variable (&context, declaration);
                     break;
 
