@@ -233,17 +233,16 @@ static enum kan_resource_compile_result_t kan_resource_material_instance_compile
         static_byproduct.base_static = parent ? parent->static_data : NULL;
         static_byproduct.append_raw_instance = state->name;
 
-        // TODO: Temporary change to regular byproducts as unique byproducts do not work properly with hot reload.
-        if (!(output->static_data = state->register_byproduct (
-                  state->interface_user_data, kan_string_intern ("kan_resource_material_instance_static_t"),
-                  &static_byproduct)))
+        output->static_data = state->register_unique_byproduct (
+            state->interface_user_data, kan_string_intern ("kan_resource_material_instance_static_t"), state->name,
+            &static_byproduct);
+
+        if (!output->static_data)
         {
             KAN_LOG (resource_material_instance_compilation, KAN_LOG_ERROR,
                      "Material instance \"%s\" failed to register static data byproduct.", state->name)
             return KAN_RESOURCE_PIPELINE_COMPILE_FAILED;
         }
-
-        // output->static_data = state->name;
     }
     else if (parent)
     {

@@ -332,7 +332,7 @@ static enum kan_resource_compile_result_t kan_resource_texture_compile (struct k
 #define COPY_CHANNELS_SAME_COUNT(CHANNEL_TYPE, CHANNELS)                                                               \
     {                                                                                                                  \
         const kan_instance_size_t pixel_count = width * height * depth;                                                \
-        kan_dynamic_array_set_capacity (&compiled_data.data, pixel_count *CHANNELS * sizeof (CHANNEL_TYPE));           \
+        kan_dynamic_array_set_capacity (&compiled_data.data, pixel_count * CHANNELS * sizeof (CHANNEL_TYPE));          \
         compiled_data.data.size = compiled_data.data.capacity;                                                         \
         uint8_t *compression_output = (uint8_t *) compiled_data.data.data;                                             \
         memcpy (compression_output, compression_input, compiled_data.data.size);                                       \
@@ -341,7 +341,7 @@ static enum kan_resource_compile_result_t kan_resource_texture_compile (struct k
 #define COPY_CHANNELS_DIFFERENT_COUNT(CHANNEL_TYPE, INPUT_CHANNELS, OUTPUT_CHANNELS)                                   \
     {                                                                                                                  \
         const kan_instance_size_t pixel_count = width * height * depth;                                                \
-        kan_dynamic_array_set_capacity (&compiled_data.data, pixel_count *OUTPUT_CHANNELS * sizeof (CHANNEL_TYPE));    \
+        kan_dynamic_array_set_capacity (&compiled_data.data, pixel_count * OUTPUT_CHANNELS * sizeof (CHANNEL_TYPE));   \
         compiled_data.data.size = pixel_count * compiled_data.data.capacity;                                           \
         uint8_t *compression_output = (uint8_t *) compiled_data.data.data;                                             \
                                                                                                                        \
@@ -582,11 +582,12 @@ static enum kan_resource_compile_result_t kan_resource_texture_compile (struct k
                     char name_buffer[KAN_RESOURCE_TEXTURE_BYPRODUCT_MAX_NAME_LENGTH];
                     snprintf (name_buffer, KAN_RESOURCE_TEXTURE_BYPRODUCT_MAX_NAME_LENGTH, "%s_%s_mip_%u", state->name,
                               target_format_name, (unsigned int) mip);
-                    kan_interned_string_t byproduct_name = kan_string_intern (name_buffer);
 
-                    if (state->register_unique_byproduct (state->interface_user_data,
-                                                          interned_kan_resource_texture_compiled_data_t, byproduct_name,
-                                                          &compiled_data))
+                    kan_interned_string_t byproduct_name = state->register_unique_byproduct (
+                        state->interface_user_data, interned_kan_resource_texture_compiled_data_t,
+                        kan_string_intern (name_buffer), &compiled_data);
+
+                    if (byproduct_name)
                     {
                         kan_interned_string_t *spot = kan_dynamic_array_add_last (&item->compiled_data_per_mip);
                         KAN_ASSERT (spot)

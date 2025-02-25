@@ -2186,13 +2186,12 @@ static kan_interned_string_t interface_register_byproduct (kan_functor_user_data
     return register_byproduct_internal (interface_user_data, byproduct_type_name, NULL, byproduct_data);
 }
 
-static kan_bool_t interface_register_unique_byproduct (kan_functor_user_data_t interface_user_data,
-                                                       kan_interned_string_t byproduct_type_name,
-                                                       kan_interned_string_t byproduct_name,
-                                                       void *byproduct_data)
+static kan_interned_string_t interface_register_unique_byproduct (kan_functor_user_data_t interface_user_data,
+                                                                  kan_interned_string_t byproduct_type_name,
+                                                                  kan_interned_string_t byproduct_name,
+                                                                  void *byproduct_data)
 {
-    return register_byproduct_internal (interface_user_data, byproduct_type_name, byproduct_name, byproduct_data) ==
-           byproduct_name;
+    return register_byproduct_internal (interface_user_data, byproduct_type_name, byproduct_name, byproduct_data);
 }
 
 static void save_references_to_cache (struct native_entry_node_t *node, kan_bool_t compiled)
