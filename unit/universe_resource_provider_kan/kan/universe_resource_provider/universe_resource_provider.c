@@ -2705,10 +2705,23 @@ static kan_instance_size_t recursively_awake_requests (struct resource_provider_
     return direct_request_count;
 }
 
-static inline void process_file_addition (struct resource_provider_state_t *state,
-                                          const struct kan_resource_provider_singleton_t *public,
-                                          struct resource_provider_private_singleton_t *private,
-                                          const char *path)
+enum resource_provider_file_addition_processing_result_t
+{
+    /// \brief Unable to process file addition and should not try again.
+    RESOURCE_PROVIDER_FILE_ADDITION_PROCESSING_RESULT_CANCELLED = 0u,
+
+    /// \brief Unable to process file addition, but should try again later.
+    RESOURCE_PROVIDER_FILE_ADDITION_PROCESSING_RESULT_DELAYED,
+
+    /// \brief Successfully reacted to file addition.
+    RESOURCE_PROVIDER_FILE_ADDITION_PROCESSING_RESULT_SUCCESSFUL,
+};
+
+static inline enum resource_provider_file_addition_processing_result_t process_file_addition (
+    struct resource_provider_state_t *state,
+    const struct kan_resource_provider_singleton_t *public,
+    struct resource_provider_private_singleton_t *private,
+    const char *path)
 {
     kan_virtual_file_system_volume_t volume =
         kan_virtual_file_system_get_context_volume_for_read (state->virtual_file_system);
@@ -2719,7 +2732,7 @@ static inline void process_file_addition (struct resource_provider_state_t *stat
         KAN_LOG (universe_resource_provider, KAN_LOG_ERROR,
                  "Failed to react to \"%s\" addition, unable to query status.", path)
         kan_virtual_file_system_close_context_read_access (state->virtual_file_system);
-        return;
+        return RESOURCE_PROVIDER_FILE_ADDITION_PROCESSING_RESULT_CANCELLED;
     }
 
     KAN_ASSERT (status.type == KAN_VIRTUAL_FILE_SYSTEM_ENTRY_TYPE_FILE)
@@ -2729,7 +2742,7 @@ static inline void process_file_addition (struct resource_provider_state_t *stat
     if (!scan_result.name)
     {
         KAN_LOG (universe_resource_provider, KAN_LOG_ERROR, "Failed to react to \"%s\" addition, scan failed.", path)
-        return;
+        return RESOURCE_PROVIDER_FILE_ADDITION_PROCESSING_RESULT_DELAYED;
     }
 
     if (state->enable_runtime_compilation && scan_result.type)
@@ -2783,7 +2796,8 @@ static inline void process_file_addition (struct resource_provider_state_t *stat
                                     !KAN_TYPED_ID_32_IS_VALID (suffix->loading_container_id))
 
                         schedule_native_entry_loading (state, private, entry, suffix, min_priority);
-                        KAN_UP_QUERY_RETURN_VOID;
+                        KAN_UP_QUERY_RETURN_VALUE (enum resource_provider_file_addition_processing_result_t,
+                                                   RESOURCE_PROVIDER_FILE_ADDITION_PROCESSING_RESULT_SUCCESSFUL);
                     }
                 }
             }
@@ -2799,11 +2813,14 @@ static inline void process_file_addition (struct resource_provider_state_t *stat
                     KAN_ASSERT (suffix->loaded_data == NULL && suffix->loading_data == NULL)
 
                     schedule_third_party_entry_loading (state, entry, suffix, min_priority);
-                    KAN_UP_QUERY_RETURN_VOID;
+                    KAN_UP_QUERY_RETURN_VALUE (enum resource_provider_file_addition_processing_result_t,
+                                               RESOURCE_PROVIDER_FILE_ADDITION_PROCESSING_RESULT_SUCCESSFUL);
                 }
             }
         }
     }
+
+    return RESOURCE_PROVIDER_FILE_ADDITION_PROCESSING_RESULT_SUCCESSFUL;
 }
 
 static inline void process_delayed_addition (struct resource_provider_state_t *state,
@@ -2825,8 +2842,25 @@ static inline void process_delayed_addition (struct resource_provider_state_t *s
     KAN_UP_INTERVAL_ASCENDING_WRITE (delayed_addition, resource_provider_delayed_file_addition_t,
                                      investigate_after_timer, KAN_UP_NOTHING, &current_timer)
     {
-        process_file_addition (state, public, private, delayed_addition->path);
-        KAN_UP_ACCESS_DELETE (delayed_addition);
+        switch (process_file_addition (state, public, private, delayed_addition->path))
+        {
+        case RESOURCE_PROVIDER_FILE_ADDITION_PROCESSING_RESULT_CANCELLED:
+        case RESOURCE_PROVIDER_FILE_ADDITION_PROCESSING_RESULT_SUCCESSFUL:
+            KAN_UP_ACCESS_DELETE (delayed_addition);
+            break;
+
+        case RESOURCE_PROVIDER_FILE_ADDITION_PROCESSING_RESULT_DELAYED:
+        {
+            struct kan_hot_reload_automatic_config_t *automatic_config =
+                kan_hot_reload_coordination_system_get_automatic_config (state->hot_reload_system);
+
+            const kan_time_size_t investigate_after_ns =
+                kan_precise_time_get_elapsed_nanoseconds () + automatic_config->change_wait_time_ns;
+            KAN_ASSERT (KAN_PACKED_TIMER_IS_SAFE_TO_SET (investigate_after_ns))
+            delayed_addition->investigate_after_timer = KAN_PACKED_TIMER_SET (investigate_after_ns);
+            break;
+        }
+        }
     }
 }
 
@@ -3367,8 +3401,8 @@ static inline kan_interned_string_t register_byproduct_internal (kan_functor_use
                 // Unique byproducts are always re-produced as new byproducts with name suffix.
                 // It is unavoidable because during hot reload we need to properly handle both old byproduct,
                 // that should not override anything until compilation is done, and new byproduct with the new data.
-                snprintf (name_buffer, KAN_UNIVERSE_RESOURCE_PROVIDER_RB_MAX_NAME_LENGTH, "%s_%lu",
-                          byproduct_name, (unsigned long) new_byproduct_name_id);
+                snprintf (name_buffer, KAN_UNIVERSE_RESOURCE_PROVIDER_RB_MAX_NAME_LENGTH, "%s_%lu", byproduct_name,
+                          (unsigned long) new_byproduct_name_id);
                 byproduct_name = kan_string_intern (name_buffer);
             }
 
@@ -3423,10 +3457,11 @@ static kan_interned_string_t compilation_interface_register_byproduct (kan_funct
     return register_byproduct_internal (interface_user_data, byproduct_type_name, NULL, byproduct_data);
 }
 
-static kan_interned_string_t compilation_interface_register_unique_byproduct (kan_functor_user_data_t interface_user_data,
-                                                                   kan_interned_string_t byproduct_type_name,
-                                                                   kan_interned_string_t byproduct_name,
-                                                                   void *byproduct_data)
+static kan_interned_string_t compilation_interface_register_unique_byproduct (
+    kan_functor_user_data_t interface_user_data,
+    kan_interned_string_t byproduct_type_name,
+    kan_interned_string_t byproduct_name,
+    void *byproduct_data)
 {
     return register_byproduct_internal (interface_user_data, byproduct_type_name, byproduct_name, byproduct_data);
 }
