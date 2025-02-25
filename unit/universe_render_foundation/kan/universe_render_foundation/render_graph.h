@@ -84,6 +84,9 @@ struct kan_render_graph_pass_t
     /// \details Can be invalid handle when pipelines has empty parameter set layout.
     kan_render_pipeline_parameter_set_layout_t pass_parameter_set_layout;
 
+    /// \brief Bindings meta for pass pipeline parameter set.
+    struct kan_rpl_meta_set_bindings_t pass_parameter_set_bindings;
+
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_render_graph_pass_attachment_t)
     struct kan_dynamic_array_t attachments;
 };

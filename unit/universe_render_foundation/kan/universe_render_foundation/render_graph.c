@@ -348,8 +348,11 @@ static void configure_render_pass (struct kan_render_graph_pass_t *pass,
     pass->pass = backend_pass;
     pass->pass_parameter_set_layout = pass_set_layout;
 
-    kan_dynamic_array_set_capacity (&pass->attachments, pass_resource->attachments.size);
+    kan_rpl_meta_set_bindings_shutdown (&pass->pass_parameter_set_bindings);
+    kan_rpl_meta_set_bindings_init_copy (&pass->pass_parameter_set_bindings, &pass_resource->pass_set_bindings);
+
     pass->attachments.size = 0u;
+    kan_dynamic_array_set_capacity (&pass->attachments, pass_resource->attachments.size);
 
     for (kan_loop_size_t index = 0u; index < (kan_loop_size_t) pass_resource->attachments.size; ++index)
     {
@@ -604,6 +607,7 @@ void kan_render_graph_pass_init (struct kan_render_graph_pass_t *instance)
     instance->type = KAN_RENDER_PASS_GRAPHICS;
     instance->pass = KAN_HANDLE_SET_INVALID (kan_render_pass_t);
     instance->pass_parameter_set_layout = KAN_HANDLE_SET_INVALID (kan_render_pipeline_parameter_set_layout_t);
+    kan_rpl_meta_set_bindings_init (&instance->pass_parameter_set_bindings);
     kan_dynamic_array_init (&instance->attachments, 0u, sizeof (struct kan_render_graph_pass_attachment_t),
                             _Alignof (struct kan_render_graph_pass_attachment_t), kan_allocation_group_stack_get ());
 }
@@ -620,6 +624,7 @@ void kan_render_graph_pass_shutdown (struct kan_render_graph_pass_t *instance)
         kan_render_pipeline_parameter_set_layout_destroy (instance->pass_parameter_set_layout);
     }
 
+    kan_rpl_meta_set_bindings_shutdown (&instance->pass_parameter_set_bindings);
     kan_dynamic_array_shutdown (&instance->attachments);
 }
 
