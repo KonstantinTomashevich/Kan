@@ -592,6 +592,7 @@ static kan_bool_t emit_meta_gather_parameters_process_field (
     struct compiler_instance_declaration_node_t *first_declaration,
     struct kan_rpl_meta_buffer_t *meta_output,
     struct kan_trivial_string_buffer_t *name_generation_buffer,
+    kan_instance_size_t name_skip_offset,
     kan_bool_t tail);
 
 static kan_bool_t emit_meta_gather_parameters_process_field_list (
@@ -600,6 +601,7 @@ static kan_bool_t emit_meta_gather_parameters_process_field_list (
     struct compiler_instance_declaration_node_t *first_declaration,
     struct kan_rpl_meta_buffer_t *meta_output,
     struct kan_trivial_string_buffer_t *name_generation_buffer,
+    kan_instance_size_t name_skip_offset,
     kan_bool_t tail)
 {
     kan_bool_t valid = KAN_TRUE;
@@ -608,14 +610,14 @@ static kan_bool_t emit_meta_gather_parameters_process_field_list (
     while (field)
     {
         const kan_instance_size_t length = name_generation_buffer->size;
-        if (name_generation_buffer->size > 0u)
+        if (name_generation_buffer->size > name_skip_offset)
         {
             kan_trivial_string_buffer_append_string (name_generation_buffer, ".");
         }
 
         kan_trivial_string_buffer_append_string (name_generation_buffer, field->variable.name);
         if (!emit_meta_gather_parameters_process_field (instance, base_offset, field, meta_output,
-                                                        name_generation_buffer, tail))
+                                                        name_generation_buffer, name_skip_offset, tail))
         {
             valid = KAN_FALSE;
         }
@@ -632,6 +634,7 @@ static kan_bool_t emit_meta_gather_parameters_process_field (struct rpl_compiler
                                                              struct compiler_instance_declaration_node_t *field,
                                                              struct kan_rpl_meta_buffer_t *meta_output,
                                                              struct kan_trivial_string_buffer_t *name_generation_buffer,
+                                                             kan_instance_size_t name_skip_offset,
                                                              kan_bool_t tail)
 {
     if (field->variable.type.if_vector || field->variable.type.if_matrix)
@@ -656,8 +659,9 @@ static kan_bool_t emit_meta_gather_parameters_process_field (struct rpl_compiler
         }
 
         kan_rpl_meta_parameter_init (parameter);
-        parameter->name = kan_char_sequence_intern (name_generation_buffer->buffer,
-                                                    name_generation_buffer->buffer + name_generation_buffer->size);
+        parameter->name =
+            kan_char_sequence_intern (name_generation_buffer->buffer + name_skip_offset,
+                                      name_generation_buffer->buffer + name_generation_buffer->size);
         parameter->offset = base_offset + field->offset;
 
         if (!emit_meta_variable_type_to_meta_type (&field->variable, &parameter->type, instance->context_log_name,
@@ -689,18 +693,19 @@ static kan_bool_t emit_meta_gather_parameters_process_field (struct rpl_compiler
             // Should be guaranteed by resolve stage.
             KAN_ASSERT (!tail)
             meta_output->tail_name = field->variable.name;
+            name_skip_offset = name_generation_buffer->size;
 
-            return emit_meta_gather_parameters_process_field_list (instance, 0u,
-                                                                   field->variable.type.if_struct->first_field,
-                                                                   meta_output, name_generation_buffer, KAN_TRUE);
+            return emit_meta_gather_parameters_process_field_list (
+                instance, 0u, field->variable.type.if_struct->first_field, meta_output, name_generation_buffer,
+                name_skip_offset, KAN_TRUE);
         }
         // Currently we only generate parameters for non-array structs as parameters from arrays of structs sound
         // like a strange and not entirely useful idea.
         else if (field->variable.type.array_dimensions_count == 0u)
         {
-            return emit_meta_gather_parameters_process_field_list (instance, base_offset + field->offset,
-                                                                   field->variable.type.if_struct->first_field,
-                                                                   meta_output, name_generation_buffer, tail);
+            return emit_meta_gather_parameters_process_field_list (
+                instance, base_offset + field->offset, field->variable.type.if_struct->first_field, meta_output,
+                name_generation_buffer, name_skip_offset, tail);
         }
     }
 
@@ -922,7 +927,7 @@ kan_bool_t kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t comp
             buffer->type == KAN_RPL_BUFFER_TYPE_INSTANCED_ATTRIBUTE)
         {
             if (!emit_meta_gather_parameters_process_field_list (instance, 0u, buffer->first_field, meta_buffer,
-                                                                 &name_generation_buffer, KAN_FALSE))
+                                                                 &name_generation_buffer, 0u, KAN_FALSE))
             {
                 valid = KAN_FALSE;
             }
