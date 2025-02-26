@@ -659,9 +659,8 @@ static kan_bool_t emit_meta_gather_parameters_process_field (struct rpl_compiler
         }
 
         kan_rpl_meta_parameter_init (parameter);
-        parameter->name =
-            kan_char_sequence_intern (name_generation_buffer->buffer + name_skip_offset,
-                                      name_generation_buffer->buffer + name_generation_buffer->size);
+        parameter->name = kan_char_sequence_intern (name_generation_buffer->buffer + name_skip_offset,
+                                                    name_generation_buffer->buffer + name_generation_buffer->size);
         parameter->offset = base_offset + field->offset;
 
         if (!emit_meta_variable_type_to_meta_type (&field->variable, &parameter->type, instance->context_log_name,

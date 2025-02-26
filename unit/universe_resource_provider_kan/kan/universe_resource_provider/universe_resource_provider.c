@@ -2353,9 +2353,9 @@ static inline void remove_native_entry_reference (struct resource_provider_state
                 if (compiled_entry->request_count == 0u)
                 {
                     // Cancel and unload everything, but keep the entry.
-                     unload_compiled_entry (state, compiled_entry);
-                     cancel_runtime_compilation (state, compiled_entry);
-                     compiled_entry->compilation_state = RESOURCE_PROVIDER_COMPILATION_STATE_NOT_PENDING;
+                    unload_compiled_entry (state, compiled_entry);
+                    cancel_runtime_compilation (state, compiled_entry);
+                    compiled_entry->compilation_state = RESOURCE_PROVIDER_COMPILATION_STATE_NOT_PENDING;
                 }
 
                 KAN_UP_QUERY_RETURN_VOID;
