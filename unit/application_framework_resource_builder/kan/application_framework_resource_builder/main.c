@@ -33,12 +33,11 @@
 #define ERROR_CODE_FAILED_TO_READ_PROJECT -2
 #define ERROR_CODE_FAILED_TO_LOCK_DIRECTORY -3
 #define ERROR_CODE_VFS_SETUP_FAILURE -4
-#define ERROR_CODE_FAILED_TO_LOAD_PLATFORM_CONFIGURATION -5
-#define ERROR_CODE_FAILED_TO_SETUP_TARGETS -6
-#define ERROR_CODE_FAILED_TO_SCAN_TARGETS -7
-#define ERROR_CODE_FAILED_TO_COMPILE_RESOURCES -8
-#define ERROR_CODE_FAILED_TO_INTERN_STRING -9
-#define ERROR_CODE_FAILED_TO_PACK_TARGETS -10
+#define ERROR_CODE_FAILED_TO_SETUP_TARGETS -5
+#define ERROR_CODE_FAILED_TO_SCAN_TARGETS -6
+#define ERROR_CODE_FAILED_TO_COMPILE_RESOURCES -7
+#define ERROR_CODE_FAILED_TO_INTERN_STRING -8
+#define ERROR_CODE_FAILED_TO_PACK_TARGETS -9
 
 #define VFS_TARGETS_DIRECTORY "targets"
 #define VFS_RAW_REFERENCE_CACHE_DIRECTORY "reference_cache"
@@ -2756,11 +2755,10 @@ static void compilation_loop (void)
     // We cannot risk compiling everything at once, because we can run out of memory.
     const kan_instance_size_t max_in_active_queue = kan_platform_get_cpu_logical_core_count ();
 
-    const kan_interned_string_t interned_manage_resources_native = kan_string_intern ("manage_resources_native");
-    const kan_interned_string_t interned_manage_resources_third_party =
-        kan_string_intern ("manage_resources_third_party");
-    const kan_interned_string_t interned_process_native_node_compilation =
-        kan_string_intern ("process_native_node_compilation");
+    const kan_cpu_section_t section_manage_resources_native = kan_cpu_section_get ("manage_resources_native");
+    const kan_cpu_section_t section_manage_resources_third_party = kan_cpu_section_get ("manage_resources_third_party");
+    const kan_cpu_section_t section_process_native_node_compilation =
+        kan_cpu_section_get ("process_native_node_compilation");
 
     while (global.compilation_active_queue || global.compilation_passive_queue_first)
     {
@@ -2877,8 +2875,8 @@ static void compilation_loop (void)
         while (native_node)
         {
             KAN_ASSERT (native_node->queued_for_resource_management)
-            KAN_CPU_TASK_LIST_USER_VALUE (&task_list, &global.temporary_allocator, interned_manage_resources_native,
-                                          manage_resources_native, native_node)
+            KAN_CPU_TASK_LIST_USER_VALUE (&task_list, &global.temporary_allocator, manage_resources_native,
+                                          section_manage_resources_native, native_node)
             native_node = native_node->next_node_in_resource_management_queue;
         }
 
@@ -2886,9 +2884,8 @@ static void compilation_loop (void)
         while (third_party_node)
         {
             KAN_ASSERT (third_party_node->queued_for_resource_management)
-            KAN_CPU_TASK_LIST_USER_VALUE (&task_list, &global.temporary_allocator,
-                                          interned_manage_resources_third_party, manage_resources_third_party,
-                                          third_party_node)
+            KAN_CPU_TASK_LIST_USER_VALUE (&task_list, &global.temporary_allocator, manage_resources_third_party,
+                                          section_manage_resources_third_party, third_party_node)
             third_party_node = third_party_node->next_node_in_resource_management_queue;
         }
 
@@ -2910,9 +2907,8 @@ static void compilation_loop (void)
         while (native_node)
         {
             KAN_ASSERT (native_node->compilation_queue == NATIVE_NODE_COMPILATION_QUEUE_ACTIVE)
-            KAN_CPU_TASK_LIST_USER_VALUE (&task_list, &global.temporary_allocator,
-                                          interned_process_native_node_compilation, process_native_node_compilation,
-                                          native_node)
+            KAN_CPU_TASK_LIST_USER_VALUE (&task_list, &global.temporary_allocator, process_native_node_compilation,
+                                          section_process_native_node_compilation, native_node)
             native_node = native_node->next_node_in_compilation_queue;
         }
 
@@ -3487,15 +3483,15 @@ int main (int argument_count, char **argument_values)
         {
             KAN_LOG (application_framework_resource_builder, KAN_LOG_INFO, "Scanning targets for resources...")
             struct kan_cpu_task_list_node_t *task_list = NULL;
-            const kan_interned_string_t task_name = kan_string_intern ("scan_target_for_resources");
+            const kan_cpu_section_t task_section = kan_cpu_section_get ("scan_target_for_resources");
 
             for (kan_loop_size_t target_index = 0u; target_index < global.targets.size; ++target_index)
             {
                 struct target_t *target = &((struct target_t *) global.targets.data)[target_index];
                 if (target->requested_for_build)
                 {
-                    KAN_CPU_TASK_LIST_USER_VALUE (&task_list, &global.temporary_allocator, task_name,
-                                                  scan_target_for_resources, target)
+                    KAN_CPU_TASK_LIST_USER_VALUE (&task_list, &global.temporary_allocator, scan_target_for_resources,
+                                                  task_section, target)
                 }
             }
 
@@ -3520,7 +3516,7 @@ int main (int argument_count, char **argument_values)
         {
             KAN_LOG (application_framework_resource_builder, KAN_LOG_INFO, "Checking resources for collisions...")
             struct kan_cpu_task_list_node_t *task_list = NULL;
-            const kan_interned_string_t task_name = kan_string_intern ("check_for_name_collisions");
+            const kan_cpu_section_t task_section = kan_cpu_section_get ("check_for_name_collisions");
 
             for (kan_loop_size_t target_index = 0u; target_index < global.targets.size; ++target_index)
             {
@@ -3529,8 +3525,8 @@ int main (int argument_count, char **argument_values)
 
                 while (native_node)
                 {
-                    KAN_CPU_TASK_LIST_USER_VALUE (&task_list, &global.temporary_allocator, task_name,
-                                                  scan_native_for_name_collisions, native_node)
+                    KAN_CPU_TASK_LIST_USER_VALUE (&task_list, &global.temporary_allocator,
+                                                  scan_native_for_name_collisions, task_section, native_node)
                     native_node = (struct native_entry_node_t *) native_node->node.list_node.next;
                 }
 
@@ -3539,8 +3535,8 @@ int main (int argument_count, char **argument_values)
 
                 while (third_party_node)
                 {
-                    KAN_CPU_TASK_LIST_USER_VALUE (&task_list, &global.temporary_allocator, task_name,
-                                                  scan_third_party_for_name_collisions, third_party_node)
+                    KAN_CPU_TASK_LIST_USER_VALUE (&task_list, &global.temporary_allocator,
+                                                  scan_third_party_for_name_collisions, task_section, third_party_node)
                     third_party_node = (struct third_party_entry_node_t *) third_party_node->node.list_node.next;
                 }
             }
@@ -3598,15 +3594,15 @@ int main (int argument_count, char **argument_values)
         {
             KAN_LOG (application_framework_resource_builder, KAN_LOG_INFO, "Saving targets byproduct states...")
             struct kan_cpu_task_list_node_t *task_list = NULL;
-            const kan_interned_string_t task_name = kan_string_intern ("save_target_byproduct_state");
+            const kan_cpu_section_t task_section = kan_cpu_section_get ("save_target_byproduct_state");
 
             for (kan_loop_size_t target_index = 0u; target_index < global.targets.size; ++target_index)
             {
                 struct target_t *target = &((struct target_t *) global.targets.data)[target_index];
                 if (target->requested_for_build)
                 {
-                    KAN_CPU_TASK_LIST_USER_VALUE (&task_list, &global.temporary_allocator, task_name,
-                                                  save_target_byproduct_state, target)
+                    KAN_CPU_TASK_LIST_USER_VALUE (&task_list, &global.temporary_allocator, save_target_byproduct_state,
+                                                  task_section, target)
                 }
             }
 
@@ -3632,7 +3628,7 @@ int main (int argument_count, char **argument_values)
         {
             KAN_LOG (application_framework_resource_builder, KAN_LOG_INFO, "Interning strings...")
             struct kan_cpu_task_list_node_t *task_list = NULL;
-            const kan_interned_string_t task_name = kan_string_intern ("intern_strings");
+            const kan_cpu_section_t task_section = kan_cpu_section_get ("intern_strings");
 
             for (kan_loop_size_t target_index = 0u; target_index < global.targets.size; ++target_index)
             {
@@ -3642,8 +3638,8 @@ int main (int argument_count, char **argument_values)
                 {
                     if (native_node->should_be_included_in_pack)
                     {
-                        KAN_CPU_TASK_LIST_USER_VALUE (&task_list, &global.temporary_allocator, task_name,
-                                                      intern_strings_in_native, native_node)
+                        KAN_CPU_TASK_LIST_USER_VALUE (&task_list, &global.temporary_allocator, intern_strings_in_native,
+                                                      task_section, native_node)
                     }
 
                     native_node = (struct native_entry_node_t *) native_node->node.list_node.next;
@@ -3671,14 +3667,14 @@ int main (int argument_count, char **argument_values)
         {
             KAN_LOG (application_framework_resource_builder, KAN_LOG_INFO, "Building packs...")
             struct kan_cpu_task_list_node_t *task_list = NULL;
-            const kan_interned_string_t task_name = kan_string_intern ("pack_target");
+            const kan_cpu_section_t task_section = kan_cpu_section_get ("pack_target");
 
             for (kan_loop_size_t target_index = 0u; target_index < global.targets.size; ++target_index)
             {
                 struct target_t *target = &((struct target_t *) global.targets.data)[target_index];
                 if (target->requested_for_build)
                 {
-                    KAN_CPU_TASK_LIST_USER_VALUE (&task_list, &global.temporary_allocator, task_name, pack_target,
+                    KAN_CPU_TASK_LIST_USER_VALUE (&task_list, &global.temporary_allocator, pack_target, task_section,
                                                   target)
                 }
             }

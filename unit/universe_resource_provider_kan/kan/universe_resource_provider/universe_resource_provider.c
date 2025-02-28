@@ -447,7 +447,6 @@ struct resource_provider_state_t
     kan_serialization_interned_string_registry_reader_t string_registry_reader;
 
     kan_interned_string_t interned_kan_resource_index_t;
-    kan_interned_string_t interned_resource_provider_server;
     kan_interned_string_t interned_kan_resource_compilable_meta_t;
     kan_interned_string_t interned_kan_resource_byproduct_type_meta_t;
 
@@ -468,6 +467,8 @@ struct resource_provider_state_t
     ///          including meta could have changed.
     KAN_REFLECTION_IGNORE
     kan_bool_t need_to_restart_runtime_compilation;
+
+    kan_cpu_section_t section_resource_provider_server;
 
     kan_instance_size_t trailing_data_count;
 
@@ -678,9 +679,9 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void resource_provider_state_init (struct res
                                     KAN_UNIVERSE_RESOURCE_PROVIDER_TEMPORARY_CHUNK_SIZE);
 
     data->interned_kan_resource_index_t = kan_string_intern ("kan_resource_index_t");
-    data->interned_resource_provider_server = kan_string_intern ("resource_provider_server");
     data->interned_kan_resource_compilable_meta_t = kan_string_intern ("kan_resource_compilable_meta_t");
     data->interned_kan_resource_byproduct_type_meta_t = kan_string_intern ("kan_resource_byproduct_type_meta_t");
+    data->section_resource_provider_server = kan_cpu_section_get ("resource_provider_server");
 }
 
 UNIVERSE_RESOURCE_PROVIDER_KAN_API void mutator_template_deploy_resource_provider (
@@ -4105,8 +4106,8 @@ static void dispatch_shared_serve (struct resource_provider_state_t *state)
 
     for (kan_loop_size_t worker_index = 0u; worker_index < cpu_count; ++worker_index)
     {
-        KAN_CPU_TASK_LIST_USER_VALUE (&task_list_node, &state->temporary_allocator,
-                                      state->interned_resource_provider_server, execute_shared_serve, state)
+        KAN_CPU_TASK_LIST_USER_VALUE (&task_list_node, &state->temporary_allocator, execute_shared_serve,
+                                      state->section_resource_provider_server, state)
     }
 
     kan_cpu_job_dispatch_and_detach_task_list (state->execution_shared_state.job, task_list_node);

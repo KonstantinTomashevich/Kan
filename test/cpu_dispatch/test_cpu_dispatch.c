@@ -39,14 +39,14 @@ static void dispatch_separately (kan_cpu_job_t job,
                                  struct test_task_user_data_t *user_data_output,
                                  kan_instance_size_t count)
 {
-    const kan_interned_string_t test_task_name = kan_string_intern ("test_task");
+    const kan_cpu_section_t test_task_section = kan_cpu_section_get ("test_task");
     for (kan_loop_size_t index = 0u; index < count; ++index)
     {
         user_data_output[index].work_done = kan_atomic_int_init (0);
         struct kan_cpu_task_t task = {
-            .name = test_task_name,
             .function = test_task_function,
             .user_data = (kan_functor_user_data_t) &user_data_output[index],
+            .profiler_section = test_task_section,
         };
 
         if (!KAN_HANDLE_IS_VALID (job))
@@ -65,7 +65,7 @@ static void dispatch_as_list (kan_cpu_job_t job,
                               struct test_task_user_data_t *user_data_output,
                               kan_instance_size_t count)
 {
-    const kan_interned_string_t test_task_name = kan_string_intern ("test_task");
+    const kan_cpu_section_t test_task_section = kan_cpu_section_get ("test_task");
     struct kan_cpu_task_list_node_t *nodes =
         kan_allocate_general (KAN_ALLOCATION_GROUP_IGNORE, sizeof (struct kan_cpu_task_list_node_t) * count,
                               _Alignof (struct kan_cpu_task_list_node_t));
@@ -76,9 +76,9 @@ static void dispatch_as_list (kan_cpu_job_t job,
         nodes[index].next = index + 1u == count ? NULL : &nodes[index + 1u];
 
         nodes[index].task = (struct kan_cpu_task_t) {
-            .name = test_task_name,
             .function = test_task_function,
             .user_data = (kan_functor_user_data_t) &user_data_output[index],
+            .profiler_section = test_task_section,
         };
     }
 
@@ -250,9 +250,9 @@ KAN_TEST_CASE (job_1000_completion_task)
     const kan_cpu_job_t job = kan_cpu_job_create ();
 
     kan_cpu_job_set_completion_task (job, (struct kan_cpu_task_t) {
-                                              .name = kan_string_intern ("completion_task"),
                                               .function = test_task_function,
                                               .user_data = (kan_functor_user_data_t) &completion_task_user_data,
+                                              .profiler_section = kan_cpu_section_get ("completion_task"),
                                           });
 
     dispatch_as_list (job, handles, user_data, 1000u);

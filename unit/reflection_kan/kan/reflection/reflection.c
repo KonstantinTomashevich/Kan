@@ -5227,7 +5227,7 @@ void kan_reflection_struct_migrator_migrate_patches (kan_reflection_struct_migra
     struct patch_migration_task_data_t *next_task_data = NULL;
     kan_instance_size_t patches_in_task = 0u;
     struct kan_cpu_task_list_node_t *task_list = NULL;
-    const kan_interned_string_t task_name = kan_string_intern ("reflection_patch_migration");
+    const kan_cpu_section_t task_section = kan_cpu_section_get ("reflection_patch_migration");
 
     struct kan_stack_group_allocator_t allocator;
     kan_stack_group_allocator_init (&allocator, group, KAN_REFLECTION_MIGRATOR_PATCH_TASK_STACK_INITIAL_SIZE);
@@ -5252,9 +5252,9 @@ void kan_reflection_struct_migrator_migrate_patches (kan_reflection_struct_migra
 
             task_list_node->next = task_list;
             task_list_node->task = (struct kan_cpu_task_t) {
-                .name = task_name,
                 .function = migrate_patch_task,
                 .user_data = (kan_functor_user_data_t) next_task_data,
+                .profiler_section = task_section,
             };
 
             task_list = task_list_node;

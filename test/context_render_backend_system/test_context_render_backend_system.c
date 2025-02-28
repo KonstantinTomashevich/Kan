@@ -4,6 +4,7 @@
 
 #include <kan/context/all_system_names.h>
 #include <kan/context/render_backend_system.h>
+#include <kan/cpu_dispatch/task.h>
 #include <kan/cpu_profiler/markup.h>
 #include <kan/file_system/stream.h>
 #include <kan/image/image.h>
@@ -1221,6 +1222,7 @@ KAN_TEST_CASE (render_and_capture)
         }
 
         kan_cpu_stage_separator ();
+        kan_cpu_reset_task_dispatch_counter ();
         ++frame;
     }
 

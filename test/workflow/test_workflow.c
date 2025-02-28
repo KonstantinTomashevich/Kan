@@ -248,9 +248,9 @@ static void multi_threaded_node_function (kan_cpu_job_t job, kan_functor_user_da
     for (kan_loop_size_t index = 0u; index < MULTI_THREAD_NODE_SUB_TASKS; ++index)
     {
         kan_cpu_job_dispatch_task (job, (struct kan_cpu_task_t) {
-                                            .name = kan_string_intern ("multithreaded_task"),
                                             .function = multi_threaded_sub_task,
                                             .user_data = (kan_functor_user_data_t) state,
+                                            .profiler_section = kan_cpu_section_get ("multithreaded_task"),
                                         });
 
         // Spend some time by sleeping.

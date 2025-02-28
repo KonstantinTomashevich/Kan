@@ -3,7 +3,7 @@ concrete_include (PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 concrete_sources ("*.c")
 concrete_require (
         SCOPE PUBLIC
-        ABSTRACT context_render_backend_system cpu_profiler file_system image
+        ABSTRACT context_render_backend_system cpu_dispatch cpu_profiler file_system image
         CONCRETE_INTERFACE inline_math render_pipeline_language testing)
 
 file (MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/tests_resources/context_render_backend_system")

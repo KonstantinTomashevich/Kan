@@ -876,16 +876,6 @@ struct migration_context_t
     struct kan_cpu_task_list_node_t *task_list;
 };
 
-struct record_migration_user_data_t
-{
-    void **record_pointer;
-    kan_allocation_group_t allocation_group;
-    kan_bool_t batched_allocation;
-    kan_reflection_struct_migrator_t migrator;
-    const struct kan_reflection_struct_t *old_type;
-    const struct kan_reflection_struct_t *new_type;
-};
-
 struct switch_to_serving_context_t
 {
     struct kan_stack_group_allocator_t allocator;
@@ -904,29 +894,31 @@ struct indexed_switch_to_serving_user_data_t
     struct repository_t *repository;
 };
 
-static kan_bool_t interned_strings_ready = KAN_FALSE;
+static kan_bool_t statics_initialized = KAN_FALSE;
 static struct kan_atomic_int_t interned_strings_initialization_lock = {.value = 0};
-static kan_interned_string_t migration_task_name;
-static kan_interned_string_t switch_to_serving_task_name;
 static kan_interned_string_t meta_automatic_on_change_event_name;
 static kan_interned_string_t meta_automatic_on_insert_event_name;
 static kan_interned_string_t meta_automatic_on_delete_event_name;
 static kan_interned_string_t meta_automatic_cascade_deletion_name;
 
-static void ensure_interned_strings_ready (void)
+static kan_cpu_section_t migration_task_section;
+static kan_cpu_section_t switch_to_serving_task_section;
+
+static void ensure_statics_initialized (void)
 {
-    if (!interned_strings_ready)
+    if (!statics_initialized)
     {
         kan_atomic_int_lock (&interned_strings_initialization_lock);
-        if (!interned_strings_ready)
+        if (!statics_initialized)
         {
-            migration_task_name = kan_string_intern ("repository_migration_task");
-            switch_to_serving_task_name = kan_string_intern ("repository_switch_to_serving_task");
             meta_automatic_on_change_event_name = kan_string_intern ("kan_repository_meta_automatic_on_change_event_t");
             meta_automatic_on_insert_event_name = kan_string_intern ("kan_repository_meta_automatic_on_insert_event_t");
             meta_automatic_on_delete_event_name = kan_string_intern ("kan_repository_meta_automatic_on_delete_event_t");
             meta_automatic_cascade_deletion_name =
                 kan_string_intern ("kan_repository_meta_automatic_cascade_deletion_t");
+
+            migration_task_section = kan_cpu_section_get ("repository_migration");
+            switch_to_serving_task_section = kan_cpu_section_get ("repository_switch_to_serving");
         }
 
         kan_atomic_int_unlock (&interned_strings_initialization_lock);
@@ -2018,7 +2010,7 @@ static void observation_event_triggers_definition_build (struct observation_even
                                                          struct kan_stack_group_allocator_t *temporary_allocator,
                                                          kan_allocation_group_t result_allocation_group)
 {
-    ensure_interned_strings_ready ();
+    ensure_statics_initialized ();
     struct kan_reflection_struct_meta_iterator_t iterator = kan_reflection_registry_query_struct_meta (
         repository->registry, observed_struct->name, meta_automatic_on_change_event_name);
 
@@ -2222,7 +2214,7 @@ static struct lifetime_event_trigger_list_node_t *lifetime_event_triggers_extrac
     kan_instance_size_t *count_output,
     kan_instance_size_t *array_size_output)
 {
-    ensure_interned_strings_ready ();
+    ensure_statics_initialized ();
     struct kan_reflection_struct_meta_iterator_t iterator = kan_reflection_registry_query_struct_meta (
         repository->registry, observed_struct->name, meta_automatic_on_insert_event_name);
 
@@ -2281,7 +2273,7 @@ static struct lifetime_event_trigger_list_node_t *lifetime_event_triggers_extrac
     kan_instance_size_t *count_output,
     kan_instance_size_t *array_size_output)
 {
-    ensure_interned_strings_ready ();
+    ensure_statics_initialized ();
     struct kan_reflection_struct_meta_iterator_t iterator = kan_reflection_registry_query_struct_meta (
         repository->registry, observed_struct->name, meta_automatic_on_delete_event_name);
 
@@ -2491,7 +2483,7 @@ static void cascade_deleters_definition_build (struct cascade_deleters_definitio
                                                struct kan_stack_group_allocator_t *temporary_allocator,
                                                kan_allocation_group_t result_allocation_group)
 {
-    ensure_interned_strings_ready ();
+    ensure_statics_initialized ();
     KAN_ASSERT (!definition->cascade_deleters)
 
     struct kan_reflection_struct_meta_iterator_t iterator = kan_reflection_registry_query_struct_meta (
@@ -3927,39 +3919,50 @@ void kan_repository_prepare_for_migration (kan_repository_t root_repository,
     repository_prepare_for_migration_internal (repository, migration_seed);
 }
 
-static void execute_migration (kan_functor_user_data_t user_data)
+KAN_CPU_TASK_BATCHED_HEADER (execute_migration)
 {
-    // We can migrate several records in one task if instance-per-task model is too slow.
-    struct record_migration_user_data_t *data = (struct record_migration_user_data_t *) user_data;
-    void *old_object = *data->record_pointer;
+    kan_reflection_struct_migrator_t migrator;
+};
 
-    void *new_object = data->batched_allocation ? kan_allocate_batched (data->allocation_group, data->new_type->size) :
-                                                  kan_allocate_general (data->allocation_group, data->new_type->size,
-                                                                        data->new_type->alignment);
+KAN_CPU_TASK_BATCHED_BODY (execute_migration)
+{
+    void **record_pointer;
+    kan_allocation_group_t allocation_group;
+    kan_bool_t batched_allocation;
+    const struct kan_reflection_struct_t *old_type;
+    const struct kan_reflection_struct_t *new_type;
+};
 
-    if (data->new_type->init)
+KAN_CPU_TASK_BATCHED_DEFINE (execute_migration)
+{
+    void *old_object = *body->record_pointer;
+    void *new_object = body->batched_allocation ? kan_allocate_batched (body->allocation_group, body->new_type->size) :
+                                                  kan_allocate_general (body->allocation_group, body->new_type->size,
+                                                                        body->new_type->alignment);
+
+    if (body->new_type->init)
     {
-        kan_allocation_group_stack_push (data->allocation_group);
-        data->new_type->init (data->new_type->functor_user_data, new_object);
+        kan_allocation_group_stack_push (body->allocation_group);
+        body->new_type->init (body->new_type->functor_user_data, new_object);
         kan_allocation_group_stack_pop ();
     }
 
-    kan_reflection_struct_migrator_migrate_instance (data->migrator, data->new_type->name, old_object, new_object);
-    if (data->old_type->shutdown)
+    kan_reflection_struct_migrator_migrate_instance (header->migrator, body->new_type->name, old_object, new_object);
+    if (body->old_type->shutdown)
     {
-        data->old_type->shutdown (data->old_type->functor_user_data, old_object);
+        body->old_type->shutdown (body->old_type->functor_user_data, old_object);
     }
 
-    if (data->batched_allocation)
+    if (body->batched_allocation)
     {
-        kan_free_batched (data->allocation_group, old_object);
+        kan_free_batched (body->allocation_group, old_object);
     }
     else
     {
-        kan_free_general (data->allocation_group, old_object, data->old_type->size);
+        kan_free_general (body->allocation_group, old_object, body->old_type->size);
     }
 
-    *data->record_pointer = new_object;
+    *body->record_pointer = new_object;
 }
 
 static void repository_migrate_internal (struct repository_t *repository,
@@ -3971,6 +3974,12 @@ static void repository_migrate_internal (struct repository_t *repository,
     KAN_ASSERT (repository->mode == REPOSITORY_MODE_PLANNING)
     struct singleton_storage_node_t *singleton_storage_node =
         (struct singleton_storage_node_t *) repository->singleton_storages.items.first;
+
+    KAN_CPU_TASK_LIST_BATCHED_PREPARE (execute_migration, KAN_REPOSITORY_MIGRATION_TASK_BATCH_MIN,
+                                       KAN_REPOSITORY_MIGRATION_TASK_BATCH_ATE,
+                                       {
+                                           .migrator = migrator,
+                                       });
 
     while (singleton_storage_node)
     {
@@ -3994,16 +4003,15 @@ static void repository_migrate_internal (struct repository_t *repository,
         {
         case KAN_REFLECTION_MIGRATION_NEEDED:
         {
-            KAN_CPU_TASK_LIST_USER_STRUCT (&context->task_list, &context->allocator, migration_task_name,
-                                           execute_migration, struct record_migration_user_data_t,
-                                           {
-                                               .record_pointer = &singleton_storage_node->singleton,
-                                               .allocation_group = singleton_storage_node->allocation_group,
-                                               .batched_allocation = KAN_FALSE,
-                                               .migrator = migrator,
-                                               .old_type = old_type,
-                                               .new_type = new_type,
-                                           })
+            KAN_CPU_TASK_LIST_BATCHED (&context->task_list, &context->allocator, execute_migration,
+                                       migration_task_section,
+                                       {
+                                           .record_pointer = &singleton_storage_node->singleton,
+                                           .allocation_group = singleton_storage_node->allocation_group,
+                                           .batched_allocation = KAN_FALSE,
+                                           .old_type = old_type,
+                                           .new_type = new_type,
+                                       });
             break;
         }
 
@@ -4153,16 +4161,16 @@ static void repository_migrate_internal (struct repository_t *repository,
 
             while (node)
             {
-                KAN_CPU_TASK_LIST_USER_STRUCT (&context->task_list, &context->allocator, migration_task_name,
-                                               execute_migration, struct record_migration_user_data_t,
-                                               {
-                                                   .record_pointer = &node->record,
-                                                   .allocation_group = indexed_storage_node->records_allocation_group,
-                                                   .batched_allocation = KAN_TRUE,
-                                                   .migrator = migrator,
-                                                   .old_type = old_type,
-                                                   .new_type = new_type,
-                                               })
+                KAN_CPU_TASK_LIST_BATCHED (&context->task_list, &context->allocator, execute_migration,
+                                           migration_task_section,
+                                           {
+                                               .record_pointer = &node->record,
+                                               .allocation_group = indexed_storage_node->records_allocation_group,
+                                               .batched_allocation = KAN_TRUE,
+                                               .old_type = old_type,
+                                               .new_type = new_type,
+                                           });
+
                 node = (struct indexed_storage_record_node_t *) node->list_node.next;
             }
 
@@ -4209,16 +4217,16 @@ static void repository_migrate_internal (struct repository_t *repository,
             struct event_queue_node_t *node = (struct event_queue_node_t *) event_storage_node->event_queue.oldest;
             while (&node->node != event_storage_node->event_queue.next_placeholder)
             {
-                KAN_CPU_TASK_LIST_USER_STRUCT (&context->task_list, &context->allocator, migration_task_name,
-                                               execute_migration, struct record_migration_user_data_t,
-                                               {
-                                                   .record_pointer = &node->event,
-                                                   .allocation_group = event_storage_node->allocation_group,
-                                                   .batched_allocation = KAN_TRUE,
-                                                   .migrator = migrator,
-                                                   .old_type = old_type,
-                                                   .new_type = new_type,
-                                               })
+                KAN_CPU_TASK_LIST_BATCHED (&context->task_list, &context->allocator, execute_migration,
+                                           migration_task_section,
+                                           {
+                                               .record_pointer = &node->event,
+                                               .allocation_group = event_storage_node->allocation_group,
+                                               .batched_allocation = KAN_TRUE,
+                                               .old_type = old_type,
+                                               .new_type = new_type,
+                                           });
+
                 node = (struct event_queue_node_t *) node->node.next;
             }
 
@@ -8604,7 +8612,7 @@ static kan_bool_t repository_is_indexed_storage_can_be_cleared (struct indexed_s
         return KAN_TRUE;
     }
 
-    ensure_interned_strings_ready ();
+    ensure_statics_initialized ();
     kan_bool_t has_obstacles = KAN_FALSE;
     indexed_storage_node->candidate_for_cleanup = KAN_TRUE;
 
@@ -8792,7 +8800,7 @@ static void extract_observation_chunks_from_on_change_events (
     struct observation_buffer_scenario_chunk_list_node_t **first,
     struct observation_buffer_scenario_chunk_list_node_t **last)
 {
-    ensure_interned_strings_ready ();
+    ensure_statics_initialized ();
     struct kan_reflection_struct_meta_iterator_t iterator = kan_reflection_registry_query_struct_meta (
         repository->registry, observed_struct->name, meta_automatic_on_change_event_name);
 
@@ -9111,8 +9119,8 @@ static void repository_prepare_storages (struct repository_t *repository, struct
 
     while (singleton_storage_node)
     {
-        KAN_CPU_TASK_LIST_USER_STRUCT (&context->task_list, &context->allocator, switch_to_serving_task_name,
-                                       prepare_singleton_storage, struct singleton_switch_to_serving_user_data_t,
+        KAN_CPU_TASK_LIST_USER_STRUCT (&context->task_list, &context->allocator, prepare_singleton_storage,
+                                       switch_to_serving_task_section, struct singleton_switch_to_serving_user_data_t,
                                        {
                                            .storage = singleton_storage_node,
                                            .repository = repository,
@@ -9125,8 +9133,8 @@ static void repository_prepare_storages (struct repository_t *repository, struct
 
     while (indexed_storage_node)
     {
-        KAN_CPU_TASK_LIST_USER_STRUCT (&context->task_list, &context->allocator, switch_to_serving_task_name,
-                                       prepare_indexed_storage, struct indexed_switch_to_serving_user_data_t,
+        KAN_CPU_TASK_LIST_USER_STRUCT (&context->task_list, &context->allocator, prepare_indexed_storage,
+                                       switch_to_serving_task_section, struct indexed_switch_to_serving_user_data_t,
                                        {
                                            .storage = indexed_storage_node,
                                            .repository = repository,

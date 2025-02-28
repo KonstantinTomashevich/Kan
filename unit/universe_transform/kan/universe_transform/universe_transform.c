@@ -329,20 +329,14 @@ static inline void kan_transform_3_interpolate_visual (struct kan_transform_3_co
         struct kan_stack_group_allocator_t temporary_allocator;                                                        \
                                                                                                                        \
         kan_allocation_group_t my_allocation_group;                                                                    \
-        kan_interned_string_t task_name;                                                                               \
-    };                                                                                                                 \
-                                                                                                                       \
-    struct visual_transform_sync_##TRANSFORM_DIMENSION##_invalidate_task_user_data_t                                   \
-    {                                                                                                                  \
-        struct visual_transform_sync_##TRANSFORM_DIMENSION##_invalidate_state_t *source_state;                         \
-        struct kan_repository_indexed_signal_read_access_t transform_read_access;                                      \
+        kan_cpu_section_t task_section;                                                                                \
     };                                                                                                                 \
                                                                                                                        \
     UNIVERSE_TRANSFORM_API void visual_transform_sync_##TRANSFORM_DIMENSION##_invalidate_state_init (                  \
         struct visual_transform_sync_##TRANSFORM_DIMENSION##_invalidate_state_t *instance)                             \
     {                                                                                                                  \
         instance->my_allocation_group = kan_allocation_group_stack_get ();                                             \
-        instance->task_name = kan_string_intern ("visual_transform_sync_invalidate" TRANSFORM_DIMENSION_STRING);       \
+        instance->task_section = kan_cpu_section_get ("visual_transform_sync_invalidate" TRANSFORM_DIMENSION_STRING);  \
     }                                                                                                                  \
                                                                                                                        \
     UNIVERSE_TRANSFORM_API void kan_universe_mutator_deploy_visual_transform_sync_##TRANSFORM_DIMENSION##_invalidate ( \
@@ -355,15 +349,23 @@ static inline void kan_transform_3_interpolate_visual (struct kan_transform_3_co
                                         KAN_UNIVERSE_TRANSFORM_VISUAL_SYNC_INV_TASK_STACK);                            \
     }                                                                                                                  \
                                                                                                                        \
-    static void visual_transform_sync_##TRANSFORM_DIMENSION##_invalidate_execute (kan_functor_user_data_t user_data)   \
+    KAN_CPU_TASK_BATCHED_HEADER (visual_transform_sync_##TRANSFORM_DIMENSION##_invalidate_execute)                     \
     {                                                                                                                  \
-        struct visual_transform_sync_##TRANSFORM_DIMENSION##_invalidate_task_user_data_t *data =                       \
-            (struct visual_transform_sync_##TRANSFORM_DIMENSION##_invalidate_task_user_data_t *) user_data;            \
+        struct visual_transform_sync_##TRANSFORM_DIMENSION##_invalidate_state_t *state;                                \
+    };                                                                                                                 \
+                                                                                                                       \
+    KAN_CPU_TASK_BATCHED_BODY (visual_transform_sync_##TRANSFORM_DIMENSION##_invalidate_execute)                       \
+    {                                                                                                                  \
+        struct kan_repository_indexed_signal_read_access_t transform_read_access;                                      \
+    };                                                                                                                 \
+                                                                                                                       \
+    KAN_CPU_TASK_BATCHED_DEFINE (visual_transform_sync_##TRANSFORM_DIMENSION##_invalidate_execute)                     \
+    {                                                                                                                  \
         const struct kan_transform_##TRANSFORM_DIMENSION##_component_t *component =                                    \
-            kan_repository_indexed_signal_read_access_resolve (&data->transform_read_access);                          \
-        kan_transform_##TRANSFORM_DIMENSION##_invalidate_children_visual_global (                                      \
-            &data->source_state->transform_queries, component);                                                        \
-        kan_repository_indexed_signal_read_access_close (&data->transform_read_access);                                \
+            kan_repository_indexed_signal_read_access_resolve (&body->transform_read_access);                          \
+        kan_transform_##TRANSFORM_DIMENSION##_invalidate_children_visual_global (&header->state->transform_queries,    \
+                                                                                 component);                           \
+        kan_repository_indexed_signal_read_access_close (&body->transform_read_access);                                \
     }                                                                                                                  \
                                                                                                                        \
     UNIVERSE_TRANSFORM_API void                                                                                        \
@@ -373,19 +375,24 @@ static inline void kan_transform_3_interpolate_visual (struct kan_transform_3_co
         kan_stack_group_allocator_reset (&state->temporary_allocator);                                                 \
         struct kan_cpu_task_list_node_t *task_node = NULL;                                                             \
                                                                                                                        \
+        KAN_CPU_TASK_LIST_BATCHED_PREPARE (visual_transform_sync_##TRANSFORM_DIMENSION##_invalidate_execute,           \
+                                           KAN_UNIVERSE_TRANSFORM_VISUAL_SYNC_TASK_BATCH_MIN,                          \
+                                           KAN_UNIVERSE_TRANSFORM_VISUAL_SYNC_TASK_BATCH_ATE,                          \
+                                           {                                                                           \
+                                               .state = state,                                                         \
+                                           });                                                                         \
+                                                                                                                       \
         KAN_UP_SIGNAL_READ (component, kan_transform_##TRANSFORM_DIMENSION##_component_t, visual_sync_needed, 1)       \
         {                                                                                                              \
             struct kan_repository_indexed_signal_read_access_t escaped_access;                                         \
             KAN_UP_ACCESS_ESCAPE (escaped_access, component);                                                          \
                                                                                                                        \
-            KAN_CPU_TASK_LIST_USER_STRUCT (                                                                            \
-                &task_node, &state->temporary_allocator, state->task_name,                                             \
-                visual_transform_sync_##TRANSFORM_DIMENSION##_invalidate_execute,                                      \
-                struct visual_transform_sync_##TRANSFORM_DIMENSION##_invalidate_task_user_data_t,                      \
-                {                                                                                                      \
-                    .source_state = state,                                                                             \
-                    .transform_read_access = escaped_access,                                                           \
-                });                                                                                                    \
+            KAN_CPU_TASK_LIST_BATCHED (&task_node, &state->temporary_allocator,                                        \
+                                       visual_transform_sync_##TRANSFORM_DIMENSION##_invalidate_execute,               \
+                                       state->task_section,                                                            \
+                                       {                                                                               \
+                                           .transform_read_access = escaped_access,                                    \
+                                       });                                                                             \
         }                                                                                                              \
                                                                                                                        \
         kan_cpu_job_dispatch_and_detach_task_list (job, task_node);                                                    \
@@ -415,20 +422,14 @@ VISUAL_TRANSFORM_SYNC_INVALIDATE_MUTATOR (3, "3")
         struct kan_stack_group_allocator_t temporary_allocator;                                                        \
                                                                                                                        \
         kan_allocation_group_t my_allocation_group;                                                                    \
-        kan_interned_string_t task_name;                                                                               \
-    };                                                                                                                 \
-                                                                                                                       \
-    struct visual_transform_sync_##TRANSFORM_DIMENSION##_calculate_task_user_data_t                                    \
-    {                                                                                                                  \
-        struct visual_transform_sync_##TRANSFORM_DIMENSION##_calculate_state_t *source_state;                          \
-        struct kan_repository_indexed_signal_update_access_t transform_update_access;                                  \
+        kan_cpu_section_t task_section;                                                                                \
     };                                                                                                                 \
                                                                                                                        \
     UNIVERSE_TRANSFORM_API void visual_transform_sync_##TRANSFORM_DIMENSION##_calculate_state_init (                   \
         struct visual_transform_sync_##TRANSFORM_DIMENSION##_calculate_state_t *instance)                              \
     {                                                                                                                  \
         instance->my_allocation_group = kan_allocation_group_stack_get ();                                             \
-        instance->task_name = kan_string_intern ("visual_transform_sync_calculate" TRANSFORM_DIMENSION_STRING);        \
+        instance->task_section = kan_cpu_section_get ("visual_transform_sync_calculate" TRANSFORM_DIMENSION_STRING);   \
     }                                                                                                                  \
                                                                                                                        \
     UNIVERSE_TRANSFORM_API void kan_universe_mutator_deploy_visual_transform_sync_##TRANSFORM_DIMENSION##_calculate (  \
@@ -443,16 +444,23 @@ VISUAL_TRANSFORM_SYNC_INVALIDATE_MUTATOR (3, "3")
                                         KAN_UNIVERSE_TRANSFORM_VISUAL_SYNC_CALC_TASK_STACK);                           \
     }                                                                                                                  \
                                                                                                                        \
-    static void visual_transform_sync_##TRANSFORM_DIMENSION##_calculate_execute (kan_functor_user_data_t user_data)    \
+    KAN_CPU_TASK_BATCHED_HEADER (visual_transform_sync_##TRANSFORM_DIMENSION##_calculate_execute)                      \
     {                                                                                                                  \
-        struct visual_transform_sync_##TRANSFORM_DIMENSION##_calculate_task_user_data_t *data =                        \
-            (struct visual_transform_sync_##TRANSFORM_DIMENSION##_calculate_task_user_data_t *) user_data;             \
-        struct visual_transform_sync_##TRANSFORM_DIMENSION##_calculate_state_t *state = data->source_state;            \
+        struct visual_transform_sync_##TRANSFORM_DIMENSION##_calculate_state_t *state;                                 \
+    };                                                                                                                 \
                                                                                                                        \
+    KAN_CPU_TASK_BATCHED_BODY (visual_transform_sync_##TRANSFORM_DIMENSION##_calculate_execute)                        \
+    {                                                                                                                  \
+        struct kan_repository_indexed_signal_update_access_t transform_update_access;                                  \
+    };                                                                                                                 \
+                                                                                                                       \
+    KAN_CPU_TASK_BATCHED_DEFINE (visual_transform_sync_##TRANSFORM_DIMENSION##_calculate_execute)                      \
+    {                                                                                                                  \
+        struct visual_transform_sync_##TRANSFORM_DIMENSION##_calculate_state_t *state = header->state;                 \
         KAN_UP_SINGLETON_READ (time, kan_time_singleton_t)                                                             \
         {                                                                                                              \
             struct kan_transform_##TRANSFORM_DIMENSION##_component_t *component =                                      \
-                kan_repository_indexed_signal_update_access_resolve (&data->transform_update_access);                  \
+                kan_repository_indexed_signal_update_access_resolve (&body->transform_update_access);                  \
             const kan_time_size_t source_time_ns = time->visual_time_ns - time->visual_delta_ns;                       \
             const kan_time_size_t target_time_ns = component->logical_local_time_ns;                                   \
                                                                                                                        \
@@ -474,7 +482,7 @@ VISUAL_TRANSFORM_SYNC_INVALIDATE_MUTATOR (3, "3")
             kan_atomic_int_lock (&component->visual_global_lock);                                                      \
             component->visual_global_dirty = 1u;                                                                       \
             kan_atomic_int_unlock (&component->visual_global_lock);                                                    \
-            kan_repository_indexed_signal_update_access_close (&data->transform_update_access);                        \
+            kan_repository_indexed_signal_update_access_close (&body->transform_update_access);                        \
         }                                                                                                              \
     }                                                                                                                  \
                                                                                                                        \
@@ -484,19 +492,24 @@ VISUAL_TRANSFORM_SYNC_INVALIDATE_MUTATOR (3, "3")
         kan_stack_group_allocator_reset (&state->temporary_allocator);                                                 \
         struct kan_cpu_task_list_node_t *task_node = NULL;                                                             \
                                                                                                                        \
+        KAN_CPU_TASK_LIST_BATCHED_PREPARE (visual_transform_sync_##TRANSFORM_DIMENSION##_calculate_execute,            \
+                                           KAN_UNIVERSE_TRANSFORM_VISUAL_SYNC_TASK_BATCH_MIN,                          \
+                                           KAN_UNIVERSE_TRANSFORM_VISUAL_SYNC_TASK_BATCH_ATE,                          \
+                                           {                                                                           \
+                                               .state = state,                                                         \
+                                           });                                                                         \
+                                                                                                                       \
         KAN_UP_SIGNAL_UPDATE (component, kan_transform_##TRANSFORM_DIMENSION##_component_t, visual_sync_needed, 1)     \
         {                                                                                                              \
             struct kan_repository_indexed_signal_update_access_t escaped_access;                                       \
             KAN_UP_ACCESS_ESCAPE (escaped_access, component);                                                          \
                                                                                                                        \
-            KAN_CPU_TASK_LIST_USER_STRUCT (                                                                            \
-                &task_node, &state->temporary_allocator, state->task_name,                                             \
-                visual_transform_sync_##TRANSFORM_DIMENSION##_calculate_execute,                                       \
-                struct visual_transform_sync_##TRANSFORM_DIMENSION##_calculate_task_user_data_t,                       \
-                {                                                                                                      \
-                    .source_state = state,                                                                             \
-                    .transform_update_access = escaped_access,                                                         \
-                });                                                                                                    \
+            KAN_CPU_TASK_LIST_BATCHED (&task_node, &state->temporary_allocator,                                        \
+                                       visual_transform_sync_##TRANSFORM_DIMENSION##_calculate_execute,                \
+                                       state->task_section,                                                            \
+                                       {                                                                               \
+                                           .transform_update_access = escaped_access,                                  \
+                                       });                                                                             \
         }                                                                                                              \
                                                                                                                        \
         kan_cpu_job_dispatch_and_detach_task_list (job, task_node);                                                    \

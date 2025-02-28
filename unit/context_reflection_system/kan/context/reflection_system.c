@@ -401,7 +401,7 @@ static void reflection_system_generate (struct reflection_system_t *system)
 
     KAN_LOG (reflection_system, KAN_LOG_INFO, "Starting generation iteration.")
     kan_loop_size_t iteration_index = 0u;
-    const kan_interned_string_t task_name = kan_string_intern ("reflection_system_generation_iterate");
+    const kan_cpu_section_t task_section = kan_cpu_section_get ("reflection_system_generation_iterate");
 
     struct generation_context_t generation_context;
     generation_context.this_iteration_submission_lock = kan_atomic_int_init (0);
@@ -561,7 +561,7 @@ static void reflection_system_generate (struct reflection_system_t *system)
         while (iterate_node)
         {
             KAN_CPU_TASK_LIST_USER_STRUCT (
-                &list_node, &generation_context.temporary_allocator, task_name, call_generation_iterate_task,
+                &list_node, &generation_context.temporary_allocator, call_generation_iterate_task, task_section,
                 struct generation_iteration_task_user_data_t,
                 {
                     .iterator =
@@ -597,7 +597,7 @@ static void reflection_system_generate (struct reflection_system_t *system)
         while (reflection_generator_node)
         {
             KAN_CPU_TASK_LIST_USER_STRUCT (
-                &list_node, &generation_context.temporary_allocator, task_name, call_generation_iterate_task,
+                &list_node, &generation_context.temporary_allocator, call_generation_iterate_task, task_section,
                 struct generation_iteration_task_user_data_t,
                 {
                     .iterator =

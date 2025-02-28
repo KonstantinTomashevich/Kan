@@ -56,6 +56,7 @@ struct task_dispatcher_t
     struct kan_atomic_int_t shutting_down;
     kan_instance_size_t threads_count;
     kan_thread_t *threads;
+    struct kan_atomic_int_t dispatched_tasks_counter;
 };
 
 static kan_bool_t global_task_dispatcher_ready = KAN_FALSE;
@@ -111,10 +112,8 @@ static kan_thread_result_t worker_thread_function (kan_thread_user_data_t user_d
             }
         }
 
-        const kan_cpu_section_t task_section = kan_cpu_section_get (task->task.name);
         struct kan_cpu_section_execution_t task_section_execution;
-
-        kan_cpu_section_execution_init (&task_section_execution, task_section);
+        kan_cpu_section_execution_init (&task_section_execution, task->task.profiler_section);
         task->task.function (task->task.user_data);
         kan_cpu_section_execution_shutdown (&task_section_execution);
 
@@ -185,6 +184,7 @@ static void ensure_global_task_dispatcher_ready (void)
                 KAN_ASSERT (KAN_HANDLE_IS_VALID (global_task_dispatcher.threads[index]))
             }
 
+            global_task_dispatcher.dispatched_tasks_counter = kan_atomic_int_init (0);
             atexit (shutdown_global_task_dispatcher);
             global_task_dispatcher_ready = KAN_TRUE;
         }
@@ -213,6 +213,8 @@ static struct task_node_t *dispatch_task (struct job_t *job, struct kan_cpu_task
     task_node->next = global_task_dispatcher.tasks_first;
     global_task_dispatcher.tasks_first = task_node;
     kan_atomic_int_unlock (&global_task_dispatcher.task_lock);
+
+    kan_atomic_int_add (&global_task_dispatcher.dispatched_tasks_counter, 1);
     return task_node;
 }
 
@@ -265,6 +267,7 @@ static void dispatch_task_list (struct job_t *job, struct kan_cpu_task_list_node
     }
 
     kan_atomic_int_unlock (&global_task_dispatcher.task_lock);
+    kan_atomic_int_add (&global_task_dispatcher.dispatched_tasks_counter, (int) count);
 }
 
 kan_cpu_task_t kan_cpu_task_dispatch (struct kan_cpu_task_t task)
@@ -312,6 +315,16 @@ void kan_cpu_task_detach (kan_cpu_task_t task)
 void kan_cpu_task_dispatch_list (struct kan_cpu_task_list_node_t *list)
 {
     dispatch_task_list (NULL, list);
+}
+
+kan_instance_size_t kan_cpu_get_task_dispatch_counter (void)
+{
+    return (kan_instance_size_t) kan_atomic_int_get (&global_task_dispatcher.dispatched_tasks_counter);
+}
+
+void kan_cpu_reset_task_dispatch_counter (void)
+{
+    kan_atomic_int_set (&global_task_dispatcher.dispatched_tasks_counter, 0);
 }
 
 static kan_bool_t job_allocation_group_ready = KAN_FALSE;
@@ -378,7 +391,8 @@ kan_cpu_job_t kan_cpu_job_create (void)
 
     struct job_t *job = (struct job_t *) kan_allocate_batched (job_allocation_group, sizeof (struct job_t));
     job->status = kan_atomic_int_init (JOB_STATUS_INITIAL);
-    job->completion_task = (struct kan_cpu_task_t) {.name = NULL, .function = NULL, .user_data = 0u};
+    job->completion_task =
+        (struct kan_cpu_task_t) {.profiler_section = KAN_HANDLE_INITIALIZE_INVALID, .function = NULL, .user_data = 0u};
     return KAN_HANDLE_SET (kan_cpu_job_t, job);
 }
 
