@@ -30,8 +30,11 @@ application_plugin_include (
         ABSTRACT universe_resource_provider=kan
         CONCRETE
         application_framework_examples_icon_resource application_framework_examples_platform_configuration
-        render_pipeline_language resource_material resource_texture universe_object universe_single_pipeline_scheduler
-        universe_time)
+        render_pipeline_language universe_object universe_single_pipeline_scheduler universe_time)
+
+if (Vulkan_FOUND)
+    application_plugin_include (CONCRETE resource_material resource_texture)
+endif ()
 
 if (Vulkan_FOUND)
     application_plugin_include (CONCRETE universe_render_foundation)
