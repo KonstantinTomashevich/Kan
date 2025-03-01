@@ -1122,7 +1122,8 @@ static void scan_file (struct target_t *target, struct kan_file_system_path_cont
             if (!node->source_data)
             {
                 KAN_LOG_WITH_BUFFER (KAN_FILE_SYSTEM_MAX_PATH_LENGTH * 2u, application_framework_resource_builder,
-                                     KAN_LOG_ERROR, "Failed to byproduct native entry at \"%s\".", path_container->path)
+                                     KAN_LOG_ERROR, "Failed to load byproduct native entry at \"%s\".",
+                                     path_container->path)
                 kan_atomic_int_add (&global.errors_count, 1);
                 return;
             }

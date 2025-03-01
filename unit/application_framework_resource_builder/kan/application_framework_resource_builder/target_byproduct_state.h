@@ -22,7 +22,7 @@ struct kan_resource_target_byproduct_production_t
 struct kan_resource_target_byproduct_state_t
 {
     /// \brief Generator integer value that is used to generate byproduct indices.
-    kan_instance_size_t byproduct_index_generator;
+    kan_serialized_size_t byproduct_index_generator;
 
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_resource_target_byproduct_production_t)
     struct kan_dynamic_array_t production;
