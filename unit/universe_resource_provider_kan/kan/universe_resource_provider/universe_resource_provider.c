@@ -375,10 +375,6 @@ struct resource_provider_execution_shared_state_t
     KAN_REFLECTION_IGNORE
     struct kan_atomic_int_t concurrency_lock;
 
-    /// \brief Special lock for producing byproducts during runtime compilation.
-    KAN_REFLECTION_IGNORE
-    struct kan_atomic_int_t byproduct_lock;
-
     KAN_REFLECTION_IGNORE
     struct kan_repository_indexed_interval_descending_write_cursor_t operation_cursor;
 
@@ -3355,7 +3351,7 @@ static inline kan_interned_string_t register_byproduct_internal (kan_functor_use
     kan_hash_t byproduct_hash = BYPRODUCT_UNIQUE_HASH;
 
     // Byproducts need to be registered under lock in order to avoid excessive byproduct creation.
-    kan_atomic_int_lock (&state->execution_shared_state.byproduct_lock);
+    kan_atomic_int_lock (&state->execution_shared_state.concurrency_lock);
 
     if (!byproduct_name)
     {
@@ -3418,7 +3414,7 @@ static inline kan_interned_string_t register_byproduct_internal (kan_functor_use
     if (byproduct_name && byproduct_hash != BYPRODUCT_UNIQUE_HASH)
     {
         // Replaced by the same byproduct, no need for insertion.
-        kan_atomic_int_unlock (&state->execution_shared_state.byproduct_lock);
+        kan_atomic_int_unlock (&state->execution_shared_state.concurrency_lock);
         return byproduct_name;
     }
 #undef BYPRODUCT_UNIQUE_HASH
@@ -3493,7 +3489,7 @@ static inline kan_interned_string_t register_byproduct_internal (kan_functor_use
         }
     }
 
-    kan_atomic_int_unlock (&state->execution_shared_state.byproduct_lock);
+    kan_atomic_int_unlock (&state->execution_shared_state.concurrency_lock);
 
     // Reference scan for of from-byproduct-to-byproduct references can be safely done outside of byproduct lock.
     // However, usage addition should be done under concurrency lock as usages can be deleted from other thread
@@ -4098,7 +4094,6 @@ static void dispatch_shared_serve (struct resource_provider_state_t *state)
 
     state->execution_shared_state.workers_left = kan_atomic_int_init ((int) cpu_count);
     state->execution_shared_state.concurrency_lock = kan_atomic_int_init (0);
-    state->execution_shared_state.byproduct_lock = kan_atomic_int_init (0);
 
     state->execution_shared_state.operation_cursor = kan_repository_indexed_interval_write_query_execute_descending (
         &state->write_interval__resource_provider_operation__priority, &state->execution_shared_state.min_priority,
