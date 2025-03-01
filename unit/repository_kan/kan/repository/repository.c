@@ -1653,6 +1653,7 @@ static struct copy_out_list_node_t *merge_copy_outs (struct copy_out_list_node_t
 {
     if (!input)
     {
+        *output_count = 0u;
         return NULL;
     }
 

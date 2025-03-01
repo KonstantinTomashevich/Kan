@@ -1000,7 +1000,8 @@ static void instantiate_material_static_data (
                                     material_loaded->family_meta.set_material.buffers.size);
     kan_render_context_t render_context = kan_render_backend_system_get_render_context (state->render_backend_system);
 
-    uint8_t temporary_data_static[KAN_UNIVERSE_RENDER_FOUNDATION_MI_TEMPORARY_DATA_SIZE];
+    _Alignas (struct kan_float_matrix_4x4_t)
+        uint8_t temporary_data_static[KAN_UNIVERSE_RENDER_FOUNDATION_MI_TEMPORARY_DATA_SIZE];
     kan_instance_size_t temporary_data_size = KAN_UNIVERSE_RENDER_FOUNDATION_MI_TEMPORARY_DATA_SIZE;
     uint8_t *temporary_data = temporary_data_static;
 
