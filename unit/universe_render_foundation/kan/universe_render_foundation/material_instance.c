@@ -1177,8 +1177,8 @@ static void instantiate_material_static_data (
                 kan_free_general (state->temporary_allocation_group, temporary_data, temporary_data_size);
             }
 
-            temporary_data_size = (kan_instance_size_t) kan_apply_alignment (
-                buffer_size, _Alignof (struct kan_float_matrix_4x4_t));
+            temporary_data_size =
+                (kan_instance_size_t) kan_apply_alignment (buffer_size, _Alignof (struct kan_float_matrix_4x4_t));
             temporary_data = kan_allocate_general (state->temporary_allocation_group, temporary_data_size,
                                                    _Alignof (struct kan_float_matrix_4x4_t));
         }
