@@ -3070,7 +3070,6 @@ static inline kan_bool_t add_to_pack (kan_virtual_file_system_read_only_pack_bui
     resource_stream = kan_random_access_stream_buffer_open_for_read (resource_stream, KAN_RESOURCE_BUILDER_IO_BUFFER);
     const kan_bool_t added =
         kan_virtual_file_system_read_only_pack_builder_add (builder, resource_stream, path_in_pack);
-
     resource_stream->operations->close (resource_stream);
 
     if (!added)
@@ -3630,21 +3629,28 @@ int main (int argument_count, char **argument_values)
             struct kan_cpu_task_list_node_t *task_list = NULL;
             const kan_cpu_section_t task_section = kan_cpu_section_get ("intern_strings");
 
+            // TODO: Temporary.
+            kan_instance_size_t task_count = 0u;
+
             for (kan_loop_size_t target_index = 0u; target_index < global.targets.size; ++target_index)
             {
                 struct target_t *target = &((struct target_t *) global.targets.data)[target_index];
                 struct native_entry_node_t *native_node = (struct native_entry_node_t *) target->native.items.first;
+
                 while (native_node)
                 {
                     if (native_node->should_be_included_in_pack)
                     {
                         KAN_CPU_TASK_LIST_USER_VALUE (&task_list, &global.temporary_allocator, intern_strings_in_native,
                                                       task_section, native_node)
+                        ++task_count;
                     }
 
                     native_node = (struct native_entry_node_t *) native_node->node.list_node.next;
                 }
             }
+
+            KAN_LOG (application_framework_resource_builder, KAN_LOG_INFO, "%u", (unsigned int) task_count)
 
             if (task_list)
             {
