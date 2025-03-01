@@ -904,6 +904,10 @@ static inline enum parse_status_t continue_into_potential_pragma (kan_bool_t all
 
      "warning (push, " [0-9]+ "))" { return PARSE_STATUS_IN_PROGRESS; }
 
+     "warning (push))" { return PARSE_STATUS_IN_PROGRESS; }
+
+     "warning (disable : " [0-9]+ "))" { return PARSE_STATUS_IN_PROGRESS; }
+
      "warning (pop))" { return PARSE_STATUS_IN_PROGRESS; }
 
      (. \ [\)])+ (")" | separators_till_nl) { return PARSE_STATUS_IN_PROGRESS; }
