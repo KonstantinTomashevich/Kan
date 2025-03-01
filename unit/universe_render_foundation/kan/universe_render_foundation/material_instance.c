@@ -1177,7 +1177,8 @@ static void instantiate_material_static_data (
                 kan_free_general (state->temporary_allocation_group, temporary_data, temporary_data_size);
             }
 
-            temporary_data_size = kan_apply_alignment (buffer_size, _Alignof (struct kan_float_matrix_4x4_t));
+            temporary_data_size = (kan_instance_size_t) kan_apply_alignment (
+                buffer_size, _Alignof (struct kan_float_matrix_4x4_t));
             temporary_data = kan_allocate_general (state->temporary_allocation_group, temporary_data_size,
                                                    _Alignof (struct kan_float_matrix_4x4_t));
         }
@@ -1418,8 +1419,8 @@ static void update_material_instance_custom_loaded_data (
                                        custom_loaded->data.combined_instanced_data.data, buffer_offset,
                                        &buffer->main_parameters, &parameter->parameter);
 
-            buffer_offset = kan_apply_alignment (buffer_offset + buffer->main_size,
-                                                 KAN_RENDER_MATERIAL_INSTANCE_INLINED_INSTANCED_DATA_ALIGNMENT);
+            buffer_offset = (kan_instance_size_t) kan_apply_alignment (
+                buffer_offset + buffer->main_size, KAN_RENDER_MATERIAL_INSTANCE_INLINED_INSTANCED_DATA_ALIGNMENT);
         }
     }
 }
@@ -1443,8 +1444,8 @@ static void update_material_instance_loaded_data (
         if (buffer->type == KAN_RPL_BUFFER_TYPE_INSTANCED_ATTRIBUTE)
         {
             KAN_ASSERT (buffer->tail_item_size == 0u)
-            combined_data_size = kan_apply_alignment (combined_data_size + buffer->main_size,
-                                                      KAN_RENDER_MATERIAL_INSTANCE_INLINED_INSTANCED_DATA_ALIGNMENT);
+            combined_data_size = (kan_instance_size_t) kan_apply_alignment (
+                combined_data_size + buffer->main_size, KAN_RENDER_MATERIAL_INSTANCE_INLINED_INSTANCED_DATA_ALIGNMENT);
         }
     }
 
@@ -1505,8 +1506,8 @@ static void update_material_instance_loaded_data (
                                        &buffer->main_parameters, parameter);
         }
 
-        buffer_offset = kan_apply_alignment (buffer_offset + buffer->main_size,
-                                             KAN_RENDER_MATERIAL_INSTANCE_INLINED_INSTANCED_DATA_ALIGNMENT);
+        buffer_offset = (kan_instance_size_t) kan_apply_alignment (
+            buffer_offset + buffer->main_size, KAN_RENDER_MATERIAL_INSTANCE_INLINED_INSTANCED_DATA_ALIGNMENT);
     }
 
     // Update custom instances.

@@ -902,7 +902,7 @@ static void recreate_family (struct render_foundation_material_management_execut
                 KAN_ASSERT (loaded->meta.pipeline_type == KAN_RPL_PIPELINE_TYPE_GRAPHICS_CLASSIC)
 
                 kan_render_code_module_t code_module = KAN_HANDLE_INITIALIZE_INVALID;
-                if (kan_render_get_supported_code_format_flags () & (1u << loaded->code_format))
+                if (kan_render_get_supported_code_format_flags () & (kan_memory_size_t) (1u << loaded->code_format))
                 {
                     code_module = kan_render_code_module_create (
                         kan_render_backend_system_get_render_context (state->render_backend_system), loaded->code.size,

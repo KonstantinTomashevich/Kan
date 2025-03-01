@@ -3,6 +3,7 @@
 #include <resource_material_api.h>
 
 #include <kan/api_common/core_types.h>
+#include <kan/api_common/mute_warnings.h>
 #include <kan/container/dynamic_array.h>
 #include <kan/container/interned_string.h>
 #include <kan/context/render_backend_system.h>
@@ -15,6 +16,7 @@
 
 KAN_C_HEADER_BEGIN
 
+KAN_MUTE_STRUCTURE_PADDED_WARNINGS_BEGIN
 struct kan_resource_material_parameter_t
 {
     kan_interned_string_t name;
@@ -63,6 +65,7 @@ struct kan_resource_material_parameter_t
         struct kan_float_matrix_4x4_t value_f4x4;
     };
 };
+KAN_MUTE_STRUCTURE_PADDED_WARNINGS_END
 
 struct kan_resource_material_tail_set_t
 {
