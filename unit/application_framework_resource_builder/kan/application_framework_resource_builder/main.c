@@ -142,11 +142,15 @@ struct target_t
     struct kan_hash_storage_t third_party;
     kan_serialization_interned_string_registry_t interned_string_registry;
 
+    /// \brief Lock for proper access of resource entries during compilation.
+    /// \details As byproducts might create new entries during compilation, we need to do all queries inside a target
+    ///          under this lock (in addition to all the operations with byproducts, of course).
+    struct kan_atomic_int_t compilation_entry_registry_lock;
+
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct target_t *)
     struct kan_dynamic_array_t visible_targets;
 
     struct kan_atomic_int_t byproduct_index_generator;
-    struct kan_atomic_int_t byproduct_registration_lock;
     struct kan_hash_storage_t byproducts;
 
     struct kan_hash_storage_t loaded_byproduct_production;
@@ -740,11 +744,11 @@ static void target_init (struct target_t *instance)
     kan_hash_storage_init (&instance->third_party, nodes_allocation_group, KAN_RESOURCE_BUILDER_TARGET_NODES_BUCKETS);
     instance->interned_string_registry = KAN_HANDLE_SET_INVALID (kan_serialization_interned_string_registry_t);
 
+    instance->compilation_entry_registry_lock = kan_atomic_int_init (0);
     kan_dynamic_array_init (&instance->visible_targets, 0u, sizeof (struct target_t *), _Alignof (struct target_t *),
                             targets_allocation_group);
 
     instance->byproduct_index_generator = kan_atomic_int_init (0);
-    instance->byproduct_registration_lock = kan_atomic_int_init (0);
     kan_hash_storage_init (&instance->byproducts, nodes_allocation_group, KAN_RESOURCE_BUILDER_TARGET_NODES_BUCKETS);
 
     kan_hash_storage_init (&instance->loaded_byproduct_production, nodes_allocation_group,
@@ -778,8 +782,10 @@ static struct native_entry_node_t *target_query_local_native_by_compiled_type (s
                                                                                kan_interned_string_t type,
                                                                                kan_interned_string_t name)
 {
+    kan_atomic_int_lock (&target->compilation_entry_registry_lock);
     const struct kan_hash_storage_bucket_t *bucket =
         kan_hash_storage_query (&target->native, KAN_HASH_OBJECT_POINTER (name));
+
     struct native_entry_node_t *node = (struct native_entry_node_t *) bucket->first;
     const struct native_entry_node_t *node_end =
         (struct native_entry_node_t *) (bucket->last ? bucket->last->next : NULL);
@@ -788,12 +794,14 @@ static struct native_entry_node_t *target_query_local_native_by_compiled_type (s
     {
         if (node->name == name && node->compiled_type->name == type)
         {
+            kan_atomic_int_unlock (&target->compilation_entry_registry_lock);
             return node;
         }
 
         node = (struct native_entry_node_t *) node->node.list_node.next;
     }
 
+    kan_atomic_int_unlock (&target->compilation_entry_registry_lock);
     return NULL;
 }
 
@@ -850,8 +858,10 @@ static struct native_entry_node_t *target_query_global_native_by_compiled_type (
 static struct third_party_entry_node_t *target_query_local_third_party (struct target_t *target,
                                                                         kan_interned_string_t name)
 {
+    kan_atomic_int_lock (&target->compilation_entry_registry_lock);
     const struct kan_hash_storage_bucket_t *bucket =
         kan_hash_storage_query (&target->third_party, KAN_HASH_OBJECT_POINTER (name));
+
     struct third_party_entry_node_t *node = (struct third_party_entry_node_t *) bucket->first;
     const struct third_party_entry_node_t *node_end =
         (struct third_party_entry_node_t *) (bucket->last ? bucket->last->next : NULL);
@@ -860,12 +870,14 @@ static struct third_party_entry_node_t *target_query_local_third_party (struct t
     {
         if (node->name == name)
         {
+            kan_atomic_int_unlock (&target->compilation_entry_registry_lock);
             return node;
         }
 
         node = (struct third_party_entry_node_t *) node->node.list_node.next;
     }
 
+    kan_atomic_int_unlock (&target->compilation_entry_registry_lock);
     return NULL;
 }
 
@@ -1693,6 +1705,12 @@ static inline kan_bool_t read_detected_references_cache (struct native_entry_nod
                                                          struct kan_resource_detected_reference_container_t *container,
                                                          const char *path)
 {
+    if (!kan_virtual_file_system_check_existence (global.volume, path))
+    {
+        // No reference cache for this resource.
+        return KAN_FALSE;
+    }
+
     struct kan_stream_t *stream = kan_virtual_file_stream_open_for_read (global.volume, path);
     if (!stream)
     {
@@ -1944,7 +1962,7 @@ static inline void confirm_loaded_byproduct_production (struct target_t *target,
 {
     const kan_hash_t resource_hash =
         kan_hash_combine (KAN_HASH_OBJECT_POINTER (resource_type), KAN_HASH_OBJECT_POINTER (resource_name));
-    kan_atomic_int_lock (&target->byproduct_registration_lock);
+    kan_atomic_int_lock (&target->compilation_entry_registry_lock);
 
     const struct kan_hash_storage_bucket_t *bucket =
         kan_hash_storage_query (&target->loaded_byproduct_production, resource_hash);
@@ -1976,7 +1994,7 @@ static inline void confirm_loaded_byproduct_production (struct target_t *target,
         node = (struct byproduct_production_node_t *) node->node.list_node.next;
     }
 
-    kan_atomic_int_unlock (&target->byproduct_registration_lock);
+    kan_atomic_int_unlock (&target->compilation_entry_registry_lock);
 }
 
 static inline kan_interned_string_t register_byproduct_internal (kan_functor_user_data_t interface_user_data,
@@ -2028,7 +2046,7 @@ static inline kan_interned_string_t register_byproduct_internal (kan_functor_use
             --byproduct_hash;
         }
 
-        kan_atomic_int_lock (&source_node->target->byproduct_registration_lock);
+        kan_atomic_int_lock (&source_node->target->compilation_entry_registry_lock);
         const struct kan_hash_storage_bucket_t *bucket =
             kan_hash_storage_query (&source_node->target->byproducts, byproduct_hash);
         node = (struct byproduct_node_t *) bucket->first;
@@ -2074,7 +2092,7 @@ static inline kan_interned_string_t register_byproduct_internal (kan_functor_use
                          "name is already occupied",
                          source_node->target->name, byproduct_type_name, byproduct_name)
                 kan_atomic_int_add (&global.errors_count, 1);
-                kan_atomic_int_unlock (&source_node->target->byproduct_registration_lock);
+                kan_atomic_int_unlock (&source_node->target->compilation_entry_registry_lock);
                 return NULL;
             }
         }
@@ -2110,7 +2128,7 @@ static inline kan_interned_string_t register_byproduct_internal (kan_functor_use
                      "\"%s\" as its native entry creation has failed.",
                      source_node->target->name, byproduct_type_name, source_node->name, source_node->source_type->name)
             kan_atomic_int_add (&global.errors_count, 1);
-            kan_atomic_int_unlock (&source_node->target->byproduct_registration_lock);
+            kan_atomic_int_unlock (&source_node->target->compilation_entry_registry_lock);
             return NULL;
         }
 
@@ -2147,7 +2165,7 @@ static inline kan_interned_string_t register_byproduct_internal (kan_functor_use
     }
 
     byproduct_node_add_production_unsafe (node, source_node->source_type->name, source_node->name);
-    kan_atomic_int_unlock (&source_node->target->byproduct_registration_lock);
+    kan_atomic_int_unlock (&source_node->target->compilation_entry_registry_lock);
 
     if (insert_new_node)
     {
@@ -3629,9 +3647,6 @@ int main (int argument_count, char **argument_values)
             struct kan_cpu_task_list_node_t *task_list = NULL;
             const kan_cpu_section_t task_section = kan_cpu_section_get ("intern_strings");
 
-            // TODO: Temporary.
-            kan_instance_size_t task_count = 0u;
-
             for (kan_loop_size_t target_index = 0u; target_index < global.targets.size; ++target_index)
             {
                 struct target_t *target = &((struct target_t *) global.targets.data)[target_index];
@@ -3643,14 +3658,11 @@ int main (int argument_count, char **argument_values)
                     {
                         KAN_CPU_TASK_LIST_USER_VALUE (&task_list, &global.temporary_allocator, intern_strings_in_native,
                                                       task_section, native_node)
-                        ++task_count;
                     }
 
                     native_node = (struct native_entry_node_t *) native_node->node.list_node.next;
                 }
             }
-
-            KAN_LOG (application_framework_resource_builder, KAN_LOG_INFO, "%u", (unsigned int) task_count)
 
             if (task_list)
             {
