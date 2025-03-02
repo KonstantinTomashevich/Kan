@@ -478,6 +478,18 @@ void kan_resource_material_tail_append_shutdown (struct kan_resource_material_ta
     kan_dynamic_array_shutdown (&instance->parameters);
 }
 
+void kan_resource_material_image_init (struct kan_resource_material_image_t *instance)
+{
+    instance->name = NULL;
+    instance->texture = NULL;
+    instance->sampler.min_filter = KAN_RENDER_FILTER_MODE_NEAREST;
+    instance->sampler.mag_filter = KAN_RENDER_FILTER_MODE_NEAREST;
+    instance->sampler.mip_map_mode = KAN_RENDER_MIP_MAP_MODE_NEAREST;
+    instance->sampler.address_mode_u = KAN_RENDER_ADDRESS_MODE_REPEAT;
+    instance->sampler.address_mode_v = KAN_RENDER_ADDRESS_MODE_REPEAT;
+    instance->sampler.address_mode_w = KAN_RENDER_ADDRESS_MODE_REPEAT;
+}
+
 void kan_resource_material_instance_init (struct kan_resource_material_instance_t *instance)
 {
     instance->material = NULL;

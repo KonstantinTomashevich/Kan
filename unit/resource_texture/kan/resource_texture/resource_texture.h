@@ -131,7 +131,7 @@ struct kan_resource_texture_t
 
 RESOURCE_TEXTURE_API void kan_resource_texture_init (struct kan_resource_texture_t *instance);
 
-/// \brief Contains target platform configuration for compiling texture.
+/// \brief Contains target platform configuration for compiling textures.
 /// \details Must be present in order to make compilation possible.
 struct kan_resource_texture_platform_configuration_t
 {

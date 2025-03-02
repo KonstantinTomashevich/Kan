@@ -10,6 +10,23 @@
 #include <kan/reflection/markup.h>
 #include <kan/render_pipeline_language/compiler.h>
 
+/// \file
+/// \brief This file stores various resource types needed to properly store, compile and use render passes.
+///
+/// \par Overview
+/// \parblock
+/// Render pass has the information needed for creation of render backend pass along with pass parameter set layout
+/// source file in render pipeline language. Pass parameter set source file is automatically included into pipelines
+/// that are compiled for this pass in order to provide proper sets for the pipelines.
+///
+/// When compiled, pass stored meta about its bindings instead of the link to pass set source. Other data is just copied
+/// during compilation.
+///
+/// Also, tag requirement system is created for passes in order to avoid compiling anything for passes that are not
+/// supported by target platform. It is also useful for excluding development-only passes like editor and debug
+/// passes, because we don't need them in final build.
+/// \endparblock
+
 KAN_C_HEADER_BEGIN
 
 /// \brief Represents data structure of resource that describes render pass.
@@ -36,6 +53,7 @@ RESOURCE_MATERIAL_API void kan_resource_render_pass_init (struct kan_resource_re
 
 RESOURCE_MATERIAL_API void kan_resource_render_pass_shutdown (struct kan_resource_render_pass_t *instance);
 
+/// \brief Represents compiled data structure of resource that describes render pass.
 struct kan_resource_render_pass_compiled_t
 {
     /// \brief Whether pass was considered supported at the time of compilation.

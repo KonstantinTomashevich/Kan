@@ -403,6 +403,11 @@ UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_execute_render_foundati
                                     KAN_RESOURCE_PROVIDER_CONTAINER_GET (kan_resource_render_pass_compiled_t,
                                                                          container);
 
+                                if (!pass_resource->supported)
+                                {
+                                    KAN_UP_QUERY_BREAK;
+                                }
+
                                 struct kan_render_pass_description_t description = {
                                     .type = pass_resource->type,
                                     .attachments_count = pass_resource->attachments.size,

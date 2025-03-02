@@ -1000,7 +1000,8 @@ static void instantiate_material_static_data (
                                     material_loaded->family_meta.set_material.buffers.size);
     kan_render_context_t render_context = kan_render_backend_system_get_render_context (state->render_backend_system);
 
-    _Alignas (struct kan_float_matrix_4x4_t)
+    // Align as the biggest possible alignment of parameter value.
+    _Alignas (struct kan_resource_material_parameter_t)
         uint8_t temporary_data_static[KAN_UNIVERSE_RENDER_FOUNDATION_MI_TEMPORARY_DATA_SIZE];
     kan_instance_size_t temporary_data_size = KAN_UNIVERSE_RENDER_FOUNDATION_MI_TEMPORARY_DATA_SIZE;
     uint8_t *temporary_data = temporary_data_static;
@@ -2006,7 +2007,8 @@ void kan_render_material_instance_singleton_init (struct kan_render_material_ins
 void kan_render_material_instance_loaded_data_init (struct kan_render_material_instance_loaded_data_t *instance)
 {
     instance->parameter_set = KAN_HANDLE_SET_INVALID (kan_render_pipeline_parameter_set_t);
-    kan_dynamic_array_init (&instance->combined_instanced_data, 0u, sizeof (uint8_t), _Alignof (uint8_t),
+    kan_dynamic_array_init (&instance->combined_instanced_data, 0u, sizeof (uint8_t),
+                            KAN_RENDER_MATERIAL_INSTANCE_INLINED_INSTANCED_DATA_ALIGNMENT,
                             kan_allocation_group_stack_get ());
 }
 

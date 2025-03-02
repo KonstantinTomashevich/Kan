@@ -10,7 +10,19 @@
 #include <kan/universe_object/universe_object.h>
 #include <kan/universe_resource_provider/universe_resource_provider.h>
 
-// TODO: Docs.
+/// \file
+/// \brief Provides API for interacting with render foundation material management implementation.
+///
+/// \par Definition
+/// \parblock
+/// Render foundation material management automatically loads and unloads materials based on
+/// `kan_render_material_usage_t` instances. Pipelines are automatically loaded and scheduled for compilation based
+/// on loaded render pass presence. Pipelines can be deleted from loaded material and/or inserted back as a response
+/// to render pass reload, deletion or insertion. Material hot reload including code changes is supported.
+///
+/// Also, material management requires configuration with name KAN_RENDER_FOUNDATION_MATERIAL_MANAGEMENT_CONFIGURATION
+/// of type `kan_render_material_configuration_t` to be present in its world.
+/// \endparblock
 
 KAN_C_HEADER_BEGIN
 
@@ -62,6 +74,7 @@ static inline kan_render_material_usage_id_t kan_next_material_usage_id (
         (kan_id_32_t) kan_atomic_int_add ((struct kan_atomic_int_t *) &material_singleton->usage_id_counter, 1));
 }
 
+/// \brief Configuration data type for material management routine.
 struct kan_render_material_configuration_t
 {
     /// \brief Attempts to load all available materials as soon as they're detected.
@@ -74,30 +87,40 @@ struct kan_render_material_configuration_t
     kan_bool_t preload_materials;
 };
 
+/// \brief Stores information about loaded and instance pipeline for particular pass.
 struct kan_render_material_loaded_pipeline_t
 {
+    /// \brief Name of the pass for which pipeline was created.
     kan_interned_string_t pass_name;
 
+    /// \brief Handle to the actual pipeline. Might still be in compilation stage.
     /// \details Not owned, just copied handle.
     kan_render_graphics_pipeline_t pipeline;
 };
 
+///\brief Contains material loaded data: its parameter set layouts, pipelines and family meta.
 struct kan_render_material_loaded_t
 {
+    /// \brief Material resource name.
     kan_interned_string_t name;
 
+    /// \brief Layout for material set of parameters for pipeline.
     /// \details Not owned, just copied handle. Can be invalid if set layout is empty.
     kan_render_pipeline_parameter_set_layout_t set_material;
 
+    /// \brief Layout for object set of parameters for pipeline.
     /// \details Not owned, just copied handle. Can be invalid if set layout is empty.
     kan_render_pipeline_parameter_set_layout_t set_object;
 
+    /// \brief Layout for unstable set of parameters for pipeline.
     /// \details Not owned, just copied handle. Can be invalid if set layout is empty.
     kan_render_pipeline_parameter_set_layout_t set_unstable;
 
+    /// \brief Array with currently instanced pipelines for existing passes.
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_render_material_loaded_pipeline_t)
     struct kan_dynamic_array_t pipelines;
 
+    /// \brief Meta of material pipeline family. Does not contains any info about any particular pass.
     struct kan_rpl_meta_t family_meta;
 };
 
@@ -105,7 +128,7 @@ UNIVERSE_RENDER_FOUNDATION_API void kan_render_material_loaded_init (struct kan_
 
 UNIVERSE_RENDER_FOUNDATION_API void kan_render_material_loaded_shutdown (struct kan_render_material_loaded_t *instance);
 
-/// \details Sent when material itself is updated, not its pipelines.
+/// \brief Sent when loaded material is inserted or updated, including pipeline update due to pass-related operations.
 struct kan_render_material_updated_event_t
 {
     kan_interned_string_t name;

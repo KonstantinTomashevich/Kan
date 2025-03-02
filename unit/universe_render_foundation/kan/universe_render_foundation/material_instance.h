@@ -11,6 +11,26 @@
 #include <kan/universe_render_foundation/texture.h>
 #include <kan/universe_resource_provider/universe_resource_provider.h>
 
+/// \file
+/// \brief Provides API for interacting with render foundation material instance management implementation.
+///
+/// \par Definition
+/// \parblock
+/// Render foundation material instance management automatically loads and unloads material instances based on
+/// `kan_render_material_instance_usage_t` instances. Usages control suggested mips for textures bound to material
+/// instances through best/worst advised mip fields, which are merged and passed to appropriate texture usages.
+/// Buffers and parameter sets are allocated once per material static data, therefore material instances with
+/// instanced parameters only are lightweight and easy to use for instancing.
+///
+/// Custom parameter feature for material instance usages allows to override instanced parameters on per usage basis.
+/// Only instanced parameters can be changed on per usage basis as changing static parameters would lead to creation
+/// of additional buffers and therefore is a questionable practice from performance point of view. When objects
+/// really need complex data on per-instance basis, it is advised to use object parameter set and manual upload of
+/// data to this set as it would be much more efficient and such cases are rare. When custom parameters are used for
+/// material instance usage, `kan_render_material_instance_custom_loaded_t` instance should be queries by usage id
+/// instead of querying `kan_render_material_instance_loaded_t` by name.
+/// \endparblock
+
 KAN_C_HEADER_BEGIN
 
 /// \brief Group that is used to add all render foundation material instance management mutators.
@@ -48,6 +68,9 @@ struct kan_render_material_instance_usage_t
 UNIVERSE_RENDER_FOUNDATION_API void kan_render_material_instance_usage_init (
     struct kan_render_material_instance_usage_t *instance);
 
+/// \brief Can be attached to usage by usage id in order to
+///        request material instance with customized instanced parameters.
+/// \details It is allowed to add multiple custom instanced parameters to one usage.
 struct kan_render_material_instance_custom_instanced_parameter_t
 {
     kan_render_material_instance_usage_id_t usage_id;
@@ -80,15 +103,18 @@ static inline kan_render_material_instance_usage_id_t kan_next_material_instance
 /// \brief Alignment used for buffer data in `kan_render_material_instance_loaded_data_t::combined_instanced_data`.
 #define KAN_RENDER_MATERIAL_INSTANCE_INLINED_INSTANCED_DATA_ALIGNMENT _Alignof (struct kan_float_matrix_4x4_t)
 
+/// \brief Material instance loaded data storage structured. Used both for usual and customized instances.
 struct kan_render_material_instance_loaded_data_t
 {
+    /// \brief Name of the material that should be used with this instance.
     kan_interned_string_t material_name;
 
+    /// \brief Parameter set for material set slot of the pipeline.
     /// \details Not owned.
     kan_render_pipeline_parameter_set_t parameter_set;
 
-    /// \details Combined instanced data for better cache coherency.
-    ///          Data for every instanced attribute buffer goes one after another in the same order as buffers in meta.
+    /// \brief Storage for material instanced data which is combined into one array for cache coherency.
+    /// \details Data for every instanced attribute buffer goes one after another in the same order as buffers in meta.
     ///          Every buffer start is aligned using KAN_RENDER_MATERIAL_INSTANCE_INLINED_INSTANCED_DATA_ALIGNMENT.
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (uint8_t)
     struct kan_dynamic_array_t combined_instanced_data;
@@ -100,6 +126,7 @@ UNIVERSE_RENDER_FOUNDATION_API void kan_render_material_instance_loaded_data_ini
 UNIVERSE_RENDER_FOUNDATION_API void kan_render_material_instance_loaded_data_shutdown (
     struct kan_render_material_instance_loaded_data_t *instance);
 
+/// \brief Contains loaded data for usual, not customized, material instance.
 struct kan_render_material_instance_loaded_t
 {
     kan_interned_string_t name;
@@ -112,6 +139,7 @@ UNIVERSE_RENDER_FOUNDATION_API void kan_render_material_instance_loaded_init (
 UNIVERSE_RENDER_FOUNDATION_API void kan_render_material_instance_loaded_shutdown (
     struct kan_render_material_instance_loaded_t *instance);
 
+/// \brief Contains loaded data for material instance customized for particular usage.
 struct kan_render_material_instance_custom_loaded_t
 {
     kan_render_material_instance_usage_id_t usage_id;
