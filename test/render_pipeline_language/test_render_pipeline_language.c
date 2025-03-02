@@ -90,14 +90,15 @@ KAN_TEST_CASE (generic)
         kan_rpl_compiler_context_create (KAN_RPL_PIPELINE_TYPE_GRAPHICS_CLASSIC, kan_string_intern ("variant_test"));
 
     kan_rpl_compiler_context_use_module (compiler_context, &intermediate);
-    kan_rpl_compiler_context_set_option_flag (compiler_context, kan_string_intern ("wireframe"), KAN_TRUE);
+    kan_rpl_compiler_context_set_option_flag (compiler_context, KAN_RPL_OPTION_TARGET_SCOPE_ANY,
+                                              kan_string_intern ("wireframe"), KAN_TRUE);
 
     kan_rpl_compiler_instance_t meta_instance = kan_rpl_compiler_context_resolve (compiler_context, 0u, NULL);
     KAN_TEST_ASSERT (KAN_HANDLE_IS_VALID (meta_instance))
 
     struct kan_rpl_meta_t meta;
     kan_rpl_meta_init (&meta);
-    KAN_TEST_ASSERT (kan_rpl_compiler_instance_emit_meta (meta_instance, &meta))
+    KAN_TEST_ASSERT (kan_rpl_compiler_instance_emit_meta (meta_instance, &meta, KAN_RPL_META_EMISSION_FULL))
     kan_rpl_compiler_instance_destroy (meta_instance);
 
 #define TEST_FLOATING_TOLERANCE 0.000001f
@@ -364,7 +365,7 @@ static void benchmark_step (struct kan_dynamic_array_t *source, kan_bool_t finis
     struct kan_rpl_meta_t meta;
     kan_rpl_meta_init (&meta);
 
-    KAN_TEST_ASSERT (kan_rpl_compiler_instance_emit_meta (meta_instance, &meta))
+    KAN_TEST_ASSERT (kan_rpl_compiler_instance_emit_meta (meta_instance, &meta, KAN_RPL_META_EMISSION_FULL))
     kan_rpl_compiler_instance_destroy (meta_instance);
     kan_rpl_meta_shutdown (&meta);
 

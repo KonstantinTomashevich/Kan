@@ -222,31 +222,14 @@ kan_thread_result_t render_backend_pipeline_compiler_state_worker_function (kan_
         request->pipeline->compilation_state = PIPELINE_COMPILATION_STATE_EXECUTION;
         kan_mutex_unlock (state->state_transition_mutex);
 
-        struct render_backend_graphics_pipeline_family_t *family = request->pipeline->family;
         VkPipelineVertexInputStateCreateInfo vertex_input_info = {
             .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
             .pNext = NULL,
             .flags = 0u,
-            .vertexBindingDescriptionCount = (vulkan_size_t) family->input_bindings_count,
-            .pVertexBindingDescriptions = family->input_bindings,
-            .vertexAttributeDescriptionCount = (vulkan_size_t) family->attributes_count,
-            .pVertexAttributeDescriptions = family->attributes,
-        };
-
-        VkPrimitiveTopology topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-        switch (family->topology)
-        {
-        case KAN_RENDER_GRAPHICS_TOPOLOGY_TRIANGLE_LIST:
-            topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-            break;
-        }
-
-        VkPipelineInputAssemblyStateCreateInfo input_assembly = {
-            .sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
-            .pNext = NULL,
-            .flags = 0u,
-            .topology = topology,
-            .primitiveRestartEnable = VK_FALSE,
+            .vertexBindingDescriptionCount = (vulkan_size_t) request->input_bindings_count,
+            .pVertexBindingDescriptions = request->input_bindings,
+            .vertexAttributeDescriptionCount = (vulkan_size_t) request->attributes_count,
+            .pVertexAttributeDescriptions = request->attributes,
         };
 
         // Viewport and scissor are arbitrary as they're overwritten by dynamic states.
@@ -290,7 +273,7 @@ kan_thread_result_t render_backend_pipeline_compiler_state_worker_function (kan_
             .stageCount = (vulkan_size_t) request->shader_stages_count,
             .pStages = request->shader_stages,
             .pVertexInputState = &vertex_input_info,
-            .pInputAssemblyState = &input_assembly,
+            .pInputAssemblyState = &request->input_assembly,
             .pTessellationState = NULL,
             .pViewportState = &viewport_state,
             .pRasterizationState = &request->rasterization,
@@ -298,7 +281,7 @@ kan_thread_result_t render_backend_pipeline_compiler_state_worker_function (kan_
             .pDepthStencilState = &request->depth_stencil,
             .pColorBlendState = &request->color_blending,
             .pDynamicState = &dynamic_state,
-            .layout = family->layout,
+            .layout = request->pipeline->layout,
             .renderPass = request->pipeline->pass->pass,
             .subpass = 0u,
             .basePipelineHandle = VK_NULL_HANDLE,
@@ -317,9 +300,8 @@ kan_thread_result_t render_backend_pipeline_compiler_state_worker_function (kan_
         if (result != VK_SUCCESS)
         {
             pipeline = VK_NULL_HANDLE;
-            KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR,
-                     "Failed to compile pipeline \"%s\" from family \"%s\".", request->pipeline->tracking_name,
-                     request->pipeline->family->tracking_name)
+            KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR, "Failed to compile pipeline \"%s\".",
+                     request->pipeline->tracking_name)
         }
 
 #if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED)
@@ -377,11 +359,19 @@ void render_backend_compiler_state_request_graphics (struct render_backend_pipel
                               sizeof (VkPipelineShaderStageCreateInfo) * request->shader_stages_count,
                               _Alignof (VkPipelineShaderStageCreateInfo));
 
+    request->linked_code_modules_count = description->code_modules_count;
+    request->linked_code_modules =
+        kan_allocate_general (pipeline->system->pipeline_wrapper_allocation_group,
+                              sizeof (struct render_backend_code_module_t *) * description->code_modules_count,
+                              _Alignof (struct render_backend_code_module_t *));
+
     VkPipelineShaderStageCreateInfo *output_stage = request->shader_stages;
     for (kan_loop_size_t module_index = 0u; module_index < description->code_modules_count; ++module_index)
     {
         struct render_backend_code_module_t *code_module =
             KAN_HANDLE_GET (description->code_modules[module_index].code_module);
+        request->linked_code_modules[module_index] = code_module;
+        kan_atomic_int_add (&code_module->links, 1);
         VkShaderModule module = code_module->module;
 
         for (kan_loop_size_t entry_point_index = 0u;
@@ -409,6 +399,160 @@ void render_backend_compiler_state_request_graphics (struct render_backend_pipel
             }
 
             ++output_stage;
+        }
+    }
+
+    VkPrimitiveTopology topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+    switch (description->topology)
+    {
+    case KAN_RENDER_GRAPHICS_TOPOLOGY_TRIANGLE_LIST:
+        topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+        break;
+    }
+
+    request->input_assembly = (VkPipelineInputAssemblyStateCreateInfo) {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
+        .pNext = NULL,
+        .flags = 0u,
+        .topology = topology,
+        .primitiveRestartEnable = VK_FALSE,
+    };
+
+    request->input_bindings_count = description->attribute_sources_count;
+    request->input_bindings =
+        kan_allocate_general (pipeline->system->pipeline_wrapper_allocation_group,
+                              sizeof (VkVertexInputBindingDescription) * request->input_bindings_count,
+                              _Alignof (VkVertexInputBindingDescription));
+
+    for (kan_loop_size_t index = 0u; index < description->attribute_sources_count; ++index)
+    {
+        struct kan_render_attribute_source_description_t *input = &description->attribute_sources[index];
+        VkVertexInputBindingDescription *output = &request->input_bindings[index];
+
+        output->binding = (vulkan_size_t) input->binding;
+        output->stride = (vulkan_size_t) input->stride;
+
+        switch (input->rate)
+        {
+        case KAN_RENDER_ATTRIBUTE_RATE_PER_VERTEX:
+            output->inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+            break;
+
+        case KAN_RENDER_ATTRIBUTE_RATE_PER_INSTANCE:
+            output->inputRate = VK_VERTEX_INPUT_RATE_INSTANCE;
+            break;
+        }
+    }
+
+    request->attributes_count = 0u;
+    for (kan_loop_size_t index = 0u; index < description->attributes_count; ++index)
+    {
+        struct kan_render_attribute_description_t *input = &description->attributes[index];
+        switch (input->format)
+        {
+        case KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_FLOAT_1:
+        case KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_FLOAT_2:
+        case KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_FLOAT_3:
+        case KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_FLOAT_4:
+        case KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_SIGNED_INT_1:
+        case KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_SIGNED_INT_2:
+        case KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_SIGNED_INT_3:
+        case KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_SIGNED_INT_4:
+            ++request->attributes_count;
+            break;
+
+        case KAN_RENDER_ATTRIBUTE_FORMAT_MATRIX_FLOAT_3_3:
+            request->attributes_count += 3u;
+            break;
+
+        case KAN_RENDER_ATTRIBUTE_FORMAT_MATRIX_FLOAT_4_4:
+            request->attributes_count += 4u;
+            break;
+        }
+    }
+
+    request->attributes = kan_allocate_general (pipeline->system->pipeline_wrapper_allocation_group,
+                                                sizeof (VkVertexInputAttributeDescription) * request->attributes_count,
+                                                _Alignof (VkVertexInputAttributeDescription));
+    VkVertexInputAttributeDescription *attribute_output = request->attributes;
+
+    for (kan_loop_size_t index = 0u; index < description->attributes_count; ++index)
+    {
+        struct kan_render_attribute_description_t *input = &description->attributes[index];
+        VkFormat input_format = VK_FORMAT_R32_SFLOAT;
+        kan_instance_size_t attribute_count = 1u;
+        vulkan_size_t item_offset = sizeof (float);
+
+        switch (input->format)
+        {
+        case KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_FLOAT_1:
+            input_format = VK_FORMAT_R32_SFLOAT;
+            attribute_count = 1u;
+            item_offset = sizeof (float);
+            break;
+
+        case KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_FLOAT_2:
+            input_format = VK_FORMAT_R32G32_SFLOAT;
+            attribute_count = 1u;
+            item_offset = sizeof (float) * 2u;
+            break;
+
+        case KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_FLOAT_3:
+            input_format = VK_FORMAT_R32G32B32_SFLOAT;
+            attribute_count = 1u;
+            item_offset = sizeof (float) * 3u;
+            break;
+
+        case KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_FLOAT_4:
+            input_format = VK_FORMAT_R32G32B32A32_SFLOAT;
+            attribute_count = 1u;
+            item_offset = sizeof (float) * 4u;
+            break;
+
+        case KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_SIGNED_INT_1:
+            input_format = VK_FORMAT_R32_SINT;
+            attribute_count = 1u;
+            item_offset = sizeof (int32_t);
+            break;
+
+        case KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_SIGNED_INT_2:
+            input_format = VK_FORMAT_R32G32_SINT;
+            attribute_count = 1u;
+            item_offset = sizeof (int32_t) * 2u;
+            break;
+
+        case KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_SIGNED_INT_3:
+            input_format = VK_FORMAT_R32G32B32_SINT;
+            attribute_count = 1u;
+            item_offset = sizeof (int32_t) * 3u;
+            break;
+
+        case KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_SIGNED_INT_4:
+            input_format = VK_FORMAT_R32G32B32A32_SINT;
+            attribute_count = 1u;
+            item_offset = sizeof (int32_t) * 4u;
+            break;
+
+        case KAN_RENDER_ATTRIBUTE_FORMAT_MATRIX_FLOAT_3_3:
+            input_format = VK_FORMAT_R32G32B32_SFLOAT;
+            attribute_count = 3u;
+            item_offset = sizeof (float) * 3u;
+            break;
+
+        case KAN_RENDER_ATTRIBUTE_FORMAT_MATRIX_FLOAT_4_4:
+            input_format = VK_FORMAT_R32G32B32A32_SFLOAT;
+            attribute_count = 4u;
+            item_offset = sizeof (float) * 4u;
+            break;
+        }
+
+        for (vulkan_size_t attribute_index = 0u; attribute_index < attribute_count; ++attribute_index)
+        {
+            attribute_output->binding = (vulkan_size_t) input->binding;
+            attribute_output->location = (vulkan_size_t) input->location + attribute_index;
+            attribute_output->offset = (vulkan_size_t) input->offset + item_offset * attribute_index;
+            attribute_output->format = input_format;
+            ++attribute_output;
         }
     }
 
@@ -568,11 +712,22 @@ void render_backend_compiler_state_request_graphics (struct render_backend_pipel
 
 void render_backend_compiler_state_destroy_graphics_request (struct graphics_pipeline_compilation_request_t *request)
 {
+    for (kan_loop_size_t module_index = 0u; module_index < request->linked_code_modules_count; ++module_index)
+    {
+        render_backend_system_unlink_code_module (request->linked_code_modules[module_index]);
+    }
+
     kan_allocation_group_t allocation_group = request->pipeline->system->pipeline_wrapper_allocation_group;
     kan_free_general (allocation_group, request->shader_stages,
                       sizeof (VkPipelineShaderStageCreateInfo) * request->shader_stages_count);
+    kan_free_general (allocation_group, request->input_bindings,
+                      sizeof (VkVertexInputBindingDescription) * request->input_bindings_count);
+    kan_free_general (allocation_group, request->attributes,
+                      sizeof (VkVertexInputAttributeDescription) * request->attributes_count);
     kan_free_general (allocation_group, request->color_blending_attachments,
                       sizeof (VkPipelineColorBlendAttachmentState) * request->color_blending_attachments_count);
+    kan_free_general (allocation_group, request->linked_code_modules,
+                      sizeof (struct render_backend_code_module_t *) * request->linked_code_modules_count);
     kan_free_batched (allocation_group, request);
 }
 
@@ -584,7 +739,103 @@ struct render_backend_graphics_pipeline_t *render_backend_system_create_graphics
     struct kan_cpu_section_execution_t execution;
     kan_cpu_section_execution_init (&execution, system->section_create_graphics_pipeline_internal);
 
-    struct render_backend_graphics_pipeline_family_t *family = KAN_HANDLE_GET (description->family);
+    // We create pipeline layout right away, because its creation should be quite fast in comparison with pipeline
+    // compilation and therefore there is no need to copy set layout array and postpone layout creation till
+    // pipeline compilation.
+    vulkan_size_t used_set_index_count = 0u;
+
+    for (kan_loop_size_t index = 0u; index < description->parameter_set_layouts_count; ++index)
+    {
+        struct render_backend_pipeline_parameter_set_layout_t *layout =
+            KAN_HANDLE_GET (description->parameter_set_layouts[index]);
+        used_set_index_count = KAN_MAX (used_set_index_count, layout->set + 1u);
+    }
+
+    VkPipelineLayout pipeline_layout;
+    VkDescriptorSetLayout layouts_for_pipeline_static[KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_INLINE_DESCS];
+    VkDescriptorSetLayout *layouts_for_pipeline = layouts_for_pipeline_static;
+
+    if (used_set_index_count > KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_INLINE_DESCS)
+    {
+        layouts_for_pipeline = kan_allocate_general (system->utility_allocation_group,
+                                                     sizeof (VkDescriptorSetLayout) * used_set_index_count,
+                                                     _Alignof (VkDescriptorSetLayout));
+    }
+
+    for (kan_loop_size_t layout_index = 0u; layout_index < used_set_index_count; ++layout_index)
+    {
+        layouts_for_pipeline[layout_index] = system->empty_descriptor_set_layout;
+    }
+
+    for (kan_loop_size_t index = 0u; index < description->parameter_set_layouts_count; ++index)
+    {
+        struct render_backend_pipeline_parameter_set_layout_t *layout =
+            KAN_HANDLE_GET (description->parameter_set_layouts[index]);
+
+        if (layouts_for_pipeline[layout->set] != system->empty_descriptor_set_layout)
+        {
+            KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR,
+                     "Failed to add parameter set layout \"%s\" for set %lu for to pipeline \"%s\" as this hardware "
+                     "set is already used.",
+                     layout->tracking_name, (unsigned long) layout->set, description->tracking_name)
+
+            if (layouts_for_pipeline != layouts_for_pipeline_static)
+            {
+                kan_free_general (system->utility_allocation_group, layouts_for_pipeline,
+                                  sizeof (VkDescriptorSetLayout) * used_set_index_count);
+            }
+
+            return NULL;
+        }
+        else
+        {
+            layouts_for_pipeline[layout->set] = layout->layout;
+        }
+    }
+
+    VkPipelineLayoutCreateInfo pipeline_layout_info = {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+        .pNext = NULL,
+        .flags = 0u,
+        .setLayoutCount = (vulkan_size_t) used_set_index_count,
+        .pSetLayouts = layouts_for_pipeline,
+        .pushConstantRangeCount = 0u,
+        .pPushConstantRanges = NULL,
+    };
+
+    VkResult result = vkCreatePipelineLayout (system->device, &pipeline_layout_info,
+                                              VULKAN_ALLOCATION_CALLBACKS (system), &pipeline_layout);
+
+    if (layouts_for_pipeline != layouts_for_pipeline_static)
+    {
+        kan_free_general (system->utility_allocation_group, layouts_for_pipeline,
+                          sizeof (VkDescriptorSetLayout) * used_set_index_count);
+    }
+
+    if (result != VK_SUCCESS)
+    {
+        KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR, "Failed to create pipeline layout for pipeline \"%s\".",
+                 description->tracking_name)
+        kan_cpu_section_execution_shutdown (&execution);
+        return NULL;
+    }
+
+#if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED)
+    char debug_name[KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME];
+    snprintf (debug_name, KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME, "PipelineLayout::ForPipelineFamily::%s",
+              description->tracking_name);
+
+    struct VkDebugUtilsObjectNameInfoEXT object_name = {
+        .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
+        .pNext = NULL,
+        .objectType = VK_OBJECT_TYPE_PIPELINE_LAYOUT,
+        .objectHandle = CONVERT_HANDLE_FOR_DEBUG pipeline_layout,
+        .pObjectName = debug_name,
+    };
+
+    vkSetDebugUtilsObjectNameEXT (system->device, &object_name);
+#endif
+
     struct render_backend_graphics_pipeline_t *pipeline = kan_allocate_batched (
         system->pipeline_wrapper_allocation_group, sizeof (struct render_backend_graphics_pipeline_t));
 
@@ -594,8 +845,8 @@ struct render_backend_graphics_pipeline_t *render_backend_system_create_graphics
     pipeline->system = system;
 
     pipeline->pipeline = VK_NULL_HANDLE;
+    pipeline->layout = pipeline_layout;
     pipeline->pass = KAN_HANDLE_GET (description->pass);
-    pipeline->family = family;
 
     pipeline->min_depth = description->min_depth;
     pipeline->max_depth = description->max_depth;
@@ -620,6 +871,11 @@ void render_backend_system_destroy_graphics_pipeline (struct render_backend_syst
     if (pipeline->pipeline != VK_NULL_HANDLE)
     {
         vkDestroyPipeline (system->device, pipeline->pipeline, VULKAN_ALLOCATION_CALLBACKS (system));
+    }
+
+    if (pipeline->layout != VK_NULL_HANDLE)
+    {
+        vkDestroyPipelineLayout (system->device, pipeline->layout, VULKAN_ALLOCATION_CALLBACKS (system));
     }
 
     kan_free_batched (system->pipeline_wrapper_allocation_group, pipeline);

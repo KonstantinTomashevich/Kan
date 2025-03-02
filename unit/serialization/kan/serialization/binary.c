@@ -628,7 +628,6 @@ _Static_assert (sizeof (enum kan_reflection_archetype_t) == sizeof (kan_reflecti
 
 static inline void add_field_to_commands (struct generation_temporary_state_t *state,
                                           struct kan_reflection_field_t *field,
-                                          script_size_t padding_to_include,
                                           script_size_t condition_index)
 {
     switch (field->archetype)
@@ -802,11 +801,6 @@ static inline void add_field_to_commands (struct generation_temporary_state_t *s
                  state->struct_data->name, field->name)
         break;
     }
-
-    if (state->last_command && state->last_command->command.type == SCRIPT_COMMAND_BLOCK)
-    {
-        state->last_command->command.block.size += padding_to_include;
-    }
 }
 
 static void script_storage_ensure_script_generated (struct script_storage_t *storage, struct script_node_t *node)
@@ -855,31 +849,11 @@ static void script_storage_ensure_script_generated (struct script_storage_t *sto
             if (condition_index == SCRIPT_NO_CONDITION)
             {
                 add_condition (&state, condition);
+                condition_index = state.conditions_count - 1u;
             }
         }
 
-        script_size_t padding_to_include = 0u;
-
-        // It only makes sense to include paddings if we're not part of the union.
-        if (condition_index == SCRIPT_NO_CONDITION)
-        {
-            const script_size_t field_end = (script_size_t) (field->offset + field->size);
-            if (field_index + 1u != state.struct_data->fields_count)
-            {
-                struct kan_reflection_field_t *next_field = &state.struct_data->fields[field_index + 1u];
-                if (!next_field->visibility_condition_field)
-                {
-                    padding_to_include = (script_size_t) (next_field->offset - field_end);
-                }
-            }
-            else if (field_end % state.struct_data->alignment != 0u)
-            {
-                padding_to_include =
-                    (script_size_t) (state.struct_data->alignment - (field_end % state.struct_data->alignment));
-            }
-        }
-
-        add_field_to_commands (&state, field, padding_to_include, condition_index);
+        add_field_to_commands (&state, field, condition_index);
     }
 
     _Static_assert (_Alignof (struct script_t) == _Alignof (struct script_condition_t),
@@ -1438,6 +1412,7 @@ static inline void serialization_common_state_push_script_state (
         {
             for (script_size_t index = 0u; index < script->conditions_count; ++index)
             {
+                script_state->condition_values[index] = SERIALIZATION_CONDITION_NOT_CALCULATED;
                 calculate_condition (instance, script_state->condition_values, index,
                                      (struct script_condition_t *) script->data);
             }

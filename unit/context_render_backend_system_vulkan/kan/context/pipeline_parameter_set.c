@@ -13,7 +13,7 @@ void render_backend_descriptor_set_allocator_init (struct render_backend_descrip
 struct render_backend_descriptor_set_allocation_t render_backend_descriptor_set_allocator_allocate (
     struct render_backend_system_t *system,
     struct render_backend_descriptor_set_allocator_t *allocator,
-    struct render_backend_descriptor_set_layout_t *layout)
+    struct render_backend_pipeline_parameter_set_layout_t *layout)
 {
     struct kan_cpu_section_execution_t execution;
     kan_cpu_section_execution_init (&execution, system->section_descriptor_set_allocator_allocate);
@@ -206,30 +206,7 @@ struct render_backend_pipeline_parameter_set_t *render_backend_system_create_pip
     struct kan_cpu_section_execution_t execution;
     kan_cpu_section_execution_init (&execution, system->section_create_pipeline_parameter_set_internal);
 
-    struct render_backend_descriptor_set_layout_t *layout = NULL;
-    switch (description->family_type)
-    {
-    case KAN_RENDER_PIPELINE_TYPE_GRAPHICS:
-    {
-        struct render_backend_graphics_pipeline_family_t *family = KAN_HANDLE_GET (description->graphics_family);
-
-        if (description->set >= family->descriptor_set_layouts_count)
-        {
-            KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR,
-                     "Failed to create pipeline parameter set \"%s\": requested set %lu while pipeline family has only "
-                     "%lu sets.",
-                     description->tracking_name, (unsigned long) description->set,
-                     (unsigned long) family->descriptor_set_layouts_count)
-
-            kan_cpu_section_execution_shutdown (&execution);
-            return NULL;
-        }
-
-        layout = family->descriptor_set_layouts[description->set];
-        break;
-    }
-    }
-
+    struct render_backend_pipeline_parameter_set_layout_t *layout = KAN_HANDLE_GET (description->layout);
     struct render_backend_descriptor_set_allocation_t stable_allocation = {VK_NULL_HANDLE, NULL};
     struct render_backend_descriptor_set_allocation_t *unstable_allocations = NULL;
 
@@ -351,9 +328,7 @@ struct render_backend_pipeline_parameter_set_t *render_backend_system_create_pip
         set->unstable.last_accessed_allocation_index = UINT32_MAX;
     }
 
-    set->set_index = description->set;
     set->bound_image_views = NULL;
-
     if (layout->combined_image_samplers_count > 0u)
     {
         set->bound_image_views =

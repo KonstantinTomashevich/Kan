@@ -2805,7 +2805,7 @@ static void re2c_yyrestore (void)
  re2c:api = custom;
  re2c:api:style = free-form;
  re2c:define:YYCTYPE  = char;
- re2c:define:YYLESSTHAN = "io.cursor >= io.limit";
+ re2c:define:YYLESSTHAN = "io.limit - io.cursor < @@{len}";
  re2c:define:YYPEEK = "*io.cursor";
  re2c:define:YYSKIP = "re2c_yyskip ();";
  re2c:define:YYBACKUP = "re2c_yybackup ();";
@@ -3293,7 +3293,7 @@ static enum parse_response_t process_input_signal (enum indexed_access_type_t ac
          separator* @name_begin [A-Za-z_][A-Za-z0-9_]* @name_end separator* ","
          separator* @type_begin [A-Za-z_][A-Za-z0-9_]* @type_end separator* ","
          separator* @field_begin ([A-Za-z0-9_] | ".")+ @field_end separator* ","
-         separator* @value_begin [0-9]+ @value_end separator* ")"
+         separator* @value_begin [0-9]+ @value_end "u"? separator* ")"
          (" "* "\n")?
          {
              if (!io.is_output_phase)

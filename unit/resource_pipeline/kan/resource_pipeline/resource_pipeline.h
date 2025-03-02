@@ -95,11 +95,15 @@ typedef kan_interned_string_t (*kan_resource_compilation_register_byproduct_func
 /// \brief Register byproduct that is considered to be unique and should have unique readable name.
 /// \details Functionally, almost the same as `kan_resource_compilation_register_byproduct_functor_t`, but it never
 ///          searches the compatible byproduct through hashing and equality check. Instead, it attempts to create
-///          new byproduct with given name right away. If name is already occupied, function returns KAN_FALSE.
-typedef kan_bool_t (*kan_resource_compilation_register_unique_byproduct_functor_t) (
+///          new byproduct with given name as name base part: name base part should be unique and implementation is
+///          allowed to fail and return NULL if it is not unique among byproducts of given type, but implementation is
+///          also allowed to append arbitrary suffix to base name part if it is unavoidable. For example, runtime
+///          compilation might need to append suffix as it might need to properly handle both old and new versions
+///          of unique byproduct during hot reload. Therefore, resulting name is returning from this functor.
+typedef kan_interned_string_t (*kan_resource_compilation_register_unique_byproduct_functor_t) (
     kan_functor_user_data_t interface_user_data,
     kan_interned_string_t byproduct_type_name,
-    kan_interned_string_t byproduct_name,
+    kan_interned_string_t byproduct_name_base_part,
     void *byproduct_data);
 
 /// \brief Defines whole state of compilation routine.

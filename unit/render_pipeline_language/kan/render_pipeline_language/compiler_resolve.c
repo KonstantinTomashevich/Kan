@@ -3292,6 +3292,10 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
         if (!check_alias_or_variable_name_is_not_occupied (context, instance, resolve_scope,
                                                            expression->variable_declaration.variable_name))
         {
+            KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
+                     "[%s:%s:%s:%ld] Failed to add variable \"%s\" as its name is already occupied in current scope.",
+                     context->log_name, resolve_scope->function->module_name, expression->source_name,
+                     (long) expression->source_line, expression->variable_declaration.variable_name)
             resolved = KAN_FALSE;
         }
 

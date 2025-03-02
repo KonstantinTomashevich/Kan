@@ -568,7 +568,7 @@ static inline void re2c_yyrestore (void)
  re2c:api = custom;
  re2c:api:style = free-form;
  re2c:define:YYCTYPE  = char;
- re2c:define:YYLESSTHAN = "parser.cursor >= parser.limit";
+ re2c:define:YYLESSTHAN = "parser.limit - parser.cursor < @@{len}";
  re2c:define:YYPEEK = "*parser.cursor";
  re2c:define:YYSKIP = "re2c_yyskip ();";
  re2c:define:YYBACKUP = "re2c_yybackup ();";
@@ -903,6 +903,10 @@ static inline enum parse_status_t continue_into_potential_pragma (kan_bool_t all
      }
 
      "warning (push, " [0-9]+ "))" { return PARSE_STATUS_IN_PROGRESS; }
+
+     "warning (push))" { return PARSE_STATUS_IN_PROGRESS; }
+
+     "warning (disable : " [0-9]+ "))" { return PARSE_STATUS_IN_PROGRESS; }
 
      "warning (pop))" { return PARSE_STATUS_IN_PROGRESS; }
 

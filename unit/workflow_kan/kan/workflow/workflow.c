@@ -80,9 +80,9 @@ struct graph_builder_t
 
 struct workflow_graph_node_t
 {
-    kan_interned_string_t name;
     kan_workflow_function_t function;
     kan_functor_user_data_t user_data;
+    kan_cpu_section_t profiler_section;
 
     struct workflow_graph_header_t *header;
     kan_instance_size_t incomes_count;
@@ -111,15 +111,15 @@ struct workflow_graph_header_t
 };
 
 static kan_bool_t statics_initialized = KAN_FALSE;
-static kan_interned_string_t task_start_name;
-static kan_interned_string_t task_finish_name;
+static kan_cpu_section_t task_start_section;
+static kan_cpu_section_t task_finish_section;
 
 static void ensure_statics_initialized (void)
 {
     if (!statics_initialized)
     {
-        task_start_name = kan_string_intern ("workflow_task_start");
-        task_finish_name = kan_string_intern ("workflow_task_finish");
+        task_start_section = kan_cpu_section_get ("workflow_task_start");
+        task_finish_section = kan_cpu_section_get ("workflow_task_finish");
         statics_initialized = KAN_TRUE;
     }
 }
@@ -872,9 +872,9 @@ kan_workflow_graph_t kan_workflow_graph_builder_finalize (kan_workflow_graph_bui
                     result_graph->start_nodes[next_start_node_index++] = built_node;
                 }
 
-                built_node->name = node->name;
                 built_node->function = node->function;
                 built_node->user_data = node->user_data;
+                built_node->profiler_section = kan_cpu_section_get (node->name);
 
                 built_node->header = result_graph;
                 built_node->incomes_count = node->intermediate_incomes.size;
@@ -1014,15 +1014,15 @@ static void workflow_task_start_function (kan_functor_user_data_t user_data)
     struct workflow_graph_node_t *node = (struct workflow_graph_node_t *) user_data;
     node->job = kan_cpu_job_create ();
     kan_cpu_job_set_completion_task (node->job, (struct kan_cpu_task_t) {
-                                                    .name = task_finish_name,
                                                     .function = workflow_task_finish_function,
                                                     .user_data = user_data,
+                                                    .profiler_section = task_finish_section,
                                                 });
 
     kan_cpu_task_t task_handle = kan_cpu_job_dispatch_task (node->job, (struct kan_cpu_task_t) {
-                                                                           .name = node->name,
                                                                            .function = workflow_task_execute_function,
                                                                            .user_data = user_data,
+                                                                           .profiler_section = node->profiler_section,
                                                                        });
 
     if (KAN_HANDLE_IS_VALID (task_handle))
@@ -1055,9 +1055,9 @@ static void workflow_task_finish_function (kan_functor_user_data_t user_data)
             kan_atomic_int_unlock (&node->header->temporary_allocator_lock);
 
             list_node->task = (struct kan_cpu_task_t) {
-                .name = task_start_name,
                 .function = workflow_task_start_function,
                 .user_data = (kan_functor_user_data_t) outcome,
+                .profiler_section = task_start_section,
             };
 
             list_node->next = first_list_node;
@@ -1096,8 +1096,8 @@ void kan_workflow_graph_execute (kan_workflow_graph_t graph)
     for (kan_loop_size_t start_index = 0u; start_index < graph_header->start_nodes_count; ++start_index)
     {
         struct workflow_graph_node_t *start = graph_header->start_nodes[start_index];
-        KAN_CPU_TASK_LIST_USER_VALUE (&first_list_node, &graph_header->temporary_allocator, task_start_name,
-                                      workflow_task_start_function, start)
+        KAN_CPU_TASK_LIST_USER_VALUE (&first_list_node, &graph_header->temporary_allocator,
+                                      workflow_task_start_function, task_start_section, start)
     }
 
     kan_cpu_task_dispatch_list (first_list_node);

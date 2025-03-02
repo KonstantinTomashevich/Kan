@@ -75,3 +75,15 @@
 
 #    define KAN_MUTE_UNUSED_WARNINGS_END _Pragma ("GCC diagnostic pop")
 #endif
+
+#if defined(_MSC_VER) && !defined(__clang__)
+#    define KAN_MUTE_STRUCTURE_PADDED_WARNINGS_BEGIN _Pragma ("warning (push)") _Pragma ("warning (disable : 4324)")
+#    define KAN_MUTE_STRUCTURE_PADDED_WARNINGS_END _Pragma ("warning (pop)")
+#else
+// clang-format off
+#    define KAN_MUTE_STRUCTURE_PADDED_WARNINGS_BEGIN                                                                   \
+         _Pragma ("GCC diagnostic push")
+// clang-format on
+
+#    define KAN_MUTE_STRUCTURE_PADDED_WARNINGS_END _Pragma ("GCC diagnostic pop")
+#endif

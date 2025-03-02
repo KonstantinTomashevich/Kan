@@ -7,6 +7,7 @@
 #include <kan/container/hash_storage.h>
 #include <kan/context/render_backend_system.h>
 #include <kan/inline_math/inline_math.h>
+#include <kan/resource_material/resource_render_pass.h>
 #include <kan/threading/atomic.h>
 #include <kan/universe/universe.h>
 #include <kan/universe_object/universe_object.h>
@@ -25,9 +26,8 @@
 /// \parblock
 /// All found render pass resources are loaded and prepared for usage automatically, because in most cases all render
 /// passes are required for the application, therefore there is no sense to load them on demand. Passes that are needed
-/// for tools, but are not needed for the game (for example, editor-only passes), should be stored in appropriate
-/// resource directories that are visible for the editor and invisible for the game. Pass hot reload is done
-/// automatically when needed.
+/// for tools, but are not needed for the game (for example, editor-only passes), should be excluded through tag
+/// requirement routine, described in `kan_resource_render_pass_t` documentation.
 /// \endparblock
 ///
 /// \par Render graph
@@ -67,23 +67,6 @@ KAN_C_HEADER_BEGIN
 /// \brief Checkpoint, that is hit after all render foundation frame scheduling mutators finished execution.
 #define KAN_RENDER_FOUNDATION_FRAME_END "render_foundation_frame_end"
 
-/// \brief Represents data structure of resource that describes render pass.
-struct kan_resource_render_graph_pass_t
-{
-    /// \brief Render pass type.
-    enum kan_render_pass_type_t type;
-
-    /// \brief List of render pass attachments and their descriptions.
-    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_render_pass_attachment_t)
-    struct kan_dynamic_array_t attachments;
-};
-
-UNIVERSE_RENDER_FOUNDATION_API void kan_resource_render_graph_pass_init (
-    struct kan_resource_render_graph_pass_t *instance);
-
-UNIVERSE_RENDER_FOUNDATION_API void kan_resource_render_graph_pass_shutdown (
-    struct kan_resource_render_graph_pass_t *instance);
-
 /// \brief Stores information about pass attachment that could be useful for outer users.
 struct kan_render_graph_pass_attachment_t
 {
@@ -98,6 +81,12 @@ struct kan_render_graph_pass_t
     enum kan_render_pass_type_t type;
     kan_render_pass_t pass;
 
+    /// \details Can be invalid handle when pipelines has empty parameter set layout.
+    kan_render_pipeline_parameter_set_layout_t pass_parameter_set_layout;
+
+    /// \brief Bindings meta for pass pipeline parameter set.
+    struct kan_rpl_meta_set_bindings_t pass_parameter_set_bindings;
+
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_render_graph_pass_attachment_t)
     struct kan_dynamic_array_t attachments;
 };
@@ -105,6 +94,28 @@ struct kan_render_graph_pass_t
 UNIVERSE_RENDER_FOUNDATION_API void kan_render_graph_pass_init (struct kan_render_graph_pass_t *instance);
 
 UNIVERSE_RENDER_FOUNDATION_API void kan_render_graph_pass_shutdown (struct kan_render_graph_pass_t *instance);
+
+/// \brief Helper function for construction parameter set layout using meta.
+/// \details Used across different routine in render foundation.
+UNIVERSE_RENDER_FOUNDATION_API kan_render_pipeline_parameter_set_layout_t
+kan_render_construct_parameter_set_layout_from_meta (kan_render_context_t render_context,
+                                                     kan_render_size_t set,
+                                                     kan_bool_t stable_binding,
+                                                     const struct kan_rpl_meta_set_bindings_t *meta,
+                                                     kan_interned_string_t tracking_name,
+                                                     kan_allocation_group_t temporary_allocation_group);
+
+/// \brief Event that is being sent when `kan_render_graph_pass_t` is inserted or updated.
+struct kan_render_graph_pass_updated_event_t
+{
+    kan_interned_string_t name;
+};
+
+/// \brief Event that is being sent when `kan_render_graph_pass_t` is deleted.
+struct kan_render_graph_pass_deleted_event_t
+{
+    kan_interned_string_t name;
+};
 
 /// \brief Singleton that contains render context and used to manage access to it.
 /// \details Should only be opened with write access when whole render context is modified (for example when

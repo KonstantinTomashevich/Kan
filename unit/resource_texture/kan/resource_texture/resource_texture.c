@@ -1,6 +1,7 @@
 #include <string.h>
 
 #include <kan/log/logging.h>
+#include <kan/memory/allocation.h>
 #include <kan/resource_pipeline/resource_pipeline.h>
 #include <kan/resource_texture/resource_texture.h>
 
@@ -581,11 +582,12 @@ static enum kan_resource_compile_result_t kan_resource_texture_compile (struct k
                     char name_buffer[KAN_RESOURCE_TEXTURE_BYPRODUCT_MAX_NAME_LENGTH];
                     snprintf (name_buffer, KAN_RESOURCE_TEXTURE_BYPRODUCT_MAX_NAME_LENGTH, "%s_%s_mip_%u", state->name,
                               target_format_name, (unsigned int) mip);
-                    kan_interned_string_t byproduct_name = kan_string_intern (name_buffer);
 
-                    if (state->register_unique_byproduct (state->interface_user_data,
-                                                          interned_kan_resource_texture_compiled_data_t, byproduct_name,
-                                                          &compiled_data))
+                    kan_interned_string_t byproduct_name = state->register_unique_byproduct (
+                        state->interface_user_data, interned_kan_resource_texture_compiled_data_t,
+                        kan_string_intern (name_buffer), &compiled_data);
+
+                    if (byproduct_name)
                     {
                         kan_interned_string_t *spot = kan_dynamic_array_add_last (&item->compiled_data_per_mip);
                         KAN_ASSERT (spot)

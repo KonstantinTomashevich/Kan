@@ -15,3 +15,8 @@ parent = ""
         KAN_RESOURCE_TEXTURE_COMPILED_FORMAT_UNCOMPRESSED_D16,
         KAN_RESOURCE_TEXTURE_COMPILED_FORMAT_UNCOMPRESSED_D32
 }
+
++configuration {
+    __type = kan_resource_material_platform_configuration_t
+    code_format = KAN_RENDER_CODE_FORMAT_SPIRV
+}

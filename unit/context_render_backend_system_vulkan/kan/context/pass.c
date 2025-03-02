@@ -583,8 +583,7 @@ kan_bool_t kan_render_pass_instance_graphics_pipeline (kan_render_pass_instance_
     DEBUG_LABEL_INSERT (instance->command_buffer, pipeline->tracking_name, 0.063f, 0.569f, 0.0f, 1.0f)
     vkCmdBindPipeline (instance->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->pipeline);
     kan_atomic_int_unlock (&command_state->command_operation_lock);
-    instance->current_pipeline_layout = pipeline->family->layout;
-
+    instance->current_pipeline_layout = pipeline->layout;
     return KAN_TRUE;
 }
 
@@ -631,8 +630,8 @@ void kan_render_pass_instance_pipeline_parameter_sets (kan_render_pass_instance_
 
         DEBUG_LABEL_INSERT (instance->command_buffer, set->tracking_name, 0.918f, 0.98f, 0.0f, 1.0f)
         vkCmdBindDescriptorSets (instance->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                 instance->current_pipeline_layout, (vulkan_size_t) set->set_index, 1u, &descriptor_set,
-                                 0u, NULL);
+                                 instance->current_pipeline_layout, (vulkan_size_t) set->layout->set, 1u,
+                                 &descriptor_set, 0u, NULL);
     }
 
     kan_atomic_int_unlock (&command_state->command_operation_lock);

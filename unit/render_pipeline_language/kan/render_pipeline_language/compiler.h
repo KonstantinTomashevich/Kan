@@ -17,6 +17,15 @@ KAN_C_HEADER_BEGIN
 KAN_HANDLE_DEFINE (kan_rpl_compiler_context_t);
 KAN_HANDLE_DEFINE (kan_rpl_compiler_instance_t);
 
+/// \brief Target scope for option setters.
+/// \details Makes it possible for user to validate that option belongs to expected scope.
+enum kan_rpl_option_target_scope_t
+{
+    KAN_RPL_OPTION_TARGET_SCOPE_ANY = 0u,
+    KAN_RPL_OPTION_TARGET_SCOPE_GLOBAL,
+    KAN_RPL_OPTION_TARGET_SCOPE_INSTANCE,
+};
+
 /// \brief Defines entry point using its stage and function name.
 struct kan_rpl_entry_point_t
 {
@@ -139,6 +148,9 @@ enum kan_rpl_meta_variable_type_t
     KAN_RPL_META_VARIABLE_TYPE_F4X4,
 };
 
+/// \brief Helper for representing `kan_rpl_meta_variable_type_t` as strings in logs.
+RENDER_PIPELINE_LANGUAGE_API const char *kan_rpl_meta_variable_type_to_string (enum kan_rpl_meta_variable_type_t type);
+
 /// \brief Stores information about exposed buffer attribute.
 struct kan_rpl_meta_attribute_t
 {
@@ -162,6 +174,9 @@ struct kan_rpl_meta_parameter_t
 };
 
 RENDER_PIPELINE_LANGUAGE_API void kan_rpl_meta_parameter_init (struct kan_rpl_meta_parameter_t *instance);
+
+RENDER_PIPELINE_LANGUAGE_API void kan_rpl_meta_parameter_init_copy (struct kan_rpl_meta_parameter_t *instance,
+                                                                    const struct kan_rpl_meta_parameter_t *copy_from);
 
 RENDER_PIPELINE_LANGUAGE_API void kan_rpl_meta_parameter_shutdown (struct kan_rpl_meta_parameter_t *instance);
 
@@ -203,31 +218,10 @@ struct kan_rpl_meta_buffer_t
 
 RENDER_PIPELINE_LANGUAGE_API void kan_rpl_meta_buffer_init (struct kan_rpl_meta_buffer_t *instance);
 
+RENDER_PIPELINE_LANGUAGE_API void kan_rpl_meta_buffer_init_copy (struct kan_rpl_meta_buffer_t *instance,
+                                                                 const struct kan_rpl_meta_buffer_t *copy_from);
+
 RENDER_PIPELINE_LANGUAGE_API void kan_rpl_meta_buffer_shutdown (struct kan_rpl_meta_buffer_t *instance);
-
-/// \brief Enumerates supported sampler filter modes.
-enum kan_rpl_meta_sampler_filter_t
-{
-    KAN_RPL_META_SAMPLER_FILTER_NEAREST = 0u,
-    KAN_RPL_META_SAMPLER_FILTER_LINEAR,
-};
-
-/// \brief Enumerates supported sampler mip map modes.
-enum kan_rpl_meta_sampler_mip_map_mode_t
-{
-    KAN_RPL_META_SAMPLER_MIP_MAP_MODE_NEAREST = 0u,
-    KAN_RPL_META_SAMPLER_MIP_MAP_MODE_LINEAR,
-};
-
-/// \brief Enumerates supported sampler address modes.
-enum kan_rpl_meta_sampler_address_mode_t
-{
-    KAN_RPL_META_SAMPLER_ADDRESS_MODE_REPEAT = 0u,
-    KAN_RPL_META_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT,
-    KAN_RPL_META_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-    KAN_RPL_META_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER,
-    KAN_RPL_META_SAMPLER_ADDRESS_MODE_MIRROR_CLAMP_TO_EDGE,
-};
 
 /// \brief Stores information about sampler exposed to metadata.
 struct kan_rpl_meta_sampler_t
@@ -248,6 +242,9 @@ struct kan_rpl_meta_set_bindings_t
 };
 
 RENDER_PIPELINE_LANGUAGE_API void kan_rpl_meta_set_bindings_init (struct kan_rpl_meta_set_bindings_t *instance);
+
+RENDER_PIPELINE_LANGUAGE_API void kan_rpl_meta_set_bindings_init_copy (
+    struct kan_rpl_meta_set_bindings_t *instance, const struct kan_rpl_meta_set_bindings_t *copy_from);
 
 RENDER_PIPELINE_LANGUAGE_API void kan_rpl_meta_set_bindings_shutdown (struct kan_rpl_meta_set_bindings_t *instance);
 
@@ -346,7 +343,24 @@ struct kan_rpl_meta_t
     float color_blend_constant_a;
 };
 
+/// \brief Meta emission flags that make it possible to skip generation of some parts of meta.
+KAN_REFLECTION_FLAGS
+enum kan_rpl_meta_emission_flags_t
+{
+    /// \brief Constant that indicates that nothing is skipped.
+    KAN_RPL_META_EMISSION_FULL = 0u,
+
+    /// \brief Flag that tells compiler to skip generation of attribute buffers meta.
+    KAN_RPL_META_EMISSION_SKIP_ATTRIBUTE_BUFFERS = 1u << 0u,
+
+    /// \brief Flags that tells compiler to skip generation of parameter sets meta.
+    KAN_RPL_META_EMISSION_SKIP_SETS = 1u << 1u,
+};
+
 RENDER_PIPELINE_LANGUAGE_API void kan_rpl_meta_init (struct kan_rpl_meta_t *instance);
+
+RENDER_PIPELINE_LANGUAGE_API void kan_rpl_meta_init_copy (struct kan_rpl_meta_t *instance,
+                                                          const struct kan_rpl_meta_t *copy_from);
 
 RENDER_PIPELINE_LANGUAGE_API void kan_rpl_meta_shutdown (struct kan_rpl_meta_t *instance);
 
@@ -356,15 +370,25 @@ kan_rpl_compiler_context_create (enum kan_rpl_pipeline_type_t pipeline_type, kan
 
 /// \brief Adds given module to resolution scope. Does not copy and does not transfer ownership.
 RENDER_PIPELINE_LANGUAGE_API kan_bool_t kan_rpl_compiler_context_use_module (
-    kan_rpl_compiler_context_t compiler_context, struct kan_rpl_intermediate_t *intermediate_reference);
+    kan_rpl_compiler_context_t compiler_context, const struct kan_rpl_intermediate_t *intermediate_reference);
 
 /// \brief Attempts to set flag option value.
-RENDER_PIPELINE_LANGUAGE_API kan_bool_t kan_rpl_compiler_context_set_option_flag (
-    kan_rpl_compiler_context_t compiler_context, kan_interned_string_t name, kan_bool_t value);
+/// \details `only_instance_scope` additionally restricts operation to only instanced options, which can be required in
+///          some contexts in order to process option application with due validation.
+RENDER_PIPELINE_LANGUAGE_API kan_bool_t
+kan_rpl_compiler_context_set_option_flag (kan_rpl_compiler_context_t compiler_context,
+                                          enum kan_rpl_option_target_scope_t target_scope,
+                                          kan_interned_string_t name,
+                                          kan_bool_t value);
 
 /// \brief Attempts to set count option value.
-RENDER_PIPELINE_LANGUAGE_API kan_bool_t kan_rpl_compiler_context_set_option_count (
-    kan_rpl_compiler_context_t compiler_context, kan_interned_string_t name, kan_rpl_unsigned_int_literal_t value);
+/// \details `only_instance_scope` additionally restricts operation to only instanced options, which can be required in
+///          some contexts in order to process option application with due validation.
+RENDER_PIPELINE_LANGUAGE_API kan_bool_t
+kan_rpl_compiler_context_set_option_count (kan_rpl_compiler_context_t compiler_context,
+                                           enum kan_rpl_option_target_scope_t target_scope,
+                                           kan_interned_string_t name,
+                                           kan_rpl_unsigned_int_literal_t value);
 
 /// \brief Resolves context with given entry points to provide data for emit step.
 /// \details One context can be used for multiple resolves as resolves do not modify the context.
@@ -376,7 +400,9 @@ kan_rpl_compiler_context_resolve (kan_rpl_compiler_context_t compiler_context,
 
 /// \brief Emits meta using resolved instance data.
 RENDER_PIPELINE_LANGUAGE_API kan_bool_t
-kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t compiler_instance, struct kan_rpl_meta_t *meta);
+kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t compiler_instance,
+                                     struct kan_rpl_meta_t *meta,
+                                     enum kan_rpl_meta_emission_flags_t flags);
 
 /// \brief Emits SPIRV 1.3 bytecode using resolved instance data.
 /// \invariant Given output dynamic array must not be initialized.

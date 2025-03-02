@@ -64,6 +64,11 @@ CONTAINER_API void kan_dynamic_array_init (struct kan_dynamic_array_t *array,
                                            kan_instance_size_t item_alignment,
                                            kan_allocation_group_t allocation_group);
 
+/// \brief Initializes array instance by moving data into it from another instances.
+/// \details Another instance will still be usable, but it will become empty.
+CONTAINER_API void kan_dynamic_array_init_move (struct kan_dynamic_array_t *array,
+                                                struct kan_dynamic_array_t *move_from_array);
+
 /// \brief Attempts to increase array size, returns pointer to usable memory block for one item on success.
 /// \details If array is already full, `NULL` will be returned instead of correct address.
 CONTAINER_API void *kan_dynamic_array_add_last (struct kan_dynamic_array_t *array);

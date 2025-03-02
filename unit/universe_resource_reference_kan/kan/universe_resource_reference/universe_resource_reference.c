@@ -140,7 +140,7 @@ struct resource_reference_manager_state_t
     KAN_REFLECTION_IGNORE
     struct resource_reference_manager_execution_shared_state_t execution_shared_state;
 
-    kan_interned_string_t interned_resource_reference_manager_server;
+    kan_cpu_section_t section_resource_reference_manager_server;
 
     kan_instance_size_t trailing_data_count;
 
@@ -191,7 +191,7 @@ UNIVERSE_RESOURCE_REFERENCE_KAN_API void resource_reference_manager_state_init (
     struct resource_reference_manager_state_t *instance)
 {
     instance->my_allocation_group = kan_allocation_group_stack_get ();
-    instance->interned_resource_reference_manager_server = kan_string_intern ("resource_reference_manager_server");
+    instance->section_resource_reference_manager_server = kan_cpu_section_get ("resource_reference_manager_server");
 }
 
 UNIVERSE_RESOURCE_REFERENCE_KAN_API void mutator_template_deploy_resource_reference_manager (
@@ -965,8 +965,8 @@ UNIVERSE_RESOURCE_REFERENCE_KAN_API void mutator_template_execute_resource_refer
 
     for (kan_loop_size_t worker_index = 0u; worker_index < cpu_count; ++worker_index)
     {
-        KAN_CPU_TASK_LIST_USER_VALUE (&task_list_node, &state->temporary_allocator,
-                                      state->interned_resource_reference_manager_server, execute_shared_serve, state)
+        KAN_CPU_TASK_LIST_USER_VALUE (&task_list_node, &state->temporary_allocator, execute_shared_serve,
+                                      state->section_resource_reference_manager_server, state)
     }
 
     kan_cpu_job_dispatch_and_detach_task_list (job, task_list_node);

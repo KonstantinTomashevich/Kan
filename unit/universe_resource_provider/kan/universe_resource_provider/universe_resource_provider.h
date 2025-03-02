@@ -142,6 +142,16 @@ struct kan_resource_request_t
     /// \brief Priority for resource loading if it is not already loaded.
     kan_instance_size_t priority;
 
+    /// \brief True if resource provider has any scheduled operation that will update this request.
+    /// \details In environment with hot reload enabled, difference resource might form one logical entity which can
+    ///          only be properly updated when all resources are loaded in latest state.
+    ///          When hot reload is disabled, this flag is always false.
+    ///          Keep in mind, that this flag would not be reset to false when scheduled operation has failed, for
+    ///          example due to serialization or runtime compilation error. It is not updated, because failure means
+    ///          that expected new data cannot be loaded and if something relies on receiving coherent new data from
+    ///          multiple resources, it cannot do so due to this failure.
+    kan_bool_t expecting_new_data;
+
     /// \brief Whether request is put to sleeping mode.
     /// \details Sleeping mode allows resource provider to unload resource if there is no awake requests.
     ///          Requests will be automatically awoken when their resource changes due to hot reload.

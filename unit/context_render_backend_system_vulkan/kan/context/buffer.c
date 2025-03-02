@@ -351,6 +351,12 @@ void *kan_render_buffer_patch (kan_render_buffer_t buffer, vulkan_size_t slice_o
     return NULL;
 }
 
+kan_render_size_t kan_render_buffer_get_full_size (kan_render_buffer_t buffer)
+{
+    struct render_backend_buffer_t *data = KAN_HANDLE_GET (buffer);
+    return (kan_render_size_t) data->full_size;
+}
+
 void *kan_render_buffer_begin_access (kan_render_buffer_t buffer)
 {
     struct render_backend_buffer_t *data = KAN_HANDLE_GET (buffer);

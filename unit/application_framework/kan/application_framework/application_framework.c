@@ -514,6 +514,8 @@ int kan_application_framework_run_with_configuration (
             while (!kan_application_framework_system_is_exit_requested (application_framework_system, &result))
             {
                 kan_cpu_stage_separator ();
+                kan_cpu_reset_task_dispatch_counter ();
+
                 const kan_time_size_t frame_start_ns = kan_precise_time_get_elapsed_nanoseconds ();
                 kan_application_system_sync_in_main_thread (application_system);
                 kan_update_system_run (update_system);
@@ -533,6 +535,7 @@ int kan_application_framework_run_with_configuration (
             }
 
             kan_cpu_stage_separator ();
+            kan_cpu_reset_task_dispatch_counter ();
         }
     }
 

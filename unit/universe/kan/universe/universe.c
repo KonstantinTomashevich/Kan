@@ -164,13 +164,7 @@ enum query_type_t
     QUERY_TYPE_EVENT_FETCH,
 };
 
-static kan_bool_t interned_statics_initialized = KAN_FALSE;
-static kan_interned_string_t interned_deploy_scheduler;
-static kan_interned_string_t interned_deploy_mutator;
-static kan_interned_string_t interned_finish_pipeline_deployment;
-static kan_interned_string_t interned_migrate_configuration;
-static kan_interned_string_t interned_undeploy_and_migrate_scheduler;
-static kan_interned_string_t interned_undeploy_and_migrate_mutator;
+static kan_bool_t statics_initialized = KAN_FALSE;
 static kan_interned_string_t interned_kan_repository_singleton_read_query_t;
 static kan_interned_string_t interned_kan_repository_singleton_write_query_t;
 static kan_interned_string_t interned_kan_repository_indexed_insert_query_t;
@@ -203,19 +197,19 @@ static kan_interned_string_t interned_kan_universe_scheduler_interface_run_pipel
 static kan_interned_string_t interned_kan_universe_scheduler_interface_update_child;
 static kan_interned_string_t interned_kan_universe_scheduler_interface_update_all_children;
 
-static void ensure_interned_statics_initialized (void)
+static kan_cpu_section_t section_deploy_scheduler;
+static kan_cpu_section_t section_deploy_mutator;
+static kan_cpu_section_t section_migrate_configuration;
+static kan_cpu_section_t section_undeploy_and_migrate_scheduler;
+static kan_cpu_section_t section_undeploy_and_migrate_mutator;
+static kan_cpu_section_t section_finish_pipeline_deployment;
+
+static void ensure_statics_initialized (void)
 {
-    if (interned_statics_initialized)
+    if (statics_initialized)
     {
         return;
     }
-
-    interned_deploy_scheduler = kan_string_intern ("deploy_scheduler");
-    interned_deploy_mutator = kan_string_intern ("deploy_mutator");
-    interned_finish_pipeline_deployment = kan_string_intern ("finish_pipeline_deployment");
-    interned_migrate_configuration = kan_string_intern ("migrate_configuration");
-    interned_undeploy_and_migrate_scheduler = kan_string_intern ("undeploy_and_migrate_scheduler");
-    interned_undeploy_and_migrate_mutator = kan_string_intern ("undeploy_and_migrate_mutator");
 
     interned_kan_repository_singleton_read_query_t = kan_string_intern ("kan_repository_singleton_read_query_t");
     interned_kan_repository_singleton_write_query_t = kan_string_intern ("kan_repository_singleton_write_query_t");
@@ -282,7 +276,14 @@ static void ensure_interned_statics_initialized (void)
     interned_kan_universe_scheduler_interface_update_all_children =
         kan_string_intern ("kan_universe_scheduler_interface_update_all_children");
 
-    interned_statics_initialized = KAN_TRUE;
+    section_deploy_scheduler = kan_cpu_section_get ("deploy_scheduler");
+    section_deploy_mutator = kan_cpu_section_get ("deploy_mutator");
+    section_migrate_configuration = kan_cpu_section_get ("migrate_configuration");
+    section_undeploy_and_migrate_scheduler = kan_cpu_section_get ("undeploy_and_migrate_scheduler");
+    section_undeploy_and_migrate_mutator = kan_cpu_section_get ("undeploy_and_migrate_mutator");
+    section_finish_pipeline_deployment = kan_cpu_section_get ("finish_pipeline_deployment");
+
+    statics_initialized = KAN_TRUE;
 }
 
 struct automated_lifetime_query_check_result_t
@@ -2116,7 +2117,7 @@ static void world_collect_deployment_tasks (struct universe_t *universe,
                                             struct kan_cpu_task_list_node_t **list_node,
                                             struct kan_stack_group_allocator_t *temporary_allocator)
 {
-    KAN_CPU_TASK_LIST_USER_STRUCT (list_node, temporary_allocator, interned_deploy_scheduler, deploy_scheduler_execute,
+    KAN_CPU_TASK_LIST_USER_STRUCT (list_node, temporary_allocator, deploy_scheduler_execute, section_deploy_scheduler,
                                    struct deploy_scheduler_user_data_t,
                                    {
                                        .universe = universe,
@@ -2136,7 +2137,7 @@ static void world_collect_deployment_tasks (struct universe_t *universe,
         {
             struct mutator_t *mutator = &((struct mutator_t *) pipeline->mutators.data)[mutator_index];
             KAN_CPU_TASK_LIST_USER_STRUCT (
-                list_node, temporary_allocator, interned_deploy_mutator, deploy_mutator_execute,
+                list_node, temporary_allocator, deploy_mutator_execute, section_deploy_mutator,
                 struct deploy_mutator_user_data_t,
                 {
                     .universe = universe,
@@ -2182,8 +2183,8 @@ static void world_finish_deployment (struct universe_t *universe,
     for (kan_loop_size_t index = 0u; index < world->pipelines.size; ++index)
     {
         struct pipeline_t *pipeline = &((struct pipeline_t *) world->pipelines.data)[index];
-        KAN_CPU_TASK_LIST_USER_VALUE (list_node, temporary_allocator, interned_finish_pipeline_deployment,
-                                      finish_pipeline_deployment_execute, pipeline)
+        KAN_CPU_TASK_LIST_USER_VALUE (list_node, temporary_allocator, finish_pipeline_deployment_execute,
+                                      section_finish_pipeline_deployment, pipeline)
     }
 
     for (kan_loop_size_t index = 0u; index < world->children.size; ++index)
@@ -2488,7 +2489,7 @@ kan_universe_t kan_universe_create (kan_allocation_group_t group,
                                     kan_reflection_registry_t registry,
                                     kan_context_t context)
 {
-    ensure_interned_statics_initialized ();
+    ensure_statics_initialized ();
     struct universe_t *universe =
         (struct universe_t *) kan_allocate_general (group, sizeof (struct universe_t), _Alignof (struct universe_t));
 
@@ -2622,8 +2623,8 @@ static void world_migration_schedulers_mutators_migrate (struct universe_t *univ
                 world->scheduler_api = &new_scheduler_api_node->api;
 
                 KAN_CPU_TASK_LIST_USER_STRUCT (
-                    first_task_node, temporary_allocator, interned_undeploy_and_migrate_scheduler,
-                    undeploy_and_migrate_scheduler_execute, struct undeploy_and_migrate_scheduler_user_data_t,
+                    first_task_node, temporary_allocator, undeploy_and_migrate_scheduler_execute,
+                    section_undeploy_and_migrate_scheduler, struct undeploy_and_migrate_scheduler_user_data_t,
                     {
                         .universe = universe,
                         .world = world,
@@ -2764,8 +2765,8 @@ static void world_migration_schedulers_mutators_migrate (struct universe_t *univ
                         mutator->api = &new_mutator_api_node->api;
 
                         KAN_CPU_TASK_LIST_USER_STRUCT (
-                            first_task_node, temporary_allocator, interned_undeploy_and_migrate_mutator,
-                            undeploy_and_migrate_mutator_execute, struct undeploy_and_migrate_mutator_user_data_t,
+                            first_task_node, temporary_allocator, undeploy_and_migrate_mutator_execute,
+                            section_undeploy_and_migrate_mutator, struct undeploy_and_migrate_mutator_user_data_t,
                             {
                                 .universe = universe,
                                 .mutator = mutator,
@@ -2872,8 +2873,8 @@ static void world_migrate_configuration (struct universe_t *universe,
                 kan_reflection_registry_query_struct (universe->reflection_registry, configuration->type->name);
             KAN_ASSERT (new_type)
 
-            KAN_CPU_TASK_LIST_USER_STRUCT (first_task_node, temporary_allocator, interned_migrate_configuration,
-                                           migrate_configuration_execute, struct migrate_configuration_user_data_t,
+            KAN_CPU_TASK_LIST_USER_STRUCT (first_task_node, temporary_allocator, migrate_configuration_execute,
+                                           section_migrate_configuration, struct migrate_configuration_user_data_t,
                                            {
                                                .configuration = configuration,
                                                .new_type = new_type,

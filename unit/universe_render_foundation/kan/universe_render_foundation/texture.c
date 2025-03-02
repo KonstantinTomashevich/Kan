@@ -107,13 +107,19 @@ struct render_foundation_texture_compiled_data_usage_t
     kan_resource_request_id_t request_id;
 };
 
-#define INVALID_MIP KAN_INT_MAX (uint8_t)
+enum render_foundation_texture_usage_flags_t
+{
+    RENDER_FOUNDATION_TEXTURE_USAGE_FLAGS_LOADING_COMPILED = 1u << 0u,
+    RENDER_FOUNDATION_TEXTURE_USAGE_FLAGS_HAS_REQUESTED_MIPS = 1u << 1u,
+    RENDER_FOUNDATION_TEXTURE_USAGE_FLAGS_HAS_LOADED_MIPS = 1u << 2u,
+};
 
 struct render_foundation_texture_usage_state_t
 {
     kan_interned_string_t name;
+    kan_instance_size_t reference_count;
 
-    kan_bool_t loading_compiled;
+    uint8_t flags;
     uint8_t usage_best_mip;
     uint8_t usage_worst_mip;
     uint8_t requested_best_mip;
@@ -163,109 +169,106 @@ static void create_new_usage_state_if_needed (struct render_foundation_texture_m
                                               const struct kan_resource_provider_singleton_t *resource_provider,
                                               kan_interned_string_t texture_name)
 {
-    kan_bool_t exists = KAN_FALSE;
     KAN_UP_VALUE_UPDATE (usage_state, render_foundation_texture_usage_state_t, name, &texture_name)
     {
-        exists = KAN_TRUE;
+        ++usage_state->reference_count;
+        KAN_UP_QUERY_RETURN_VOID;
     }
 
-    if (!exists)
+    KAN_UP_INDEXED_INSERT (new_usage_state, render_foundation_texture_usage_state_t)
     {
-        KAN_UP_INDEXED_INSERT (new_usage_state, render_foundation_texture_usage_state_t)
+        new_usage_state->name = texture_name;
+        new_usage_state->reference_count = 1u;
+
+        new_usage_state->flags = 0u;
+        new_usage_state->usage_best_mip = 0u;
+        new_usage_state->usage_worst_mip = KAN_INT_MAX (uint8_t);
+        new_usage_state->requested_best_mip = 0u;
+        new_usage_state->requested_worst_mip = KAN_INT_MAX (uint8_t);
+        new_usage_state->loaded_best_mip = 0u;
+        new_usage_state->loaded_worst_mip = KAN_INT_MAX (uint8_t);
+        new_usage_state->selected_compiled_format_index = KAN_INT_MAX (kan_instance_size_t);
+
+        new_usage_state->last_usage_inspection_time_ns = KAN_INT_MAX (kan_time_size_t);
+        new_usage_state->last_loading_inspection_time_ns = KAN_INT_MAX (kan_time_size_t);
+
+        KAN_UP_VALUE_READ (entry, kan_resource_native_entry_t, name, &texture_name)
         {
-            new_usage_state->name = texture_name;
-            new_usage_state->loading_compiled = KAN_FALSE;
-            new_usage_state->usage_best_mip = INVALID_MIP;
-            new_usage_state->usage_worst_mip = INVALID_MIP;
-            new_usage_state->requested_best_mip = INVALID_MIP;
-            new_usage_state->requested_worst_mip = INVALID_MIP;
-            new_usage_state->loaded_best_mip = INVALID_MIP;
-            new_usage_state->loaded_worst_mip = INVALID_MIP;
-            new_usage_state->selected_compiled_format_index = KAN_INT_MAX (kan_instance_size_t);
-
-            new_usage_state->last_usage_inspection_time_ns = KAN_INT_MAX (kan_time_size_t);
-            new_usage_state->last_loading_inspection_time_ns = KAN_INT_MAX (kan_time_size_t);
-
-            KAN_UP_VALUE_READ (entry, kan_resource_native_entry_t, name, &texture_name)
+            if (entry->type == state->interned_kan_resource_texture_compiled_t)
             {
-                if (entry->type == state->interned_kan_resource_texture_compiled_t)
-                {
-                    new_usage_state->loading_compiled = KAN_TRUE;
-                    KAN_UP_QUERY_BREAK;
-                }
+                new_usage_state->flags |= RENDER_FOUNDATION_TEXTURE_USAGE_FLAGS_LOADING_COMPILED;
+                KAN_UP_QUERY_BREAK;
             }
+        }
 
-            KAN_UP_INDEXED_INSERT (request, kan_resource_request_t)
-            {
-                request->request_id = kan_next_resource_request_id (resource_provider);
-                new_usage_state->texture_request_id = request->request_id;
+        KAN_UP_INDEXED_INSERT (request, kan_resource_request_t)
+        {
+            request->request_id = kan_next_resource_request_id (resource_provider);
+            new_usage_state->texture_request_id = request->request_id;
 
-                request->name = texture_name;
-                request->type = new_usage_state->loading_compiled ? state->interned_kan_resource_texture_compiled_t :
-                                                                    state->interned_kan_resource_texture_t;
-                request->priority = KAN_UNIVERSE_RENDER_FOUNDATION_TEXTURE_INFO_PRIORITY;
-            }
+            request->name = texture_name;
+            request->type = (new_usage_state->flags & RENDER_FOUNDATION_TEXTURE_USAGE_FLAGS_LOADING_COMPILED) != 0u ?
+                                state->interned_kan_resource_texture_compiled_t :
+                                state->interned_kan_resource_texture_t;
+            request->priority = KAN_UNIVERSE_RENDER_FOUNDATION_TEXTURE_INFO_PRIORITY;
         }
     }
 }
 
-static void destroy_old_usage_state_if_not_reference (
+static void destroy_old_usage_state_if_not_referenced (
     struct render_foundation_texture_management_planning_state_t *state, kan_interned_string_t texture_name)
 {
-    kan_bool_t referenced = KAN_FALSE;
-    KAN_UP_VALUE_READ (usage, kan_render_texture_usage_t, name, &texture_name)
+    KAN_UP_VALUE_WRITE (usage_state, render_foundation_texture_usage_state_t, name, &texture_name)
     {
-        referenced = KAN_TRUE;
-        KAN_UP_QUERY_BREAK;
-    }
+        KAN_ASSERT (usage_state->reference_count > 0u)
+        --usage_state->reference_count;
 
-    if (!referenced)
-    {
-        KAN_UP_VALUE_DELETE (usage_state, render_foundation_texture_usage_state_t, name, &texture_name)
+        if (usage_state->reference_count > 0u)
         {
-            if (KAN_TYPED_ID_32_IS_VALID (usage_state->texture_request_id))
+            KAN_UP_QUERY_RETURN_VOID;
+        }
+
+        if (KAN_TYPED_ID_32_IS_VALID (usage_state->texture_request_id))
+        {
+            KAN_UP_EVENT_INSERT (event, kan_resource_request_defer_delete_event_t)
+            {
+                event->request_id = usage_state->texture_request_id;
+            }
+        }
+
+        KAN_UP_VALUE_DELETE (raw_data_usage, render_foundation_texture_raw_data_usage_t, texture_name, &texture_name)
+        {
+            if (KAN_TYPED_ID_32_IS_VALID (raw_data_usage->request_id))
             {
                 KAN_UP_EVENT_INSERT (event, kan_resource_request_defer_delete_event_t)
                 {
-                    event->request_id = usage_state->texture_request_id;
+                    event->request_id = raw_data_usage->request_id;
                 }
             }
 
-            KAN_UP_VALUE_DELETE (raw_data_usage, render_foundation_texture_raw_data_usage_t, texture_name,
-                                 &texture_name)
-            {
-                if (KAN_TYPED_ID_32_IS_VALID (raw_data_usage->request_id))
-                {
-                    KAN_UP_EVENT_INSERT (event, kan_resource_request_defer_delete_event_t)
-                    {
-                        event->request_id = raw_data_usage->request_id;
-                    }
-                }
-
-                KAN_UP_ACCESS_DELETE (raw_data_usage);
-            }
-
-            KAN_UP_VALUE_DELETE (compiled_data_usage, render_foundation_texture_compiled_data_usage_t, texture_name,
-                                 &texture_name)
-            {
-                if (KAN_TYPED_ID_32_IS_VALID (compiled_data_usage->request_id))
-                {
-                    KAN_UP_EVENT_INSERT (event, kan_resource_request_defer_delete_event_t)
-                    {
-                        event->request_id = compiled_data_usage->request_id;
-                    }
-                }
-
-                KAN_UP_ACCESS_DELETE (compiled_data_usage);
-            }
-
-            KAN_UP_VALUE_DELETE (loaded, kan_render_texture_loaded_t, name, &texture_name)
-            {
-                KAN_UP_ACCESS_DELETE (loaded);
-            }
-
-            KAN_UP_ACCESS_DELETE (usage_state);
+            KAN_UP_ACCESS_DELETE (raw_data_usage);
         }
+
+        KAN_UP_VALUE_DELETE (compiled_data_usage, render_foundation_texture_compiled_data_usage_t, texture_name,
+                             &texture_name)
+        {
+            if (KAN_TYPED_ID_32_IS_VALID (compiled_data_usage->request_id))
+            {
+                KAN_UP_EVENT_INSERT (event, kan_resource_request_defer_delete_event_t)
+                {
+                    event->request_id = compiled_data_usage->request_id;
+                }
+            }
+
+            KAN_UP_ACCESS_DELETE (compiled_data_usage);
+        }
+
+        KAN_UP_VALUE_DELETE (loaded, kan_render_texture_loaded_t, name, &texture_name)
+        {
+            KAN_UP_ACCESS_DELETE (loaded);
+        }
+
+        KAN_UP_ACCESS_DELETE (usage_state);
     }
 }
 
@@ -291,22 +294,20 @@ UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_execute_render_foundati
             if (on_change_event->new_texture_name != on_change_event->old_texture_name)
             {
                 create_new_usage_state_if_needed (state, resource_provider, on_change_event->new_texture_name);
-                destroy_old_usage_state_if_not_reference (state, on_change_event->old_texture_name);
+                destroy_old_usage_state_if_not_referenced (state, on_change_event->old_texture_name);
             }
         }
 
         KAN_UP_EVENT_FETCH (on_delete_event, render_foundation_texture_usage_on_delete_event_t)
         {
-            destroy_old_usage_state_if_not_reference (state, on_delete_event->texture_name);
+            destroy_old_usage_state_if_not_referenced (state, on_delete_event->texture_name);
         }
-
-        _Static_assert (KAN_TYPED_ID_32_INVALID_LITERAL == 0,
-                        "Invalid literal has expected constant value for queries.");
 
         // TODO: In future, data loading priority should depend on mips and we should implement proper streaming.
         //       It is too early to properly implement this right now as streaming is too far away in plans.
 
-        KAN_UP_SIGNAL_UPDATE (raw_data_usage, render_foundation_texture_raw_data_usage_t, request_id, 0)
+        KAN_UP_SIGNAL_UPDATE (raw_data_usage, render_foundation_texture_raw_data_usage_t, request_id,
+                              KAN_TYPED_ID_32_INVALID_LITERAL)
         {
             KAN_UP_INDEXED_INSERT (request, kan_resource_request_t)
             {
@@ -318,7 +319,8 @@ UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_execute_render_foundati
             }
         }
 
-        KAN_UP_SIGNAL_UPDATE (compiled_data_usage, render_foundation_texture_compiled_data_usage_t, request_id, 0)
+        KAN_UP_SIGNAL_UPDATE (compiled_data_usage, render_foundation_texture_compiled_data_usage_t, request_id,
+                              KAN_TYPED_ID_32_INVALID_LITERAL)
         {
             KAN_UP_INDEXED_INSERT (request, kan_resource_request_t)
             {
@@ -440,7 +442,7 @@ static void inspect_texture_usages_internal (struct render_foundation_texture_ma
     struct kan_cpu_section_execution_t section_execution;
     kan_cpu_section_execution_init (&section_execution, state->section_inspect_texture_usages_internal);
 
-    KAN_ASSERT (usage_state->loading_compiled)
+    KAN_ASSERT (usage_state->flags & RENDER_FOUNDATION_TEXTURE_USAGE_FLAGS_LOADING_COMPILED)
     if (usage_state->selected_compiled_format_index == KAN_INT_MAX (kan_instance_size_t))
     {
         for (kan_loop_size_t index = 0u; index < loaded_texture->compiled_formats.size; ++index)
@@ -477,22 +479,20 @@ static void inspect_texture_usages_internal (struct render_foundation_texture_ma
     KAN_UP_VALUE_READ (usage, kan_render_texture_usage_t, name, &usage_state->name)
     {
         KAN_ASSERT (usage->best_advised_mip <= usage->worst_advised_mip)
-        KAN_ASSERT (usage->best_advised_mip != INVALID_MIP)
-        KAN_ASSERT (usage->worst_advised_mip != INVALID_MIP)
         usage_state->usage_best_mip = KAN_MIN (usage_state->usage_best_mip, usage->best_advised_mip);
         usage_state->usage_worst_mip = KAN_MAX (usage_state->usage_worst_mip, usage->worst_advised_mip);
     }
 
     KAN_ASSERT (usage_state->usage_best_mip <= usage_state->usage_worst_mip);
     usage_state->usage_best_mip = KAN_MIN (usage_state->usage_best_mip, (uint8_t) loaded_texture->mips - 1u);
-
     usage_state->usage_worst_mip = KAN_MIN (usage_state->usage_worst_mip, (uint8_t) loaded_texture->mips - 1u);
 
     // TODO: In the future, it would be good to implement texture memory budget and automatically unload
     //       best mips when we don't have enough memory. Skipped for now as we're prototyping texture
     //       loading.
 
-    if (usage_state->usage_best_mip == usage_state->requested_best_mip &&
+    if ((usage_state->flags & RENDER_FOUNDATION_TEXTURE_USAGE_FLAGS_HAS_REQUESTED_MIPS) &&
+        usage_state->usage_best_mip == usage_state->requested_best_mip &&
         usage_state->usage_worst_mip == usage_state->requested_worst_mip)
     {
         // No changes, just exit.
@@ -526,7 +526,8 @@ static void inspect_texture_usages_internal (struct render_foundation_texture_ma
 
     for (uint8_t mip = usage_state->usage_best_mip; mip <= usage_state->usage_worst_mip; ++mip)
     {
-        if (mip < usage_state->requested_best_mip || mip > usage_state->requested_worst_mip)
+        if ((usage_state->flags & RENDER_FOUNDATION_TEXTURE_USAGE_FLAGS_HAS_REQUESTED_MIPS) == 0u ||
+            mip < usage_state->requested_best_mip || mip > usage_state->requested_worst_mip)
         {
             KAN_UP_INDEXED_INSERT (data_usage, render_foundation_texture_compiled_data_usage_t)
             {
@@ -540,10 +541,11 @@ static void inspect_texture_usages_internal (struct render_foundation_texture_ma
         }
     }
 
+    usage_state->flags |= RENDER_FOUNDATION_TEXTURE_USAGE_FLAGS_HAS_REQUESTED_MIPS;
     usage_state->requested_best_mip = usage_state->usage_best_mip;
     usage_state->requested_worst_mip = usage_state->usage_worst_mip;
 
-    if (!any_new_request && usage_state->loaded_best_mip != INVALID_MIP && usage_state->loaded_worst_mip != INVALID_MIP)
+    if (!any_new_request && (usage_state->flags & RENDER_FOUNDATION_TEXTURE_USAGE_FLAGS_HAS_LOADED_MIPS) != 0u)
     {
         // No new requests: we're just using less mips than before.
         // We can plainly recreate texture with less mips.
@@ -562,10 +564,16 @@ static void inspect_texture_usages_internal (struct render_foundation_texture_ma
                                                 mip - usage_state->requested_best_mip);
                 }
 
+                usage_state->flags |= RENDER_FOUNDATION_TEXTURE_USAGE_FLAGS_HAS_LOADED_MIPS;
                 usage_state->loaded_best_mip = usage_state->requested_best_mip;
                 usage_state->loaded_worst_mip = usage_state->requested_worst_mip;
                 kan_render_image_destroy (loaded->image);
                 loaded->image = new_image;
+
+                KAN_UP_EVENT_INSERT (event, kan_render_texture_updated_event_t)
+                {
+                    event->name = usage_state->name;
+                }
             }
             else
             {
@@ -595,7 +603,7 @@ static inline void inspect_texture_usages (struct render_foundation_texture_mana
         }
 
         usage_state->last_usage_inspection_time_ns = inspection_time_ns;
-        if (!usage_state->loading_compiled)
+        if ((usage_state->flags & RENDER_FOUNDATION_TEXTURE_USAGE_FLAGS_LOADING_COMPILED) == 0u)
         {
             // Mip management is only relevant for compiled textures.
             kan_cpu_section_execution_shutdown (&section_execution);
@@ -690,6 +698,11 @@ static void raw_texture_load (struct render_foundation_texture_management_execut
 
     kan_render_image_upload_data (new_image, 0u, raw_data->data.size, raw_data->data.data);
     kan_render_image_request_mip_generation (new_image, 0u, (uint8_t) (loaded_texture->mips - 1u));
+
+    KAN_UP_EVENT_INSERT (event, kan_render_texture_updated_event_t)
+    {
+        event->name = usage_state->name;
+    }
 
     KAN_UP_VALUE_UPDATE (loaded, kan_render_texture_loaded_t, name, &usage_state->name)
     {
@@ -835,10 +848,13 @@ static void on_compiled_texture_request_updated (struct render_foundation_textur
                         KAN_UP_ACCESS_DELETE (compiled_data_usage);
                     }
 
-                    usage_state->requested_best_mip = INVALID_MIP;
-                    usage_state->requested_worst_mip = INVALID_MIP;
-                    usage_state->loaded_best_mip = INVALID_MIP;
-                    usage_state->loaded_worst_mip = INVALID_MIP;
+                    usage_state->flags &= ~0u ^ (RENDER_FOUNDATION_TEXTURE_USAGE_FLAGS_HAS_REQUESTED_MIPS |
+                                                 RENDER_FOUNDATION_TEXTURE_USAGE_FLAGS_HAS_LOADED_MIPS);
+
+                    usage_state->requested_best_mip = 0u;
+                    usage_state->requested_worst_mip = KAN_INT_MAX (uint8_t);
+                    usage_state->loaded_best_mip = 0u;
+                    usage_state->loaded_worst_mip = KAN_INT_MAX (uint8_t);
                     usage_state->selected_compiled_format_index = KAN_INT_MAX (kan_instance_size_t);
                     usage_state->last_usage_inspection_time_ns = inspection_time_ns;
                     inspect_texture_usages_internal (state, device_info, usage_state, loaded_texture);
@@ -970,6 +986,11 @@ static void on_compiled_texture_data_request_updated (
                         KAN_UP_QUERY_RETURN_VOID;
                     }
 
+                    KAN_UP_EVENT_INSERT (event, kan_render_texture_updated_event_t)
+                    {
+                        event->name = usage_state->name;
+                    }
+
                     kan_bool_t updated = KAN_FALSE;
                     KAN_UP_VALUE_UPDATE (loaded, kan_render_texture_loaded_t, name, &usage_state->name)
                     {
@@ -994,6 +1015,7 @@ static void on_compiled_texture_data_request_updated (
                         }
                     }
 
+                    usage_state->flags |= RENDER_FOUNDATION_TEXTURE_USAGE_FLAGS_HAS_LOADED_MIPS;
                     usage_state->loaded_best_mip = usage_state->requested_best_mip;
                     usage_state->loaded_worst_mip = usage_state->requested_worst_mip;
                 }

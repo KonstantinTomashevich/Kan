@@ -291,7 +291,7 @@ struct insert_from_multiple_threads_state_t
     KAN_REFLECTION_IGNORE
     struct kan_stack_group_allocator_t task_data_allocator;
 
-    kan_interned_string_t task_name;
+    kan_cpu_section_t task_section;
 };
 
 TEST_UNIVERSE_API void kan_universe_mutator_deploy_insert_from_multiple_threads (
@@ -302,7 +302,7 @@ TEST_UNIVERSE_API void kan_universe_mutator_deploy_insert_from_multiple_threads 
     struct insert_from_multiple_threads_state_t *state)
 {
     kan_stack_group_allocator_init (&state->task_data_allocator, KAN_ALLOCATION_GROUP_IGNORE, 1024u);
-    state->task_name = kan_string_intern ("insert_task");
+    state->task_section = kan_cpu_section_get ("insert_task");
     kan_workflow_graph_node_make_dependency_of (workflow_node, "validate_insert_from_multiple_threads");
 }
 
@@ -340,8 +340,8 @@ TEST_UNIVERSE_API void kan_universe_mutator_execute_insert_from_multiple_threads
 
     for (kan_loop_size_t index = 0u; index < 16u; ++index)
     {
-        KAN_CPU_TASK_LIST_USER_STRUCT (&tasks_head, &state->task_data_allocator, state->task_name, insert_task_execute,
-                                       struct insert_task_user_data_t,
+        KAN_CPU_TASK_LIST_USER_STRUCT (&tasks_head, &state->task_data_allocator, insert_task_execute,
+                                       state->task_section, struct insert_task_user_data_t,
                                        {
                                            .state = state,
                                            .index = index,

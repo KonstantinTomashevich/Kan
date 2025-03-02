@@ -592,6 +592,7 @@ static kan_bool_t emit_meta_gather_parameters_process_field (
     struct compiler_instance_declaration_node_t *first_declaration,
     struct kan_rpl_meta_buffer_t *meta_output,
     struct kan_trivial_string_buffer_t *name_generation_buffer,
+    kan_instance_size_t name_skip_offset,
     kan_bool_t tail);
 
 static kan_bool_t emit_meta_gather_parameters_process_field_list (
@@ -600,6 +601,7 @@ static kan_bool_t emit_meta_gather_parameters_process_field_list (
     struct compiler_instance_declaration_node_t *first_declaration,
     struct kan_rpl_meta_buffer_t *meta_output,
     struct kan_trivial_string_buffer_t *name_generation_buffer,
+    kan_instance_size_t name_skip_offset,
     kan_bool_t tail)
 {
     kan_bool_t valid = KAN_TRUE;
@@ -608,14 +610,14 @@ static kan_bool_t emit_meta_gather_parameters_process_field_list (
     while (field)
     {
         const kan_instance_size_t length = name_generation_buffer->size;
-        if (name_generation_buffer->size > 0u)
+        if (name_generation_buffer->size > name_skip_offset)
         {
             kan_trivial_string_buffer_append_string (name_generation_buffer, ".");
         }
 
         kan_trivial_string_buffer_append_string (name_generation_buffer, field->variable.name);
         if (!emit_meta_gather_parameters_process_field (instance, base_offset, field, meta_output,
-                                                        name_generation_buffer, tail))
+                                                        name_generation_buffer, name_skip_offset, tail))
         {
             valid = KAN_FALSE;
         }
@@ -632,6 +634,7 @@ static kan_bool_t emit_meta_gather_parameters_process_field (struct rpl_compiler
                                                              struct compiler_instance_declaration_node_t *field,
                                                              struct kan_rpl_meta_buffer_t *meta_output,
                                                              struct kan_trivial_string_buffer_t *name_generation_buffer,
+                                                             kan_instance_size_t name_skip_offset,
                                                              kan_bool_t tail)
 {
     if (field->variable.type.if_vector || field->variable.type.if_matrix)
@@ -656,7 +659,7 @@ static kan_bool_t emit_meta_gather_parameters_process_field (struct rpl_compiler
         }
 
         kan_rpl_meta_parameter_init (parameter);
-        parameter->name = kan_char_sequence_intern (name_generation_buffer->buffer,
+        parameter->name = kan_char_sequence_intern (name_generation_buffer->buffer + name_skip_offset,
                                                     name_generation_buffer->buffer + name_generation_buffer->size);
         parameter->offset = base_offset + field->offset;
 
@@ -689,18 +692,19 @@ static kan_bool_t emit_meta_gather_parameters_process_field (struct rpl_compiler
             // Should be guaranteed by resolve stage.
             KAN_ASSERT (!tail)
             meta_output->tail_name = field->variable.name;
+            name_skip_offset = name_generation_buffer->size;
 
-            return emit_meta_gather_parameters_process_field_list (instance, 0u,
-                                                                   field->variable.type.if_struct->first_field,
-                                                                   meta_output, name_generation_buffer, KAN_TRUE);
+            return emit_meta_gather_parameters_process_field_list (
+                instance, 0u, field->variable.type.if_struct->first_field, meta_output, name_generation_buffer,
+                name_skip_offset, KAN_TRUE);
         }
         // Currently we only generate parameters for non-array structs as parameters from arrays of structs sound
         // like a strange and not entirely useful idea.
         else if (field->variable.type.array_dimensions_count == 0u)
         {
-            return emit_meta_gather_parameters_process_field_list (instance, base_offset + field->offset,
-                                                                   field->variable.type.if_struct->first_field,
-                                                                   meta_output, name_generation_buffer, tail);
+            return emit_meta_gather_parameters_process_field_list (
+                instance, base_offset + field->offset, field->variable.type.if_struct->first_field, meta_output,
+                name_generation_buffer, name_skip_offset, tail);
         }
     }
 
@@ -708,7 +712,8 @@ static kan_bool_t emit_meta_gather_parameters_process_field (struct rpl_compiler
 }
 
 kan_bool_t kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t compiler_instance,
-                                                struct kan_rpl_meta_t *meta)
+                                                struct kan_rpl_meta_t *meta,
+                                                enum kan_rpl_meta_emission_flags_t flags)
 {
     struct rpl_compiler_instance_t *instance = KAN_HANDLE_GET (compiler_instance);
     meta->pipeline_type = instance->pipeline_type;
@@ -781,13 +786,20 @@ kan_bool_t kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t comp
         buffer = buffer->next;
     }
 
-    kan_dynamic_array_set_capacity (&meta->attribute_buffers, attribute_buffer_count);
-    kan_dynamic_array_set_capacity (&meta->set_pass.buffers, pass_buffer_count);
-    kan_dynamic_array_set_capacity (&meta->set_material.buffers, material_buffer_count);
-    kan_dynamic_array_set_capacity (&meta->set_object.buffers, object_buffer_count);
-    kan_dynamic_array_set_capacity (&meta->set_unstable.buffers, unstable_buffer_count);
-    kan_dynamic_array_set_capacity (&meta->color_outputs, color_outputs);
+    if ((flags & KAN_RPL_META_EMISSION_SKIP_ATTRIBUTE_BUFFERS) == 0u)
+    {
+        kan_dynamic_array_set_capacity (&meta->attribute_buffers, attribute_buffer_count);
+    }
 
+    if ((flags & KAN_RPL_META_EMISSION_SKIP_SETS) == 0u)
+    {
+        kan_dynamic_array_set_capacity (&meta->set_pass.buffers, pass_buffer_count);
+        kan_dynamic_array_set_capacity (&meta->set_material.buffers, material_buffer_count);
+        kan_dynamic_array_set_capacity (&meta->set_object.buffers, object_buffer_count);
+        kan_dynamic_array_set_capacity (&meta->set_unstable.buffers, unstable_buffer_count);
+    }
+
+    kan_dynamic_array_set_capacity (&meta->color_outputs, color_outputs);
     for (kan_loop_size_t output_index = 0u; output_index < color_outputs; ++output_index)
     {
         *(struct kan_rpl_meta_color_output_t *) kan_dynamic_array_add_last (&meta->color_outputs) =
@@ -800,11 +812,14 @@ kan_bool_t kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t comp
     while (buffer)
     {
         struct kan_dynamic_array_t *buffer_array = NULL;
+        kan_bool_t skip = KAN_FALSE;
+
         switch (buffer->type)
         {
         case KAN_RPL_BUFFER_TYPE_VERTEX_ATTRIBUTE:
         case KAN_RPL_BUFFER_TYPE_INSTANCED_ATTRIBUTE:
             buffer_array = &meta->attribute_buffers;
+            skip = (flags & KAN_RPL_META_EMISSION_SKIP_ATTRIBUTE_BUFFERS) != 0u;
             break;
 
         case KAN_RPL_BUFFER_TYPE_UNIFORM:
@@ -828,6 +843,7 @@ kan_bool_t kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t comp
                 break;
             }
 
+            skip = (flags & KAN_RPL_META_EMISSION_SKIP_SETS) != 0u;
             break;
 
         case KAN_RPL_BUFFER_TYPE_VERTEX_STAGE_OUTPUT:
@@ -855,7 +871,7 @@ kan_bool_t kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t comp
             break;
         }
 
-        if (!buffer_array)
+        if (skip || !buffer_array)
         {
             buffer = buffer->next;
             continue;
@@ -910,7 +926,7 @@ kan_bool_t kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t comp
             buffer->type == KAN_RPL_BUFFER_TYPE_INSTANCED_ATTRIBUTE)
         {
             if (!emit_meta_gather_parameters_process_field_list (instance, 0u, buffer->first_field, meta_buffer,
-                                                                 &name_generation_buffer, KAN_FALSE))
+                                                                 &name_generation_buffer, 0u, KAN_FALSE))
             {
                 valid = KAN_FALSE;
             }
@@ -921,71 +937,74 @@ kan_bool_t kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t comp
         buffer = buffer->next;
     }
 
-    kan_loop_size_t pass_sampler_count = 0u;
-    kan_loop_size_t material_sampler_count = 0u;
-    kan_loop_size_t object_sampler_count = 0u;
-    kan_loop_size_t unstable_sampler_count = 0u;
-    struct compiler_instance_sampler_node_t *sampler = instance->first_sampler;
-
-    while (sampler)
+    if ((flags & KAN_RPL_META_EMISSION_SKIP_SETS) == 0u)
     {
-        switch (sampler->set)
+        kan_loop_size_t pass_sampler_count = 0u;
+        kan_loop_size_t material_sampler_count = 0u;
+        kan_loop_size_t object_sampler_count = 0u;
+        kan_loop_size_t unstable_sampler_count = 0u;
+        struct compiler_instance_sampler_node_t *sampler = instance->first_sampler;
+
+        while (sampler)
         {
-        case KAN_RPL_SET_PASS:
-            ++pass_sampler_count;
-            break;
+            switch (sampler->set)
+            {
+            case KAN_RPL_SET_PASS:
+                ++pass_sampler_count;
+                break;
 
-        case KAN_RPL_SET_MATERIAL:
-            ++material_sampler_count;
-            break;
+            case KAN_RPL_SET_MATERIAL:
+                ++material_sampler_count;
+                break;
 
-        case KAN_RPL_SET_OBJECT:
-            ++object_sampler_count;
-            break;
+            case KAN_RPL_SET_OBJECT:
+                ++object_sampler_count;
+                break;
 
-        case KAN_RPL_SET_UNSTABLE:
-            ++unstable_sampler_count;
-            break;
+            case KAN_RPL_SET_UNSTABLE:
+                ++unstable_sampler_count;
+                break;
+            }
+
+            sampler = sampler->next;
         }
 
-        sampler = sampler->next;
-    }
+        kan_dynamic_array_set_capacity (&meta->set_pass.samplers, pass_sampler_count);
+        kan_dynamic_array_set_capacity (&meta->set_material.samplers, material_sampler_count);
+        kan_dynamic_array_set_capacity (&meta->set_object.samplers, object_sampler_count);
+        kan_dynamic_array_set_capacity (&meta->set_unstable.samplers, unstable_sampler_count);
 
-    kan_dynamic_array_set_capacity (&meta->set_pass.samplers, pass_sampler_count);
-    kan_dynamic_array_set_capacity (&meta->set_material.samplers, material_sampler_count);
-    kan_dynamic_array_set_capacity (&meta->set_object.samplers, object_sampler_count);
-    kan_dynamic_array_set_capacity (&meta->set_unstable.samplers, unstable_sampler_count);
-    sampler = instance->first_sampler;
-
-    while (sampler)
-    {
-        struct kan_dynamic_array_t *sampler_array = NULL;
-        switch (sampler->set)
+        sampler = instance->first_sampler;
+        while (sampler)
         {
-        case KAN_RPL_SET_PASS:
-            sampler_array = &meta->set_pass.samplers;
-            break;
+            struct kan_dynamic_array_t *sampler_array = NULL;
+            switch (sampler->set)
+            {
+            case KAN_RPL_SET_PASS:
+                sampler_array = &meta->set_pass.samplers;
+                break;
 
-        case KAN_RPL_SET_MATERIAL:
-            sampler_array = &meta->set_material.samplers;
-            break;
+            case KAN_RPL_SET_MATERIAL:
+                sampler_array = &meta->set_material.samplers;
+                break;
 
-        case KAN_RPL_SET_OBJECT:
-            sampler_array = &meta->set_object.samplers;
-            break;
+            case KAN_RPL_SET_OBJECT:
+                sampler_array = &meta->set_object.samplers;
+                break;
 
-        case KAN_RPL_SET_UNSTABLE:
-            sampler_array = &meta->set_unstable.samplers;
-            break;
+            case KAN_RPL_SET_UNSTABLE:
+                sampler_array = &meta->set_unstable.samplers;
+                break;
+            }
+
+            struct kan_rpl_meta_sampler_t *meta_sampler = kan_dynamic_array_add_last (sampler_array);
+            KAN_ASSERT (meta_sampler)
+
+            meta_sampler->name = sampler->name;
+            meta_sampler->binding = sampler->binding;
+            meta_sampler->type = sampler->type;
+            sampler = sampler->next;
         }
-
-        struct kan_rpl_meta_sampler_t *meta_sampler = kan_dynamic_array_add_last (sampler_array);
-        KAN_ASSERT (meta_sampler)
-
-        meta_sampler->name = sampler->name;
-        meta_sampler->binding = sampler->binding;
-        meta_sampler->type = sampler->type;
-        sampler = sampler->next;
     }
 
     if (!emit_meta_settings (instance, meta))

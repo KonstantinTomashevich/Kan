@@ -6,7 +6,6 @@
 #include <kan/container/dynamic_array.h>
 #include <kan/container/interned_string.h>
 #include <kan/error/critical.h>
-#include <kan/memory/allocation.h>
 #include <kan/reflection/markup.h>
 
 /// \file
@@ -77,9 +76,9 @@ enum kan_resource_texture_raw_format_t
 /// \brief Resource that contains texture raw data. Expected to be produced by resource import.
 struct kan_resource_texture_raw_data_t
 {
-    kan_instance_size_t width;
-    kan_instance_size_t height;
-    kan_instance_size_t depth;
+    kan_serialized_size_t width;
+    kan_serialized_size_t height;
+    kan_serialized_size_t depth;
     enum kan_resource_texture_raw_format_t format;
 
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (uint8_t)
@@ -127,12 +126,12 @@ struct kan_resource_texture_t
     kan_interned_string_t compilation_preset;
 
     /// \brief Count of mips to generate for this texture.
-    kan_instance_size_t mips;
+    kan_serialized_size_t mips;
 };
 
 RESOURCE_TEXTURE_API void kan_resource_texture_init (struct kan_resource_texture_t *instance);
 
-/// \brief Contains target platform configuration for compiling texture.
+/// \brief Contains target platform configuration for compiling textures.
 /// \details Must be present in order to make compilation possible.
 struct kan_resource_texture_platform_configuration_t
 {
@@ -181,10 +180,10 @@ RESOURCE_TEXTURE_API void kan_resource_texture_compiled_format_item_shutdown (
 /// \brief Contains compiled texture information excluding actual texture data.
 struct kan_resource_texture_compiled_t
 {
-    kan_instance_size_t width;
-    kan_instance_size_t height;
-    kan_instance_size_t depth;
-    kan_instance_size_t mips;
+    kan_serialized_size_t width;
+    kan_serialized_size_t height;
+    kan_serialized_size_t depth;
+    kan_serialized_size_t mips;
 
     /// \brief Contains information about compiled data for every compiled format.
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_resource_texture_compiled_format_item_t)

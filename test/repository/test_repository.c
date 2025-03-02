@@ -432,8 +432,8 @@ static void check_manual_event_from_task (struct kan_repository_event_fetch_quer
                                           struct manual_event_t data)
 {
     struct kan_repository_event_read_access_t access = kan_repository_event_fetch_query_next (query);
-    KAN_CPU_TASK_LIST_USER_STRUCT (node, temporary_allocator, kan_string_intern ("check_manual_event_from_task"),
-                                   check_manual_event_from_task_executor,
+    KAN_CPU_TASK_LIST_USER_STRUCT (node, temporary_allocator, check_manual_event_from_task_executor,
+                                   kan_cpu_section_get ("check_manual_event_from_task"),
                                    struct check_manual_event_from_task_user_data_t,
                                    {
                                        .access = access,

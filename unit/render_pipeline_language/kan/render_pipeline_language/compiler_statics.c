@@ -4,6 +4,7 @@
 #include <kan/render_pipeline_language/compiler_internal.h>
 
 static kan_bool_t statics_initialized = KAN_FALSE;
+static struct kan_atomic_int_t statics_initialization_lock = {.value = 0};
 struct kan_rpl_compiler_statics_t kan_rpl_compiler_statics;
 
 static void build_repeating_vector_constructor_signatures (
@@ -39,6 +40,13 @@ void kan_rpl_compiler_ensure_statics_initialized (void)
 {
     if (!statics_initialized)
     {
+        kan_atomic_int_lock (&statics_initialization_lock);
+        if (statics_initialized)
+        {
+            kan_atomic_int_unlock (&statics_initialization_lock);
+            return;
+        }
+
         STATICS.rpl_allocation_group =
             kan_allocation_group_get_child (kan_allocation_group_root (), "render_pipeline_language");
         STATICS.rpl_meta_allocation_group = kan_allocation_group_get_child (STATICS.rpl_allocation_group, "meta");
@@ -900,5 +908,6 @@ void kan_rpl_compiler_ensure_statics_initialized (void)
 #undef BUILTIN_3
 
         statics_initialized = KAN_TRUE;
+        kan_atomic_int_unlock (&statics_initialization_lock);
     }
 }

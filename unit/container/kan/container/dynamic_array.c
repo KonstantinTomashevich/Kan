@@ -22,10 +22,19 @@ void kan_dynamic_array_init (struct kan_dynamic_array_t *array,
         array->data = NULL;
     }
 
-    KAN_ASSERT (item_size % item_alignment == 0u)
+    // Custom case for byte-sized array with special alignment requirements.
+    KAN_ASSERT (item_size % item_alignment == 0u || item_size == 1u)
     array->item_size = item_size;
     array->item_alignment = item_alignment;
     array->allocation_group = allocation_group;
+}
+
+void kan_dynamic_array_init_move (struct kan_dynamic_array_t *array, struct kan_dynamic_array_t *move_from_array)
+{
+    *array = *move_from_array;
+    move_from_array->size = 0u;
+    move_from_array->capacity = 0u;
+    move_from_array->data = NULL;
 }
 
 void *kan_dynamic_array_add_last (struct kan_dynamic_array_t *array)

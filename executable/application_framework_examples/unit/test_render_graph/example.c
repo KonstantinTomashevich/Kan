@@ -83,7 +83,7 @@ APPLICATION_FRAMEWORK_EXAMPLES_TEST_RENDER_GRAPH_API void kan_universe_mutator_e
     kan_cpu_job_t job, struct test_render_graph_state_t *state)
 {
     KAN_UP_SINGLETON_READ (render_context, kan_render_context_singleton_t)
-    KAN_UP_SINGLETON_WRITE (render_graph, kan_render_graph_resource_management_singleton_t)
+    KAN_UP_SINGLETON_READ (render_graph, kan_render_graph_resource_management_singleton_t)
     KAN_UP_SINGLETON_WRITE (singleton, example_test_render_graph_singleton_t)
     {
         if (!KAN_HANDLE_IS_VALID (singleton->window_handle))

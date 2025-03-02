@@ -650,7 +650,7 @@ static inline void re2c_restore_saved_cursor (struct dynamic_parser_state_t *par
  re2c:api = custom;
  re2c:api:style = free-form;
  re2c:define:YYCTYPE  = char;
- re2c:define:YYLESSTHAN = "state->cursor >= state->limit";
+ re2c:define:YYLESSTHAN = "state->limit - state->cursor < @@{len}";
  re2c:define:YYPEEK = "*state->cursor";
  re2c:define:YYSKIP = "re2c_yyskip (state);";
  re2c:define:YYBACKUP = "re2c_yybackup (state);";
