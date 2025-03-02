@@ -3491,7 +3491,7 @@ static inline kan_interned_string_t register_byproduct_internal (kan_functor_use
 
     kan_atomic_int_unlock (&state->execution_shared_state.concurrency_lock);
 
-    // Reference scan for of from-byproduct-to-byproduct references can be safely done outside of byproduct lock.
+    // Reference scan for of from-byproduct-to-byproduct references can be safely done outside of concurrency lock.
     // However, usage addition should be done under concurrency lock as usages can be deleted from other thread
     // at the same moment.
 

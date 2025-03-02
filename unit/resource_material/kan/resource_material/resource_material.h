@@ -18,9 +18,9 @@
 /// \parblock
 /// Material is a set of render pipeline language sources and their configurations for different render passes.
 /// It specifies KAN_RPL_OPTION_SCOPE_GLOBAL options in `kan_resource_material_t::global_options` and
-/// KAN_RPL_OPTION_SCOPE_INSTANCE can be specified in every pass configuration in
+/// KAN_RPL_OPTION_SCOPE_INSTANCE options can be specified in every pass configuration in
 /// `kan_resource_material_pass_t::options`. This split is done to make sure from the architecture point of view that
-/// all parameter sets for every pipeline created from material are identical except from pass parameter set.
+/// all parameter sets and inputs for every pipeline created from material are identical except from pass parameter set.
 /// Pass parameter set layout is specified `kan_resource_render_pass_t::pass_set_source` which is injected automatically
 /// during compilation for every pass.
 ///
@@ -31,7 +31,7 @@
 ///
 /// Materials with the same source list and global parameters can share families -- it would be handled by byproduct
 /// routine. In the same way, if materials share family, then if some of their pipelines have the same instance options
-/// and passes, these pipelines would be shared too.
+/// in passes, these pipelines would be shared too.
 ///
 /// Keep in mind, that material compilation mostly consists of compiling source code into intermediate code format,
 /// like SPIRV for Vulkan. When creating pipeline in runtime, its code would still need to be compiled from intermediate
@@ -74,6 +74,7 @@ struct kan_resource_material_pass_t
     /// \brief Pass name as resource.
     kan_interned_string_t name;
 
+    /// \brief Entry points for pass stages.
     /// \details Entry points are allowed to be different for different passes.
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_entry_point_t)
     struct kan_dynamic_array_t entry_points;
@@ -166,7 +167,7 @@ RESOURCE_MATERIAL_API void kan_resource_material_pipeline_compiled_init (
 RESOURCE_MATERIAL_API void kan_resource_material_pipeline_compiled_shutdown (
     struct kan_resource_material_pipeline_compiled_t *instance);
 
-/// \brief Entry of pipeline-for-pass array in compiled material.
+/// \brief Item of pipeline-for-pass array in compiled material.
 struct kan_resource_material_pass_compiled_t
 {
     kan_interned_string_t name;

@@ -19,7 +19,7 @@
 /// source file in render pipeline language. Pass parameter set source file is automatically included into pipelines
 /// that are compiled for this pass in order to provide proper sets for the pipelines.
 ///
-/// When compiled, pass stored meta about its bindings instead of the link to pass set source. Other data is just copied
+/// When compiled, pass stores meta about its bindings instead of the link to pass set source. Other data is just copied
 /// during compilation.
 ///
 /// Also, tag requirement system is created for passes in order to avoid compiling anything for passes that are not

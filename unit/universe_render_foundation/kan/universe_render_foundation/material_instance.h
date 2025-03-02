@@ -22,13 +22,13 @@
 /// Buffers and parameter sets are allocated once per material static data, therefore material instances with
 /// instanced parameters only are lightweight and easy to use for instancing.
 ///
-/// Custom parameter feature for material instance usages allows to override instanced parameters on per usage basis.
+/// Custom parameters feature for material instance usages allows to override instanced parameters on per usage basis.
 /// Only instanced parameters can be changed on per usage basis as changing static parameters would lead to creation
 /// of additional buffers and therefore is a questionable practice from performance point of view. When objects
 /// really need complex data on per-instance basis, it is advised to use object parameter set and manual upload of
 /// data to this set as it would be much more efficient and such cases are rare. When custom parameters are used for
-/// material instance usage, `kan_render_material_instance_custom_loaded_t` instance should be queries by usage id
-/// instead of querying `kan_render_material_instance_loaded_t` by name.
+/// material instance usage, `kan_render_material_instance_custom_loaded_t` entry should be queried by usage id
+/// instead of querying `kan_render_material_instance_loaded_t` by material instance name.
 /// \endparblock
 
 KAN_C_HEADER_BEGIN

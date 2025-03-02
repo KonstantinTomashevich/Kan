@@ -23,7 +23,7 @@
 /// When compiled, material instance removes all inheritance by merging all the data. Also, everything except for
 /// instanced attributes is separated into static data, which can be shared between several instances. The rule is that
 /// if material instance only has instanced attributes, it just reuses static data from parent (if any). It makes it
-/// easier to avoid allocating unneeded data for material instanced in runtime: parameter set and buffers only need
+/// easier to avoid allocating unneeded data for material instances in runtime: parameter set and buffers only need
 /// to be allocated once per static data, not per material instance.
 /// \endparblock
 ///
