@@ -1103,6 +1103,7 @@ kan_bool_t kan_render_backend_system_select_device (kan_context_system_t render_
     {
         system->render_finished_semaphores[index] = VK_NULL_HANDLE;
         system->in_flight_fences[index] = VK_NULL_HANDLE;
+        system->present_skipped_flags[index] = KAN_FALSE;
     }
 
     kan_bool_t synchronization_objects_created = KAN_TRUE;
@@ -3197,8 +3198,15 @@ static void render_backend_system_finish_command_submission (struct render_backe
 
     VkSemaphore *wait_semaphores = static_wait_semaphores;
     VkPipelineStageFlags *semaphore_stages = static_semaphore_stages;
-    surface = (struct render_backend_surface_t *) system->surfaces.first;
 
+    if (system->present_skipped_flags[system->current_frame_in_flight_index])
+    {
+        wait_semaphores[semaphores_to_wait] = system->render_finished_semaphores[system->current_frame_in_flight_index];
+        semaphore_stages[semaphores_to_wait] = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+        ++semaphores_to_wait;
+    }
+
+    surface = (struct render_backend_surface_t *) system->surfaces.first;
     while (surface)
     {
         if (surface->surface != VK_NULL_HANDLE && surface->acquired_image_frame != UINT32_MAX)
@@ -3226,8 +3234,14 @@ static void render_backend_system_finish_command_submission (struct render_backe
                                   _Alignof (VkPipelineStageFlags));
 
         semaphores_to_wait = 0u;
-        surface = (struct render_backend_surface_t *) system->surfaces.first;
+        if (system->present_skipped_flags[system->current_frame_in_flight_index])
+        {
+            wait_semaphores[semaphores_to_wait] = system->render_finished_semaphores[system->current_frame_in_flight_index];
+            semaphore_stages[semaphores_to_wait] = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+            ++semaphores_to_wait;
+        }
 
+        surface = (struct render_backend_surface_t *) system->surfaces.first;
         while (surface)
         {
             if (surface->surface != VK_NULL_HANDLE && surface->acquired_image_frame != UINT32_MAX)
@@ -3332,7 +3346,16 @@ static void render_backend_system_submit_present (struct render_backend_system_t
         }
     }
 
+    if (swap_chains_count == 0u)
+    {
+        // Nowhere to present.
+        system->present_skipped_flags[system->current_frame_in_flight_index] = KAN_TRUE;
+        return;
+    }
+
+    system->present_skipped_flags[system->current_frame_in_flight_index] = KAN_FALSE;
     VkSemaphore wait_semaphores[] = {system->render_finished_semaphores[system->current_frame_in_flight_index]};
+
     VkPresentInfoKHR present_info = {
         .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
         .pNext = NULL,
