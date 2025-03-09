@@ -847,6 +847,12 @@ enum repository_mode_t
     REPOSITORY_MODE_SERVING,
 };
 
+struct type_name_node_t
+{
+    struct kan_hash_storage_node_t node;
+    kan_interned_string_t type_name;
+};
+
 struct repository_t
 {
     struct repository_t *parent;
@@ -868,6 +874,20 @@ struct repository_t
     struct kan_hash_storage_t singleton_storages;
     struct kan_hash_storage_t indexed_storages;
     struct kan_hash_storage_t event_storages;
+
+    /// \details Event storages for automatic events might need to be uplifted from children repositories to
+    ///          parent repositories in order to function properly. Uplift happens when event storage is created
+    ///          and not after that -- top-down storage creation rule must be followed (which is true for the repository
+    ///          storage creation in general). We cannot create event storages for automatic events right after their
+    ///          source type storage creation, because events might.
+    struct kan_hash_storage_t event_types_to_uplift;
+
+#if defined(KAN_REPOSITORY_VALIDATION_ENABLED)
+    /// \details If type is cascade deleted, its storages cannot be created in child repositories as they would be
+    ///          invisible to the repository with cascade deletion source type. Therefore, we need to validate that
+    ///          it is not happening.
+    struct kan_hash_storage_t cascade_deleted_indexed_types;
+#endif
 };
 
 struct migration_context_t
@@ -2011,7 +2031,6 @@ static void observation_event_triggers_definition_build (struct observation_even
                                                          struct kan_stack_group_allocator_t *temporary_allocator,
                                                          kan_allocation_group_t result_allocation_group)
 {
-    ensure_statics_initialized ();
     struct kan_reflection_struct_meta_iterator_t iterator = kan_reflection_registry_query_struct_meta (
         repository->registry, observed_struct->name, meta_automatic_on_change_event_name);
 
@@ -2215,7 +2234,6 @@ static struct lifetime_event_trigger_list_node_t *lifetime_event_triggers_extrac
     kan_instance_size_t *count_output,
     kan_instance_size_t *array_size_output)
 {
-    ensure_statics_initialized ();
     struct kan_reflection_struct_meta_iterator_t iterator = kan_reflection_registry_query_struct_meta (
         repository->registry, observed_struct->name, meta_automatic_on_insert_event_name);
 
@@ -2274,7 +2292,6 @@ static struct lifetime_event_trigger_list_node_t *lifetime_event_triggers_extrac
     kan_instance_size_t *count_output,
     kan_instance_size_t *array_size_output)
 {
-    ensure_statics_initialized ();
     struct kan_reflection_struct_meta_iterator_t iterator = kan_reflection_registry_query_struct_meta (
         repository->registry, observed_struct->name, meta_automatic_on_delete_event_name);
 
@@ -2484,9 +2501,7 @@ static void cascade_deleters_definition_build (struct cascade_deleters_definitio
                                                struct kan_stack_group_allocator_t *temporary_allocator,
                                                kan_allocation_group_t result_allocation_group)
 {
-    ensure_statics_initialized ();
     KAN_ASSERT (!definition->cascade_deleters)
-
     struct kan_reflection_struct_meta_iterator_t iterator = kan_reflection_registry_query_struct_meta (
         repository->registry, parent_type_name, meta_automatic_cascade_deletion_name);
 
@@ -3643,13 +3658,52 @@ static void repository_storage_map_access_unlock (struct repository_t *caller)
                                             &caller->shared_storage_access_lock);
 }
 
+static void repository_init_utility_planning_storages (struct repository_t *repository)
+{
+    kan_hash_storage_init (&repository->event_types_to_uplift, repository->allocation_group,
+                           KAN_REPOSITORY_UTILITY_HASHES_INITIAL_BUCKETS);
+
+#if defined(KAN_REPOSITORY_VALIDATION_ENABLED)
+    kan_hash_storage_init (&repository->cascade_deleted_indexed_types, repository->allocation_group,
+                           KAN_REPOSITORY_UTILITY_HASHES_INITIAL_BUCKETS);
+#endif
+}
+
+static void repository_shutdown_utility_planning_storages (struct repository_t *repository)
+{
+    struct type_name_node_t *node = (struct type_name_node_t *) repository->event_types_to_uplift.items.first;
+    while (node)
+    {
+        struct type_name_node_t *next = (struct type_name_node_t *) node->node.list_node.next;
+        kan_free_batched (repository->allocation_group, node);
+        node = next;
+    }
+
+#if defined(KAN_REPOSITORY_VALIDATION_ENABLED)
+    node = (struct type_name_node_t *) repository->cascade_deleted_indexed_types.items.first;
+    while (node)
+    {
+        struct type_name_node_t *next = (struct type_name_node_t *) node->node.list_node.next;
+        kan_free_batched (repository->allocation_group, node);
+        node = next;
+    }
+#endif
+
+    kan_hash_storage_shutdown (&repository->event_types_to_uplift);
+#if defined(KAN_REPOSITORY_VALIDATION_ENABLED)
+    kan_hash_storage_shutdown (&repository->cascade_deleted_indexed_types);
+#endif
+}
+
 static struct repository_t *repository_create (kan_allocation_group_t allocation_group,
                                                struct repository_t *parent,
                                                kan_interned_string_t name,
                                                kan_reflection_registry_t registry)
 {
+    ensure_statics_initialized ();
     struct repository_t *repository = (struct repository_t *) kan_allocate_general (
         allocation_group, sizeof (struct repository_t), _Alignof (struct repository_t));
+
     repository->parent = parent;
     repository->first = NULL;
 
@@ -3687,6 +3741,8 @@ static struct repository_t *repository_create (kan_allocation_group_t allocation
 
     kan_hash_storage_init (&repository->event_storages, repository->allocation_group,
                            KAN_REPOSITORY_EVENT_STORAGE_INITIAL_BUCKETS);
+
+    repository_init_utility_planning_storages (repository);
     return repository;
 }
 
@@ -3737,9 +3793,138 @@ static void repository_start_scheduled_destroy (struct repository_t *repository)
     }
 }
 
+static kan_bool_t type_name_storage_contains (struct kan_hash_storage_t *storage, kan_interned_string_t type_name)
+{
+    const struct kan_hash_storage_bucket_t *bucket = kan_hash_storage_query (storage, (kan_hash_t) type_name);
+    struct type_name_node_t *node = (struct type_name_node_t *) bucket->first;
+    const struct type_name_node_t *node_end = (struct type_name_node_t *) (bucket->last ? bucket->last->next : NULL);
+
+    while (node != node_end)
+    {
+        if (node->type_name == type_name)
+        {
+            return KAN_TRUE;
+        }
+
+        node = (struct type_name_node_t *) node->node.list_node.next;
+    }
+
+    return KAN_FALSE;
+}
+
+static void type_name_storage_insert (struct kan_hash_storage_t *storage,
+                                      kan_interned_string_t type_name,
+                                      kan_allocation_group_t allocation_group)
+{
+    if (type_name_storage_contains (storage, type_name))
+    {
+        return;
+    }
+
+    struct type_name_node_t *new_node = kan_allocate_batched (allocation_group, sizeof (struct type_name_node_t));
+    new_node->node.hash = KAN_HASH_OBJECT_POINTER (type_name);
+    new_node->type_name = type_name;
+
+    kan_hash_storage_update_bucket_count_default (storage, KAN_REPOSITORY_UTILITY_HASHES_INITIAL_BUCKETS);
+    kan_hash_storage_add (storage, &new_node->node);
+}
+
+static void repository_register_events_to_uplift (struct repository_t *repository, kan_interned_string_t source_type)
+{
+    struct kan_reflection_struct_meta_iterator_t iterator = kan_reflection_registry_query_struct_meta (
+        repository->registry, source_type, meta_automatic_on_insert_event_name);
+
+    const struct kan_repository_meta_automatic_on_insert_event_t *meta_on_insert =
+        kan_reflection_struct_meta_iterator_get (&iterator);
+
+    while (meta_on_insert)
+    {
+        type_name_storage_insert (&repository->event_types_to_uplift, kan_string_intern (meta_on_insert->event_type),
+                                  repository->allocation_group);
+
+        kan_reflection_struct_meta_iterator_next (&iterator);
+        meta_on_insert = kan_reflection_struct_meta_iterator_get (&iterator);
+    }
+
+    iterator = kan_reflection_registry_query_struct_meta (repository->registry, source_type,
+                                                          meta_automatic_on_change_event_name);
+
+    const struct kan_repository_meta_automatic_on_change_event_t *meta_on_change =
+        kan_reflection_struct_meta_iterator_get (&iterator);
+
+    while (meta_on_change)
+    {
+        type_name_storage_insert (&repository->event_types_to_uplift, kan_string_intern (meta_on_change->event_type),
+                                  repository->allocation_group);
+
+        kan_reflection_struct_meta_iterator_next (&iterator);
+        meta_on_change = kan_reflection_struct_meta_iterator_get (&iterator);
+    }
+
+    iterator = kan_reflection_registry_query_struct_meta (repository->registry, source_type,
+                                                          meta_automatic_on_delete_event_name);
+
+    const struct kan_repository_meta_automatic_on_delete_event_t *meta_on_delete =
+        kan_reflection_struct_meta_iterator_get (&iterator);
+
+    while (meta_on_delete)
+    {
+        type_name_storage_insert (&repository->event_types_to_uplift, kan_string_intern (meta_on_delete->event_type),
+                                  repository->allocation_group);
+
+        kan_reflection_struct_meta_iterator_next (&iterator);
+        meta_on_delete = kan_reflection_struct_meta_iterator_get (&iterator);
+    }
+}
+
+#if defined(KAN_REPOSITORY_VALIDATION_ENABLED)
+static void repository_register_cascade_deleted_types (struct repository_t *repository,
+                                                       kan_interned_string_t source_type)
+{
+    struct kan_reflection_struct_meta_iterator_t iterator = kan_reflection_registry_query_struct_meta (
+        repository->registry, source_type, meta_automatic_cascade_deletion_name);
+
+    const struct kan_repository_meta_automatic_cascade_deletion_t *meta =
+        kan_reflection_struct_meta_iterator_get (&iterator);
+
+    while (meta)
+    {
+        type_name_storage_insert (&repository->cascade_deleted_indexed_types, kan_string_intern (meta->child_type_name),
+                                  repository->allocation_group);
+
+        kan_reflection_struct_meta_iterator_next (&iterator);
+        meta = kan_reflection_struct_meta_iterator_get (&iterator);
+    }
+}
+
+static kan_bool_t validate_indexed_type_is_not_forbidden_due_to_cascade_deletion (struct repository_t *repository,
+                                                                                  kan_interned_string_t type)
+{
+    struct repository_t *parent_repository = repository->parent;
+    while (parent_repository)
+    {
+        if (type_name_storage_contains (&parent_repository->cascade_deleted_indexed_types, type))
+        {
+            KAN_LOG (repository, KAN_LOG_ERROR,
+                     "Storage for indexed record type \"%s\" cannot be opened in repository \"%s\", because it is "
+                     "already referenced in cascade deleter in parent repository \"%s\". Created storage would "
+                     "invisible to parent and cascade deletion would not work.",
+                     type, repository->name, parent_repository->name)
+            return KAN_FALSE;
+        }
+
+        parent_repository = parent_repository->parent;
+    }
+
+    return KAN_TRUE;
+}
+#endif
+
 static void repository_enter_planning_mode_internal (struct repository_t *repository)
 {
+    repository_init_utility_planning_storages (repository);
     struct repository_t *child_repository = repository->first;
+
     while (child_repository)
     {
         repository_enter_planning_mode_internal (child_repository);
@@ -3780,6 +3965,7 @@ static void repository_enter_planning_mode_internal (struct repository_t *reposi
                                                         singleton_storage_node->automation_allocation_group);
         observation_event_triggers_definition_init (&singleton_storage_node->observation_events_triggers);
 
+        repository_register_events_to_uplift (repository, singleton_storage_node->type->name);
         singleton_storage_node = (struct singleton_storage_node_t *) singleton_storage_node->node.list_node.next;
     }
 
@@ -3807,6 +3993,11 @@ static void repository_enter_planning_mode_internal (struct repository_t *reposi
         cascade_deleters_definition_shutdown (&indexed_storage_node->cascade_deleters,
                                               indexed_storage_node->automation_allocation_group);
         cascade_deleters_definition_init (&indexed_storage_node->cascade_deleters);
+
+        repository_register_events_to_uplift (repository, indexed_storage_node->type->name);
+#if defined(KAN_REPOSITORY_VALIDATION_ENABLED)
+        repository_register_cascade_deleted_types (repository, indexed_storage_node->type->name);
+#endif
 
         indexed_storage_node = (struct indexed_storage_node_t *) indexed_storage_node->node.list_node.next;
     }
@@ -4366,6 +4557,8 @@ kan_repository_singleton_storage_t kan_repository_singleton_storage_open (kan_re
         kan_hash_storage_update_bucket_count_default (&repository_data->singleton_storages,
                                                       KAN_REPOSITORY_SINGLETON_STORAGE_INITIAL_BUCKETS);
         kan_hash_storage_add (&repository_data->singleton_storages, &storage->node);
+
+        repository_register_events_to_uplift (repository_data, interned_type_name);
     }
 
     repository_storage_map_access_unlock (repository_data);
@@ -4535,6 +4728,14 @@ kan_repository_indexed_storage_t kan_repository_indexed_storage_open (kan_reposi
             return KAN_HANDLE_SET_INVALID (kan_repository_indexed_storage_t);
         }
 
+#if defined(KAN_REPOSITORY_VALIDATION_ENABLED)
+        if (!validate_indexed_type_is_not_forbidden_due_to_cascade_deletion (repository_data, interned_type_name))
+        {
+            repository_storage_map_access_unlock (repository_data);
+            return KAN_HANDLE_SET_INVALID (kan_repository_indexed_storage_t);
+        }
+#endif
+
         const kan_allocation_group_t storage_allocation_group = kan_allocation_group_get_child (
             kan_allocation_group_get_child (repository_data->allocation_group, "indexed"), interned_type_name);
 
@@ -4582,6 +4783,11 @@ kan_repository_indexed_storage_t kan_repository_indexed_storage_open (kan_reposi
         kan_hash_storage_update_bucket_count_default (&repository_data->indexed_storages,
                                                       KAN_REPOSITORY_INDEXED_STORAGE_INITIAL_BUCKETS);
         kan_hash_storage_add (&repository_data->indexed_storages, &storage->node);
+
+        repository_register_events_to_uplift (repository_data, interned_type_name);
+#if defined(KAN_REPOSITORY_VALIDATION_ENABLED)
+        repository_register_cascade_deleted_types (repository_data, interned_type_name);
+#endif
     }
 
     repository_storage_map_access_unlock (repository_data);
@@ -8252,8 +8458,30 @@ kan_repository_event_storage_t kan_repository_event_storage_open (kan_repository
             return KAN_HANDLE_SET_INVALID (kan_repository_event_storage_t);
         }
 
+        // Uplift event storage to the highest parent repository that might produce this event.
+        struct repository_t *target_event_repository = repository_data;
+        struct repository_t *uplift_parent_repository = repository_data->parent;
+
+        while (uplift_parent_repository)
+        {
+            if (type_name_storage_contains (&uplift_parent_repository->event_types_to_uplift, interned_type_name))
+            {
+                target_event_repository = uplift_parent_repository;
+            }
+
+            uplift_parent_repository = uplift_parent_repository->parent;
+        }
+
+        if (target_event_repository != repository_data)
+        {
+            KAN_LOG (repository, KAN_LOG_DEBUG,
+                     "Event type \"%s\" was requested in repository \"%s\", but was instead uplifted to \"%s\" in "
+                     "order to make automatic event routine work properly.",
+                     interned_type_name, repository_data->name, target_event_repository->name)
+        }
+
         const kan_allocation_group_t storage_allocation_group = kan_allocation_group_get_child (
-            kan_allocation_group_get_child (repository_data->allocation_group, "events"), interned_type_name);
+            kan_allocation_group_get_child (target_event_repository->allocation_group, "events"), interned_type_name);
 
         storage = (struct event_storage_node_t *) kan_allocate_batched (storage_allocation_group,
                                                                         sizeof (struct event_storage_node_t));
@@ -8270,9 +8498,9 @@ kan_repository_event_storage_t kan_repository_event_storage_open (kan_repository
 #endif
 
         storage->scheduled_for_destroy = KAN_FALSE;
-        kan_hash_storage_update_bucket_count_default (&repository_data->event_storages,
+        kan_hash_storage_update_bucket_count_default (&target_event_repository->event_storages,
                                                       KAN_REPOSITORY_EVENT_STORAGE_INITIAL_BUCKETS);
-        kan_hash_storage_add (&repository_data->event_storages, &storage->node);
+        kan_hash_storage_add (&target_event_repository->event_storages, &storage->node);
     }
 
     repository_storage_map_access_unlock (repository_data);
@@ -8536,6 +8764,7 @@ static void repository_destroy_internal (struct repository_t *repository)
         }
     }
 
+    repository_shutdown_utility_planning_storages (repository);
     kan_free_general (repository->allocation_group, repository, sizeof (struct repository_t));
 }
 
@@ -8613,7 +8842,6 @@ static kan_bool_t repository_is_indexed_storage_can_be_cleared (struct indexed_s
         return KAN_TRUE;
     }
 
-    ensure_statics_initialized ();
     kan_bool_t has_obstacles = KAN_FALSE;
     indexed_storage_node->candidate_for_cleanup = KAN_TRUE;
 
@@ -8801,7 +9029,6 @@ static void extract_observation_chunks_from_on_change_events (
     struct observation_buffer_scenario_chunk_list_node_t **first,
     struct observation_buffer_scenario_chunk_list_node_t **last)
 {
-    ensure_statics_initialized ();
     struct kan_reflection_struct_meta_iterator_t iterator = kan_reflection_registry_query_struct_meta (
         repository->registry, observed_struct->name, meta_automatic_on_change_event_name);
 
@@ -9154,6 +9381,7 @@ static void repository_prepare_storages (struct repository_t *repository, struct
 static void repository_complete_switch_to_serving (struct repository_t *repository)
 {
     repository->mode = REPOSITORY_MODE_SERVING;
+    repository_shutdown_utility_planning_storages (repository);
     repository = repository->first;
 
     while (repository)
