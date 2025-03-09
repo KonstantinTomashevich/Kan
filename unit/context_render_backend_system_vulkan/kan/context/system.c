@@ -3236,7 +3236,8 @@ static void render_backend_system_finish_command_submission (struct render_backe
         semaphores_to_wait = 0u;
         if (system->present_skipped_flags[system->current_frame_in_flight_index])
         {
-            wait_semaphores[semaphores_to_wait] = system->render_finished_semaphores[system->current_frame_in_flight_index];
+            wait_semaphores[semaphores_to_wait] =
+                system->render_finished_semaphores[system->current_frame_in_flight_index];
             semaphore_stages[semaphores_to_wait] = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
             ++semaphores_to_wait;
         }
