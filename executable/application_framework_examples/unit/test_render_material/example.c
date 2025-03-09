@@ -167,6 +167,9 @@ APPLICATION_FRAMEWORK_EXAMPLES_TEST_RENDER_MATERIAL_API void kan_universe_mutato
     kan_workflow_graph_node_t workflow_node,
     struct test_render_material_state_t *state)
 {
+    kan_workflow_graph_node_depend_on (workflow_node,
+                                       KAN_RENDER_FOUNDATION_MATERIAL_INSTANCE_CUSTOM_SYNC_END_CHECKPOINT);
+
     kan_context_t context = kan_universe_get_context (universe);
     state->application_system_handle = kan_context_query (context, KAN_CONTEXT_APPLICATION_SYSTEM_NAME);
     state->application_framework_system_handle =
@@ -192,6 +195,10 @@ APPLICATION_FRAMEWORK_EXAMPLES_TEST_RENDER_MATERIAL_API void kan_universe_mutato
 #define TEST_HEIGHT 512u
 #define TEST_WIDTH_FLOAT 512.0f
 #define TEST_HEIGHT_FLOAT 512.0f
+
+/// \brief As this example is temporary and is used for manual launches,
+///        check for custom material logic was hidden under this define.
+// #define TEST_USE_CUSTOM_MATERIAL
 
 static void try_render_frame (struct test_render_material_state_t *state,
                               const struct kan_render_context_singleton_t *render_context,
@@ -263,8 +270,25 @@ static void try_render_frame (struct test_render_material_state_t *state,
     // For the sake of the simple example, we just assume that projection view matrix is at the beginning of the buffer.
     memcpy (pass_buffer_data, &projection_view, sizeof (projection_view));
 
+#if defined(TEST_USE_CUSTOM_MATERIAL)
+    KAN_UP_VALUE_READ (material_instance, kan_render_material_instance_custom_loaded_t, usage_id,
+                       &singleton->material_instance_usage_id)
+#else
     KAN_UP_VALUE_READ (material_instance, kan_render_material_instance_loaded_t, name, &material_instance_name)
+#endif
     {
+#if defined(TEST_USE_CUSTOM_MATERIAL)
+        KAN_UP_VALUE_UPDATE (parameter, kan_render_material_instance_custom_instanced_parameter_t, usage_id,
+                             &singleton->material_instance_usage_id)
+        {
+            if (parameter->parameter.name == kan_string_intern ("preset_index"))
+            {
+                parameter->parameter.value_i1 = (parameter->parameter.value_i1 + 1) % 3;
+                KAN_UP_QUERY_BREAK;
+            }
+        }
+#endif
+
         KAN_UP_VALUE_READ (material, kan_render_material_loaded_t, name, &material_instance->data.material_name)
         {
             kan_render_graphics_pipeline_t pipeline = KAN_HANDLE_INITIALIZE_INVALID;
@@ -430,6 +454,17 @@ APPLICATION_FRAMEWORK_EXAMPLES_TEST_RENDER_MATERIAL_API void kan_universe_mutato
                             singleton->material_instance_usage_id = usage->usage_id;
                             usage->name = test_config->material_instance_name;
                         }
+
+#if defined(TEST_USE_CUSTOM_MATERIAL)
+                        KAN_UP_INDEXED_INSERT (custom_parameter,
+                                               kan_render_material_instance_custom_instanced_parameter_t)
+                        {
+                            custom_parameter->usage_id = singleton->material_instance_usage_id;
+                            custom_parameter->parameter.name = kan_string_intern ("preset_index");
+                            custom_parameter->parameter.type = KAN_RPL_META_VARIABLE_TYPE_I1;
+                            custom_parameter->parameter.value_i1 = 1;
+                        }
+#endif
                     }
 
                     if (KAN_HANDLE_IS_VALID (render_context->render_context) && render_context->frame_scheduled)
