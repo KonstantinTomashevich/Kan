@@ -2,6 +2,7 @@
 
 #include <kan/api_common/alignment.h>
 #include <kan/api_common/min_max.h>
+#include <kan/container/hash_storage.h>
 #include <kan/container/list.h>
 #include <kan/container/stack_group_allocator.h>
 #include <kan/context/all_system_names.h>
@@ -446,11 +447,11 @@ struct render_backend_layout_binding_t
 
 struct render_backend_pipeline_parameter_set_layout_t
 {
-    struct kan_bd_list_node_t list_node;
+    struct kan_hash_storage_node_t node;
     struct render_backend_system_t *system;
 
-    /// \details In future, we can try to hash the layouts to avoid creating lots of similar ones.
     VkDescriptorSetLayout layout;
+    struct kan_atomic_int_t reference_count;
 
     kan_render_size_t set;
     kan_bool_t stable_binding;
@@ -464,7 +465,7 @@ struct render_backend_pipeline_parameter_set_layout_t
     struct render_backend_layout_binding_t bindings[];
 };
 
-struct render_backend_pipeline_parameter_set_layout_t *render_backend_system_create_pipeline_parameter_set_layout (
+struct render_backend_pipeline_parameter_set_layout_t *render_backend_system_register_pipeline_parameter_set_layout (
     struct render_backend_system_t *system, struct kan_render_pipeline_parameter_set_layout_description_t *description);
 
 void render_backend_system_destroy_pipeline_parameter_set_layout (
@@ -489,6 +490,25 @@ void render_backend_system_unlink_code_module (struct render_backend_code_module
 void render_backend_system_destroy_code_module (struct render_backend_system_t *system,
                                                 struct render_backend_code_module_t *code_module);
 
+struct render_backend_pipeline_layout_t
+{
+    struct kan_hash_storage_node_t node;
+    VkPipelineLayout layout;
+    kan_instance_size_t usage_count;
+
+    kan_instance_size_t set_layouts_count;
+    struct render_backend_pipeline_parameter_set_layout_t *set_layouts[];
+};
+
+struct render_backend_pipeline_layout_t *render_backend_system_register_pipeline_layout (
+    struct render_backend_system_t *system,
+    kan_instance_size_t parameter_set_layouts_count,
+    kan_render_pipeline_parameter_set_layout_t *parameter_set_layouts,
+    kan_interned_string_t tracking_name);
+
+void render_backend_system_destroy_pipeline_layout (struct render_backend_system_t *system,
+                                                    struct render_backend_pipeline_layout_t *layout);
+
 enum pipeline_compilation_state_t
 {
     PIPELINE_COMPILATION_STATE_PENDING = 0u,
@@ -503,11 +523,7 @@ struct render_backend_graphics_pipeline_t
     struct render_backend_system_t *system;
 
     VkPipeline pipeline;
-
-    /// \details In future, we can try to hash the layouts and share them between pipelines whenever it is possible.
-    ///          But it is only needed if there is lots of pipelines with similar layouts, which is not guaranteed
-    ///          to be the case.
-    VkPipelineLayout layout;
+    struct render_backend_pipeline_layout_t *layout;
 
     struct render_backend_pass_t *pass;
     float min_depth;
@@ -860,7 +876,17 @@ struct render_backend_system_t
     struct render_backend_schedule_state_t schedule_states[KAN_CONTEXT_RENDER_BACKEND_VULKAN_FRAMES_IN_FLIGHT];
 
     /// \brief Lock for safe resource creation registration in multithreaded environment.
+    /// \details Reused for various lists as we only insert to these lists under this lock.
+    ///          Therefore, reusing it would not cause too much wait time.
     struct kan_atomic_int_t resource_registration_lock;
+
+    /// \brief Separate lock for pipeline parameter set layout registration: it is more difficult due to the need to
+    ///        keep cache consistent, therefore it would waste too much time if it was under common registration lock.
+    struct kan_atomic_int_t pipeline_parameter_set_layout_registration_lock;
+
+    /// \brief Separate lock for pipeline layout registration: it is more difficult due to the need to
+    ///        keep cache consistent, therefore it would waste too much time if it was under common registration lock.
+    struct kan_atomic_int_t pipeline_layout_registration_lock;
 
     /// \brief Lock used for registering static dependencies between passes.
     struct kan_atomic_int_t pass_static_dependency_lock;
@@ -873,7 +899,10 @@ struct render_backend_system_t
     struct kan_bd_list_t passes;
     struct kan_bd_list_t pass_instances;
     struct kan_bd_list_t pass_instances_available;
-    struct kan_bd_list_t pipeline_parameter_set_layouts;
+
+    struct kan_hash_storage_t pipeline_parameter_set_layouts;
+    struct kan_hash_storage_t pipeline_layouts;
+
     struct kan_bd_list_t code_modules;
     struct kan_bd_list_t graphics_pipelines;
     struct kan_bd_list_t pipeline_parameter_sets;
@@ -909,6 +938,7 @@ struct render_backend_system_t
     kan_allocation_group_t pass_instance_allocation_group;
     kan_allocation_group_t parameter_set_layout_wrapper_allocation_group;
     kan_allocation_group_t code_module_wrapper_allocation_group;
+    kan_allocation_group_t pipeline_layout_wrapper_allocation_group;
     kan_allocation_group_t pipeline_wrapper_allocation_group;
     kan_allocation_group_t pipeline_parameter_set_wrapper_allocation_group;
     kan_allocation_group_t buffer_wrapper_allocation_group;
@@ -924,9 +954,10 @@ struct render_backend_system_t
     kan_cpu_section_t section_create_pass;
     kan_cpu_section_t section_create_pass_internal;
     kan_cpu_section_t section_create_pass_instance;
-    kan_cpu_section_t section_create_pipeline_parameter_set_layout;
+    kan_cpu_section_t section_register_pipeline_parameter_set_layout;
     kan_cpu_section_t section_create_code_module;
     kan_cpu_section_t section_create_code_module_internal;
+    kan_cpu_section_t section_register_pipeline_layout;
     kan_cpu_section_t section_create_graphics_pipeline;
     kan_cpu_section_t section_create_graphics_pipeline_internal;
     kan_cpu_section_t section_create_pipeline_parameter_set;

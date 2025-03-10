@@ -28,6 +28,8 @@ kan_context_system_t render_backend_system_create (kan_allocation_group_t group,
     system->parameter_set_layout_wrapper_allocation_group =
         kan_allocation_group_get_child (group, "parameter_set_layout_wrapper");
     system->code_module_wrapper_allocation_group = kan_allocation_group_get_child (group, "code_module_wrapper");
+    system->pipeline_layout_wrapper_allocation_group =
+        kan_allocation_group_get_child (group, "pipeline_layout_wrapper");
     system->pipeline_wrapper_allocation_group = kan_allocation_group_get_child (group, "pipeline_wrapper");
     system->pipeline_parameter_set_wrapper_allocation_group =
         kan_allocation_group_get_child (group, "pipeline_parameter_set_wrapper");
@@ -45,10 +47,11 @@ kan_context_system_t render_backend_system_create (kan_allocation_group_t group,
     system->section_create_pass = kan_cpu_section_get ("render_backend_create_pass");
     system->section_create_pass_internal = kan_cpu_section_get ("render_backend_create_pass_internal");
     system->section_create_pass_instance = kan_cpu_section_get ("render_backend_create_pass_instance");
-    system->section_create_pipeline_parameter_set_layout =
-        kan_cpu_section_get ("render_backend_create_pipeline_parameter_set_layout");
+    system->section_register_pipeline_parameter_set_layout =
+        kan_cpu_section_get ("render_backend_register_pipeline_parameter_set_layout");
     system->section_create_code_module = kan_cpu_section_get ("render_backend_create_code_module");
     system->section_create_code_module_internal = kan_cpu_section_get ("render_backend_create_code_module_internal");
+    system->section_register_pipeline_layout = kan_cpu_section_get ("render_backend_register_pipeline_layout");
     system->section_create_graphics_pipeline = kan_cpu_section_get ("render_backend_create_graphics_pipeline");
     system->section_create_graphics_pipeline_internal =
         kan_cpu_section_get ("render_backend_create_graphics_pipeline_internal");
@@ -125,6 +128,8 @@ kan_context_system_t render_backend_system_create (kan_allocation_group_t group,
     system->current_frame_in_flight_index = 0u;
 
     system->resource_registration_lock = kan_atomic_int_init (0);
+    system->pipeline_parameter_set_layout_registration_lock = kan_atomic_int_init (0);
+    system->pipeline_layout_registration_lock = kan_atomic_int_init (0);
     system->pass_static_dependency_lock = kan_atomic_int_init (0);
     system->pass_instance_state_management_lock = kan_atomic_int_init (0);
 
@@ -133,7 +138,14 @@ kan_context_system_t render_backend_system_create (kan_allocation_group_t group,
     kan_bd_list_init (&system->passes);
     kan_bd_list_init (&system->pass_instances);
     kan_bd_list_init (&system->pass_instances_available);
-    kan_bd_list_init (&system->pipeline_parameter_set_layouts);
+
+    kan_hash_storage_init (&system->pipeline_parameter_set_layouts,
+                           system->parameter_set_layout_wrapper_allocation_group,
+                           KAN_CONTEXT_RENDER_BACKEND_VULKAN_SET_LAYOUT_BUCKETS);
+
+    kan_hash_storage_init (&system->pipeline_layouts, system->pipeline_layout_wrapper_allocation_group,
+                           KAN_CONTEXT_RENDER_BACKEND_VULKAN_PL_BUCKETS);
+
     kan_bd_list_init (&system->code_modules);
     kan_bd_list_init (&system->graphics_pipelines);
     kan_bd_list_init (&system->pipeline_parameter_sets);
@@ -735,6 +747,18 @@ void render_backend_system_destroy (kan_context_system_t handle)
         pipeline = next;
     }
 
+    struct render_backend_pipeline_layout_t *pipeline_layout =
+        (struct render_backend_pipeline_layout_t *) system->pipeline_layouts.items.first;
+
+    while (pipeline_layout)
+    {
+        struct render_backend_pipeline_layout_t *next =
+            (struct render_backend_pipeline_layout_t *) pipeline_layout->node.list_node.next;
+        render_backend_system_destroy_pipeline_layout (system, pipeline_layout);
+        pipeline_layout = next;
+    }
+
+    kan_hash_storage_shutdown (&system->pipeline_layouts);
     struct render_backend_code_module_t *code_module =
         (struct render_backend_code_module_t *) system->code_modules.first;
 
@@ -746,16 +770,17 @@ void render_backend_system_destroy (kan_context_system_t handle)
     }
 
     struct render_backend_pipeline_parameter_set_layout_t *parameter_set_layout =
-        (struct render_backend_pipeline_parameter_set_layout_t *) system->pipeline_parameter_set_layouts.first;
+        (struct render_backend_pipeline_parameter_set_layout_t *) system->pipeline_parameter_set_layouts.items.first;
 
     while (parameter_set_layout)
     {
         struct render_backend_pipeline_parameter_set_layout_t *next =
-            (struct render_backend_pipeline_parameter_set_layout_t *) parameter_set_layout->list_node.next;
+            (struct render_backend_pipeline_parameter_set_layout_t *) parameter_set_layout->node.list_node.next;
         render_backend_system_destroy_pipeline_parameter_set_layout (system, parameter_set_layout);
         parameter_set_layout = next;
     }
 
+    kan_hash_storage_shutdown (&system->pipeline_parameter_set_layouts);
     vkDestroyDescriptorSetLayout (system->device, system->empty_descriptor_set_layout,
                                   VULKAN_ALLOCATION_CALLBACKS (system));
 
@@ -4216,6 +4241,7 @@ kan_bool_t kan_render_backend_system_next_frame (kan_context_system_t render_bac
     struct scheduled_graphics_pipeline_destroy_t *graphics_pipeline_destroy =
         schedule->first_scheduled_graphics_pipeline_destroy;
     schedule->first_scheduled_graphics_pipeline_destroy = NULL;
+    kan_bool_t any_pipeline_layout_destroyed = KAN_FALSE;
 
     while (graphics_pipeline_destroy)
     {
@@ -4262,22 +4288,52 @@ kan_bool_t kan_render_backend_system_next_frame (kan_context_system_t render_bac
             kan_cpu_section_execution_shutdown (&waiting_compilation_execution);
         }
 
+        struct render_backend_pipeline_layout_t *pipeline_layout = graphics_pipeline_destroy->pipeline->layout;
         kan_bd_list_remove (&system->graphics_pipelines, &graphics_pipeline_destroy->pipeline->list_node);
         render_backend_system_destroy_graphics_pipeline (system, graphics_pipeline_destroy->pipeline);
+        --pipeline_layout->usage_count;
+
+        if (pipeline_layout->usage_count == 0u)
+        {
+            kan_hash_storage_remove (&system->pipeline_layouts, &pipeline_layout->node);
+            render_backend_system_destroy_pipeline_layout (system, pipeline_layout);
+            any_pipeline_layout_destroyed = KAN_TRUE;
+        }
+
         graphics_pipeline_destroy = graphics_pipeline_destroy->next;
+    }
+
+    if (any_pipeline_layout_destroyed)
+    {
+        kan_hash_storage_update_bucket_count_default (&system->pipeline_layouts,
+                                                      KAN_CONTEXT_RENDER_BACKEND_VULKAN_PL_BUCKETS);
     }
 
     struct scheduled_pipeline_parameter_set_layout_destroy_t *pipeline_parameter_set_layout_destroy =
         schedule->first_scheduled_pipeline_parameter_set_layout_destroy;
     schedule->first_scheduled_pipeline_parameter_set_layout_destroy = NULL;
+    kan_bool_t any_pipeline_parameter_set_layout_destroyed = KAN_FALSE;
 
     while (pipeline_parameter_set_layout_destroy)
     {
-        kan_bd_list_remove (&system->pipeline_parameter_set_layouts,
-                            &pipeline_parameter_set_layout_destroy->layout->list_node);
-        render_backend_system_destroy_pipeline_parameter_set_layout (system,
-                                                                     pipeline_parameter_set_layout_destroy->layout);
+        // References could've been updated even after layout destruction: for example, new layout with the same
+        // content could've been created right away -- in that case, there is no need to delete old one.
+        if (kan_atomic_int_get (&pipeline_parameter_set_layout_destroy->layout->reference_count) == 0)
+        {
+            kan_hash_storage_remove (&system->pipeline_parameter_set_layouts,
+                                     &pipeline_parameter_set_layout_destroy->layout->node);
+            render_backend_system_destroy_pipeline_parameter_set_layout (system,
+                                                                         pipeline_parameter_set_layout_destroy->layout);
+            any_pipeline_parameter_set_layout_destroyed = KAN_TRUE;
+        }
+
         pipeline_parameter_set_layout_destroy = pipeline_parameter_set_layout_destroy->next;
+    }
+
+    if (any_pipeline_parameter_set_layout_destroyed)
+    {
+        kan_hash_storage_update_bucket_count_default (&system->pipeline_parameter_set_layouts,
+                                                      KAN_CONTEXT_RENDER_BACKEND_VULKAN_SET_LAYOUT_BUCKETS);
     }
 
     struct scheduled_frame_buffer_destroy_t *frame_buffer_destroy = schedule->first_scheduled_frame_buffer_destroy;

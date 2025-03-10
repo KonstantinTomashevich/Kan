@@ -583,7 +583,7 @@ kan_bool_t kan_render_pass_instance_graphics_pipeline (kan_render_pass_instance_
     DEBUG_LABEL_INSERT (instance->command_buffer, pipeline->tracking_name, 0.063f, 0.569f, 0.0f, 1.0f)
     vkCmdBindPipeline (instance->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->pipeline);
     kan_atomic_int_unlock (&command_state->command_operation_lock);
-    instance->current_pipeline_layout = pipeline->layout;
+    instance->current_pipeline_layout = pipeline->layout->layout;
     return KAN_TRUE;
 }
 

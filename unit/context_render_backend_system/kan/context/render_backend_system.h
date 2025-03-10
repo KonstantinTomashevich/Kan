@@ -85,6 +85,13 @@
 /// \parblock
 /// Pipeline parameter set layout describes bindings in one particular parameter set along with this set index.
 /// Set layouts are used for creation of pipelines and parameter sets.
+///
+/// Pipeline parameter set layouts are guaranteed to be reused: if `kan_render_pipeline_parameter_set_layout_create`
+/// called several times with the same bindings (order in description doesn't matter, only binding indices matter),
+/// it would be created only once and the same `kan_render_pipeline_parameter_set_layout_t` would be returned to the
+/// user. It is made to avoid excessive creation of sets and also makes life easier for the user by guarantying that
+/// compatible layouts from different materials would automatically be merged and user should not worry about merging
+/// layouts manually.
 /// \endparblock
 ///
 /// \par Pipelines
@@ -635,12 +642,12 @@ struct kan_render_pipeline_parameter_set_layout_description_t
     kan_interned_string_t tracking_name;
 };
 
-/// \brief Creates new pipeline parameter set from given parameters.
+/// \brief Creates new pipeline parameter set layout from given parameters or retrieves compatible layout from cache.
 CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_pipeline_parameter_set_layout_t
 kan_render_pipeline_parameter_set_layout_create (
     kan_render_context_t context, struct kan_render_pipeline_parameter_set_layout_description_t *description);
 
-/// \brief Requests given pipeline parameter set to be destroyed.
+/// \brief Destroys reference to given parameter set layout. Destroys it if it is no longer references.
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pipeline_parameter_set_layout_destroy (
     kan_render_pipeline_parameter_set_layout_t layout);
 
@@ -831,6 +838,11 @@ struct kan_render_graphics_pipeline_description_t
     struct kan_render_attribute_description_t *attributes;
 
     kan_instance_size_t parameter_set_layouts_count;
+
+    /// \warning Created pipeline is not responsible for set layout management. User still needs to ensure that if
+    ///          set layout is destroyed, then pipeline that was using it would be destroyed in the same frame too.
+    ///          It works like that, because user needs to maintain consistent view of both pipelines and set layouts
+    ///          anyway, therefore there is no sense to add needless complexity to the implementation.
     kan_render_pipeline_parameter_set_layout_t *parameter_set_layouts;
 
     kan_instance_size_t output_setups_count;
