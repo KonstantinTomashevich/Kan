@@ -1224,16 +1224,23 @@ static inline void calculate_size_and_alignment_from_declarations (
     *size_output = (kan_instance_size_t) kan_apply_alignment (*size_output, *alignment_output);
 }
 
-static kan_bool_t resolve_buffers (struct rpl_compiler_context_t *context,
-                                   struct rpl_compiler_instance_t *instance,
-                                   struct kan_rpl_intermediate_t *intermediate,
-                                   struct binding_location_assignment_counter_t *assignment_counter)
+static kan_bool_t resolve_buffers_of_type (struct rpl_compiler_context_t *context,
+                                           struct rpl_compiler_instance_t *instance,
+                                           struct kan_rpl_intermediate_t *intermediate,
+                                           struct binding_location_assignment_counter_t *assignment_counter,
+                                           enum kan_rpl_buffer_type_t buffer_type)
 {
     kan_bool_t result = KAN_TRUE;
     for (kan_loop_size_t buffer_index = 0u; buffer_index < intermediate->buffers.size; ++buffer_index)
     {
         struct kan_rpl_buffer_t *source_buffer =
             &((struct kan_rpl_buffer_t *) intermediate->buffers.data)[buffer_index];
+
+        // Buffer of other type, will be resolved later.
+        if (source_buffer->type != buffer_type)
+        {
+            continue;
+        }
 
         switch (evaluate_conditional (context, intermediate, source_buffer->conditional_index, KAN_FALSE))
         {
@@ -1442,16 +1449,42 @@ static kan_bool_t resolve_buffers (struct rpl_compiler_context_t *context,
     return result;
 }
 
-static kan_bool_t resolve_samplers (struct rpl_compiler_context_t *context,
-                                    struct rpl_compiler_instance_t *instance,
-                                    struct kan_rpl_intermediate_t *intermediate,
-                                    struct binding_location_assignment_counter_t *assignment_counter)
+static kan_bool_t resolve_buffers (struct rpl_compiler_context_t *context,
+                                   struct rpl_compiler_instance_t *instance,
+                                   struct kan_rpl_intermediate_t *intermediate,
+                                   struct binding_location_assignment_counter_t *assignment_counter)
+{
+    // Buffer resolution is ordered by buffer types in order to make resulting pipeline bindings layouts more common.
+    return resolve_buffers_of_type (context, instance, intermediate, assignment_counter,
+                                    KAN_RPL_BUFFER_TYPE_VERTEX_ATTRIBUTE) &
+           resolve_buffers_of_type (context, instance, intermediate, assignment_counter, KAN_RPL_BUFFER_TYPE_UNIFORM) &
+           resolve_buffers_of_type (context, instance, intermediate, assignment_counter,
+                                    KAN_RPL_BUFFER_TYPE_READ_ONLY_STORAGE) &
+           resolve_buffers_of_type (context, instance, intermediate, assignment_counter,
+                                    KAN_RPL_BUFFER_TYPE_INSTANCED_ATTRIBUTE) &
+           resolve_buffers_of_type (context, instance, intermediate, assignment_counter,
+                                    KAN_RPL_BUFFER_TYPE_VERTEX_STAGE_OUTPUT) &
+           resolve_buffers_of_type (context, instance, intermediate, assignment_counter,
+                                    KAN_RPL_BUFFER_TYPE_FRAGMENT_STAGE_OUTPUT);
+}
+
+static kan_bool_t resolve_samplers_of_type (struct rpl_compiler_context_t *context,
+                                            struct rpl_compiler_instance_t *instance,
+                                            struct kan_rpl_intermediate_t *intermediate,
+                                            struct binding_location_assignment_counter_t *assignment_counter,
+                                            enum kan_rpl_sampler_type_t sampler_type)
 {
     kan_bool_t result = KAN_TRUE;
     for (kan_loop_size_t sampler_index = 0u; sampler_index < intermediate->samplers.size; ++sampler_index)
     {
         struct kan_rpl_sampler_t *source_sampler =
             &((struct kan_rpl_sampler_t *) intermediate->samplers.data)[sampler_index];
+
+        // Sampler of other type, will be resolved later.
+        if (source_sampler->type != sampler_type)
+        {
+            continue;
+        }
 
         switch (evaluate_conditional (context, intermediate, source_sampler->conditional_index, KAN_FALSE))
         {
@@ -1525,6 +1558,15 @@ static kan_bool_t resolve_samplers (struct rpl_compiler_context_t *context,
     }
 
     return result;
+}
+
+static kan_bool_t resolve_samplers (struct rpl_compiler_context_t *context,
+                                    struct rpl_compiler_instance_t *instance,
+                                    struct kan_rpl_intermediate_t *intermediate,
+                                    struct binding_location_assignment_counter_t *assignment_counter)
+{
+    // Sampler resolution is ordered by sampler types in order to make resulting pipeline bindings layouts more common.
+    return resolve_samplers_of_type (context, instance, intermediate, assignment_counter, KAN_RPL_SAMPLER_TYPE_2D);
 }
 
 static const char *get_stage_name (enum kan_rpl_pipeline_stage_t stage)
