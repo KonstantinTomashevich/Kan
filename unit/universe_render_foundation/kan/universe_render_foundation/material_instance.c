@@ -1360,6 +1360,7 @@ static void instantiate_material_static_data (
 
     struct kan_render_pipeline_parameter_set_description_t set_description = {
         .layout = material_loaded->set_material,
+        .stable_binding = KAN_TRUE,
         .tracking_name = static_state->name,
         .initial_bindings_count = update_output_index,
         .initial_bindings = updates,

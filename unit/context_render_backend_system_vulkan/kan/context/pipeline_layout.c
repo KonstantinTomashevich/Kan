@@ -8,23 +8,11 @@ struct render_backend_pipeline_layout_t *render_backend_system_register_pipeline
 {
     struct kan_cpu_section_execution_t execution;
     kan_cpu_section_execution_init (&execution, system->section_register_pipeline_layout);
-    vulkan_size_t used_set_index_count = 0u;
     kan_hash_t layout_hash = 0u;
 
-    // Technically, it would be better to sort layouts by sets in case that user might pass them in different order,
-    // but I don't think that this is really required right now. There is not a lot of places where pipelines are
-    // created (most likely, only in material loading and in future for some compute passes), so it is not that easy
-    // to introduce random order of layouts in description.
-    //
-    // Anyway, having several duplicated pipeline layouts is not an issue, in contrast to pipeline set layouts,
-    // because pipeline set layouts are crucial for pipeline set sharing, but pipeline layouts are only used inside
-    // pipelines and are not visible to the outside world.
-    //
-    // Therefore, allocating additional array and sorting it by set indices is kind of an overkill here.
     for (kan_loop_size_t index = 0u; index < parameter_set_layouts_count; ++index)
     {
         struct render_backend_pipeline_parameter_set_layout_t *layout = KAN_HANDLE_GET (parameter_set_layouts[index]);
-        used_set_index_count = KAN_MAX (used_set_index_count, layout->set + 1u);
         kan_hash_t set_hash = KAN_HASH_OBJECT_POINTER (layout);
 
         if (index == 0u)
@@ -73,41 +61,23 @@ struct render_backend_pipeline_layout_t *render_backend_system_register_pipeline
     VkDescriptorSetLayout layouts_for_pipeline_static[KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_INLINE_DESCS];
     VkDescriptorSetLayout *layouts_for_pipeline = layouts_for_pipeline_static;
 
-    if (used_set_index_count > KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_INLINE_DESCS)
+    if (parameter_set_layouts_count > KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_INLINE_DESCS)
     {
         layouts_for_pipeline = kan_allocate_general (system->utility_allocation_group,
-                                                     sizeof (VkDescriptorSetLayout) * used_set_index_count,
+                                                     sizeof (VkDescriptorSetLayout) * parameter_set_layouts_count,
                                                      _Alignof (VkDescriptorSetLayout));
-    }
-
-    for (kan_loop_size_t layout_index = 0u; layout_index < used_set_index_count; ++layout_index)
-    {
-        layouts_for_pipeline[layout_index] = system->empty_descriptor_set_layout;
     }
 
     for (kan_loop_size_t index = 0u; index < parameter_set_layouts_count; ++index)
     {
         struct render_backend_pipeline_parameter_set_layout_t *layout = KAN_HANDLE_GET (parameter_set_layouts[index]);
-
-        if (layouts_for_pipeline[layout->set] != system->empty_descriptor_set_layout)
+        if (layout)
         {
-            KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR,
-                     "Failed to add parameter set layout \"%s\" for set %lu for to pipeline layout \"%s\" as this "
-                     "hardware set is already used.",
-                     layout->tracking_name, (unsigned long) layout->set, tracking_name)
-
-            if (layouts_for_pipeline != layouts_for_pipeline_static)
-            {
-                kan_free_general (system->utility_allocation_group, layouts_for_pipeline,
-                                  sizeof (VkDescriptorSetLayout) * used_set_index_count);
-            }
-
-            kan_atomic_int_unlock (&system->pipeline_layout_registration_lock);
-            return NULL;
+            layouts_for_pipeline[index] = layout->layout;
         }
         else
         {
-            layouts_for_pipeline[layout->set] = layout->layout;
+            layouts_for_pipeline[index] = system->empty_descriptor_set_layout;
         }
     }
 
@@ -115,7 +85,7 @@ struct render_backend_pipeline_layout_t *render_backend_system_register_pipeline
         .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
         .pNext = NULL,
         .flags = 0u,
-        .setLayoutCount = (vulkan_size_t) used_set_index_count,
+        .setLayoutCount = (vulkan_size_t) parameter_set_layouts_count,
         .pSetLayouts = layouts_for_pipeline,
         .pushConstantRangeCount = 0u,
         .pPushConstantRanges = NULL,
@@ -127,21 +97,19 @@ struct render_backend_pipeline_layout_t *render_backend_system_register_pipeline
     if (layouts_for_pipeline != layouts_for_pipeline_static)
     {
         kan_free_general (system->utility_allocation_group, layouts_for_pipeline,
-                          sizeof (VkDescriptorSetLayout) * used_set_index_count);
+                          sizeof (VkDescriptorSetLayout) * parameter_set_layouts_count);
     }
 
     if (result != VK_SUCCESS)
     {
-        KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR, "Failed to create pipeline layout \"%s\".",
-                 tracking_name)
+        KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR, "Failed to create pipeline layout \"%s\".", tracking_name)
         kan_cpu_section_execution_shutdown (&execution);
         return NULL;
     }
 
 #if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED)
     char debug_name[KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME];
-    snprintf (debug_name, KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME, "PipelineLayout::%s",
-              tracking_name);
+    snprintf (debug_name, KAN_CONTEXT_RENDER_BACKEND_VULKAN_MAX_DEBUG_NAME, "PipelineLayout::%s", tracking_name);
 
     struct VkDebugUtilsObjectNameInfoEXT object_name = {
         .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,

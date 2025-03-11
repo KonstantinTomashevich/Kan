@@ -257,6 +257,7 @@ static void try_render_frame (struct test_render_material_state_t *state,
 
         struct kan_render_pipeline_parameter_set_description_t description = {
             .layout = pass->pass_parameter_set_layout,
+            .stable_binding = KAN_TRUE,
             .initial_bindings_count = sizeof (bindings) / sizeof (bindings[0u]),
             .initial_bindings = bindings,
             .tracking_name = kan_string_intern ("pass"),
@@ -315,13 +316,10 @@ static void try_render_frame (struct test_render_material_state_t *state,
                 KAN_UP_QUERY_BREAK;
             }
 
-            kan_render_pipeline_parameter_set_t sets[] = {
-                singleton->pass_parameter_set,
-                material_instance->data.parameter_set,
-            };
-
-            kan_render_pass_instance_pipeline_parameter_sets (pass_allocation->pass_instance,
-                                                              sizeof (sets) / sizeof (sets[0u]), sets);
+            kan_render_pass_instance_pipeline_parameter_sets (pass_allocation->pass_instance, KAN_RPL_SET_PASS, 1u,
+                                                              &singleton->pass_parameter_set);
+            kan_render_pass_instance_pipeline_parameter_sets (pass_allocation->pass_instance, KAN_RPL_SET_MATERIAL, 1u,
+                                                              &material_instance->data.parameter_set);
 
             // Only one attribute buffer and only one instanced attribute buffer for the sake of simplicity.
             KAN_ASSERT (material->family_meta.attribute_buffers.size == 2u)

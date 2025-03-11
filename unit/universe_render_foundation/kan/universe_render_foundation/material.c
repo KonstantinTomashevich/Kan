@@ -835,8 +835,8 @@ static void recreate_family (struct render_foundation_material_management_execut
                           family->name);
 
                 family->set_material = kan_render_construct_parameter_set_layout_from_meta (
-                    kan_render_backend_system_get_render_context (state->render_backend_system), KAN_RPL_SET_MATERIAL,
-                    KAN_TRUE, &loaded->meta.set_material, name_buffer, state->description_allocation_group);
+                    kan_render_backend_system_get_render_context (state->render_backend_system),
+                    &loaded->meta.set_material, name_buffer, state->description_allocation_group);
 
                 if (!KAN_HANDLE_IS_VALID (family->set_material))
                 {
@@ -853,8 +853,8 @@ static void recreate_family (struct render_foundation_material_management_execut
                           family->name);
 
                 family->set_object = kan_render_construct_parameter_set_layout_from_meta (
-                    kan_render_backend_system_get_render_context (state->render_backend_system), KAN_RPL_SET_MATERIAL,
-                    KAN_TRUE, &loaded->meta.set_object, name_buffer, state->description_allocation_group);
+                    kan_render_backend_system_get_render_context (state->render_backend_system),
+                    &loaded->meta.set_object, name_buffer, state->description_allocation_group);
 
                 if (!KAN_HANDLE_IS_VALID (family->set_object))
                 {
@@ -871,8 +871,8 @@ static void recreate_family (struct render_foundation_material_management_execut
                           family->name);
 
                 family->set_unstable = kan_render_construct_parameter_set_layout_from_meta (
-                    kan_render_backend_system_get_render_context (state->render_backend_system), KAN_RPL_SET_MATERIAL,
-                    KAN_FALSE, &loaded->meta.set_unstable, name_buffer, state->description_allocation_group);
+                    kan_render_backend_system_get_render_context (state->render_backend_system),
+                    &loaded->meta.set_unstable, name_buffer, state->description_allocation_group);
 
                 if (!KAN_HANDLE_IS_VALID (family->set_unstable))
                 {
@@ -1046,32 +1046,12 @@ static void recreate_family (struct render_foundation_material_management_execut
                             }
                         }
 
-                        kan_render_pipeline_parameter_set_layout_t parameter_sets[4u];
-                        kan_instance_size_t parameter_set_index = 0u;
-
-                        if (KAN_HANDLE_IS_VALID (pass->pass_parameter_set_layout))
-                        {
-                            parameter_sets[parameter_set_index] = pass->pass_parameter_set_layout;
-                            ++parameter_set_index;
-                        }
-
-                        if (KAN_HANDLE_IS_VALID (family->set_material))
-                        {
-                            parameter_sets[parameter_set_index] = family->set_material;
-                            ++parameter_set_index;
-                        }
-
-                        if (KAN_HANDLE_IS_VALID (family->set_object))
-                        {
-                            parameter_sets[parameter_set_index] = family->set_object;
-                            ++parameter_set_index;
-                        }
-
-                        if (KAN_HANDLE_IS_VALID (family->set_unstable))
-                        {
-                            parameter_sets[parameter_set_index] = family->set_unstable;
-                            ++parameter_set_index;
-                        }
+                        kan_render_pipeline_parameter_set_layout_t parameter_sets[4u] = {
+                            pass->pass_parameter_set_layout,
+                            family->set_material,
+                            family->set_object,
+                            family->set_unstable,
+                        };
 
                         struct kan_render_graphics_pipeline_description_t description = {
                             .pass = pass->pass,
@@ -1080,7 +1060,7 @@ static void recreate_family (struct render_foundation_material_management_execut
                             .attribute_sources = attribute_sources,
                             .attributes_count = attributes_count,
                             .attributes = attributes,
-                            .parameter_set_layouts_count = parameter_set_index,
+                            .parameter_set_layouts_count = 4u,
                             .parameter_set_layouts = parameter_sets,
 
                             .polygon_mode = polygon_mode,

@@ -210,7 +210,7 @@ struct render_backend_pipeline_parameter_set_t *render_backend_system_create_pip
     struct render_backend_descriptor_set_allocation_t stable_allocation = {VK_NULL_HANDLE, NULL};
     struct render_backend_descriptor_set_allocation_t *unstable_allocations = NULL;
 
-    if (layout->stable_binding)
+    if (description->stable_binding)
     {
         stable_allocation =
             render_backend_descriptor_set_allocator_allocate (system, &system->descriptor_set_allocator, layout);
@@ -315,8 +315,9 @@ struct render_backend_pipeline_parameter_set_t *render_backend_system_create_pip
 
     set->system = system;
     set->layout = layout;
+    set->stable_binding = description->stable_binding;
 
-    if (layout->stable_binding)
+    if (description->stable_binding)
     {
         set->stable.allocation = stable_allocation;
         set->stable.has_been_submitted = KAN_FALSE;
@@ -381,7 +382,7 @@ static inline void detach_parameter_set_from_render_target (
 void render_backend_system_destroy_pipeline_parameter_set (struct render_backend_system_t *system,
                                                            struct render_backend_pipeline_parameter_set_t *set)
 {
-    if (set->layout->stable_binding)
+    if (set->stable_binding)
     {
         render_backend_descriptor_set_allocator_free (system, &system->descriptor_set_allocator,
                                                       &set->stable.allocation);
@@ -791,7 +792,7 @@ void kan_render_pipeline_parameter_set_update (kan_render_pipeline_parameter_set
         render_target_attachment = next;
     }
 
-    if (data->layout->stable_binding)
+    if (data->stable_binding)
     {
         VkDescriptorSet source_set = data->stable.allocation.descriptor_set;
         if (data->stable.has_been_submitted || data->stable.allocation.descriptor_set == VK_NULL_HANDLE)

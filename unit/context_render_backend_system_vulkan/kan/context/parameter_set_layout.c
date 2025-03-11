@@ -35,10 +35,9 @@ struct render_backend_pipeline_parameter_set_layout_t *render_backend_system_reg
         }
     }
 
-    _Static_assert (sizeof (kan_hash_t) >= 4u,
-                    "We can confidently pack all sizes and stability flag into one unique hash.");
+    _Static_assert (sizeof (kan_hash_t) >= 3u, "We can confidently pack all sizes into one unique hash.");
     const kan_hash_t layout_hash = (uniform_buffer_binding_count << 0u) | (storage_buffer_binding_count << 1u) |
-                                   (combined_image_sampler_binding_count << 2u) | (description->stable_binding << 3u);
+                                   (combined_image_sampler_binding_count << 2u);
 
     kan_atomic_int_lock (&system->pipeline_parameter_set_layout_registration_lock);
     const struct kan_hash_storage_bucket_t *bucket =
@@ -196,9 +195,7 @@ struct render_backend_pipeline_parameter_set_layout_t *render_backend_system_reg
 
     layout->reference_count = kan_atomic_int_init (1);
     layout->layout = vulkan_layout;
-    layout->set = description->set;
 
-    layout->stable_binding = description->stable_binding;
     layout->bindings_count = used_binding_index_count;
     layout->uniform_buffers_count = uniform_buffer_binding_count;
     layout->storage_buffers_count = storage_buffer_binding_count;

@@ -433,9 +433,8 @@ UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_execute_render_foundati
                                     pass_resource->pass_set_bindings.samplers.size > 0u)
                                 {
                                     layout = kan_render_construct_parameter_set_layout_from_meta (
-                                        render_context->render_context, KAN_RPL_SET_PASS, KAN_TRUE,
-                                        &pass_resource->pass_set_bindings, loading->name,
-                                        state->temporary_allocation_group);
+                                        render_context->render_context, &pass_resource->pass_set_bindings,
+                                        loading->name, state->temporary_allocation_group);
 
                                     if (!KAN_HANDLE_IS_VALID (layout))
                                     {
@@ -635,8 +634,6 @@ void kan_render_graph_pass_shutdown (struct kan_render_graph_pass_t *instance)
 
 kan_render_pipeline_parameter_set_layout_t kan_render_construct_parameter_set_layout_from_meta (
     kan_render_context_t render_context,
-    kan_render_size_t set,
-    kan_bool_t stable_binding,
     const struct kan_rpl_meta_set_bindings_t *meta,
     kan_interned_string_t tracking_name,
     kan_allocation_group_t temporary_allocation_group)
@@ -694,10 +691,8 @@ kan_render_pipeline_parameter_set_layout_t kan_render_construct_parameter_set_la
     }
 
     struct kan_render_pipeline_parameter_set_layout_description_t description = {
-        .set = set,
         .bindings_count = bindings_count,
         .bindings = bindings,
-        .stable_binding = stable_binding,
         .tracking_name = tracking_name,
     };
 

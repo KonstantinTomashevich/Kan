@@ -453,9 +453,6 @@ struct render_backend_pipeline_parameter_set_layout_t
     VkDescriptorSetLayout layout;
     struct kan_atomic_int_t reference_count;
 
-    kan_render_size_t set;
-    kan_bool_t stable_binding;
-
     uint8_t uniform_buffers_count;
     uint8_t storage_buffers_count;
     uint8_t combined_image_samplers_count;
@@ -586,6 +583,8 @@ struct render_backend_pipeline_parameter_set_t
     struct render_backend_system_t *system;
 
     struct render_backend_pipeline_parameter_set_layout_t *layout;
+    kan_bool_t stable_binding;
+
     union
     {
         struct render_backend_stable_parameter_set_data_t stable;

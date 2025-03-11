@@ -588,8 +588,9 @@ kan_bool_t kan_render_pass_instance_graphics_pipeline (kan_render_pass_instance_
 }
 
 void kan_render_pass_instance_pipeline_parameter_sets (kan_render_pass_instance_t pass_instance,
+                                                       kan_instance_size_t start_from_set_index,
                                                        kan_instance_size_t parameter_sets_count,
-                                                       kan_render_pipeline_parameter_set_t *parameter_sets)
+                                                       const kan_render_pipeline_parameter_set_t *parameter_sets)
 {
     struct render_backend_pass_instance_t *instance = KAN_HANDLE_GET (pass_instance);
     KAN_ASSERT (instance->current_pipeline_layout)
@@ -600,7 +601,7 @@ void kan_render_pass_instance_pipeline_parameter_sets (kan_render_pass_instance_
     for (kan_loop_size_t index = 0u; index < parameter_sets_count; ++index)
     {
         struct render_backend_pipeline_parameter_set_t *set = KAN_HANDLE_GET (parameter_sets[index]);
-        if (!set->layout->stable_binding && set->unstable.last_accessed_allocation_index != UINT32_MAX &&
+        if (set && !set->stable_binding && set->unstable.last_accessed_allocation_index != UINT32_MAX &&
             set->unstable.last_accessed_allocation_index != set->system->current_frame_in_flight_index)
         {
             VkDescriptorSet source_set =
@@ -617,8 +618,13 @@ void kan_render_pass_instance_pipeline_parameter_sets (kan_render_pass_instance_
         // We don't implement sequential set optimization as it looks like it is not worth it in most cases for us.
         struct render_backend_pipeline_parameter_set_t *set = KAN_HANDLE_GET (parameter_sets[index]);
 
+        if (!set)
+        {
+            continue;
+        }
+
         VkDescriptorSet descriptor_set;
-        if (set->layout->stable_binding)
+        if (set->stable_binding)
         {
             descriptor_set = set->stable.allocation.descriptor_set;
             set->stable.has_been_submitted = KAN_TRUE;
@@ -630,7 +636,7 @@ void kan_render_pass_instance_pipeline_parameter_sets (kan_render_pass_instance_
 
         DEBUG_LABEL_INSERT (instance->command_buffer, set->tracking_name, 0.918f, 0.98f, 0.0f, 1.0f)
         vkCmdBindDescriptorSets (instance->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                 instance->current_pipeline_layout, (vulkan_size_t) set->layout->set, 1u,
+                                 instance->current_pipeline_layout, (vulkan_size_t) (start_from_set_index + index), 1u,
                                  &descriptor_set, 0u, NULL);
     }
 

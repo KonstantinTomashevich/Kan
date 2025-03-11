@@ -99,8 +99,6 @@ UNIVERSE_RENDER_FOUNDATION_API void kan_render_graph_pass_shutdown (struct kan_r
 /// \details Used across different routine in render foundation.
 UNIVERSE_RENDER_FOUNDATION_API kan_render_pipeline_parameter_set_layout_t
 kan_render_construct_parameter_set_layout_from_meta (kan_render_context_t render_context,
-                                                     kan_render_size_t set,
-                                                     kan_bool_t stable_binding,
                                                      const struct kan_rpl_meta_set_bindings_t *meta,
                                                      kan_interned_string_t tracking_name,
                                                      kan_allocation_group_t temporary_allocation_group);

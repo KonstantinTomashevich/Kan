@@ -83,8 +83,8 @@
 ///
 /// \par Pipeline parameter set layouts
 /// \parblock
-/// Pipeline parameter set layout describes bindings in one particular parameter set along with this set index.
-/// Set layouts are used for creation of pipelines and parameter sets.
+/// Pipeline parameter set layout describes bindings in one particular parameter set. Set layouts are used for creation
+/// of pipelines and parameter sets.
 ///
 /// Pipeline parameter set layouts are guaranteed to be reused: if `kan_render_pipeline_parameter_set_layout_create`
 /// called several times with the same bindings (order in description doesn't matter, only binding indices matter),
@@ -580,8 +580,9 @@ CONTEXT_RENDER_BACKEND_SYSTEM_API kan_bool_t kan_render_pass_instance_graphics_p
 /// \brief Submits parameter set bindings to the render pass.
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_instance_pipeline_parameter_sets (
     kan_render_pass_instance_t pass_instance,
+    kan_instance_size_t start_from_set_index,
     kan_instance_size_t parameter_sets_count,
-    kan_render_pipeline_parameter_set_t *parameter_sets);
+    const kan_render_pipeline_parameter_set_t *parameter_sets);
 
 /// \brief Submits attributes to the render pass.
 /// \details `buffer_offsets` is an optional array of offsets for passed buffers.
@@ -632,13 +633,8 @@ struct kan_render_parameter_binding_description_t
 /// \brief Describes set of parameters that can be bound at particular set index.
 struct kan_render_pipeline_parameter_set_layout_description_t
 {
-    kan_render_size_t set;
     kan_instance_size_t bindings_count;
     struct kan_render_parameter_binding_description_t *bindings;
-
-    /// \brief True if bindings are rarely changed. False otherwise. Used for optimization.
-    kan_bool_t stable_binding;
-
     kan_interned_string_t tracking_name;
 };
 
@@ -839,6 +835,8 @@ struct kan_render_graphics_pipeline_description_t
 
     kan_instance_size_t parameter_set_layouts_count;
 
+    /// \brief Layout for each parameter set for the pipeline.
+    ///        Invalid handle if pipeline has nothing bound at that set index.
     /// \warning Created pipeline is not responsible for set layout management. User still needs to ensure that if
     ///          set layout is destroyed, then pipeline that was using it would be destroyed in the same frame too.
     ///          It works like that, because user needs to maintain consistent view of both pipelines and set layouts
@@ -905,6 +903,10 @@ CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_graphics_pipeline_destroy (kan
 struct kan_render_pipeline_parameter_set_description_t
 {
     kan_render_pipeline_parameter_set_layout_t layout;
+
+    /// \brief True if bindings are rarely changed. False otherwise. Used for optimization.
+    kan_bool_t stable_binding;
+
     kan_interned_string_t tracking_name;
 
     kan_instance_size_t initial_bindings_count;
