@@ -227,8 +227,8 @@ static enum kan_resource_compile_result_t kan_resource_render_pass_variant_compi
             {
                 kan_rpl_compiler_context_destroy (compiler_context);
                 KAN_LOG (resource_pass_compilation, KAN_LOG_ERROR,
-                         "Failed to compile pass \"%s\" variant %lu set layout: failed to use module.", input->source_pass,
-                         (unsigned long) input->source_variant_index)
+                         "Failed to compile pass \"%s\" variant %lu set layout: failed to use module.",
+                         input->source_pass, (unsigned long) input->source_variant_index)
                 return KAN_RESOURCE_PIPELINE_COMPILE_FAILED;
             }
         }
