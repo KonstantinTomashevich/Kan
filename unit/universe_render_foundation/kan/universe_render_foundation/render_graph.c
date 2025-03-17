@@ -598,6 +598,20 @@ static void inspect_render_pass_loading (struct render_foundation_pass_managemen
             configure_render_pass (state, render_context, new_pass, loading);
         }
     }
+
+    KAN_UP_EVENT_INSERT (pass_sleep_event, kan_resource_request_defer_sleep_event_t)
+    {
+        pass_sleep_event->request_id = loading->request_id;
+    }
+
+    KAN_UP_VALUE_READ (variant_loading_to_unload_request, render_foundation_pass_variant_loading_state_t, pass_name,
+                       &loading->name)
+    {
+        KAN_UP_EVENT_INSERT (variant_sleep_event, kan_resource_request_defer_sleep_event_t)
+        {
+            pass_sleep_event->request_id = variant_loading_to_unload_request->request_id;
+        }
+    }
 }
 
 static void on_render_pass_loaded (struct render_foundation_pass_management_execution_state_t *state,
