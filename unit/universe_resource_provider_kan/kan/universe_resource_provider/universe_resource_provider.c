@@ -1698,7 +1698,6 @@ static inline void schedule_compilation (struct resource_provider_state_t *state
     }
 
     entry->pending_container_id = container_view->container_id;
-    ++entry->pending_compilation_index;
     entry->compilation_state = RESOURCE_PROVIDER_COMPILATION_STATE_COMPILING;
 
     KAN_UP_INDEXED_INSERT (operation, resource_provider_operation_t)
@@ -2074,9 +2073,10 @@ static inline void runtime_compilation_delete_dependency_requests (
 {
     if (KAN_TYPED_ID_32_IS_VALID (entry->source_resource_request_id))
     {
-        KAN_UP_VALUE_DELETE (old_request, kan_resource_request_t, request_id, &entry->source_resource_request_id)
+        // We cannot delete directly, as these deletion can be called from request delete event processing routine.
+        KAN_UP_EVENT_INSERT (delete_event, kan_resource_request_defer_delete_event_t)
         {
-            KAN_UP_ACCESS_DELETE (old_request);
+            delete_event->request_id = entry->source_resource_request_id;
         }
 
         entry->source_resource_request_id = KAN_TYPED_ID_32_SET_INVALID (kan_resource_request_id_t);
@@ -2088,9 +2088,11 @@ static inline void runtime_compilation_delete_dependency_requests (
         {
             if (KAN_TYPED_ID_32_IS_VALID (dependency->request_id))
             {
-                KAN_UP_VALUE_DELETE (old_request, kan_resource_request_t, request_id, &dependency->request_id)
+                // We cannot delete directly,
+                // as these deletion can be called from request delete event processing routine.
+                KAN_UP_EVENT_INSERT (delete_event, kan_resource_request_defer_delete_event_t)
                 {
-                    KAN_UP_ACCESS_DELETE (old_request);
+                    delete_event->request_id = dependency->request_id;
                 }
 
                 dependency->request_id = KAN_TYPED_ID_32_SET_INVALID (kan_resource_request_id_t);
@@ -2365,8 +2367,7 @@ static inline void remove_native_entry_reference (struct resource_provider_state
         }
     }
 
-    KAN_LOG (universe_resource_provider, KAN_LOG_ERROR,
-             "Unable to find requested native resource \"%s\" of type \"%s\".", name, type)
+    // We do not print error when removing unknown reference: we should've already printed it during reference addition.
 }
 
 static inline void remove_third_party_entry_reference (struct resource_provider_state_t *state,
@@ -2393,7 +2394,7 @@ static inline void remove_third_party_entry_reference (struct resource_provider_
         KAN_UP_QUERY_RETURN_VOID;
     }
 
-    KAN_LOG (universe_resource_provider, KAN_LOG_ERROR, "Unable to find requested third party resource \"%s\".", name)
+    // We do not print error when removing unknown reference: we should've already printed it during reference addition.
 }
 
 static inline void on_file_added (struct resource_provider_state_t *state,
@@ -4377,6 +4378,18 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void mutator_template_execute_resource_provid
                 kan_virtual_file_system_close_context_read_access (state->virtual_file_system);
             }
 
+            // Insert and change must be processed before sleep,
+            // otherwise we might lose useful runtime compilation byproducts.
+            process_request_on_insert (state, public, private);
+            process_request_on_change (state, public, private);
+
+            if (state->enable_runtime_compilation)
+            {
+                // The same goes for runtime compilation: its bootstrap adds byproduct usages that could be eliminated
+                // by deferred sleep otherwise.
+                update_runtime_compilation_states_on_request_events (state, public, private);
+            }
+
             KAN_UP_EVENT_FETCH (sleep_event, kan_resource_request_defer_sleep_event_t)
             {
                 if (KAN_HANDLE_IS_VALID (state->hot_reload_system) &&
@@ -4428,7 +4441,9 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void mutator_template_execute_resource_provid
                 }
             }
 
+            process_request_on_delete (state);
             state->execution_shared_state.job = job;
+
             if (KAN_HANDLE_IS_VALID (state->hot_reload_system) &&
                 kan_hot_reload_coordination_system_is_hot_swap (state->hot_reload_system))
             {
@@ -4441,19 +4456,10 @@ UNIVERSE_RESOURCE_PROVIDER_KAN_API void mutator_template_execute_resource_provid
                 state->execution_shared_state.end_time_ns = state->frame_begin_time_ns + state->serve_budget_ns;
             }
 
-            process_request_on_insert (state, public, private);
-            process_request_on_change (state, public, private);
-            process_request_on_delete (state);
-
             if (KAN_HANDLE_IS_VALID (private->resource_watcher))
             {
                 process_delayed_addition (state, public, private);
                 process_delayed_reload (state, public, private);
-            }
-
-            if (state->enable_runtime_compilation)
-            {
-                update_runtime_compilation_states_on_request_events (state, public, private);
             }
 
             execute_dispatch_shared_serve = KAN_TRUE;
