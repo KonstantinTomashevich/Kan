@@ -63,7 +63,7 @@ Also, there are 2 classes of options:
 
 - `global` options are allowed to be used everywhere and can be used in any conditional.
 - `instance` options can only be used in places where they do not affect which buffers are generated, which data
-  they hold and which samplers are generated (therefore, sampler settings are `global`-only).
+  they hold and which samplers are generated.
 
 Goal of these classes is to make it easier for material system to follow proper configuration routine. Every pass
 supported by material should accept the same data format, therefore buffers should not be different, which can be

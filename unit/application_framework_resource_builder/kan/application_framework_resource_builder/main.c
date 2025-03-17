@@ -1796,7 +1796,7 @@ static inline kan_bool_t request_compiled_dependencies (struct native_entry_node
                 KAN_LOG (application_framework_resource_builder, KAN_LOG_ERROR,
                          "[Target \"%s\"] Failed to compile native resource \"%s\" of type \"%s\" as its "
                          "native compile dependency \"%s\" of type \"%s\" is not found.",
-                         node->target->name, node->name, node->source_type->name, reference->type, reference->name)
+                         node->target->name, node->name, node->source_type->name, reference->name, reference->type)
                 successful = KAN_FALSE;
             }
         }
@@ -1869,7 +1869,7 @@ static inline kan_bool_t request_raw_dependencies (struct native_entry_node_t *n
                     KAN_LOG (application_framework_resource_builder, KAN_LOG_ERROR,
                              "[Target \"%s\"] Failed to compile native resource \"%s\" of type \"%s\" as its "
                              "native compile dependency \"%s\" of type \"%s\" is not found.",
-                             node->target->name, node->name, node->source_type->name, reference->type, reference->name)
+                             node->target->name, node->name, node->source_type->name, reference->name, reference->type)
                     successful = KAN_FALSE;
                 }
             }

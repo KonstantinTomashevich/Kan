@@ -67,6 +67,22 @@ KAN_C_HEADER_BEGIN
 /// \brief Checkpoint, that is hit after all render foundation frame scheduling mutators finished execution.
 #define KAN_RENDER_FOUNDATION_FRAME_END "render_foundation_frame_end"
 
+/// \brief Contains layout and binding information about single variant for pipelines inside render pass.
+struct kan_render_graph_pass_variant_t
+{
+    /// \details Can be invalid handle when pipelines has empty parameter set layout.
+    kan_render_pipeline_parameter_set_layout_t pass_parameter_set_layout;
+
+    /// \brief Bindings meta for pass pipeline parameter set.
+    struct kan_rpl_meta_set_bindings_t pass_parameter_set_bindings;
+};
+
+UNIVERSE_RENDER_FOUNDATION_API void kan_render_graph_pass_variant_init (
+    struct kan_render_graph_pass_variant_t *instance);
+
+UNIVERSE_RENDER_FOUNDATION_API void kan_render_graph_pass_variant_shutdown (
+    struct kan_render_graph_pass_variant_t *instance);
+
 /// \brief Stores information about pass attachment that could be useful for outer users.
 struct kan_render_graph_pass_attachment_t
 {
@@ -81,14 +97,13 @@ struct kan_render_graph_pass_t
     enum kan_render_pass_type_t type;
     kan_render_pass_t pass;
 
-    /// \details Can be invalid handle when pipelines has empty parameter set layout.
-    kan_render_pipeline_parameter_set_layout_t pass_parameter_set_layout;
-
-    /// \brief Bindings meta for pass pipeline parameter set.
-    struct kan_rpl_meta_set_bindings_t pass_parameter_set_bindings;
-
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_render_graph_pass_attachment_t)
     struct kan_dynamic_array_t attachments;
+
+    /// \brief Information about layout and binding for pass pipeline variants in the same order as in resource.
+    /// \details Will be empty for passes that do not have any pass customization (no special set layout).
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_render_graph_pass_variant_t)
+    struct kan_dynamic_array_t variants;
 };
 
 UNIVERSE_RENDER_FOUNDATION_API void kan_render_graph_pass_init (struct kan_render_graph_pass_t *instance);

@@ -1,3 +1,6 @@
+#include <qsort.h>
+
+#include <kan/api_common/mute_warnings.h>
 #include <kan/context/all_system_names.h>
 #include <kan/cpu_profiler/markup.h>
 #include <kan/log/logging.h>
@@ -100,10 +103,11 @@ struct render_foundation_material_state_t
     kan_interned_string_t pipeline_family_name;
 };
 
-struct render_foundation_material_pass_state_t
+struct render_foundation_material_pass_variant_state_t
 {
     kan_interned_string_t material_name;
     kan_interned_string_t pass_name;
+    kan_instance_size_t pass_variant_index;
     kan_interned_string_t pipeline_name;
 };
 
@@ -145,16 +149,17 @@ struct render_foundation_pipeline_state_t
     kan_instance_size_t reference_count;
 };
 
-struct render_foundation_pipeline_pass_state_t
+struct render_foundation_pipeline_pass_variant_state_t
 {
     kan_interned_string_t pipeline_name;
     kan_interned_string_t pass_name;
-    kan_render_graphics_pipeline_t pipeline;
+    kan_instance_size_t pass_variant_index;
     kan_instance_size_t reference_count;
+    kan_render_graphics_pipeline_t pipeline;
 };
 
-UNIVERSE_RENDER_FOUNDATION_API void render_foundation_pipeline_pass_state_shutdown (
-    struct render_foundation_pipeline_pass_state_t *instance)
+UNIVERSE_RENDER_FOUNDATION_API void render_foundation_pipeline_pass_variant_state_shutdown (
+    struct render_foundation_pipeline_pass_variant_state_t *instance)
 {
     if (KAN_HANDLE_IS_VALID (instance->pipeline))
     {
@@ -263,17 +268,22 @@ static void create_new_usage_state_if_needed (struct render_foundation_material_
 }
 
 #define MATERIAL_HELPER_DETACH_FAMILY_AND_PASSES                                                                       \
-    KAN_UP_VALUE_DELETE (material_pass, render_foundation_material_pass_state_t, material_name, &material->name)       \
+    KAN_UP_VALUE_DELETE (material_pass, render_foundation_material_pass_variant_state_t, material_name,                \
+                         &material->name)                                                                              \
     {                                                                                                                  \
-        KAN_UP_VALUE_WRITE (pipeline_pass, render_foundation_pipeline_pass_state_t, pipeline_name,                     \
+        KAN_UP_VALUE_WRITE (pipeline_pass, render_foundation_pipeline_pass_variant_state_t, pipeline_name,             \
                             &material_pass->pipeline_name)                                                             \
         {                                                                                                              \
-            KAN_ASSERT (pipeline_pass->reference_count > 0u)                                                           \
-            --pipeline_pass->reference_count;                                                                          \
-                                                                                                                       \
-            if (pipeline_pass->reference_count == 0u)                                                                  \
+            if (pipeline_pass->pass_name == material_pass->pass_name &&                                                \
+                pipeline_pass->pass_variant_index == material_pass->pass_variant_index)                                \
             {                                                                                                          \
-                KAN_UP_ACCESS_DELETE (pipeline_pass);                                                                  \
+                KAN_ASSERT (pipeline_pass->reference_count > 0u)                                                       \
+                --pipeline_pass->reference_count;                                                                      \
+                                                                                                                       \
+                if (pipeline_pass->reference_count == 0u)                                                              \
+                {                                                                                                      \
+                    KAN_UP_ACCESS_DELETE (pipeline_pass);                                                              \
+                }                                                                                                      \
             }                                                                                                          \
         }                                                                                                              \
                                                                                                                        \
@@ -920,13 +930,13 @@ static void recreate_family (struct render_foundation_material_management_execut
                              "Pipeline \"%s\" is compiled to unsupported code format.", pipeline_state->pipeline_name)
                 }
 
-                KAN_UP_VALUE_UPDATE (pipeline_pass, render_foundation_pipeline_pass_state_t, pipeline_name,
-                                     &pipeline_state->pipeline_name)
+                KAN_UP_VALUE_UPDATE (pipeline_pass_variant, render_foundation_pipeline_pass_variant_state_t,
+                                     pipeline_name, &pipeline_state->pipeline_name)
                 {
-                    if (KAN_HANDLE_IS_VALID (pipeline_pass->pipeline))
+                    if (KAN_HANDLE_IS_VALID (pipeline_pass_variant->pipeline))
                     {
-                        kan_render_graphics_pipeline_destroy (pipeline_pass->pipeline);
-                        pipeline_pass->pipeline = KAN_HANDLE_SET_INVALID (kan_render_graphics_pipeline_t);
+                        kan_render_graphics_pipeline_destroy (pipeline_pass_variant->pipeline);
+                        pipeline_pass_variant->pipeline = KAN_HANDLE_SET_INVALID (kan_render_graphics_pipeline_t);
                     }
 
                     if (!set_layouts_created || !KAN_HANDLE_IS_VALID (code_module))
@@ -934,8 +944,20 @@ static void recreate_family (struct render_foundation_material_management_execut
                         KAN_UP_QUERY_CONTINUE;
                     }
 
-                    KAN_UP_VALUE_READ (pass, kan_render_graph_pass_t, name, &pipeline_pass->pass_name)
+                    KAN_UP_VALUE_READ (pass, kan_render_graph_pass_t, name, &pipeline_pass_variant->pass_name)
                     {
+                        if (pipeline_pass_variant->pass_variant_index >= pass->variants.size &&
+                            // Corner case: variant-less passes that have no pass customization.
+                            (pipeline_pass_variant->pass_variant_index != 0u || pass->variants.size != 0u))
+                        {
+                            KAN_LOG (render_foundation_material, KAN_LOG_ERROR,
+                                     "Failed to create pipeline \"%s\" for pass \"%s\" variant %lu -- variant index "
+                                     "overflow, internal error?.",
+                                     pipeline_pass_variant->pipeline_name, pipeline_pass_variant->pass_name,
+                                     (unsigned long) pipeline_pass_variant->pass_variant_index)
+                            KAN_UP_QUERY_CONTINUE;
+                        }
+
                         enum kan_render_polygon_mode_t polygon_mode = KAN_RENDER_POLYGON_MODE_FILL;
                         switch (loaded->meta.graphics_classic_settings.polygon_mode)
                         {
@@ -1046,8 +1068,19 @@ static void recreate_family (struct render_foundation_material_management_execut
                             }
                         }
 
+                        kan_render_pipeline_parameter_set_layout_t pass_parameter_set_layout =
+                            KAN_HANDLE_INITIALIZE_INVALID;
+
+                        if (pipeline_pass_variant->pass_variant_index < pass->variants.size)
+                        {
+                            struct kan_render_graph_pass_variant_t *pass_variant =
+                                &((struct kan_render_graph_pass_variant_t *)
+                                      pass->variants.data)[pipeline_pass_variant->pass_variant_index];
+                            pass_parameter_set_layout = pass_variant->pass_parameter_set_layout;
+                        }
+
                         kan_render_pipeline_parameter_set_layout_t parameter_sets[4u] = {
-                            pass->pass_parameter_set_layout,
+                            pass_parameter_set_layout,
                             family->set_material,
                             family->set_object,
                             family->set_unstable,
@@ -1116,10 +1149,10 @@ static void recreate_family (struct render_foundation_material_management_execut
                             .code_modules_count = 1u,
                             .code_modules = &code_module_usage,
 
-                            .tracking_name = pipeline_pass->pipeline_name,
+                            .tracking_name = pipeline_pass_variant->pipeline_name,
                         };
 
-                        pipeline_pass->pipeline = kan_render_graphics_pipeline_create (
+                        pipeline_pass_variant->pipeline = kan_render_graphics_pipeline_create (
                             kan_render_backend_system_get_render_context (state->render_backend_system), &description,
                             // Priority will be automatically changed to active when active material uses it.
                             KAN_RENDER_PIPELINE_COMPILATION_PRIORITY_CACHE);
@@ -1141,11 +1174,12 @@ static void recreate_family (struct render_foundation_material_management_execut
 #undef COLOR_OUTPUTS_STATIC_COUNT
 #undef ENTRY_POINTS_STATIC_COUNT
 
-                        if (!KAN_HANDLE_IS_VALID (pipeline_pass->pipeline))
+                        if (!KAN_HANDLE_IS_VALID (pipeline_pass_variant->pipeline))
                         {
                             KAN_LOG (render_foundation_material, KAN_LOG_ERROR,
-                                     "Failed to create pipeline \"%s\" for pass \"%s\".", pipeline_pass->pipeline_name,
-                                     pipeline_pass->pass_name)
+                                     "Failed to create pipeline \"%s\" for pass \"%s\" variant %lu.",
+                                     pipeline_pass_variant->pipeline_name, pipeline_pass_variant->pass_name,
+                                     (unsigned long) pipeline_pass_variant->pass_variant_index)
                         }
                     }
                 }
@@ -1192,14 +1226,15 @@ static void reload_material_from_family (struct render_foundation_material_manag
     loaded->pipelines.size = 0u;
     kan_dynamic_array_set_capacity (&loaded->pipelines, KAN_UNIVERSE_RENDER_FOUNDATION_MATERIAL_PSC);
 
-    KAN_UP_VALUE_READ (material_pass, render_foundation_material_pass_state_t, material_name, &material->name)
+    KAN_UP_VALUE_READ (material_pass, render_foundation_material_pass_variant_state_t, material_name, &material->name)
     {
-        KAN_UP_VALUE_READ (pipeline_pass, render_foundation_pipeline_pass_state_t, pipeline_name,
+        KAN_UP_VALUE_READ (pipeline_pass_variant, render_foundation_pipeline_pass_variant_state_t, pipeline_name,
                            &material_pass->pipeline_name)
         {
-            if (pipeline_pass->pass_name == material_pass->pass_name)
+            if (pipeline_pass_variant->pass_name == material_pass->pass_name &&
+                pipeline_pass_variant->pass_variant_index == material_pass->pass_variant_index)
             {
-                if (KAN_HANDLE_IS_VALID (pipeline_pass->pipeline))
+                if (KAN_HANDLE_IS_VALID (pipeline_pass_variant->pipeline))
                 {
                     struct kan_render_material_loaded_pipeline_t *spot =
                         kan_dynamic_array_add_last (&loaded->pipelines);
@@ -1211,7 +1246,8 @@ static void reload_material_from_family (struct render_foundation_material_manag
                     }
 
                     spot->pass_name = material_pass->pass_name;
-                    spot->pipeline = pipeline_pass->pipeline;
+                    spot->variant_index = pipeline_pass_variant->pass_variant_index;
+                    spot->pipeline = pipeline_pass_variant->pipeline;
 
                     if (state->preload_materials && material->reference_count > 0u)
                     {
@@ -1226,6 +1262,27 @@ static void reload_material_from_family (struct render_foundation_material_manag
     }
 
     kan_dynamic_array_set_capacity (&loaded->pipelines, loaded->pipelines.size);
+
+    {
+        // Now we need to properly sort the pipelines array for usability.
+        struct kan_render_material_loaded_pipeline_t temporary;
+
+        KAN_MUTE_THIRD_PARTY_WARNINGS_BEGIN
+#define AT_INDEX(INDEX) (((struct kan_render_material_loaded_pipeline_t *) loaded->pipelines.data)[INDEX])
+#define LESS(first_index, second_index)                                                                                \
+    (AT_INDEX (first_index).pass_name == AT_INDEX (second_index).pass_name &&                                          \
+     AT_INDEX (first_index).variant_index < AT_INDEX (second_index).variant_index) ||                                  \
+        AT_INDEX (first_index).pass_name < AT_INDEX (second_index).pass_name
+#define SWAP(first_index, second_index)                                                                                \
+    temporary = AT_INDEX (first_index), AT_INDEX (first_index) = AT_INDEX (second_index),                              \
+    AT_INDEX (second_index) = temporary
+        QSORT (loaded->pipelines.size, LESS, SWAP);
+#undef LESS
+#undef SWAP
+#undef AT_INDEX
+        KAN_MUTE_THIRD_PARTY_WARNINGS_END
+    }
+
     kan_rpl_meta_shutdown (&loaded->family_meta);
 
     KAN_UP_VALUE_READ (family_request, kan_resource_request_t, request_id, &family->request_id)
@@ -1389,21 +1446,24 @@ static inline void on_material_updated (struct render_foundation_material_manage
                         new_family_exists = KAN_TRUE;
                     }
 
-                    for (kan_loop_size_t index = 0u; index < material_data->passes.size; ++index)
+                    for (kan_loop_size_t index = 0u; index < material_data->pass_variants.size; ++index)
                     {
-                        struct kan_resource_material_pass_compiled_t *pass_compiled =
-                            &((struct kan_resource_material_pass_compiled_t *) material_data->passes.data)[index];
+                        struct kan_resource_material_pass_variant_compiled_t *variant_compiled =
+                            &((struct kan_resource_material_pass_variant_compiled_t *)
+                                  material_data->pass_variants.data)[index];
 
                         KAN_UP_VALUE_UPDATE (pipeline_to_add_reference, render_foundation_pipeline_state_t,
-                                             pipeline_name, &pass_compiled->pipeline)
+                                             pipeline_name, &variant_compiled->pipeline)
                         {
                             ++pipeline_to_add_reference->reference_count;
                         }
 
-                        KAN_UP_VALUE_UPDATE (pipeline_pass_to_add_reference, render_foundation_pipeline_pass_state_t,
-                                             pipeline_name, &pass_compiled->pipeline)
+                        KAN_UP_VALUE_UPDATE (pipeline_pass_to_add_reference,
+                                             render_foundation_pipeline_pass_variant_state_t, pipeline_name,
+                                             &variant_compiled->pipeline)
                         {
-                            if (pipeline_pass_to_add_reference->pass_name == pass_compiled->name)
+                            if (pipeline_pass_to_add_reference->pass_name == variant_compiled->name &&
+                                pipeline_pass_to_add_reference->pass_variant_index == variant_compiled->variant_index)
                             {
                                 ++pipeline_pass_to_add_reference->reference_count;
                                 KAN_UP_QUERY_BREAK;
@@ -1411,6 +1471,8 @@ static inline void on_material_updated (struct render_foundation_material_manage
                         }
                     }
 
+                    // TODO: We should not delete family and passes like that: it breaks already loaded data.
+                    //       We should keep it until everything is fully reloaded.
                     // Detach and remove all the old data.
                     MATERIAL_HELPER_DETACH_FAMILY_AND_PASSES
 
@@ -1434,25 +1496,28 @@ static inline void on_material_updated (struct render_foundation_material_manage
                         }
                     }
 
-                    for (kan_loop_size_t index = 0u; index < material_data->passes.size; ++index)
+                    for (kan_loop_size_t index = 0u; index < material_data->pass_variants.size; ++index)
                     {
-                        struct kan_resource_material_pass_compiled_t *pass_compiled =
-                            &((struct kan_resource_material_pass_compiled_t *) material_data->passes.data)[index];
+                        struct kan_resource_material_pass_variant_compiled_t *variant_compiled =
+                            &((struct kan_resource_material_pass_variant_compiled_t *)
+                                  material_data->pass_variants.data)[index];
 
-                        KAN_UP_INDEXED_INSERT (new_material_pass, render_foundation_material_pass_state_t)
+                        KAN_UP_INDEXED_INSERT (new_material_pass, render_foundation_material_pass_variant_state_t)
                         {
                             new_material_pass->material_name = material->name;
-                            new_material_pass->pass_name = pass_compiled->name;
-                            new_material_pass->pipeline_name = pass_compiled->pipeline;
+                            new_material_pass->pass_name = variant_compiled->name;
+                            new_material_pass->pipeline_name = variant_compiled->pipeline;
+                            new_material_pass->pass_variant_index = variant_compiled->variant_index;
 
                             // We instantiate pipeline and pipeline pass only if pass is available in current context.
-                            KAN_UP_VALUE_READ (pass, kan_render_graph_pass_t, name, &pass_compiled->name)
+                            KAN_UP_VALUE_READ (pass, kan_render_graph_pass_t, name, &variant_compiled->name)
                             {
                                 kan_bool_t pipeline_pass_exists = KAN_FALSE;
-                                KAN_UP_VALUE_READ (pipeline_pass, render_foundation_pipeline_pass_state_t,
+                                KAN_UP_VALUE_READ (pipeline_pass, render_foundation_pipeline_pass_variant_state_t,
                                                    pipeline_name, &new_material_pass->pipeline_name)
                                 {
-                                    if (pipeline_pass->pass_name == new_material_pass->pass_name)
+                                    if (pipeline_pass->pass_name == new_material_pass->pass_name &&
+                                        pipeline_pass->pass_variant_index == new_material_pass->pass_variant_index)
                                     {
                                         // No need to add reference, it was done earlier.
                                         pipeline_pass_exists = KAN_TRUE;
@@ -1462,13 +1527,15 @@ static inline void on_material_updated (struct render_foundation_material_manage
 
                                 if (!pipeline_pass_exists)
                                 {
-                                    KAN_UP_INDEXED_INSERT (new_pipeline_pass, render_foundation_pipeline_pass_state_t)
+                                    KAN_UP_INDEXED_INSERT (new_pipeline_pass,
+                                                           render_foundation_pipeline_pass_variant_state_t)
                                     {
                                         new_pipeline_pass->pipeline_name = new_material_pass->pipeline_name;
                                         new_pipeline_pass->pass_name = new_material_pass->pass_name;
+                                        new_pipeline_pass->reference_count = 1u;
+                                        new_pipeline_pass->pass_variant_index = new_material_pass->pass_variant_index;
                                         new_pipeline_pass->pipeline =
                                             KAN_HANDLE_SET_INVALID (kan_render_graphics_pipeline_t);
-                                        new_pipeline_pass->reference_count = 1u;
                                     }
                                 }
 
@@ -1525,7 +1592,8 @@ static inline void remove_pass_from_loaded_material (
 
             if (loaded_pipeline->pass_name == pass_name)
             {
-                kan_dynamic_array_remove_swap_at (&loaded->pipelines, pass_index);
+                // We do not use remove swap, as we need to maintain convenient order of pipelines in array.
+                kan_dynamic_array_remove_at (&loaded->pipelines, pass_index);
             }
             else
             {
@@ -1565,7 +1633,7 @@ UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_execute_render_foundati
 
         KAN_UP_EVENT_FETCH (pass_updated_event, kan_render_graph_pass_updated_event_t)
         {
-            KAN_UP_VALUE_UPDATE (pipeline_pass, render_foundation_pipeline_pass_state_t, pass_name,
+            KAN_UP_VALUE_UPDATE (pipeline_pass, render_foundation_pipeline_pass_variant_state_t, pass_name,
                                  &pass_updated_event->name)
             {
                 // We need to also delete pipeline as it depends on pass set layout from pass.
@@ -1583,7 +1651,7 @@ UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_execute_render_foundati
                 }
             }
 
-            KAN_UP_VALUE_READ (material_pass, render_foundation_material_pass_state_t, pass_name,
+            KAN_UP_VALUE_READ (material_pass, render_foundation_material_pass_variant_state_t, pass_name,
                                &pass_updated_event->name)
             {
                 // We do to temporary remove pipeline from loaded materials as its pass was destroyed during update.
@@ -1596,7 +1664,7 @@ UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_execute_render_foundati
             // Pass deletion is rare hot reload related event, therefore we do not optimize for cases like multiple
             // pass deletions in one frame.
 
-            KAN_UP_VALUE_DELETE (pipeline_pass, render_foundation_pipeline_pass_state_t, pass_name,
+            KAN_UP_VALUE_DELETE (pipeline_pass, render_foundation_pipeline_pass_variant_state_t, pass_name,
                                  &pass_deleted_event->name)
             {
                 KAN_UP_ACCESS_DELETE (pipeline_pass);
@@ -1605,7 +1673,7 @@ UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_execute_render_foundati
             // Rationally, there can be several instances of one pass in material,
             // therefore we can just iterate materials and update them.
 
-            KAN_UP_VALUE_READ (material_pass, render_foundation_material_pass_state_t, pass_name,
+            KAN_UP_VALUE_READ (material_pass, render_foundation_material_pass_variant_state_t, pass_name,
                                pass_deleted_event->name)
             {
                 // Destroy pipeline if necessary.

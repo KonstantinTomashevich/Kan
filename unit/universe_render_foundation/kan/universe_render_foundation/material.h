@@ -93,6 +93,9 @@ struct kan_render_material_loaded_pipeline_t
     /// \brief Name of the pass for which pipeline was created.
     kan_interned_string_t pass_name;
 
+    /// \brief Index of this pipeline in pass variants.
+    kan_instance_size_t variant_index;
+
     /// \brief Handle to the actual pipeline. Might still be in compilation stage.
     /// \details Not owned, just copied handle.
     kan_render_graphics_pipeline_t pipeline;
@@ -117,6 +120,8 @@ struct kan_render_material_loaded_t
     kan_render_pipeline_parameter_set_layout_t set_unstable;
 
     /// \brief Array with currently instanced pipelines for existing passes.
+    /// \details Guaranteed to be sorted by passes and variant indices. It means that pipelines are clustered by passes
+    ///          and inside every cluster pipelines are guaranteed to be sorted by variant index.
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_render_material_loaded_pipeline_t)
     struct kan_dynamic_array_t pipelines;
 

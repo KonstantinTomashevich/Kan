@@ -13,3 +13,10 @@ concrete_require (SCOPE PRIVATE ABSTRACT error log CONCRETE_INTERFACE resource_p
 concrete_preprocessing_queue_step_preprocess ()
 reflection_preprocessor_setup_step (GLOB "*.c" "*.h")
 register_unit_reflection ()
+
+set (KAN_RESOURCE_MATERIAL_PASS_VARIANT_MAX_NAME_LENGTH "256" CACHE STRING
+        "Size of a buffer used to format compiled pass variant byproduct names.")
+
+concrete_compile_definitions (
+        PRIVATE
+        KAN_RESOURCE_MATERIAL_PASS_VARIANT_MAX_NAME_LENGTH=${KAN_RESOURCE_MATERIAL_PASS_VARIANT_MAX_NAME_LENGTH})

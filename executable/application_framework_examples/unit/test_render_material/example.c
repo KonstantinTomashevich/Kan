@@ -229,10 +229,14 @@ static void try_render_frame (struct test_render_material_state_t *state,
     struct kan_float_matrix_4x4_t projection_view;
     kan_float_matrix_4x4_multiply (&projection, &view, &projection_view);
 
-    // Only one buffer in pass parameter set for the sake of simplicity.
-    KAN_ASSERT (pass->pass_parameter_set_bindings.buffers.size == 1u)
+    // Only one buffer in pass parameter set in one variant for the sake of simplicity.
+    KAN_ASSERT (pass->variants.size == 1u)
+    struct kan_render_graph_pass_variant_t *pass_variant =
+        &((struct kan_render_graph_pass_variant_t *) pass->variants.data)[0u];
+
+    KAN_ASSERT (pass_variant->pass_parameter_set_bindings.buffers.size == 1u)
     struct kan_rpl_meta_buffer_t *pass_meta_buffer =
-        &((struct kan_rpl_meta_buffer_t *) pass->pass_parameter_set_bindings.buffers.data)[0u];
+        &((struct kan_rpl_meta_buffer_t *) pass_variant->pass_parameter_set_bindings.buffers.data)[0u];
 
     if (!KAN_HANDLE_IS_VALID (singleton->pass_buffer))
     {
@@ -244,7 +248,7 @@ static void try_render_frame (struct test_render_material_state_t *state,
 
     if (!KAN_HANDLE_IS_VALID (singleton->pass_parameter_set))
     {
-        KAN_ASSERT (KAN_HANDLE_IS_VALID (pass->pass_parameter_set_layout))
+        KAN_ASSERT (KAN_HANDLE_IS_VALID (pass_variant->pass_parameter_set_layout))
         struct kan_render_parameter_update_description_t bindings[] = {{
             .binding = pass_meta_buffer->binding,
             .buffer_binding =
@@ -256,7 +260,7 @@ static void try_render_frame (struct test_render_material_state_t *state,
         }};
 
         struct kan_render_pipeline_parameter_set_description_t description = {
-            .layout = pass->pass_parameter_set_layout,
+            .layout = pass_variant->pass_parameter_set_layout,
             .stable_binding = KAN_TRUE,
             .initial_bindings_count = sizeof (bindings) / sizeof (bindings[0u]),
             .initial_bindings = bindings,
@@ -298,7 +302,7 @@ static void try_render_frame (struct test_render_material_state_t *state,
                 const struct kan_render_material_loaded_pipeline_t *loaded =
                     &((struct kan_render_material_loaded_pipeline_t *) material->pipelines.data)[index];
 
-                if (loaded->pass_name == state->scene_pass_name)
+                if (loaded->pass_name == state->scene_pass_name && loaded->variant_index == 0u)
                 {
                     pipeline = loaded->pipeline;
                     break;

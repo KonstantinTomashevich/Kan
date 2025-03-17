@@ -783,6 +783,8 @@ static void on_material_instance_updated (
                         }
                     }
 
+                    // TODO: We should not delete static data like that.
+                    //       We should keep it until everything is fully reloaded.
                     if (old_static_name != instance->static_name)
                     {
                         HELPER_UNLINK_STATIC_STATE_DATA (&old_static_name)
