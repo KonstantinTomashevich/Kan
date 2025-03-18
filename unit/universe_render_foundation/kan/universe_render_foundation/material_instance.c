@@ -166,7 +166,9 @@ struct render_foundation_material_instance_state_t
     kan_interned_string_t name;
     kan_resource_request_id_t request_id;
     kan_instance_size_t reference_count;
+
     kan_interned_string_t static_name;
+    kan_interned_string_t loaded_static_name;
 
     kan_time_size_t last_usage_inspection_time_ns;
     uint8_t image_best_mip;
@@ -308,6 +310,7 @@ static void create_new_usage_state_if_needed (
         new_state->name = material_instance_name;
         new_state->reference_count = 1u;
         new_state->static_name = NULL;
+        new_state->loaded_static_name = NULL;
 
         new_state->last_usage_inspection_time_ns = KAN_INT_MAX (kan_time_size_t);
         new_state->image_best_mip = 0u;
@@ -756,39 +759,36 @@ static void on_material_instance_updated (
                 {
                     const struct kan_resource_material_instance_compiled_t *instance_data =
                         KAN_RESOURCE_PROVIDER_CONTAINER_GET (kan_resource_material_instance_compiled_t, container);
-
-                    const kan_interned_string_t old_static_name = instance->static_name;
-                    instance->static_name = instance_data->static_data;
                     new_static_name = instance->static_name;
-                    kan_bool_t new_static_exists = KAN_FALSE;
 
-                    KAN_UP_VALUE_UPDATE (static_state, render_foundation_material_instance_static_state_t, name,
-                                         &instance->static_name)
+                    if (instance->static_name != instance_data->static_data)
                     {
-                        new_static_exists = KAN_TRUE;
-                        if (old_static_name != instance->static_name)
+                        // If current static name is not used for loaded data, we can unlink it right away.
+                        if (instance->static_name != instance->loaded_static_name)
                         {
+                            HELPER_UNLINK_STATIC_STATE_DATA (&instance->static_name)
+                        }
+
+                        instance->static_name = instance_data->static_data;
+                        kan_bool_t new_static_exists = KAN_FALSE;
+
+                        KAN_UP_VALUE_UPDATE (static_state, render_foundation_material_instance_static_state_t, name,
+                                             &instance->static_name)
+                        {
+                            new_static_exists = KAN_TRUE;
                             ++static_state->reference_count;
                             static_state->mip_update_needed = KAN_TRUE;
                         }
-                    }
 
-                    if (!new_static_exists)
-                    {
-                        KAN_UP_INDEXED_INSERT (new_static_state, render_foundation_material_instance_static_state_t)
+                        if (!new_static_exists)
                         {
-                            new_static_state->name = instance->static_name;
-                            new_static_state->reference_count = 1u;
-                            new_static_state->mip_update_needed = KAN_TRUE;
+                            KAN_UP_INDEXED_INSERT (new_static_state, render_foundation_material_instance_static_state_t)
+                            {
+                                new_static_state->name = instance->static_name;
+                                new_static_state->reference_count = 1u;
+                                new_static_state->mip_update_needed = KAN_TRUE;
+                            }
                         }
-                    }
-
-                    // TODO: We should not delete static data like that.
-                    //       We should keep it until everything is fully reloaded.
-                    if (old_static_name != instance->static_name)
-                    {
-                        HELPER_UNLINK_STATIC_STATE_DATA (&old_static_name)
-                        remove_material_instance_loaded_data (state, instance->name);
                     }
                 }
             }
@@ -1618,6 +1618,36 @@ static void update_linked_material_instances (
     struct render_foundation_material_instance_static_state_t *static_state,
     const struct kan_render_material_loaded_t *material_loaded)
 {
+    if (state->hot_reload_possible)
+    {
+        // When hot reload is enabled, there is a peculiar case when:
+        //
+        // - Instance plans to use new static data after loading (new static data name).
+        // - Loaded static data is also updated 1 or more prior to the new static data.
+        // - Loaded instance ends up with invalid data as its loaded static reloaded its data, but normal routine
+        //   didn't update loaded instance as it already has other static name selected for the future.
+        //
+        // Therefore, to solve this, we additionally updated instances that reference this state as loaded: if they've
+        // already received new data, they wouldn't have this static data in loaded fields.
+        KAN_UP_VALUE_UPDATE (instance, render_foundation_material_instance_state_t, loaded_static_name,
+                             &static_state->name)
+        {
+            KAN_UP_VALUE_READ (request, kan_resource_request_t, request_id, &instance->request_id)
+            {
+                KAN_ASSERT (KAN_TYPED_ID_32_IS_VALID (request->provided_container_id))
+                KAN_UP_VALUE_READ (
+                    container, KAN_RESOURCE_PROVIDER_MAKE_CONTAINER_TYPE (kan_resource_material_instance_compiled_t),
+                    container_id, &request->provided_container_id)
+                {
+                    const struct kan_resource_material_instance_compiled_t *instance_data =
+                        KAN_RESOURCE_PROVIDER_CONTAINER_GET (kan_resource_material_instance_compiled_t, container);
+                    create_or_update_material_instance_loaded_data (state, static_state, instance, instance_data,
+                                                                    material_loaded);
+                }
+            }
+        }
+    }
+
     KAN_UP_VALUE_UPDATE (instance, render_foundation_material_instance_state_t, static_name, &static_state->name)
     {
         KAN_UP_VALUE_READ (request, kan_resource_request_t, request_id, &instance->request_id)
@@ -1631,6 +1661,12 @@ static void update_linked_material_instances (
                     KAN_RESOURCE_PROVIDER_CONTAINER_GET (kan_resource_material_instance_compiled_t, container);
                 create_or_update_material_instance_loaded_data (state, static_state, instance, instance_data,
                                                                 material_loaded);
+
+                if (instance->loaded_static_name != instance->static_name)
+                {
+                    HELPER_UNLINK_STATIC_STATE_DATA (&instance->loaded_static_name)
+                    instance->loaded_static_name = instance->static_name;
+                }
             }
         }
 
