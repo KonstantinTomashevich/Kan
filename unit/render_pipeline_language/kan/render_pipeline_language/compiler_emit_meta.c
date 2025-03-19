@@ -67,7 +67,7 @@ static inline kan_bool_t emit_meta_check_common_setting (struct rpl_compiler_ins
         SETTING_REQUIRE_TYPE (KAN_RPL_SETTING_TYPE_FLOATING, "floating")
         SETTING_REQUIRE_NOT_IN_BLOCK
         {
-            meta->color_blend_constant_r = setting->floating;
+            meta->color_blend_constants.r = setting->floating;
         }
     }
     else if (setting->name == STATICS.interned_color_blend_constant_g)
@@ -75,7 +75,7 @@ static inline kan_bool_t emit_meta_check_common_setting (struct rpl_compiler_ins
         SETTING_REQUIRE_TYPE (KAN_RPL_SETTING_TYPE_FLOATING, "floating")
         SETTING_REQUIRE_NOT_IN_BLOCK
         {
-            meta->color_blend_constant_g = setting->floating;
+            meta->color_blend_constants.g = setting->floating;
         }
     }
     else if (setting->name == STATICS.interned_color_blend_constant_b)
@@ -83,7 +83,7 @@ static inline kan_bool_t emit_meta_check_common_setting (struct rpl_compiler_ins
         SETTING_REQUIRE_TYPE (KAN_RPL_SETTING_TYPE_FLOATING, "floating")
         SETTING_REQUIRE_NOT_IN_BLOCK
         {
-            meta->color_blend_constant_b = setting->floating;
+            meta->color_blend_constants.b = setting->floating;
         }
     }
     else if (setting->name == STATICS.interned_color_blend_constant_a)
@@ -91,7 +91,7 @@ static inline kan_bool_t emit_meta_check_common_setting (struct rpl_compiler_ins
         SETTING_REQUIRE_TYPE (KAN_RPL_SETTING_TYPE_FLOATING, "floating")
         SETTING_REQUIRE_NOT_IN_BLOCK
         {
-            meta->color_blend_constant_a = setting->floating;
+            meta->color_blend_constants.a = setting->floating;
         }
     }
     else

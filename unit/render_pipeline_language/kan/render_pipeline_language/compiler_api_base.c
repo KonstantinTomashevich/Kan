@@ -212,10 +212,10 @@ void kan_rpl_meta_init (struct kan_rpl_meta_t *instance)
     kan_dynamic_array_init (&instance->color_outputs, 0u, sizeof (struct kan_rpl_meta_color_output_t),
                             _Alignof (struct kan_rpl_meta_color_output_t), STATICS.rpl_meta_allocation_group);
 
-    instance->color_blend_constant_r = 0.0f;
-    instance->color_blend_constant_g = 0.0f;
-    instance->color_blend_constant_b = 0.0f;
-    instance->color_blend_constant_a = 0.0f;
+    instance->color_blend_constants.r = 0.0f;
+    instance->color_blend_constants.g = 0.0f;
+    instance->color_blend_constants.b = 0.0f;
+    instance->color_blend_constants.a = 0.0f;
 }
 
 void kan_rpl_meta_init_copy (struct kan_rpl_meta_t *instance, const struct kan_rpl_meta_t *copy_from)
@@ -255,10 +255,7 @@ void kan_rpl_meta_init_copy (struct kan_rpl_meta_t *instance, const struct kan_r
                 copy_from->color_outputs.size * copy_from->color_outputs.item_size);
     }
 
-    instance->color_blend_constant_r = copy_from->color_blend_constant_r;
-    instance->color_blend_constant_g = copy_from->color_blend_constant_g;
-    instance->color_blend_constant_b = copy_from->color_blend_constant_b;
-    instance->color_blend_constant_a = copy_from->color_blend_constant_a;
+    instance->color_blend_constants = copy_from->color_blend_constants;
 }
 
 void kan_rpl_meta_shutdown (struct kan_rpl_meta_t *instance)

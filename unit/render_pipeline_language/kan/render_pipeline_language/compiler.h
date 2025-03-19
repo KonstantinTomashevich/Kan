@@ -313,6 +313,15 @@ static inline struct kan_rpl_meta_color_output_t kan_rpl_meta_color_output_defau
     };
 }
 
+/// \brief Contains constants for color blending operations.
+struct kan_rpl_color_blend_constants_t
+{
+    float r;
+    float g;
+    float b;
+    float a;
+};
+
 /// \brief Provides full metadata about resolved pipeline.
 struct kan_rpl_meta_t
 {
@@ -337,10 +346,7 @@ struct kan_rpl_meta_t
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_meta_color_output_t)
     struct kan_dynamic_array_t color_outputs;
 
-    float color_blend_constant_r;
-    float color_blend_constant_g;
-    float color_blend_constant_b;
-    float color_blend_constant_a;
+    struct kan_rpl_color_blend_constants_t color_blend_constants;
 };
 
 /// \brief Meta emission flags that make it possible to skip generation of some parts of meta.

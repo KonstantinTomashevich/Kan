@@ -268,10 +268,10 @@ KAN_TEST_CASE (generic)
     KAN_TEST_CHECK (color_output->destination_alpha_blend_factor == KAN_RPL_BLEND_FACTOR_ZERO)
     KAN_TEST_CHECK (color_output->alpha_blend_operation == KAN_RPL_BLEND_OPERATION_ADD)
 
-    KAN_TEST_CHECK (fabs (meta.color_blend_constant_r) < TEST_FLOATING_TOLERANCE)
-    KAN_TEST_CHECK (fabs (meta.color_blend_constant_g) < TEST_FLOATING_TOLERANCE)
-    KAN_TEST_CHECK (fabs (meta.color_blend_constant_b) < TEST_FLOATING_TOLERANCE)
-    KAN_TEST_CHECK (fabs (meta.color_blend_constant_a) < TEST_FLOATING_TOLERANCE)
+    KAN_TEST_CHECK (fabs (meta.color_blend_constants.r) < TEST_FLOATING_TOLERANCE)
+    KAN_TEST_CHECK (fabs (meta.color_blend_constants.g) < TEST_FLOATING_TOLERANCE)
+    KAN_TEST_CHECK (fabs (meta.color_blend_constants.b) < TEST_FLOATING_TOLERANCE)
+    KAN_TEST_CHECK (fabs (meta.color_blend_constants.a) < TEST_FLOATING_TOLERANCE)
 
 #undef TEST_FLOATING_TOLERANCE
 
