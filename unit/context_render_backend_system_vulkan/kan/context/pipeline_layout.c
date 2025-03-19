@@ -50,6 +50,7 @@ struct render_backend_pipeline_layout_t *render_backend_system_register_pipeline
             {
                 ++node->usage_count;
                 kan_atomic_int_unlock (&system->pipeline_layout_registration_lock);
+                kan_cpu_section_execution_shutdown (&execution);
                 return node;
             }
         }
@@ -143,6 +144,7 @@ struct render_backend_pipeline_layout_t *render_backend_system_register_pipeline
     }
 
     kan_atomic_int_unlock (&system->pipeline_layout_registration_lock);
+    kan_cpu_section_execution_shutdown (&execution);
     return pipeline_layout;
 }
 
