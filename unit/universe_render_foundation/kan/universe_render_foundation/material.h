@@ -125,8 +125,26 @@ struct kan_render_material_loaded_t
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_render_material_loaded_pipeline_t)
     struct kan_dynamic_array_t pipelines;
 
-    /// \brief Meta of material pipeline family. Does not contains any info about any particular pass.
-    struct kan_rpl_meta_t family_meta;
+    /// \brief Information about vertex attribute buffers used by this material.
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_meta_buffer_t)
+    struct kan_dynamic_array_t vertex_attribute_buffers;
+
+    /// \brief Whether this material has instanced attribute buffer.
+    kan_bool_t has_instanced_attribute_buffer;
+
+    /// \brief Information about instanced attribute buffer for this material if it exists.
+    KAN_REFLECTION_VISIBILITY_CONDITION_FIELD (has_instanced_attribute_buffer)
+    KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (KAN_TRUE)
+    struct kan_rpl_meta_buffer_t instanced_attribute_buffer;
+
+    /// \brief Information about bindings for material set of this material.
+    struct kan_rpl_meta_set_bindings_t set_material_bindings;
+
+    /// \brief Information about bindings for object set of this material.
+    struct kan_rpl_meta_set_bindings_t set_object_bindings;
+
+    /// \brief Information about bindings for unstable set of this material.
+    struct kan_rpl_meta_set_bindings_t set_unstable_bindings;
 };
 
 UNIVERSE_RENDER_FOUNDATION_API void kan_render_material_loaded_init (struct kan_render_material_loaded_t *instance);

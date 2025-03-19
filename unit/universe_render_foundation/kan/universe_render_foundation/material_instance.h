@@ -116,8 +116,8 @@ static inline kan_render_material_instance_usage_id_t kan_next_material_instance
         (kan_id_32_t) kan_atomic_int_add ((struct kan_atomic_int_t *) &singleton->usage_id_counter, 1));
 }
 
-/// \brief Alignment used for buffer data in `kan_render_material_instance_loaded_data_t::combined_instanced_data`.
-#define KAN_RENDER_MATERIAL_INSTANCE_INLINED_INSTANCED_DATA_ALIGNMENT _Alignof (struct kan_float_matrix_4x4_t)
+/// \brief Alignment used for buffer data in `kan_render_material_instance_loaded_data_t::instanced_data`.
+#define KAN_RENDER_MATERIAL_INSTANCE_INSTANCED_DATA_ALIGNMENT _Alignof (struct kan_float_matrix_4x4_t)
 
 /// \brief Material instance loaded data storage structured. Used both for usual and customized instances.
 struct kan_render_material_instance_loaded_data_t
@@ -129,11 +129,9 @@ struct kan_render_material_instance_loaded_data_t
     /// \details Not owned.
     kan_render_pipeline_parameter_set_t parameter_set;
 
-    /// \brief Storage for material instanced data which is combined into one array for cache coherency.
-    /// \details Data for every instanced attribute buffer goes one after another in the same order as buffers in meta.
-    ///          Every buffer start is aligned using KAN_RENDER_MATERIAL_INSTANCE_INLINED_INSTANCED_DATA_ALIGNMENT.
+    /// \brief Storage for material instanced data. We have one storage as only one instanced buffer is allowed.
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (uint8_t)
-    struct kan_dynamic_array_t combined_instanced_data;
+    struct kan_dynamic_array_t instanced_data;
 };
 
 UNIVERSE_RENDER_FOUNDATION_API void kan_render_material_instance_loaded_data_init (

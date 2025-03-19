@@ -689,12 +689,12 @@ static inline void process_texture_updates (
                             if (image->texture == static_image->texture_name)
                             {
                                 for (kan_loop_size_t sampler_index = 0u;
-                                     sampler_index < material_loaded->family_meta.set_material.samplers.size;
+                                     sampler_index < material_loaded->set_material_bindings.samplers.size;
                                      ++sampler_index)
                                 {
                                     struct kan_rpl_meta_sampler_t *sampler =
                                         &((struct kan_rpl_meta_sampler_t *)
-                                              material_loaded->family_meta.set_material.samplers.data)[sampler_index];
+                                              material_loaded->set_material_bindings.samplers.data)[sampler_index];
 
                                     if (sampler->name == image->name)
                                     {
@@ -997,7 +997,7 @@ static void instantiate_material_static_data (
 
     static_state->parameter_buffers.size = 0u;
     kan_dynamic_array_set_capacity (&static_state->parameter_buffers,
-                                    material_loaded->family_meta.set_material.buffers.size);
+                                    material_loaded->set_material_bindings.buffers.size);
     kan_render_context_t render_context = kan_render_backend_system_get_render_context (state->render_backend_system);
 
     // Align as the biggest possible alignment of parameter value.
@@ -1014,11 +1014,11 @@ static void instantiate_material_static_data (
             &((struct kan_resource_material_parameter_t *) data->parameters.data)[parameter_index];
         kan_bool_t found = KAN_FALSE;
 
-        for (kan_loop_size_t buffer_index = 0u; buffer_index < material_loaded->family_meta.set_material.buffers.size;
+        for (kan_loop_size_t buffer_index = 0u; buffer_index < material_loaded->set_material_bindings.buffers.size;
              ++buffer_index)
         {
-            struct kan_rpl_meta_buffer_t *meta_buffer = &(
-                (struct kan_rpl_meta_buffer_t *) material_loaded->family_meta.set_material.buffers.data)[buffer_index];
+            struct kan_rpl_meta_buffer_t *meta_buffer =
+                &((struct kan_rpl_meta_buffer_t *) material_loaded->set_material_bindings.buffers.data)[buffer_index];
 
             if ((found |= is_parameter_found_in_buffer (&meta_buffer->main_parameters, parameter)))
             {
@@ -1041,11 +1041,11 @@ static void instantiate_material_static_data (
             &((struct kan_resource_material_tail_set_t *) data->tail_set.data)[tail_index];
         kan_bool_t tail_found = KAN_FALSE;
 
-        for (kan_loop_size_t buffer_index = 0u; buffer_index < material_loaded->family_meta.set_material.buffers.size;
+        for (kan_loop_size_t buffer_index = 0u; buffer_index < material_loaded->set_material_bindings.buffers.size;
              ++buffer_index)
         {
-            struct kan_rpl_meta_buffer_t *meta_buffer = &(
-                (struct kan_rpl_meta_buffer_t *) material_loaded->family_meta.set_material.buffers.data)[buffer_index];
+            struct kan_rpl_meta_buffer_t *meta_buffer =
+                &((struct kan_rpl_meta_buffer_t *) material_loaded->set_material_bindings.buffers.data)[buffer_index];
 
             if (meta_buffer->tail_name == tail_set->tail_name)
             {
@@ -1083,11 +1083,11 @@ static void instantiate_material_static_data (
             &((struct kan_resource_material_tail_append_t *) data->tail_append.data)[tail_index];
         kan_bool_t tail_found = KAN_FALSE;
 
-        for (kan_loop_size_t buffer_index = 0u; buffer_index < material_loaded->family_meta.set_material.buffers.size;
+        for (kan_loop_size_t buffer_index = 0u; buffer_index < material_loaded->set_material_bindings.buffers.size;
              ++buffer_index)
         {
-            struct kan_rpl_meta_buffer_t *meta_buffer = &(
-                (struct kan_rpl_meta_buffer_t *) material_loaded->family_meta.set_material.buffers.data)[buffer_index];
+            struct kan_rpl_meta_buffer_t *meta_buffer =
+                &((struct kan_rpl_meta_buffer_t *) material_loaded->set_material_bindings.buffers.data)[buffer_index];
 
             if (meta_buffer->tail_name == tail_append->tail_name)
             {
@@ -1120,10 +1120,10 @@ static void instantiate_material_static_data (
     }
 #endif
 
-    for (kan_loop_size_t index = 0u; index < material_loaded->family_meta.set_material.buffers.size; ++index)
+    for (kan_loop_size_t index = 0u; index < material_loaded->set_material_bindings.buffers.size; ++index)
     {
         struct kan_rpl_meta_buffer_t *meta_buffer =
-            &((struct kan_rpl_meta_buffer_t *) material_loaded->family_meta.set_material.buffers.data)[index];
+            &((struct kan_rpl_meta_buffer_t *) material_loaded->set_material_bindings.buffers.data)[index];
 
         if (meta_buffer->main_size == 0u && meta_buffer->tail_item_size == 0u)
         {
@@ -1285,8 +1285,8 @@ static void instantiate_material_static_data (
     }
 
     struct kan_render_parameter_update_description_t updates_static[KAN_UNIVERSE_RENDER_FOUNDATION_MI_UPDATES_COUNT];
-    const kan_instance_size_t updates_total = material_loaded->family_meta.set_material.buffers.size +
-                                              material_loaded->family_meta.set_material.samplers.size;
+    const kan_instance_size_t updates_total =
+        material_loaded->set_material_bindings.buffers.size + material_loaded->set_material_bindings.samplers.size;
     struct kan_render_parameter_update_description_t *updates = updates_static;
 
     if (updates_total > KAN_UNIVERSE_RENDER_FOUNDATION_MI_UPDATES_COUNT)
@@ -1297,10 +1297,10 @@ static void instantiate_material_static_data (
     }
 
     kan_instance_size_t update_output_index = 0u;
-    for (kan_loop_size_t index = 0u; index < material_loaded->family_meta.set_material.buffers.size; ++index)
+    for (kan_loop_size_t index = 0u; index < material_loaded->set_material_bindings.buffers.size; ++index)
     {
         struct kan_rpl_meta_buffer_t *meta_buffer =
-            &((struct kan_rpl_meta_buffer_t *) material_loaded->family_meta.set_material.buffers.data)[index];
+            &((struct kan_rpl_meta_buffer_t *) material_loaded->set_material_bindings.buffers.data)[index];
         kan_render_buffer_t render_buffer = ((kan_render_buffer_t *) static_state->parameter_buffers.data)[index];
 
         if (KAN_HANDLE_IS_VALID (render_buffer))
@@ -1333,11 +1333,11 @@ static void instantiate_material_static_data (
                 if (image->texture == static_image->texture_name)
                 {
                     for (kan_loop_size_t sampler_index = 0u;
-                         sampler_index < material_loaded->family_meta.set_material.samplers.size; ++sampler_index)
+                         sampler_index < material_loaded->set_material_bindings.samplers.size; ++sampler_index)
                     {
                         struct kan_rpl_meta_sampler_t *sampler =
                             &((struct kan_rpl_meta_sampler_t *)
-                                  material_loaded->family_meta.set_material.samplers.data)[sampler_index];
+                                  material_loaded->set_material_bindings.samplers.data)[sampler_index];
 
                         if (sampler->name == image->name)
                         {
@@ -1395,12 +1395,11 @@ static void update_material_instance_custom_inherit_data (
     custom_loaded->data.material_name = instance_loaded->data.material_name;
     custom_loaded->data.parameter_set = instance_loaded->data.parameter_set;
 
-    custom_loaded->data.combined_instanced_data.size = 0u;
-    kan_dynamic_array_set_capacity (&custom_loaded->data.combined_instanced_data,
-                                    instance_loaded->data.combined_instanced_data.size);
-    custom_loaded->data.combined_instanced_data.size = custom_loaded->data.combined_instanced_data.capacity;
-    memcpy (custom_loaded->data.combined_instanced_data.data, instance_loaded->data.combined_instanced_data.data,
-            custom_loaded->data.combined_instanced_data.size);
+    custom_loaded->data.instanced_data.size = 0u;
+    kan_dynamic_array_set_capacity (&custom_loaded->data.instanced_data, instance_loaded->data.instanced_data.size);
+    custom_loaded->data.instanced_data.size = custom_loaded->data.instanced_data.capacity;
+    memcpy (custom_loaded->data.instanced_data.data, instance_loaded->data.instanced_data.data,
+            custom_loaded->data.instanced_data.size);
 }
 
 static void update_material_instance_custom_apply_parameter (
@@ -1411,20 +1410,10 @@ static void update_material_instance_custom_apply_parameter (
 {
 #if defined(KAN_UNIVERSE_RENDER_FOUNDATION_VALIDATION_ENABLED)
     kan_bool_t found = KAN_FALSE;
-    for (kan_loop_size_t index = 0u; index < material_loaded->family_meta.attribute_buffers.size; ++index)
+    if (material_loaded->has_instanced_attribute_buffer)
     {
-        struct kan_rpl_meta_buffer_t *buffer =
-            &((struct kan_rpl_meta_buffer_t *) material_loaded->family_meta.attribute_buffers.data)[index];
-
-        if (buffer->type != KAN_RPL_BUFFER_TYPE_INSTANCED_ATTRIBUTE)
-        {
-            continue;
-        }
-
-        if ((found |= is_parameter_found_in_buffer (&buffer->main_parameters, &parameter->parameter)))
-        {
-            break;
-        }
+        found = is_parameter_found_in_buffer (&material_loaded->instanced_attribute_buffer.main_parameters,
+                                              &parameter->parameter);
     }
 
     if (!found)
@@ -1437,24 +1426,8 @@ static void update_material_instance_custom_apply_parameter (
     }
 #endif
 
-    kan_instance_size_t buffer_offset = 0u;
-    for (kan_loop_size_t index = 0u; index < material_loaded->family_meta.attribute_buffers.size; ++index)
-    {
-        struct kan_rpl_meta_buffer_t *buffer =
-            &((struct kan_rpl_meta_buffer_t *) material_loaded->family_meta.attribute_buffers.data)[index];
-
-        if (buffer->type != KAN_RPL_BUFFER_TYPE_INSTANCED_ATTRIBUTE)
-        {
-            continue;
-        }
-
-        apply_parameter_to_memory (instance_loaded->name, NULL, KAN_TRUE,
-                                   custom_loaded->data.combined_instanced_data.data, buffer_offset,
-                                   &buffer->main_parameters, &parameter->parameter);
-
-        buffer_offset = (kan_instance_size_t) kan_apply_alignment (
-            buffer_offset + buffer->main_size, KAN_RENDER_MATERIAL_INSTANCE_INLINED_INSTANCED_DATA_ALIGNMENT);
-    }
+    apply_parameter_to_memory (instance_loaded->name, NULL, KAN_TRUE, custom_loaded->data.instanced_data.data, 0u,
+                               &material_loaded->instanced_attribute_buffer.main_parameters, &parameter->parameter);
 }
 
 /// \details Macro as it can be used from different mutators.
@@ -1476,66 +1449,41 @@ static void update_material_instance_loaded_data (
 {
     instance_loaded->data.material_name = static_state->loaded_material_name;
     instance_loaded->data.parameter_set = static_state->parameter_set;
-    kan_instance_size_t combined_data_size = 0u;
-
-    for (kan_loop_size_t index = 0u; index < material_loaded->family_meta.attribute_buffers.size; ++index)
-    {
-        struct kan_rpl_meta_buffer_t *buffer =
-            &((struct kan_rpl_meta_buffer_t *) material_loaded->family_meta.attribute_buffers.data)[index];
-
-        if (buffer->type == KAN_RPL_BUFFER_TYPE_INSTANCED_ATTRIBUTE)
-        {
-            KAN_ASSERT (buffer->tail_item_size == 0u)
-            combined_data_size = (kan_instance_size_t) kan_apply_alignment (
-                combined_data_size + buffer->main_size, KAN_RENDER_MATERIAL_INSTANCE_INLINED_INSTANCED_DATA_ALIGNMENT);
-        }
-    }
-
-    instance_loaded->data.combined_instanced_data.size = 0u;
-    kan_dynamic_array_set_capacity (&instance_loaded->data.combined_instanced_data, combined_data_size);
-    instance_loaded->data.combined_instanced_data.size = combined_data_size;
 
 #if defined(KAN_UNIVERSE_RENDER_FOUNDATION_VALIDATION_ENABLED)
     // Detect and log unknown parameters and tails.
-    for (kan_loop_size_t parameter_index = 0u; parameter_index < instance_data->instanced_parameters.size;
-         ++parameter_index)
+    if (material_loaded->has_instanced_attribute_buffer)
     {
-        struct kan_resource_material_parameter_t *parameter =
-            &((struct kan_resource_material_parameter_t *) instance_data->instanced_parameters.data)[parameter_index];
-        kan_bool_t found = KAN_FALSE;
-
-        for (kan_loop_size_t buffer_index = 0u; buffer_index < material_loaded->family_meta.attribute_buffers.size;
-             ++buffer_index)
+        for (kan_loop_size_t parameter_index = 0u; parameter_index < instance_data->instanced_parameters.size;
+             ++parameter_index)
         {
-            struct kan_rpl_meta_buffer_t *meta_buffer =
-                &((struct kan_rpl_meta_buffer_t *) material_loaded->family_meta.attribute_buffers.data)[buffer_index];
+            struct kan_resource_material_parameter_t *parameter = &(
+                (struct kan_resource_material_parameter_t *) instance_data->instanced_parameters.data)[parameter_index];
 
-            if ((found |= is_parameter_found_in_buffer (&meta_buffer->main_parameters, parameter)))
+            if (!is_parameter_found_in_buffer (&material_loaded->instanced_attribute_buffer.main_parameters, parameter))
             {
-                break;
+                KAN_LOG (render_foundation_material_instance, KAN_LOG_ERROR,
+                         "Material instance \"%s\" has instanced parameter \"%s\", but there is no such parameter in "
+                         "any meta attribute buffer.",
+                         instance_loaded->name, parameter->name)
             }
         }
-
-        if (!found)
-        {
-            KAN_LOG (render_foundation_material_instance, KAN_LOG_ERROR,
-                     "Material instance \"%s\" has instanced parameter \"%s\", but there is no such parameter in any "
-                     "meta attribute buffer.",
-                     instance_loaded->name, parameter->name)
-        }
+    }
+    else if (instance_data->instanced_parameters.size > 0u)
+    {
+        KAN_LOG (render_foundation_material_instance, KAN_LOG_ERROR,
+                 "Material instance \"%s\" has instanced parameters, but there is no instanced attribute buffer in "
+                 "material.",
+                 instance_loaded->name)
     }
 #endif
 
-    kan_instance_size_t buffer_offset = 0u;
-    for (kan_loop_size_t index = 0u; index < material_loaded->family_meta.attribute_buffers.size; ++index)
+    instance_loaded->data.instanced_data.size = 0u;
+    if (material_loaded->has_instanced_attribute_buffer)
     {
-        struct kan_rpl_meta_buffer_t *buffer =
-            &((struct kan_rpl_meta_buffer_t *) material_loaded->family_meta.attribute_buffers.data)[index];
-
-        if (buffer->type != KAN_RPL_BUFFER_TYPE_INSTANCED_ATTRIBUTE)
-        {
-            continue;
-        }
+        kan_dynamic_array_set_capacity (&instance_loaded->data.instanced_data,
+                                        material_loaded->instanced_attribute_buffer.main_size);
+        instance_loaded->data.instanced_data.size = material_loaded->instanced_attribute_buffer.main_size;
 
         for (kan_loop_size_t parameter_index = 0u; parameter_index < instance_data->instanced_parameters.size;
              ++parameter_index)
@@ -1544,12 +1492,13 @@ static void update_material_instance_loaded_data (
                 (struct kan_resource_material_parameter_t *) instance_data->instanced_parameters.data)[parameter_index];
 
             apply_parameter_to_memory (instance_loaded->name, NULL, KAN_FALSE,
-                                       instance_loaded->data.combined_instanced_data.data, buffer_offset,
-                                       &buffer->main_parameters, parameter);
+                                       instance_loaded->data.instanced_data.data, 0u,
+                                       &material_loaded->instanced_attribute_buffer.main_parameters, parameter);
         }
-
-        buffer_offset = (kan_instance_size_t) kan_apply_alignment (
-            buffer_offset + buffer->main_size, KAN_RENDER_MATERIAL_INSTANCE_INLINED_INSTANCED_DATA_ALIGNMENT);
+    }
+    else
+    {
+        kan_dynamic_array_set_capacity (&instance_loaded->data.instanced_data, 0u);
     }
 
     // Update custom instances.
@@ -2117,14 +2066,13 @@ void kan_render_material_instance_singleton_init (struct kan_render_material_ins
 void kan_render_material_instance_loaded_data_init (struct kan_render_material_instance_loaded_data_t *instance)
 {
     instance->parameter_set = KAN_HANDLE_SET_INVALID (kan_render_pipeline_parameter_set_t);
-    kan_dynamic_array_init (&instance->combined_instanced_data, 0u, sizeof (uint8_t),
-                            KAN_RENDER_MATERIAL_INSTANCE_INLINED_INSTANCED_DATA_ALIGNMENT,
-                            kan_allocation_group_stack_get ());
+    kan_dynamic_array_init (&instance->instanced_data, 0u, sizeof (uint8_t),
+                            KAN_RENDER_MATERIAL_INSTANCE_INSTANCED_DATA_ALIGNMENT, kan_allocation_group_stack_get ());
 }
 
 void kan_render_material_instance_loaded_data_shutdown (struct kan_render_material_instance_loaded_data_t *instance)
 {
-    kan_dynamic_array_shutdown (&instance->combined_instanced_data);
+    kan_dynamic_array_shutdown (&instance->instanced_data);
 }
 
 void kan_render_material_instance_loaded_init (struct kan_render_material_instance_loaded_t *instance)

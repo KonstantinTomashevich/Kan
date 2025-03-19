@@ -557,6 +557,69 @@ UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_deploy_render_foundatio
         kan_context_query (kan_universe_get_context (universe), KAN_CONTEXT_RENDER_BACKEND_SYSTEM_NAME);
 }
 
+static void add_attributes_from_buffer (const struct kan_rpl_meta_buffer_t *buffer,
+                                        struct kan_render_attribute_description_t *attributes,
+                                        kan_instance_size_t *attribute_output_index_pointer)
+{
+    for (kan_loop_size_t attribute_index = 0u; attribute_index < buffer->attributes.size;
+         ++attribute_index, ++*attribute_output_index_pointer)
+    {
+        struct kan_rpl_meta_attribute_t *attribute =
+            &((struct kan_rpl_meta_attribute_t *) buffer->attributes.data)[attribute_index];
+        enum kan_render_attribute_format_t format = KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_FLOAT_1;
+
+        switch (attribute->type)
+        {
+        case KAN_RPL_META_VARIABLE_TYPE_F1:
+            format = KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_FLOAT_1;
+            break;
+
+        case KAN_RPL_META_VARIABLE_TYPE_F2:
+            format = KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_FLOAT_2;
+            break;
+
+        case KAN_RPL_META_VARIABLE_TYPE_F3:
+            format = KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_FLOAT_3;
+            break;
+
+        case KAN_RPL_META_VARIABLE_TYPE_F4:
+            format = KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_FLOAT_4;
+            break;
+
+        case KAN_RPL_META_VARIABLE_TYPE_I1:
+            format = KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_SIGNED_INT_1;
+            break;
+
+        case KAN_RPL_META_VARIABLE_TYPE_I2:
+            format = KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_SIGNED_INT_2;
+            break;
+
+        case KAN_RPL_META_VARIABLE_TYPE_I3:
+            format = KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_SIGNED_INT_3;
+            break;
+
+        case KAN_RPL_META_VARIABLE_TYPE_I4:
+            format = KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_SIGNED_INT_4;
+            break;
+
+        case KAN_RPL_META_VARIABLE_TYPE_F3X3:
+            format = KAN_RENDER_ATTRIBUTE_FORMAT_MATRIX_FLOAT_3_3;
+            break;
+
+        case KAN_RPL_META_VARIABLE_TYPE_F4X4:
+            format = KAN_RENDER_ATTRIBUTE_FORMAT_MATRIX_FLOAT_4_4;
+            break;
+        }
+
+        attributes[*attribute_output_index_pointer] = (struct kan_render_attribute_description_t) {
+            .binding = buffer->binding,
+            .location = attribute->location,
+            .offset = attribute->offset,
+            .format = format,
+        };
+    }
+}
+
 static inline enum kan_render_compare_operation_t convert_compare_operation (enum kan_rpl_compare_operation_t operation)
 {
     switch (operation)
@@ -742,54 +805,49 @@ static void recreate_family (struct render_foundation_material_management_execut
             const struct kan_resource_material_pipeline_family_compiled_t *loaded =
                 KAN_RESOURCE_PROVIDER_CONTAINER_GET (kan_resource_material_pipeline_family_compiled_t, container);
 
-            // Only classic pipeline are supported by materials right now.
-            KAN_ASSERT (loaded->meta.pipeline_type == KAN_RPL_PIPELINE_TYPE_GRAPHICS_CLASSIC)
-
-            if (loaded->meta.attribute_buffers.size > 0u)
+            if (loaded->vertex_attribute_buffers.size > 0u || loaded->has_instanced_attribute_buffer)
             {
                 attribute_sources = attribute_sources_static;
-                attributes_sources_count = loaded->meta.attribute_buffers.size;
+                attributes_sources_count = loaded->vertex_attribute_buffers.size;
 
-                if (loaded->meta.attribute_buffers.size > KAN_UNIVERSE_RENDER_FOUNDATION_BINDINGS_MAX_STATIC)
+                if (loaded->has_instanced_attribute_buffer)
+                {
+                    ++attributes_sources_count;
+                }
+
+                if (attributes_sources_count > KAN_UNIVERSE_RENDER_FOUNDATION_BINDINGS_MAX_STATIC)
                 {
                     attribute_sources = kan_allocate_general (
                         state->description_allocation_group,
-                        sizeof (struct kan_render_attribute_source_description_t) * loaded->meta.attribute_buffers.size,
+                        sizeof (struct kan_render_attribute_source_description_t) * attributes_sources_count,
                         _Alignof (struct kan_render_attribute_source_description_t));
                 }
 
-                for (kan_loop_size_t index = 0u; index < loaded->meta.attribute_buffers.size; ++index)
+                for (kan_loop_size_t index = 0u; index < loaded->vertex_attribute_buffers.size; ++index)
                 {
                     struct kan_rpl_meta_buffer_t *buffer =
-                        &((struct kan_rpl_meta_buffer_t *) loaded->meta.attribute_buffers.data)[index];
+                        &((struct kan_rpl_meta_buffer_t *) loaded->vertex_attribute_buffers.data)[index];
+                    KAN_ASSERT (buffer->type == KAN_RPL_BUFFER_TYPE_VERTEX_ATTRIBUTE)
 
                     attributes_count += buffer->attributes.size;
                     KAN_ASSERT (buffer->tail_item_size == 0u)
-                    enum kan_render_attribute_rate_t rate = KAN_RENDER_ATTRIBUTE_RATE_PER_VERTEX;
-
-                    switch (buffer->type)
-                    {
-                    case KAN_RPL_BUFFER_TYPE_VERTEX_ATTRIBUTE:
-                        rate = KAN_RENDER_ATTRIBUTE_RATE_PER_VERTEX;
-                        break;
-
-                    case KAN_RPL_BUFFER_TYPE_UNIFORM:
-                    case KAN_RPL_BUFFER_TYPE_READ_ONLY_STORAGE:
-                    case KAN_RPL_BUFFER_TYPE_VERTEX_STAGE_OUTPUT:
-                    case KAN_RPL_BUFFER_TYPE_FRAGMENT_STAGE_OUTPUT:
-                        KAN_ASSERT (KAN_FALSE)
-                        break;
-
-                    case KAN_RPL_BUFFER_TYPE_INSTANCED_ATTRIBUTE:
-                        rate = KAN_RENDER_ATTRIBUTE_RATE_PER_INSTANCE;
-                        break;
-                    }
 
                     attribute_sources[index] = (struct kan_render_attribute_source_description_t) {
                         .binding = buffer->binding,
                         .stride = buffer->main_size,
-                        .rate = rate,
+                        .rate = KAN_RENDER_ATTRIBUTE_RATE_PER_VERTEX,
                     };
+                }
+
+                if (loaded->has_instanced_attribute_buffer)
+                {
+                    attributes_count += loaded->instanced_attribute_buffer.attributes.size;
+                    attribute_sources[loaded->vertex_attribute_buffers.size] =
+                        (struct kan_render_attribute_source_description_t) {
+                            .binding = loaded->instanced_attribute_buffer.binding,
+                            .stride = loaded->instanced_attribute_buffer.main_size,
+                            .rate = KAN_RENDER_ATTRIBUTE_RATE_PER_INSTANCE,
+                        };
                 }
             }
 
@@ -805,81 +863,30 @@ static void recreate_family (struct render_foundation_material_management_execut
                 }
 
                 kan_instance_size_t attribute_output_index = 0u;
-                for (kan_loop_size_t source_index = 0u; source_index < loaded->meta.attribute_buffers.size;
+                for (kan_loop_size_t source_index = 0u; source_index < loaded->vertex_attribute_buffers.size;
                      ++source_index)
                 {
                     struct kan_rpl_meta_buffer_t *buffer =
-                        &((struct kan_rpl_meta_buffer_t *) loaded->meta.attribute_buffers.data)[source_index];
+                        &((struct kan_rpl_meta_buffer_t *) loaded->vertex_attribute_buffers.data)[source_index];
+                    add_attributes_from_buffer (buffer, attributes, &attribute_output_index);
+                }
 
-                    for (kan_loop_size_t attribute_index = 0u; attribute_index < buffer->attributes.size;
-                         ++attribute_index, ++attribute_output_index)
-                    {
-                        struct kan_rpl_meta_attribute_t *attribute =
-                            &((struct kan_rpl_meta_attribute_t *) buffer->attributes.data)[attribute_index];
-                        enum kan_render_attribute_format_t format = KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_FLOAT_1;
-
-                        switch (attribute->type)
-                        {
-                        case KAN_RPL_META_VARIABLE_TYPE_F1:
-                            format = KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_FLOAT_1;
-                            break;
-
-                        case KAN_RPL_META_VARIABLE_TYPE_F2:
-                            format = KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_FLOAT_2;
-                            break;
-
-                        case KAN_RPL_META_VARIABLE_TYPE_F3:
-                            format = KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_FLOAT_3;
-                            break;
-
-                        case KAN_RPL_META_VARIABLE_TYPE_F4:
-                            format = KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_FLOAT_4;
-                            break;
-
-                        case KAN_RPL_META_VARIABLE_TYPE_I1:
-                            format = KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_SIGNED_INT_1;
-                            break;
-
-                        case KAN_RPL_META_VARIABLE_TYPE_I2:
-                            format = KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_SIGNED_INT_2;
-                            break;
-
-                        case KAN_RPL_META_VARIABLE_TYPE_I3:
-                            format = KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_SIGNED_INT_3;
-                            break;
-
-                        case KAN_RPL_META_VARIABLE_TYPE_I4:
-                            format = KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_SIGNED_INT_4;
-                            break;
-
-                        case KAN_RPL_META_VARIABLE_TYPE_F3X3:
-                            format = KAN_RENDER_ATTRIBUTE_FORMAT_MATRIX_FLOAT_3_3;
-                            break;
-
-                        case KAN_RPL_META_VARIABLE_TYPE_F4X4:
-                            format = KAN_RENDER_ATTRIBUTE_FORMAT_MATRIX_FLOAT_4_4;
-                            break;
-                        }
-
-                        attributes[attribute_output_index] = (struct kan_render_attribute_description_t) {
-                            .binding = buffer->binding,
-                            .location = attribute->location,
-                            .offset = attribute->offset,
-                            .format = format,
-                        };
-                    }
+                if (loaded->has_instanced_attribute_buffer)
+                {
+                    add_attributes_from_buffer (&loaded->instanced_attribute_buffer, attributes,
+                                                &attribute_output_index);
                 }
             }
 
-            if (loaded->meta.set_material.buffers.size > 0u || loaded->meta.set_material.samplers.size > 0u)
+            if (loaded->set_material.buffers.size > 0u || loaded->set_material.samplers.size > 0u)
             {
                 char name_buffer[KAN_UNIVERSE_RENDER_FOUNDATION_NAME_BUFFER_LENGTH];
                 snprintf (name_buffer, KAN_UNIVERSE_RENDER_FOUNDATION_NAME_BUFFER_LENGTH, "%s[set_material]",
                           family->name);
 
                 family->set_material = kan_render_construct_parameter_set_layout_from_meta (
-                    kan_render_backend_system_get_render_context (state->render_backend_system),
-                    &loaded->meta.set_material, name_buffer, state->description_allocation_group);
+                    kan_render_backend_system_get_render_context (state->render_backend_system), &loaded->set_material,
+                    name_buffer, state->description_allocation_group);
 
                 if (!KAN_HANDLE_IS_VALID (family->set_material))
                 {
@@ -889,15 +896,15 @@ static void recreate_family (struct render_foundation_material_management_execut
                 }
             }
 
-            if (loaded->meta.set_object.buffers.size > 0u || loaded->meta.set_object.samplers.size > 0u)
+            if (loaded->set_object.buffers.size > 0u || loaded->set_object.samplers.size > 0u)
             {
                 char name_buffer[KAN_UNIVERSE_RENDER_FOUNDATION_NAME_BUFFER_LENGTH];
                 snprintf (name_buffer, KAN_UNIVERSE_RENDER_FOUNDATION_NAME_BUFFER_LENGTH, "%s[set_object]",
                           family->name);
 
                 family->set_object = kan_render_construct_parameter_set_layout_from_meta (
-                    kan_render_backend_system_get_render_context (state->render_backend_system),
-                    &loaded->meta.set_object, name_buffer, state->description_allocation_group);
+                    kan_render_backend_system_get_render_context (state->render_backend_system), &loaded->set_object,
+                    name_buffer, state->description_allocation_group);
 
                 if (!KAN_HANDLE_IS_VALID (family->set_object))
                 {
@@ -907,15 +914,15 @@ static void recreate_family (struct render_foundation_material_management_execut
                 }
             }
 
-            if (loaded->meta.set_unstable.buffers.size > 0u || loaded->meta.set_unstable.samplers.size > 0u)
+            if (loaded->set_unstable.buffers.size > 0u || loaded->set_unstable.samplers.size > 0u)
             {
                 char name_buffer[KAN_UNIVERSE_RENDER_FOUNDATION_NAME_BUFFER_LENGTH];
                 snprintf (name_buffer, KAN_UNIVERSE_RENDER_FOUNDATION_NAME_BUFFER_LENGTH, "%s[set_unstable]",
                           family->name);
 
                 family->set_unstable = kan_render_construct_parameter_set_layout_from_meta (
-                    kan_render_backend_system_get_render_context (state->render_backend_system),
-                    &loaded->meta.set_unstable, name_buffer, state->description_allocation_group);
+                    kan_render_backend_system_get_render_context (state->render_backend_system), &loaded->set_unstable,
+                    name_buffer, state->description_allocation_group);
 
                 if (!KAN_HANDLE_IS_VALID (family->set_unstable))
                 {
@@ -940,9 +947,6 @@ static void recreate_family (struct render_foundation_material_management_execut
             {
                 const struct kan_resource_material_pipeline_compiled_t *loaded =
                     KAN_RESOURCE_PROVIDER_CONTAINER_GET (kan_resource_material_pipeline_compiled_t, container);
-
-                // Only classic pipeline are supported by materials right now.
-                KAN_ASSERT (loaded->meta.pipeline_type == KAN_RPL_PIPELINE_TYPE_GRAPHICS_CLASSIC)
 
                 kan_render_code_module_t code_module = KAN_HANDLE_INITIALIZE_INVALID;
                 if (kan_render_get_supported_code_format_flags () & (kan_memory_size_t) (1u << loaded->code_format))
@@ -992,7 +996,7 @@ static void recreate_family (struct render_foundation_material_management_execut
                         }
 
                         enum kan_render_polygon_mode_t polygon_mode = KAN_RENDER_POLYGON_MODE_FILL;
-                        switch (loaded->meta.graphics_classic_settings.polygon_mode)
+                        switch (loaded->pipeline_settings.polygon_mode)
                         {
                         case KAN_RPL_POLYGON_MODE_FILL:
                             polygon_mode = KAN_RENDER_POLYGON_MODE_FILL;
@@ -1004,7 +1008,7 @@ static void recreate_family (struct render_foundation_material_management_execut
                         }
 
                         enum kan_render_cull_mode_t cull_mode = KAN_RENDER_CULL_MODE_BACK;
-                        switch (loaded->meta.graphics_classic_settings.cull_mode)
+                        switch (loaded->pipeline_settings.cull_mode)
                         {
                         case KAN_RPL_CULL_MODE_BACK:
                             cull_mode = KAN_RENDER_CULL_MODE_BACK;
@@ -1018,22 +1022,22 @@ static void recreate_family (struct render_foundation_material_management_execut
                             color_outputs_static[COLOR_OUTPUTS_STATIC_COUNT];
                         struct kan_render_color_output_setup_description_t *color_outputs = NULL;
 
-                        if (loaded->meta.color_outputs.size > 0u)
+                        if (loaded->color_outputs.size > 0u)
                         {
                             color_outputs = color_outputs_static;
-                            if (loaded->meta.color_outputs.size > COLOR_OUTPUTS_STATIC_COUNT)
+                            if (loaded->color_outputs.size > COLOR_OUTPUTS_STATIC_COUNT)
                             {
                                 color_outputs = kan_allocate_general (
                                     state->description_allocation_group,
                                     sizeof (struct kan_render_color_output_setup_description_t) *
-                                        loaded->meta.color_outputs.size,
+                                        loaded->color_outputs.size,
                                     _Alignof (struct kan_render_color_output_setup_description_t));
                             }
 
-                            for (kan_loop_size_t index = 0u; index < loaded->meta.color_outputs.size; ++index)
+                            for (kan_loop_size_t index = 0u; index < loaded->color_outputs.size; ++index)
                             {
                                 struct kan_rpl_meta_color_output_t *color_output =
-                                    &((struct kan_rpl_meta_color_output_t *) loaded->meta.color_outputs.data)[index];
+                                    &((struct kan_rpl_meta_color_output_t *) loaded->color_outputs.data)[index];
 
                                 color_outputs[index] = (struct kan_render_color_output_setup_description_t) {
                                     .use_blend = color_output->use_blend,
@@ -1133,50 +1137,50 @@ static void recreate_family (struct render_foundation_material_management_execut
                             .cull_mode = cull_mode,
                             .use_depth_clamp = KAN_FALSE,
 
-                            .output_setups_count = loaded->meta.color_outputs.size,
+                            .output_setups_count = loaded->color_outputs.size,
                             .output_setups = color_outputs,
 
-                            .blend_constant_r = loaded->meta.color_blend_constant_r,
-                            .blend_constant_g = loaded->meta.color_blend_constant_g,
-                            .blend_constant_b = loaded->meta.color_blend_constant_b,
-                            .blend_constant_a = loaded->meta.color_blend_constant_a,
+                            .blend_constant_r = loaded->color_blend_constants.r,
+                            .blend_constant_g = loaded->color_blend_constants.g,
+                            .blend_constant_b = loaded->color_blend_constants.b,
+                            .blend_constant_a = loaded->color_blend_constants.a,
 
-                            .depth_test_enabled = loaded->meta.graphics_classic_settings.depth_test,
-                            .depth_write_enabled = loaded->meta.graphics_classic_settings.depth_write,
-                            .depth_bounds_test_enabled = loaded->meta.graphics_classic_settings.depth_bounds_test,
-                            .depth_compare_operation = convert_compare_operation (
-                                loaded->meta.graphics_classic_settings.depth_compare_operation),
-                            .min_depth = loaded->meta.graphics_classic_settings.depth_min,
-                            .max_depth = loaded->meta.graphics_classic_settings.depth_max,
+                            .depth_test_enabled = loaded->pipeline_settings.depth_test,
+                            .depth_write_enabled = loaded->pipeline_settings.depth_write,
+                            .depth_bounds_test_enabled = loaded->pipeline_settings.depth_bounds_test,
+                            .depth_compare_operation =
+                                convert_compare_operation (loaded->pipeline_settings.depth_compare_operation),
+                            .min_depth = loaded->pipeline_settings.depth_min,
+                            .max_depth = loaded->pipeline_settings.depth_max,
 
-                            .stencil_test_enabled = loaded->meta.graphics_classic_settings.stencil_test,
+                            .stencil_test_enabled = loaded->pipeline_settings.stencil_test,
                             .stencil_front =
                                 {
-                                    .on_fail = convert_stencil_operation (
-                                        loaded->meta.graphics_classic_settings.stencil_front_on_fail),
+                                    .on_fail =
+                                        convert_stencil_operation (loaded->pipeline_settings.stencil_front_on_fail),
                                     .on_depth_fail = convert_stencil_operation (
-                                        loaded->meta.graphics_classic_settings.stencil_front_on_depth_fail),
-                                    .on_pass = convert_stencil_operation (
-                                        loaded->meta.graphics_classic_settings.stencil_front_on_pass),
-                                    .compare = convert_compare_operation (
-                                        loaded->meta.graphics_classic_settings.stencil_front_compare),
-                                    .compare_mask = loaded->meta.graphics_classic_settings.stencil_front_compare_mask,
-                                    .write_mask = loaded->meta.graphics_classic_settings.stencil_front_write_mask,
-                                    .reference = loaded->meta.graphics_classic_settings.stencil_front_reference,
+                                        loaded->pipeline_settings.stencil_front_on_depth_fail),
+                                    .on_pass =
+                                        convert_stencil_operation (loaded->pipeline_settings.stencil_front_on_pass),
+                                    .compare =
+                                        convert_compare_operation (loaded->pipeline_settings.stencil_front_compare),
+                                    .compare_mask = loaded->pipeline_settings.stencil_front_compare_mask,
+                                    .write_mask = loaded->pipeline_settings.stencil_front_write_mask,
+                                    .reference = loaded->pipeline_settings.stencil_front_reference,
                                 },
                             .stencil_back =
                                 {
-                                    .on_fail = convert_stencil_operation (
-                                        loaded->meta.graphics_classic_settings.stencil_back_on_fail),
+                                    .on_fail =
+                                        convert_stencil_operation (loaded->pipeline_settings.stencil_back_on_fail),
                                     .on_depth_fail = convert_stencil_operation (
-                                        loaded->meta.graphics_classic_settings.stencil_back_on_depth_fail),
-                                    .on_pass = convert_stencil_operation (
-                                        loaded->meta.graphics_classic_settings.stencil_back_on_pass),
-                                    .compare = convert_compare_operation (
-                                        loaded->meta.graphics_classic_settings.stencil_back_compare),
-                                    .compare_mask = loaded->meta.graphics_classic_settings.stencil_back_compare_mask,
-                                    .write_mask = loaded->meta.graphics_classic_settings.stencil_back_write_mask,
-                                    .reference = loaded->meta.graphics_classic_settings.stencil_back_reference,
+                                        loaded->pipeline_settings.stencil_back_on_depth_fail),
+                                    .on_pass =
+                                        convert_stencil_operation (loaded->pipeline_settings.stencil_back_on_pass),
+                                    .compare =
+                                        convert_compare_operation (loaded->pipeline_settings.stencil_back_compare),
+                                    .compare_mask = loaded->pipeline_settings.stencil_back_compare_mask,
+                                    .write_mask = loaded->pipeline_settings.stencil_back_write_mask,
+                                    .reference = loaded->pipeline_settings.stencil_back_reference,
                                 },
 
                             .code_modules_count = 1u,
@@ -1194,7 +1198,7 @@ static void recreate_family (struct render_foundation_material_management_execut
                         {
                             kan_free_general (state->description_allocation_group, color_outputs,
                                               sizeof (struct kan_render_color_output_setup_description_t) *
-                                                  loaded->meta.color_outputs.size);
+                                                  loaded->color_outputs.size);
                         }
 
                         if (code_module_usage.entry_points && code_module_usage.entry_points != entry_points_static)
@@ -1339,8 +1343,6 @@ static void reload_material_from_family (struct render_foundation_material_manag
         KAN_MUTE_THIRD_PARTY_WARNINGS_END
     }
 
-    kan_rpl_meta_shutdown (&loaded->family_meta);
-
     KAN_UP_VALUE_READ (family_request, kan_resource_request_t, request_id, &family->request_id)
     {
         KAN_ASSERT (KAN_TYPED_ID_32_IS_VALID (family_request->provided_container_id))
@@ -1350,7 +1352,39 @@ static void reload_material_from_family (struct render_foundation_material_manag
         {
             const struct kan_resource_material_pipeline_family_compiled_t *family_data =
                 KAN_RESOURCE_PROVIDER_CONTAINER_GET (kan_resource_material_pipeline_family_compiled_t, container);
-            kan_rpl_meta_init_copy (&loaded->family_meta, &family_data->meta);
+
+            for (kan_loop_size_t index = 0u; index < loaded->vertex_attribute_buffers.size; ++index)
+            {
+                kan_rpl_meta_buffer_shutdown (
+                    &((struct kan_rpl_meta_buffer_t *) loaded->vertex_attribute_buffers.data)[index]);
+            }
+
+            loaded->vertex_attribute_buffers.size = 0u;
+            kan_rpl_meta_buffer_shutdown (&loaded->instanced_attribute_buffer);
+            kan_rpl_meta_set_bindings_shutdown (&loaded->set_material_bindings);
+            kan_rpl_meta_set_bindings_shutdown (&loaded->set_object_bindings);
+            kan_rpl_meta_set_bindings_shutdown (&loaded->set_unstable_bindings);
+
+            kan_dynamic_array_set_capacity (&loaded->vertex_attribute_buffers,
+                                            family_data->vertex_attribute_buffers.size);
+
+            for (kan_loop_size_t index = 0u; index < family_data->vertex_attribute_buffers.size; ++index)
+            {
+                const struct kan_rpl_meta_buffer_t *source =
+                    &((struct kan_rpl_meta_buffer_t *) family_data->vertex_attribute_buffers.data)[index];
+
+                struct kan_rpl_meta_buffer_t *target = kan_dynamic_array_add_last (&loaded->vertex_attribute_buffers);
+                KAN_ASSERT (target)
+                kan_rpl_meta_buffer_init_copy (target, source);
+            }
+
+            loaded->has_instanced_attribute_buffer = family_data->has_instanced_attribute_buffer;
+            kan_rpl_meta_buffer_init_copy (&loaded->instanced_attribute_buffer,
+                                           &family_data->instanced_attribute_buffer);
+
+            kan_rpl_meta_set_bindings_init_copy (&loaded->set_material_bindings, &family_data->set_material);
+            kan_rpl_meta_set_bindings_init_copy (&loaded->set_object_bindings, &family_data->set_object);
+            kan_rpl_meta_set_bindings_init_copy (&loaded->set_unstable_bindings, &family_data->set_unstable);
             KAN_UP_QUERY_RETURN_VOID;
         }
     }
@@ -1890,11 +1924,30 @@ void kan_render_material_loaded_init (struct kan_render_material_loaded_t *insta
     instance->set_unstable = KAN_HANDLE_SET_INVALID (kan_render_pipeline_parameter_set_layout_t);
     kan_dynamic_array_init (&instance->pipelines, 0u, sizeof (struct kan_render_material_loaded_pipeline_t),
                             _Alignof (struct kan_render_material_loaded_pipeline_t), kan_allocation_group_stack_get ());
-    kan_rpl_meta_init (&instance->family_meta);
+
+    kan_dynamic_array_init (&instance->vertex_attribute_buffers, 0u, sizeof (struct kan_rpl_meta_buffer_t),
+                            _Alignof (struct kan_rpl_meta_buffer_t), kan_allocation_group_stack_get ());
+
+    instance->has_instanced_attribute_buffer = KAN_FALSE;
+    kan_rpl_meta_buffer_init (&instance->instanced_attribute_buffer);
+
+    kan_rpl_meta_set_bindings_init (&instance->set_material_bindings);
+    kan_rpl_meta_set_bindings_init (&instance->set_object_bindings);
+    kan_rpl_meta_set_bindings_init (&instance->set_unstable_bindings);
 }
 
 void kan_render_material_loaded_shutdown (struct kan_render_material_loaded_t *instance)
 {
+    for (kan_loop_size_t index = 0u; index < instance->vertex_attribute_buffers.size; ++index)
+    {
+        kan_rpl_meta_buffer_shutdown (
+            &((struct kan_rpl_meta_buffer_t *) instance->vertex_attribute_buffers.data)[index]);
+    }
+
     kan_dynamic_array_shutdown (&instance->pipelines);
-    kan_rpl_meta_shutdown (&instance->family_meta);
+    kan_dynamic_array_shutdown (&instance->vertex_attribute_buffers);
+    kan_rpl_meta_buffer_shutdown (&instance->instanced_attribute_buffer);
+    kan_rpl_meta_set_bindings_shutdown (&instance->set_material_bindings);
+    kan_rpl_meta_set_bindings_shutdown (&instance->set_object_bindings);
+    kan_rpl_meta_set_bindings_shutdown (&instance->set_unstable_bindings);
 }

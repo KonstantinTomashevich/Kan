@@ -325,20 +325,16 @@ static void try_render_frame (struct test_render_material_state_t *state,
             kan_render_pass_instance_pipeline_parameter_sets (pass_allocation->pass_instance, KAN_RPL_SET_MATERIAL, 1u,
                                                               &material_instance->data.parameter_set);
 
-            // Only one attribute buffer and only one instanced attribute buffer for the sake of simplicity.
-            KAN_ASSERT (material->family_meta.attribute_buffers.size == 2u)
+            // Only one vertex attribute buffer for the sake of simplicity.
+            KAN_ASSERT (material->vertex_attribute_buffers.size == 1u)
+            KAN_ASSERT (material->has_instanced_attribute_buffer)
 
             struct kan_rpl_meta_buffer_t *expected_attribute_buffer =
-                &((struct kan_rpl_meta_buffer_t *) material->family_meta.attribute_buffers.data)[0u];
+                &((struct kan_rpl_meta_buffer_t *) material->vertex_attribute_buffers.data)[0u];
             KAN_ASSERT (expected_attribute_buffer->type == KAN_RPL_BUFFER_TYPE_VERTEX_ATTRIBUTE)
 
-            struct kan_rpl_meta_buffer_t *expected_instanced_buffer =
-                &((struct kan_rpl_meta_buffer_t *) material->family_meta.attribute_buffers.data)[1u];
-            KAN_ASSERT (expected_instanced_buffer->type == KAN_RPL_BUFFER_TYPE_INSTANCED_ATTRIBUTE)
-            KAN_ASSERT (expected_instanced_buffer->binding == expected_attribute_buffer->binding + 1u)
-
             struct kan_render_allocated_slice_t allocation = kan_render_frame_lifetime_buffer_allocator_allocate (
-                singleton->instanced_data_allocator, expected_instanced_buffer->main_size,
+                singleton->instanced_data_allocator, material->instanced_attribute_buffer.main_size,
                 _Alignof (struct kan_float_matrix_4x4_t));
             KAN_ASSERT (KAN_HANDLE_IS_VALID (allocation.buffer))
 
@@ -347,9 +343,9 @@ static void try_render_frame (struct test_render_material_state_t *state,
             kan_transform_3_to_float_matrix_4x4 (&box_transform, &box_transform_matrix);
 
             void *instanced_data = kan_render_buffer_patch (allocation.buffer, allocation.slice_offset,
-                                                            expected_instanced_buffer->main_size);
-            memcpy (instanced_data, material_instance->data.combined_instanced_data.data,
-                    expected_instanced_buffer->main_size);
+                                                            material->instanced_attribute_buffer.main_size);
+            memcpy (instanced_data, material_instance->data.instanced_data.data,
+                    material->instanced_attribute_buffer.main_size);
             // For the sake of the simple example, we just assume that model matrix is the first field.
             memcpy (instanced_data, &box_transform_matrix, sizeof (box_transform_matrix));
 
@@ -362,6 +358,13 @@ static void try_render_frame (struct test_render_material_state_t *state,
 
             kan_render_pass_instance_indices (pass_allocation->pass_instance, singleton->index_buffer);
             kan_render_pass_instance_draw (pass_allocation->pass_instance, 0u, singleton->index_count, 0u);
+
+            if (!singleton->frame_checked)
+            {
+                KAN_LOG (application_framework_example_test_render_material, KAN_LOG_INFO,
+                         "First frame to render index %u.", (unsigned) singleton->test_frames_count)
+            }
+
             singleton->frame_checked = KAN_TRUE;
         }
     }
@@ -545,12 +548,14 @@ APPLICATION_FRAMEWORK_EXAMPLES_TEST_RENDER_MATERIAL_API void kan_universe_mutato
             }
         }
 
+        ++singleton->test_frames_count;
         if (state->test_mode)
         {
-            if (30u < ++singleton->test_frames_count)
+            if (30u < singleton->test_frames_count || singleton->frame_checked)
             {
                 KAN_LOG (application_framework_example_test_render_material, KAN_LOG_INFO,
                          "Shutting down in test mode...")
+
                 if (!singleton->frame_checked)
                 {
                     KAN_LOG (application_framework_example_test_render_material, KAN_LOG_ERROR,

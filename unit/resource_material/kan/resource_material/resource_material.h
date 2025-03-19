@@ -109,7 +109,18 @@ RESOURCE_MATERIAL_API kan_bool_t kan_resource_material_platform_configuration_is
 /// \brief Contains compiled data of pipeline family -- meta that describes common input pattern for pipelines.
 struct kan_resource_material_pipeline_family_compiled_t
 {
-    struct kan_rpl_meta_t meta;
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_meta_buffer_t)
+    struct kan_dynamic_array_t vertex_attribute_buffers;
+
+    kan_bool_t has_instanced_attribute_buffer;
+
+    KAN_REFLECTION_VISIBILITY_CONDITION_FIELD (has_instanced_attribute_buffer)
+    KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (KAN_TRUE)
+    struct kan_rpl_meta_buffer_t instanced_attribute_buffer;
+
+    struct kan_rpl_meta_set_bindings_t set_material;
+    struct kan_rpl_meta_set_bindings_t set_object;
+    struct kan_rpl_meta_set_bindings_t set_unstable;
 };
 
 RESOURCE_MATERIAL_API void kan_resource_material_pipeline_family_compiled_init (
@@ -118,7 +129,7 @@ RESOURCE_MATERIAL_API void kan_resource_material_pipeline_family_compiled_init (
 RESOURCE_MATERIAL_API void kan_resource_material_pipeline_family_compiled_shutdown (
     struct kan_resource_material_pipeline_family_compiled_t *instance);
 
-/// \brief Contains compiled data for one pipeline -- its entry points, meta and code.
+/// \brief Contains compiled data for one pipeline -- its entry points, pipeline specific meta and code.
 struct kan_resource_material_pipeline_compiled_t
 {
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_entry_point_t)
@@ -126,9 +137,12 @@ struct kan_resource_material_pipeline_compiled_t
 
     enum kan_render_code_format_t code_format;
 
-    /// \details Attribute buffers and pipeline parameter sets are excluded as
-    ///          they should be the same for the whole material.
-    struct kan_rpl_meta_t meta;
+    struct kan_rpl_graphics_classic_pipeline_settings_t pipeline_settings;
+
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_meta_color_output_t)
+    struct kan_dynamic_array_t color_outputs;
+
+    struct kan_rpl_color_blend_constants_t color_blend_constants;
 
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (uint8_t)
     struct kan_dynamic_array_t code;

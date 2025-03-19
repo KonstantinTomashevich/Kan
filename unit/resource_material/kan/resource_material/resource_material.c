@@ -730,7 +730,10 @@ static enum kan_resource_compile_result_t kan_resource_material_pipeline_family_
         return KAN_RESOURCE_PIPELINE_COMPILE_FAILED;
     }
 
-    if (!kan_rpl_compiler_instance_emit_meta (compiler_instance, &output->meta, KAN_RPL_META_EMISSION_FULL))
+    struct kan_rpl_meta_t meta;
+    kan_rpl_meta_init (&meta);
+
+    if (!kan_rpl_compiler_instance_emit_meta (compiler_instance, &meta, KAN_RPL_META_EMISSION_FULL))
     {
         kan_rpl_compiler_instance_destroy (compiler_instance);
         kan_rpl_compiler_context_destroy (compiler_context);
@@ -742,18 +745,72 @@ static enum kan_resource_compile_result_t kan_resource_material_pipeline_family_
 
     kan_rpl_compiler_instance_destroy (compiler_instance);
     kan_rpl_compiler_context_destroy (compiler_context);
+    kan_bool_t meta_valid = KAN_TRUE;
 
-    if (output->meta.set_pass.buffers.size > 0u || output->meta.set_pass.samplers.size > 0u)
+    if (meta.set_pass.buffers.size > 0u || meta.set_pass.samplers.size > 0u)
     {
         KAN_LOG (
             resource_material_compilation, KAN_LOG_ERROR,
             "Produced incorrect meta for \"%s\" (material \"%s\"): meta has entries in pass set, but it should've been "
             "compiled from pass-agnostic sources. That means that source list contains pass set, but it shouldn't.",
             state->name, input->source_material)
-        return KAN_RESOURCE_PIPELINE_COMPILE_FAILED;
+        meta_valid = KAN_FALSE;
     }
 
-    return KAN_RESOURCE_PIPELINE_COMPILE_FINISHED;
+    kan_dynamic_array_set_capacity (&output->vertex_attribute_buffers, meta.attribute_buffers.size);
+    for (kan_loop_size_t index = 0u; index < meta.attribute_buffers.size; ++index)
+    {
+        const struct kan_rpl_meta_buffer_t *source =
+            &((struct kan_rpl_meta_buffer_t *) meta.attribute_buffers.data)[index];
+
+        switch (source->type)
+        {
+        case KAN_RPL_BUFFER_TYPE_VERTEX_ATTRIBUTE:
+        {
+            struct kan_rpl_meta_buffer_t *target = kan_dynamic_array_add_last (&output->vertex_attribute_buffers);
+            KAN_ASSERT (target)
+            kan_rpl_meta_buffer_init_copy (target, source);
+            break;
+        }
+
+        case KAN_RPL_BUFFER_TYPE_INSTANCED_ATTRIBUTE:
+            if (output->has_instanced_attribute_buffer)
+            {
+                KAN_LOG (resource_material_compilation, KAN_LOG_ERROR,
+                         "Produced incorrect meta for \"%s\" (material \"%s\"): meta has several instanced attribute "
+                         "buffers, but it is not supported by materials right now.",
+                         state->name, input->source_material)
+                meta_valid = KAN_FALSE;
+            }
+            else
+            {
+                output->has_instanced_attribute_buffer = KAN_TRUE;
+                kan_rpl_meta_buffer_shutdown (&output->instanced_attribute_buffer);
+                kan_rpl_meta_buffer_init_copy (&output->instanced_attribute_buffer, source);
+            }
+
+            break;
+
+        case KAN_RPL_BUFFER_TYPE_UNIFORM:
+        case KAN_RPL_BUFFER_TYPE_READ_ONLY_STORAGE:
+        case KAN_RPL_BUFFER_TYPE_VERTEX_STAGE_OUTPUT:
+        case KAN_RPL_BUFFER_TYPE_FRAGMENT_STAGE_OUTPUT:
+            KAN_ASSERT (KAN_FALSE)
+            break;
+        }
+    }
+
+    kan_rpl_meta_set_bindings_shutdown (&output->set_material);
+    kan_rpl_meta_set_bindings_init_copy (&output->set_material, &meta.set_material);
+
+    kan_rpl_meta_set_bindings_shutdown (&output->set_object);
+    kan_rpl_meta_set_bindings_init_copy (&output->set_object, &meta.set_object);
+
+    kan_rpl_meta_set_bindings_shutdown (&output->set_unstable);
+    kan_rpl_meta_set_bindings_init_copy (&output->set_unstable, &meta.set_unstable);
+
+    kan_rpl_meta_shutdown (&meta);
+    return meta_valid ? KAN_RESOURCE_PIPELINE_COMPILE_FINISHED : KAN_RESOURCE_PIPELINE_COMPILE_FAILED;
 }
 
 static enum kan_resource_compile_result_t kan_resource_material_pipeline_compile (
@@ -854,12 +911,16 @@ static enum kan_resource_compile_result_t kan_resource_material_pipeline_compile
         return KAN_RESOURCE_PIPELINE_COMPILE_FAILED;
     }
 
+    struct kan_rpl_meta_t meta;
+    kan_rpl_meta_init (&meta);
+
     if (!kan_rpl_compiler_instance_emit_meta (
-            compiler_instance, &output->meta,
-            KAN_RPL_META_EMISSION_SKIP_ATTRIBUTE_BUFFERS | KAN_RPL_META_EMISSION_SKIP_SETS))
+            compiler_instance, &meta, KAN_RPL_META_EMISSION_SKIP_ATTRIBUTE_BUFFERS | KAN_RPL_META_EMISSION_SKIP_SETS))
     {
         kan_rpl_compiler_instance_destroy (compiler_instance);
         kan_rpl_compiler_context_destroy (compiler_context);
+        kan_rpl_meta_shutdown (&meta);
+
         KAN_LOG (resource_material_compilation, KAN_LOG_ERROR,
                  "Failed to resolve meta for \"%s\" (material \"%s\", pass \"%s\", variant %lu): failed to emit meta.",
                  state->name, input->source_material, input->source_pass,
@@ -867,7 +928,28 @@ static enum kan_resource_compile_result_t kan_resource_material_pipeline_compile
         return KAN_RESOURCE_PIPELINE_COMPILE_FAILED;
     }
 
+    if (meta.pipeline_type != KAN_RPL_PIPELINE_TYPE_GRAPHICS_CLASSIC)
+    {
+        kan_rpl_compiler_instance_destroy (compiler_instance);
+        kan_rpl_compiler_context_destroy (compiler_context);
+        kan_rpl_meta_shutdown (&meta);
+
+        KAN_LOG (resource_material_compilation, KAN_LOG_ERROR,
+                 "Failed to resolve meta for \"%s\" (material \"%s\", pass \"%s\", variant %lu): pipeline type is not "
+                 "graphics classic, other types are not supported.",
+                 state->name, input->source_material, input->source_pass,
+                 (unsigned long) input->source_pass_variant_index)
+        return KAN_RESOURCE_PIPELINE_COMPILE_FAILED;
+    }
+
+    output->pipeline_settings = meta.graphics_classic_settings;
+    kan_dynamic_array_shutdown (&output->color_outputs);
+    kan_dynamic_array_init_move (&output->color_outputs, &meta.color_outputs);
+    output->color_blend_constants = meta.color_blend_constants;
+
+    kan_rpl_meta_shutdown (&meta);
     kan_bool_t emit_result = KAN_FALSE;
+
     switch (configuration->code_format)
     {
     case KAN_RENDER_CODE_FORMAT_SPIRV:
@@ -985,12 +1067,54 @@ kan_bool_t kan_resource_material_platform_configuration_is_pass_supported (
     return KAN_TRUE;
 }
 
+void kan_resource_material_pipeline_family_compiled_init (
+    struct kan_resource_material_pipeline_family_compiled_t *instance)
+{
+    kan_dynamic_array_init (&instance->vertex_attribute_buffers, 0u, sizeof (struct kan_rpl_meta_buffer_t),
+                            _Alignof (struct kan_rpl_meta_buffer_t), kan_allocation_group_stack_get ());
+
+    instance->has_instanced_attribute_buffer = KAN_FALSE;
+    kan_rpl_meta_buffer_init (&instance->instanced_attribute_buffer);
+
+    kan_rpl_meta_set_bindings_init (&instance->set_material);
+    kan_rpl_meta_set_bindings_init (&instance->set_object);
+    kan_rpl_meta_set_bindings_init (&instance->set_unstable);
+}
+
+void kan_resource_material_pipeline_family_compiled_shutdown (
+    struct kan_resource_material_pipeline_family_compiled_t *instance)
+{
+    for (kan_loop_size_t index = 0u; index < instance->vertex_attribute_buffers.size; ++index)
+    {
+        kan_rpl_meta_buffer_shutdown (
+            &((struct kan_rpl_meta_buffer_t *) instance->vertex_attribute_buffers.data)[index]);
+    }
+
+    kan_dynamic_array_shutdown (&instance->vertex_attribute_buffers);
+    kan_rpl_meta_buffer_shutdown (&instance->instanced_attribute_buffer);
+    kan_rpl_meta_set_bindings_shutdown (&instance->set_material);
+    kan_rpl_meta_set_bindings_shutdown (&instance->set_object);
+    kan_rpl_meta_set_bindings_shutdown (&instance->set_unstable);
+}
+
 void kan_resource_material_pipeline_compiled_init (struct kan_resource_material_pipeline_compiled_t *instance)
 {
     kan_dynamic_array_init (&instance->entry_points, 0u, sizeof (struct kan_rpl_entry_point_t),
                             _Alignof (struct kan_rpl_entry_point_t), kan_allocation_group_stack_get ());
+
     instance->code_format = KAN_RENDER_CODE_FORMAT_SPIRV;
-    kan_rpl_meta_init (&instance->meta);
+    instance->pipeline_settings = kan_rpl_graphics_classic_pipeline_settings_default ();
+
+    kan_dynamic_array_init (&instance->color_outputs, 0u, sizeof (struct kan_rpl_meta_color_output_t),
+                            _Alignof (struct kan_rpl_meta_color_output_t), kan_allocation_group_stack_get ());
+
+    instance->color_blend_constants = (struct kan_rpl_color_blend_constants_t) {
+        .r = 0.0f,
+        .g = 0.0f,
+        .b = 0.0f,
+        .a = 0.0f,
+    };
+
     kan_dynamic_array_init (&instance->code, 0u, sizeof (uint8_t), _Alignof (uint8_t),
                             kan_allocation_group_stack_get ());
 }
@@ -998,20 +1122,8 @@ void kan_resource_material_pipeline_compiled_init (struct kan_resource_material_
 void kan_resource_material_pipeline_compiled_shutdown (struct kan_resource_material_pipeline_compiled_t *instance)
 {
     kan_dynamic_array_shutdown (&instance->entry_points);
-    kan_rpl_meta_shutdown (&instance->meta);
+    kan_dynamic_array_shutdown (&instance->color_outputs);
     kan_dynamic_array_shutdown (&instance->code);
-}
-
-void kan_resource_material_pipeline_family_compiled_init (
-    struct kan_resource_material_pipeline_family_compiled_t *instance)
-{
-    kan_rpl_meta_init (&instance->meta);
-}
-
-void kan_resource_material_pipeline_family_compiled_shutdown (
-    struct kan_resource_material_pipeline_family_compiled_t *instance)
-{
-    kan_rpl_meta_shutdown (&instance->meta);
 }
 
 void kan_resource_material_compiled_init (struct kan_resource_material_compiled_t *instance)
