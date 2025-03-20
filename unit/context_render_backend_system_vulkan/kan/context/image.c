@@ -207,25 +207,19 @@ void kan_render_image_upload_data (kan_render_image_t image, uint8_t mip, vulkan
         return;
     }
 
-    void *staging_memory;
-    if (vmaMapMemory (image_data->system->gpu_memory_allocator, staging_allocation.buffer->allocation,
-                      &staging_memory) != VK_SUCCESS)
+    KAN_ASSERT (staging_allocation.buffer->mapped_memory)
+    memcpy (((uint8_t *) staging_allocation.buffer->mapped_memory) + staging_allocation.offset, data, allocation_size);
+
+    if (staging_allocation.buffer->needs_flush)
     {
-        kan_error_critical (
-            "Unexpected failure while mapping staging buffer memory for image upload, unable to continue properly.",
-            __FILE__, __LINE__);
+        if (vmaFlushAllocation (image_data->system->gpu_memory_allocator, staging_allocation.buffer->allocation,
+                                staging_allocation.offset, allocation_size) != VK_SUCCESS)
+        {
+            kan_error_critical ("Unexpected failure while flushing buffer data, unable to continue properly.", __FILE__,
+                                __LINE__);
+        }
     }
 
-    if (!staging_memory)
-    {
-        KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR,
-                 "Failed to upload image \"%s\" mip %lu: unable to patch acquired staging memory.",
-                 image_data->description.tracking_name, (unsigned long) mip)
-        kan_cpu_section_execution_shutdown (&execution);
-        return;
-    }
-
-    memcpy (((uint8_t *) staging_memory) + staging_allocation.offset, data, allocation_size);
     struct render_backend_schedule_state_t *schedule =
         render_backend_system_get_schedule_for_memory (image_data->system);
     kan_atomic_int_lock (&schedule->schedule_lock);

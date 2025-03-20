@@ -133,9 +133,9 @@ struct render_backend_descriptor_set_allocation_t
     struct render_backend_descriptor_set_pool_t *source_pool;
 };
 
-struct scheduled_buffer_unmap_flush_transfer_t
+struct scheduled_buffer_flush_transfer_t
 {
-    struct scheduled_buffer_unmap_flush_transfer_t *next;
+    struct scheduled_buffer_flush_transfer_t *next;
     struct render_backend_buffer_t *source_buffer;
     struct render_backend_buffer_t *target_buffer;
     vulkan_size_t source_offset;
@@ -143,9 +143,9 @@ struct scheduled_buffer_unmap_flush_transfer_t
     vulkan_size_t size;
 };
 
-struct scheduled_buffer_unmap_flush_t
+struct scheduled_buffer_flush_t
 {
-    struct scheduled_buffer_unmap_flush_t *next;
+    struct scheduled_buffer_flush_t *next;
     struct render_backend_buffer_t *buffer;
     vulkan_size_t offset;
     vulkan_size_t size;
@@ -311,8 +311,8 @@ struct render_backend_schedule_state_t
     /// \brief Common lock for submitting scheduled operations.
     struct kan_atomic_int_t schedule_lock;
 
-    struct scheduled_buffer_unmap_flush_transfer_t *first_scheduled_buffer_unmap_flush_transfer;
-    struct scheduled_buffer_unmap_flush_t *first_scheduled_buffer_unmap_flush;
+    struct scheduled_buffer_flush_transfer_t *first_scheduled_buffer_flush_transfer;
+    struct scheduled_buffer_flush_t *first_scheduled_buffer_flush;
     struct scheduled_image_upload_t *first_scheduled_image_upload;
     struct scheduled_frame_buffer_create_t *first_scheduled_frame_buffer_create;
     struct scheduled_image_mip_generation_t *first_scheduled_image_mip_generation;
@@ -611,8 +611,10 @@ struct render_backend_buffer_t
     VmaAllocation allocation;
     enum render_backend_buffer_family_t family;
     enum kan_render_buffer_type_t type;
+    void *mapped_memory;
     vulkan_size_t full_size;
     kan_interned_string_t tracking_name;
+    kan_bool_t needs_flush;
 
 #if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_PROFILE_MEMORY)
     kan_allocation_group_t device_allocation_group;
@@ -1013,6 +1015,8 @@ struct render_backend_system_t
 
     struct kan_render_supported_devices_t *supported_devices;
     struct kan_render_supported_device_info_t *selected_device_info;
+
+    VkPhysicalDeviceMemoryProperties selected_device_memory_properties;
 
 #if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_PROFILE_MEMORY)
     struct memory_profiling_t memory_profiling;

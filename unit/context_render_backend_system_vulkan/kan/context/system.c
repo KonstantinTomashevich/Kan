@@ -695,26 +695,6 @@ void render_backend_system_destroy (kan_context_system_t handle)
             detached_image_destroy = detached_image_destroy->next;
         }
 
-        // We need to unmap scheduled uploads.
-        struct scheduled_buffer_unmap_flush_transfer_t *buffer_unmap_flush_transfer =
-            schedule->first_scheduled_buffer_unmap_flush_transfer;
-        schedule->first_scheduled_buffer_unmap_flush_transfer = NULL;
-
-        while (buffer_unmap_flush_transfer)
-        {
-            vmaUnmapMemory (system->gpu_memory_allocator, buffer_unmap_flush_transfer->source_buffer->allocation);
-            buffer_unmap_flush_transfer = buffer_unmap_flush_transfer->next;
-        }
-
-        struct scheduled_buffer_unmap_flush_t *buffer_unmap_flush = schedule->first_scheduled_buffer_unmap_flush;
-        schedule->first_scheduled_buffer_unmap_flush = NULL;
-
-        while (buffer_unmap_flush)
-        {
-            vmaUnmapMemory (system->gpu_memory_allocator, buffer_unmap_flush->buffer->allocation);
-            buffer_unmap_flush = buffer_unmap_flush->next;
-        }
-
         struct render_backend_read_back_status_t *status = schedule->first_read_back_status;
         while (status)
         {
@@ -1316,8 +1296,8 @@ kan_bool_t kan_render_backend_system_select_device (kan_context_system_t render_
                                         KAN_CONTEXT_RENDER_BACKEND_VULKAN_SCHEDULE_STACK_SIZE);
         state->schedule_lock = kan_atomic_int_init (0);
 
-        state->first_scheduled_buffer_unmap_flush_transfer = NULL;
-        state->first_scheduled_buffer_unmap_flush = NULL;
+        state->first_scheduled_buffer_flush_transfer = NULL;
+        state->first_scheduled_buffer_flush = NULL;
         state->first_scheduled_image_upload = NULL;
         state->first_scheduled_frame_buffer_create = NULL;
         state->first_scheduled_image_mip_generation = NULL;
@@ -1349,6 +1329,7 @@ kan_bool_t kan_render_backend_system_select_device (kan_context_system_t render_
         kan_string_intern ("default_staging_buffer"));
 
     system->selected_device_info = device_info;
+    vkGetPhysicalDeviceMemoryProperties (physical_device, &system->selected_device_memory_properties);
     return KAN_TRUE;
 }
 
@@ -1390,34 +1371,34 @@ static void render_backend_system_submit_transfer (struct render_backend_system_
     DEBUG_LABEL_SCOPE_BEGIN (state->primary_command_buffer, "buffer_transfer", DEBUG_LABEL_COLOR_PASS)
 
     struct render_backend_schedule_state_t *schedule = &system->schedule_states[system->current_frame_in_flight_index];
-    struct scheduled_buffer_unmap_flush_transfer_t *buffer_unmap_flush_transfer =
-        schedule->first_scheduled_buffer_unmap_flush_transfer;
-    schedule->first_scheduled_buffer_unmap_flush_transfer = NULL;
+    struct scheduled_buffer_flush_transfer_t *buffer_flush_transfer = schedule->first_scheduled_buffer_flush_transfer;
+    schedule->first_scheduled_buffer_flush_transfer = NULL;
 
-    while (buffer_unmap_flush_transfer)
+    while (buffer_flush_transfer)
     {
-        vmaUnmapMemory (system->gpu_memory_allocator, buffer_unmap_flush_transfer->source_buffer->allocation);
-        if (vmaFlushAllocation (system->gpu_memory_allocator, buffer_unmap_flush_transfer->source_buffer->allocation,
-                                buffer_unmap_flush_transfer->source_offset,
-                                buffer_unmap_flush_transfer->size) != VK_SUCCESS)
+        if (buffer_flush_transfer->source_buffer->needs_flush)
         {
-            kan_error_critical ("Unexpected failure while flushing buffer data, unable to continue properly.", __FILE__,
-                                __LINE__);
+            if (vmaFlushAllocation (system->gpu_memory_allocator, buffer_flush_transfer->source_buffer->allocation,
+                                    buffer_flush_transfer->source_offset, buffer_flush_transfer->size) != VK_SUCCESS)
+            {
+                kan_error_critical ("Unexpected failure while flushing buffer data, unable to continue properly.",
+                                    __FILE__, __LINE__);
+            }
         }
 
         struct VkBufferCopy region = {
-            .srcOffset = buffer_unmap_flush_transfer->source_offset,
-            .dstOffset = buffer_unmap_flush_transfer->target_offset,
-            .size = buffer_unmap_flush_transfer->size,
+            .srcOffset = buffer_flush_transfer->source_offset,
+            .dstOffset = buffer_flush_transfer->target_offset,
+            .size = buffer_flush_transfer->size,
         };
 
-        vkCmdCopyBuffer (state->primary_command_buffer, buffer_unmap_flush_transfer->source_buffer->buffer,
-                         buffer_unmap_flush_transfer->target_buffer->buffer, 1u, &region);
+        vkCmdCopyBuffer (state->primary_command_buffer, buffer_flush_transfer->source_buffer->buffer,
+                         buffer_flush_transfer->target_buffer->buffer, 1u, &region);
 
         VkAccessFlags destination_access_flags = 0u;
         VkPipelineStageFlags destination_stage = 0u;
 
-        switch (buffer_unmap_flush_transfer->target_buffer->type)
+        switch (buffer_flush_transfer->target_buffer->type)
         {
         case KAN_RENDER_BUFFER_TYPE_ATTRIBUTE:
             destination_access_flags |= VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;
@@ -1455,33 +1436,35 @@ static void render_backend_system_submit_transfer (struct render_backend_system_
             .dstAccessMask = destination_access_flags,
             .srcQueueFamilyIndex = system->device_queue_family_index,
             .dstQueueFamilyIndex = system->device_queue_family_index,
-            .buffer = buffer_unmap_flush_transfer->target_buffer->buffer,
+            .buffer = buffer_flush_transfer->target_buffer->buffer,
             .offset = region.dstOffset,
             .size = region.size,
         };
 
         vkCmdPipelineBarrier (state->primary_command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT, destination_stage, 0u, 0u,
                               NULL, 1u, &memory_barrier, 0u, NULL);
-        buffer_unmap_flush_transfer = buffer_unmap_flush_transfer->next;
+        buffer_flush_transfer = buffer_flush_transfer->next;
     }
 
     DEBUG_LABEL_SCOPE_END (state->primary_command_buffer)
     DEBUG_LABEL_SCOPE_BEGIN (state->primary_command_buffer, "buffer_flush", DEBUG_LABEL_COLOR_PASS)
 
-    struct scheduled_buffer_unmap_flush_t *buffer_unmap_flush = schedule->first_scheduled_buffer_unmap_flush;
-    schedule->first_scheduled_buffer_unmap_flush = NULL;
+    struct scheduled_buffer_flush_t *buffer_flush = schedule->first_scheduled_buffer_flush;
+    schedule->first_scheduled_buffer_flush = NULL;
 
-    while (buffer_unmap_flush)
+    while (buffer_flush)
     {
-        vmaUnmapMemory (system->gpu_memory_allocator, buffer_unmap_flush->buffer->allocation);
-        if (vmaFlushAllocation (system->gpu_memory_allocator, buffer_unmap_flush->buffer->allocation,
-                                buffer_unmap_flush->offset, buffer_unmap_flush->size) != VK_SUCCESS)
+        if (buffer_flush->buffer->needs_flush)
         {
-            kan_error_critical ("Unexpected failure while flushing buffer data, unable to continue properly.", __FILE__,
-                                __LINE__);
+            if (vmaFlushAllocation (system->gpu_memory_allocator, buffer_flush->buffer->allocation,
+                                    buffer_flush->offset, buffer_flush->size) != VK_SUCCESS)
+            {
+                kan_error_critical ("Unexpected failure while flushing buffer data, unable to continue properly.",
+                                    __FILE__, __LINE__);
+            }
         }
 
-        buffer_unmap_flush = buffer_unmap_flush->next;
+        buffer_flush = buffer_flush->next;
     }
 
     DEBUG_LABEL_SCOPE_END (state->primary_command_buffer)
@@ -1548,15 +1531,6 @@ static void render_backend_system_submit_transfer (struct render_backend_system_
                     .depth = (vulkan_size_t) depth,
                 },
         };
-
-        vmaUnmapMemory (system->gpu_memory_allocator, image_upload->staging_buffer->allocation);
-        if (vmaFlushAllocation (system->gpu_memory_allocator, image_upload->staging_buffer->allocation,
-                                image_upload->staging_buffer_offset, image_upload->staging_buffer_size) != VK_SUCCESS)
-        {
-            kan_error_critical (
-                "Unexpected failure while flushing buffer data for image upload, unable to continue properly.",
-                __FILE__, __LINE__);
-        }
 
         vkCmdCopyBufferToImage (state->primary_command_buffer, image_upload->staging_buffer->buffer,
                                 image_upload->image->image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1u, &copy_region);
@@ -3422,7 +3396,7 @@ static void render_backend_system_clean_current_schedule_if_safe (struct render_
     // took too much space and we don't need it anymore.
     kan_stack_group_allocator_shrink (&schedule->item_allocator);
 
-    if (!schedule->first_scheduled_buffer_unmap_flush_transfer && !schedule->first_scheduled_buffer_unmap_flush &&
+    if (!schedule->first_scheduled_buffer_flush_transfer && !schedule->first_scheduled_buffer_flush &&
         !schedule->first_scheduled_image_upload && !schedule->first_scheduled_frame_buffer_create &&
         !schedule->first_scheduled_image_mip_generation && !schedule->first_scheduled_image_copy_data &&
         !schedule->first_scheduled_surface_read_back && !schedule->first_scheduled_buffer_read_back &&

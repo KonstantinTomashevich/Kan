@@ -34,11 +34,11 @@ struct render_backend_buffer_t *render_backend_system_create_buffer (struct rend
 
     case RENDER_BACKEND_BUFFER_FAMILY_STAGING:
         usage_flags |= VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-        allocation_flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
+        allocation_flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
         break;
 
     case RENDER_BACKEND_BUFFER_FAMILY_HOST_FRAME_LIFETIME_ALLOCATOR:
-        allocation_flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
+        allocation_flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
         break;
     }
 
@@ -66,7 +66,7 @@ struct render_backend_buffer_t *render_backend_system_create_buffer (struct rend
         case KAN_RENDER_BUFFER_TYPE_READ_BACK_STORAGE:
             KAN_ASSERT (family == RENDER_BACKEND_BUFFER_FAMILY_RESOURCE)
             usage_flags |= VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-            allocation_flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT;
+            allocation_flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
             break;
         }
     }
@@ -106,6 +106,15 @@ struct render_backend_buffer_t *render_backend_system_create_buffer (struct rend
         return NULL;
     }
 
+    if ((allocation_flags & VMA_ALLOCATION_CREATE_MAPPED_BIT) != 0u && !allocation_info.pMappedData)
+    {
+        KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR,
+                 "Failed to map buffer \"%s\" to memory while its type required memory mapping.", tracking_name)
+        kan_cpu_section_execution_shutdown (&execution);
+        return NULL;
+    }
+
+    KAN_ASSERT (!allocation_info.pMappedData || (allocation_flags & VMA_ALLOCATION_CREATE_MAPPED_BIT) != 0u)
 #if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_DEBUG_ENABLED)
     const char *buffer_type_name = "UnknownBuffer";
     switch (buffer_type)
@@ -161,8 +170,13 @@ struct render_backend_buffer_t *render_backend_system_create_buffer (struct rend
     buffer->allocation = allocation_handle;
     buffer->family = family;
     buffer->type = buffer_type;
+    buffer->mapped_memory = allocation_info.pMappedData;
     buffer->full_size = full_size;
     buffer->tracking_name = tracking_name;
+
+    buffer->needs_flush =
+        (system->selected_device_memory_properties.memoryTypes[allocation_info.memoryType].propertyFlags &
+         VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) == 0u;
 
 #if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_PROFILE_MEMORY)
     kan_allocation_group_t type_allocation_group = system->memory_profiling.gpu_buffer_group;
@@ -239,6 +253,9 @@ kan_render_buffer_t kan_render_buffer_create (kan_render_context_t context,
             // Due to unified memory, we should be able to directly initialize buffer.
             void *memory;
 
+            // Memory shouldn't be automatically mapped as it is a stable resource buffer.
+            KAN_ASSERT (!buffer->mapped_memory)
+
             if (vmaMapMemory (system->gpu_memory_allocator, buffer->allocation, &memory) != VK_SUCCESS)
             {
                 kan_error_critical ("Unexpected failure while mapping buffer memory, unable to continue properly.",
@@ -247,13 +264,6 @@ kan_render_buffer_t kan_render_buffer_create (kan_render_context_t context,
 
             memcpy (memory, optional_initial_data, full_size);
             vmaUnmapMemory (system->gpu_memory_allocator, buffer->allocation);
-
-            if (vmaFlushAllocation (system->gpu_memory_allocator, buffer->allocation, 0u, full_size) != VK_SUCCESS)
-            {
-                kan_error_critical (
-                    "Unexpected failure while flushing buffer initial data, unable to continue properly.", __FILE__,
-                    __LINE__);
-            }
         }
         else
         {
@@ -291,21 +301,16 @@ void *kan_render_buffer_patch (kan_render_buffer_t buffer, vulkan_size_t slice_o
             return NULL;
         }
 
-        void *memory;
-        if (vmaMapMemory (data->system->gpu_memory_allocator, staging_allocation.buffer->allocation, &memory) !=
-            VK_SUCCESS)
-        {
-            kan_error_critical ("Unexpected failure while mapping staging buffer memory, unable to continue properly.",
-                                __FILE__, __LINE__);
-        }
+        // Memory should always be mapped for staging buffers.
+        KAN_ASSERT (staging_allocation.buffer->mapped_memory)
 
         kan_atomic_int_lock (&schedule->schedule_lock);
-        struct scheduled_buffer_unmap_flush_transfer_t *item = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (
-            &schedule->item_allocator, struct scheduled_buffer_unmap_flush_transfer_t);
+        struct scheduled_buffer_flush_transfer_t *item = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (
+            &schedule->item_allocator, struct scheduled_buffer_flush_transfer_t);
 
         // We do not need to preserve order as buffers cannot depend one on another.
-        item->next = schedule->first_scheduled_buffer_unmap_flush_transfer;
-        schedule->first_scheduled_buffer_unmap_flush_transfer = item;
+        item->next = schedule->first_scheduled_buffer_flush_transfer;
+        schedule->first_scheduled_buffer_flush_transfer = item;
         item->source_buffer = staging_allocation.buffer;
         item->target_buffer = data;
         item->source_offset = staging_allocation.offset;
@@ -313,7 +318,7 @@ void *kan_render_buffer_patch (kan_render_buffer_t buffer, vulkan_size_t slice_o
         item->size = slice_size;
         kan_atomic_int_unlock (&schedule->schedule_lock);
 
-        return ((uint8_t *) memory) + staging_allocation.offset;
+        return ((uint8_t *) staging_allocation.buffer->mapped_memory) + staging_allocation.offset;
     }
 
     case RENDER_BACKEND_BUFFER_FAMILY_STAGING:
@@ -324,26 +329,24 @@ void *kan_render_buffer_patch (kan_render_buffer_t buffer, vulkan_size_t slice_o
     case RENDER_BACKEND_BUFFER_FAMILY_HOST_FRAME_LIFETIME_ALLOCATOR:
     {
         // Frame lifetime allocations are always host visible, there is no need to stage them due to their lifetime.
-        void *memory;
+        KAN_ASSERT (data->mapped_memory)
 
-        if (vmaMapMemory (data->system->gpu_memory_allocator, data->allocation, &memory) != VK_SUCCESS)
+        if (data->needs_flush)
         {
-            kan_error_critical ("Unexpected failure while mapping buffer memory, unable to continue properly.",
-                                __FILE__, __LINE__);
+            kan_atomic_int_lock (&schedule->schedule_lock);
+            struct scheduled_buffer_flush_t *item =
+                KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&schedule->item_allocator, struct scheduled_buffer_flush_t);
+
+            // We do not need to preserve order as buffers cannot depend one on another.
+            item->next = schedule->first_scheduled_buffer_flush;
+            schedule->first_scheduled_buffer_flush = item;
+            item->buffer = data;
+            item->offset = slice_offset;
+            item->size = slice_size;
+            kan_atomic_int_unlock (&schedule->schedule_lock);
         }
 
-        kan_atomic_int_lock (&schedule->schedule_lock);
-        struct scheduled_buffer_unmap_flush_t *item =
-            KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&schedule->item_allocator, struct scheduled_buffer_unmap_flush_t);
-
-        // We do not need to preserve order as buffers cannot depend one on another.
-        item->next = schedule->first_scheduled_buffer_unmap_flush;
-        schedule->first_scheduled_buffer_unmap_flush = item;
-        item->buffer = data;
-        item->offset = slice_offset;
-        item->size = slice_size;
-        kan_atomic_int_unlock (&schedule->schedule_lock);
-        return ((uint8_t *) memory) + slice_offset;
+        return ((uint8_t *) data->mapped_memory) + slice_offset;
     }
     }
 
@@ -361,22 +364,13 @@ void *kan_render_buffer_begin_access (kan_render_buffer_t buffer)
 {
     struct render_backend_buffer_t *data = KAN_HANDLE_GET (buffer);
     KAN_ASSERT (data->type == KAN_RENDER_BUFFER_TYPE_READ_BACK_STORAGE)
-    void *memory;
-
-    if (vmaMapMemory (data->system->gpu_memory_allocator, data->allocation, &memory) != VK_SUCCESS)
-    {
-        kan_error_critical ("Unexpected failure while mapping buffer memory, unable to continue properly.", __FILE__,
-                            __LINE__);
-    }
-
-    return memory;
+    KAN_ASSERT (data->mapped_memory)
+    return data->mapped_memory;
 }
 
 void kan_render_buffer_end_access (kan_render_buffer_t buffer)
 {
-    struct render_backend_buffer_t *data = KAN_HANDLE_GET (buffer);
-    KAN_ASSERT (data->type == KAN_RENDER_BUFFER_TYPE_READ_BACK_STORAGE)
-    vmaUnmapMemory (data->system->gpu_memory_allocator, data->allocation);
+    // We do not need to do anything in this implementation.
 }
 
 void kan_render_buffer_destroy (kan_render_buffer_t buffer)
