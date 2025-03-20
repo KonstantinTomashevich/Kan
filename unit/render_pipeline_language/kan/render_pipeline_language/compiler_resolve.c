@@ -1309,8 +1309,8 @@ static kan_bool_t resolve_buffers_of_type (struct rpl_compiler_context_t *contex
                     target_buffer->binding = assignment_counter->next_object_set_binding++;
                     break;
 
-                case KAN_RPL_SET_UNSTABLE:
-                    target_buffer->binding = assignment_counter->next_unstable_set_binding++;
+                case KAN_RPL_SET_SHARED:
+                    target_buffer->binding = assignment_counter->next_shared_set_binding++;
                     break;
                 }
 
@@ -1529,8 +1529,8 @@ static kan_bool_t resolve_samplers_of_type (struct rpl_compiler_context_t *conte
                 target_sampler->binding = assignment_counter->next_object_set_binding++;
                 break;
 
-            case KAN_RPL_SET_UNSTABLE:
-                target_sampler->binding = assignment_counter->next_unstable_set_binding++;
+            case KAN_RPL_SET_SHARED:
+                target_sampler->binding = assignment_counter->next_shared_set_binding++;
                 break;
             }
 
@@ -4327,7 +4327,7 @@ kan_rpl_compiler_instance_t kan_rpl_compiler_context_resolve (kan_rpl_compiler_c
         .next_pass_set_binding = 0u,
         .next_material_set_binding = 0u,
         .next_object_set_binding = 0u,
-        .next_unstable_set_binding = 0u,
+        .next_shared_set_binding = 0u,
         .next_attribute_location = 0u,
         .next_vertex_output_location = 0u,
         .next_fragment_output_location = 0u,

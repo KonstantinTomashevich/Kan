@@ -379,8 +379,10 @@ enum kan_rpl_set_t
     /// \brief Set for data that is bound on per-object basis.
     KAN_RPL_SET_OBJECT = 2u,
 
-    /// \brief Set for data that which bindings keep changing every frame.
-    KAN_RPL_SET_UNSTABLE = 3u,
+    /// \brief Set for the runtime data that might be shared between several objects, but is not on the material level.
+    /// \details For example, skeleton of even buffer with several skeletons might be shared across several objects
+    ///          in order to make instancing possible for these objects.
+    KAN_RPL_SET_SHARED = 3u,
 };
 
 /// \brief Enumerates supported buffer types.

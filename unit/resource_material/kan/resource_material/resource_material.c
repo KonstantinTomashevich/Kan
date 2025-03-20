@@ -806,8 +806,8 @@ static enum kan_resource_compile_result_t kan_resource_material_pipeline_family_
     kan_rpl_meta_set_bindings_shutdown (&output->set_object);
     kan_rpl_meta_set_bindings_init_copy (&output->set_object, &meta.set_object);
 
-    kan_rpl_meta_set_bindings_shutdown (&output->set_unstable);
-    kan_rpl_meta_set_bindings_init_copy (&output->set_unstable, &meta.set_unstable);
+    kan_rpl_meta_set_bindings_shutdown (&output->set_shared);
+    kan_rpl_meta_set_bindings_init_copy (&output->set_shared, &meta.set_shared);
 
     kan_rpl_meta_shutdown (&meta);
     return meta_valid ? KAN_RESOURCE_PIPELINE_COMPILE_FINISHED : KAN_RESOURCE_PIPELINE_COMPILE_FAILED;
@@ -1078,7 +1078,7 @@ void kan_resource_material_pipeline_family_compiled_init (
 
     kan_rpl_meta_set_bindings_init (&instance->set_material);
     kan_rpl_meta_set_bindings_init (&instance->set_object);
-    kan_rpl_meta_set_bindings_init (&instance->set_unstable);
+    kan_rpl_meta_set_bindings_init (&instance->set_shared);
 }
 
 void kan_resource_material_pipeline_family_compiled_shutdown (
@@ -1094,7 +1094,7 @@ void kan_resource_material_pipeline_family_compiled_shutdown (
     kan_rpl_meta_buffer_shutdown (&instance->instanced_attribute_buffer);
     kan_rpl_meta_set_bindings_shutdown (&instance->set_material);
     kan_rpl_meta_set_bindings_shutdown (&instance->set_object);
-    kan_rpl_meta_set_bindings_shutdown (&instance->set_unstable);
+    kan_rpl_meta_set_bindings_shutdown (&instance->set_shared);
 }
 
 void kan_resource_material_pipeline_compiled_init (struct kan_resource_material_pipeline_compiled_t *instance)

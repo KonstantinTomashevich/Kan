@@ -1181,7 +1181,7 @@ static kan_bool_t parse_main (struct rpl_parser_t *parser, struct dynamic_parser
         const char *marker_set_pass;
         const char *marker_set_material;
         const char *marker_set_object;
-        const char *marker_set_unstable;
+        const char *marker_set_shared;
 
         const char *marker_buffer_uniform;
         const char *marker_buffer_read_only_storage;
@@ -1200,9 +1200,9 @@ static kan_bool_t parse_main (struct rpl_parser_t *parser, struct dynamic_parser
     {                                                                                                                  \
         detected_set = KAN_RPL_SET_OBJECT;                                                                             \
     }                                                                                                                  \
-    else if (marker_set_unstable)                                                                                      \
+    else if (marker_set_shared)                                                                                        \
     {                                                                                                                  \
-        detected_set = KAN_RPL_SET_UNSTABLE;                                                                           \
+        detected_set = KAN_RPL_SET_SHARED;                                                                             \
     }                                                                                                                  \
     else                                                                                                               \
     {                                                                                                                  \
@@ -1237,7 +1237,7 @@ static kan_bool_t parse_main (struct rpl_parser_t *parser, struct dynamic_parser
          set_prefix = ("set_pass" @marker_set_pass) |
                       ("set_material" @marker_set_material) |
                       ("set_object" @marker_set_object) |
-                      ("set_unstable" @marker_set_unstable);
+                      ("set_shared" @marker_set_shared);
 
          external_buffer_type_prefix =
              ("uniform_buffer" @marker_buffer_uniform) |

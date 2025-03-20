@@ -26,7 +26,7 @@
 /// during compilation for every pass.
 ///
 /// When compiled, material produces family and pipeline byproducts. Family defines common input interface for all
-/// the pipelines (except for pass sets) by storing information about attributes, material, object and unstable sets.
+/// the pipelines (except for pass sets) by storing information about attributes, material, object and shared sets.
 /// Pipelines are created and compiled for each pass variant separately (if that pass is considered supported for the
 /// platform). Their meta is stripped of input information by design as it is the same for all the families.
 ///
@@ -120,7 +120,7 @@ struct kan_resource_material_pipeline_family_compiled_t
 
     struct kan_rpl_meta_set_bindings_t set_material;
     struct kan_rpl_meta_set_bindings_t set_object;
-    struct kan_rpl_meta_set_bindings_t set_unstable;
+    struct kan_rpl_meta_set_bindings_t set_shared;
 };
 
 RESOURCE_MATERIAL_API void kan_resource_material_pipeline_family_compiled_init (

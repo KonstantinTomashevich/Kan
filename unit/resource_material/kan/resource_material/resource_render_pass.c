@@ -279,7 +279,7 @@ static enum kan_resource_compile_result_t kan_resource_render_pass_variant_compi
     }
 
     if (meta.set_material.buffers.size || meta.set_material.samplers.size > 0u || meta.set_object.buffers.size ||
-        meta.set_object.samplers.size > 0u || meta.set_unstable.buffers.size || meta.set_unstable.samplers.size > 0u)
+        meta.set_object.samplers.size > 0u || meta.set_shared.buffers.size || meta.set_shared.samplers.size > 0u)
     {
         kan_rpl_meta_shutdown (&meta);
         KAN_LOG (resource_pass_compilation, KAN_LOG_ERROR,

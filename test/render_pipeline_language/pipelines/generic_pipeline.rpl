@@ -69,7 +69,7 @@ conditional (!support_instancing) set_object uniform_buffer object
     f4x4... joint_transforms;
 };
 
-conditional (support_instancing && enable_skinning) set_unstable read_only_storage_buffer joints
+conditional (support_instancing && enable_skinning) set_shared read_only_storage_buffer joints
 {
     f4x4... transforms;
 };

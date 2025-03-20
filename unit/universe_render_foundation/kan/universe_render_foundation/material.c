@@ -127,7 +127,7 @@ struct render_foundation_pipeline_family_state_t
     kan_resource_request_id_t request_id;
     kan_render_pipeline_parameter_set_layout_t set_material;
     kan_render_pipeline_parameter_set_layout_t set_object;
-    kan_render_pipeline_parameter_set_layout_t set_unstable;
+    kan_render_pipeline_parameter_set_layout_t set_shared;
     kan_instance_size_t reference_count;
     kan_time_size_t inspection_time_ns;
 };
@@ -145,9 +145,9 @@ UNIVERSE_RENDER_FOUNDATION_API void render_foundation_pipeline_family_state_shut
         kan_render_pipeline_parameter_set_layout_destroy (instance->set_object);
     }
 
-    if (KAN_HANDLE_IS_VALID (instance->set_unstable))
+    if (KAN_HANDLE_IS_VALID (instance->set_shared))
     {
-        kan_render_pipeline_parameter_set_layout_destroy (instance->set_unstable);
+        kan_render_pipeline_parameter_set_layout_destroy (instance->set_shared);
     }
 }
 
@@ -779,10 +779,10 @@ static void recreate_family (struct render_foundation_material_management_execut
         family->set_object = KAN_HANDLE_SET_INVALID (kan_render_pipeline_parameter_set_layout_t);
     }
 
-    if (KAN_HANDLE_IS_VALID (family->set_unstable))
+    if (KAN_HANDLE_IS_VALID (family->set_shared))
     {
-        kan_render_pipeline_parameter_set_layout_destroy (family->set_unstable);
-        family->set_unstable = KAN_HANDLE_SET_INVALID (kan_render_pipeline_parameter_set_layout_t);
+        kan_render_pipeline_parameter_set_layout_destroy (family->set_shared);
+        family->set_shared = KAN_HANDLE_SET_INVALID (kan_render_pipeline_parameter_set_layout_t);
     }
 
     struct kan_render_attribute_source_description_t
@@ -914,20 +914,20 @@ static void recreate_family (struct render_foundation_material_management_execut
                 }
             }
 
-            if (loaded->set_unstable.buffers.size > 0u || loaded->set_unstable.samplers.size > 0u)
+            if (loaded->set_shared.buffers.size > 0u || loaded->set_shared.samplers.size > 0u)
             {
                 char name_buffer[KAN_UNIVERSE_RENDER_FOUNDATION_NAME_BUFFER_LENGTH];
-                snprintf (name_buffer, KAN_UNIVERSE_RENDER_FOUNDATION_NAME_BUFFER_LENGTH, "%s[set_unstable]",
+                snprintf (name_buffer, KAN_UNIVERSE_RENDER_FOUNDATION_NAME_BUFFER_LENGTH, "%s[set_shared]",
                           family->name);
 
-                family->set_unstable = kan_render_construct_parameter_set_layout_from_meta (
-                    kan_render_backend_system_get_render_context (state->render_backend_system), &loaded->set_unstable,
+                family->set_shared = kan_render_construct_parameter_set_layout_from_meta (
+                    kan_render_backend_system_get_render_context (state->render_backend_system), &loaded->set_shared,
                     name_buffer, state->description_allocation_group);
 
-                if (!KAN_HANDLE_IS_VALID (family->set_unstable))
+                if (!KAN_HANDLE_IS_VALID (family->set_shared))
                 {
                     KAN_LOG (render_foundation_material, KAN_LOG_ERROR,
-                             "Failed to create unstable set layout for family \"%s\".", family->name)
+                             "Failed to create shared set layout for family \"%s\".", family->name)
                     set_layouts_created = KAN_FALSE;
                 }
             }
@@ -1120,7 +1120,7 @@ static void recreate_family (struct render_foundation_material_management_execut
                             pass_parameter_set_layout,
                             family->set_material,
                             family->set_object,
-                            family->set_unstable,
+                            family->set_shared,
                         };
 
                         struct kan_render_graphics_pipeline_description_t description = {
@@ -1259,7 +1259,7 @@ static void reload_material_from_family (struct render_foundation_material_manag
 
     loaded->set_material = family->set_material;
     loaded->set_object = family->set_object;
-    loaded->set_unstable = family->set_unstable;
+    loaded->set_shared = family->set_shared;
     loaded->pipelines.size = 0u;
     kan_dynamic_array_set_capacity (&loaded->pipelines, KAN_UNIVERSE_RENDER_FOUNDATION_MATERIAL_PSC);
 
@@ -1363,7 +1363,7 @@ static void reload_material_from_family (struct render_foundation_material_manag
             kan_rpl_meta_buffer_shutdown (&loaded->instanced_attribute_buffer);
             kan_rpl_meta_set_bindings_shutdown (&loaded->set_material_bindings);
             kan_rpl_meta_set_bindings_shutdown (&loaded->set_object_bindings);
-            kan_rpl_meta_set_bindings_shutdown (&loaded->set_unstable_bindings);
+            kan_rpl_meta_set_bindings_shutdown (&loaded->set_shared_bindings);
 
             kan_dynamic_array_set_capacity (&loaded->vertex_attribute_buffers,
                                             family_data->vertex_attribute_buffers.size);
@@ -1384,7 +1384,7 @@ static void reload_material_from_family (struct render_foundation_material_manag
 
             kan_rpl_meta_set_bindings_init_copy (&loaded->set_material_bindings, &family_data->set_material);
             kan_rpl_meta_set_bindings_init_copy (&loaded->set_object_bindings, &family_data->set_object);
-            kan_rpl_meta_set_bindings_init_copy (&loaded->set_unstable_bindings, &family_data->set_unstable);
+            kan_rpl_meta_set_bindings_init_copy (&loaded->set_shared_bindings, &family_data->set_shared);
             KAN_UP_QUERY_RETURN_VOID;
         }
     }
@@ -1639,7 +1639,7 @@ static inline void on_material_updated (struct render_foundation_material_manage
                                         KAN_HANDLE_SET_INVALID (kan_render_pipeline_parameter_set_layout_t);
                                     new_family->set_object =
                                         KAN_HANDLE_SET_INVALID (kan_render_pipeline_parameter_set_layout_t);
-                                    new_family->set_unstable =
+                                    new_family->set_shared =
                                         KAN_HANDLE_SET_INVALID (kan_render_pipeline_parameter_set_layout_t);
                                     new_family->reference_count = 1u;
                                     new_family->inspection_time_ns = 0u;
@@ -1921,7 +1921,7 @@ void kan_render_material_loaded_init (struct kan_render_material_loaded_t *insta
     instance->name = NULL;
     instance->set_material = KAN_HANDLE_SET_INVALID (kan_render_pipeline_parameter_set_layout_t);
     instance->set_object = KAN_HANDLE_SET_INVALID (kan_render_pipeline_parameter_set_layout_t);
-    instance->set_unstable = KAN_HANDLE_SET_INVALID (kan_render_pipeline_parameter_set_layout_t);
+    instance->set_shared = KAN_HANDLE_SET_INVALID (kan_render_pipeline_parameter_set_layout_t);
     kan_dynamic_array_init (&instance->pipelines, 0u, sizeof (struct kan_render_material_loaded_pipeline_t),
                             _Alignof (struct kan_render_material_loaded_pipeline_t), kan_allocation_group_stack_get ());
 
@@ -1933,7 +1933,7 @@ void kan_render_material_loaded_init (struct kan_render_material_loaded_t *insta
 
     kan_rpl_meta_set_bindings_init (&instance->set_material_bindings);
     kan_rpl_meta_set_bindings_init (&instance->set_object_bindings);
-    kan_rpl_meta_set_bindings_init (&instance->set_unstable_bindings);
+    kan_rpl_meta_set_bindings_init (&instance->set_shared_bindings);
 }
 
 void kan_render_material_loaded_shutdown (struct kan_render_material_loaded_t *instance)
@@ -1949,5 +1949,5 @@ void kan_render_material_loaded_shutdown (struct kan_render_material_loaded_t *i
     kan_rpl_meta_buffer_shutdown (&instance->instanced_attribute_buffer);
     kan_rpl_meta_set_bindings_shutdown (&instance->set_material_bindings);
     kan_rpl_meta_set_bindings_shutdown (&instance->set_object_bindings);
-    kan_rpl_meta_set_bindings_shutdown (&instance->set_unstable_bindings);
+    kan_rpl_meta_set_bindings_shutdown (&instance->set_shared_bindings);
 }

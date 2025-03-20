@@ -137,7 +137,7 @@ struct binding_location_assignment_counter_t
     kan_rpl_size_t next_pass_set_binding;
     kan_rpl_size_t next_material_set_binding;
     kan_rpl_size_t next_object_set_binding;
-    kan_rpl_size_t next_unstable_set_binding;
+    kan_rpl_size_t next_shared_set_binding;
     kan_rpl_size_t next_attribute_location;
     kan_rpl_size_t next_vertex_output_location;
     kan_rpl_size_t next_fragment_output_location;

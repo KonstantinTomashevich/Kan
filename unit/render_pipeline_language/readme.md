@@ -189,9 +189,9 @@ There are several inbuilt descriptor sets that correspond to the common usage pa
   high level concept of materials.
 - `set_object` is advised for data unique for scene object, but when binding is rarely changed. For example, object may
   store its data in its own uniform buffer and update this buffer without changing descriptor set.
-- `set_unstable` is advised for data that is unique for every scene object and which binding changing every frame.
-  For example, data that is being sent from CPU to GPU every frame and has varying size can be passed through
-  unstable sets with the help of frame lifetime allocators.
+- `set_shared` is advised for data that can be shared across multiple objects, but is not global enough to be on 
+  material set level. For example, one skeleton or even an array of several skeletons can be shared across multiple
+  objects, making instancing possible for them.
 
 Any set keyword inside declaration syntax is called `set_prefix` below.
 
@@ -257,7 +257,7 @@ conditional (!support_instancing) set_material uniform_buffer material
     f4 color_multiplier;
 };
 
-conditional (support_instancing && enable_skinning) set_unstable read_only_storage_buffer joints
+conditional (support_instancing && enable_skinning) set_shared read_only_storage_buffer joints
 {
     f4x4... transforms;
 };

@@ -207,7 +207,7 @@ void kan_rpl_meta_init (struct kan_rpl_meta_t *instance)
     kan_rpl_meta_set_bindings_init (&instance->set_pass);
     kan_rpl_meta_set_bindings_init (&instance->set_material);
     kan_rpl_meta_set_bindings_init (&instance->set_object);
-    kan_rpl_meta_set_bindings_init (&instance->set_unstable);
+    kan_rpl_meta_set_bindings_init (&instance->set_shared);
 
     kan_dynamic_array_init (&instance->color_outputs, 0u, sizeof (struct kan_rpl_meta_color_output_t),
                             _Alignof (struct kan_rpl_meta_color_output_t), STATICS.rpl_meta_allocation_group);
@@ -242,7 +242,7 @@ void kan_rpl_meta_init_copy (struct kan_rpl_meta_t *instance, const struct kan_r
     kan_rpl_meta_set_bindings_init_copy (&instance->set_pass, &copy_from->set_pass);
     kan_rpl_meta_set_bindings_init_copy (&instance->set_material, &copy_from->set_material);
     kan_rpl_meta_set_bindings_init_copy (&instance->set_object, &copy_from->set_object);
-    kan_rpl_meta_set_bindings_init_copy (&instance->set_unstable, &copy_from->set_unstable);
+    kan_rpl_meta_set_bindings_init_copy (&instance->set_shared, &copy_from->set_shared);
 
     kan_dynamic_array_init (&instance->color_outputs, copy_from->color_outputs.size,
                             sizeof (struct kan_rpl_meta_color_output_t), _Alignof (struct kan_rpl_meta_color_output_t),
@@ -269,7 +269,7 @@ void kan_rpl_meta_shutdown (struct kan_rpl_meta_t *instance)
     kan_rpl_meta_set_bindings_shutdown (&instance->set_pass);
     kan_rpl_meta_set_bindings_shutdown (&instance->set_material);
     kan_rpl_meta_set_bindings_shutdown (&instance->set_object);
-    kan_rpl_meta_set_bindings_shutdown (&instance->set_unstable);
+    kan_rpl_meta_set_bindings_shutdown (&instance->set_shared);
     kan_dynamic_array_shutdown (&instance->color_outputs);
 }
 

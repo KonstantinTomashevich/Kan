@@ -115,9 +115,9 @@ struct kan_render_material_loaded_t
     /// \details Not owned, just copied handle. Can be invalid if set layout is empty.
     kan_render_pipeline_parameter_set_layout_t set_object;
 
-    /// \brief Layout for unstable set of parameters for pipeline.
+    /// \brief Layout for shared set of parameters for pipeline.
     /// \details Not owned, just copied handle. Can be invalid if set layout is empty.
-    kan_render_pipeline_parameter_set_layout_t set_unstable;
+    kan_render_pipeline_parameter_set_layout_t set_shared;
 
     /// \brief Array with currently instanced pipelines for existing passes.
     /// \details Guaranteed to be sorted by passes and variant indices. It means that pipelines are clustered by passes
@@ -144,7 +144,7 @@ struct kan_render_material_loaded_t
     struct kan_rpl_meta_set_bindings_t set_object_bindings;
 
     /// \brief Information about bindings for unstable set of this material.
-    struct kan_rpl_meta_set_bindings_t set_unstable_bindings;
+    struct kan_rpl_meta_set_bindings_t set_shared_bindings;
 };
 
 UNIVERSE_RENDER_FOUNDATION_API void kan_render_material_loaded_init (struct kan_render_material_loaded_t *instance);
