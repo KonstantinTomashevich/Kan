@@ -534,56 +534,31 @@ static inline kan_bool_t emit_meta_variable_type_to_meta_type (struct compiler_i
                                                                kan_interned_string_t source_name,
                                                                kan_rpl_size_t source_line)
 {
-    if (variable->type.if_vector == &STATICS.type_f1)
+    switch (variable->type.class)
     {
-        *output = KAN_RPL_META_VARIABLE_TYPE_F1;
-    }
-    else if (variable->type.if_vector == &STATICS.type_f2)
-    {
-        *output = KAN_RPL_META_VARIABLE_TYPE_F2;
-    }
-    else if (variable->type.if_vector == &STATICS.type_f3)
-    {
-        *output = KAN_RPL_META_VARIABLE_TYPE_F3;
-    }
-    else if (variable->type.if_vector == &STATICS.type_f4)
-    {
-        *output = KAN_RPL_META_VARIABLE_TYPE_F4;
-    }
-    else if (variable->type.if_vector == &STATICS.type_i1)
-    {
-        *output = KAN_RPL_META_VARIABLE_TYPE_I1;
-    }
-    else if (variable->type.if_vector == &STATICS.type_i2)
-    {
-        *output = KAN_RPL_META_VARIABLE_TYPE_I2;
-    }
-    else if (variable->type.if_vector == &STATICS.type_i3)
-    {
-        *output = KAN_RPL_META_VARIABLE_TYPE_I3;
-    }
-    else if (variable->type.if_vector == &STATICS.type_i4)
-    {
-        *output = KAN_RPL_META_VARIABLE_TYPE_I4;
-    }
-    else if (variable->type.if_matrix == &STATICS.type_f3x3)
-    {
-        *output = KAN_RPL_META_VARIABLE_TYPE_F3X3;
-    }
-    else if (variable->type.if_matrix == &STATICS.type_f4x4)
-    {
-        *output = KAN_RPL_META_VARIABLE_TYPE_F4X4;
-    }
-    else
-    {
-        KAN_LOG (
-            rpl_compiler_context, KAN_LOG_ERROR, "[%s:%s:%s:%ld] Unable to find meta type for type \"%s\".",
-            context_log_name, module_name, source_name, (long) source_line,
-            get_type_name_for_logging (variable->type.if_vector, variable->type.if_matrix, variable->type.if_struct))
-        return KAN_FALSE;
+    case COMPILER_INSTANCE_TYPE_CLASS_VOID:
+    case COMPILER_INSTANCE_TYPE_CLASS_BOOLEAN:
+    case COMPILER_INSTANCE_TYPE_CLASS_STRUCT:
+    case COMPILER_INSTANCE_TYPE_CLASS_BUFFER:
+    case COMPILER_INSTANCE_TYPE_CLASS_SAMPLER:
+    case COMPILER_INSTANCE_TYPE_CLASS_IMAGE:
+        // Should not be parameter types. Resolve should fail.
+        KAN_ASSERT (KAN_FALSE)
+        break;
+
+    case COMPILER_INSTANCE_TYPE_CLASS_VECTOR:
+        *output = variable->type.vector_data->meta_type;
+        return KAN_TRUE;
+
+    case COMPILER_INSTANCE_TYPE_CLASS_MATRIX:
+        *output = variable->type.matrix_data->meta_type;
+        return KAN_TRUE;
     }
 
-    return KAN_TRUE;
+    KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR, "[%s:%s:%s:%ld] Unable to find meta type for type \"%s\".",
+             context_log_name, module_name, source_name, (long) source_line,
+             get_type_name_for_logging (&variable->type))
+    return KAN_FALSE;
 }
 
 static kan_bool_t emit_meta_gather_parameters_process_field (
@@ -637,7 +612,19 @@ static kan_bool_t emit_meta_gather_parameters_process_field (struct rpl_compiler
                                                              kan_instance_size_t name_skip_offset,
                                                              kan_bool_t tail)
 {
-    if (field->variable.type.if_vector || field->variable.type.if_matrix)
+    switch (field->variable.type.class)
+    {
+    case COMPILER_INSTANCE_TYPE_CLASS_VOID:
+    case COMPILER_INSTANCE_TYPE_CLASS_BOOLEAN:
+    case COMPILER_INSTANCE_TYPE_CLASS_BUFFER:
+    case COMPILER_INSTANCE_TYPE_CLASS_SAMPLER:
+    case COMPILER_INSTANCE_TYPE_CLASS_IMAGE:
+        // Cannot be part of the properly resolved AST.
+        KAN_ASSERT (KAN_FALSE)
+        return KAN_FALSE;
+
+    case COMPILER_INSTANCE_TYPE_CLASS_VECTOR:
+    case COMPILER_INSTANCE_TYPE_CLASS_MATRIX:
     {
         if (field->variable.type.array_size_runtime)
         {
@@ -685,8 +672,8 @@ static kan_bool_t emit_meta_gather_parameters_process_field (struct rpl_compiler
 
         return valid;
     }
-    else if (field->variable.type.if_struct)
-    {
+
+    case COMPILER_INSTANCE_TYPE_CLASS_STRUCT:
         if (field->variable.type.array_size_runtime)
         {
             // Should be guaranteed by resolve stage.
@@ -695,7 +682,7 @@ static kan_bool_t emit_meta_gather_parameters_process_field (struct rpl_compiler
             name_skip_offset = name_generation_buffer->size;
 
             return emit_meta_gather_parameters_process_field_list (
-                instance, 0u, field->variable.type.if_struct->first_field, meta_output, name_generation_buffer,
+                instance, 0u, field->variable.type.struct_data->first_field, meta_output, name_generation_buffer,
                 name_skip_offset, KAN_TRUE);
         }
         // Currently we only generate parameters for non-array structs as parameters from arrays of structs sound
@@ -703,12 +690,15 @@ static kan_bool_t emit_meta_gather_parameters_process_field (struct rpl_compiler
         else if (field->variable.type.array_dimensions_count == 0u)
         {
             return emit_meta_gather_parameters_process_field_list (
-                instance, base_offset + field->offset, field->variable.type.if_struct->first_field, meta_output,
+                instance, base_offset + field->offset, field->variable.type.struct_data->first_field, meta_output,
                 name_generation_buffer, name_skip_offset, tail);
         }
+
+        return KAN_TRUE;
     }
 
-    return KAN_TRUE;
+    KAN_ASSERT (KAN_FALSE)
+    return KAN_FALSE;
 }
 
 kan_bool_t kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t compiler_instance,
@@ -858,10 +848,14 @@ kan_bool_t kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t comp
 
                 while (declaration)
                 {
-                    KAN_ASSERT (declaration->source_declaration->variable.type.if_vector)
-                    ((struct kan_rpl_meta_color_output_t *) meta->color_outputs.data)[color_output_index]
-                        .components_count =
-                        (uint8_t) declaration->source_declaration->variable.type.if_vector->items_count;
+                    KAN_ASSERT (declaration->source_declaration->variable.type.class ==
+                                COMPILER_INSTANCE_TYPE_CLASS_VECTOR)
+
+                    struct kan_rpl_meta_color_output_t *output =
+                        &((struct kan_rpl_meta_color_output_t *) meta->color_outputs.data)[color_output_index];
+
+                    output->components_count =
+                        (uint8_t) declaration->source_declaration->variable.type.vector_data->items_count;
 
                     ++color_output_index;
                     declaration = declaration->next;
@@ -1002,8 +996,78 @@ kan_bool_t kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t comp
 
             meta_sampler->name = sampler->name;
             meta_sampler->binding = sampler->binding;
-            meta_sampler->type = sampler->type;
             sampler = sampler->next;
+        }
+    }
+    
+    if ((flags & KAN_RPL_META_EMISSION_SKIP_SETS) == 0u)
+    {
+        kan_loop_size_t pass_image_count = 0u;
+        kan_loop_size_t material_image_count = 0u;
+        kan_loop_size_t object_image_count = 0u;
+        kan_loop_size_t shared_image_count = 0u;
+        struct compiler_instance_image_node_t *image = instance->first_image;
+        
+        while (image)
+        {
+            switch (image->set)
+            {
+            case KAN_RPL_SET_PASS:
+                ++pass_image_count;
+                break;
+
+            case KAN_RPL_SET_MATERIAL:
+                ++material_image_count;
+                break;
+
+            case KAN_RPL_SET_OBJECT:
+                ++object_image_count;
+                break;
+
+            case KAN_RPL_SET_SHARED:
+                ++shared_image_count;
+                break;
+            }
+
+            image = image->next;
+        }
+
+        kan_dynamic_array_set_capacity (&meta->set_pass.images, pass_image_count);
+        kan_dynamic_array_set_capacity (&meta->set_material.images, material_image_count);
+        kan_dynamic_array_set_capacity (&meta->set_object.images, object_image_count);
+        kan_dynamic_array_set_capacity (&meta->set_shared.images, shared_image_count);
+
+        image = instance->first_image;
+        while (image)
+        {
+            struct kan_dynamic_array_t *image_array = NULL;
+            switch (image->set)
+            {
+            case KAN_RPL_SET_PASS:
+                image_array = &meta->set_pass.images;
+                break;
+
+            case KAN_RPL_SET_MATERIAL:
+                image_array = &meta->set_material.images;
+                break;
+
+            case KAN_RPL_SET_OBJECT:
+                image_array = &meta->set_object.images;
+                break;
+
+            case KAN_RPL_SET_SHARED:
+                image_array = &meta->set_shared.images;
+                break;
+            }
+
+            struct kan_rpl_meta_image_t *meta_image = kan_dynamic_array_add_last (image_array);
+            KAN_ASSERT (meta_image)
+
+            meta_image->name = image->name;
+            meta_image->binding = image->binding;
+            meta_image->type = image->type;
+            meta_image->image_array_size = image->array_size;
+            image = image->next;
         }
     }
 

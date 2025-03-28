@@ -250,7 +250,16 @@ KAN_TEST_CASE (generic)
     struct kan_rpl_meta_sampler_t *sampler_meta =
         &((struct kan_rpl_meta_sampler_t *) meta.set_material.samplers.data)[0u];
     KAN_TEST_CHECK (sampler_meta->binding == 0u)
-    KAN_TEST_CHECK (sampler_meta->type == KAN_RPL_SAMPLER_TYPE_2D)
+
+    KAN_TEST_ASSERT (meta.set_pass.images.size == 0u)
+    KAN_TEST_ASSERT (meta.set_material.images.size == 1u)
+    KAN_TEST_ASSERT (meta.set_object.images.size == 0u)
+    KAN_TEST_ASSERT (meta.set_shared.images.size == 0u)
+
+    struct kan_rpl_meta_image_t *image_meta = &((struct kan_rpl_meta_image_t *) meta.set_material.images.data)[0u];
+    KAN_TEST_CHECK (image_meta->binding == 1u)
+    KAN_TEST_CHECK (image_meta->type == KAN_RPL_IMAGE_TYPE_COLOR_2D)
+    KAN_TEST_CHECK (image_meta->image_array_size == 4u)
 
     KAN_TEST_ASSERT (meta.color_outputs.size == 1u)
     struct kan_rpl_meta_color_output_t *color_output =
@@ -297,11 +306,11 @@ static void compile_test (const char *path)
     load_pipeline_source (path, &source);
 
     kan_rpl_parser_t parser = kan_rpl_parser_create (kan_string_intern ("test"));
-    KAN_TEST_CHECK (kan_rpl_parser_add_source (parser, (const char *) source.data, kan_string_intern ("code")))
+    KAN_TEST_ASSERT (kan_rpl_parser_add_source (parser, (const char *) source.data, kan_string_intern ("code")))
 
     struct kan_rpl_intermediate_t intermediate;
     kan_rpl_intermediate_init (&intermediate);
-    KAN_TEST_CHECK (kan_rpl_parser_build_intermediate (parser, &intermediate))
+    KAN_TEST_ASSERT (kan_rpl_parser_build_intermediate (parser, &intermediate))
 
     kan_rpl_parser_destroy (parser);
     kan_dynamic_array_shutdown (&source);

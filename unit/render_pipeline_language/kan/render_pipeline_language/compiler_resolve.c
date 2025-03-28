@@ -651,6 +651,54 @@ static kan_bool_t resolve_settings (struct rpl_compiler_context_t *context,
     return result;
 }
 
+static inline kan_bool_t resolve_array_dimension_value (struct rpl_compiler_context_t *context,
+                                                        struct rpl_compiler_instance_t *instance,
+                                                        struct kan_rpl_intermediate_t *intermediate,
+                                                        kan_rpl_size_t expression_index,
+                                                        kan_rpl_size_t *output,
+                                                        kan_bool_t instance_options_allowed,
+                                                        kan_rpl_size_t log_dimension_index)
+{
+    struct kan_rpl_expression_t *expression =
+        &((struct kan_rpl_expression_t *) intermediate->expression_storage.data)[expression_index];
+
+    struct compile_time_evaluation_value_t value =
+        evaluate_compile_time_expression (context, intermediate, expression, instance_options_allowed);
+
+    switch (value.type)
+    {
+    case CONDITIONAL_EVALUATION_VALUE_TYPE_ERROR:
+        return KAN_FALSE;
+
+    case CONDITIONAL_EVALUATION_VALUE_TYPE_BOOLEAN:
+    case CONDITIONAL_EVALUATION_VALUE_TYPE_FLOATING:
+        KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
+                 "[%s:%s:%s:%ld] Declaration array size at dimension %ld calculation resulted in non-integer value.",
+                 context->log_name, intermediate->log_name, expression->source_name, (long) expression->source_line,
+                 (long) log_dimension_index)
+        return KAN_FALSE;
+
+    case CONDITIONAL_EVALUATION_VALUE_TYPE_INTEGER:
+        if (value.integer_value > 0 && (kan_rpl_size_t) value.integer_value <= KAN_INT_MAX (kan_rpl_size_t))
+        {
+            *output = (kan_rpl_size_t) value.integer_value;
+            return KAN_TRUE;
+        }
+        else
+        {
+            KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
+                     "[%s:%s:%s:%ld] Declaration array size at dimension %ld calculation resulted in invalid value for "
+                     "array size %ld.",
+                     context->log_name, intermediate->log_name, expression->source_name, (long) expression->source_line,
+                     (long) log_dimension_index, (long) value.integer_value)
+            return KAN_FALSE;
+        }
+    }
+
+    KAN_ASSERT (KAN_FALSE)
+    return KAN_FALSE;
+}
+
 static inline kan_bool_t resolve_array_dimensions (struct rpl_compiler_context_t *context,
                                                    struct rpl_compiler_instance_t *instance,
                                                    struct kan_rpl_intermediate_t *intermediate,
@@ -677,45 +725,10 @@ static inline kan_bool_t resolve_array_dimensions (struct rpl_compiler_context_t
         {
             const kan_rpl_size_t expression_index =
                 ((kan_rpl_size_t *) intermediate->expression_lists_storage.data)[dimensions_list_index + dimension];
-            struct kan_rpl_expression_t *expression =
-                &((struct kan_rpl_expression_t *) intermediate->expression_storage.data)[expression_index];
 
-            struct compile_time_evaluation_value_t value =
-                evaluate_compile_time_expression (context, intermediate, expression, instance_options_allowed);
-
-            switch (value.type)
-            {
-            case CONDITIONAL_EVALUATION_VALUE_TYPE_ERROR:
-                result = KAN_FALSE;
-                break;
-
-            case CONDITIONAL_EVALUATION_VALUE_TYPE_BOOLEAN:
-            case CONDITIONAL_EVALUATION_VALUE_TYPE_FLOATING:
-                KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
-                         "[%s:%s:%s:%ld] Declaration \"%s\" array size at dimension %ld calculation resulted "
-                         "in non-integer value.",
-                         context->log_name, intermediate->log_name, expression->source_name,
-                         (long) expression->source_line, variable->name, (long) dimension)
-                result = KAN_FALSE;
-                break;
-
-            case CONDITIONAL_EVALUATION_VALUE_TYPE_INTEGER:
-                if (value.integer_value > 0 && (kan_rpl_size_t) value.integer_value <= KAN_INT_MAX (kan_rpl_size_t))
-                {
-                    variable->type.array_dimensions[dimension] = (kan_rpl_size_t) value.integer_value;
-                }
-                else
-                {
-                    KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
-                             "[%s:%s:%s:%ld] Declaration \"%s\" array size at dimension %ld calculation resulted "
-                             "in invalid value for array size %ld.",
-                             context->log_name, intermediate->log_name, expression->source_name,
-                             (long) expression->source_line, variable->name, (long) dimension,
-                             (long) value.integer_value)
-                    result = KAN_FALSE;
-                }
-                break;
-            }
+            result &= resolve_array_dimension_value (context, instance, intermediate, expression_index,
+                                                     &variable->type.array_dimensions[dimension],
+                                                     instance_options_allowed, (kan_rpl_size_t) dimension);
         }
     }
     else
@@ -731,37 +744,121 @@ static kan_bool_t resolve_use_struct (struct rpl_compiler_context_t *context,
                                       kan_interned_string_t name,
                                       struct compiler_instance_struct_node_t **output);
 
-static inline kan_bool_t resolve_variable_type (struct rpl_compiler_context_t *context,
-                                                struct rpl_compiler_instance_t *instance,
-                                                kan_interned_string_t intermediate_log_name,
-                                                struct compiler_instance_variable_t *variable,
-                                                kan_interned_string_t type_name,
-                                                kan_interned_string_t declaration_name,
-                                                kan_interned_string_t source_name,
-                                                kan_rpl_size_t source_line)
+static inline kan_bool_t resolve_type (struct rpl_compiler_context_t *context,
+                                       struct rpl_compiler_instance_t *instance,
+                                       kan_interned_string_t intermediate_log_name,
+                                       struct compiler_instance_type_definition_t *type,
+                                       kan_interned_string_t type_name,
+                                       const char *declaration_name_for_logging,
+                                       kan_interned_string_t source_name_for_logging,
+                                       kan_rpl_size_t source_line_for_logging)
 {
-    variable->type.if_vector = NULL;
-    variable->type.if_matrix = NULL;
-    variable->type.if_struct = NULL;
+    // We do not resolve array dimensions here. Clean them just in case.
+    type->array_size_runtime = KAN_FALSE;
+    type->array_dimensions_count = 0u;
+    type->array_dimensions = NULL;
 
-    if (!(variable->type.if_vector = find_inbuilt_vector_type (type_name)) &&
-        !(variable->type.if_matrix = find_inbuilt_matrix_type (type_name)) &&
-        !resolve_use_struct (context, instance, type_name, &variable->type.if_struct))
+    if (type_name == STATICS.interned_void)
     {
-        KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR, "[%s:%s:%s:%ld] Declaration \"%s\" type \"%s\" is unknown.",
-                 context->log_name, intermediate_log_name, source_name, (long) source_line, declaration_name, type_name)
-        return KAN_FALSE;
+        type->class = COMPILER_INSTANCE_TYPE_CLASS_VOID;
+        return KAN_TRUE;
     }
 
-    return KAN_TRUE;
+    struct inbuilt_vector_type_t *vector_type = find_inbuilt_vector_type (type_name);
+    if (vector_type)
+    {
+        type->class = COMPILER_INSTANCE_TYPE_CLASS_VECTOR;
+        type->vector_data = vector_type;
+        return KAN_TRUE;
+    }
+
+    struct inbuilt_matrix_type_t *matrix_type = find_inbuilt_matrix_type (type_name);
+    if (matrix_type)
+    {
+        type->class = COMPILER_INSTANCE_TYPE_CLASS_MATRIX;
+        type->matrix_data = matrix_type;
+        return KAN_TRUE;
+    }
+
+    if (type_name == STATICS.interned_sampler)
+    {
+        type->class = COMPILER_INSTANCE_TYPE_CLASS_SAMPLER;
+        return KAN_TRUE;
+    }
+
+    if (type_name == STATICS.interned_image_color_2d)
+    {
+        type->class = COMPILER_INSTANCE_TYPE_CLASS_IMAGE;
+        type->image_type = KAN_RPL_IMAGE_TYPE_COLOR_2D;
+        return KAN_TRUE;
+    }
+
+    if (type_name == STATICS.interned_image_color_3d)
+    {
+        type->class = COMPILER_INSTANCE_TYPE_CLASS_IMAGE;
+        type->image_type = KAN_RPL_IMAGE_TYPE_COLOR_3D;
+        return KAN_TRUE;
+    }
+
+    if (type_name == STATICS.interned_image_color_cube)
+    {
+        type->class = COMPILER_INSTANCE_TYPE_CLASS_IMAGE;
+        type->image_type = KAN_RPL_IMAGE_TYPE_COLOR_CUBE;
+        return KAN_TRUE;
+    }
+
+    if (type_name == STATICS.interned_image_color_2d_array)
+    {
+        type->class = COMPILER_INSTANCE_TYPE_CLASS_IMAGE;
+        type->image_type = KAN_RPL_IMAGE_TYPE_COLOR_2D_ARRAY;
+        return KAN_TRUE;
+    }
+
+    if (type_name == STATICS.interned_image_depth_2d)
+    {
+        type->class = COMPILER_INSTANCE_TYPE_CLASS_IMAGE;
+        type->image_type = KAN_RPL_IMAGE_TYPE_DEPTH_2D;
+        return KAN_TRUE;
+    }
+
+    if (type_name == STATICS.interned_image_depth_3d)
+    {
+        type->class = COMPILER_INSTANCE_TYPE_CLASS_IMAGE;
+        type->image_type = KAN_RPL_IMAGE_TYPE_DEPTH_3D;
+        return KAN_TRUE;
+    }
+
+    if (type_name == STATICS.interned_image_depth_cube)
+    {
+        type->class = COMPILER_INSTANCE_TYPE_CLASS_IMAGE;
+        type->image_type = KAN_RPL_IMAGE_TYPE_DEPTH_CUBE;
+        return KAN_TRUE;
+    }
+
+    if (type_name == STATICS.interned_image_depth_2d_array)
+    {
+        type->class = COMPILER_INSTANCE_TYPE_CLASS_IMAGE;
+        type->image_type = KAN_RPL_IMAGE_TYPE_DEPTH_2D_ARRAY;
+        return KAN_TRUE;
+    }
+
+    if (resolve_use_struct (context, instance, type_name, &type->struct_data))
+    {
+        type->class = COMPILER_INSTANCE_TYPE_CLASS_STRUCT;
+        return KAN_TRUE;
+    }
+
+    KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR, "[%s:%s:%s:%ld] Declaration \"%s\" type \"%s\" is unknown.",
+             context->log_name, intermediate_log_name, source_name_for_logging, (long) source_line_for_logging,
+             declaration_name_for_logging, type_name)
+    return KAN_FALSE;
 }
 
-static kan_bool_t resolve_declarations (struct rpl_compiler_context_t *context,
-                                        struct rpl_compiler_instance_t *instance,
-                                        struct kan_rpl_intermediate_t *intermediate,
-                                        struct kan_dynamic_array_t *declaration_array,
-                                        struct compiler_instance_declaration_node_t **first_output,
-                                        kan_bool_t instance_options_allowed)
+static kan_bool_t resolve_field_declarations (struct rpl_compiler_context_t *context,
+                                              struct rpl_compiler_instance_t *instance,
+                                              struct kan_rpl_intermediate_t *intermediate,
+                                              struct kan_dynamic_array_t *declaration_array,
+                                              struct compiler_instance_declaration_node_t **first_output)
 {
     kan_bool_t result = KAN_TRUE;
     kan_instance_size_t current_offset = 0u;
@@ -774,8 +871,7 @@ static kan_bool_t resolve_declarations (struct rpl_compiler_context_t *context,
         struct kan_rpl_declaration_t *source_declaration =
             &((struct kan_rpl_declaration_t *) declaration_array->data)[declaration_index];
 
-        switch (evaluate_conditional (context, intermediate, source_declaration->conditional_index,
-                                      instance_options_allowed))
+        switch (evaluate_conditional (context, intermediate, source_declaration->conditional_index, KAN_FALSE))
         {
         case CONDITIONAL_EVALUATION_RESULT_FAILED:
             result = KAN_FALSE;
@@ -788,28 +884,50 @@ static kan_bool_t resolve_declarations (struct rpl_compiler_context_t *context,
 
             target_declaration->next = NULL;
             target_declaration->variable.name = source_declaration->name;
-            target_declaration->variable.type.if_vector = NULL;
-            target_declaration->variable.type.if_matrix = NULL;
-            target_declaration->variable.type.if_struct = NULL;
+            target_declaration->variable.type.class = COMPILER_INSTANCE_TYPE_CLASS_VOID;
 
-            if (!resolve_variable_type (context, instance, intermediate->log_name, &target_declaration->variable,
-                                        source_declaration->type_name, source_declaration->name,
-                                        source_declaration->source_name, source_declaration->source_line))
+            if (!resolve_type (context, instance, intermediate->log_name, &target_declaration->variable.type,
+                               source_declaration->type_name, source_declaration->name, source_declaration->source_name,
+                               source_declaration->source_line))
             {
                 result = KAN_FALSE;
             }
 
-            if (!resolve_array_dimensions (
-                    context, instance, intermediate, &target_declaration->variable,
-                    source_declaration->array_size_runtime, source_declaration->array_size_expression_list_size,
-                    source_declaration->array_size_expression_list_index, instance_options_allowed))
+            if (!resolve_array_dimensions (context, instance, intermediate, &target_declaration->variable,
+                                           source_declaration->array_size_runtime,
+                                           source_declaration->array_size_expression_list_size,
+                                           source_declaration->array_size_expression_list_index, KAN_FALSE))
             {
                 result = KAN_FALSE;
             }
 
             if (result)
             {
-                calculate_full_type_definition_size_and_alignment (
+                switch (target_declaration->variable.type.class)
+                {
+                case COMPILER_INSTANCE_TYPE_CLASS_VOID:
+                case COMPILER_INSTANCE_TYPE_CLASS_BOOLEAN:
+                case COMPILER_INSTANCE_TYPE_CLASS_BUFFER:
+                case COMPILER_INSTANCE_TYPE_CLASS_SAMPLER:
+                case COMPILER_INSTANCE_TYPE_CLASS_IMAGE:
+                    KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
+                             "[%s:%s:%s:%ld] Declaration \"%s\" has type \"%s\" which is not supported for fields.",
+                             context->log_name, intermediate->log_name, source_declaration->source_name,
+                             (long) source_declaration->source_line, source_declaration->name,
+                             source_declaration->type_name)
+                    result = KAN_FALSE;
+                    break;
+
+                case COMPILER_INSTANCE_TYPE_CLASS_VECTOR:
+                case COMPILER_INSTANCE_TYPE_CLASS_MATRIX:
+                case COMPILER_INSTANCE_TYPE_CLASS_STRUCT:
+                    break;
+                }
+            }
+
+            if (result)
+            {
+                calculate_type_definition_size_and_alignment (
                     &target_declaration->variable.type, 0u, &target_declaration->size, &target_declaration->alignment);
 
                 if (target_declaration->size != 0u && target_declaration->alignment != 0u)
@@ -938,7 +1056,19 @@ static kan_bool_t flatten_buffer_process_field (struct rpl_compiler_context_t *c
                                                 struct binding_location_assignment_counter_t *assignment_counter)
 {
     kan_bool_t result = KAN_TRUE;
-    if (declaration->variable.type.if_vector || declaration->variable.type.if_matrix)
+    switch (declaration->variable.type.class)
+    {
+    case COMPILER_INSTANCE_TYPE_CLASS_VOID:
+    case COMPILER_INSTANCE_TYPE_CLASS_BOOLEAN:
+    case COMPILER_INSTANCE_TYPE_CLASS_BUFFER:
+    case COMPILER_INSTANCE_TYPE_CLASS_SAMPLER:
+    case COMPILER_INSTANCE_TYPE_CLASS_IMAGE:
+        // Cannot be fields, should be detected and aborted earlier.
+        KAN_ASSERT (KAN_FALSE)
+        break;
+
+    case COMPILER_INSTANCE_TYPE_CLASS_VECTOR:
+    case COMPILER_INSTANCE_TYPE_CLASS_MATRIX:
     {
         // Reached leaf.
         struct compiler_instance_buffer_flattened_declaration_t *flattened = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (
@@ -955,16 +1085,16 @@ static kan_bool_t flatten_buffer_process_field (struct rpl_compiler_context_t *c
         case KAN_RPL_BUFFER_TYPE_VERTEX_ATTRIBUTE:
         case KAN_RPL_BUFFER_TYPE_INSTANCED_ATTRIBUTE:
             flattened->location = assignment_counter->next_attribute_location;
-            if (flattened->source_declaration->variable.type.if_vector)
+            if (flattened->source_declaration->variable.type.class == COMPILER_INSTANCE_TYPE_CLASS_VECTOR)
             {
                 ++assignment_counter->next_attribute_location;
             }
-            else if (flattened->source_declaration->variable.type.if_matrix)
+            else if (flattened->source_declaration->variable.type.class == COMPILER_INSTANCE_TYPE_CLASS_MATRIX)
             {
                 // Unfortunately, most graphic APIs cannot push matrix as one attribute,
                 // therefore we need to process one matrix attribute as several column attributes.
                 assignment_counter->next_attribute_location +=
-                    flattened->source_declaration->variable.type.if_matrix->columns;
+                    flattened->source_declaration->variable.type.matrix_data->columns;
             }
             else
             {
@@ -1000,15 +1130,18 @@ static kan_bool_t flatten_buffer_process_field (struct rpl_compiler_context_t *c
 
         buffer->last_flattened_declaration = flattened;
         output_node->flattened_result = flattened;
+        break;
     }
-    else if (declaration->variable.type.if_struct)
-    {
+
+    case COMPILER_INSTANCE_TYPE_CLASS_STRUCT:
         if (!flatten_buffer_process_field_list (context, instance, buffer,
-                                                declaration->variable.type.if_struct->first_field, output_node,
+                                                declaration->variable.type.struct_data->first_field, output_node,
                                                 assignment_counter))
         {
             result = KAN_FALSE;
         }
+
+        break;
     }
 
     return result;
@@ -1042,10 +1175,21 @@ static kan_bool_t resolve_buffers_validate_uniform_internals_alignment (
 
     while (declaration)
     {
-        if (declaration->variable.type.if_vector)
+        switch (declaration->variable.type.class)
         {
-            const kan_instance_size_t size = declaration->variable.type.if_vector->items_count *
-                                             inbuilt_type_item_size[declaration->variable.type.if_vector->item];
+        case COMPILER_INSTANCE_TYPE_CLASS_VOID:
+        case COMPILER_INSTANCE_TYPE_CLASS_BOOLEAN:
+        case COMPILER_INSTANCE_TYPE_CLASS_BUFFER:
+        case COMPILER_INSTANCE_TYPE_CLASS_SAMPLER:
+        case COMPILER_INSTANCE_TYPE_CLASS_IMAGE:
+            // Cannot be fields, should be detected and aborted earlier.
+            KAN_ASSERT (KAN_FALSE)
+            break;
+
+        case COMPILER_INSTANCE_TYPE_CLASS_VECTOR:
+        {
+            const kan_instance_size_t size = declaration->variable.type.vector_data->items_count *
+                                             inbuilt_type_item_size[declaration->variable.type.vector_data->item];
 
             if (size % 16u != 0u)
             {
@@ -1056,12 +1200,15 @@ static kan_bool_t resolve_buffers_validate_uniform_internals_alignment (
                          (long) declaration->source_line, declaration->variable.name, buffer->name)
                 valid = KAN_FALSE;
             }
+
+            break;
         }
-        else if (declaration->variable.type.if_matrix)
+
+        case COMPILER_INSTANCE_TYPE_CLASS_MATRIX:
         {
-            const kan_instance_size_t size = declaration->variable.type.if_matrix->rows *
-                                             declaration->variable.type.if_matrix->columns *
-                                             inbuilt_type_item_size[declaration->variable.type.if_matrix->item];
+            const kan_instance_size_t size = declaration->variable.type.matrix_data->rows *
+                                             declaration->variable.type.matrix_data->columns *
+                                             inbuilt_type_item_size[declaration->variable.type.matrix_data->item];
 
             if (size % 16u != 0u)
             {
@@ -1072,14 +1219,18 @@ static kan_bool_t resolve_buffers_validate_uniform_internals_alignment (
                          (long) declaration->source_line, declaration->variable.name, buffer->name)
                 valid = KAN_FALSE;
             }
+
+            break;
         }
-        else if (declaration->variable.type.if_struct)
-        {
+
+        case COMPILER_INSTANCE_TYPE_CLASS_STRUCT:
             if (!resolve_buffers_validate_uniform_internals_alignment (
-                    context, buffer, declaration->variable.type.if_struct->first_field))
+                    context, buffer, declaration->variable.type.struct_data->first_field))
             {
                 valid = KAN_FALSE;
             }
+
+            break;
         }
 
         declaration = declaration->next;
@@ -1114,10 +1265,10 @@ static kan_bool_t resolve_buffers_validate_buffer_tail_if_any (
                          (long) declaration->source_line, declaration->variable.name, buffer->name)
             }
         }
-        else if (declaration->variable.type.if_struct)
+        else if (declaration->variable.type.class == COMPILER_INSTANCE_TYPE_CLASS_STRUCT)
         {
             if (!resolve_buffers_validate_buffer_tail_if_any (
-                    context, buffer, declaration->variable.type.if_struct->first_field, has_tail_output))
+                    context, buffer, declaration->variable.type.struct_data->first_field, has_tail_output))
             {
                 valid = KAN_FALSE;
             }
@@ -1143,6 +1294,11 @@ static kan_bool_t is_global_name_occupied (struct rpl_compiler_context_t *contex
                                            struct rpl_compiler_instance_t *instance,
                                            kan_interned_string_t name)
 {
+    if (name == STATICS.sample_function_name)
+    {
+        return KAN_TRUE;
+    }
+
     struct compiler_instance_struct_node_t *struct_data = instance->first_struct;
     while (struct_data)
     {
@@ -1174,6 +1330,17 @@ static kan_bool_t is_global_name_occupied (struct rpl_compiler_context_t *contex
         }
 
         sampler = sampler->next;
+    }
+
+    struct compiler_instance_image_node_t *image = instance->first_image;
+    while (image)
+    {
+        if (image->name == name)
+        {
+            return KAN_TRUE;
+        }
+
+        image = image->next;
     }
 
     struct compiler_instance_function_node_t *function = instance->first_function;
@@ -1279,8 +1446,8 @@ static kan_bool_t resolve_buffers_of_type (struct rpl_compiler_context_t *contex
             }
 #endif
 
-            if (!resolve_declarations (context, instance, intermediate, &source_buffer->fields,
-                                       &target_buffer->first_field, KAN_FALSE))
+            if (!resolve_field_declarations (context, instance, intermediate, &source_buffer->fields,
+                                             &target_buffer->first_field))
             {
                 result = KAN_FALSE;
             }
@@ -1374,6 +1541,15 @@ static kan_bool_t resolve_buffers_of_type (struct rpl_compiler_context_t *contex
                         result = KAN_FALSE;
                     }
 
+                    if (has_tail)
+                    {
+                        KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
+                                 "[%s:%s:%s:%ld] Uniform buffer cannot have tails, but buffer \"%s\" has one.",
+                                 context->log_name, intermediate->log_name, target_buffer->source_name,
+                                 (long) target_buffer->source_line, target_buffer->name)
+                        result = KAN_FALSE;
+                    }
+
                     break;
                 }
 
@@ -1401,7 +1577,7 @@ static kan_bool_t resolve_buffers_of_type (struct rpl_compiler_context_t *contex
 
                     while (declaration)
                     {
-                        if (!declaration->source_declaration->variable.type.if_vector)
+                        if (declaration->source_declaration->variable.type.class != COMPILER_INSTANCE_TYPE_CLASS_VECTOR)
                         {
                             KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
                                      "[%s:%s:%s:%ld] Fragment stage output should only contain vector declarations, "
@@ -1468,23 +1644,16 @@ static kan_bool_t resolve_buffers (struct rpl_compiler_context_t *context,
                                     KAN_RPL_BUFFER_TYPE_FRAGMENT_STAGE_OUTPUT);
 }
 
-static kan_bool_t resolve_samplers_of_type (struct rpl_compiler_context_t *context,
-                                            struct rpl_compiler_instance_t *instance,
-                                            struct kan_rpl_intermediate_t *intermediate,
-                                            struct binding_location_assignment_counter_t *assignment_counter,
-                                            enum kan_rpl_sampler_type_t sampler_type)
+static kan_bool_t resolve_samplers (struct rpl_compiler_context_t *context,
+                                    struct rpl_compiler_instance_t *instance,
+                                    struct kan_rpl_intermediate_t *intermediate,
+                                    struct binding_location_assignment_counter_t *assignment_counter)
 {
     kan_bool_t result = KAN_TRUE;
     for (kan_loop_size_t sampler_index = 0u; sampler_index < intermediate->samplers.size; ++sampler_index)
     {
         struct kan_rpl_sampler_t *source_sampler =
             &((struct kan_rpl_sampler_t *) intermediate->samplers.data)[sampler_index];
-
-        // Sampler of other type, will be resolved later.
-        if (source_sampler->type != sampler_type)
-        {
-            continue;
-        }
 
         switch (evaluate_conditional (context, intermediate, source_sampler->conditional_index, KAN_FALSE))
         {
@@ -1510,7 +1679,6 @@ static kan_bool_t resolve_samplers_of_type (struct rpl_compiler_context_t *conte
 
             target_sampler->next = NULL;
             target_sampler->name = source_sampler->name;
-            target_sampler->type = source_sampler->type;
 
             target_sampler->used = KAN_FALSE;
             target_sampler->set = source_sampler->set;
@@ -1560,13 +1728,128 @@ static kan_bool_t resolve_samplers_of_type (struct rpl_compiler_context_t *conte
     return result;
 }
 
-static kan_bool_t resolve_samplers (struct rpl_compiler_context_t *context,
-                                    struct rpl_compiler_instance_t *instance,
-                                    struct kan_rpl_intermediate_t *intermediate,
-                                    struct binding_location_assignment_counter_t *assignment_counter)
+static kan_bool_t resolve_images_of_type (struct rpl_compiler_context_t *context,
+                                          struct rpl_compiler_instance_t *instance,
+                                          struct kan_rpl_intermediate_t *intermediate,
+                                          struct binding_location_assignment_counter_t *assignment_counter,
+                                          enum kan_rpl_image_type_t image_type)
 {
-    // Sampler resolution is ordered by sampler types in order to make resulting pipeline bindings layouts more common.
-    return resolve_samplers_of_type (context, instance, intermediate, assignment_counter, KAN_RPL_SAMPLER_TYPE_2D);
+    kan_bool_t result = KAN_TRUE;
+    for (kan_loop_size_t image_index = 0u; image_index < intermediate->images.size; ++image_index)
+    {
+        struct kan_rpl_image_t *source_image = &((struct kan_rpl_image_t *) intermediate->images.data)[image_index];
+
+        // Image of other type, will be resolved later.
+        if (source_image->type != image_type)
+        {
+            continue;
+        }
+
+        switch (evaluate_conditional (context, intermediate, source_image->conditional_index, KAN_FALSE))
+        {
+        case CONDITIONAL_EVALUATION_RESULT_FAILED:
+            result = KAN_FALSE;
+            break;
+
+        case CONDITIONAL_EVALUATION_RESULT_TRUE:
+        {
+            if (is_global_name_occupied (context, instance, source_image->name))
+            {
+                KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
+                         "[%s:%s:%s:%ld] Cannot resolve image \"%s\" as its global name is already occupied.",
+                         context->log_name, intermediate->log_name, source_image->source_name,
+                         (long) source_image->source_line, source_image->name)
+
+                result = KAN_FALSE;
+                break;
+            }
+
+            struct compiler_instance_image_node_t *target_image = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (
+                &instance->resolve_allocator, struct compiler_instance_image_node_t);
+
+            target_image->next = NULL;
+            target_image->name = source_image->name;
+            target_image->set = source_image->set;
+            target_image->type = source_image->type;
+            target_image->used = KAN_FALSE;
+            target_image->array_size = 1u;
+
+            if (source_image->array_size_index != KAN_RPL_EXPRESSION_INDEX_NONE)
+            {
+                if (!resolve_array_dimension_value (context, instance, intermediate, source_image->array_size_index,
+                                                    &target_image->array_size, KAN_FALSE, 0u))
+                {
+                    KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
+                             "[%s:%s:%s:%ld] Cannot resolve image \"%s\" due to error while array size resolution.",
+                             context->log_name, intermediate->log_name, source_image->source_name,
+                             (long) source_image->source_line, source_image->name)
+
+                    result = KAN_FALSE;
+                    break;
+                }
+            }
+
+            switch (target_image->set)
+            {
+            case KAN_RPL_SET_PASS:
+                target_image->binding = assignment_counter->next_pass_set_binding++;
+                break;
+
+            case KAN_RPL_SET_MATERIAL:
+                target_image->binding = assignment_counter->next_material_set_binding++;
+                break;
+
+            case KAN_RPL_SET_OBJECT:
+                target_image->binding = assignment_counter->next_object_set_binding++;
+                break;
+
+            case KAN_RPL_SET_SHARED:
+                target_image->binding = assignment_counter->next_shared_set_binding++;
+                break;
+            }
+
+            target_image->module_name = intermediate->log_name;
+            target_image->source_name = source_image->source_name;
+            target_image->source_line = source_image->source_line;
+
+            if (instance->last_image)
+            {
+                instance->last_image->next = target_image;
+                instance->last_image = target_image;
+            }
+            else
+            {
+                instance->first_image = target_image;
+                instance->last_image = target_image;
+            }
+
+            break;
+        }
+
+        case CONDITIONAL_EVALUATION_RESULT_FALSE:
+            break;
+        }
+    }
+
+    return result;
+}
+
+static kan_bool_t resolve_images (struct rpl_compiler_context_t *context,
+                                  struct rpl_compiler_instance_t *instance,
+                                  struct kan_rpl_intermediate_t *intermediate,
+                                  struct binding_location_assignment_counter_t *assignment_counter)
+{
+    // Image resolution is ordered by image types in order to make resulting pipeline bindings layouts more common.
+    return resolve_images_of_type (context, instance, intermediate, assignment_counter, KAN_RPL_IMAGE_TYPE_COLOR_2D) &
+           resolve_images_of_type (context, instance, intermediate, assignment_counter, KAN_RPL_IMAGE_TYPE_COLOR_3D) &
+           resolve_images_of_type (context, instance, intermediate, assignment_counter, KAN_RPL_IMAGE_TYPE_COLOR_CUBE) &
+           resolve_images_of_type (context, instance, intermediate, assignment_counter,
+                                   KAN_RPL_IMAGE_TYPE_COLOR_2D_ARRAY) &
+           resolve_images_of_type (context, instance, intermediate, assignment_counter, KAN_RPL_IMAGE_TYPE_DEPTH_2D) &
+           resolve_images_of_type (context, instance, intermediate, assignment_counter, KAN_RPL_IMAGE_TYPE_DEPTH_3D) &
+           resolve_images_of_type (context, instance, intermediate, assignment_counter, KAN_RPL_IMAGE_TYPE_DEPTH_CUBE) &
+           resolve_images_of_type (context, instance, intermediate, assignment_counter,
+                                   KAN_RPL_IMAGE_TYPE_DEPTH_2D_ARRAY);
 }
 
 static const char *get_stage_name (enum kan_rpl_pipeline_stage_t stage)
@@ -1762,8 +2045,8 @@ static kan_bool_t resolve_use_struct (struct rpl_compiler_context_t *context,
     struct_node->source_name = intermediate_struct->source_name;
     struct_node->source_line = intermediate_struct->source_line;
 
-    if (!resolve_declarations (context, instance, selected_intermediate, &intermediate_struct->fields,
-                               &struct_node->first_field, KAN_FALSE))
+    if (!resolve_field_declarations (context, instance, selected_intermediate, &intermediate_struct->fields,
+                                     &struct_node->first_field))
     {
         resolve_successful = KAN_FALSE;
     }
@@ -1816,9 +2099,9 @@ static inline kan_bool_t resolve_bind_function_to_stage (struct rpl_compiler_con
 static kan_bool_t resolve_use_buffer (struct rpl_compiler_context_t *context,
                                       struct rpl_compiler_instance_t *instance,
                                       struct compiler_instance_function_node_t *function,
-                                      kan_rpl_size_t usage_line,
                                       enum kan_rpl_pipeline_stage_t stage,
-                                      struct compiler_instance_buffer_node_t *buffer)
+                                      struct compiler_instance_buffer_node_t *buffer,
+                                      kan_rpl_size_t usage_line)
 {
     struct compiler_instance_buffer_access_node_t *access_node = function->first_buffer_access;
     while (access_node)
@@ -1888,21 +2171,38 @@ static kan_bool_t resolve_use_sampler (struct rpl_compiler_context_t *context,
     function->first_sampler_access = access_node;
     access_node->sampler = sampler;
     access_node->direct_access_function = function;
-
-    enum kan_rpl_pipeline_stage_t sampling_stage = KAN_RPL_PIPELINE_STAGE_GRAPHICS_CLASSIC_FRAGMENT;
-    switch (context->pipeline_type)
-    {
-    case KAN_RPL_PIPELINE_TYPE_GRAPHICS_CLASSIC:
-        sampling_stage = KAN_RPL_PIPELINE_STAGE_GRAPHICS_CLASSIC_FRAGMENT;
-        break;
-    }
-
-    if (!resolve_bind_function_to_stage (context, function, sampling_stage, usage_line, sampler->name))
-    {
-        return KAN_FALSE;
-    }
-
+    // Sampling is not stage specific, therefore there is no additional stage binding.
     sampler->used = KAN_TRUE;
+    return KAN_TRUE;
+}
+
+static kan_bool_t resolve_use_image (struct rpl_compiler_context_t *context,
+                                     struct rpl_compiler_instance_t *instance,
+                                     struct compiler_instance_function_node_t *function,
+                                     struct compiler_instance_image_node_t *image,
+                                     kan_rpl_size_t usage_line)
+{
+    struct compiler_instance_image_access_node_t *access_node = function->first_image_access;
+    while (access_node)
+    {
+        if (access_node->image == image)
+        {
+            // Already used, no need fop further verification.
+            return KAN_TRUE;
+        }
+
+        access_node = access_node->next;
+    }
+
+    access_node = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&instance->resolve_allocator,
+                                                            struct compiler_instance_image_access_node_t);
+
+    access_node->next = function->first_image_access;
+    function->first_image_access = access_node;
+    access_node->image = image;
+    access_node->direct_access_function = function;
+    // Image usage not stage specific, therefore there is no additional stage binding.
+    image->used = KAN_TRUE;
     return KAN_TRUE;
 }
 
@@ -1957,35 +2257,69 @@ static const char *get_expression_call_name_for_logging (struct compiler_instanc
     {
         return owner_expression->function_call.function->name;
     }
-    else if (owner_expression->type == COMPILER_INSTANCE_EXPRESSION_TYPE_SAMPLER_CALL)
+    else if (owner_expression->type == COMPILER_INSTANCE_EXPRESSION_TYPE_IMAGE_SAMPLE)
     {
-        return owner_expression->sampler_call.sampler->name;
+        return STATICS.sample_function_name;
     }
-    else if (owner_expression->type == COMPILER_INSTANCE_EXPRESSION_TYPE_CONSTRUCTOR)
+    else if (owner_expression->type == COMPILER_INSTANCE_EXPRESSION_TYPE_VECTOR_CONSTRUCTOR)
     {
-        return get_type_name_for_logging (owner_expression->constructor.type_if_vector,
-                                          owner_expression->constructor.type_if_matrix,
-                                          owner_expression->constructor.type_if_struct);
+        return owner_expression->vector_constructor.type->name;
+    }
+    else if (owner_expression->type == COMPILER_INSTANCE_EXPRESSION_TYPE_MATRIX_CONSTRUCTOR)
+    {
+        return owner_expression->matrix_constructor.type->name;
+    }
+    else if (owner_expression->type == COMPILER_INSTANCE_EXPRESSION_TYPE_STRUCT_CONSTRUCTOR)
+    {
+        return owner_expression->struct_constructor.type->name;
     }
 
     return "<unknown_call_name>";
 }
 
+static inline kan_bool_t is_access_readable (enum kan_rpl_access_class_t access)
+{
+    switch (access)
+    {
+    case KAN_RPL_ACCESS_CLASS_READ_ONLY:
+    case KAN_RPL_ACCESS_CLASS_READ_WRITE:
+        return KAN_TRUE;
+
+    case KAN_RPL_ACCESS_CLASS_WRITE_ONLY:
+        return KAN_FALSE;
+    }
+
+    KAN_ASSERT (KAN_FALSE)
+    return KAN_FALSE;
+}
+
+static inline kan_bool_t is_access_writeable (enum kan_rpl_access_class_t access)
+{
+    switch (access)
+    {
+    case KAN_RPL_ACCESS_CLASS_READ_ONLY:
+        return KAN_FALSE;
+
+    case KAN_RPL_ACCESS_CLASS_WRITE_ONLY:
+    case KAN_RPL_ACCESS_CLASS_READ_WRITE:
+        return KAN_TRUE;
+    }
+
+    KAN_ASSERT (KAN_FALSE)
+    return KAN_FALSE;
+}
+
 static inline kan_bool_t resolve_match_signature_at_index (struct rpl_compiler_context_t *context,
                                                            kan_interned_string_t module_name,
                                                            struct compiler_instance_expression_node_t *owner_expression,
-                                                           struct compiler_instance_declaration_node_t *signature,
+                                                           struct compiler_instance_variable_t *signature,
+                                                           enum kan_rpl_access_class_t signature_access_class,
                                                            kan_rpl_size_t signature_index,
                                                            struct compiler_instance_expression_node_t *expression)
 {
     if (signature)
     {
-        if ((signature->variable.type.if_vector &&
-             signature->variable.type.if_vector != expression->output.type.if_vector) ||
-            (signature->variable.type.if_matrix &&
-             signature->variable.type.if_matrix != expression->output.type.if_matrix) ||
-            (signature->variable.type.if_struct &&
-             signature->variable.type.if_struct != expression->output.type.if_struct))
+        if (!is_type_definition_base_equal (&signature->type, &expression->output.type))
         {
             KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
                      "[%s:%s:%s:%ld] Expression array item at index %ld for \"%s\" call has incorrect "
@@ -1993,44 +2327,71 @@ static inline kan_bool_t resolve_match_signature_at_index (struct rpl_compiler_c
                      context->log_name, module_name, owner_expression->source_name,
                      (long) owner_expression->source_line, (long) signature_index,
                      get_expression_call_name_for_logging (owner_expression),
-                     get_type_name_for_logging (expression->output.type.if_vector, expression->output.type.if_matrix,
-                                                expression->output.type.if_struct),
-                     get_type_name_for_logging (signature->variable.type.if_vector, signature->variable.type.if_matrix,
-                                                signature->variable.type.if_struct))
+                     get_type_name_for_logging (&expression->output.type), get_type_name_for_logging (&signature->type))
             return KAN_FALSE;
         }
+
+        if (is_access_readable (signature_access_class) && !is_access_readable (expression->output.access))
+        {
+            KAN_LOG (
+                rpl_compiler_context, KAN_LOG_ERROR,
+                "[%s:%s:%s:%ld] Expression array item at index %ld for \"%s\" call must be readable, but it isn't.",
+                context->log_name, module_name, owner_expression->source_name, (long) owner_expression->source_line,
+                (long) signature_index, get_expression_call_name_for_logging (owner_expression))
+            return KAN_FALSE;
+        }
+
+        if (is_access_writeable (signature_access_class) && !is_access_writeable (expression->output.access))
+        {
+            KAN_LOG (
+                rpl_compiler_context, KAN_LOG_ERROR,
+                "[%s:%s:%s:%ld] Expression array item at index %ld for \"%s\" call must be writeable, but it isn't.",
+                context->log_name, module_name, owner_expression->source_name, (long) owner_expression->source_line,
+                (long) signature_index, get_expression_call_name_for_logging (owner_expression))
+            return KAN_FALSE;
+        }
+
         // Runtime arrays should not matter here as they should be disallowed on parser level.
-        else if (signature->variable.type.array_dimensions_count != expression->output.type.array_dimensions_count)
+        KAN_ASSERT (!signature->type.array_size_runtime)
+
+        if (expression->output.type.array_size_runtime)
         {
             KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
-                     "[%s:%s:%s:%ld] Expression array item at index %ld for \"%s\" call has incorrect "
-                     "array dimension count: %ld while %ld is expected",
+                     "[%s:%s:%s:%ld] Expression array item at index %ld for \"%s\" call is a runtime array, which is "
+                     "not allowed.",
                      context->log_name, module_name, owner_expression->source_name,
                      (long) owner_expression->source_line, (long) signature_index,
-                     get_expression_call_name_for_logging (owner_expression),
-                     (long) expression->output.type.array_dimensions_count,
-                     (long) signature->variable.type.array_dimensions_count)
+                     get_expression_call_name_for_logging (owner_expression))
             return KAN_FALSE;
         }
-        else
+
+        if (signature->type.array_dimensions_count != expression->output.type.array_dimensions_count)
         {
-            // Runtime arrays should not matter here as they should be disallowed on parser level.
-            for (kan_loop_size_t array_dimension_index = 0u;
-                 array_dimension_index < signature->variable.type.array_dimensions_count; ++array_dimension_index)
+            KAN_LOG (
+                rpl_compiler_context, KAN_LOG_ERROR,
+                "[%s:%s:%s:%ld] Expression array item at index %ld for \"%s\" call has incorrect "
+                "array dimension count: %ld while %ld is expected",
+                context->log_name, module_name, owner_expression->source_name, (long) owner_expression->source_line,
+                (long) signature_index, get_expression_call_name_for_logging (owner_expression),
+                (long) expression->output.type.array_dimensions_count, (long) signature->type.array_dimensions_count)
+            return KAN_FALSE;
+        }
+
+        for (kan_loop_size_t array_dimension_index = 0u; array_dimension_index < signature->type.array_dimensions_count;
+             ++array_dimension_index)
+        {
+            if (signature->type.array_dimensions[array_dimension_index] !=
+                expression->output.type.array_dimensions[array_dimension_index])
             {
-                if (signature->variable.type.array_dimensions[array_dimension_index] !=
-                    expression->output.type.array_dimensions[array_dimension_index])
-                {
-                    KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
-                             "[%s:%s:%s:%ld] Expression array item at index %ld for \"%s\" call has "
-                             "incorrect array dimension %ld size: %ld while %ld is expected",
-                             context->log_name, module_name, owner_expression->source_name,
-                             (long) owner_expression->source_line, (long) signature_index,
-                             get_expression_call_name_for_logging (owner_expression), (long) array_dimension_index,
-                             (long) expression->output.type.array_dimensions[array_dimension_index],
-                             (long) signature->variable.type.array_dimensions[array_dimension_index])
-                    return KAN_FALSE;
-                }
+                KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
+                         "[%s:%s:%s:%ld] Expression array item at index %ld for \"%s\" call has "
+                         "incorrect array dimension %ld size: %ld while %ld is expected",
+                         context->log_name, module_name, owner_expression->source_name,
+                         (long) owner_expression->source_line, (long) signature_index,
+                         get_expression_call_name_for_logging (owner_expression), (long) array_dimension_index,
+                         (long) expression->output.type.array_dimensions[array_dimension_index],
+                         (long) signature->type.array_dimensions[array_dimension_index])
+                return KAN_FALSE;
             }
         }
     }
@@ -2056,11 +2417,11 @@ static inline kan_bool_t resolve_expression_array_with_signature (
     struct compiler_instance_expression_list_item_t **first_expression_output,
     kan_rpl_size_t expression_list_size,
     kan_rpl_size_t expression_list_index,
-    struct compiler_instance_declaration_node_t *first_argument)
+    struct compiler_instance_function_argument_node_t *first_argument)
 {
     kan_bool_t resolved = KAN_TRUE;
     struct compiler_instance_expression_list_item_t *last_expression = NULL;
-    struct compiler_instance_declaration_node_t *current_argument = first_argument;
+    struct compiler_instance_function_argument_node_t *current_argument = first_argument;
     kan_loop_size_t current_argument_index = 0u;
 
     for (kan_loop_size_t index = 0u; index < expression_list_size; ++index)
@@ -2091,13 +2452,16 @@ static inline kan_bool_t resolve_expression_array_with_signature (
             }
 
             last_expression = list_item;
-            if (!resolve_match_signature_at_index (context, resolve_scope->function->module_name, target_expression,
-                                                   current_argument, current_argument_index, resolved_expression))
+            if (!resolve_match_signature_at_index (
+                    context, resolve_scope->function->module_name, target_expression,
+                    current_argument ? &current_argument->variable : NULL,
+                    current_argument ? current_argument->access : KAN_RPL_ACCESS_CLASS_READ_ONLY,
+                    current_argument_index, resolved_expression))
             {
                 resolved = KAN_FALSE;
             }
 
-            current_argument = current_argument->next;
+            current_argument = current_argument ? current_argument->next : current_argument;
             ++current_argument_index;
         }
         else
@@ -2188,8 +2552,8 @@ static struct resolve_fiend_access_linear_node_t *resolve_field_access_linearize
     return first_node;
 }
 
-static kan_bool_t is_buffer_writable_for_stage (struct compiler_instance_buffer_node_t *buffer,
-                                                enum kan_rpl_pipeline_stage_t stage)
+static enum kan_rpl_access_class_t get_buffer_access_for_stage (struct compiler_instance_buffer_node_t *buffer,
+                                                                enum kan_rpl_pipeline_stage_t stage)
 {
     switch (buffer->type)
     {
@@ -2197,17 +2561,19 @@ static kan_bool_t is_buffer_writable_for_stage (struct compiler_instance_buffer_
     case KAN_RPL_BUFFER_TYPE_UNIFORM:
     case KAN_RPL_BUFFER_TYPE_READ_ONLY_STORAGE:
     case KAN_RPL_BUFFER_TYPE_INSTANCED_ATTRIBUTE:
-        return KAN_FALSE;
+        return KAN_RPL_ACCESS_CLASS_READ_ONLY;
 
     case KAN_RPL_BUFFER_TYPE_VERTEX_STAGE_OUTPUT:
-        return stage == KAN_RPL_PIPELINE_STAGE_GRAPHICS_CLASSIC_VERTEX;
+        return stage == KAN_RPL_PIPELINE_STAGE_GRAPHICS_CLASSIC_VERTEX ? KAN_RPL_ACCESS_CLASS_READ_WRITE :
+                                                                         KAN_RPL_ACCESS_CLASS_READ_ONLY;
 
     case KAN_RPL_BUFFER_TYPE_FRAGMENT_STAGE_OUTPUT:
-        return stage == KAN_RPL_PIPELINE_STAGE_GRAPHICS_CLASSIC_FRAGMENT;
+        return stage == KAN_RPL_PIPELINE_STAGE_GRAPHICS_CLASSIC_FRAGMENT ? KAN_RPL_ACCESS_CLASS_READ_WRITE :
+                                                                           KAN_RPL_ACCESS_CLASS_READ_ONLY;
     }
 
     KAN_ASSERT (KAN_FALSE)
-    return KAN_FALSE;
+    return KAN_RPL_ACCESS_CLASS_READ_ONLY;
 }
 
 static inline kan_bool_t resolve_field_access_ascend_flattened_buffer (
@@ -2224,8 +2590,8 @@ static inline kan_bool_t resolve_field_access_ascend_flattened_buffer (
     *declaration_output = NULL;
     *access_resolve_next_node = NULL;
 
-    if (!resolve_use_buffer (context, instance, resolve_scope->function, stop_expression_line,
-                             resolve_scope->function->required_stage, buffer))
+    if (!resolve_use_buffer (context, instance, resolve_scope->function, resolve_scope->function->required_stage,
+                             buffer, stop_expression_line))
     {
         return KAN_FALSE;
     }
@@ -2290,38 +2656,19 @@ static inline kan_bool_t resolve_field_access_structured (struct rpl_compiler_co
         return KAN_FALSE;
     }
 
-    if (input_node->output.boolean)
-    {
-        KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
-                 "[%s:%s:%s:%ld] Failed to resolve structured access: attempted to use \".\" on boolean.",
-                 context->log_name, resolve_scope->function->module_name, chain_first->field_source->source_name,
-                 (long) chain_first->field_source->source_line)
-        return KAN_FALSE;
-    }
-
     result_expression->type = COMPILER_INSTANCE_EXPRESSION_TYPE_STRUCTURED_ACCESS;
     result_expression->structured_access.input = input_node;
     result_expression->structured_access.access_chain_length = chain_length;
     result_expression->structured_access.access_chain_indices = kan_stack_group_allocator_allocate (
         &instance->resolve_allocator, sizeof (kan_instance_size_t) * chain_length, _Alignof (kan_instance_size_t));
 
-    kan_instance_size_t index = 0u;
-    result_expression->output.type.if_vector = input_node->output.type.if_vector;
-    result_expression->output.type.if_matrix = input_node->output.type.if_matrix;
-    result_expression->output.type.if_struct = input_node->output.type.if_struct;
-    result_expression->output.type.array_size_runtime = KAN_FALSE;
-    result_expression->output.type.array_dimensions_count = 0u;
-    result_expression->output.type.array_dimensions = NULL;
-    result_expression->output.boolean = KAN_FALSE;
-    result_expression->output.writable = input_node->output.writable;
+    copy_type_definition (&result_expression->output.type, &input_node->output.type);
+    result_expression->output.access = input_node->output.access;
 
-    if (input_node->type == COMPILER_INSTANCE_EXPRESSION_TYPE_STRUCTURED_BUFFER_REFERENCE)
-    {
-        result_expression->output.writable = is_buffer_writable_for_stage (input_node->structured_buffer_reference,
-                                                                           resolve_scope->function->required_stage);
-    }
-
+    kan_instance_size_t chain_output_index = 0u;
+    kan_bool_t increment_chain_output_index = KAN_TRUE;
     struct resolve_fiend_access_linear_node_t *chain_current = chain_first;
+
     while (chain_current)
     {
         kan_bool_t found = KAN_FALSE;
@@ -2335,143 +2682,319 @@ static inline kan_bool_t resolve_field_access_structured (struct rpl_compiler_co
             return KAN_FALSE;
         }
 
-        if (result_expression->output.type.if_vector)
+        switch (result_expression->output.type.class)
         {
-            if (result_expression->output.type.if_vector->items_count == 1u)
+        case COMPILER_INSTANCE_TYPE_CLASS_VOID:
+            KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
+                     "[%s:%s:%s:%ld] Failed to resolve structured access: attempted to use \".\" on void.",
+                     context->log_name, resolve_scope->function->module_name, chain_first->field_source->source_name,
+                     (long) chain_first->field_source->source_line)
+            return KAN_FALSE;
+
+        case COMPILER_INSTANCE_TYPE_CLASS_VECTOR:
+        {
+            if (chain_current->field_source->identifier[0u] == '\0')
             {
-                KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
-                         "[%s:%s:%s:%ld] Failed to resolve structured access: \"%s\" treated as scalar type and "
-                         "therefore has no fields.",
-                         context->log_name, resolve_scope->function->module_name,
-                         chain_first->field_source->source_name, (long) chain_first->field_source->source_line,
-                         result_expression->output.type.if_vector->name)
+                KAN_LOG (
+                    rpl_compiler_context, KAN_LOG_ERROR,
+                    "[%s:%s:%s:%ld] Failed to resolve structured access: vector component access specifier is empty.",
+                    context->log_name, resolve_scope->function->module_name, chain_first->field_source->source_name,
+                    (long) chain_first->field_source->source_line)
                 return KAN_FALSE;
             }
 
-            if (chain_current->field_source->identifier[0u] != '_' ||
-                chain_current->field_source->identifier[1u] < '0' ||
-                chain_current->field_source->identifier[1u] > '9' ||
-                chain_current->field_source->identifier[2u] != '\0')
+            if (chain_current->field_source->identifier[1u] == '\0')
             {
-                KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
-                         "[%s:%s:%s:%ld] Failed to resolve structured access: vector item access specifier \".\" "
-                         "doesn't match format \"_<digit>\".",
-                         context->log_name, resolve_scope->function->module_name,
-                         chain_first->field_source->source_name, (long) chain_first->field_source->source_line)
-                return KAN_FALSE;
+                switch (chain_current->field_source->identifier[0u])
+                {
+                case 'x':
+                    result_expression->structured_access.access_chain_indices[chain_output_index] = 0u;
+                    break;
+                case 'y':
+                    result_expression->structured_access.access_chain_indices[chain_output_index] = 1u;
+                    break;
+                case 'z':
+                    result_expression->structured_access.access_chain_indices[chain_output_index] = 2u;
+                    break;
+                case 'w':
+                    result_expression->structured_access.access_chain_indices[chain_output_index] = 3u;
+                    break;
+                default:
+                    KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
+                             "[%s:%s:%s:%ld] Failed to resolve structured access: unknown vector component access "
+                             "specified \"%s\", only \"x\", \"y\", \"z\" and \"w\" are supported for 0th, 1st, 2nd and "
+                             "3rd components respectively.",
+                             context->log_name, resolve_scope->function->module_name,
+                             chain_first->field_source->source_name, (long) chain_first->field_source->source_line,
+                             chain_current->field_source->identifier)
+                    return KAN_FALSE;
+                }
+
+                if (result_expression->structured_access.access_chain_indices[chain_output_index] >=
+                    result_expression->output.type.vector_data->items_count)
+                {
+                    KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
+                             "[%s:%s:%s:%ld] Failed to resolve structured access: \"%s\" has only %ld components, but "
+                             "component at index %ld requested.",
+                             context->log_name, resolve_scope->function->module_name,
+                             chain_first->field_source->source_name, (long) chain_first->field_source->source_line,
+                             result_expression->output.type.matrix_data->name,
+                             (long) result_expression->output.type.matrix_data->columns,
+                             (long) result_expression->structured_access.access_chain_indices[chain_output_index])
+                    return KAN_FALSE;
+                }
+
+                found = KAN_TRUE;
+                result_expression->output.type.class = COMPILER_INSTANCE_TYPE_CLASS_VECTOR;
+                result_expression->output.type.vector_data = &STATICS.vector_types[INBUILT_VECTOR_TYPE_INDEX (
+                    result_expression->output.type.matrix_data->item, 1u)];
+            }
+            else
+            {
+                if (!is_access_readable (result_expression->output.access))
+                {
+                    KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
+                             "[%s:%s:%s:%ld] Failed to resolve structured access: vector swizzle result is always read "
+                             "only, therefore its source must be readable, but it isn't.",
+                             context->log_name, resolve_scope->function->module_name,
+                             chain_first->field_source->source_name, (long) chain_first->field_source->source_line)
+                    return KAN_FALSE;
+                }
+
+                struct compiler_instance_expression_node_t *swizzle_input_node = input_node;
+                if (chain_current != chain_first)
+                {
+                    // Copy current structured access into separate node and use it as input for swizzle instead.
+                    struct compiler_instance_expression_node_t *new_expression =
+                        KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&instance->resolve_allocator,
+                                                                  struct compiler_instance_expression_node_t);
+
+                    new_expression->type = COMPILER_INSTANCE_EXPRESSION_TYPE_STRUCTURED_ACCESS;
+                    new_expression->structured_access = result_expression->structured_access;
+                    new_expression->structured_access.access_chain_length = chain_output_index;
+                    copy_type_definition (&new_expression->output.type, &result_expression->output.type);
+                    new_expression->output.access = result_expression->output.access;
+
+                    new_expression->module_name = result_expression->module_name;
+                    new_expression->source_name = result_expression->source_name;
+                    new_expression->source_line = result_expression->source_line;
+                    swizzle_input_node = new_expression;
+                }
+
+                struct compiler_instance_expression_node_t *swizzle_node = NULL;
+                if (chain_current->next)
+                {
+                    // Swizzle is not the last expression. Therefore, we need a new expression for it.
+                    struct compiler_instance_expression_node_t *new_expression =
+                        KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&instance->resolve_allocator,
+                                                                  struct compiler_instance_expression_node_t);
+
+                    new_expression->module_name = result_expression->module_name;
+                    new_expression->source_name = result_expression->source_name;
+                    new_expression->source_line = result_expression->source_line;
+                    swizzle_node = new_expression;
+                }
+                else
+                {
+                    // Swizzle is the last expression, we can write it directly to the result.
+                    swizzle_node = result_expression;
+                }
+
+                swizzle_node->type = COMPILER_INSTANCE_EXPRESSION_TYPE_SWIZZLE;
+                swizzle_node->swizzle.input = swizzle_input_node;
+                swizzle_node->swizzle.items_count = 0u;
+
+                while (chain_current->field_source->identifier[swizzle_node->swizzle.items_count] != '\0')
+                {
+                    if (swizzle_node->swizzle.items_count >= SWIZZLE_MAX_ITEMS)
+                    {
+                        KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
+                                 "[%s:%s:%s:%ld] Failed to resolve structured access: too many swizzle items, only up "
+                                 "to %u supported.",
+                                 context->log_name, resolve_scope->function->module_name,
+                                 chain_first->field_source->source_name, (long) chain_first->field_source->source_line,
+                                 (unsigned) SWIZZLE_MAX_ITEMS)
+                        return KAN_FALSE;
+                    }
+
+                    switch (chain_current->field_source->identifier[swizzle_node->swizzle.items_count])
+                    {
+                    case 'x':
+                        swizzle_node->swizzle.items[swizzle_node->swizzle.items_count] = 0u;
+                        break;
+                    case 'y':
+                        swizzle_node->swizzle.items[swizzle_node->swizzle.items_count] = 1u;
+                        break;
+                    case 'z':
+                        swizzle_node->swizzle.items[swizzle_node->swizzle.items_count] = 2u;
+                        break;
+                    case 'w':
+                        swizzle_node->swizzle.items[swizzle_node->swizzle.items_count] = 3u;
+                        break;
+                    default:
+                        KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
+                                 "[%s:%s:%s:%ld] Failed to resolve structured access: unknown vector component access "
+                                 "in swizzle specified \"%c\", only \"x\", \"y\", \"z\" and \"w\" are supported for "
+                                 "0th, 1st, 2nd and 3rd components respectively.",
+                                 context->log_name, resolve_scope->function->module_name,
+                                 chain_first->field_source->source_name, (long) chain_first->field_source->source_line,
+                                 chain_current->field_source->identifier[swizzle_node->swizzle.items_count])
+                        return KAN_FALSE;
+                    }
+
+                    ++swizzle_node->swizzle.items_count;
+                }
+
+                // Otherwise we're doing something wrong internally.
+                KAN_ASSERT (swizzle_node->swizzle.items_count > 1u)
+
+                found = KAN_TRUE;
+                // Swizzles cannot be targets for writing.
+                swizzle_node->output.access = KAN_RPL_ACCESS_CLASS_READ_ONLY;
+
+                result_expression->output.type.class = COMPILER_INSTANCE_TYPE_CLASS_VECTOR;
+                result_expression->output.type.vector_data = &STATICS.vector_types[INBUILT_VECTOR_TYPE_INDEX (
+                    result_expression->output.type.matrix_data->item, swizzle_node->swizzle.items_count)];
+
+                if (swizzle_node != result_expression)
+                {
+                    // Swizzle node is not a result expression. We need to properly rebuild result structured access.
+                    result_expression->structured_access.input = swizzle_node;
+                    KAN_ASSERT (result_expression->structured_access.access_chain_length > chain_output_index + 1u)
+                    result_expression->structured_access.access_chain_length -= chain_output_index - 1u;
+                    result_expression->structured_access.access_chain_indices += chain_output_index + 1u;
+                    copy_type_definition (&result_expression->output.type, &swizzle_node->output.type);
+                    result_expression->output.access = KAN_RPL_ACCESS_CLASS_READ_ONLY;
+
+                    chain_output_index = 0u;
+                    increment_chain_output_index = KAN_FALSE;
+                }
             }
 
-            result_expression->structured_access.access_chain_indices[index] =
-                chain_current->field_source->identifier[1u] - '0';
-
-            if (result_expression->structured_access.access_chain_indices[index] >=
-                result_expression->output.type.if_vector->items_count)
-            {
-                KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
-                         "[%s:%s:%s:%ld] Failed to resolve structured access: \"%s\" has only %ld items, but item at "
-                         "index %ld requested.",
-                         context->log_name, resolve_scope->function->module_name,
-                         chain_first->field_source->source_name, (long) chain_first->field_source->source_line,
-                         result_expression->output.type.if_vector->name,
-                         (long) result_expression->output.type.if_vector->items_count,
-                         (long) result_expression->structured_access.access_chain_indices[index])
-                return KAN_FALSE;
-            }
-
-            found = KAN_TRUE;
-            switch (result_expression->output.type.if_vector->item)
-            {
-            case INBUILT_TYPE_ITEM_FLOAT:
-                result_expression->output.type.if_vector = &STATICS.type_f1;
-                break;
-            case INBUILT_TYPE_ITEM_INTEGER:
-                result_expression->output.type.if_vector = &STATICS.type_i1;
-                break;
-            }
+            break;
         }
-        else if (result_expression->output.type.if_matrix)
+
+        case COMPILER_INSTANCE_TYPE_CLASS_MATRIX:
         {
-            if (chain_current->field_source->identifier[0u] != '_' ||
-                chain_current->field_source->identifier[1u] < '0' ||
-                chain_current->field_source->identifier[1u] > '9' ||
-                chain_current->field_source->identifier[2u] != '\0')
+            if (chain_current->field_source->identifier[0u] == '\0')
             {
                 KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
-                         "[%s:%s:%s:%ld] Failed to resolve structured access: matrix column access specifier \".\" "
-                         "doesn't match format \"_<digit>\".",
+                         "[%s:%s:%s:%ld] Failed to resolve structured access: matrix column access specifier is empty.",
                          context->log_name, resolve_scope->function->module_name,
                          chain_first->field_source->source_name, (long) chain_first->field_source->source_line)
                 return KAN_FALSE;
             }
 
-            result_expression->structured_access.access_chain_indices[index] =
-                chain_current->field_source->identifier[1u] - '0';
+            if (chain_current->field_source->identifier[1u] != '\0')
+            {
+                KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
+                         "[%s:%s:%s:%ld] Failed to resolve structured access: matrix column access specifier is longer "
+                         "than 1 symbol.",
+                         context->log_name, resolve_scope->function->module_name,
+                         chain_first->field_source->source_name, (long) chain_first->field_source->source_line)
+                return KAN_FALSE;
+            }
 
-            if (result_expression->structured_access.access_chain_indices[index] >=
-                result_expression->output.type.if_matrix->columns)
+            switch (chain_current->field_source->identifier[0u])
+            {
+            case 'x':
+                result_expression->structured_access.access_chain_indices[chain_output_index] = 0u;
+                break;
+            case 'y':
+                result_expression->structured_access.access_chain_indices[chain_output_index] = 1u;
+                break;
+            case 'z':
+                result_expression->structured_access.access_chain_indices[chain_output_index] = 2u;
+                break;
+            case 'w':
+                result_expression->structured_access.access_chain_indices[chain_output_index] = 3u;
+                break;
+            default:
+                KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
+                         "[%s:%s:%s:%ld] Failed to resolve structured access: unknown matrix column access specified "
+                         "\"%s\", only \"x\", \"y\", \"z\" and \"w\" are supported for 0th, 1st, 2nd and 3rd columns "
+                         "respectively.",
+                         context->log_name, resolve_scope->function->module_name,
+                         chain_first->field_source->source_name, (long) chain_first->field_source->source_line,
+                         chain_current->field_source->identifier)
+                return KAN_FALSE;
+            }
+
+            if (result_expression->structured_access.access_chain_indices[chain_output_index] >=
+                result_expression->output.type.matrix_data->columns)
             {
                 KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
                          "[%s:%s:%s:%ld] Failed to resolve structured access: \"%s\" has only %ld columns, but column "
                          "at index %ld requested.",
                          context->log_name, resolve_scope->function->module_name,
                          chain_first->field_source->source_name, (long) chain_first->field_source->source_line,
-                         result_expression->output.type.if_matrix->name,
-                         (long) result_expression->output.type.if_matrix->columns,
-                         (long) result_expression->structured_access.access_chain_indices[index])
+                         result_expression->output.type.matrix_data->name,
+                         (long) result_expression->output.type.matrix_data->columns,
+                         (long) result_expression->structured_access.access_chain_indices[chain_output_index])
                 return KAN_FALSE;
             }
 
             found = KAN_TRUE;
-            switch (result_expression->output.type.if_matrix->item)
-            {
-            case INBUILT_TYPE_ITEM_FLOAT:
-                result_expression->output.type.if_vector =
-                    STATICS.floating_vector_types[result_expression->output.type.if_matrix->rows - 1u];
-                break;
-            case INBUILT_TYPE_ITEM_INTEGER:
-                result_expression->output.type.if_vector =
-                    STATICS.integer_vector_types[result_expression->output.type.if_matrix->rows - 1u];
-                break;
-            }
+            result_expression->output.type.class = COMPILER_INSTANCE_TYPE_CLASS_VECTOR;
+            result_expression->output.type.vector_data = &STATICS.vector_types[INBUILT_VECTOR_TYPE_INDEX (
+                result_expression->output.type.matrix_data->item, result_expression->output.type.matrix_data->rows)];
 
-            result_expression->output.type.if_matrix = NULL;
+            break;
         }
 
 #define SEARCH_USING_DECLARATION                                                                                       \
-    result_expression->structured_access.access_chain_indices[index] = 0u;                                             \
+    result_expression->structured_access.access_chain_indices[chain_output_index] = 0u;                                \
     while (declaration)                                                                                                \
     {                                                                                                                  \
         if (declaration->variable.name == chain_current->field_source->identifier)                                     \
         {                                                                                                              \
             found = KAN_TRUE;                                                                                          \
-            result_expression->output.type.if_vector = declaration->variable.type.if_vector;                           \
-            result_expression->output.type.if_matrix = declaration->variable.type.if_matrix;                           \
-            result_expression->output.type.if_struct = declaration->variable.type.if_struct;                           \
-            result_expression->output.type.array_size_runtime = declaration->variable.type.array_size_runtime;         \
-            result_expression->output.type.array_dimensions_count = declaration->variable.type.array_dimensions_count; \
-            result_expression->output.type.array_dimensions = declaration->variable.type.array_dimensions;             \
+            copy_type_definition (&result_expression->output.type, &declaration->variable.type);                       \
             break;                                                                                                     \
         }                                                                                                              \
                                                                                                                        \
-        ++result_expression->structured_access.access_chain_indices[index];                                            \
+        ++result_expression->structured_access.access_chain_indices[chain_output_index];                               \
         declaration = declaration->next;                                                                               \
     }
 
-        else if (result_expression->output.type.if_struct)
+        case COMPILER_INSTANCE_TYPE_CLASS_STRUCT:
         {
             struct compiler_instance_declaration_node_t *declaration =
-                result_expression->output.type.if_struct->first_field;
+                result_expression->output.type.struct_data->first_field;
             SEARCH_USING_DECLARATION
+            break;
         }
-        else if (chain_current == chain_first &&
-                 input_node->type == COMPILER_INSTANCE_EXPRESSION_TYPE_STRUCTURED_BUFFER_REFERENCE)
+
+        case COMPILER_INSTANCE_TYPE_CLASS_BUFFER:
         {
-            struct compiler_instance_declaration_node_t *declaration =
-                input_node->structured_buffer_reference->first_field;
+            struct compiler_instance_declaration_node_t *declaration = input_node->output.type.buffer_data->first_field;
             SEARCH_USING_DECLARATION
+            break;
         }
 
 #undef SEARCH_USING_DECLARATION
+
+        case COMPILER_INSTANCE_TYPE_CLASS_BOOLEAN:
+            KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
+                     "[%s:%s:%s:%ld] Failed to resolve structured access: attempted to use \".\" on boolean.",
+                     context->log_name, resolve_scope->function->module_name, chain_first->field_source->source_name,
+                     (long) chain_first->field_source->source_line)
+            return KAN_FALSE;
+
+        case COMPILER_INSTANCE_TYPE_CLASS_SAMPLER:
+            KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
+                     "[%s:%s:%s:%ld] Failed to resolve structured access: attempted to use \".\" on sampler.",
+                     context->log_name, resolve_scope->function->module_name, chain_first->field_source->source_name,
+                     (long) chain_first->field_source->source_line)
+            return KAN_FALSE;
+
+        case COMPILER_INSTANCE_TYPE_CLASS_IMAGE:
+            KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
+                     "[%s:%s:%s:%ld] Failed to resolve structured access: attempted to use \".\" on image.",
+                     context->log_name, resolve_scope->function->module_name, chain_first->field_source->source_name,
+                     (long) chain_first->field_source->source_line)
+            return KAN_FALSE;
+        }
 
         if (!found)
         {
@@ -2482,7 +3005,12 @@ static inline kan_bool_t resolve_field_access_structured (struct rpl_compiler_co
             return KAN_FALSE;
         }
 
-        ++index;
+        if (increment_chain_output_index)
+        {
+            ++chain_output_index;
+        }
+
+        increment_chain_output_index = KAN_TRUE;
         chain_current = chain_current->next;
     }
 
@@ -2528,63 +3056,40 @@ static inline kan_bool_t resolve_binary_operation (struct rpl_compiler_context_t
                             return KAN_FALSE;
                         }
 
+                        const enum kan_rpl_access_class_t access =
+                            get_buffer_access_for_stage (buffer, resolve_scope->function->required_stage);
+
                         if (chain_first)
                         {
                             chain_input_expression = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (
                                 &instance->resolve_allocator, struct compiler_instance_expression_node_t);
 
-                            const kan_bool_t writable =
-                                is_buffer_writable_for_stage (buffer, resolve_scope->function->required_stage);
-
                             chain_input_expression->type =
-                                writable ? COMPILER_INSTANCE_EXPRESSION_TYPE_FLATTENED_BUFFER_ACCESS_OUTPUT :
-                                           COMPILER_INSTANCE_EXPRESSION_TYPE_FLATTENED_BUFFER_ACCESS_INPUT;
+                                access == KAN_RPL_ACCESS_CLASS_READ_ONLY ?
+                                    COMPILER_INSTANCE_EXPRESSION_TYPE_FLATTENED_BUFFER_ACCESS_INPUT :
+                                    COMPILER_INSTANCE_EXPRESSION_TYPE_FLATTENED_BUFFER_ACCESS_OUTPUT;
 
                             chain_input_expression->flattened_buffer_access = flattened_declaration;
                             chain_input_expression->module_name = resolve_scope->function->module_name;
                             chain_input_expression->source_name = chain_stop_expression->source_name;
                             chain_input_expression->source_line = chain_stop_expression->source_line;
 
-                            chain_input_expression->output.type.if_vector =
-                                flattened_declaration->source_declaration->variable.type.if_vector;
-                            chain_input_expression->output.type.if_matrix =
-                                flattened_declaration->source_declaration->variable.type.if_matrix;
-                            chain_input_expression->output.type.if_struct =
-                                flattened_declaration->source_declaration->variable.type.if_struct;
-                            chain_input_expression->output.type.array_size_runtime =
-                                flattened_declaration->source_declaration->variable.type.array_size_runtime;
-                            chain_input_expression->output.type.array_dimensions_count =
-                                flattened_declaration->source_declaration->variable.type.array_dimensions_count;
-                            chain_input_expression->output.type.array_dimensions =
-                                flattened_declaration->source_declaration->variable.type.array_dimensions;
-                            chain_input_expression->output.boolean = KAN_FALSE;
-                            chain_input_expression->output.writable = writable;
+                            copy_type_definition (&chain_input_expression->output.type,
+                                                  &flattened_declaration->source_declaration->variable.type);
+                            chain_input_expression->output.access = access;
                         }
                         else
                         {
                             // Full access chain was resolved as flattened access.
-                            const kan_bool_t writable =
-                                is_buffer_writable_for_stage (buffer, resolve_scope->function->required_stage);
-
                             result_expression->type =
-                                writable ? COMPILER_INSTANCE_EXPRESSION_TYPE_FLATTENED_BUFFER_ACCESS_OUTPUT :
-                                           COMPILER_INSTANCE_EXPRESSION_TYPE_FLATTENED_BUFFER_ACCESS_INPUT;
+                                access == KAN_RPL_ACCESS_CLASS_READ_ONLY ?
+                                    COMPILER_INSTANCE_EXPRESSION_TYPE_FLATTENED_BUFFER_ACCESS_INPUT :
+                                    COMPILER_INSTANCE_EXPRESSION_TYPE_FLATTENED_BUFFER_ACCESS_OUTPUT;
 
                             result_expression->flattened_buffer_access = flattened_declaration;
-                            result_expression->output.type.if_vector =
-                                flattened_declaration->source_declaration->variable.type.if_vector;
-                            result_expression->output.type.if_matrix =
-                                flattened_declaration->source_declaration->variable.type.if_matrix;
-                            result_expression->output.type.if_struct =
-                                flattened_declaration->source_declaration->variable.type.if_struct;
-                            result_expression->output.type.array_size_runtime =
-                                flattened_declaration->source_declaration->variable.type.array_size_runtime;
-                            result_expression->output.type.array_dimensions_count =
-                                flattened_declaration->source_declaration->variable.type.array_dimensions_count;
-                            result_expression->output.type.array_dimensions =
-                                flattened_declaration->source_declaration->variable.type.array_dimensions;
-                            result_expression->output.boolean = KAN_FALSE;
-                            result_expression->output.writable = writable;
+                            copy_type_definition (&result_expression->output.type,
+                                                  &flattened_declaration->source_declaration->variable.type);
+                            result_expression->output.access = access;
                             return KAN_TRUE;
                         }
                     }
@@ -2641,8 +3146,32 @@ static inline kan_bool_t resolve_binary_operation (struct rpl_compiler_context_t
         KAN_ASSERT (KAN_FALSE)
         return KAN_FALSE;
 
+#define NEEDS_TO_READ_LEFT(OPERATOR_STRING)                                                                            \
+    if (!is_access_readable (left->output.access))                                                                     \
+    {                                                                                                                  \
+        KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,                                                                  \
+                 "[%s:%s:%s:%ld] Cannot execute \"" OPERATOR_STRING                                                    \
+                 "\" operation as left argument must be readable, but it isn't.",                                      \
+                 context->log_name, resolve_scope->function->module_name, input_expression->source_name,               \
+                 (long) input_expression->source_line)                                                                 \
+        return KAN_FALSE;                                                                                              \
+    }
+
+#define NEEDS_TO_READ_RIGHT(OPERATOR_STRING)                                                                           \
+    if (!is_access_readable (right->output.access))                                                                    \
+    {                                                                                                                  \
+        KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,                                                                  \
+                 "[%s:%s:%s:%ld] Cannot execute \"" OPERATOR_STRING                                                    \
+                 "\" operation as right argument must be readable, but it isn't.",                                     \
+                 context->log_name, resolve_scope->function->module_name, input_expression->source_name,               \
+                 (long) input_expression->source_line)                                                                 \
+        return KAN_FALSE;                                                                                              \
+    }
+
     case KAN_RPL_BINARY_OPERATION_ARRAY_ACCESS:
         result_expression->type = COMPILER_INSTANCE_EXPRESSION_TYPE_OPERATION_ARRAY_INDEX;
+        NEEDS_TO_READ_RIGHT ("[]")
+
         if (!left->output.type.array_size_runtime && left->output.type.array_dimensions_count == 0u)
         {
             KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
@@ -2652,22 +3181,20 @@ static inline kan_bool_t resolve_binary_operation (struct rpl_compiler_context_t
             return KAN_FALSE;
         }
 
-        if (right->output.type.if_vector != &STATICS.type_i1)
+        if (right->output.type.class != COMPILER_INSTANCE_TYPE_CLASS_VECTOR ||
+            right->output.type.vector_data->item != INBUILT_TYPE_ITEM_INTEGER ||
+            right->output.type.vector_data->items_count > 1u)
         {
             KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
                      "[%s:%s:%s:%ld] Cannot execute array access as right operand is \"%s\" instead of i1.",
                      context->log_name, resolve_scope->function->module_name, input_expression->source_name,
-                     (long) input_expression->source_line,
-                     get_type_name_for_logging (right->output.type.if_vector, right->output.type.if_matrix,
-                                                right->output.type.if_struct))
+                     (long) input_expression->source_line, get_type_name_for_logging (&right->output.type))
             return KAN_FALSE;
         }
 
-        result_expression->output.type.if_vector = left->output.type.if_vector;
-        result_expression->output.type.if_matrix = left->output.type.if_matrix;
-        result_expression->output.type.if_struct = left->output.type.if_struct;
-        result_expression->output.boolean = left->output.boolean;
-        result_expression->output.writable = left->output.writable;
+        copy_type_definition (&result_expression->output.type, &left->output.type);
+        result_expression->output.access = left->output.access;
+        result_expression->output.type.array_size_runtime = KAN_FALSE;
         result_expression->output.type.array_dimensions_count =
             left->output.type.array_size_runtime ? 0u : left->output.type.array_dimensions_count - 1u;
         result_expression->output.type.array_dimensions = left->output.type.array_dimensions + 1u;
@@ -2685,43 +3212,38 @@ static inline kan_bool_t resolve_binary_operation (struct rpl_compiler_context_t
     }
 
 #define CAN_ONLY_EXECUTE_ON_MATCHING_BUILTIN(OPERATOR_STRING)                                                          \
-    if (left->output.type.if_vector != right->output.type.if_vector ||                                                 \
-        left->output.type.if_matrix != right->output.type.if_matrix || left->output.type.if_struct ||                  \
-        right->output.type.if_struct)                                                                                  \
     {                                                                                                                  \
-        KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,                                                                  \
-                 "[%s:%s:%s:%ld] Cannot execute \"" OPERATOR_STRING "\" on \"%s\" and \"%s\".", context->log_name,     \
-                 resolve_scope->function->module_name, input_expression->source_name,                                  \
-                 (long) input_expression->source_line,                                                                 \
-                 get_type_name_for_logging (left->output.type.if_vector, left->output.type.if_matrix,                  \
-                                            left->output.type.if_struct),                                              \
-                 get_type_name_for_logging (right->output.type.if_vector, right->output.type.if_matrix,                \
-                                            right->output.type.if_struct))                                             \
-        return KAN_FALSE;                                                                                              \
+        const kan_bool_t is_matching_builtin = left->output.type.class == right->output.type.class &&                  \
+                                               ((left->output.type.class == COMPILER_INSTANCE_TYPE_CLASS_VECTOR &&     \
+                                                 left->output.type.vector_data == right->output.type.vector_data) ||   \
+                                                (left->output.type.class == COMPILER_INSTANCE_TYPE_CLASS_MATRIX &&     \
+                                                 left->output.type.matrix_data == right->output.type.matrix_data));    \
+                                                                                                                       \
+        if (!is_matching_builtin)                                                                                      \
+        {                                                                                                              \
+            KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,                                                              \
+                     "[%s:%s:%s:%ld] Cannot execute \"" OPERATOR_STRING "\" on \"%s\" and \"%s\".", context->log_name, \
+                     resolve_scope->function->module_name, input_expression->source_name,                              \
+                     (long) input_expression->source_line, get_type_name_for_logging (&left->output.type),             \
+                     get_type_name_for_logging (&right->output.type))                                                  \
+            return KAN_FALSE;                                                                                          \
+        }                                                                                                              \
     }
 
 #define COPY_TYPE_FROM_LEFT_FOR_ELEMENTAL_OPERATION                                                                    \
-    result_expression->output.type.if_vector = left->output.type.if_vector;                                            \
-    result_expression->output.type.if_matrix = left->output.type.if_matrix;                                            \
-    result_expression->output.type.if_struct = left->output.type.if_struct;                                            \
-    result_expression->output.boolean = left->output.boolean;                                                          \
-    result_expression->output.writable = KAN_FALSE;                                                                    \
-    result_expression->output.type.array_dimensions_count = 0u;                                                        \
-    result_expression->output.type.array_dimensions = NULL
+    copy_type_definition (&result_expression->output.type, &left->output.type);                                        \
+    result_expression->output.access = KAN_RPL_ACCESS_CLASS_READ_ONLY
 
 #define COPY_TYPE_FROM_RIGHT_FOR_ELEMENTAL_OPERATION                                                                   \
-    result_expression->output.type.if_vector = right->output.type.if_vector;                                           \
-    result_expression->output.type.if_matrix = right->output.type.if_matrix;                                           \
-    result_expression->output.type.if_struct = right->output.type.if_struct;                                           \
-    result_expression->output.boolean = right->output.boolean;                                                         \
-    result_expression->output.writable = KAN_FALSE;                                                                    \
-    result_expression->output.type.array_dimensions_count = 0u;                                                        \
-    result_expression->output.type.array_dimensions = NULL
+    copy_type_definition (&result_expression->output.type, &right->output.type);                                       \
+    result_expression->output.access = KAN_RPL_ACCESS_CLASS_READ_ONLY
 
     case KAN_RPL_BINARY_OPERATION_ADD:
         result_expression->type = COMPILER_INSTANCE_EXPRESSION_TYPE_OPERATION_ADD;
         CANNOT_EXECUTE_ON_ARRAYS ("+")
         CAN_ONLY_EXECUTE_ON_MATCHING_BUILTIN ("+")
+        NEEDS_TO_READ_LEFT ("+")
+        NEEDS_TO_READ_RIGHT ("+")
         COPY_TYPE_FROM_LEFT_FOR_ELEMENTAL_OPERATION;
         return KAN_TRUE;
 
@@ -2729,96 +3251,139 @@ static inline kan_bool_t resolve_binary_operation (struct rpl_compiler_context_t
         result_expression->type = COMPILER_INSTANCE_EXPRESSION_TYPE_OPERATION_SUBTRACT;
         CANNOT_EXECUTE_ON_ARRAYS ("-")
         CAN_ONLY_EXECUTE_ON_MATCHING_BUILTIN ("-")
+        NEEDS_TO_READ_LEFT ("-")
+        NEEDS_TO_READ_RIGHT ("-")
         COPY_TYPE_FROM_LEFT_FOR_ELEMENTAL_OPERATION;
         return KAN_TRUE;
 
     case KAN_RPL_BINARY_OPERATION_MULTIPLY:
         result_expression->type = COMPILER_INSTANCE_EXPRESSION_TYPE_OPERATION_MULTIPLY;
         CANNOT_EXECUTE_ON_ARRAYS ("*")
+        NEEDS_TO_READ_LEFT ("*")
+        NEEDS_TO_READ_RIGHT ("*")
 
         // Multiply vectors by elements.
-        if (left->output.type.if_vector && left->output.type.if_vector == right->output.type.if_vector)
+        if (left->output.type.class == COMPILER_INSTANCE_TYPE_CLASS_VECTOR &&
+            right->output.type.class == COMPILER_INSTANCE_TYPE_CLASS_VECTOR &&
+            left->output.type.vector_data == right->output.type.vector_data)
         {
             COPY_TYPE_FROM_LEFT_FOR_ELEMENTAL_OPERATION;
             return KAN_TRUE;
         }
 
         // Multiply vector by scalar of the same type.
-        if (left->output.type.if_vector && right->output.type.if_vector &&
-            left->output.type.if_vector->item == right->output.type.if_vector->item &&
-            right->output.type.if_vector->items_count == 1u)
+        if (left->output.type.class == COMPILER_INSTANCE_TYPE_CLASS_VECTOR &&
+            right->output.type.class == COMPILER_INSTANCE_TYPE_CLASS_VECTOR &&
+            left->output.type.vector_data->item == right->output.type.vector_data->item &&
+            right->output.type.vector_data->items_count == 1u)
         {
             COPY_TYPE_FROM_LEFT_FOR_ELEMENTAL_OPERATION;
             return KAN_TRUE;
         }
 
         // Multiply matrix by scalar of the same type.
-        if (left->output.type.if_matrix && right->output.type.if_vector &&
-            left->output.type.if_matrix->item == right->output.type.if_vector->item &&
-            right->output.type.if_vector->items_count == 1u)
+        if (left->output.type.class == COMPILER_INSTANCE_TYPE_CLASS_MATRIX &&
+            right->output.type.class == COMPILER_INSTANCE_TYPE_CLASS_VECTOR &&
+            left->output.type.matrix_data->item == right->output.type.vector_data->item &&
+            right->output.type.vector_data->items_count == 1u)
         {
             COPY_TYPE_FROM_LEFT_FOR_ELEMENTAL_OPERATION;
             return KAN_TRUE;
         }
 
         // Multiply matrix by vector of the same type.
-        if (left->output.type.if_matrix && right->output.type.if_vector &&
-            left->output.type.if_matrix->item == right->output.type.if_vector->item &&
-            left->output.type.if_matrix->columns == right->output.type.if_vector->items_count)
+        if (left->output.type.class == COMPILER_INSTANCE_TYPE_CLASS_MATRIX &&
+            right->output.type.class == COMPILER_INSTANCE_TYPE_CLASS_VECTOR &&
+            left->output.type.matrix_data->item == right->output.type.vector_data->item &&
+            left->output.type.matrix_data->columns == right->output.type.vector_data->items_count)
         {
             COPY_TYPE_FROM_RIGHT_FOR_ELEMENTAL_OPERATION;
             return KAN_TRUE;
         }
 
         // Multiply vector by matrix of the same type.
-        if (left->output.type.if_vector && right->output.type.if_matrix &&
-            left->output.type.if_vector->item == right->output.type.if_matrix->item &&
-            left->output.type.if_vector->items_count == right->output.type.if_matrix->rows)
+        if (left->output.type.class == COMPILER_INSTANCE_TYPE_CLASS_VECTOR &&
+            right->output.type.class == COMPILER_INSTANCE_TYPE_CLASS_MATRIX &&
+            left->output.type.vector_data->item == right->output.type.matrix_data->item &&
+            left->output.type.vector_data->items_count == right->output.type.matrix_data->rows)
         {
             COPY_TYPE_FROM_LEFT_FOR_ELEMENTAL_OPERATION;
             return KAN_TRUE;
         }
 
         // Multiply matrix by matrix of the same type.
-        if (left->output.type.if_matrix && right->output.type.if_matrix &&
-            left->output.type.if_matrix->item == right->output.type.if_matrix->item &&
-            left->output.type.if_matrix->columns == right->output.type.if_matrix->rows)
+        if (left->output.type.class == COMPILER_INSTANCE_TYPE_CLASS_MATRIX &&
+            right->output.type.class == COMPILER_INSTANCE_TYPE_CLASS_MATRIX &&
+            left->output.type.matrix_data->item == right->output.type.matrix_data->item &&
+            left->output.type.matrix_data->columns == right->output.type.matrix_data->rows)
         {
-            COPY_TYPE_FROM_LEFT_FOR_ELEMENTAL_OPERATION;
+            result_expression->output.type.class = COMPILER_INSTANCE_TYPE_CLASS_MATRIX;
+            result_expression->output.type.matrix_data = NULL;
+
+            const kan_instance_size_t matrix_type_count =
+                sizeof (kan_rpl_compiler_statics.matrix_types) / sizeof (kan_rpl_compiler_statics.matrix_types[0u]);
+
+            for (kan_loop_size_t index = 0u; index < matrix_type_count; ++index)
+            {
+                struct inbuilt_matrix_type_t *type = &kan_rpl_compiler_statics.matrix_types[index];
+                if (type->item == left->output.type.matrix_data->item &&
+                    type->rows == left->output.type.matrix_data->rows &&
+                    type->columns == right->output.type.matrix_data->columns)
+                {
+                    result_expression->output.type.matrix_data = type;
+                }
+            }
+
+            if (!result_expression->output.type.matrix_data)
+            {
+                KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
+                         "[%s:%s:%s:%ld] There is no supported matrix type to represent result of \"*\" on \"%s\" and "
+                         "\"%s\".",
+                         context->log_name, resolve_scope->function->module_name, input_expression->source_name,
+                         (long) input_expression->source_line, get_type_name_for_logging (&left->output.type),
+                         get_type_name_for_logging (&right->output.type))
+                return KAN_FALSE;
+            }
+
+            result_expression->output.access = KAN_RPL_ACCESS_CLASS_READ_ONLY;
             return KAN_TRUE;
         }
 
         KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR, "[%s:%s:%s:%ld] Cannot execute \"*\" on \"%s\" and \"%s\".",
                  context->log_name, resolve_scope->function->module_name, input_expression->source_name,
-                 (long) input_expression->source_line,
-                 get_type_name_for_logging (left->output.type.if_vector, left->output.type.if_matrix,
-                                            left->output.type.if_struct),
-                 get_type_name_for_logging (right->output.type.if_vector, right->output.type.if_matrix,
-                                            right->output.type.if_struct))
+                 (long) input_expression->source_line, get_type_name_for_logging (&left->output.type),
+                 get_type_name_for_logging (&right->output.type))
         return KAN_FALSE;
 
     case KAN_RPL_BINARY_OPERATION_DIVIDE:
         result_expression->type = COMPILER_INSTANCE_EXPRESSION_TYPE_OPERATION_DIVIDE;
         CANNOT_EXECUTE_ON_ARRAYS ("/")
+        NEEDS_TO_READ_LEFT ("/")
+        NEEDS_TO_READ_RIGHT ("/")
 
         // Divide vectors of the same type.
-        if (left->output.type.if_vector && left->output.type.if_vector == right->output.type.if_vector)
+        if (left->output.type.class == COMPILER_INSTANCE_TYPE_CLASS_VECTOR &&
+            right->output.type.class == COMPILER_INSTANCE_TYPE_CLASS_VECTOR &&
+            left->output.type.vector_data == right->output.type.vector_data)
         {
             COPY_TYPE_FROM_LEFT_FOR_ELEMENTAL_OPERATION;
             return KAN_TRUE;
         }
 
         // Divide floating point matrices (integer point matrices are left out for simplicity).
-        if (left->output.type.if_matrix && left->output.type.if_matrix == right->output.type.if_matrix)
+        if (left->output.type.class == COMPILER_INSTANCE_TYPE_CLASS_MATRIX &&
+            right->output.type.class == COMPILER_INSTANCE_TYPE_CLASS_MATRIX &&
+            left->output.type.matrix_data == right->output.type.matrix_data)
         {
             COPY_TYPE_FROM_LEFT_FOR_ELEMENTAL_OPERATION;
             return KAN_TRUE;
         }
 
         // Divide vector by scalar of the same type.
-        if (left->output.type.if_vector && right->output.type.if_vector &&
-            left->output.type.if_vector->item == right->output.type.if_vector->item &&
-            right->output.type.if_vector->items_count == 1u)
+        if (left->output.type.class == COMPILER_INSTANCE_TYPE_CLASS_VECTOR &&
+            right->output.type.class == COMPILER_INSTANCE_TYPE_CLASS_VECTOR &&
+            left->output.type.vector_data->item == right->output.type.vector_data->item &&
+            right->output.type.vector_data->items_count == 1u)
         {
             COPY_TYPE_FROM_LEFT_FOR_ELEMENTAL_OPERATION;
             return KAN_TRUE;
@@ -2826,29 +3391,26 @@ static inline kan_bool_t resolve_binary_operation (struct rpl_compiler_context_t
 
         KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR, "[%s:%s:%s:%ld] Cannot execute \"/\" on \"%s\" and \"%s\".",
                  context->log_name, resolve_scope->function->module_name, input_expression->source_name,
-                 (long) input_expression->source_line,
-                 get_type_name_for_logging (left->output.type.if_vector, left->output.type.if_matrix,
-                                            left->output.type.if_struct),
-                 get_type_name_for_logging (right->output.type.if_vector, right->output.type.if_matrix,
-                                            right->output.type.if_struct))
+                 (long) input_expression->source_line, get_type_name_for_logging (&left->output.type),
+                 get_type_name_for_logging (&right->output.type))
         return KAN_FALSE;
 
 #define INTEGER_ONLY_VECTOR_OPERATION(OPERATION_STRING)                                                                \
     CANNOT_EXECUTE_ON_ARRAYS (OPERATION_STRING)                                                                        \
+    NEEDS_TO_READ_LEFT (OPERATION_STRING)                                                                              \
+    NEEDS_TO_READ_RIGHT (OPERATION_STRING)                                                                             \
                                                                                                                        \
-    if (!left->output.type.if_vector || !right->output.type.if_vector ||                                               \
-        left->output.type.if_vector->item != INBUILT_TYPE_ITEM_INTEGER ||                                              \
-        right->output.type.if_vector->item != INBUILT_TYPE_ITEM_INTEGER)                                               \
+    if (left->output.type.class != COMPILER_INSTANCE_TYPE_CLASS_VECTOR ||                                              \
+        right->output.type.class != COMPILER_INSTANCE_TYPE_CLASS_VECTOR ||                                             \
+        left->output.type.vector_data->item != INBUILT_TYPE_ITEM_INTEGER ||                                            \
+        right->output.type.vector_data->item != INBUILT_TYPE_ITEM_INTEGER)                                             \
     {                                                                                                                  \
         KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,                                                                  \
                  "[%s:%s:%s:%ld] Cannot execute \"" OPERATION_STRING                                                   \
                  "\" on \"%s\" and \"%s\", only integer vectors are supported.",                                       \
                  context->log_name, resolve_scope->function->module_name, input_expression->source_name,               \
-                 (long) input_expression->source_line,                                                                 \
-                 get_type_name_for_logging (left->output.type.if_vector, left->output.type.if_matrix,                  \
-                                            left->output.type.if_struct),                                              \
-                 get_type_name_for_logging (right->output.type.if_vector, right->output.type.if_matrix,                \
-                                            right->output.type.if_struct))                                             \
+                 (long) input_expression->source_line, get_type_name_for_logging (&left->output.type),                 \
+                 get_type_name_for_logging (&right->output.type))                                                      \
     }                                                                                                                  \
                                                                                                                        \
     COPY_TYPE_FROM_LEFT_FOR_ELEMENTAL_OPERATION
@@ -2861,8 +3423,9 @@ static inline kan_bool_t resolve_binary_operation (struct rpl_compiler_context_t
     case KAN_RPL_BINARY_OPERATION_ASSIGN:
         result_expression->type = COMPILER_INSTANCE_EXPRESSION_TYPE_OPERATION_ASSIGN;
         CANNOT_EXECUTE_ON_ARRAYS ("=")
+        NEEDS_TO_READ_RIGHT ("=")
 
-        if (!left->output.writable)
+        if (!is_access_writeable (left->output.access))
         {
             KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
                      "[%s:%s:%s:%ld] Cannot execute \"=\" as its output is not writable.", context->log_name,
@@ -2871,17 +3434,12 @@ static inline kan_bool_t resolve_binary_operation (struct rpl_compiler_context_t
             return KAN_FALSE;
         }
 
-        if (left->output.type.if_vector != right->output.type.if_vector ||
-            left->output.type.if_matrix != right->output.type.if_matrix ||
-            left->output.type.if_struct != right->output.type.if_struct)
+        if (!is_type_definition_base_equal (&left->output.type, &right->output.type))
         {
             KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR, "[%s:%s:%s:%ld] Cannot execute \"=\" on \"%s\" and \"%s\".",
                      context->log_name, resolve_scope->function->module_name, input_expression->source_name,
-                     (long) input_expression->source_line,
-                     get_type_name_for_logging (left->output.type.if_vector, left->output.type.if_matrix,
-                                                left->output.type.if_struct),
-                     get_type_name_for_logging (right->output.type.if_vector, right->output.type.if_matrix,
-                                                right->output.type.if_struct))
+                     (long) input_expression->source_line, get_type_name_for_logging (&left->output.type),
+                     get_type_name_for_logging (&right->output.type))
             return KAN_FALSE;
         }
 
@@ -2890,27 +3448,22 @@ static inline kan_bool_t resolve_binary_operation (struct rpl_compiler_context_t
 
 #define LOGIC_OPERATION(OPERATION_STRING)                                                                              \
     CANNOT_EXECUTE_ON_ARRAYS (OPERATION_STRING)                                                                        \
-    if (!left->output.boolean || !right->output.boolean)                                                               \
+    NEEDS_TO_READ_LEFT (OPERATION_STRING)                                                                              \
+    NEEDS_TO_READ_RIGHT (OPERATION_STRING)                                                                             \
+                                                                                                                       \
+    if (left->output.type.class != COMPILER_INSTANCE_TYPE_CLASS_BOOLEAN ||                                             \
+        right->output.type.class != COMPILER_INSTANCE_TYPE_CLASS_BOOLEAN)                                              \
     {                                                                                                                  \
         KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,                                                                  \
                  "[%s:%s:%s:%ld] Cannot execute \"" OPERATION_STRING                                                   \
                  "\" on \"%s\" and \"%s\", only booleans are supported.",                                              \
                  context->log_name, resolve_scope->function->module_name, input_expression->source_name,               \
-                 (long) input_expression->source_line,                                                                 \
-                 get_type_name_for_logging (left->output.type.if_vector, left->output.type.if_matrix,                  \
-                                            left->output.type.if_struct),                                              \
-                 get_type_name_for_logging (right->output.type.if_vector, right->output.type.if_matrix,                \
-                                            right->output.type.if_struct))                                             \
+                 (long) input_expression->source_line, get_type_name_for_logging (&left->output.type),                 \
+                 get_type_name_for_logging (&right->output.type))                                                      \
         return KAN_FALSE;                                                                                              \
     }                                                                                                                  \
                                                                                                                        \
-    result_expression->output.type.if_vector = NULL;                                                                   \
-    result_expression->output.type.if_matrix = NULL;                                                                   \
-    result_expression->output.type.if_struct = NULL;                                                                   \
-    result_expression->output.boolean = KAN_TRUE;                                                                      \
-    result_expression->output.writable = KAN_FALSE;                                                                    \
-    result_expression->output.type.array_dimensions_count = 0u;                                                        \
-    result_expression->output.type.array_dimensions = NULL
+    result_expression->output.type.class = COMPILER_INSTANCE_TYPE_CLASS_BOOLEAN;
 
     case KAN_RPL_BINARY_OPERATION_AND:
         result_expression->type = COMPILER_INSTANCE_EXPRESSION_TYPE_OPERATION_AND;
@@ -2924,23 +3477,27 @@ static inline kan_bool_t resolve_binary_operation (struct rpl_compiler_context_t
 
 #define EQUALITY_OPERATION(OPERATION_STRING)                                                                           \
     CANNOT_EXECUTE_ON_ARRAYS (OPERATION_STRING)                                                                        \
+    NEEDS_TO_READ_LEFT (OPERATION_STRING)                                                                              \
+    NEEDS_TO_READ_RIGHT (OPERATION_STRING)                                                                             \
                                                                                                                        \
-    if (!left->output.type.if_vector || !right->output.type.if_vector ||                                               \
-        left->output.type.if_vector->item != INBUILT_TYPE_ITEM_INTEGER ||                                              \
-        right->output.type.if_vector->item != INBUILT_TYPE_ITEM_INTEGER)                                               \
+    if (left->output.type.class != COMPILER_INSTANCE_TYPE_CLASS_VECTOR ||                                              \
+        right->output.type.class != COMPILER_INSTANCE_TYPE_CLASS_VECTOR ||                                             \
+        left->output.type.vector_data->item != INBUILT_TYPE_ITEM_INTEGER ||                                            \
+        right->output.type.vector_data->item != INBUILT_TYPE_ITEM_INTEGER)                                             \
     {                                                                                                                  \
         KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,                                                                  \
                  "[%s:%s:%s:%ld] Cannot execute \"" OPERATION_STRING                                                   \
                  "\" on \"%s\" and \"%s\", only integer vectors are supported.",                                       \
                  context->log_name, resolve_scope->function->module_name, input_expression->source_name,               \
-                 (long) input_expression->source_line,                                                                 \
-                 get_type_name_for_logging (left->output.type.if_vector, left->output.type.if_matrix,                  \
-                                            left->output.type.if_struct),                                              \
-                 get_type_name_for_logging (right->output.type.if_vector, right->output.type.if_matrix,                \
-                                            right->output.type.if_struct))                                             \
+                 (long) input_expression->source_line, get_type_name_for_logging (&left->output.type),                 \
+                 get_type_name_for_logging (&right->output.type))                                                      \
     }                                                                                                                  \
                                                                                                                        \
-    result_expression->output.boolean = KAN_TRUE
+    result_expression->output.type.class = COMPILER_INSTANCE_TYPE_CLASS_BOOLEAN;                                       \
+    result_expression->output.type.array_size_runtime = KAN_FALSE;                                                     \
+    result_expression->output.type.array_dimensions_count = 0u;                                                        \
+    result_expression->output.type.array_dimensions = NULL;                                                            \
+    result_expression->output.access = KAN_RPL_ACCESS_CLASS_READ_ONLY;
 
     case KAN_RPL_BINARY_OPERATION_EQUAL:
         result_expression->type = COMPILER_INSTANCE_EXPRESSION_TYPE_OPERATION_EQUAL;
@@ -2954,23 +3511,23 @@ static inline kan_bool_t resolve_binary_operation (struct rpl_compiler_context_t
 
 #define LOGICAL_SCALAR_ONLY_OPERATION(OPERATION_STRING)                                                                \
     CANNOT_EXECUTE_ON_ARRAYS (OPERATION_STRING)                                                                        \
+    NEEDS_TO_READ_LEFT (OPERATION_STRING)                                                                              \
+    NEEDS_TO_READ_RIGHT (OPERATION_STRING)                                                                             \
                                                                                                                        \
-    if (!left->output.type.if_vector || !right->output.type.if_vector ||                                               \
-        left->output.type.if_vector->items_count > 1u || right->output.type.if_vector->items_count > 1u ||             \
-        left->output.type.if_vector->item != right->output.type.if_vector->item)                                       \
+    if (left->output.type.class != COMPILER_INSTANCE_TYPE_CLASS_VECTOR ||                                              \
+        right->output.type.class != COMPILER_INSTANCE_TYPE_CLASS_VECTOR ||                                             \
+        left->output.type.vector_data->items_count > 1u || right->output.type.vector_data->items_count > 1u ||         \
+        left->output.type.vector_data->item != right->output.type.vector_data->item)                                   \
     {                                                                                                                  \
         KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,                                                                  \
                  "[%s:%s:%s:%ld] Cannot execute \"" OPERATION_STRING                                                   \
                  "\" on \"%s\" and \"%s\", only one-item vectors are supported.",                                      \
                  context->log_name, resolve_scope->function->module_name, input_expression->source_name,               \
-                 (long) input_expression->source_line,                                                                 \
-                 get_type_name_for_logging (left->output.type.if_vector, left->output.type.if_matrix,                  \
-                                            left->output.type.if_struct),                                              \
-                 get_type_name_for_logging (right->output.type.if_vector, right->output.type.if_matrix,                \
-                                            right->output.type.if_struct))                                             \
+                 (long) input_expression->source_line, get_type_name_for_logging (&left->output.type),                 \
+                 get_type_name_for_logging (&right->output.type))                                                      \
     }                                                                                                                  \
                                                                                                                        \
-    result_expression->output.boolean = KAN_TRUE
+    result_expression->output.type.class = COMPILER_INSTANCE_TYPE_CLASS_BOOLEAN;
 
     case KAN_RPL_BINARY_OPERATION_LESS:
         result_expression->type = COMPILER_INSTANCE_EXPRESSION_TYPE_OPERATION_LESS;
@@ -3017,6 +3574,8 @@ static inline kan_bool_t resolve_binary_operation (struct rpl_compiler_context_t
         INTEGER_ONLY_VECTOR_OPERATION ("|");
         return KAN_TRUE;
 
+#undef NEEDS_TO_READ_LEFT
+#undef NEEDS_TO_READ_RIGHT
 #undef CANNOT_EXECUTE_ON_ARRAYS
 #undef CAN_ONLY_EXECUTE_ON_MATCHING_BUILTIN
 #undef COPY_TYPE_FROM_LEFT_FOR_ELEMENTAL_OPERATION
@@ -3057,55 +3616,72 @@ static inline kan_bool_t resolve_unary_operation (struct rpl_compiler_context_t 
 
     switch (input_expression->unary_operation.operation)
     {
+#define NEEDS_TO_READ(OPERATOR_STRING)                                                                                 \
+    if (!is_access_readable (operand->output.access))                                                                  \
+    {                                                                                                                  \
+        KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,                                                                  \
+                 "[%s:%s:%s:%ld] Cannot execute \"" OPERATOR_STRING                                                    \
+                 "\" operation as operand must be readable, but it isn't.",                                            \
+                 context->log_name, resolve_scope->function->module_name, input_expression->source_name,               \
+                 (long) input_expression->source_line)                                                                 \
+        return KAN_FALSE;                                                                                              \
+    }
+
     case KAN_RPL_UNARY_OPERATION_NEGATE:
         result_expression->type = COMPILER_INSTANCE_EXPRESSION_TYPE_OPERATION_NEGATE;
-        if (!operand->output.type.if_vector && !operand->output.type.if_matrix)
+        NEEDS_TO_READ ("-")
+
+        if (operand->output.type.class != COMPILER_INSTANCE_TYPE_CLASS_VECTOR &&
+            operand->output.type.class != COMPILER_INSTANCE_TYPE_CLASS_MATRIX)
         {
             KAN_LOG (
                 rpl_compiler_context, KAN_LOG_ERROR,
-                "[%s:%s:%s:%ld] Cannot apply \"~\" operation to type \"%s\", only vectors and matrices are supported.",
+                "[%s:%s:%s:%ld] Cannot apply \"-\" operation to type \"%s\", only vectors and matrices are supported.",
                 context->log_name, resolve_scope->function->module_name, input_expression->source_name,
-                (long) input_expression->source_line,
-                get_type_name_for_logging (operand->output.type.if_vector, operand->output.type.if_matrix,
-                                           operand->output.type.if_struct))
+                (long) input_expression->source_line, get_type_name_for_logging (&operand->output.type))
             return KAN_FALSE;
         }
 
-        result_expression->output.type.if_vector = operand->output.type.if_vector;
-        result_expression->output.type.if_matrix = operand->output.type.if_matrix;
+        copy_type_definition (&result_expression->output.type, &operand->output.type);
         return KAN_TRUE;
 
     case KAN_RPL_UNARY_OPERATION_NOT:
         result_expression->type = COMPILER_INSTANCE_EXPRESSION_TYPE_OPERATION_NOT;
-        if (!operand->output.boolean)
+        NEEDS_TO_READ ("!")
+
+        if (operand->output.type.class != COMPILER_INSTANCE_TYPE_CLASS_BOOLEAN)
         {
             KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
                      "[%s:%s:%s:%ld] Cannot apply \"!\" operation to non-boolean type \"%s\".", context->log_name,
                      resolve_scope->function->module_name, input_expression->source_name,
-                     (long) input_expression->source_line,
-                     get_type_name_for_logging (operand->output.type.if_vector, operand->output.type.if_matrix,
-                                                operand->output.type.if_struct))
+                     (long) input_expression->source_line, get_type_name_for_logging (&operand->output.type))
             return KAN_FALSE;
         }
 
-        result_expression->output.boolean = KAN_TRUE;
+        result_expression->output.type.class = COMPILER_INSTANCE_TYPE_CLASS_BOOLEAN;
         return KAN_TRUE;
 
     case KAN_RPL_UNARY_OPERATION_BITWISE_NOT:
         result_expression->type = COMPILER_INSTANCE_EXPRESSION_TYPE_OPERATION_BITWISE_NOT;
-        if (operand->output.type.if_vector != &STATICS.type_i1)
+        NEEDS_TO_READ ("~")
+
+        if (operand->output.type.class != COMPILER_INSTANCE_TYPE_CLASS_VECTOR ||
+            operand->output.type.vector_data->item != INBUILT_TYPE_ITEM_INTEGER ||
+            operand->output.type.vector_data->items_count > 1u)
         {
             KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
                      "[%s:%s:%s:%ld] Cannot apply \"~\" operation to type \"%s\", only i1 is supported.",
                      context->log_name, resolve_scope->function->module_name, input_expression->source_name,
-                     (long) input_expression->source_line,
-                     get_type_name_for_logging (operand->output.type.if_vector, operand->output.type.if_matrix,
-                                                operand->output.type.if_struct))
+                     (long) input_expression->source_line, get_type_name_for_logging (&operand->output.type))
             return KAN_FALSE;
         }
 
-        result_expression->output.type.if_vector = &STATICS.type_i1;
+        result_expression->output.type.class = COMPILER_INSTANCE_TYPE_CLASS_VECTOR;
+        result_expression->output.type.vector_data =
+            &STATICS.vector_types[INBUILT_VECTOR_TYPE_INDEX (CONDITIONAL_EVALUATION_VALUE_TYPE_INTEGER, 1u)];
         return KAN_TRUE;
+
+#undef NEEDS_TO_READ
     }
 
     KAN_ASSERT (KAN_FALSE)
@@ -3201,14 +3777,11 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
     struct compiler_instance_expression_node_t *new_expression = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (
         &instance->resolve_allocator, struct compiler_instance_expression_node_t);
 
-    new_expression->output.type.if_vector = NULL;
-    new_expression->output.type.if_matrix = NULL;
-    new_expression->output.type.if_struct = NULL;
+    new_expression->output.type.class = COMPILER_INSTANCE_TYPE_CLASS_VOID;
     new_expression->output.type.array_size_runtime = KAN_FALSE;
     new_expression->output.type.array_dimensions_count = 0u;
     new_expression->output.type.array_dimensions = NULL;
-    new_expression->output.boolean = KAN_FALSE;
-    new_expression->output.writable = KAN_FALSE;
+    new_expression->output.access = KAN_RPL_ACCESS_CLASS_READ_ONLY;
 
     new_expression->module_name = resolve_scope->function->module_name;
     new_expression->source_name = expression->source_name;
@@ -3244,11 +3817,59 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
 
                 new_expression->type = COMPILER_INSTANCE_EXPRESSION_TYPE_STRUCTURED_BUFFER_REFERENCE;
                 new_expression->structured_buffer_reference = buffer;
-                return resolve_use_buffer (context, instance, resolve_scope->function, expression->source_line,
-                                           resolve_scope->function->required_stage, buffer);
+
+                new_expression->output.type.class = COMPILER_INSTANCE_TYPE_CLASS_BUFFER;
+                new_expression->output.type.buffer_data = buffer;
+                new_expression->output.access =
+                    get_buffer_access_for_stage (buffer, resolve_scope->function->required_stage);
+
+                return resolve_use_buffer (context, instance, resolve_scope->function,
+                                           resolve_scope->function->required_stage, buffer, expression->source_line);
             }
 
             buffer = buffer->next;
+        }
+
+        struct compiler_instance_sampler_node_t *sampler = instance->first_sampler;
+        while (sampler)
+        {
+            if (sampler->name == expression->identifier)
+            {
+                new_expression->type = COMPILER_INSTANCE_EXPRESSION_TYPE_SAMPLER_REFERENCE;
+                new_expression->sampler_reference = sampler;
+
+                new_expression->output.type.class = COMPILER_INSTANCE_TYPE_CLASS_SAMPLER;
+                new_expression->output.access = KAN_RPL_ACCESS_CLASS_READ_ONLY;
+
+                return resolve_use_sampler (context, instance, resolve_scope->function, sampler,
+                                            expression->source_line);
+            }
+
+            sampler = sampler->next;
+        }
+
+        struct compiler_instance_image_node_t *image = instance->first_image;
+        while (image)
+        {
+            if (image->name == expression->identifier)
+            {
+                new_expression->type = COMPILER_INSTANCE_EXPRESSION_TYPE_IMAGE_REFERENCE;
+                new_expression->image_reference = image;
+
+                new_expression->output.type.class = COMPILER_INSTANCE_TYPE_CLASS_IMAGE;
+                new_expression->output.type.image_type = image->type;
+                new_expression->output.access = KAN_RPL_ACCESS_CLASS_READ_ONLY;
+
+                if (image->array_size > 1u)
+                {
+                    new_expression->output.type.array_dimensions_count = 1u;
+                    new_expression->output.type.array_dimensions = &image->array_size;
+                }
+
+                return resolve_use_image (context, instance, resolve_scope->function, image, expression->source_line);
+            }
+
+            image = image->next;
         }
 
         struct compiler_instance_scope_variable_item_t *variable =
@@ -3258,15 +3879,8 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
         {
             new_expression->type = COMPILER_INSTANCE_EXPRESSION_TYPE_VARIABLE_REFERENCE;
             new_expression->variable_reference = variable;
-
-            new_expression->output.type.if_vector = variable->variable->type.if_vector;
-            new_expression->output.type.if_matrix = variable->variable->type.if_matrix;
-            new_expression->output.type.if_struct = variable->variable->type.if_struct;
-            new_expression->output.type.array_size_runtime = variable->variable->type.array_size_runtime;
-            new_expression->output.type.array_dimensions_count = variable->variable->type.array_dimensions_count;
-            new_expression->output.type.array_dimensions = variable->variable->type.array_dimensions;
-            new_expression->output.boolean = KAN_FALSE;
-            new_expression->output.writable = variable->writable;
+            copy_type_definition (&new_expression->output.type, &variable->variable->type);
+            new_expression->output.access = variable->access;
             return KAN_TRUE;
         }
 
@@ -3292,7 +3906,9 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
                 case KAN_RPL_OPTION_TYPE_COUNT:
                     new_expression->type = COMPILER_INSTANCE_EXPRESSION_TYPE_INTEGER_LITERAL;
                     new_expression->integer_literal = (kan_rpl_signed_int_literal_t) value->count_value;
-                    new_expression->output.type.if_vector = &STATICS.type_i1;
+                    new_expression->output.type.class = COMPILER_INSTANCE_TYPE_CLASS_VECTOR;
+                    new_expression->output.type.vector_data =
+                        &STATICS.vector_types[INBUILT_VECTOR_TYPE_INDEX (INBUILT_TYPE_ITEM_INTEGER, 1u)];
                     return KAN_TRUE;
                 }
             }
@@ -3317,13 +3933,17 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
 
         new_expression->type = COMPILER_INSTANCE_EXPRESSION_TYPE_INTEGER_LITERAL;
         new_expression->integer_literal = expression->integer_literal;
-        new_expression->output.type.if_vector = &STATICS.type_i1;
+        new_expression->output.type.class = COMPILER_INSTANCE_TYPE_CLASS_VECTOR;
+        new_expression->output.type.vector_data =
+            &STATICS.vector_types[INBUILT_VECTOR_TYPE_INDEX (INBUILT_TYPE_ITEM_INTEGER, 1u)];
         return KAN_TRUE;
 
     case KAN_RPL_EXPRESSION_NODE_TYPE_FLOATING_LITERAL:
         new_expression->type = COMPILER_INSTANCE_EXPRESSION_TYPE_FLOATING_LITERAL;
         new_expression->floating_literal = expression->floating_literal;
-        new_expression->output.type.if_vector = &STATICS.type_f1;
+        new_expression->output.type.class = COMPILER_INSTANCE_TYPE_CLASS_VECTOR;
+        new_expression->output.type.vector_data =
+            &STATICS.vector_types[INBUILT_VECTOR_TYPE_INDEX (INBUILT_TYPE_ITEM_FLOAT, 1u)];
         return KAN_TRUE;
 
     case KAN_RPL_EXPRESSION_NODE_TYPE_VARIABLE_DECLARATION:
@@ -3346,10 +3966,10 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
         new_expression->variable_declaration.variable.type.array_dimensions_count =
             expression->variable_declaration.array_size_expression_list_size;
 
-        if (!resolve_variable_type (
-                context, instance, new_expression->module_name, &new_expression->variable_declaration.variable,
-                expression->variable_declaration.type_name, expression->variable_declaration.variable_name,
-                expression->source_name, expression->source_line))
+        if (!resolve_type (context, instance, new_expression->module_name,
+                           &new_expression->variable_declaration.variable.type,
+                           expression->variable_declaration.type_name, expression->variable_declaration.variable_name,
+                           expression->source_name, expression->source_line))
         {
             resolved = KAN_FALSE;
         }
@@ -3359,6 +3979,33 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
                                        expression->variable_declaration.array_size_expression_list_index, KAN_TRUE))
         {
             resolved = KAN_FALSE;
+        }
+
+        if (resolved)
+        {
+            switch (new_expression->variable_declaration.variable.type.class)
+            {
+            case COMPILER_INSTANCE_TYPE_CLASS_VOID:
+            case COMPILER_INSTANCE_TYPE_CLASS_BOOLEAN:
+            case COMPILER_INSTANCE_TYPE_CLASS_BUFFER:
+                // While samplers and images are technically pointers that can be used, creating variables with them
+                // can be tricky due to how logical pointers work in some target languages like SPIRV. Therefore,
+                // they're only allowed as function parameters for now.
+            case COMPILER_INSTANCE_TYPE_CLASS_SAMPLER:
+            case COMPILER_INSTANCE_TYPE_CLASS_IMAGE:
+                KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
+                         "[%s:%s:%s:%ld] Declaration \"%s\" has type \"%s\" which is not supported for variables.",
+                         context->log_name, intermediate->log_name, expression->source_name,
+                         (long) expression->source_line, expression->variable_declaration.variable_name,
+                         expression->variable_declaration.type_name)
+                resolved = KAN_FALSE;
+                break;
+
+            case COMPILER_INSTANCE_TYPE_CLASS_VECTOR:
+            case COMPILER_INSTANCE_TYPE_CLASS_MATRIX:
+            case COMPILER_INSTANCE_TYPE_CLASS_STRUCT:
+                break;
+            }
         }
 
         new_expression->variable_declaration.declared_in_scope = NULL;
@@ -3377,7 +4024,7 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
 
                 item->variable = &new_expression->variable_declaration.variable;
                 item->next = owner_scope->associated_resolved_scope_if_any->scope.first_variable;
-                item->writable = KAN_TRUE;
+                item->access = KAN_RPL_ACCESS_CLASS_READ_WRITE;
 
                 owner_scope->associated_resolved_scope_if_any->scope.first_variable = item;
                 new_expression->variable_declaration.declared_in_scope = item;
@@ -3392,16 +4039,8 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
                 resolved = KAN_FALSE;
             }
 
-            new_expression->output.type.if_vector = new_expression->variable_declaration.variable.type.if_vector;
-            new_expression->output.type.if_matrix = new_expression->variable_declaration.variable.type.if_matrix;
-            new_expression->output.type.if_struct = new_expression->variable_declaration.variable.type.if_struct;
-            new_expression->output.type.array_size_runtime = KAN_FALSE;
-            new_expression->output.type.array_dimensions_count =
-                new_expression->variable_declaration.variable.type.array_dimensions_count;
-            new_expression->output.type.array_dimensions =
-                new_expression->variable_declaration.variable.type.array_dimensions;
-            new_expression->output.boolean = KAN_FALSE;
-            new_expression->output.writable = KAN_TRUE;
+            copy_type_definition (&new_expression->output.type, &new_expression->variable_declaration.variable.type);
+            new_expression->output.access = KAN_RPL_ACCESS_CLASS_READ_WRITE;
         }
 
         return resolved;
@@ -3515,41 +4154,161 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
 
     case KAN_RPL_EXPRESSION_NODE_TYPE_FUNCTION_CALL:
     {
-        struct compiler_instance_sampler_node_t *sampler = instance->first_sampler;
-        while (sampler)
+        if (expression->function_call.name == STATICS.sample_function_name ||
+            expression->function_call.name == STATICS.sample_dref_function_name)
         {
-            if (sampler->name == expression->function_call.name)
+            new_expression->type = expression->function_call.name == STATICS.sample_function_name ?
+                                       COMPILER_INSTANCE_EXPRESSION_TYPE_IMAGE_SAMPLE :
+                                       COMPILER_INSTANCE_EXPRESSION_TYPE_IMAGE_SAMPLE_DREF;
+
+            if (expression->function_call.argument_list_size < 3u)
             {
-                new_expression->type = COMPILER_INSTANCE_EXPRESSION_TYPE_SAMPLER_CALL;
-                new_expression->sampler_call.sampler = sampler;
-                kan_bool_t resolved = KAN_TRUE;
-
-                if (!resolve_use_sampler (context, instance, resolve_scope->function, sampler, expression->source_line))
-                {
-                    resolved = KAN_FALSE;
-                }
-
-                struct compiler_instance_declaration_node_t *signature_first_element = NULL;
-                switch (sampler->type)
-                {
-                case KAN_RPL_SAMPLER_TYPE_2D:
-                    signature_first_element = STATICS.sampler_2d_call_signature_first_element;
-                    break;
-                }
-
-                if (!resolve_expression_array_with_signature (
-                        context, instance, intermediate, resolve_scope, new_expression,
-                        &new_expression->sampler_call.first_argument, expression->function_call.argument_list_size,
-                        expression->function_call.argument_list_index, signature_first_element))
-                {
-                    resolved = KAN_FALSE;
-                }
-
-                new_expression->output.type.if_vector = &STATICS.type_f4;
-                return resolved;
+                KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
+                         "[%s:%s:%s:%ld] \"%s\" call must have at least 3 arguments: sampler, image and at least "
+                         "one image-specific argument.",
+                         context->log_name, resolve_scope->function->module_name, expression->source_name,
+                         (long) expression->source_line, expression->function_call.name)
+                return KAN_FALSE;
             }
 
-            sampler = sampler->next;
+            const kan_rpl_size_t list_base_index = expression->function_call.argument_list_index;
+            const kan_rpl_size_t sampler_expression_index =
+                ((kan_rpl_size_t *) intermediate->expression_lists_storage.data)[list_base_index];
+
+            if (!resolve_expression (
+                    context, instance, intermediate, resolve_scope,
+                    &((struct kan_rpl_expression_t *) intermediate->expression_storage.data)[sampler_expression_index],
+                    &new_expression->image_sample.sampler))
+            {
+                KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
+                         "[%s:%s:%s:%ld] Failed to resolve sampler argument expression for \"%s\" call.",
+                         context->log_name, resolve_scope->function->module_name, expression->source_name,
+                         (long) expression->source_line, expression->function_call.name)
+                return KAN_FALSE;
+            }
+
+            // Must be always readable technically.
+            KAN_ASSERT (is_access_readable (new_expression->image_sample.sampler->output.access))
+
+            if (new_expression->image_sample.sampler->output.type.class != COMPILER_INSTANCE_TYPE_CLASS_SAMPLER ||
+                new_expression->image_sample.sampler->output.type.array_size_runtime ||
+                new_expression->image_sample.sampler->output.type.array_dimensions_count > 0u)
+            {
+                KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
+                         "[%s:%s:%s:%ld] First argument for \"%s\" call must be a single sampler, but it is not.",
+                         context->log_name, resolve_scope->function->module_name, expression->source_name,
+                         (long) expression->source_line, expression->function_call.name)
+                return KAN_FALSE;
+            }
+
+            const kan_rpl_size_t image_expression_index =
+                ((kan_rpl_size_t *) intermediate->expression_lists_storage.data)[list_base_index + 1u];
+
+            if (!resolve_expression (
+                    context, instance, intermediate, resolve_scope,
+                    &((struct kan_rpl_expression_t *) intermediate->expression_storage.data)[image_expression_index],
+                    &new_expression->image_sample.image))
+            {
+                KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
+                         "[%s:%s:%s:%ld] Failed to resolve image argument expression for \"%s\" call.",
+                         context->log_name, resolve_scope->function->module_name, expression->source_name,
+                         (long) expression->source_line, expression->function_call.name)
+                return KAN_FALSE;
+            }
+
+            // Must be always readable technically.
+            KAN_ASSERT (is_access_readable (new_expression->image_sample.image->output.access))
+
+            if (new_expression->image_sample.image->output.type.class != COMPILER_INSTANCE_TYPE_CLASS_IMAGE ||
+                new_expression->image_sample.image->output.type.array_size_runtime ||
+                new_expression->image_sample.image->output.type.array_dimensions_count > 0u)
+            {
+                KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
+                         "[%s:%s:%s:%ld] Second argument for \"%s\" call must be a single image, but it is not.",
+                         context->log_name, resolve_scope->function->module_name, expression->source_name,
+                         (long) expression->source_line, expression->function_call.name)
+                return KAN_FALSE;
+            }
+
+            struct compiler_instance_function_argument_node_t *image_specific_arguments = NULL;
+            if (expression->function_call.name == STATICS.sample_function_name)
+            {
+                switch (new_expression->image_sample.image->output.type.image_type)
+                {
+                case KAN_RPL_IMAGE_TYPE_COLOR_2D:
+                case KAN_RPL_IMAGE_TYPE_DEPTH_2D:
+                    image_specific_arguments = STATICS.sample_2d_additional_arguments;
+                    break;
+
+                case KAN_RPL_IMAGE_TYPE_COLOR_3D:
+                case KAN_RPL_IMAGE_TYPE_DEPTH_3D:
+                    image_specific_arguments = STATICS.sample_3d_additional_arguments;
+                    break;
+
+                case KAN_RPL_IMAGE_TYPE_COLOR_CUBE:
+                case KAN_RPL_IMAGE_TYPE_DEPTH_CUBE:
+                    image_specific_arguments = STATICS.sample_cube_additional_arguments;
+                    break;
+
+                case KAN_RPL_IMAGE_TYPE_COLOR_2D_ARRAY:
+                case KAN_RPL_IMAGE_TYPE_DEPTH_2D_ARRAY:
+                    image_specific_arguments = STATICS.sample_2d_array_additional_arguments;
+                    break;
+
+                case KAN_RPL_IMAGE_TYPE_COUNT:
+                    KAN_ASSERT (KAN_FALSE)
+                    break;
+                }
+            }
+            else
+            {
+                KAN_ASSERT (expression->function_call.name == STATICS.sample_dref_function_name)
+                switch (new_expression->image_sample.image->output.type.image_type)
+                {
+                case KAN_RPL_IMAGE_TYPE_COLOR_2D:
+                case KAN_RPL_IMAGE_TYPE_COLOR_3D:
+                case KAN_RPL_IMAGE_TYPE_COLOR_CUBE:
+                case KAN_RPL_IMAGE_TYPE_COLOR_2D_ARRAY:
+                    KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
+                             "[%s:%s:%s:%ld] Caught \"%s\" for color image. Only depth images support dref sampling.",
+                             context->log_name, resolve_scope->function->module_name, expression->source_name,
+                             (long) expression->source_line, expression->function_call.name)
+                    return KAN_FALSE;
+
+                case KAN_RPL_IMAGE_TYPE_DEPTH_2D:
+                    image_specific_arguments = STATICS.sample_dref_2d_additional_arguments;
+                    break;
+
+                case KAN_RPL_IMAGE_TYPE_DEPTH_3D:
+                    image_specific_arguments = STATICS.sample_dref_3d_additional_arguments;
+                    break;
+
+                case KAN_RPL_IMAGE_TYPE_DEPTH_CUBE:
+                    image_specific_arguments = STATICS.sample_dref_cube_additional_arguments;
+                    break;
+
+                case KAN_RPL_IMAGE_TYPE_DEPTH_2D_ARRAY:
+                    image_specific_arguments = STATICS.sample_dref_2d_array_additional_arguments;
+                    break;
+
+                case KAN_RPL_IMAGE_TYPE_COUNT:
+                    KAN_ASSERT (KAN_FALSE)
+                    break;
+                }
+            }
+
+            if (!resolve_expression_array_with_signature (context, instance, intermediate, resolve_scope,
+                                                          new_expression, &new_expression->image_sample.first_argument,
+                                                          expression->function_call.argument_list_size - 2u,
+                                                          list_base_index + 2u, image_specific_arguments))
+            {
+                return KAN_FALSE;
+            }
+
+            new_expression->output.type.class = COMPILER_INSTANCE_TYPE_CLASS_VECTOR;
+            new_expression->output.type.vector_data =
+                &STATICS.vector_types[INBUILT_VECTOR_TYPE_INDEX (INBUILT_TYPE_ITEM_FLOAT, 4u)];
+            return KAN_TRUE;
         }
 
         new_expression->type = COMPILER_INSTANCE_EXPRESSION_TYPE_FUNCTION_CALL;
@@ -3561,6 +4320,9 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
                                        resolve_scope->function->required_stage,
                                        &new_expression->function_call.function))
         {
+            KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR, "[%s:%s:%s:%ld] Unable to find function \"%s\" for the call.",
+                     context->log_name, resolve_scope->function->module_name, expression->source_name,
+                     (long) expression->source_line, expression->function_call.name)
             resolved = KAN_FALSE;
         }
         else if (!resolve_expression_array_with_signature (
@@ -3573,9 +4335,7 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
         }
         else
         {
-            new_expression->output.type.if_vector = new_expression->function_call.function->return_type_if_vector;
-            new_expression->output.type.if_matrix = new_expression->function_call.function->return_type_if_matrix;
-            new_expression->output.type.if_struct = new_expression->function_call.function->return_type_if_struct;
+            copy_type_definition (&new_expression->output.type, &new_expression->function_call.function->return_type);
         }
 
         // We need to pass callee accesses to the caller function.
@@ -3650,6 +4410,40 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
                 sampler_access_node = sampler_access_node->next;
             }
 
+            struct compiler_instance_image_access_node_t *image_access_node =
+                new_expression->function_call.function->first_image_access;
+
+            while (image_access_node)
+            {
+                struct compiler_instance_image_access_node_t *existent_access_node =
+                    resolve_scope->function->first_image_access;
+
+                while (existent_access_node)
+                {
+                    if (existent_access_node->image == image_access_node->image)
+                    {
+                        // Already used, no need fop further verification.
+                        return KAN_TRUE;
+                    }
+
+                    existent_access_node = existent_access_node->next;
+                }
+
+                if (!existent_access_node)
+                {
+                    struct compiler_instance_image_access_node_t *new_access_node =
+                        KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&instance->resolve_allocator,
+                                                                  struct compiler_instance_image_access_node_t);
+
+                    new_access_node->next = resolve_scope->function->first_image_access;
+                    resolve_scope->function->first_image_access = new_access_node;
+                    new_access_node->image = image_access_node->image;
+                    new_access_node->direct_access_function = image_access_node->direct_access_function;
+                }
+
+                image_access_node = image_access_node->next;
+            }
+
             if (!resolve_scope->function->has_stage_specific_access &&
                 new_expression->function_call.function->has_stage_specific_access)
             {
@@ -3662,54 +4456,293 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
 
     case KAN_RPL_EXPRESSION_NODE_TYPE_CONSTRUCTOR:
     {
-        new_expression->type = COMPILER_INSTANCE_EXPRESSION_TYPE_CONSTRUCTOR;
+        // For any constructor, we need to resolve all the arguments first.
+        // And only after that we can decide constructor type (for custom inbuilt constructors).
+
         kan_bool_t resolved = KAN_TRUE;
-        new_expression->constructor.type_if_vector = NULL;
-        new_expression->constructor.type_if_matrix = NULL;
-        new_expression->constructor.type_if_struct = NULL;
+        struct compiler_instance_expression_list_item_t *first_expression = NULL;
+        struct compiler_instance_expression_list_item_t *last_expression = NULL;
 
-        if (!(new_expression->constructor.type_if_vector =
-                  find_inbuilt_vector_type (expression->constructor.type_name)) &&
-            !(new_expression->constructor.type_if_matrix =
-                  find_inbuilt_matrix_type (expression->constructor.type_name)) &&
-            !resolve_use_struct (context, instance, expression->constructor.type_name,
-                                 &new_expression->constructor.type_if_struct))
+        for (kan_loop_size_t list_index = expression->constructor.argument_list_index;
+             list_index < expression->constructor.argument_list_index + expression->constructor.argument_list_size;
+             ++list_index)
         {
-            KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR, "[%s:%s:%s:%ld] Constructor \"%s\" type is unknown.",
-                     context->log_name, new_expression->module_name, new_expression->source_name,
-                     (long) new_expression->source_line, expression->constructor.type_name)
-            resolved = KAN_FALSE;
-        }
+            struct compiler_instance_expression_node_t *resolved_expression;
+            const kan_rpl_size_t expression_index =
+                ((kan_rpl_size_t *) intermediate->expression_lists_storage.data)[list_index];
 
-        if (resolved)
-        {
-            struct compiler_instance_declaration_node_t *signature = NULL;
-            if (new_expression->constructor.type_if_vector)
+            if (resolve_expression (
+                    context, instance, intermediate, resolve_scope,
+                    &((struct kan_rpl_expression_t *) intermediate->expression_storage.data)[expression_index],
+                    &resolved_expression))
             {
-                signature = new_expression->constructor.type_if_vector->constructor_signature;
-            }
-            else if (new_expression->constructor.type_if_matrix)
-            {
-                signature = new_expression->constructor.type_if_matrix->constructor_signature;
-            }
-            else if (new_expression->constructor.type_if_struct)
-            {
-                signature = new_expression->constructor.type_if_struct->first_field;
-            }
+                if (!is_access_readable (resolved_expression->output.access))
+                {
+                    KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
+                             "[%s:%s:%s:%ld] Constructor \"%s\" argument at index %u must be readable, but it isn't.",
+                             context->log_name, new_expression->module_name, new_expression->source_name,
+                             (long) new_expression->source_line, expression->constructor.type_name,
+                             (unsigned int) (list_index - expression->constructor.argument_list_index))
+                    return KAN_FALSE;
+                }
 
-            if (!resolve_expression_array_with_signature (context, instance, intermediate, resolve_scope,
-                                                          new_expression, &new_expression->constructor.first_argument,
-                                                          expression->constructor.argument_list_size,
-                                                          expression->constructor.argument_list_index, signature))
+                KAN_ASSERT (resolved_expression)
+                struct compiler_instance_expression_list_item_t *list_item = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (
+                    &instance->resolve_allocator, struct compiler_instance_expression_list_item_t);
+
+                list_item->next = NULL;
+                list_item->expression = resolved_expression;
+
+                if (last_expression)
+                {
+                    last_expression->next = list_item;
+                }
+                else
+                {
+                    first_expression = list_item;
+                }
+
+                last_expression = list_item;
+            }
+            else
             {
                 resolved = KAN_FALSE;
             }
         }
 
-        new_expression->output.type.if_vector = new_expression->constructor.type_if_vector;
-        new_expression->output.type.if_matrix = new_expression->constructor.type_if_matrix;
-        new_expression->output.type.if_struct = new_expression->constructor.type_if_struct;
-        return resolved;
+        if (!resolved)
+        {
+            // Failed to resolve arguments.
+            return KAN_FALSE;
+        }
+
+        struct inbuilt_vector_type_t *vector_type = NULL;
+        struct inbuilt_matrix_type_t *matrix_type = NULL;
+        struct compiler_instance_struct_node_t *struct_type = NULL;
+
+        if ((vector_type = find_inbuilt_vector_type (expression->constructor.type_name)))
+        {
+            new_expression->type = COMPILER_INSTANCE_EXPRESSION_TYPE_VECTOR_CONSTRUCTOR;
+            new_expression->vector_constructor.type = vector_type;
+            new_expression->vector_constructor.first_argument = first_expression;
+            new_expression->output.type.class = COMPILER_INSTANCE_TYPE_CLASS_VECTOR;
+            new_expression->output.type.vector_data = vector_type;
+
+            // Check special cases for one item constructors.
+            if (expression->constructor.argument_list_size == 1u &&
+                first_expression->expression->output.type.class == COMPILER_INSTANCE_TYPE_CLASS_VECTOR &&
+                !first_expression->expression->output.type.array_size_runtime &&
+                first_expression->expression->output.type.array_dimensions_count == 0u)
+            {
+                if (first_expression->expression->output.type.vector_data->items_count == vector_type->items_count)
+                {
+                    if (first_expression->expression->output.type.vector_data->item == vector_type->item)
+                    {
+                        new_expression->vector_constructor.variant = COMPILER_INSTANCE_VECTOR_CONSTRUCTOR_SKIP;
+                    }
+                    else
+                    {
+                        new_expression->vector_constructor.variant = COMPILER_INSTANCE_VECTOR_CONSTRUCTOR_CONVERT;
+                    }
+
+                    return KAN_TRUE;
+                }
+                else if (first_expression->expression->output.type.vector_data->items_count == 1u &&
+                         first_expression->expression->output.type.vector_data->item == vector_type->item)
+                {
+                    new_expression->vector_constructor.variant = COMPILER_INSTANCE_VECTOR_CONSTRUCTOR_FILL;
+                    return KAN_TRUE;
+                }
+            }
+
+            // No more special cases, it can only be combine constructor.
+            new_expression->vector_constructor.variant = COMPILER_INSTANCE_VECTOR_CONSTRUCTOR_COMBINE;
+            kan_instance_size_t total_items = 0u;
+            kan_instance_size_t argument_index = 0u;
+            struct compiler_instance_expression_list_item_t *argument_expression = first_expression;
+
+            while (argument_expression)
+            {
+                if (argument_expression->expression->output.type.array_size_runtime ||
+                    argument_expression->expression->output.type.array_dimensions_count != 0u)
+                {
+                    KAN_LOG (
+                        rpl_compiler_context, KAN_LOG_ERROR,
+                        "[%s:%s:%s:%ld] Constructor \"%s\" argument at index %u is an array which is not supported.",
+                        context->log_name, new_expression->module_name, new_expression->source_name,
+                        (long) new_expression->source_line, expression->constructor.type_name,
+                        (unsigned int) argument_index)
+                    return KAN_FALSE;
+                }
+
+                if (argument_expression->expression->output.type.class != COMPILER_INSTANCE_TYPE_CLASS_VECTOR ||
+                    argument_expression->expression->output.type.vector_data->item != vector_type->item)
+                {
+                    KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
+                             "[%s:%s:%s:%ld] Constructor \"%s\" argument at index %u is not a vector with the same "
+                             "item type.",
+                             context->log_name, new_expression->module_name, new_expression->source_name,
+                             (long) new_expression->source_line, expression->constructor.type_name,
+                             (unsigned int) argument_index)
+                    return KAN_FALSE;
+                }
+
+                total_items += argument_expression->expression->output.type.vector_data->items_count;
+                ++argument_index;
+                argument_expression = argument_expression->next;
+            }
+
+            if (total_items != vector_type->items_count)
+            {
+                KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
+                         "[%s:%s:%s:%ld] Constructor \"%s\" arguments form %u components instead of %u components.",
+                         context->log_name, new_expression->module_name, new_expression->source_name,
+                         (long) new_expression->source_line, expression->constructor.type_name,
+                         (unsigned int) total_items, (unsigned int) vector_type->items_count)
+                return KAN_FALSE;
+            }
+
+            return KAN_TRUE;
+        }
+        else if ((matrix_type = find_inbuilt_matrix_type (expression->constructor.type_name)))
+        {
+            new_expression->type = COMPILER_INSTANCE_EXPRESSION_TYPE_MATRIX_CONSTRUCTOR;
+            new_expression->matrix_constructor.type = matrix_type;
+            new_expression->matrix_constructor.first_argument = first_expression;
+            new_expression->output.type.class = COMPILER_INSTANCE_TYPE_CLASS_MATRIX;
+            new_expression->output.type.matrix_data = matrix_type;
+
+            // Check special cases for one item constructors.
+            if (expression->constructor.argument_list_size == 1u &&
+                first_expression->expression->output.type.class == COMPILER_INSTANCE_TYPE_CLASS_MATRIX &&
+                !first_expression->expression->output.type.array_size_runtime &&
+                first_expression->expression->output.type.array_dimensions_count == 0u)
+            {
+                struct inbuilt_matrix_type_t *argument_type = first_expression->expression->output.type.matrix_data;
+                if (argument_type->item == matrix_type->item && argument_type->rows == matrix_type->rows &&
+                    argument_type->columns == matrix_type->columns)
+                {
+                    new_expression->matrix_constructor.variant = COMPILER_INSTANCE_MATRIX_CONSTRUCTOR_SKIP;
+                    return KAN_TRUE;
+                }
+                else if (argument_type->rows == matrix_type->rows && argument_type->columns == matrix_type->columns)
+                {
+                    new_expression->matrix_constructor.variant = COMPILER_INSTANCE_MATRIX_CONSTRUCTOR_CONVERT;
+                    return KAN_TRUE;
+                }
+                else if (argument_type->item == matrix_type->item && argument_type->rows >= matrix_type->rows &&
+                         argument_type->columns >= matrix_type->columns)
+                {
+                    new_expression->matrix_constructor.variant = COMPILER_INSTANCE_MATRIX_CONSTRUCTOR_CROP;
+                    return KAN_TRUE;
+                }
+            }
+
+            // No more special cases, it can only be combine constructor.
+            new_expression->matrix_constructor.variant = COMPILER_INSTANCE_MATRIX_CONSTRUCTOR_COMBINE;
+
+            if (expression->constructor.argument_list_size != matrix_type->columns)
+            {
+                KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
+                         "[%s:%s:%s:%ld] Constructor \"%s\" received %u arguments, but matrix has %u columns.",
+                         context->log_name, new_expression->module_name, new_expression->source_name,
+                         (long) new_expression->source_line, expression->constructor.type_name,
+                         (unsigned int) expression->constructor.argument_list_size, (unsigned int) matrix_type->columns)
+                return KAN_FALSE;
+            }
+
+            kan_instance_size_t argument_index = 0u;
+            struct compiler_instance_expression_list_item_t *argument_expression = first_expression;
+
+            while (argument_expression)
+            {
+                if (argument_expression->expression->output.type.array_size_runtime ||
+                    argument_expression->expression->output.type.array_dimensions_count != 0u)
+                {
+                    KAN_LOG (
+                        rpl_compiler_context, KAN_LOG_ERROR,
+                        "[%s:%s:%s:%ld] Constructor \"%s\" argument at index %u is an array which is not supported.",
+                        context->log_name, new_expression->module_name, new_expression->source_name,
+                        (long) new_expression->source_line, expression->constructor.type_name,
+                        (unsigned int) argument_index)
+                    return KAN_FALSE;
+                }
+
+                if (argument_expression->expression->output.type.class != COMPILER_INSTANCE_TYPE_CLASS_VECTOR ||
+                    argument_expression->expression->output.type.vector_data->item != matrix_type->item ||
+                    argument_expression->expression->output.type.vector_data->items_count != matrix_type->rows)
+                {
+                    KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
+                             "[%s:%s:%s:%ld] Constructor \"%s\" argument at index %u is not a vector with same type as "
+                             "matrix row.",
+                             context->log_name, new_expression->module_name, new_expression->source_name,
+                             (long) new_expression->source_line, expression->constructor.type_name,
+                             (unsigned int) argument_index)
+                    return KAN_FALSE;
+                }
+
+                ++argument_index;
+                argument_expression = argument_expression->next;
+            }
+
+            return KAN_TRUE;
+        }
+        else if (!resolve_use_struct (context, instance, expression->constructor.type_name, &struct_type))
+        {
+            new_expression->type = COMPILER_INSTANCE_EXPRESSION_TYPE_STRUCT_CONSTRUCTOR;
+            new_expression->struct_constructor.type = struct_type;
+            new_expression->struct_constructor.first_argument = first_expression;
+            new_expression->output.type.class = COMPILER_INSTANCE_TYPE_CLASS_STRUCT;
+            new_expression->output.type.struct_data = struct_type;
+
+            struct compiler_instance_declaration_node_t *declaration_node = struct_type->first_field;
+            kan_instance_size_t argument_index = 0u;
+            struct compiler_instance_expression_list_item_t *argument_expression = first_expression;
+
+            while (argument_expression)
+            {
+                if (!declaration_node)
+                {
+                    KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
+                             "[%s:%s:%s:%ld] Constructor \"%s\" has more arguments that structure has fields.",
+                             context->log_name, new_expression->module_name, new_expression->source_name,
+                             (long) new_expression->source_line, expression->constructor.type_name)
+                    return KAN_FALSE;
+                }
+
+                if (!resolve_match_signature_at_index (context, resolve_scope->function->module_name, new_expression,
+                                                       &declaration_node->variable, KAN_RPL_ACCESS_CLASS_READ_ONLY,
+                                                       argument_index, argument_expression->expression))
+                {
+                    resolved = KAN_FALSE;
+                }
+
+                ++argument_index;
+                argument_expression = argument_expression->next;
+                declaration_node = declaration_node->next;
+            }
+
+            if (!resolved)
+            {
+                return KAN_FALSE;
+            }
+
+            if (declaration_node)
+            {
+                KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
+                         "[%s:%s:%s:%ld] Constructor \"%s\" has less arguments that structure has fields.",
+                         context->log_name, new_expression->module_name, new_expression->source_name,
+                         (long) new_expression->source_line, expression->constructor.type_name)
+                return KAN_FALSE;
+            }
+
+            return KAN_TRUE;
+        }
+
+        KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR, "[%s:%s:%s:%ld] Constructor \"%s\" type is unknown.",
+                 context->log_name, new_expression->module_name, new_expression->source_name,
+                 (long) new_expression->source_line, expression->constructor.type_name)
+        return KAN_FALSE;
     }
 
     case KAN_RPL_EXPRESSION_NODE_TYPE_IF:
@@ -3722,7 +4755,17 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
                                       intermediate->expression_storage.data)[expression->if_.condition_index],
                                 &new_expression->if_.condition))
         {
-            if (!new_expression->if_.condition->output.boolean)
+            if (!is_access_readable (new_expression->if_.condition->output.access))
+            {
+                KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR, "[%s:%s:%s:%ld] Condition of if is not readable.",
+                         context->log_name, new_expression->module_name, new_expression->source_name,
+                         (long) new_expression->source_line)
+                resolved = KAN_FALSE;
+            }
+
+            if (new_expression->if_.condition->output.type.class != COMPILER_INSTANCE_TYPE_CLASS_BOOLEAN ||
+                new_expression->if_.condition->output.type.array_size_runtime ||
+                new_expression->if_.condition->output.type.array_dimensions_count > 0u)
             {
                 KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
                          "[%s:%s:%s:%ld] Condition of if cannot be resolved as boolean.", context->log_name,
@@ -3806,7 +4849,17 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
                                       intermediate->expression_storage.data)[expression->for_.condition_index],
                                 &loop_expression->for_.condition))
         {
-            if (!loop_expression->for_.condition->output.boolean)
+            if (!is_access_readable (loop_expression->for_.condition->output.access))
+            {
+                KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR, "[%s:%s:%s:%ld] Condition of for is not readable.",
+                         context->log_name, new_expression->module_name, new_expression->source_name,
+                         (long) new_expression->source_line)
+                resolved = KAN_FALSE;
+            }
+
+            if (loop_expression->for_.condition->output.type.class != COMPILER_INSTANCE_TYPE_CLASS_BOOLEAN ||
+                loop_expression->for_.condition->output.type.array_size_runtime ||
+                loop_expression->for_.condition->output.type.array_dimensions_count > 0u)
             {
                 KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
                          "[%s:%s:%s:%ld] Condition of for cannot be resolved as boolean.", context->log_name,
@@ -3857,7 +4910,17 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
                                       intermediate->expression_storage.data)[expression->while_.condition_index],
                                 &new_expression->while_.condition))
         {
-            if (!new_expression->while_.condition->output.boolean)
+            if (!is_access_readable (new_expression->while_.condition->output.access))
+            {
+                KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR, "[%s:%s:%s:%ld] Condition of while is not readable.",
+                         context->log_name, new_expression->module_name, new_expression->source_name,
+                         (long) new_expression->source_line)
+                resolved = KAN_FALSE;
+            }
+
+            if (new_expression->while_.condition->output.type.class != COMPILER_INSTANCE_TYPE_CLASS_BOOLEAN ||
+                new_expression->while_.condition->output.type.array_size_runtime ||
+                new_expression->while_.condition->output.type.array_dimensions_count > 0u)
             {
                 KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
                          "[%s:%s:%s:%ld] Condition of while cannot be resolved as boolean.", context->log_name,
@@ -3921,16 +4984,13 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
                     &((struct kan_rpl_expression_t *) intermediate->expression_storage.data)[expression->return_index],
                     &new_expression->return_expression))
             {
-                if (!resolve_scope->function->return_type_if_vector &&
-                    !resolve_scope->function->return_type_if_matrix && !resolve_scope->function->return_type_if_struct)
+                if (resolve_scope->function->return_type.class == COMPILER_INSTANCE_TYPE_CLASS_VOID)
                 {
                     KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
                              "[%s:%s:%s:%ld] Caught attempt to return \"%s\" from function \"%s\" which returns void.",
                              context->log_name, new_expression->module_name, new_expression->source_name,
                              (long) new_expression->source_line,
-                             get_type_name_for_logging (new_expression->return_expression->output.type.if_vector,
-                                                        new_expression->return_expression->output.type.if_matrix,
-                                                        new_expression->return_expression->output.type.if_struct),
+                             get_type_name_for_logging (&new_expression->return_expression->output.type),
                              resolve_scope->function->name)
                     resolved = KAN_FALSE;
                 }
@@ -3945,38 +5005,26 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
                     resolved = KAN_FALSE;
                 }
 
-                if (new_expression->return_expression->output.boolean)
+                if (!is_access_readable (new_expression->return_expression->output.access))
                 {
                     KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
-                             "[%s:%s:%s:%ld] Caught return of boolean from function \"%s\" which is not supported as "
-                             "independent type.",
-                             context->log_name, new_expression->module_name, new_expression->source_name,
-                             (long) new_expression->source_line, resolve_scope->function->name)
+                             "[%s:%s:%s:%ld] Return expression result is not readable.", context->log_name,
+                             new_expression->module_name, new_expression->source_name,
+                             (long) new_expression->source_line)
                     resolved = KAN_FALSE;
                 }
 
-                if ((resolve_scope->function->return_type_if_vector &&
-                     new_expression->return_expression->output.type.if_vector !=
-                         resolve_scope->function->return_type_if_vector) ||
-                    (resolve_scope->function->return_type_if_matrix &&
-                     new_expression->return_expression->output.type.if_matrix !=
-                         resolve_scope->function->return_type_if_matrix) ||
-                    (resolve_scope->function->return_type_if_struct &&
-                     new_expression->return_expression->output.type.if_struct !=
-                         resolve_scope->function->return_type_if_struct))
+                if (!is_type_definition_base_equal (&resolve_scope->function->return_type,
+                                                    &new_expression->return_expression->output.type))
                 {
                     KAN_LOG (
                         rpl_compiler_context, KAN_LOG_ERROR,
                         "[%s:%s:%s:%ld] Caught attempt to return \"%s\" from function \"%s\" which returns \"%s\".",
                         context->log_name, new_expression->module_name, new_expression->source_name,
                         (long) new_expression->source_line,
-                        get_type_name_for_logging (new_expression->return_expression->output.type.if_vector,
-                                                   new_expression->return_expression->output.type.if_matrix,
-                                                   new_expression->return_expression->output.type.if_struct),
+                        get_type_name_for_logging (&new_expression->return_expression->output.type),
                         resolve_scope->function->name,
-                        get_type_name_for_logging (resolve_scope->function->return_type_if_vector,
-                                                   resolve_scope->function->return_type_if_matrix,
-                                                   resolve_scope->function->return_type_if_struct))
+                        get_type_name_for_logging (&resolve_scope->function->return_type))
                     resolved = KAN_FALSE;
                 }
             }
@@ -3988,16 +5036,13 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
         else
         {
             new_expression->return_expression = NULL;
-            if (resolve_scope->function->return_type_if_vector || resolve_scope->function->return_type_if_matrix ||
-                resolve_scope->function->return_type_if_struct)
+            if (resolve_scope->function->return_type.class != COMPILER_INSTANCE_TYPE_CLASS_VOID)
             {
                 KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
                          "[%s:%s:%s:%ld] Caught void return from function \"%s\" which returns \"%s\".",
                          context->log_name, new_expression->module_name, new_expression->source_name,
                          (long) new_expression->source_line, resolve_scope->function->name,
-                         get_type_name_for_logging (resolve_scope->function->return_type_if_vector,
-                                                    resolve_scope->function->return_type_if_matrix,
-                                                    resolve_scope->function->return_type_if_struct))
+                         get_type_name_for_logging (&resolve_scope->function->return_type))
                 resolved = KAN_FALSE;
             }
         }
@@ -4008,6 +5053,117 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
 
     KAN_ASSERT (KAN_FALSE)
     return KAN_FALSE;
+}
+
+static kan_bool_t resolve_argument_declarations (struct rpl_compiler_context_t *context,
+                                                 struct rpl_compiler_instance_t *instance,
+                                                 struct kan_rpl_intermediate_t *intermediate,
+                                                 struct kan_dynamic_array_t *declaration_array,
+                                                 struct compiler_instance_function_argument_node_t **first_output)
+{
+    kan_bool_t result = KAN_TRUE;
+    struct compiler_instance_function_argument_node_t *first = NULL;
+    struct compiler_instance_function_argument_node_t *last = NULL;
+
+    for (kan_loop_size_t declaration_index = 0u; declaration_index < declaration_array->size; ++declaration_index)
+    {
+        struct kan_rpl_function_argument_t *source_argument =
+            &((struct kan_rpl_function_argument_t *) declaration_array->data)[declaration_index];
+
+        switch (evaluate_conditional (context, intermediate, source_argument->conditional_index, KAN_FALSE))
+        {
+        case CONDITIONAL_EVALUATION_RESULT_FAILED:
+            result = KAN_FALSE;
+            break;
+
+        case CONDITIONAL_EVALUATION_RESULT_TRUE:
+        {
+            struct compiler_instance_function_argument_node_t *target_argument =
+                KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&instance->resolve_allocator,
+                                                          struct compiler_instance_function_argument_node_t);
+
+            target_argument->next = NULL;
+            target_argument->variable.name = source_argument->name;
+            target_argument->variable.type.class = COMPILER_INSTANCE_TYPE_CLASS_VOID;
+            target_argument->access = source_argument->access;
+
+            if (!resolve_type (context, instance, intermediate->log_name, &target_argument->variable.type,
+                               source_argument->type_name, source_argument->name, source_argument->source_name,
+                               source_argument->source_line))
+            {
+                result = KAN_FALSE;
+            }
+
+            if (!resolve_array_dimensions (context, instance, intermediate, &target_argument->variable, KAN_FALSE,
+                                           source_argument->array_size_expression_list_size,
+                                           source_argument->array_size_expression_list_index, KAN_TRUE))
+            {
+                result = KAN_FALSE;
+            }
+
+            if (result)
+            {
+                switch (target_argument->variable.type.class)
+                {
+                case COMPILER_INSTANCE_TYPE_CLASS_VOID:
+                case COMPILER_INSTANCE_TYPE_CLASS_BOOLEAN:
+                case COMPILER_INSTANCE_TYPE_CLASS_BUFFER:
+                    KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
+                             "[%s:%s:%s:%ld] Argument \"%s\" has type \"%s\" which is not supported for arguments.",
+                             context->log_name, intermediate->log_name, source_argument->source_name,
+                             (long) source_argument->source_line, source_argument->name, source_argument->type_name)
+                    result = KAN_FALSE;
+                    break;
+
+                case COMPILER_INSTANCE_TYPE_CLASS_VECTOR:
+                case COMPILER_INSTANCE_TYPE_CLASS_MATRIX:
+                case COMPILER_INSTANCE_TYPE_CLASS_STRUCT:
+                    break;
+
+                case COMPILER_INSTANCE_TYPE_CLASS_SAMPLER:
+                case COMPILER_INSTANCE_TYPE_CLASS_IMAGE:
+                    if (target_argument->access != KAN_RPL_ACCESS_CLASS_READ_ONLY)
+                    {
+                        KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
+                                 "[%s:%s:%s:%ld] Argument \"%s\" of type \"%s\" must be readonly due to its type.",
+                                 context->log_name, intermediate->log_name, source_argument->source_name,
+                                 (long) source_argument->source_line, source_argument->name, source_argument->type_name)
+                        result = KAN_FALSE;
+                    }
+
+                    break;
+                }
+            }
+
+            target_argument->module_name = intermediate->log_name;
+            target_argument->source_name = source_argument->source_name;
+            target_argument->source_line = source_argument->source_line;
+
+            if (last)
+            {
+                last->next = target_argument;
+                last = target_argument;
+            }
+            else
+            {
+                first = target_argument;
+                last = target_argument;
+            }
+
+            break;
+        }
+
+        case CONDITIONAL_EVALUATION_RESULT_FALSE:
+            break;
+        }
+    }
+
+    if (result)
+    {
+        *first_output = first;
+    }
+
+    return result;
 }
 
 static kan_bool_t resolve_new_used_function (struct rpl_compiler_context_t *context,
@@ -4035,39 +5191,56 @@ static kan_bool_t resolve_new_used_function (struct rpl_compiler_context_t *cont
     kan_bool_t resolved = KAN_TRUE;
     function_node->name = function->name;
 
-    function_node->return_type_if_vector = NULL;
-    function_node->return_type_if_matrix = NULL;
-    function_node->return_type_if_struct = NULL;
-
-    if (function->return_type_name != STATICS.interned_void)
+    if (resolve_type (context, instance, intermediate->log_name, &function_node->return_type,
+                      function->return_type_name, function_node->name, function_node->source_name,
+                      function_node->source_line))
     {
-        if (!(function_node->return_type_if_vector = find_inbuilt_vector_type (function->return_type_name)) &&
-            !(function_node->return_type_if_matrix = find_inbuilt_matrix_type (function->return_type_name)) &&
-            !resolve_use_struct (context, instance, function->return_type_name, &function_node->return_type_if_struct))
+        switch (function_node->return_type.class)
         {
-            KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR, "[%s:%s:%s:%ld] Function return type \"%s\" is unknown.",
+        case COMPILER_INSTANCE_TYPE_CLASS_VOID:
+        case COMPILER_INSTANCE_TYPE_CLASS_VECTOR:
+        case COMPILER_INSTANCE_TYPE_CLASS_MATRIX:
+        case COMPILER_INSTANCE_TYPE_CLASS_STRUCT:
+            break;
+
+        case COMPILER_INSTANCE_TYPE_CLASS_BOOLEAN:
+        case COMPILER_INSTANCE_TYPE_CLASS_BUFFER:
+        case COMPILER_INSTANCE_TYPE_CLASS_SAMPLER:
+        case COMPILER_INSTANCE_TYPE_CLASS_IMAGE:
+            KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
+                     "[%s:%s:%s:%ld] Function return type \"%s\" is not void, vector, matrix or struct. Other types "
+                     "are not supported for return.",
                      context->log_name, intermediate->log_name, function->source_name, (long) function->source_line,
                      function->return_type_name)
             resolved = KAN_FALSE;
+            break;
         }
+    }
+    else
+    {
+        KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR, "[%s:%s:%s:%ld] Function return type \"%s\" is unknown.",
+                 context->log_name, intermediate->log_name, function->source_name, (long) function->source_line,
+                 function->return_type_name)
+        resolved = KAN_FALSE;
     }
 
     function_node->has_stage_specific_access = KAN_FALSE;
     function_node->required_stage = context_stage;
     function_node->first_buffer_access = NULL;
     function_node->first_sampler_access = NULL;
+    function_node->first_image_access = NULL;
 
     function_node->module_name = intermediate->log_name;
     function_node->source_name = function->source_name;
     function_node->source_line = function->source_line;
 
-    if (!resolve_declarations (context, instance, intermediate, &function->arguments, &function_node->first_argument,
-                               KAN_TRUE))
+    if (!resolve_argument_declarations (context, instance, intermediate, &function->arguments,
+                                        &function_node->first_argument))
     {
         resolved = KAN_FALSE;
     }
 
-    struct compiler_instance_declaration_node_t *argument_declaration = function_node->first_argument;
+    struct compiler_instance_function_argument_node_t *argument_declaration = function_node->first_argument;
     function_node->first_argument_variable = NULL;
     struct compiler_instance_scope_variable_item_t *last_argument_variable = NULL;
 
@@ -4078,7 +5251,7 @@ static kan_bool_t resolve_new_used_function (struct rpl_compiler_context_t *cont
 
         item->next = NULL;
         item->variable = &argument_declaration->variable;
-        item->writable = KAN_FALSE;
+        item->access = argument_declaration->access;
 
         if (last_argument_variable)
         {
@@ -4109,8 +5282,7 @@ static kan_bool_t resolve_new_used_function (struct rpl_compiler_context_t *cont
         resolved = KAN_FALSE;
     }
 
-    if (function_node->return_type_if_vector || function_node->return_type_if_matrix ||
-        function_node->return_type_if_struct)
+    if (function_node->return_type.class != COMPILER_INSTANCE_TYPE_CLASS_VOID)
     {
         if (!function_node->body->scope.leads_to_return)
         {
@@ -4318,6 +5490,9 @@ kan_rpl_compiler_instance_t kan_rpl_compiler_context_resolve (kan_rpl_compiler_c
     instance->first_sampler = NULL;
     instance->last_sampler = NULL;
 
+    instance->first_image = NULL;
+    instance->last_image = NULL;
+
     instance->first_function = NULL;
     instance->last_function = NULL;
 
@@ -4352,6 +5527,11 @@ kan_rpl_compiler_instance_t kan_rpl_compiler_context_resolve (kan_rpl_compiler_c
         }
 
         if (!resolve_samplers (context, instance, intermediate, &assignment_counter))
+        {
+            successfully_resolved = KAN_FALSE;
+        }
+
+        if (!resolve_images (context, instance, intermediate, &assignment_counter))
         {
             successfully_resolved = KAN_FALSE;
         }

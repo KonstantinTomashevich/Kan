@@ -319,7 +319,7 @@ struct kan_rpl_setting_t
     kan_rpl_size_t source_line;
 };
 
-/// \brief Defines structure that holds one declaration data: either field or function argument.
+/// \brief Defines structure that holds one struct field declaration.
 struct kan_rpl_declaration_t
 {
     kan_interned_string_t type_name;
@@ -421,18 +421,11 @@ RENDER_PIPELINE_LANGUAGE_API void kan_rpl_buffer_init (struct kan_rpl_buffer_t *
 
 RENDER_PIPELINE_LANGUAGE_API void kan_rpl_buffer_shutdown (struct kan_rpl_buffer_t *instance);
 
-/// \brief Enumerates supported sampler types.
-enum kan_rpl_sampler_type_t
-{
-    KAN_RPL_SAMPLER_TYPE_2D = 0u,
-};
-
-/// \brief Defines structure that holds sampler data.
+/// \brief Defines structure that holds sampler declaration.
 struct kan_rpl_sampler_t
 {
     kan_interned_string_t name;
     enum kan_rpl_set_t set;
-    enum kan_rpl_sampler_type_t type;
 
     /// \details Conditional expression if it is not KAN_RPL_EXPRESSION_NODE_TYPE_NOPE.
     kan_rpl_size_t conditional_index;
@@ -443,13 +436,79 @@ struct kan_rpl_sampler_t
 
 RENDER_PIPELINE_LANGUAGE_API void kan_rpl_sampler_init (struct kan_rpl_sampler_t *instance);
 
+/// \brief Enumerates supported image types.
+enum kan_rpl_image_type_t
+{
+    KAN_RPL_IMAGE_TYPE_COLOR_2D = 0u,
+    KAN_RPL_IMAGE_TYPE_COLOR_3D,
+    KAN_RPL_IMAGE_TYPE_COLOR_CUBE,
+    KAN_RPL_IMAGE_TYPE_COLOR_2D_ARRAY,
+    KAN_RPL_IMAGE_TYPE_DEPTH_2D,
+    KAN_RPL_IMAGE_TYPE_DEPTH_3D,
+    KAN_RPL_IMAGE_TYPE_DEPTH_CUBE,
+    KAN_RPL_IMAGE_TYPE_DEPTH_2D_ARRAY,
+
+    /// \brief Interval value used as counter for image types.
+    KAN_RPL_IMAGE_TYPE_COUNT,
+};
+
+/// \brief Defines structure that holds image or image array declaration.
+struct kan_rpl_image_t
+{
+    kan_interned_string_t name;
+    enum kan_rpl_set_t set;
+    enum kan_rpl_image_type_t type;
+
+    /// \details Conditional expression if it is not KAN_RPL_EXPRESSION_NODE_TYPE_NOPE.
+    kan_rpl_size_t array_size_index;
+
+    /// \details Conditional expression if it is not KAN_RPL_EXPRESSION_NODE_TYPE_NOPE.
+    kan_rpl_size_t conditional_index;
+
+    kan_interned_string_t source_name;
+    kan_rpl_size_t source_line;
+};
+
+RENDER_PIPELINE_LANGUAGE_API void kan_rpl_image_init (struct kan_rpl_image_t *instance);
+
+/// \brief Enumerates access classes for function arguments.
+enum kan_rpl_access_class_t
+{
+    KAN_RPL_ACCESS_CLASS_READ_ONLY = 0u,
+    KAN_RPL_ACCESS_CLASS_WRITE_ONLY,
+    KAN_RPL_ACCESS_CLASS_READ_WRITE,
+};
+
+/// \brief Defines structure that holds one function argument declaration.
+/// \details Different from `kan_rpl_declaration_t` as function arguments have some differences from structure fields.
+struct kan_rpl_function_argument_t
+{
+    kan_interned_string_t type_name;
+    kan_interned_string_t name;
+    enum kan_rpl_access_class_t access;
+
+    /// \details Array size expressions list count if declaring array.
+    kan_rpl_size_t array_size_expression_list_size;
+
+    /// \details Array size expressions list index if declaring array.
+    kan_rpl_size_t array_size_expression_list_index;
+
+    /// \details Conditional expression if it is not KAN_RPL_EXPRESSION_NODE_TYPE_NOPE.
+    kan_rpl_size_t conditional_index;
+
+    kan_interned_string_t source_name;
+    kan_rpl_size_t source_line;
+};
+
+RENDER_PIPELINE_LANGUAGE_API void kan_rpl_function_argument_init (struct kan_rpl_function_argument_t *instance);
+
 /// \brief Defines structure that holds function data.
 struct kan_rpl_function_t
 {
     kan_interned_string_t return_type_name;
     kan_interned_string_t name;
 
-    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_declaration_t)
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_function_argument_t)
     struct kan_dynamic_array_t arguments;
 
     kan_rpl_size_t body_index;
@@ -496,6 +555,10 @@ struct kan_rpl_intermediate_t
     /// \brief Array of parsed samplers.
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_sampler_t)
     struct kan_dynamic_array_t samplers;
+
+    /// \brief Array of parsed images.
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_image_t)
+    struct kan_dynamic_array_t images;
 
     /// \brief Array of parsed functions.
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_function_t)

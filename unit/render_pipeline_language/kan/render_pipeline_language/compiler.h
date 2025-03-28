@@ -228,7 +228,17 @@ struct kan_rpl_meta_sampler_t
 {
     kan_interned_string_t name;
     kan_rpl_size_t binding;
-    enum kan_rpl_sampler_type_t type;
+};
+
+/// \brief Stores information about image exposed to metadata.
+struct kan_rpl_meta_image_t
+{
+    kan_interned_string_t name;
+    kan_rpl_size_t binding;
+    enum kan_rpl_image_type_t type;
+
+    /// \brief Sizes of an array if it is an array of images. Equals to 1 if it is not an array.
+    kan_rpl_size_t image_array_size;
 };
 
 /// \brief Stores information about buffer and sampler bindings for concrete descriptor set.
@@ -239,6 +249,9 @@ struct kan_rpl_meta_set_bindings_t
 
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_meta_sampler_t)
     struct kan_dynamic_array_t samplers;
+
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_meta_image_t)
+    struct kan_dynamic_array_t images;
 };
 
 RENDER_PIPELINE_LANGUAGE_API void kan_rpl_meta_set_bindings_init (struct kan_rpl_meta_set_bindings_t *instance);

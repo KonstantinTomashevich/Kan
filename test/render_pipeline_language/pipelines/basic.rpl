@@ -19,11 +19,12 @@ vertex_stage_output vertex_output
 void vertex_main (void)
 {
     vertex_output.uv = vertex.uv;
-    f4 position4 = f4 {vertex.position._0, vertex.position._1, vertex.position._2, 1.0};
+    f4 position4 = f4 {vertex.position.xyz, 1.0};
     vertex_stage_output_position (uniforms.model_view_projection * position4);
 }
 
-set_material sampler_2d diffuse_color;
+set_material sampler color_sampler;
+set_material image_color_2d diffuse_color;
 
 fragment_stage_output fragment_output
 {
@@ -32,5 +33,5 @@ fragment_stage_output fragment_output
 
 void fragment_main (void)
 {
-    fragment_output.color = diffuse_color (vertex_output.uv);
+    fragment_output.color = sample (color_sampler, diffuse_color, vertex_output.uv);
 }

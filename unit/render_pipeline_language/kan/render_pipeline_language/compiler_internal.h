@@ -77,11 +77,31 @@ struct compiler_instance_setting_node_t
     kan_rpl_size_t source_line;
 };
 
-struct compiler_instance_full_type_definition_t
+enum compiler_instance_type_class_t
 {
-    struct inbuilt_vector_type_t *if_vector;
-    struct inbuilt_matrix_type_t *if_matrix;
-    struct compiler_instance_struct_node_t *if_struct;
+    /// \brief Special case for functions that return nothing.
+    COMPILER_INSTANCE_TYPE_CLASS_VOID = 0u,
+
+    COMPILER_INSTANCE_TYPE_CLASS_VECTOR,
+    COMPILER_INSTANCE_TYPE_CLASS_MATRIX,
+    COMPILER_INSTANCE_TYPE_CLASS_STRUCT,
+    COMPILER_INSTANCE_TYPE_CLASS_BOOLEAN,
+    COMPILER_INSTANCE_TYPE_CLASS_BUFFER,
+    COMPILER_INSTANCE_TYPE_CLASS_SAMPLER,
+    COMPILER_INSTANCE_TYPE_CLASS_IMAGE,
+};
+
+struct compiler_instance_type_definition_t
+{
+    enum compiler_instance_type_class_t class;
+    union
+    {
+        struct inbuilt_vector_type_t *vector_data;
+        struct inbuilt_matrix_type_t *matrix_data;
+        struct compiler_instance_struct_node_t *struct_data;
+        struct compiler_instance_buffer_node_t *buffer_data;
+        enum kan_rpl_image_type_t image_type;
+    };
 
     kan_bool_t array_size_runtime;
     kan_instance_size_t array_dimensions_count;
@@ -91,7 +111,7 @@ struct compiler_instance_full_type_definition_t
 struct compiler_instance_variable_t
 {
     kan_interned_string_t name;
-    struct compiler_instance_full_type_definition_t type;
+    struct compiler_instance_type_definition_t type;
 };
 
 struct compiler_instance_declaration_node_t
@@ -127,8 +147,6 @@ struct compiler_instance_struct_node_t
     spirv_size_t spirv_id_function_pointer;
 };
 
-#define INVALID_LOCATION KAN_INT_MAX (kan_rpl_size_t)
-#define INVALID_SET KAN_INT_MAX (kan_rpl_size_t)
 #define INVALID_BINDING KAN_INT_MAX (kan_rpl_size_t)
 
 struct binding_location_assignment_counter_t
@@ -192,9 +210,26 @@ struct compiler_instance_sampler_node_t
     struct compiler_instance_sampler_node_t *next;
     kan_interned_string_t name;
     enum kan_rpl_set_t set;
-    enum kan_rpl_sampler_type_t type;
     kan_bool_t used;
 
+    kan_instance_size_t binding;
+
+    spirv_size_t variable_spirv_id;
+
+    kan_interned_string_t module_name;
+    kan_interned_string_t source_name;
+    kan_rpl_size_t source_line;
+};
+
+struct compiler_instance_image_node_t
+{
+    struct compiler_instance_image_node_t *next;
+    kan_interned_string_t name;
+    enum kan_rpl_set_t set;
+    enum kan_rpl_image_type_t type;
+    kan_rpl_size_t array_size;
+
+    kan_bool_t used;
     kan_instance_size_t binding;
 
     spirv_size_t variable_spirv_id;
@@ -207,8 +242,11 @@ struct compiler_instance_sampler_node_t
 enum compiler_instance_expression_type_t
 {
     COMPILER_INSTANCE_EXPRESSION_TYPE_STRUCTURED_BUFFER_REFERENCE,
+    COMPILER_INSTANCE_EXPRESSION_TYPE_SAMPLER_REFERENCE,
+    COMPILER_INSTANCE_EXPRESSION_TYPE_IMAGE_REFERENCE,
     COMPILER_INSTANCE_EXPRESSION_TYPE_VARIABLE_REFERENCE,
     COMPILER_INSTANCE_EXPRESSION_TYPE_STRUCTURED_ACCESS,
+    COMPILER_INSTANCE_EXPRESSION_TYPE_SWIZZLE,
     COMPILER_INSTANCE_EXPRESSION_TYPE_FLATTENED_BUFFER_ACCESS_INPUT,
     COMPILER_INSTANCE_EXPRESSION_TYPE_FLATTENED_BUFFER_ACCESS_OUTPUT,
     COMPILER_INSTANCE_EXPRESSION_TYPE_INTEGER_LITERAL,
@@ -239,8 +277,11 @@ enum compiler_instance_expression_type_t
     COMPILER_INSTANCE_EXPRESSION_TYPE_OPERATION_BITWISE_NOT,
     COMPILER_INSTANCE_EXPRESSION_TYPE_SCOPE,
     COMPILER_INSTANCE_EXPRESSION_TYPE_FUNCTION_CALL,
-    COMPILER_INSTANCE_EXPRESSION_TYPE_SAMPLER_CALL,
-    COMPILER_INSTANCE_EXPRESSION_TYPE_CONSTRUCTOR,
+    COMPILER_INSTANCE_EXPRESSION_TYPE_IMAGE_SAMPLE,
+    COMPILER_INSTANCE_EXPRESSION_TYPE_IMAGE_SAMPLE_DREF,
+    COMPILER_INSTANCE_EXPRESSION_TYPE_VECTOR_CONSTRUCTOR,
+    COMPILER_INSTANCE_EXPRESSION_TYPE_MATRIX_CONSTRUCTOR,
+    COMPILER_INSTANCE_EXPRESSION_TYPE_STRUCT_CONSTRUCTOR,
     COMPILER_INSTANCE_EXPRESSION_TYPE_IF,
     COMPILER_INSTANCE_EXPRESSION_TYPE_FOR,
     COMPILER_INSTANCE_EXPRESSION_TYPE_WHILE,
@@ -254,6 +295,15 @@ struct compiler_instance_structured_access_suffix_t
     struct compiler_instance_expression_node_t *input;
     kan_instance_size_t access_chain_length;
     kan_instance_size_t *access_chain_indices;
+};
+
+#define SWIZZLE_MAX_ITEMS 4u
+
+struct compiler_instance_swizzle_suffix_t
+{
+    struct compiler_instance_expression_node_t *input;
+    uint8_t items_count;
+    uint8_t items[SWIZZLE_MAX_ITEMS];
 };
 
 struct compiler_instance_variable_declaration_suffix_t
@@ -283,7 +333,7 @@ struct compiler_instance_scope_variable_item_t
 {
     struct compiler_instance_scope_variable_item_t *next;
     struct compiler_instance_variable_t *variable;
-    kan_bool_t writable;
+    enum kan_rpl_access_class_t access;
     spirv_size_t spirv_id;
 };
 
@@ -301,17 +351,50 @@ struct compiler_instance_function_call_suffix_t
     struct compiler_instance_expression_list_item_t *first_argument;
 };
 
-struct compiler_instance_sampler_call_suffix_t
+struct compiler_instance_image_sample_suffix_t
 {
-    struct compiler_instance_sampler_node_t *sampler;
+    struct compiler_instance_expression_node_t *sampler;
+    struct compiler_instance_expression_node_t *image;
     struct compiler_instance_expression_list_item_t *first_argument;
 };
 
-struct compiler_instance_constructor_suffix_t
+enum compiler_instance_vector_constructor_variant_t
 {
-    struct inbuilt_vector_type_t *type_if_vector;
-    struct inbuilt_matrix_type_t *type_if_matrix;
-    struct compiler_instance_struct_node_t *type_if_struct;
+    /// \brief If argument resolves to the same type, constructor is treated as type-enforcing syntax and is skipped.
+    COMPILER_INSTANCE_VECTOR_CONSTRUCTOR_SKIP = 0u,
+
+    COMPILER_INSTANCE_VECTOR_CONSTRUCTOR_COMBINE,
+    COMPILER_INSTANCE_VECTOR_CONSTRUCTOR_CONVERT,
+    COMPILER_INSTANCE_VECTOR_CONSTRUCTOR_FILL,
+};
+
+struct compiler_instance_vector_constructor_suffix_t
+{
+    struct inbuilt_vector_type_t *type;
+    enum compiler_instance_vector_constructor_variant_t variant;
+    struct compiler_instance_expression_list_item_t *first_argument;
+};
+
+enum compiler_instance_matrix_constructor_variant_t
+{
+    /// \brief If argument resolves to the same type, constructor is treated as type-enforcing syntax and is skipped.
+    COMPILER_INSTANCE_MATRIX_CONSTRUCTOR_SKIP = 0u,
+
+    COMPILER_INSTANCE_MATRIX_CONSTRUCTOR_COMBINE,
+    COMPILER_INSTANCE_MATRIX_CONSTRUCTOR_CONVERT,
+    COMPILER_INSTANCE_MATRIX_CONSTRUCTOR_CROP,
+};
+
+struct compiler_instance_matrix_constructor_suffix_t
+{
+    struct inbuilt_matrix_type_t *type;
+    enum compiler_instance_matrix_constructor_variant_t variant;
+    struct compiler_instance_expression_list_item_t *first_argument;
+};
+
+struct compiler_instance_struct_constructor_suffix_t
+{
+    struct compiler_instance_struct_node_t *type;
     struct compiler_instance_expression_list_item_t *first_argument;
 };
 
@@ -344,9 +427,8 @@ struct compiler_instance_while_suffix_t
 
 struct compiler_instance_expression_output_type_t
 {
-    struct compiler_instance_full_type_definition_t type;
-    kan_bool_t boolean;
-    kan_bool_t writable;
+    struct compiler_instance_type_definition_t type;
+    enum kan_rpl_access_class_t access;
 };
 
 struct compiler_instance_expression_node_t
@@ -355,8 +437,11 @@ struct compiler_instance_expression_node_t
     union
     {
         struct compiler_instance_buffer_node_t *structured_buffer_reference;
+        struct compiler_instance_sampler_node_t *sampler_reference;
+        struct compiler_instance_image_node_t *image_reference;
         struct compiler_instance_scope_variable_item_t *variable_reference;
         struct compiler_instance_structured_access_suffix_t structured_access;
+        struct compiler_instance_swizzle_suffix_t swizzle;
         struct compiler_instance_buffer_flattened_declaration_t *flattened_buffer_access;
         kan_rpl_signed_int_literal_t integer_literal;
         float floating_literal;
@@ -365,8 +450,13 @@ struct compiler_instance_expression_node_t
         struct compiler_instance_unary_operation_suffix_t unary_operation;
         struct compiler_instance_scope_suffix_t scope;
         struct compiler_instance_function_call_suffix_t function_call;
-        struct compiler_instance_sampler_call_suffix_t sampler_call;
-        struct compiler_instance_constructor_suffix_t constructor;
+
+        /// \brief Used for both normal and dref sampling.
+        struct compiler_instance_image_sample_suffix_t image_sample;
+
+        struct compiler_instance_vector_constructor_suffix_t vector_constructor;
+        struct compiler_instance_matrix_constructor_suffix_t matrix_constructor;
+        struct compiler_instance_struct_constructor_suffix_t struct_constructor;
         struct compiler_instance_if_suffix_t if_;
         struct compiler_instance_for_suffix_t for_;
         struct compiler_instance_while_suffix_t while_;
@@ -396,15 +486,31 @@ struct compiler_instance_sampler_access_node_t
     struct compiler_instance_function_node_t *direct_access_function;
 };
 
+struct compiler_instance_image_access_node_t
+{
+    struct compiler_instance_image_access_node_t *next;
+    struct compiler_instance_image_node_t *image;
+    struct compiler_instance_function_node_t *direct_access_function;
+};
+
+struct compiler_instance_function_argument_node_t
+{
+    struct compiler_instance_function_argument_node_t *next;
+    struct compiler_instance_variable_t variable;
+    enum kan_rpl_access_class_t access;
+
+    kan_interned_string_t module_name;
+    kan_interned_string_t source_name;
+    kan_rpl_size_t source_line;
+};
+
 struct compiler_instance_function_node_t
 {
     struct compiler_instance_function_node_t *next;
     kan_interned_string_t name;
-    struct inbuilt_vector_type_t *return_type_if_vector;
-    struct inbuilt_matrix_type_t *return_type_if_matrix;
-    struct compiler_instance_struct_node_t *return_type_if_struct;
+    struct compiler_instance_type_definition_t return_type;
 
-    struct compiler_instance_declaration_node_t *first_argument;
+    struct compiler_instance_function_argument_node_t *first_argument;
     struct compiler_instance_expression_node_t *body;
     struct compiler_instance_scope_variable_item_t *first_argument_variable;
 
@@ -412,6 +518,7 @@ struct compiler_instance_function_node_t
     enum kan_rpl_pipeline_stage_t required_stage;
     struct compiler_instance_buffer_access_node_t *first_buffer_access;
     struct compiler_instance_sampler_access_node_t *first_sampler_access;
+    struct compiler_instance_image_access_node_t *first_image_access;
 
     spirv_size_t spirv_id;
     spirv_size_t spirv_external_library_id;
@@ -444,6 +551,9 @@ struct rpl_compiler_instance_t
     struct compiler_instance_sampler_node_t *first_sampler;
     struct compiler_instance_sampler_node_t *last_sampler;
 
+    struct compiler_instance_image_node_t *first_image;
+    struct compiler_instance_image_node_t *last_image;
+
     struct compiler_instance_function_node_t *first_function;
     struct compiler_instance_function_node_t *last_function;
 
@@ -461,19 +571,22 @@ static kan_instance_size_t inbuilt_type_item_size[] = {
     4u,
 };
 
+#define INBUILT_ITEM_TYPE_COUNT (sizeof (inbuilt_type_item_size) / sizeof (inbuilt_type_item_size[0u]))
+#define INBUILT_VECTOR_MAX_ITEMS 4u
+#define INBUILT_VECTOR_TYPE_INDEX(ITEM_TYPE, ITEM_COUNT)                                                               \
+    ((kan_instance_size_t) (ITEM_TYPE)) * INBUILT_VECTOR_MAX_ITEMS + (ITEM_COUNT) - 1u
+#define INBUILT_VECTOR_TYPE_COUNT INBUILT_ITEM_TYPE_COUNT *INBUILT_VECTOR_MAX_ITEMS
+
 struct inbuilt_vector_type_t
 {
     kan_interned_string_t name;
     enum inbuilt_type_item_t item;
     kan_instance_size_t items_count;
     enum kan_rpl_meta_variable_type_t meta_type;
-    struct compiler_instance_declaration_node_t *constructor_signature;
-
-    spirv_size_t spirv_id;
-    spirv_size_t spirv_id_input_pointer;
-    spirv_size_t spirv_id_output_pointer;
-    spirv_size_t spirv_id_function_pointer;
 };
+
+#define INBUILT_MATRIX_MAX_COLUMNS 4u
+#define INBUILT_MATRIX_MAX_ROWS INBUILT_VECTOR_MAX_ITEMS
 
 struct inbuilt_matrix_type_t
 {
@@ -482,12 +595,6 @@ struct inbuilt_matrix_type_t
     kan_instance_size_t rows;
     kan_instance_size_t columns;
     enum kan_rpl_meta_variable_type_t meta_type;
-    struct compiler_instance_declaration_node_t *constructor_signature;
-
-    spirv_size_t spirv_id;
-    spirv_size_t spirv_id_input_pointer;
-    spirv_size_t spirv_id_output_pointer;
-    spirv_size_t spirv_id_function_pointer;
 };
 
 /// \details In common header as they are needed to initialize statics with known fixed ids.
@@ -497,62 +604,6 @@ enum spirv_fixed_ids_t
 
     SPIRV_FIXED_ID_TYPE_VOID = 1u,
     SPIRV_FIXED_ID_TYPE_BOOLEAN,
-
-    SPIRV_FIXED_ID_TYPE_FLOAT,
-    SPIRV_FIXED_ID_TYPE_FLOAT_INPUT_POINTER,
-    SPIRV_FIXED_ID_TYPE_FLOAT_OUTPUT_POINTER,
-    SPIRV_FIXED_ID_TYPE_FLOAT_FUNCTION_POINTER,
-
-    SPIRV_FIXED_ID_TYPE_INTEGER,
-    SPIRV_FIXED_ID_TYPE_INTEGER_INPUT_POINTER,
-    SPIRV_FIXED_ID_TYPE_INTEGER_OUTPUT_POINTER,
-    SPIRV_FIXED_ID_TYPE_INTEGER_FUNCTION_POINTER,
-
-    SPIRV_FIXED_ID_TYPE_F2,
-    SPIRV_FIXED_ID_TYPE_F2_INPUT_POINTER,
-    SPIRV_FIXED_ID_TYPE_F2_OUTPUT_POINTER,
-    SPIRV_FIXED_ID_TYPE_F2_FUNCTION_POINTER,
-
-    SPIRV_FIXED_ID_TYPE_F3,
-    SPIRV_FIXED_ID_TYPE_F3_INPUT_POINTER,
-    SPIRV_FIXED_ID_TYPE_F3_OUTPUT_POINTER,
-    SPIRV_FIXED_ID_TYPE_F3_FUNCTION_POINTER,
-
-    SPIRV_FIXED_ID_TYPE_F4,
-    SPIRV_FIXED_ID_TYPE_F4_INPUT_POINTER,
-    SPIRV_FIXED_ID_TYPE_F4_OUTPUT_POINTER,
-    SPIRV_FIXED_ID_TYPE_F4_FUNCTION_POINTER,
-
-    SPIRV_FIXED_ID_TYPE_I2,
-    SPIRV_FIXED_ID_TYPE_I2_INPUT_POINTER,
-    SPIRV_FIXED_ID_TYPE_I2_OUTPUT_POINTER,
-    SPIRV_FIXED_ID_TYPE_I2_FUNCTION_POINTER,
-
-    SPIRV_FIXED_ID_TYPE_I3,
-    SPIRV_FIXED_ID_TYPE_I3_INPUT_POINTER,
-    SPIRV_FIXED_ID_TYPE_I3_OUTPUT_POINTER,
-    SPIRV_FIXED_ID_TYPE_I3_FUNCTION_POINTER,
-
-    SPIRV_FIXED_ID_TYPE_I4,
-    SPIRV_FIXED_ID_TYPE_I4_INPUT_POINTER,
-    SPIRV_FIXED_ID_TYPE_I4_OUTPUT_POINTER,
-    SPIRV_FIXED_ID_TYPE_I4_FUNCTION_POINTER,
-
-    SPIRV_FIXED_ID_TYPE_F3X3,
-    SPIRV_FIXED_ID_TYPE_F3X3_INPUT_POINTER,
-    SPIRV_FIXED_ID_TYPE_F3X3_OUTPUT_POINTER,
-    SPIRV_FIXED_ID_TYPE_F3X3_FUNCTION_POINTER,
-
-    SPIRV_FIXED_ID_TYPE_F4X4,
-    SPIRV_FIXED_ID_TYPE_F4X4_INPUT_POINTER,
-    SPIRV_FIXED_ID_TYPE_F4X4_OUTPUT_POINTER,
-    SPIRV_FIXED_ID_TYPE_F4X4_FUNCTION_POINTER,
-
-    SPIRV_FIXED_ID_TYPE_COMMON_SAMPLER,
-
-    SPIRV_FIXED_ID_TYPE_SAMPLER_2D_IMAGE,
-    SPIRV_FIXED_ID_TYPE_SAMPLER_2D,
-    SPIRV_FIXED_ID_TYPE_SAMPLER_2D_POINTER,
 
     SPIRV_FIXED_ID_GLSL_LIBRARY,
 
@@ -676,646 +727,230 @@ struct kan_rpl_compiler_statics_t
     kan_interned_string_t interned_color_blend_constant_a;
 
     kan_interned_string_t interned_void;
+    kan_interned_string_t interned_sampler;
 
-    struct inbuilt_vector_type_t type_f1;
-    struct compiler_instance_declaration_node_t type_f1_constructor_signatures[1u];
+    kan_interned_string_t interned_image_color_2d;
+    kan_interned_string_t interned_image_color_3d;
+    kan_interned_string_t interned_image_color_cube;
+    kan_interned_string_t interned_image_color_2d_array;
+    kan_interned_string_t interned_image_depth_2d;
+    kan_interned_string_t interned_image_depth_3d;
+    kan_interned_string_t interned_image_depth_cube;
+    kan_interned_string_t interned_image_depth_2d_array;
 
-    struct inbuilt_vector_type_t type_f2;
-    struct compiler_instance_declaration_node_t type_f2_constructor_signatures[2u];
+    struct inbuilt_vector_type_t vector_types[INBUILT_VECTOR_TYPE_COUNT];
+#define INBUILT_MATRIX_TYPE_COUNT 2u
+    struct inbuilt_matrix_type_t matrix_types[INBUILT_MATRIX_TYPE_COUNT];
 
-    struct inbuilt_vector_type_t type_f3;
-    struct compiler_instance_declaration_node_t type_f3_constructor_signatures[3u];
+    kan_interned_string_t sample_function_name;
+    kan_interned_string_t sample_dref_function_name;
 
-    struct inbuilt_vector_type_t type_f4;
-    struct compiler_instance_declaration_node_t type_f4_constructor_signatures[4u];
+    struct compiler_instance_function_argument_node_t sample_2d_additional_arguments[1u];
+    struct compiler_instance_function_argument_node_t sample_3d_additional_arguments[1u];
+    struct compiler_instance_function_argument_node_t sample_cube_additional_arguments[1u];
+    struct compiler_instance_function_argument_node_t sample_2d_array_additional_arguments[2u];
 
-    struct inbuilt_vector_type_t type_i1;
-    struct compiler_instance_declaration_node_t type_i1_constructor_signatures[1u];
-
-    struct inbuilt_vector_type_t type_i2;
-    struct compiler_instance_declaration_node_t type_i2_constructor_signatures[2u];
-
-    struct inbuilt_vector_type_t type_i3;
-    struct compiler_instance_declaration_node_t type_i3_constructor_signatures[3u];
-
-    struct inbuilt_vector_type_t type_i4;
-    struct compiler_instance_declaration_node_t type_i4_constructor_signatures[4u];
-
-    struct inbuilt_vector_type_t *vector_types[8u];
-    struct inbuilt_vector_type_t *floating_vector_types[4u];
-    struct inbuilt_vector_type_t *integer_vector_types[4u];
-
-    struct inbuilt_matrix_type_t type_f3x3;
-    struct compiler_instance_declaration_node_t type_f3x3_constructor_signatures[3u];
-
-    struct inbuilt_matrix_type_t type_f4x4;
-    struct compiler_instance_declaration_node_t type_f4x4_constructor_signatures[4u];
-
-    struct inbuilt_matrix_type_t *matrix_types[2u];
+    struct compiler_instance_function_argument_node_t sample_dref_2d_additional_arguments[2u];
+    struct compiler_instance_function_argument_node_t sample_dref_3d_additional_arguments[2u];
+    struct compiler_instance_function_argument_node_t sample_dref_cube_additional_arguments[2u];
+    struct compiler_instance_function_argument_node_t sample_dref_2d_array_additional_arguments[3u];
 
     struct compiler_instance_declaration_node_t *sampler_2d_call_signature_first_element;
     struct compiler_instance_declaration_node_t sampler_2d_call_signature_location;
 
     struct kan_hash_storage_t builtin_hash_storage;
 
-    struct compiler_instance_function_node_t builtin_vertex_stage_output_position;
-    struct compiler_instance_declaration_node_t builtin_vertex_stage_output_position_arguments[1u];
+#define BUILTIN_FUNCTION_FIELD(NAME, ARGUMENTS_COUNT)                                                                  \
+    struct compiler_instance_function_node_t builtin_##NAME;                                                           \
+    struct compiler_instance_function_argument_node_t builtin_##NAME##_arguments[ARGUMENTS_COUNT]
+
+    BUILTIN_FUNCTION_FIELD (vertex_stage_output_position, 1u);
 
     struct compiler_instance_function_node_t builtin_pi;
 
-    struct compiler_instance_function_node_t builtin_i1_to_f1;
-    struct compiler_instance_declaration_node_t builtin_i1_to_f1_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_i2_to_f2;
-    struct compiler_instance_declaration_node_t builtin_i2_to_f2_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_i3_to_f3;
-    struct compiler_instance_declaration_node_t builtin_i3_to_f3_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_i4_to_f4;
-    struct compiler_instance_declaration_node_t builtin_i4_to_f4_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_f1_to_i1;
-    struct compiler_instance_declaration_node_t builtin_f1_to_i1_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_f2_to_i2;
-    struct compiler_instance_declaration_node_t builtin_f2_to_i2_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_f3_to_i3;
-    struct compiler_instance_declaration_node_t builtin_f3_to_i3_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_f4_to_i4;
-    struct compiler_instance_declaration_node_t builtin_f4_to_i4_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_round_f1;
-    struct compiler_instance_declaration_node_t builtin_round_f1_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_round_f2;
-    struct compiler_instance_declaration_node_t builtin_round_f2_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_round_f3;
-    struct compiler_instance_declaration_node_t builtin_round_f3_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_round_f4;
-    struct compiler_instance_declaration_node_t builtin_round_f4_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_round_even_f1;
-    struct compiler_instance_declaration_node_t builtin_round_even_f1_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_round_even_f2;
-    struct compiler_instance_declaration_node_t builtin_round_even_f2_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_round_even_f3;
-    struct compiler_instance_declaration_node_t builtin_round_even_f3_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_round_even_f4;
-    struct compiler_instance_declaration_node_t builtin_round_even_f4_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_trunc_f1;
-    struct compiler_instance_declaration_node_t builtin_trunc_f1_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_trunc_f2;
-    struct compiler_instance_declaration_node_t builtin_trunc_f2_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_trunc_f3;
-    struct compiler_instance_declaration_node_t builtin_trunc_f3_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_trunc_f4;
-    struct compiler_instance_declaration_node_t builtin_trunc_f4_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_abs_f1;
-    struct compiler_instance_declaration_node_t builtin_abs_f1_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_abs_f2;
-    struct compiler_instance_declaration_node_t builtin_abs_f2_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_abs_f3;
-    struct compiler_instance_declaration_node_t builtin_abs_f3_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_abs_f4;
-    struct compiler_instance_declaration_node_t builtin_abs_f4_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_abs_i1;
-    struct compiler_instance_declaration_node_t builtin_abs_i1_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_abs_i2;
-    struct compiler_instance_declaration_node_t builtin_abs_i2_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_abs_i3;
-    struct compiler_instance_declaration_node_t builtin_abs_i3_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_abs_i4;
-    struct compiler_instance_declaration_node_t builtin_abs_i4_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_sign_f1;
-    struct compiler_instance_declaration_node_t builtin_sign_f1_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_sign_f2;
-    struct compiler_instance_declaration_node_t builtin_sign_f2_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_sign_f3;
-    struct compiler_instance_declaration_node_t builtin_sign_f3_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_sign_f4;
-    struct compiler_instance_declaration_node_t builtin_sign_f4_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_sign_i1;
-    struct compiler_instance_declaration_node_t builtin_sign_i1_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_sign_i2;
-    struct compiler_instance_declaration_node_t builtin_sign_i2_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_sign_i3;
-    struct compiler_instance_declaration_node_t builtin_sign_i3_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_sign_i4;
-    struct compiler_instance_declaration_node_t builtin_sign_i4_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_floor_f1;
-    struct compiler_instance_declaration_node_t builtin_floor_f1_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_floor_f2;
-    struct compiler_instance_declaration_node_t builtin_floor_f2_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_floor_f3;
-    struct compiler_instance_declaration_node_t builtin_floor_f3_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_floor_f4;
-    struct compiler_instance_declaration_node_t builtin_floor_f4_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_ceil_f1;
-    struct compiler_instance_declaration_node_t builtin_ceil_f1_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_ceil_f2;
-    struct compiler_instance_declaration_node_t builtin_ceil_f2_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_ceil_f3;
-    struct compiler_instance_declaration_node_t builtin_ceil_f3_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_ceil_f4;
-    struct compiler_instance_declaration_node_t builtin_ceil_f4_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_fract_f1;
-    struct compiler_instance_declaration_node_t builtin_fract_f1_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_fract_f2;
-    struct compiler_instance_declaration_node_t builtin_fract_f2_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_fract_f3;
-    struct compiler_instance_declaration_node_t builtin_fract_f3_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_fract_f4;
-    struct compiler_instance_declaration_node_t builtin_fract_f4_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_sin_f1;
-    struct compiler_instance_declaration_node_t builtin_sin_f1_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_sin_f2;
-    struct compiler_instance_declaration_node_t builtin_sin_f2_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_sin_f3;
-    struct compiler_instance_declaration_node_t builtin_sin_f3_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_sin_f4;
-    struct compiler_instance_declaration_node_t builtin_sin_f4_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_cos_f1;
-    struct compiler_instance_declaration_node_t builtin_cos_f1_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_cos_f2;
-    struct compiler_instance_declaration_node_t builtin_cos_f2_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_cos_f3;
-    struct compiler_instance_declaration_node_t builtin_cos_f3_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_cos_f4;
-    struct compiler_instance_declaration_node_t builtin_cos_f4_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_tan_f1;
-    struct compiler_instance_declaration_node_t builtin_tan_f1_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_tan_f2;
-    struct compiler_instance_declaration_node_t builtin_tan_f2_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_tan_f3;
-    struct compiler_instance_declaration_node_t builtin_tan_f3_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_tan_f4;
-    struct compiler_instance_declaration_node_t builtin_tan_f4_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_asin_f1;
-    struct compiler_instance_declaration_node_t builtin_asin_f1_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_asin_f2;
-    struct compiler_instance_declaration_node_t builtin_asin_f2_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_asin_f3;
-    struct compiler_instance_declaration_node_t builtin_asin_f3_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_asin_f4;
-    struct compiler_instance_declaration_node_t builtin_asin_f4_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_acos_f1;
-    struct compiler_instance_declaration_node_t builtin_acos_f1_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_acos_f2;
-    struct compiler_instance_declaration_node_t builtin_acos_f2_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_acos_f3;
-    struct compiler_instance_declaration_node_t builtin_acos_f3_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_acos_f4;
-    struct compiler_instance_declaration_node_t builtin_acos_f4_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_atan_f1;
-    struct compiler_instance_declaration_node_t builtin_atan_f1_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_atan_f2;
-    struct compiler_instance_declaration_node_t builtin_atan_f2_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_atan_f3;
-    struct compiler_instance_declaration_node_t builtin_atan_f3_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_atan_f4;
-    struct compiler_instance_declaration_node_t builtin_atan_f4_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_sinh_f1;
-    struct compiler_instance_declaration_node_t builtin_sinh_f1_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_sinh_f2;
-    struct compiler_instance_declaration_node_t builtin_sinh_f2_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_sinh_f3;
-    struct compiler_instance_declaration_node_t builtin_sinh_f3_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_sinh_f4;
-    struct compiler_instance_declaration_node_t builtin_sinh_f4_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_cosh_f1;
-    struct compiler_instance_declaration_node_t builtin_cosh_f1_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_cosh_f2;
-    struct compiler_instance_declaration_node_t builtin_cosh_f2_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_cosh_f3;
-    struct compiler_instance_declaration_node_t builtin_cosh_f3_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_cosh_f4;
-    struct compiler_instance_declaration_node_t builtin_cosh_f4_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_tanh_f1;
-    struct compiler_instance_declaration_node_t builtin_tanh_f1_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_tanh_f2;
-    struct compiler_instance_declaration_node_t builtin_tanh_f2_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_tanh_f3;
-    struct compiler_instance_declaration_node_t builtin_tanh_f3_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_tanh_f4;
-    struct compiler_instance_declaration_node_t builtin_tanh_f4_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_asinh_f1;
-    struct compiler_instance_declaration_node_t builtin_asinh_f1_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_asinh_f2;
-    struct compiler_instance_declaration_node_t builtin_asinh_f2_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_asinh_f3;
-    struct compiler_instance_declaration_node_t builtin_asinh_f3_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_asinh_f4;
-    struct compiler_instance_declaration_node_t builtin_asinh_f4_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_acosh_f1;
-    struct compiler_instance_declaration_node_t builtin_acosh_f1_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_acosh_f2;
-    struct compiler_instance_declaration_node_t builtin_acosh_f2_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_acosh_f3;
-    struct compiler_instance_declaration_node_t builtin_acosh_f3_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_acosh_f4;
-    struct compiler_instance_declaration_node_t builtin_acosh_f4_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_atanh_f1;
-    struct compiler_instance_declaration_node_t builtin_atanh_f1_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_atanh_f2;
-    struct compiler_instance_declaration_node_t builtin_atanh_f2_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_atanh_f3;
-    struct compiler_instance_declaration_node_t builtin_atanh_f3_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_atanh_f4;
-    struct compiler_instance_declaration_node_t builtin_atanh_f4_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_atan2_f1;
-    struct compiler_instance_declaration_node_t builtin_atan2_f1_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_atan2_f2;
-    struct compiler_instance_declaration_node_t builtin_atan2_f2_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_atan2_f3;
-    struct compiler_instance_declaration_node_t builtin_atan2_f3_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_atan2_f4;
-    struct compiler_instance_declaration_node_t builtin_atan2_f4_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_pow_f1;
-    struct compiler_instance_declaration_node_t builtin_pow_f1_arguments[2u];
-
-    struct compiler_instance_function_node_t builtin_pow_f2;
-    struct compiler_instance_declaration_node_t builtin_pow_f2_arguments[2u];
-
-    struct compiler_instance_function_node_t builtin_pow_f3;
-    struct compiler_instance_declaration_node_t builtin_pow_f3_arguments[2u];
-
-    struct compiler_instance_function_node_t builtin_pow_f4;
-    struct compiler_instance_declaration_node_t builtin_pow_f4_arguments[2u];
-
-    struct compiler_instance_function_node_t builtin_exp_f1;
-    struct compiler_instance_declaration_node_t builtin_exp_f1_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_exp_f2;
-    struct compiler_instance_declaration_node_t builtin_exp_f2_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_exp_f3;
-    struct compiler_instance_declaration_node_t builtin_exp_f3_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_exp_f4;
-    struct compiler_instance_declaration_node_t builtin_exp_f4_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_log_f1;
-    struct compiler_instance_declaration_node_t builtin_log_f1_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_log_f2;
-    struct compiler_instance_declaration_node_t builtin_log_f2_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_log_f3;
-    struct compiler_instance_declaration_node_t builtin_log_f3_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_log_f4;
-    struct compiler_instance_declaration_node_t builtin_log_f4_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_exp2_f1;
-    struct compiler_instance_declaration_node_t builtin_exp2_f1_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_exp2_f2;
-    struct compiler_instance_declaration_node_t builtin_exp2_f2_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_exp2_f3;
-    struct compiler_instance_declaration_node_t builtin_exp2_f3_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_exp2_f4;
-    struct compiler_instance_declaration_node_t builtin_exp2_f4_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_log2_f1;
-    struct compiler_instance_declaration_node_t builtin_log2_f1_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_log2_f2;
-    struct compiler_instance_declaration_node_t builtin_log2_f2_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_log2_f3;
-    struct compiler_instance_declaration_node_t builtin_log2_f3_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_log2_f4;
-    struct compiler_instance_declaration_node_t builtin_log2_f4_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_sqrt_f1;
-    struct compiler_instance_declaration_node_t builtin_sqrt_f1_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_sqrt_f2;
-    struct compiler_instance_declaration_node_t builtin_sqrt_f2_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_sqrt_f3;
-    struct compiler_instance_declaration_node_t builtin_sqrt_f3_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_sqrt_f4;
-    struct compiler_instance_declaration_node_t builtin_sqrt_f4_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_inverse_sqrt_f1;
-    struct compiler_instance_declaration_node_t builtin_inverse_sqrt_f1_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_inverse_sqrt_f2;
-    struct compiler_instance_declaration_node_t builtin_inverse_sqrt_f2_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_inverse_sqrt_f3;
-    struct compiler_instance_declaration_node_t builtin_inverse_sqrt_f3_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_inverse_sqrt_f4;
-    struct compiler_instance_declaration_node_t builtin_inverse_sqrt_f4_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_determinant_f3x3;
-    struct compiler_instance_declaration_node_t builtin_determinant_f3x3_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_determinant_f4x4;
-    struct compiler_instance_declaration_node_t builtin_determinant_f4x4_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_inverse_matrix_f3x3;
-    struct compiler_instance_declaration_node_t builtin_inverse_matrix_f3x3_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_inverse_matrix_f4x4;
-    struct compiler_instance_declaration_node_t builtin_inverse_matrix_f4x4_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_transpose_matrix_f3x3;
-    struct compiler_instance_declaration_node_t builtin_transpose_matrix_f3x3_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_transpose_matrix_f4x4;
-    struct compiler_instance_declaration_node_t builtin_transpose_matrix_f4x4_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_min_f1;
-    struct compiler_instance_declaration_node_t builtin_min_f1_arguments[2u];
-
-    struct compiler_instance_function_node_t builtin_min_f2;
-    struct compiler_instance_declaration_node_t builtin_min_f2_arguments[2u];
-
-    struct compiler_instance_function_node_t builtin_min_f3;
-    struct compiler_instance_declaration_node_t builtin_min_f3_arguments[2u];
-
-    struct compiler_instance_function_node_t builtin_min_f4;
-    struct compiler_instance_declaration_node_t builtin_min_f4_arguments[2u];
-
-    struct compiler_instance_function_node_t builtin_min_i1;
-    struct compiler_instance_declaration_node_t builtin_min_i1_arguments[2u];
-
-    struct compiler_instance_function_node_t builtin_min_i2;
-    struct compiler_instance_declaration_node_t builtin_min_i2_arguments[2u];
-
-    struct compiler_instance_function_node_t builtin_min_i3;
-    struct compiler_instance_declaration_node_t builtin_min_i3_arguments[2u];
-
-    struct compiler_instance_function_node_t builtin_min_i4;
-    struct compiler_instance_declaration_node_t builtin_min_i4_arguments[2u];
-
-    struct compiler_instance_function_node_t builtin_max_f1;
-    struct compiler_instance_declaration_node_t builtin_max_f1_arguments[2u];
-
-    struct compiler_instance_function_node_t builtin_max_f2;
-    struct compiler_instance_declaration_node_t builtin_max_f2_arguments[2u];
-
-    struct compiler_instance_function_node_t builtin_max_f3;
-    struct compiler_instance_declaration_node_t builtin_max_f3_arguments[2u];
-
-    struct compiler_instance_function_node_t builtin_max_f4;
-    struct compiler_instance_declaration_node_t builtin_max_f4_arguments[2u];
-
-    struct compiler_instance_function_node_t builtin_max_i1;
-    struct compiler_instance_declaration_node_t builtin_max_i1_arguments[2u];
-
-    struct compiler_instance_function_node_t builtin_max_i2;
-    struct compiler_instance_declaration_node_t builtin_max_i2_arguments[2u];
-
-    struct compiler_instance_function_node_t builtin_max_i3;
-    struct compiler_instance_declaration_node_t builtin_max_i3_arguments[2u];
-
-    struct compiler_instance_function_node_t builtin_max_i4;
-    struct compiler_instance_declaration_node_t builtin_max_i4_arguments[2u];
-
-    struct compiler_instance_function_node_t builtin_clamp_f1;
-    struct compiler_instance_declaration_node_t builtin_clamp_f1_arguments[3u];
-
-    struct compiler_instance_function_node_t builtin_clamp_f2;
-    struct compiler_instance_declaration_node_t builtin_clamp_f2_arguments[3u];
-
-    struct compiler_instance_function_node_t builtin_clamp_f3;
-    struct compiler_instance_declaration_node_t builtin_clamp_f3_arguments[3u];
-
-    struct compiler_instance_function_node_t builtin_clamp_f4;
-    struct compiler_instance_declaration_node_t builtin_clamp_f4_arguments[3u];
-
-    struct compiler_instance_function_node_t builtin_clamp_i1;
-    struct compiler_instance_declaration_node_t builtin_clamp_i1_arguments[3u];
-
-    struct compiler_instance_function_node_t builtin_clamp_i2;
-    struct compiler_instance_declaration_node_t builtin_clamp_i2_arguments[3u];
-
-    struct compiler_instance_function_node_t builtin_clamp_i3;
-    struct compiler_instance_declaration_node_t builtin_clamp_i3_arguments[3u];
-
-    struct compiler_instance_function_node_t builtin_clamp_i4;
-    struct compiler_instance_declaration_node_t builtin_clamp_i4_arguments[3u];
-
-    struct compiler_instance_function_node_t builtin_mix_f1;
-    struct compiler_instance_declaration_node_t builtin_mix_f1_arguments[3u];
-
-    struct compiler_instance_function_node_t builtin_mix_f2;
-    struct compiler_instance_declaration_node_t builtin_mix_f2_arguments[3u];
-
-    struct compiler_instance_function_node_t builtin_mix_f3;
-    struct compiler_instance_declaration_node_t builtin_mix_f3_arguments[3u];
-
-    struct compiler_instance_function_node_t builtin_mix_f4;
-    struct compiler_instance_declaration_node_t builtin_mix_f4_arguments[3u];
-
-    struct compiler_instance_function_node_t builtin_step_f1;
-    struct compiler_instance_declaration_node_t builtin_step_f1_arguments[2u];
-
-    struct compiler_instance_function_node_t builtin_step_f2;
-    struct compiler_instance_declaration_node_t builtin_step_f2_arguments[2u];
-
-    struct compiler_instance_function_node_t builtin_step_f3;
-    struct compiler_instance_declaration_node_t builtin_step_f3_arguments[2u];
-
-    struct compiler_instance_function_node_t builtin_step_f4;
-    struct compiler_instance_declaration_node_t builtin_step_f4_arguments[2u];
-
-    struct compiler_instance_function_node_t builtin_fma_f1;
-    struct compiler_instance_declaration_node_t builtin_fma_f1_arguments[3u];
-
-    struct compiler_instance_function_node_t builtin_fma_f2;
-    struct compiler_instance_declaration_node_t builtin_fma_f2_arguments[3u];
-
-    struct compiler_instance_function_node_t builtin_fma_f3;
-    struct compiler_instance_declaration_node_t builtin_fma_f3_arguments[3u];
-
-    struct compiler_instance_function_node_t builtin_fma_f4;
-    struct compiler_instance_declaration_node_t builtin_fma_f4_arguments[3u];
-
-    struct compiler_instance_function_node_t builtin_length_f1;
-    struct compiler_instance_declaration_node_t builtin_length_f1_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_length_f2;
-    struct compiler_instance_declaration_node_t builtin_length_f2_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_length_f3;
-    struct compiler_instance_declaration_node_t builtin_length_f3_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_length_f4;
-    struct compiler_instance_declaration_node_t builtin_length_f4_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_distance_f1;
-    struct compiler_instance_declaration_node_t builtin_distance_f1_arguments[2u];
-
-    struct compiler_instance_function_node_t builtin_distance_f2;
-    struct compiler_instance_declaration_node_t builtin_distance_f2_arguments[2u];
-
-    struct compiler_instance_function_node_t builtin_distance_f3;
-    struct compiler_instance_declaration_node_t builtin_distance_f3_arguments[2u];
-
-    struct compiler_instance_function_node_t builtin_distance_f4;
-    struct compiler_instance_declaration_node_t builtin_distance_f4_arguments[2u];
-
-    struct compiler_instance_function_node_t builtin_cross_f3;
-    struct compiler_instance_declaration_node_t builtin_cross_f3_arguments[2u];
-
-    struct compiler_instance_function_node_t builtin_dot_f1;
-    struct compiler_instance_declaration_node_t builtin_dot_f1_arguments[2u];
-
-    struct compiler_instance_function_node_t builtin_dot_f2;
-    struct compiler_instance_declaration_node_t builtin_dot_f2_arguments[2u];
-
-    struct compiler_instance_function_node_t builtin_dot_f3;
-    struct compiler_instance_declaration_node_t builtin_dot_f3_arguments[2u];
-
-    struct compiler_instance_function_node_t builtin_dot_f4;
-    struct compiler_instance_declaration_node_t builtin_dot_f4_arguments[2u];
-
-    struct compiler_instance_function_node_t builtin_normalize_f1;
-    struct compiler_instance_declaration_node_t builtin_normalize_f1_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_normalize_f2;
-    struct compiler_instance_declaration_node_t builtin_normalize_f2_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_normalize_f3;
-    struct compiler_instance_declaration_node_t builtin_normalize_f3_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_normalize_f4;
-    struct compiler_instance_declaration_node_t builtin_normalize_f4_arguments[1u];
-
-    struct compiler_instance_function_node_t builtin_reflect_f1;
-    struct compiler_instance_declaration_node_t builtin_reflect_f1_arguments[2u];
-
-    struct compiler_instance_function_node_t builtin_reflect_f2;
-    struct compiler_instance_declaration_node_t builtin_reflect_f2_arguments[2u];
-
-    struct compiler_instance_function_node_t builtin_reflect_f3;
-    struct compiler_instance_declaration_node_t builtin_reflect_f3_arguments[2u];
-
-    struct compiler_instance_function_node_t builtin_reflect_f4;
-    struct compiler_instance_declaration_node_t builtin_reflect_f4_arguments[2u];
-
-    struct compiler_instance_function_node_t builtin_refract_f1;
-    struct compiler_instance_declaration_node_t builtin_refract_f1_arguments[3u];
-
-    struct compiler_instance_function_node_t builtin_refract_f2;
-    struct compiler_instance_declaration_node_t builtin_refract_f2_arguments[3u];
-
-    struct compiler_instance_function_node_t builtin_refract_f3;
-    struct compiler_instance_declaration_node_t builtin_refract_f3_arguments[3u];
-
-    struct compiler_instance_function_node_t builtin_refract_f4;
-    struct compiler_instance_declaration_node_t builtin_refract_f4_arguments[3u];
-
-    struct compiler_instance_function_node_t builtin_expand_f3_to_f4;
-    struct compiler_instance_declaration_node_t builtin_expand_f3_to_f4_arguments[2u];
-
-    struct compiler_instance_function_node_t builtin_crop_f4_to_f3;
-    struct compiler_instance_declaration_node_t builtin_crop_f4_to_f3_arguments[2u];
-
-    struct compiler_instance_function_node_t builtin_crop_f4x4_to_f3x3;
-    struct compiler_instance_declaration_node_t builtin_crop_f4x4_to_f3x3_arguments[2u];
+    BUILTIN_FUNCTION_FIELD (round_f1, 1u);
+    BUILTIN_FUNCTION_FIELD (round_f2, 1u);
+    BUILTIN_FUNCTION_FIELD (round_f3, 1u);
+    BUILTIN_FUNCTION_FIELD (round_f4, 1u);
+    BUILTIN_FUNCTION_FIELD (round_even_f1, 1u);
+    BUILTIN_FUNCTION_FIELD (round_even_f2, 1u);
+    BUILTIN_FUNCTION_FIELD (round_even_f3, 1u);
+    BUILTIN_FUNCTION_FIELD (round_even_f4, 1u);
+    BUILTIN_FUNCTION_FIELD (trunc_f1, 1u);
+    BUILTIN_FUNCTION_FIELD (trunc_f2, 1u);
+    BUILTIN_FUNCTION_FIELD (trunc_f3, 1u);
+    BUILTIN_FUNCTION_FIELD (trunc_f4, 1u);
+    BUILTIN_FUNCTION_FIELD (abs_f1, 1u);
+    BUILTIN_FUNCTION_FIELD (abs_f2, 1u);
+    BUILTIN_FUNCTION_FIELD (abs_f3, 1u);
+    BUILTIN_FUNCTION_FIELD (abs_f4, 1u);
+    BUILTIN_FUNCTION_FIELD (abs_i1, 1u);
+    BUILTIN_FUNCTION_FIELD (abs_i2, 1u);
+    BUILTIN_FUNCTION_FIELD (abs_i3, 1u);
+    BUILTIN_FUNCTION_FIELD (abs_i4, 1u);
+    BUILTIN_FUNCTION_FIELD (sign_f1, 1u);
+    BUILTIN_FUNCTION_FIELD (sign_f2, 1u);
+    BUILTIN_FUNCTION_FIELD (sign_f3, 1u);
+    BUILTIN_FUNCTION_FIELD (sign_f4, 1u);
+    BUILTIN_FUNCTION_FIELD (sign_i1, 1u);
+    BUILTIN_FUNCTION_FIELD (sign_i2, 1u);
+    BUILTIN_FUNCTION_FIELD (sign_i3, 1u);
+    BUILTIN_FUNCTION_FIELD (sign_i4, 1u);
+    BUILTIN_FUNCTION_FIELD (floor_f1, 1u);
+    BUILTIN_FUNCTION_FIELD (floor_f2, 1u);
+    BUILTIN_FUNCTION_FIELD (floor_f3, 1u);
+    BUILTIN_FUNCTION_FIELD (floor_f4, 1u);
+    BUILTIN_FUNCTION_FIELD (ceil_f1, 1u);
+    BUILTIN_FUNCTION_FIELD (ceil_f2, 1u);
+    BUILTIN_FUNCTION_FIELD (ceil_f3, 1u);
+    BUILTIN_FUNCTION_FIELD (ceil_f4, 1u);
+    BUILTIN_FUNCTION_FIELD (fract_f1, 1u);
+    BUILTIN_FUNCTION_FIELD (fract_f2, 1u);
+    BUILTIN_FUNCTION_FIELD (fract_f3, 1u);
+    BUILTIN_FUNCTION_FIELD (fract_f4, 1u);
+    BUILTIN_FUNCTION_FIELD (sin_f1, 1u);
+    BUILTIN_FUNCTION_FIELD (sin_f2, 1u);
+    BUILTIN_FUNCTION_FIELD (sin_f3, 1u);
+    BUILTIN_FUNCTION_FIELD (sin_f4, 1u);
+    BUILTIN_FUNCTION_FIELD (cos_f1, 1u);
+    BUILTIN_FUNCTION_FIELD (cos_f2, 1u);
+    BUILTIN_FUNCTION_FIELD (cos_f3, 1u);
+    BUILTIN_FUNCTION_FIELD (cos_f4, 1u);
+    BUILTIN_FUNCTION_FIELD (tan_f1, 1u);
+    BUILTIN_FUNCTION_FIELD (tan_f2, 1u);
+    BUILTIN_FUNCTION_FIELD (tan_f3, 1u);
+    BUILTIN_FUNCTION_FIELD (tan_f4, 1u);
+    BUILTIN_FUNCTION_FIELD (asin_f1, 1u);
+    BUILTIN_FUNCTION_FIELD (asin_f2, 1u);
+    BUILTIN_FUNCTION_FIELD (asin_f3, 1u);
+    BUILTIN_FUNCTION_FIELD (asin_f4, 1u);
+    BUILTIN_FUNCTION_FIELD (acos_f1, 1u);
+    BUILTIN_FUNCTION_FIELD (acos_f2, 1u);
+    BUILTIN_FUNCTION_FIELD (acos_f3, 1u);
+    BUILTIN_FUNCTION_FIELD (acos_f4, 1u);
+    BUILTIN_FUNCTION_FIELD (atan_f1, 1u);
+    BUILTIN_FUNCTION_FIELD (atan_f2, 1u);
+    BUILTIN_FUNCTION_FIELD (atan_f3, 1u);
+    BUILTIN_FUNCTION_FIELD (atan_f4, 1u);
+    BUILTIN_FUNCTION_FIELD (sinh_f1, 1u);
+    BUILTIN_FUNCTION_FIELD (sinh_f2, 1u);
+    BUILTIN_FUNCTION_FIELD (sinh_f3, 1u);
+    BUILTIN_FUNCTION_FIELD (sinh_f4, 1u);
+    BUILTIN_FUNCTION_FIELD (cosh_f1, 1u);
+    BUILTIN_FUNCTION_FIELD (cosh_f2, 1u);
+    BUILTIN_FUNCTION_FIELD (cosh_f3, 1u);
+    BUILTIN_FUNCTION_FIELD (cosh_f4, 1u);
+    BUILTIN_FUNCTION_FIELD (tanh_f1, 1u);
+    BUILTIN_FUNCTION_FIELD (tanh_f2, 1u);
+    BUILTIN_FUNCTION_FIELD (tanh_f3, 1u);
+    BUILTIN_FUNCTION_FIELD (tanh_f4, 1u);
+    BUILTIN_FUNCTION_FIELD (asinh_f1, 1u);
+    BUILTIN_FUNCTION_FIELD (asinh_f2, 1u);
+    BUILTIN_FUNCTION_FIELD (asinh_f3, 1u);
+    BUILTIN_FUNCTION_FIELD (asinh_f4, 1u);
+    BUILTIN_FUNCTION_FIELD (acosh_f1, 1u);
+    BUILTIN_FUNCTION_FIELD (acosh_f2, 1u);
+    BUILTIN_FUNCTION_FIELD (acosh_f3, 1u);
+    BUILTIN_FUNCTION_FIELD (acosh_f4, 1u);
+    BUILTIN_FUNCTION_FIELD (atanh_f1, 1u);
+    BUILTIN_FUNCTION_FIELD (atanh_f2, 1u);
+    BUILTIN_FUNCTION_FIELD (atanh_f3, 1u);
+    BUILTIN_FUNCTION_FIELD (atanh_f4, 1u);
+    BUILTIN_FUNCTION_FIELD (atan2_f1, 1u);
+    BUILTIN_FUNCTION_FIELD (atan2_f2, 1u);
+    BUILTIN_FUNCTION_FIELD (atan2_f3, 1u);
+    BUILTIN_FUNCTION_FIELD (atan2_f4, 1u);
+    BUILTIN_FUNCTION_FIELD (pow_f1, 2u);
+    BUILTIN_FUNCTION_FIELD (pow_f2, 2u);
+    BUILTIN_FUNCTION_FIELD (pow_f3, 2u);
+    BUILTIN_FUNCTION_FIELD (pow_f4, 2u);
+    BUILTIN_FUNCTION_FIELD (exp_f1, 1u);
+    BUILTIN_FUNCTION_FIELD (exp_f2, 1u);
+    BUILTIN_FUNCTION_FIELD (exp_f3, 1u);
+    BUILTIN_FUNCTION_FIELD (exp_f4, 1u);
+    BUILTIN_FUNCTION_FIELD (log_f1, 1u);
+    BUILTIN_FUNCTION_FIELD (log_f2, 1u);
+    BUILTIN_FUNCTION_FIELD (log_f3, 1u);
+    BUILTIN_FUNCTION_FIELD (log_f4, 1u);
+    BUILTIN_FUNCTION_FIELD (exp2_f1, 1u);
+    BUILTIN_FUNCTION_FIELD (exp2_f2, 1u);
+    BUILTIN_FUNCTION_FIELD (exp2_f3, 1u);
+    BUILTIN_FUNCTION_FIELD (exp2_f4, 1u);
+    BUILTIN_FUNCTION_FIELD (log2_f1, 1u);
+    BUILTIN_FUNCTION_FIELD (log2_f2, 1u);
+    BUILTIN_FUNCTION_FIELD (log2_f3, 1u);
+    BUILTIN_FUNCTION_FIELD (log2_f4, 1u);
+    BUILTIN_FUNCTION_FIELD (sqrt_f1, 1u);
+    BUILTIN_FUNCTION_FIELD (sqrt_f2, 1u);
+    BUILTIN_FUNCTION_FIELD (sqrt_f3, 1u);
+    BUILTIN_FUNCTION_FIELD (sqrt_f4, 1u);
+    BUILTIN_FUNCTION_FIELD (inverse_sqrt_f1, 1u);
+    BUILTIN_FUNCTION_FIELD (inverse_sqrt_f2, 1u);
+    BUILTIN_FUNCTION_FIELD (inverse_sqrt_f3, 1u);
+    BUILTIN_FUNCTION_FIELD (inverse_sqrt_f4, 1u);
+    BUILTIN_FUNCTION_FIELD (determinant_f3x3, 1u);
+    BUILTIN_FUNCTION_FIELD (determinant_f4x4, 1u);
+    BUILTIN_FUNCTION_FIELD (inverse_f3x3, 1u);
+    BUILTIN_FUNCTION_FIELD (inverse_f4x4, 1u);
+    BUILTIN_FUNCTION_FIELD (transpose_matrix_f3x3, 1u);
+    BUILTIN_FUNCTION_FIELD (transpose_matrix_f4x4, 1u);
+    BUILTIN_FUNCTION_FIELD (min_f1, 2u);
+    BUILTIN_FUNCTION_FIELD (min_f2, 2u);
+    BUILTIN_FUNCTION_FIELD (min_f3, 2u);
+    BUILTIN_FUNCTION_FIELD (min_f4, 2u);
+    BUILTIN_FUNCTION_FIELD (min_i1, 2u);
+    BUILTIN_FUNCTION_FIELD (min_i2, 2u);
+    BUILTIN_FUNCTION_FIELD (min_i3, 2u);
+    BUILTIN_FUNCTION_FIELD (min_i4, 2u);
+    BUILTIN_FUNCTION_FIELD (max_f1, 2u);
+    BUILTIN_FUNCTION_FIELD (max_f2, 2u);
+    BUILTIN_FUNCTION_FIELD (max_f3, 2u);
+    BUILTIN_FUNCTION_FIELD (max_f4, 2u);
+    BUILTIN_FUNCTION_FIELD (max_i1, 2u);
+    BUILTIN_FUNCTION_FIELD (max_i2, 2u);
+    BUILTIN_FUNCTION_FIELD (max_i3, 2u);
+    BUILTIN_FUNCTION_FIELD (max_i4, 2u);
+    BUILTIN_FUNCTION_FIELD (clamp_f1, 3u);
+    BUILTIN_FUNCTION_FIELD (clamp_f2, 3u);
+    BUILTIN_FUNCTION_FIELD (clamp_f3, 3u);
+    BUILTIN_FUNCTION_FIELD (clamp_f4, 3u);
+    BUILTIN_FUNCTION_FIELD (clamp_i1, 3u);
+    BUILTIN_FUNCTION_FIELD (clamp_i2, 3u);
+    BUILTIN_FUNCTION_FIELD (clamp_i3, 3u);
+    BUILTIN_FUNCTION_FIELD (clamp_i4, 3u);
+    BUILTIN_FUNCTION_FIELD (mix_f1, 3u);
+    BUILTIN_FUNCTION_FIELD (mix_f2, 3u);
+    BUILTIN_FUNCTION_FIELD (mix_f3, 3u);
+    BUILTIN_FUNCTION_FIELD (mix_f4, 3u);
+    BUILTIN_FUNCTION_FIELD (step_f1, 2u);
+    BUILTIN_FUNCTION_FIELD (step_f2, 2u);
+    BUILTIN_FUNCTION_FIELD (step_f3, 2u);
+    BUILTIN_FUNCTION_FIELD (step_f4, 2u);
+    BUILTIN_FUNCTION_FIELD (fma_f1, 3u);
+    BUILTIN_FUNCTION_FIELD (fma_f2, 3u);
+    BUILTIN_FUNCTION_FIELD (fma_f3, 3u);
+    BUILTIN_FUNCTION_FIELD (fma_f4, 3u);
+    BUILTIN_FUNCTION_FIELD (length_f2, 1u);
+    BUILTIN_FUNCTION_FIELD (length_f3, 1u);
+    BUILTIN_FUNCTION_FIELD (length_f4, 1u);
+    BUILTIN_FUNCTION_FIELD (distance_f2, 2u);
+    BUILTIN_FUNCTION_FIELD (distance_f3, 2u);
+    BUILTIN_FUNCTION_FIELD (distance_f4, 2u);
+    BUILTIN_FUNCTION_FIELD (cross_f3, 2u);
+    BUILTIN_FUNCTION_FIELD (dot_f2, 2u);
+    BUILTIN_FUNCTION_FIELD (dot_f3, 2u);
+    BUILTIN_FUNCTION_FIELD (dot_f4, 2u);
+    BUILTIN_FUNCTION_FIELD (normalize_f2, 1u);
+    BUILTIN_FUNCTION_FIELD (normalize_f3, 1u);
+    BUILTIN_FUNCTION_FIELD (normalize_f4, 1u);
+    BUILTIN_FUNCTION_FIELD (reflect_f1, 2u);
+    BUILTIN_FUNCTION_FIELD (reflect_f2, 2u);
+    BUILTIN_FUNCTION_FIELD (reflect_f3, 2u);
+    BUILTIN_FUNCTION_FIELD (reflect_f4, 2u);
+    BUILTIN_FUNCTION_FIELD (refract_f1, 3u);
+    BUILTIN_FUNCTION_FIELD (refract_f2, 3u);
+    BUILTIN_FUNCTION_FIELD (refract_f3, 3u);
+    BUILTIN_FUNCTION_FIELD (refract_f4, 3u);
 };
 
 extern struct kan_rpl_compiler_statics_t kan_rpl_compiler_statics;
@@ -1331,9 +966,9 @@ static inline struct inbuilt_vector_type_t *find_inbuilt_vector_type (kan_intern
          index < sizeof (kan_rpl_compiler_statics.vector_types) / sizeof (kan_rpl_compiler_statics.vector_types[0u]);
          ++index)
     {
-        if (kan_rpl_compiler_statics.vector_types[index]->name == name)
+        if (kan_rpl_compiler_statics.vector_types[index].name == name)
         {
-            return kan_rpl_compiler_statics.vector_types[index];
+            return &kan_rpl_compiler_statics.vector_types[index];
         }
     }
 
@@ -1346,9 +981,9 @@ static inline struct inbuilt_matrix_type_t *find_inbuilt_matrix_type (kan_intern
          index < sizeof (kan_rpl_compiler_statics.matrix_types) / sizeof (kan_rpl_compiler_statics.matrix_types[0u]);
          ++index)
     {
-        if (kan_rpl_compiler_statics.matrix_types[index]->name == name)
+        if (kan_rpl_compiler_statics.matrix_types[index].name == name)
         {
-            return kan_rpl_compiler_statics.matrix_types[index];
+            return &kan_rpl_compiler_statics.matrix_types[index];
         }
     }
 
@@ -1376,54 +1011,185 @@ static inline struct compiler_instance_function_node_t *find_builtin_function (k
     return NULL;
 }
 
-static inline const char *get_type_name_for_logging (struct inbuilt_vector_type_t *if_vector,
-                                                     struct inbuilt_matrix_type_t *if_matrix,
-                                                     struct compiler_instance_struct_node_t *if_struct)
+static inline const char *get_image_type_name (enum kan_rpl_image_type_t type)
 {
-    if (if_vector)
+    switch (type)
     {
-        return if_vector->name;
-    }
-    else if (if_matrix)
-    {
-        return if_matrix->name;
-    }
-    else if (if_struct)
-    {
-        return if_struct->name;
+    case KAN_RPL_IMAGE_TYPE_COLOR_2D:
+        return "image_color_2d";
+
+    case KAN_RPL_IMAGE_TYPE_COLOR_3D:
+        return "image_color_3d";
+
+    case KAN_RPL_IMAGE_TYPE_COLOR_CUBE:
+        return "image_color_cube";
+
+    case KAN_RPL_IMAGE_TYPE_COLOR_2D_ARRAY:
+        return "image_color_2d_array";
+
+    case KAN_RPL_IMAGE_TYPE_DEPTH_2D:
+        return "image_depth_2d";
+
+    case KAN_RPL_IMAGE_TYPE_DEPTH_3D:
+        return "image_depth_3d";
+
+    case KAN_RPL_IMAGE_TYPE_DEPTH_CUBE:
+        return "image_depth_cube";
+
+    case KAN_RPL_IMAGE_TYPE_DEPTH_2D_ARRAY:
+        return "image_depth_2d_array";
+
+    case KAN_RPL_IMAGE_TYPE_COUNT:
+        KAN_ASSERT (KAN_FALSE)
+        break;
     }
 
-    return "<not_a_variable_type>";
+    return "<unknown_image_type>";
 }
 
-static inline void calculate_full_type_definition_size_and_alignment (
-    struct compiler_instance_full_type_definition_t *definition,
-    kan_instance_size_t dimension_offset,
-    kan_instance_size_t *size,
-    kan_instance_size_t *alignment)
+static inline const char *get_type_name_for_logging (struct compiler_instance_type_definition_t *definition)
+{
+    switch (definition->class)
+    {
+    case COMPILER_INSTANCE_TYPE_CLASS_VOID:
+        return "void";
+
+    case COMPILER_INSTANCE_TYPE_CLASS_VECTOR:
+        return definition->vector_data->name;
+
+    case COMPILER_INSTANCE_TYPE_CLASS_MATRIX:
+        return definition->matrix_data->name;
+
+    case COMPILER_INSTANCE_TYPE_CLASS_STRUCT:
+        return definition->struct_data->name;
+
+    case COMPILER_INSTANCE_TYPE_CLASS_BUFFER:
+        return definition->buffer_data->name;
+
+    case COMPILER_INSTANCE_TYPE_CLASS_BOOLEAN:
+        return "boolean";
+
+    case COMPILER_INSTANCE_TYPE_CLASS_SAMPLER:
+        return "sampler";
+
+    case COMPILER_INSTANCE_TYPE_CLASS_IMAGE:
+        return get_image_type_name (definition->image_type);
+    }
+
+    return "<unknown_type>";
+}
+
+static inline void calculate_type_definition_size_and_alignment (struct compiler_instance_type_definition_t *definition,
+                                                                 kan_instance_size_t dimension_offset,
+                                                                 kan_instance_size_t *size,
+                                                                 kan_instance_size_t *alignment)
 {
     *size = 0u;
     *alignment = 0u;
 
-    if (definition->if_vector)
+    switch (definition->class)
     {
-        *size = inbuilt_type_item_size[definition->if_vector->item] * definition->if_vector->items_count;
-        *alignment = inbuilt_type_item_size[definition->if_vector->item];
-    }
-    else if (definition->if_matrix)
-    {
-        *size = inbuilt_type_item_size[definition->if_matrix->item] * definition->if_matrix->rows *
-                definition->if_matrix->columns;
-        *alignment = inbuilt_type_item_size[definition->if_matrix->item];
-    }
-    else if (definition->if_struct)
-    {
-        *size = definition->if_struct->size;
-        *alignment = definition->if_struct->alignment;
+    case COMPILER_INSTANCE_TYPE_CLASS_VECTOR:
+        *size = inbuilt_type_item_size[definition->vector_data->item] * definition->vector_data->items_count;
+        *alignment = inbuilt_type_item_size[definition->vector_data->item];
+        break;
+
+    case COMPILER_INSTANCE_TYPE_CLASS_MATRIX:
+        *size = inbuilt_type_item_size[definition->matrix_data->item] * definition->matrix_data->rows *
+                definition->matrix_data->columns;
+        *alignment = inbuilt_type_item_size[definition->matrix_data->item];
+        break;
+
+    case COMPILER_INSTANCE_TYPE_CLASS_STRUCT:
+        *size = definition->struct_data->size;
+        *alignment = definition->struct_data->alignment;
+        break;
+
+    case COMPILER_INSTANCE_TYPE_CLASS_VOID:
+    case COMPILER_INSTANCE_TYPE_CLASS_BOOLEAN:
+    case COMPILER_INSTANCE_TYPE_CLASS_BUFFER:
+    case COMPILER_INSTANCE_TYPE_CLASS_SAMPLER:
+    case COMPILER_INSTANCE_TYPE_CLASS_IMAGE:
+        // Shouldn't get there. Callers should validate that size and alignment is not calculated for opaque type.
+        KAN_ASSERT (KAN_FALSE)
+        break;
     }
 
     for (kan_loop_size_t dimension = dimension_offset; dimension < definition->array_dimensions_count; ++dimension)
     {
         *size *= definition->array_dimensions[dimension];
     }
+}
+
+/// \brief Checks if type definition base types (everything except for the array specifiers) are equal.
+static inline kan_bool_t is_type_definition_base_equal (struct compiler_instance_type_definition_t *left,
+                                                        struct compiler_instance_type_definition_t *right)
+{
+    if (left->class != right->class)
+    {
+        return KAN_FALSE;
+    }
+
+    switch (left->class)
+    {
+    case COMPILER_INSTANCE_TYPE_CLASS_VOID:
+    case COMPILER_INSTANCE_TYPE_CLASS_BOOLEAN:
+    case COMPILER_INSTANCE_TYPE_CLASS_SAMPLER:
+        return KAN_TRUE;
+
+    case COMPILER_INSTANCE_TYPE_CLASS_VECTOR:
+        return left->vector_data == right->vector_data;
+
+    case COMPILER_INSTANCE_TYPE_CLASS_MATRIX:
+        return left->matrix_data == right->matrix_data;
+
+    case COMPILER_INSTANCE_TYPE_CLASS_BUFFER:
+        return left->buffer_data == right->buffer_data;
+
+    case COMPILER_INSTANCE_TYPE_CLASS_STRUCT:
+        return left->struct_data == right->struct_data;
+
+    case COMPILER_INSTANCE_TYPE_CLASS_IMAGE:
+        return left->image_type == right->image_type;
+    }
+
+    KAN_ASSERT (KAN_FALSE)
+    return KAN_FALSE;
+}
+
+static inline void copy_type_definition (struct compiler_instance_type_definition_t *output,
+                                         const struct compiler_instance_type_definition_t *source)
+{
+    output->class = source->class;
+    switch (output->class)
+    {
+    case COMPILER_INSTANCE_TYPE_CLASS_VOID:
+    case COMPILER_INSTANCE_TYPE_CLASS_BOOLEAN:
+    case COMPILER_INSTANCE_TYPE_CLASS_SAMPLER:
+        break;
+
+    case COMPILER_INSTANCE_TYPE_CLASS_VECTOR:
+        output->vector_data = source->vector_data;
+        break;
+
+    case COMPILER_INSTANCE_TYPE_CLASS_MATRIX:
+        output->matrix_data = source->matrix_data;
+        break;
+
+    case COMPILER_INSTANCE_TYPE_CLASS_STRUCT:
+        output->struct_data = source->struct_data;
+        break;
+
+    case COMPILER_INSTANCE_TYPE_CLASS_BUFFER:
+        output->buffer_data = source->buffer_data;
+        break;
+
+    case COMPILER_INSTANCE_TYPE_CLASS_IMAGE:
+        output->image_type = source->image_type;
+        break;
+    }
+
+    output->array_size_runtime = source->array_size_runtime;
+    output->array_dimensions_count = source->array_dimensions_count;
+    output->array_dimensions = source->array_dimensions;
 }

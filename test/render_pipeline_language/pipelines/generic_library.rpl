@@ -1,7 +1,7 @@
 // Simple file that can be used as drop-in library source for the parser.
 
-f4 darken_from_center (f2 uv)
+f4 darken_from_center (in f2 uv)
 {
     f1 distance = distance_f2 (uv, f2 {0.5, 0.5});
-    return f4 {1.0 - distance, 1.0 - distance, 1.0 - distance, 1.0};
+    return f4 {f3 {1.0 - distance}, 1.0};
 }

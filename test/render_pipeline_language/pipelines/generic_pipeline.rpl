@@ -87,7 +87,7 @@ void vertex_main (void)
     conditional (!support_instancing) alias (color_multiplier, material.color_multiplier)
     vertex_output.color_multiplier = color_multiplier;
 
-    f4 position4 = f4 {vertex.position._0, vertex.position._1, vertex.position._2, 1.0};
+    f4 position4 = f4 {vertex.position.xyz, 1.0};
     conditional (enable_skinning)
     {
         conditional (support_instancing) alias (transforms, joints.transforms)
@@ -97,17 +97,17 @@ void vertex_main (void)
         conditional (skinning_2_weights)
         {
             global_joint_transform =
-                transforms[instance_vertex.joint_offset + vertex.joint_indices._0] * vertex.joint_weights._0 +
-                transforms[instance_vertex.joint_offset + vertex.joint_indices._1] * vertex.joint_weights._1;
+                transforms[instance_vertex.joint_offset + vertex.joint_indices.x] * vertex.joint_weights.x +
+                transforms[instance_vertex.joint_offset + vertex.joint_indices.y] * vertex.joint_weights.y;
         }
 
         conditional (skinning_4_weights)
         {
             global_joint_transform =
-                transforms[instance_vertex.joint_offset + vertex.joint_indices._0] * vertex.joint_weights._0 +
-                transforms[instance_vertex.joint_offset + vertex.joint_indices._1] * vertex.joint_weights._1 +
-                transforms[instance_vertex.joint_offset + vertex.joint_indices._2] * vertex.joint_weights._2 +
-                transforms[instance_vertex.joint_offset + vertex.joint_indices._3] * vertex.joint_weights._3;
+                transforms[instance_vertex.joint_offset + vertex.joint_indices.x] * vertex.joint_weights.x +
+                transforms[instance_vertex.joint_offset + vertex.joint_indices.y] * vertex.joint_weights.y +
+                transforms[instance_vertex.joint_offset + vertex.joint_indices.z] * vertex.joint_weights.z +
+                transforms[instance_vertex.joint_offset + vertex.joint_indices.w] * vertex.joint_weights.w;
         }
 
         position4 = global_joint_transform * position4;
@@ -122,7 +122,9 @@ void vertex_main (void)
     vertex_stage_output_position (pass.projection_mul_view * position4);
 }
 
-set_material sampler_2d diffuse_color;
+set_material sampler color_sampler;
+// Use image array just for testing purposes.
+set_material image_color_2d[4] diffuse_color;
 
 fragment_stage_output fragment_output
 {
@@ -131,7 +133,7 @@ fragment_stage_output fragment_output
 
 void fragment_main (void)
 {
-    fragment_output.color = diffuse_color (vertex_output.uv) *
+    fragment_output.color = sample (color_sampler, diffuse_color[2], vertex_output.uv) *
             darken_from_center (vertex_output.uv) *
             vertex_output.color_multiplier;
 }
