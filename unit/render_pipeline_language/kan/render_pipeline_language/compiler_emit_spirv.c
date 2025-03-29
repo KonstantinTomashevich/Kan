@@ -2494,7 +2494,7 @@ static spirv_size_t spirv_emit_expression (struct spirv_generation_context_t *co
             result_id = spirv_emit_vector_div (context, &(*current_block)->code_section,
                                                expression->output.type.vector_data, left_operand_id, right_operand_id);
         }
-        if (expression->binary_operation.left_operand->output.type.class == COMPILER_INSTANCE_TYPE_CLASS_MATRIX &&
+        else if (expression->binary_operation.left_operand->output.type.class == COMPILER_INSTANCE_TYPE_CLASS_MATRIX &&
             expression->binary_operation.right_operand->output.type.class == COMPILER_INSTANCE_TYPE_CLASS_MATRIX &&
             expression->binary_operation.left_operand->output.type.matrix_data ==
                 expression->binary_operation.right_operand->output.type.matrix_data)
