@@ -98,9 +98,8 @@ material = test_material
     value_i1 = 0
 }
 
-+images {
-    name = texture_1_color
-    texture = bricks_1
++samplers {
+    name = texture_sampler
     sampler {
         mag_filter = KAN_RENDER_FILTER_MODE_NEAREST
         min_filter = KAN_RENDER_FILTER_MODE_NEAREST
@@ -112,14 +111,11 @@ material = test_material
 }
 
 +images {
+    name = texture_1_color
+    texture = bricks_1
+}
+
++images {
     name = texture_2_color
     texture = bricks_2
-    sampler {
-        mag_filter = KAN_RENDER_FILTER_MODE_NEAREST
-        min_filter = KAN_RENDER_FILTER_MODE_NEAREST
-        mip_map_mode = KAN_RENDER_MIP_MAP_MODE_NEAREST
-        address_mode_u = KAN_RENDER_ADDRESS_MODE_REPEAT
-        address_mode_v = KAN_RENDER_ADDRESS_MODE_REPEAT
-        address_mode_w = KAN_RENDER_ADDRESS_MODE_REPEAT
-    }
 }

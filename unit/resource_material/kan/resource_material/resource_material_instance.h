@@ -124,6 +124,18 @@ RESOURCE_MATERIAL_API void kan_resource_material_tail_append_init (
 RESOURCE_MATERIAL_API void kan_resource_material_tail_append_shutdown (
     struct kan_resource_material_tail_append_t *instance);
 
+/// \brief Data structure for configuring sampler binding in material.
+struct kan_resource_material_sampler_t
+{
+    /// \brief Corresponds to `kan_rpl_meta_sampler_t::name`.
+    kan_interned_string_t name;
+
+    /// \brief Sampling configuration.
+    struct kan_render_sampler_t sampler;
+};
+
+RESOURCE_MATERIAL_API void kan_resource_material_sampler_init (struct kan_resource_material_sampler_t *instance);
+
 /// \brief Data structure for configuring texture-to-image binding in material.
 struct kan_resource_material_image_t
 {
@@ -132,9 +144,6 @@ struct kan_resource_material_image_t
 
     /// \brief Name of the texture resource.
     kan_interned_string_t texture;
-
-    /// \brief Sampling configuration.
-    struct kan_render_sampler_t sampler;
 };
 
 RESOURCE_MATERIAL_API void kan_resource_material_image_init (struct kan_resource_material_image_t *instance);
@@ -163,6 +172,12 @@ struct kan_resource_material_instance_t
     /// \brief Array of tail item appends.
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_resource_material_tail_append_t)
     struct kan_dynamic_array_t tail_append;
+    
+    /// \brief Array of sampler configurations.
+    /// \warning Sampler configuration for particular name fully overrides parent sampler configuration.
+    ///          Therefore, material must specify full sampler configuration, not only differences from parent sampler.
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_resource_material_sampler_t)
+    struct kan_dynamic_array_t samplers;
 
     /// \brief Array of texture selections for image slots.
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_resource_material_image_t)
@@ -188,6 +203,9 @@ struct kan_resource_material_instance_static_compiled_t
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_resource_material_tail_append_t)
     struct kan_dynamic_array_t tail_append;
 
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_resource_material_sampler_t)
+    struct kan_dynamic_array_t samplers;
+    
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_resource_material_image_t)
     struct kan_dynamic_array_t images;
 };

@@ -800,6 +800,19 @@ static enum kan_resource_compile_result_t kan_resource_material_pipeline_family_
         }
     }
 
+    for (kan_loop_size_t index = 0u; index < meta.set_material.images.size; ++index)
+    {
+        struct kan_rpl_meta_image_t *image = &((struct kan_rpl_meta_image_t *) meta.set_material.images.data)[index];
+        if (image->image_array_size > 1u)
+        {
+            KAN_LOG (resource_material_compilation, KAN_LOG_ERROR,
+                     "Produced incorrect meta for \"%s\" (material \"%s\"): meta has image array \"%s\" in material "
+                     "set, but image arrays are not yet supported on material level.",
+                     state->name, input->source_material, image->name)
+            meta_valid = KAN_FALSE;
+        }
+    }
+
     kan_rpl_meta_set_bindings_shutdown (&output->set_material);
     kan_rpl_meta_set_bindings_init_copy (&output->set_material, &meta.set_material);
 

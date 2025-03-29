@@ -688,15 +688,15 @@ static inline void process_texture_updates (
 
                             if (image->texture == static_image->texture_name)
                             {
-                                for (kan_loop_size_t sampler_index = 0u;
-                                     sampler_index < material_loaded->set_material_bindings.samplers.size;
-                                     ++sampler_index)
+                                for (kan_loop_size_t image_binding_index = 0u;
+                                     image_binding_index < material_loaded->set_material_bindings.images.size;
+                                     ++image_binding_index)
                                 {
-                                    struct kan_rpl_meta_sampler_t *sampler =
-                                        &((struct kan_rpl_meta_sampler_t *)
-                                              material_loaded->set_material_bindings.samplers.data)[sampler_index];
+                                    struct kan_rpl_meta_image_t *image_binding =
+                                        &((struct kan_rpl_meta_image_t *)
+                                              material_loaded->set_material_bindings.images.data)[image_binding_index];
 
-                                    if (sampler->name == image->name)
+                                    if (image_binding->name == image->name)
                                     {
                                         if (update_output_index >= KAN_UNIVERSE_RENDER_FOUNDATION_MI_UPDATES_COUNT)
                                         {
@@ -707,11 +707,11 @@ static inline void process_texture_updates (
 
                                         updates[update_output_index] =
                                             (struct kan_render_parameter_update_description_t) {
-                                                .binding = sampler->binding,
+                                                .binding = image_binding->binding,
                                                 .image_binding =
                                                     {
                                                         .image = texture_loaded->image,
-                                                        .sampler = image->sampler,
+                                                        .array_index = 1u,
                                                     },
                                             };
 
@@ -1285,8 +1285,9 @@ static void instantiate_material_static_data (
     }
 
     struct kan_render_parameter_update_description_t updates_static[KAN_UNIVERSE_RENDER_FOUNDATION_MI_UPDATES_COUNT];
-    const kan_instance_size_t updates_total =
-        material_loaded->set_material_bindings.buffers.size + material_loaded->set_material_bindings.samplers.size;
+    const kan_instance_size_t updates_total = material_loaded->set_material_bindings.buffers.size +
+                                              material_loaded->set_material_bindings.samplers.size +
+                                              material_loaded->set_material_bindings.images.size;
     struct kan_render_parameter_update_description_t *updates = updates_static;
 
     if (updates_total > KAN_UNIVERSE_RENDER_FOUNDATION_MI_UPDATES_COUNT)
@@ -1320,6 +1321,35 @@ static void instantiate_material_static_data (
         }
     }
 
+    for (kan_loop_size_t sampler_index = 0u; sampler_index < data->samplers.size; ++sampler_index)
+    {
+        struct kan_resource_material_sampler_t *sampler =
+            &((struct kan_resource_material_sampler_t *) data->samplers.data)[sampler_index];
+
+        for (kan_loop_size_t sampler_binding_index = 0u;
+             sampler_binding_index < material_loaded->set_material_bindings.samplers.size; ++sampler_binding_index)
+        {
+            struct kan_rpl_meta_sampler_t *sampler_binding =
+                &((struct kan_rpl_meta_sampler_t *)
+                      material_loaded->set_material_bindings.samplers.data)[sampler_binding_index];
+
+            if (sampler_binding->name == sampler->name)
+            {
+                KAN_ASSERT (update_output_index < updates_total)
+                updates[update_output_index] = (struct kan_render_parameter_update_description_t) {
+                    .binding = sampler_binding->binding,
+                    .sampler_binding =
+                        {
+                            .sampler = sampler->sampler,
+                        },
+                };
+
+                ++update_output_index;
+                break;
+            }
+        }
+    }
+
     KAN_UP_VALUE_READ (static_image, render_foundation_material_instance_static_image_t, static_name,
                        &static_state->name)
     {
@@ -1332,22 +1362,23 @@ static void instantiate_material_static_data (
 
                 if (image->texture == static_image->texture_name)
                 {
-                    for (kan_loop_size_t sampler_index = 0u;
-                         sampler_index < material_loaded->set_material_bindings.samplers.size; ++sampler_index)
+                    for (kan_loop_size_t image_binding_index = 0u;
+                         image_binding_index < material_loaded->set_material_bindings.images.size;
+                         ++image_binding_index)
                     {
-                        struct kan_rpl_meta_sampler_t *sampler =
-                            &((struct kan_rpl_meta_sampler_t *)
-                                  material_loaded->set_material_bindings.samplers.data)[sampler_index];
+                        struct kan_rpl_meta_image_t *image_binding =
+                            &((struct kan_rpl_meta_image_t *)
+                                  material_loaded->set_material_bindings.images.data)[image_binding_index];
 
-                        if (sampler->name == image->name)
+                        if (image_binding->name == image->name)
                         {
                             KAN_ASSERT (update_output_index < updates_total)
                             updates[update_output_index] = (struct kan_render_parameter_update_description_t) {
-                                .binding = sampler->binding,
+                                .binding = image_binding->binding,
                                 .image_binding =
                                     {
                                         .image = texture_loaded->image,
-                                        .sampler = image->sampler,
+                                        .array_index = 1u,
                                     },
                             };
 

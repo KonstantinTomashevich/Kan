@@ -893,7 +893,7 @@ kan_render_pipeline_parameter_set_layout_t kan_render_construct_parameter_set_la
     struct kan_render_parameter_binding_description_t
         bindings_static[KAN_UNIVERSE_RENDER_FOUNDATION_BINDINGS_MAX_STATIC];
     struct kan_render_parameter_binding_description_t *bindings = bindings_static;
-    const kan_instance_size_t bindings_count = meta->buffers.size + meta->samplers.size;
+    const kan_instance_size_t bindings_count = meta->buffers.size + meta->samplers.size + meta->images.size;
 
     if (bindings_count > KAN_UNIVERSE_RENDER_FOUNDATION_BINDINGS_MAX_STATIC)
     {
@@ -928,16 +928,31 @@ kan_render_pipeline_parameter_set_layout_t kan_render_construct_parameter_set_la
         bindings[binding_output_index] = (struct kan_render_parameter_binding_description_t) {
             .binding = buffer->binding,
             .type = binding_type,
+            .descriptor_count = 1u,
             .used_stage_mask = (1u << KAN_RENDER_STAGE_GRAPHICS_VERTEX) | (1u << KAN_RENDER_STAGE_GRAPHICS_FRAGMENT),
         };
     }
+
     for (kan_loop_size_t index = 0u; index < meta->samplers.size; ++index, ++binding_output_index)
     {
         struct kan_rpl_meta_sampler_t *sampler = &((struct kan_rpl_meta_sampler_t *) meta->samplers.data)[index];
 
         bindings[binding_output_index] = (struct kan_render_parameter_binding_description_t) {
             .binding = sampler->binding,
-            .type = KAN_RENDER_PARAMETER_BINDING_TYPE_COMBINED_IMAGE_SAMPLER,
+            .type = KAN_RENDER_PARAMETER_BINDING_TYPE_SAMPLER,
+            .descriptor_count = 1u,
+            .used_stage_mask = (1u << KAN_RENDER_STAGE_GRAPHICS_VERTEX) | (1u << KAN_RENDER_STAGE_GRAPHICS_FRAGMENT),
+        };
+    }
+    
+    for (kan_loop_size_t index = 0u; index < meta->images.size; ++index, ++binding_output_index)
+    {
+        struct kan_rpl_meta_image_t *image = &((struct kan_rpl_meta_image_t *) meta->images.data)[index];
+        
+        bindings[binding_output_index] = (struct kan_render_parameter_binding_description_t) {
+            .binding = image->binding,
+            .type = KAN_RENDER_PARAMETER_BINDING_TYPE_IMAGE,
+            .descriptor_count = image->image_array_size,
             .used_stage_mask = (1u << KAN_RENDER_STAGE_GRAPHICS_VERTEX) | (1u << KAN_RENDER_STAGE_GRAPHICS_FRAGMENT),
         };
     }

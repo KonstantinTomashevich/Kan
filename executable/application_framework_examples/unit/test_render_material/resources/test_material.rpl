@@ -45,24 +45,24 @@ void vertex_main (void)
     vertex_output.uv = vertex.uv;
     vertex_output.preset_index = instanced.preset_index;
     vertex_output.grid_index = instanced.grid_index;
-    vertex_stage_output_position (pass.projection_view * instanced.model * expand_f3_to_f4 (vertex.position, 1.0));
+    vertex_stage_output_position (pass.projection_view * instanced.model * f4 {vertex.position, 1.0});
 }
 
-set_material sampler_2d texture_1_color;
-set_material sampler_2d texture_2_color;
+set_material sampler texture_sampler;
+set_material image_color_2d texture_1_color;
+set_material image_color_2d texture_2_color;
 
 fragment_stage_output fragment_output
 {
     f4 color;
 };
 
-f1 calculate_relative_distance_to_grid (f2 uv)
+f1 calculate_relative_distance_to_grid (in f2 uv)
 {
-    f2 separator_vector = f2 {
-        grid.grids[vertex_output.grid_index].separator, grid.grids[vertex_output.grid_index].separator};
+    f2 separator_vector = f2 {grid.grids[vertex_output.grid_index].separator};
     f2 localized_fracts = fract_f2 (uv / separator_vector);
-    f2 distances = abs_f2 (localized_fracts - step_f2 (f2 {0.5, 0.5}, localized_fracts));
-    return min_f1 (distances._0, distances._1);
+    f2 distances = abs_f2 (localized_fracts - step_f2 (f2 {0.5}, localized_fracts));
+    return min_f1 (distances.x, distances.y);
 }
 
 void fragment_main (void)
@@ -79,8 +79,10 @@ void fragment_main (void)
     }
     else
     {
+        f4 color_1 = sample (texture_sampler, texture_1_color, vertex_output.uv);
+        f4 color_2 = sample (texture_sampler, texture_2_color, vertex_output.uv);
         fragment_output.color =
-            texture_1_color (vertex_output.uv) * material.presets[vertex_output.preset_index].modifier_1 +
-            texture_2_color (vertex_output.uv) * material.presets[vertex_output.preset_index].modifier_2;
+            color_1 * material.presets[vertex_output.preset_index].modifier_1 +
+            color_2 * material.presets[vertex_output.preset_index].modifier_2;
     }
 }
