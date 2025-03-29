@@ -186,15 +186,14 @@ void kan_rpl_meta_set_bindings_init_copy (struct kan_rpl_meta_set_bindings_t *in
         memcpy (instance->samplers.data, copy_from->samplers.data,
                 copy_from->samplers.size * copy_from->samplers.item_size);
     }
-    
+
     kan_dynamic_array_init (&instance->images, copy_from->images.size, sizeof (struct kan_rpl_meta_image_t),
                             _Alignof (struct kan_rpl_meta_image_t), STATICS.rpl_meta_allocation_group);
     instance->images.size = copy_from->images.size;
-    
+
     if (instance->images.size > 0u)
     {
-        memcpy (instance->images.data, copy_from->images.data,
-                copy_from->images.size * copy_from->images.item_size);
+        memcpy (instance->images.data, copy_from->images.data, copy_from->images.size * copy_from->images.item_size);
     }
 }
 

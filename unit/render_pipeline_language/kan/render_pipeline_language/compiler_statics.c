@@ -278,16 +278,15 @@ void kan_rpl_compiler_ensure_statics_initialized (void)
         STATICS.sample_dref_function_name = kan_string_intern ("sample_dref");
 
 #define SAMPLER_ARGUMENT(TYPE, NAME, NEXT)                                                                             \
-    (struct compiler_instance_function_argument_node_t) {                                                              \
+    (struct compiler_instance_function_argument_node_t)                                                                \
+    {                                                                                                                  \
         .next = NEXT,                                                                                                  \
         .variable =                                                                                                    \
             {                                                                                                          \
                 .name = kan_string_intern (#NAME),                                                                     \
                 .type = type_definition_##TYPE,                                                                        \
             },                                                                                                         \
-        .access = KAN_RPL_ACCESS_CLASS_READ_ONLY,                                                                      \
-        .module_name = interned_sampler,                                                                               \
-        .source_name = interned_calls,                                                                                 \
+        .access = KAN_RPL_ACCESS_CLASS_READ_ONLY, .module_name = interned_sampler, .source_name = interned_calls,      \
         .source_line = 0u,                                                                                             \
     }
 
@@ -347,16 +346,15 @@ void kan_rpl_compiler_ensure_statics_initialized (void)
     kan_hash_storage_add (&STATICS.builtin_hash_storage, &node_##NAME->node)
 
 #define BUILTIN_ARGUMENT(BULTIN, INDEX, NEXT, TYPE, NAME)                                                              \
-    STATICS.builtin_##BULTIN##_arguments[INDEX] = (struct compiler_instance_function_argument_node_t) {                \
+    STATICS.builtin_##BULTIN##_arguments[INDEX] = (struct compiler_instance_function_argument_node_t)                  \
+    {                                                                                                                  \
         .next = NEXT,                                                                                                  \
         .variable =                                                                                                    \
             {                                                                                                          \
                 .name = kan_string_intern (#NAME),                                                                     \
                 .type = type_definition_##TYPE,                                                                        \
             },                                                                                                         \
-        .access = KAN_RPL_ACCESS_CLASS_READ_ONLY,                                                                      \
-        .module_name = module_standard,                                                                                \
-        .source_name = source_functions,                                                                               \
+        .access = KAN_RPL_ACCESS_CLASS_READ_ONLY, .module_name = module_standard, .source_name = source_functions,     \
         .source_line = 0u,                                                                                             \
     }
 

@@ -999,7 +999,7 @@ kan_bool_t kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t comp
             sampler = sampler->next;
         }
     }
-    
+
     if ((flags & KAN_RPL_META_EMISSION_SKIP_SETS) == 0u)
     {
         kan_loop_size_t pass_image_count = 0u;
@@ -1007,7 +1007,7 @@ kan_bool_t kan_rpl_compiler_instance_emit_meta (kan_rpl_compiler_instance_t comp
         kan_loop_size_t object_image_count = 0u;
         kan_loop_size_t shared_image_count = 0u;
         struct compiler_instance_image_node_t *image = instance->first_image;
-        
+
         while (image)
         {
             switch (image->set)
