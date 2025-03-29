@@ -2327,7 +2327,7 @@ static spirv_size_t spirv_emit_expression (struct spirv_generation_context_t *co
     case COMPILER_INSTANCE_EXPRESSION_TYPE_OPERATION_ADD:
     {
         BINARY_OPERATION_COMMON_PREPARE;
-        spirv_size_t result_id;
+        spirv_size_t result_id = SPIRV_FIXED_ID_INVALID;
 
         switch (expression->output.type.class)
         {
@@ -2359,7 +2359,7 @@ static spirv_size_t spirv_emit_expression (struct spirv_generation_context_t *co
     case COMPILER_INSTANCE_EXPRESSION_TYPE_OPERATION_SUBTRACT:
     {
         BINARY_OPERATION_COMMON_PREPARE;
-        spirv_size_t result_id;
+        spirv_size_t result_id = SPIRV_FIXED_ID_INVALID;
 
         switch (expression->output.type.class)
         {

@@ -2555,7 +2555,7 @@ static inline void execute_pass_instance_submission (struct render_backend_syste
             //       as attachment, but several passes use it as attachment before other pass samples it.
 
             VkAccessFlags possible_access_flags = 0u;
-            VkImageLayout new_layout;
+            VkImageLayout new_layout = VK_IMAGE_LAYOUT_UNDEFINED;
 
             switch (get_image_format_class (attachment->image->description.format))
             {
