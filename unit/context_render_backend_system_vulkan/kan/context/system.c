@@ -2689,8 +2689,9 @@ static void render_backend_system_submit_graphics (struct render_backend_system_
     kan_cpu_section_execution_init (&checkpoint_execution, system->section_pass_instance_resolve_checkpoints);
 
 #define PASS_INSTANCE_GET_FROM_NODE(SOURCE, NODE)                                                                      \
-    (struct render_backend_pass_instance_t *) (((uint8_t *) SOURCE) -                                                  \
-                                               offsetof (struct render_backend_pass_instance_t, NODE))
+    SOURCE ? (struct render_backend_pass_instance_t *) (((uint8_t *) SOURCE) -                                         \
+                                                        offsetof (struct render_backend_pass_instance_t, NODE)) :      \
+             NULL
 
     struct render_backend_pass_instance_t *pass_instance =
         PASS_INSTANCE_GET_FROM_NODE (system->pass_instances.first, node_in_all);

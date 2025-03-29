@@ -9,7 +9,8 @@ struct render_backend_pipeline_parameter_set_layout_t *render_backend_system_reg
 
     uint8_t uniform_buffer_binding_count = 0u;
     uint8_t storage_buffer_binding_count = 0u;
-    uint8_t combined_image_sampler_binding_count = 0u;
+    uint8_t sampler_binding_count = 0u;
+    uint8_t image_binding_count = 0u;
 
     for (kan_loop_size_t binding_index = 0u; binding_index < description->bindings_count; ++binding_index)
     {
@@ -26,18 +27,25 @@ struct render_backend_pipeline_parameter_set_layout_t *render_backend_system_reg
             ++storage_buffer_binding_count;
             break;
 
-        case KAN_RENDER_PARAMETER_BINDING_TYPE_COMBINED_IMAGE_SAMPLER:
+        case KAN_RENDER_PARAMETER_BINDING_TYPE_SAMPLER:
         {
-            KAN_ASSERT (combined_image_sampler_binding_count < UINT8_MAX)
-            ++combined_image_sampler_binding_count;
+            KAN_ASSERT (sampler_binding_count < UINT8_MAX)
+            ++sampler_binding_count;
+            break;
+        }
+
+        case KAN_RENDER_PARAMETER_BINDING_TYPE_IMAGE:
+        {
+            KAN_ASSERT (sampler_binding_count < UINT8_MAX)
+            ++image_binding_count;
             break;
         }
         }
     }
 
-    _Static_assert (sizeof (kan_hash_t) >= 3u, "We can confidently pack all sizes into one unique hash.");
+    _Static_assert (sizeof (kan_hash_t) >= 4u, "We can confidently pack all sizes into one unique hash.");
     const kan_hash_t layout_hash = (uniform_buffer_binding_count << 0u) | (storage_buffer_binding_count << 1u) |
-                                   (combined_image_sampler_binding_count << 2u);
+                                   (sampler_binding_count << 2u) | (image_binding_count << 3u);
 
     kan_atomic_int_lock (&system->pipeline_parameter_set_layout_registration_lock);
     const struct kan_hash_storage_bucket_t *bucket =
@@ -63,6 +71,8 @@ struct render_backend_pipeline_parameter_set_layout_t *render_backend_system_reg
 
                 if (binding_description->binding > node->bindings_count ||
                     binding_description->type != node->bindings[binding_description->binding].type ||
+                    binding_description->descriptor_count !=
+                        node->bindings[binding_description->binding].descriptor_count ||
                     binding_description->used_stage_mask !=
                         node->bindings[binding_description->binding].used_stage_mask)
                 {
@@ -104,7 +114,10 @@ struct render_backend_pipeline_parameter_set_layout_t *render_backend_system_reg
         VkDescriptorSetLayoutBinding *vulkan_binding = &bindings[binding_index];
 
         vulkan_binding->binding = (vulkan_size_t) binding_description->binding;
-        vulkan_binding->descriptorCount = 1u;
+        KAN_ASSERT (binding_description->descriptor_count > 0u &&
+                    (binding_description->type == KAN_RENDER_PARAMETER_BINDING_TYPE_IMAGE ||
+                     binding_description->descriptor_count == 1u))
+        vulkan_binding->descriptorCount = binding_description->descriptor_count;
         vulkan_binding->stageFlags = 0u;
         vulkan_binding->pImmutableSamplers = NULL;
 
@@ -118,8 +131,12 @@ struct render_backend_pipeline_parameter_set_layout_t *render_backend_system_reg
             vulkan_binding->descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
             break;
 
-        case KAN_RENDER_PARAMETER_BINDING_TYPE_COMBINED_IMAGE_SAMPLER:
-            vulkan_binding->descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        case KAN_RENDER_PARAMETER_BINDING_TYPE_SAMPLER:
+            vulkan_binding->descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER;
+            break;
+
+        case KAN_RENDER_PARAMETER_BINDING_TYPE_IMAGE:
+            vulkan_binding->descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
             break;
         }
 
@@ -199,7 +216,8 @@ struct render_backend_pipeline_parameter_set_layout_t *render_backend_system_reg
     layout->bindings_count = used_binding_index_count;
     layout->uniform_buffers_count = uniform_buffer_binding_count;
     layout->storage_buffers_count = storage_buffer_binding_count;
-    layout->combined_image_samplers_count = combined_image_sampler_binding_count;
+    layout->samplers_count = sampler_binding_count;
+    layout->images_count = image_binding_count;
     layout->tracking_name = description->tracking_name;
 
     for (vulkan_size_t binding = 0u; binding < used_binding_index_count; ++binding)

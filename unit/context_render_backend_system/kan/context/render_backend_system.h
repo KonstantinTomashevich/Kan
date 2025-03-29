@@ -634,7 +634,8 @@ enum kan_render_parameter_binding_type_t
 {
     KAN_RENDER_PARAMETER_BINDING_TYPE_UNIFORM_BUFFER = 0u,
     KAN_RENDER_PARAMETER_BINDING_TYPE_STORAGE_BUFFER,
-    KAN_RENDER_PARAMETER_BINDING_TYPE_COMBINED_IMAGE_SAMPLER,
+    KAN_RENDER_PARAMETER_BINDING_TYPE_SAMPLER,
+    KAN_RENDER_PARAMETER_BINDING_TYPE_IMAGE,
 };
 
 /// \brief Describes parameter that can be bound to the pipeline.
@@ -642,6 +643,12 @@ struct kan_render_parameter_binding_description_t
 {
     kan_render_size_t binding;
     enum kan_render_parameter_binding_type_t type;
+
+    /// \brief Count of descriptors inside that binding.
+    /// \details Used to represent image arrays in pipelines.
+    /// \invariant Should always be equal to 1 unless KAN_RENDER_PARAMETER_BINDING_TYPE_IMAGE is used.
+    kan_render_size_t descriptor_count;
+
     kan_render_mask_t used_stage_mask;
 };
 
@@ -960,7 +967,8 @@ enum kan_render_address_mode_t
     KAN_RENDER_ADDRESS_MODE_CLAMP_TO_BORDER,
 };
 
-/// \brief Contains image sampling parameters.
+/// \brief Contains sampling parameters.
+/// \details Separate from update description as can be useful as data structure in other places.
 struct kan_render_sampler_t
 {
     enum kan_render_filter_mode_t mag_filter;
@@ -971,11 +979,17 @@ struct kan_render_sampler_t
     enum kan_render_address_mode_t address_mode_w;
 };
 
+/// \brief Contains information for sampler binding update.
+struct kan_render_parameter_update_description_sampler_t
+{
+    struct kan_render_sampler_t sampler;
+};
+
 /// \brief Contains information for image binding update.
 struct kan_render_parameter_update_description_image_t
 {
     kan_render_image_t image;
-    struct kan_render_sampler_t sampler;
+    kan_render_size_t array_index;
 };
 
 /// \brief Contains information on how to update one parameter binding.
@@ -985,6 +999,7 @@ struct kan_render_parameter_update_description_t
     union
     {
         struct kan_render_parameter_update_description_buffer_t buffer_binding;
+        struct kan_render_parameter_update_description_sampler_t sampler_binding;
         struct kan_render_parameter_update_description_image_t image_binding;
     };
 };

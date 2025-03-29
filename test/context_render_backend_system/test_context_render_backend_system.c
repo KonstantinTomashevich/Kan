@@ -61,8 +61,8 @@ static const char *render_image_shader =
     "\n"
     "void vertex_main (void)\n"
     "{\n"
-    "    vertex_output.uv = f2 {0.5, 0.5} + f2 {0.5, 0.5} * vertex.position;"
-    "    vertex_stage_output_position (f4 {vertex.position._0, vertex.position._1, 0.0, 1.0});"
+    "    vertex_output.uv = f2 {0.5} + f2 {0.5} * vertex.position;"
+    "    vertex_stage_output_position (f4 {vertex.position.xy, 0.0, 1.0});"
     "}\n"
     "\n"
     "set_material read_only_storage_buffer config\n"
@@ -83,32 +83,31 @@ static const char *render_image_shader =
     "void fragment_main (void)\n"
     "{\n"
     "    f2 coordinates = vertex_output.uv * config.bricks;\n"
-    "    if (f1_to_i1 (trunc_f1 (coordinates._1)) % 2 == 1)\n"
+    "    if (i1 {trunc_f1 (coordinates.y)} % 2 == 1)\n"
     "    {\n"
-    "        coordinates._0 = coordinates._0 + 0.5;\n"
+    "        coordinates.x = coordinates.x + 0.5;\n"
     "    }\n"
     "    \n"
     "    f2 local_coordinates = fract_f2 (coordinates);\n"
-    "    f2 inverse_border = f2 {1.0, 1.0} - config.border;"
+    "    f2 inverse_border = f2 {1.0} - config.border;"
     "\n"
     "    f2 border_mask = min_f2 (\n"
     "        step_f2 (config.border, local_coordinates),\n"
-    "        f2 {1.0, 1.0} - step_f2 (inverse_border, local_coordinates));\n"
-    "    f1 is_brick = min_f1 (border_mask._0, border_mask._1);\n"
+    "        f2 {1.0} - step_f2 (inverse_border, local_coordinates));\n"
+    "    f1 is_brick = min_f1 (border_mask.x, border_mask.y);\n"
     "\n"
     "    f4 fragment_color = mix_f4 (\n"
-    "        config.border_color, config.brick_color, f4 {is_brick, is_brick, is_brick, is_brick});\n"
+    "        config.border_color, config.brick_color, f4 {is_brick});\n"
     "\n"
-    "    f2 image_border = f2 {config.image_border_size, config.image_border_size};\n"
-    "    f2 inverse_image_border = f2 {1.0, 1.0} - image_border;\n"
+    "    f2 image_border = f2 {config.image_border_size};\n"
+    "    f2 inverse_image_border = f2 {1.0} - image_border;\n"
     "    f2 image_border_mask = min_f2 (\n"
     "        step_f2 (image_border, vertex_output.uv),\n"
-    "        f2 {1.0, 1.0} - step_f2 (inverse_image_border, vertex_output.uv));\n"
-    "    f1 is_image_content = min_f1 (image_border_mask._0, image_border_mask._1);\n"
+    "        f2 {1.0} - step_f2 (inverse_image_border, vertex_output.uv));\n"
+    "    f1 is_image_content = min_f1 (image_border_mask.x, image_border_mask.y);\n"
     "\n"
     "    fragment_output.color = mix_f4 (\n"
-    "        config.image_border_color, fragment_color ,\n"
-    "        f4 {is_image_content, is_image_content, is_image_content, is_image_content});\n"
+    "        config.image_border_color, fragment_color, f4 {is_image_content});\n"
     "}\n";
 
 static kan_render_pass_t create_render_image_pass (kan_render_context_t render_context)
@@ -210,6 +209,7 @@ static kan_render_graphics_pipeline_t create_render_image_pipeline (
     material_set_bindings[0u].binding = buffer->binding;
     *output_config_binding = buffer->binding;
     material_set_bindings[0u].type = KAN_RENDER_PARAMETER_BINDING_TYPE_STORAGE_BUFFER;
+    material_set_bindings[0u].descriptor_count = 1u;
     material_set_bindings[0u].used_stage_mask =
         (1u << KAN_RENDER_STAGE_GRAPHICS_VERTEX) | (1u << KAN_RENDER_STAGE_GRAPHICS_FRAGMENT);
 
@@ -364,10 +364,11 @@ static const char *cube_shader =
     "{\n"
     "    vertex_output.uv = vertex.uv;"
     "    vertex_stage_output_position (\n"
-    "        pass.projection_view * instanced.model * expand_f3_to_f4 (vertex.position, 1.0));\n"
+    "        pass.projection_view * instanced.model * f4 {vertex.position.xyz, 1.0});\n"
     "}\n"
     "\n"
-    "set_material sampler_2d diffuse_color;\n"
+    "set_material sampler color_sampler;\n"
+    "set_material image_color_2d diffuse_color;\n"
     "\n"
     "fragment_stage_output fragment_output\n"
     "{\n"
@@ -376,7 +377,7 @@ static const char *cube_shader =
     "\n"
     "void fragment_main (void)\n"
     "{\n"
-    "    fragment_output.color = diffuse_color (vertex_output.uv);\n"
+    "    fragment_output.color = sample (color_sampler, diffuse_color, vertex_output.uv);\n"
     "}\n";
 
 static kan_render_pass_t create_cube_pass (kan_render_context_t render_context)
@@ -414,6 +415,7 @@ static kan_render_graphics_pipeline_t create_cube_pipeline (
     kan_render_size_t *output_attribute_vertex_binding,
     kan_render_size_t *output_instanced_vertex_binding,
     kan_render_size_t *output_pass_binding,
+    kan_render_size_t *output_color_sampler_binding,
     kan_render_size_t *output_diffuse_color_binding,
     kan_render_pipeline_parameter_set_layout_t *pass_set_layout_output,
     kan_render_pipeline_parameter_set_layout_t *material_set_layout_output)
@@ -465,7 +467,7 @@ static kan_render_graphics_pipeline_t create_cube_pipeline (
         .tracking_name = kan_string_intern ("cube_pass"),
     };
 
-    struct kan_render_parameter_binding_description_t material_set_bindings[1u];
+    struct kan_render_parameter_binding_description_t material_set_bindings[2u];
     struct kan_render_pipeline_parameter_set_layout_description_t material_set_description = {
         .bindings_count = sizeof (material_set_bindings) / sizeof (material_set_bindings[0u]),
         .bindings = material_set_bindings,
@@ -517,6 +519,7 @@ static kan_render_graphics_pipeline_t create_cube_pipeline (
     pass_set_bindings[0u].binding = buffer->binding;
     *output_pass_binding = buffer->binding;
     pass_set_bindings[0u].type = KAN_RENDER_PARAMETER_BINDING_TYPE_UNIFORM_BUFFER;
+    pass_set_bindings[0u].descriptor_count = 1u;
     pass_set_bindings[0u].used_stage_mask =
         (1u << KAN_RENDER_STAGE_GRAPHICS_VERTEX) | (1u << KAN_RENDER_STAGE_GRAPHICS_FRAGMENT);
 
@@ -524,9 +527,20 @@ static kan_render_graphics_pipeline_t create_cube_pipeline (
     struct kan_rpl_meta_sampler_t *sampler = &((struct kan_rpl_meta_sampler_t *) meta.set_material.samplers.data)[0u];
 
     material_set_bindings[0u].binding = sampler->binding;
-    *output_diffuse_color_binding = sampler->binding;
-    material_set_bindings[0u].type = KAN_RENDER_PARAMETER_BINDING_TYPE_COMBINED_IMAGE_SAMPLER;
+    *output_color_sampler_binding = sampler->binding;
+    material_set_bindings[0u].type = KAN_RENDER_PARAMETER_BINDING_TYPE_SAMPLER;
+    material_set_bindings[0u].descriptor_count = 1u;
     material_set_bindings[0u].used_stage_mask =
+        (1u << KAN_RENDER_STAGE_GRAPHICS_VERTEX) | (1u << KAN_RENDER_STAGE_GRAPHICS_FRAGMENT);
+
+    KAN_TEST_ASSERT (meta.set_material.images.size == 1u)
+    struct kan_rpl_meta_image_t *image = &((struct kan_rpl_meta_image_t *) meta.set_material.images.data)[0u];
+
+    material_set_bindings[1u].binding = image->binding;
+    *output_diffuse_color_binding = image->binding;
+    material_set_bindings[1u].type = KAN_RENDER_PARAMETER_BINDING_TYPE_IMAGE;
+    material_set_bindings[1u].descriptor_count = 1u;
+    material_set_bindings[1u].used_stage_mask =
         (1u << KAN_RENDER_STAGE_GRAPHICS_VERTEX) | (1u << KAN_RENDER_STAGE_GRAPHICS_FRAGMENT);
 
     *pass_set_layout_output = kan_render_pipeline_parameter_set_layout_create (render_context, &pass_set_description);
@@ -773,6 +787,7 @@ KAN_TEST_CASE (render_and_capture)
     kan_render_size_t cube_attribute_vertex_binding;
     kan_render_size_t cube_instanced_vertex_binding;
     kan_render_size_t cube_pass_binding;
+    kan_render_size_t cube_color_sampler_binding;
     kan_render_size_t cube_diffuse_color_binding;
 
     kan_render_pipeline_parameter_set_layout_t cube_pass_set_layout;
@@ -780,7 +795,7 @@ KAN_TEST_CASE (render_and_capture)
 
     kan_render_graphics_pipeline_t cube_pipeline = create_cube_pipeline (
         render_context, cube_pass, &cube_attribute_vertex_binding, &cube_instanced_vertex_binding, &cube_pass_binding,
-        &cube_diffuse_color_binding, &cube_pass_set_layout, &cube_material_set_layout);
+        &cube_color_sampler_binding, &cube_diffuse_color_binding, &cube_pass_set_layout, &cube_material_set_layout);
 
     const kan_render_size_t render_target_image_size = 256u;
     struct kan_render_image_description_t render_target_image_description = {
@@ -795,7 +810,6 @@ KAN_TEST_CASE (render_and_capture)
     };
 
     kan_render_image_t render_target_image = kan_render_image_create (render_context, &render_target_image_description);
-
     struct kan_render_image_description_t depth_image_description = {
         .format = KAN_RENDER_IMAGE_FORMAT_D32_SFLOAT,
         .width = fixed_window_size,
@@ -808,7 +822,6 @@ KAN_TEST_CASE (render_and_capture)
     };
 
     kan_render_image_t depth_image = kan_render_image_create (render_context, &depth_image_description);
-
     struct kan_render_frame_buffer_attachment_description_t render_image_frame_buffer_attachments[] = {
         {
             .type = KAN_FRAME_BUFFER_ATTACHMENT_IMAGE,
@@ -967,10 +980,9 @@ KAN_TEST_CASE (render_and_capture)
 
     struct kan_render_parameter_update_description_t cube_material_parameters[] = {
         {
-            .binding = cube_diffuse_color_binding,
-            .image_binding =
+            .binding = cube_color_sampler_binding,
+            .sampler_binding =
                 {
-                    .image = render_target_image,
                     .sampler =
                         {
                             .mag_filter = KAN_RENDER_FILTER_MODE_NEAREST,
@@ -980,6 +992,14 @@ KAN_TEST_CASE (render_and_capture)
                             .address_mode_v = KAN_RENDER_ADDRESS_MODE_REPEAT,
                             .address_mode_w = KAN_RENDER_ADDRESS_MODE_REPEAT,
                         },
+                },
+        },
+        {
+            .binding = cube_diffuse_color_binding,
+            .image_binding =
+                {
+                    .image = render_target_image,
+                    .array_index = 0u,
                 },
         },
     };

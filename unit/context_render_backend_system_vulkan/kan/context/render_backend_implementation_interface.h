@@ -445,6 +445,7 @@ void render_backend_pass_instance_add_dependency_internal (struct render_backend
 struct render_backend_layout_binding_t
 {
     enum kan_render_parameter_binding_type_t type;
+    kan_render_size_t descriptor_count;
     vulkan_size_t used_stage_mask;
 };
 
@@ -458,7 +459,8 @@ struct render_backend_pipeline_parameter_set_layout_t
 
     uint8_t uniform_buffers_count;
     uint8_t storage_buffers_count;
-    uint8_t combined_image_samplers_count;
+    uint8_t samplers_count;
+    uint8_t images_count;
 
     kan_interned_string_t tracking_name;
     kan_instance_size_t bindings_count;
@@ -816,7 +818,8 @@ struct render_backend_descriptor_set_allocator_t
     kan_instance_size_t total_set_allocations;
     kan_instance_size_t uniform_buffer_binding_allocations;
     kan_instance_size_t storage_buffer_binding_allocations;
-    kan_instance_size_t combined_image_binding_sampler_allocations;
+    kan_instance_size_t sampler_binding_allocations;
+    kan_instance_size_t image_binding_allocations;
 };
 
 void render_backend_descriptor_set_allocator_init (struct render_backend_descriptor_set_allocator_t *allocator);
