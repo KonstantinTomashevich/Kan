@@ -1257,13 +1257,13 @@ kan_bool_t kan_render_graph_resource_management_singleton_request_pass (
                     for (kan_loop_size_t dependant_index = 0u;
                          dependant_index < (kan_loop_size_t) dependant_to_register; ++dependant_index)
                     {
-                        kan_render_pass_instance_add_dynamic_dependency (usage->next->producer_pass,
-                                                                         usage->user_passes[dependant_index]);
+                        kan_render_pass_instance_add_instance_dependency (usage->next->producer_pass,
+                                                                          usage->user_passes[dependant_index]);
                     }
                 }
                 else
                 {
-                    kan_render_pass_instance_add_dynamic_dependency (usage->next->producer_pass, usage->producer_pass);
+                    kan_render_pass_instance_add_instance_dependency (usage->next->producer_pass, usage->producer_pass);
                 }
             }
         }

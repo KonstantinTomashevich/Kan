@@ -119,6 +119,8 @@ kan_context_system_t render_backend_system_create (kan_allocation_group_t group,
         kan_cpu_section_get ("render_backend_execute_frame_buffer_creation");
     system->section_submit_blit_requests = kan_cpu_section_get ("render_backend_submit_blit_requests");
     system->section_submit_pass_instance = kan_cpu_section_get ("render_backend_submit_pass_instance");
+    system->section_pass_instance_resolve_checkpoints =
+        kan_cpu_section_get ("render_backend_pass_instance_resolve_checkpoints");
     system->section_pass_instance_sort_and_submission =
         kan_cpu_section_get ("render_backend_pass_instance_sort_and_submission");
     system->section_submit_read_back = kan_cpu_section_get ("render_backend_submit_read_back");
@@ -130,7 +132,6 @@ kan_context_system_t render_backend_system_create (kan_allocation_group_t group,
     system->resource_registration_lock = kan_atomic_int_init (0);
     system->pipeline_parameter_set_layout_registration_lock = kan_atomic_int_init (0);
     system->pipeline_layout_registration_lock = kan_atomic_int_init (0);
-    system->pass_static_dependency_lock = kan_atomic_int_init (0);
     system->pass_instance_state_management_lock = kan_atomic_int_init (0);
 
     kan_bd_list_init (&system->surfaces);
@@ -2367,6 +2368,30 @@ static inline void process_surface_blit_requests (struct render_backend_system_t
     kan_cpu_section_execution_shutdown (&execution);
 }
 
+static void propagate_pass_instance_dependency_through_checkpoints (
+    struct render_backend_pass_instance_t *pass_instance, struct render_backend_pass_instance_checkpoint_t *checkpoint)
+{
+    struct render_backend_pass_instance_instance_dependency_t *dependant_instance =
+        checkpoint->first_dependant_instance;
+
+    while (dependant_instance)
+    {
+        render_backend_pass_instance_add_dependency_internal (dependant_instance->dependant_pass_instance,
+                                                              pass_instance);
+        dependant_instance = dependant_instance->next;
+    }
+
+    struct render_backend_pass_instance_checkpoint_dependency_t *dependant_checkpoint =
+        checkpoint->first_dependant_checkpoint;
+
+    while (dependant_checkpoint)
+    {
+        propagate_pass_instance_dependency_through_checkpoints (pass_instance,
+                                                                dependant_checkpoint->dependant_checkpoint);
+        dependant_checkpoint = dependant_checkpoint->next;
+    }
+}
+
 static inline void execute_pass_instance_submission (struct render_backend_system_t *system,
                                                      struct render_backend_command_state_t *state,
                                                      struct render_backend_pass_instance_t *pass_instance)
@@ -2526,11 +2551,17 @@ static inline void execute_pass_instance_submission (struct render_backend_syste
 
         if (attachment->type == KAN_FRAME_BUFFER_ATTACHMENT_IMAGE && attachment->image->description.supports_sampling)
         {
+            // TODO: This can cause additional unnecessary transitions of an image if it is used both for sampling and
+            //       as attachment, but several passes use it as attachment before other pass samples it.
+
             VkAccessFlags possible_access_flags = 0u;
+            VkImageLayout new_layout;
+
             switch (get_image_format_class (attachment->image->description.format))
             {
             case IMAGE_FORMAT_CLASS_COLOR:
                 possible_access_flags |= VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+                new_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
                 break;
 
             case IMAGE_FORMAT_CLASS_DEPTH:
@@ -2538,6 +2569,7 @@ static inline void execute_pass_instance_submission (struct render_backend_syste
             case IMAGE_FORMAT_CLASS_DEPTH_STENCIL:
                 possible_access_flags |=
                     VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+                new_layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
                 break;
             }
 
@@ -2547,7 +2579,7 @@ static inline void execute_pass_instance_submission (struct render_backend_syste
                 .srcAccessMask = possible_access_flags,
                 .dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
                 .oldLayout = attachment->image->last_command_layout,
-                .newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                .newLayout = new_layout,
                 .srcQueueFamilyIndex = system->device_queue_family_index,
                 .dstQueueFamilyIndex = system->device_queue_family_index,
                 .image = attachment->image->image,
@@ -2561,7 +2593,7 @@ static inline void execute_pass_instance_submission (struct render_backend_syste
                     },
             };
 
-            attachment->image->last_command_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            attachment->image->last_command_layout = new_layout;
             ++added_barriers;
         }
     }
@@ -2613,7 +2645,7 @@ static void render_backend_system_submit_pass_instance (struct render_backend_sy
                  pass_instance->pass->tracking_name)
     }
 
-    struct render_backend_pass_instance_dependency_t *dependant = pass_instance->first_dependant;
+    struct render_backend_pass_instance_instance_dependency_t *dependant = pass_instance->first_dependant_instance;
     while (dependant)
     {
         // Dependencies left can be already zero if we were trying to get out of dead lock situation.
@@ -2653,31 +2685,31 @@ static void render_backend_system_submit_graphics (struct render_backend_system_
     submit_mip_generation (system, schedule, state);
     process_frame_buffer_create_requests (system, schedule);
 
-    struct render_backend_pass_t *pass = (struct render_backend_pass_t *) system->passes.first;
-    while (pass)
+    struct kan_cpu_section_execution_t checkpoint_execution;
+    kan_cpu_section_execution_init (&checkpoint_execution, system->section_pass_instance_resolve_checkpoints);
+
+#define PASS_INSTANCE_GET_FROM_NODE(SOURCE, NODE)                                                                      \
+    (struct render_backend_pass_instance_t *) (((uint8_t *) SOURCE) -                                                  \
+                                               offsetof (struct render_backend_pass_instance_t, NODE))
+
+    struct render_backend_pass_instance_t *pass_instance =
+        PASS_INSTANCE_GET_FROM_NODE (system->pass_instances.first, node_in_all);
+
+    while (pass_instance)
     {
-        struct render_backend_pass_dependency_t *dependant_pass = pass->first_dependant_pass;
-        while (dependant_pass)
+        struct render_backend_pass_instance_checkpoint_dependency_t *dependant =
+            pass_instance->first_dependant_checkpoint;
+
+        while (dependant)
         {
-            struct render_backend_pass_instance_t *dependant_instance = dependant_pass->dependant_pass->first_instance;
-            while (dependant_instance)
-            {
-                struct render_backend_pass_instance_t *dependency_instance = pass->first_instance;
-                while (dependency_instance)
-                {
-                    render_backend_pass_instance_add_dependency_internal (dependant_instance, dependency_instance);
-                    dependency_instance = dependency_instance->next_in_pass;
-                }
-
-                dependant_instance = dependant_instance->next_in_pass;
-            }
-
-            dependant_pass = dependant_pass->next;
+            propagate_pass_instance_dependency_through_checkpoints (pass_instance, dependant->dependant_checkpoint);
+            dependant = dependant->next;
         }
 
-        pass = (struct render_backend_pass_t *) pass->list_node.next;
+        pass_instance = PASS_INSTANCE_GET_FROM_NODE (pass_instance->node_in_all.next, node_in_all);
     }
 
+    kan_cpu_section_execution_shutdown (&checkpoint_execution);
     struct kan_cpu_section_execution_t pass_instance_execution;
     kan_cpu_section_execution_init (&pass_instance_execution, system->section_pass_instance_sort_and_submission);
 
@@ -2686,10 +2718,7 @@ static void render_backend_system_submit_graphics (struct render_backend_system_
         while (system->pass_instances_available.size > 0u)
         {
             render_backend_system_submit_pass_instance (
-                system, state,
-                (struct render_backend_pass_instance_t *) (((uint8_t *) system->pass_instances_available.first) -
-                                                           offsetof (struct render_backend_pass_instance_t,
-                                                                     node_in_available)));
+                system, state, PASS_INSTANCE_GET_FROM_NODE (system->pass_instances_available.first, node_in_available));
         }
 
         if (system->pass_instances.size > 0u)
@@ -2699,10 +2728,7 @@ static void render_backend_system_submit_graphics (struct render_backend_system_
                      "dependencies to try to work around the issue.")
 
             struct render_backend_pass_instance_t *make_available_anyway = NULL;
-            struct render_backend_pass_instance_t *pass_instance =
-                (struct render_backend_pass_instance_t *) (((uint8_t *) system->pass_instances.first) -
-                                                           offsetof (struct render_backend_pass_instance_t,
-                                                                     node_in_all));
+            pass_instance = PASS_INSTANCE_GET_FROM_NODE (system->pass_instances.first, node_in_all);
 
             while (pass_instance)
             {
@@ -2717,10 +2743,7 @@ static void render_backend_system_submit_graphics (struct render_backend_system_
                     make_available_anyway = pass_instance;
                 }
 
-                pass_instance =
-                    (struct render_backend_pass_instance_t *) (((uint8_t *) pass_instance->node_in_all.next) -
-                                                               offsetof (struct render_backend_pass_instance_t,
-                                                                         node_in_all));
+                pass_instance = PASS_INSTANCE_GET_FROM_NODE (pass_instance->node_in_all.next, node_in_all);
             }
 
             make_available_anyway->dependencies_left = 0u;
@@ -2728,15 +2751,8 @@ static void render_backend_system_submit_graphics (struct render_backend_system_
         }
     }
 
+#undef PASS_INSTANCE_GET_FROM_NODE
     kan_cpu_section_execution_shutdown (&pass_instance_execution);
-    pass = (struct render_backend_pass_t *) system->passes.first;
-
-    while (pass)
-    {
-        pass->first_instance = NULL;
-        pass = (struct render_backend_pass_t *) pass->list_node.next;
-    }
-
     kan_stack_group_allocator_shrink (&system->pass_instance_allocator);
     kan_stack_group_allocator_reset (&system->pass_instance_allocator);
 

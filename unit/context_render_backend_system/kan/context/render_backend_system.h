@@ -62,16 +62,18 @@
 /// \par Render passes
 /// \parblock
 /// Render pass is a concept that encloses routine of rendering objects into frame buffer that has specific set of
-/// attachments. It also usually has high level meaning, but for render backend it is irrelevant. Render passes can
-/// form dependencies one on another through `kan_render_pass_add_static_dependency`.
+/// attachments. It also usually has high level meaning, but for render backend it is irrelevant.
 ///
 /// In order to submit commands to render pass, it must be instantiated for the current frame through
 /// `kan_render_pass_instantiate` with appropriate frame buffer, viewport, scissor and clear values. If render pass
 /// instance was successfully created, it can then receive commands through `kan_render_pass_instance_*` functions
-/// and receive frame-lifetime dependencies through `kan_render_pass_instance_add_dynamic_dependency`.
+/// and receive frame-lifetime dependencies through `kan_render_pass_instance_add_instance_dependency`. It is also
+/// possible to utilize `kan_render_pass_instance_checkpoint_t` to create implicit dependencies between groups of
+/// pass instances.
 ///
 /// It is allowed to create as many instances of render passes as needed: render pass functions as blueprint for the
 /// instances. Also, instances lifetime is only one frame and they are automatically destroyed when frame ends.
+/// The same goes for pass instance checkpoints: they have one frame lifetime as well.
 /// \endparblock
 ///
 /// \par Frame buffers
@@ -184,6 +186,7 @@ KAN_HANDLE_DEFINE (kan_render_surface_t);
 KAN_HANDLE_DEFINE (kan_render_frame_buffer_t);
 KAN_HANDLE_DEFINE (kan_render_pass_t);
 KAN_HANDLE_DEFINE (kan_render_pass_instance_t);
+KAN_HANDLE_DEFINE (kan_render_pass_instance_checkpoint_t);
 KAN_HANDLE_DEFINE (kan_render_pipeline_parameter_set_layout_t);
 KAN_HANDLE_DEFINE (kan_render_code_module_t);
 KAN_HANDLE_DEFINE (kan_render_graphics_pipeline_t);
@@ -549,14 +552,6 @@ struct kan_render_clear_value_t
 CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_pass_t
 kan_render_pass_create (kan_render_context_t context, struct kan_render_pass_description_t *description);
 
-/// \brief Creates dependency between render passes that will be inherited by all instances.
-/// \details Fully thread safe for both passes.
-///          Static dependency creation binds passes together and requires both passes to be destroyed during the
-///          same frame. It shouldn't be an issue for the architecture, because passes are part of render graph and
-///          graph should only be destroyed as a whole, not partially.
-CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_add_static_dependency (kan_render_pass_t pass,
-                                                                              kan_render_pass_t dependency);
-
 /// \brief Instantiates render pass for given frame buffer with given configuration.
 CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_pass_instance_t
 kan_render_pass_instantiate (kan_render_pass_t pass,
@@ -567,8 +562,13 @@ kan_render_pass_instantiate (kan_render_pass_t pass,
 
 /// \brief Creates dependency between two render pass instances.
 /// \details Fully thread safe for both pass instances.
-CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_instance_add_dynamic_dependency (
+CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_instance_add_instance_dependency (
     kan_render_pass_instance_t pass_instance, kan_render_pass_instance_t dependency);
+
+/// \brief Creates dependency between render pass instance and checkpoint.
+/// \details Fully thread safe for both pass instance and checkpoint.
+CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_instance_add_checkpoint_dependency (
+    kan_render_pass_instance_t pass_instance, kan_render_pass_instance_checkpoint_t dependency);
 
 /// \brief Submits graphics pipeline binding to the render pass.
 /// \return Whether pipeline was successfully bound. Binding will fail if pipeline is not compiled yet and priority is
@@ -610,6 +610,21 @@ CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_instance_instanced_draw (
     kan_render_size_t vertex_offset,
     kan_render_size_t instance_offset,
     kan_render_size_t instance_count);
+
+/// \brief Creates new checkpoint for building dependencies between pass instances.
+/// \details Checkpoints have the same lifetime as pass instances and are destroyed when frame is submitted.
+CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_pass_instance_checkpoint_t
+kan_render_pass_instance_checkpoint_create (kan_render_context_t context);
+
+/// \brief Creates dependency between checkpoint and render pass instance.
+/// \details Fully thread safe for both pass instance and checkpoint.
+CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_instance_checkpoint_add_instance_dependancy (
+    kan_render_pass_instance_checkpoint_t checkpoint, kan_render_pass_instance_t dependency);
+
+/// \brief Creates dependency between render pass instance checkpoints.
+/// \details Fully thread safe for both checkpoints.
+CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_instance_checkpoint_add_checkpoint_dependancy (
+    kan_render_pass_instance_checkpoint_t checkpoint, kan_render_pass_instance_checkpoint_t dependency);
 
 /// \brief Requests given render pass to be destroyed.
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_destroy (kan_render_pass_t pass);

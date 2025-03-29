@@ -387,21 +387,11 @@ void render_backend_frame_buffer_schedule_resource_destroy (struct render_backen
 void render_backend_system_destroy_frame_buffer (struct render_backend_system_t *system,
                                                  struct render_backend_frame_buffer_t *frame_buffer);
 
-struct render_backend_pass_dependency_t
-{
-    struct render_backend_pass_dependency_t *next;
-    struct render_backend_pass_t *dependant_pass;
-};
-
 struct render_backend_pass_t
 {
     struct kan_bd_list_node_t list_node;
     struct render_backend_system_t *system;
-
     VkRenderPass pass;
-    struct render_backend_pass_dependency_t *first_dependant_pass;
-    struct render_backend_pass_instance_t *first_instance;
-
     kan_interned_string_t tracking_name;
 };
 
@@ -410,10 +400,23 @@ struct render_backend_pass_t *render_backend_system_create_pass (struct render_b
 
 void render_backend_system_destroy_pass (struct render_backend_system_t *system, struct render_backend_pass_t *pass);
 
-struct render_backend_pass_instance_dependency_t
+struct render_backend_pass_instance_instance_dependency_t
 {
-    struct render_backend_pass_instance_dependency_t *next;
+    struct render_backend_pass_instance_instance_dependency_t *next;
     struct render_backend_pass_instance_t *dependant_pass_instance;
+};
+
+struct render_backend_pass_instance_checkpoint_t
+{
+    struct render_backend_system_t *system;
+    struct render_backend_pass_instance_instance_dependency_t *first_dependant_instance;
+    struct render_backend_pass_instance_checkpoint_dependency_t *first_dependant_checkpoint;
+};
+
+struct render_backend_pass_instance_checkpoint_dependency_t
+{
+    struct render_backend_pass_instance_checkpoint_dependency_t *next;
+    struct render_backend_pass_instance_checkpoint_t *dependant_checkpoint;
 };
 
 struct render_backend_pass_instance_t
@@ -426,9 +429,9 @@ struct render_backend_pass_instance_t
     VkPipelineLayout current_pipeline_layout;
 
     kan_instance_size_t dependencies_left;
-    struct render_backend_pass_instance_dependency_t *first_dependant;
+    struct render_backend_pass_instance_instance_dependency_t *first_dependant_instance;
+    struct render_backend_pass_instance_checkpoint_dependency_t *first_dependant_checkpoint;
 
-    struct render_backend_pass_instance_t *next_in_pass;
     struct kan_bd_list_node_t node_in_available;
     struct kan_bd_list_node_t node_in_all;
 
@@ -889,9 +892,6 @@ struct render_backend_system_t
     ///        keep cache consistent, therefore it would waste too much time if it was under common registration lock.
     struct kan_atomic_int_t pipeline_layout_registration_lock;
 
-    /// \brief Lock used for registering static dependencies between passes.
-    struct kan_atomic_int_t pass_static_dependency_lock;
-
     /// \details Lock used for operations than change pass instance state by moving it in different lists.
     struct kan_atomic_int_t pass_instance_state_management_lock;
 
@@ -1009,6 +1009,7 @@ struct render_backend_system_t
     kan_cpu_section_t section_execute_frame_buffer_creation;
     kan_cpu_section_t section_submit_blit_requests;
     kan_cpu_section_t section_submit_pass_instance;
+    kan_cpu_section_t section_pass_instance_resolve_checkpoints;
     kan_cpu_section_t section_pass_instance_sort_and_submission;
     kan_cpu_section_t section_submit_read_back;
     kan_cpu_section_t section_present;

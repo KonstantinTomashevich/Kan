@@ -217,8 +217,6 @@ struct render_backend_pass_t *render_backend_system_create_pass (struct render_b
 
     pass->pass = render_pass;
     pass->system = system;
-    pass->first_dependant_pass = NULL;
-    pass->first_instance = NULL;
     pass->tracking_name = description->tracking_name;
 
     kan_cpu_section_execution_shutdown (&execution);
@@ -228,22 +226,13 @@ struct render_backend_pass_t *render_backend_system_create_pass (struct render_b
 void render_backend_system_destroy_pass (struct render_backend_system_t *system, struct render_backend_pass_t *pass)
 {
     vkDestroyRenderPass (system->device, pass->pass, VULKAN_ALLOCATION_CALLBACKS (system));
-    struct render_backend_pass_dependency_t *dependency = pass->first_dependant_pass;
-
-    while (dependency)
-    {
-        struct render_backend_pass_dependency_t *next = dependency->next;
-        kan_free_batched (system->pass_wrapper_allocation_group, dependency);
-        dependency = next;
-    }
-
     kan_free_batched (system->pass_wrapper_allocation_group, pass);
 }
 
 void render_backend_pass_instance_add_dependency_internal (struct render_backend_pass_instance_t *dependant,
                                                            struct render_backend_pass_instance_t *dependency)
 {
-    struct render_backend_pass_instance_dependency_t *dependency_info = dependency->first_dependant;
+    struct render_backend_pass_instance_instance_dependency_t *dependency_info = dependency->first_dependant_instance;
     while (dependency_info)
     {
         if (dependency_info->dependant_pass_instance == dependant)
@@ -254,11 +243,11 @@ void render_backend_pass_instance_add_dependency_internal (struct render_backend
         dependency_info = dependency_info->next;
     }
 
-    dependency_info = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&dependant->system->pass_instance_allocator,
-                                                                struct render_backend_pass_instance_dependency_t);
+    dependency_info = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (
+        &dependant->system->pass_instance_allocator, struct render_backend_pass_instance_instance_dependency_t);
 
-    dependency_info->next = dependency->first_dependant;
-    dependency->first_dependant = dependency_info;
+    dependency_info->next = dependency->first_dependant_instance;
+    dependency->first_dependant_instance = dependency_info;
     dependency_info->dependant_pass_instance = dependant;
 
     if (dependant->dependencies_left == 0u)
@@ -278,38 +267,6 @@ kan_render_pass_t kan_render_pass_create (kan_render_context_t context,
     struct render_backend_pass_t *pass = render_backend_system_create_pass (system, description);
     kan_cpu_section_execution_shutdown (&execution);
     return pass ? KAN_HANDLE_SET (kan_render_pass_t, pass) : KAN_HANDLE_SET_INVALID (kan_render_pass_t);
-}
-
-void kan_render_pass_add_static_dependency (kan_render_pass_t pass, kan_render_pass_t dependency)
-{
-    struct render_backend_pass_t *dependant_pass = KAN_HANDLE_GET (pass);
-    struct render_backend_pass_t *dependency_pass = KAN_HANDLE_GET (dependency);
-
-    kan_atomic_int_lock (&dependant_pass->system->pass_static_dependency_lock);
-    struct render_backend_pass_dependency_t *dependency_info = dependency_pass->first_dependant_pass;
-
-    // Check if dependency already exists.
-    while (dependency_info)
-    {
-        if (dependency_info->dependant_pass == dependant_pass)
-        {
-            break;
-        }
-
-        dependency_info = dependency_info->next;
-    }
-
-    if (!dependency_info)
-    {
-        // Dependency is new, create it.
-        dependency_info = kan_allocate_batched (dependant_pass->system->pass_wrapper_allocation_group,
-                                                sizeof (struct render_backend_pass_dependency_t));
-        dependency_info->next = dependency_pass->first_dependant_pass;
-        dependency_pass->first_dependant_pass = dependency_info;
-        dependency_info->dependant_pass = dependant_pass;
-    }
-
-    kan_atomic_int_unlock (&dependant_pass->system->pass_static_dependency_lock);
 }
 
 kan_render_pass_instance_t kan_render_pass_instantiate (kan_render_pass_t pass,
@@ -424,10 +381,9 @@ kan_render_pass_instance_t kan_render_pass_instantiate (kan_render_pass_t pass,
     instance->frame_buffer = KAN_HANDLE_GET (frame_buffer);
     instance->current_pipeline_layout = VK_NULL_HANDLE;
     instance->dependencies_left = 0u;
-    instance->first_dependant = NULL;
+    instance->first_dependant_instance = NULL;
+    instance->first_dependant_checkpoint = NULL;
 
-    instance->next_in_pass = pass_data->first_instance;
-    pass_data->first_instance = instance;
     kan_bd_list_add (&pass_data->system->pass_instances, NULL, &instance->node_in_all);
     kan_bd_list_add (&pass_data->system->pass_instances_available, NULL, &instance->node_in_available);
     kan_atomic_int_unlock (&pass_data->system->pass_instance_state_management_lock);
@@ -523,8 +479,8 @@ kan_render_pass_instance_t kan_render_pass_instantiate (kan_render_pass_t pass,
     return KAN_HANDLE_SET (kan_render_pass_instance_t, instance);
 }
 
-void kan_render_pass_instance_add_dynamic_dependency (kan_render_pass_instance_t pass_instance,
-                                                      kan_render_pass_instance_t dependency)
+void kan_render_pass_instance_add_instance_dependency (kan_render_pass_instance_t pass_instance,
+                                                       kan_render_pass_instance_t dependency)
 {
     struct render_backend_pass_instance_t *dependant_instance = KAN_HANDLE_GET (pass_instance);
     struct render_backend_pass_instance_t *dependency_instance = KAN_HANDLE_GET (dependency);
@@ -532,6 +488,23 @@ void kan_render_pass_instance_add_dynamic_dependency (kan_render_pass_instance_t
     kan_atomic_int_lock (&dependant_instance->system->pass_instance_state_management_lock);
     render_backend_pass_instance_add_dependency_internal (dependant_instance, dependency_instance);
     kan_atomic_int_unlock (&dependant_instance->system->pass_instance_state_management_lock);
+}
+
+void kan_render_pass_instance_add_checkpoint_dependency (kan_render_pass_instance_t pass_instance,
+                                                         kan_render_pass_instance_checkpoint_t dependency)
+{
+    struct render_backend_pass_instance_t *instance = KAN_HANDLE_GET (pass_instance);
+    struct render_backend_pass_instance_checkpoint_t *checkpoint = KAN_HANDLE_GET (dependency);
+
+    kan_atomic_int_lock (&instance->system->pass_instance_state_management_lock);
+    struct render_backend_pass_instance_instance_dependency_t *dependency_info =
+        KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&instance->system->pass_instance_allocator,
+                                                  struct render_backend_pass_instance_instance_dependency_t);
+
+    dependency_info->dependant_pass_instance = instance;
+    dependency_info->next = checkpoint->first_dependant_instance;
+    checkpoint->first_dependant_instance = dependency_info;
+    kan_atomic_int_unlock (&instance->system->pass_instance_state_management_lock);
 }
 
 kan_bool_t kan_render_pass_instance_graphics_pipeline (kan_render_pass_instance_t pass_instance,
@@ -736,6 +709,55 @@ void kan_render_pass_instance_instanced_draw (kan_render_pass_instance_t pass_in
     vkCmdDrawIndexed (instance->command_buffer, index_count, instance_count, index_offset,
                       (vulkan_offset_t) vertex_offset, instance_offset);
     kan_atomic_int_unlock (&command_state->command_operation_lock);
+}
+
+kan_render_pass_instance_checkpoint_t kan_render_pass_instance_checkpoint_create (kan_render_context_t context)
+{
+    struct render_backend_system_t *system = KAN_HANDLE_GET (context);
+    kan_atomic_int_lock (&system->pass_instance_state_management_lock);
+
+    struct render_backend_pass_instance_checkpoint_t *checkpoint = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (
+        &system->pass_instance_allocator, struct render_backend_pass_instance_checkpoint_t);
+
+    checkpoint->system = system;
+    checkpoint->first_dependant_instance = NULL;
+    checkpoint->first_dependant_checkpoint = NULL;
+    kan_atomic_int_unlock (&system->pass_instance_state_management_lock);
+    return KAN_HANDLE_SET (kan_render_pass_instance_checkpoint_t, checkpoint);
+}
+
+void kan_render_pass_instance_checkpoint_add_instance_dependancy (kan_render_pass_instance_checkpoint_t checkpoint,
+                                                                  kan_render_pass_instance_t dependency)
+{
+    struct render_backend_pass_instance_t *instance = KAN_HANDLE_GET (dependency);
+    struct render_backend_pass_instance_checkpoint_t *dependant_checkpoint = KAN_HANDLE_GET (checkpoint);
+
+    kan_atomic_int_lock (&instance->system->pass_instance_state_management_lock);
+    struct render_backend_pass_instance_checkpoint_dependency_t *dependency_info =
+        KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&instance->system->pass_instance_allocator,
+                                                  struct render_backend_pass_instance_checkpoint_dependency_t);
+
+    dependency_info->dependant_checkpoint = dependant_checkpoint;
+    dependency_info->next = instance->first_dependant_checkpoint;
+    instance->first_dependant_checkpoint = dependency_info;
+    kan_atomic_int_unlock (&instance->system->pass_instance_state_management_lock);
+}
+
+void kan_render_pass_instance_checkpoint_add_checkpoint_dependancy (kan_render_pass_instance_checkpoint_t checkpoint,
+                                                                    kan_render_pass_instance_checkpoint_t dependency)
+{
+    struct render_backend_pass_instance_checkpoint_t *dependant_checkpoint = KAN_HANDLE_GET (checkpoint);
+    struct render_backend_pass_instance_checkpoint_t *dependency_checkpoint = KAN_HANDLE_GET (dependency);
+
+    kan_atomic_int_lock (&dependant_checkpoint->system->pass_instance_state_management_lock);
+    struct render_backend_pass_instance_checkpoint_dependency_t *dependency_info =
+        KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&dependant_checkpoint->system->pass_instance_allocator,
+                                                  struct render_backend_pass_instance_checkpoint_dependency_t);
+
+    dependency_info->dependant_checkpoint = dependant_checkpoint;
+    dependency_info->next = dependency_checkpoint->first_dependant_checkpoint;
+    dependency_checkpoint->first_dependant_checkpoint = dependency_info;
+    kan_atomic_int_unlock (&dependant_checkpoint->system->pass_instance_state_management_lock);
 }
 
 void kan_render_pass_destroy (kan_render_pass_t pass)

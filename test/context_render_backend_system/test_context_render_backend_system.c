@@ -1216,7 +1216,7 @@ KAN_TEST_CASE (render_and_capture)
 
                     if (KAN_HANDLE_IS_VALID (cube_instance))
                     {
-                        kan_render_pass_instance_add_dynamic_dependency (cube_instance, render_image_instance);
+                        kan_render_pass_instance_add_instance_dependency (cube_instance, render_image_instance);
                     }
 
                     last_render_image_frame = frame;
