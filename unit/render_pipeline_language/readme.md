@@ -175,6 +175,19 @@ There are two ways to access vector items:
 
 Matrix columns can be accessed as vectors in the same way as single item access works for vectors.
 
+## Note about inbuilt types precision
+
+It was decided to support only 32-bit types for now, because not all GPUs support 16-bit and 8-bit precision inside
+pipeline code: most of them do support, but not all of them. 
+
+GLSL in ES mode goes around it by using the feature called relaxed precision in SPIRV: it means that code tells driver 
+that it is possible to use 16-bit calculations in specified places if the driver thinks it is beneficial for the 
+performance. If GPU does not support 16-bit calculations, then driver will just ignore relaxed precision instructions.
+Precision specifiers in GLSL in OpenGL work the same way: they're just advises, not requirements.
+
+It was decided to postpone relaxed precision integration as we don't yet support devices on which it would be possible 
+to see the difference.
+
 ## Type usage syntax
 
 Type can be specified using syntax: `type_name ((\[ array_dimension_expression \])+ | ...)?` with type_name being 
