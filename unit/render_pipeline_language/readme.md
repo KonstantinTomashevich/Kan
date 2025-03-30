@@ -136,9 +136,44 @@ There is list of currently supported inbuilt types:
 
 - `f1` -- 32-bit floating point scalar.
 - `f2`, `f3` and `f4` -- 2, 3 and 4 dimensional vectors of 32-bit floating point scalars.
-- `i1` -- 32-bit signed integer scalar.
-- `i2`, `i3`, `i4` -- 2, 3 and 4 dimensional vectors of 32-bit signed integer scalars.
+- `u1` -- 32-bit unsigned integer scalar.
+- `u2`, `u3`, `u4` -- 2, 3 and 4 dimensional vectors of 32-bit unsigned integer scalars.
+- `s1` -- 32-bit signed integer scalar.
+- `s2`, `s3`, `s4` -- 2, 3 and 4 dimensional vectors of 32-bit signed integer scalars.
 - `f3x3`, `f4x4` -- 3x3 and 4x4 column-major matrices of 32-bit floating point scalars.
+
+Keep in mind, that any integer literal without suffix (or with `s` suffix) is treated as `s1` literal. In order to
+create `u1` literal, add `u` suffix. Also, `count` options are always treated as `u1`s.
+
+There are several supported constructor signatures for vectors:
+
+- Combine constructor: combines several vectors or scalars into one vector with the same item type. All vectors
+  must have these item type. Total count of items must be equal to the constructed vector size.
+  Example: `f4 {1.0, f2 {2.0, 3.0}, 4.0}`
+- Convert constructor: converts one vector with one item type to another vector with other item type but same count 
+  of items. Example: `f4 {u4 {0u, 1u, 2u, 3u}}`
+- Fill constructor: fills all the vector items with one scalar value. Example: `f4 {0.5}`.
+
+There are several supported constructor signatures for matrices:
+
+- Combine constructor: combines several vectors into matrix treating them as columns. All vectors must have the same
+  item type and the same size (matrix row count). 
+  Example: `f3x3 {f3 {1.0, 0.0, 0.0}, f3 {0.0, 1.0, 0.0}, f3 {0.0, 0.0, 1.0}}`.
+- Convert constructor: converts matrix with one item type into the matrix of the same size but with different item type.
+  Currently unused as all matrices are floating.
+- Crop constructor: crops bigger matrix into smaller matrix by leaving out unneeded elements.
+  Example: `f4x4 my_big_matrix = f4x4 {...}; f3x3 my_small_matrix = f3x3 {my_big_matrix};`.
+
+There are two ways to access vector items:
+
+- Single item name can be used to access item directly: `x` for first item, `y` for second, `z` for third, 
+  `w` for fourth. Using single item access makes it possible to write into items directly.
+- Swizzles can be used to create new vectors based on source vector items. Swizzle is a sequence of item names with
+  no more than 4 items in it. For example, `f3 my_vector = f3 {...}; f4 result = my_vector.xyxy;` is the same
+  as `f3 my_vector = f3 {...}; f4 result = f4 {my_vector.x, my_vector.y, my_vector.x, my_vector.y};`;
+  However, swizzles might be a little bit faster as they usually have designated instruction in shader IR languages.
+
+Matrix columns can be accessed as vectors in the same way as single item access works for vectors.
 
 ## Type usage syntax
 
@@ -234,10 +269,10 @@ vertex_attribute_buffer vertex
     f3 normal;
     f2 uv;
 
-    conditional (enable_skinning && skinning_2_weights) i2 joint_indices;
+    conditional (enable_skinning && skinning_2_weights) u2 joint_indices;
     conditional (enable_skinning && skinning_2_weights) f2 joint_weights;
 
-    conditional (enable_skinning && skinning_4_weights) i4 joint_indices;
+    conditional (enable_skinning && skinning_4_weights) u4 joint_indices;
     conditional (enable_skinning && skinning_4_weights) f4 joint_weights;
 };
 
@@ -250,7 +285,7 @@ conditional (support_instancing) instanced_attribute_buffer instance_vertex
 
     conditional (enable_skinning)
     meta (hidden, joint_offset_index)
-    i1 joint_offset;
+    u1 joint_offset;
 };
 
 conditional (!support_instancing) set_material uniform_buffer material
@@ -315,14 +350,14 @@ additional arguments depend on image types.
 - For `sampler_color_2d` and `sampler_depth_2d`: `f2 coordinate`.
 - For `sampler_color_3d` and `sampler_depth_3d`: `f3 coordinate`.
 - For `sampler_color_cube` and `sampler_depth_cube`: `f3 direction`.
-- For `sampler_color_2d_array` and `sampler_depth_cube`: `i1 layer` and `f2 coordinate`.
+- For `sampler_color_2d_array` and `sampler_depth_cube`: `u1 layer` and `f2 coordinate`.
 
 `sample_dref` function additional arguments are:
 
 - For `sampler_depth_2d`: `f2 coordinate` and `f1 reference`.
 - For `sampler_depth_3d`: `f3 coordinate` and `f1 reference`.
 - For `sampler_depth_cube`: `f3 direction` and `f1 reference`.
-- For `sampler_depth_cube`: `i1 layer`, `f2 coordinate` and `f1 reference`.
+- For `sampler_depth_cube`: `u1 layer`, `f2 coordinate` and `f1 reference`.
 
 Sampler call examples:
 

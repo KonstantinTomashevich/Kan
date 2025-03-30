@@ -586,19 +586,35 @@ static void add_attributes_from_buffer (const struct kan_rpl_meta_buffer_t *buff
             format = KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_FLOAT_4;
             break;
 
-        case KAN_RPL_META_VARIABLE_TYPE_I1:
+        case KAN_RPL_META_VARIABLE_TYPE_U1:
+            format = KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_UNSIGNED_INT_1;
+            break;
+
+        case KAN_RPL_META_VARIABLE_TYPE_U2:
+            format = KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_UNSIGNED_INT_2;
+            break;
+
+        case KAN_RPL_META_VARIABLE_TYPE_U3:
+            format = KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_UNSIGNED_INT_3;
+            break;
+
+        case KAN_RPL_META_VARIABLE_TYPE_U4:
+            format = KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_UNSIGNED_INT_4;
+            break;
+
+        case KAN_RPL_META_VARIABLE_TYPE_S1:
             format = KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_SIGNED_INT_1;
             break;
 
-        case KAN_RPL_META_VARIABLE_TYPE_I2:
+        case KAN_RPL_META_VARIABLE_TYPE_S2:
             format = KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_SIGNED_INT_2;
             break;
 
-        case KAN_RPL_META_VARIABLE_TYPE_I3:
+        case KAN_RPL_META_VARIABLE_TYPE_S3:
             format = KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_SIGNED_INT_3;
             break;
 
-        case KAN_RPL_META_VARIABLE_TYPE_I4:
+        case KAN_RPL_META_VARIABLE_TYPE_S4:
             format = KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_SIGNED_INT_4;
             break;
 

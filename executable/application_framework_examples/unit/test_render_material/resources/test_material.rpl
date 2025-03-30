@@ -7,8 +7,8 @@ vertex_attribute_buffer vertex
 instanced_attribute_buffer instanced
 {
     f4x4 model;
-    i1 preset_index;
-    i1 grid_index;
+    u1 preset_index;
+    u1 grid_index;
 };
 
 struct preset_t
@@ -36,8 +36,8 @@ set_material read_only_storage_buffer grid
 vertex_stage_output vertex_output
 {
     f2 uv;
-    i1 preset_index;
-    i1 grid_index;
+    u1 preset_index;
+    u1 grid_index;
 };
 
 void vertex_main (void)

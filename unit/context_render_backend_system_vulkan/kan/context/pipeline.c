@@ -454,6 +454,10 @@ void render_backend_compiler_state_request_graphics (struct render_backend_pipel
         case KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_FLOAT_2:
         case KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_FLOAT_3:
         case KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_FLOAT_4:
+        case KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_UNSIGNED_INT_1:
+        case KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_UNSIGNED_INT_2:
+        case KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_UNSIGNED_INT_3:
+        case KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_UNSIGNED_INT_4:
         case KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_SIGNED_INT_1:
         case KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_SIGNED_INT_2:
         case KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_SIGNED_INT_3:
@@ -507,6 +511,30 @@ void render_backend_compiler_state_request_graphics (struct render_backend_pipel
             input_format = VK_FORMAT_R32G32B32A32_SFLOAT;
             attribute_count = 1u;
             item_offset = sizeof (float) * 4u;
+            break;
+
+        case KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_UNSIGNED_INT_1:
+            input_format = VK_FORMAT_R32_UINT;
+            attribute_count = 1u;
+            item_offset = sizeof (int32_t);
+            break;
+
+        case KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_UNSIGNED_INT_2:
+            input_format = VK_FORMAT_R32G32_UINT;
+            attribute_count = 1u;
+            item_offset = sizeof (int32_t) * 2u;
+            break;
+
+        case KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_UNSIGNED_INT_3:
+            input_format = VK_FORMAT_R32G32B32_UINT;
+            attribute_count = 1u;
+            item_offset = sizeof (int32_t) * 3u;
+            break;
+
+        case KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_UNSIGNED_INT_4:
+            input_format = VK_FORMAT_R32G32B32A32_UINT;
+            attribute_count = 1u;
+            item_offset = sizeof (int32_t) * 4u;
             break;
 
         case KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_SIGNED_INT_1:

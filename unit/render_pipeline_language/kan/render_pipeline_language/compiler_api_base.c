@@ -20,17 +20,29 @@ const char *kan_rpl_meta_variable_type_to_string (enum kan_rpl_meta_variable_typ
     case KAN_RPL_META_VARIABLE_TYPE_F4:
         return "KAN_RPL_META_VARIABLE_TYPE_F4";
 
-    case KAN_RPL_META_VARIABLE_TYPE_I1:
-        return "KAN_RPL_META_VARIABLE_TYPE_I1";
+    case KAN_RPL_META_VARIABLE_TYPE_U1:
+        return "KAN_RPL_META_VARIABLE_TYPE_U1";
 
-    case KAN_RPL_META_VARIABLE_TYPE_I2:
-        return "KAN_RPL_META_VARIABLE_TYPE_I2";
+    case KAN_RPL_META_VARIABLE_TYPE_U2:
+        return "KAN_RPL_META_VARIABLE_TYPE_U2";
 
-    case KAN_RPL_META_VARIABLE_TYPE_I3:
-        return "KAN_RPL_META_VARIABLE_TYPE_I3";
+    case KAN_RPL_META_VARIABLE_TYPE_U3:
+        return "KAN_RPL_META_VARIABLE_TYPE_U3";
 
-    case KAN_RPL_META_VARIABLE_TYPE_I4:
-        return "KAN_RPL_META_VARIABLE_TYPE_I4";
+    case KAN_RPL_META_VARIABLE_TYPE_U4:
+        return "KAN_RPL_META_VARIABLE_TYPE_U4";
+
+    case KAN_RPL_META_VARIABLE_TYPE_S1:
+        return "KAN_RPL_META_VARIABLE_TYPE_S1";
+
+    case KAN_RPL_META_VARIABLE_TYPE_S2:
+        return "KAN_RPL_META_VARIABLE_TYPE_S2";
+
+    case KAN_RPL_META_VARIABLE_TYPE_S3:
+        return "KAN_RPL_META_VARIABLE_TYPE_S3";
+
+    case KAN_RPL_META_VARIABLE_TYPE_S4:
+        return "KAN_RPL_META_VARIABLE_TYPE_S4";
 
     case KAN_RPL_META_VARIABLE_TYPE_F3X3:
         return "KAN_RPL_META_VARIABLE_TYPE_F3X3";

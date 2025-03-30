@@ -55,7 +55,7 @@ struct directional_light_t
 set_pass uniform_buffer lights
 {
     f4 ambient_color;
-    i4 counts;
+    u4 counts;
     point_light_t[max_point_lights] point;
     directional_light_t[max_point_lights] directional;
 };
@@ -286,12 +286,12 @@ void fragment_main (void)
     f3 _r = reflect_f3 (-_v, _n);
 
     f3 light_accum = f3 {0.0};
-    for (i1 i = 0; i < lights.counts.x && i < max_point_lights; i = i + 1)
+    for (u1 i = 0u; i < lights.counts.x && i < max_point_lights; i = i + 1u)
     {
         light_accum = light_accum + point_light (lights.point[i], roughness, n_dot_v, _n, _v, _r, f0, diffuse_color);
     }
 
-    for (i1 i = 0; i < lights.counts.y && i < max_directional_lights; i = i + 1)
+    for (u1 i = 0u; i < lights.counts.y && i < max_directional_lights; i = i + 1u)
     {
         light_accum = light_accum + directional_light (
             lights.directional[i], roughness, n_dot_v, _n, _v, _r, f0, diffuse_color);

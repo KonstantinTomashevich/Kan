@@ -24,6 +24,9 @@
 typedef uint32_t spirv_size_t;
 
 /// \brief Unsigned integer type for SPIRV bytecode.
+typedef uint32_t spirv_unsigned_literal_t;
+
+/// \brief Signed integer type for SPIRV bytecode.
 typedef uint32_t spirv_signed_literal_t;
 
 struct rpl_compiler_context_option_value_t
@@ -249,8 +252,9 @@ enum compiler_instance_expression_type_t
     COMPILER_INSTANCE_EXPRESSION_TYPE_SWIZZLE,
     COMPILER_INSTANCE_EXPRESSION_TYPE_FLATTENED_BUFFER_ACCESS_INPUT,
     COMPILER_INSTANCE_EXPRESSION_TYPE_FLATTENED_BUFFER_ACCESS_OUTPUT,
-    COMPILER_INSTANCE_EXPRESSION_TYPE_INTEGER_LITERAL,
     COMPILER_INSTANCE_EXPRESSION_TYPE_FLOATING_LITERAL,
+    COMPILER_INSTANCE_EXPRESSION_TYPE_UNSIGNED_LITERAL,
+    COMPILER_INSTANCE_EXPRESSION_TYPE_SIGNED_LITERAL,
     COMPILER_INSTANCE_EXPRESSION_TYPE_VARIABLE_DECLARATION,
     COMPILER_INSTANCE_EXPRESSION_TYPE_OPERATION_ARRAY_INDEX,
     COMPILER_INSTANCE_EXPRESSION_TYPE_OPERATION_ADD,
@@ -443,8 +447,9 @@ struct compiler_instance_expression_node_t
         struct compiler_instance_structured_access_suffix_t structured_access;
         struct compiler_instance_swizzle_suffix_t swizzle;
         struct compiler_instance_buffer_flattened_declaration_t *flattened_buffer_access;
-        kan_rpl_signed_int_literal_t integer_literal;
         float floating_literal;
+        kan_rpl_unsigned_int_literal_t unsigned_literal;
+        kan_rpl_signed_int_literal_t signed_literal;
         struct compiler_instance_variable_declaration_suffix_t variable_declaration;
         struct compiler_instance_binary_operation_suffix_t binary_operation;
         struct compiler_instance_unary_operation_suffix_t unary_operation;
@@ -563,10 +568,28 @@ struct rpl_compiler_instance_t
 enum inbuilt_type_item_t
 {
     INBUILT_TYPE_ITEM_FLOAT = 0u,
-    INBUILT_TYPE_ITEM_INTEGER,
+    INBUILT_TYPE_ITEM_UNSIGNED,
+    INBUILT_TYPE_ITEM_SIGNED,
 };
 
+static inline kan_bool_t inbuilt_type_item_is_integer (enum inbuilt_type_item_t item)
+{
+    switch (item)
+    {
+    case INBUILT_TYPE_ITEM_FLOAT:
+        return KAN_FALSE;
+
+    case INBUILT_TYPE_ITEM_UNSIGNED:
+    case INBUILT_TYPE_ITEM_SIGNED:
+        return KAN_TRUE;
+    }
+
+    KAN_ASSERT (KAN_FALSE)
+    return KAN_FALSE;
+}
+
 static kan_instance_size_t inbuilt_type_item_size[] = {
+    4u,
     4u,
     4u,
 };
@@ -784,18 +807,18 @@ struct kan_rpl_compiler_statics_t
     BUILTIN_FUNCTION_FIELD (abs_f2, 1u);
     BUILTIN_FUNCTION_FIELD (abs_f3, 1u);
     BUILTIN_FUNCTION_FIELD (abs_f4, 1u);
-    BUILTIN_FUNCTION_FIELD (abs_i1, 1u);
-    BUILTIN_FUNCTION_FIELD (abs_i2, 1u);
-    BUILTIN_FUNCTION_FIELD (abs_i3, 1u);
-    BUILTIN_FUNCTION_FIELD (abs_i4, 1u);
+    BUILTIN_FUNCTION_FIELD (abs_s1, 1u);
+    BUILTIN_FUNCTION_FIELD (abs_s2, 1u);
+    BUILTIN_FUNCTION_FIELD (abs_s3, 1u);
+    BUILTIN_FUNCTION_FIELD (abs_s4, 1u);
     BUILTIN_FUNCTION_FIELD (sign_f1, 1u);
     BUILTIN_FUNCTION_FIELD (sign_f2, 1u);
     BUILTIN_FUNCTION_FIELD (sign_f3, 1u);
     BUILTIN_FUNCTION_FIELD (sign_f4, 1u);
-    BUILTIN_FUNCTION_FIELD (sign_i1, 1u);
-    BUILTIN_FUNCTION_FIELD (sign_i2, 1u);
-    BUILTIN_FUNCTION_FIELD (sign_i3, 1u);
-    BUILTIN_FUNCTION_FIELD (sign_i4, 1u);
+    BUILTIN_FUNCTION_FIELD (sign_s1, 1u);
+    BUILTIN_FUNCTION_FIELD (sign_s2, 1u);
+    BUILTIN_FUNCTION_FIELD (sign_s3, 1u);
+    BUILTIN_FUNCTION_FIELD (sign_s4, 1u);
     BUILTIN_FUNCTION_FIELD (floor_f1, 1u);
     BUILTIN_FUNCTION_FIELD (floor_f2, 1u);
     BUILTIN_FUNCTION_FIELD (floor_f3, 1u);
@@ -898,26 +921,38 @@ struct kan_rpl_compiler_statics_t
     BUILTIN_FUNCTION_FIELD (min_f2, 2u);
     BUILTIN_FUNCTION_FIELD (min_f3, 2u);
     BUILTIN_FUNCTION_FIELD (min_f4, 2u);
-    BUILTIN_FUNCTION_FIELD (min_i1, 2u);
-    BUILTIN_FUNCTION_FIELD (min_i2, 2u);
-    BUILTIN_FUNCTION_FIELD (min_i3, 2u);
-    BUILTIN_FUNCTION_FIELD (min_i4, 2u);
+    BUILTIN_FUNCTION_FIELD (min_u1, 2u);
+    BUILTIN_FUNCTION_FIELD (min_u2, 2u);
+    BUILTIN_FUNCTION_FIELD (min_u3, 2u);
+    BUILTIN_FUNCTION_FIELD (min_u4, 2u);
+    BUILTIN_FUNCTION_FIELD (min_s1, 2u);
+    BUILTIN_FUNCTION_FIELD (min_s2, 2u);
+    BUILTIN_FUNCTION_FIELD (min_s3, 2u);
+    BUILTIN_FUNCTION_FIELD (min_s4, 2u);
     BUILTIN_FUNCTION_FIELD (max_f1, 2u);
     BUILTIN_FUNCTION_FIELD (max_f2, 2u);
     BUILTIN_FUNCTION_FIELD (max_f3, 2u);
     BUILTIN_FUNCTION_FIELD (max_f4, 2u);
-    BUILTIN_FUNCTION_FIELD (max_i1, 2u);
-    BUILTIN_FUNCTION_FIELD (max_i2, 2u);
-    BUILTIN_FUNCTION_FIELD (max_i3, 2u);
-    BUILTIN_FUNCTION_FIELD (max_i4, 2u);
+    BUILTIN_FUNCTION_FIELD (max_u1, 2u);
+    BUILTIN_FUNCTION_FIELD (max_u2, 2u);
+    BUILTIN_FUNCTION_FIELD (max_u3, 2u);
+    BUILTIN_FUNCTION_FIELD (max_u4, 2u);
+    BUILTIN_FUNCTION_FIELD (max_s1, 2u);
+    BUILTIN_FUNCTION_FIELD (max_s2, 2u);
+    BUILTIN_FUNCTION_FIELD (max_s3, 2u);
+    BUILTIN_FUNCTION_FIELD (max_s4, 2u);
     BUILTIN_FUNCTION_FIELD (clamp_f1, 3u);
     BUILTIN_FUNCTION_FIELD (clamp_f2, 3u);
     BUILTIN_FUNCTION_FIELD (clamp_f3, 3u);
     BUILTIN_FUNCTION_FIELD (clamp_f4, 3u);
-    BUILTIN_FUNCTION_FIELD (clamp_i1, 3u);
-    BUILTIN_FUNCTION_FIELD (clamp_i2, 3u);
-    BUILTIN_FUNCTION_FIELD (clamp_i3, 3u);
-    BUILTIN_FUNCTION_FIELD (clamp_i4, 3u);
+    BUILTIN_FUNCTION_FIELD (clamp_u1, 3u);
+    BUILTIN_FUNCTION_FIELD (clamp_u2, 3u);
+    BUILTIN_FUNCTION_FIELD (clamp_u3, 3u);
+    BUILTIN_FUNCTION_FIELD (clamp_u4, 3u);
+    BUILTIN_FUNCTION_FIELD (clamp_s1, 3u);
+    BUILTIN_FUNCTION_FIELD (clamp_s2, 3u);
+    BUILTIN_FUNCTION_FIELD (clamp_s3, 3u);
+    BUILTIN_FUNCTION_FIELD (clamp_s4, 3u);
     BUILTIN_FUNCTION_FIELD (mix_f1, 3u);
     BUILTIN_FUNCTION_FIELD (mix_f2, 3u);
     BUILTIN_FUNCTION_FIELD (mix_f3, 3u);

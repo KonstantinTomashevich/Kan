@@ -83,7 +83,7 @@ static const char *render_image_shader =
     "void fragment_main (void)\n"
     "{\n"
     "    f2 coordinates = vertex_output.uv * config.bricks;\n"
-    "    if (i1 {trunc_f1 (coordinates.y)} % 2 == 1)\n"
+    "    if (s1 {trunc_f1 (coordinates.y)} % 2 == 1)\n"
     "    {\n"
     "        coordinates.x = coordinates.x + 0.5;\n"
     "    }\n"

@@ -12,8 +12,11 @@ enum compile_time_evaluation_value_type_t
 {
     CONDITIONAL_EVALUATION_VALUE_TYPE_ERROR = 0u,
     CONDITIONAL_EVALUATION_VALUE_TYPE_BOOLEAN,
-    CONDITIONAL_EVALUATION_VALUE_TYPE_INTEGER,
     CONDITIONAL_EVALUATION_VALUE_TYPE_FLOATING,
+
+    /// \brief For the simplification, we treat both unsigned and signed integers
+    ///        as the same type during compile time evaluation.
+    CONDITIONAL_EVALUATION_VALUE_TYPE_INTEGER,
 };
 
 struct compile_time_evaluation_value_t
@@ -146,14 +149,31 @@ static struct compile_time_evaluation_value_t evaluate_compile_time_expression (
         break;
     }
 
-    case KAN_RPL_EXPRESSION_NODE_TYPE_INTEGER_LITERAL:
-        result.type = CONDITIONAL_EVALUATION_VALUE_TYPE_INTEGER;
-        result.integer_value = expression->integer_literal;
-        break;
-
     case KAN_RPL_EXPRESSION_NODE_TYPE_FLOATING_LITERAL:
         result.type = CONDITIONAL_EVALUATION_VALUE_TYPE_FLOATING;
         result.floating_value = expression->floating_literal;
+        break;
+
+    case KAN_RPL_EXPRESSION_NODE_TYPE_UNSIGNED_LITERAL:
+        if (expression->unsigned_literal <= (kan_rpl_unsigned_int_literal_t) INT32_MAX)
+        {
+            result.type = CONDITIONAL_EVALUATION_VALUE_TYPE_INTEGER;
+            result.integer_value = (kan_rpl_signed_int_literal_t) expression->unsigned_literal;
+        }
+        else
+        {
+            KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
+                     "[%s:%s:%s%ld] Compile time expression uses unsigned literal %llu which is too big.",
+                     instance->log_name, intermediate->log_name, expression->source_name,
+                     (long) expression->source_line, (unsigned long long) expression->unsigned_literal)
+            result.type = CONDITIONAL_EVALUATION_VALUE_TYPE_ERROR;
+        }
+
+        break;
+
+    case KAN_RPL_EXPRESSION_NODE_TYPE_SIGNED_LITERAL:
+        result.type = CONDITIONAL_EVALUATION_VALUE_TYPE_INTEGER;
+        result.integer_value = expression->signed_literal;
         break;
 
     case KAN_RPL_EXPRESSION_NODE_TYPE_BINARY_OPERATION:
@@ -3182,11 +3202,11 @@ static inline kan_bool_t resolve_binary_operation (struct rpl_compiler_context_t
         }
 
         if (right->output.type.class != COMPILER_INSTANCE_TYPE_CLASS_VECTOR ||
-            right->output.type.vector_data->item != INBUILT_TYPE_ITEM_INTEGER ||
+            right->output.type.vector_data->item != INBUILT_TYPE_ITEM_UNSIGNED ||
             right->output.type.vector_data->items_count > 1u)
         {
             KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
-                     "[%s:%s:%s:%ld] Cannot execute array access as right operand is \"%s\" instead of i1.",
+                     "[%s:%s:%s:%ld] Cannot execute array access as right operand is \"%s\" instead of u1.",
                      context->log_name, resolve_scope->function->module_name, input_expression->source_name,
                      (long) input_expression->source_line, get_type_name_for_logging (&right->output.type))
             return KAN_FALSE;
@@ -3397,17 +3417,18 @@ static inline kan_bool_t resolve_binary_operation (struct rpl_compiler_context_t
 
 #define INTEGER_ONLY_VECTOR_OPERATION(OPERATION_STRING)                                                                \
     CANNOT_EXECUTE_ON_ARRAYS (OPERATION_STRING)                                                                        \
+    CAN_ONLY_EXECUTE_ON_MATCHING_BUILTIN (OPERATION_STRING)                                                            \
     NEEDS_TO_READ_LEFT (OPERATION_STRING)                                                                              \
     NEEDS_TO_READ_RIGHT (OPERATION_STRING)                                                                             \
                                                                                                                        \
     if (left->output.type.class != COMPILER_INSTANCE_TYPE_CLASS_VECTOR ||                                              \
         right->output.type.class != COMPILER_INSTANCE_TYPE_CLASS_VECTOR ||                                             \
-        left->output.type.vector_data->item != INBUILT_TYPE_ITEM_INTEGER ||                                            \
-        right->output.type.vector_data->item != INBUILT_TYPE_ITEM_INTEGER)                                             \
+        !inbuilt_type_item_is_integer (left->output.type.vector_data->item) ||                                         \
+        !inbuilt_type_item_is_integer (right->output.type.vector_data->item))                                          \
     {                                                                                                                  \
         KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,                                                                  \
                  "[%s:%s:%s:%ld] Cannot execute \"" OPERATION_STRING                                                   \
-                 "\" on \"%s\" and \"%s\", only integer vectors are supported.",                                       \
+                 "\" on \"%s\" and \"%s\", only unsigned and signed vectors are supported.",                           \
                  context->log_name, resolve_scope->function->module_name, input_expression->source_name,               \
                  (long) input_expression->source_line, get_type_name_for_logging (&left->output.type),                 \
                  get_type_name_for_logging (&right->output.type))                                                      \
@@ -3477,17 +3498,18 @@ static inline kan_bool_t resolve_binary_operation (struct rpl_compiler_context_t
 
 #define EQUALITY_OPERATION(OPERATION_STRING)                                                                           \
     CANNOT_EXECUTE_ON_ARRAYS (OPERATION_STRING)                                                                        \
+    CAN_ONLY_EXECUTE_ON_MATCHING_BUILTIN (OPERATION_STRING)                                                            \
     NEEDS_TO_READ_LEFT (OPERATION_STRING)                                                                              \
     NEEDS_TO_READ_RIGHT (OPERATION_STRING)                                                                             \
                                                                                                                        \
     if (left->output.type.class != COMPILER_INSTANCE_TYPE_CLASS_VECTOR ||                                              \
         right->output.type.class != COMPILER_INSTANCE_TYPE_CLASS_VECTOR ||                                             \
-        left->output.type.vector_data->item != INBUILT_TYPE_ITEM_INTEGER ||                                            \
-        right->output.type.vector_data->item != INBUILT_TYPE_ITEM_INTEGER)                                             \
+        !inbuilt_type_item_is_integer (left->output.type.vector_data->item) ||                                         \
+        !inbuilt_type_item_is_integer (right->output.type.vector_data->item))                                          \
     {                                                                                                                  \
         KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,                                                                  \
                  "[%s:%s:%s:%ld] Cannot execute \"" OPERATION_STRING                                                   \
-                 "\" on \"%s\" and \"%s\", only integer vectors are supported.",                                       \
+                 "\" on \"%s\" and \"%s\", only unsigned and signed vectors are supported.",                           \
                  context->log_name, resolve_scope->function->module_name, input_expression->source_name,               \
                  (long) input_expression->source_line, get_type_name_for_logging (&left->output.type),                 \
                  get_type_name_for_logging (&right->output.type))                                                      \
@@ -3628,6 +3650,7 @@ static inline kan_bool_t resolve_unary_operation (struct rpl_compiler_context_t 
     }
 
     case KAN_RPL_UNARY_OPERATION_NEGATE:
+    {
         result_expression->type = COMPILER_INSTANCE_EXPRESSION_TYPE_OPERATION_NEGATE;
         NEEDS_TO_READ ("-")
 
@@ -3642,8 +3665,27 @@ static inline kan_bool_t resolve_unary_operation (struct rpl_compiler_context_t 
             return KAN_FALSE;
         }
 
+        enum inbuilt_type_item_t item = operand->output.type.class == COMPILER_INSTANCE_TYPE_CLASS_VECTOR ?
+                                            operand->output.type.vector_data->item :
+                                            operand->output.type.matrix_data->item;
+
+        switch (item)
+        {
+        case INBUILT_TYPE_ITEM_FLOAT:
+        case INBUILT_TYPE_ITEM_SIGNED:
+            break;
+
+        case INBUILT_TYPE_ITEM_UNSIGNED:
+            KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
+                     "[%s:%s:%s:%ld] Cannot apply \"-\" operation to type \"%s\" as unsigned types cannot be negated.",
+                     context->log_name, resolve_scope->function->module_name, input_expression->source_name,
+                     (long) input_expression->source_line, get_type_name_for_logging (&operand->output.type))
+            return KAN_FALSE;
+        }
+
         copy_type_definition (&result_expression->output.type, &operand->output.type);
         return KAN_TRUE;
+    }
 
     case KAN_RPL_UNARY_OPERATION_NOT:
         result_expression->type = COMPILER_INSTANCE_EXPRESSION_TYPE_OPERATION_NOT;
@@ -3666,11 +3708,11 @@ static inline kan_bool_t resolve_unary_operation (struct rpl_compiler_context_t 
         NEEDS_TO_READ ("~")
 
         if (operand->output.type.class != COMPILER_INSTANCE_TYPE_CLASS_VECTOR ||
-            operand->output.type.vector_data->item != INBUILT_TYPE_ITEM_INTEGER ||
+            !inbuilt_type_item_is_integer (operand->output.type.vector_data->item) ||
             operand->output.type.vector_data->items_count > 1u)
         {
             KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
-                     "[%s:%s:%s:%ld] Cannot apply \"~\" operation to type \"%s\", only i1 is supported.",
+                     "[%s:%s:%s:%ld] Cannot apply \"~\" operation to type \"%s\", only u1 and s1 is supported.",
                      context->log_name, resolve_scope->function->module_name, input_expression->source_name,
                      (long) input_expression->source_line, get_type_name_for_logging (&operand->output.type))
             return KAN_FALSE;
@@ -3904,11 +3946,11 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
                     return KAN_FALSE;
 
                 case KAN_RPL_OPTION_TYPE_COUNT:
-                    new_expression->type = COMPILER_INSTANCE_EXPRESSION_TYPE_INTEGER_LITERAL;
-                    new_expression->integer_literal = (kan_rpl_signed_int_literal_t) value->count_value;
+                    new_expression->type = COMPILER_INSTANCE_EXPRESSION_TYPE_UNSIGNED_LITERAL;
+                    new_expression->unsigned_literal = (kan_rpl_unsigned_int_literal_t) value->count_value;
                     new_expression->output.type.class = COMPILER_INSTANCE_TYPE_CLASS_VECTOR;
                     new_expression->output.type.vector_data =
-                        &STATICS.vector_types[INBUILT_VECTOR_TYPE_INDEX (INBUILT_TYPE_ITEM_INTEGER, 1u)];
+                        &STATICS.vector_types[INBUILT_VECTOR_TYPE_INDEX (INBUILT_TYPE_ITEM_UNSIGNED, 1u)];
                     return KAN_TRUE;
                 }
             }
@@ -3921,29 +3963,46 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
         return KAN_FALSE;
     }
 
-    case KAN_RPL_EXPRESSION_NODE_TYPE_INTEGER_LITERAL:
-        if (expression->integer_literal < INT32_MIN || expression->integer_literal > INT32_MAX)
-        {
-            KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
-                     "[%s:%s:%s:%ld] Integer literal %lld is too big for some backends.", context->log_name,
-                     resolve_scope->function->module_name, expression->source_name, (long) expression->source_line,
-                     (long long) expression->integer_literal)
-            return KAN_FALSE;
-        }
-
-        new_expression->type = COMPILER_INSTANCE_EXPRESSION_TYPE_INTEGER_LITERAL;
-        new_expression->integer_literal = expression->integer_literal;
-        new_expression->output.type.class = COMPILER_INSTANCE_TYPE_CLASS_VECTOR;
-        new_expression->output.type.vector_data =
-            &STATICS.vector_types[INBUILT_VECTOR_TYPE_INDEX (INBUILT_TYPE_ITEM_INTEGER, 1u)];
-        return KAN_TRUE;
-
     case KAN_RPL_EXPRESSION_NODE_TYPE_FLOATING_LITERAL:
         new_expression->type = COMPILER_INSTANCE_EXPRESSION_TYPE_FLOATING_LITERAL;
         new_expression->floating_literal = expression->floating_literal;
         new_expression->output.type.class = COMPILER_INSTANCE_TYPE_CLASS_VECTOR;
         new_expression->output.type.vector_data =
             &STATICS.vector_types[INBUILT_VECTOR_TYPE_INDEX (INBUILT_TYPE_ITEM_FLOAT, 1u)];
+        return KAN_TRUE;
+
+    case KAN_RPL_EXPRESSION_NODE_TYPE_UNSIGNED_LITERAL:
+        if (expression->unsigned_literal > UINT32_MAX)
+        {
+            KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
+                     "[%s:%s:%s:%ld] Unsigned literal %lld is too big for some backends.", context->log_name,
+                     resolve_scope->function->module_name, expression->source_name, (long) expression->source_line,
+                     (long long) expression->unsigned_literal)
+            return KAN_FALSE;
+        }
+
+        new_expression->type = COMPILER_INSTANCE_EXPRESSION_TYPE_UNSIGNED_LITERAL;
+        new_expression->unsigned_literal = expression->unsigned_literal;
+        new_expression->output.type.class = COMPILER_INSTANCE_TYPE_CLASS_VECTOR;
+        new_expression->output.type.vector_data =
+            &STATICS.vector_types[INBUILT_VECTOR_TYPE_INDEX (INBUILT_TYPE_ITEM_UNSIGNED, 1u)];
+        return KAN_TRUE;
+
+    case KAN_RPL_EXPRESSION_NODE_TYPE_SIGNED_LITERAL:
+        if (expression->signed_literal < INT32_MIN || expression->signed_literal > INT32_MAX)
+        {
+            KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
+                     "[%s:%s:%s:%ld] Signed literal %lld is too big for some backends.", context->log_name,
+                     resolve_scope->function->module_name, expression->source_name, (long) expression->source_line,
+                     (long long) expression->signed_literal)
+            return KAN_FALSE;
+        }
+
+        new_expression->type = COMPILER_INSTANCE_EXPRESSION_TYPE_SIGNED_LITERAL;
+        new_expression->signed_literal = expression->signed_literal;
+        new_expression->output.type.class = COMPILER_INSTANCE_TYPE_CLASS_VECTOR;
+        new_expression->output.type.vector_data =
+            &STATICS.vector_types[INBUILT_VECTOR_TYPE_INDEX (INBUILT_TYPE_ITEM_SIGNED, 1u)];
         return KAN_TRUE;
 
     case KAN_RPL_EXPRESSION_NODE_TYPE_VARIABLE_DECLARATION:

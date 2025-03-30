@@ -107,7 +107,9 @@ struct parser_expression_tree_node_t
     {
         kan_interned_string_t identifier;
 
-        kan_rpl_signed_int_literal_t integer_literal;
+        kan_rpl_unsigned_int_literal_t signed_literal;
+
+        kan_rpl_signed_int_literal_t unsigned_literal;
 
         float floating_literal;
 
@@ -427,12 +429,16 @@ static inline struct parser_expression_tree_node_t *parser_expression_tree_node_
         node->identifier = NULL;
         break;
 
-    case KAN_RPL_EXPRESSION_NODE_TYPE_INTEGER_LITERAL:
-        node->integer_literal = 0;
-        break;
-
     case KAN_RPL_EXPRESSION_NODE_TYPE_FLOATING_LITERAL:
         node->floating_literal = 0.0;
+        break;
+
+    case KAN_RPL_EXPRESSION_NODE_TYPE_SIGNED_LITERAL:
+        node->signed_literal = 0;
+        break;
+
+    case KAN_RPL_EXPRESSION_NODE_TYPE_UNSIGNED_LITERAL:
+        node->unsigned_literal = 0u;
         break;
 
     case KAN_RPL_EXPRESSION_NODE_TYPE_VARIABLE_DECLARATION:
@@ -1515,52 +1521,6 @@ static kan_bool_t parse_main (struct rpl_parser_t *parser, struct dynamic_parser
     }
 }
 
-static kan_bool_t parse_expression_integer_literal (struct rpl_parser_t *parser,
-                                                    struct dynamic_parser_state_t *state,
-                                                    struct expression_parse_state_t *expression_parse_state,
-                                                    const char *literal_begin,
-                                                    const char *literal_end)
-{
-    if (!expression_parse_state->expecting_operand)
-    {
-        KAN_LOG (rpl_parser, KAN_LOG_ERROR, "[%s:%s] [%ld:%ld]: Encountered integer literal while expecting operation.",
-                 parser->log_name, state->source_log_name, (long) state->cursor_line, (long) state->cursor_symbol)
-        return KAN_FALSE;
-    }
-
-    struct parser_expression_tree_node_t *node = expression_parse_state->current_node;
-    KAN_ASSERT (node && node->type == KAN_RPL_EXPRESSION_NODE_TYPE_NOPE)
-    node->type = KAN_RPL_EXPRESSION_NODE_TYPE_INTEGER_LITERAL;
-    node->source_log_name = state->source_log_name;
-    node->source_line = state->cursor_line;
-
-    const kan_bool_t is_negative = *literal_begin == '-';
-    if (is_negative)
-    {
-        ++literal_begin;
-    }
-
-    const kan_rpl_unsigned_int_literal_t positive_literal =
-        parse_unsigned_integer_value (parser, state, literal_begin, literal_end);
-    if (positive_literal > KAN_INT_MAX (kan_rpl_signed_int_literal_t))
-    {
-        KAN_LOG (rpl_parser, KAN_LOG_ERROR,
-                 "[%s:%s] [%ld:%ld]: Encountered integer literal that is bigger than maximum allowed %lld.",
-                 parser->log_name, state->source_log_name, (long) state->cursor_line, (long) state->cursor_symbol,
-                 (long long) INT64_MAX)
-        return KAN_FALSE;
-    }
-
-    node->integer_literal = (kan_rpl_signed_int_literal_t) positive_literal;
-    if (is_negative)
-    {
-        node->integer_literal = -node->integer_literal;
-    }
-
-    expression_parse_state->expecting_operand = KAN_FALSE;
-    return KAN_TRUE;
-}
-
 static kan_bool_t parse_expression_floating_literal (struct rpl_parser_t *parser,
                                                      struct dynamic_parser_state_t *state,
                                                      struct expression_parse_state_t *expression_parse_state,
@@ -1593,6 +1553,89 @@ static kan_bool_t parse_expression_floating_literal (struct rpl_parser_t *parser
     if (is_negative)
     {
         node->floating_literal = -node->floating_literal;
+    }
+
+    expression_parse_state->expecting_operand = KAN_FALSE;
+    return KAN_TRUE;
+}
+
+static kan_bool_t parse_expression_unsigned_literal (struct rpl_parser_t *parser,
+                                                     struct dynamic_parser_state_t *state,
+                                                     struct expression_parse_state_t *expression_parse_state,
+                                                     const char *literal_begin,
+                                                     const char *literal_end)
+{
+    if (!expression_parse_state->expecting_operand)
+    {
+        KAN_LOG (rpl_parser, KAN_LOG_ERROR,
+                 "[%s:%s] [%ld:%ld]: Encountered unsigned literal while expecting operation.", parser->log_name,
+                 state->source_log_name, (long) state->cursor_line, (long) state->cursor_symbol)
+        return KAN_FALSE;
+    }
+
+    struct parser_expression_tree_node_t *node = expression_parse_state->current_node;
+    KAN_ASSERT (node && node->type == KAN_RPL_EXPRESSION_NODE_TYPE_NOPE)
+    node->type = KAN_RPL_EXPRESSION_NODE_TYPE_UNSIGNED_LITERAL;
+    node->source_log_name = state->source_log_name;
+    node->source_line = state->cursor_line;
+
+    if (literal_begin != literal_end && *(literal_end - 1u) == 'u')
+    {
+        // Remove optional suffix.
+        --literal_end;
+    }
+
+    node->unsigned_literal = parse_unsigned_integer_value (parser, state, literal_begin, literal_end);
+    expression_parse_state->expecting_operand = KAN_FALSE;
+    return KAN_TRUE;
+}
+
+static kan_bool_t parse_expression_signed_literal (struct rpl_parser_t *parser,
+                                                   struct dynamic_parser_state_t *state,
+                                                   struct expression_parse_state_t *expression_parse_state,
+                                                   const char *literal_begin,
+                                                   const char *literal_end)
+{
+    if (!expression_parse_state->expecting_operand)
+    {
+        KAN_LOG (rpl_parser, KAN_LOG_ERROR, "[%s:%s] [%ld:%ld]: Encountered signed literal while expecting operation.",
+                 parser->log_name, state->source_log_name, (long) state->cursor_line, (long) state->cursor_symbol)
+        return KAN_FALSE;
+    }
+
+    struct parser_expression_tree_node_t *node = expression_parse_state->current_node;
+    KAN_ASSERT (node && node->type == KAN_RPL_EXPRESSION_NODE_TYPE_NOPE)
+    node->type = KAN_RPL_EXPRESSION_NODE_TYPE_SIGNED_LITERAL;
+    node->source_log_name = state->source_log_name;
+    node->source_line = state->cursor_line;
+
+    const kan_bool_t is_negative = *literal_begin == '-';
+    if (is_negative)
+    {
+        ++literal_begin;
+    }
+
+    if (literal_begin != literal_end && *(literal_end - 1u) == 's')
+    {
+        // Remove optional suffix.
+        --literal_end;
+    }
+
+    const kan_rpl_unsigned_int_literal_t positive_literal =
+        parse_unsigned_integer_value (parser, state, literal_begin, literal_end);
+    if (positive_literal > KAN_INT_MAX (kan_rpl_signed_int_literal_t))
+    {
+        KAN_LOG (rpl_parser, KAN_LOG_ERROR,
+                 "[%s:%s] [%ld:%ld]: Encountered integer literal that is bigger than maximum allowed %lld.",
+                 parser->log_name, state->source_log_name, (long) state->cursor_line, (long) state->cursor_symbol,
+                 (long long) INT64_MAX)
+        return KAN_FALSE;
+    }
+
+    node->signed_literal = (kan_rpl_signed_int_literal_t) positive_literal;
+    if (is_negative)
+    {
+        node->signed_literal = -node->signed_literal;
     }
 
     expression_parse_state->expecting_operand = KAN_FALSE;
@@ -2018,16 +2061,22 @@ static struct parser_expression_tree_node_t *parse_expression (struct rpl_parser
     continue;
 
         /*!re2c
-         @literal_begin "-"? [0-9]+ @literal_end
-         {
-             CHECKED (parse_expression_integer_literal (parser, state, &expression_parse_state,
-                                                        literal_begin, literal_end))
-         }
-
          @literal_begin "-"? [0-9]+ "." [0-9]+  @literal_end
          {
              CHECKED (parse_expression_floating_literal (parser, state, &expression_parse_state,
                                                          literal_begin, literal_end))
+         }
+
+         @literal_begin [0-9]+"u" @literal_end
+         {
+             CHECKED (parse_expression_unsigned_literal (parser, state, &expression_parse_state,
+                                                        literal_begin, literal_end))
+         }
+
+         @literal_begin "-"? [0-9]+"s"? @literal_end
+         {
+             CHECKED (parse_expression_signed_literal (parser, state, &expression_parse_state,
+                                                        literal_begin, literal_end))
          }
 
          "." separator* @name_begin identifier @name_end
@@ -3773,12 +3822,16 @@ static kan_bool_t build_intermediate_expression (struct rpl_parser_t *instance,
         output->identifier = expression->identifier;
         break;
 
-    case KAN_RPL_EXPRESSION_NODE_TYPE_INTEGER_LITERAL:
-        output->integer_literal = expression->integer_literal;
-        break;
-
     case KAN_RPL_EXPRESSION_NODE_TYPE_FLOATING_LITERAL:
         output->floating_literal = expression->floating_literal;
+        break;
+
+    case KAN_RPL_EXPRESSION_NODE_TYPE_UNSIGNED_LITERAL:
+        output->unsigned_literal = expression->unsigned_literal;
+        break;
+
+    case KAN_RPL_EXPRESSION_NODE_TYPE_SIGNED_LITERAL:
+        output->signed_literal = expression->signed_literal;
         break;
 
     case KAN_RPL_EXPRESSION_NODE_TYPE_VARIABLE_DECLARATION:

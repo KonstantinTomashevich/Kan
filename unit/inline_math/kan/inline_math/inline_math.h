@@ -18,6 +18,30 @@ KAN_C_HEADER_BEGIN
 #define KAN_PI CGLM_PI
 #define KAN_PI_2 CGLM_PI_2
 
+/// \brief 2 dimensional unsigned integer vector type.
+struct kan_unsigned_integer_vector_2_t
+{
+    kan_serialized_size_t x;
+    kan_serialized_size_t y;
+};
+
+/// \brief 3 dimensional unsigned integer vector type.
+struct kan_unsigned_integer_vector_3_t
+{
+    kan_serialized_size_t x;
+    kan_serialized_size_t y;
+    kan_serialized_size_t z;
+};
+
+/// \brief 4 dimensional unsigned integer vector type.
+struct kan_unsigned_integer_vector_4_t
+{
+    kan_serialized_size_t x;
+    kan_serialized_size_t y;
+    kan_serialized_size_t z;
+    kan_serialized_size_t w;
+};
+
 /// \brief 2 dimensional integer vector type.
 struct kan_integer_vector_2_t
 {

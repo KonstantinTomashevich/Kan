@@ -88,14 +88,14 @@ material = test_material
 
 +instanced_parameters {
     name = preset_index
-    type = KAN_RPL_META_VARIABLE_TYPE_I1
-    value_i1 = 0
+    type = KAN_RPL_META_VARIABLE_TYPE_U1
+    value_u1 = 0
 }
 
 +instanced_parameters {
     name = grid_index
-    type = KAN_RPL_META_VARIABLE_TYPE_I1
-    value_i1 = 0
+    type = KAN_RPL_META_VARIABLE_TYPE_U1
+    value_u1 = 0
 }
 
 +samplers {

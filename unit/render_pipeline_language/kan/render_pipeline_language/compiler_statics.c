@@ -185,36 +185,68 @@ void kan_rpl_compiler_ensure_statics_initialized (void)
             .meta_type = KAN_RPL_META_VARIABLE_TYPE_F4,
         };
 
-        STATICS.vector_types[INBUILT_VECTOR_TYPE_INDEX (INBUILT_TYPE_ITEM_INTEGER, 1u)] =
+        STATICS.vector_types[INBUILT_VECTOR_TYPE_INDEX (INBUILT_TYPE_ITEM_UNSIGNED, 1u)] =
             (struct inbuilt_vector_type_t) {
-                .name = kan_string_intern ("i1"),
-                .item = INBUILT_TYPE_ITEM_INTEGER,
+                .name = kan_string_intern ("u1"),
+                .item = INBUILT_TYPE_ITEM_UNSIGNED,
                 .items_count = 1u,
-                .meta_type = KAN_RPL_META_VARIABLE_TYPE_I1,
+                .meta_type = KAN_RPL_META_VARIABLE_TYPE_U1,
             };
 
-        STATICS.vector_types[INBUILT_VECTOR_TYPE_INDEX (INBUILT_TYPE_ITEM_INTEGER, 2u)] =
+        STATICS.vector_types[INBUILT_VECTOR_TYPE_INDEX (INBUILT_TYPE_ITEM_UNSIGNED, 2u)] =
             (struct inbuilt_vector_type_t) {
-                .name = kan_string_intern ("i2"),
-                .item = INBUILT_TYPE_ITEM_INTEGER,
+                .name = kan_string_intern ("u2"),
+                .item = INBUILT_TYPE_ITEM_UNSIGNED,
                 .items_count = 2u,
-                .meta_type = KAN_RPL_META_VARIABLE_TYPE_I2,
+                .meta_type = KAN_RPL_META_VARIABLE_TYPE_U2,
             };
 
-        STATICS.vector_types[INBUILT_VECTOR_TYPE_INDEX (INBUILT_TYPE_ITEM_INTEGER, 3u)] =
+        STATICS.vector_types[INBUILT_VECTOR_TYPE_INDEX (INBUILT_TYPE_ITEM_UNSIGNED, 3u)] =
             (struct inbuilt_vector_type_t) {
-                .name = kan_string_intern ("i3"),
-                .item = INBUILT_TYPE_ITEM_INTEGER,
+                .name = kan_string_intern ("u3"),
+                .item = INBUILT_TYPE_ITEM_UNSIGNED,
                 .items_count = 3u,
-                .meta_type = KAN_RPL_META_VARIABLE_TYPE_I3,
+                .meta_type = KAN_RPL_META_VARIABLE_TYPE_U3,
             };
 
-        STATICS.vector_types[INBUILT_VECTOR_TYPE_INDEX (INBUILT_TYPE_ITEM_INTEGER, 4u)] =
+        STATICS.vector_types[INBUILT_VECTOR_TYPE_INDEX (INBUILT_TYPE_ITEM_UNSIGNED, 4u)] =
             (struct inbuilt_vector_type_t) {
-                .name = kan_string_intern ("i4"),
-                .item = INBUILT_TYPE_ITEM_INTEGER,
+                .name = kan_string_intern ("u4"),
+                .item = INBUILT_TYPE_ITEM_UNSIGNED,
                 .items_count = 4u,
-                .meta_type = KAN_RPL_META_VARIABLE_TYPE_I4,
+                .meta_type = KAN_RPL_META_VARIABLE_TYPE_U4,
+            };
+
+        STATICS.vector_types[INBUILT_VECTOR_TYPE_INDEX (INBUILT_TYPE_ITEM_SIGNED, 1u)] =
+            (struct inbuilt_vector_type_t) {
+                .name = kan_string_intern ("s1"),
+                .item = INBUILT_TYPE_ITEM_SIGNED,
+                .items_count = 1u,
+                .meta_type = KAN_RPL_META_VARIABLE_TYPE_S1,
+            };
+
+        STATICS.vector_types[INBUILT_VECTOR_TYPE_INDEX (INBUILT_TYPE_ITEM_SIGNED, 2u)] =
+            (struct inbuilt_vector_type_t) {
+                .name = kan_string_intern ("s2"),
+                .item = INBUILT_TYPE_ITEM_SIGNED,
+                .items_count = 2u,
+                .meta_type = KAN_RPL_META_VARIABLE_TYPE_S2,
+            };
+
+        STATICS.vector_types[INBUILT_VECTOR_TYPE_INDEX (INBUILT_TYPE_ITEM_SIGNED, 3u)] =
+            (struct inbuilt_vector_type_t) {
+                .name = kan_string_intern ("s3"),
+                .item = INBUILT_TYPE_ITEM_SIGNED,
+                .items_count = 3u,
+                .meta_type = KAN_RPL_META_VARIABLE_TYPE_S3,
+            };
+
+        STATICS.vector_types[INBUILT_VECTOR_TYPE_INDEX (INBUILT_TYPE_ITEM_SIGNED, 4u)] =
+            (struct inbuilt_vector_type_t) {
+                .name = kan_string_intern ("s4"),
+                .item = INBUILT_TYPE_ITEM_SIGNED,
+                .items_count = 4u,
+                .meta_type = KAN_RPL_META_VARIABLE_TYPE_S4,
             };
 
         struct inbuilt_matrix_type_t *type_pointer_f3x3 = &STATICS.matrix_types[0u];
@@ -255,10 +287,14 @@ void kan_rpl_compiler_ensure_statics_initialized (void)
         VECTOR_TYPE_DEFINITION (f2, INBUILT_TYPE_ITEM_FLOAT, 2u);
         VECTOR_TYPE_DEFINITION (f3, INBUILT_TYPE_ITEM_FLOAT, 3u);
         VECTOR_TYPE_DEFINITION (f4, INBUILT_TYPE_ITEM_FLOAT, 4u);
-        VECTOR_TYPE_DEFINITION (i1, INBUILT_TYPE_ITEM_INTEGER, 1u);
-        VECTOR_TYPE_DEFINITION (i2, INBUILT_TYPE_ITEM_INTEGER, 2u);
-        VECTOR_TYPE_DEFINITION (i3, INBUILT_TYPE_ITEM_INTEGER, 3u);
-        VECTOR_TYPE_DEFINITION (i4, INBUILT_TYPE_ITEM_INTEGER, 4u);
+        VECTOR_TYPE_DEFINITION (u1, INBUILT_TYPE_ITEM_UNSIGNED, 1u);
+        VECTOR_TYPE_DEFINITION (u2, INBUILT_TYPE_ITEM_UNSIGNED, 2u);
+        VECTOR_TYPE_DEFINITION (u3, INBUILT_TYPE_ITEM_UNSIGNED, 3u);
+        VECTOR_TYPE_DEFINITION (u4, INBUILT_TYPE_ITEM_UNSIGNED, 4u);
+        VECTOR_TYPE_DEFINITION (s1, INBUILT_TYPE_ITEM_SIGNED, 1u);
+        VECTOR_TYPE_DEFINITION (s2, INBUILT_TYPE_ITEM_SIGNED, 2u);
+        VECTOR_TYPE_DEFINITION (s3, INBUILT_TYPE_ITEM_SIGNED, 3u);
+        VECTOR_TYPE_DEFINITION (s4, INBUILT_TYPE_ITEM_SIGNED, 4u);
 
 #define MATRIX_TYPE_DEFINITION(TYPE)                                                                                   \
     struct compiler_instance_type_definition_t type_definition_##TYPE = {                                              \
@@ -295,7 +331,7 @@ void kan_rpl_compiler_ensure_statics_initialized (void)
         STATICS.sample_cube_additional_arguments[0u] = SAMPLER_ARGUMENT (f3, coordinates, NULL);
 
         STATICS.sample_2d_array_additional_arguments[0u] =
-            SAMPLER_ARGUMENT (i1, layer, &STATICS.sample_2d_array_additional_arguments[1u]);
+            SAMPLER_ARGUMENT (u1, layer, &STATICS.sample_2d_array_additional_arguments[1u]);
         STATICS.sample_2d_array_additional_arguments[1u] = SAMPLER_ARGUMENT (f2, coordinates, NULL);
 
         STATICS.sample_dref_2d_additional_arguments[0u] =
@@ -311,7 +347,7 @@ void kan_rpl_compiler_ensure_statics_initialized (void)
         STATICS.sample_dref_cube_additional_arguments[1u] = SAMPLER_ARGUMENT (f1, reference, NULL);
 
         STATICS.sample_dref_2d_array_additional_arguments[0u] =
-            SAMPLER_ARGUMENT (i1, array_layer, &STATICS.sample_dref_2d_array_additional_arguments[1u]);
+            SAMPLER_ARGUMENT (u1, array_layer, &STATICS.sample_dref_2d_array_additional_arguments[1u]);
         STATICS.sample_dref_2d_array_additional_arguments[1u] =
             SAMPLER_ARGUMENT (f2, coordinates, &STATICS.sample_dref_2d_array_additional_arguments[2u]);
         STATICS.sample_dref_2d_array_additional_arguments[2u] = SAMPLER_ARGUMENT (f1, reference, NULL);
@@ -451,7 +487,18 @@ void kan_rpl_compiler_ensure_statics_initialized (void)
         ANY_MULTI_ITEM_FLOAT_VECTOR_BUILTINS (f3);
         ANY_MULTI_ITEM_FLOAT_VECTOR_BUILTINS (f4);
 
-#define ANY_INTERGER_VECTOR_BUILTINS(TYPE)                                                                             \
+#define ANY_UNSIGNED_VECTOR_BUILTINS(TYPE)                                                                             \
+    BUILTIN_2 (min_##TYPE, TYPE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450SMin, TYPE, x, TYPE, y);            \
+    BUILTIN_2 (max_##TYPE, TYPE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450SMax, TYPE, x, TYPE, y);            \
+    BUILTIN_3 (clamp_##TYPE, TYPE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450SClamp, TYPE, value, TYPE, min,   \
+               TYPE, max)
+
+        ANY_UNSIGNED_VECTOR_BUILTINS (u1);
+        ANY_UNSIGNED_VECTOR_BUILTINS (u2);
+        ANY_UNSIGNED_VECTOR_BUILTINS (u3);
+        ANY_UNSIGNED_VECTOR_BUILTINS (u4);
+
+#define ANY_SIGNED_VECTOR_BUILTINS(TYPE)                                                                               \
     BUILTIN_1 (abs_##TYPE, TYPE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450SAbs, TYPE, value);                 \
     BUILTIN_1 (sign_##TYPE, TYPE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450SSign, TYPE, value);               \
     BUILTIN_2 (min_##TYPE, TYPE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450SMin, TYPE, x, TYPE, y);            \
@@ -459,10 +506,10 @@ void kan_rpl_compiler_ensure_statics_initialized (void)
     BUILTIN_3 (clamp_##TYPE, TYPE, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450SClamp, TYPE, value, TYPE, min,   \
                TYPE, max)
 
-        ANY_INTERGER_VECTOR_BUILTINS (i1);
-        ANY_INTERGER_VECTOR_BUILTINS (i2);
-        ANY_INTERGER_VECTOR_BUILTINS (i3);
-        ANY_INTERGER_VECTOR_BUILTINS (i4);
+        ANY_SIGNED_VECTOR_BUILTINS (s1);
+        ANY_SIGNED_VECTOR_BUILTINS (s2);
+        ANY_SIGNED_VECTOR_BUILTINS (s3);
+        ANY_SIGNED_VECTOR_BUILTINS (s4);
 
         BUILTIN_1 (determinant_f3x3, f1, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Determinant, f3x3, matrix);
         BUILTIN_1 (determinant_f4x4, f1, ANY_STAGE, SPIRV_FIXED_ID_GLSL_LIBRARY, GLSLstd450Determinant, f4x4, matrix);

@@ -944,11 +944,11 @@ kan_render_pipeline_parameter_set_layout_t kan_render_construct_parameter_set_la
             .used_stage_mask = (1u << KAN_RENDER_STAGE_GRAPHICS_VERTEX) | (1u << KAN_RENDER_STAGE_GRAPHICS_FRAGMENT),
         };
     }
-    
+
     for (kan_loop_size_t index = 0u; index < meta->images.size; ++index, ++binding_output_index)
     {
         struct kan_rpl_meta_image_t *image = &((struct kan_rpl_meta_image_t *) meta->images.data)[index];
-        
+
         bindings[binding_output_index] = (struct kan_render_parameter_binding_description_t) {
             .binding = image->binding,
             .type = KAN_RENDER_PARAMETER_BINDING_TYPE_IMAGE,

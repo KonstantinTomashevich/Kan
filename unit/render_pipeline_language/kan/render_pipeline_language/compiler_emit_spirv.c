@@ -94,18 +94,25 @@ struct spirv_generation_function_node_t
     struct spirv_generation_temporary_variable_t *first_used_temporary_variable;
 };
 
-struct spirv_generation_integer_constant_t
-{
-    struct spirv_generation_integer_constant_t *next;
-    spirv_size_t spirv_id;
-    spirv_signed_literal_t value;
-};
-
 struct spirv_generation_floating_constant_t
 {
     struct spirv_generation_floating_constant_t *next;
     spirv_size_t spirv_id;
     float value;
+};
+
+struct spirv_generation_unsigned_constant_t
+{
+    struct spirv_generation_unsigned_constant_t *next;
+    spirv_size_t spirv_id;
+    spirv_unsigned_literal_t value;
+};
+
+struct spirv_generation_signed_constant_t
+{
+    struct spirv_generation_signed_constant_t *next;
+    spirv_size_t spirv_id;
+    spirv_signed_literal_t value;
 };
 
 struct spirv_known_pointer_type_t
@@ -143,8 +150,9 @@ struct spirv_generation_context_t
     struct spirv_generation_function_type_t *first_generated_function_type;
     struct spirv_generation_builtin_t *first_builtin;
 
-    struct spirv_generation_integer_constant_t *first_integer_constant;
     struct spirv_generation_floating_constant_t *first_floating_constant;
+    struct spirv_generation_unsigned_constant_t *first_unsigned_constant;
+    struct spirv_generation_signed_constant_t *first_signed_constant;
 
     struct spirv_known_pointer_type_t *first_known_input_pointer;
     struct spirv_known_pointer_type_t *first_known_output_pointer;
@@ -375,8 +383,9 @@ static void spirv_init_generation_context (struct spirv_generation_context_t *co
     context->first_generated_array_type = NULL;
     context->first_generated_function_type = NULL;
 
-    context->first_integer_constant = NULL;
     context->first_floating_constant = NULL;
+    context->first_unsigned_constant = NULL;
+    context->first_signed_constant = NULL;
     context->first_builtin = NULL;
 
     context->first_known_input_pointer = NULL;
@@ -671,40 +680,6 @@ static kan_bool_t spirv_finalize_generation_context (struct spirv_generation_con
 static spirv_size_t spirv_find_or_generate_vector_type (struct spirv_generation_context_t *context,
                                                         kan_rpl_size_t type_index);
 
-static spirv_size_t spirv_request_i1_constant (struct spirv_generation_context_t *context, spirv_signed_literal_t value)
-{
-    struct spirv_generation_integer_constant_t *existent_constant = context->first_integer_constant;
-    while (existent_constant)
-    {
-        if (existent_constant->value == value)
-        {
-            return existent_constant->spirv_id;
-        }
-
-        existent_constant = existent_constant->next;
-    }
-
-    spirv_size_t constant_id = context->current_bound;
-    ++context->current_bound;
-    spirv_size_t constant_type =
-        spirv_find_or_generate_vector_type (context, INBUILT_VECTOR_TYPE_INDEX (INBUILT_TYPE_ITEM_INTEGER, 1u));
-
-    spirv_size_t *constant_code = spirv_new_instruction (context, &context->base_type_section, 4u);
-    constant_code[0u] |= SpvOpCodeMask & SpvOpConstant;
-    constant_code[1u] = constant_type;
-    constant_code[2u] = constant_id;
-    *(spirv_signed_literal_t *) &constant_code[3u] = (spirv_signed_literal_t) value;
-
-    struct spirv_generation_integer_constant_t *new_constant = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (
-        &context->temporary_allocator, struct spirv_generation_integer_constant_t);
-
-    new_constant->next = context->first_integer_constant;
-    context->first_integer_constant = new_constant;
-    new_constant->spirv_id = constant_id;
-    new_constant->value = value;
-    return constant_id;
-}
-
 static spirv_size_t spirv_request_f1_constant (struct spirv_generation_context_t *context, float value)
 {
     struct spirv_generation_floating_constant_t *existent_constant = context->first_floating_constant;
@@ -739,6 +714,75 @@ static spirv_size_t spirv_request_f1_constant (struct spirv_generation_context_t
     return constant_id;
 }
 
+static spirv_size_t spirv_request_u1_constant (struct spirv_generation_context_t *context,
+                                               spirv_unsigned_literal_t value)
+{
+    struct spirv_generation_unsigned_constant_t *existent_constant = context->first_unsigned_constant;
+    while (existent_constant)
+    {
+        if (existent_constant->value == value)
+        {
+            return existent_constant->spirv_id;
+        }
+
+        existent_constant = existent_constant->next;
+    }
+
+    spirv_size_t constant_id = context->current_bound;
+    ++context->current_bound;
+    spirv_size_t constant_type =
+        spirv_find_or_generate_vector_type (context, INBUILT_VECTOR_TYPE_INDEX (INBUILT_TYPE_ITEM_UNSIGNED, 1u));
+
+    spirv_size_t *constant_code = spirv_new_instruction (context, &context->base_type_section, 4u);
+    constant_code[0u] |= SpvOpCodeMask & SpvOpConstant;
+    constant_code[1u] = constant_type;
+    constant_code[2u] = constant_id;
+    *(spirv_unsigned_literal_t *) &constant_code[3u] = (spirv_unsigned_literal_t) value;
+
+    struct spirv_generation_unsigned_constant_t *new_constant = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (
+        &context->temporary_allocator, struct spirv_generation_unsigned_constant_t);
+
+    new_constant->next = context->first_unsigned_constant;
+    context->first_unsigned_constant = new_constant;
+    new_constant->spirv_id = constant_id;
+    new_constant->value = value;
+    return constant_id;
+}
+
+static spirv_size_t spirv_request_s1_constant (struct spirv_generation_context_t *context, spirv_signed_literal_t value)
+{
+    struct spirv_generation_signed_constant_t *existent_constant = context->first_signed_constant;
+    while (existent_constant)
+    {
+        if (existent_constant->value == value)
+        {
+            return existent_constant->spirv_id;
+        }
+
+        existent_constant = existent_constant->next;
+    }
+
+    spirv_size_t constant_id = context->current_bound;
+    ++context->current_bound;
+    spirv_size_t constant_type =
+        spirv_find_or_generate_vector_type (context, INBUILT_VECTOR_TYPE_INDEX (INBUILT_TYPE_ITEM_SIGNED, 1u));
+
+    spirv_size_t *constant_code = spirv_new_instruction (context, &context->base_type_section, 4u);
+    constant_code[0u] |= SpvOpCodeMask & SpvOpConstant;
+    constant_code[1u] = constant_type;
+    constant_code[2u] = constant_id;
+    *(spirv_signed_literal_t *) &constant_code[3u] = (spirv_signed_literal_t) value;
+
+    struct spirv_generation_signed_constant_t *new_constant = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (
+        &context->temporary_allocator, struct spirv_generation_signed_constant_t);
+
+    new_constant->next = context->first_signed_constant;
+    context->first_signed_constant = new_constant;
+    new_constant->spirv_id = constant_id;
+    new_constant->value = value;
+    return constant_id;
+}
+
 static spirv_size_t spirv_find_or_generate_vector_type (struct spirv_generation_context_t *context,
                                                         kan_rpl_size_t type_index)
 {
@@ -761,7 +805,17 @@ static spirv_size_t spirv_find_or_generate_vector_type (struct spirv_generation_
                 break;
             }
 
-            case INBUILT_TYPE_ITEM_INTEGER:
+            case INBUILT_TYPE_ITEM_UNSIGNED:
+            {
+                spirv_size_t *code = spirv_new_instruction (context, &context->base_type_section, 4u);
+                code[0u] |= SpvOpCodeMask & SpvOpTypeInt;
+                code[1u] = context->vector_ids[type_index];
+                code[2u] = 32u;
+                code[3u] = 0u; // Unsigned.
+                break;
+            }
+
+            case INBUILT_TYPE_ITEM_SIGNED:
             {
                 spirv_size_t *code = spirv_new_instruction (context, &context->base_type_section, 4u);
                 code[0u] |= SpvOpCodeMask & SpvOpTypeInt;
@@ -1007,7 +1061,7 @@ static spirv_size_t spirv_find_or_generate_object_type (struct spirv_generation_
     else
     {
         const spirv_size_t constant_id =
-            spirv_request_i1_constant (context, (spirv_size_t) type->array_dimensions[start_dimension_index]);
+            spirv_request_u1_constant (context, (spirv_size_t) type->array_dimensions[start_dimension_index]);
 
         spirv_size_t *dimension_type_code = spirv_new_instruction (context, &context->higher_type_section, 4u);
         dimension_type_code[0u] |= SpvOpCodeMask & SpvOpTypeArray;
@@ -1210,7 +1264,8 @@ static inline void spirv_emit_flattened_input_variable (
         case INBUILT_TYPE_ITEM_FLOAT:
             break;
 
-        case INBUILT_TYPE_ITEM_INTEGER:
+        case INBUILT_TYPE_ITEM_UNSIGNED:
+        case INBUILT_TYPE_ITEM_SIGNED:
         {
             spirv_size_t *decoration_code = spirv_new_instruction (context, &context->decoration_section, 3u);
             decoration_code[0u] |= SpvOpCodeMask & SpvOpDecorate;
@@ -1582,8 +1637,8 @@ static spirv_size_t *spirv_fill_access_chain_elements (struct spirv_generation_c
         for (kan_loop_size_t index = 0u; index < top_expression->structured_access.access_chain_length; ++index)
         {
             KAN_ASSERT (top_expression->structured_access.access_chain_indices[index] < INT32_MAX)
-            spirv_size_t constant_id = spirv_request_i1_constant (
-                context, (spirv_signed_literal_t) top_expression->structured_access.access_chain_indices[index]);
+            spirv_size_t constant_id = spirv_request_u1_constant (
+                context, (spirv_unsigned_literal_t) top_expression->structured_access.access_chain_indices[index]);
 
             *output = constant_id;
             ++output;
@@ -1750,8 +1805,9 @@ static inline spirv_size_t spirv_emit_access_chain (struct spirv_generation_cont
     case COMPILER_INSTANCE_EXPRESSION_TYPE_SAMPLER_REFERENCE:
     case COMPILER_INSTANCE_EXPRESSION_TYPE_STRUCTURED_ACCESS:
     case COMPILER_INSTANCE_EXPRESSION_TYPE_OPERATION_ARRAY_INDEX:
-    case COMPILER_INSTANCE_EXPRESSION_TYPE_INTEGER_LITERAL:
     case COMPILER_INSTANCE_EXPRESSION_TYPE_FLOATING_LITERAL:
+    case COMPILER_INSTANCE_EXPRESSION_TYPE_UNSIGNED_LITERAL:
+    case COMPILER_INSTANCE_EXPRESSION_TYPE_SIGNED_LITERAL:
     case COMPILER_INSTANCE_EXPRESSION_TYPE_SCOPE:
     case COMPILER_INSTANCE_EXPRESSION_TYPE_IF:
     case COMPILER_INSTANCE_EXPRESSION_TYPE_FOR:
@@ -1868,6 +1924,10 @@ static inline spirv_size_t spirv_emit_single_composite_extract (struct spirv_gen
 
 SPIRV_EMIT_CONVERT (signed_to_float, SpvOpConvertSToF)
 SPIRV_EMIT_CONVERT (float_to_signed, SpvOpConvertFToS)
+SPIRV_EMIT_CONVERT (unsigned_to_float, SpvOpConvertUToF)
+SPIRV_EMIT_CONVERT (float_to_unsigned, SpvOpConvertFToU)
+SPIRV_EMIT_CONVERT (signed_to_unsigned, SpvOpBitcast)
+SPIRV_EMIT_CONVERT (unsigned_to_signed, SpvOpBitcast)
 #undef SPIRV_EMIT_CONVERT
 
 static inline spirv_size_t spirv_convert_vector (struct spirv_generation_context_t *context,
@@ -1885,19 +1945,40 @@ static inline spirv_size_t spirv_convert_vector (struct spirv_generation_context
         case INBUILT_TYPE_ITEM_FLOAT:
             return operand_id;
 
-        case INBUILT_TYPE_ITEM_INTEGER:
+        case INBUILT_TYPE_ITEM_UNSIGNED:
+            return spirv_emit_convert_unsigned_to_float (context, section, result_type_id, operand_id);
+
+        case INBUILT_TYPE_ITEM_SIGNED:
             return spirv_emit_convert_signed_to_float (context, section, result_type_id, operand_id);
         }
 
         break;
 
-    case INBUILT_TYPE_ITEM_INTEGER:
+    case INBUILT_TYPE_ITEM_UNSIGNED:
+        switch (source_item)
+        {
+        case INBUILT_TYPE_ITEM_FLOAT:
+            return spirv_emit_convert_float_to_unsigned (context, section, result_type_id, operand_id);
+
+        case INBUILT_TYPE_ITEM_UNSIGNED:
+            return operand_id;
+
+        case INBUILT_TYPE_ITEM_SIGNED:
+            return spirv_emit_convert_signed_to_unsigned (context, section, result_type_id, operand_id);
+        }
+
+        break;
+
+    case INBUILT_TYPE_ITEM_SIGNED:
         switch (source_item)
         {
         case INBUILT_TYPE_ITEM_FLOAT:
             return spirv_emit_convert_float_to_signed (context, section, result_type_id, operand_id);
 
-        case INBUILT_TYPE_ITEM_INTEGER:
+        case INBUILT_TYPE_ITEM_UNSIGNED:
+            return spirv_emit_convert_unsigned_to_signed (context, section, result_type_id, operand_id);
+
+        case INBUILT_TYPE_ITEM_SIGNED:
             return operand_id;
         }
 
@@ -1908,7 +1989,7 @@ static inline spirv_size_t spirv_convert_vector (struct spirv_generation_context
     return SPIRV_FIXED_ID_INVALID;
 }
 
-#define SPIRV_EMIT_VECTOR_ARITHMETIC(SUFFIX, FLOAT_OP, INTEGER_OP)                                                     \
+#define SPIRV_EMIT_VECTOR_ARITHMETIC(SUFFIX, FLOAT_OP, UNSIGNED_OP, SIGNED_OP)                                         \
     static inline spirv_size_t spirv_emit_vector_##SUFFIX (                                                            \
         struct spirv_generation_context_t *context, struct spirv_arbitrary_instruction_section_t *section,             \
         struct inbuilt_vector_type_t *type, spirv_size_t left, spirv_size_t right)                                     \
@@ -1929,10 +2010,21 @@ static inline spirv_size_t spirv_convert_vector (struct spirv_generation_context
             break;                                                                                                     \
         }                                                                                                              \
                                                                                                                        \
-        case INBUILT_TYPE_ITEM_INTEGER:                                                                                \
+        case INBUILT_TYPE_ITEM_UNSIGNED:                                                                               \
         {                                                                                                              \
             spirv_size_t *code = spirv_new_instruction (context, section, 5u);                                         \
-            code[0u] |= SpvOpCodeMask & INTEGER_OP;                                                                    \
+            code[0u] |= SpvOpCodeMask & UNSIGNED_OP;                                                                   \
+            code[1u] = spirv_find_or_generate_vector_type (context, type - STATICS.vector_types);                      \
+            code[2u] = result_id;                                                                                      \
+            code[3u] = left;                                                                                           \
+            code[4u] = right;                                                                                          \
+            break;                                                                                                     \
+        }                                                                                                              \
+                                                                                                                       \
+        case INBUILT_TYPE_ITEM_SIGNED:                                                                                 \
+        {                                                                                                              \
+            spirv_size_t *code = spirv_new_instruction (context, section, 5u);                                         \
+            code[0u] |= SpvOpCodeMask & SIGNED_OP;                                                                     \
             code[1u] = spirv_find_or_generate_vector_type (context, type - STATICS.vector_types);                      \
             code[2u] = result_id;                                                                                      \
             code[3u] = left;                                                                                           \
@@ -1944,10 +2036,10 @@ static inline spirv_size_t spirv_convert_vector (struct spirv_generation_context
         return result_id;                                                                                              \
     }
 
-SPIRV_EMIT_VECTOR_ARITHMETIC (add, SpvOpFAdd, SpvOpIAdd)
-SPIRV_EMIT_VECTOR_ARITHMETIC (sub, SpvOpFSub, SpvOpISub)
-SPIRV_EMIT_VECTOR_ARITHMETIC (mul, SpvOpFMul, SpvOpIMul)
-SPIRV_EMIT_VECTOR_ARITHMETIC (div, SpvOpFDiv, SpvOpSDiv)
+SPIRV_EMIT_VECTOR_ARITHMETIC (add, SpvOpFAdd, SpvOpIAdd, SpvOpIAdd)
+SPIRV_EMIT_VECTOR_ARITHMETIC (sub, SpvOpFSub, SpvOpISub, SpvOpISub)
+SPIRV_EMIT_VECTOR_ARITHMETIC (mul, SpvOpFMul, SpvOpIMul, SpvOpIMul)
+SPIRV_EMIT_VECTOR_ARITHMETIC (div, SpvOpFDiv, SpvOpUDiv, SpvOpSDiv)
 #undef SPIRV_EMIT_VECTOR_ARITHMETIC
 
 #define SPIRV_EMIT_MATRIX_ARITHMETIC(SUFFIX)                                                                           \
@@ -2293,17 +2385,25 @@ static spirv_size_t spirv_emit_expression (struct spirv_generation_context_t *co
                                    spirv_find_or_generate_object_type (context, &expression->output.type, 0u),
                                    expression->flattened_buffer_access->spirv_id_output, KAN_TRUE);
 
-    case COMPILER_INSTANCE_EXPRESSION_TYPE_INTEGER_LITERAL:
+    case COMPILER_INSTANCE_EXPRESSION_TYPE_FLOATING_LITERAL:
     {
-        spirv_size_t result_id =
-            spirv_request_i1_constant (context, (spirv_signed_literal_t) expression->integer_literal);
+        spirv_size_t result_id = spirv_request_f1_constant (context, (float) expression->floating_literal);
         WRAP_OPERATION_RESULT_IF_NEEDED
         return result_id;
     }
 
-    case COMPILER_INSTANCE_EXPRESSION_TYPE_FLOATING_LITERAL:
+    case COMPILER_INSTANCE_EXPRESSION_TYPE_UNSIGNED_LITERAL:
     {
-        spirv_size_t result_id = spirv_request_f1_constant (context, (float) expression->floating_literal);
+        spirv_size_t result_id =
+            spirv_request_u1_constant (context, (spirv_unsigned_literal_t) expression->unsigned_literal);
+        WRAP_OPERATION_RESULT_IF_NEEDED
+        return result_id;
+    }
+
+    case COMPILER_INSTANCE_EXPRESSION_TYPE_SIGNED_LITERAL:
+    {
+        spirv_size_t result_id =
+            spirv_request_s1_constant (context, (spirv_signed_literal_t) expression->signed_literal);
         WRAP_OPERATION_RESULT_IF_NEEDED
         return result_id;
     }
@@ -2495,9 +2595,9 @@ static spirv_size_t spirv_emit_expression (struct spirv_generation_context_t *co
                                                expression->output.type.vector_data, left_operand_id, right_operand_id);
         }
         else if (expression->binary_operation.left_operand->output.type.class == COMPILER_INSTANCE_TYPE_CLASS_MATRIX &&
-            expression->binary_operation.right_operand->output.type.class == COMPILER_INSTANCE_TYPE_CLASS_MATRIX &&
-            expression->binary_operation.left_operand->output.type.matrix_data ==
-                expression->binary_operation.right_operand->output.type.matrix_data)
+                 expression->binary_operation.right_operand->output.type.class == COMPILER_INSTANCE_TYPE_CLASS_MATRIX &&
+                 expression->binary_operation.left_operand->output.type.matrix_data ==
+                     expression->binary_operation.right_operand->output.type.matrix_data)
         {
             result_id = spirv_emit_matrix_div (context, &(*current_block)->code_section,
                                                expression->output.type.matrix_data, left_operand_id, right_operand_id);
@@ -2543,8 +2643,24 @@ static spirv_size_t spirv_emit_expression (struct spirv_generation_context_t *co
         spirv_size_t result_id = context->current_bound;
         ++context->current_bound;
 
+        spirv_size_t operation = SpvOpCodeMask;
+        switch (expression->output.type.vector_data->item)
+        {
+        case INBUILT_TYPE_ITEM_FLOAT:
+            KAN_ASSERT (KAN_FALSE)
+            break;
+
+        case INBUILT_TYPE_ITEM_UNSIGNED:
+            operation = SpvOpUMod;
+            break;
+
+        case INBUILT_TYPE_ITEM_SIGNED:
+            operation = SpvOpSMod;
+            break;
+        }
+
         spirv_size_t *code = spirv_new_instruction (context, &(*current_block)->code_section, 5u);
-        code[0u] |= SpvOpCodeMask & SpvOpSMod;
+        code[0u] |= SpvOpCodeMask & operation;
         code[1u] =
             spirv_find_or_generate_vector_type (context, expression->output.type.vector_data - STATICS.vector_types);
         code[2u] = result_id;
@@ -2642,7 +2758,7 @@ static spirv_size_t spirv_emit_expression (struct spirv_generation_context_t *co
     case COMPILER_INSTANCE_EXPRESSION_TYPE_OPERATION_NOT_EQUAL:
         TRIVIAL_LOGICAL_OPERATION (SpvOpINotEqual)
 
-#define SCALAR_LOGICAL_OPERATION(WHEN_FLOAT, WHEN_INTEGER)                                                             \
+#define SCALAR_LOGICAL_OPERATION(WHEN_FLOAT, WHEN_UNSIGNED, WHEN_SIGNED)                                               \
     {                                                                                                                  \
         BINARY_OPERATION_COMMON_PREPARE;                                                                               \
         spirv_size_t result_id = context->current_bound;                                                               \
@@ -2655,8 +2771,12 @@ static spirv_size_t spirv_emit_expression (struct spirv_generation_context_t *co
             operation = WHEN_FLOAT;                                                                                    \
             break;                                                                                                     \
                                                                                                                        \
-        case INBUILT_TYPE_ITEM_INTEGER:                                                                                \
-            operation = WHEN_INTEGER;                                                                                  \
+        case INBUILT_TYPE_ITEM_UNSIGNED:                                                                               \
+            operation = WHEN_UNSIGNED;                                                                                 \
+            break;                                                                                                     \
+                                                                                                                       \
+        case INBUILT_TYPE_ITEM_SIGNED:                                                                                 \
+            operation = WHEN_SIGNED;                                                                                   \
             break;                                                                                                     \
         }                                                                                                              \
                                                                                                                        \
@@ -2672,16 +2792,16 @@ static spirv_size_t spirv_emit_expression (struct spirv_generation_context_t *co
     }
 
     case COMPILER_INSTANCE_EXPRESSION_TYPE_OPERATION_LESS:
-        SCALAR_LOGICAL_OPERATION (SpvOpFOrdLessThan, SpvOpSLessThan)
+        SCALAR_LOGICAL_OPERATION (SpvOpFOrdLessThan, SpvOpULessThan, SpvOpSLessThan)
 
     case COMPILER_INSTANCE_EXPRESSION_TYPE_OPERATION_GREATER:
-        SCALAR_LOGICAL_OPERATION (SpvOpFOrdGreaterThan, SpvOpSGreaterThan)
+        SCALAR_LOGICAL_OPERATION (SpvOpFOrdGreaterThan, SpvOpUGreaterThan, SpvOpSGreaterThan)
 
     case COMPILER_INSTANCE_EXPRESSION_TYPE_OPERATION_LESS_OR_EQUAL:
-        SCALAR_LOGICAL_OPERATION (SpvOpFOrdLessThanEqual, SpvOpSLessThanEqual)
+        SCALAR_LOGICAL_OPERATION (SpvOpFOrdLessThanEqual, SpvOpULessThanEqual, SpvOpSLessThanEqual)
 
     case COMPILER_INSTANCE_EXPRESSION_TYPE_OPERATION_GREATER_OR_EQUAL:
-        SCALAR_LOGICAL_OPERATION (SpvOpFOrdGreaterThanEqual, SpvOpSGreaterThanEqual)
+        SCALAR_LOGICAL_OPERATION (SpvOpFOrdGreaterThanEqual, SpvOpUGreaterThanEqual, SpvOpSGreaterThanEqual)
 
 #define TRIVIAL_BITWISE_OPERATION(OPERATION)                                                                           \
     {                                                                                                                  \
@@ -2745,7 +2865,11 @@ static spirv_size_t spirv_emit_expression (struct spirv_generation_context_t *co
                 operation = SpvOpFNegate;
                 break;
 
-            case INBUILT_TYPE_ITEM_INTEGER:
+            case INBUILT_TYPE_ITEM_UNSIGNED:
+                KAN_ASSERT (KAN_FALSE)
+                break;
+
+            case INBUILT_TYPE_ITEM_SIGNED:
                 operation = SpvOpSNegate;
                 break;
             }
@@ -2768,8 +2892,12 @@ static spirv_size_t spirv_emit_expression (struct spirv_generation_context_t *co
                 constant_id = spirv_request_f1_constant (context, -1.0f);
                 break;
 
-            case INBUILT_TYPE_ITEM_INTEGER:
-                constant_id = spirv_request_i1_constant (context, (spirv_signed_literal_t) -1);
+            case INBUILT_TYPE_ITEM_UNSIGNED:
+                KAN_ASSERT (KAN_FALSE)
+                break;
+
+            case INBUILT_TYPE_ITEM_SIGNED:
+                constant_id = spirv_request_s1_constant (context, (spirv_signed_literal_t) -1);
                 break;
             }
 
@@ -3372,8 +3500,9 @@ static struct spirv_generation_block_t *spirv_emit_scope (struct spirv_generatio
         case COMPILER_INSTANCE_EXPRESSION_TYPE_SWIZZLE:
         case COMPILER_INSTANCE_EXPRESSION_TYPE_FLATTENED_BUFFER_ACCESS_INPUT:
         case COMPILER_INSTANCE_EXPRESSION_TYPE_FLATTENED_BUFFER_ACCESS_OUTPUT:
-        case COMPILER_INSTANCE_EXPRESSION_TYPE_INTEGER_LITERAL:
         case COMPILER_INSTANCE_EXPRESSION_TYPE_FLOATING_LITERAL:
+        case COMPILER_INSTANCE_EXPRESSION_TYPE_UNSIGNED_LITERAL:
+        case COMPILER_INSTANCE_EXPRESSION_TYPE_SIGNED_LITERAL:
         case COMPILER_INSTANCE_EXPRESSION_TYPE_VARIABLE_DECLARATION:
         case COMPILER_INSTANCE_EXPRESSION_TYPE_OPERATION_ARRAY_INDEX:
         case COMPILER_INSTANCE_EXPRESSION_TYPE_OPERATION_ADD:

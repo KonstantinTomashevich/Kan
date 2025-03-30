@@ -154,20 +154,36 @@ static inline kan_bool_t merge_parameters_into (struct kan_dynamic_array_t *outp
                     output_parameter->value_f4 = overlay_parameter->value_f4;
                     break;
 
-                case KAN_RPL_META_VARIABLE_TYPE_I1:
-                    output_parameter->value_i1 = overlay_parameter->value_i1;
+                case KAN_RPL_META_VARIABLE_TYPE_U1:
+                    output_parameter->value_u1 = overlay_parameter->value_u1;
                     break;
 
-                case KAN_RPL_META_VARIABLE_TYPE_I2:
-                    output_parameter->value_i2 = overlay_parameter->value_i2;
+                case KAN_RPL_META_VARIABLE_TYPE_U2:
+                    output_parameter->value_u2 = overlay_parameter->value_u2;
                     break;
 
-                case KAN_RPL_META_VARIABLE_TYPE_I3:
-                    output_parameter->value_i3 = overlay_parameter->value_i3;
+                case KAN_RPL_META_VARIABLE_TYPE_U3:
+                    output_parameter->value_u3 = overlay_parameter->value_u3;
                     break;
 
-                case KAN_RPL_META_VARIABLE_TYPE_I4:
-                    output_parameter->value_i4 = overlay_parameter->value_i4;
+                case KAN_RPL_META_VARIABLE_TYPE_U4:
+                    output_parameter->value_u4 = overlay_parameter->value_u4;
+                    break;
+
+                case KAN_RPL_META_VARIABLE_TYPE_S1:
+                    output_parameter->value_s1 = overlay_parameter->value_s1;
+                    break;
+
+                case KAN_RPL_META_VARIABLE_TYPE_S2:
+                    output_parameter->value_s2 = overlay_parameter->value_s2;
+                    break;
+
+                case KAN_RPL_META_VARIABLE_TYPE_S3:
+                    output_parameter->value_s3 = overlay_parameter->value_s3;
+                    break;
+
+                case KAN_RPL_META_VARIABLE_TYPE_S4:
+                    output_parameter->value_s4 = overlay_parameter->value_s4;
                     break;
 
                 case KAN_RPL_META_VARIABLE_TYPE_F3X3:
@@ -413,7 +429,7 @@ static enum kan_resource_compile_result_t kan_resource_material_instance_static_
         append_tail_append_copy (&output->tail_append,
                                  &((struct kan_resource_material_tail_append_t *) append_raw->tail_append.data)[index]);
     }
-    
+
     kan_dynamic_array_set_capacity (&output->samplers, (base ? base->samplers.size : 0u) + append_raw->samplers.size);
     if (base && base->samplers.size > 0u)
     {
@@ -421,7 +437,7 @@ static enum kan_resource_compile_result_t kan_resource_material_instance_static_
         memcpy (output->samplers.data, base->samplers.data,
                 sizeof (struct kan_resource_material_sampler_t) * base->samplers.size);
     }
-    
+
     for (kan_loop_size_t append_index = 0u; append_index < append_raw->samplers.size; ++append_index)
     {
         kan_bool_t overridden = KAN_FALSE;

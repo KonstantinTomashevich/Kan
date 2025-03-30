@@ -924,20 +924,36 @@ static inline void apply_parameter_to_memory (kan_interned_string_t instance_nam
                 *(struct kan_float_vector_4_t *) address = parameter->value_f4;
                 break;
 
-            case KAN_RPL_META_VARIABLE_TYPE_I1:
-                *(int32_t *) address = parameter->value_i1;
+            case KAN_RPL_META_VARIABLE_TYPE_U1:
+                *(kan_serialized_size_t *) address = parameter->value_u1;
                 break;
 
-            case KAN_RPL_META_VARIABLE_TYPE_I2:
-                *(struct kan_integer_vector_2_t *) address = parameter->value_i2;
+            case KAN_RPL_META_VARIABLE_TYPE_U2:
+                *(struct kan_unsigned_integer_vector_2_t *) address = parameter->value_u2;
                 break;
 
-            case KAN_RPL_META_VARIABLE_TYPE_I3:
-                *(struct kan_integer_vector_3_t *) address = parameter->value_i3;
+            case KAN_RPL_META_VARIABLE_TYPE_U3:
+                *(struct kan_unsigned_integer_vector_3_t *) address = parameter->value_u3;
                 break;
 
-            case KAN_RPL_META_VARIABLE_TYPE_I4:
-                *(struct kan_integer_vector_4_t *) address = parameter->value_i4;
+            case KAN_RPL_META_VARIABLE_TYPE_U4:
+                *(struct kan_unsigned_integer_vector_4_t *) address = parameter->value_u4;
+                break;
+
+            case KAN_RPL_META_VARIABLE_TYPE_S1:
+                *(kan_serialized_offset_t *) address = parameter->value_s1;
+                break;
+
+            case KAN_RPL_META_VARIABLE_TYPE_S2:
+                *(struct kan_integer_vector_2_t *) address = parameter->value_s2;
+                break;
+
+            case KAN_RPL_META_VARIABLE_TYPE_S3:
+                *(struct kan_integer_vector_3_t *) address = parameter->value_s3;
+                break;
+
+            case KAN_RPL_META_VARIABLE_TYPE_S4:
+                *(struct kan_integer_vector_4_t *) address = parameter->value_s4;
                 break;
 
             case KAN_RPL_META_VARIABLE_TYPE_F3X3:

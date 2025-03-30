@@ -36,10 +36,10 @@ void fragment_main (void)
     f4 base_color = sample (color_sampler, diffuse_color, vertex_output.uv);
     f4 modifier = f4 {0.0, 0.0, 0.0, 1.0};
 
-    for (i1 i = 0; i < 5 || i < 7 || i < 10; i = i + 1)
+    for (u1 i = 0u; i < 5u || i < 7u || i < 10u; i = i + 1u)
     {
         modifier = modifier + f4 {0.1, 0.1, 0.1, 0.0};
-        if (i == 3)
+        if (i == 3u)
         {
             modifier.x = 1.0;
             break;

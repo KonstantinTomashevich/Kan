@@ -29,10 +29,10 @@ vertex_attribute_buffer vertex
     f3 normal;
     f2 uv;
 
-    conditional (enable_skinning && skinning_2_weights) i2 joint_indices;
+    conditional (enable_skinning && skinning_2_weights) u2 joint_indices;
     conditional (enable_skinning && skinning_2_weights) f2 joint_weights;
 
-    conditional (enable_skinning && skinning_4_weights) i4 joint_indices;
+    conditional (enable_skinning && skinning_4_weights) u4 joint_indices;
     conditional (enable_skinning && skinning_4_weights) f4 joint_weights;
 };
 
@@ -45,7 +45,7 @@ conditional (support_instancing) instanced_attribute_buffer instance_vertex
 
     conditional (enable_skinning)
     meta (hidden, joint_offset_index)
-    i1 joint_offset;
+    u1 joint_offset;
 };
 
 set_pass uniform_buffer pass
@@ -133,7 +133,7 @@ fragment_stage_output fragment_output
 
 void fragment_main (void)
 {
-    fragment_output.color = sample (color_sampler, diffuse_color[2], vertex_output.uv) *
+    fragment_output.color = sample (color_sampler, diffuse_color[2u], vertex_output.uv) *
             darken_from_center (vertex_output.uv) *
             vertex_output.color_multiplier;
 }

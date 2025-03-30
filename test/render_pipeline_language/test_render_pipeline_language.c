@@ -141,7 +141,7 @@ KAN_TEST_CASE (generic)
 
     attribute_meta = &((struct kan_rpl_meta_attribute_t *) buffer_meta->attributes.data)[3u];
     KAN_TEST_CHECK (attribute_meta->location == 3u)
-    KAN_TEST_CHECK (attribute_meta->type == KAN_RPL_META_VARIABLE_TYPE_I2)
+    KAN_TEST_CHECK (attribute_meta->type == KAN_RPL_META_VARIABLE_TYPE_U2)
     KAN_TEST_CHECK (attribute_meta->offset == 32u)
 
     attribute_meta = &((struct kan_rpl_meta_attribute_t *) buffer_meta->attributes.data)[4u];
@@ -172,7 +172,7 @@ KAN_TEST_CASE (generic)
 
     attribute_meta = &((struct kan_rpl_meta_attribute_t *) buffer_meta->attributes.data)[2u];
     KAN_TEST_CHECK (attribute_meta->location == 10u)
-    KAN_TEST_CHECK (attribute_meta->type == KAN_RPL_META_VARIABLE_TYPE_I1)
+    KAN_TEST_CHECK (attribute_meta->type == KAN_RPL_META_VARIABLE_TYPE_U1)
     KAN_TEST_CHECK (attribute_meta->offset == 80u)
 
     KAN_TEST_ASSERT (buffer_meta->main_parameters.size == 3u)
@@ -195,7 +195,7 @@ KAN_TEST_CASE (generic)
 
     parameter_meta = &((struct kan_rpl_meta_parameter_t *) buffer_meta->main_parameters.data)[2u];
     KAN_TEST_CHECK (strcmp (parameter_meta->name, "joint_offset") == 0)
-    KAN_TEST_CHECK (parameter_meta->type == KAN_RPL_META_VARIABLE_TYPE_I1)
+    KAN_TEST_CHECK (parameter_meta->type == KAN_RPL_META_VARIABLE_TYPE_U1)
     KAN_TEST_CHECK (parameter_meta->offset == 80u)
     KAN_TEST_CHECK (parameter_meta->total_item_count == 1u)
     KAN_TEST_ASSERT (parameter_meta->meta.size == 2u)
