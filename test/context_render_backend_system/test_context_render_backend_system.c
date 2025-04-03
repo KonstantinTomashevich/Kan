@@ -49,19 +49,19 @@ struct render_image_config_t
 };
 
 static const char *render_image_shader =
-    "vertex_attribute_buffer vertex\n"
+    "vertex_attribute_container vertex\n"
     "{\n"
     "    f2 position;\n"
     "};\n"
     "\n"
-    "vertex_stage_output vertex_output\n"
+    "state_container state\n"
     "{\n"
     "    f2 uv;\n"
     "};\n"
     "\n"
     "void vertex_main (void)\n"
     "{\n"
-    "    vertex_output.uv = f2 {0.5} + f2 {0.5} * vertex.position;"
+    "    state.uv = f2 {0.5} + f2 {0.5} * vertex.position;"
     "    vertex_stage_output_position (f4 {vertex.position.xy, 0.0, 1.0});"
     "}\n"
     "\n"
@@ -75,14 +75,14 @@ static const char *render_image_shader =
     "    f1 image_border_size;\n"
     "};\n"
     "\n"
-    "fragment_stage_output fragment_output\n"
+    "color_output_container fragment_output\n"
     "{\n"
     "    f4 color;\n"
     "};\n"
     "\n"
     "void fragment_main (void)\n"
     "{\n"
-    "    f2 coordinates = vertex_output.uv * config.bricks;\n"
+    "    f2 coordinates = state.uv * config.bricks;\n"
     "    if (s1 {trunc_f1 (coordinates.y)} % 2 == 1)\n"
     "    {\n"
     "        coordinates.x = coordinates.x + 0.5;\n"
@@ -102,8 +102,8 @@ static const char *render_image_shader =
     "    f2 image_border = f2 {config.image_border_size};\n"
     "    f2 inverse_image_border = f2 {1.0} - image_border;\n"
     "    f2 image_border_mask = min_f2 (\n"
-    "        step_f2 (image_border, vertex_output.uv),\n"
-    "        f2 {1.0} - step_f2 (inverse_image_border, vertex_output.uv));\n"
+    "        step_f2 (image_border, state.uv),\n"
+    "        f2 {1.0} - step_f2 (inverse_image_border, state.uv));\n"
     "    f1 is_image_content = min_f1 (image_border_mask.x, image_border_mask.y);\n"
     "\n"
     "    fragment_output.color = mix_f4 (\n"
@@ -186,24 +186,28 @@ static kan_render_graphics_pipeline_t create_render_image_pipeline (
     struct kan_render_attribute_source_description_t attribute_sources[1u];
     struct kan_render_attribute_description_t attributes[1u];
 
-    KAN_TEST_ASSERT (meta.attribute_buffers.size == 1u)
-    struct kan_rpl_meta_buffer_t *buffer = &((struct kan_rpl_meta_buffer_t *) meta.attribute_buffers.data)[0u];
-    attribute_sources[0u].binding = buffer->binding;
-    *output_attribute_binding = buffer->binding;
-    attribute_sources[0u].stride = buffer->main_size;
+    KAN_TEST_ASSERT (meta.attribute_sources.size == 1u)
+    struct kan_rpl_meta_attribute_source_t *attribute_source =
+        &((struct kan_rpl_meta_attribute_source_t *) meta.attribute_sources.data)[0u];
+    attribute_sources[0u].binding = attribute_source->binding;
+    *output_attribute_binding = attribute_source->binding;
+    attribute_sources[0u].stride = attribute_source->block_size;
     attribute_sources[0u].rate = KAN_RENDER_ATTRIBUTE_RATE_PER_VERTEX;
 
-    KAN_TEST_ASSERT (buffer->attributes.size == 1u)
-    struct kan_rpl_meta_attribute_t *attribute = &((struct kan_rpl_meta_attribute_t *) buffer->attributes.data)[0u];
+    KAN_TEST_ASSERT (attribute_source->attributes.size == 1u)
+    struct kan_rpl_meta_attribute_t *attribute =
+        &((struct kan_rpl_meta_attribute_t *) attribute_source->attributes.data)[0u];
 
-    attributes[0u].binding = buffer->binding;
+    attributes[0u].binding = attribute_source->binding;
     attributes[0u].location = attribute->location;
     attributes[0u].offset = attribute->offset;
-    KAN_TEST_CHECK (attribute->type == KAN_RPL_META_VARIABLE_TYPE_F2)
-    attributes[0u].format = KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_FLOAT_2;
+    KAN_TEST_CHECK (attribute->class == KAN_RPL_META_ATTRIBUTE_CLASS_VECTOR_2)
+    attributes[0u].class = KAN_RENDER_ATTRIBUTE_CLASS_VECTOR_2;
+    KAN_TEST_CHECK (attribute->item_format == KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_FLOAT_32)
+    attributes[0u].item_format = KAN_RENDER_ATTRIBUTE_ITEM_FORMAT_FLOAT_32;
 
     KAN_TEST_ASSERT (meta.set_material.buffers.size == 1u)
-    buffer = &((struct kan_rpl_meta_buffer_t *) meta.set_material.buffers.data)[0u];
+    struct kan_rpl_meta_buffer_t *buffer = &((struct kan_rpl_meta_buffer_t *) meta.set_material.buffers.data)[0u];
 
     KAN_TEST_CHECK (buffer->type == KAN_RPL_BUFFER_TYPE_READ_ONLY_STORAGE)
     material_set_bindings[0u].binding = buffer->binding;
@@ -339,13 +343,13 @@ struct pass_t
 };
 
 static const char *cube_shader =
-    "vertex_attribute_buffer vertex\n"
+    "vertex_attribute_container vertex\n"
     "{\n"
     "    f3 position;\n"
     "    f2 uv;\n"
     "};\n"
     "\n"
-    "instanced_attribute_buffer instanced\n"
+    "instanced_attribute_container instanced\n"
     "{\n"
     "    f4x4 model;\n"
     "};\n"
@@ -355,14 +359,14 @@ static const char *cube_shader =
     "    f4x4 projection_view;\n"
     "};\n"
     "\n"
-    "vertex_stage_output vertex_output\n"
+    "state_container state\n"
     "{\n"
     "    f2 uv;\n"
     "};\n"
     "\n"
     "void vertex_main (void)\n"
     "{\n"
-    "    vertex_output.uv = vertex.uv;"
+    "    state.uv = vertex.uv;"
     "    vertex_stage_output_position (\n"
     "        pass.projection_view * instanced.model * f4 {vertex.position.xyz, 1.0});\n"
     "}\n"
@@ -370,14 +374,14 @@ static const char *cube_shader =
     "set_material sampler color_sampler;\n"
     "set_material image_color_2d diffuse_color;\n"
     "\n"
-    "fragment_stage_output fragment_output\n"
+    "color_output_container fragment_output\n"
     "{\n"
     "    f4 color;\n"
     "};\n"
     "\n"
     "void fragment_main (void)\n"
     "{\n"
-    "    fragment_output.color = sample (color_sampler, diffuse_color, vertex_output.uv);\n"
+    "    fragment_output.color = sample (color_sampler, diffuse_color, state.uv);\n"
     "}\n";
 
 static kan_render_pass_t create_cube_pass (kan_render_context_t render_context)
@@ -474,46 +478,54 @@ static kan_render_graphics_pipeline_t create_cube_pipeline (
         .tracking_name = kan_string_intern ("cube_material"),
     };
 
-    KAN_TEST_ASSERT (meta.attribute_buffers.size == 2u)
-    struct kan_rpl_meta_buffer_t *buffer = &((struct kan_rpl_meta_buffer_t *) meta.attribute_buffers.data)[0u];
-    attribute_sources[0u].binding = buffer->binding;
-    *output_attribute_vertex_binding = buffer->binding;
-    attribute_sources[0u].stride = buffer->main_size;
+    KAN_TEST_ASSERT (meta.attribute_sources.size == 2u)
+    struct kan_rpl_meta_attribute_source_t *attribute_source =
+        &((struct kan_rpl_meta_attribute_source_t *) meta.attribute_sources.data)[0u];
+    attribute_sources[0u].binding = attribute_source->binding;
+    *output_attribute_vertex_binding = attribute_source->binding;
+    attribute_sources[0u].stride = attribute_source->block_size;
     attribute_sources[0u].rate = KAN_RENDER_ATTRIBUTE_RATE_PER_VERTEX;
 
-    KAN_TEST_ASSERT (buffer->attributes.size == 2u)
-    struct kan_rpl_meta_attribute_t *attribute = &((struct kan_rpl_meta_attribute_t *) buffer->attributes.data)[0u];
+    KAN_TEST_ASSERT (attribute_source->attributes.size == 2u)
+    struct kan_rpl_meta_attribute_t *attribute =
+        &((struct kan_rpl_meta_attribute_t *) attribute_source->attributes.data)[0u];
 
-    attributes[0u].binding = buffer->binding;
+    attributes[0u].binding = attribute_sources->binding;
     attributes[0u].location = attribute->location;
     attributes[0u].offset = attribute->offset;
-    KAN_TEST_CHECK (attribute->type == KAN_RPL_META_VARIABLE_TYPE_F3)
-    attributes[0u].format = KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_FLOAT_3;
+    KAN_TEST_CHECK (attribute->class == KAN_RPL_META_ATTRIBUTE_CLASS_VECTOR_3)
+    attributes[0u].class = KAN_RENDER_ATTRIBUTE_CLASS_VECTOR_3;
+    KAN_TEST_CHECK (attribute->item_format == KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_FLOAT_32)
+    attributes[0u].item_format = KAN_RENDER_ATTRIBUTE_ITEM_FORMAT_FLOAT_32;
 
-    attribute = &((struct kan_rpl_meta_attribute_t *) buffer->attributes.data)[1u];
-    attributes[1u].binding = buffer->binding;
+    attribute = &((struct kan_rpl_meta_attribute_t *) attribute_source->attributes.data)[1u];
+    attributes[1u].binding = attribute_source->binding;
     attributes[1u].location = attribute->location;
     attributes[1u].offset = attribute->offset;
-    KAN_TEST_CHECK (attribute->type == KAN_RPL_META_VARIABLE_TYPE_F2)
-    attributes[1u].format = KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_FLOAT_2;
+    KAN_TEST_CHECK (attribute->class == KAN_RPL_META_ATTRIBUTE_CLASS_VECTOR_2)
+    attributes[1u].class = KAN_RENDER_ATTRIBUTE_CLASS_VECTOR_2;
+    KAN_TEST_CHECK (attribute->item_format == KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_FLOAT_32)
+    attributes[1u].item_format = KAN_RENDER_ATTRIBUTE_ITEM_FORMAT_FLOAT_32;
 
-    buffer = &((struct kan_rpl_meta_buffer_t *) meta.attribute_buffers.data)[1u];
-    attribute_sources[1u].binding = buffer->binding;
-    *output_instanced_vertex_binding = buffer->binding;
-    attribute_sources[1u].stride = buffer->main_size;
+    attribute_source = &((struct kan_rpl_meta_attribute_source_t *) meta.attribute_sources.data)[1u];
+    attribute_sources[1u].binding = attribute_source->binding;
+    *output_instanced_vertex_binding = attribute_source->binding;
+    attribute_sources[1u].stride = attribute_source->block_size;
     attribute_sources[1u].rate = KAN_RENDER_ATTRIBUTE_RATE_PER_INSTANCE;
 
-    KAN_TEST_ASSERT (buffer->attributes.size == 1u)
-    attribute = &((struct kan_rpl_meta_attribute_t *) buffer->attributes.data)[0u];
+    KAN_TEST_ASSERT (attribute_source->attributes.size == 1u)
+    attribute = &((struct kan_rpl_meta_attribute_t *) attribute_source->attributes.data)[0u];
 
-    attributes[2u].binding = buffer->binding;
+    attributes[2u].binding = attribute_source->binding;
     attributes[2u].location = attribute->location;
     attributes[2u].offset = attribute->offset;
-    KAN_TEST_CHECK (attribute->type == KAN_RPL_META_VARIABLE_TYPE_F4X4)
-    attributes[2u].format = KAN_RENDER_ATTRIBUTE_FORMAT_MATRIX_FLOAT_4_4;
+    KAN_TEST_CHECK (attribute->class == KAN_RPL_META_ATTRIBUTE_CLASS_MATRIX_4X4)
+    attributes[2u].class = KAN_RENDER_ATTRIBUTE_CLASS_MATRIX_4_4;
+    KAN_TEST_CHECK (attribute->item_format == KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_FLOAT_32)
+    attributes[2u].item_format = KAN_RENDER_ATTRIBUTE_ITEM_FORMAT_FLOAT_32;
 
     KAN_TEST_ASSERT (meta.set_pass.buffers.size == 1u)
-    buffer = &((struct kan_rpl_meta_buffer_t *) meta.set_pass.buffers.data)[0u];
+    struct kan_rpl_meta_buffer_t *buffer = &((struct kan_rpl_meta_buffer_t *) meta.set_pass.buffers.data)[0u];
 
     KAN_TEST_CHECK (buffer->type == KAN_RPL_BUFFER_TYPE_UNIFORM)
     pass_set_bindings[0u].binding = buffer->binding;

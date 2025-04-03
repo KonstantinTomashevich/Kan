@@ -717,23 +717,35 @@ struct kan_render_attribute_source_description_t
     enum kan_render_attribute_rate_t rate;
 };
 
-/// \brief Enumerates supported attribute formats.
-enum kan_render_attribute_format_t
+/// \brief Enumerates supported attribute classes.
+/// \details Attribute class describes attribute structure without its item format.
+///          We split attribute types into classes and item formats, because enumeration with all the combinations
+///          of classes and formats would be enormous.
+enum kan_render_attribute_class_t
 {
-    KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_FLOAT_1,
-    KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_FLOAT_2,
-    KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_FLOAT_3,
-    KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_FLOAT_4,
-    KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_UNSIGNED_INT_1,
-    KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_UNSIGNED_INT_2,
-    KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_UNSIGNED_INT_3,
-    KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_UNSIGNED_INT_4,
-    KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_SIGNED_INT_1,
-    KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_SIGNED_INT_2,
-    KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_SIGNED_INT_3,
-    KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_SIGNED_INT_4,
-    KAN_RENDER_ATTRIBUTE_FORMAT_MATRIX_FLOAT_3_3,
-    KAN_RENDER_ATTRIBUTE_FORMAT_MATRIX_FLOAT_4_4,
+    KAN_RENDER_ATTRIBUTE_CLASS_VECTOR_1 = 0u,
+    KAN_RENDER_ATTRIBUTE_CLASS_VECTOR_2,
+    KAN_RENDER_ATTRIBUTE_CLASS_VECTOR_3,
+    KAN_RENDER_ATTRIBUTE_CLASS_VECTOR_4,
+    KAN_RENDER_ATTRIBUTE_CLASS_MATRIX_3_3,
+    KAN_RENDER_ATTRIBUTE_CLASS_MATRIX_4_4,
+};
+
+/// \brief Enumerates supported attribute item formats.
+enum kan_render_attribute_item_format_t
+{
+    KAN_RENDER_ATTRIBUTE_ITEM_FORMAT_FLOAT_16 = 0u,
+    KAN_RENDER_ATTRIBUTE_ITEM_FORMAT_FLOAT_32,
+    KAN_RENDER_ATTRIBUTE_ITEM_FORMAT_FLOAT_UNORM_8,
+    KAN_RENDER_ATTRIBUTE_ITEM_FORMAT_FLOAT_UNORM_16,
+    KAN_RENDER_ATTRIBUTE_ITEM_FORMAT_FLOAT_SNORM_8,
+    KAN_RENDER_ATTRIBUTE_ITEM_FORMAT_FLOAT_SNORM_16,
+    KAN_RENDER_ATTRIBUTE_ITEM_FORMAT_FLOAT_UINT_8,
+    KAN_RENDER_ATTRIBUTE_ITEM_FORMAT_FLOAT_UINT_16,
+    KAN_RENDER_ATTRIBUTE_ITEM_FORMAT_FLOAT_UINT_32,
+    KAN_RENDER_ATTRIBUTE_ITEM_FORMAT_FLOAT_SINT_8,
+    KAN_RENDER_ATTRIBUTE_ITEM_FORMAT_FLOAT_SINT_16,
+    KAN_RENDER_ATTRIBUTE_ITEM_FORMAT_FLOAT_SINT_32,
 };
 
 /// \brief Describes one attribute.
@@ -742,7 +754,8 @@ struct kan_render_attribute_description_t
     kan_render_size_t binding;
     kan_render_size_t location;
     kan_render_size_t offset;
-    enum kan_render_attribute_format_t format;
+    enum kan_render_attribute_class_t class;
+    enum kan_render_attribute_item_format_t item_format;
 };
 
 /// \brief Enumerates supported blend factors.
