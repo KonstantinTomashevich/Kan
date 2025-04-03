@@ -114,107 +114,101 @@ KAN_TEST_CASE (generic)
     KAN_TEST_CHECK (fabs (meta.graphics_classic_settings.depth_min) < TEST_FLOATING_TOLERANCE)
     KAN_TEST_CHECK (fabs (meta.graphics_classic_settings.depth_max - 1.0) < TEST_FLOATING_TOLERANCE)
 
-    KAN_TEST_ASSERT (meta.attribute_buffers.size == 2u)
-    struct kan_rpl_meta_buffer_t *buffer_meta = &((struct kan_rpl_meta_buffer_t *) meta.attribute_buffers.data)[0u];
-    KAN_TEST_CHECK (strcmp (buffer_meta->name, "vertex") == 0)
-    KAN_TEST_CHECK (buffer_meta->binding == 0u)
-    KAN_TEST_CHECK (buffer_meta->type == KAN_RPL_BUFFER_TYPE_VERTEX_ATTRIBUTE)
-    KAN_TEST_CHECK (buffer_meta->main_size == 48u)
-    KAN_TEST_CHECK (buffer_meta->tail_item_size == 0u)
+    KAN_TEST_ASSERT (meta.attribute_sources.size == 2u)
+    struct kan_rpl_meta_attribute_source_t *attribute_source_meta =
+        &((struct kan_rpl_meta_attribute_source_t *) meta.attribute_sources.data)[0u];
+    KAN_TEST_CHECK (strcmp (attribute_source_meta->name, "vertex") == 0)
+    KAN_TEST_CHECK (attribute_source_meta->binding == 0u)
+    KAN_TEST_CHECK (attribute_source_meta->rate == KAN_RPL_META_ATTRIBUTE_SOURCE_RATE_VERTEX)
+    KAN_TEST_CHECK (attribute_source_meta->block_size == 28u)
 
-    KAN_TEST_ASSERT (buffer_meta->attributes.size == 5u)
+    KAN_TEST_ASSERT (attribute_source_meta->attributes.size == 5u)
     struct kan_rpl_meta_attribute_t *attribute_meta =
-        &((struct kan_rpl_meta_attribute_t *) buffer_meta->attributes.data)[0u];
+        &((struct kan_rpl_meta_attribute_t *) attribute_source_meta->attributes.data)[0u];
+    KAN_TEST_CHECK (strcmp (attribute_meta->name, "position") == 0)
     KAN_TEST_CHECK (attribute_meta->location == 0u)
-    KAN_TEST_CHECK (attribute_meta->type == KAN_RPL_META_VARIABLE_TYPE_F3)
     KAN_TEST_CHECK (attribute_meta->offset == 0u)
+    KAN_TEST_CHECK (attribute_meta->class == KAN_RPL_META_ATTRIBUTE_CLASS_VECTOR_3)
+    KAN_TEST_CHECK (attribute_meta->item_format == KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_FLOAT_32)
+    KAN_TEST_CHECK (attribute_meta->meta.size == 0u)
 
-    attribute_meta = &((struct kan_rpl_meta_attribute_t *) buffer_meta->attributes.data)[1u];
+    attribute_meta = &((struct kan_rpl_meta_attribute_t *) attribute_source_meta->attributes.data)[1u];
+    KAN_TEST_CHECK (strcmp (attribute_meta->name, "normal") == 0)
     KAN_TEST_CHECK (attribute_meta->location == 1u)
-    KAN_TEST_CHECK (attribute_meta->type == KAN_RPL_META_VARIABLE_TYPE_F3)
     KAN_TEST_CHECK (attribute_meta->offset == 12u)
+    KAN_TEST_CHECK (attribute_meta->class == KAN_RPL_META_ATTRIBUTE_CLASS_VECTOR_3)
+    KAN_TEST_CHECK (attribute_meta->item_format == KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_SNORM_16)
+    KAN_TEST_CHECK (attribute_meta->meta.size == 0u)
 
-    attribute_meta = &((struct kan_rpl_meta_attribute_t *) buffer_meta->attributes.data)[2u];
+    attribute_meta = &((struct kan_rpl_meta_attribute_t *) attribute_source_meta->attributes.data)[2u];
+    KAN_TEST_CHECK (strcmp (attribute_meta->name, "uv") == 0)
     KAN_TEST_CHECK (attribute_meta->location == 2u)
-    KAN_TEST_CHECK (attribute_meta->type == KAN_RPL_META_VARIABLE_TYPE_F2)
-    KAN_TEST_CHECK (attribute_meta->offset == 24u)
+    KAN_TEST_CHECK (attribute_meta->offset == 18u)
+    KAN_TEST_CHECK (attribute_meta->class == KAN_RPL_META_ATTRIBUTE_CLASS_VECTOR_2)
+    KAN_TEST_CHECK (attribute_meta->item_format == KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_FLOAT_16)
+    KAN_TEST_CHECK (attribute_meta->meta.size == 0u)
 
-    attribute_meta = &((struct kan_rpl_meta_attribute_t *) buffer_meta->attributes.data)[3u];
+    attribute_meta = &((struct kan_rpl_meta_attribute_t *) attribute_source_meta->attributes.data)[3u];
+    KAN_TEST_CHECK (strcmp (attribute_meta->name, "joint_indices") == 0)
     KAN_TEST_CHECK (attribute_meta->location == 3u)
-    KAN_TEST_CHECK (attribute_meta->type == KAN_RPL_META_VARIABLE_TYPE_U2)
-    KAN_TEST_CHECK (attribute_meta->offset == 32u)
+    KAN_TEST_CHECK (attribute_meta->offset == 22u)
+    KAN_TEST_CHECK (attribute_meta->class == KAN_RPL_META_ATTRIBUTE_CLASS_VECTOR_2)
+    KAN_TEST_CHECK (attribute_meta->item_format == KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_UINT_16)
+    KAN_TEST_CHECK (attribute_meta->meta.size == 0u)
 
-    attribute_meta = &((struct kan_rpl_meta_attribute_t *) buffer_meta->attributes.data)[4u];
+    attribute_meta = &((struct kan_rpl_meta_attribute_t *) attribute_source_meta->attributes.data)[4u];
+    KAN_TEST_CHECK (strcmp (attribute_meta->name, "joint_weights") == 0)
     KAN_TEST_CHECK (attribute_meta->location == 4u)
-    KAN_TEST_CHECK (attribute_meta->type == KAN_RPL_META_VARIABLE_TYPE_F2)
-    KAN_TEST_CHECK (attribute_meta->offset == 40u)
+    KAN_TEST_CHECK (attribute_meta->offset == 26u)
+    KAN_TEST_CHECK (attribute_meta->class == KAN_RPL_META_ATTRIBUTE_CLASS_VECTOR_2)
+    KAN_TEST_CHECK (attribute_meta->item_format == KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_UNORM_8)
+    KAN_TEST_CHECK (attribute_meta->meta.size == 0u)
 
-    KAN_TEST_ASSERT (buffer_meta->main_parameters.size == 0u)
-    KAN_TEST_ASSERT (buffer_meta->tail_item_parameters.size == 0u)
+    attribute_source_meta = &((struct kan_rpl_meta_attribute_source_t *) meta.attribute_sources.data)[1u];
+    KAN_TEST_CHECK (strcmp (attribute_source_meta->name, "instance_vertex") == 0)
+    KAN_TEST_CHECK (attribute_source_meta->binding == 1u)
+    KAN_TEST_CHECK (attribute_source_meta->rate == KAN_RPL_META_ATTRIBUTE_SOURCE_RATE_INSTANCE)
+    KAN_TEST_CHECK (attribute_source_meta->block_size == 72u)
 
-    buffer_meta = &((struct kan_rpl_meta_buffer_t *) meta.attribute_buffers.data)[1u];
-    KAN_TEST_CHECK (strcmp (buffer_meta->name, "instance_vertex") == 0)
-    KAN_TEST_CHECK (buffer_meta->binding == 1u)
-    KAN_TEST_CHECK (buffer_meta->type == KAN_RPL_BUFFER_TYPE_INSTANCED_ATTRIBUTE)
-    KAN_TEST_CHECK (buffer_meta->main_size == 84u)
-    KAN_TEST_CHECK (buffer_meta->tail_item_size == 0u)
-
-    KAN_TEST_ASSERT (buffer_meta->attributes.size == 3u)
-    attribute_meta = &((struct kan_rpl_meta_attribute_t *) buffer_meta->attributes.data)[0u];
+    KAN_TEST_ASSERT (attribute_source_meta->attributes.size == 3u)
+    attribute_meta = &((struct kan_rpl_meta_attribute_t *) attribute_source_meta->attributes.data)[0u];
+    KAN_TEST_CHECK (strcmp (attribute_meta->name, "color_multiplier") == 0)
     KAN_TEST_CHECK (attribute_meta->location == 5u)
-    KAN_TEST_CHECK (attribute_meta->type == KAN_RPL_META_VARIABLE_TYPE_F4)
     KAN_TEST_CHECK (attribute_meta->offset == 0u)
+    KAN_TEST_CHECK (attribute_meta->class == KAN_RPL_META_ATTRIBUTE_CLASS_VECTOR_4)
+    KAN_TEST_CHECK (attribute_meta->item_format == KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_UNORM_8)
+    KAN_TEST_CHECK (attribute_meta->meta.size == 0u)
 
-    attribute_meta = &((struct kan_rpl_meta_attribute_t *) buffer_meta->attributes.data)[1u];
+    attribute_meta = &((struct kan_rpl_meta_attribute_t *) attribute_source_meta->attributes.data)[1u];
+    KAN_TEST_CHECK (strcmp (attribute_meta->name, "joint_offset") == 0)
     KAN_TEST_CHECK (attribute_meta->location == 6u)
-    KAN_TEST_CHECK (attribute_meta->type == KAN_RPL_META_VARIABLE_TYPE_F4X4)
-    KAN_TEST_CHECK (attribute_meta->offset == 16u)
+    KAN_TEST_CHECK (attribute_meta->offset == 4u)
+    KAN_TEST_CHECK (attribute_meta->class == KAN_RPL_META_ATTRIBUTE_CLASS_VECTOR_1)
+    KAN_TEST_CHECK (attribute_meta->item_format == KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_UINT_32)
+    KAN_TEST_ASSERT (attribute_meta->meta.size == 2u)
+    KAN_TEST_CHECK (strcmp (((kan_interned_string_t *) attribute_meta->meta.data)[0u], "joint_offset_index") == 0)
+    KAN_TEST_CHECK (strcmp (((kan_interned_string_t *) attribute_meta->meta.data)[1u], "hidden") == 0)
 
-    attribute_meta = &((struct kan_rpl_meta_attribute_t *) buffer_meta->attributes.data)[2u];
-    KAN_TEST_CHECK (attribute_meta->location == 10u)
-    KAN_TEST_CHECK (attribute_meta->type == KAN_RPL_META_VARIABLE_TYPE_U1)
-    KAN_TEST_CHECK (attribute_meta->offset == 80u)
-
-    KAN_TEST_ASSERT (buffer_meta->main_parameters.size == 3u)
-    struct kan_rpl_meta_parameter_t *parameter_meta =
-        &((struct kan_rpl_meta_parameter_t *) buffer_meta->main_parameters.data)[0u];
-    KAN_TEST_CHECK (strcmp (parameter_meta->name, "color_multiplier") == 0)
-    KAN_TEST_CHECK (parameter_meta->type == KAN_RPL_META_VARIABLE_TYPE_F4)
-    KAN_TEST_CHECK (parameter_meta->offset == 0u)
-    KAN_TEST_CHECK (parameter_meta->total_item_count == 1u)
-    KAN_TEST_ASSERT (parameter_meta->meta.size == 0u)
-
-    parameter_meta = &((struct kan_rpl_meta_parameter_t *) buffer_meta->main_parameters.data)[1u];
-    KAN_TEST_CHECK (strcmp (parameter_meta->name, "model_space") == 0)
-    KAN_TEST_CHECK (parameter_meta->type == KAN_RPL_META_VARIABLE_TYPE_F4X4)
-    KAN_TEST_CHECK (parameter_meta->offset == 16u)
-    KAN_TEST_CHECK (parameter_meta->total_item_count == 1u)
-    KAN_TEST_ASSERT (parameter_meta->meta.size == 2u)
-    KAN_TEST_CHECK (strcmp (((kan_interned_string_t *) parameter_meta->meta.data)[0u], "model_space_matrix") == 0)
-    KAN_TEST_CHECK (strcmp (((kan_interned_string_t *) parameter_meta->meta.data)[1u], "hidden") == 0)
-
-    parameter_meta = &((struct kan_rpl_meta_parameter_t *) buffer_meta->main_parameters.data)[2u];
-    KAN_TEST_CHECK (strcmp (parameter_meta->name, "joint_offset") == 0)
-    KAN_TEST_CHECK (parameter_meta->type == KAN_RPL_META_VARIABLE_TYPE_U1)
-    KAN_TEST_CHECK (parameter_meta->offset == 80u)
-    KAN_TEST_CHECK (parameter_meta->total_item_count == 1u)
-    KAN_TEST_ASSERT (parameter_meta->meta.size == 2u)
-    KAN_TEST_CHECK (strcmp (((kan_interned_string_t *) parameter_meta->meta.data)[0u], "joint_offset_index") == 0)
-    KAN_TEST_CHECK (strcmp (((kan_interned_string_t *) parameter_meta->meta.data)[1u], "hidden") == 0)
-
-    KAN_TEST_ASSERT (buffer_meta->tail_item_parameters.size == 0u)
+    attribute_meta = &((struct kan_rpl_meta_attribute_t *) attribute_source_meta->attributes.data)[2u];
+    KAN_TEST_CHECK (strcmp (attribute_meta->name, "model_space") == 0)
+    KAN_TEST_CHECK (attribute_meta->location == 7u)
+    KAN_TEST_CHECK (attribute_meta->offset == 8u)
+    KAN_TEST_CHECK (attribute_meta->class == KAN_RPL_META_ATTRIBUTE_CLASS_MATRIX_4X4)
+    KAN_TEST_CHECK (attribute_meta->item_format == KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_FLOAT_32)
+    KAN_TEST_ASSERT (attribute_meta->meta.size == 2u)
+    KAN_TEST_CHECK (strcmp (((kan_interned_string_t *) attribute_meta->meta.data)[0u], "model_space_matrix") == 0)
+    KAN_TEST_CHECK (strcmp (((kan_interned_string_t *) attribute_meta->meta.data)[1u], "hidden") == 0)
 
     KAN_TEST_ASSERT (meta.set_pass.buffers.size == 1u)
-    buffer_meta = &((struct kan_rpl_meta_buffer_t *) meta.set_pass.buffers.data)[0u];
+    struct kan_rpl_meta_buffer_t *buffer_meta = &((struct kan_rpl_meta_buffer_t *) meta.set_pass.buffers.data)[0u];
     KAN_TEST_CHECK (strcmp (buffer_meta->name, "pass") == 0)
     KAN_TEST_CHECK (buffer_meta->binding == 0u)
     KAN_TEST_CHECK (buffer_meta->type == KAN_RPL_BUFFER_TYPE_UNIFORM)
     KAN_TEST_CHECK (buffer_meta->main_size == 64u)
 
-    KAN_TEST_ASSERT (buffer_meta->attributes.size == 0u)
-
     KAN_TEST_ASSERT (buffer_meta->main_parameters.size == 1u)
-    parameter_meta = &((struct kan_rpl_meta_parameter_t *) buffer_meta->main_parameters.data)[0u];
+    struct kan_rpl_meta_parameter_t *parameter_meta =
+        &((struct kan_rpl_meta_parameter_t *) buffer_meta->main_parameters.data)[0u];
     KAN_TEST_CHECK (strcmp (parameter_meta->name, "projection_mul_view") == 0)
     KAN_TEST_CHECK (parameter_meta->type == KAN_RPL_META_VARIABLE_TYPE_F4X4)
     KAN_TEST_CHECK (parameter_meta->offset == 0u)
@@ -235,8 +229,6 @@ KAN_TEST_CASE (generic)
     KAN_TEST_CHECK (buffer_meta->type == KAN_RPL_BUFFER_TYPE_READ_ONLY_STORAGE)
     KAN_TEST_CHECK (buffer_meta->main_size == 0u)
     KAN_TEST_CHECK (buffer_meta->tail_item_size == 64u)
-
-    KAN_TEST_ASSERT (buffer_meta->attributes.size == 0u)
 
     KAN_TEST_ASSERT (buffer_meta->main_parameters.size == 0u)
 

@@ -4,6 +4,138 @@
 KAN_LOG_DEFINE_CATEGORY (rpl_compiler_context);
 KAN_LOG_DEFINE_CATEGORY (rpl_compiler_instance);
 
+kan_instance_size_t kan_rpl_meta_attribute_item_format_get_size (enum kan_rpl_meta_attribute_item_format_t format)
+{
+    switch (format)
+    {
+    case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_FLOAT_16:
+    case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_UNORM_16:
+    case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_SNORM_16:
+    case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_UINT_16:
+    case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_SINT_16:
+        return sizeof (uint16_t);
+
+    case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_FLOAT_32:
+    case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_UNORM_32:
+    case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_SNORM_32:
+    case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_UINT_32:
+    case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_SINT_32:
+        return sizeof (uint32_t);
+
+    case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_UNORM_8:
+    case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_SNORM_8:
+    case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_UINT_8:
+    case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_SINT_8:
+        return sizeof (uint8_t);
+    }
+
+    KAN_ASSERT (KAN_FALSE)
+    return 0u;
+}
+
+kan_instance_size_t kan_rpl_meta_attribute_item_format_get_alignment (enum kan_rpl_meta_attribute_item_format_t format)
+{
+    switch (format)
+    {
+    case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_FLOAT_16:
+    case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_UNORM_16:
+    case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_SNORM_16:
+    case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_UINT_16:
+    case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_SINT_16:
+        return _Alignof (uint16_t);
+
+    case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_FLOAT_32:
+    case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_UNORM_32:
+    case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_SNORM_32:
+    case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_UINT_32:
+    case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_SINT_32:
+        return _Alignof (uint32_t);
+
+    case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_UNORM_8:
+    case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_SNORM_8:
+    case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_UINT_8:
+    case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_SINT_8:
+        return _Alignof (uint8_t);
+    }
+
+    KAN_ASSERT (KAN_FALSE)
+    return 0u;
+}
+
+RENDER_PIPELINE_LANGUAGE_API void kan_rpl_meta_attribute_init (struct kan_rpl_meta_attribute_t *instance)
+{
+    instance->name = NULL;
+    instance->location = 0u;
+    instance->offset = 0u;
+    instance->class = KAN_RPL_META_ATTRIBUTE_CLASS_VECTOR_1;
+    instance->item_format = KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_FLOAT_32;
+    kan_dynamic_array_init (&instance->meta, 0u, sizeof (kan_interned_string_t), _Alignof (kan_interned_string_t),
+                            STATICS.rpl_meta_allocation_group);
+}
+
+RENDER_PIPELINE_LANGUAGE_API void kan_rpl_meta_attribute_init_copy (struct kan_rpl_meta_attribute_t *instance,
+                                                                    const struct kan_rpl_meta_attribute_t *copy_from)
+{
+    instance->name = copy_from->name;
+    instance->location = copy_from->location;
+    instance->offset = copy_from->offset;
+    instance->class = copy_from->class;
+    instance->item_format = copy_from->item_format;
+
+    kan_dynamic_array_init (&instance->meta, copy_from->meta.size, sizeof (kan_interned_string_t),
+                            _Alignof (kan_interned_string_t), STATICS.rpl_meta_allocation_group);
+    instance->meta.size = copy_from->meta.size;
+
+    if (instance->meta.size > 0u)
+    {
+        memcpy (instance->meta.data, copy_from->meta.data, copy_from->meta.size * copy_from->meta.item_size);
+    }
+}
+
+RENDER_PIPELINE_LANGUAGE_API void kan_rpl_meta_attribute_shutdown (struct kan_rpl_meta_attribute_t *instance)
+{
+    kan_dynamic_array_shutdown (&instance->meta);
+}
+
+void kan_rpl_meta_attribute_source_init (struct kan_rpl_meta_attribute_source_t *instance)
+{
+    instance->name = NULL;
+    instance->rate = KAN_RPL_META_ATTRIBUTE_SOURCE_RATE_VERTEX;
+    instance->binding = 0u;
+    instance->block_size = 0u;
+    kan_dynamic_array_init (&instance->attributes, 0u, sizeof (struct kan_rpl_meta_attribute_t),
+                            _Alignof (struct kan_rpl_meta_attribute_t), STATICS.rpl_meta_allocation_group);
+}
+
+void kan_rpl_meta_attribute_source_init_copy (struct kan_rpl_meta_attribute_source_t *instance,
+                                              const struct kan_rpl_meta_attribute_source_t *copy_from)
+{
+    instance->name = copy_from->name;
+    instance->rate = copy_from->rate;
+    instance->binding = copy_from->binding;
+    instance->block_size = copy_from->block_size;
+
+    kan_dynamic_array_init (&instance->attributes, copy_from->attributes.size, sizeof (struct kan_rpl_meta_attribute_t),
+                            _Alignof (struct kan_rpl_meta_attribute_t), STATICS.rpl_meta_allocation_group);
+
+    for (kan_loop_size_t index = 0u; index < copy_from->attributes.size; ++index)
+    {
+        kan_rpl_meta_attribute_init_copy (kan_dynamic_array_add_last (&instance->attributes),
+                                          &((struct kan_rpl_meta_attribute_t *) copy_from->attributes.data)[index]);
+    }
+}
+
+void kan_rpl_meta_attribute_source_shutdown (struct kan_rpl_meta_attribute_source_t *instance)
+{
+    for (kan_loop_size_t attribute_index = 0u; attribute_index < instance->attributes.size; ++attribute_index)
+    {
+        kan_rpl_meta_attribute_shutdown (
+            &((struct kan_rpl_meta_attribute_t *) instance->attributes.data)[attribute_index]);
+    }
+
+    kan_dynamic_array_shutdown (&instance->attributes);
+}
+
 const char *kan_rpl_meta_variable_type_to_string (enum kan_rpl_meta_variable_type_t type)
 {
     switch (type)
@@ -92,11 +224,9 @@ void kan_rpl_meta_buffer_init (struct kan_rpl_meta_buffer_t *instance)
 {
     instance->name = NULL;
     instance->binding = 0u;
-    instance->type = KAN_RPL_BUFFER_TYPE_VERTEX_ATTRIBUTE;
+    instance->type = KAN_RPL_BUFFER_TYPE_UNIFORM;
     instance->main_size = 0u;
     instance->tail_item_size = 0u;
-    kan_dynamic_array_init (&instance->attributes, 0u, sizeof (struct kan_rpl_meta_attribute_t),
-                            _Alignof (struct kan_rpl_meta_attribute_t), STATICS.rpl_meta_allocation_group);
     kan_dynamic_array_init (&instance->main_parameters, 0u, sizeof (struct kan_rpl_meta_parameter_t),
                             _Alignof (struct kan_rpl_meta_parameter_t), STATICS.rpl_meta_allocation_group);
 
@@ -113,16 +243,6 @@ void kan_rpl_meta_buffer_init_copy (struct kan_rpl_meta_buffer_t *instance,
     instance->type = copy_from->type;
     instance->main_size = copy_from->main_size;
     instance->tail_item_size = copy_from->tail_item_size;
-
-    kan_dynamic_array_init (&instance->attributes, copy_from->attributes.size, sizeof (struct kan_rpl_meta_attribute_t),
-                            _Alignof (struct kan_rpl_meta_attribute_t), STATICS.rpl_meta_allocation_group);
-    instance->attributes.size = copy_from->attributes.size;
-
-    if (instance->attributes.size > 0u)
-    {
-        memcpy (instance->attributes.data, copy_from->attributes.data,
-                copy_from->attributes.size * copy_from->attributes.item_size);
-    }
 
     kan_dynamic_array_init (&instance->main_parameters, copy_from->main_parameters.size,
                             sizeof (struct kan_rpl_meta_parameter_t), _Alignof (struct kan_rpl_meta_parameter_t),
@@ -162,7 +282,6 @@ void kan_rpl_meta_buffer_shutdown (struct kan_rpl_meta_buffer_t *instance)
             &((struct kan_rpl_meta_parameter_t *) instance->tail_item_parameters.data)[parameter_index]);
     }
 
-    kan_dynamic_array_shutdown (&instance->attributes);
     kan_dynamic_array_shutdown (&instance->main_parameters);
     kan_dynamic_array_shutdown (&instance->tail_item_parameters);
 }
@@ -226,8 +345,8 @@ void kan_rpl_meta_init (struct kan_rpl_meta_t *instance)
     instance->pipeline_type = KAN_RPL_PIPELINE_TYPE_GRAPHICS_CLASSIC;
     instance->graphics_classic_settings = kan_rpl_graphics_classic_pipeline_settings_default ();
 
-    kan_dynamic_array_init (&instance->attribute_buffers, 0u, sizeof (struct kan_rpl_meta_buffer_t),
-                            _Alignof (struct kan_rpl_meta_buffer_t), STATICS.rpl_meta_allocation_group);
+    kan_dynamic_array_init (&instance->attribute_sources, 0u, sizeof (struct kan_rpl_meta_attribute_source_t),
+                            _Alignof (struct kan_rpl_meta_attribute_source_t), STATICS.rpl_meta_allocation_group);
     kan_rpl_meta_set_bindings_init (&instance->set_pass);
     kan_rpl_meta_set_bindings_init (&instance->set_material);
     kan_rpl_meta_set_bindings_init (&instance->set_object);
@@ -253,14 +372,15 @@ void kan_rpl_meta_init_copy (struct kan_rpl_meta_t *instance, const struct kan_r
         break;
     }
 
-    kan_dynamic_array_init (&instance->attribute_buffers, copy_from->attribute_buffers.size,
-                            sizeof (struct kan_rpl_meta_buffer_t), _Alignof (struct kan_rpl_meta_buffer_t),
-                            STATICS.rpl_meta_allocation_group);
+    kan_dynamic_array_init (&instance->attribute_sources, copy_from->attribute_sources.size,
+                            sizeof (struct kan_rpl_meta_attribute_source_t),
+                            _Alignof (struct kan_rpl_meta_attribute_source_t), STATICS.rpl_meta_allocation_group);
 
-    for (kan_loop_size_t index = 0u; index < copy_from->attribute_buffers.size; ++index)
+    for (kan_loop_size_t index = 0u; index < copy_from->attribute_sources.size; ++index)
     {
-        kan_rpl_meta_buffer_init_copy (kan_dynamic_array_add_last (&instance->attribute_buffers),
-                                       &((struct kan_rpl_meta_buffer_t *) copy_from->attribute_buffers.data)[index]);
+        kan_rpl_meta_attribute_source_init_copy (
+            kan_dynamic_array_add_last (&instance->attribute_sources),
+            &((struct kan_rpl_meta_attribute_source_t *) copy_from->attribute_sources.data)[index]);
     }
 
     kan_rpl_meta_set_bindings_init_copy (&instance->set_pass, &copy_from->set_pass);
@@ -284,12 +404,13 @@ void kan_rpl_meta_init_copy (struct kan_rpl_meta_t *instance, const struct kan_r
 
 void kan_rpl_meta_shutdown (struct kan_rpl_meta_t *instance)
 {
-    for (kan_loop_size_t index = 0u; index < instance->attribute_buffers.size; ++index)
+    for (kan_loop_size_t index = 0u; index < instance->attribute_sources.size; ++index)
     {
-        kan_rpl_meta_buffer_shutdown (&((struct kan_rpl_meta_buffer_t *) instance->attribute_buffers.data)[index]);
+        kan_rpl_meta_attribute_source_shutdown (
+            &((struct kan_rpl_meta_attribute_source_t *) instance->attribute_sources.data)[index]);
     }
 
-    kan_dynamic_array_shutdown (&instance->attribute_buffers);
+    kan_dynamic_array_shutdown (&instance->attribute_sources);
     kan_rpl_meta_set_bindings_shutdown (&instance->set_pass);
     kan_rpl_meta_set_bindings_shutdown (&instance->set_material);
     kan_rpl_meta_set_bindings_shutdown (&instance->set_object);
@@ -316,8 +437,6 @@ kan_rpl_compiler_context_t kan_rpl_compiler_context_create (enum kan_rpl_pipelin
     kan_stack_group_allocator_init (&instance->resolve_allocator, STATICS.rpl_compiler_context_allocation_group,
                                     KAN_RPL_COMPILER_CONTEXT_RESOLVE_STACK);
 
-    kan_trivial_string_buffer_init (&instance->name_generation_buffer, STATICS.rpl_compiler_context_allocation_group,
-                                    KAN_RPL_COMPILER_INSTANCE_MAX_FLAT_NAME_LENGTH);
     return KAN_HANDLE_SET (kan_rpl_compiler_context_t, instance);
 }
 
@@ -522,6 +641,5 @@ void kan_rpl_compiler_context_destroy (kan_rpl_compiler_context_t compiler_conte
     kan_dynamic_array_shutdown (&instance->option_values);
     kan_dynamic_array_shutdown (&instance->modules);
     kan_stack_group_allocator_shutdown (&instance->resolve_allocator);
-    kan_trivial_string_buffer_shutdown (&instance->name_generation_buffer);
     kan_free_general (STATICS.rpl_compiler_context_allocation_group, instance, sizeof (struct rpl_compiler_context_t));
 }

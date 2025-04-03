@@ -133,6 +133,103 @@ static inline struct kan_rpl_graphics_classic_pipeline_settings_t kan_rpl_graphi
     };
 }
 
+/// \brief Describes classes of attribute data structures without specifying item type.
+/// \details We cannot list all possible vectors and matrices, as it would result in a very big enumeration due to
+///          various format combinations. Therefore, we use separate enum for data class and separate enum for format.
+enum kan_rpl_meta_attribute_class_t
+{
+    KAN_RPL_META_ATTRIBUTE_CLASS_VECTOR_1 = 0u,
+    KAN_RPL_META_ATTRIBUTE_CLASS_VECTOR_2,
+    KAN_RPL_META_ATTRIBUTE_CLASS_VECTOR_3,
+    KAN_RPL_META_ATTRIBUTE_CLASS_VECTOR_4,
+    KAN_RPL_META_ATTRIBUTE_CLASS_MATRIX_3X3,
+    KAN_RPL_META_ATTRIBUTE_CLASS_MATRIX_4X4,
+};
+
+/// \brief Format for attribute input item.
+/// \details Attribute input format might differ from variable type in shader as conversion is allowed on GPU.
+enum kan_rpl_meta_attribute_item_format_t
+{
+    KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_FLOAT_16 = 0u,
+    KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_FLOAT_32,
+    KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_UNORM_8,
+    KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_UNORM_16,
+    KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_UNORM_32,
+    KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_SNORM_8,
+    KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_SNORM_16,
+    KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_SNORM_32,
+    KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_UINT_8,
+    KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_UINT_16,
+    KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_UINT_32,
+    KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_SINT_8,
+    KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_SINT_16,
+    KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_SINT_32,
+};
+
+/// \brief Returns full item size of an input item encoded in given format.
+RENDER_PIPELINE_LANGUAGE_API kan_instance_size_t
+kan_rpl_meta_attribute_item_format_get_size (enum kan_rpl_meta_attribute_item_format_t format);
+
+/// \brief Returns item alignment of an input item encoded in given format.
+RENDER_PIPELINE_LANGUAGE_API kan_instance_size_t
+kan_rpl_meta_attribute_item_format_get_alignment (enum kan_rpl_meta_attribute_item_format_t format);
+
+/// \brief Stores information about attribute exposed by attribute source.
+struct kan_rpl_meta_attribute_t
+{
+    kan_interned_string_t name;
+    kan_rpl_size_t location;
+    kan_rpl_size_t offset;
+
+    enum kan_rpl_meta_attribute_class_t class;
+    enum kan_rpl_meta_attribute_item_format_t item_format;
+
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (kan_interned_string_t)
+    struct kan_dynamic_array_t meta;
+};
+
+RENDER_PIPELINE_LANGUAGE_API void kan_rpl_meta_attribute_init (struct kan_rpl_meta_attribute_t *instance);
+
+RENDER_PIPELINE_LANGUAGE_API void kan_rpl_meta_attribute_init_copy (struct kan_rpl_meta_attribute_t *instance,
+                                                                    const struct kan_rpl_meta_attribute_t *copy_from);
+
+RENDER_PIPELINE_LANGUAGE_API void kan_rpl_meta_attribute_shutdown (struct kan_rpl_meta_attribute_t *instance);
+
+/// \brief Enumerates known attribute source rates.
+enum kan_rpl_meta_attribute_source_rate_t
+{
+    /// \brief Contains one block per vertex.
+    KAN_RPL_META_ATTRIBUTE_SOURCE_RATE_VERTEX = 0u,
+
+    /// \brief Contains one block per draw instance.
+    KAN_RPL_META_ATTRIBUTE_SOURCE_RATE_INSTANCE,
+};
+
+/// \brief Stores information about attribute source exposed in metadata.
+struct kan_rpl_meta_attribute_source_t
+{
+    kan_interned_string_t name;
+    enum kan_rpl_meta_attribute_source_rate_t rate;
+
+    /// \brief Attribute source binding point.
+    kan_rpl_size_t binding;
+
+    /// \brief Size of one attribute block.
+    kan_rpl_size_t block_size;
+
+    /// \brief Parameters provided by this buffer main part, useful for things like materials.
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_meta_attribute_t)
+    struct kan_dynamic_array_t attributes;
+};
+
+RENDER_PIPELINE_LANGUAGE_API void kan_rpl_meta_attribute_source_init (struct kan_rpl_meta_attribute_source_t *instance);
+
+RENDER_PIPELINE_LANGUAGE_API void kan_rpl_meta_attribute_source_init_copy (
+    struct kan_rpl_meta_attribute_source_t *instance, const struct kan_rpl_meta_attribute_source_t *copy_from);
+
+RENDER_PIPELINE_LANGUAGE_API void kan_rpl_meta_attribute_source_shutdown (
+    struct kan_rpl_meta_attribute_source_t *instance);
+
 /// \brief Enumerates exposed variables types for metadata.
 enum kan_rpl_meta_variable_type_t
 {
@@ -154,14 +251,6 @@ enum kan_rpl_meta_variable_type_t
 
 /// \brief Helper for representing `kan_rpl_meta_variable_type_t` as strings in logs.
 RENDER_PIPELINE_LANGUAGE_API const char *kan_rpl_meta_variable_type_to_string (enum kan_rpl_meta_variable_type_t type);
-
-/// \brief Stores information about exposed buffer attribute.
-struct kan_rpl_meta_attribute_t
-{
-    kan_rpl_size_t location;
-    kan_rpl_size_t offset;
-    enum kan_rpl_meta_variable_type_t type;
-};
 
 /// \brief Stores information about exposed buffer parameter.
 struct kan_rpl_meta_parameter_t
@@ -202,11 +291,6 @@ struct kan_rpl_meta_buffer_t
 
     /// \brief Size of a tail item of runtime sized array if any (if none, then zero).
     kan_rpl_size_t tail_item_size;
-
-    /// \brief Attributes provided by this buffer, needed for pipeline setup.
-    /// \details Only provided for attribute buffers.
-    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_meta_attribute_t)
-    struct kan_dynamic_array_t attributes;
 
     /// \brief Parameters provided by this buffer main part, useful for things like materials.
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_meta_parameter_t)
@@ -351,8 +435,8 @@ struct kan_rpl_meta_t
         struct kan_rpl_graphics_classic_pipeline_settings_t graphics_classic_settings;
     };
 
-    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_meta_buffer_t)
-    struct kan_dynamic_array_t attribute_buffers;
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_meta_attribute_source_t)
+    struct kan_dynamic_array_t attribute_sources;
 
     struct kan_rpl_meta_set_bindings_t set_pass;
     struct kan_rpl_meta_set_bindings_t set_material;
@@ -374,7 +458,7 @@ enum kan_rpl_meta_emission_flags_t
     KAN_RPL_META_EMISSION_FULL = 0u,
 
     /// \brief Flag that tells compiler to skip generation of attribute buffers meta.
-    KAN_RPL_META_EMISSION_SKIP_ATTRIBUTE_BUFFERS = 1u << 0u,
+    KAN_RPL_META_EMISSION_SKIP_ATTRIBUTE_SOURCES = 1u << 0u,
 
     /// \brief Flags that tells compiler to skip generation of parameter sets meta.
     KAN_RPL_META_EMISSION_SKIP_SETS = 1u << 1u,

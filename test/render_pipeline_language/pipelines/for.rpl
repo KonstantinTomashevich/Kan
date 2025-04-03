@@ -1,9 +1,9 @@
 // Improvised simple pipeline to check that for loop can be properly processed.
 
-vertex_attribute_buffer vertex
+vertex_attribute_container vertex
 {
     f3 position;
-    f2 uv;
+    pack (float16) f2 uv;
 };
 
 set_object uniform_buffer uniforms
@@ -11,14 +11,14 @@ set_object uniform_buffer uniforms
     f4x4 model_view_projection;
 };
 
-vertex_stage_output vertex_output
+state_container state
 {
     f2 uv;
 };
 
 void vertex_main (void)
 {
-    vertex_output.uv = vertex.uv;
+    state.uv = vertex.uv;
     f4 position4 = f4 {vertex.position.xyz, 1.0};
     vertex_stage_output_position (uniforms.model_view_projection * position4);
 }
@@ -26,14 +26,14 @@ void vertex_main (void)
 set_material sampler color_sampler;
 set_material image_color_2d diffuse_color;
 
-fragment_stage_output fragment_output
+color_output_container fragment_output
 {
     f4 color;
 };
 
 void fragment_main (void)
 {
-    f4 base_color = sample (color_sampler, diffuse_color, vertex_output.uv);
+    f4 base_color = sample (color_sampler, diffuse_color, state.uv);
     f4 modifier = f4 {0.0, 0.0, 0.0, 1.0};
 
     for (u1 i = 0u; i < 5u || i < 7u || i < 10u; i = i + 1u)

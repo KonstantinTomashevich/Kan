@@ -54,7 +54,6 @@ struct rpl_compiler_context_t
     struct kan_dynamic_array_t modules;
 
     struct kan_stack_group_allocator_t resolve_allocator;
-    struct kan_trivial_string_buffer_t name_generation_buffer;
 };
 
 struct compiler_instance_setting_node_t
@@ -94,6 +93,18 @@ enum compiler_instance_type_class_t
     COMPILER_INSTANCE_TYPE_CLASS_IMAGE,
 };
 
+enum compiler_instance_type_flags_t
+{
+    /// \brief Used for expression output types.
+    ///        Indicates that is stored somewhere in pipeline interface, not function scopes.
+    /// \details Due to logical pointer model in languages like SPIRV, pointers to interface variables (anything that
+    ///          is not in function scope) need additional care when working with them. It makes it particularly
+    ///          difficult to use such pointers as writable arguments for functions. Therefore, we currently forbid
+    ///          using non-function-scope variables as writable arguments for functions. And to detect this access
+    ///          pattern, we need this flag.
+    COMPILER_INSTANCE_TYPE_INTERFACE_POINTER = 1u << 0u,
+};
+
 struct compiler_instance_type_definition_t
 {
     enum compiler_instance_type_class_t class;
@@ -105,6 +116,9 @@ struct compiler_instance_type_definition_t
         struct compiler_instance_buffer_node_t *buffer_data;
         enum kan_rpl_image_type_t image_type;
     };
+
+    enum kan_rpl_access_class_t access;
+    enum compiler_instance_type_flags_t flags;
 
     kan_bool_t array_size_runtime;
     kan_instance_size_t array_dimensions_count;
@@ -154,33 +168,60 @@ struct compiler_instance_struct_node_t
 
 struct binding_location_assignment_counter_t
 {
-    kan_rpl_size_t next_attribute_buffer_binding;
+    kan_rpl_size_t next_attribute_container_binding;
     kan_rpl_size_t next_pass_set_binding;
     kan_rpl_size_t next_material_set_binding;
     kan_rpl_size_t next_object_set_binding;
     kan_rpl_size_t next_shared_set_binding;
     kan_rpl_size_t next_attribute_location;
-    kan_rpl_size_t next_vertex_output_location;
-    kan_rpl_size_t next_fragment_output_location;
+    kan_rpl_size_t next_state_location;
+    kan_rpl_size_t next_color_output_location;
 };
 
-struct compiler_instance_buffer_flattened_declaration_t
+struct compiler_instance_container_field_stage_node_t
 {
-    struct compiler_instance_buffer_flattened_declaration_t *next;
-    struct compiler_instance_declaration_node_t *source_declaration;
-    kan_interned_string_t readable_name;
-    kan_rpl_size_t location;
-
+    struct compiler_instance_container_field_stage_node_t *next;
+    enum kan_rpl_pipeline_stage_t user_stage;
     spirv_size_t spirv_id_input;
     spirv_size_t spirv_id_output;
 };
 
-struct compiler_instance_buffer_flattening_graph_node_t
+struct compiler_instance_container_field_node_t
 {
-    struct compiler_instance_buffer_flattening_graph_node_t *next_on_level;
-    struct compiler_instance_buffer_flattening_graph_node_t *first_child;
+    struct compiler_instance_container_field_node_t *next;
+    struct compiler_instance_variable_t variable;
+
+    kan_instance_size_t location;
+    enum kan_rpl_meta_attribute_item_format_t input_item_format;
+    struct compiler_instance_container_field_stage_node_t *first_usage_stage;
+
+    kan_instance_size_t size;
+    kan_instance_size_t alignment;
+    kan_instance_size_t offset_if_input;
+
+    kan_instance_size_t meta_count;
+    kan_interned_string_t *meta;
+
+    kan_interned_string_t module_name;
+    kan_interned_string_t source_name;
+    kan_rpl_size_t source_line;
+};
+
+struct compiler_instance_container_node_t
+{
+    struct compiler_instance_container_node_t *next;
     kan_interned_string_t name;
-    struct compiler_instance_buffer_flattened_declaration_t *flattened_result;
+    enum kan_rpl_container_type_t type;
+    kan_bool_t used;
+
+    kan_instance_size_t block_size_if_input;
+    kan_instance_size_t block_alignment_if_input;
+    kan_instance_size_t binding_if_input;
+    struct compiler_instance_container_field_node_t *first_field;
+
+    kan_interned_string_t module_name;
+    kan_interned_string_t source_name;
+    kan_rpl_size_t source_line;
 };
 
 struct compiler_instance_buffer_node_t
@@ -196,10 +237,6 @@ struct compiler_instance_buffer_node_t
     kan_instance_size_t alignment;
     struct compiler_instance_declaration_node_t *first_field;
     kan_instance_size_t binding;
-
-    struct compiler_instance_buffer_flattening_graph_node_t *flattening_graph_base;
-    struct compiler_instance_buffer_flattened_declaration_t *first_flattened_declaration;
-    struct compiler_instance_buffer_flattened_declaration_t *last_flattened_declaration;
 
     spirv_size_t structured_variable_spirv_id;
 
@@ -250,8 +287,8 @@ enum compiler_instance_expression_type_t
     COMPILER_INSTANCE_EXPRESSION_TYPE_VARIABLE_REFERENCE,
     COMPILER_INSTANCE_EXPRESSION_TYPE_STRUCTURED_ACCESS,
     COMPILER_INSTANCE_EXPRESSION_TYPE_SWIZZLE,
-    COMPILER_INSTANCE_EXPRESSION_TYPE_FLATTENED_BUFFER_ACCESS_INPUT,
-    COMPILER_INSTANCE_EXPRESSION_TYPE_FLATTENED_BUFFER_ACCESS_OUTPUT,
+    COMPILER_INSTANCE_EXPRESSION_TYPE_CONTAINER_FIELD_ACCESS_INPUT,
+    COMPILER_INSTANCE_EXPRESSION_TYPE_CONTAINER_FIELD_ACCESS_OUTPUT,
     COMPILER_INSTANCE_EXPRESSION_TYPE_FLOATING_LITERAL,
     COMPILER_INSTANCE_EXPRESSION_TYPE_UNSIGNED_LITERAL,
     COMPILER_INSTANCE_EXPRESSION_TYPE_SIGNED_LITERAL,
@@ -337,7 +374,6 @@ struct compiler_instance_scope_variable_item_t
 {
     struct compiler_instance_scope_variable_item_t *next;
     struct compiler_instance_variable_t *variable;
-    enum kan_rpl_access_class_t access;
     spirv_size_t spirv_id;
 };
 
@@ -429,12 +465,6 @@ struct compiler_instance_while_suffix_t
     spirv_size_t spirv_label_continue;
 };
 
-struct compiler_instance_expression_output_type_t
-{
-    struct compiler_instance_type_definition_t type;
-    enum kan_rpl_access_class_t access;
-};
-
 struct compiler_instance_expression_node_t
 {
     enum compiler_instance_expression_type_t type;
@@ -446,7 +476,7 @@ struct compiler_instance_expression_node_t
         struct compiler_instance_scope_variable_item_t *variable_reference;
         struct compiler_instance_structured_access_suffix_t structured_access;
         struct compiler_instance_swizzle_suffix_t swizzle;
-        struct compiler_instance_buffer_flattened_declaration_t *flattened_buffer_access;
+        struct compiler_instance_container_field_node_t *container_field_access;
         float floating_literal;
         kan_rpl_unsigned_int_literal_t unsigned_literal;
         kan_rpl_signed_int_literal_t signed_literal;
@@ -470,10 +500,17 @@ struct compiler_instance_expression_node_t
         struct compiler_instance_expression_node_t *return_expression;
     };
 
-    struct compiler_instance_expression_output_type_t output;
+    struct compiler_instance_type_definition_t output;
     kan_interned_string_t module_name;
     kan_interned_string_t source_name;
     kan_rpl_size_t source_line;
+};
+
+struct compiler_instance_container_access_node_t
+{
+    struct compiler_instance_container_access_node_t *next;
+    struct compiler_instance_container_node_t *container;
+    struct compiler_instance_function_node_t *direct_access_function;
 };
 
 struct compiler_instance_buffer_access_node_t
@@ -481,7 +518,6 @@ struct compiler_instance_buffer_access_node_t
     struct compiler_instance_buffer_access_node_t *next;
     struct compiler_instance_buffer_node_t *buffer;
     struct compiler_instance_function_node_t *direct_access_function;
-    kan_bool_t used_as_output;
 };
 
 struct compiler_instance_sampler_access_node_t
@@ -502,7 +538,6 @@ struct compiler_instance_function_argument_node_t
 {
     struct compiler_instance_function_argument_node_t *next;
     struct compiler_instance_variable_t variable;
-    enum kan_rpl_access_class_t access;
 
     kan_interned_string_t module_name;
     kan_interned_string_t source_name;
@@ -521,6 +556,7 @@ struct compiler_instance_function_node_t
 
     kan_bool_t has_stage_specific_access;
     enum kan_rpl_pipeline_stage_t required_stage;
+    struct compiler_instance_container_access_node_t *first_container_access;
     struct compiler_instance_buffer_access_node_t *first_buffer_access;
     struct compiler_instance_sampler_access_node_t *first_sampler_access;
     struct compiler_instance_image_access_node_t *first_image_access;
@@ -550,6 +586,9 @@ struct rpl_compiler_instance_t
     struct compiler_instance_struct_node_t *first_struct;
     struct compiler_instance_struct_node_t *last_struct;
 
+    struct compiler_instance_container_node_t *first_container;
+    struct compiler_instance_container_node_t *last_container;
+
     struct compiler_instance_buffer_node_t *first_buffer;
     struct compiler_instance_buffer_node_t *last_buffer;
 
@@ -561,8 +600,6 @@ struct rpl_compiler_instance_t
 
     struct compiler_instance_function_node_t *first_function;
     struct compiler_instance_function_node_t *last_function;
-
-    struct kan_trivial_string_buffer_t resolve_name_generation_buffer;
 };
 
 enum inbuilt_type_item_t
@@ -760,6 +797,9 @@ struct kan_rpl_compiler_statics_t
     kan_interned_string_t interned_image_depth_3d;
     kan_interned_string_t interned_image_depth_cube;
     kan_interned_string_t interned_image_depth_2d_array;
+
+    kan_interned_string_t interned_in;
+    kan_interned_string_t interned_out;
 
     struct inbuilt_vector_type_t vector_types[INBUILT_VECTOR_TYPE_COUNT];
 #define INBUILT_MATRIX_TYPE_COUNT 2u
@@ -1156,7 +1196,7 @@ static inline void calculate_type_definition_size_and_alignment (struct compiler
     }
 }
 
-/// \brief Checks if type definition base types (everything except for the array specifiers) are equal.
+/// \brief Checks if type definition base types (array specifiers, access and flags are excluded) are equal.
 static inline kan_bool_t is_type_definition_base_equal (struct compiler_instance_type_definition_t *left,
                                                         struct compiler_instance_type_definition_t *right)
 {
@@ -1223,6 +1263,9 @@ static inline void copy_type_definition (struct compiler_instance_type_definitio
         output->image_type = source->image_type;
         break;
     }
+
+    output->access = source->access;
+    output->flags = source->flags;
 
     output->array_size_runtime = source->array_size_runtime;
     output->array_dimensions_count = source->array_dimensions_count;

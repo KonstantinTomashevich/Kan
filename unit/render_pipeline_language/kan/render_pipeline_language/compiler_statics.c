@@ -146,6 +146,9 @@ void kan_rpl_compiler_ensure_statics_initialized (void)
         STATICS.interned_image_depth_cube = kan_string_intern ("image_depth_cube");
         STATICS.interned_image_depth_2d_array = kan_string_intern ("image_depth_2d_array");
 
+        STATICS.interned_in = kan_string_intern ("in");
+        STATICS.interned_out = kan_string_intern ("out");
+
         for (kan_loop_size_t vector_item_count = 0u; vector_item_count < INBUILT_VECTOR_MAX_ITEMS; ++vector_item_count)
         {
             STATICS.vector_types[INBUILT_VECTOR_TYPE_INDEX (INBUILT_TYPE_ITEM_FLOAT, vector_item_count)] =
@@ -267,46 +270,49 @@ void kan_rpl_compiler_ensure_statics_initialized (void)
             .meta_type = KAN_RPL_META_VARIABLE_TYPE_F4X4,
         };
 
-        struct compiler_instance_type_definition_t type_definition_void = {
+        struct compiler_instance_type_definition_t type_definition_in_void = {
             .class = COMPILER_INSTANCE_TYPE_CLASS_VOID,
+            .access = KAN_RPL_ACCESS_CLASS_READ_ONLY,
             .array_size_runtime = KAN_FALSE,
             .array_dimensions_count = 0u,
             .array_dimensions = NULL,
         };
 
-#define VECTOR_TYPE_DEFINITION(TYPE, ITEM_TYPE, ITEMS_COUNT)                                                           \
-    struct compiler_instance_type_definition_t type_definition_##TYPE = {                                              \
+#define VECTOR_IN_TYPE_DEFINITION(TYPE, ITEM_TYPE, ITEMS_COUNT)                                                        \
+    struct compiler_instance_type_definition_t type_definition_in_##TYPE = {                                           \
         .class = COMPILER_INSTANCE_TYPE_CLASS_VECTOR,                                                                  \
         .vector_data = &STATICS.vector_types[INBUILT_VECTOR_TYPE_INDEX (ITEM_TYPE, ITEMS_COUNT)],                      \
+        .access = KAN_RPL_ACCESS_CLASS_READ_ONLY,                                                                      \
         .array_size_runtime = KAN_FALSE,                                                                               \
         .array_dimensions_count = 0u,                                                                                  \
         .array_dimensions = NULL,                                                                                      \
     }
 
-        VECTOR_TYPE_DEFINITION (f1, INBUILT_TYPE_ITEM_FLOAT, 1u);
-        VECTOR_TYPE_DEFINITION (f2, INBUILT_TYPE_ITEM_FLOAT, 2u);
-        VECTOR_TYPE_DEFINITION (f3, INBUILT_TYPE_ITEM_FLOAT, 3u);
-        VECTOR_TYPE_DEFINITION (f4, INBUILT_TYPE_ITEM_FLOAT, 4u);
-        VECTOR_TYPE_DEFINITION (u1, INBUILT_TYPE_ITEM_UNSIGNED, 1u);
-        VECTOR_TYPE_DEFINITION (u2, INBUILT_TYPE_ITEM_UNSIGNED, 2u);
-        VECTOR_TYPE_DEFINITION (u3, INBUILT_TYPE_ITEM_UNSIGNED, 3u);
-        VECTOR_TYPE_DEFINITION (u4, INBUILT_TYPE_ITEM_UNSIGNED, 4u);
-        VECTOR_TYPE_DEFINITION (s1, INBUILT_TYPE_ITEM_SIGNED, 1u);
-        VECTOR_TYPE_DEFINITION (s2, INBUILT_TYPE_ITEM_SIGNED, 2u);
-        VECTOR_TYPE_DEFINITION (s3, INBUILT_TYPE_ITEM_SIGNED, 3u);
-        VECTOR_TYPE_DEFINITION (s4, INBUILT_TYPE_ITEM_SIGNED, 4u);
+        VECTOR_IN_TYPE_DEFINITION (f1, INBUILT_TYPE_ITEM_FLOAT, 1u);
+        VECTOR_IN_TYPE_DEFINITION (f2, INBUILT_TYPE_ITEM_FLOAT, 2u);
+        VECTOR_IN_TYPE_DEFINITION (f3, INBUILT_TYPE_ITEM_FLOAT, 3u);
+        VECTOR_IN_TYPE_DEFINITION (f4, INBUILT_TYPE_ITEM_FLOAT, 4u);
+        VECTOR_IN_TYPE_DEFINITION (u1, INBUILT_TYPE_ITEM_UNSIGNED, 1u);
+        VECTOR_IN_TYPE_DEFINITION (u2, INBUILT_TYPE_ITEM_UNSIGNED, 2u);
+        VECTOR_IN_TYPE_DEFINITION (u3, INBUILT_TYPE_ITEM_UNSIGNED, 3u);
+        VECTOR_IN_TYPE_DEFINITION (u4, INBUILT_TYPE_ITEM_UNSIGNED, 4u);
+        VECTOR_IN_TYPE_DEFINITION (s1, INBUILT_TYPE_ITEM_SIGNED, 1u);
+        VECTOR_IN_TYPE_DEFINITION (s2, INBUILT_TYPE_ITEM_SIGNED, 2u);
+        VECTOR_IN_TYPE_DEFINITION (s3, INBUILT_TYPE_ITEM_SIGNED, 3u);
+        VECTOR_IN_TYPE_DEFINITION (s4, INBUILT_TYPE_ITEM_SIGNED, 4u);
 
-#define MATRIX_TYPE_DEFINITION(TYPE)                                                                                   \
-    struct compiler_instance_type_definition_t type_definition_##TYPE = {                                              \
+#define MATRIX_IN_TYPE_DEFINITION(TYPE)                                                                                \
+    struct compiler_instance_type_definition_t type_definition_in_##TYPE = {                                           \
         .class = COMPILER_INSTANCE_TYPE_CLASS_MATRIX,                                                                  \
         .matrix_data = type_pointer_##TYPE,                                                                            \
+        .access = KAN_RPL_ACCESS_CLASS_READ_ONLY,                                                                      \
         .array_size_runtime = KAN_FALSE,                                                                               \
         .array_dimensions_count = 0u,                                                                                  \
         .array_dimensions = NULL,                                                                                      \
     }
 
-        MATRIX_TYPE_DEFINITION (f3x3);
-        MATRIX_TYPE_DEFINITION (f4x4);
+        MATRIX_IN_TYPE_DEFINITION (f3x3);
+        MATRIX_IN_TYPE_DEFINITION (f4x4);
 
         const kan_interned_string_t interned_sampler = kan_string_intern ("sampler");
         const kan_interned_string_t interned_calls = kan_string_intern ("calls");
@@ -320,10 +326,9 @@ void kan_rpl_compiler_ensure_statics_initialized (void)
         .variable =                                                                                                    \
             {                                                                                                          \
                 .name = kan_string_intern (#NAME),                                                                     \
-                .type = type_definition_##TYPE,                                                                        \
+                .type = type_definition_in_##TYPE,                                                                     \
             },                                                                                                         \
-        .access = KAN_RPL_ACCESS_CLASS_READ_ONLY, .module_name = interned_sampler, .source_name = interned_calls,      \
-        .source_line = 0u,                                                                                             \
+        .module_name = interned_sampler, .source_name = interned_calls, .source_line = 0u,                             \
     }
 
         STATICS.sample_2d_additional_arguments[0u] = SAMPLER_ARGUMENT (f2, coordinates, NULL);
@@ -360,7 +365,7 @@ void kan_rpl_compiler_ensure_statics_initialized (void)
     STATICS.builtin_##NAME = (struct compiler_instance_function_node_t) {                                              \
         .next = NULL,                                                                                                  \
         .name = kan_string_intern (#NAME),                                                                             \
-        .return_type = type_definition_##RETURN_TYPE,                                                                  \
+        .return_type = type_definition_in_##RETURN_TYPE,                                                               \
         .first_argument = ARGUMENTS,                                                                                   \
         .body = NULL,                                                                                                  \
         .has_stage_specific_access = REQUIRED_STAGE == ANY_STAGE ? KAN_FALSE : KAN_TRUE,                               \
@@ -388,10 +393,9 @@ void kan_rpl_compiler_ensure_statics_initialized (void)
         .variable =                                                                                                    \
             {                                                                                                          \
                 .name = kan_string_intern (#NAME),                                                                     \
-                .type = type_definition_##TYPE,                                                                        \
+                .type = type_definition_in_##TYPE,                                                                     \
             },                                                                                                         \
-        .access = KAN_RPL_ACCESS_CLASS_READ_ONLY, .module_name = module_standard, .source_name = source_functions,     \
-        .source_line = 0u,                                                                                             \
+        .module_name = module_standard, .source_name = source_functions, .source_line = 0u,                            \
     }
 
 #define BUILTIN_0(NAME, RETURN_TYPE, REQUIRED_STAGE, SPIRV_EXTERNAL_LIBRARY, SPIRV_EXTERNAL_INSTRUCTION)               \

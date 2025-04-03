@@ -23,29 +23,29 @@ conditional (enable_skinning) struct joint_data_t
     f4x4[max_joints] model_joints;
 };
 
-vertex_attribute_buffer vertex
+vertex_attribute_container vertex
 {
     f3 position;
-    f3 normal;
-    f2 uv;
+    pack (snorm16) f3 normal;
+    pack (float16) f2 uv;
 
-    conditional (enable_skinning && skinning_2_weights) u2 joint_indices;
-    conditional (enable_skinning && skinning_2_weights) f2 joint_weights;
+    conditional (enable_skinning && skinning_2_weights) pack (uint16) u2 joint_indices;
+    conditional (enable_skinning && skinning_2_weights) pack (unorm8) f2 joint_weights;
 
-    conditional (enable_skinning && skinning_4_weights) u4 joint_indices;
-    conditional (enable_skinning && skinning_4_weights) f4 joint_weights;
+    conditional (enable_skinning && skinning_4_weights) pack (uint16) u4 joint_indices;
+    conditional (enable_skinning && skinning_4_weights) pack (unorm8) f4 joint_weights;
 };
 
-conditional (support_instancing) instanced_attribute_buffer instance_vertex
+conditional (support_instancing) instanced_attribute_container instance_vertex
 {
-    f4 color_multiplier;
-
-    meta (hidden, model_space_matrix)
-    f4x4 model_space;
+    pack (unorm8) f4 color_multiplier;
 
     conditional (enable_skinning)
     meta (hidden, joint_offset_index)
     u1 joint_offset;
+
+    meta (hidden, model_space_matrix)
+    f4x4 model_space;
 };
 
 set_pass uniform_buffer pass
@@ -74,7 +74,7 @@ conditional (support_instancing && enable_skinning) set_shared read_only_storage
     f4x4... transforms;
 };
 
-vertex_stage_output vertex_output
+state_container state
 {
     f2 uv;
     f4 color_multiplier;
@@ -82,10 +82,10 @@ vertex_stage_output vertex_output
 
 void vertex_main (void)
 {
-    vertex_output.uv = vertex.uv;
+    state.uv = vertex.uv;
     conditional (support_instancing) alias (color_multiplier, instance_vertex.color_multiplier)
     conditional (!support_instancing) alias (color_multiplier, material.color_multiplier)
-    vertex_output.color_multiplier = color_multiplier;
+    state.color_multiplier = color_multiplier;
 
     f4 position4 = f4 {vertex.position.xyz, 1.0};
     conditional (enable_skinning)
@@ -126,14 +126,14 @@ set_material sampler color_sampler;
 // Use image array just for testing purposes.
 set_material image_color_2d[4] diffuse_color;
 
-fragment_stage_output fragment_output
+color_output_container fragment_output
 {
     f4 color;
 };
 
 void fragment_main (void)
 {
-    fragment_output.color = sample (color_sampler, diffuse_color[2u], vertex_output.uv) *
-            darken_from_center (vertex_output.uv) *
-            vertex_output.color_multiplier;
+    fragment_output.color = sample (color_sampler, diffuse_color[2u], state.uv) *
+            darken_from_center (state.uv) *
+            state.color_multiplier;
 }

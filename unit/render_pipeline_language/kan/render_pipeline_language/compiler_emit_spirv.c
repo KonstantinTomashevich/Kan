@@ -426,25 +426,6 @@ static inline void spirv_copy_instructions (spirv_size_t **output,
     }
 }
 
-static inline kan_bool_t spirv_is_buffer_shared_across_invocations (struct compiler_instance_buffer_node_t *buffer)
-{
-    switch (buffer->type)
-    {
-    case KAN_RPL_BUFFER_TYPE_VERTEX_ATTRIBUTE:
-    case KAN_RPL_BUFFER_TYPE_INSTANCED_ATTRIBUTE:
-    case KAN_RPL_BUFFER_TYPE_FRAGMENT_STAGE_OUTPUT:
-    case KAN_RPL_BUFFER_TYPE_VERTEX_STAGE_OUTPUT:
-        return KAN_FALSE;
-
-    case KAN_RPL_BUFFER_TYPE_UNIFORM:
-    case KAN_RPL_BUFFER_TYPE_READ_ONLY_STORAGE:
-        return KAN_TRUE;
-    }
-
-    KAN_ASSERT (KAN_FALSE)
-    return KAN_FALSE;
-}
-
 static kan_bool_t spirv_finalize_generation_context (struct spirv_generation_context_t *context,
                                                      struct kan_dynamic_array_t *code_output)
 {
@@ -509,29 +490,36 @@ static kan_bool_t spirv_finalize_generation_context (struct spirv_generation_con
         }
 
         kan_loop_size_t accesses_count = 0u;
-        struct compiler_instance_buffer_access_node_t *buffer_access = function->first_buffer_access;
+        struct compiler_instance_container_access_node_t *container_access = function->first_container_access;
 
-        while (buffer_access)
+        while (container_access)
         {
-            if (!spirv_is_buffer_shared_across_invocations (buffer_access->buffer))
+            struct compiler_instance_container_field_node_t *field = container_access->container->first_field;
+            while (field)
             {
-                if (buffer_access->buffer->first_flattened_declaration)
+                struct compiler_instance_container_field_stage_node_t *stage = field->first_usage_stage;
+                while (stage)
                 {
-                    struct compiler_instance_buffer_flattened_declaration_t *declaration =
-                        buffer_access->buffer->first_flattened_declaration;
-                    while (declaration)
+                    if (stage->user_stage == entry_point->stage)
                     {
-                        ++accesses_count;
-                        declaration = declaration->next;
+                        if (stage->spirv_id_input != SPIRV_FIXED_ID_INVALID)
+                        {
+                            ++accesses_count;
+                        }
+
+                        if (stage->spirv_id_output != SPIRV_FIXED_ID_INVALID)
+                        {
+                            ++accesses_count;
+                        }
                     }
+
+                    stage = stage->next;
                 }
-                else
-                {
-                    ++accesses_count;
-                }
+
+                field = field->next;
             }
 
-            buffer_access = buffer_access->next;
+            container_access = container_access->next;
         }
 
         struct spirv_generation_builtin_t *builtin = context->first_builtin;
@@ -574,33 +562,38 @@ static kan_bool_t spirv_finalize_generation_context (struct spirv_generation_con
         entry_point_code[2u + name_word_length] = 0u;
         memcpy ((uint8_t *) (entry_point_code + 3u), function->name, name_length);
         spirv_size_t *access_output = entry_point_code + 3u + name_word_length;
-        buffer_access = function->first_buffer_access;
+        container_access = function->first_container_access;
 
-        while (buffer_access)
+        while (container_access)
         {
-            if (!spirv_is_buffer_shared_across_invocations (buffer_access->buffer))
+            struct compiler_instance_container_field_node_t *field = container_access->container->first_field;
+            while (field)
             {
-                if (buffer_access->buffer->first_flattened_declaration)
+                struct compiler_instance_container_field_stage_node_t *stage = field->first_usage_stage;
+                while (stage)
                 {
-                    struct compiler_instance_buffer_flattened_declaration_t *declaration =
-                        buffer_access->buffer->first_flattened_declaration;
-
-                    while (declaration)
+                    if (stage->user_stage == entry_point->stage)
                     {
-                        *access_output =
-                            buffer_access->used_as_output ? declaration->spirv_id_output : declaration->spirv_id_input;
-                        ++access_output;
-                        declaration = declaration->next;
+                        if (stage->spirv_id_input != SPIRV_FIXED_ID_INVALID)
+                        {
+                            *access_output = stage->spirv_id_input;
+                            ++access_output;
+                        }
+
+                        if (stage->spirv_id_output != SPIRV_FIXED_ID_INVALID)
+                        {
+                            *access_output = stage->spirv_id_output;
+                            ++access_output;
+                        }
                     }
+
+                    stage = stage->next;
                 }
-                else
-                {
-                    *access_output = buffer_access->buffer->structured_variable_spirv_id;
-                    ++access_output;
-                }
+
+                field = field->next;
             }
 
-            buffer_access = buffer_access->next;
+            container_access = container_access->next;
         }
 
         builtin = context->first_builtin;
@@ -1215,85 +1208,138 @@ static inline void spirv_emit_descriptor_set (struct spirv_generation_context_t 
     binding_code[3u] = (spirv_size_t) descriptor_set;
 }
 
-static inline void spirv_emit_flattened_input_variable (
-    struct spirv_generation_context_t *context,
-    struct compiler_instance_buffer_flattened_declaration_t *declaration,
-    kan_bool_t context_needs_flat_decoration)
+static inline void spirv_emit_container_field (struct spirv_generation_context_t *context,
+                                               enum kan_rpl_container_type_t container_type,
+                                               struct compiler_instance_container_field_node_t *field)
 {
-    declaration->spirv_id_input = context->current_bound;
-    ++context->current_bound;
-
-    spirv_size_t *variable_code = spirv_new_instruction (context, &context->global_variable_section, 4u);
-    variable_code[0u] |= SpvOpCodeMask & SpvOpVariable;
-    variable_code[1u] = spirv_get_or_create_pointer_type (
-        context, spirv_find_or_generate_object_type (context, &declaration->source_declaration->variable.type, 0u),
-        SpvStorageClassInput);
-
-    variable_code[2u] = declaration->spirv_id_input;
-    variable_code[3u] = SpvStorageClassInput;
-
-    spirv_emit_location (context, declaration->spirv_id_input, declaration->location);
-    spirv_generate_op_name (context, declaration->spirv_id_input, declaration->readable_name);
-
-    if (context_needs_flat_decoration)
+    struct compiler_instance_container_field_stage_node_t *stage = field->first_usage_stage;
+    while (stage)
     {
-        enum inbuilt_type_item_t item_type = INBUILT_TYPE_ITEM_FLOAT;
-        switch (declaration->source_declaration->variable.type.class)
+        kan_bool_t needs_input = KAN_FALSE;
+        kan_bool_t needs_output = KAN_FALSE;
+        kan_bool_t make_input_flat_if_integer = KAN_FALSE;
+
+        switch (container_type)
         {
-        case COMPILER_INSTANCE_TYPE_CLASS_VOID:
-        case COMPILER_INSTANCE_TYPE_CLASS_STRUCT:
-        case COMPILER_INSTANCE_TYPE_CLASS_BOOLEAN:
-        case COMPILER_INSTANCE_TYPE_CLASS_SAMPLER:
-        case COMPILER_INSTANCE_TYPE_CLASS_BUFFER:
-        case COMPILER_INSTANCE_TYPE_CLASS_IMAGE:
-            // Unexpected for flattened declarations.
-            KAN_ASSERT (KAN_FALSE)
+        case KAN_RPL_CONTAINER_TYPE_VERTEX_ATTRIBUTE:
+        case KAN_RPL_CONTAINER_TYPE_INSTANCED_ATTRIBUTE:
+            // Shouldn't be available outside of vertex stage anyway.
+            KAN_ASSERT (stage->user_stage == KAN_RPL_PIPELINE_STAGE_GRAPHICS_CLASSIC_VERTEX)
+            needs_input = KAN_TRUE;
+            needs_output = KAN_FALSE;
             break;
 
-        case COMPILER_INSTANCE_TYPE_CLASS_VECTOR:
-            item_type = declaration->source_declaration->variable.type.vector_data->item;
+        case KAN_RPL_CONTAINER_TYPE_STATE:
+            switch (stage->user_stage)
+            {
+            case KAN_RPL_PIPELINE_STAGE_GRAPHICS_CLASSIC_VERTEX:
+                needs_input = KAN_FALSE;
+                needs_output = KAN_TRUE;
+                break;
+
+            case KAN_RPL_PIPELINE_STAGE_GRAPHICS_CLASSIC_FRAGMENT:
+                needs_input = KAN_TRUE;
+                needs_output = KAN_FALSE;
+                make_input_flat_if_integer = KAN_TRUE;
+                break;
+            }
+
             break;
 
-        case COMPILER_INSTANCE_TYPE_CLASS_MATRIX:
-            item_type = declaration->source_declaration->variable.type.matrix_data->item;
+        case KAN_RPL_CONTAINER_TYPE_COLOR_OUTPUT:
+            // Shouldn't be available outside of fragment stage anyway.
+            KAN_ASSERT (stage->user_stage == KAN_RPL_PIPELINE_STAGE_GRAPHICS_CLASSIC_FRAGMENT)
+            needs_input = KAN_FALSE;
+            needs_output = KAN_TRUE;
             break;
         }
 
-        switch (item_type)
+        if (needs_input)
         {
-        case INBUILT_TYPE_ITEM_FLOAT:
-            break;
+            stage->spirv_id_input = context->current_bound;
+            ++context->current_bound;
 
-        case INBUILT_TYPE_ITEM_UNSIGNED:
-        case INBUILT_TYPE_ITEM_SIGNED:
+            spirv_size_t *variable_code = spirv_new_instruction (context, &context->global_variable_section, 4u);
+            variable_code[0u] |= SpvOpCodeMask & SpvOpVariable;
+            variable_code[1u] = spirv_get_or_create_pointer_type (
+                context, spirv_find_or_generate_object_type (context, &field->variable.type, 0u), SpvStorageClassInput);
+
+            variable_code[2u] = stage->spirv_id_input;
+            variable_code[3u] = SpvStorageClassInput;
+
+            spirv_emit_location (context, stage->spirv_id_input, field->location);
+            spirv_generate_op_name (context, stage->spirv_id_input, field->variable.name);
+
+            if (make_input_flat_if_integer)
+            {
+                enum inbuilt_type_item_t item_type = INBUILT_TYPE_ITEM_FLOAT;
+                switch (field->variable.type.class)
+                {
+                case COMPILER_INSTANCE_TYPE_CLASS_VOID:
+                case COMPILER_INSTANCE_TYPE_CLASS_STRUCT:
+                case COMPILER_INSTANCE_TYPE_CLASS_BOOLEAN:
+                case COMPILER_INSTANCE_TYPE_CLASS_SAMPLER:
+                case COMPILER_INSTANCE_TYPE_CLASS_BUFFER:
+                case COMPILER_INSTANCE_TYPE_CLASS_IMAGE:
+                    // Unexpected for flattened declarations.
+                    KAN_ASSERT (KAN_FALSE)
+                    break;
+
+                case COMPILER_INSTANCE_TYPE_CLASS_VECTOR:
+                    item_type = field->variable.type.vector_data->item;
+                    break;
+
+                case COMPILER_INSTANCE_TYPE_CLASS_MATRIX:
+                    item_type = field->variable.type.matrix_data->item;
+                    break;
+                }
+
+                switch (item_type)
+                {
+                case INBUILT_TYPE_ITEM_FLOAT:
+                    break;
+
+                case INBUILT_TYPE_ITEM_UNSIGNED:
+                case INBUILT_TYPE_ITEM_SIGNED:
+                {
+                    spirv_size_t *decoration_code = spirv_new_instruction (context, &context->decoration_section, 3u);
+                    decoration_code[0u] |= SpvOpCodeMask & SpvOpDecorate;
+                    decoration_code[1u] = stage->spirv_id_input;
+                    decoration_code[2u] = SpvDecorationFlat;
+                    break;
+                }
+                }
+            }
+        }
+        else
         {
-            spirv_size_t *decoration_code = spirv_new_instruction (context, &context->decoration_section, 3u);
-            decoration_code[0u] |= SpvOpCodeMask & SpvOpDecorate;
-            decoration_code[1u] = declaration->spirv_id_input;
-            decoration_code[2u] = SpvDecorationFlat;
-            break;
+            stage->spirv_id_input = SPIRV_FIXED_ID_INVALID;
         }
+
+        if (needs_output)
+        {
+            stage->spirv_id_output = context->current_bound;
+            ++context->current_bound;
+
+            spirv_size_t *variable_code = spirv_new_instruction (context, &context->global_variable_section, 4u);
+            variable_code[0u] |= SpvOpCodeMask & SpvOpVariable;
+            variable_code[1u] = spirv_get_or_create_pointer_type (
+                context, spirv_find_or_generate_object_type (context, &field->variable.type, 0u),
+                SpvStorageClassOutput);
+
+            variable_code[2u] = stage->spirv_id_output;
+            variable_code[3u] = SpvStorageClassOutput;
+
+            spirv_emit_location (context, stage->spirv_id_output, field->location);
+            spirv_generate_op_name (context, stage->spirv_id_output, field->variable.name);
         }
+        else
+        {
+            stage->spirv_id_output = SPIRV_FIXED_ID_INVALID;
+        }
+
+        stage = stage->next;
     }
-}
-
-static inline void spirv_emit_flattened_output_variable (
-    struct spirv_generation_context_t *context, struct compiler_instance_buffer_flattened_declaration_t *declaration)
-{
-    declaration->spirv_id_output = context->current_bound;
-    ++context->current_bound;
-
-    spirv_size_t *variable_code = spirv_new_instruction (context, &context->global_variable_section, 4u);
-    variable_code[0u] |= SpvOpCodeMask & SpvOpVariable;
-    variable_code[1u] = spirv_get_or_create_pointer_type (
-        context, spirv_find_or_generate_object_type (context, &declaration->source_declaration->variable.type, 0u),
-        SpvStorageClassOutput);
-
-    variable_code[2u] = declaration->spirv_id_output;
-    variable_code[3u] = SpvStorageClassOutput;
-
-    spirv_emit_location (context, declaration->spirv_id_output, declaration->location);
-    spirv_generate_op_name (context, declaration->spirv_id_output, declaration->readable_name);
 }
 
 static kan_bool_t spirv_is_uniform_resource_type (struct compiler_instance_type_definition_t *type)
@@ -1603,12 +1649,8 @@ static kan_instance_size_t spirv_count_access_chain_elements (
 
         switch (top_expression->structured_buffer_reference->type)
         {
-        case KAN_RPL_BUFFER_TYPE_VERTEX_ATTRIBUTE:
         case KAN_RPL_BUFFER_TYPE_UNIFORM:
         case KAN_RPL_BUFFER_TYPE_READ_ONLY_STORAGE:
-        case KAN_RPL_BUFFER_TYPE_INSTANCED_ATTRIBUTE:
-        case KAN_RPL_BUFFER_TYPE_VERTEX_STAGE_OUTPUT:
-        case KAN_RPL_BUFFER_TYPE_FRAGMENT_STAGE_OUTPUT:
             return 0u;
         }
     }
@@ -1662,12 +1704,8 @@ static spirv_size_t *spirv_fill_access_chain_elements (struct spirv_generation_c
     {
         switch (top_expression->structured_buffer_reference->type)
         {
-        case KAN_RPL_BUFFER_TYPE_VERTEX_ATTRIBUTE:
         case KAN_RPL_BUFFER_TYPE_UNIFORM:
         case KAN_RPL_BUFFER_TYPE_READ_ONLY_STORAGE:
-        case KAN_RPL_BUFFER_TYPE_INSTANCED_ATTRIBUTE:
-        case KAN_RPL_BUFFER_TYPE_VERTEX_STAGE_OUTPUT:
-        case KAN_RPL_BUFFER_TYPE_FRAGMENT_STAGE_OUTPUT:
             return output;
         }
     }
@@ -1679,13 +1717,6 @@ static inline SpvStorageClass spirv_get_structured_buffer_storage_class (struct 
 {
     switch (buffer->type)
     {
-    case KAN_RPL_BUFFER_TYPE_VERTEX_ATTRIBUTE:
-    case KAN_RPL_BUFFER_TYPE_INSTANCED_ATTRIBUTE:
-    case KAN_RPL_BUFFER_TYPE_VERTEX_STAGE_OUTPUT:
-    case KAN_RPL_BUFFER_TYPE_FRAGMENT_STAGE_OUTPUT:
-        KAN_ASSERT (KAN_FALSE)
-        return (SpvStorageClass) SPIRV_FIXED_ID_INVALID;
-
     case KAN_RPL_BUFFER_TYPE_UNIFORM:
         return SpvStorageClassUniform;
 
@@ -1699,15 +1730,15 @@ static inline SpvStorageClass spirv_get_structured_buffer_storage_class (struct 
 
 static spirv_size_t spirv_use_temporary_variable (struct spirv_generation_context_t *context,
                                                   struct spirv_generation_function_node_t *function,
-                                                  struct compiler_instance_expression_output_type_t *required_type)
+                                                  struct compiler_instance_type_definition_t *required_type)
 {
     // We do not expect temporary variables to be arrays or booleans.
     // If they are, then something is wrong with the resolve.
-    KAN_ASSERT (required_type->type.array_dimensions_count == 0u)
-    KAN_ASSERT (!required_type->type.array_size_runtime)
+    KAN_ASSERT (required_type->array_dimensions_count == 0u)
+    KAN_ASSERT (!required_type->array_size_runtime)
 
     spirv_size_t required_type_id = SPIRV_FIXED_ID_INVALID;
-    switch (required_type->type.class)
+    switch (required_type->class)
     {
     case COMPILER_INSTANCE_TYPE_CLASS_VOID:
     case COMPILER_INSTANCE_TYPE_CLASS_BOOLEAN:
@@ -1721,7 +1752,7 @@ static spirv_size_t spirv_use_temporary_variable (struct spirv_generation_contex
     case COMPILER_INSTANCE_TYPE_CLASS_VECTOR:
     case COMPILER_INSTANCE_TYPE_CLASS_MATRIX:
     case COMPILER_INSTANCE_TYPE_CLASS_STRUCT:
-        required_type_id = spirv_find_or_generate_object_type (context, &required_type->type, 0u);
+        required_type_id = spirv_find_or_generate_object_type (context, required_type, 0u);
         break;
     }
 
@@ -1791,7 +1822,7 @@ static inline spirv_size_t spirv_emit_access_chain (struct spirv_generation_cont
     spirv_size_t result_id = context->current_bound;
     ++context->current_bound;
 
-    spirv_size_t result_value_type = spirv_find_or_generate_object_type (context, &top_expression->output.type, 0u);
+    spirv_size_t result_value_type = spirv_find_or_generate_object_type (context, &top_expression->output, 0u);
     spirv_size_t result_pointer_type = (spirv_size_t) SPIRV_FIXED_ID_INVALID;
 
     switch (root_expression->type)
@@ -1855,15 +1886,15 @@ static inline spirv_size_t spirv_emit_access_chain (struct spirv_generation_cont
     case COMPILER_INSTANCE_EXPRESSION_TYPE_VECTOR_CONSTRUCTOR:
     case COMPILER_INSTANCE_EXPRESSION_TYPE_MATRIX_CONSTRUCTOR:
     case COMPILER_INSTANCE_EXPRESSION_TYPE_STRUCT_CONSTRUCTOR:
-        KAN_ASSERT (!spirv_is_uniform_resource_type (&top_expression->output.type))
+        KAN_ASSERT (!spirv_is_uniform_resource_type (&top_expression->output))
         result_pointer_type = spirv_get_or_create_pointer_type (context, result_value_type, SpvStorageClassFunction);
         break;
 
-    case COMPILER_INSTANCE_EXPRESSION_TYPE_FLATTENED_BUFFER_ACCESS_INPUT:
+    case COMPILER_INSTANCE_EXPRESSION_TYPE_CONTAINER_FIELD_ACCESS_INPUT:
         result_pointer_type = spirv_get_or_create_pointer_type (context, result_value_type, SpvStorageClassInput);
         break;
 
-    case COMPILER_INSTANCE_EXPRESSION_TYPE_FLATTENED_BUFFER_ACCESS_OUTPUT:
+    case COMPILER_INSTANCE_EXPRESSION_TYPE_CONTAINER_FIELD_ACCESS_OUTPUT:
         result_pointer_type = spirv_get_or_create_pointer_type (context, result_value_type, SpvStorageClassOutput);
         break;
     }
@@ -2141,10 +2172,10 @@ static inline spirv_size_t *spirv_gather_call_arguments (
                                                                arguments_should_be_pointers);
 
             kan_bool_t pointer_argument_needs_to_be_interned =
-                arguments_should_be_pointers && !spirv_is_uniform_resource_type (&argument->expression->output.type) &&
+                arguments_should_be_pointers && !spirv_is_uniform_resource_type (&argument->expression->output) &&
                 // Special case for flattened input variables: they're technically pointers, but they have different
                 // storage type, therefore they should be copied into function variable first.
-                (argument->expression->type == COMPILER_INSTANCE_EXPRESSION_TYPE_FLATTENED_BUFFER_ACCESS_INPUT ||
+                (argument->expression->type == COMPILER_INSTANCE_EXPRESSION_TYPE_CONTAINER_FIELD_ACCESS_INPUT ||
                  // Special case for access chains: their results can not be passed as function arguments as
                  // requested by SPIRV specification, therefore they should be copied into function variable first.
                  argument->expression->type == COMPILER_INSTANCE_EXPRESSION_TYPE_STRUCTURED_ACCESS ||
@@ -2321,7 +2352,7 @@ static spirv_size_t spirv_emit_expression (struct spirv_generation_context_t *co
         }
 
         return spirv_request_load (context, *current_block,
-                                   spirv_find_or_generate_object_type (context, &expression->output.type, 0u),
+                                   spirv_find_or_generate_object_type (context, &expression->output, 0u),
                                    expression->variable_reference->spirv_id, KAN_TRUE);
 
     case COMPILER_INSTANCE_EXPRESSION_TYPE_STRUCTURED_ACCESS:
@@ -2343,7 +2374,7 @@ static spirv_size_t spirv_emit_expression (struct spirv_generation_context_t *co
             spirv_emit_expression (context, function, current_block, expression->swizzle.input, KAN_FALSE);
 
         spirv_size_t result_type_id =
-            spirv_find_or_generate_vector_type (context, expression->output.type.vector_data - STATICS.vector_types);
+            spirv_find_or_generate_vector_type (context, expression->output.vector_data - STATICS.vector_types);
 
         spirv_size_t result_id = context->current_bound;
         ++context->current_bound;
@@ -2365,25 +2396,59 @@ static spirv_size_t spirv_emit_expression (struct spirv_generation_context_t *co
         return result_id;
     }
 
-    case COMPILER_INSTANCE_EXPRESSION_TYPE_FLATTENED_BUFFER_ACCESS_INPUT:
-        if (result_should_be_pointer)
+    case COMPILER_INSTANCE_EXPRESSION_TYPE_CONTAINER_FIELD_ACCESS_INPUT:
+    {
+        struct compiler_instance_container_field_stage_node_t *stage =
+            expression->container_field_access->first_usage_stage;
+
+        while (stage)
         {
-            return expression->flattened_buffer_access->spirv_id_input;
+            if (stage->user_stage == function->source->required_stage)
+            {
+                if (result_should_be_pointer)
+                {
+                    return stage->spirv_id_input;
+                }
+
+                return spirv_request_load (context, *current_block,
+                                           spirv_find_or_generate_object_type (context, &expression->output, 0u),
+                                           stage->spirv_id_input, KAN_TRUE);
+            }
+
+            stage = stage->next;
         }
 
-        return spirv_request_load (context, *current_block,
-                                   spirv_find_or_generate_object_type (context, &expression->output.type, 0u),
-                                   expression->flattened_buffer_access->spirv_id_input, KAN_TRUE);
+        // Internal corruption somewhere.
+        KAN_ASSERT (KAN_FALSE)
+        return SPIRV_FIXED_ID_INVALID;
+    }
 
-    case COMPILER_INSTANCE_EXPRESSION_TYPE_FLATTENED_BUFFER_ACCESS_OUTPUT:
-        if (result_should_be_pointer)
+    case COMPILER_INSTANCE_EXPRESSION_TYPE_CONTAINER_FIELD_ACCESS_OUTPUT:
+    {
+        struct compiler_instance_container_field_stage_node_t *stage =
+            expression->container_field_access->first_usage_stage;
+
+        while (stage)
         {
-            return expression->flattened_buffer_access->spirv_id_output;
+            if (stage->user_stage == function->source->required_stage)
+            {
+                if (result_should_be_pointer)
+                {
+                    return stage->spirv_id_output;
+                }
+
+                return spirv_request_load (context, *current_block,
+                                           spirv_find_or_generate_object_type (context, &expression->output, 0u),
+                                           stage->spirv_id_output, KAN_TRUE);
+            }
+
+            stage = stage->next;
         }
 
-        return spirv_request_load (context, *current_block,
-                                   spirv_find_or_generate_object_type (context, &expression->output.type, 0u),
-                                   expression->flattened_buffer_access->spirv_id_output, KAN_TRUE);
+        // Internal corruption somewhere.
+        KAN_ASSERT (KAN_FALSE)
+        return SPIRV_FIXED_ID_INVALID;
+    }
 
     case COMPILER_INSTANCE_EXPRESSION_TYPE_FLOATING_LITERAL:
     {
@@ -2429,7 +2494,7 @@ static spirv_size_t spirv_emit_expression (struct spirv_generation_context_t *co
         BINARY_OPERATION_COMMON_PREPARE;
         spirv_size_t result_id = SPIRV_FIXED_ID_INVALID;
 
-        switch (expression->output.type.class)
+        switch (expression->output.class)
         {
         case COMPILER_INSTANCE_TYPE_CLASS_VOID:
         case COMPILER_INSTANCE_TYPE_CLASS_STRUCT:
@@ -2442,13 +2507,13 @@ static spirv_size_t spirv_emit_expression (struct spirv_generation_context_t *co
             break;
 
         case COMPILER_INSTANCE_TYPE_CLASS_VECTOR:
-            result_id = spirv_emit_vector_add (context, &(*current_block)->code_section,
-                                               expression->output.type.vector_data, left_operand_id, right_operand_id);
+            result_id = spirv_emit_vector_add (context, &(*current_block)->code_section, expression->output.vector_data,
+                                               left_operand_id, right_operand_id);
             break;
 
         case COMPILER_INSTANCE_TYPE_CLASS_MATRIX:
-            result_id = spirv_emit_matrix_add (context, &(*current_block)->code_section,
-                                               expression->output.type.matrix_data, left_operand_id, right_operand_id);
+            result_id = spirv_emit_matrix_add (context, &(*current_block)->code_section, expression->output.matrix_data,
+                                               left_operand_id, right_operand_id);
             break;
         }
 
@@ -2461,7 +2526,7 @@ static spirv_size_t spirv_emit_expression (struct spirv_generation_context_t *co
         BINARY_OPERATION_COMMON_PREPARE;
         spirv_size_t result_id = SPIRV_FIXED_ID_INVALID;
 
-        switch (expression->output.type.class)
+        switch (expression->output.class)
         {
         case COMPILER_INSTANCE_TYPE_CLASS_VOID:
         case COMPILER_INSTANCE_TYPE_CLASS_STRUCT:
@@ -2474,13 +2539,13 @@ static spirv_size_t spirv_emit_expression (struct spirv_generation_context_t *co
             break;
 
         case COMPILER_INSTANCE_TYPE_CLASS_VECTOR:
-            result_id = spirv_emit_vector_sub (context, &(*current_block)->code_section,
-                                               expression->output.type.vector_data, left_operand_id, right_operand_id);
+            result_id = spirv_emit_vector_sub (context, &(*current_block)->code_section, expression->output.vector_data,
+                                               left_operand_id, right_operand_id);
             break;
 
         case COMPILER_INSTANCE_TYPE_CLASS_MATRIX:
-            result_id = spirv_emit_matrix_sub (context, &(*current_block)->code_section,
-                                               expression->output.type.matrix_data, left_operand_id, right_operand_id);
+            result_id = spirv_emit_matrix_sub (context, &(*current_block)->code_section, expression->output.matrix_data,
+                                               left_operand_id, right_operand_id);
             break;
         }
 
@@ -2493,41 +2558,41 @@ static spirv_size_t spirv_emit_expression (struct spirv_generation_context_t *co
         BINARY_OPERATION_COMMON_PREPARE;
         spirv_size_t result_id;
 
-        if (expression->binary_operation.left_operand->output.type.class == COMPILER_INSTANCE_TYPE_CLASS_VECTOR &&
-            expression->binary_operation.right_operand->output.type.class == COMPILER_INSTANCE_TYPE_CLASS_VECTOR &&
-            expression->binary_operation.left_operand->output.type.vector_data ==
-                expression->binary_operation.right_operand->output.type.vector_data)
+        if (expression->binary_operation.left_operand->output.class == COMPILER_INSTANCE_TYPE_CLASS_VECTOR &&
+            expression->binary_operation.right_operand->output.class == COMPILER_INSTANCE_TYPE_CLASS_VECTOR &&
+            expression->binary_operation.left_operand->output.vector_data ==
+                expression->binary_operation.right_operand->output.vector_data)
         {
-            result_id = spirv_emit_vector_mul (context, &(*current_block)->code_section,
-                                               expression->output.type.vector_data, left_operand_id, right_operand_id);
+            result_id = spirv_emit_vector_mul (context, &(*current_block)->code_section, expression->output.vector_data,
+                                               left_operand_id, right_operand_id);
         }
-        else if (expression->binary_operation.left_operand->output.type.class == COMPILER_INSTANCE_TYPE_CLASS_VECTOR &&
-                 expression->binary_operation.right_operand->output.type.class == COMPILER_INSTANCE_TYPE_CLASS_VECTOR &&
-                 expression->binary_operation.right_operand->output.type.vector_data->items_count == 1u)
+        else if (expression->binary_operation.left_operand->output.class == COMPILER_INSTANCE_TYPE_CLASS_VECTOR &&
+                 expression->binary_operation.right_operand->output.class == COMPILER_INSTANCE_TYPE_CLASS_VECTOR &&
+                 expression->binary_operation.right_operand->output.vector_data->items_count == 1u)
         {
             result_id = context->current_bound;
             ++context->current_bound;
 
             spirv_size_t *multiply = spirv_new_instruction (context, &(*current_block)->code_section, 5u);
             multiply[0u] |= SpvOpCodeMask & SpvOpVectorTimesScalar;
-            multiply[1u] = spirv_find_or_generate_vector_type (
-                context, expression->output.type.vector_data - STATICS.vector_types);
+            multiply[1u] =
+                spirv_find_or_generate_vector_type (context, expression->output.vector_data - STATICS.vector_types);
             multiply[2u] = result_id;
             multiply[3u] = left_operand_id;
             multiply[4u] = right_operand_id;
         }
-        else if (expression->binary_operation.left_operand->output.type.class == COMPILER_INSTANCE_TYPE_CLASS_MATRIX &&
-                 expression->binary_operation.right_operand->output.type.class == COMPILER_INSTANCE_TYPE_CLASS_VECTOR)
+        else if (expression->binary_operation.left_operand->output.class == COMPILER_INSTANCE_TYPE_CLASS_MATRIX &&
+                 expression->binary_operation.right_operand->output.class == COMPILER_INSTANCE_TYPE_CLASS_VECTOR)
         {
             result_id = context->current_bound;
             ++context->current_bound;
 
-            if (expression->binary_operation.right_operand->output.type.vector_data->items_count == 1u)
+            if (expression->binary_operation.right_operand->output.vector_data->items_count == 1u)
             {
                 spirv_size_t *multiply = spirv_new_instruction (context, &(*current_block)->code_section, 5u);
                 multiply[0u] |= SpvOpCodeMask & SpvOpMatrixTimesScalar;
-                multiply[1u] = spirv_find_or_generate_matrix_type (
-                    context, expression->output.type.matrix_data - STATICS.matrix_types);
+                multiply[1u] =
+                    spirv_find_or_generate_matrix_type (context, expression->output.matrix_data - STATICS.matrix_types);
                 multiply[2u] = result_id;
                 multiply[3u] = left_operand_id;
                 multiply[4u] = right_operand_id;
@@ -2536,37 +2601,37 @@ static spirv_size_t spirv_emit_expression (struct spirv_generation_context_t *co
             {
                 spirv_size_t *multiply = spirv_new_instruction (context, &(*current_block)->code_section, 5u);
                 multiply[0u] |= SpvOpCodeMask & SpvOpMatrixTimesVector;
-                multiply[1u] = spirv_find_or_generate_vector_type (
-                    context, expression->output.type.vector_data - STATICS.vector_types);
+                multiply[1u] =
+                    spirv_find_or_generate_vector_type (context, expression->output.vector_data - STATICS.vector_types);
                 multiply[2u] = result_id;
                 multiply[3u] = left_operand_id;
                 multiply[4u] = right_operand_id;
             }
         }
-        else if (expression->binary_operation.left_operand->output.type.class == COMPILER_INSTANCE_TYPE_CLASS_VECTOR &&
-                 expression->binary_operation.right_operand->output.type.class == COMPILER_INSTANCE_TYPE_CLASS_MATRIX)
+        else if (expression->binary_operation.left_operand->output.class == COMPILER_INSTANCE_TYPE_CLASS_VECTOR &&
+                 expression->binary_operation.right_operand->output.class == COMPILER_INSTANCE_TYPE_CLASS_MATRIX)
         {
             result_id = context->current_bound;
             ++context->current_bound;
 
             spirv_size_t *multiply = spirv_new_instruction (context, &(*current_block)->code_section, 5u);
             multiply[0u] |= SpvOpCodeMask & SpvOpVectorTimesMatrix;
-            multiply[1u] = spirv_find_or_generate_vector_type (
-                context, expression->output.type.vector_data - STATICS.vector_types);
+            multiply[1u] =
+                spirv_find_or_generate_vector_type (context, expression->output.vector_data - STATICS.vector_types);
             multiply[2u] = result_id;
             multiply[3u] = left_operand_id;
             multiply[4u] = right_operand_id;
         }
-        else if (expression->binary_operation.left_operand->output.type.class == COMPILER_INSTANCE_TYPE_CLASS_MATRIX &&
-                 expression->binary_operation.right_operand->output.type.class == COMPILER_INSTANCE_TYPE_CLASS_MATRIX)
+        else if (expression->binary_operation.left_operand->output.class == COMPILER_INSTANCE_TYPE_CLASS_MATRIX &&
+                 expression->binary_operation.right_operand->output.class == COMPILER_INSTANCE_TYPE_CLASS_MATRIX)
         {
             result_id = context->current_bound;
             ++context->current_bound;
 
             spirv_size_t *multiply = spirv_new_instruction (context, &(*current_block)->code_section, 5u);
             multiply[0u] |= SpvOpCodeMask & SpvOpMatrixTimesMatrix;
-            multiply[1u] = spirv_find_or_generate_matrix_type (
-                context, expression->output.type.matrix_data - STATICS.matrix_types);
+            multiply[1u] =
+                spirv_find_or_generate_matrix_type (context, expression->output.matrix_data - STATICS.matrix_types);
             multiply[2u] = result_id;
             multiply[3u] = left_operand_id;
             multiply[4u] = right_operand_id;
@@ -2586,45 +2651,45 @@ static spirv_size_t spirv_emit_expression (struct spirv_generation_context_t *co
         BINARY_OPERATION_COMMON_PREPARE;
         spirv_size_t result_id;
 
-        if (expression->binary_operation.left_operand->output.type.class == COMPILER_INSTANCE_TYPE_CLASS_VECTOR &&
-            expression->binary_operation.right_operand->output.type.class == COMPILER_INSTANCE_TYPE_CLASS_VECTOR &&
-            expression->binary_operation.left_operand->output.type.vector_data ==
-                expression->binary_operation.right_operand->output.type.vector_data)
+        if (expression->binary_operation.left_operand->output.class == COMPILER_INSTANCE_TYPE_CLASS_VECTOR &&
+            expression->binary_operation.right_operand->output.class == COMPILER_INSTANCE_TYPE_CLASS_VECTOR &&
+            expression->binary_operation.left_operand->output.vector_data ==
+                expression->binary_operation.right_operand->output.vector_data)
         {
-            result_id = spirv_emit_vector_div (context, &(*current_block)->code_section,
-                                               expression->output.type.vector_data, left_operand_id, right_operand_id);
+            result_id = spirv_emit_vector_div (context, &(*current_block)->code_section, expression->output.vector_data,
+                                               left_operand_id, right_operand_id);
         }
-        else if (expression->binary_operation.left_operand->output.type.class == COMPILER_INSTANCE_TYPE_CLASS_MATRIX &&
-                 expression->binary_operation.right_operand->output.type.class == COMPILER_INSTANCE_TYPE_CLASS_MATRIX &&
-                 expression->binary_operation.left_operand->output.type.matrix_data ==
-                     expression->binary_operation.right_operand->output.type.matrix_data)
+        else if (expression->binary_operation.left_operand->output.class == COMPILER_INSTANCE_TYPE_CLASS_MATRIX &&
+                 expression->binary_operation.right_operand->output.class == COMPILER_INSTANCE_TYPE_CLASS_MATRIX &&
+                 expression->binary_operation.left_operand->output.matrix_data ==
+                     expression->binary_operation.right_operand->output.matrix_data)
         {
-            result_id = spirv_emit_matrix_div (context, &(*current_block)->code_section,
-                                               expression->output.type.matrix_data, left_operand_id, right_operand_id);
+            result_id = spirv_emit_matrix_div (context, &(*current_block)->code_section, expression->output.matrix_data,
+                                               left_operand_id, right_operand_id);
         }
-        else if (expression->binary_operation.left_operand->output.type.class == COMPILER_INSTANCE_TYPE_CLASS_VECTOR &&
-                 expression->binary_operation.right_operand->output.type.class == COMPILER_INSTANCE_TYPE_CLASS_VECTOR &&
-                 expression->binary_operation.right_operand->output.type.vector_data->items_count == 1u)
+        else if (expression->binary_operation.left_operand->output.class == COMPILER_INSTANCE_TYPE_CLASS_VECTOR &&
+                 expression->binary_operation.right_operand->output.class == COMPILER_INSTANCE_TYPE_CLASS_VECTOR &&
+                 expression->binary_operation.right_operand->output.vector_data->items_count == 1u)
         {
             spirv_size_t composite_id = context->current_bound;
             ++context->current_bound;
 
-            spirv_size_t *construct = spirv_new_instruction (
-                context, &(*current_block)->code_section,
-                3u + expression->binary_operation.left_operand->output.type.vector_data->items_count);
+            spirv_size_t *construct =
+                spirv_new_instruction (context, &(*current_block)->code_section,
+                                       3u + expression->binary_operation.left_operand->output.vector_data->items_count);
             construct[0u] |= SpvOpCodeMask & SpvOpCompositeConstruct;
-            construct[1u] = spirv_find_or_generate_vector_type (
-                context, expression->output.type.vector_data - STATICS.vector_types);
+            construct[1u] =
+                spirv_find_or_generate_vector_type (context, expression->output.vector_data - STATICS.vector_types);
             construct[2u] = composite_id;
 
             for (kan_loop_size_t index = 0u;
-                 index < expression->binary_operation.left_operand->output.type.vector_data->items_count; ++index)
+                 index < expression->binary_operation.left_operand->output.vector_data->items_count; ++index)
             {
                 construct[3u + index] = right_operand_id;
             }
 
             result_id = spirv_emit_vector_div (context, &(*current_block)->code_section,
-                                               expression->binary_operation.left_operand->output.type.vector_data,
+                                               expression->binary_operation.left_operand->output.vector_data,
                                                left_operand_id, composite_id);
         }
         else
@@ -2644,7 +2709,7 @@ static spirv_size_t spirv_emit_expression (struct spirv_generation_context_t *co
         ++context->current_bound;
 
         spirv_size_t operation = SpvOpCodeMask;
-        switch (expression->output.type.vector_data->item)
+        switch (expression->output.vector_data->item)
         {
         case INBUILT_TYPE_ITEM_FLOAT:
             KAN_ASSERT (KAN_FALSE)
@@ -2661,8 +2726,7 @@ static spirv_size_t spirv_emit_expression (struct spirv_generation_context_t *co
 
         spirv_size_t *code = spirv_new_instruction (context, &(*current_block)->code_section, 5u);
         code[0u] |= SpvOpCodeMask & operation;
-        code[1u] =
-            spirv_find_or_generate_vector_type (context, expression->output.type.vector_data - STATICS.vector_types);
+        code[1u] = spirv_find_or_generate_vector_type (context, expression->output.vector_data - STATICS.vector_types);
         code[2u] = result_id;
         code[3u] = left_operand_id;
         code[4u] = right_operand_id;
@@ -2765,7 +2829,7 @@ static spirv_size_t spirv_emit_expression (struct spirv_generation_context_t *co
         ++context->current_bound;                                                                                      \
                                                                                                                        \
         spirv_size_t operation = SpvOpCodeMask;                                                                        \
-        switch (expression->binary_operation.left_operand->output.type.vector_data->item)                              \
+        switch (expression->binary_operation.left_operand->output.vector_data->item)                                   \
         {                                                                                                              \
         case INBUILT_TYPE_ITEM_FLOAT:                                                                                  \
             operation = WHEN_FLOAT;                                                                                    \
@@ -2812,7 +2876,7 @@ static spirv_size_t spirv_emit_expression (struct spirv_generation_context_t *co
         spirv_size_t *code = spirv_new_instruction (context, &(*current_block)->code_section, 5u);                     \
         code[0u] |= SpvOpCodeMask & OPERATION;                                                                         \
         code[1u] =                                                                                                     \
-            spirv_find_or_generate_vector_type (context, expression->output.type.vector_data - STATICS.vector_types);  \
+            spirv_find_or_generate_vector_type (context, expression->output.vector_data - STATICS.vector_types);       \
         code[2u] = result_id;                                                                                          \
         code[3u] = left_operand_id;                                                                                    \
         code[4u] = right_operand_id;                                                                                   \
@@ -2844,7 +2908,7 @@ static spirv_size_t spirv_emit_expression (struct spirv_generation_context_t *co
         spirv_size_t result_id = context->current_bound;
         ++context->current_bound;
 
-        switch (expression->output.type.class)
+        switch (expression->output.class)
         {
         case COMPILER_INSTANCE_TYPE_CLASS_VOID:
         case COMPILER_INSTANCE_TYPE_CLASS_STRUCT:
@@ -2859,7 +2923,7 @@ static spirv_size_t spirv_emit_expression (struct spirv_generation_context_t *co
         case COMPILER_INSTANCE_TYPE_CLASS_VECTOR:
         {
             spirv_size_t operation = SpvOpCodeMask;
-            switch (expression->output.type.vector_data->item)
+            switch (expression->output.vector_data->item)
             {
             case INBUILT_TYPE_ITEM_FLOAT:
                 operation = SpvOpFNegate;
@@ -2876,8 +2940,8 @@ static spirv_size_t spirv_emit_expression (struct spirv_generation_context_t *co
 
             spirv_size_t *code = spirv_new_instruction (context, &(*current_block)->code_section, 4u);
             code[0u] |= SpvOpCodeMask & operation;
-            code[1u] = spirv_find_or_generate_vector_type (context,
-                                                           expression->output.type.vector_data - STATICS.vector_types);
+            code[1u] =
+                spirv_find_or_generate_vector_type (context, expression->output.vector_data - STATICS.vector_types);
             code[2u] = result_id;
             code[3u] = operand_id;
             break;
@@ -2886,7 +2950,7 @@ static spirv_size_t spirv_emit_expression (struct spirv_generation_context_t *co
         case COMPILER_INSTANCE_TYPE_CLASS_MATRIX:
         {
             spirv_size_t constant_id = (spirv_size_t) SPIRV_FIXED_ID_INVALID;
-            switch (expression->output.type.matrix_data->item)
+            switch (expression->output.matrix_data->item)
             {
             case INBUILT_TYPE_ITEM_FLOAT:
                 constant_id = spirv_request_f1_constant (context, -1.0f);
@@ -2903,8 +2967,8 @@ static spirv_size_t spirv_emit_expression (struct spirv_generation_context_t *co
 
             spirv_size_t *multiply = spirv_new_instruction (context, &(*current_block)->code_section, 5u);
             multiply[0u] |= SpvOpCodeMask & SpvOpMatrixTimesScalar;
-            multiply[1u] = spirv_find_or_generate_matrix_type (
-                context, expression->output.type.matrix_data - STATICS.matrix_types);
+            multiply[1u] =
+                spirv_find_or_generate_matrix_type (context, expression->output.matrix_data - STATICS.matrix_types);
             multiply[2u] = result_id;
             multiply[3u] = operand_id;
             multiply[4u] = constant_id;
@@ -2944,8 +3008,7 @@ static spirv_size_t spirv_emit_expression (struct spirv_generation_context_t *co
 
         spirv_size_t *code = spirv_new_instruction (context, &(*current_block)->code_section, 4u);
         code[0u] |= SpvOpCodeMask & SpvOpNot;
-        code[1u] =
-            spirv_find_or_generate_vector_type (context, expression->output.type.vector_data - STATICS.vector_types);
+        code[1u] = spirv_find_or_generate_vector_type (context, expression->output.vector_data - STATICS.vector_types);
         code[2u] = result_id;
         code[3u] = operand_id;
 
@@ -3006,7 +3069,7 @@ static spirv_size_t spirv_emit_expression (struct spirv_generation_context_t *co
         spirv_size_t loaded_image_operand =
             spirv_emit_expression (context, function, current_block, expression->image_sample.image, KAN_FALSE);
 
-        enum kan_rpl_image_type_t image_type = expression->image_sample.image->output.type.image_type;
+        enum kan_rpl_image_type_t image_type = expression->image_sample.image->output.image_type;
         spirv_size_t sampled_image_type_id = spirv_find_or_generate_image_type (context, image_type).sampled_image;
 
         spirv_size_t sampled_image_result_id = context->current_bound;
@@ -3261,8 +3324,8 @@ static spirv_size_t spirv_emit_expression (struct spirv_generation_context_t *co
                 context, expression->vector_constructor.type - STATICS.vector_types);
 
             spirv_size_t result_id = spirv_convert_vector (
-                context, &(*current_block)->code_section, expression->output.type.vector_data->item,
-                expression->vector_constructor.first_argument->expression->output.type.vector_data->item, operand_id,
+                context, &(*current_block)->code_section, expression->output.vector_data->item,
+                expression->vector_constructor.first_argument->expression->output.vector_data->item, operand_id,
                 result_type_id);
 
             WRAP_OPERATION_RESULT_IF_NEEDED
@@ -3343,7 +3406,7 @@ static spirv_size_t spirv_emit_expression (struct spirv_generation_context_t *co
                 context, function, current_block, expression->matrix_constructor.first_argument->expression, KAN_FALSE);
 
             struct inbuilt_matrix_type_t *operand_matrix_type =
-                expression->matrix_constructor.first_argument->expression->output.type.matrix_data;
+                expression->matrix_constructor.first_argument->expression->output.matrix_data;
 
             spirv_size_t operand_column_type_id = spirv_find_or_generate_vector_type (
                 context, INBUILT_VECTOR_TYPE_INDEX (operand_matrix_type->item, operand_matrix_type->rows));
@@ -3498,8 +3561,8 @@ static struct spirv_generation_block_t *spirv_emit_scope (struct spirv_generatio
         case COMPILER_INSTANCE_EXPRESSION_TYPE_VARIABLE_REFERENCE:
         case COMPILER_INSTANCE_EXPRESSION_TYPE_STRUCTURED_ACCESS:
         case COMPILER_INSTANCE_EXPRESSION_TYPE_SWIZZLE:
-        case COMPILER_INSTANCE_EXPRESSION_TYPE_FLATTENED_BUFFER_ACCESS_INPUT:
-        case COMPILER_INSTANCE_EXPRESSION_TYPE_FLATTENED_BUFFER_ACCESS_OUTPUT:
+        case COMPILER_INSTANCE_EXPRESSION_TYPE_CONTAINER_FIELD_ACCESS_INPUT:
+        case COMPILER_INSTANCE_EXPRESSION_TYPE_CONTAINER_FIELD_ACCESS_OUTPUT:
         case COMPILER_INSTANCE_EXPRESSION_TYPE_FLOATING_LITERAL:
         case COMPILER_INSTANCE_EXPRESSION_TYPE_UNSIGNED_LITERAL:
         case COMPILER_INSTANCE_EXPRESSION_TYPE_SIGNED_LITERAL:
@@ -3833,29 +3896,47 @@ static inline void spirv_emit_function (struct spirv_generation_context_t *conte
     definition_code[4u] = function->spirv_function_type->generated_id;
 
     kan_bool_t writes_globals = KAN_FALSE;
-    kan_bool_t reads_globals = function->first_buffer_access || function->first_sampler_access;
+    kan_bool_t reads_globals = function->first_container_access || function->first_buffer_access ||
+                               function->first_sampler_access || function->first_image_access;
 
-    struct compiler_instance_buffer_access_node_t *buffer_access = function->first_buffer_access;
-    while (buffer_access)
+    struct compiler_instance_container_access_node_t *container_access = function->first_container_access;
+    while (container_access)
     {
-        switch (buffer_access->buffer->type)
+        switch (container_access->container->type)
         {
-        case KAN_RPL_BUFFER_TYPE_VERTEX_ATTRIBUTE:
-        case KAN_RPL_BUFFER_TYPE_UNIFORM:
-        case KAN_RPL_BUFFER_TYPE_READ_ONLY_STORAGE:
-        case KAN_RPL_BUFFER_TYPE_INSTANCED_ATTRIBUTE:
+        case KAN_RPL_CONTAINER_TYPE_VERTEX_ATTRIBUTE:
+        case KAN_RPL_CONTAINER_TYPE_INSTANCED_ATTRIBUTE:
             break;
 
-        case KAN_RPL_BUFFER_TYPE_VERTEX_STAGE_OUTPUT:
-            writes_globals |= function->required_stage == KAN_RPL_PIPELINE_STAGE_GRAPHICS_CLASSIC_VERTEX;
+        case KAN_RPL_CONTAINER_TYPE_STATE:
+            switch (function->required_stage)
+            {
+            case KAN_RPL_PIPELINE_STAGE_GRAPHICS_CLASSIC_VERTEX:
+                writes_globals = KAN_TRUE;
+                break;
+
+            case KAN_RPL_PIPELINE_STAGE_GRAPHICS_CLASSIC_FRAGMENT:
+                break;
+            }
+
             break;
 
-        case KAN_RPL_BUFFER_TYPE_FRAGMENT_STAGE_OUTPUT:
-            writes_globals |= function->required_stage == KAN_RPL_PIPELINE_STAGE_GRAPHICS_CLASSIC_FRAGMENT;
+        case KAN_RPL_CONTAINER_TYPE_COLOR_OUTPUT:
+            switch (function->required_stage)
+            {
+            case KAN_RPL_PIPELINE_STAGE_GRAPHICS_CLASSIC_VERTEX:
+                KAN_ASSERT (KAN_FALSE)
+                break;
+
+            case KAN_RPL_PIPELINE_STAGE_GRAPHICS_CLASSIC_FRAGMENT:
+                writes_globals = KAN_TRUE;
+                break;
+            }
+
             break;
         }
 
-        buffer_access = buffer_access->next;
+        container_access = container_access->next;
     }
 
     if (!writes_globals && !reads_globals)
@@ -3931,6 +4012,25 @@ kan_bool_t kan_rpl_compiler_instance_emit_spirv (kan_rpl_compiler_instance_t com
         struct_node = struct_node->next;
     }
 
+    struct compiler_instance_container_node_t *container = instance->first_container;
+    while (container)
+    {
+        if (!container->used)
+        {
+            container = container->next;
+            continue;
+        }
+
+        struct compiler_instance_container_field_node_t *field = container->first_field;
+        while (field)
+        {
+            spirv_emit_container_field (&context, container->type, field);
+            field = field->next;
+        }
+
+        container = container->next;
+    }
+
     struct compiler_instance_buffer_node_t *buffer = instance->first_buffer;
     while (buffer)
     {
@@ -3940,89 +4040,45 @@ kan_bool_t kan_rpl_compiler_instance_emit_spirv (kan_rpl_compiler_instance_t com
             continue;
         }
 
-        if (buffer->first_flattened_declaration)
+        spirv_size_t buffer_struct_id = context.current_bound;
+        ++context.current_bound;
+        spirv_emit_struct_from_declaration_list (&context, buffer->first_field, buffer->name, buffer_struct_id);
+
+        switch (buffer->type)
         {
-            buffer->structured_variable_spirv_id = UINT32_MAX;
-            struct compiler_instance_buffer_flattened_declaration_t *declaration = buffer->first_flattened_declaration;
-
-            while (declaration)
-            {
-                declaration->spirv_id_input = UINT32_MAX;
-                declaration->spirv_id_output = UINT32_MAX;
-
-                switch (buffer->type)
-                {
-                case KAN_RPL_BUFFER_TYPE_VERTEX_ATTRIBUTE:
-                case KAN_RPL_BUFFER_TYPE_INSTANCED_ATTRIBUTE:
-                    spirv_emit_flattened_input_variable (&context, declaration, KAN_FALSE);
-                    break;
-
-                case KAN_RPL_BUFFER_TYPE_UNIFORM:
-                case KAN_RPL_BUFFER_TYPE_READ_ONLY_STORAGE:
-                    KAN_ASSERT (KAN_FALSE)
-                    break;
-
-                case KAN_RPL_BUFFER_TYPE_VERTEX_STAGE_OUTPUT:
-                    spirv_emit_flattened_input_variable (&context, declaration, KAN_TRUE);
-                    spirv_emit_flattened_output_variable (&context, declaration);
-                    break;
-
-                case KAN_RPL_BUFFER_TYPE_FRAGMENT_STAGE_OUTPUT:
-                    spirv_emit_flattened_output_variable (&context, declaration);
-                    break;
-                }
-
-                declaration = declaration->next;
-            }
-        }
-        else
+        case KAN_RPL_BUFFER_TYPE_UNIFORM:
+        case KAN_RPL_BUFFER_TYPE_READ_ONLY_STORAGE:
         {
-            spirv_size_t buffer_struct_id = context.current_bound;
-            ++context.current_bound;
-            spirv_emit_struct_from_declaration_list (&context, buffer->first_field, buffer->name, buffer_struct_id);
-
-            switch (buffer->type)
-            {
-            case KAN_RPL_BUFFER_TYPE_VERTEX_ATTRIBUTE:
-            case KAN_RPL_BUFFER_TYPE_INSTANCED_ATTRIBUTE:
-            case KAN_RPL_BUFFER_TYPE_VERTEX_STAGE_OUTPUT:
-            case KAN_RPL_BUFFER_TYPE_FRAGMENT_STAGE_OUTPUT:
-                break;
-
-            case KAN_RPL_BUFFER_TYPE_UNIFORM:
-            case KAN_RPL_BUFFER_TYPE_READ_ONLY_STORAGE:
-            {
-                spirv_size_t *block_decorate_code = spirv_new_instruction (&context, &context.decoration_section, 3u);
-                block_decorate_code[0u] |= SpvOpCodeMask & SpvOpDecorate;
-                block_decorate_code[1u] = buffer_struct_id;
-                block_decorate_code[2u] = SpvDecorationBlock;
-                break;
-            }
-            }
-
-            SpvStorageClass storage_type = spirv_get_structured_buffer_storage_class (buffer);
-            spirv_size_t buffer_struct_pointer_id = context.current_bound;
-            ++context.current_bound;
-
-            spirv_size_t *pointer_code = spirv_new_instruction (&context, &context.higher_type_section, 4u);
-            pointer_code[0u] |= SpvOpCodeMask & SpvOpTypePointer;
-            pointer_code[1u] = buffer_struct_pointer_id;
-            pointer_code[2u] = storage_type;
-            pointer_code[3u] = buffer_struct_id;
-
-            buffer->structured_variable_spirv_id = context.current_bound;
-            ++context.current_bound;
-
-            spirv_size_t *variable_code = spirv_new_instruction (&context, &context.global_variable_section, 4u);
-            variable_code[0u] |= SpvOpCodeMask & SpvOpVariable;
-            variable_code[1u] = buffer_struct_pointer_id;
-            variable_code[2u] = buffer->structured_variable_spirv_id;
-            variable_code[3u] = storage_type;
-
-            spirv_emit_descriptor_set (&context, buffer->structured_variable_spirv_id, (spirv_size_t) buffer->set);
-            spirv_emit_binding (&context, buffer->structured_variable_spirv_id, buffer->binding);
-            spirv_generate_op_name (&context, buffer->structured_variable_spirv_id, buffer->name);
+            spirv_size_t *block_decorate_code = spirv_new_instruction (&context, &context.decoration_section, 3u);
+            block_decorate_code[0u] |= SpvOpCodeMask & SpvOpDecorate;
+            block_decorate_code[1u] = buffer_struct_id;
+            block_decorate_code[2u] = SpvDecorationBlock;
+            break;
         }
+        }
+
+        SpvStorageClass storage_type = spirv_get_structured_buffer_storage_class (buffer);
+        spirv_size_t buffer_struct_pointer_id = context.current_bound;
+        ++context.current_bound;
+
+        spirv_size_t *pointer_code = spirv_new_instruction (&context, &context.higher_type_section, 4u);
+        pointer_code[0u] |= SpvOpCodeMask & SpvOpTypePointer;
+        pointer_code[1u] = buffer_struct_pointer_id;
+        pointer_code[2u] = storage_type;
+        pointer_code[3u] = buffer_struct_id;
+
+        buffer->structured_variable_spirv_id = context.current_bound;
+        ++context.current_bound;
+
+        spirv_size_t *variable_code = spirv_new_instruction (&context, &context.global_variable_section, 4u);
+        variable_code[0u] |= SpvOpCodeMask & SpvOpVariable;
+        variable_code[1u] = buffer_struct_pointer_id;
+        variable_code[2u] = buffer->structured_variable_spirv_id;
+        variable_code[3u] = storage_type;
+
+        spirv_emit_descriptor_set (&context, buffer->structured_variable_spirv_id, (spirv_size_t) buffer->set);
+        spirv_emit_binding (&context, buffer->structured_variable_spirv_id, buffer->binding);
+        spirv_generate_op_name (&context, buffer->structured_variable_spirv_id, buffer->name);
 
         buffer = buffer->next;
     }

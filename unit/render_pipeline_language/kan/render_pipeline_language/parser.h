@@ -390,19 +390,81 @@ enum kan_rpl_set_t
     KAN_RPL_SET_SHARED = 3u,
 };
 
+/// \brief Enumerates supported container types.
+enum kan_rpl_container_type_t
+{
+    KAN_RPL_CONTAINER_TYPE_VERTEX_ATTRIBUTE = 0u,
+    KAN_RPL_CONTAINER_TYPE_INSTANCED_ATTRIBUTE,
+    KAN_RPL_CONTAINER_TYPE_STATE,
+    KAN_RPL_CONTAINER_TYPE_COLOR_OUTPUT,
+};
+
+/// \brief Enumerates known input attribute pack types.
+enum kan_rpl_input_pack_class_t
+{
+    /// \brief Special values that indicates that packing was not specified and original format should be used.
+    KAN_RPL_INPUT_PACK_CLASS_DEFAULT = 0u,
+
+    KAN_RPL_INPUT_PACK_CLASS_FLOAT,
+    KAN_RPL_INPUT_PACK_CLASS_UNORM,
+    KAN_RPL_INPUT_PACK_CLASS_SNORM,
+    KAN_RPL_INPUT_PACK_CLASS_UINT,
+    KAN_RPL_INPUT_PACK_CLASS_SINT,
+};
+
+/// \brief Defines structure that holds container field data.
+struct kan_rpl_container_field_t
+{
+    kan_interned_string_t type_name;
+    kan_interned_string_t name;
+
+    enum kan_rpl_input_pack_class_t pack_class;
+    union
+    {
+        KAN_REFLECTION_VISIBILITY_CONDITION_FIELD (pack_class)
+        KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (KAN_RPL_INPUT_PACK_CLASS_FLOAT)
+        KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (KAN_RPL_INPUT_PACK_CLASS_UNORM)
+        KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (KAN_RPL_INPUT_PACK_CLASS_SNORM)
+        KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (KAN_RPL_INPUT_PACK_CLASS_UINT)
+        KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (KAN_RPL_INPUT_PACK_CLASS_SINT)
+        kan_rpl_size_t pack_class_bits;
+    };
+
+    /// \details Conditional expression if it is not KAN_RPL_EXPRESSION_NODE_TYPE_NOPE.
+    kan_rpl_size_t conditional_index;
+
+    kan_rpl_size_t meta_list_size;
+    kan_rpl_size_t meta_list_index;
+
+    kan_interned_string_t source_name;
+    kan_rpl_size_t source_line;
+};
+
+/// \brief Defines structure that holds container data.
+struct kan_rpl_container_t
+{
+    kan_interned_string_t name;
+    enum kan_rpl_container_type_t type;
+
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_container_field_t)
+    struct kan_dynamic_array_t fields;
+
+    /// \details Conditional expression if it is not KAN_RPL_EXPRESSION_NODE_TYPE_NOPE.
+    kan_rpl_size_t conditional_index;
+
+    kan_interned_string_t source_name;
+    kan_rpl_size_t source_line;
+};
+
+RENDER_PIPELINE_LANGUAGE_API void kan_rpl_container_init (struct kan_rpl_container_t *instance);
+
+RENDER_PIPELINE_LANGUAGE_API void kan_rpl_container_shutdown (struct kan_rpl_container_t *instance);
+
 /// \brief Enumerates supported buffer types.
 enum kan_rpl_buffer_type_t
 {
-    KAN_RPL_BUFFER_TYPE_VERTEX_ATTRIBUTE = 0u,
     KAN_RPL_BUFFER_TYPE_UNIFORM,
     KAN_RPL_BUFFER_TYPE_READ_ONLY_STORAGE,
-    KAN_RPL_BUFFER_TYPE_INSTANCED_ATTRIBUTE,
-
-    /// \details Not really a buffer, but uses buffer semantics.
-    KAN_RPL_BUFFER_TYPE_VERTEX_STAGE_OUTPUT,
-
-    /// \details Not really a buffer, but uses buffer semantics.
-    KAN_RPL_BUFFER_TYPE_FRAGMENT_STAGE_OUTPUT,
 };
 
 /// \brief Defines structure that holds buffer data.
@@ -552,6 +614,10 @@ struct kan_rpl_intermediate_t
     /// \brief Array of parsed structs.
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_struct_t)
     struct kan_dynamic_array_t structs;
+
+    /// \brief Array of parsed containers.
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_container_t)
+    struct kan_dynamic_array_t containers;
 
     /// \brief Array of parsed buffers.
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_buffer_t)

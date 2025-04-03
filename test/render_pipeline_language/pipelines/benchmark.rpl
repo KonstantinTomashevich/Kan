@@ -1,6 +1,6 @@
 // Ported code glsl code from naga benchmark to rpl in order to use for benchmarking.
 
-vertex_attribute_buffer vertex
+vertex_attribute_container vertex
 {
     f3 position;
     f3 normal;
@@ -8,7 +8,7 @@ vertex_attribute_buffer vertex
     f4 tangent;
 };
 
-vertex_stage_output vertex_output
+state_container state
 {
     f3 world_position;
     f3 world_normal;
@@ -27,12 +27,12 @@ void vertex_main (void)
 {
     f4 position_4 = f4 {vertex.position, 1.0};
     f4 world_position_4 = volatile_uniforms.model * position_4;
-    vertex_output.world_position = world_position_4.xyz;
+    state.world_position = world_position_4.xyz;
 
     f3x3 model_cropped = f3x3 {volatile_uniforms.model};
-    vertex_output.world_normal = model_cropped  * vertex.normal;
-    vertex_output.uv = vertex.uv;
-    vertex_output.world_tangent = f4 {model_cropped * vertex.tangent.xyz, vertex.tangent.w};
+    state.world_normal = model_cropped  * vertex.normal;
+    state.uv = vertex.uv;
+    state.world_tangent = f4 {model_cropped * vertex.tangent.xyz, vertex.tangent.w};
     vertex_stage_output_position (world_position_4);
 }
 
@@ -75,7 +75,7 @@ set_material image_color_2d texture_normal;
 set_material image_color_2d texture_occlusion;
 set_material image_color_2d texture_emissive;
 
-fragment_stage_output fragment_output
+color_output_container fragment_output
 {
     f4 color;
 };
@@ -201,7 +201,7 @@ f3 reinhard_extended_luminance (in f3 color, in f1 max_white_l)
 f3 point_light (
     in point_light_t light, in f1 roughness, in f1 n_dot_v, in f3 _n, in f3 _v, in f3 _r, in f3 f0, in f3 diffuse_color)
 {
-    f3 light_to_frag = light.position.xyz - vertex_output.world_position;
+    f3 light_to_frag = light.position.xyz - state.world_position;
     f1 distance_square = dot_f3 (light_to_frag, light_to_frag);
     f1 range_attenuation = get_distance_attenuation (distance_square, light.light_parameters.x);
 
@@ -254,28 +254,28 @@ f3 directional_light (
 void fragment_main (void)
 {
     f4 output_color = material.base_color;
-    output_color = output_color * sample (texture_sampler, texture_base_color, vertex_output.uv);
+    output_color = output_color * sample (texture_sampler, texture_base_color, state.uv);
 
-    f4 metallic_roughness = sample (texture_sampler, texture_metallic_roughness, vertex_output.uv);
+    f4 metallic_roughness = sample (texture_sampler, texture_metallic_roughness, state.uv);
     f1 metallic = material.proughness_metallic_reflectance.y * metallic_roughness.z;
     f1 p_roughness = material.proughness_metallic_reflectance.x * metallic_roughness.y;
     f1 roughness = perceptual_roughness_to_roughness (p_roughness);
 
-    f3 _n = normalize_f3 (vertex_output.world_normal);
-    f3 _t = normalize_f3 (vertex_output.world_tangent.xyz);
-    f3 _b = cross_f3 (_n, _t) * vertex_output.world_tangent.w;
+    f3 _n = normalize_f3 (state.world_normal);
+    f3 _t = normalize_f3 (state.world_tangent.xyz);
+    f3 _b = cross_f3 (_n, _t) * state.world_tangent.w;
 
     // TODO: Not working with gl_FrontFacing for now as I'm not sure it is always need, because we cull back faces?
 
     f3x3 _tbn = f3x3 {_t, _b, _n};
-    _n = _tbn * normalize_f3 (sample (texture_sampler, texture_normal, vertex_output.uv).xyz * 2.0 - f3 {1.0});
+    _n = _tbn * normalize_f3 (sample (texture_sampler, texture_normal, state.uv).xyz * 2.0 - f3 {1.0});
 
-    f1 occlusion = sample (texture_sampler, texture_occlusion, vertex_output.uv).x;
+    f1 occlusion = sample (texture_sampler, texture_occlusion, state.uv).x;
 
-    f4 sampled_emissive = sample (texture_sampler, texture_emissive, vertex_output.uv);
+    f4 sampled_emissive = sample (texture_sampler, texture_emissive, state.uv);
     f4 emissive = f4 {material.emissive.xyz * sampled_emissive.xyz, material.emissive.w};
 
-    f3 _v = normalize_f3 (volatile_uniforms.camera_position.xyz - vertex_output.world_position);
+    f3 _v = normalize_f3 (volatile_uniforms.camera_position.xyz - state.world_position);
     f1 n_dot_v = max_f1 (dot_f3 (_n, _v), 0.001);
 
     f1 reflectance = material.proughness_metallic_reflectance.z;
