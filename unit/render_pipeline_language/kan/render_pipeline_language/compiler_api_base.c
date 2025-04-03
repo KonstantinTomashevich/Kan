@@ -16,8 +16,6 @@ kan_instance_size_t kan_rpl_meta_attribute_item_format_get_size (enum kan_rpl_me
         return sizeof (uint16_t);
 
     case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_FLOAT_32:
-    case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_UNORM_32:
-    case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_SNORM_32:
     case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_UINT_32:
     case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_SINT_32:
         return sizeof (uint32_t);
@@ -45,8 +43,6 @@ kan_instance_size_t kan_rpl_meta_attribute_item_format_get_alignment (enum kan_r
         return _Alignof (uint16_t);
 
     case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_FLOAT_32:
-    case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_UNORM_32:
-    case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_SNORM_32:
     case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_UINT_32:
     case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_SINT_32:
         return _Alignof (uint32_t);

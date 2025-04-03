@@ -271,8 +271,7 @@ And `pack_bits` is one of the following:
 - `8` bits, not supported for `float` class.
 - `16` bits.
 - `32` bits, only used to explicitly highlight that attribute has 32-bit precision in source data. 
-  Makes no sense for `unorm` and `snorm` as floating pointer format on pipeline code side will not be able to 
-  represent number with such precision.
+  Not supported for `unorm` and `snorm` as 32 bit floating point value would not be precise enough for that input.
 
 For example: `pack (unorm8)` informs compiler that all elements of the following vector or matrix field will be encoded
 in `unorm` format using 8 bits per item.

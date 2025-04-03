@@ -1067,10 +1067,6 @@ static inline kan_bool_t resolve_item_format (struct compiler_instance_type_defi
         case 16u:
             *output = KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_UNORM_16;
             return KAN_TRUE;
-
-        case 32u:
-            *output = KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_UNORM_32;
-            return KAN_TRUE;
         }
 
         break;
@@ -1084,10 +1080,6 @@ static inline kan_bool_t resolve_item_format (struct compiler_instance_type_defi
 
         case 16u:
             *output = KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_SNORM_16;
-            return KAN_TRUE;
-
-        case 32u:
-            *output = KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_SNORM_32;
             return KAN_TRUE;
         }
 
