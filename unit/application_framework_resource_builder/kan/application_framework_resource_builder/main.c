@@ -2031,6 +2031,7 @@ static inline kan_interned_string_t register_byproduct_internal (kan_functor_use
         return NULL;
     }
 
+    kan_atomic_int_lock (&source_node->target->compilation_entry_registry_lock);
     struct byproduct_node_t *node = NULL;
 #define BYPRODUCT_UNIQUE_HASH KAN_INT_MAX (kan_hash_t)
     kan_hash_t byproduct_hash = BYPRODUCT_UNIQUE_HASH;
@@ -2047,7 +2048,6 @@ static inline kan_interned_string_t register_byproduct_internal (kan_functor_use
             --byproduct_hash;
         }
 
-        kan_atomic_int_lock (&source_node->target->compilation_entry_registry_lock);
         const struct kan_hash_storage_bucket_t *bucket =
             kan_hash_storage_query (&source_node->target->byproducts, byproduct_hash);
         node = (struct byproduct_node_t *) bucket->first;
