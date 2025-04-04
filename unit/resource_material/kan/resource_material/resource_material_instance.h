@@ -34,8 +34,8 @@
 /// used to select appropriate subset. If this approach is used, we would still have one material instance parameter set
 /// and therefore we would be able to batch lots of draws.
 ///
-/// Keep in mind, that every buffer except for attribute buffers is allowed to have tail, therefore it is possible to
-/// have several tails inside one material and to select each one independently through independent index.
+/// Keep in mind, that every storage buffer is allowed to have tail, therefore it is possible to have several tails
+/// inside one material and to select each one independently through independent index.
 /// \endparblock
 
 KAN_C_HEADER_BEGIN
@@ -173,7 +173,7 @@ struct kan_resource_material_instance_t
     /// \brief Name of the parent material instance if any.
     kan_interned_string_t parent;
 
-    /// \brief Array of parameters for instance attribute buffers.
+    /// \brief Array of parameters for instance attribute source.
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_resource_material_parameter_t)
     struct kan_dynamic_array_t instanced_parameters;
 

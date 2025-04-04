@@ -164,6 +164,10 @@ enum kan_rpl_meta_attribute_item_format_t
     KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_SINT_32,
 };
 
+/// \brief Helper that returns readable name for the attribute item format.
+RENDER_PIPELINE_LANGUAGE_API const char *kan_rpl_meta_attribute_item_format_to_string (
+    enum kan_rpl_meta_attribute_item_format_t format);
+
 /// \brief Returns full item size of an input item encoded in given format.
 RENDER_PIPELINE_LANGUAGE_API kan_instance_size_t
 kan_rpl_meta_attribute_item_format_get_size (enum kan_rpl_meta_attribute_item_format_t format);

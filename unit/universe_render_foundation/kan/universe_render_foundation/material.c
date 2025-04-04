@@ -557,81 +557,103 @@ UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_deploy_render_foundatio
         kan_context_query (kan_universe_get_context (universe), KAN_CONTEXT_RENDER_BACKEND_SYSTEM_NAME);
 }
 
-static void add_attributes_from_buffer (const struct kan_rpl_meta_buffer_t *buffer,
+static void add_attributes_from_source (const struct kan_rpl_meta_attribute_source_t *source,
                                         struct kan_render_attribute_description_t *attributes,
                                         kan_instance_size_t *attribute_output_index_pointer)
 {
-    for (kan_loop_size_t attribute_index = 0u; attribute_index < buffer->attributes.size;
+    for (kan_loop_size_t attribute_index = 0u; attribute_index < source->attributes.size;
          ++attribute_index, ++*attribute_output_index_pointer)
     {
         struct kan_rpl_meta_attribute_t *attribute =
-            &((struct kan_rpl_meta_attribute_t *) buffer->attributes.data)[attribute_index];
-        enum kan_render_attribute_format_t format = KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_FLOAT_1;
+            &((struct kan_rpl_meta_attribute_t *) source->attributes.data)[attribute_index];
 
-        switch (attribute->type)
+        enum kan_render_attribute_class_t class = KAN_RENDER_ATTRIBUTE_CLASS_VECTOR_1;
+        enum kan_render_attribute_item_format_t format = KAN_RENDER_ATTRIBUTE_ITEM_FORMAT_FLOAT_32;
+
+        switch (attribute->class)
         {
-        case KAN_RPL_META_VARIABLE_TYPE_F1:
-            format = KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_FLOAT_1;
+        case KAN_RPL_META_ATTRIBUTE_CLASS_VECTOR_1:
+            class = KAN_RENDER_ATTRIBUTE_CLASS_VECTOR_1;
             break;
 
-        case KAN_RPL_META_VARIABLE_TYPE_F2:
-            format = KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_FLOAT_2;
+        case KAN_RPL_META_ATTRIBUTE_CLASS_VECTOR_2:
+            class = KAN_RENDER_ATTRIBUTE_CLASS_VECTOR_2;
             break;
 
-        case KAN_RPL_META_VARIABLE_TYPE_F3:
-            format = KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_FLOAT_3;
+        case KAN_RPL_META_ATTRIBUTE_CLASS_VECTOR_3:
+            class = KAN_RENDER_ATTRIBUTE_CLASS_VECTOR_3;
             break;
 
-        case KAN_RPL_META_VARIABLE_TYPE_F4:
-            format = KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_FLOAT_4;
+        case KAN_RPL_META_ATTRIBUTE_CLASS_VECTOR_4:
+            class = KAN_RENDER_ATTRIBUTE_CLASS_VECTOR_4;
             break;
 
-        case KAN_RPL_META_VARIABLE_TYPE_U1:
-            format = KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_UNSIGNED_INT_1;
+        case KAN_RPL_META_ATTRIBUTE_CLASS_MATRIX_3X3:
+            class = KAN_RENDER_ATTRIBUTE_CLASS_MATRIX_3_3;
             break;
 
-        case KAN_RPL_META_VARIABLE_TYPE_U2:
-            format = KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_UNSIGNED_INT_2;
+        case KAN_RPL_META_ATTRIBUTE_CLASS_MATRIX_4X4:
+            class = KAN_RENDER_ATTRIBUTE_CLASS_MATRIX_4_4;
+            break;
+        }
+
+        switch (attribute->item_format)
+        {
+        case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_FLOAT_16:
+            format = KAN_RENDER_ATTRIBUTE_ITEM_FORMAT_FLOAT_16;
             break;
 
-        case KAN_RPL_META_VARIABLE_TYPE_U3:
-            format = KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_UNSIGNED_INT_3;
+        case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_FLOAT_32:
+            format = KAN_RENDER_ATTRIBUTE_ITEM_FORMAT_FLOAT_32;
             break;
 
-        case KAN_RPL_META_VARIABLE_TYPE_U4:
-            format = KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_UNSIGNED_INT_4;
+        case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_UNORM_8:
+            format = KAN_RENDER_ATTRIBUTE_ITEM_FORMAT_FLOAT_UNORM_8;
             break;
 
-        case KAN_RPL_META_VARIABLE_TYPE_S1:
-            format = KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_SIGNED_INT_1;
+        case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_UNORM_16:
+            format = KAN_RENDER_ATTRIBUTE_ITEM_FORMAT_FLOAT_UNORM_16;
             break;
 
-        case KAN_RPL_META_VARIABLE_TYPE_S2:
-            format = KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_SIGNED_INT_2;
+        case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_SNORM_8:
+            format = KAN_RENDER_ATTRIBUTE_ITEM_FORMAT_FLOAT_SNORM_8;
             break;
 
-        case KAN_RPL_META_VARIABLE_TYPE_S3:
-            format = KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_SIGNED_INT_3;
+        case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_SNORM_16:
+            format = KAN_RENDER_ATTRIBUTE_ITEM_FORMAT_FLOAT_SNORM_16;
             break;
 
-        case KAN_RPL_META_VARIABLE_TYPE_S4:
-            format = KAN_RENDER_ATTRIBUTE_FORMAT_VECTOR_SIGNED_INT_4;
+        case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_UINT_8:
+            format = KAN_RENDER_ATTRIBUTE_ITEM_FORMAT_FLOAT_UINT_8;
             break;
 
-        case KAN_RPL_META_VARIABLE_TYPE_F3X3:
-            format = KAN_RENDER_ATTRIBUTE_FORMAT_MATRIX_FLOAT_3_3;
+        case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_UINT_16:
+            format = KAN_RENDER_ATTRIBUTE_ITEM_FORMAT_FLOAT_UINT_16;
             break;
 
-        case KAN_RPL_META_VARIABLE_TYPE_F4X4:
-            format = KAN_RENDER_ATTRIBUTE_FORMAT_MATRIX_FLOAT_4_4;
+        case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_UINT_32:
+            format = KAN_RENDER_ATTRIBUTE_ITEM_FORMAT_FLOAT_UINT_32;
+            break;
+
+        case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_SINT_8:
+            format = KAN_RENDER_ATTRIBUTE_ITEM_FORMAT_FLOAT_SINT_8;
+            break;
+
+        case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_SINT_16:
+            format = KAN_RENDER_ATTRIBUTE_ITEM_FORMAT_FLOAT_SINT_16;
+            break;
+
+        case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_SINT_32:
+            format = KAN_RENDER_ATTRIBUTE_ITEM_FORMAT_FLOAT_SINT_32;
             break;
         }
 
         attributes[*attribute_output_index_pointer] = (struct kan_render_attribute_description_t) {
-            .binding = buffer->binding,
+            .binding = source->binding,
             .location = attribute->location,
             .offset = attribute->offset,
-            .format = format,
+            .class = class,
+            .item_format = format,
         };
     }
 }
@@ -821,12 +843,12 @@ static void recreate_family (struct render_foundation_material_management_execut
             const struct kan_resource_material_pipeline_family_compiled_t *loaded =
                 KAN_RESOURCE_PROVIDER_CONTAINER_GET (kan_resource_material_pipeline_family_compiled_t, container);
 
-            if (loaded->vertex_attribute_buffers.size > 0u || loaded->has_instanced_attribute_buffer)
+            if (loaded->vertex_attribute_sources.size > 0u || loaded->has_instanced_attribute_source)
             {
                 attribute_sources = attribute_sources_static;
-                attributes_sources_count = loaded->vertex_attribute_buffers.size;
+                attributes_sources_count = loaded->vertex_attribute_sources.size;
 
-                if (loaded->has_instanced_attribute_buffer)
+                if (loaded->has_instanced_attribute_source)
                 {
                     ++attributes_sources_count;
                 }
@@ -839,29 +861,26 @@ static void recreate_family (struct render_foundation_material_management_execut
                         _Alignof (struct kan_render_attribute_source_description_t));
                 }
 
-                for (kan_loop_size_t index = 0u; index < loaded->vertex_attribute_buffers.size; ++index)
+                for (kan_loop_size_t index = 0u; index < loaded->vertex_attribute_sources.size; ++index)
                 {
-                    struct kan_rpl_meta_buffer_t *buffer =
-                        &((struct kan_rpl_meta_buffer_t *) loaded->vertex_attribute_buffers.data)[index];
-                    KAN_ASSERT (buffer->type == KAN_RPL_BUFFER_TYPE_VERTEX_ATTRIBUTE)
-
-                    attributes_count += buffer->attributes.size;
-                    KAN_ASSERT (buffer->tail_item_size == 0u)
+                    struct kan_rpl_meta_attribute_source_t *source =
+                        &((struct kan_rpl_meta_attribute_source_t *) loaded->vertex_attribute_sources.data)[index];
+                    attributes_count += source->attributes.size;
 
                     attribute_sources[index] = (struct kan_render_attribute_source_description_t) {
-                        .binding = buffer->binding,
-                        .stride = buffer->main_size,
+                        .binding = source->binding,
+                        .stride = source->block_size,
                         .rate = KAN_RENDER_ATTRIBUTE_RATE_PER_VERTEX,
                     };
                 }
 
-                if (loaded->has_instanced_attribute_buffer)
+                if (loaded->has_instanced_attribute_source)
                 {
-                    attributes_count += loaded->instanced_attribute_buffer.attributes.size;
-                    attribute_sources[loaded->vertex_attribute_buffers.size] =
+                    attributes_count += loaded->instanced_attribute_source.attributes.size;
+                    attribute_sources[loaded->vertex_attribute_sources.size] =
                         (struct kan_render_attribute_source_description_t) {
-                            .binding = loaded->instanced_attribute_buffer.binding,
-                            .stride = loaded->instanced_attribute_buffer.main_size,
+                            .binding = loaded->instanced_attribute_source.binding,
+                            .stride = loaded->instanced_attribute_source.block_size,
                             .rate = KAN_RENDER_ATTRIBUTE_RATE_PER_INSTANCE,
                         };
                 }
@@ -879,17 +898,17 @@ static void recreate_family (struct render_foundation_material_management_execut
                 }
 
                 kan_instance_size_t attribute_output_index = 0u;
-                for (kan_loop_size_t source_index = 0u; source_index < loaded->vertex_attribute_buffers.size;
+                for (kan_loop_size_t source_index = 0u; source_index < loaded->vertex_attribute_sources.size;
                      ++source_index)
                 {
-                    struct kan_rpl_meta_buffer_t *buffer =
-                        &((struct kan_rpl_meta_buffer_t *) loaded->vertex_attribute_buffers.data)[source_index];
-                    add_attributes_from_buffer (buffer, attributes, &attribute_output_index);
+                    struct kan_rpl_meta_attribute_source_t *source = &(
+                        (struct kan_rpl_meta_attribute_source_t *) loaded->vertex_attribute_sources.data)[source_index];
+                    add_attributes_from_source (source, attributes, &attribute_output_index);
                 }
 
-                if (loaded->has_instanced_attribute_buffer)
+                if (loaded->has_instanced_attribute_source)
                 {
-                    add_attributes_from_buffer (&loaded->instanced_attribute_buffer, attributes,
+                    add_attributes_from_source (&loaded->instanced_attribute_source, attributes,
                                                 &attribute_output_index);
                 }
             }
@@ -1369,34 +1388,35 @@ static void reload_material_from_family (struct render_foundation_material_manag
             const struct kan_resource_material_pipeline_family_compiled_t *family_data =
                 KAN_RESOURCE_PROVIDER_CONTAINER_GET (kan_resource_material_pipeline_family_compiled_t, container);
 
-            for (kan_loop_size_t index = 0u; index < loaded->vertex_attribute_buffers.size; ++index)
+            for (kan_loop_size_t index = 0u; index < loaded->vertex_attribute_sources.size; ++index)
             {
-                kan_rpl_meta_buffer_shutdown (
-                    &((struct kan_rpl_meta_buffer_t *) loaded->vertex_attribute_buffers.data)[index]);
+                kan_rpl_meta_attribute_source_shutdown (
+                    &((struct kan_rpl_meta_attribute_source_t *) loaded->vertex_attribute_sources.data)[index]);
             }
 
-            loaded->vertex_attribute_buffers.size = 0u;
-            kan_rpl_meta_buffer_shutdown (&loaded->instanced_attribute_buffer);
+            loaded->vertex_attribute_sources.size = 0u;
+            kan_rpl_meta_attribute_source_shutdown (&loaded->instanced_attribute_source);
             kan_rpl_meta_set_bindings_shutdown (&loaded->set_material_bindings);
             kan_rpl_meta_set_bindings_shutdown (&loaded->set_object_bindings);
             kan_rpl_meta_set_bindings_shutdown (&loaded->set_shared_bindings);
 
-            kan_dynamic_array_set_capacity (&loaded->vertex_attribute_buffers,
-                                            family_data->vertex_attribute_buffers.size);
+            kan_dynamic_array_set_capacity (&loaded->vertex_attribute_sources,
+                                            family_data->vertex_attribute_sources.size);
 
-            for (kan_loop_size_t index = 0u; index < family_data->vertex_attribute_buffers.size; ++index)
+            for (kan_loop_size_t index = 0u; index < family_data->vertex_attribute_sources.size; ++index)
             {
-                const struct kan_rpl_meta_buffer_t *source =
-                    &((struct kan_rpl_meta_buffer_t *) family_data->vertex_attribute_buffers.data)[index];
+                const struct kan_rpl_meta_attribute_source_t *source =
+                    &((struct kan_rpl_meta_attribute_source_t *) family_data->vertex_attribute_sources.data)[index];
 
-                struct kan_rpl_meta_buffer_t *target = kan_dynamic_array_add_last (&loaded->vertex_attribute_buffers);
+                struct kan_rpl_meta_attribute_source_t *target =
+                    kan_dynamic_array_add_last (&loaded->vertex_attribute_sources);
                 KAN_ASSERT (target)
-                kan_rpl_meta_buffer_init_copy (target, source);
+                kan_rpl_meta_attribute_source_init_copy (target, source);
             }
 
-            loaded->has_instanced_attribute_buffer = family_data->has_instanced_attribute_buffer;
-            kan_rpl_meta_buffer_init_copy (&loaded->instanced_attribute_buffer,
-                                           &family_data->instanced_attribute_buffer);
+            loaded->has_instanced_attribute_source = family_data->has_instanced_attribute_source;
+            kan_rpl_meta_attribute_source_init_copy (&loaded->instanced_attribute_source,
+                                                     &family_data->instanced_attribute_source);
 
             kan_rpl_meta_set_bindings_init_copy (&loaded->set_material_bindings, &family_data->set_material);
             kan_rpl_meta_set_bindings_init_copy (&loaded->set_object_bindings, &family_data->set_object);
@@ -1941,11 +1961,11 @@ void kan_render_material_loaded_init (struct kan_render_material_loaded_t *insta
     kan_dynamic_array_init (&instance->pipelines, 0u, sizeof (struct kan_render_material_loaded_pipeline_t),
                             _Alignof (struct kan_render_material_loaded_pipeline_t), kan_allocation_group_stack_get ());
 
-    kan_dynamic_array_init (&instance->vertex_attribute_buffers, 0u, sizeof (struct kan_rpl_meta_buffer_t),
-                            _Alignof (struct kan_rpl_meta_buffer_t), kan_allocation_group_stack_get ());
+    kan_dynamic_array_init (&instance->vertex_attribute_sources, 0u, sizeof (struct kan_rpl_meta_attribute_source_t),
+                            _Alignof (struct kan_rpl_meta_attribute_source_t), kan_allocation_group_stack_get ());
 
-    instance->has_instanced_attribute_buffer = KAN_FALSE;
-    kan_rpl_meta_buffer_init (&instance->instanced_attribute_buffer);
+    instance->has_instanced_attribute_source = KAN_FALSE;
+    kan_rpl_meta_attribute_source_init(&instance->instanced_attribute_source);
 
     kan_rpl_meta_set_bindings_init (&instance->set_material_bindings);
     kan_rpl_meta_set_bindings_init (&instance->set_object_bindings);
@@ -1954,15 +1974,15 @@ void kan_render_material_loaded_init (struct kan_render_material_loaded_t *insta
 
 void kan_render_material_loaded_shutdown (struct kan_render_material_loaded_t *instance)
 {
-    for (kan_loop_size_t index = 0u; index < instance->vertex_attribute_buffers.size; ++index)
+    for (kan_loop_size_t index = 0u; index < instance->vertex_attribute_sources.size; ++index)
     {
-        kan_rpl_meta_buffer_shutdown (
-            &((struct kan_rpl_meta_buffer_t *) instance->vertex_attribute_buffers.data)[index]);
+        kan_rpl_meta_attribute_source_shutdown (
+            &((struct kan_rpl_meta_attribute_source_t *) instance->vertex_attribute_sources.data)[index]);
     }
 
     kan_dynamic_array_shutdown (&instance->pipelines);
-    kan_dynamic_array_shutdown (&instance->vertex_attribute_buffers);
-    kan_rpl_meta_buffer_shutdown (&instance->instanced_attribute_buffer);
+    kan_dynamic_array_shutdown (&instance->vertex_attribute_sources);
+    kan_rpl_meta_attribute_source_shutdown (&instance->instanced_attribute_source);
     kan_rpl_meta_set_bindings_shutdown (&instance->set_material_bindings);
     kan_rpl_meta_set_bindings_shutdown (&instance->set_object_bindings);
     kan_rpl_meta_set_bindings_shutdown (&instance->set_shared_bindings);

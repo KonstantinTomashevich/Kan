@@ -910,13 +910,6 @@ kan_render_pipeline_parameter_set_layout_t kan_render_construct_parameter_set_la
 
         switch (buffer->type)
         {
-        case KAN_RPL_BUFFER_TYPE_VERTEX_ATTRIBUTE:
-        case KAN_RPL_BUFFER_TYPE_INSTANCED_ATTRIBUTE:
-        case KAN_RPL_BUFFER_TYPE_VERTEX_STAGE_OUTPUT:
-        case KAN_RPL_BUFFER_TYPE_FRAGMENT_STAGE_OUTPUT:
-            KAN_ASSERT (KAN_FALSE)
-            break;
-
         case KAN_RPL_BUFFER_TYPE_UNIFORM:
             binding_type = KAN_RENDER_PARAMETER_BINDING_TYPE_UNIFORM_BUFFER;
             break;

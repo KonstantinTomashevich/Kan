@@ -125,17 +125,17 @@ struct kan_render_material_loaded_t
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_render_material_loaded_pipeline_t)
     struct kan_dynamic_array_t pipelines;
 
-    /// \brief Information about vertex attribute buffers used by this material.
-    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_meta_buffer_t)
-    struct kan_dynamic_array_t vertex_attribute_buffers;
+    /// \brief Information about vertex attribute sources used by this material.
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_meta_attribute_source_t)
+    struct kan_dynamic_array_t vertex_attribute_sources;
 
-    /// \brief Whether this material has instanced attribute buffer.
-    kan_bool_t has_instanced_attribute_buffer;
+    /// \brief Whether this material has instanced attribute source.
+    kan_bool_t has_instanced_attribute_source;
 
-    /// \brief Information about instanced attribute buffer for this material if it exists.
-    KAN_REFLECTION_VISIBILITY_CONDITION_FIELD (has_instanced_attribute_buffer)
+    /// \brief Information about instanced attribute source for this material if it exists.
+    KAN_REFLECTION_VISIBILITY_CONDITION_FIELD (has_instanced_attribute_source)
     KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (KAN_TRUE)
-    struct kan_rpl_meta_buffer_t instanced_attribute_buffer;
+    struct kan_rpl_meta_attribute_source_t instanced_attribute_source;
 
     /// \brief Information about bindings for material set of this material.
     struct kan_rpl_meta_set_bindings_t set_material_bindings;

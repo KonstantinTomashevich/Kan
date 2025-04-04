@@ -326,15 +326,14 @@ static void try_render_frame (struct test_render_material_state_t *state,
                                                               &material_instance->data.parameter_set);
 
             // Only one vertex attribute buffer for the sake of simplicity.
-            KAN_ASSERT (material->vertex_attribute_buffers.size == 1u)
-            KAN_ASSERT (material->has_instanced_attribute_buffer)
+            KAN_ASSERT (material->vertex_attribute_sources.size == 1u)
+            KAN_ASSERT (material->has_instanced_attribute_source)
 
-            struct kan_rpl_meta_buffer_t *expected_attribute_buffer =
-                &((struct kan_rpl_meta_buffer_t *) material->vertex_attribute_buffers.data)[0u];
-            KAN_ASSERT (expected_attribute_buffer->type == KAN_RPL_BUFFER_TYPE_VERTEX_ATTRIBUTE)
+            struct kan_rpl_meta_attribute_source_t *expected_attribute_source =
+                &((struct kan_rpl_meta_attribute_source_t *) material->vertex_attribute_sources.data)[0u];
 
             struct kan_render_allocated_slice_t allocation = kan_render_frame_lifetime_buffer_allocator_allocate (
-                singleton->instanced_data_allocator, material->instanced_attribute_buffer.main_size,
+                singleton->instanced_data_allocator, material->instanced_attribute_source.block_size,
                 _Alignof (struct kan_float_matrix_4x4_t));
             KAN_ASSERT (KAN_HANDLE_IS_VALID (allocation.buffer))
 
@@ -343,16 +342,16 @@ static void try_render_frame (struct test_render_material_state_t *state,
             kan_transform_3_to_float_matrix_4x4 (&box_transform, &box_transform_matrix);
 
             void *instanced_data = kan_render_buffer_patch (allocation.buffer, allocation.slice_offset,
-                                                            material->instanced_attribute_buffer.main_size);
+                                                            material->instanced_attribute_source.block_size);
             memcpy (instanced_data, material_instance->data.instanced_data.data,
-                    material->instanced_attribute_buffer.main_size);
+                    material->instanced_attribute_source.block_size);
             // For the sake of the simple example, we just assume that model matrix is the first field.
             memcpy (instanced_data, &box_transform_matrix, sizeof (box_transform_matrix));
 
             kan_render_buffer_t attribute_buffers[] = {singleton->vertex_buffer, allocation.buffer};
             kan_render_size_t attribute_buffers_offsets[] = {0u, allocation.slice_offset};
 
-            kan_render_pass_instance_attributes (pass_allocation->pass_instance, expected_attribute_buffer->binding,
+            kan_render_pass_instance_attributes (pass_allocation->pass_instance, expected_attribute_source->binding,
                                                  sizeof (attribute_buffers) / sizeof (attribute_buffers[0u]),
                                                  attribute_buffers, attribute_buffers_offsets);
 

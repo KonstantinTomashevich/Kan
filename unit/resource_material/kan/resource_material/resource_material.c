@@ -757,45 +757,72 @@ static enum kan_resource_compile_result_t kan_resource_material_pipeline_family_
         meta_valid = KAN_FALSE;
     }
 
-    kan_dynamic_array_set_capacity (&output->vertex_attribute_buffers, meta.attribute_buffers.size);
-    for (kan_loop_size_t index = 0u; index < meta.attribute_buffers.size; ++index)
+    kan_dynamic_array_set_capacity (&output->vertex_attribute_sources, meta.attribute_sources.size);
+    for (kan_loop_size_t index = 0u; index < meta.attribute_sources.size; ++index)
     {
-        const struct kan_rpl_meta_buffer_t *source =
-            &((struct kan_rpl_meta_buffer_t *) meta.attribute_buffers.data)[index];
+        const struct kan_rpl_meta_attribute_source_t *source =
+            &((struct kan_rpl_meta_attribute_source_t *) meta.attribute_sources.data)[index];
 
-        switch (source->type)
+        switch (source->rate)
         {
-        case KAN_RPL_BUFFER_TYPE_VERTEX_ATTRIBUTE:
+        case KAN_RPL_META_ATTRIBUTE_SOURCE_RATE_VERTEX:
         {
-            struct kan_rpl_meta_buffer_t *target = kan_dynamic_array_add_last (&output->vertex_attribute_buffers);
+            struct kan_rpl_meta_attribute_source_t *target =
+                kan_dynamic_array_add_last (&output->vertex_attribute_sources);
             KAN_ASSERT (target)
-            kan_rpl_meta_buffer_init_copy (target, source);
+            kan_rpl_meta_attribute_source_init_copy (target, source);
             break;
         }
 
-        case KAN_RPL_BUFFER_TYPE_INSTANCED_ATTRIBUTE:
-            if (output->has_instanced_attribute_buffer)
+        case KAN_RPL_META_ATTRIBUTE_SOURCE_RATE_INSTANCE:
+            if (output->has_instanced_attribute_source)
             {
                 KAN_LOG (resource_material_compilation, KAN_LOG_ERROR,
                          "Produced incorrect meta for \"%s\" (material \"%s\"): meta has several instanced attribute "
-                         "buffers, but it is not supported by materials right now.",
+                         "sources, but it is not supported by materials right now.",
                          state->name, input->source_material)
                 meta_valid = KAN_FALSE;
             }
             else
             {
-                output->has_instanced_attribute_buffer = KAN_TRUE;
-                kan_rpl_meta_buffer_shutdown (&output->instanced_attribute_buffer);
-                kan_rpl_meta_buffer_init_copy (&output->instanced_attribute_buffer, source);
+                output->has_instanced_attribute_source = KAN_TRUE;
+                kan_rpl_meta_attribute_source_shutdown (&output->instanced_attribute_source);
+                kan_rpl_meta_attribute_source_init_copy (&output->instanced_attribute_source, source);
+
+                for (kan_loop_size_t attribute_index = 0u; attribute_index < source->attributes.size; ++attribute_index)
+                {
+                    const struct kan_rpl_meta_attribute_t *attribute =
+                        &((struct kan_rpl_meta_attribute_t *) source->attributes.data)[attribute_index];
+
+                    switch (attribute->item_format)
+                    {
+                    case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_FLOAT_16:
+                    case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_UNORM_8:
+                    case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_UNORM_16:
+                    case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_SNORM_8:
+                    case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_SNORM_16:
+                    case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_UINT_8:
+                    case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_UINT_16:
+                    case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_SINT_8:
+                    case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_SINT_16:
+                        KAN_LOG (resource_material_compilation, KAN_LOG_ERROR,
+                                 "Produced incorrect meta for \"%s\" (material \"%s\"): instanced attribute source has "
+                                 "attribute \"%s\" with item format \"%s\", which is not currently supported. "
+                                 "Currently, only 32-bit items are supported for instanced attributes for material "
+                                 "code simplification.",
+                                 state->name, input->source_material, attribute->name,
+                                 kan_rpl_meta_attribute_item_format_to_string (attribute->item_format))
+                        meta_valid = KAN_FALSE;
+                        break;
+
+                    case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_FLOAT_32:
+                    case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_UINT_32:
+                    case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_SINT_32:
+                        break;
+                    }
+                }
             }
 
-            break;
-
-        case KAN_RPL_BUFFER_TYPE_UNIFORM:
-        case KAN_RPL_BUFFER_TYPE_READ_ONLY_STORAGE:
-        case KAN_RPL_BUFFER_TYPE_VERTEX_STAGE_OUTPUT:
-        case KAN_RPL_BUFFER_TYPE_FRAGMENT_STAGE_OUTPUT:
-            KAN_ASSERT (KAN_FALSE)
             break;
         }
     }
@@ -928,7 +955,7 @@ static enum kan_resource_compile_result_t kan_resource_material_pipeline_compile
     kan_rpl_meta_init (&meta);
 
     if (!kan_rpl_compiler_instance_emit_meta (
-            compiler_instance, &meta, KAN_RPL_META_EMISSION_SKIP_ATTRIBUTE_BUFFERS | KAN_RPL_META_EMISSION_SKIP_SETS))
+            compiler_instance, &meta, KAN_RPL_META_EMISSION_SKIP_ATTRIBUTE_SOURCES | KAN_RPL_META_EMISSION_SKIP_SETS))
     {
         kan_rpl_compiler_instance_destroy (compiler_instance);
         kan_rpl_compiler_context_destroy (compiler_context);
@@ -1083,11 +1110,11 @@ kan_bool_t kan_resource_material_platform_configuration_is_pass_supported (
 void kan_resource_material_pipeline_family_compiled_init (
     struct kan_resource_material_pipeline_family_compiled_t *instance)
 {
-    kan_dynamic_array_init (&instance->vertex_attribute_buffers, 0u, sizeof (struct kan_rpl_meta_buffer_t),
-                            _Alignof (struct kan_rpl_meta_buffer_t), kan_allocation_group_stack_get ());
+    kan_dynamic_array_init (&instance->vertex_attribute_sources, 0u, sizeof (struct kan_rpl_meta_attribute_source_t),
+                            _Alignof (struct kan_rpl_meta_attribute_source_t), kan_allocation_group_stack_get ());
 
-    instance->has_instanced_attribute_buffer = KAN_FALSE;
-    kan_rpl_meta_buffer_init (&instance->instanced_attribute_buffer);
+    instance->has_instanced_attribute_source = KAN_FALSE;
+    kan_rpl_meta_attribute_source_init (&instance->instanced_attribute_source);
 
     kan_rpl_meta_set_bindings_init (&instance->set_material);
     kan_rpl_meta_set_bindings_init (&instance->set_object);
@@ -1097,14 +1124,14 @@ void kan_resource_material_pipeline_family_compiled_init (
 void kan_resource_material_pipeline_family_compiled_shutdown (
     struct kan_resource_material_pipeline_family_compiled_t *instance)
 {
-    for (kan_loop_size_t index = 0u; index < instance->vertex_attribute_buffers.size; ++index)
+    for (kan_loop_size_t index = 0u; index < instance->vertex_attribute_sources.size; ++index)
     {
-        kan_rpl_meta_buffer_shutdown (
-            &((struct kan_rpl_meta_buffer_t *) instance->vertex_attribute_buffers.data)[index]);
+        kan_rpl_meta_attribute_source_shutdown (
+            &((struct kan_rpl_meta_attribute_source_t *) instance->vertex_attribute_sources.data)[index]);
     }
 
-    kan_dynamic_array_shutdown (&instance->vertex_attribute_buffers);
-    kan_rpl_meta_buffer_shutdown (&instance->instanced_attribute_buffer);
+    kan_dynamic_array_shutdown (&instance->vertex_attribute_sources);
+    kan_rpl_meta_attribute_source_shutdown (&instance->instanced_attribute_source);
     kan_rpl_meta_set_bindings_shutdown (&instance->set_material);
     kan_rpl_meta_set_bindings_shutdown (&instance->set_object);
     kan_rpl_meta_set_bindings_shutdown (&instance->set_shared);

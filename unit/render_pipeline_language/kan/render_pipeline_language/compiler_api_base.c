@@ -4,6 +4,51 @@
 KAN_LOG_DEFINE_CATEGORY (rpl_compiler_context);
 KAN_LOG_DEFINE_CATEGORY (rpl_compiler_instance);
 
+const char *kan_rpl_meta_attribute_item_format_to_string (enum kan_rpl_meta_attribute_item_format_t format)
+{
+    switch (format)
+    {
+    case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_FLOAT_16:
+        return "KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_FLOAT_16";
+
+    case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_FLOAT_32:
+        return "KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_FLOAT_32";
+
+    case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_UNORM_8:
+        return "KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_UNORM_8";
+
+    case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_UNORM_16:
+        return "KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_UNORM_16";
+
+    case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_SNORM_8:
+        return "KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_SNORM_8";
+
+    case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_SNORM_16:
+        return "KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_SNORM_16";
+
+    case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_UINT_8:
+        return "KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_UINT_8";
+
+    case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_UINT_16:
+        return "KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_UINT_16";
+
+    case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_UINT_32:
+        return "KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_UINT_32";
+
+    case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_SINT_8:
+        return "KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_SINT_8";
+
+    case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_SINT_16:
+        return "KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_SINT_16";
+
+    case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_SINT_32:
+        return "KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_SINT_32";
+    }
+
+    KAN_ASSERT (KAN_FALSE)
+    return "<unknown>";
+}
+
 kan_instance_size_t kan_rpl_meta_attribute_item_format_get_size (enum kan_rpl_meta_attribute_item_format_t format)
 {
     switch (format)

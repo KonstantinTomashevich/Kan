@@ -109,14 +109,14 @@ RESOURCE_MATERIAL_API kan_bool_t kan_resource_material_platform_configuration_is
 /// \brief Contains compiled data of pipeline family -- meta that describes common input pattern for pipelines.
 struct kan_resource_material_pipeline_family_compiled_t
 {
-    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_meta_buffer_t)
-    struct kan_dynamic_array_t vertex_attribute_buffers;
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_rpl_meta_attribute_source_t)
+    struct kan_dynamic_array_t vertex_attribute_sources;
 
-    kan_bool_t has_instanced_attribute_buffer;
+    kan_bool_t has_instanced_attribute_source;
 
-    KAN_REFLECTION_VISIBILITY_CONDITION_FIELD (has_instanced_attribute_buffer)
+    KAN_REFLECTION_VISIBILITY_CONDITION_FIELD (has_instanced_attribute_source)
     KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (KAN_TRUE)
-    struct kan_rpl_meta_buffer_t instanced_attribute_buffer;
+    struct kan_rpl_meta_attribute_source_t instanced_attribute_source;
 
     struct kan_rpl_meta_set_bindings_t set_material;
     struct kan_rpl_meta_set_bindings_t set_object;

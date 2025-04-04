@@ -268,11 +268,11 @@ static enum kan_resource_compile_result_t kan_resource_render_pass_variant_compi
         return KAN_RESOURCE_PIPELINE_COMPILE_FAILED;
     }
 
-    if (meta.attribute_buffers.size > 0u)
+    if (meta.attribute_sources.size > 0u)
     {
         kan_rpl_meta_shutdown (&meta);
         KAN_LOG (resource_pass_compilation, KAN_LOG_ERROR,
-                 "Failed to compile pass \"%s\" variant %lu set layout: source contains attribute buffers, which is "
+                 "Failed to compile pass \"%s\" variant %lu set layout: source contains attribute sources, which is "
                  "forbidden for pass set layout sources.",
                  input->source_pass, (unsigned long) input->source_variant_index)
         return KAN_RESOURCE_PIPELINE_COMPILE_FAILED;

@@ -1255,12 +1255,6 @@ static void instantiate_material_static_data (
         enum kan_render_buffer_type_t buffer_type = KAN_RENDER_BUFFER_TYPE_UNIFORM;
         switch (meta_buffer->type)
         {
-        case KAN_RPL_BUFFER_TYPE_VERTEX_ATTRIBUTE:
-        case KAN_RPL_BUFFER_TYPE_INSTANCED_ATTRIBUTE:
-        case KAN_RPL_BUFFER_TYPE_VERTEX_STAGE_OUTPUT:
-        case KAN_RPL_BUFFER_TYPE_FRAGMENT_STAGE_OUTPUT:
-            break;
-
         case KAN_RPL_BUFFER_TYPE_UNIFORM:
             buffer_type = KAN_RENDER_BUFFER_TYPE_UNIFORM;
             break;
@@ -1449,6 +1443,231 @@ static void update_material_instance_custom_inherit_data (
             custom_loaded->data.instanced_data.size);
 }
 
+#if defined(KAN_UNIVERSE_RENDER_FOUNDATION_VALIDATION_ENABLED)
+static inline kan_bool_t is_instanced_attribute_found_in_source (
+    const struct kan_rpl_meta_attribute_source_t *source, const struct kan_resource_material_parameter_t *parameter)
+{
+    for (kan_loop_size_t meta_index = 0u; meta_index < source->attributes.size; ++meta_index)
+    {
+        struct kan_rpl_meta_attribute_t *meta =
+            &((struct kan_rpl_meta_attribute_t *) source->attributes.data)[meta_index];
+
+        if (meta->name == parameter->name)
+        {
+            return KAN_TRUE;
+        }
+    }
+
+    return KAN_FALSE;
+}
+#endif
+
+static inline void apply_instanced_attribute_to_memory (kan_interned_string_t instance_name,
+                                                        kan_bool_t custom,
+                                                        uint8_t *memory,
+                                                        kan_instance_size_t offset,
+                                                        const struct kan_rpl_meta_attribute_source_t *source,
+                                                        const struct kan_resource_material_parameter_t *parameter)
+{
+    for (kan_loop_size_t meta_index = 0u; meta_index < source->attributes.size; ++meta_index)
+    {
+        struct kan_rpl_meta_attribute_t *meta =
+            &((struct kan_rpl_meta_attribute_t *) source->attributes.data)[meta_index];
+
+        if (meta->name == parameter->name)
+        {
+            enum kan_rpl_meta_variable_type_t expected_variable_type = KAN_RPL_META_VARIABLE_TYPE_F1;
+            kan_bool_t variable_type_valid = KAN_TRUE;
+
+            switch (meta->item_format)
+            {
+            case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_FLOAT_16:
+            case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_UNORM_8:
+            case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_UNORM_16:
+            case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_SNORM_8:
+            case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_SNORM_16:
+            case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_UINT_8:
+            case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_UINT_16:
+            case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_SINT_8:
+            case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_SINT_16:
+                // These formats shouldn't be allowed during material compilation for instanced attributes.
+                KAN_ASSERT (KAN_FALSE)
+                break;
+
+            case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_FLOAT_32:
+                switch (meta->class)
+                {
+                case KAN_RPL_META_ATTRIBUTE_CLASS_VECTOR_1:
+                    expected_variable_type = KAN_RPL_META_VARIABLE_TYPE_F1;
+                    break;
+
+                case KAN_RPL_META_ATTRIBUTE_CLASS_VECTOR_2:
+                    expected_variable_type = KAN_RPL_META_VARIABLE_TYPE_F2;
+                    break;
+
+                case KAN_RPL_META_ATTRIBUTE_CLASS_VECTOR_3:
+                    expected_variable_type = KAN_RPL_META_VARIABLE_TYPE_F3;
+                    break;
+
+                case KAN_RPL_META_ATTRIBUTE_CLASS_VECTOR_4:
+                    expected_variable_type = KAN_RPL_META_VARIABLE_TYPE_F4;
+                    break;
+
+                case KAN_RPL_META_ATTRIBUTE_CLASS_MATRIX_3X3:
+                    expected_variable_type = KAN_RPL_META_VARIABLE_TYPE_F3X3;
+                    break;
+
+                case KAN_RPL_META_ATTRIBUTE_CLASS_MATRIX_4X4:
+                    expected_variable_type = KAN_RPL_META_VARIABLE_TYPE_F4X4;
+                    break;
+                }
+
+                break;
+
+            case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_UINT_32:
+                switch (meta->class)
+                {
+                case KAN_RPL_META_ATTRIBUTE_CLASS_VECTOR_1:
+                    expected_variable_type = KAN_RPL_META_VARIABLE_TYPE_U1;
+                    break;
+
+                case KAN_RPL_META_ATTRIBUTE_CLASS_VECTOR_2:
+                    expected_variable_type = KAN_RPL_META_VARIABLE_TYPE_U2;
+                    break;
+
+                case KAN_RPL_META_ATTRIBUTE_CLASS_VECTOR_3:
+                    expected_variable_type = KAN_RPL_META_VARIABLE_TYPE_U3;
+                    break;
+
+                case KAN_RPL_META_ATTRIBUTE_CLASS_VECTOR_4:
+                    expected_variable_type = KAN_RPL_META_VARIABLE_TYPE_U4;
+                    break;
+
+                case KAN_RPL_META_ATTRIBUTE_CLASS_MATRIX_3X3:
+                case KAN_RPL_META_ATTRIBUTE_CLASS_MATRIX_4X4:
+                    KAN_LOG (render_foundation_material_instance, KAN_LOG_ERROR,
+                             "Material instance \"%s\" %s has parameter \"%s\" which is expected to be integer matrix "
+                             "by the pipeline, but integer matrices are not supported.",
+                             instance_name, custom ? "(custom)" : "", parameter->name)
+                    variable_type_valid = KAN_FALSE;
+                    break;
+                }
+
+                break;
+
+            case KAN_RPL_META_ATTRIBUTE_ITEM_FORMAT_SINT_32:
+                switch (meta->class)
+                {
+                case KAN_RPL_META_ATTRIBUTE_CLASS_VECTOR_1:
+                    expected_variable_type = KAN_RPL_META_VARIABLE_TYPE_S1;
+                    break;
+
+                case KAN_RPL_META_ATTRIBUTE_CLASS_VECTOR_2:
+                    expected_variable_type = KAN_RPL_META_VARIABLE_TYPE_S2;
+                    break;
+
+                case KAN_RPL_META_ATTRIBUTE_CLASS_VECTOR_3:
+                    expected_variable_type = KAN_RPL_META_VARIABLE_TYPE_S3;
+                    break;
+
+                case KAN_RPL_META_ATTRIBUTE_CLASS_VECTOR_4:
+                    expected_variable_type = KAN_RPL_META_VARIABLE_TYPE_S4;
+                    break;
+
+                case KAN_RPL_META_ATTRIBUTE_CLASS_MATRIX_3X3:
+                case KAN_RPL_META_ATTRIBUTE_CLASS_MATRIX_4X4:
+                    KAN_LOG (render_foundation_material_instance, KAN_LOG_ERROR,
+                             "Material instance \"%s\" %s has parameter \"%s\" which is expected to be integer matrix "
+                             "by the pipeline, but integer matrices are not supported.",
+                             instance_name, custom ? "(custom)" : "", parameter->name)
+                    variable_type_valid = KAN_FALSE;
+                    break;
+                }
+
+                break;
+            }
+
+            if (!variable_type_valid)
+            {
+                break;
+            }
+
+            if (expected_variable_type != parameter->type)
+            {
+                KAN_LOG (render_foundation_material_instance, KAN_LOG_ERROR,
+                         "Material instance \"%s\" %s has parameter \"%s\" (main parameters) which type %s does "
+                         "not match expected type %s.",
+                         instance_name, custom ? "(custom)" : "", parameter->name,
+                         kan_rpl_meta_variable_type_to_string (parameter->type),
+                         kan_rpl_meta_variable_type_to_string (expected_variable_type))
+                break;
+            }
+
+            uint8_t *address = memory + offset + meta->offset;
+            switch (parameter->type)
+            {
+            case KAN_RPL_META_VARIABLE_TYPE_F1:
+                *(float *) address = parameter->value_f1;
+                break;
+
+            case KAN_RPL_META_VARIABLE_TYPE_F2:
+                *(struct kan_float_vector_2_t *) address = parameter->value_f2;
+                break;
+
+            case KAN_RPL_META_VARIABLE_TYPE_F3:
+                *(struct kan_float_vector_3_t *) address = parameter->value_f3;
+                break;
+
+            case KAN_RPL_META_VARIABLE_TYPE_F4:
+                *(struct kan_float_vector_4_t *) address = parameter->value_f4;
+                break;
+
+            case KAN_RPL_META_VARIABLE_TYPE_U1:
+                *(kan_serialized_size_t *) address = parameter->value_u1;
+                break;
+
+            case KAN_RPL_META_VARIABLE_TYPE_U2:
+                *(struct kan_unsigned_integer_vector_2_t *) address = parameter->value_u2;
+                break;
+
+            case KAN_RPL_META_VARIABLE_TYPE_U3:
+                *(struct kan_unsigned_integer_vector_3_t *) address = parameter->value_u3;
+                break;
+
+            case KAN_RPL_META_VARIABLE_TYPE_U4:
+                *(struct kan_unsigned_integer_vector_4_t *) address = parameter->value_u4;
+                break;
+
+            case KAN_RPL_META_VARIABLE_TYPE_S1:
+                *(kan_serialized_offset_t *) address = parameter->value_s1;
+                break;
+
+            case KAN_RPL_META_VARIABLE_TYPE_S2:
+                *(struct kan_integer_vector_2_t *) address = parameter->value_s2;
+                break;
+
+            case KAN_RPL_META_VARIABLE_TYPE_S3:
+                *(struct kan_integer_vector_3_t *) address = parameter->value_s3;
+                break;
+
+            case KAN_RPL_META_VARIABLE_TYPE_S4:
+                *(struct kan_integer_vector_4_t *) address = parameter->value_s4;
+                break;
+
+            case KAN_RPL_META_VARIABLE_TYPE_F3X3:
+                *(struct kan_float_matrix_3x3_t *) address = parameter->value_f3x3;
+                break;
+
+            case KAN_RPL_META_VARIABLE_TYPE_F4X4:
+                *(struct kan_float_matrix_4x4_t *) address = parameter->value_f4x4;
+                break;
+            }
+
+            break;
+        }
+    }
+}
+
 static void update_material_instance_custom_apply_parameter (
     const struct kan_render_material_loaded_t *material_loaded,
     const struct kan_render_material_instance_loaded_t *instance_loaded,
@@ -1457,10 +1676,10 @@ static void update_material_instance_custom_apply_parameter (
 {
 #if defined(KAN_UNIVERSE_RENDER_FOUNDATION_VALIDATION_ENABLED)
     kan_bool_t found = KAN_FALSE;
-    if (material_loaded->has_instanced_attribute_buffer)
+    if (material_loaded->has_instanced_attribute_source)
     {
-        found = is_parameter_found_in_buffer (&material_loaded->instanced_attribute_buffer.main_parameters,
-                                              &parameter->parameter);
+        found = is_instanced_attribute_found_in_source (&material_loaded->instanced_attribute_source,
+                                                        &parameter->parameter);
     }
 
     if (!found)
@@ -1473,8 +1692,8 @@ static void update_material_instance_custom_apply_parameter (
     }
 #endif
 
-    apply_parameter_to_memory (instance_loaded->name, NULL, KAN_TRUE, custom_loaded->data.instanced_data.data, 0u,
-                               &material_loaded->instanced_attribute_buffer.main_parameters, &parameter->parameter);
+    apply_instanced_attribute_to_memory (instance_loaded->name, KAN_TRUE, custom_loaded->data.instanced_data.data, 0u,
+                                         &material_loaded->instanced_attribute_source, &parameter->parameter);
 }
 
 /// \details Macro as it can be used from different mutators.
@@ -1499,7 +1718,7 @@ static void update_material_instance_loaded_data (
 
 #if defined(KAN_UNIVERSE_RENDER_FOUNDATION_VALIDATION_ENABLED)
     // Detect and log unknown parameters and tails.
-    if (material_loaded->has_instanced_attribute_buffer)
+    if (material_loaded->has_instanced_attribute_source)
     {
         for (kan_loop_size_t parameter_index = 0u; parameter_index < instance_data->instanced_parameters.size;
              ++parameter_index)
@@ -1507,7 +1726,7 @@ static void update_material_instance_loaded_data (
             struct kan_resource_material_parameter_t *parameter = &(
                 (struct kan_resource_material_parameter_t *) instance_data->instanced_parameters.data)[parameter_index];
 
-            if (!is_parameter_found_in_buffer (&material_loaded->instanced_attribute_buffer.main_parameters, parameter))
+            if (!is_instanced_attribute_found_in_source (&material_loaded->instanced_attribute_source, parameter))
             {
                 KAN_LOG (render_foundation_material_instance, KAN_LOG_ERROR,
                          "Material instance \"%s\" has instanced parameter \"%s\", but there is no such parameter in "
@@ -1526,11 +1745,11 @@ static void update_material_instance_loaded_data (
 #endif
 
     instance_loaded->data.instanced_data.size = 0u;
-    if (material_loaded->has_instanced_attribute_buffer)
+    if (material_loaded->has_instanced_attribute_source)
     {
         kan_dynamic_array_set_capacity (&instance_loaded->data.instanced_data,
-                                        material_loaded->instanced_attribute_buffer.main_size);
-        instance_loaded->data.instanced_data.size = material_loaded->instanced_attribute_buffer.main_size;
+                                        material_loaded->instanced_attribute_source.block_size);
+        instance_loaded->data.instanced_data.size = material_loaded->instanced_attribute_source.block_size;
 
         for (kan_loop_size_t parameter_index = 0u; parameter_index < instance_data->instanced_parameters.size;
              ++parameter_index)
@@ -1538,9 +1757,9 @@ static void update_material_instance_loaded_data (
             struct kan_resource_material_parameter_t *parameter = &(
                 (struct kan_resource_material_parameter_t *) instance_data->instanced_parameters.data)[parameter_index];
 
-            apply_parameter_to_memory (instance_loaded->name, NULL, KAN_FALSE,
-                                       instance_loaded->data.instanced_data.data, 0u,
-                                       &material_loaded->instanced_attribute_buffer.main_parameters, parameter);
+            apply_instanced_attribute_to_memory (instance_loaded->name, KAN_FALSE,
+                                                 instance_loaded->data.instanced_data.data, 0u,
+                                                 &material_loaded->instanced_attribute_source, parameter);
         }
     }
     else
@@ -2114,7 +2333,7 @@ void kan_render_material_instance_loaded_data_init (struct kan_render_material_i
 {
     instance->parameter_set = KAN_HANDLE_SET_INVALID (kan_render_pipeline_parameter_set_t);
     kan_dynamic_array_init (&instance->instanced_data, 0u, sizeof (uint8_t),
-                            KAN_RENDER_MATERIAL_INSTANCE_INSTANCED_DATA_ALIGNMENT, kan_allocation_group_stack_get ());
+                            KAN_RENDER_MATERIAL_INSTANCE_ATTRIBUTE_DATA_ALIGNMENT, kan_allocation_group_stack_get ());
 }
 
 void kan_render_material_instance_loaded_data_shutdown (struct kan_render_material_instance_loaded_data_t *instance)
