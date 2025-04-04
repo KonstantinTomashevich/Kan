@@ -17,7 +17,7 @@
 /// \parblock
 /// Provided components have double-transform system: logical transform and visual transform. It makes it possible
 /// to keep render transformations smooth when logical update rate is much lower than visual update rate by utilizing
-/// linear interpolation in transform visual sync mutators. Transform visual sync mytators automatically keep visual
+/// linear interpolation in transform visual sync mutators. Transform visual sync mutators automatically keep visual
 /// transform in sync with logical transform changes.
 /// \endparblock
 
