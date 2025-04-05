@@ -423,6 +423,7 @@ static inline kan_render_image_t create_image_for_compiled_texture (
         .width = KAN_MAX (1u, texture->width >> best_mip),
         .height = KAN_MAX (1u, texture->height >> best_mip),
         .depth = KAN_MAX (1u, texture->depth >> best_mip),
+        .layers = 1u,
         .mips = worst_mip - best_mip + 1u,
 
         .render_target = KAN_FALSE,
@@ -560,8 +561,8 @@ static void inspect_texture_usages_internal (struct render_foundation_texture_ma
             {
                 for (uint8_t mip = usage_state->requested_best_mip; mip <= usage_state->requested_worst_mip; ++mip)
                 {
-                    kan_render_image_copy_data (loaded->image, mip - usage_state->loaded_best_mip, new_image,
-                                                mip - usage_state->requested_best_mip);
+                    kan_render_image_copy_data (loaded->image, 0u, mip - usage_state->loaded_best_mip, new_image,
+                                                0u, mip - usage_state->requested_best_mip);
                 }
 
                 usage_state->flags |= RENDER_FOUNDATION_TEXTURE_USAGE_FLAGS_HAS_LOADED_MIPS;
@@ -668,6 +669,7 @@ static void raw_texture_load (struct render_foundation_texture_management_execut
         .width = raw_data->width,
         .height = raw_data->height,
         .depth = raw_data->depth,
+        .layers = 1u,
         .mips = (uint8_t) loaded_texture->mips,
 
         .render_target = KAN_FALSE,
@@ -696,8 +698,8 @@ static void raw_texture_load (struct render_foundation_texture_management_execut
         return;
     }
 
-    kan_render_image_upload_data (new_image, 0u, raw_data->data.size, raw_data->data.data);
-    kan_render_image_request_mip_generation (new_image, 0u, (uint8_t) (loaded_texture->mips - 1u));
+    kan_render_image_upload_data (new_image, 0u, 0u, raw_data->data.size, raw_data->data.data);
+    kan_render_image_request_mip_generation (new_image, 0u, 0u, (uint8_t) (loaded_texture->mips - 1u));
 
     KAN_UP_EVENT_INSERT (event, kan_render_texture_updated_event_t)
     {
@@ -882,8 +884,8 @@ static void compiled_texture_load_mips (struct render_foundation_texture_managem
                     KAN_ASSERT (data_usage->mip >= usage_state->loaded_best_mip &&
                                 data_usage->mip <= usage_state->loaded_worst_mip)
 
-                    kan_render_image_copy_data (old_image, data_usage->mip - usage_state->loaded_best_mip, new_image,
-                                                data_usage->mip - usage_state->requested_best_mip);
+                    kan_render_image_copy_data (old_image, 0u, data_usage->mip - usage_state->loaded_best_mip, new_image,
+                                                0u, data_usage->mip - usage_state->requested_best_mip);
                 }
                 else
                 {
@@ -898,7 +900,7 @@ static void compiled_texture_load_mips (struct render_foundation_texture_managem
                             KAN_RESOURCE_PROVIDER_CONTAINER_GET (kan_resource_texture_compiled_data_t,
                                                                  compiled_data_container);
 
-                        kan_render_image_upload_data (new_image, data_usage->mip - usage_state->requested_best_mip,
+                        kan_render_image_upload_data (new_image, 0u, data_usage->mip - usage_state->requested_best_mip,
                                                       compiled_data->data.size, compiled_data->data.data);
                     }
 

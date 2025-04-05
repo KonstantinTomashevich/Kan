@@ -366,32 +366,32 @@ APPLICATION_FRAMEWORK_EXAMPLES_TEST_RENDER_GRAPH_API void kan_universe_mutator_e
                         check_successful = KAN_FALSE;
                     }
 
-                    if (!KAN_HANDLE_IS_EQUAL (scene_pass_1_allocation.attachments[1u].image,
-                                              scene_pass_2_allocation.attachments[1u].image))
+                    if (!KAN_HANDLE_IS_EQUAL (scene_pass_1_allocation.attachments[1u].image.image,
+                                              scene_pass_2_allocation.attachments[1u].image.image))
                     {
                         KAN_LOG (application_framework_example_test_render_graph, KAN_LOG_ERROR,
                                  "Scene passes expected to reuse the same depth image.")
                         check_successful = KAN_FALSE;
                     }
 
-                    if (KAN_HANDLE_IS_EQUAL (shadow_pass_1_allocation.attachments[0u].image,
-                                             shadow_pass_2_allocation.attachments[0u].image))
+                    if (KAN_HANDLE_IS_EQUAL (shadow_pass_1_allocation.attachments[0u].image.image,
+                                             shadow_pass_2_allocation.attachments[0u].image.image))
                     {
                         KAN_LOG (application_framework_example_test_render_graph, KAN_LOG_ERROR,
                                  "Shadow pass 1 and 2 must have different images.")
                         check_successful = KAN_FALSE;
                     }
 
-                    if (KAN_HANDLE_IS_EQUAL (shadow_pass_2_allocation.attachments[0u].image,
-                                             shadow_pass_3_allocation.attachments[0u].image))
+                    if (KAN_HANDLE_IS_EQUAL (shadow_pass_2_allocation.attachments[0u].image.image,
+                                             shadow_pass_3_allocation.attachments[0u].image.image))
                     {
                         KAN_LOG (application_framework_example_test_render_graph, KAN_LOG_ERROR,
                                  "Shadow pass 1 and 2 must have different images.")
                         check_successful = KAN_FALSE;
                     }
 
-                    if (!KAN_HANDLE_IS_EQUAL (shadow_pass_1_allocation.attachments[0u].image,
-                                              shadow_pass_3_allocation.attachments[0u].image))
+                    if (!KAN_HANDLE_IS_EQUAL (shadow_pass_1_allocation.attachments[0u].image.image,
+                                              shadow_pass_3_allocation.attachments[0u].image.image))
                     {
                         KAN_LOG (application_framework_example_test_render_graph, KAN_LOG_ERROR,
                                  "Shadow pass 1 and 3 must share image.")

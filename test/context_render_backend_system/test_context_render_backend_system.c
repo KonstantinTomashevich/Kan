@@ -815,6 +815,7 @@ KAN_TEST_CASE (render_and_capture)
         .width = render_target_image_size,
         .height = render_target_image_size,
         .depth = 1u,
+        .layers = 1u,
         .mips = 1u,
         .render_target = KAN_TRUE,
         .supports_sampling = KAN_TRUE,
@@ -827,6 +828,7 @@ KAN_TEST_CASE (render_and_capture)
         .width = fixed_window_size,
         .height = fixed_window_size,
         .depth = 1u,
+        .layers = 1u,
         .mips = 1u,
         .render_target = KAN_TRUE,
         .supports_sampling = KAN_FALSE,
@@ -837,7 +839,11 @@ KAN_TEST_CASE (render_and_capture)
     struct kan_render_frame_buffer_attachment_description_t render_image_frame_buffer_attachments[] = {
         {
             .type = KAN_FRAME_BUFFER_ATTACHMENT_IMAGE,
-            .image = render_target_image,
+            .image =
+                {
+                    .image = render_target_image,
+                    .layer = 0u,
+                },
         },
     };
 
@@ -859,7 +865,11 @@ KAN_TEST_CASE (render_and_capture)
         },
         {
             .type = KAN_FRAME_BUFFER_ATTACHMENT_IMAGE,
-            .image = depth_image,
+            .image =
+                {
+                    .image = depth_image,
+                    .layer = 0u,
+                },
         },
     };
 
@@ -1012,6 +1022,8 @@ KAN_TEST_CASE (render_and_capture)
                 {
                     .image = render_target_image,
                     .array_index = 0u,
+                    .layer_offset = 0u,
+                    .layer_count = 1u,
                 },
         },
     };

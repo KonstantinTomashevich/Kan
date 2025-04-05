@@ -86,6 +86,7 @@ kan_render_read_back_status_t kan_render_request_read_back_from_buffer (kan_rend
 }
 
 kan_render_read_back_status_t kan_render_request_read_back_from_image (kan_render_image_t image,
+                                                                       uint8_t layer,
                                                                        uint8_t mip,
                                                                        kan_render_buffer_t read_back_buffer,
                                                                        vulkan_size_t read_back_offset)
@@ -110,6 +111,7 @@ kan_render_read_back_status_t kan_render_request_read_back_from_image (kan_rende
     item->next = schedule->first_scheduled_image_read_back;
     schedule->first_scheduled_image_read_back = item;
     item->image = image_data;
+    item->layer = layer;
     item->mip = mip;
     item->read_back_buffer = read_back_buffer_data;
     item->read_back_offset = read_back_offset;

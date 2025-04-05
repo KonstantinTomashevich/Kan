@@ -75,6 +75,7 @@ static struct render_foundation_graph_image_cache_node_t *render_foundation_grap
         .width = width,
         .height = height,
         .depth = 1u,
+        .layers = 1u,
         .mips = 1u,
         .render_target = KAN_TRUE,
         .supports_sampling = supports_sampling,
@@ -134,7 +135,9 @@ static kan_hash_t calculate_cached_frame_buffer_hash (
         switch (attachments[index].type)
         {
         case KAN_FRAME_BUFFER_ATTACHMENT_IMAGE:
-            hash = kan_hash_combine (hash, (kan_hash_t) KAN_HANDLE_GET (attachments[index].image));
+            hash =
+                kan_hash_combine (hash, kan_hash_combine ((kan_hash_t) KAN_HANDLE_GET (attachments[index].image.image),
+                                                          (kan_hash_t) attachments[index].image.layer));
             break;
 
         case KAN_FRAME_BUFFER_ATTACHMENT_SURFACE:
@@ -1113,7 +1116,8 @@ kan_bool_t kan_render_graph_resource_management_singleton_request_pass (
         }
 
         attachment_output->type = KAN_FRAME_BUFFER_ATTACHMENT_IMAGE;
-        attachment_output->image = node->image;
+        attachment_output->image.image = node->image;
+        attachment_output->image.layer = 0u;
         images[index] = node;
     }
 
@@ -1149,7 +1153,9 @@ kan_bool_t kan_render_graph_resource_management_singleton_request_pass (
                     switch (attachment_descriptions[index].type)
                     {
                     case KAN_FRAME_BUFFER_ATTACHMENT_IMAGE:
-                        if (!KAN_HANDLE_IS_EQUAL (attachment_descriptions[index].image, node->attachments[index].image))
+                        if (!KAN_HANDLE_IS_EQUAL (attachment_descriptions[index].image.image,
+                                                  node->attachments[index].image.image) ||
+                            attachment_descriptions[index].image.layer != node->attachments[index].image.layer)
                         {
                             attachments_equal = KAN_FALSE;
                             break;

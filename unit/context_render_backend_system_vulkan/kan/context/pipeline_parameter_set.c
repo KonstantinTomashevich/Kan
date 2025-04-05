@@ -612,6 +612,7 @@ void render_backend_apply_descriptor_set_mutation (struct render_backend_pipelin
                 this_image_info->sampler = VK_NULL_HANDLE;
                 this_image_info->imageView = VK_NULL_HANDLE;
                 this_image_info->imageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+                array_index = update_bindings[index].image_binding.array_index;
 
                 if (set_context->bound_image_views[update_bindings[index].binding] != VK_NULL_HANDLE)
                 {
@@ -665,8 +666,8 @@ void render_backend_apply_descriptor_set_mutation (struct render_backend_pipelin
                                 .aspectMask = get_image_aspects (&image->description),
                                 .baseMipLevel = 0u,
                                 .levelCount = (vulkan_size_t) image->description.mips,
-                                .baseArrayLayer = 0u,
-                                .layerCount = 1u,
+                                .baseArrayLayer = (vulkan_size_t) update_bindings[index].image_binding.layer_offset,
+                                .layerCount = (vulkan_size_t) update_bindings[index].image_binding.layer_count,
                             },
                     };
 

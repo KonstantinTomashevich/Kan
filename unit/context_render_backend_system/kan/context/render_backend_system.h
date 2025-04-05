@@ -403,6 +403,7 @@ kan_render_backend_system_create_surface (kan_context_system_t render_backend_sy
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_backend_system_present_image_on_surface (
     kan_render_surface_t surface,
     kan_render_image_t image,
+    uint8_t image_layer,
     struct kan_render_integer_region_t surface_region,
     struct kan_render_integer_region_t image_region);
 
@@ -434,13 +435,20 @@ enum kan_render_frame_buffer_attachment_type_t
     KAN_FRAME_BUFFER_ATTACHMENT_SURFACE,
 };
 
+/// \brief Describes attachment of render target image to a frame buffer.
+struct kan_render_frame_buffer_image_attachment_description_t
+{
+    kan_render_image_t image;
+    uint8_t layer;
+};
+
 /// \brief Describes one frame buffer attachment.
 struct kan_render_frame_buffer_attachment_description_t
 {
     enum kan_render_frame_buffer_attachment_type_t type;
     union
     {
-        kan_render_image_t image;
+        struct kan_render_frame_buffer_image_attachment_description_t image;
         kan_render_surface_t surface;
     };
 };
@@ -1006,7 +1014,9 @@ struct kan_render_parameter_update_description_sampler_t
 struct kan_render_parameter_update_description_image_t
 {
     kan_render_image_t image;
-    kan_render_size_t array_index;
+    uint8_t array_index;
+    uint8_t layer_offset;
+    uint8_t layer_count;
 };
 
 /// \brief Contains information on how to update one parameter binding.
@@ -1130,8 +1140,6 @@ kan_render_frame_lifetime_buffer_allocator_allocate (kan_render_frame_lifetime_b
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_frame_lifetime_buffer_allocator_destroy (
     kan_render_frame_lifetime_buffer_allocator_t allocator);
 
-// TODO: For future iterations: cube maps and layered images (aka image arrays).
-
 /// \brief Contains information for image creation.
 struct kan_render_image_description_t
 {
@@ -1139,6 +1147,7 @@ struct kan_render_image_description_t
     kan_render_size_t width;
     kan_render_size_t height;
     kan_render_size_t depth;
+    uint8_t layers;
     uint8_t mips;
 
     kan_bool_t render_target;
@@ -1151,16 +1160,15 @@ struct kan_render_image_description_t
 CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_image_t
 kan_render_image_create (kan_render_context_t context, struct kan_render_image_description_t *description);
 
-/// \brief Schedules data upload to given image mip.
-CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_image_upload_data (kan_render_image_t image,
-                                                                     uint8_t mip,
-                                                                     kan_render_size_t data_size,
-                                                                     void *data);
+/// \brief Schedules data upload to given image layer and mip.
+CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_image_upload_data (
+    kan_render_image_t image, uint8_t layer, uint8_t mip, kan_render_size_t data_size, void *data);
 
 /// \brief Requests image mip generation to be executed from the first mip to the last (including it).
 /// \invariant First mip is already filled with image data using `kan_render_image_upload_data`.
 ///            It is allowed to call `kan_render_image_upload_data` and then call this function during the same frame.
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_image_request_mip_generation (kan_render_image_t image,
+                                                                                uint8_t layer,
                                                                                 uint8_t first,
                                                                                 uint8_t last);
 
@@ -1168,8 +1176,10 @@ CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_image_request_mip_generation (
 /// \invariant User must guarantee that images are compatible and that sizes at given mips are equal.
 /// \invariant For thread safety, both images should not be modified by other functions during this call.
 CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_image_copy_data (kan_render_image_t from_image,
+                                                                   uint8_t from_layer,
                                                                    uint8_t from_mip,
                                                                    kan_render_image_t to_image,
+                                                                   uint8_t to_layer,
                                                                    uint8_t to_mip);
 
 /// \brief Requests render target to be resized without breaking the attachments.
@@ -1213,8 +1223,12 @@ kan_render_request_read_back_from_buffer (kan_render_buffer_t buffer,
                                           kan_render_size_t read_back_offset);
 
 /// \brief Requests to read data back from image when this frame ends.
-CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_read_back_status_t kan_render_request_read_back_from_image (
-    kan_render_image_t image, uint8_t mip, kan_render_buffer_t read_back_buffer, kan_render_size_t read_back_offset);
+CONTEXT_RENDER_BACKEND_SYSTEM_API kan_render_read_back_status_t
+kan_render_request_read_back_from_image (kan_render_image_t image,
+                                         uint8_t layer,
+                                         uint8_t mip,
+                                         kan_render_buffer_t read_back_buffer,
+                                         kan_render_size_t read_back_offset);
 
 /// \brief Queries current status of read back operation.
 CONTEXT_RENDER_BACKEND_SYSTEM_API enum kan_render_read_back_state_t kan_read_read_back_status_get (

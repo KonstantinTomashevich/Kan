@@ -397,7 +397,7 @@ kan_render_pass_instance_t kan_render_pass_instantiate (kan_render_pass_t pass,
         switch (frame_buffer_data->attachments[index].type)
         {
         case KAN_FRAME_BUFFER_ATTACHMENT_IMAGE:
-            switch (get_image_format_class (frame_buffer_data->attachments[index].image->description.format))
+            switch (get_image_format_class (frame_buffer_data->attachments[index].image.data->description.format))
             {
             case IMAGE_FORMAT_CLASS_COLOR:
                 instance->clear_values[index].color.float32[0u] = attachment_clear_values[index].color.r;

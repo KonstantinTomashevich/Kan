@@ -188,7 +188,7 @@ APPLICATION_FRAMEWORK_EXAMPLES_TEST_RENDER_TEXTURE_API void kan_universe_mutator
                             };
 
                             kan_render_backend_system_present_image_on_surface (
-                                singleton->window_surface, loaded->image, surface_region, texture_region);
+                                singleton->window_surface, loaded->image, 0u, surface_region, texture_region);
                             singleton->frame_checked = KAN_TRUE;
                         }
                     }

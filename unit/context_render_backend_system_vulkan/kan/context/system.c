@@ -1499,14 +1499,13 @@ static void render_backend_system_submit_transfer (struct render_backend_system_
                     .aspectMask = image_aspect,
                     .baseMipLevel = (vulkan_size_t) image_upload->mip,
                     .levelCount = 1u,
-                    .baseArrayLayer = 0u,
+                    .baseArrayLayer = image_upload->layer,
                     .layerCount = 1u,
                 },
         };
 
         vkCmdPipelineBarrier (state->primary_command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT,
                               VK_PIPELINE_STAGE_TRANSFER_BIT, 0u, 0u, NULL, 0u, NULL, 1u, &prepare_transfer_barrier);
-        image_upload->image->last_command_layout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
 
         VkBufferImageCopy copy_region = {
             .bufferOffset = (vulkan_size_t) image_upload->staging_buffer_offset,
@@ -1516,7 +1515,7 @@ static void render_backend_system_submit_transfer (struct render_backend_system_
                 {
                     .aspectMask = image_aspect,
                     .mipLevel = (vulkan_size_t) image_upload->mip,
-                    .baseArrayLayer = 0u,
+                    .baseArrayLayer = image_upload->layer,
                     .layerCount = 1u,
                 },
             .imageOffset =
@@ -1541,7 +1540,7 @@ static void render_backend_system_submit_transfer (struct render_backend_system_
             .pNext = NULL,
             .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
             .dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_TRANSFER_READ_BIT,
-            .oldLayout = image_upload->image->last_command_layout,
+            .oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
             .newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
             .srcQueueFamilyIndex = system->device_queue_family_index,
             .dstQueueFamilyIndex = system->device_queue_family_index,
@@ -1551,7 +1550,7 @@ static void render_backend_system_submit_transfer (struct render_backend_system_
                     .aspectMask = image_aspect,
                     .baseMipLevel = (vulkan_size_t) image_upload->mip,
                     .levelCount = 1u,
-                    .baseArrayLayer = 0u,
+                    .baseArrayLayer = image_upload->layer,
                     .layerCount = 1u,
                 },
         };
@@ -1560,7 +1559,7 @@ static void render_backend_system_submit_transfer (struct render_backend_system_
                               VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT, 0u, 0u, NULL, 0u,
                               NULL, 1u, &finish_transfer_barrier);
 
-        image_upload->image->last_command_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        set_image_layout_info (image_upload->image, image_upload->layer, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
         image_upload = image_upload->next;
     }
 
@@ -1583,7 +1582,7 @@ static void render_backend_system_submit_transfer (struct render_backend_system_
                 .pNext = NULL,
                 .srcAccessMask = 0u,
                 .dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
-                .oldLayout = image_copy->from_image->last_command_layout,
+                .oldLayout = get_image_layout_info (image_copy->from_image, image_copy->from_layer),
                 .newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
                 .srcQueueFamilyIndex = system->device_queue_family_index,
                 .dstQueueFamilyIndex = system->device_queue_family_index,
@@ -1593,7 +1592,7 @@ static void render_backend_system_submit_transfer (struct render_backend_system_
                         .aspectMask = image_aspect,
                         .baseMipLevel = (vulkan_size_t) image_copy->from_mip,
                         .levelCount = 1u,
-                        .baseArrayLayer = 0u,
+                        .baseArrayLayer = (vulkan_size_t) image_copy->from_layer,
                         .layerCount = 1u,
                     },
             },
@@ -1612,7 +1611,7 @@ static void render_backend_system_submit_transfer (struct render_backend_system_
                         .aspectMask = image_aspect,
                         .baseMipLevel = (vulkan_size_t) image_copy->to_mip,
                         .levelCount = 1u,
-                        .baseArrayLayer = 0u,
+                        .baseArrayLayer = (vulkan_size_t) image_copy->to_layer,
                         .layerCount = 1u,
                     },
             },
@@ -1622,15 +1621,13 @@ static void render_backend_system_submit_transfer (struct render_backend_system_
                               VK_PIPELINE_STAGE_TRANSFER_BIT, 0u, 0u, NULL, 0u, NULL,
                               sizeof (prepare_transfer_barriers) / sizeof (prepare_transfer_barriers[0u]),
                               prepare_transfer_barriers);
-        image_copy->from_image->last_command_layout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-        image_copy->to_image->last_command_layout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
 
         VkImageCopy copy_region = {
             .srcSubresource =
                 {
                     .aspectMask = image_aspect,
                     .mipLevel = (vulkan_size_t) image_copy->from_mip,
-                    .baseArrayLayer = 0u,
+                    .baseArrayLayer = (vulkan_size_t) image_copy->from_layer,
                     .layerCount = 1u,
                 },
             .srcOffset =
@@ -1643,7 +1640,7 @@ static void render_backend_system_submit_transfer (struct render_backend_system_
                 {
                     .aspectMask = image_aspect,
                     .mipLevel = (vulkan_size_t) image_copy->to_mip,
-                    .baseArrayLayer = 0u,
+                    .baseArrayLayer = (vulkan_size_t) image_copy->to_layer,
                     .layerCount = 1u,
                 },
             .dstOffset =
@@ -1670,7 +1667,7 @@ static void render_backend_system_submit_transfer (struct render_backend_system_
                 .pNext = NULL,
                 .srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
                 .dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
-                .oldLayout = image_copy->from_image->last_command_layout,
+                .oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
                 .newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                 .srcQueueFamilyIndex = system->device_queue_family_index,
                 .dstQueueFamilyIndex = system->device_queue_family_index,
@@ -1680,7 +1677,7 @@ static void render_backend_system_submit_transfer (struct render_backend_system_
                         .aspectMask = image_aspect,
                         .baseMipLevel = (vulkan_size_t) image_copy->from_mip,
                         .levelCount = 1u,
-                        .baseArrayLayer = 0u,
+                        .baseArrayLayer = (vulkan_size_t) image_copy->from_layer,
                         .layerCount = 1u,
                     },
             },
@@ -1689,7 +1686,7 @@ static void render_backend_system_submit_transfer (struct render_backend_system_
                 .pNext = NULL,
                 .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
                 .dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
-                .oldLayout = image_copy->to_image->last_command_layout,
+                .oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                 .newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                 .srcQueueFamilyIndex = system->device_queue_family_index,
                 .dstQueueFamilyIndex = system->device_queue_family_index,
@@ -1699,7 +1696,7 @@ static void render_backend_system_submit_transfer (struct render_backend_system_
                         .aspectMask = image_aspect,
                         .baseMipLevel = (vulkan_size_t) image_copy->to_mip,
                         .levelCount = 1u,
-                        .baseArrayLayer = 0u,
+                        .baseArrayLayer = (vulkan_size_t) image_copy->to_layer,
                         .layerCount = 1u,
                     },
             },
@@ -1710,8 +1707,9 @@ static void render_backend_system_submit_transfer (struct render_backend_system_
                               NULL, sizeof (finish_transfer_barriers) / sizeof (finish_transfer_barriers[0u]),
                               finish_transfer_barriers);
 
-        image_copy->from_image->last_command_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        image_copy->to_image->last_command_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        set_image_layout_info (image_copy->from_image, image_copy->from_layer,
+                               VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        set_image_layout_info (image_copy->to_image, image_copy->to_layer, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
         image_copy = image_copy->next;
     }
 
@@ -1763,7 +1761,7 @@ static inline void submit_mip_generation (struct render_backend_system_t *system
                         .aspectMask = image_aspect,
                         .baseMipLevel = (vulkan_size_t) input_mip,
                         .levelCount = 1u,
-                        .baseArrayLayer = 0u,
+                        .baseArrayLayer = (vulkan_size_t) image_mip_generation->layer,
                         .layerCount = 1u,
                     },
             };
@@ -1787,7 +1785,7 @@ static inline void submit_mip_generation (struct render_backend_system_t *system
                         .aspectMask = image_aspect,
                         .baseMipLevel = (vulkan_size_t) output_mip,
                         .levelCount = 1u,
-                        .baseArrayLayer = 0u,
+                        .baseArrayLayer = (vulkan_size_t) image_mip_generation->layer,
                         .layerCount = 1u,
                     },
             };
@@ -1801,7 +1799,7 @@ static inline void submit_mip_generation (struct render_backend_system_t *system
                     {
                         .aspectMask = image_aspect,
                         .mipLevel = (vulkan_size_t) input_mip,
-                        .baseArrayLayer = 0u,
+                        .baseArrayLayer = (vulkan_size_t) image_mip_generation->layer,
                         .layerCount = 1u,
                     },
                 .srcOffsets =
@@ -1821,7 +1819,7 @@ static inline void submit_mip_generation (struct render_backend_system_t *system
                     {
                         .aspectMask = image_aspect,
                         .mipLevel = (vulkan_size_t) output_mip,
-                        .baseArrayLayer = 0u,
+                        .baseArrayLayer = (vulkan_size_t) image_mip_generation->layer,
                         .layerCount = 1u,
                     },
                 .dstOffsets =
@@ -1858,7 +1856,7 @@ static inline void submit_mip_generation (struct render_backend_system_t *system
                         .aspectMask = image_aspect,
                         .baseMipLevel = (vulkan_size_t) input_mip,
                         .levelCount = 1u,
-                        .baseArrayLayer = 0u,
+                        .baseArrayLayer = (vulkan_size_t) image_mip_generation->layer,
                         .layerCount = 1u,
                     },
             };
@@ -1883,7 +1881,7 @@ static inline void submit_mip_generation (struct render_backend_system_t *system
                     .aspectMask = image_aspect,
                     .baseMipLevel = (vulkan_size_t) image_mip_generation->last,
                     .levelCount = 1u,
-                    .baseArrayLayer = 0u,
+                    .baseArrayLayer = (vulkan_size_t) image_mip_generation->layer,
                     .layerCount = 1u,
                 },
         };
@@ -1891,7 +1889,8 @@ static inline void submit_mip_generation (struct render_backend_system_t *system
         vkCmdPipelineBarrier (state->primary_command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT,
                               VK_PIPELINE_STAGE_TRANSFER_BIT, 0u, 0u, NULL, 0u, NULL, 1u, &last_to_read_only_barrier);
 
-        image_mip_generation->image->last_command_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        set_image_layout_info (image_mip_generation->image, image_mip_generation->layer,
+                               VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
         image_mip_generation = image_mip_generation->next;
     }
 
@@ -1965,17 +1964,20 @@ static inline void process_frame_buffer_create_requests (struct render_backend_s
             switch (frame_buffer->attachments[attachment_index].type)
             {
             case KAN_FRAME_BUFFER_ATTACHMENT_IMAGE:
-                attachment_width = (vulkan_size_t) frame_buffer->attachments[attachment_index].image->description.width;
-                attachment_height =
-                    (vulkan_size_t) frame_buffer->attachments[attachment_index].image->description.height;
+            {
+                struct render_backend_image_t *image = frame_buffer->attachments[attachment_index].image.data;
+                attachment_width = (vulkan_size_t) image->description.width;
+                attachment_height = (vulkan_size_t) image->description.height;
                 break;
+            }
 
             case KAN_FRAME_BUFFER_ATTACHMENT_SURFACE:
-                attachment_width = (vulkan_size_t) frame_buffer->attachments[attachment_index]
-                                       .surface->swap_chain_creation_window_width;
-                attachment_height = (vulkan_size_t) frame_buffer->attachments[attachment_index]
-                                        .surface->swap_chain_creation_window_height;
+            {
+                struct render_backend_surface_t *surface = frame_buffer->attachments[attachment_index].surface;
+                attachment_width = (vulkan_size_t) surface->swap_chain_creation_window_width;
+                attachment_height = (vulkan_size_t) surface->swap_chain_creation_window_height;
                 break;
+            }
             }
 
             if (attachment_index == 0u)
@@ -2020,12 +2022,12 @@ static inline void process_frame_buffer_create_requests (struct render_backend_s
             {
             case KAN_FRAME_BUFFER_ATTACHMENT_IMAGE:
             {
-                struct render_backend_image_t *image = frame_buffer->attachments[attachment_index].image;
+                struct render_backend_image_t *image = frame_buffer->attachments[attachment_index].image.data;
                 VkImageViewCreateInfo create_info = {
                     .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
                     .pNext = NULL,
                     .flags = 0u,
-                    .image = frame_buffer->attachments[attachment_index].image->image,
+                    .image = image->image,
                     .viewType = get_image_view_type (&image->description),
                     .format = image_format_to_vulkan (image->description.format),
                     .components =
@@ -2040,7 +2042,7 @@ static inline void process_frame_buffer_create_requests (struct render_backend_s
                             .aspectMask = get_image_aspects (&image->description),
                             .baseMipLevel = 0u,
                             .levelCount = 1u,
-                            .baseArrayLayer = 0u,
+                            .baseArrayLayer = frame_buffer->attachments[attachment_index].image.layer,
                             .layerCount = 1u,
                         },
                 };
@@ -2177,14 +2179,15 @@ static inline void process_surface_blit_requests (struct render_backend_system_t
         struct surface_blit_request_t *request = surface->first_blit_request;
         while (request)
         {
-            if (request->image->last_command_layout != VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL)
+            VkImageLayout image_old_layout = get_image_layout_info (request->image, request->image_layer);
+            if (image_old_layout != VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL)
             {
                 VkImageMemoryBarrier barrier_info = {
                     .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
                     .pNext = NULL,
                     .srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
                     .dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
-                    .oldLayout = request->image->last_command_layout,
+                    .oldLayout = image_old_layout,
                     .newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
                     .srcQueueFamilyIndex = system->device_queue_family_index,
                     .dstQueueFamilyIndex = system->device_queue_family_index,
@@ -2201,7 +2204,7 @@ static inline void process_surface_blit_requests (struct render_backend_system_t
 
                 vkCmdPipelineBarrier (state->primary_command_buffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
                                       VK_PIPELINE_STAGE_TRANSFER_BIT, 0u, 0u, NULL, 0u, NULL, 1u, &barrier_info);
-                request->image->last_command_layout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+                set_image_layout_info (request->image, request->image_layer, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
             }
 
             // Prepare destination surface image.
@@ -2326,7 +2329,9 @@ static inline void process_surface_blit_requests (struct render_backend_system_t
         while (request)
         {
             struct surface_blit_request_t *next = request->next;
-            if (request->image->last_command_layout == VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL)
+            VkImageLayout image_old_layout = get_image_layout_info (request->image, request->image_layer);
+
+            if (image_old_layout == VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL)
             {
                 // If image supports sampling, return it back to normal layout.
                 if (request->image->description.supports_sampling)
@@ -2336,7 +2341,7 @@ static inline void process_surface_blit_requests (struct render_backend_system_t
                         .pNext = NULL,
                         .srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
                         .dstAccessMask = 0u,
-                        .oldLayout = request->image->last_command_layout,
+                        .oldLayout = image_old_layout,
                         .newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                         .srcQueueFamilyIndex = system->device_queue_family_index,
                         .dstQueueFamilyIndex = system->device_queue_family_index,
@@ -2353,7 +2358,8 @@ static inline void process_surface_blit_requests (struct render_backend_system_t
 
                     vkCmdPipelineBarrier (state->primary_command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT,
                                           VK_PIPELINE_STAGE_TRANSFER_BIT, 0u, 0u, NULL, 0u, NULL, 1u, &barrier_info);
-                    request->image->last_command_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                    set_image_layout_info (request->image, request->image_layer,
+                                           VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
                 }
             }
 
@@ -2426,7 +2432,7 @@ static inline void execute_pass_instance_submission (struct render_backend_syste
             VkAccessFlags possible_access_flags = 0u;
             VkAccessFlags target_access_flags = 0u;
 
-            switch (get_image_format_class (attachment->image->description.format))
+            switch (get_image_format_class (attachment->image.data->description.format))
             {
             case IMAGE_FORMAT_CLASS_COLOR:
                 target_layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
@@ -2445,14 +2451,15 @@ static inline void execute_pass_instance_submission (struct render_backend_syste
                 break;
             }
 
-            if (attachment->image->last_command_layout != target_layout ||
+            VkImageLayout image_old_layout = get_image_layout_info (attachment->image.data, attachment->image.layer);
+            if (image_old_layout != target_layout ||
                 // There is always at least one attachment (the current one) and if there are several attachments,
                 // then we're trying to be safe and add barrier to be sure that previous attachment has finished its
                 // work. Previous attachment might not exist in this frame, but it is better to be safe than sorry
                 // right now.
-                attachment->image->first_frame_buffer_attachment->next)
+                attachment->image.data->first_frame_buffer_attachment->next)
             {
-                if (attachment->image->description.supports_sampling)
+                if (attachment->image.data->description.supports_sampling)
                 {
                     possible_access_flags |= VK_ACCESS_SHADER_READ_BIT;
                 }
@@ -2462,22 +2469,22 @@ static inline void execute_pass_instance_submission (struct render_backend_syste
                     .pNext = NULL,
                     .srcAccessMask = possible_access_flags,
                     .dstAccessMask = target_access_flags,
-                    .oldLayout = attachment->image->last_command_layout,
+                    .oldLayout = image_old_layout,
                     .newLayout = target_layout,
                     .srcQueueFamilyIndex = system->device_queue_family_index,
                     .dstQueueFamilyIndex = system->device_queue_family_index,
-                    .image = attachment->image->image,
+                    .image = attachment->image.data->image,
                     .subresourceRange =
                         {
-                            .aspectMask = get_image_aspects (&attachment->image->description),
+                            .aspectMask = get_image_aspects (&attachment->image.data->description),
                             .baseMipLevel = 0u,
                             .levelCount = 1u,
-                            .baseArrayLayer = 0u,
+                            .baseArrayLayer = attachment->image.layer,
                             .layerCount = 1u,
                         },
                 };
 
-                attachment->image->last_command_layout = target_layout;
+                set_image_layout_info (attachment->image.data, attachment->image.layer, target_layout);
                 ++added_barriers;
             }
 
@@ -2549,7 +2556,8 @@ static inline void execute_pass_instance_submission (struct render_backend_syste
         struct render_backend_frame_buffer_attachment_t *attachment =
             &pass_instance->frame_buffer->attachments[attachment_index];
 
-        if (attachment->type == KAN_FRAME_BUFFER_ATTACHMENT_IMAGE && attachment->image->description.supports_sampling)
+        if (attachment->type == KAN_FRAME_BUFFER_ATTACHMENT_IMAGE &&
+            attachment->image.data->description.supports_sampling)
         {
             // TODO: This can cause additional unnecessary transitions of an image if it is used both for sampling and
             //       as attachment, but several passes use it as attachment before other pass samples it.
@@ -2557,7 +2565,7 @@ static inline void execute_pass_instance_submission (struct render_backend_syste
             VkAccessFlags possible_access_flags = 0u;
             VkImageLayout new_layout = VK_IMAGE_LAYOUT_UNDEFINED;
 
-            switch (get_image_format_class (attachment->image->description.format))
+            switch (get_image_format_class (attachment->image.data->description.format))
             {
             case IMAGE_FORMAT_CLASS_COLOR:
                 possible_access_flags |= VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
@@ -2578,14 +2586,14 @@ static inline void execute_pass_instance_submission (struct render_backend_syste
                 .pNext = NULL,
                 .srcAccessMask = possible_access_flags,
                 .dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
-                .oldLayout = attachment->image->last_command_layout,
+                .oldLayout = get_image_layout_info (attachment->image.data, attachment->image.layer),
                 .newLayout = new_layout,
                 .srcQueueFamilyIndex = system->device_queue_family_index,
                 .dstQueueFamilyIndex = system->device_queue_family_index,
-                .image = attachment->image->image,
+                .image = attachment->image.data->image,
                 .subresourceRange =
                     {
-                        .aspectMask = get_image_aspects (&attachment->image->description),
+                        .aspectMask = get_image_aspects (&attachment->image.data->description),
                         .baseMipLevel = 0u,
                         .levelCount = 1u,
                         .baseArrayLayer = 0u,
@@ -2593,7 +2601,7 @@ static inline void execute_pass_instance_submission (struct render_backend_syste
                     },
             };
 
-            attachment->image->last_command_layout = new_layout;
+            set_image_layout_info (attachment->image.data, attachment->image.layer, new_layout);
             ++added_barriers;
         }
     }
@@ -2969,31 +2977,35 @@ static void render_backend_system_submit_read_back (struct render_backend_system
     image_read_back = first_image_read_back;
     while (image_read_back)
     {
-        if (image_read_back->status->state == KAN_RENDER_READ_BACK_STATE_SCHEDULED &&
-            image_read_back->image->last_command_layout != VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL)
+        if (image_read_back->status->state == KAN_RENDER_READ_BACK_STATE_SCHEDULED)
         {
-            *image_barrier_output = (VkImageMemoryBarrier) {
-                .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-                .pNext = NULL,
-                .srcAccessMask = 0u,
-                .dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
-                .oldLayout = image_read_back->image->last_command_layout,
-                .newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                .srcQueueFamilyIndex = system->device_queue_family_index,
-                .dstQueueFamilyIndex = system->device_queue_family_index,
-                .image = image_read_back->image->image,
-                .subresourceRange =
-                    {
-                        .aspectMask = get_image_aspects (&image_read_back->image->description),
-                        .baseMipLevel = image_read_back->mip,
-                        .levelCount = 1u,
-                        .baseArrayLayer = 0u,
-                        .layerCount = 1u,
-                    },
-            };
+            VkImageLayout image_old_layout = get_image_layout_info (image_read_back->image, image_read_back->layer);
+            if (image_old_layout != VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL)
+            {
+                *image_barrier_output = (VkImageMemoryBarrier) {
+                    .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+                    .pNext = NULL,
+                    .srcAccessMask = 0u,
+                    .dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
+                    .oldLayout = image_old_layout,
+                    .newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                    .srcQueueFamilyIndex = system->device_queue_family_index,
+                    .dstQueueFamilyIndex = system->device_queue_family_index,
+                    .image = image_read_back->image->image,
+                    .subresourceRange =
+                        {
+                            .aspectMask = get_image_aspects (&image_read_back->image->description),
+                            .baseMipLevel = image_read_back->mip,
+                            .levelCount = 1u,
+                            .baseArrayLayer = 0u,
+                            .layerCount = 1u,
+                        },
+                };
 
-            image_read_back->image->last_command_layout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-            ++image_barrier_output;
+                set_image_layout_info (image_read_back->image, image_read_back->layer,
+                                       VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+                ++image_barrier_output;
+            }
         }
 
         image_read_back = image_read_back->next;
@@ -3120,9 +3132,9 @@ static void render_backend_system_submit_read_back (struct render_backend_system
             *image_barrier_output = (VkImageMemoryBarrier) {
                 .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
                 .pNext = NULL,
-                .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
+                .srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
                 .dstAccessMask = 0u,
-                .oldLayout = image_read_back->image->last_command_layout,
+                .oldLayout = get_image_layout_info (image_read_back->image, image_read_back->layer),
                 .newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                 .srcQueueFamilyIndex = system->device_queue_family_index,
                 .dstQueueFamilyIndex = system->device_queue_family_index,
@@ -3137,7 +3149,8 @@ static void render_backend_system_submit_read_back (struct render_backend_system
                     },
             };
 
-            image_read_back->image->last_command_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            set_image_layout_info (image_read_back->image, image_read_back->layer,
+                                   VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
             ++image_barrier_output;
         }
 
@@ -4598,6 +4611,7 @@ kan_render_surface_t kan_render_backend_system_create_surface (
 
 void kan_render_backend_system_present_image_on_surface (kan_render_surface_t surface,
                                                          kan_render_image_t image,
+                                                         uint8_t image_layer,
                                                          struct kan_render_integer_region_t surface_region,
                                                          struct kan_render_integer_region_t image_region)
 {
@@ -4607,6 +4621,7 @@ void kan_render_backend_system_present_image_on_surface (kan_render_surface_t su
 
     request->next = NULL;
     request->image = KAN_HANDLE_GET (image);
+    request->image_layer = image_layer;
     request->image_region = image_region;
     request->surface_region = surface_region;
 

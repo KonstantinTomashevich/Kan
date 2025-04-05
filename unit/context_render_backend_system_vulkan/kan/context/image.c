@@ -8,9 +8,23 @@ static kan_bool_t create_vulkan_image (struct render_backend_system_t *system,
     struct kan_cpu_section_execution_t execution;
     kan_cpu_section_execution_init (&execution, system->section_image_create_on_device);
 
+    KAN_ASSERT (description->width > 0u)
+    KAN_ASSERT (description->height > 0u)
+    KAN_ASSERT (description->depth > 0u)
+    KAN_ASSERT (description->layers > 0u)
+
     VkImageType image_type = description->depth > 1u ? VK_IMAGE_TYPE_3D : VK_IMAGE_TYPE_2D;
     // Always support at least transfer source as read back might be requested.
     VkImageUsageFlags image_usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+
+    if (image_type == VK_IMAGE_TYPE_3D && description->layers > 1u)
+    {
+        KAN_LOG (render_backend_system_vulkan, KAN_LOG_ERROR,
+                 "Unable to create image \"%s\": having both depth > 1 and layers > 1 is not supported.",
+                 description->tracking_name)
+        kan_cpu_section_execution_shutdown (&execution);
+        return KAN_FALSE;
+    }
 
     if (description->render_target)
     {
@@ -49,7 +63,7 @@ static kan_bool_t create_vulkan_image (struct render_backend_system_t *system,
                 .depth = (vulkan_size_t) description->depth,
             },
         .mipLevels = (vulkan_size_t) description->mips,
-        .arrayLayers = 1u,
+        .arrayLayers = (vulkan_size_t) description->layers,
         .samples = VK_SAMPLE_COUNT_1_BIT,
         .tiling = VK_IMAGE_TILING_OPTIMAL,
         .usage = image_usage,
@@ -125,9 +139,24 @@ struct render_backend_image_t *render_backend_system_create_image (struct render
     image->image = vulkan_image;
     image->allocation = vulkan_allocation;
     image->description = *description;
-    image->last_command_layout = VK_IMAGE_LAYOUT_UNDEFINED;
     image->first_frame_buffer_attachment = NULL;
     image->first_parameter_set_attachment = NULL;
+
+    if (image->description.layers == 1u)
+    {
+        image->last_command_layout_single_layer = VK_IMAGE_LAYOUT_UNDEFINED;
+    }
+    else
+    {
+        image->last_command_layouts_per_layer =
+            kan_allocate_general (system->image_wrapper_allocation_group,
+                                  sizeof (VkImageLayout) * image->description.layers, _Alignof (VkImageLayout));
+
+        for (kan_loop_size_t index = 0u; index < image->description.layers; ++index)
+        {
+            image->last_command_layouts_per_layer[index] = VK_IMAGE_LAYOUT_UNDEFINED;
+        }
+    }
 
 #if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_PROFILE_MEMORY)
     image->device_allocation_group =
@@ -162,6 +191,12 @@ void render_backend_system_destroy_image (struct render_backend_system_t *system
         parameter_set_attachment = next;
     }
 
+    if (image->description.layers > 1u)
+    {
+        kan_free_general (system->image_wrapper_allocation_group, image->last_command_layouts_per_layer,
+                          sizeof (VkImageLayout) * image->description.layers);
+    }
+
 #if defined(KAN_CONTEXT_RENDER_BACKEND_VULKAN_PROFILE_MEMORY)
     VkMemoryRequirements requirements;
     vkGetImageMemoryRequirements (system->device, image->image, &requirements);
@@ -185,7 +220,8 @@ kan_render_image_t kan_render_image_create (kan_render_context_t context,
     return image ? KAN_HANDLE_SET (kan_render_image_t, image) : KAN_HANDLE_SET_INVALID (kan_render_image_t);
 }
 
-void kan_render_image_upload_data (kan_render_image_t image, uint8_t mip, vulkan_size_t data_size, void *data)
+void kan_render_image_upload_data (
+    kan_render_image_t image, uint8_t layer, uint8_t mip, vulkan_size_t data_size, void *data)
 {
     struct render_backend_image_t *image_data = KAN_HANDLE_GET (image);
     struct kan_cpu_section_execution_t execution;
@@ -231,6 +267,7 @@ void kan_render_image_upload_data (kan_render_image_t image, uint8_t mip, vulkan
     item->next = schedule->first_scheduled_image_upload;
     schedule->first_scheduled_image_upload = item;
     item->image = image_data;
+    item->layer = layer;
     item->mip = mip;
     item->staging_buffer = staging_allocation.buffer;
     item->staging_buffer_offset = staging_allocation.offset;
@@ -240,7 +277,7 @@ void kan_render_image_upload_data (kan_render_image_t image, uint8_t mip, vulkan
     kan_cpu_section_execution_shutdown (&execution);
 }
 
-void kan_render_image_request_mip_generation (kan_render_image_t image, uint8_t first, uint8_t last)
+void kan_render_image_request_mip_generation (kan_render_image_t image, uint8_t layer, uint8_t first, uint8_t last)
 {
     struct render_backend_image_t *data = KAN_HANDLE_GET (image);
     KAN_ASSERT (!data->description.render_target)
@@ -255,14 +292,17 @@ void kan_render_image_request_mip_generation (kan_render_image_t image, uint8_t 
     item->next = schedule->first_scheduled_image_mip_generation;
     schedule->first_scheduled_image_mip_generation = item;
     item->image = data;
+    item->layer = layer;
     item->first = first;
     item->last = last;
     kan_atomic_int_unlock (&schedule->schedule_lock);
 }
 
 void kan_render_image_copy_data (kan_render_image_t from_image,
+                                 uint8_t from_layer,
                                  uint8_t from_mip,
                                  kan_render_image_t to_image,
+                                 uint8_t to_layer,
                                  uint8_t to_mip)
 {
     struct render_backend_image_t *source_data = KAN_HANDLE_GET (from_image);
@@ -298,7 +338,9 @@ void kan_render_image_copy_data (kan_render_image_t from_image,
 
     item->from_image = source_data;
     item->to_image = target_data;
+    item->from_layer = from_layer;
     item->from_mip = from_mip;
+    item->to_layer = to_layer;
     item->to_mip = to_mip;
     kan_atomic_int_unlock (&schedule->schedule_lock);
 }
@@ -343,7 +385,18 @@ void kan_render_image_resize_render_target (kan_render_image_t image,
         kan_atomic_int_unlock (&schedule->schedule_lock);
     }
 
-    data->last_command_layout = VK_IMAGE_LAYOUT_UNDEFINED;
+    if (data->description.layers == 1u)
+    {
+        data->last_command_layout_single_layer = VK_IMAGE_LAYOUT_UNDEFINED;
+    }
+    else
+    {
+        for (kan_loop_size_t index = 0u; index < data->description.layers; ++index)
+        {
+            data->last_command_layouts_per_layer[index] = VK_IMAGE_LAYOUT_UNDEFINED;
+        }
+    }
+
     data->description.width = new_width;
     data->description.height = new_height;
     data->description.depth = new_depth;

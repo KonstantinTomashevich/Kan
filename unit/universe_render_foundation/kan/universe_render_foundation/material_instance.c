@@ -711,7 +711,9 @@ static inline void process_texture_updates (
                                                 .image_binding =
                                                     {
                                                         .image = texture_loaded->image,
-                                                        .array_index = 1u,
+                                                        .array_index = 0u,
+                                                        .layer_offset = 0u,
+                                                        .layer_count = 1u,
                                                     },
                                             };
 
@@ -1388,7 +1390,9 @@ static void instantiate_material_static_data (
                                 .image_binding =
                                     {
                                         .image = texture_loaded->image,
-                                        .array_index = 1u,
+                                        .array_index = 0u,
+                                        .layer_offset = 0u,
+                                        .layer_count = 1u,
                                     },
                             };
 

@@ -39,14 +39,15 @@ struct render_backend_frame_buffer_t *render_backend_system_create_frame_buffer 
         {
         case KAN_FRAME_BUFFER_ATTACHMENT_IMAGE:
         {
-            target->image = KAN_HANDLE_GET (source->image);
-            KAN_ASSERT (target->image->description.render_target)
+            target->image.data = KAN_HANDLE_GET (source->image.image);
+            target->image.layer = source->image.layer;
+            KAN_ASSERT (target->image.data->description.render_target)
 
             struct image_frame_buffer_attachment_t *attachment = kan_allocate_batched (
                 system->image_wrapper_allocation_group, sizeof (struct image_frame_buffer_attachment_t));
 
-            attachment->next = target->image->first_frame_buffer_attachment;
-            target->image->first_frame_buffer_attachment = attachment;
+            attachment->next = target->image.data->first_frame_buffer_attachment;
+            target->image.data->first_frame_buffer_attachment = attachment;
             attachment->frame_buffer = buffer;
             break;
         }
@@ -187,7 +188,7 @@ void render_backend_system_destroy_frame_buffer (struct render_backend_system_t 
         case KAN_FRAME_BUFFER_ATTACHMENT_IMAGE:
         {
             struct image_frame_buffer_attachment_t *previous = NULL;
-            struct image_frame_buffer_attachment_t *current = attachment->image->first_frame_buffer_attachment;
+            struct image_frame_buffer_attachment_t *current = attachment->image.data->first_frame_buffer_attachment;
 
             while (current)
             {
@@ -199,8 +200,8 @@ void render_backend_system_destroy_frame_buffer (struct render_backend_system_t 
                     }
                     else
                     {
-                        KAN_ASSERT (attachment->image->first_frame_buffer_attachment == current)
-                        attachment->image->first_frame_buffer_attachment = current->next;
+                        KAN_ASSERT (attachment->image.data->first_frame_buffer_attachment == current)
+                        attachment->image.data->first_frame_buffer_attachment = current->next;
                     }
 
                     kan_free_batched (system->image_wrapper_allocation_group, current);

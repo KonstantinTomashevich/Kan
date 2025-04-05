@@ -67,6 +67,7 @@ struct surface_blit_request_t
 {
     struct surface_blit_request_t *next;
     struct render_backend_image_t *image;
+    uint8_t image_layer;
     struct kan_render_integer_region_t image_region;
     struct kan_render_integer_region_t surface_region;
 };
@@ -155,6 +156,7 @@ struct scheduled_image_upload_t
 {
     struct scheduled_image_upload_t *next;
     struct render_backend_image_t *image;
+    uint8_t layer;
     uint8_t mip;
     struct render_backend_buffer_t *staging_buffer;
     vulkan_size_t staging_buffer_offset;
@@ -171,6 +173,7 @@ struct scheduled_image_mip_generation_t
 {
     struct scheduled_image_mip_generation_t *next;
     struct render_backend_image_t *image;
+    uint8_t layer;
     uint8_t first;
     uint8_t last;
 };
@@ -180,7 +183,9 @@ struct scheduled_image_copy_data_t
     struct scheduled_image_copy_data_t *next;
     struct render_backend_image_t *from_image;
     struct render_backend_image_t *to_image;
+    uint8_t from_layer;
     uint8_t from_mip;
+    uint8_t to_layer;
     uint8_t to_mip;
 };
 
@@ -210,6 +215,7 @@ struct scheduled_image_read_back_t
 {
     struct scheduled_image_read_back_t *next;
     struct render_backend_image_t *image;
+    uint8_t layer;
     uint8_t mip;
 
     struct render_backend_buffer_t *read_back_buffer;
@@ -339,12 +345,18 @@ struct render_backend_schedule_state_t
     struct render_backend_read_back_status_t *first_read_back_status;
 };
 
+struct render_backend_frame_buffer_image_attachment_t
+{
+    struct render_backend_image_t *data;
+    uint8_t layer;
+};
+
 struct render_backend_frame_buffer_attachment_t
 {
     enum kan_render_frame_buffer_attachment_type_t type;
     union
     {
-        struct render_backend_image_t *image;
+        struct render_backend_frame_buffer_image_attachment_t image;
         struct render_backend_surface_t *surface;
     };
 };
@@ -735,7 +747,11 @@ struct render_backend_image_t
     VmaAllocation allocation;
 
     struct kan_render_image_description_t description;
-    VkImageLayout last_command_layout;
+    union
+    {
+        VkImageLayout last_command_layout_single_layer;
+        VkImageLayout *last_command_layouts_per_layer;
+    };
 
     struct image_frame_buffer_attachment_t *first_frame_buffer_attachment;
     struct image_parameter_set_attachment_t *first_parameter_set_attachment;
@@ -1049,6 +1065,30 @@ static inline void transfer_memory_between_groups (vulkan_size_t amount,
 #else
 #    define VULKAN_ALLOCATION_CALLBACKS(SYSTEM) NULL
 #endif
+
+static inline VkImageLayout get_image_layout_info (const struct render_backend_image_t *image, uint8_t layer)
+{
+    if (image->description.layers == 1u)
+    {
+        return image->last_command_layout_single_layer;
+    }
+    else
+    {
+        return image->last_command_layouts_per_layer[layer];
+    }
+}
+
+static inline void set_image_layout_info (struct render_backend_image_t *image, uint8_t layer, VkImageLayout layout)
+{
+    if (image->description.layers == 1u)
+    {
+        image->last_command_layout_single_layer = layout;
+    }
+    else
+    {
+        image->last_command_layouts_per_layer[layer] = layout;
+    }
+}
 
 static inline VkFormat image_format_to_vulkan (enum kan_render_image_format_t format)
 {
