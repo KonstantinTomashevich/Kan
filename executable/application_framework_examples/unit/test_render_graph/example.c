@@ -118,23 +118,265 @@ APPLICATION_FRAMEWORK_EXAMPLES_TEST_RENDER_GRAPH_API void kan_universe_mutator_e
             {
                 KAN_UP_VALUE_READ (shadow_pass, kan_render_graph_pass_t, name, &state->shadow_pass_name)
                 {
-                    struct kan_render_graph_pass_instance_allocation_t scene_pass_1_allocation;
-                    struct kan_render_graph_pass_instance_allocation_t scene_pass_2_allocation;
+                    const struct kan_render_graph_resource_response_t *scene_pass_1_response = NULL;
+                    const struct kan_render_graph_resource_response_t *scene_pass_2_response = NULL;
 
-                    struct kan_render_graph_pass_instance_allocation_t shadow_pass_1_allocation;
-                    struct kan_render_graph_pass_instance_allocation_t shadow_pass_2_allocation;
-                    struct kan_render_graph_pass_instance_allocation_t shadow_pass_3_allocation;
+                    const struct kan_render_graph_resource_response_t *shadow_pass_1_response = NULL;
+                    const struct kan_render_graph_resource_response_t *shadow_pass_2_response = NULL;
+                    const struct kan_render_graph_resource_response_t *shadow_pass_3_response = NULL;
 
-                    struct kan_render_graph_pass_instance_request_attachment_info_t scene_pass_attachment_info[] = {
+                    KAN_ASSERT (scene_pass->attachments.size == 2u)
+                    enum kan_render_image_format_t scene_depth_format =
+                        ((struct kan_render_graph_pass_attachment_t *) scene_pass->attachments.data)[1u].format;
+
+                    struct kan_render_graph_resource_image_request_t scene_pass_images[] = {
                         {
-                            .use_surface = singleton->window_surface,
-                            .used_by_dependant_instances = KAN_FALSE,
-                        },
-                        {
-                            .use_surface = KAN_HANDLE_INITIALIZE_INVALID,
-                            .used_by_dependant_instances = KAN_FALSE,
+                            .description =
+                                {
+                                    .format = scene_depth_format,
+                                    .width = 600u,
+                                    .height = 400u,
+                                    .depth = 1u,
+                                    .layers = 1u,
+                                    .mips = 1u,
+                                    .render_target = KAN_TRUE,
+                                    .supports_sampling = KAN_FALSE,
+                                    .tracking_name = NULL,
+                                },
+                            .internal = KAN_TRUE,
                         },
                     };
+
+                    struct kan_render_graph_resource_frame_buffer_request_t scene_pass_frame_buffers[] = {
+                        {
+                            .pass = scene_pass->pass,
+                            .attachments_count = 2u,
+                            .attachments =
+                                (struct kan_render_graph_resource_frame_buffer_request_attachment_t[]) {
+                                    {
+                                        .surface_attachment = KAN_TRUE,
+                                        .surface = singleton->window_surface,
+                                    },
+                                    {
+                                        .surface_attachment = KAN_FALSE,
+                                        .image =
+                                            {
+                                                .index = 0u,
+                                                .layer = 0u,
+                                            },
+                                    },
+                                },
+                        },
+                    };
+
+                    struct kan_render_graph_resource_request_t scene_pass_request = {
+                        .context = render_context->render_context,
+                        .dependant_count = 0u,
+                        .dependant = NULL,
+                        .images_count = sizeof (scene_pass_images) / sizeof (scene_pass_images[0u]),
+                        .images = scene_pass_images,
+                        .frame_buffers_count =
+                            sizeof (scene_pass_frame_buffers) / sizeof (scene_pass_frame_buffers[0u]),
+                        .frame_buffers = scene_pass_frame_buffers,
+                    };
+
+                    if (!(scene_pass_1_response = kan_render_graph_resource_management_singleton_request (
+                              render_graph, &scene_pass_request)))
+                    {
+                        KAN_LOG (application_framework_example_test_render_graph, KAN_LOG_ERROR,
+                                 "Failed to create scene pass 1.")
+                        kan_application_framework_system_request_exit (state->application_framework_system_handle, 1);
+                        KAN_UP_MUTATOR_RETURN;
+                    }
+
+                    if (!(scene_pass_2_response = kan_render_graph_resource_management_singleton_request (
+                              render_graph, &scene_pass_request)))
+                    {
+                        KAN_LOG (application_framework_example_test_render_graph, KAN_LOG_ERROR,
+                                 "Failed to create scene pass 2.")
+                        kan_application_framework_system_request_exit (state->application_framework_system_handle, 1);
+                        KAN_UP_MUTATOR_RETURN;
+                    }
+
+                    KAN_ASSERT (shadow_pass->attachments.size == 1u)
+                    enum kan_render_image_format_t shadow_depth_format =
+                        ((struct kan_render_graph_pass_attachment_t *) shadow_pass->attachments.data)[0u].format;
+
+                    struct kan_render_graph_resource_image_request_t shadow_pass_images[] = {
+                        {
+                            .description =
+                                {
+                                    .format = shadow_depth_format,
+                                    .width = 256u,
+                                    .height = 256u,
+                                    .depth = 1u,
+                                    .layers = 1u,
+                                    .mips = 1u,
+                                    .render_target = KAN_TRUE,
+                                    .supports_sampling = KAN_TRUE,
+                                    .tracking_name = NULL,
+                                },
+                            .internal = KAN_FALSE,
+                        },
+                    };
+
+                    struct kan_render_graph_resource_frame_buffer_request_t shadow_pass_frame_buffers[] = {
+                        {
+                            .pass = shadow_pass->pass,
+                            .attachments_count = 1u,
+                            .attachments =
+                                (struct kan_render_graph_resource_frame_buffer_request_attachment_t[]) {
+                                    {
+                                        .surface_attachment = KAN_FALSE,
+                                        .image =
+                                            {
+                                                .index = 0u,
+                                                .layer = 0u,
+                                            },
+                                    },
+                                },
+                        },
+                    };
+
+                    {
+                        struct kan_render_graph_resource_request_t request = {
+                            .context = render_context->render_context,
+                            .dependant_count = 1u,
+                            .dependant =
+                                (const struct kan_render_graph_resource_response_t *[]) {
+                                    scene_pass_1_response,
+                                },
+                            .images_count = sizeof (shadow_pass_images) / sizeof (shadow_pass_images[0u]),
+                            .images = shadow_pass_images,
+                            .frame_buffers_count =
+                                sizeof (shadow_pass_frame_buffers) / sizeof (shadow_pass_frame_buffers[0u]),
+                            .frame_buffers = shadow_pass_frame_buffers,
+                        };
+
+                        if (!(shadow_pass_1_response =
+                                  kan_render_graph_resource_management_singleton_request (render_graph, &request)))
+                        {
+                            KAN_LOG (application_framework_example_test_render_graph, KAN_LOG_ERROR,
+                                     "Failed to create shadow pass 1.")
+                            kan_application_framework_system_request_exit (state->application_framework_system_handle,
+                                                                           1);
+                            KAN_UP_MUTATOR_RETURN;
+                        }
+                    }
+
+                    {
+                        struct kan_render_graph_resource_request_t request = {
+                            .context = render_context->render_context,
+                            .dependant_count = 2u,
+                            .dependant =
+                                (const struct kan_render_graph_resource_response_t *[]) {
+                                    scene_pass_1_response,
+                                    scene_pass_2_response,
+                                },
+                            .images_count = sizeof (shadow_pass_images) / sizeof (shadow_pass_images[0u]),
+                            .images = shadow_pass_images,
+                            .frame_buffers_count =
+                                sizeof (shadow_pass_frame_buffers) / sizeof (shadow_pass_frame_buffers[0u]),
+                            .frame_buffers = shadow_pass_frame_buffers,
+                        };
+
+                        if (!(shadow_pass_2_response =
+                                  kan_render_graph_resource_management_singleton_request (render_graph, &request)))
+                        {
+                            KAN_LOG (application_framework_example_test_render_graph, KAN_LOG_ERROR,
+                                     "Failed to create shadow pass 2.")
+                            kan_application_framework_system_request_exit (state->application_framework_system_handle,
+                                                                           1);
+                            KAN_UP_MUTATOR_RETURN;
+                        }
+                    }
+
+                    {
+                        struct kan_render_graph_resource_request_t request = {
+                            .context = render_context->render_context,
+                            .dependant_count = 1u,
+                            .dependant =
+                                (const struct kan_render_graph_resource_response_t *[]) {
+                                    scene_pass_2_response,
+                                },
+                            .images_count = sizeof (shadow_pass_images) / sizeof (shadow_pass_images[0u]),
+                            .images = shadow_pass_images,
+                            .frame_buffers_count =
+                                sizeof (shadow_pass_frame_buffers) / sizeof (shadow_pass_frame_buffers[0u]),
+                            .frame_buffers = shadow_pass_frame_buffers,
+                        };
+
+                        if (!(shadow_pass_3_response =
+                                  kan_render_graph_resource_management_singleton_request (render_graph, &request)))
+                        {
+                            KAN_LOG (application_framework_example_test_render_graph, KAN_LOG_ERROR,
+                                     "Failed to create shadow pass 3.")
+                            kan_application_framework_system_request_exit (state->application_framework_system_handle,
+                                                                           1);
+                            KAN_UP_MUTATOR_RETURN;
+                        }
+                    }
+
+                    kan_bool_t check_successful = KAN_TRUE;
+                    if (!KAN_HANDLE_IS_EQUAL (scene_pass_1_response->images[0u], scene_pass_2_response->images[0u]))
+                    {
+                        KAN_LOG (application_framework_example_test_render_graph, KAN_LOG_ERROR,
+                                 "Scene passes expected to reuse the same depth image.")
+                        check_successful = KAN_FALSE;
+                    }
+
+                    if (!KAN_HANDLE_IS_EQUAL (scene_pass_1_response->frame_buffers[0u],
+                                              scene_pass_2_response->frame_buffers[0u]))
+                    {
+                        KAN_LOG (application_framework_example_test_render_graph, KAN_LOG_ERROR,
+                                 "Scene passes expected to reuse the same frame buffer.")
+                        check_successful = KAN_FALSE;
+                    }
+
+                    if (KAN_HANDLE_IS_EQUAL (shadow_pass_1_response->images[0u], shadow_pass_2_response->images[0u]))
+                    {
+                        KAN_LOG (application_framework_example_test_render_graph, KAN_LOG_ERROR,
+                                 "Shadow pass 1 and 2 must have different images.")
+                        check_successful = KAN_FALSE;
+                    }
+
+                    if (KAN_HANDLE_IS_EQUAL (shadow_pass_1_response->frame_buffers[0u],
+                                             shadow_pass_2_response->frame_buffers[0u]))
+                    {
+                        KAN_LOG (application_framework_example_test_render_graph, KAN_LOG_ERROR,
+                                 "Shadow pass 1 and 2 must have different frame buffers.")
+                        check_successful = KAN_FALSE;
+                    }
+
+                    if (KAN_HANDLE_IS_EQUAL (shadow_pass_2_response->images[0u], shadow_pass_3_response->images[0u]))
+                    {
+                        KAN_LOG (application_framework_example_test_render_graph, KAN_LOG_ERROR,
+                                 "Shadow pass 1 and 2 must have different images.")
+                        check_successful = KAN_FALSE;
+                    }
+
+                    if (KAN_HANDLE_IS_EQUAL (shadow_pass_2_response->frame_buffers[0u],
+                                             shadow_pass_3_response->frame_buffers[0u]))
+                    {
+                        KAN_LOG (application_framework_example_test_render_graph, KAN_LOG_ERROR,
+                                 "Shadow pass 1 and 2 must have different frame buffers.")
+                        check_successful = KAN_FALSE;
+                    }
+
+                    if (!KAN_HANDLE_IS_EQUAL (shadow_pass_1_response->images[0u], shadow_pass_3_response->images[0u]))
+                    {
+                        KAN_LOG (application_framework_example_test_render_graph, KAN_LOG_ERROR,
+                                 "Shadow pass 1 and 3 must share image.")
+                        check_successful = KAN_FALSE;
+                    }
+
+                    if (!KAN_HANDLE_IS_EQUAL (shadow_pass_1_response->frame_buffers[0u],
+                                              shadow_pass_3_response->frame_buffers[0u]))
+                    {
+                        KAN_LOG (application_framework_example_test_render_graph, KAN_LOG_ERROR,
+                                 "Shadow pass 1 and 3 must share frame buffer.")
+                        check_successful = KAN_FALSE;
+                    }
 
                     struct kan_render_viewport_bounds_t scene_pass_viewport_bounds = {
                         .x = 0.0f,
@@ -161,33 +403,15 @@ APPLICATION_FRAMEWORK_EXAMPLES_TEST_RENDER_GRAPH_API void kan_universe_mutator_e
                         },
                     };
 
-                    {
-                        struct kan_render_graph_pass_instance_request_t request = {
-                            .context = render_context->render_context,
-                            .pass = scene_pass,
+                    kan_render_pass_instance_t scene_pass_1 = kan_render_pass_instantiate (
+                        scene_pass->pass, scene_pass_1_response->frame_buffers[0u], &scene_pass_viewport_bounds,
+                        &scene_pass_scissor, scene_pass_clear_values);
 
-                            .frame_buffer_width = 600u,
-                            .frame_buffer_height = 400u,
-                            .attachment_info = scene_pass_attachment_info,
+                    kan_render_pass_instance_add_checkpoint_dependency (scene_pass_1,
+                                                                        scene_pass_1_response->usage_begin_checkpoint);
 
-                            .dependant_count = 0u,
-                            .dependant = NULL,
-
-                            .viewport_bounds = &scene_pass_viewport_bounds,
-                            .scissor = &scene_pass_scissor,
-                            .attachment_clear_values = scene_pass_clear_values,
-                        };
-
-                        if (!kan_render_graph_resource_management_singleton_request_pass (render_graph, &request,
-                                                                                          &scene_pass_1_allocation))
-                        {
-                            KAN_LOG (application_framework_example_test_render_graph, KAN_LOG_ERROR,
-                                     "Failed to create scene pass 1.")
-                            kan_application_framework_system_request_exit (state->application_framework_system_handle,
-                                                                           1);
-                            KAN_UP_MUTATOR_RETURN;
-                        }
-                    }
+                    kan_render_pass_instance_checkpoint_add_instance_dependancy (
+                        scene_pass_1_response->usage_end_checkpoint, scene_pass_1);
 
                     scene_pass_viewport_bounds.x = 300.0f;
                     scene_pass_scissor.x = 300;
@@ -195,40 +419,15 @@ APPLICATION_FRAMEWORK_EXAMPLES_TEST_RENDER_GRAPH_API void kan_universe_mutator_e
                     scene_pass_clear_values[0u].color.g = 0.29f;
                     scene_pass_clear_values[0u].color.b = 0.88f;
 
-                    {
-                        struct kan_render_graph_pass_instance_request_t request = {
-                            .context = render_context->render_context,
-                            .pass = scene_pass,
+                    kan_render_pass_instance_t scene_pass_2 = kan_render_pass_instantiate (
+                        scene_pass->pass, scene_pass_2_response->frame_buffers[0u], &scene_pass_viewport_bounds,
+                        &scene_pass_scissor, scene_pass_clear_values);
 
-                            .frame_buffer_width = 600u,
-                            .frame_buffer_height = 400u,
-                            .attachment_info = scene_pass_attachment_info,
+                    kan_render_pass_instance_add_checkpoint_dependency (scene_pass_2,
+                                                                        scene_pass_2_response->usage_begin_checkpoint);
 
-                            .dependant_count = 0u,
-                            .dependant = NULL,
-
-                            .viewport_bounds = &scene_pass_viewport_bounds,
-                            .scissor = &scene_pass_scissor,
-                            .attachment_clear_values = scene_pass_clear_values,
-                        };
-
-                        if (!kan_render_graph_resource_management_singleton_request_pass (render_graph, &request,
-                                                                                          &scene_pass_2_allocation))
-                        {
-                            KAN_LOG (application_framework_example_test_render_graph, KAN_LOG_ERROR,
-                                     "Failed to create scene pass 2.")
-                            kan_application_framework_system_request_exit (state->application_framework_system_handle,
-                                                                           1);
-                            KAN_UP_MUTATOR_RETURN;
-                        }
-                    }
-
-                    struct kan_render_graph_pass_instance_request_attachment_info_t shadow_pass_attachment_info[] = {
-                        {
-                            .use_surface = KAN_HANDLE_INITIALIZE_INVALID,
-                            .used_by_dependant_instances = KAN_TRUE,
-                        },
-                    };
+                    kan_render_pass_instance_checkpoint_add_instance_dependancy (
+                        scene_pass_2_response->usage_end_checkpoint, scene_pass_2);
 
                     struct kan_render_viewport_bounds_t shadow_pass_viewport_bounds = {
                         .x = 0.0f,
@@ -252,151 +451,35 @@ APPLICATION_FRAMEWORK_EXAMPLES_TEST_RENDER_GRAPH_API void kan_universe_mutator_e
                         },
                     };
 
-                    {
-                        kan_render_pass_instance_t dependant[] = {
-                            scene_pass_1_allocation.pass_instance,
-                        };
+                    kan_render_pass_instance_t shadow_pass_1 = kan_render_pass_instantiate (
+                        shadow_pass->pass, shadow_pass_1_response->frame_buffers[0u], &shadow_pass_viewport_bounds,
+                        &shadow_pass_scissor, shadow_pass_clear_values);
 
-                        struct kan_render_graph_pass_instance_request_t request = {
-                            .context = render_context->render_context,
-                            .pass = shadow_pass,
+                    kan_render_pass_instance_add_checkpoint_dependency (shadow_pass_1,
+                                                                        shadow_pass_1_response->usage_begin_checkpoint);
 
-                            .frame_buffer_width = 256u,
-                            .frame_buffer_height = 256u,
-                            .attachment_info = shadow_pass_attachment_info,
+                    kan_render_pass_instance_checkpoint_add_instance_dependancy (
+                        shadow_pass_1_response->usage_end_checkpoint, shadow_pass_1);
 
-                            .dependant_count = sizeof (dependant) / sizeof (dependant[0u]),
-                            .dependant = dependant,
+                    kan_render_pass_instance_t shadow_pass_2 = kan_render_pass_instantiate (
+                        shadow_pass->pass, shadow_pass_2_response->frame_buffers[0u], &shadow_pass_viewport_bounds,
+                        &shadow_pass_scissor, shadow_pass_clear_values);
 
-                            .viewport_bounds = &shadow_pass_viewport_bounds,
-                            .scissor = &shadow_pass_scissor,
-                            .attachment_clear_values = shadow_pass_clear_values,
-                        };
+                    kan_render_pass_instance_add_checkpoint_dependency (shadow_pass_2,
+                                                                        shadow_pass_2_response->usage_begin_checkpoint);
 
-                        if (!kan_render_graph_resource_management_singleton_request_pass (render_graph, &request,
-                                                                                          &shadow_pass_1_allocation))
-                        {
-                            KAN_LOG (application_framework_example_test_render_graph, KAN_LOG_ERROR,
-                                     "Failed to create shadow pass 1.")
-                            kan_application_framework_system_request_exit (state->application_framework_system_handle,
-                                                                           1);
-                            KAN_UP_MUTATOR_RETURN;
-                        }
-                    }
+                    kan_render_pass_instance_checkpoint_add_instance_dependancy (
+                        shadow_pass_2_response->usage_end_checkpoint, shadow_pass_2);
 
-                    {
-                        kan_render_pass_instance_t dependant[] = {
-                            scene_pass_1_allocation.pass_instance,
-                            scene_pass_2_allocation.pass_instance,
-                        };
+                    kan_render_pass_instance_t shadow_pass_3 = kan_render_pass_instantiate (
+                        shadow_pass->pass, shadow_pass_3_response->frame_buffers[0u], &shadow_pass_viewport_bounds,
+                        &shadow_pass_scissor, shadow_pass_clear_values);
 
-                        struct kan_render_graph_pass_instance_request_t request = {
-                            .context = render_context->render_context,
-                            .pass = shadow_pass,
+                    kan_render_pass_instance_add_checkpoint_dependency (shadow_pass_3,
+                                                                        shadow_pass_3_response->usage_begin_checkpoint);
 
-                            .frame_buffer_width = 256u,
-                            .frame_buffer_height = 256u,
-                            .attachment_info = shadow_pass_attachment_info,
-
-                            .dependant_count = sizeof (dependant) / sizeof (dependant[0u]),
-                            .dependant = dependant,
-
-                            .viewport_bounds = &shadow_pass_viewport_bounds,
-                            .scissor = &shadow_pass_scissor,
-                            .attachment_clear_values = shadow_pass_clear_values,
-                        };
-
-                        if (!kan_render_graph_resource_management_singleton_request_pass (render_graph, &request,
-                                                                                          &shadow_pass_2_allocation))
-                        {
-                            KAN_LOG (application_framework_example_test_render_graph, KAN_LOG_ERROR,
-                                     "Failed to create shadow pass 2.")
-                            kan_application_framework_system_request_exit (state->application_framework_system_handle,
-                                                                           1);
-                            KAN_UP_MUTATOR_RETURN;
-                        }
-                    }
-
-                    {
-                        kan_render_pass_instance_t dependant[] = {
-                            scene_pass_2_allocation.pass_instance,
-                        };
-
-                        struct kan_render_graph_pass_instance_request_t request = {
-                            .context = render_context->render_context,
-                            .pass = shadow_pass,
-
-                            .frame_buffer_width = 256u,
-                            .frame_buffer_height = 256u,
-                            .attachment_info = shadow_pass_attachment_info,
-
-                            .dependant_count = sizeof (dependant) / sizeof (dependant[0u]),
-                            .dependant = dependant,
-
-                            .viewport_bounds = &shadow_pass_viewport_bounds,
-                            .scissor = &shadow_pass_scissor,
-                            .attachment_clear_values = shadow_pass_clear_values,
-                        };
-
-                        if (!kan_render_graph_resource_management_singleton_request_pass (render_graph, &request,
-                                                                                          &shadow_pass_3_allocation))
-                        {
-                            KAN_LOG (application_framework_example_test_render_graph, KAN_LOG_ERROR,
-                                     "Failed to create shadow pass 3.")
-                            kan_application_framework_system_request_exit (state->application_framework_system_handle,
-                                                                           1);
-                            KAN_UP_MUTATOR_RETURN;
-                        }
-                    }
-
-                    kan_bool_t check_successful = KAN_TRUE;
-                    if (!KAN_HANDLE_IS_EQUAL (scene_pass_1_allocation.attachments[0u].surface,
-                                              singleton->window_surface))
-                    {
-                        KAN_LOG (application_framework_example_test_render_graph, KAN_LOG_ERROR,
-                                 "Scene pass 1 should output to window.")
-                        check_successful = KAN_FALSE;
-                    }
-
-                    if (!KAN_HANDLE_IS_EQUAL (scene_pass_2_allocation.attachments[0u].surface,
-                                              singleton->window_surface))
-                    {
-                        KAN_LOG (application_framework_example_test_render_graph, KAN_LOG_ERROR,
-                                 "Scene pass 2 should output to window.")
-                        check_successful = KAN_FALSE;
-                    }
-
-                    if (!KAN_HANDLE_IS_EQUAL (scene_pass_1_allocation.attachments[1u].image.image,
-                                              scene_pass_2_allocation.attachments[1u].image.image))
-                    {
-                        KAN_LOG (application_framework_example_test_render_graph, KAN_LOG_ERROR,
-                                 "Scene passes expected to reuse the same depth image.")
-                        check_successful = KAN_FALSE;
-                    }
-
-                    if (KAN_HANDLE_IS_EQUAL (shadow_pass_1_allocation.attachments[0u].image.image,
-                                             shadow_pass_2_allocation.attachments[0u].image.image))
-                    {
-                        KAN_LOG (application_framework_example_test_render_graph, KAN_LOG_ERROR,
-                                 "Shadow pass 1 and 2 must have different images.")
-                        check_successful = KAN_FALSE;
-                    }
-
-                    if (KAN_HANDLE_IS_EQUAL (shadow_pass_2_allocation.attachments[0u].image.image,
-                                             shadow_pass_3_allocation.attachments[0u].image.image))
-                    {
-                        KAN_LOG (application_framework_example_test_render_graph, KAN_LOG_ERROR,
-                                 "Shadow pass 1 and 2 must have different images.")
-                        check_successful = KAN_FALSE;
-                    }
-
-                    if (!KAN_HANDLE_IS_EQUAL (shadow_pass_1_allocation.attachments[0u].image.image,
-                                              shadow_pass_3_allocation.attachments[0u].image.image))
-                    {
-                        KAN_LOG (application_framework_example_test_render_graph, KAN_LOG_ERROR,
-                                 "Shadow pass 1 and 3 must share image.")
-                        check_successful = KAN_FALSE;
-                    }
+                    kan_render_pass_instance_checkpoint_add_instance_dependancy (
+                        shadow_pass_3_response->usage_end_checkpoint, shadow_pass_3);
 
                     if (check_successful)
                     {

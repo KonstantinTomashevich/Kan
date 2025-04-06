@@ -561,8 +561,8 @@ static void inspect_texture_usages_internal (struct render_foundation_texture_ma
             {
                 for (uint8_t mip = usage_state->requested_best_mip; mip <= usage_state->requested_worst_mip; ++mip)
                 {
-                    kan_render_image_copy_data (loaded->image, 0u, mip - usage_state->loaded_best_mip, new_image,
-                                                0u, mip - usage_state->requested_best_mip);
+                    kan_render_image_copy_data (loaded->image, 0u, mip - usage_state->loaded_best_mip, new_image, 0u,
+                                                mip - usage_state->requested_best_mip);
                 }
 
                 usage_state->flags |= RENDER_FOUNDATION_TEXTURE_USAGE_FLAGS_HAS_LOADED_MIPS;
@@ -884,8 +884,8 @@ static void compiled_texture_load_mips (struct render_foundation_texture_managem
                     KAN_ASSERT (data_usage->mip >= usage_state->loaded_best_mip &&
                                 data_usage->mip <= usage_state->loaded_worst_mip)
 
-                    kan_render_image_copy_data (old_image, 0u, data_usage->mip - usage_state->loaded_best_mip, new_image,
-                                                0u, data_usage->mip - usage_state->requested_best_mip);
+                    kan_render_image_copy_data (old_image, 0u, data_usage->mip - usage_state->loaded_best_mip,
+                                                new_image, 0u, data_usage->mip - usage_state->requested_best_mip);
                 }
                 else
                 {

@@ -21,7 +21,7 @@ set (KAN_UNIVERSE_RENDER_FOUNDATION_GIC_BUCKETS "17" CACHE STRING
 set (KAN_UNIVERSE_RENDER_FOUNDATION_GFBC_BUCKETS "17" CACHE STRING
         "Initial count of buckets for render foundation graph resource management frame buffer cache.")
 
-set (KAN_UNIVERSE_RENDER_FOUNDATION_GTA_INITIAL_STACK "8192" CACHE STRING
+set (KAN_UNIVERSE_RENDER_FOUNDATION_GTA_INITIAL_STACK "32768" CACHE STRING
         "Size of a stack group item for render foundation graph temporary allocator.")
 
 set (KAN_UNIVERSE_RENDER_FOUNDATION_ATTACHMENTS_MAX_STATIC "8" CACHE STRING

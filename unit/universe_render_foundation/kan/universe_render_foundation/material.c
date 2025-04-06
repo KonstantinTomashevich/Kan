@@ -1965,7 +1965,7 @@ void kan_render_material_loaded_init (struct kan_render_material_loaded_t *insta
                             _Alignof (struct kan_rpl_meta_attribute_source_t), kan_allocation_group_stack_get ());
 
     instance->has_instanced_attribute_source = KAN_FALSE;
-    kan_rpl_meta_attribute_source_init(&instance->instanced_attribute_source);
+    kan_rpl_meta_attribute_source_init (&instance->instanced_attribute_source);
 
     kan_rpl_meta_set_bindings_init (&instance->set_material_bindings);
     kan_rpl_meta_set_bindings_init (&instance->set_object_bindings);

@@ -204,7 +204,7 @@ static void try_render_frame (struct test_render_material_state_t *state,
                               const struct kan_render_context_singleton_t *render_context,
                               struct example_test_render_material_singleton_t *singleton,
                               const struct kan_render_graph_pass_t *pass,
-                              struct kan_render_graph_pass_instance_allocation_t *pass_allocation,
+                              kan_render_pass_instance_t pass_instance,
                               kan_interned_string_t material_instance_name)
 {
     if (!singleton->object_buffers_initialized)
@@ -314,15 +314,15 @@ static void try_render_frame (struct test_render_material_state_t *state,
                 KAN_UP_QUERY_BREAK;
             }
 
-            if (!kan_render_pass_instance_graphics_pipeline (pass_allocation->pass_instance, pipeline))
+            if (!kan_render_pass_instance_graphics_pipeline (pass_instance, pipeline))
             {
                 // Pipeline is not yet ready, skip draw.
                 KAN_UP_QUERY_BREAK;
             }
 
-            kan_render_pass_instance_pipeline_parameter_sets (pass_allocation->pass_instance, KAN_RPL_SET_PASS, 1u,
+            kan_render_pass_instance_pipeline_parameter_sets (pass_instance, KAN_RPL_SET_PASS, 1u,
                                                               &singleton->pass_parameter_set);
-            kan_render_pass_instance_pipeline_parameter_sets (pass_allocation->pass_instance, KAN_RPL_SET_MATERIAL, 1u,
+            kan_render_pass_instance_pipeline_parameter_sets (pass_instance, KAN_RPL_SET_MATERIAL, 1u,
                                                               &material_instance->data.parameter_set);
 
             // Only one vertex attribute buffer for the sake of simplicity.
@@ -351,12 +351,12 @@ static void try_render_frame (struct test_render_material_state_t *state,
             kan_render_buffer_t attribute_buffers[] = {singleton->vertex_buffer, allocation.buffer};
             kan_render_size_t attribute_buffers_offsets[] = {0u, allocation.slice_offset};
 
-            kan_render_pass_instance_attributes (pass_allocation->pass_instance, expected_attribute_source->binding,
+            kan_render_pass_instance_attributes (pass_instance, expected_attribute_source->binding,
                                                  sizeof (attribute_buffers) / sizeof (attribute_buffers[0u]),
                                                  attribute_buffers, attribute_buffers_offsets);
 
-            kan_render_pass_instance_indices (pass_allocation->pass_instance, singleton->index_buffer);
-            kan_render_pass_instance_draw (pass_allocation->pass_instance, 0u, singleton->index_count, 0u);
+            kan_render_pass_instance_indices (pass_instance, singleton->index_buffer);
+            kan_render_pass_instance_draw (pass_instance, 0u, singleton->index_count, 0u);
 
             if (!singleton->frame_checked)
             {
@@ -475,17 +475,44 @@ APPLICATION_FRAMEWORK_EXAMPLES_TEST_RENDER_MATERIAL_API void kan_universe_mutato
                     {
                         KAN_UP_VALUE_READ (scene_pass, kan_render_graph_pass_t, name, &state->scene_pass_name)
                         {
-                            struct kan_render_graph_pass_instance_request_attachment_info_t
-                                scene_pass_attachment_info[] = {
-                                    {
-                                        .use_surface = singleton->window_surface,
-                                        .used_by_dependant_instances = KAN_FALSE,
-                                    },
-                                    {
-                                        .use_surface = KAN_HANDLE_INITIALIZE_INVALID,
-                                        .used_by_dependant_instances = KAN_FALSE,
-                                    },
-                                };
+                            // Just surface, no depth.
+                            KAN_ASSERT (scene_pass->attachments.size == 1u)
+
+                            struct kan_render_graph_resource_frame_buffer_request_t scene_pass_frame_buffers[] = {
+                                {
+                                    .pass = scene_pass->pass,
+                                    .attachments_count = 1u,
+                                    .attachments =
+                                        (struct kan_render_graph_resource_frame_buffer_request_attachment_t[]) {
+                                            {
+                                                .surface_attachment = KAN_TRUE,
+                                                .surface = singleton->window_surface,
+                                            },
+                                        },
+                                },
+                            };
+
+                            struct kan_render_graph_resource_request_t scene_pass_request = {
+                                .context = render_context->render_context,
+                                .dependant_count = 0u,
+                                .dependant = NULL,
+                                .images_count = 0u,
+                                .images = NULL,
+                                .frame_buffers_count =
+                                    sizeof (scene_pass_frame_buffers) / sizeof (scene_pass_frame_buffers[0u]),
+                                .frame_buffers = scene_pass_frame_buffers,
+                            };
+
+                            const struct kan_render_graph_resource_response_t *resource_response = NULL;
+                            if (!(resource_response = kan_render_graph_resource_management_singleton_request (
+                                      render_graph, &scene_pass_request)))
+                            {
+                                KAN_LOG (application_framework_example_test_render_material, KAN_LOG_ERROR,
+                                         "Failed to request pass resources.")
+                                kan_application_framework_system_request_exit (
+                                    state->application_framework_system_handle, 1);
+                                KAN_UP_MUTATOR_RETURN;
+                            }
 
                             struct kan_render_viewport_bounds_t scene_pass_viewport_bounds = {
                                 .x = 0.0f,
@@ -512,34 +539,17 @@ APPLICATION_FRAMEWORK_EXAMPLES_TEST_RENDER_MATERIAL_API void kan_universe_mutato
                                 },
                             };
 
-                            struct kan_render_graph_pass_instance_allocation_t scene_pass_allocation;
-                            struct kan_render_graph_pass_instance_request_t scene_pass_request = {
-                                .context = render_context->render_context,
-                                .pass = scene_pass,
+                            kan_render_pass_instance_t pass = kan_render_pass_instantiate (
+                                scene_pass->pass, resource_response->frame_buffers[0u], &scene_pass_viewport_bounds,
+                                &scene_pass_scissor, scene_pass_clear_values);
 
-                                .frame_buffer_width = TEST_WIDTH,
-                                .frame_buffer_height = TEST_HEIGHT,
-                                .attachment_info = scene_pass_attachment_info,
+                            kan_render_pass_instance_add_checkpoint_dependency (
+                                pass, resource_response->usage_begin_checkpoint);
 
-                                .dependant_count = 0u,
-                                .dependant = NULL,
+                            kan_render_pass_instance_checkpoint_add_instance_dependancy (
+                                resource_response->usage_end_checkpoint, pass);
 
-                                .viewport_bounds = &scene_pass_viewport_bounds,
-                                .scissor = &scene_pass_scissor,
-                                .attachment_clear_values = scene_pass_clear_values,
-                            };
-
-                            if (!kan_render_graph_resource_management_singleton_request_pass (
-                                    render_graph, &scene_pass_request, &scene_pass_allocation))
-                            {
-                                KAN_LOG (application_framework_example_test_render_material, KAN_LOG_ERROR,
-                                         "Failed to create scene pass.")
-                                kan_application_framework_system_request_exit (
-                                    state->application_framework_system_handle, 1);
-                                KAN_UP_MUTATOR_RETURN;
-                            }
-
-                            try_render_frame (state, render_context, singleton, scene_pass, &scene_pass_allocation,
+                            try_render_frame (state, render_context, singleton, scene_pass, pass,
                                               test_config->material_instance_name);
                         }
                     }

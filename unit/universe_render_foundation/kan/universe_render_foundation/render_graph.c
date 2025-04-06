@@ -36,53 +36,43 @@ KAN_REFLECTION_IGNORE
 struct render_foundation_graph_image_usage_t
 {
     struct render_foundation_graph_image_usage_t *next;
-    kan_render_pass_instance_t producer_pass;
-    kan_instance_size_t user_passes_count;
-    kan_render_pass_instance_t user_passes[];
+    struct kan_render_graph_resource_response_t *producer_response;
+    kan_instance_size_t user_responses_count;
+    struct kan_render_graph_resource_response_t *user_responses[];
 };
 
 KAN_REFLECTION_IGNORE
 struct render_foundation_graph_image_cache_node_t
 {
     struct kan_hash_storage_node_t node;
-
     kan_render_image_t image;
-    enum kan_render_image_format_t format;
-    kan_render_size_t width;
-    kan_render_size_t height;
-    kan_bool_t supports_sampling;
-
+    struct kan_render_image_description_t description;
     struct render_foundation_graph_image_usage_t *first_usage;
 };
 
-static inline kan_hash_t calculate_cached_image_hash (enum kan_render_image_format_t format,
-                                                      kan_render_size_t width,
-                                                      kan_render_size_t height)
+static inline kan_hash_t calculate_image_description_hash (struct kan_render_image_description_t *description)
 {
-    return kan_hash_combine ((kan_hash_t) format, kan_hash_combine ((kan_hash_t) width, (kan_hash_t) height));
+    _Static_assert (KAN_RENDER_IMAGE_FORMAT_COUNT <= UINT8_MAX, "Possible to pack format into byte.");
+    _Static_assert (sizeof (kan_hash_t) >= 4u, "Possible to pack everything except for sizes into one hash.");
+    const kan_hash_t attributes_hash = (((uint8_t) description->format) << 0u) | (description->layers << 1u);
+
+    const kan_hash_t sizes_hash =
+        kan_hash_combine ((kan_hash_t) description->width,
+                          kan_hash_combine ((kan_hash_t) description->height, (kan_hash_t) description->depth));
+
+    return kan_hash_combine (attributes_hash, sizes_hash);
 }
 
 static struct render_foundation_graph_image_cache_node_t *render_foundation_graph_image_cache_node_create (
     const struct kan_render_graph_resource_management_singleton_t *singleton,
     kan_render_context_t context,
-    enum kan_render_image_format_t format,
-    kan_render_size_t width,
-    kan_render_size_t height,
-    kan_bool_t supports_sampling)
+    kan_hash_t precalculated_description_hash,
+    const struct kan_render_image_description_t *description)
 {
-    struct kan_render_image_description_t description = {
-        .format = format,
-        .width = width,
-        .height = height,
-        .depth = 1u,
-        .layers = 1u,
-        .mips = 1u,
-        .render_target = KAN_TRUE,
-        .supports_sampling = supports_sampling,
-        .tracking_name = singleton->cached_image_name,
-    };
+    struct kan_render_image_description_t creation_description = *description;
+    creation_description.tracking_name = singleton->cached_image_name;
+    kan_render_image_t image = kan_render_image_create (context, &creation_description);
 
-    kan_render_image_t image = kan_render_image_create (context, &description);
     if (!KAN_HANDLE_IS_VALID (image))
     {
         KAN_LOG (render_foundation_graph, KAN_LOG_ERROR, "Failed to create new image for render graph.")
@@ -93,13 +83,9 @@ static struct render_foundation_graph_image_cache_node_t *render_foundation_grap
         kan_allocate_batched (singleton->cache_group, sizeof (struct render_foundation_graph_image_cache_node_t));
 
     node->image = image;
-    node->format = format;
-    node->width = width;
-    node->height = height;
-    node->supports_sampling = supports_sampling;
+    node->description = creation_description;
     node->first_usage = NULL;
-
-    node->node.hash = calculate_cached_image_hash (node->format, node->width, node->height);
+    node->node.hash = precalculated_description_hash;
     return node;
 }
 
@@ -121,7 +107,7 @@ struct render_foundation_graph_frame_buffer_cache_node_t
     kan_bool_t used_in_current_frame;
 
     kan_instance_size_t attachments_count;
-    struct kan_render_frame_buffer_attachment_description_t *attachments;
+    struct kan_render_frame_buffer_attachment_description_t attachments[];
 };
 
 static kan_hash_t calculate_cached_frame_buffer_hash (
@@ -153,6 +139,7 @@ static struct render_foundation_graph_frame_buffer_cache_node_t *
 render_foundation_graph_frame_buffer_cache_node_create (
     const struct kan_render_graph_resource_management_singleton_t *singleton,
     kan_render_context_t context,
+    kan_hash_t precalculated_hash,
     kan_render_pass_t pass,
     kan_instance_size_t attachments_count,
     struct kan_render_frame_buffer_attachment_description_t *attachments)
@@ -171,17 +158,21 @@ render_foundation_graph_frame_buffer_cache_node_create (
         return NULL;
     }
 
-    struct render_foundation_graph_frame_buffer_cache_node_t *node = kan_allocate_batched (
-        singleton->cache_group, sizeof (struct render_foundation_graph_frame_buffer_cache_node_t));
+    struct render_foundation_graph_frame_buffer_cache_node_t *node =
+        kan_allocate_general (singleton->cache_group,
+                              sizeof (struct render_foundation_graph_frame_buffer_cache_node_t) +
+                                  attachments_count * sizeof (struct kan_render_frame_buffer_attachment_description_t),
+                              _Alignof (struct render_foundation_graph_frame_buffer_cache_node_t));
 
     node->frame_buffer = frame_buffer;
     node->pass = pass;
     node->used_in_current_frame = KAN_FALSE;
 
     node->attachments_count = attachments_count;
-    node->attachments = attachments;
+    memcpy (node->attachments, attachments,
+            attachments_count * sizeof (struct kan_render_frame_buffer_attachment_description_t));
 
-    node->node.hash = calculate_cached_frame_buffer_hash (pass, attachments_count, attachments);
+    node->node.hash = precalculated_hash;
     return node;
 }
 
@@ -190,9 +181,10 @@ static void render_foundation_graph_frame_buffer_cache_node_destroy (
     struct render_foundation_graph_frame_buffer_cache_node_t *instance)
 {
     kan_render_frame_buffer_destroy (instance->frame_buffer);
-    kan_free_general (singleton->cache_group, instance->attachments,
-                      sizeof (struct kan_render_frame_buffer_attachment_description_t) * instance->attachments_count);
-    kan_free_batched (singleton->cache_group, instance);
+    kan_free_general (
+        singleton->cache_group, instance,
+        sizeof (struct render_foundation_graph_frame_buffer_cache_node_t) +
+            sizeof (struct kan_render_frame_buffer_attachment_description_t) * instance->attachments_count);
 }
 
 struct render_foundation_pass_management_planning_state_t
@@ -410,8 +402,6 @@ static void configure_render_pass (struct render_foundation_pass_management_exec
     }
 
     pass->variants.size = 0u;
-
-    // Start by creating new loading states for variants.
     KAN_UP_VALUE_READ (pass_request, kan_resource_request_t, request_id, &loading->request_id)
     {
         if (KAN_TYPED_ID_32_IS_VALID (pass_request->provided_container_id))
@@ -806,8 +796,11 @@ UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_execute_render_foundati
                 kan_hash_storage_remove (&render_graph->image_cache, &image->node);
                 render_foundation_graph_image_cache_node_destroy (render_graph, image);
             }
+            else
+            {
+                image->first_usage = NULL;
+            }
 
-            image->first_usage = NULL;
             image = next;
         }
 
@@ -824,8 +817,11 @@ UNIVERSE_RENDER_FOUNDATION_API void kan_universe_mutator_execute_render_foundati
                 kan_hash_storage_remove (&render_graph->frame_buffer_cache, &frame_buffer->node);
                 render_foundation_graph_frame_buffer_cache_node_destroy (render_graph, frame_buffer);
             }
+            else
+            {
+                frame_buffer->used_in_current_frame = KAN_FALSE;
+            }
 
-            frame_buffer->used_in_current_frame = KAN_FALSE;
             frame_buffer = next;
         }
 
@@ -996,71 +992,97 @@ void kan_render_graph_resource_management_singleton_init (
                                     KAN_UNIVERSE_RENDER_FOUNDATION_GTA_INITIAL_STACK);
 }
 
-kan_bool_t kan_render_graph_resource_management_singleton_request_pass (
+const struct kan_render_graph_resource_response_t *kan_render_graph_resource_management_singleton_request (
     const struct kan_render_graph_resource_management_singleton_t *instance,
-    const struct kan_render_graph_pass_instance_request_t *request,
-    struct kan_render_graph_pass_instance_allocation_t *output)
+    const struct kan_render_graph_resource_request_t *request)
 {
     struct kan_render_graph_resource_management_singleton_t *mutable_instance =
         (struct kan_render_graph_resource_management_singleton_t *) instance;
 
-    struct kan_render_frame_buffer_attachment_description_t *attachment_descriptions = kan_allocate_general (
-        instance->cache_group,
-        sizeof (struct kan_render_frame_buffer_attachment_description_t) * request->pass->attachments.size,
-        _Alignof (struct kan_render_frame_buffer_attachment_description_t));
-
-    struct render_foundation_graph_image_cache_node_t
-        *images_static[KAN_UNIVERSE_RENDER_FOUNDATION_ATTACHMENTS_MAX_STATIC];
-    struct render_foundation_graph_image_cache_node_t **images = images_static;
+    kan_atomic_int_lock (&mutable_instance->request_lock);
     kan_bool_t successful = KAN_TRUE;
 
-    if (KAN_UNIVERSE_RENDER_FOUNDATION_ATTACHMENTS_MAX_STATIC < request->pass->attachments.size)
+    // Start by allocating response.
+    struct kan_render_graph_resource_response_t *response = KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (
+        &mutable_instance->temporary_allocator, struct kan_render_graph_resource_response_t);
+
+    response->usage_begin_checkpoint = kan_render_pass_instance_checkpoint_create (request->context);
+    response->usage_end_checkpoint = kan_render_pass_instance_checkpoint_create (request->context);
+    kan_render_pass_instance_checkpoint_add_checkpoint_dependancy (response->usage_end_checkpoint,
+                                                                   response->usage_begin_checkpoint);
+
+    for (kan_loop_size_t index = 0u; index < request->dependant_count; ++index)
     {
-        images = kan_allocate_general (
-            instance->allocation_group,
-            sizeof (struct render_foundation_graph_image_cache_node_t *) * request->pass->attachments.size,
-            _Alignof (struct render_foundation_graph_image_cache_node_t *));
+        kan_render_pass_instance_checkpoint_add_checkpoint_dependancy (
+            request->dependant[index]->usage_begin_checkpoint, response->usage_end_checkpoint);
     }
 
-    kan_atomic_int_lock (&mutable_instance->request_lock);
-    for (kan_loop_size_t index = 0u; index < (kan_loop_size_t) request->pass->attachments.size; ++index)
+    response->images_count = request->images_count;
+    if (response->images_count > 0u)
     {
-        struct kan_render_graph_pass_attachment_t *pass_attachment =
-            &((struct kan_render_graph_pass_attachment_t *) request->pass->attachments.data)[index];
-        struct kan_render_graph_pass_instance_request_attachment_info_t *info = &request->attachment_info[index];
-        struct kan_render_frame_buffer_attachment_description_t *attachment_output = &attachment_descriptions[index];
+        response->images = kan_stack_group_allocator_allocate (&mutable_instance->temporary_allocator,
+                                                               sizeof (kan_render_image_t) * request->images_count,
+                                                               _Alignof (kan_render_image_t));
+    }
+    else
+    {
+        response->images = NULL;
+    }
 
-        if (KAN_HANDLE_IS_VALID (info->use_surface))
+    response->frame_buffers_count = request->frame_buffers_count;
+    if (response->frame_buffers_count > 0u)
+    {
+        response->frame_buffers = kan_stack_group_allocator_allocate (
+            &mutable_instance->temporary_allocator, sizeof (kan_render_frame_buffer_t) * request->frame_buffers_count,
+            _Alignof (kan_render_frame_buffer_t));
+    }
+    else
+    {
+        response->frame_buffers = NULL;
+    }
+
+    // Try to retrieve or create proper images.
+    for (kan_loop_size_t index = 0u; index < request->images_count; ++index)
+    {
+        struct kan_render_graph_resource_image_request_t *image_request = &request->images[index];
+        if (image_request->description.mips > 1u)
         {
-            attachment_output->type = KAN_FRAME_BUFFER_ATTACHMENT_SURFACE;
-            attachment_output->surface = info->use_surface;
-            images[index] = NULL;
-            continue;
+            KAN_LOG (render_foundation_graph, KAN_LOG_ERROR,
+                     "Received image requests with mips, makes no sense for render target allocation.")
+            successful = KAN_FALSE;
+            break;
         }
 
-        const kan_hash_t attachment_hash = calculate_cached_image_hash (
-            pass_attachment->format, request->frame_buffer_width, request->frame_buffer_height);
+        if (!image_request->description.render_target)
+        {
+            KAN_LOG (render_foundation_graph, KAN_LOG_ERROR,
+                     "Received image requests without render target flag, makes no sense for render target allocation.")
+            successful = KAN_FALSE;
+            break;
+        }
 
+        const kan_hash_t request_hash = calculate_image_description_hash (&image_request->description);
         const struct kan_hash_storage_bucket_t *bucket =
-            kan_hash_storage_query (&mutable_instance->image_cache, attachment_hash);
+            kan_hash_storage_query (&mutable_instance->image_cache, request_hash);
 
         struct render_foundation_graph_image_cache_node_t *node =
             (struct render_foundation_graph_image_cache_node_t *) bucket->first;
-
         const struct render_foundation_graph_image_cache_node_t *node_end =
             (struct render_foundation_graph_image_cache_node_t *) (bucket->last ? bucket->last->next : NULL);
 
         while (node != node_end)
         {
-            if (node->node.hash == attachment_hash && node->format == pass_attachment->format &&
-                node->width == request->frame_buffer_width && node->height == request->frame_buffer_height &&
-                // Technically, we can use images with sampling even if sampling is not used, but it shouldn't matter
-                // in real world scenarios as no-sampling mode is usually only selected for scene depth textures,
-                // that are rarely shared to other passes except for passes with scene depth rendering.
-                node->supports_sampling == info->used_by_dependant_instances)
+            if (node->node.hash == request_hash && node->description.format == image_request->description.format &&
+                node->description.width == image_request->description.width &&
+                node->description.height == image_request->description.height &&
+                node->description.depth == image_request->description.depth &&
+                node->description.layers == image_request->description.layers &&
+                (!image_request->description.supports_sampling || node->description.supports_sampling))
             {
+                // Found suitable image. Let's check if we can use it.
                 kan_bool_t found_collision = KAN_FALSE;
-                if (info->used_by_dependant_instances)
+
+                if (!image_request->internal)
                 {
                     struct render_foundation_graph_image_usage_t *usage = node->first_usage;
                     while (usage && !found_collision)
@@ -1069,15 +1091,16 @@ kan_bool_t kan_render_graph_resource_management_singleton_request_pass (
                              dependant_index < (kan_loop_size_t) request->dependant_count && !found_collision;
                              ++dependant_index)
                         {
-                            if (KAN_HANDLE_IS_EQUAL (request->dependant[index], usage->producer_pass))
+                            if (request->dependant[index] == usage->producer_response)
                             {
                                 found_collision = KAN_TRUE;
                                 break;
                             }
 
-                            for (kan_loop_size_t user_index = 0u; user_index < usage->user_passes_count; ++user_index)
+                            for (kan_loop_size_t user_index = 0u; user_index < usage->user_responses_count;
+                                 ++user_index)
                             {
-                                if (KAN_HANDLE_IS_EQUAL (request->dependant[index], usage->user_passes[user_index]))
+                                if (request->dependant[index] == usage->user_responses[user_index])
                                 {
                                     found_collision = KAN_TRUE;
                                     break;
@@ -1098,11 +1121,10 @@ kan_bool_t kan_render_graph_resource_management_singleton_request_pass (
             node = (struct render_foundation_graph_image_cache_node_t *) node->node.list_node.next;
         }
 
-        if (!node)
+        if (node == node_end)
         {
-            node = render_foundation_graph_image_cache_node_create (
-                instance, request->context, pass_attachment->format, request->frame_buffer_width,
-                request->frame_buffer_height, info->used_by_dependant_instances);
+            node = render_foundation_graph_image_cache_node_create (instance, request->context, request_hash,
+                                                                    &image_request->description);
 
             if (!node)
             {
@@ -1115,190 +1137,185 @@ kan_bool_t kan_render_graph_resource_management_singleton_request_pass (
             kan_hash_storage_add (&mutable_instance->image_cache, &node->node);
         }
 
-        attachment_output->type = KAN_FRAME_BUFFER_ATTACHMENT_IMAGE;
-        attachment_output->image.image = node->image;
-        attachment_output->image.layer = 0u;
-        images[index] = node;
+        response->images[index] = node->image;
+
+        // Technically, adding usage right now might be considered too early as allocation might fail later.
+        // But in reality, this usage would not cause any harm as it would be just an empty usage with empty checkpoints
+        // and no dependencies (as user will not receive response due to error).
+        // Therefore, it is safe to add usage right now.
+        //
+        // One of the cornerstones of current render graph implementation is that we need to reduce parallelism
+        // in order to use less resources. For example, when we have split screen, in most cases we would have
+        // shadow maps that are visible in one viewport, but are not visible in other viewport. First though in
+        // this case it to let every shadow map be rendered independently as there is no dependencies in graph.
+        // However, chance that GPU will benefit from such large parallelism is slim, but this parallelism would
+        // require much more memory. Instead, we can inject additional dependencies between pass instances to make
+        // it possible to reuse more textures by reducing parallelism. It should reduce memory usage while also
+        // reducing parallelism, but, as said before, lost parallelism might actually not be beneficial at all.
+
+        const kan_instance_size_t dependant_to_register = image_request->internal ? 0u : request->dependant_count;
+        struct render_foundation_graph_image_usage_t *usage = kan_stack_group_allocator_allocate (
+            &mutable_instance->temporary_allocator,
+            sizeof (struct render_foundation_graph_image_usage_t) +
+                sizeof (struct kan_render_graph_resource_response_t *) * dependant_to_register,
+            _Alignof (struct render_foundation_graph_image_usage_t));
+
+        usage->next = node->first_usage;
+        node->first_usage = usage;
+        usage->producer_response = response;
+        usage->user_responses_count = dependant_to_register;
+
+        if (dependant_to_register > 0u)
+        {
+            memcpy (usage->user_responses, request->dependant,
+                    sizeof (struct kan_render_graph_resource_response_t *) * dependant_to_register);
+        }
+
+        if (usage->next)
+        {
+            if (dependant_to_register > 0u)
+            {
+                for (kan_loop_size_t dependant_index = 0u; dependant_index < (kan_loop_size_t) dependant_to_register;
+                     ++dependant_index)
+                {
+                    kan_render_pass_instance_checkpoint_add_checkpoint_dependancy (
+                        usage->next->producer_response->usage_begin_checkpoint,
+                        usage->user_responses[dependant_index]->usage_end_checkpoint);
+                }
+            }
+            else
+            {
+                kan_render_pass_instance_checkpoint_add_checkpoint_dependancy (
+                    usage->next->producer_response->usage_begin_checkpoint, response->usage_end_checkpoint);
+            }
+        }
     }
 
-    struct render_foundation_graph_frame_buffer_cache_node_t *frame_buffer_node = NULL;
     if (successful)
     {
-        const kan_hash_t frame_buffer_hash = calculate_cached_frame_buffer_hash (
-            request->pass->pass, request->pass->attachments.size, attachment_descriptions);
-
-        const struct kan_hash_storage_bucket_t *bucket =
-            kan_hash_storage_query (&mutable_instance->frame_buffer_cache, (kan_hash_t) frame_buffer_hash);
-
-        struct render_foundation_graph_frame_buffer_cache_node_t *node =
-            (struct render_foundation_graph_frame_buffer_cache_node_t *) bucket->first;
-
-        const struct render_foundation_graph_frame_buffer_cache_node_t *node_end =
-            (struct render_foundation_graph_frame_buffer_cache_node_t *) (bucket->last ? bucket->last->next : NULL);
-
-        while (node != node_end)
+        for (kan_loop_size_t frame_buffer_index = 0u; frame_buffer_index < request->frame_buffers_count;
+             ++frame_buffer_index)
         {
-            if (node->node.hash == frame_buffer_hash && KAN_HANDLE_IS_EQUAL (node->pass, request->pass->pass) &&
-                node->attachments_count == request->pass->attachments.size)
+            struct kan_render_graph_resource_frame_buffer_request_t *frame_buffer_request =
+                &request->frame_buffers[frame_buffer_index];
+
+            struct kan_render_frame_buffer_attachment_description_t *attachments =
+                kan_stack_group_allocator_allocate (&mutable_instance->temporary_allocator,
+                                                    sizeof (struct kan_render_frame_buffer_attachment_description_t) *
+                                                        frame_buffer_request->attachments_count,
+                                                    _Alignof (struct kan_render_frame_buffer_attachment_description_t));
+
+            for (kan_loop_size_t attachment_index = 0u; attachment_index < frame_buffer_request->attachments_count;
+                 ++attachment_index)
             {
-                kan_bool_t attachments_equal = KAN_TRUE;
-                for (kan_loop_size_t index = 0u; index < node->attachments_count && attachments_equal; ++index)
+                struct kan_render_graph_resource_frame_buffer_request_attachment_t *attachment_request =
+                    &frame_buffer_request->attachments[attachment_index];
+
+                if (attachment_request->surface_attachment)
                 {
-                    if (attachment_descriptions[index].type != node->attachments[index].type)
+                    attachments[attachment_index] = (struct kan_render_frame_buffer_attachment_description_t) {
+                        .type = KAN_FRAME_BUFFER_ATTACHMENT_SURFACE,
+                        .surface = attachment_request->surface,
+                    };
+                }
+                else
+                {
+                    attachments[attachment_index] = (struct kan_render_frame_buffer_attachment_description_t) {
+                        .type = KAN_FRAME_BUFFER_ATTACHMENT_IMAGE,
+                        .image =
+                            {
+                                .image = response->images[attachment_request->image.index],
+                                .layer = attachment_request->image.layer,
+                            },
+                    };
+                }
+            }
+
+            const kan_hash_t request_hash = calculate_cached_frame_buffer_hash (
+                frame_buffer_request->pass, frame_buffer_request->attachments_count, attachments);
+
+            const struct kan_hash_storage_bucket_t *bucket =
+                kan_hash_storage_query (&mutable_instance->frame_buffer_cache, request_hash);
+
+            struct render_foundation_graph_frame_buffer_cache_node_t *node =
+                (struct render_foundation_graph_frame_buffer_cache_node_t *) bucket->first;
+
+            const struct render_foundation_graph_frame_buffer_cache_node_t *node_end =
+                (struct render_foundation_graph_frame_buffer_cache_node_t *) (bucket->last ? bucket->last->next : NULL);
+
+            while (node != node_end)
+            {
+                if (node->node.hash == request_hash && KAN_HANDLE_IS_EQUAL (node->pass, frame_buffer_request->pass) &&
+                    node->attachments_count == frame_buffer_request->attachments_count)
+                {
+                    kan_bool_t attachments_equal = KAN_TRUE;
+                    for (kan_loop_size_t index = 0u; index < node->attachments_count && attachments_equal; ++index)
                     {
-                        attachments_equal = KAN_FALSE;
-                        break;
+                        if (attachments[index].type != node->attachments[index].type)
+                        {
+                            attachments_equal = KAN_FALSE;
+                            break;
+                        }
+
+                        switch (attachments[index].type)
+                        {
+                        case KAN_FRAME_BUFFER_ATTACHMENT_IMAGE:
+                            if (!KAN_HANDLE_IS_EQUAL (attachments[index].image.image,
+                                                      node->attachments[index].image.image) ||
+                                attachments[index].image.layer != node->attachments[index].image.layer)
+                            {
+                                attachments_equal = KAN_FALSE;
+                                break;
+                            }
+
+                            break;
+
+                        case KAN_FRAME_BUFFER_ATTACHMENT_SURFACE:
+                            if (!KAN_HANDLE_IS_EQUAL (attachments[index].surface, node->attachments[index].surface))
+                            {
+                                attachments_equal = KAN_FALSE;
+                                break;
+                            }
+
+                            break;
+                        }
                     }
 
-                    switch (attachment_descriptions[index].type)
+                    if (attachments_equal)
                     {
-                    case KAN_FRAME_BUFFER_ATTACHMENT_IMAGE:
-                        if (!KAN_HANDLE_IS_EQUAL (attachment_descriptions[index].image.image,
-                                                  node->attachments[index].image.image) ||
-                            attachment_descriptions[index].image.layer != node->attachments[index].image.layer)
-                        {
-                            attachments_equal = KAN_FALSE;
-                            break;
-                        }
-
-                        break;
-
-                    case KAN_FRAME_BUFFER_ATTACHMENT_SURFACE:
-                        if (!KAN_HANDLE_IS_EQUAL (attachment_descriptions[index].surface,
-                                                  node->attachments[index].surface))
-                        {
-                            attachments_equal = KAN_FALSE;
-                            break;
-                        }
-
                         break;
                     }
                 }
 
-                if (attachments_equal)
+                node = (struct render_foundation_graph_frame_buffer_cache_node_t *) node->node.list_node.next;
+            }
+
+            if (node == node_end)
+            {
+                node = render_foundation_graph_frame_buffer_cache_node_create (
+                    instance, request->context, request_hash, frame_buffer_request->pass,
+                    frame_buffer_request->attachments_count, attachments);
+
+                if (node)
                 {
+                    kan_hash_storage_update_bucket_count_default (&mutable_instance->frame_buffer_cache,
+                                                                  KAN_UNIVERSE_RENDER_FOUNDATION_GFBC_BUCKETS);
+                    kan_hash_storage_add (&mutable_instance->frame_buffer_cache, &node->node);
+                }
+                else
+                {
+                    successful = KAN_FALSE;
                     break;
                 }
             }
 
-            node = (struct render_foundation_graph_frame_buffer_cache_node_t *) node->node.list_node.next;
-        }
-
-        if (!node)
-        {
-            node = render_foundation_graph_frame_buffer_cache_node_create (
-                instance, request->context, request->pass->pass, request->pass->attachments.size,
-                attachment_descriptions);
-
-            if (node)
-            {
-                kan_hash_storage_update_bucket_count_default (&mutable_instance->frame_buffer_cache,
-                                                              KAN_UNIVERSE_RENDER_FOUNDATION_GFBC_BUCKETS);
-                kan_hash_storage_add (&mutable_instance->frame_buffer_cache, &node->node);
-            }
-            else
-            {
-                successful = KAN_FALSE;
-            }
-        }
-
-        frame_buffer_node = node;
-    }
-
-    if (successful)
-    {
-        output->pass_instance =
-            kan_render_pass_instantiate (request->pass->pass, frame_buffer_node->frame_buffer, request->viewport_bounds,
-                                         request->scissor, request->attachment_clear_values);
-
-        output->attachments_count = request->pass->attachments.size;
-        output->attachments = attachment_descriptions;
-
-        if (!KAN_HANDLE_IS_VALID (output->pass_instance))
-        {
-            KAN_LOG (render_foundation_graph, KAN_LOG_ERROR, "Failed to create new frame buffer for render graph.")
-            successful = KAN_FALSE;
-        }
-    }
-
-    if (successful)
-    {
-        frame_buffer_node->used_in_current_frame = KAN_TRUE;
-        for (kan_loop_size_t index = 0u; index < (kan_loop_size_t) request->pass->attachments.size; ++index)
-        {
-            struct kan_render_graph_pass_instance_request_attachment_info_t *info = &request->attachment_info[index];
-            struct render_foundation_graph_image_cache_node_t *node = images[index];
-
-            if (!node)
-            {
-                KAN_ASSERT (KAN_HANDLE_IS_VALID (info->use_surface))
-                continue;
-            }
-
-            // One of the cornerstones of current render graph implementation is that we need to reduce parallelism
-            // in order to use less resources. For example, when we have split screen, in most cases we would have
-            // shadow maps that are visible in one viewport, but are not visible in other viewport. First though in
-            // this case it to let every shadow map be rendered independently as there is no dependencies in graph.
-            // However, chance that GPU will benefit from such large parallelism is slim, but this parallelism would
-            // require much more memory. Instead, we can inject additional dependencies between pass instances to make
-            // it possible to reuse more textures by reducing parallelism. It should reduce memory usage while also
-            // reducing parallelism, but, as said before, lost parallelism might actually not be beneficial at all.
-
-            const kan_instance_size_t dependant_to_register =
-                info->used_by_dependant_instances ? request->dependant_count : 0u;
-
-            struct render_foundation_graph_image_usage_t *usage =
-                kan_stack_group_allocator_allocate (&mutable_instance->temporary_allocator,
-                                                    sizeof (struct render_foundation_graph_image_usage_t) +
-                                                        sizeof (kan_render_pass_instance_t) * dependant_to_register,
-                                                    _Alignof (struct render_foundation_graph_image_usage_t));
-
-            usage->next = node->first_usage;
-            node->first_usage = usage;
-            usage->producer_pass = output->pass_instance;
-            usage->user_passes_count = dependant_to_register;
-
-            if (dependant_to_register > 0u)
-            {
-                memcpy (usage->user_passes, request->dependant,
-                        sizeof (kan_render_pass_instance_t) * dependant_to_register);
-            }
-
-            if (usage->next)
-            {
-                if (dependant_to_register > 0u)
-                {
-                    for (kan_loop_size_t dependant_index = 0u;
-                         dependant_index < (kan_loop_size_t) dependant_to_register; ++dependant_index)
-                    {
-                        kan_render_pass_instance_add_instance_dependency (usage->next->producer_pass,
-                                                                          usage->user_passes[dependant_index]);
-                    }
-                }
-                else
-                {
-                    kan_render_pass_instance_add_instance_dependency (usage->next->producer_pass, usage->producer_pass);
-                }
-            }
+            node->used_in_current_frame = KAN_TRUE;
+            response->frame_buffers[frame_buffer_index] = node->frame_buffer;
         }
     }
 
     kan_atomic_int_unlock (&mutable_instance->request_lock);
-    if (images != images_static)
-    {
-        kan_free_general (
-            instance->allocation_group, images,
-            sizeof (struct render_foundation_graph_image_cache_node_t *) * request->pass->attachments.size);
-    }
-
-    if (!successful)
-    {
-        kan_free_general (
-            instance->cache_group, attachment_descriptions,
-            sizeof (struct kan_render_frame_buffer_attachment_description_t) * request->pass->attachments.size);
-    }
-
-    return successful;
+    return successful ? response : NULL;
 }
 
 void kan_render_graph_resource_management_singleton_shutdown (

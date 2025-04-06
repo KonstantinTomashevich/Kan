@@ -565,7 +565,7 @@ void render_backend_compiler_state_request_graphics (struct render_backend_pipel
 
         case KAN_RENDER_ATTRIBUTE_ITEM_FORMAT_FLOAT_UNORM_8:
             item_offset = sizeof (uint8_t);
-            
+
             switch (items_count_in_attribute)
             {
             case 1u:
@@ -589,13 +589,13 @@ void render_backend_compiler_state_request_graphics (struct render_backend_pipel
 
         case KAN_RENDER_ATTRIBUTE_ITEM_FORMAT_FLOAT_UNORM_16:
             item_offset = sizeof (uint16_t);
-            
+
             switch (items_count_in_attribute)
             {
             case 1u:
                 input_format = VK_FORMAT_R16_UNORM;
                 break;
-                
+
             case 2u:
                 input_format = VK_FORMAT_R16G16_UNORM;
                 break;
@@ -613,17 +613,17 @@ void render_backend_compiler_state_request_graphics (struct render_backend_pipel
 
         case KAN_RENDER_ATTRIBUTE_ITEM_FORMAT_FLOAT_SNORM_8:
             item_offset = sizeof (uint8_t);
-            
+
             switch (items_count_in_attribute)
             {
             case 1u:
                 input_format = VK_FORMAT_R8_SNORM;
                 break;
-                
+
             case 2u:
                 input_format = VK_FORMAT_R8G8_SNORM;
                 break;
-                
+
             case 3u:
                 input_format = VK_FORMAT_R8G8B8_SNORM;
                 break;
@@ -637,21 +637,21 @@ void render_backend_compiler_state_request_graphics (struct render_backend_pipel
 
         case KAN_RENDER_ATTRIBUTE_ITEM_FORMAT_FLOAT_SNORM_16:
             item_offset = sizeof (uint16_t);
-            
+
             switch (items_count_in_attribute)
             {
             case 1u:
                 input_format = VK_FORMAT_R16_SNORM;
                 break;
-                
+
             case 2u:
                 input_format = VK_FORMAT_R16G16_SNORM;
                 break;
-                
+
             case 3u:
                 input_format = VK_FORMAT_R16G16B16_SNORM;
                 break;
-                
+
             case 4u:
                 input_format = VK_FORMAT_R16G16B16A16_SNORM;
                 break;
@@ -661,21 +661,21 @@ void render_backend_compiler_state_request_graphics (struct render_backend_pipel
 
         case KAN_RENDER_ATTRIBUTE_ITEM_FORMAT_FLOAT_UINT_8:
             item_offset = sizeof (uint8_t);
-            
+
             switch (items_count_in_attribute)
             {
             case 1u:
                 input_format = VK_FORMAT_R8_UINT;
                 break;
-                
+
             case 2u:
                 input_format = VK_FORMAT_R8G8_UINT;
                 break;
-                
+
             case 3u:
                 input_format = VK_FORMAT_R8G8B8_UINT;
                 break;
-                
+
             case 4u:
                 input_format = VK_FORMAT_R8G8B8A8_UINT;
                 break;
@@ -685,122 +685,122 @@ void render_backend_compiler_state_request_graphics (struct render_backend_pipel
 
         case KAN_RENDER_ATTRIBUTE_ITEM_FORMAT_FLOAT_UINT_16:
             item_offset = sizeof (uint16_t);
-            
+
             switch (items_count_in_attribute)
             {
             case 1u:
                 input_format = VK_FORMAT_R16_UINT;
                 break;
-                
+
             case 2u:
                 input_format = VK_FORMAT_R16G16_UINT;
                 break;
-                
+
             case 3u:
                 input_format = VK_FORMAT_R16G16B16_UINT;
                 break;
-                
+
             case 4u:
                 input_format = VK_FORMAT_R16G16B16A16_UINT;
                 break;
             }
-            
+
             break;
 
         case KAN_RENDER_ATTRIBUTE_ITEM_FORMAT_FLOAT_UINT_32:
             item_offset = sizeof (uint32_t);
-            
+
             switch (items_count_in_attribute)
             {
             case 1u:
                 input_format = VK_FORMAT_R32_UINT;
                 break;
-                
+
             case 2u:
                 input_format = VK_FORMAT_R32G32_UINT;
                 break;
-                
+
             case 3u:
                 input_format = VK_FORMAT_R32G32B32_UINT;
                 break;
-                
+
             case 4u:
                 input_format = VK_FORMAT_R32G32B32A32_UINT;
                 break;
             }
-            
+
             break;
 
         case KAN_RENDER_ATTRIBUTE_ITEM_FORMAT_FLOAT_SINT_8:
             item_offset = sizeof (uint8_t);
-            
+
             switch (items_count_in_attribute)
             {
             case 1u:
                 input_format = VK_FORMAT_R8_SINT;
                 break;
-                
+
             case 2u:
                 input_format = VK_FORMAT_R8G8_SINT;
                 break;
-                
+
             case 3u:
                 input_format = VK_FORMAT_R8G8B8_SINT;
                 break;
-                
+
             case 4u:
                 input_format = VK_FORMAT_R8G8B8A8_SINT;
                 break;
             }
-            
+
             break;
 
         case KAN_RENDER_ATTRIBUTE_ITEM_FORMAT_FLOAT_SINT_16:
             item_offset = sizeof (uint16_t);
-            
+
             switch (items_count_in_attribute)
             {
             case 1u:
                 input_format = VK_FORMAT_R16_SINT;
                 break;
-                
+
             case 2u:
                 input_format = VK_FORMAT_R16G16_SINT;
                 break;
-                
+
             case 3u:
                 input_format = VK_FORMAT_R16G16B16_SINT;
                 break;
-                
+
             case 4u:
                 input_format = VK_FORMAT_R16G16B16A16_SINT;
                 break;
             }
-            
+
             break;
 
         case KAN_RENDER_ATTRIBUTE_ITEM_FORMAT_FLOAT_SINT_32:
             item_offset = sizeof (uint32_t);
-            
+
             switch (items_count_in_attribute)
             {
             case 1u:
                 input_format = VK_FORMAT_R32_SINT;
                 break;
-                
+
             case 2u:
                 input_format = VK_FORMAT_R32G32_SINT;
                 break;
-                
+
             case 3u:
                 input_format = VK_FORMAT_R32G32B32_SINT;
                 break;
-                
+
             case 4u:
                 input_format = VK_FORMAT_R32G32B32A32_SINT;
                 break;
             }
-            
+
             break;
         }
 
