@@ -1008,12 +1008,12 @@ const struct kan_render_graph_resource_response_t *kan_render_graph_resource_man
 
     response->usage_begin_checkpoint = kan_render_pass_instance_checkpoint_create (request->context);
     response->usage_end_checkpoint = kan_render_pass_instance_checkpoint_create (request->context);
-    kan_render_pass_instance_checkpoint_add_checkpoint_dependancy (response->usage_end_checkpoint,
+    kan_render_pass_instance_checkpoint_add_checkpoint_dependency (response->usage_end_checkpoint,
                                                                    response->usage_begin_checkpoint);
 
     for (kan_loop_size_t index = 0u; index < request->dependant_count; ++index)
     {
-        kan_render_pass_instance_checkpoint_add_checkpoint_dependancy (
+        kan_render_pass_instance_checkpoint_add_checkpoint_dependency (
             request->dependant[index]->usage_begin_checkpoint, response->usage_end_checkpoint);
     }
 
@@ -1072,7 +1072,15 @@ const struct kan_render_graph_resource_response_t *kan_render_graph_resource_man
 
         while (node != node_end)
         {
-            if (node->node.hash == request_hash && node->description.format == image_request->description.format &&
+            if (node->node.hash == request_hash &&
+                // Catch special case: one request can have several images with the same description, for example two
+                // textures for G buffer that have literally equal descriptions. But if request contains them as two
+                // distinct images, then we need to return two distinct images.
+                // If image is requested for this response during this request resolution, it is always stored in its
+                // first usage. Therefore, checking first usage is enough.
+                (!node->first_usage || node->first_usage->producer_response != response) &&
+                // Check that description is the same.
+                node->description.format == image_request->description.format &&
                 node->description.width == image_request->description.width &&
                 node->description.height == image_request->description.height &&
                 node->description.depth == image_request->description.depth &&
@@ -1173,19 +1181,22 @@ const struct kan_render_graph_resource_response_t *kan_render_graph_resource_man
 
         if (usage->next)
         {
+            // Just in case. Should never happen, but better to catch it early.
+            KAN_ASSERT (usage->next->producer_response != response)
+
             if (dependant_to_register > 0u)
             {
                 for (kan_loop_size_t dependant_index = 0u; dependant_index < (kan_loop_size_t) dependant_to_register;
                      ++dependant_index)
                 {
-                    kan_render_pass_instance_checkpoint_add_checkpoint_dependancy (
+                    kan_render_pass_instance_checkpoint_add_checkpoint_dependency (
                         usage->next->producer_response->usage_begin_checkpoint,
                         usage->user_responses[dependant_index]->usage_end_checkpoint);
                 }
             }
             else
             {
-                kan_render_pass_instance_checkpoint_add_checkpoint_dependancy (
+                kan_render_pass_instance_checkpoint_add_checkpoint_dependency (
                     usage->next->producer_response->usage_begin_checkpoint, response->usage_end_checkpoint);
             }
         }
