@@ -289,15 +289,7 @@ static enum kan_resource_compile_result_t kan_resource_render_pass_variant_compi
         return KAN_RESOURCE_PIPELINE_COMPILE_FAILED;
     }
 
-    if (meta.color_outputs.size > 0u)
-    {
-        kan_rpl_meta_shutdown (&meta);
-        KAN_LOG (resource_pass_compilation, KAN_LOG_ERROR,
-                 "Failed to compile pass \"%s\" variant %lu set layout: source contains color outputs, which is "
-                 "forbidden for pass set layout sources.",
-                 input->source_pass, (unsigned long) input->source_variant_index)
-        return KAN_RESOURCE_PIPELINE_COMPILE_FAILED;
-    }
+    // Color outputs are explicitly allowed as their structure usually depends on pass.
 
     kan_rpl_meta_set_bindings_shutdown (&output->pass_set_bindings);
     kan_rpl_meta_set_bindings_init_copy (&output->pass_set_bindings, &meta.set_pass);
