@@ -95,7 +95,7 @@ static void kan_resource_material_pipeline_family_move (void *target_void, void 
 
     kan_dynamic_array_init_move (&target->sources, &source->sources);
     kan_dynamic_array_init_move (&target->options.flags, &source->options.flags);
-    kan_dynamic_array_init_move (&target->options.counts, &source->options.counts);
+    kan_dynamic_array_init_move (&target->options.uints, &source->options.uints);
     target->source_material = source->source_material;
 }
 
@@ -178,7 +178,7 @@ static void kan_resource_material_pipeline_move (void *target_void, void *source
     kan_dynamic_array_init_move (&target->entry_points, &source->entry_points);
     kan_dynamic_array_init_move (&target->sources, &source->sources);
     kan_dynamic_array_init_move (&target->instance_options.flags, &source->instance_options.flags);
-    kan_dynamic_array_init_move (&target->instance_options.counts, &source->instance_options.counts);
+    kan_dynamic_array_init_move (&target->instance_options.uints, &source->instance_options.uints);
     target->source_material = source->source_material;
     target->source_pass = source->source_pass;
     target->source_pass_variant_index = source->source_pass_variant_index;
@@ -239,7 +239,7 @@ static kan_bool_t append_options (struct kan_resource_rpl_options_t *target,
                                   const struct kan_resource_rpl_options_t *source)
 {
     kan_dynamic_array_set_capacity (&target->flags, target->flags.size + source->flags.size);
-    kan_dynamic_array_set_capacity (&target->counts, target->counts.size + source->counts.size);
+    kan_dynamic_array_set_capacity (&target->uints, target->uints.size + source->uints.size);
 
     for (kan_loop_size_t index = 0u; index < (kan_loop_size_t) source->flags.size; ++index)
     {
@@ -262,14 +262,14 @@ static kan_bool_t append_options (struct kan_resource_rpl_options_t *target,
         output->value = input->value;
     }
 
-    for (kan_loop_size_t index = 0u; index < (kan_loop_size_t) source->counts.size; ++index)
+    for (kan_loop_size_t index = 0u; index < (kan_loop_size_t) source->uints.size; ++index)
     {
-        const struct kan_resource_rpl_count_option_t *input =
-            &((struct kan_resource_rpl_count_option_t *) source->counts.data)[index];
+        const struct kan_resource_rpl_uint_option_t *input =
+            &((struct kan_resource_rpl_uint_option_t *) source->uints.data)[index];
 
-        for (kan_loop_size_t target_index = 0u; target_index < (kan_loop_size_t) target->counts.size; ++target_index)
+        for (kan_loop_size_t target_index = 0u; target_index < (kan_loop_size_t) target->uints.size; ++target_index)
         {
-            if (((struct kan_resource_rpl_count_option_t *) target->counts.data)[target_index].name == input->name)
+            if (((struct kan_resource_rpl_uint_option_t *) target->uints.data)[target_index].name == input->name)
             {
                 KAN_LOG (resource_material_compilation, KAN_LOG_ERROR,
                          "Unable to append count option \"%s\" as its value is already present.", input->name)
@@ -277,7 +277,7 @@ static kan_bool_t append_options (struct kan_resource_rpl_options_t *target,
             }
         }
 
-        struct kan_resource_rpl_count_option_t *output = kan_dynamic_array_add_last (&target->counts);
+        struct kan_resource_rpl_uint_option_t *output = kan_dynamic_array_add_last (&target->uints);
         KAN_ASSERT (output)
         output->name = input->name;
         output->value = input->value;
@@ -305,15 +305,63 @@ static void sort_options (struct kan_resource_rpl_options_t *options)
     }
 
     {
-        struct kan_resource_rpl_count_option_t temporary;
+        struct kan_resource_rpl_uint_option_t temporary;
 
         KAN_MUTE_THIRD_PARTY_WARNINGS_BEGIN
-#define AT_INDEX(INDEX) (((struct kan_resource_rpl_count_option_t *) options->counts.data)[INDEX])
+#define AT_INDEX(INDEX) (((struct kan_resource_rpl_uint_option_t *) options->uints.data)[INDEX])
 #define LESS(first_index, second_index) strcmp (AT_INDEX (first_index).name, AT_INDEX (second_index).name) < 0
 #define SWAP(first_index, second_index)                                                                                \
     temporary = AT_INDEX (first_index), AT_INDEX (first_index) = AT_INDEX (second_index),                              \
     AT_INDEX (second_index) = temporary
-        QSORT (options->counts.size, LESS, SWAP);
+        QSORT (options->uints.size, LESS, SWAP);
+#undef LESS
+#undef SWAP
+#undef AT_INDEX
+        KAN_MUTE_THIRD_PARTY_WARNINGS_END
+    }
+    
+    {
+        struct kan_resource_rpl_sint_option_t temporary;
+        
+        KAN_MUTE_THIRD_PARTY_WARNINGS_BEGIN
+#define AT_INDEX(INDEX) (((struct kan_resource_rpl_sint_option_t *) options->sints.data)[INDEX])
+#define LESS(first_index, second_index) strcmp (AT_INDEX (first_index).name, AT_INDEX (second_index).name) < 0
+#define SWAP(first_index, second_index)                                                                                \
+    temporary = AT_INDEX (first_index), AT_INDEX (first_index) = AT_INDEX (second_index),                              \
+    AT_INDEX (second_index) = temporary
+        QSORT (options->sints.size, LESS, SWAP);
+#undef LESS
+#undef SWAP
+#undef AT_INDEX
+        KAN_MUTE_THIRD_PARTY_WARNINGS_END
+    }
+    
+    {
+        struct kan_resource_rpl_float_option_t temporary;
+        
+        KAN_MUTE_THIRD_PARTY_WARNINGS_BEGIN
+#define AT_INDEX(INDEX) (((struct kan_resource_rpl_float_option_t *) options->floats.data)[INDEX])
+#define LESS(first_index, second_index) strcmp (AT_INDEX (first_index).name, AT_INDEX (second_index).name) < 0
+#define SWAP(first_index, second_index)                                                                                \
+    temporary = AT_INDEX (first_index), AT_INDEX (first_index) = AT_INDEX (second_index),                              \
+    AT_INDEX (second_index) = temporary
+        QSORT (options->floats.size, LESS, SWAP);
+#undef LESS
+#undef SWAP
+#undef AT_INDEX
+        KAN_MUTE_THIRD_PARTY_WARNINGS_END
+    }
+    
+    {
+        struct kan_resource_rpl_enum_option_t temporary;
+        
+        KAN_MUTE_THIRD_PARTY_WARNINGS_BEGIN
+#define AT_INDEX(INDEX) (((struct kan_resource_rpl_enum_option_t *) options->enums.data)[INDEX])
+#define LESS(first_index, second_index) strcmp (AT_INDEX (first_index).name, AT_INDEX (second_index).name) < 0
+#define SWAP(first_index, second_index)                                                                                \
+    temporary = AT_INDEX (first_index), AT_INDEX (first_index) = AT_INDEX (second_index),                              \
+    AT_INDEX (second_index) = temporary
+        QSORT (options->enums.size, LESS, SWAP);
 #undef LESS
 #undef SWAP
 #undef AT_INDEX
@@ -669,12 +717,45 @@ static kan_bool_t apply_options_to_compiler_context (kan_rpl_compiler_context_t 
         }
     }
 
-    for (kan_loop_size_t index = 0u; index < (kan_loop_size_t) options->counts.size; ++index)
+    for (kan_loop_size_t index = 0u; index < (kan_loop_size_t) options->uints.size; ++index)
     {
-        struct kan_resource_rpl_count_option_t *option =
-            &((struct kan_resource_rpl_count_option_t *) options->counts.data)[index];
+        struct kan_resource_rpl_uint_option_t *option =
+            &((struct kan_resource_rpl_uint_option_t *) options->uints.data)[index];
 
-        if (!kan_rpl_compiler_context_set_option_count (compiler_context, target_scope, option->name, option->value))
+        if (!kan_rpl_compiler_context_set_option_uint (compiler_context, target_scope, option->name, option->value))
+        {
+            return KAN_FALSE;
+        }
+    }
+    
+    for (kan_loop_size_t index = 0u; index < (kan_loop_size_t) options->sints.size; ++index)
+    {
+        struct kan_resource_rpl_sint_option_t *option =
+            &((struct kan_resource_rpl_sint_option_t *) options->sints.data)[index];
+        
+        if (!kan_rpl_compiler_context_set_option_sint (compiler_context, target_scope, option->name, option->value))
+        {
+            return KAN_FALSE;
+        }
+    }
+    
+    for (kan_loop_size_t index = 0u; index < (kan_loop_size_t) options->floats.size; ++index)
+    {
+        struct kan_resource_rpl_float_option_t *option =
+            &((struct kan_resource_rpl_float_option_t *) options->floats.data)[index];
+        
+        if (!kan_rpl_compiler_context_set_option_float (compiler_context, target_scope, option->name, option->value))
+        {
+            return KAN_FALSE;
+        }
+    }
+    
+    for (kan_loop_size_t index = 0u; index < (kan_loop_size_t) options->enums.size; ++index)
+    {
+        struct kan_resource_rpl_enum_option_t *option =
+            &((struct kan_resource_rpl_enum_option_t *) options->enums.data)[index];
+        
+        if (!kan_rpl_compiler_context_set_option_enum (compiler_context, target_scope, option->name, option->value))
         {
             return KAN_FALSE;
         }

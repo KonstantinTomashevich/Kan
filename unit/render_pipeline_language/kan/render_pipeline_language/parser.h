@@ -36,7 +36,19 @@ enum kan_rpl_option_scope_t
 enum kan_rpl_option_type_t
 {
     KAN_RPL_OPTION_TYPE_FLAG = 0u,
-    KAN_RPL_OPTION_TYPE_COUNT,
+    KAN_RPL_OPTION_TYPE_UINT,
+    KAN_RPL_OPTION_TYPE_SINT,
+    KAN_RPL_OPTION_TYPE_FLOAT,
+    KAN_RPL_OPTION_TYPE_ENUM,
+};
+
+/// \brief Enum option serializable data.
+/// \details Supported enum values are stored among other serializable strings in
+///          `kan_rpl_intermediate_t::string_lists_storage`.
+struct kan_rpl_option_enum_t
+{
+    kan_rpl_size_t list_size;
+    kan_rpl_size_t list_index;
 };
 
 /// \brief Defines intermediate format to store parsed option.
@@ -53,8 +65,20 @@ struct kan_rpl_option_t
         kan_bool_t flag_default_value;
 
         KAN_REFLECTION_VISIBILITY_CONDITION_FIELD (type)
-        KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (KAN_RPL_OPTION_TYPE_COUNT)
-        kan_rpl_unsigned_int_literal_t count_default_value;
+        KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (KAN_RPL_OPTION_TYPE_UINT)
+        kan_rpl_unsigned_int_literal_t uint_default_value;
+
+        KAN_REFLECTION_VISIBILITY_CONDITION_FIELD (type)
+        KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (KAN_RPL_OPTION_TYPE_SINT)
+        kan_rpl_unsigned_int_literal_t sint_default_value;
+
+        KAN_REFLECTION_VISIBILITY_CONDITION_FIELD (type)
+        KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (KAN_RPL_OPTION_TYPE_FLOAT)
+        kan_rpl_floating_t float_default_value;
+
+        KAN_REFLECTION_VISIBILITY_CONDITION_FIELD (type)
+        KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (KAN_RPL_OPTION_TYPE_ENUM)
+        struct kan_rpl_option_enum_t enum_values;
     };
 };
 
@@ -646,10 +670,10 @@ struct kan_rpl_intermediate_t
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (kan_rpl_size_t)
     struct kan_dynamic_array_t expression_lists_storage;
 
-    /// \brief Array that is used to store all meta tags for declarations.
-    /// \details For the same reason as expressions, lists of meta tags are stored in one continuous array.
+    /// \brief Array that is used to store all strings, including enum values and meta tags.
+    /// \details For the same reason as expressions, lists of strings are stored in one continuous array.
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (kan_interned_string_t)
-    struct kan_dynamic_array_t meta_lists_storage;
+    struct kan_dynamic_array_t string_lists_storage;
 };
 
 RENDER_PIPELINE_LANGUAGE_API void kan_rpl_intermediate_init (struct kan_rpl_intermediate_t *instance);

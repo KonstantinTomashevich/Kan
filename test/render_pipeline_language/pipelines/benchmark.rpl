@@ -36,8 +36,8 @@ void vertex_main (void)
     vertex_stage_output_position (world_position_4);
 }
 
-global count max_point_lights 10;
-global count max_directional_lights 1;
+global max_point_lights: uint 10;
+global max_directional_lights: uint 1;
 
 struct point_light_t
 {

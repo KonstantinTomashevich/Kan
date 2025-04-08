@@ -11,6 +11,12 @@
 
 KAN_LOG_DEFINE_CATEGORY (rpl_parser);
 
+struct parser_option_enum_value_t
+{
+    struct parser_option_enum_value_t *next;
+    kan_interned_string_t name;
+};
+
 struct parser_option_t
 {
     struct parser_option_t *next;
@@ -21,7 +27,10 @@ struct parser_option_t
     union
     {
         kan_bool_t flag_default_value;
-        kan_rpl_unsigned_int_literal_t count_default_value;
+        kan_rpl_unsigned_int_literal_t uint_default_value;
+        kan_rpl_signed_int_literal_t sint_default_value;
+        float float_default_value;
+        struct parser_option_enum_value_t *first_enum_value;
     };
 };
 
@@ -849,49 +858,11 @@ static inline kan_bool_t ensure_option_name_unique (struct rpl_parser_t *parser,
     return KAN_TRUE;
 }
 
-static inline kan_bool_t parse_main_option_flag (struct rpl_parser_t *parser,
+static inline kan_bool_t parse_main_option_body (struct rpl_parser_t *parser,
                                                  struct dynamic_parser_state_t *state,
                                                  const char *name_begin,
                                                  const char *name_end,
-                                                 enum kan_rpl_option_scope_t scope,
-                                                 kan_bool_t value)
-{
-    if (state->detached_conditional)
-    {
-        KAN_LOG (rpl_parser, KAN_LOG_ERROR,
-                 "[%s:%s] [%ld:%ld]: Encountered conditional before option which is not supported.", parser->log_name,
-                 state->source_log_name, (long) state->cursor_line, (long) state->cursor_symbol)
-        return KAN_FALSE;
-    }
-
-    kan_interned_string_t name = kan_char_sequence_intern (name_begin, name_end);
-    if (!ensure_option_name_unique (parser, state, name))
-    {
-        return KAN_FALSE;
-    }
-
-    struct parser_option_t *node =
-        KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&parser->allocator, struct parser_option_t);
-
-    node->next = NULL;
-    if (parser->processing_data.last_option)
-    {
-        parser->processing_data.last_option->next = node;
-    }
-    else
-    {
-        parser->processing_data.first_option = node;
-    }
-
-    parser->processing_data.last_option = node;
-    ++parser->processing_data.option_count;
-
-    node->name = name;
-    node->scope = scope;
-    node->type = KAN_RPL_OPTION_TYPE_FLAG;
-    node->flag_default_value = value;
-    return KAN_TRUE;
-}
+                                                 enum kan_rpl_option_scope_t scope);
 
 static inline kan_rpl_unsigned_int_literal_t parse_unsigned_integer_value (struct rpl_parser_t *parser,
                                                                            struct dynamic_parser_state_t *state,
@@ -942,51 +913,6 @@ static inline float parse_unsigned_floating_value (struct rpl_parser_t *parser,
     }
 
     return value;
-}
-
-static inline kan_bool_t parse_main_option_count (struct rpl_parser_t *parser,
-                                                  struct dynamic_parser_state_t *state,
-                                                  const char *name_begin,
-                                                  const char *name_end,
-                                                  enum kan_rpl_option_scope_t scope,
-                                                  const char *literal_begin,
-                                                  const char *literal_end)
-{
-    if (state->detached_conditional)
-    {
-        KAN_LOG (rpl_parser, KAN_LOG_ERROR,
-                 "[%s:%s] [%ld:%ld]: Encountered conditional before option which is not supported.", parser->log_name,
-                 state->source_log_name, (long) state->cursor_line, (long) state->cursor_symbol)
-        return KAN_FALSE;
-    }
-
-    kan_interned_string_t name = kan_char_sequence_intern (name_begin, name_end);
-    if (!ensure_option_name_unique (parser, state, name))
-    {
-        return KAN_FALSE;
-    }
-
-    struct parser_option_t *node =
-        KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&parser->allocator, struct parser_option_t);
-
-    node->next = NULL;
-    if (parser->processing_data.last_option)
-    {
-        parser->processing_data.last_option->next = node;
-    }
-    else
-    {
-        parser->processing_data.first_option = node;
-    }
-
-    parser->processing_data.last_option = node;
-    ++parser->processing_data.option_count;
-
-    node->name = name;
-    node->scope = scope;
-    node->type = KAN_RPL_OPTION_TYPE_COUNT;
-    node->count_default_value = parse_unsigned_integer_value (parser, state, literal_begin, literal_end);
-    return KAN_TRUE;
 }
 
 static struct parser_expression_tree_node_t *parse_expression (struct rpl_parser_t *parser,
@@ -1526,41 +1452,14 @@ static kan_bool_t parse_main (struct rpl_parser_t *parser, struct dynamic_parser
              ("image_depth_cube" @marker_image_depth_cube) |
              ("image_depth_2d_array" @marker_image_depth_2d_array);
 
-         "global" separator+ "flag" separator+ @name_begin identifier @name_end separator+ "on" separator* ";"
+         "global" separator+ @name_begin identifier @name_end separator* ":"
          {
-             CHECKED (parse_main_option_flag (parser, state, name_begin, name_end, KAN_RPL_OPTION_SCOPE_GLOBAL,
-                                              KAN_TRUE))
-         }
-         "global" separator+ "flag" separator+ @name_begin identifier @name_end separator+ "off" separator* ";"
-         {
-             CHECKED (parse_main_option_flag (parser, state,name_begin, name_end, KAN_RPL_OPTION_SCOPE_GLOBAL,
-                                              KAN_FALSE))
+             CHECKED (parse_main_option_body (parser, state, name_begin, name_end, KAN_RPL_OPTION_SCOPE_GLOBAL))
          }
 
-         "instance" separator+ "flag" separator+ @name_begin identifier @name_end separator+ "on" separator* ";"
+         "instance" separator+ @name_begin identifier @name_end separator* ":"
          {
-             CHECKED (parse_main_option_flag (parser, state,name_begin, name_end, KAN_RPL_OPTION_SCOPE_INSTANCE,
-                                              KAN_TRUE))
-         }
-
-         "instance" separator+ "flag" separator+ @name_begin identifier @name_end separator+ "off" separator* ";"
-         {
-             CHECKED (parse_main_option_flag (parser, state,name_begin, name_end, KAN_RPL_OPTION_SCOPE_INSTANCE,
-                                              KAN_FALSE))
-         }
-
-         "global" separator+ "count" separator+ @name_begin identifier @name_end separator+
-         @literal_begin [0-9]+ @literal_end separator* ";"
-         {
-             CHECKED (parse_main_option_count (parser, state, name_begin, name_end, KAN_RPL_OPTION_SCOPE_GLOBAL,
-                                               literal_begin, literal_end))
-         }
-
-         "instance" separator+ "count" separator+ @name_begin identifier @name_end separator+
-         @literal_begin [0-9]+ @literal_end separator* ";"
-         {
-             CHECKED (parse_main_option_count (parser, state, name_begin, name_end, KAN_RPL_OPTION_SCOPE_INSTANCE,
-                                               literal_begin, literal_end))
+             CHECKED (parse_main_option_body (parser, state, name_begin, name_end, KAN_RPL_OPTION_SCOPE_INSTANCE))
          }
 
          "conditional" separator* "("
@@ -1655,6 +1554,237 @@ static kan_bool_t parse_main (struct rpl_parser_t *parser, struct dynamic_parser
          */
 
 #undef CHECKED
+    }
+}
+
+static inline kan_bool_t parse_main_option_enum_values (struct rpl_parser_t *parser,
+                                                        struct dynamic_parser_state_t *state,
+                                                        struct parser_option_t *node)
+{
+    node->type = KAN_RPL_OPTION_TYPE_ENUM;
+    node->first_enum_value = NULL;
+    struct parser_option_enum_value_t *last_value_node = NULL;
+
+    while (KAN_TRUE)
+    {
+        state->token = state->cursor;
+        const char *identifier_begin;
+        const char *identifier_end;
+
+        /*!re2c
+         ";"
+         {
+             if (!node->first_enum_value)
+             {
+                 KAN_LOG (rpl_parser, KAN_LOG_ERROR,
+                          "[%s:%s] [%ld:%ld]: Encountered enum with no values.",
+                          parser->log_name, state->source_log_name, (long) state->cursor_line,
+                          (long) state->cursor_symbol)
+                 return KAN_FALSE;
+             }
+
+             return KAN_TRUE;
+         }
+
+         @identifier_begin identifier @identifier_end
+         {
+             kan_interned_string_t value_name = kan_char_sequence_intern (identifier_begin, identifier_end);
+             struct parser_option_enum_value_t *node_to_check = node->first_enum_value;
+
+             while (node_to_check)
+             {
+                 if (node_to_check->name == value_name)
+                 {
+                     KAN_LOG (rpl_parser, KAN_LOG_ERROR,
+                             "[%s:%s] [%ld:%ld]: Value \"%s\" already exists in enum, it cannot be added twice.",
+                             parser->log_name, state->source_log_name, (long) state->cursor_line,
+                             (long) state->cursor_symbol, value_name)
+                     return KAN_FALSE;
+                 }
+
+                 node_to_check = node_to_check->next;
+             }
+
+             struct parser_option_enum_value_t *value_node =
+                 KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&parser->allocator, struct parser_option_enum_value_t);
+
+             if (last_value_node)
+             {
+                 last_value_node->next = value_node;
+             }
+             else
+             {
+                 node->first_enum_value = value_node;
+             }
+
+             value_node->next = NULL;
+             last_value_node = value_node;
+             value_node->name = value_name;
+             continue;
+         }
+
+         separator+ { continue; }
+         comment+ { continue; }
+
+         *
+         {
+             KAN_LOG (rpl_parser, KAN_LOG_ERROR,
+                      "[%s:%s] [%ld:%ld]: Encountered unknown expression while reading option enum values.",
+                      parser->log_name, state->source_log_name, (long) state->cursor_line, (long) state->cursor_symbol)
+             return KAN_FALSE;
+         }
+
+         $
+         {
+             KAN_LOG (rpl_parser, KAN_LOG_ERROR,
+                      "[%s:%s] [%ld:%ld]: Encountered end of file while reading option enum values.",
+                      parser->log_name, state->source_log_name, (long) state->cursor_line, (long) state->cursor_symbol)
+             return KAN_FALSE;
+         }
+         */
+    }
+}
+
+static inline kan_bool_t parse_main_option_body (struct rpl_parser_t *parser,
+                                                 struct dynamic_parser_state_t *state,
+                                                 const char *name_begin,
+                                                 const char *name_end,
+                                                 enum kan_rpl_option_scope_t scope)
+{
+    if (state->detached_conditional)
+    {
+        KAN_LOG (rpl_parser, KAN_LOG_ERROR,
+                 "[%s:%s] [%ld:%ld]: Encountered conditional before option which is not supported.", parser->log_name,
+                 state->source_log_name, (long) state->cursor_line, (long) state->cursor_symbol)
+        return KAN_FALSE;
+    }
+
+    kan_interned_string_t name = kan_char_sequence_intern (name_begin, name_end);
+    if (!ensure_option_name_unique (parser, state, name))
+    {
+        return KAN_FALSE;
+    }
+
+    struct parser_option_t *node =
+        KAN_STACK_GROUP_ALLOCATOR_ALLOCATE_TYPED (&parser->allocator, struct parser_option_t);
+
+    node->next = NULL;
+    if (parser->processing_data.last_option)
+    {
+        parser->processing_data.last_option->next = node;
+    }
+    else
+    {
+        parser->processing_data.first_option = node;
+    }
+
+    parser->processing_data.last_option = node;
+    ++parser->processing_data.option_count;
+    node->name = name;
+    node->scope = scope;
+
+    while (KAN_TRUE)
+    {
+        state->token = state->cursor;
+        const char *literal_begin;
+        const char *literal_end;
+
+        /*!re2c
+         "flag" separator+ "on" separator* ";"
+         {
+             node->type = KAN_RPL_OPTION_TYPE_FLAG;
+             node->flag_default_value = KAN_TRUE;
+             return KAN_TRUE;
+         }
+
+         "flag" separator+ "off" separator* ";"
+         {
+             node->type = KAN_RPL_OPTION_TYPE_FLAG;
+             node->flag_default_value = KAN_FALSE;
+             return KAN_TRUE;
+         }
+
+         "uint" separator+ @literal_begin [0-9]+ @literal_end "u"? separator* ";"
+         {
+             node->type = KAN_RPL_OPTION_TYPE_UINT;
+             node->uint_default_value = parse_unsigned_integer_value (parser, state, literal_begin, literal_end);
+             return KAN_TRUE;
+         }
+
+         "sint" separator+ @literal_begin "-" [0-9]+ @literal_end "s"? separator* ";"
+         {
+             node->type = KAN_RPL_OPTION_TYPE_SINT;
+             kan_bool_t negative = *literal_begin == '-';
+
+             if (negative)
+             {
+                 ++literal_begin;
+             }
+
+             const kan_rpl_unsigned_int_literal_t positive_literal =
+                 parse_unsigned_integer_value (parser, state, literal_begin, literal_end);
+
+             if (positive_literal > KAN_INT_MAX (kan_rpl_signed_int_literal_t))
+             {
+                 KAN_LOG (rpl_parser, KAN_LOG_ERROR,
+                     "[%s:%s] [%ld:%ld]: Encountered integer literal that is bigger than maximum allowed %lld.",
+                     parser->log_name, state->source_log_name, (long) state->cursor_line, (long) state->cursor_symbol,
+                     (long long) INT64_MAX)
+                 return KAN_FALSE;
+             }
+
+             node->sint_default_value = (kan_rpl_signed_int_literal_t) positive_literal;
+             if (negative)
+             {
+                 node->sint_default_value = -node->sint_default_value;
+             }
+
+             return KAN_TRUE;
+         }
+
+         "float" separator+ @literal_begin "-"? [0-9]+ "." [0-9]+  @literal_end separator* ";"
+         {
+             node->type = KAN_RPL_OPTION_TYPE_FLOAT;
+             kan_bool_t negative = *literal_begin == '-';
+
+             if (negative)
+             {
+                 ++literal_begin;
+             }
+
+             node->float_default_value = parse_unsigned_floating_value (parser, state, literal_begin, literal_end);
+             if (negative)
+             {
+                 node->float_default_value = -node->float_default_value;
+             }
+
+             return KAN_TRUE;
+         }
+
+         "enum"
+         {
+             return parse_main_option_enum_values (parser, state, node);
+         }
+
+         separator+ { continue; }
+         comment+ { continue; }
+
+         *
+         {
+             KAN_LOG (rpl_parser, KAN_LOG_ERROR,
+                      "[%s:%s] [%ld:%ld]: Encountered unknown expression while reading option body.",
+                      parser->log_name, state->source_log_name, (long) state->cursor_line, (long) state->cursor_symbol)
+             return KAN_FALSE;
+         }
+
+         $
+         {
+             KAN_LOG (rpl_parser, KAN_LOG_ERROR,
+                      "[%s:%s] [%ld:%ld]: Encountered end of file while reading option body.",
+                      parser->log_name, state->source_log_name, (long) state->cursor_line, (long) state->cursor_symbol)
+             return KAN_FALSE;
+         }
+         */
     }
 }
 
@@ -1760,6 +1890,7 @@ static kan_bool_t parse_expression_signed_literal (struct rpl_parser_t *parser,
 
     const kan_rpl_unsigned_int_literal_t positive_literal =
         parse_unsigned_integer_value (parser, state, literal_begin, literal_end);
+
     if (positive_literal > KAN_INT_MAX (kan_rpl_signed_int_literal_t))
     {
         KAN_LOG (rpl_parser, KAN_LOG_ERROR,
@@ -2813,7 +2944,7 @@ static struct parser_container_field_t *parse_container_declarations (struct rpl
     struct parser_declaration_meta_item_t *detached_meta = NULL;
 
     enum kan_rpl_input_pack_class_t pack_class = KAN_RPL_INPUT_PACK_CLASS_DEFAULT;
-    kan_rpl_size_t pack_bits;
+    kan_rpl_size_t pack_bits = 32u;
 
     while (KAN_TRUE)
     {
@@ -2877,7 +3008,7 @@ static struct parser_container_field_t *parse_container_declarations (struct rpl
     else                                                                                                               \
     {                                                                                                                  \
         KAN_ASSERT (KAN_FALSE)                                                                                         \
-        pack_class = KAN_RPL_INPUT_PACK_CLASS_DEFAULT;                                                                 \
+        pack_bits = 32u;                                                                                               \
     }
 
         /*!re2c
@@ -4004,7 +4135,7 @@ void kan_rpl_intermediate_init (struct kan_rpl_intermediate_t *instance)
                             _Alignof (struct kan_rpl_expression_t), rpl_intermediate_allocation_group);
     kan_dynamic_array_init (&instance->expression_lists_storage, 0u, sizeof (kan_rpl_size_t), _Alignof (kan_rpl_size_t),
                             rpl_intermediate_allocation_group);
-    kan_dynamic_array_init (&instance->meta_lists_storage, 0u, sizeof (kan_interned_string_t),
+    kan_dynamic_array_init (&instance->string_lists_storage, 0u, sizeof (kan_interned_string_t),
                             _Alignof (kan_interned_string_t), rpl_intermediate_allocation_group);
 }
 
@@ -4040,7 +4171,7 @@ void kan_rpl_intermediate_shutdown (struct kan_rpl_intermediate_t *instance)
     kan_dynamic_array_shutdown (&instance->functions);
     kan_dynamic_array_shutdown (&instance->expression_storage);
     kan_dynamic_array_shutdown (&instance->expression_lists_storage);
-    kan_dynamic_array_shutdown (&instance->meta_lists_storage);
+    kan_dynamic_array_shutdown (&instance->string_lists_storage);
 }
 
 kan_rpl_parser_t kan_rpl_parser_create (kan_interned_string_t log_name)
@@ -4096,9 +4227,48 @@ static kan_bool_t build_intermediate_options (struct rpl_parser_t *instance, str
             target_option->flag_default_value = source_option->flag_default_value;
             break;
 
-        case KAN_RPL_OPTION_TYPE_COUNT:
-            target_option->count_default_value = source_option->count_default_value;
+        case KAN_RPL_OPTION_TYPE_UINT:
+            target_option->uint_default_value = source_option->uint_default_value;
             break;
+
+        case KAN_RPL_OPTION_TYPE_SINT:
+            target_option->sint_default_value = source_option->sint_default_value;
+            break;
+
+        case KAN_RPL_OPTION_TYPE_FLOAT:
+            target_option->float_default_value = source_option->float_default_value;
+            break;
+
+        case KAN_RPL_OPTION_TYPE_ENUM:
+        {
+            kan_loop_size_t values_count = 0u;
+            struct parser_option_enum_value_t *value = source_option->first_enum_value;
+
+            while (value)
+            {
+                ++values_count;
+                value = value->next;
+            }
+
+            target_option->enum_values.list_size = (kan_rpl_size_t) values_count;
+            target_option->enum_values.list_index = output->string_lists_storage.size;
+
+            if (output->string_lists_storage.size + values_count > output->string_lists_storage.capacity)
+            {
+                kan_dynamic_array_set_capacity (&output->string_lists_storage, output->string_lists_storage.size * 2u);
+            }
+
+            value = source_option->first_enum_value;
+            while (value)
+            {
+                kan_interned_string_t *next_value = kan_dynamic_array_add_last (&output->string_lists_storage);
+                KAN_ASSERT (next_value)
+                *next_value = value->name;
+                value = value->next;
+            }
+
+            break;
+        }
         }
 
         source_option = source_option->next;
@@ -4445,17 +4615,18 @@ static void build_meta (struct rpl_parser_t *instance,
     }
 
     *output_meta_list_size = (kan_rpl_size_t) meta_count;
-    *output_meta_list_index = intermediate->meta_lists_storage.size;
+    *output_meta_list_index = intermediate->string_lists_storage.size;
 
-    if (intermediate->meta_lists_storage.size + meta_count > intermediate->meta_lists_storage.capacity)
+    if (intermediate->string_lists_storage.size + meta_count > intermediate->string_lists_storage.capacity)
     {
-        kan_dynamic_array_set_capacity (&intermediate->meta_lists_storage, intermediate->meta_lists_storage.size * 2u);
+        kan_dynamic_array_set_capacity (&intermediate->string_lists_storage,
+                                        intermediate->string_lists_storage.size * 2u);
     }
 
     meta_item = first_meta;
     while (meta_item)
     {
-        kan_interned_string_t *next_meta = kan_dynamic_array_add_last (&intermediate->meta_lists_storage);
+        kan_interned_string_t *next_meta = kan_dynamic_array_add_last (&intermediate->string_lists_storage);
         KAN_ASSERT (next_meta)
         *next_meta = meta_item->meta;
         meta_item = meta_item->next;
@@ -4827,7 +4998,7 @@ kan_bool_t kan_rpl_parser_build_intermediate (kan_rpl_parser_t parser, struct ka
     kan_dynamic_array_set_capacity (&output->expression_storage, KAN_RPL_INTERMEDIATE_EXPRESSION_STORAGE_SIZE);
     kan_dynamic_array_set_capacity (&output->expression_lists_storage,
                                     KAN_RPL_INTERMEDIATE_EXPRESSION_LISTS_STORAGE_SIZE);
-    kan_dynamic_array_set_capacity (&output->meta_lists_storage, KAN_RPL_INTERMEDIATE_META_LISTS_STORAGE_SIZE);
+    kan_dynamic_array_set_capacity (&output->string_lists_storage, KAN_RPL_INTERMEDIATE_META_LISTS_STORAGE_SIZE);
 
     const kan_bool_t result =
         build_intermediate_options (instance, output) && build_intermediate_settings (instance, output) &&
@@ -4837,7 +5008,7 @@ kan_bool_t kan_rpl_parser_build_intermediate (kan_rpl_parser_t parser, struct ka
 
     kan_dynamic_array_set_capacity (&output->expression_storage, output->expression_storage.size);
     kan_dynamic_array_set_capacity (&output->expression_lists_storage, output->expression_lists_storage.size);
-    kan_dynamic_array_set_capacity (&output->meta_lists_storage, output->meta_lists_storage.size);
+    kan_dynamic_array_set_capacity (&output->string_lists_storage, output->string_lists_storage.size);
     return result;
 }
 

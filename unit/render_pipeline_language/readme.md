@@ -56,10 +56,13 @@ Currently, it is in early prototype stage.
 Options are used to specify how different pipelines variants can be configured in more precise and strict way than it
 is usually done through macros.
 
-Currently, there are 2 types of option data:
+Currently, there are 5 types of option data:
 
 - `flag` options are used for on/off type of data, like whether some feature is enabled.
-- `count` options are used for unsigned positive numbers, like maximum size of joint matrices array.
+- `uint` options are used for unsigned positive numbers, like maximum size of joint matrices array.
+- `sint` options are used for signed numbers.
+- `float` options are used for floating point numbers.
+- `enum` options are used to declare enumeration of option values for user to choose from.
 
 Also, there are 2 classes of options:
 
@@ -73,17 +76,32 @@ particular, as we'd like to ensure that all material pipelines for any pass have
 pass set input. It can be ensured through setting `global` options for the whole material only and using only
 `instance` options for customizing the pass pipelines.
 
-Options are declared in global scope and follow the pattern: `global|instance flag|count <option_name> <option_value>`
-with `on|off` for `flag` option values and unsigned decimal literals for `count` option value. Below are the examples
-of option declarations in global scope:
+`flag`, `uint`, `sint` and `float` options are declared in global scope and follow the pattern
+`option_class <option_name>: option_type <option_value>;` with `on|off` for flag option values. For example:
 
 ```
-global flag enable_skinning on;
-global flag skinning_2_weights on;
-global flag skinning_4_weights off;
-global count max_joints 256;
-global flag support_instancing on;
-instance flag wireframe off;
+global enable_skinning: flag on;
+global max_joints: uint 256;
+instance wireframe: flag off;
+```
+
+`enum` options have a little bit different pattern: 
+`option_class <option_name>: enum default_value_identifier ( other_value_identifier)+;`. Enum value could be any 
+identifier. This identifier will be used only for `==` and `!=` operations with this enum and would not claim this name 
+in variable scope. Declaration example:
+
+```
+global skinning_weights: enum weights_2 weights_4;
+```
+
+Usage example:
+
+```
+conditional (enable_skinning && skinning_weights == weights_2) pack (uint16) u2 joint_indices;
+conditional (enable_skinning && skinning_weights == weights_2) pack (unorm8) f2 joint_weights;
+
+conditional (enable_skinning && skinning_weights == weights_4) pack (uint16) u4 joint_indices;
+conditional (enable_skinning && skinning_weights == weights_4) pack (unorm8) f4 joint_weights;
 ```
 
 ## Conditional prefixes

@@ -38,8 +38,14 @@ struct rpl_compiler_context_option_value_t
     union
     {
         kan_bool_t flag_value;
-        kan_rpl_unsigned_int_literal_t count_value;
+        kan_rpl_unsigned_int_literal_t uint_value;
+        kan_rpl_unsigned_int_literal_t sint_value;
+        kan_rpl_unsigned_int_literal_t float_value;
+        kan_interned_string_t enum_value;
     };
+
+    const struct kan_rpl_intermediate_t *source_module;
+    const struct kan_rpl_option_t *source_option;
 };
 
 struct rpl_compiler_context_t

@@ -482,22 +482,44 @@ RENDER_PIPELINE_LANGUAGE_API kan_bool_t kan_rpl_compiler_context_use_module (
     kan_rpl_compiler_context_t compiler_context, const struct kan_rpl_intermediate_t *intermediate_reference);
 
 /// \brief Attempts to set flag option value.
-/// \details `only_instance_scope` additionally restricts operation to only instanced options, which can be required in
-///          some contexts in order to process option application with due validation.
+/// \details `target_scope` used to restrict operation to specified option scope if needed for validation.
 RENDER_PIPELINE_LANGUAGE_API kan_bool_t
 kan_rpl_compiler_context_set_option_flag (kan_rpl_compiler_context_t compiler_context,
                                           enum kan_rpl_option_target_scope_t target_scope,
                                           kan_interned_string_t name,
                                           kan_bool_t value);
 
-/// \brief Attempts to set count option value.
-/// \details `only_instance_scope` additionally restricts operation to only instanced options, which can be required in
-///          some contexts in order to process option application with due validation.
+/// \brief Attempts to set uint option value.
+/// \details `target_scope` used to restrict operation to specified option scope if needed for validation.
 RENDER_PIPELINE_LANGUAGE_API kan_bool_t
-kan_rpl_compiler_context_set_option_count (kan_rpl_compiler_context_t compiler_context,
+kan_rpl_compiler_context_set_option_uint (kan_rpl_compiler_context_t compiler_context,
+                                          enum kan_rpl_option_target_scope_t target_scope,
+                                          kan_interned_string_t name,
+                                          kan_rpl_unsigned_int_literal_t value);
+
+/// \brief Attempts to set sint option value.
+/// \details `target_scope` used to restrict operation to specified option scope if needed for validation.
+RENDER_PIPELINE_LANGUAGE_API kan_bool_t
+kan_rpl_compiler_context_set_option_sint (kan_rpl_compiler_context_t compiler_context,
+                                          enum kan_rpl_option_target_scope_t target_scope,
+                                          kan_interned_string_t name,
+                                          kan_rpl_signed_int_literal_t value);
+
+/// \brief Attempts to set float option value.
+/// \details `target_scope` used to restrict operation to specified option scope if needed for validation.
+RENDER_PIPELINE_LANGUAGE_API kan_bool_t
+kan_rpl_compiler_context_set_option_float (kan_rpl_compiler_context_t compiler_context,
                                            enum kan_rpl_option_target_scope_t target_scope,
                                            kan_interned_string_t name,
-                                           kan_rpl_unsigned_int_literal_t value);
+                                           kan_rpl_floating_t value);
+
+/// \brief Attempts to set float option value.
+/// \details `target_scope` used to restrict operation to specified option scope if needed for validation.
+RENDER_PIPELINE_LANGUAGE_API kan_bool_t
+kan_rpl_compiler_context_set_option_enum (kan_rpl_compiler_context_t compiler_context,
+                                          enum kan_rpl_option_target_scope_t target_scope,
+                                          kan_interned_string_t name,
+                                          kan_interned_string_t value);
 
 /// \brief Resolves context with given entry points to provide data for emit step.
 /// \details One context can be used for multiple resolves as resolves do not modify the context.

@@ -1,11 +1,10 @@
 // Generic pipeline with lots of options and conditionals to be processed.
 
-global flag enable_skinning on;
-global flag skinning_2_weights on;
-global flag skinning_4_weights off;
-global flag support_instancing on;
+global enable_skinning: flag on;
+global skinning_weights: enum weights_2 weights_4;
+global support_instancing: flag on;
 
-instance flag wireframe off;
+instance wireframe: flag off;
 
 conditional (!wireframe) setting polygon_mode "fill";
 conditional (wireframe) setting polygon_mode "wireframe";
@@ -29,11 +28,11 @@ vertex_attribute_container vertex
     pack (snorm16) f3 normal;
     pack (float16) f2 uv;
 
-    conditional (enable_skinning && skinning_2_weights) pack (uint16) u2 joint_indices;
-    conditional (enable_skinning && skinning_2_weights) pack (unorm8) f2 joint_weights;
+    conditional (enable_skinning && skinning_weights == weights_2) pack (uint16) u2 joint_indices;
+    conditional (enable_skinning && skinning_weights == weights_2) pack (unorm8) f2 joint_weights;
 
-    conditional (enable_skinning && skinning_4_weights) pack (uint16) u4 joint_indices;
-    conditional (enable_skinning && skinning_4_weights) pack (unorm8) f4 joint_weights;
+    conditional (enable_skinning && skinning_weights == weights_4) pack (uint16) u4 joint_indices;
+    conditional (enable_skinning && skinning_weights == weights_4) pack (unorm8) f4 joint_weights;
 };
 
 conditional (support_instancing) instanced_attribute_container instance_vertex
@@ -94,14 +93,14 @@ void vertex_main (void)
         conditional (!support_instancing) alias (transforms, object.joint_transforms)
         f4x4 global_joint_transform;
 
-        conditional (skinning_2_weights)
+        conditional (skinning_weights == weights_2)
         {
             global_joint_transform =
                 transforms[instance_vertex.joint_offset + vertex.joint_indices.x] * vertex.joint_weights.x +
                 transforms[instance_vertex.joint_offset + vertex.joint_indices.y] * vertex.joint_weights.y;
         }
 
-        conditional (skinning_4_weights)
+        conditional (skinning_weights == weights_4)
         {
             global_joint_transform =
                 transforms[instance_vertex.joint_offset + vertex.joint_indices.x] * vertex.joint_weights.x +

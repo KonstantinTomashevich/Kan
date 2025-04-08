@@ -49,11 +49,32 @@ struct kan_resource_rpl_flag_option_t
     kan_bool_t value;
 };
 
-/// \brief Describes count option and its value for pipeline setup.
-struct kan_resource_rpl_count_option_t
+/// \brief Describes uint option and its value for pipeline setup.
+struct kan_resource_rpl_uint_option_t
 {
     kan_interned_string_t name;
     kan_rpl_unsigned_int_literal_t value;
+};
+
+/// \brief Describes sint option and its value for pipeline setup.
+struct kan_resource_rpl_sint_option_t
+{
+    kan_interned_string_t name;
+    kan_rpl_signed_int_literal_t value;
+};
+
+/// \brief Describes float option and its value for pipeline setup.
+struct kan_resource_rpl_float_option_t
+{
+    kan_interned_string_t name;
+    kan_rpl_floating_t value;
+};
+
+/// \brief Describes enum option and its value for pipeline setup.
+struct kan_resource_rpl_enum_option_t
+{
+    kan_interned_string_t name;
+    kan_interned_string_t value;
 };
 
 /// \brief Utility structure with option storages for pipelines: materials or passes.
@@ -62,8 +83,17 @@ struct kan_resource_rpl_options_t
     KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_resource_rpl_flag_option_t)
     struct kan_dynamic_array_t flags;
 
-    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_resource_rpl_count_option_t)
-    struct kan_dynamic_array_t counts;
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_resource_rpl_uint_option_t)
+    struct kan_dynamic_array_t uints;
+
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_resource_rpl_sint_option_t)
+    struct kan_dynamic_array_t sints;
+
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_resource_rpl_float_option_t)
+    struct kan_dynamic_array_t floats;
+
+    KAN_REFLECTION_DYNAMIC_ARRAY_TYPE (struct kan_resource_rpl_enum_option_t)
+    struct kan_dynamic_array_t enums;
 };
 
 RESOURCE_MATERIAL_API void kan_resource_rpl_options_init (struct kan_resource_rpl_options_t *instance);

@@ -542,6 +542,8 @@ kan_bool_t kan_rpl_compiler_context_use_module (kan_rpl_compiler_context_t compi
         option_value->name = new_option->name;
         option_value->scope = new_option->scope;
         option_value->type = new_option->type;
+        option_value->source_module = intermediate_reference;
+        option_value->source_option = new_option;
 
         switch (new_option->type)
         {
@@ -549,8 +551,22 @@ kan_bool_t kan_rpl_compiler_context_use_module (kan_rpl_compiler_context_t compi
             option_value->flag_value = new_option->flag_default_value;
             break;
 
-        case KAN_RPL_OPTION_TYPE_COUNT:
-            option_value->count_value = new_option->count_default_value;
+        case KAN_RPL_OPTION_TYPE_UINT:
+            option_value->uint_value = new_option->uint_default_value;
+            break;
+
+        case KAN_RPL_OPTION_TYPE_SINT:
+            option_value->sint_value = new_option->sint_default_value;
+            break;
+
+        case KAN_RPL_OPTION_TYPE_FLOAT:
+            option_value->float_value = new_option->float_default_value;
+            break;
+
+        case KAN_RPL_OPTION_TYPE_ENUM:
+            option_value->enum_value =
+                ((kan_interned_string_t *)
+                     intermediate_reference->string_lists_storage.data)[new_option->enum_values.list_index];
             break;
         }
     }
@@ -631,10 +647,10 @@ kan_bool_t kan_rpl_compiler_context_set_option_flag (kan_rpl_compiler_context_t 
     return KAN_FALSE;
 }
 
-kan_bool_t kan_rpl_compiler_context_set_option_count (kan_rpl_compiler_context_t compiler_context,
-                                                      enum kan_rpl_option_target_scope_t target_scope,
-                                                      kan_interned_string_t name,
-                                                      kan_rpl_unsigned_int_literal_t value)
+kan_bool_t kan_rpl_compiler_context_set_option_uint (kan_rpl_compiler_context_t compiler_context,
+                                                     enum kan_rpl_option_target_scope_t target_scope,
+                                                     kan_interned_string_t name,
+                                                     kan_rpl_unsigned_int_literal_t value)
 {
     struct rpl_compiler_context_t *instance = KAN_HANDLE_GET (compiler_context);
     for (kan_loop_size_t index = 0u; index < instance->option_values.size; ++index)
@@ -644,9 +660,9 @@ kan_bool_t kan_rpl_compiler_context_set_option_count (kan_rpl_compiler_context_t
 
         if (option->name == name)
         {
-            if (option->type != KAN_RPL_OPTION_TYPE_COUNT)
+            if (option->type != KAN_RPL_OPTION_TYPE_UINT)
             {
-                KAN_LOG (rpl_compiler_context, KAN_LOG_WARNING, "[%s] Option \"%s\" is not a count.",
+                KAN_LOG (rpl_compiler_context, KAN_LOG_WARNING, "[%s] Option \"%s\" is not an uint.",
                          instance->log_name, name)
                 return KAN_FALSE;
             }
@@ -658,13 +674,144 @@ kan_bool_t kan_rpl_compiler_context_set_option_count (kan_rpl_compiler_context_t
                 return KAN_FALSE;
             }
 
-            option->count_value = value;
+            option->uint_value = value;
             return KAN_TRUE;
         }
     }
 
-    KAN_LOG (rpl_compiler_context, KAN_LOG_WARNING, "[%s] Unable to find count option \"%s\".", instance->log_name,
+    KAN_LOG (rpl_compiler_context, KAN_LOG_WARNING, "[%s] Unable to find uint option \"%s\".", instance->log_name, name)
+    return KAN_FALSE;
+}
+
+kan_bool_t kan_rpl_compiler_context_set_option_sint (kan_rpl_compiler_context_t compiler_context,
+                                                     enum kan_rpl_option_target_scope_t target_scope,
+                                                     kan_interned_string_t name,
+                                                     kan_rpl_signed_int_literal_t value)
+{
+    struct rpl_compiler_context_t *instance = KAN_HANDLE_GET (compiler_context);
+    for (kan_loop_size_t index = 0u; index < instance->option_values.size; ++index)
+    {
+        struct rpl_compiler_context_option_value_t *option =
+            &((struct rpl_compiler_context_option_value_t *) instance->option_values.data)[index];
+
+        if (option->name == name)
+        {
+            if (option->type != KAN_RPL_OPTION_TYPE_SINT)
+            {
+                KAN_LOG (rpl_compiler_context, KAN_LOG_WARNING, "[%s] Option \"%s\" is not a sint.", instance->log_name,
+                         name)
+                return KAN_FALSE;
+            }
+
+            if (!match_target_scope (target_scope, option->scope))
+            {
+                KAN_LOG (rpl_compiler_context, KAN_LOG_WARNING, "[%s] Option \"%s\" is not in %s scope.",
+                         instance->log_name, name, get_target_scope_name (target_scope))
+                return KAN_FALSE;
+            }
+
+            option->sint_value = value;
+            return KAN_TRUE;
+        }
+    }
+
+    KAN_LOG (rpl_compiler_context, KAN_LOG_WARNING, "[%s] Unable to find sint option \"%s\".", instance->log_name, name)
+    return KAN_FALSE;
+}
+
+kan_bool_t kan_rpl_compiler_context_set_option_float (kan_rpl_compiler_context_t compiler_context,
+                                                      enum kan_rpl_option_target_scope_t target_scope,
+                                                      kan_interned_string_t name,
+                                                      kan_rpl_floating_t value)
+{
+    struct rpl_compiler_context_t *instance = KAN_HANDLE_GET (compiler_context);
+    for (kan_loop_size_t index = 0u; index < instance->option_values.size; ++index)
+    {
+        struct rpl_compiler_context_option_value_t *option =
+            &((struct rpl_compiler_context_option_value_t *) instance->option_values.data)[index];
+
+        if (option->name == name)
+        {
+            if (option->type != KAN_RPL_OPTION_TYPE_FLOAT)
+            {
+                KAN_LOG (rpl_compiler_context, KAN_LOG_WARNING, "[%s] Option \"%s\" is not a float.",
+                         instance->log_name, name)
+                return KAN_FALSE;
+            }
+
+            if (!match_target_scope (target_scope, option->scope))
+            {
+                KAN_LOG (rpl_compiler_context, KAN_LOG_WARNING, "[%s] Option \"%s\" is not in %s scope.",
+                         instance->log_name, name, get_target_scope_name (target_scope))
+                return KAN_FALSE;
+            }
+
+            option->float_value = value;
+            return KAN_TRUE;
+        }
+    }
+
+    KAN_LOG (rpl_compiler_context, KAN_LOG_WARNING, "[%s] Unable to find float option \"%s\".", instance->log_name,
              name)
+    return KAN_FALSE;
+}
+
+kan_bool_t kan_rpl_compiler_context_set_option_enum (kan_rpl_compiler_context_t compiler_context,
+                                                     enum kan_rpl_option_target_scope_t target_scope,
+                                                     kan_interned_string_t name,
+                                                     kan_interned_string_t value)
+{
+    struct rpl_compiler_context_t *instance = KAN_HANDLE_GET (compiler_context);
+    for (kan_loop_size_t index = 0u; index < instance->option_values.size; ++index)
+    {
+        struct rpl_compiler_context_option_value_t *option =
+            &((struct rpl_compiler_context_option_value_t *) instance->option_values.data)[index];
+
+        if (option->name == name)
+        {
+            if (option->type != KAN_RPL_OPTION_TYPE_ENUM)
+            {
+                KAN_LOG (rpl_compiler_context, KAN_LOG_WARNING, "[%s] Option \"%s\" is not an enum.",
+                         instance->log_name, name)
+                return KAN_FALSE;
+            }
+
+            if (!match_target_scope (target_scope, option->scope))
+            {
+                KAN_LOG (rpl_compiler_context, KAN_LOG_WARNING, "[%s] Option \"%s\" is not in %s scope.",
+                         instance->log_name, name, get_target_scope_name (target_scope))
+                return KAN_FALSE;
+            }
+
+            const kan_interned_string_t *first_value =
+                &((kan_interned_string_t *)
+                      option->source_module->string_lists_storage.data)[option->source_option->enum_values.list_index];
+            const kan_interned_string_t *last_value = first_value + option->source_option->enum_values.list_size;
+            const kan_interned_string_t *search_value = first_value;
+
+            while (search_value != last_value)
+            {
+                if (*search_value == value)
+                {
+                    break;
+                }
+
+                ++search_value;
+            }
+
+            if (search_value == last_value)
+            {
+                KAN_LOG (rpl_compiler_context, KAN_LOG_WARNING,
+                         "[%s] Option \"%s\" enum has no requested value \"%s\".", instance->log_name, name, value)
+                return KAN_FALSE;
+            }
+
+            option->enum_value = value;
+            return KAN_TRUE;
+        }
+    }
+
+    KAN_LOG (rpl_compiler_context, KAN_LOG_WARNING, "[%s] Unable to find uint option \"%s\".", instance->log_name, name)
     return KAN_FALSE;
 }
 

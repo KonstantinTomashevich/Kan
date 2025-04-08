@@ -108,12 +108,21 @@ void kan_resource_rpl_options_init (struct kan_resource_rpl_options_t *instance)
 {
     kan_dynamic_array_init (&instance->flags, 0u, sizeof (struct kan_resource_rpl_flag_option_t),
                             _Alignof (struct kan_resource_rpl_flag_option_t), kan_allocation_group_stack_get ());
-    kan_dynamic_array_init (&instance->counts, 0u, sizeof (struct kan_resource_rpl_count_option_t),
-                            _Alignof (struct kan_resource_rpl_count_option_t), kan_allocation_group_stack_get ());
+    kan_dynamic_array_init (&instance->uints, 0u, sizeof (struct kan_resource_rpl_uint_option_t),
+                            _Alignof (struct kan_resource_rpl_uint_option_t), kan_allocation_group_stack_get ());
+    kan_dynamic_array_init (&instance->sints, 0u, sizeof (struct kan_resource_rpl_sint_option_t),
+                            _Alignof (struct kan_resource_rpl_sint_option_t), kan_allocation_group_stack_get ());
+    kan_dynamic_array_init (&instance->floats, 0u, sizeof (struct kan_resource_rpl_float_option_t),
+                            _Alignof (struct kan_resource_rpl_float_option_t), kan_allocation_group_stack_get ());
+    kan_dynamic_array_init (&instance->enums, 0u, sizeof (struct kan_resource_rpl_enum_option_t),
+                            _Alignof (struct kan_resource_rpl_enum_option_t), kan_allocation_group_stack_get ());
 }
 
 void kan_resource_rpl_options_shutdown (struct kan_resource_rpl_options_t *instance)
 {
     kan_dynamic_array_shutdown (&instance->flags);
-    kan_dynamic_array_shutdown (&instance->counts);
+    kan_dynamic_array_shutdown (&instance->uints);
+    kan_dynamic_array_shutdown (&instance->sints);
+    kan_dynamic_array_shutdown (&instance->floats);
+    kan_dynamic_array_shutdown (&instance->enums);
 }
