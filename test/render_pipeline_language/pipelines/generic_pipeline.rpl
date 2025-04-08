@@ -1,7 +1,7 @@
 // Generic pipeline with lots of options and conditionals to be processed.
 
 global enable_skinning: flag on;
-global skinning_weights: enum weights_2 weights_4;
+global skinning_weights: enum "2" "4";
 global support_instancing: flag on;
 
 instance wireframe: flag off;
@@ -28,11 +28,11 @@ vertex_attribute_container vertex
     pack (snorm16) f3 normal;
     pack (float16) f2 uv;
 
-    conditional (enable_skinning && skinning_weights == weights_2) pack (uint16) u2 joint_indices;
-    conditional (enable_skinning && skinning_weights == weights_2) pack (unorm8) f2 joint_weights;
+    conditional (enable_skinning && skinning_weights == "2") pack (uint16) u2 joint_indices;
+    conditional (enable_skinning && skinning_weights == "2") pack (unorm8) f2 joint_weights;
 
-    conditional (enable_skinning && skinning_weights == weights_4) pack (uint16) u4 joint_indices;
-    conditional (enable_skinning && skinning_weights == weights_4) pack (unorm8) f4 joint_weights;
+    conditional (enable_skinning && skinning_weights == "4") pack (uint16) u4 joint_indices;
+    conditional (enable_skinning && skinning_weights == "4") pack (unorm8) f4 joint_weights;
 };
 
 conditional (support_instancing) instanced_attribute_container instance_vertex
@@ -93,14 +93,14 @@ void vertex_main (void)
         conditional (!support_instancing) alias (transforms, object.joint_transforms)
         f4x4 global_joint_transform;
 
-        conditional (skinning_weights == weights_2)
+        conditional (skinning_weights == "2")
         {
             global_joint_transform =
                 transforms[instance_vertex.joint_offset + vertex.joint_indices.x] * vertex.joint_weights.x +
                 transforms[instance_vertex.joint_offset + vertex.joint_indices.y] * vertex.joint_weights.y;
         }
 
-        conditional (skinning_weights == weights_4)
+        conditional (skinning_weights == "4")
         {
             global_joint_transform =
                 transforms[instance_vertex.joint_offset + vertex.joint_indices.x] * vertex.joint_weights.x +

@@ -15,7 +15,7 @@ enum compile_time_evaluation_value_type_t
     CONDITIONAL_EVALUATION_VALUE_TYPE_UINT,
     CONDITIONAL_EVALUATION_VALUE_TYPE_SINT,
     CONDITIONAL_EVALUATION_VALUE_TYPE_FLOAT,
-    CONDITIONAL_EVALUATION_VALUE_TYPE_ENUM,
+    CONDITIONAL_EVALUATION_VALUE_TYPE_STRING,
 };
 
 struct compile_time_evaluation_value_t
@@ -27,7 +27,7 @@ struct compile_time_evaluation_value_t
         kan_rpl_unsigned_int_literal_t uint_value;
         kan_rpl_signed_int_literal_t sint_value;
         float float_value;
-        kan_interned_string_t enum_value;
+        kan_interned_string_t string_value;
     };
 };
 
@@ -130,8 +130,8 @@ static struct compile_time_evaluation_value_t evaluate_compile_time_expression (
                         break;
 
                     case KAN_RPL_OPTION_TYPE_ENUM:
-                        result.type = CONDITIONAL_EVALUATION_VALUE_TYPE_ENUM;
-                        result.enum_value = option->enum_value;
+                        result.type = CONDITIONAL_EVALUATION_VALUE_TYPE_STRING;
+                        result.string_value = option->enum_value;
                         break;
                     }
                 }
@@ -167,6 +167,11 @@ static struct compile_time_evaluation_value_t evaluate_compile_time_expression (
         result.sint_value = expression->signed_literal;
         break;
 
+    case KAN_RPL_EXPRESSION_NODE_TYPE_STRING_LITERAL:
+        result.type = CONDITIONAL_EVALUATION_VALUE_TYPE_STRING;
+        result.string_value = expression->string_literal;
+        break;
+
     case KAN_RPL_EXPRESSION_NODE_TYPE_BINARY_OPERATION:
     {
         struct kan_rpl_expression_t *left_expression =
@@ -179,22 +184,6 @@ static struct compile_time_evaluation_value_t evaluate_compile_time_expression (
 
         struct compile_time_evaluation_value_t left_operand =
             evaluate_compile_time_expression (instance, intermediate, left_expression, instance_options_allowed);
-
-        if (left_operand.type == CONDITIONAL_EVALUATION_VALUE_TYPE_ENUM &&
-            right_expression->type == KAN_RPL_EXPRESSION_NODE_TYPE_IDENTIFIER)
-        {
-            result.type = CONDITIONAL_EVALUATION_VALUE_TYPE_BOOLEAN;
-            if  (expression->binary_operation.operation == KAN_RPL_BINARY_OPERATION_EQUAL)
-            {
-                result.boolean_value = left_operand.enum_value == right_expression->identifier;
-                break;
-            }
-            else if (expression->binary_operation.operation == KAN_RPL_BINARY_OPERATION_NOT_EQUAL)
-            {
-                result.boolean_value = left_operand.enum_value != right_expression->identifier;
-                break;
-            }
-        }
 
         struct compile_time_evaluation_value_t right_operand =
             evaluate_compile_time_expression (instance, intermediate, right_expression, instance_options_allowed);
@@ -214,7 +203,7 @@ static struct compile_time_evaluation_value_t evaluate_compile_time_expression (
         {                                                                                                              \
         case CONDITIONAL_EVALUATION_VALUE_TYPE_ERROR:                                                                  \
         case CONDITIONAL_EVALUATION_VALUE_TYPE_BOOLEAN:                                                                \
-        case CONDITIONAL_EVALUATION_VALUE_TYPE_ENUM:                                                                   \
+        case CONDITIONAL_EVALUATION_VALUE_TYPE_STRING:                                                                 \
             KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,                                                              \
                      "[%s:%s:%s:%ld] Operator \"%s\" has non-numeric operand types.", instance->log_name,              \
                      intermediate->log_name, expression->source_name, (long) expression->source_line, #OPERATOR)       \
@@ -247,7 +236,7 @@ static struct compile_time_evaluation_value_t evaluate_compile_time_expression (
 #define EVALUATE_EQUALITY_OPERATION(OPERATOR)                                                                          \
     if (left_operand.type == right_operand.type)                                                                       \
     {                                                                                                                  \
-        result.type = left_operand.type;                                                                               \
+        result.type = CONDITIONAL_EVALUATION_VALUE_TYPE_BOOLEAN;                                                       \
         switch (left_operand.type)                                                                                     \
         {                                                                                                              \
         case CONDITIONAL_EVALUATION_VALUE_TYPE_ERROR:                                                                  \
@@ -256,23 +245,23 @@ static struct compile_time_evaluation_value_t evaluate_compile_time_expression (
             break;                                                                                                     \
                                                                                                                        \
         case CONDITIONAL_EVALUATION_VALUE_TYPE_BOOLEAN:                                                                \
-            result.uint_value = left_operand.boolean_value OPERATOR right_operand.boolean_value;                       \
+            result.boolean_value = left_operand.boolean_value OPERATOR right_operand.boolean_value;                    \
             break;                                                                                                     \
                                                                                                                        \
         case CONDITIONAL_EVALUATION_VALUE_TYPE_UINT:                                                                   \
-            result.uint_value = left_operand.uint_value OPERATOR right_operand.uint_value;                             \
+            result.boolean_value = left_operand.uint_value OPERATOR right_operand.uint_value;                          \
             break;                                                                                                     \
                                                                                                                        \
         case CONDITIONAL_EVALUATION_VALUE_TYPE_SINT:                                                                   \
-            result.sint_value = left_operand.sint_value OPERATOR right_operand.sint_value;                             \
+            result.boolean_value = left_operand.sint_value OPERATOR right_operand.sint_value;                          \
             break;                                                                                                     \
                                                                                                                        \
         case CONDITIONAL_EVALUATION_VALUE_TYPE_FLOAT:                                                                  \
-            result.uint_value = left_operand.float_value OPERATOR right_operand.float_value;                           \
+            result.boolean_value = left_operand.float_value OPERATOR right_operand.float_value;                        \
             break;                                                                                                     \
                                                                                                                        \
-        case CONDITIONAL_EVALUATION_VALUE_TYPE_ENUM:                                                                   \
-            result.uint_value = left_operand.enum_value OPERATOR right_operand.enum_value;                             \
+        case CONDITIONAL_EVALUATION_VALUE_TYPE_STRING:                                                                 \
+            result.boolean_value = left_operand.string_value OPERATOR right_operand.string_value;                      \
             break;                                                                                                     \
         }                                                                                                              \
     }                                                                                                                  \
@@ -294,7 +283,7 @@ static struct compile_time_evaluation_value_t evaluate_compile_time_expression (
         {                                                                                                              \
         case CONDITIONAL_EVALUATION_VALUE_TYPE_ERROR:                                                                  \
         case CONDITIONAL_EVALUATION_VALUE_TYPE_BOOLEAN:                                                                \
-        case CONDITIONAL_EVALUATION_VALUE_TYPE_ENUM:                                                                   \
+        case CONDITIONAL_EVALUATION_VALUE_TYPE_STRING:                                                                 \
             KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,                                                              \
                      "[%s:%s:%s:%ld] Operator \"%s\" has non-numeric operand types.", instance->log_name,              \
                      intermediate->log_name, expression->source_name, (long) expression->source_line, #OPERATOR)       \
@@ -381,7 +370,7 @@ static struct compile_time_evaluation_value_t evaluate_compile_time_expression (
                 {
                 case CONDITIONAL_EVALUATION_VALUE_TYPE_ERROR:
                 case CONDITIONAL_EVALUATION_VALUE_TYPE_BOOLEAN:
-                case CONDITIONAL_EVALUATION_VALUE_TYPE_ENUM:
+                case CONDITIONAL_EVALUATION_VALUE_TYPE_STRING:
                     KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
                              "[%s:%s:%s:%ld] Operator \"%%\" has non-numeric operand types.", instance->log_name,
                              intermediate->log_name, expression->source_name, (long) expression->source_line)
@@ -530,7 +519,7 @@ static struct compile_time_evaluation_value_t evaluate_compile_time_expression (
 
             case CONDITIONAL_EVALUATION_VALUE_TYPE_BOOLEAN:
             case CONDITIONAL_EVALUATION_VALUE_TYPE_UINT:
-            case CONDITIONAL_EVALUATION_VALUE_TYPE_ENUM:
+            case CONDITIONAL_EVALUATION_VALUE_TYPE_STRING:
                 KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
                          "[%s:%s:%s:%ld] Operator \"-\" has unsupported operand type.", instance->log_name,
                          instance->log_name, expression->source_name, (long) expression->source_line)
@@ -562,7 +551,7 @@ static struct compile_time_evaluation_value_t evaluate_compile_time_expression (
             case CONDITIONAL_EVALUATION_VALUE_TYPE_UINT:
             case CONDITIONAL_EVALUATION_VALUE_TYPE_SINT:
             case CONDITIONAL_EVALUATION_VALUE_TYPE_FLOAT:
-            case CONDITIONAL_EVALUATION_VALUE_TYPE_ENUM:
+            case CONDITIONAL_EVALUATION_VALUE_TYPE_STRING:
                 KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
                          "[%s:%s:%s:%ld] Operator \"!\" can only be applied to boolean value.", instance->log_name,
                          instance->log_name, expression->source_name, (long) expression->source_line)
@@ -586,7 +575,7 @@ static struct compile_time_evaluation_value_t evaluate_compile_time_expression (
             case CONDITIONAL_EVALUATION_VALUE_TYPE_BOOLEAN:
             case CONDITIONAL_EVALUATION_VALUE_TYPE_SINT:
             case CONDITIONAL_EVALUATION_VALUE_TYPE_FLOAT:
-            case CONDITIONAL_EVALUATION_VALUE_TYPE_ENUM:
+            case CONDITIONAL_EVALUATION_VALUE_TYPE_STRING:
                 KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
                          "[%s:%s:%s:%ld] Operator \"~\" can only be applied to uint value.", instance->log_name,
                          instance->log_name, expression->source_name, (long) expression->source_line)
@@ -672,9 +661,9 @@ static struct compile_time_evaluation_value_t evaluate_compile_time_expression (
                 result.uint_value = (kan_rpl_unsigned_int_literal_t) argument_operand.float_value;
                 break;
 
-            case CONDITIONAL_EVALUATION_VALUE_TYPE_ENUM:
+            case CONDITIONAL_EVALUATION_VALUE_TYPE_STRING:
                 KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
-                         "[%s:%s:%s:%ld] Unable to convert compile time enum value to unsigned integer.",
+                         "[%s:%s:%s:%ld] Unable to convert compile time string value to unsigned integer.",
                          instance->log_name, instance->log_name, expression->source_name,
                          (long) expression->source_line)
                 result.type = CONDITIONAL_EVALUATION_VALUE_TYPE_ERROR;
@@ -706,9 +695,9 @@ static struct compile_time_evaluation_value_t evaluate_compile_time_expression (
                 result.sint_value = (kan_rpl_signed_int_literal_t) argument_operand.float_value;
                 break;
 
-            case CONDITIONAL_EVALUATION_VALUE_TYPE_ENUM:
+            case CONDITIONAL_EVALUATION_VALUE_TYPE_STRING:
                 KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
-                         "[%s:%s:%s:%ld] Unable to convert compile time enum value to signed integer.",
+                         "[%s:%s:%s:%ld] Unable to convert compile time string value to signed integer.",
                          instance->log_name, instance->log_name, expression->source_name,
                          (long) expression->source_line)
                 result.type = CONDITIONAL_EVALUATION_VALUE_TYPE_ERROR;
@@ -740,9 +729,9 @@ static struct compile_time_evaluation_value_t evaluate_compile_time_expression (
                 result.float_value = argument_operand.float_value;
                 break;
 
-            case CONDITIONAL_EVALUATION_VALUE_TYPE_ENUM:
+            case CONDITIONAL_EVALUATION_VALUE_TYPE_STRING:
                 KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
-                         "[%s:%s:%s:%ld] Unable to convert compile time enum value to floating value.",
+                         "[%s:%s:%s:%ld] Unable to convert compile time string value to floating value.",
                          instance->log_name, instance->log_name, expression->source_name,
                          (long) expression->source_line)
                 result.type = CONDITIONAL_EVALUATION_VALUE_TYPE_ERROR;
@@ -812,8 +801,8 @@ static enum conditional_evaluation_result_t evaluate_conditional (struct rpl_com
                  intermediate->log_name, expression->source_name, (long) expression->source_line)
         return CONDITIONAL_EVALUATION_RESULT_FAILED;
 
-    case CONDITIONAL_EVALUATION_VALUE_TYPE_ENUM:
-        KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR, "[%s:%s:%s:%ld] Conditional evaluation resulted in enum value.",
+    case CONDITIONAL_EVALUATION_VALUE_TYPE_STRING:
+        KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR, "[%s:%s:%s:%ld] Conditional evaluation resulted in string value.",
                  instance->log_name, intermediate->log_name, expression->source_name, (long) expression->source_line)
         return CONDITIONAL_EVALUATION_RESULT_FAILED;
     }
@@ -917,7 +906,7 @@ static inline kan_bool_t resolve_array_dimension_value (struct rpl_compiler_cont
 
     case CONDITIONAL_EVALUATION_VALUE_TYPE_BOOLEAN:
     case CONDITIONAL_EVALUATION_VALUE_TYPE_FLOAT:
-    case CONDITIONAL_EVALUATION_VALUE_TYPE_ENUM:
+    case CONDITIONAL_EVALUATION_VALUE_TYPE_STRING:
         KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
                  "[%s:%s:%s:%ld] Declaration array size at dimension %ld calculation resulted in non-integer value.",
                  context->log_name, intermediate->log_name, expression->source_name, (long) expression->source_line,
@@ -4602,6 +4591,14 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
         new_expression->output.vector_data =
             &STATICS.vector_types[INBUILT_VECTOR_TYPE_INDEX (INBUILT_TYPE_ITEM_SIGNED, 1u)];
         return KAN_TRUE;
+
+    case KAN_RPL_EXPRESSION_NODE_TYPE_STRING_LITERAL:
+        KAN_LOG (
+            rpl_compiler_context, KAN_LOG_ERROR,
+            "[%s:%s:%s:%ld] Encountered string literal in runtime context. Strings are only supported in compile time.",
+            context->log_name, resolve_scope->function->module_name, expression->source_name,
+            (long) expression->source_line)
+        return KAN_FALSE;
 
     case KAN_RPL_EXPRESSION_NODE_TYPE_VARIABLE_DECLARATION:
     {

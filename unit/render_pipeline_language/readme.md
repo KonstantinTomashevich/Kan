@@ -86,23 +86,25 @@ instance wireframe: flag off;
 ```
 
 `enum` options have a little bit different pattern: 
-`option_class <option_name>: enum default_value_identifier ( other_value_identifier)+;`. Enum value could be any 
-identifier. This identifier will be used only for `==` and `!=` operations with this enum and would not claim this name 
-in variable scope. Declaration example:
+`option_class <option_name>: enum default_value_string ( other_value_string)+;`. Enum value could be any string.
+Declaration example:
 
 ```
-global skinning_weights: enum weights_2 weights_4;
+global skinning_weights: enum "2" "4";
 ```
 
 Usage example:
 
 ```
-conditional (enable_skinning && skinning_weights == weights_2) pack (uint16) u2 joint_indices;
-conditional (enable_skinning && skinning_weights == weights_2) pack (unorm8) f2 joint_weights;
+conditional (enable_skinning && skinning_weights == "2") pack (uint16) u2 joint_indices;
+conditional (enable_skinning && skinning_weights == "2") pack (unorm8) f2 joint_weights;
 
-conditional (enable_skinning && skinning_weights == weights_4) pack (uint16) u4 joint_indices;
-conditional (enable_skinning && skinning_weights == weights_4) pack (unorm8) f4 joint_weights;
+conditional (enable_skinning && skinning_weights == "4") pack (uint16) u4 joint_indices;
+conditional (enable_skinning && skinning_weights == "4") pack (unorm8) f4 joint_weights;
 ```
+
+The main goal of enum options is to restrict the set of possible values that can be passed during compilation to a
+subset of string literals.
 
 ## Conditional prefixes
 

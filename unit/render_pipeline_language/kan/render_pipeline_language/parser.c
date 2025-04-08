@@ -116,11 +116,13 @@ struct parser_expression_tree_node_t
     {
         kan_interned_string_t identifier;
 
-        kan_rpl_unsigned_int_literal_t signed_literal;
+        kan_rpl_unsigned_int_literal_t unsigned_literal;
 
-        kan_rpl_signed_int_literal_t unsigned_literal;
+        kan_rpl_signed_int_literal_t signed_literal;
 
         float floating_literal;
+
+        kan_interned_string_t string_literal;
 
         struct parser_declaration_data_t variable_declaration;
 
@@ -470,12 +472,16 @@ static inline struct parser_expression_tree_node_t *parser_expression_tree_node_
         node->floating_literal = 0.0;
         break;
 
+    case KAN_RPL_EXPRESSION_NODE_TYPE_UNSIGNED_LITERAL:
+        node->unsigned_literal = 0u;
+        break;
+
     case KAN_RPL_EXPRESSION_NODE_TYPE_SIGNED_LITERAL:
         node->signed_literal = 0;
         break;
 
-    case KAN_RPL_EXPRESSION_NODE_TYPE_UNSIGNED_LITERAL:
-        node->unsigned_literal = 0u;
+    case KAN_RPL_EXPRESSION_NODE_TYPE_STRING_LITERAL:
+        node->string_literal = NULL;
         break;
 
     case KAN_RPL_EXPRESSION_NODE_TYPE_VARIABLE_DECLARATION:
@@ -1568,8 +1574,8 @@ static inline kan_bool_t parse_main_option_enum_values (struct rpl_parser_t *par
     while (KAN_TRUE)
     {
         state->token = state->cursor;
-        const char *identifier_begin;
-        const char *identifier_end;
+        const char *literal_begin;
+        const char *literal_end;
 
         /*!re2c
          ";"
@@ -1586,9 +1592,9 @@ static inline kan_bool_t parse_main_option_enum_values (struct rpl_parser_t *par
              return KAN_TRUE;
          }
 
-         @identifier_begin identifier @identifier_end
+         "\"" @literal_begin ((. \ [\x22]) | "\\\"")* @literal_end "\""
          {
-             kan_interned_string_t value_name = kan_char_sequence_intern (identifier_begin, identifier_end);
+             kan_interned_string_t value_name = kan_char_sequence_intern (literal_begin, literal_end);
              struct parser_option_enum_value_t *node_to_check = node->first_enum_value;
 
              while (node_to_check)
@@ -1906,6 +1912,29 @@ static kan_bool_t parse_expression_signed_literal (struct rpl_parser_t *parser,
         node->signed_literal = -node->signed_literal;
     }
 
+    expression_parse_state->expecting_operand = KAN_FALSE;
+    return KAN_TRUE;
+}
+
+static kan_bool_t parse_expression_string_literal (struct rpl_parser_t *parser,
+                                                   struct dynamic_parser_state_t *state,
+                                                   struct expression_parse_state_t *expression_parse_state,
+                                                   const char *literal_begin,
+                                                   const char *literal_end)
+{
+    if (!expression_parse_state->expecting_operand)
+    {
+        KAN_LOG (rpl_parser, KAN_LOG_ERROR, "[%s:%s] [%ld:%ld]: Encountered string literal while expecting operation.",
+                 parser->log_name, state->source_log_name, (long) state->cursor_line, (long) state->cursor_symbol)
+        return KAN_FALSE;
+    }
+
+    struct parser_expression_tree_node_t *node = expression_parse_state->current_node;
+    KAN_ASSERT (node && node->type == KAN_RPL_EXPRESSION_NODE_TYPE_NOPE)
+    node->type = KAN_RPL_EXPRESSION_NODE_TYPE_STRING_LITERAL;
+    node->source_log_name = state->source_log_name;
+    node->source_line = state->cursor_line;
+    node->string_literal = kan_char_sequence_intern (literal_begin, literal_end);
     expression_parse_state->expecting_operand = KAN_FALSE;
     return KAN_TRUE;
 }
@@ -2338,13 +2367,19 @@ static struct parser_expression_tree_node_t *parse_expression (struct rpl_parser
          @literal_begin [0-9]+"u" @literal_end
          {
              CHECKED (parse_expression_unsigned_literal (parser, state, &expression_parse_state,
-                                                        literal_begin, literal_end))
+                                                         literal_begin, literal_end))
          }
 
          @literal_begin "-"? [0-9]+"s"? @literal_end
          {
              CHECKED (parse_expression_signed_literal (parser, state, &expression_parse_state,
-                                                        literal_begin, literal_end))
+                                                       literal_begin, literal_end))
+         }
+
+         "\"" @literal_begin ((. \ [\x22]) | "\\\"")* @literal_end "\""
+         {
+             CHECKED (parse_expression_string_literal (parser, state, &expression_parse_state,
+                                                       literal_begin, literal_end))
          }
 
          "." separator* @name_begin identifier @name_end
@@ -4359,6 +4394,10 @@ static kan_bool_t build_intermediate_expression (struct rpl_parser_t *instance,
 
     case KAN_RPL_EXPRESSION_NODE_TYPE_SIGNED_LITERAL:
         output->signed_literal = expression->signed_literal;
+        break;
+
+    case KAN_RPL_EXPRESSION_NODE_TYPE_STRING_LITERAL:
+        output->string_literal = expression->string_literal;
         break;
 
     case KAN_RPL_EXPRESSION_NODE_TYPE_VARIABLE_DECLARATION:

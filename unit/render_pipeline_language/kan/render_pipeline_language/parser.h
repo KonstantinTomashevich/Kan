@@ -25,6 +25,8 @@ typedef kan_serialized_offset_t kan_rpl_signed_int_literal_t;
 /// \brief Integer that is used for floating point literals inside RPL.
 typedef kan_serialized_floating_t kan_rpl_floating_t;
 
+// TODO: It would be useful to support binary literals for unsigned integers.
+
 /// \brief Supported option scopes.
 enum kan_rpl_option_scope_t
 {
@@ -124,6 +126,7 @@ enum kan_rpl_expression_type_t
     KAN_RPL_EXPRESSION_NODE_TYPE_FLOATING_LITERAL,
     KAN_RPL_EXPRESSION_NODE_TYPE_UNSIGNED_LITERAL,
     KAN_RPL_EXPRESSION_NODE_TYPE_SIGNED_LITERAL,
+    KAN_RPL_EXPRESSION_NODE_TYPE_STRING_LITERAL,
     KAN_RPL_EXPRESSION_NODE_TYPE_VARIABLE_DECLARATION,
     KAN_RPL_EXPRESSION_NODE_TYPE_BINARY_OPERATION,
     KAN_RPL_EXPRESSION_NODE_TYPE_UNARY_OPERATION,
@@ -252,6 +255,10 @@ struct kan_rpl_expression_t
         kan_rpl_signed_int_literal_t signed_literal;
 
         KAN_REFLECTION_VISIBILITY_CONDITION_FIELD (type)
+        KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (KAN_RPL_EXPRESSION_NODE_TYPE_STRING_LITERAL)
+        kan_interned_string_t string_literal;
+
+        KAN_REFLECTION_VISIBILITY_CONDITION_FIELD (type)
         KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (KAN_RPL_EXPRESSION_NODE_TYPE_VARIABLE_DECLARATION)
         struct kan_rpl_variable_declaration_data_t variable_declaration;
 
@@ -320,6 +327,10 @@ struct kan_rpl_setting_t
 {
     kan_interned_string_t name;
     kan_rpl_size_t block;
+
+    // TODO: It would actually be pretty cool to make it possible to calculate setting values from compile time
+    //  expressions using options. It would make stencil configuration much cleaner.
+
     enum kan_rpl_setting_type_t type;
 
     union
