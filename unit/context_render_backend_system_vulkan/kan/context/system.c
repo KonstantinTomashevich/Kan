@@ -2197,7 +2197,7 @@ static inline void process_surface_blit_requests (struct render_backend_system_t
                             .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
                             .baseMipLevel = 0u,
                             .levelCount = 1u,
-                            .baseArrayLayer = 0u,
+                            .baseArrayLayer = request->image_layer,
                             .layerCount = 1u,
                         },
                 };
@@ -2275,7 +2275,7 @@ static inline void process_surface_blit_requests (struct render_backend_system_t
                     {
                         .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
                         .mipLevel = 0u,
-                        .baseArrayLayer = 0u,
+                        .baseArrayLayer = request->image_layer,
                         .layerCount = 1u,
                     },
                 .srcOffsets =
@@ -2351,7 +2351,7 @@ static inline void process_surface_blit_requests (struct render_backend_system_t
                                 .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
                                 .baseMipLevel = 0u,
                                 .levelCount = 1u,
-                                .baseArrayLayer = 0u,
+                                .baseArrayLayer = request->image_layer,
                                 .layerCount = 1u,
                             },
                     };
