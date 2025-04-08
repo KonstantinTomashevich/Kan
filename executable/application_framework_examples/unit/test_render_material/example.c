@@ -546,7 +546,7 @@ APPLICATION_FRAMEWORK_EXAMPLES_TEST_RENDER_MATERIAL_API void kan_universe_mutato
                             kan_render_pass_instance_add_checkpoint_dependency (
                                 pass, resource_response->usage_begin_checkpoint);
 
-                            kan_render_pass_instance_checkpoint_add_instance_dependancy (
+                            kan_render_pass_instance_checkpoint_add_instance_dependency (
                                 resource_response->usage_end_checkpoint, pass);
 
                             try_render_frame (state, render_context, singleton, scene_pass, pass,

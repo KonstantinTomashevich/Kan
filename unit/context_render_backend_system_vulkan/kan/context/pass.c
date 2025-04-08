@@ -726,7 +726,7 @@ kan_render_pass_instance_checkpoint_t kan_render_pass_instance_checkpoint_create
     return KAN_HANDLE_SET (kan_render_pass_instance_checkpoint_t, checkpoint);
 }
 
-void kan_render_pass_instance_checkpoint_add_instance_dependancy (kan_render_pass_instance_checkpoint_t checkpoint,
+void kan_render_pass_instance_checkpoint_add_instance_dependency (kan_render_pass_instance_checkpoint_t checkpoint,
                                                                   kan_render_pass_instance_t dependency)
 {
     struct render_backend_pass_instance_t *instance = KAN_HANDLE_GET (dependency);
@@ -743,7 +743,7 @@ void kan_render_pass_instance_checkpoint_add_instance_dependancy (kan_render_pas
     kan_atomic_int_unlock (&instance->system->pass_instance_state_management_lock);
 }
 
-void kan_render_pass_instance_checkpoint_add_checkpoint_dependancy (kan_render_pass_instance_checkpoint_t checkpoint,
+void kan_render_pass_instance_checkpoint_add_checkpoint_dependency (kan_render_pass_instance_checkpoint_t checkpoint,
                                                                     kan_render_pass_instance_checkpoint_t dependency)
 {
     struct render_backend_pass_instance_checkpoint_t *dependant_checkpoint = KAN_HANDLE_GET (checkpoint);

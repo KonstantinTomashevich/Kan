@@ -626,12 +626,12 @@ kan_render_pass_instance_checkpoint_create (kan_render_context_t context);
 
 /// \brief Creates dependency between checkpoint and render pass instance.
 /// \details Fully thread safe for both pass instance and checkpoint.
-CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_instance_checkpoint_add_instance_dependancy (
+CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_instance_checkpoint_add_instance_dependency (
     kan_render_pass_instance_checkpoint_t checkpoint, kan_render_pass_instance_t dependency);
 
 /// \brief Creates dependency between render pass instance checkpoints.
 /// \details Fully thread safe for both checkpoints.
-CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_instance_checkpoint_add_checkpoint_dependancy (
+CONTEXT_RENDER_BACKEND_SYSTEM_API void kan_render_pass_instance_checkpoint_add_checkpoint_dependency (
     kan_render_pass_instance_checkpoint_t checkpoint, kan_render_pass_instance_checkpoint_t dependency);
 
 /// \brief Requests given render pass to be destroyed.

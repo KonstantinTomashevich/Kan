@@ -410,7 +410,7 @@ APPLICATION_FRAMEWORK_EXAMPLES_TEST_RENDER_GRAPH_API void kan_universe_mutator_e
                     kan_render_pass_instance_add_checkpoint_dependency (scene_pass_1,
                                                                         scene_pass_1_response->usage_begin_checkpoint);
 
-                    kan_render_pass_instance_checkpoint_add_instance_dependancy (
+                    kan_render_pass_instance_checkpoint_add_instance_dependency (
                         scene_pass_1_response->usage_end_checkpoint, scene_pass_1);
 
                     scene_pass_viewport_bounds.x = 300.0f;
@@ -426,7 +426,7 @@ APPLICATION_FRAMEWORK_EXAMPLES_TEST_RENDER_GRAPH_API void kan_universe_mutator_e
                     kan_render_pass_instance_add_checkpoint_dependency (scene_pass_2,
                                                                         scene_pass_2_response->usage_begin_checkpoint);
 
-                    kan_render_pass_instance_checkpoint_add_instance_dependancy (
+                    kan_render_pass_instance_checkpoint_add_instance_dependency (
                         scene_pass_2_response->usage_end_checkpoint, scene_pass_2);
 
                     struct kan_render_viewport_bounds_t shadow_pass_viewport_bounds = {
@@ -458,7 +458,7 @@ APPLICATION_FRAMEWORK_EXAMPLES_TEST_RENDER_GRAPH_API void kan_universe_mutator_e
                     kan_render_pass_instance_add_checkpoint_dependency (shadow_pass_1,
                                                                         shadow_pass_1_response->usage_begin_checkpoint);
 
-                    kan_render_pass_instance_checkpoint_add_instance_dependancy (
+                    kan_render_pass_instance_checkpoint_add_instance_dependency (
                         shadow_pass_1_response->usage_end_checkpoint, shadow_pass_1);
 
                     kan_render_pass_instance_t shadow_pass_2 = kan_render_pass_instantiate (
@@ -468,7 +468,7 @@ APPLICATION_FRAMEWORK_EXAMPLES_TEST_RENDER_GRAPH_API void kan_universe_mutator_e
                     kan_render_pass_instance_add_checkpoint_dependency (shadow_pass_2,
                                                                         shadow_pass_2_response->usage_begin_checkpoint);
 
-                    kan_render_pass_instance_checkpoint_add_instance_dependancy (
+                    kan_render_pass_instance_checkpoint_add_instance_dependency (
                         shadow_pass_2_response->usage_end_checkpoint, shadow_pass_2);
 
                     kan_render_pass_instance_t shadow_pass_3 = kan_render_pass_instantiate (
@@ -478,7 +478,7 @@ APPLICATION_FRAMEWORK_EXAMPLES_TEST_RENDER_GRAPH_API void kan_universe_mutator_e
                     kan_render_pass_instance_add_checkpoint_dependency (shadow_pass_3,
                                                                         shadow_pass_3_response->usage_begin_checkpoint);
 
-                    kan_render_pass_instance_checkpoint_add_instance_dependancy (
+                    kan_render_pass_instance_checkpoint_add_instance_dependency (
                         shadow_pass_3_response->usage_end_checkpoint, shadow_pass_3);
 
                     if (check_successful)
