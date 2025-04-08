@@ -95,7 +95,7 @@ VkSampler render_backend_resolve_cached_sampler (struct render_backend_system_t 
             .compareEnable = VK_FALSE,
             .compareOp = VK_COMPARE_OP_NEVER,
             .minLod = 0.0f,
-            .maxLod = 0.0f,
+            .maxLod = VK_LOD_CLAMP_NONE,
             .borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE,
             .unnormalizedCoordinates = VK_FALSE,
         };
