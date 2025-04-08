@@ -1360,7 +1360,22 @@ static kan_bool_t resolve_containers (struct rpl_compiler_context_t *context,
         struct kan_rpl_container_t *source_container =
             &((struct kan_rpl_container_t *) intermediate->containers.data)[container_index];
 
-        switch (evaluate_conditional (context, intermediate, source_container->conditional_index, KAN_FALSE))
+        kan_bool_t affects_pipeline_input_interface = KAN_FALSE;
+        switch (source_container->type)
+        {
+        case KAN_RPL_CONTAINER_TYPE_VERTEX_ATTRIBUTE:
+        case KAN_RPL_CONTAINER_TYPE_INSTANCED_ATTRIBUTE:
+            affects_pipeline_input_interface = KAN_TRUE;
+            break;
+
+        case KAN_RPL_CONTAINER_TYPE_STATE:
+        case KAN_RPL_CONTAINER_TYPE_COLOR_OUTPUT:
+            affects_pipeline_input_interface = KAN_FALSE;
+            break;
+        }
+
+        switch (evaluate_conditional (context, intermediate, source_container->conditional_index,
+                                      !affects_pipeline_input_interface))
         {
         case CONDITIONAL_EVALUATION_RESULT_FAILED:
             result = KAN_FALSE;
@@ -1387,22 +1402,8 @@ static kan_bool_t resolve_containers (struct rpl_compiler_context_t *context,
             target_container->type = source_container->type;
             target_container->used = KAN_FALSE;
 
-            kan_bool_t fields_affect_pipeline_input_interface = KAN_FALSE;
-            switch (target_container->type)
-            {
-            case KAN_RPL_CONTAINER_TYPE_VERTEX_ATTRIBUTE:
-            case KAN_RPL_CONTAINER_TYPE_INSTANCED_ATTRIBUTE:
-                fields_affect_pipeline_input_interface = KAN_TRUE;
-                break;
-
-            case KAN_RPL_CONTAINER_TYPE_STATE:
-            case KAN_RPL_CONTAINER_TYPE_COLOR_OUTPUT:
-                fields_affect_pipeline_input_interface = KAN_FALSE;
-                break;
-            }
-
             if (!resolve_container_fields (context, instance, intermediate, &source_container->fields,
-                                           !fields_affect_pipeline_input_interface, &target_container->first_field))
+                                           !affects_pipeline_input_interface, &target_container->first_field))
             {
                 result = KAN_FALSE;
             }
