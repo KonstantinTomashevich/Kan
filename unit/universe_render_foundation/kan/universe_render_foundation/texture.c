@@ -699,7 +699,10 @@ static void raw_texture_load (struct render_foundation_texture_management_execut
     }
 
     kan_render_image_upload_data (new_image, 0u, 0u, raw_data->data.size, raw_data->data.data);
-    kan_render_image_request_mip_generation (new_image, 0u, 0u, (uint8_t) (loaded_texture->mips - 1u));
+    if (loaded_texture->mips > 1u)
+    {
+        kan_render_image_request_mip_generation (new_image, 0u, 0u, (uint8_t) (loaded_texture->mips - 1u));
+    }
 
     KAN_UP_EVENT_INSERT (event, kan_render_texture_updated_event_t)
     {
