@@ -1251,6 +1251,19 @@ static void scan_directory (struct target_t *target, struct kan_file_system_path
     kan_virtual_file_system_directory_iterator_destroy (&iterator);
 }
 
+static inline kan_time_size_t get_file_last_modification_time_ns (const char *path)
+{
+    struct kan_virtual_file_system_entry_status_t status;
+    if (kan_virtual_file_system_query_entry (global.volume, path, &status))
+    {
+        return status.last_modification_time_ns;
+    }
+
+    // If file became absent for whatever reason, it is better to treat it as newly modified and
+    // invalidate things that depend on this file.
+    return KAN_INT_MAX (kan_time_size_t);
+}
+
 static void scan_target_for_resources (kan_functor_user_data_t user_data)
 {
     struct target_t *target = (struct target_t *) user_data;
@@ -1280,7 +1293,9 @@ static void scan_target_for_resources (kan_functor_user_data_t user_data)
     kan_file_system_path_container_append (&path_container, target->name);
     kan_file_system_path_container_add_suffix (&path_container, BYPRODUCT_STATE_FILE_SUFFIX);
 
-    if (kan_virtual_file_system_check_existence (global.volume, path_container.path))
+    if (kan_virtual_file_system_check_existence (global.volume, path_container.path) &&
+        get_file_last_modification_time_ns (path_container.path) >=
+            global.newest_loaded_plugin_last_modification_file_time_ns)
     {
         struct kan_resource_target_byproduct_state_t loaded_byproduct_state;
         kan_resource_target_byproduct_state_init (&loaded_byproduct_state);
@@ -1687,19 +1702,6 @@ static inline void form_compiled_references_cache_item_path (struct native_entry
 {
     form_compiled_references_cache_directory_path (node, output);
     kan_file_system_path_container_append (output, node->name);
-}
-
-static inline kan_time_size_t get_file_last_modification_time_ns (const char *path)
-{
-    struct kan_virtual_file_system_entry_status_t status;
-    if (kan_virtual_file_system_query_entry (global.volume, path, &status))
-    {
-        return status.last_modification_time_ns;
-    }
-
-    // If file became absent for whatever reason, it is better to treat it as newly modified and
-    // invalidate things that depend on this file.
-    return KAN_INT_MAX (kan_time_size_t);
 }
 
 static inline kan_bool_t read_detected_references_cache (struct native_entry_node_t *node,
