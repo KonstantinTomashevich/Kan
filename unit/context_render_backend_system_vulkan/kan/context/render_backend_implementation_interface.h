@@ -1066,6 +1066,40 @@ static inline void transfer_memory_between_groups (vulkan_size_t amount,
 #    define VULKAN_ALLOCATION_CALLBACKS(SYSTEM) NULL
 #endif
 
+static inline VkCompareOp to_vulkan_compare_operation (enum kan_render_compare_operation_t operation)
+{
+    switch (operation)
+    {
+    case KAN_RENDER_COMPARE_OPERATION_NEVER:
+        return VK_COMPARE_OP_NEVER;
+        break;
+
+    case KAN_RENDER_COMPARE_OPERATION_ALWAYS:
+        return VK_COMPARE_OP_ALWAYS;
+
+    case KAN_RENDER_COMPARE_OPERATION_EQUAL:
+        return VK_COMPARE_OP_EQUAL;
+
+    case KAN_RENDER_COMPARE_OPERATION_NOT_EQUAL:
+        return VK_COMPARE_OP_NOT_EQUAL;
+
+    case KAN_RENDER_COMPARE_OPERATION_LESS:
+        return VK_COMPARE_OP_LESS;
+
+    case KAN_RENDER_COMPARE_OPERATION_LESS_OR_EQUAL:
+        return VK_COMPARE_OP_LESS_OR_EQUAL;
+
+    case KAN_RENDER_COMPARE_OPERATION_GREATER:
+        return VK_COMPARE_OP_GREATER;
+
+    case KAN_RENDER_COMPARE_OPERATION_GREATER_OR_EQUAL:
+        return VK_COMPARE_OP_GREATER_OR_EQUAL;
+    }
+
+    KAN_ASSERT (KAN_FALSE)
+    return VK_COMPARE_OP_NEVER;
+}
+
 static inline VkImageLayout get_image_layout_info (const struct render_backend_image_t *image, uint8_t layer)
 {
     if (image->description.layers == 1u)

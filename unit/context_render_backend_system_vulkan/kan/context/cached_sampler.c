@@ -68,7 +68,9 @@ VkSampler render_backend_resolve_cached_sampler (struct render_backend_system_t 
             cached->description.mip_map_mode == sampler->mip_map_mode &&
             cached->description.address_mode_u == sampler->address_mode_u &&
             cached->description.address_mode_v == sampler->address_mode_v &&
-            cached->description.address_mode_w == sampler->address_mode_w)
+            cached->description.address_mode_w == sampler->address_mode_w &&
+            cached->description.depth_compare_enabled == sampler->depth_compare_enabled &&
+            cached->description.depth_compare == sampler->depth_compare)
         {
             break;
         }
@@ -92,8 +94,8 @@ VkSampler render_backend_resolve_cached_sampler (struct render_backend_system_t 
             .mipLodBias = 0.0f,
             .anisotropyEnable = VK_FALSE,
             .maxAnisotropy = 1.0f,
-            .compareEnable = VK_FALSE,
-            .compareOp = VK_COMPARE_OP_NEVER,
+            .compareEnable = sampler->depth_compare_enabled,
+            .compareOp = to_vulkan_compare_operation (sampler->depth_compare),
             .minLod = 0.0f,
             .maxLod = VK_LOD_CLAMP_NONE,
             .borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE,

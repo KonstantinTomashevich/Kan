@@ -1002,6 +1002,8 @@ struct kan_render_sampler_t
     enum kan_render_address_mode_t address_mode_u;
     enum kan_render_address_mode_t address_mode_v;
     enum kan_render_address_mode_t address_mode_w;
+    kan_bool_t depth_compare_enabled;
+    enum kan_render_compare_operation_t depth_compare;
 };
 
 /// \brief Contains information for sampler binding update.
