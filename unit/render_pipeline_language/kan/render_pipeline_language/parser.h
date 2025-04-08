@@ -25,8 +25,6 @@ typedef kan_serialized_offset_t kan_rpl_signed_int_literal_t;
 /// \brief Integer that is used for floating point literals inside RPL.
 typedef kan_serialized_floating_t kan_rpl_floating_t;
 
-// TODO: It would be useful to support binary literals for unsigned integers.
-
 /// \brief Supported option scopes.
 enum kan_rpl_option_scope_t
 {

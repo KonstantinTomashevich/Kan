@@ -892,6 +892,28 @@ static inline kan_rpl_unsigned_int_literal_t parse_unsigned_integer_value (struc
     return value;
 }
 
+static inline kan_rpl_unsigned_int_literal_t parse_binary_unsigned_integer_value (struct rpl_parser_t *parser,
+                                                                                  struct dynamic_parser_state_t *state,
+                                                                                  const char *literal_begin,
+                                                                                  const char *literal_end)
+{
+    kan_rpl_unsigned_int_literal_t value = 0u;
+    for (const char *cursor = literal_begin; cursor < literal_end; ++cursor)
+    {
+        const kan_rpl_unsigned_int_literal_t old_value = value;
+        value = (value << 1u) + (*cursor - '0');
+
+        if (value < old_value)
+        {
+            KAN_LOG (rpl_parser, KAN_LOG_WARNING, "[%s:%s] [%ld:%ld]: Found unsigned int literal which is too big.",
+                     parser->log_name, state->source_log_name, (long) state->cursor_line, (long) state->cursor_symbol)
+            return KAN_INT_MAX (kan_rpl_unsigned_int_literal_t);
+        }
+    }
+
+    return value;
+}
+
 static inline float parse_unsigned_floating_value (struct rpl_parser_t *parser,
                                                    struct dynamic_parser_state_t *state,
                                                    const char *literal_begin,
@@ -1717,6 +1739,13 @@ static inline kan_bool_t parse_main_option_body (struct rpl_parser_t *parser,
              return KAN_TRUE;
          }
 
+         "uint" separator+ "0b" @literal_begin [01]+ @literal_end separator* ";"
+         {
+             node->type = KAN_RPL_OPTION_TYPE_UINT;
+             node->uint_default_value = parse_binary_unsigned_integer_value (parser, state, literal_begin, literal_end);
+             return KAN_TRUE;
+         }
+
          "sint" separator+ @literal_begin "-" [0-9]+ @literal_end "s"? separator* ";"
          {
              node->type = KAN_RPL_OPTION_TYPE_SINT;
@@ -1851,14 +1880,31 @@ static kan_bool_t parse_expression_unsigned_literal (struct rpl_parser_t *parser
     node->type = KAN_RPL_EXPRESSION_NODE_TYPE_UNSIGNED_LITERAL;
     node->source_log_name = state->source_log_name;
     node->source_line = state->cursor_line;
+    node->unsigned_literal = parse_unsigned_integer_value (parser, state, literal_begin, literal_end);
+    expression_parse_state->expecting_operand = KAN_FALSE;
+    return KAN_TRUE;
+}
 
-    if (literal_begin != literal_end && *(literal_end - 1u) == 'u')
+static kan_bool_t parse_expression_binary_unsigned_literal (struct rpl_parser_t *parser,
+                                                            struct dynamic_parser_state_t *state,
+                                                            struct expression_parse_state_t *expression_parse_state,
+                                                            const char *literal_begin,
+                                                            const char *literal_end)
+{
+    if (!expression_parse_state->expecting_operand)
     {
-        // Remove optional suffix.
-        --literal_end;
+        KAN_LOG (rpl_parser, KAN_LOG_ERROR,
+                 "[%s:%s] [%ld:%ld]: Encountered binary unsigned literal while expecting operation.", parser->log_name,
+                 state->source_log_name, (long) state->cursor_line, (long) state->cursor_symbol)
+        return KAN_FALSE;
     }
 
-    node->unsigned_literal = parse_unsigned_integer_value (parser, state, literal_begin, literal_end);
+    struct parser_expression_tree_node_t *node = expression_parse_state->current_node;
+    KAN_ASSERT (node && node->type == KAN_RPL_EXPRESSION_NODE_TYPE_NOPE)
+    node->type = KAN_RPL_EXPRESSION_NODE_TYPE_UNSIGNED_LITERAL;
+    node->source_log_name = state->source_log_name;
+    node->source_line = state->cursor_line;
+    node->unsigned_literal = parse_binary_unsigned_integer_value (parser, state, literal_begin, literal_end);
     expression_parse_state->expecting_operand = KAN_FALSE;
     return KAN_TRUE;
 }
@@ -1886,12 +1932,6 @@ static kan_bool_t parse_expression_signed_literal (struct rpl_parser_t *parser,
     if (is_negative)
     {
         ++literal_begin;
-    }
-
-    if (literal_begin != literal_end && *(literal_end - 1u) == 's')
-    {
-        // Remove optional suffix.
-        --literal_end;
     }
 
     const kan_rpl_unsigned_int_literal_t positive_literal =
@@ -2364,13 +2404,19 @@ static struct parser_expression_tree_node_t *parse_expression (struct rpl_parser
                                                          literal_begin, literal_end))
          }
 
-         @literal_begin [0-9]+"u" @literal_end
+         @literal_begin [0-9]+ @literal_end "u"
          {
              CHECKED (parse_expression_unsigned_literal (parser, state, &expression_parse_state,
                                                          literal_begin, literal_end))
          }
 
-         @literal_begin "-"? [0-9]+"s"? @literal_end
+         "0b" @literal_begin [01]+ @literal_end
+         {
+             CHECKED (parse_expression_binary_unsigned_literal (parser, state, &expression_parse_state,
+                                                                literal_begin, literal_end))
+         }
+
+         @literal_begin "-"? [0-9]+ @literal_end "s"?
          {
              CHECKED (parse_expression_signed_literal (parser, state, &expression_parse_state,
                                                        literal_begin, literal_end))

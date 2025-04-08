@@ -165,7 +165,9 @@ There is list of currently supported inbuilt types:
 - `f3x3`, `f4x4` -- 3x3 and 4x4 column-major matrices of 32-bit floating point scalars.
 
 Keep in mind, that any integer literal without suffix (or with `s` suffix) is treated as `s1` literal. In order to
-create `u1` literal, add `u` suffix. Also, `count` options are always treated as `u1`s.
+create `u1` literal, add `u` suffix. It is also possible to provide numeric literal using binary format, 
+for example `0b11001100`. Binary literals are always treated as `u1` and are supported both in code and for 
+option values.
 
 There are several supported constructor signatures for vectors:
 
