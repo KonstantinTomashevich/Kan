@@ -96,6 +96,9 @@ static void kan_resource_material_pipeline_family_move (void *target_void, void 
     kan_dynamic_array_init_move (&target->sources, &source->sources);
     kan_dynamic_array_init_move (&target->options.flags, &source->options.flags);
     kan_dynamic_array_init_move (&target->options.uints, &source->options.uints);
+    kan_dynamic_array_init_move (&target->options.sints, &source->options.sints);
+    kan_dynamic_array_init_move (&target->options.floats, &source->options.floats);
+    kan_dynamic_array_init_move (&target->options.enums, &source->options.enums);
     target->source_material = source->source_material;
 }
 
@@ -179,6 +182,9 @@ static void kan_resource_material_pipeline_move (void *target_void, void *source
     kan_dynamic_array_init_move (&target->sources, &source->sources);
     kan_dynamic_array_init_move (&target->instance_options.flags, &source->instance_options.flags);
     kan_dynamic_array_init_move (&target->instance_options.uints, &source->instance_options.uints);
+    kan_dynamic_array_init_move (&target->instance_options.sints, &source->instance_options.sints);
+    kan_dynamic_array_init_move (&target->instance_options.floats, &source->instance_options.floats);
+    kan_dynamic_array_init_move (&target->instance_options.enums, &source->instance_options.enums);
     target->source_material = source->source_material;
     target->source_pass = source->source_pass;
     target->source_pass_variant_index = source->source_pass_variant_index;
@@ -240,48 +246,39 @@ static kan_bool_t append_options (struct kan_resource_rpl_options_t *target,
 {
     kan_dynamic_array_set_capacity (&target->flags, target->flags.size + source->flags.size);
     kan_dynamic_array_set_capacity (&target->uints, target->uints.size + source->uints.size);
+    kan_dynamic_array_set_capacity (&target->sints, target->sints.size + source->sints.size);
+    kan_dynamic_array_set_capacity (&target->floats, target->floats.size + source->floats.size);
+    kan_dynamic_array_set_capacity (&target->enums, target->enums.size + source->enums.size);
 
-    for (kan_loop_size_t index = 0u; index < (kan_loop_size_t) source->flags.size; ++index)
-    {
-        const struct kan_resource_rpl_flag_option_t *input =
-            &((struct kan_resource_rpl_flag_option_t *) source->flags.data)[index];
-
-        for (kan_loop_size_t target_index = 0u; target_index < (kan_loop_size_t) target->flags.size; ++target_index)
-        {
-            if (((struct kan_resource_rpl_flag_option_t *) target->flags.data)[target_index].name == input->name)
-            {
-                KAN_LOG (resource_material_compilation, KAN_LOG_ERROR,
-                         "Unable to append flag option \"%s\" as its value is already present.", input->name)
-                return KAN_FALSE;
-            }
-        }
-
-        struct kan_resource_rpl_flag_option_t *output = kan_dynamic_array_add_last (&target->flags);
-        KAN_ASSERT (output)
-        output->name = input->name;
-        output->value = input->value;
+#define APPEND_OPTIONS_OF_TYPE(TYPE)                                                                                   \
+    for (kan_loop_size_t index = 0u; index < (kan_loop_size_t) source->TYPE##s.size; ++index)                          \
+    {                                                                                                                  \
+        const struct kan_resource_rpl_##TYPE##_option_t *input =                                                       \
+            &((struct kan_resource_rpl_##TYPE##_option_t *) source->TYPE##s.data)[index];                                \
+                                                                                                                       \
+        for (kan_loop_size_t target_index = 0u; target_index < (kan_loop_size_t) target->TYPE##s.size; ++target_index) \
+        {                                                                                                              \
+            if (((struct kan_resource_rpl_##TYPE##_option_t *) target->TYPE##s.data)[target_index].name ==             \
+                input->name)                                                                                           \
+            {                                                                                                          \
+                KAN_LOG (resource_material_compilation, KAN_LOG_ERROR,                                                 \
+                         "Unable to append " #TYPE " option \"%s\" as its value is already present.", input->name)     \
+                return KAN_FALSE;                                                                                      \
+            }                                                                                                          \
+        }                                                                                                              \
+                                                                                                                       \
+        struct kan_resource_rpl_##TYPE##_option_t *output = kan_dynamic_array_add_last (&target->TYPE##s);             \
+        KAN_ASSERT (output)                                                                                            \
+        output->name = input->name;                                                                                    \
+        output->value = input->value;                                                                                  \
     }
 
-    for (kan_loop_size_t index = 0u; index < (kan_loop_size_t) source->uints.size; ++index)
-    {
-        const struct kan_resource_rpl_uint_option_t *input =
-            &((struct kan_resource_rpl_uint_option_t *) source->uints.data)[index];
-
-        for (kan_loop_size_t target_index = 0u; target_index < (kan_loop_size_t) target->uints.size; ++target_index)
-        {
-            if (((struct kan_resource_rpl_uint_option_t *) target->uints.data)[target_index].name == input->name)
-            {
-                KAN_LOG (resource_material_compilation, KAN_LOG_ERROR,
-                         "Unable to append count option \"%s\" as its value is already present.", input->name)
-                return KAN_FALSE;
-            }
-        }
-
-        struct kan_resource_rpl_uint_option_t *output = kan_dynamic_array_add_last (&target->uints);
-        KAN_ASSERT (output)
-        output->name = input->name;
-        output->value = input->value;
-    }
+    APPEND_OPTIONS_OF_TYPE (flag)
+    APPEND_OPTIONS_OF_TYPE (uint)
+    APPEND_OPTIONS_OF_TYPE (sint)
+    APPEND_OPTIONS_OF_TYPE (float)
+    APPEND_OPTIONS_OF_TYPE (enum)
+#undef APPEND_OPTIONS_OF_TYPE
 
     return KAN_TRUE;
 }
@@ -319,10 +316,10 @@ static void sort_options (struct kan_resource_rpl_options_t *options)
 #undef AT_INDEX
         KAN_MUTE_THIRD_PARTY_WARNINGS_END
     }
-    
+
     {
         struct kan_resource_rpl_sint_option_t temporary;
-        
+
         KAN_MUTE_THIRD_PARTY_WARNINGS_BEGIN
 #define AT_INDEX(INDEX) (((struct kan_resource_rpl_sint_option_t *) options->sints.data)[INDEX])
 #define LESS(first_index, second_index) strcmp (AT_INDEX (first_index).name, AT_INDEX (second_index).name) < 0
@@ -335,10 +332,10 @@ static void sort_options (struct kan_resource_rpl_options_t *options)
 #undef AT_INDEX
         KAN_MUTE_THIRD_PARTY_WARNINGS_END
     }
-    
+
     {
         struct kan_resource_rpl_float_option_t temporary;
-        
+
         KAN_MUTE_THIRD_PARTY_WARNINGS_BEGIN
 #define AT_INDEX(INDEX) (((struct kan_resource_rpl_float_option_t *) options->floats.data)[INDEX])
 #define LESS(first_index, second_index) strcmp (AT_INDEX (first_index).name, AT_INDEX (second_index).name) < 0
@@ -351,10 +348,10 @@ static void sort_options (struct kan_resource_rpl_options_t *options)
 #undef AT_INDEX
         KAN_MUTE_THIRD_PARTY_WARNINGS_END
     }
-    
+
     {
         struct kan_resource_rpl_enum_option_t temporary;
-        
+
         KAN_MUTE_THIRD_PARTY_WARNINGS_BEGIN
 #define AT_INDEX(INDEX) (((struct kan_resource_rpl_enum_option_t *) options->enums.data)[INDEX])
 #define LESS(first_index, second_index) strcmp (AT_INDEX (first_index).name, AT_INDEX (second_index).name) < 0
@@ -727,34 +724,34 @@ static kan_bool_t apply_options_to_compiler_context (kan_rpl_compiler_context_t 
             return KAN_FALSE;
         }
     }
-    
+
     for (kan_loop_size_t index = 0u; index < (kan_loop_size_t) options->sints.size; ++index)
     {
         struct kan_resource_rpl_sint_option_t *option =
             &((struct kan_resource_rpl_sint_option_t *) options->sints.data)[index];
-        
+
         if (!kan_rpl_compiler_context_set_option_sint (compiler_context, target_scope, option->name, option->value))
         {
             return KAN_FALSE;
         }
     }
-    
+
     for (kan_loop_size_t index = 0u; index < (kan_loop_size_t) options->floats.size; ++index)
     {
         struct kan_resource_rpl_float_option_t *option =
             &((struct kan_resource_rpl_float_option_t *) options->floats.data)[index];
-        
+
         if (!kan_rpl_compiler_context_set_option_float (compiler_context, target_scope, option->name, option->value))
         {
             return KAN_FALSE;
         }
     }
-    
+
     for (kan_loop_size_t index = 0u; index < (kan_loop_size_t) options->enums.size; ++index)
     {
         struct kan_resource_rpl_enum_option_t *option =
             &((struct kan_resource_rpl_enum_option_t *) options->enums.data)[index];
-        
+
         if (!kan_rpl_compiler_context_set_option_enum (compiler_context, target_scope, option->name, option->value))
         {
             return KAN_FALSE;
