@@ -356,6 +356,16 @@ static inline struct kan_float_vector_4_t kan_float_vector_4_slerp (struct kan_f
     return result;
 }
 
+/// \brief Creates identity 3x3 matrix.
+static inline struct kan_float_matrix_3x3_t kan_float_matrix_3x3_get_identity (void)
+{
+    struct kan_float_matrix_3x3_t matrix;
+    KAN_MUTE_POINTER_CONVERSION_WARNINGS_BEGIN
+    glm_mat3_identity (&matrix);
+    KAN_MUTE_POINTER_CONVERSION_WARNINGS_END
+    return matrix;
+}
+
 /// \brief Multiplies two 3x3 matrices and stores result in output.
 static inline void kan_float_matrix_3x3_multiply (const struct kan_float_matrix_3x3_t *left,
                                                   const struct kan_float_matrix_3x3_t *right,
@@ -373,6 +383,16 @@ static inline void kan_float_matrix_3x3_inverse (const struct kan_float_matrix_3
     KAN_MUTE_POINTER_CONVERSION_WARNINGS_BEGIN
     glm_mat3_inv (matrix, result);
     KAN_MUTE_POINTER_CONVERSION_WARNINGS_END
+}
+
+/// \brief Creates identity 4x4 matrix.
+static inline struct kan_float_matrix_4x4_t kan_float_matrix_4x4_get_identity (void)
+{
+    struct kan_float_matrix_4x4_t matrix;
+    KAN_MUTE_POINTER_CONVERSION_WARNINGS_BEGIN
+    glm_mat4_identity (&matrix);
+    KAN_MUTE_POINTER_CONVERSION_WARNINGS_END
+    return matrix;
 }
 
 /// \brief Multiplies two 4x4 matrices and stores result in output.
