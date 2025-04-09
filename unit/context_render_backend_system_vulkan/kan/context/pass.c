@@ -93,14 +93,17 @@ struct render_backend_pass_t *render_backend_system_create_pass (struct render_b
         {
         case KAN_RENDER_LOAD_OPERATION_ANY:
             vulkan_attachment->loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+            vulkan_attachment->stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
             break;
 
         case KAN_RENDER_LOAD_OPERATION_LOAD:
             vulkan_attachment->loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+            vulkan_attachment->stencilLoadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
             break;
 
         case KAN_RENDER_LOAD_OPERATION_CLEAR:
             vulkan_attachment->loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+            vulkan_attachment->stencilLoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
             break;
         }
 
@@ -108,19 +111,26 @@ struct render_backend_pass_t *render_backend_system_create_pass (struct render_b
         {
         case KAN_RENDER_STORE_OPERATION_ANY:
             vulkan_attachment->storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+            vulkan_attachment->stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
             break;
 
         case KAN_RENDER_STORE_OPERATION_STORE:
             vulkan_attachment->storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+            vulkan_attachment->stencilStoreOp = VK_ATTACHMENT_STORE_OP_STORE;
             break;
 
         case KAN_RENDER_STORE_OPERATION_NONE:
             vulkan_attachment->storeOp = VK_ATTACHMENT_STORE_OP_NONE;
+            vulkan_attachment->stencilStoreOp = VK_ATTACHMENT_STORE_OP_NONE;
             break;
         }
 
-        vulkan_attachment->stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-        vulkan_attachment->stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        if (attachment->type != KAN_RENDER_PASS_ATTACHMENT_DEPTH_STENCIL)
+        {
+            // No stencil, reset to don't care.
+            vulkan_attachment->stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+            vulkan_attachment->stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        }
 
         // We'll do the transition ourselves in order to make sure that transition works as expected.
         // It might not be the best from performance point of view, might need investigation later.
