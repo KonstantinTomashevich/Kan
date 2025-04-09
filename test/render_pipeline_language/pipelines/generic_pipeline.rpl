@@ -1,20 +1,20 @@
 // Generic pipeline with lots of options and conditionals to be processed.
 
-global enable_skinning: flag on;
+global enable_skinning: flag true;
 global skinning_weights: enum "2" "4";
-global support_instancing: flag on;
+global support_instancing: flag true;
 
-instance wireframe: flag off;
+instance wireframe: flag false;
 
-conditional (!wireframe) setting polygon_mode "fill";
-conditional (wireframe) setting polygon_mode "wireframe";
-setting cull_mode "back";
-setting depth_test on;
-setting depth_write on;
-setting depth_min 0.0;
-setting depth_max 1.0;
+conditional (!wireframe) setting polygon_mode = "fill";
+conditional (wireframe) setting polygon_mode = "wireframe";
+setting cull_mode = "back";
+setting depth_test = true;
+setting depth_write = true;
+setting depth_min = 0.0;
+setting depth_max = 1.0;
 
-setting color_output_use_blend on block 0;
+setting color_output_use_blend block 0 = true;
 
 conditional (enable_skinning) struct joint_data_t
 {

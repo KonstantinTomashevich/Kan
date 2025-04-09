@@ -58,7 +58,7 @@ is usually done through macros.
 
 Currently, there are 5 types of option data:
 
-- `flag` options are used for on/off type of data, like whether some feature is enabled.
+- `flag` options are used for boolean type of data, like whether some feature is enabled.
 - `uint` options are used for unsigned positive numbers, like maximum size of joint matrices array.
 - `sint` options are used for signed numbers.
 - `float` options are used for floating point numbers.
@@ -77,12 +77,14 @@ pass set input. It can be ensured through setting `global` options for the whole
 `instance` options for customizing the pass pipelines.
 
 `flag`, `uint`, `sint` and `float` options are declared in global scope and follow the pattern
-`option_class <option_name>: option_type <option_value>;` with `on|off` for flag option values. For example:
+`option_class <option_name>: option_type <option_value>;` with `true|false` for flag option values.
+Keep in mind that `true` and `false` are reserved names and cannot be used for anything other that boolean literals.
+For example:
 
 ```
-global enable_skinning: flag on;
+global enable_skinning: flag true;
 global max_joints: uint 256;
-instance wireframe: flag off;
+instance wireframe: flag false;
 ```
 
 `enum` options have a little bit different pattern: 
@@ -123,22 +125,36 @@ conditional (enable_skinning && skinning_2_weights)
 Settings are used to provide information for pipeline configuration. Accepted settings and their types depend on
 pipeline type (for example, classic graphics or compute) which is only known to CPU during compilation.
 
-Settings are declared in global scope and follow the pattern:
-`conditional_prefix? <setting_name> flag_value|integer_value|floating_value|string_value
-(block unsigned_integer_value)?` with `conditonal_prefix` being allowed to use instance options, `flag_value` being
-`on|off`, `integer_value` being signed integer literal, `floating_value` being signed floating literal and string value
-be C-style `"`-guarded string literal, and optional block suffix for specifying blocks for settings that require block
-context (for example there can be several color outputs, therefore we must specify color output index as block index).
+Settings are declared in global scope and follow the pattern: 
+`conditional_prefix? setting_name (block unsigned_integer_value)? = setting_value_compile_time_expression;` with
+`conditonal_prefix` being allowed to use instance options, `string_name` is an identifier or sequence of identifiers
+with `.` between them, optional block suffix for specifying blocks for settings that require block context (for example 
+there can be several color outputs, therefore we must specify color output index as block index) and compile time
+expression (like expressions in conditionals) for calculating setting value. Setting values can be flags,
+unsigned integers, signed integers, floats and strings. Setting type is checked and validated during meta generation
+for the pipeline.
+
 Below are the examples of setting declarations in global scope:
 
 ```
-conditional (!wireframe) setting polygon_mode "fill";
-conditional (wireframe) setting polygon_mode "wireframe";
-setting cull_mode "back";
-setting depth_test on;
-setting depth_write on;
-setting color_output_use_blend on block 0;
-setting color_output_source_color_blend_factor "source_color" block 1;
+conditional (!wireframe) setting polygon_mode = "fill";
+conditional (wireframe) setting polygon_mode = "wireframe";
+setting cull_mode = "back";
+setting depth_test = on;
+setting depth_write = on;
+setting color_output_use_blend block 0 = on;
+setting color_output_source_color_blend_factor block 1 = "source_color";
+setting stencil_front_reference = 0b00010000;
+setting stencil_front_write_mask = 0b11000000 | 0b00000011;
+```
+
+We can even use options to calculate settings:
+
+```
+instance stencil_any_geometry_mask: uint 0b00000001;
+instance stencil_lit_mask: uint 0b00000010;
+setting stencil_front_reference = stencil_any_geometry_mask;
+setting stencil_front_write_mask = stencil_any_geometry_mask | stencil_lit_mask;
 ```
 
 ## Meta prefixes

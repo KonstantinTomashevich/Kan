@@ -121,6 +121,7 @@ enum kan_rpl_expression_type_t
 {
     KAN_RPL_EXPRESSION_NODE_TYPE_NOPE = 0u,
     KAN_RPL_EXPRESSION_NODE_TYPE_IDENTIFIER,
+    KAN_RPL_EXPRESSION_NODE_TYPE_BOOLEAN_LITERAL,
     KAN_RPL_EXPRESSION_NODE_TYPE_FLOATING_LITERAL,
     KAN_RPL_EXPRESSION_NODE_TYPE_UNSIGNED_LITERAL,
     KAN_RPL_EXPRESSION_NODE_TYPE_SIGNED_LITERAL,
@@ -241,6 +242,10 @@ struct kan_rpl_expression_t
         kan_interned_string_t identifier;
 
         KAN_REFLECTION_VISIBILITY_CONDITION_FIELD (type)
+        KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (KAN_RPL_EXPRESSION_NODE_TYPE_BOOLEAN_LITERAL)
+        kan_bool_t boolean_literal;
+
+        KAN_REFLECTION_VISIBILITY_CONDITION_FIELD (type)
         KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (KAN_RPL_EXPRESSION_NODE_TYPE_FLOATING_LITERAL)
         kan_rpl_floating_t floating_literal;
 
@@ -309,15 +314,6 @@ struct kan_rpl_expression_t
     kan_rpl_size_t source_line;
 };
 
-/// \brief Enumerates supported setting types.
-enum kan_rpl_setting_type_t
-{
-    KAN_RPL_SETTING_TYPE_FLAG = 0u,
-    KAN_RPL_SETTING_TYPE_INTEGER,
-    KAN_RPL_SETTING_TYPE_FLOATING,
-    KAN_RPL_SETTING_TYPE_STRING,
-};
-
 #define KAN_RPL_SETTING_BLOCK_NONE UINT32_MAX
 
 /// \brief Defines structure that holds one setting data.
@@ -326,29 +322,8 @@ struct kan_rpl_setting_t
     kan_interned_string_t name;
     kan_rpl_size_t block;
 
-    // TODO: It would actually be pretty cool to make it possible to calculate setting values from compile time
-    //  expressions using options. It would make stencil configuration much cleaner.
-
-    enum kan_rpl_setting_type_t type;
-
-    union
-    {
-        KAN_REFLECTION_VISIBILITY_CONDITION_FIELD (type)
-        KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (KAN_RPL_SETTING_TYPE_FLAG)
-        kan_bool_t flag;
-
-        KAN_REFLECTION_VISIBILITY_CONDITION_FIELD (type)
-        KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (KAN_RPL_SETTING_TYPE_INTEGER)
-        kan_rpl_signed_int_literal_t integer;
-
-        KAN_REFLECTION_VISIBILITY_CONDITION_FIELD (type)
-        KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (KAN_RPL_SETTING_TYPE_FLOATING)
-        kan_rpl_floating_t floating;
-
-        KAN_REFLECTION_VISIBILITY_CONDITION_FIELD (type)
-        KAN_REFLECTION_VISIBILITY_CONDITION_VALUE (KAN_RPL_SETTING_TYPE_STRING)
-        kan_interned_string_t string;
-    };
+    /// \details Compile time expression that calculates setting value.
+    kan_rpl_size_t expression_index;
 
     /// \details Conditional expression if it is not KAN_RPL_EXPRESSION_NODE_TYPE_NOPE.
     kan_rpl_size_t conditional_index;

@@ -8,29 +8,6 @@ enum conditional_evaluation_result_t
     CONDITIONAL_EVALUATION_RESULT_FALSE,
 };
 
-enum compile_time_evaluation_value_type_t
-{
-    CONDITIONAL_EVALUATION_VALUE_TYPE_ERROR = 0u,
-    CONDITIONAL_EVALUATION_VALUE_TYPE_BOOLEAN,
-    CONDITIONAL_EVALUATION_VALUE_TYPE_UINT,
-    CONDITIONAL_EVALUATION_VALUE_TYPE_SINT,
-    CONDITIONAL_EVALUATION_VALUE_TYPE_FLOAT,
-    CONDITIONAL_EVALUATION_VALUE_TYPE_STRING,
-};
-
-struct compile_time_evaluation_value_t
-{
-    enum compile_time_evaluation_value_type_t type;
-    union
-    {
-        kan_bool_t boolean_value;
-        kan_rpl_unsigned_int_literal_t uint_value;
-        kan_rpl_signed_int_literal_t sint_value;
-        float float_value;
-        kan_interned_string_t string_value;
-    };
-};
-
 struct resolve_expression_alias_node_t
 {
     struct resolve_expression_alias_node_t *next;
@@ -151,6 +128,11 @@ static struct compile_time_evaluation_value_t evaluate_compile_time_expression (
 
         break;
     }
+
+    case KAN_RPL_EXPRESSION_NODE_TYPE_BOOLEAN_LITERAL:
+        result.type = CONDITIONAL_EVALUATION_VALUE_TYPE_BOOLEAN;
+        result.boolean_value = expression->boolean_literal;
+        break;
 
     case KAN_RPL_EXPRESSION_NODE_TYPE_FLOATING_LITERAL:
         result.type = CONDITIONAL_EVALUATION_VALUE_TYPE_FLOAT;
@@ -839,29 +821,25 @@ static kan_bool_t resolve_settings (struct rpl_compiler_context_t *context,
             target_setting->next = NULL;
             target_setting->name = source_setting->name;
             target_setting->block = source_setting->block;
-            target_setting->type = source_setting->type;
+
+            struct kan_rpl_expression_t *expression =
+                &((struct kan_rpl_expression_t *)
+                      intermediate->expression_storage.data)[source_setting->expression_index];
+
+            target_setting->value =
+                evaluate_compile_time_expression (context, intermediate, expression, instance_options_allowed);
+
+            if (target_setting->value.type == CONDITIONAL_EVALUATION_VALUE_TYPE_ERROR)
+            {
+                KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR, "[%s:%s:%s:%ld] Failed to resolve setting expression.",
+                         context->log_name, intermediate->log_name, expression->source_name,
+                         (long) expression->source_line)
+                return KAN_FALSE;
+            }
+
             target_setting->module_name = intermediate->log_name;
             target_setting->source_name = source_setting->source_name;
             target_setting->source_line = source_setting->source_line;
-
-            switch (source_setting->type)
-            {
-            case KAN_RPL_SETTING_TYPE_FLAG:
-                target_setting->flag = source_setting->flag;
-                break;
-
-            case KAN_RPL_SETTING_TYPE_INTEGER:
-                target_setting->integer = source_setting->integer;
-                break;
-
-            case KAN_RPL_SETTING_TYPE_FLOATING:
-                target_setting->floating = source_setting->floating;
-                break;
-
-            case KAN_RPL_SETTING_TYPE_STRING:
-                target_setting->string = source_setting->string;
-                break;
-            }
 
             if (*last_output)
             {
@@ -4549,6 +4527,14 @@ static kan_bool_t resolve_expression (struct rpl_compiler_context_t *context,
                  (long) expression->source_line, expression->identifier)
         return KAN_FALSE;
     }
+
+    case KAN_RPL_EXPRESSION_NODE_TYPE_BOOLEAN_LITERAL:
+        KAN_LOG (rpl_compiler_context, KAN_LOG_ERROR,
+                 "[%s:%s:%s:%ld] Encountered boolean literal in runtime context. Boolean literals are only supported "
+                 "in compile time expressions.",
+                 context->log_name, resolve_scope->function->module_name, expression->source_name,
+                 (long) expression->source_line)
+        return KAN_FALSE;
 
     case KAN_RPL_EXPRESSION_NODE_TYPE_FLOATING_LITERAL:
         new_expression->type = COMPILER_INSTANCE_EXPRESSION_TYPE_FLOATING_LITERAL;

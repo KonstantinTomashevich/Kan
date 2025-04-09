@@ -62,23 +62,35 @@ struct rpl_compiler_context_t
     struct kan_stack_group_allocator_t resolve_allocator;
 };
 
+enum compile_time_evaluation_value_type_t
+{
+    CONDITIONAL_EVALUATION_VALUE_TYPE_ERROR = 0u,
+    CONDITIONAL_EVALUATION_VALUE_TYPE_BOOLEAN,
+    CONDITIONAL_EVALUATION_VALUE_TYPE_UINT,
+    CONDITIONAL_EVALUATION_VALUE_TYPE_SINT,
+    CONDITIONAL_EVALUATION_VALUE_TYPE_FLOAT,
+    CONDITIONAL_EVALUATION_VALUE_TYPE_STRING,
+};
+
+struct compile_time_evaluation_value_t
+{
+    enum compile_time_evaluation_value_type_t type;
+    union
+    {
+        kan_bool_t boolean_value;
+        kan_rpl_unsigned_int_literal_t uint_value;
+        kan_rpl_signed_int_literal_t sint_value;
+        float float_value;
+        kan_interned_string_t string_value;
+    };
+};
+
 struct compiler_instance_setting_node_t
 {
     struct compiler_instance_setting_node_t *next;
     kan_interned_string_t name;
     kan_rpl_size_t block;
-    enum kan_rpl_setting_type_t type;
-
-    union
-    {
-        kan_bool_t flag;
-        kan_rpl_signed_int_literal_t integer;
-        float floating;
-        kan_interned_string_t string;
-    };
-
-    /// \details Conditional expression if it is not KAN_RPL_EXPRESSION_NODE_TYPE_NOPE.
-    struct kan_rpl_expression_t conditional;
+    struct compile_time_evaluation_value_t value;
 
     kan_interned_string_t module_name;
     kan_interned_string_t source_name;
