@@ -297,7 +297,7 @@ static inline struct kan_float_vector_4_t kan_make_quaternion_from_euler (float 
     struct kan_float_vector_4_t result;
     KAN_MUTE_POINTER_CONVERSION_WARNINGS_BEGIN
     vec3 angles = {x, y, z};
-    glm_euler_xyz_quat (&angles, &result);
+    glm_euler_yxz_quat (&angles, &result);
     KAN_MUTE_POINTER_CONVERSION_WARNINGS_END
     return result;
 }
