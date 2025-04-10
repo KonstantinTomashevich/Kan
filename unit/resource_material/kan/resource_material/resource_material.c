@@ -497,9 +497,9 @@ static kan_bool_t material_register_pass_variant (struct material_pass_registrat
             }
         }
 
-        // We need to sort source list again in order to make it possible for
-        // pipelines to predictably replace each other.
-        sort_source_list (&pipeline_byproduct->sources);
+        // We must not sort sources list after pass sources addition, because it might change order of source inclusion
+        // for pass sources and therefore will change the binding generation logic logic, making bindings in shader
+        // and in pass meta different.
 
         if (!append_options (&pipeline_byproduct->instance_options, &pass_variant->instance_options))
         {
@@ -961,7 +961,6 @@ static enum kan_resource_compile_result_t kan_resource_material_pipeline_compile
         if (dependency->type == interned_kan_resource_rpl_source_compiled_t)
         {
             const struct kan_resource_rpl_source_compiled_t *source = dependency->data;
-
             if (!kan_rpl_compiler_context_use_module (compiler_context, &source->intermediate))
             {
                 kan_rpl_compiler_context_destroy (compiler_context);
